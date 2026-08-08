@@ -26,12 +26,19 @@
  *  4. **Identity is trim.** A roster colour appears only on `identity` shapes,
  *     and `identity` never paints itself in a material colour — a hull that took
  *     player colour, or trim that quietly went steel, both break §3.
+ *  5. **The sky is a whisper, and never yellow** (a0-07, style-guide §2.2). The
+ *     backdrop wash (role `sky`) is the one surface in the game that covers
+ *     every pixel of every frame, so what it may carry is bounded by *number*,
+ *     not by prose — see {@link SKY_ALPHA_MAX} / {@link SKY_RESERVED_ALPHA_MAX}
+ *     below. And the ground colour is backdrop-only: {@link FLOOR} on anything
+ *     but `sky` is an entity that painted itself the floor.
  */
 
 import {
   ALLOWED_COLORS,
   DERIVED,
   DERIVED_RECIPES,
+  FLOOR,
   IDENTITY_COLORS,
   PALETTE,
   hex,
@@ -46,7 +53,14 @@ export interface Violation {
   readonly shapeIndex: number;
   readonly role: PaintRole;
   readonly color: number;
-  readonly rule: 'allow-list' | 'reserved-yellow' | 'reserved-red' | 'identity-trim' | 'alpha';
+  readonly rule:
+    | 'allow-list'
+    | 'reserved-yellow'
+    | 'reserved-red'
+    | 'identity-trim'
+    | 'alpha'
+    | 'sky-whisper'
+    | 'ground-only';
   readonly detail: string;
 }
 
@@ -64,8 +78,38 @@ export const YELLOW_FAMILY: ReadonlySet<number> = family('signalYellow');
 /** Threat red and every declared shade of it. */
 export const RED_FAMILY: ReadonlySet<number> = family('threatRed');
 
-/** The only roles signal yellow may wear (style-guide §2). */
+/** The only roles signal yellow may wear (style-guide §2). Note what is NOT here:
+ *  `sky`. The backdrop covers every pixel of every frame, so signal yellow is
+ *  barred from it at *any* alpha — the strictest reading of §2 there is. */
 const YELLOW_ROLES: readonly PaintRole[] = ['ore', 'core', 'danger'];
+
+/**
+ * The ceiling on any {@link FLOOR}-less ink painted on role `sky` (a0-07).
+ *
+ * The backdrop is the one surface behind every entity in the game at all times,
+ * which is exactly why "keep it subtle" cannot be left to taste: a wash that
+ * drifts up by 4% of alpha is a wash competing with the fleet on every frame.
+ * 12% is the ceiling; the brightest sky actually shipped (Plasma Reef) peaks at
+ * 8%, and the rest sit under 6%.
+ */
+export const SKY_ALPHA_MAX = 0.12;
+
+/**
+ * The much lower ceiling for a RESERVED hue on the sky — the whole of the §2.2
+ * carve-out, as a number (a0-07).
+ *
+ * Threat red is barred everywhere but `danger`, for the reason §2 gives: a
+ * player scanning a chaotic screen must be able to trust it. The two warm skies
+ * the developer picked (Iron Veil, Deep Ember) are *rust and dying coals* — a
+ * hue the palette owns and a value nothing else in the game occupies. They are
+ * legal only because the composite is provably not a signal: at 6% over Floor,
+ * `shade(threatRed)` lands at luma ≈ 5/255, an eighth of the ink outline every
+ * sprite in the game is drawn with, and a thirtieth of the damage fill it shares
+ * a hue with. Enforced here, so "provably" is a test rather than a claim.
+ *
+ * Signal yellow gets no such carve-out at any alpha. See `YELLOW_ROLES`.
+ */
+export const SKY_RESERVED_ALPHA_MAX = 0.06;
 
 /** Audit one sprite. An empty array is a compliant sprite. */
 export function auditSprite(def: SpriteDef): Violation[] {
@@ -91,10 +135,31 @@ export function auditSprite(def: SpriteDef): Violation[] {
         });
       }
       if (RED_FAMILY.has(color) && shape.role !== 'danger') {
+        // The one carve-out (§2.2): a warm SKY, at a whisper the audit measures.
+        const skyWhisper = shape.role === 'sky' && ink.alpha <= SKY_RESERVED_ALPHA_MAX;
+        if (!skyWhisper) {
+          found.push({
+            ...at,
+            rule: 'reserved-red',
+            detail:
+              shape.role === 'sky'
+                ? `threat red on the sky at alpha ${ink.alpha} — the §2.2 carve-out stops at ${SKY_RESERVED_ALPHA_MAX}, above which a rust band is a red screen.`
+                : `threat red on role '${shape.role}' — red is damage, alarm and enemy fire only (style-guide §2).`,
+          });
+        }
+      }
+      if (shape.role === 'sky' && color !== FLOOR && ink.alpha > SKY_ALPHA_MAX) {
         found.push({
           ...at,
-          rule: 'reserved-red',
-          detail: `threat red on role '${shape.role}' — red is damage, alarm and enemy fire only (style-guide §2).`,
+          rule: 'sky-whisper',
+          detail: `sky ink at alpha ${ink.alpha} — the backdrop is behind every entity on every frame, so it stops at ${SKY_ALPHA_MAX} (style-guide §2.2).`,
+        });
+      }
+      if (color === FLOOR && shape.role !== 'sky') {
+        found.push({
+          ...at,
+          rule: 'ground-only',
+          detail: `Floor ${hex(FLOOR)} on role '${shape.role}' — the ground is the backdrop's alone; an entity painted in it is a hole in the world (style-guide §1).`,
         });
       }
       if (IDENTITY_COLORS.has(color) && shape.role !== 'identity') {

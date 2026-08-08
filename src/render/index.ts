@@ -97,6 +97,15 @@ export interface RenderView {
   readonly cameraTarget: PlayerId;
   /** Active muzzle-flash segments this frame (one per turret that fired). */
   readonly muzzles: readonly MuzzleView[];
+  /**
+   * The map this world was built from (`sim/maps.ts` id) — which is what picks
+   * the backdrop's sky (a0-07, `../art/backdrop` `MAP_NEBULA`: a map's sky is
+   * part of its identity, like its layout). Optional and last-wins: `World`
+   * itself does not carry its map id, so the caller that chose the map passes it
+   * here, and an omitted one falls back to the default map's sky rather than to
+   * a blank one — a harness or a test fixture keeps working unchanged.
+   */
+  readonly mapId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -261,11 +270,13 @@ function withinSensorRange(viewer: { pos: Vec2 }, station: MiningStation): boole
 // ---------------------------------------------------------------------------
 
 export class Renderer {
-  /** The void (a2-06): a layered parallax star-field + nebula washes, drawn in
-   *  *screen* space behind the world so it scrolls at a fraction of the camera —
-   *  depth the fleet flies against. The look and the geometry live in the art
-   *  layer (`../art/backdrop`); the renderer only places it behind the world and
-   *  feeds it the camera offset it already computes. */
+  /** The void (a2-06, re-grounded a0-07): the Floor ground plane, a layered
+   *  parallax star-field with seeded-scatter bloom, and the map's own sky, drawn
+   *  in *screen* space behind the world so it scrolls at a fraction of the
+   *  camera — depth the fleet flies against. The look and the geometry live in
+   *  the art layer (`../art/backdrop`); the renderer only places it behind the
+   *  world and feeds it three things it already has: the camera offset, the VFX
+   *  tier, and which map is being played. */
   private readonly backdrop = new VoidBackdrop();
   /** World-space root; the camera moves this so the target ship stays centered. */
   private readonly worldRoot = new Container();
@@ -424,6 +435,7 @@ export class Renderer {
     // The void, behind the world: sized once to cover the arena+viewport (a
     // cheap no-op when neither changed), then scrolled by the camera offset
     // centerCamera just wrote — parallax, allocation-free (GDD §4.3).
+    this.backdrop.setMap(view.mapId);
     this.backdrop.configure(world.bounds.width, world.bounds.height, this.viewport.width, this.viewport.height);
     this.backdrop.update(this.offsetScratch.x, this.offsetScratch.y, this.viewport.width, this.viewport.height);
     this.drawBoundary(world.bounds);
