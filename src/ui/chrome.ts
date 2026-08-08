@@ -42,7 +42,7 @@ export const PANEL_FILL = 0x10141c;
  *  (art void shade "HUD hairline / divider rule"). */
 export const PANEL_RULE = 0x252d3a;
 
-/** Secondary label text: the words a player reads but does not act on — TOTAL,
+/** Secondary label text: the words a player reads but does not act on — ORE,
  *  HOME, MATCH, a wedge's target line, a strip action (art void shade "Secondary
  *  (muted) HUD label text"). Distinct from the disabled grey in
  *  {@link ./button-theme} (`hullSteel`), which is a *state*, not a role. */

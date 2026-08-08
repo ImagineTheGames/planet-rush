@@ -545,7 +545,12 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
   it('keeps every sound inside the headroom the mix assumes', () => {
     for (const name of SOUND_NAMES) {
       const samples = renderSound(soundSpec(name));
-      expect(peak(samples), `${name} peak`).toBeLessThanOrEqual(1);
+      // 1.0 is the CLAMP, not the ceiling — `renderVoice` limits every sample to
+      // [-1, 1], so a sound that reaches exactly 1.0 is not "at full level", it
+      // is being flattened. Round 2 of the re-voice put coreHit, stationDeath
+      // and shipExplode on that clamp by adding resonance without re-balancing,
+      // and `<= 1` could not see it. 0.95 leaves the distortion visible.
+      expect(peak(samples), `${name} is clipping, not peaking`).toBeLessThanOrEqual(0.95);
       expect(peak(samples), `${name} is silent`).toBeGreaterThan(0.01);
       expect(rms(samples), `${name} rms`).toBeLessThan(0.5);
     }
@@ -666,6 +671,135 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
       }
       expect(glide, `${where} chirps ×${glide.toFixed(2)}`).toBeLessThanOrEqual(MAX_GLIDE);
     }
+  });
+
+  it('holds the round-2 register: the bank is not one bare oscillator in three hats (s8-01)', () => {
+    // **Why this test exists, and why the one above it was not enough.**
+    //
+    // The test above forbids `square`, `saw` and the jsfxr idioms. It was GREEN
+    // on the bank the developer listened to and rejected for the second time:
+    //
+    //   > "still have all the old sounds i said i didnt want there, we need to
+    //   >  deny all of those sounds at once and make new ones that match the new
+    //   >  theme (modern/sci-fi and not retro/toony)"   — 2026-08-07, all 40 slots
+    //
+    // A contract that can only fail on an oscillator NAME cannot fail on the
+    // sound being complained about, which is exactly what happened. Round 1
+    // satisfied every clause of §5 by replacing `square` with `struck()` — two or
+    // three BARE SINE PARTIALS, 2 ms attack, a hold at full level and a linear
+    // ramp to silence — and shipped a glockenspiel in sixteen places. Retiring an
+    // arcade blip for a toy xylophone is a lateral move, and it measured as a
+    // success on every number the old contract knew how to look at.
+    //
+    // So this pins the thing that was actually wrong. It is stated as budgets
+    // rather than bans because the defect was never one voice: it was the SHAPE
+    // OF THE WHOLE BANK, and a per-voice rule cannot see a monoculture.
+    const voices: { sound: SoundName; spec: VoiceSpec }[] = [];
+    for (const name of SOUND_NAMES) {
+      const spec = soundSpec(name);
+      for (const v of isLayered(spec) ? spec.layers.map((l) => l.spec) : [spec as VoiceSpec]) {
+        voices.push({ sound: name, spec: v });
+      }
+    }
+    const share = (n: number) => n / voices.length;
+
+    // --- Clause 1: the bare-tone budget. THE ONE WITH TEETH. ----------------
+    //
+    // A voice is **bare** when it is a tonal wave carrying no grain, no filter of
+    // either kind and no decay curve — a tone generator, sounding rather than
+    // being struck. On the bank the developer rejected twice this was **83 of
+    // 116 voices, 71.6%**, and that single number is the whole bug report: it was
+    // not that the oscillators were retro, it was that nothing was ever DONE to
+    // them. `noise` is excluded by construction — filtered noise is the register,
+    // not a shortcut out of it (s7-01 §5.2).
+    //
+    // The exemptions are the six places a pure tone genuinely IS the design: the
+    // sustained drones that run for minutes under everything else. A drone is the
+    // opposite of a struck note and grain on one is an artefact, not a texture.
+    const SUSTAINED_DRONES: Readonly<Record<string, string>> = {
+      'ambient.bed': 'Cold Vacuum, fifteen minutes long — a player must never notice it twice',
+      'ambient.detune': 'detuned a hair from the bed; the two beating IS the ambience',
+      'musicBed.third': 'the minor third that makes the soundtrack an ache and not a pad',
+      'musicBed.fifth': 'the drone the theme sits on; anything in it would be heard as a fault',
+      'musicDread.clash': 'a semitone beating against the low — the unease, and it costs one voice',
+      'musicDread.sub': 'a sub under the collapse: felt rather than heard, so nothing to colour',
+    };
+    const bare = voices.filter(
+      ({ spec }) =>
+        spec.wave !== 'noise' &&
+        (spec.noiseMix ?? 0) === 0 &&
+        spec.lowPass === undefined &&
+        spec.highPass === undefined &&
+        (spec.decayCurve ?? 0) === 0,
+    );
+    for (const { sound, spec } of bare) {
+      const reason = SUSTAINED_DRONES[spec.name];
+      expect(
+        reason,
+        `${sound}/${spec.name} is a bare tone generator with no reason on file — ` +
+          `give it grain, a filter or a decay tail, or name it a sustained drone here`,
+      ).toBeDefined();
+      expect(reason!.length, `${spec.name} claims an exemption with no reason`).toBeGreaterThan(20);
+    }
+    // A budget as well as a list, so the list cannot quietly become the bank.
+    expect(share(bare.length), `${bare.length} of ${voices.length} voices are bare tone generators`).toBeLessThan(0.08);
+
+    // --- Clause 2: no oscillator monoculture. A BACKSTOP, not the point. -----
+    //
+    // Round 1 landed `sine` at 48.3% of the bank. A single waveform carrying half
+    // of everything a player hears is a monoculture whatever that waveform is, and
+    // the pass that produced it believed it was diversifying.
+    //
+    // The ceiling is 45% rather than something rounder on purpose: **bare-ness is
+    // the defect, not sine-ness.** Round 2 sits at 41.5% sine and that is fine,
+    // because those are the ratified Gantry/Bone partials (`./ui-cues`, chosen by
+    // ear by the developer in s6-01) and every one of them now carries grain and
+    // a real tail. Contorting the sound design to hit a prettier percentage would
+    // be optimising the metric instead of the sound — the exact mistake s7-01 §4.1
+    // warned about when it proved the brightness numbers were blind to the
+    // character. This clause only has to catch a collapse; clause 1 does the work.
+    const byWave = new Map<string, number>();
+    for (const { spec } of voices) byWave.set(spec.wave, (byWave.get(spec.wave) ?? 0) + 1);
+    for (const [wave, n] of byWave) {
+      expect(share(n), `${wave} is ${(100 * share(n)).toFixed(1)}% of the bank — a monoculture`).toBeLessThan(0.45);
+    }
+
+    // --- Clause 3: a decay is a tail, not a fade-out. ------------------------
+    //
+    // Until round 2 the synth had exactly one envelope, `1 - d`. Nothing physical
+    // decays in a straight line — a linear ramp to silence is a volume knob being
+    // turned down, and it is audible as "synthesized" under any oscillator. It was
+    // on every percussive voice in the bank across BOTH re-voices.
+    //
+    // The klaxon is the one exception and it is the same precedence rule as its
+    // saw: it loops, its envelope is the rhythm of the alarm rather than the shape
+    // of a body, and bending it would change a mechanic (§2.2) to buy a register.
+    const LINEAR_BY_DESIGN: Readonly<Record<string, string>> = {
+      'alarm.low': 'the klaxon loops — its envelope is the alarm rhythm, not a body decaying (§2.2)',
+      'alarm.high': 'the klaxon loops — its envelope is the alarm rhythm, not a body decaying (§2.2)',
+    };
+    for (const { sound, spec } of voices) {
+      if (spec.decay <= 0) continue; // sustained loop bodies have no decay at all
+      if ((spec.decayCurve ?? 0) > 0) continue;
+      const reason = LINEAR_BY_DESIGN[spec.name];
+      expect(reason, `${sound}/${spec.name} fades in a straight line`).toBeDefined();
+      expect(reason!.length, `${spec.name} claims an exemption with no reason`).toBeGreaterThan(20);
+    }
+
+    // --- Clause 4: the new register is actually present. --------------------
+    //
+    // The anti-gaming clause, and the reason the three above are not sufficient.
+    // Every one of them can be satisfied by sprinkling `noiseMix: 0.01` across the
+    // bank and calling it a re-voice — which is precisely the shape of the failure
+    // this brief exists to stop repeating. Modern science fiction is carried by
+    // **filter movement and material**, so the bank has to contain a working
+    // amount of both, counted rather than asserted about.
+    const swept = voices.filter(({ spec }) => spec.lowPassEnd !== undefined && spec.lowPassEnd !== spec.lowPass);
+    const resonant = voices.filter(({ spec }) => (spec.resonance ?? 0) > 0);
+    const metallic = voices.filter(({ spec }) => spec.bandPass === true);
+    expect(swept.length, 'no filter sweeps in the bank — the register is not there').toBeGreaterThanOrEqual(20);
+    expect(resonant.length, 'nothing in the bank resonates — every filter is flat').toBeGreaterThanOrEqual(40);
+    expect(metallic.length, 'no metallic band-pass transients anywhere').toBeGreaterThanOrEqual(8);
   });
 
   it('keeps the shipped mining voice under the tone the developer ratified (s4-01, s7-01)', () => {

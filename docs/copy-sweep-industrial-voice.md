@@ -236,7 +236,7 @@ is the corporate-joke register §4.7 explicitly forbids ("never winking").
 |---|---|---|---|
 | `hud.ts:614` | `stationLabel = 'HOME'` | *(unchanged)* | `[FIXED]` — **§4, the sanctioned exception** |
 | `hud.ts:904` | `'HOME LOST'` | *(unchanged)* | `[FIXED]` — same |
-| `hud.ts:576` | `totalLabel = 'TOTAL'` | `'BANKED'` | `[OPT]` |
+| `hud.ts:576` | `totalLabel = 'TOTAL'` | ~~`'BANKED'`~~ → **`'ORE'`** | `[OPT]`, **SUPERSEDED 2026-08-07** |
 | `hud.ts:776` | `'COLLAPSE'` | *(unchanged)* | `[OPT]` → `'THE CRUSH'`, see Q5 |
 | `hud.ts:780` | `'FINAL WAVE'` | *(unchanged)* | `[HOLD]` |
 | `hud.ts:771/781/784` | `WAVE 3/5 · Mid Field`, `NEXT 1:23`, `MATCH 8:42` | *(unchanged)* | `[FIXED]` — clocks and numbers, §4.7 |
@@ -252,6 +252,15 @@ is the corporate-joke register §4.7 explicitly forbids ("never winking").
 "banked total") and slightly more in register, but the string is asserted in
 `affordability.test.ts` and three live-stage specs, and the win is small. l2-02's
 call; if in doubt, leave it.
+
+> **SUPERSEDED 2026-08-07 (a0-03).** l2-02 took the `[OPT]` and shipped `BANKED`.
+> The developer then ruled on this readout directly — *"should not say total, it
+> should say ORE"* — so the label is now **`ORE`**, and the row above is history
+> rather than a live proposal. The developer's word outranks a voice-sweep
+> preference; the reasoning that `TOTAL` invites "hold + bank" is still true and
+> is *why* the rename has an open question attached to it (the wheel hub prints
+> hold + bank under the same word). See `docs/design-amendments.md`, "A build
+> wedge's cost is ONE number — and the top-left readout says `ORE`".
 
 **`RESPAWNING 3...` stays.** Considered and rejected: `HULL IN 3`, `NEW HULL 3`,
 `DISPATCH IN 3`. Respawning is a word every player knows, the string appears at the

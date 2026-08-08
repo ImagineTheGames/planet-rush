@@ -208,10 +208,11 @@ test('golden: landscape phone frozen TEAMS scene — FRIENDLY A / ENEMY B', asyn
 // makes this frame carry the cap counts at all.
 //
 // What each baseline is FOR, so a reviewer knows what a diff means:
-//   · the four-line wedge stack — name / target / `cost/held` / count over cap;
+//   · the four-line wedge stack — name / target / the cost / count over cap;
 //   · `FULL` and `4 / 4 BUILT` on a capped wedge (turret, shield);
 //   · the cost numeral in BOTH of its ratified colours — signal yellow at ore 8
-//     where RADAR's 6 is payable, threat red at ore 4 where it is not;
+//     where RADAR's 6 is payable, threat red at ore 4 where it is not, and the
+//     SAME numeral in both, because the colour is now the whole message (a0-03);
 //   · `OPEN ▸` where UPGRADE SHIP would otherwise carry a price;
 //   · and the whole look at a phone's radius, where the copy goes compact.
 
@@ -253,7 +254,11 @@ async function bootFrozenBuildWheel(page: Page, ore: number): Promise<void> {
   const radar = wedges.find((w) => w.id === 'satellite');
   expect(turret?.caps, 'the capped TURRET wedge is counting (u7-02)').toMatch(/^4\s*\/\s*4 BUILT$/);
   expect(turret?.costLabel, 'a capped wedge quotes no price').toBe('FULL');
-  expect(radar?.costLabel, 'the RADAR wedge shows cost over spendable ore').toBe(`6/${ore}`);
+  // a0-03: the cost is ONE number at every ore level, and the COLOUR is what
+  // says whether it can be paid. Both baselines below open the same wedge at the
+  // same price — if the two frames differ anywhere but the hue, that is the
+  // regression these two shots exist to catch.
+  expect(radar?.costLabel, 'the RADAR wedge shows its cost, and only its cost').toBe('6');
   expect(radar?.costPaint, 'the cost numeral takes the colour its state ratifies').toBe(
     ore >= 6 ? 'ore' : 'refused',
   );

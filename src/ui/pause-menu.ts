@@ -381,7 +381,7 @@ export const PAUSE_ANCHOR: AnchorSpec = { region: 'full' };
  * affordance is the way in.
  *
  * Placement is the top band, hard against the top edge but inset from the left by
- * enough to clear the top-left ore TOTAL — the corner itself is spoken for, and
+ * enough to clear the top-left ORE readout — the corner itself is spoken for, and
  * the empty stretch of the top band between the ore total and the centred wave
  * clock is the "clear of everything" the developer asked for. Its exact bounds
  * are published to the registry so QA's placement suite arbitrates the clearance
@@ -408,9 +408,12 @@ export const PAUSE_BUTTON_ANCHOR: AnchorSpec = { region: 'full', margin: 0 };
 export const PAUSE_BUTTON_SIZE = TOUCH_MIN;
 /** Inset from the top edge, matching the HUD's own `HUD_PAD`. */
 export const PAUSE_BUTTON_MARGIN = 16;
-/** Inset from the left edge — past the top-left ore TOTAL block (its label + a
+/** Inset from the left edge — past the top-left ORE block (its label + a
  *  two-to-three digit banked number), so the button sits in the clear top band
- *  rather than over the one readout that shares this corner. */
+ *  rather than over the one readout that shares this corner. This inset is sized
+ *  by the NUMBER, not by the caption, which is why the caption's history —
+ *  `TOTAL` → `BANKED` (l2-02) → `ORE` (a0-03) — has never moved it. `BANKED` was
+ *  the widest of the three and still cleared; `ORE` is the narrowest. */
 export const PAUSE_BUTTON_LEFT = 72;
 
 /** The inputs that decide whether the corner pause button is on screen. */
