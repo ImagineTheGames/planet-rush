@@ -168,3 +168,45 @@ never reach the lobby at all. Verify by re-running, not by reading the names.
 against **that lane's bundle** and reported a seam field as `undefined` for half
 an hour. If a live-stage readback looks impossible, check
 `pgrep -fa "vite preview"` before you debug the app.
+
+### Session 2026-08-08 (second) — re-merged main again, and the trap became a flag
+
+**Read this before touching the branch.** This session began by branching fresh
+off `main` and re-implementing the whole brief from scratch, because it did not
+check `origin/agent/bots/a0-06-pick-the-character` first — the remote branch, the
+note above, and PR **#319** were all already there. That duplicate work was
+**discarded, not merged**: two rival implementations of one feature (`character`
+vs `personality`, `castDisplayNames` vs `castNames`, `cast-seam.test.ts` vs
+`cast-wiring.test.ts`) is a merge nobody should have to review. It survives only
+as the local, unpushed branch `a0-06-local-duplicate-do-not-push`.
+
+Worth recording because the duplicate independently reproduced two findings, which
+is as close to confirmation as this repo gets:
+
+- the **`pointerleave`-after-touch-`pointerup`** defect, found the same way (PC
+  green, phone silently dead) and fixed the same way;
+- the **port-4173 lane collision**, lost the same half hour to, before reading the
+  trap note that was already on the branch.
+
+So the trap is now a **mechanism** rather than a warning: `PREVIEW_PORT` overrides
+the live-stage port (`a1bc039`), default unchanged. Marked as a separate,
+proposed commit — `tests/live-stage/` is Platform's.
+
+**What this session actually changed:** `main` had moved to `b32d0a7` (a0-07
+darker backdrop, PR #320), so `merge-base --is-ancestor` was red again. Merged
+(`1325a8f`) — **clean, no conflicts**; a0-07 is `src/art/backdrop*` and evidence,
+which this brief does not touch.
+
+#### DoD on the merged tree
+
+- `npx tsc --noEmit` — clean.
+- `npm test -- --run` — **3962 passed, 2 failed of 3964.** Both failures are the
+  same wall-clock benchmark, `tests/net/capacity/capacity-regression.test.ts`
+  ("the loop stays inside the tick budget at 12 rooms"). It is **not this
+  branch**: it failed identically on a clean `main` tree at the start of this
+  session (`expected 98.83 to be less than 33`), and the box was at **load
+  average 31 on 8 cores** with four other lanes' headless Chromium running. Same
+  conclusion the previous session reached; do not chase it.
+- `PREVIEW_PORT=4191 npm run test:live-stage -- lobby-cast.spec.ts` — **3 passed**
+  on the merged tree (cast round trip, `?` by click, `?` by tap at 390px).
+- GDD.md differs from `origin/main`; `merge-base --is-ancestor` OK.
