@@ -120,7 +120,7 @@ import { pingFits } from '../net/ping';
 // and this file's own local copy drifting from it is what a1-01 found on the CI
 // runner. Nothing below re-declares one.
 
-/** `CREW MUSTER` in the header beam, and `ROOM` above the code. */
+/** `CREW MUSTER` in the header beam, and `CLAIM` above the code. */
 const HEADING_PX = 22;
 const EYEBROW_PX = 12;
 /** The room code itself — the number a classroom reads off one screen. */
@@ -480,11 +480,15 @@ export class LobbyView extends Container {
     // The host sees the shape of the match they are about to start — the head
     // count in FFA, and the always-visible per-side tally in TEAMS (ratified:
     // counts shown, never blocking a split).
+    // "Claim holder", not "host": the guest came through JOIN A CLAIM, so the
+    // claim is the noun already on screen, and "host" is the network's word for
+    // it (GDD §4.7 worked examples). Measured at 11px against the content box
+    // before it shipped — see tests/mobile/voice-copy-fit.spec.ts.
     const text = model.countdown.active
       ? ''
       : model.hostControls
         ? hintText(model)
-        : 'WAITING FOR THE HOST';
+        : 'WAITING FOR THE CLAIM HOLDER';
     const px = typeSize(HINT_PX, m);
     this.rushHint.text = text;
     this.rushHint.style.fontSize = px;
@@ -862,7 +866,7 @@ export class LobbyView extends Container {
     this.drawToggle(
       this.abundanceText,
       this.layout.abundance,
-      `ORE · ${ABUNDANCE_LABELS[model.abundance]}`,
+      `YIELD · ${ABUNDANCE_LABELS[model.abundance]}`,
       enabled,
       m,
     );

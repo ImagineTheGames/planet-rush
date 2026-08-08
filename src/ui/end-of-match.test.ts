@@ -69,7 +69,9 @@ describe('reading an outcome', () => {
 describe('the frame model', () => {
   it('headlines each end and marks Rematch primary', () => {
     const victory = endOfMatchModel(over(1, 1));
-    expect(victory.headline).toBe('VICTORY');
+    expect(victory.headline).toBe('CLAIM HELD');
+    expect(endOfMatchModel(over(2, 5)).headline).toBe('CLAIM LOST');
+    expect(endOfMatchModel(over(2, null)).headline).toBe('NO CLAIMANT');
     expect(victory.buttons[0]).toMatchObject({ id: 'rematch', primary: true });
 
     const elim = endOfMatchModel(eliminated(1));
@@ -88,6 +90,32 @@ describe('the frame model', () => {
 
   it('names the victor in a defeat’s subhead, one-based', () => {
     expect(endOfMatchModel(over(0, 4)).subhead).toContain('Player 5');
+  });
+
+  /**
+   * The condition on the in-register headlines, not a nicety. GDD §4.7's
+   * accessibility clause permits `CLAIM HELD` / `CLAIM LOST` / `NO CLAIMANT`
+   * **only** while the line underneath states the outcome plainly — the headline
+   * may never be the sole statement of who won. If a refactor empties
+   * `subheadFor()`, this fails and the headlines must revert to plain words
+   * rather than the screen shipping an outcome the player has to infer.
+   */
+  it('never lets an in-register headline be the only statement of the outcome', () => {
+    const victory = endOfMatchModel(over(1, 1));
+    expect(victory.headline).toBe('CLAIM HELD');
+    expect(victory.subhead).toBe('You took the claim.');
+
+    const defeat = endOfMatchModel(over(1, 4));
+    expect(defeat.headline).toBe('CLAIM LOST');
+    // Says who took it — the loss is stated, not left to the headline's colour.
+    expect(defeat.subhead).toContain('took the claim');
+    expect(defeat.subhead).toContain('Player 5');
+
+    // The draw's plain line names the outcome without the fiction word, which is
+    // the clause working as written: strip "NO CLAIMANT" and the meaning survives.
+    const draw = endOfMatchModel(over(1, null));
+    expect(draw.headline).toBe('NO CLAIMANT');
+    expect(draw.subhead).toBe('No reactor survived the collapse.');
   });
 
   it('offers REMATCH + BACK TO MENU on a whole-match-over screen', () => {
@@ -212,9 +240,15 @@ describe('the Gantry/Bone summary', () => {
   it('keeps the four results reporting exactly what they reported', () => {
     // The re-skin is not allowed to change a word or a button. Pinned here so a
     // later material pass cannot quietly edit the screen's content.
-    expect(endOfMatchModel(over(1, 1)).headline).toBe('VICTORY');
-    expect(endOfMatchModel(over(1, 2)).headline).toBe('DEFEAT');
-    expect(endOfMatchModel(over(1, null)).headline).toBe('DRAW');
+    //
+    // l2-02: the three in-register headlines were re-worded by the ratified voice
+    // sweep (§4.7) — a deliberate copy change, which is the one thing this pin does
+    // NOT guard against. Its intent is intact and re-pinned on the new words: a
+    // material pass still cannot touch them, and the accessibility condition that
+    // makes them legal is asserted above, on `subheadFor()`.
+    expect(endOfMatchModel(over(1, 1)).headline).toBe('CLAIM HELD');
+    expect(endOfMatchModel(over(1, 2)).headline).toBe('CLAIM LOST');
+    expect(endOfMatchModel(over(1, null)).headline).toBe('NO CLAIMANT');
     expect(endOfMatchModel(eliminated(1)).headline).toBe('ELIMINATED');
     expect(endOfMatchModel(over(1, 2)).subhead).toBe('Player 3 took the claim.');
   });

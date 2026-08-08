@@ -113,7 +113,15 @@ export const RUSH_LABEL = 'RUSH!';
  * and a string typed into a draw call is a string nobody can find.
  */
 export const LOBBY_TITLE = 'CREW MUSTER';
-export const LOBBY_EYEBROW = 'ROOM';
+/**
+ * `CLAIM`, not `ROOM` (GDD §4.7 register 2; sweep doc §3 "lobby ROOM → CLAIM").
+ * u7-03 extracted this string out of the view and, forking from before the
+ * sweep, carried the pre-sweep word up with it — so the merge restores the
+ * ratified noun into u7-03's constant rather than reverting the extraction.
+ * The room *code* stays a code: the noun above it moved, the code did not
+ * (see `lobby-entry.ts` ENTRY_ERRORS, and r1-01's `CLAIM CODE` keypad fix).
+ */
+export const LOBBY_EYEBROW = 'CLAIM';
 
 /** Seconds the RUSH countdown runs for. Long enough to put a thumb back on the
  *  stick, short enough that nobody reads it twice. TUNABLE */
