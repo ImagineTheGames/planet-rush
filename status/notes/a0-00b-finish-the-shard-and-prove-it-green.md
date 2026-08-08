@@ -82,16 +82,50 @@ Scoped as **`a0-00c` — one page per runner** (report §6).
 
 ---
 
+## SESSION 2 (2026-08-08) — run `31258319576`, and what it changed
+
+**The three spec fixes worked.** Re-summed off this run's own `list` output, the
+units this brief attacked came back roughly halved against the table:
+
+| unit | table (pre-fix) | measured now |
+|---|---|---|
+| `iphone\|upgrade-wheel-gantry` | 1338 s | **688 s** |
+| `iphone\|menu-frame-cost` | 480 s | **186 s** |
+| `pixel\|build-wheel-gantry` | 552 s | **504 s** |
+
+**But the run is red, on a spec that was never on the list.** Shard 3:
+`build-flow.spec.ts:157` `[iphone]` — the full-construction-cycle test — blew its
+**330 s** budget twice (initial + retry #1) and took the shard to 24m51s. Shard 1
+16m34s pass, shard 4 13m33s pass, shard 2 still running past 35 m.
+
+Two things matter about that failure and neither is "raise the budget":
+
+1. `build-flow.spec.ts` is **untouched by this branch** and its 330 s comes from
+   its own `budgetTest({measuredSeconds: 32})` — pre-existing, not raised here.
+2. It is the **same root cause as the four**, now on a fifth spec. Its `[pixel]`
+   twin passed the identical test at **276 s** against the same 330 s budget —
+   i.e. both projects sit within ~15% of the cliff, and which side they land on
+   is decided by what shares the runner.
+
+**The contention evidence got stronger.** In shard 3 the failing `[iphone]`
+`build-flow:157` ran concurrently with the heavy `[pixel] build-wheel-gantry`
+tests, while the *same file's* other test (`:266`) passed at 4.0 m alongside
+light `emulation.spec.ts` work. That is Decision §4's `[pixel]`/`[iphone]`
+inversion reproduced on an independent spec — two dpr-3 software-GL pages on
+4 cores starve each other's main thread, and every CDP round trip costs a frame.
+
 ## NEXT
 
-- **Watching PR #321's checks** (run `31258098019`). The DoD gates on zero failing
-  checks; the three mechanisms above (sampling window, batching, re-balance) are
-  what has to carry it.
-- If a shard is still red on a per-test timeout, the next lever is `workers: 1` +
-  N=8 — a controlled local measurement of that is running now, so the change
-  would ship with a number rather than a hope.
-- Refresh `MEASURED_SECONDS` off the first green four-shard run (procedure in
-  report §8). The table currently holds PRE-fix costs including the 300 s
-  timeouts — conservative rather than wrong, since it isolates the heavy file.
+- Local controlled measurement of `build-flow.spec.ts` at `--workers=2` vs
+  `--workers=1`, pinned to 4 cores (`taskset -c 0-3`), running now. This is the
+  number that decides whether `workers: 1` comes IN scope from `a0-00c`.
+- Refresh `MEASURED_SECONDS` off this run's real per-unit costs (parser written;
+  3 of 4 shards aggregated, total 5369 s serial, heaviest brick now 688 s not
+  1338 s). A halved heaviest brick is what makes a larger N viable.
+- Then re-plan N / workers together, push, and watch #321 to zero failing checks.
+
+Known-unrelated: `tests/net/capacity/capacity-regression.test.ts` fails locally
+under load (34.6 ms vs a 33 ms budget) and passes both isolated and in CI. Not
+this brief's; noted so a future session does not chase it.
 
 No blockers.

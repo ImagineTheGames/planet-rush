@@ -52,7 +52,6 @@ const R_STICK = 64;
 const BUILD_GAP = 18;
 const R_BUILD = 38;
 
-
 // --- What the shipped view drew ---------------------------------------------
 
 interface DrawnWedge {
