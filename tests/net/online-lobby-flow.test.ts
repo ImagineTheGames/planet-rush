@@ -42,7 +42,7 @@ import {
   canStart,
   createLobby,
   cycleAbundance,
-  cycleBotDifficulty,
+  cycleSeatCharacter,
   cycleSeatState,
   cycleSeatTeam,
   lobbyModel,
@@ -230,7 +230,7 @@ describe('CREATE ROOM opens the SAME lobby PLAY SOLO opens (the unified play flo
     host.apply((s) => toggleMode(s)); // FFA ⇄ TEAMS
     host.apply((s) => cycleAbundance(s)); // SCARCE → STANDARD
     host.apply((s) => cycleSeatState(s, 7)); // seat 7: OPEN → BOT
-    host.apply((s) => cycleBotDifficulty(s, 3)); // seat 3's tier
+    host.apply((s) => cycleSeatCharacter(s, 3)); // seat 3's character (a0-06)
 
     const configured = lobbyModel(host.lobby());
     expect(configured.shipClass).toBe(ShipClass.Excavator);

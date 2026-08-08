@@ -24,7 +24,25 @@ import { defineConfig, type PlaywrightTestConfig } from '@playwright/test';
 import { DEVICE_MATRIX } from './tests/mobile/shot-budget';
 import { filesForShard, planShards, spreadSeconds } from './tests/mobile/shard-plan';
 
-const PREVIEW_PORT = 4173;
+/**
+ * ── THE PORT IS OVERRIDABLE, AND THAT IS A CORRECTNESS FIX (a0-06, proposed) ──
+ *
+ * `reuseExistingServer: !CI` plus a hard-coded port means that when ANOTHER lane
+ * on the same box is holding 4173 (`vite preview --strictPort`), this suite does
+ * not fail and does not build: it silently attaches to that lane's bundle and
+ * compares ITS pixels against these baselines. That is worse than a red run —
+ * a0-06 got a local PASS on `phone-landscape-lobby-teams` for a lobby row that
+ * its own branch had visibly changed, because the frame under test came from
+ * lane-3. CI, which sets CI and therefore always builds, failed it correctly.
+ *
+ * `PREVIEW_PORT=4194 npm run test:mobile` takes a private port. Default is
+ * unchanged, so CI and every existing invocation behave exactly as before. The
+ * live-stage config already carries the same override for the same reason.
+ *
+ * Marked separately because this file and `tests/mobile/` are QA's; it is a
+ * default-preserving test-infra change and drops cleanly if the owner declines.
+ */
+const PREVIEW_PORT = Number(process.env.PREVIEW_PORT ?? 4173);
 const PREVIEW_URL = `http://localhost:${PREVIEW_PORT}`;
 const TEST_DIR = './tests/mobile';
 

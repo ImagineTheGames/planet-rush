@@ -47,6 +47,9 @@ import {
   CLASS_TILE_PAD,
   LOBBY_MAP_COUNT,
   SEAT_CHIP_MAX_FRACTION,
+  SEAT_CHIP_MIN,
+  SEAT_HELP_MIN,
+  SEAT_HELP_WIDTH,
   SEAT_CHIP_PAD,
   SEAT_CHIP_WIDTH,
   SEAT_ROW_BODY_MIN,
@@ -168,12 +171,21 @@ const LONGEST_SIDE_LABEL_PX = 64;
 /** Mirrors `lobby-view`'s own `TEAM_CHIP_LABEL_PAD` — the inset the word keeps. */
 const TEAM_CHIP_LABEL_PAD = 6;
 /** …and the row width at which the side chip can therefore hold that word at full
- *  size. DERIVED rather than stated: on a row of `W`, the chip's right edge is
- *  `W − SEAT_CHIP_WIDTH − SEAT_CHIP_PAD` and its left edge is
- *  {@link seatBodyEnd}, so `W` has to satisfy
- *  `W − chip − pad − (bar + stateFraction·W + body) ≥ word + 2·pad`. */
+ *  size. DERIVED rather than stated: on a row of `W`, the side chip's right edge
+ *  is `W − SEAT_HELP_WIDTH − SEAT_CHIP_PAD − SEAT_CHIP_WIDTH − SEAT_CHIP_PAD` and
+ *  its left edge is {@link seatBodyEnd}, so `W` has to satisfy
+ *  `W − ? − pad − tier − pad − (bar + stateFraction·W + body) ≥ word + 2·pad`.
+ *
+ *  **The `?` is in the numerator since a0-06**, and this is the honest half of
+ *  adding a fifth segment: the row width at which the side word survives on ONE
+ *  line went up by the `?` and its pad, so the split landscape phone stacks the
+ *  word where before it just about did not. Both halves of the ratified
+ *  `WORD + LETTER` grammar still survive (`lobby-view` `drawTeamChip`) — only the
+ *  line break moved, on rows that were already stacking at the notch. */
 const SIDE_WORD_ROW_WIDTH =
-  (SEAT_CHIP_WIDTH +
+  (SEAT_HELP_WIDTH +
+    SEAT_CHIP_PAD +
+    SEAT_CHIP_WIDTH +
     SEAT_CHIP_PAD +
     SEAT_STRIPE +
     SEAT_ROW_BODY_MIN +
@@ -432,7 +444,12 @@ describe('thumb scale (GDD §2.4 — menus are plain taps)', () => {
           for (const [label, rect] of [
             ['state', layout.seatStates[i]!],
             ['team chip', layout.seatTeamChips[i]!],
-            ['difficulty chip', layout.seatChips[i]!],
+            ['tier chip', layout.seatChips[i]!],
+            // The `?` codex control (a0-06) — the newest and narrowest segment,
+            // and the one the row gives up first. It has to survive HERE, on the
+            // landscape phone, or the developer's own device is the one device the
+            // feature they asked for does not exist on.
+            ['codex ?', layout.seatHelp[i]!],
           ] as const) {
             expect(rect.width, `${label} ${i} missing on ${name} (${tag})`).toBeGreaterThan(0);
             expect(
@@ -787,20 +804,34 @@ describe('the MODE / ABUNDANCE strip and the per-row difficulty + team chips', (
           `row body ${i} on ${name}`,
         ).toEqual({ kind: 'seat', index: i });
 
-        // The difficulty chip — the shared control, present in BOTH modes — cycles
-        // the bot's tier. Right-anchored, so a tap on it wins over the body.
+        // The TIER chip — read-only since a0-06 (the difficulty is shown, not
+        // chosen; GDD §2.1 amended). Right-anchored, never wider than its word
+        // wants and never narrower than its floor — and NOT a target: a tap on it
+        // falls through to the row body's character cycle rather than to a control
+        // that would have to refuse.
         if (chip.width > 0 && chip.height > 0) {
-          expect(chip.x, `difficulty chip ${i} left of centre on ${name}`).toBeGreaterThan(mid);
-          expect(
-            chip.width,
-            `difficulty chip ${i} lost its max-fraction guarantee on ${name}`,
-          ).toBeCloseTo(
-            Math.min(SEAT_CHIP_WIDTH, seat.width * SEAT_CHIP_MAX_FRACTION - SEAT_CHIP_PAD),
-            6,
+          expect(chip.x, `tier chip ${i} left of centre on ${name}`).toBeGreaterThan(mid);
+          expect(chip.width, `tier chip ${i} wider than its word on ${name}`).toBeLessThanOrEqual(
+            Math.min(SEAT_CHIP_WIDTH, seat.width * SEAT_CHIP_MAX_FRACTION - SEAT_CHIP_PAD) + 1e-9,
+          );
+          expect(chip.width, `tier chip ${i} below its floor on ${name}`).toBeGreaterThanOrEqual(
+            SEAT_CHIP_MIN - 1e-9,
           );
           const c = center(chip);
-          expect(lobbyHitTest(layout, c.x, c.y), `difficulty chip ${i} on ${name}`).toEqual({
-            kind: 'seatChip',
+          expect(lobbyHitTest(layout, c.x, c.y), `tier chip ${i} is not a control on ${name}`).toEqual({
+            kind: 'seat',
+            index: i,
+          });
+        }
+
+        // The `?` — the row's codex control (a0-06). A real target, right of the
+        // tier chip, never overlapping it.
+        const help = layout.seatHelp[i]!;
+        if (help.width > 0 && help.height > 0) {
+          expect(overlaps(help, chip), `codex ? ${i} overlaps the tier chip on ${name}`).toBe(false);
+          const h = center(help);
+          expect(lobbyHitTest(layout, h.x, h.y), `codex ? ${i} on ${name}`).toEqual({
+            kind: 'seatHelp',
             index: i,
           });
         }
@@ -829,7 +860,7 @@ describe('the MODE / ABUNDANCE strip and the per-row difficulty + team chips', (
           ).toBeGreaterThanOrEqual(seatBodyEnd(seat, layout.seatStates[i]!) - 1e-9);
           expect(
             overlaps(teamChip, chip),
-            `team chip ${i} overlaps difficulty chip on ${name}`,
+            `team chip ${i} overlaps tier chip on ${name}`,
           ).toBe(false);
           const t = center(teamChip);
           expect(lobbyHitTest(layout, t.x, t.y), `team chip ${i} on ${name}`).toEqual({
@@ -869,6 +900,80 @@ describe('the MODE / ABUNDANCE strip and the per-row difficulty + team chips', (
               `wide row still clips the side word on ${name} row ${i} (${tag})`,
             ).toBeGreaterThanOrEqual(LONGEST_SIDE_LABEL_PX + 2 * TEAM_CHIP_LABEL_PAD);
           }
+        }
+      }
+    }
+  });
+
+  it('spends the `?` before the side chip, and the tier chip before dropping it (a0-06)', () => {
+    // The first cut of the `?` paid for itself out of the wrong pocket: it took
+    // its width off the far right, the tier chip measured from what it left, and
+    // the side chip — measured last — fell to ZERO on the notched landscape phone.
+    // A ratified mechanic (m10, u3: the developer could not read sides in a Teams
+    // match) silently disappearing to buy a new affordance is the trade the
+    // geometry exists to make impossible, so the order of surrender is pinned here
+    // rather than left to the order three functions happen to run in.
+    for (const { name, vp, touch } of PROFILES) {
+      for (const insets of [undefined, insetsFor(vp)]) {
+        const layout = lobbyLayout(vp, insets ? { isTouch: touch, insets } : { isTouch: touch });
+        const tag = insets ? 'with notch insets' : 'no insets';
+        for (let i = 0; i < layout.seats.length; i++) {
+          const seat = layout.seats[i]!;
+          const tier = layout.seatChips[i]!;
+          const help = layout.seatHelp[i]!;
+          const team = layout.seatTeamChips[i]!;
+          if (tier.width <= 0) continue; // a row too short for any control at all
+
+          // The tier chip NEVER drops — GDD §2.1 promises the difficulty is shown —
+          // and never falls under its floor.
+          expect(tier.width, `tier chip ${i} below its floor on ${name} (${tag})`).toBeGreaterThanOrEqual(
+            SEAT_CHIP_MIN - 1e-9,
+          );
+          // The side chip keeps its minimum, always: it is spent for nothing.
+          expect(team.width, `side chip ${i} spent on the ? on ${name} (${tag})`).toBeGreaterThanOrEqual(
+            SEAT_TEAM_CHIP_MIN - 1e-9,
+          );
+          // The row body's absolute guarantee is untouched by all three.
+          const bodyEnd = seatBodyEnd(seat, layout.seatStates[i]!);
+          for (const [label, rect] of [
+            ['tier chip', tier],
+            ['side chip', team],
+            ['codex ?', help],
+          ] as const) {
+            if (rect.width <= 0) continue;
+            expect(rect.x, `${label} ${i} eats the row body on ${name} (${tag})`).toBeGreaterThanOrEqual(
+              bodyEnd - 1e-9,
+            );
+            expect(
+              rect.x + rect.width,
+              `${label} ${i} escapes its row on ${name} (${tag})`,
+            ).toBeLessThanOrEqual(seat.x + seat.width + 1e-9);
+          }
+          // …and where the `?` IS drawn it is a glyph, not a smudge.
+          if (help.width > 0) {
+            expect(help.width, `codex ? ${i} is a stub on ${name} (${tag})`).toBeGreaterThanOrEqual(
+              SEAT_HELP_MIN - 1e-9,
+            );
+          }
+        }
+      }
+    }
+  });
+
+  it('carries the `?` on EVERY profile QA tests, notch and all', () => {
+    // The developer asked for the `?` by name and plays on a landscape phone, so
+    // "it fits on a desktop" is not the claim worth making. This one is: there is
+    // no device in the matrix where the control they asked for does not exist.
+    for (const { name, vp, touch } of PROFILES) {
+      for (const insets of [undefined, insetsFor(vp)]) {
+        const layout = lobbyLayout(vp, insets ? { isTouch: touch, insets } : { isTouch: touch });
+        const tag = insets ? 'with notch insets' : 'no insets';
+        for (let i = 0; i < layout.seats.length; i++) {
+          if (layout.seatChips[i]!.width <= 0) continue;
+          expect(
+            layout.seatHelp[i]!.width,
+            `no codex ? on ${name} row ${i} (${tag})`,
+          ).toBeGreaterThanOrEqual(SEAT_HELP_MIN - 1e-9);
         }
       }
     }

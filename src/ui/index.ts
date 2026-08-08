@@ -343,11 +343,13 @@ export type { DrawnNameplate } from './nameplates-view';
 //   // on resize:  lobby.resize(w, h, isTouch, safeAreaInsets)
 //   // on tap:     const hit = lobby.hitTest(x, y)  →  'class' | 'seat' | 'rush'
 //   //             'class' → selectShipClass(state, CLASS_ORDER[hit.index])
-//   //             'seat'  → cycleBotDifficulty(state, hit.index)   (host only)
+//   //             'seat'  → cycleSeatCharacter(state, hit.index)   (host only)
 //   //             'rush'  → pressRush(state)  → session.start()
 //   // from the wire: applyLobbySlots(state, msg.slots) on `lobbyState`,
 //   //             startLobbyMatch(state) on `matchStart`, and send
-//   //             botDifficulties(state) with the host's `lobbyChoice`.
+//   //             botDifficulties(state) with the host's `lobbyChoice` (the
+//   //             tiers the chosen cast flies at — a0-06), and hand
+//   //             lobbyRosterCast(state) to `bootOfflineMatch` offline.
 //
 // `LobbyView` implements `LayoutContributor`, so the same registry loop that
 // already registers the HUD registers the lobby with no change (see `main.ts`).
@@ -359,8 +361,9 @@ export {
   DEFAULT_SHIP_CLASS,
   DEFAULT_PLAYER_NAME,
   PLAYER_NAME_MAX_CHARS,
-  DIFFICULTY_CYCLE,
+  CHARACTER_CYCLE,
   DIFFICULTY_LABELS,
+  SEAT_HELP_GLYPH,
   LOBBY_SLOTS,
   MAX_TEAMS,
   ROOM_CODE_ALPHABET,
@@ -383,10 +386,11 @@ export {
   countdownLabel,
   createLobby,
   cycleAbundance,
-  cycleBotDifficulty,
+  cycleSeatCharacter,
   cycleSeatState,
   cycleSeatTeam,
-  defaultDifficultyForEmptySeat,
+  defaultCharacterForEmptySeat,
+  seatDifficulty,
   eraseRoomCode,
   hostControls,
   isJoinableRoomCode,
@@ -394,6 +398,7 @@ export {
   lobbyModel,
   // The authored sides, in the two orders the two ends index by (m10 teams-wire):
   // per-SLOT for the server, DENSE for the world the client builds itself.
+  lobbyRosterCast,
   lobbyRosterTeams,
   lobbyWireTeams,
   makeRoomCode,

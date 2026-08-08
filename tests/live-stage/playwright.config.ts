@@ -14,7 +14,23 @@
  */
 import { defineConfig, type PlaywrightTestConfig } from '@playwright/test';
 
-const PREVIEW_PORT = 4173;
+/**
+ * The preview port — overridable with `PREVIEW_PORT` *(a0-06, proposed; default
+ * unchanged, so CI and a single checkout behave exactly as before)*.
+ *
+ * `reuseExistingServer` reuses **whatever is already listening on this port**, and
+ * it cannot tell one workspace's preview from another's. Two agent lanes building
+ * the same repo side by side therefore run each other's bundle: the suite boots,
+ * the seams are the *other* branch's, and a readback that is impossible reads as
+ * missing wiring in code that is wired. This branch's own working note carries the
+ * trap as a warning ("check `pgrep -fa 'vite preview'` before you debug the app")
+ * and a later session lost the time again anyway, so here is the warning as a
+ * mechanism: `PREVIEW_PORT=4191 npm run test:live-stage` takes a private port.
+ *
+ * Marked separately because `tests/live-stage/` is Platform's; it is a default-
+ * preserving test-infra change and drops cleanly if the owner would rather not.
+ */
+const PREVIEW_PORT = Number(process.env.PREVIEW_PORT ?? 4173);
 const PREVIEW_URL = `http://localhost:${PREVIEW_PORT}`;
 
 const chromium: NonNullable<PlaywrightTestConfig['use']>['browserName'] = 'chromium';
