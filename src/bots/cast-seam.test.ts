@@ -120,6 +120,26 @@ describe('the cast the lobby picked is the cast the match seats (a0-06)', () => 
     expect(PERSONALITIES[seats[0]!.personality]).toBeDefined();
   });
 
+  it('ignores an inherited Object.prototype key, not just an unknown one', () => {
+    // PERSONALITIES is an object literal, so `'constructor' in PERSONALITIES` is
+    // TRUE — a membership test written with `in` would have seated these and then
+    // read `.shipClass` off a function. Every one of them has to fall back.
+    const inherited = [
+      'constructor',
+      'toString',
+      'hasOwnProperty',
+      '__proto__',
+      'valueOf',
+    ] as unknown as PersonalityId[];
+    const seats = fillEmptySlots([], MATCH_SLOTS, ROSTER, undefined, inherited);
+    for (const seat of seats.slice(0, inherited.length)) {
+      expect(PERSONALITIES[seat.personality], `slot ${seat.id}`).toBeDefined();
+      expect(ROSTER, `slot ${seat.id}`).toContain(seat.personality);
+    }
+    // And the fallback is plain roster order, exactly as an absent entry gives.
+    expect(seats.map((s) => s.personality)).toEqual([...ROSTER, ROSTER[0]]);
+  });
+
   it('is deterministic: same seed + same cast → the same match, twice', () => {
     // The one property a0-06 must not cost. The cast decides WHO flies; the seed
     // decides everything else, and neither may leak into the other.

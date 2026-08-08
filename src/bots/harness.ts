@@ -100,10 +100,15 @@ export function fillEmptySlots(
     if (taken.has(id)) continue;
     // The host's pick first; roster order only where they made none. An unknown
     // string in the table is ignored rather than seated, so a stale saved lobby
-    // can never construct a bot with no personality row behind it.
+    // can never construct a bot with no personality row behind it. `hasOwnProperty`
+    // and not `in`: PERSONALITIES is an object literal, so `'constructor' in
+    // PERSONALITIES` is true through the prototype chain, and that one would have
+    // seated a bot whose "row" is a function with no shipClass on it.
     const chosen = cast?.[id];
     const character =
-      chosen != null && chosen in PERSONALITIES ? chosen : roster[seats.length % roster.length];
+      chosen != null && Object.prototype.hasOwnProperty.call(PERSONALITIES, chosen)
+        ? chosen
+        : roster[seats.length % roster.length];
     if (character === undefined) break; // empty roster: no bots, not a crash
     const team = teams?.[id];
     seats.push(team === undefined ? { id, personality: character } : { id, personality: character, team });
