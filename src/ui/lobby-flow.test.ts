@@ -583,7 +583,7 @@ describe('the slot editor is reachable in EVERY mode AND both lobbies (guard the
     it(`reaches the whole host affordance SET in ${flavour.name} — nothing exists in one lobby and not the other`, () => {
       // The ratified guard, stated positively: every control the lobby offers its
       // host is laid out and takes effect, in BOTH flavours. The online room used to
-      // have none of these, because CREATE ROOM skipped the lobby entirely.
+      // have none of these, because HOST skipped the lobby entirely.
       const layout = lobbyLayout(GUARD_VIEWPORT);
       const state = inLobbyVia(flavour.door, 0, 0);
 

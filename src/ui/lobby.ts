@@ -856,7 +856,7 @@ export interface LobbyOptions {
  * ({@link LobbySeatView.openToJoin} is false offline; `seatSlotState` resolved an
  * open seat to a bot offline), so the rule has simply moved to where it can be
  * *seen*: the solo roster now says BOT on the rows that are bots, instead of
- * saying OPEN on rows nobody could ever take. PLAY SOLO is therefore unchanged —
+ * saying OPEN on rows nobody could ever take. SOLO is therefore unchanged —
  * it still opens on a full house you can RUSH immediately — and it is the online
  * room that starts empty.
  *
