@@ -9,6 +9,17 @@
  * natural match catches ANY future black hole, whatever path it hides on
  * (`tests/harness/ore-conservation.test.ts`).
  *
+ * IT HAS SINCE PAID OFF THE OTHER WAY (a0-08, 2026-08-08). The report came a
+ * fourth time — "sometimes picked up ore from dead ships dont count" — and this
+ * ledger answered it in an afternoon: conservation HELD, exactly, through every
+ * reproduction, so nothing was leaking and no rule needed touching. What varied
+ * was only how much of a wreck a hold could accept (empty takes all, full takes
+ * NOTHING and pulls nothing, one slot takes one), and none of it was visible.
+ * The fix was a pair of render tells, not a sim rule (`Ship.lootTake` /
+ * `lootBlocked`, GDD §2.3). Read the ledger BEFORE changing the economy: proving
+ * there is no black hole is as valuable as finding one, and it points the search
+ * at what the player could actually see.
+ *
  * Determinism (GDD §4.8): pure running sums over operations the sim already does,
  * no RNG, no clock. The ledger is *write-only accounting* — the sim never reads
  * it to make a decision, so a world with a ledger and a world without one step
