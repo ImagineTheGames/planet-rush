@@ -5,8 +5,9 @@
  * (`@render`) in the same canvas — it does NOT move with the camera. The HUD
  * "shows only what the player acts on" (GDD §2.2). Day-1 surface (GDD §4.6):
  *
- *  - **Ore at a glance**, split per the field rule: the banked **TOTAL** in the
- *    top-left corner (the safe bank the Build wheel spends), and a compact
+ *  - **Ore at a glance**, split per the field rule: the banked total in the
+ *    top-left corner, captioned **ORE** (the safe bank the Build wheel spends —
+ *    a0-03, 2026-08-07), and a compact
  *    **hold indicator under the ship** — one pip per cargo slot, flashing when
  *    full — that follows the local ship in screen space and drains during a dock
  *    deposit ({@link ./ore-hold}). Two forms, two places, so held and banked ore
@@ -131,7 +132,7 @@ import {
 
 /** Neutral light HUD text. Chalk-white — NOT signal yellow (RESERVED, §2). */
 const TEXT_PRIMARY = 0xdce3ec;
-// Muted secondary labels (TOTAL, HOME, MATCH, a strip action) draw in the void
+// Muted secondary labels (ORE, HOME, MATCH, a strip action) draw in the void
 // material's muted tone {@link TEXT_MUTED} from ./chrome — the ui-mockup's HUD
 // grey, one step lighter than the disabled `hullSteel`, so a readable-but-inert
 // label never wears the "you can't press this" costume.
@@ -146,7 +147,7 @@ const PAD = HUD_PAD;
 /** Bottom strip's baseline offset from the screen bottom, CSS px. */
 const STRIP_ROW = 18;
 const STRIP_PAD = 12;
-/** Gap between the top-left TOTAL label and the banked number below it, CSS px. */
+/** Gap between the top-left ORE label and the banked number below it, CSS px. */
 const TOTAL_LABEL_H = 14;
 
 
@@ -409,9 +410,11 @@ export class Hud extends Container {
   /** Onboarding state machine — each prompt fires once (GDD §2.10). */
   private readonly onboarding = new Onboarding();
 
-  // --- Ore TOTAL — the banked bank the Build wheel spends (top-left) --------
-  //     Field rule: top-left shows the TOTAL only; held ore moved under the ship
-  //     (see `oreHold` below), so the two ore numbers can never be confused.
+  // --- Ore — the banked total the Build wheel spends (top-left) -------------
+  //     Field rule: top-left shows the BANK only; held ore moved under the ship
+  //     (see `oreHold` below), so the two ore numbers can never be confused. The
+  //     label above it reads `ORE` since a0-03; the rule is about the NUMBER, and
+  //     the number did not move.
   private readonly oreGroup = new Container();
   private readonly totalLabel: Text;
   private readonly bankedText: Text;
@@ -588,13 +591,22 @@ export class Hud extends Container {
     // spend chimes, all from the same state that drives the visual tell.
     this.pressFeedback = new PressFeedback(sfx);
 
-    // Ore TOTAL (top-left): a dim `TOTAL` heading over the banked number in ore
-    // yellow. The heading names it as the safe bank total, distinct in both form
-    // and place from the pips carried under the ship (field rule).
-    // BANKED, not TOTAL: the squares beside it are the ore in the HOLD, so a
-    // label reading "TOTAL" invites the reading "hold + bank". GDD §2.3's own
-    // words are "banked total" (l2-02, GDD §4.7 register 2).
-    this.totalLabel = this.makeText('BANKED', FONT_HEADING, 11, TEXT_MUTED);
+    // Ore (top-left): a dim `ORE` heading over the banked number in ore yellow.
+    //
+    // `ORE`, ratified 2026-08-07 (a0-03) — the developer, on a screenshot of this
+    // readout: "should not say total, it should say ORE". It has been `TOTAL`
+    // (the field rule below) and briefly `BANKED` (l2-02's voice sweep, an [OPT]
+    // this supersedes); the developer's word is the design, and GDD §2.2 already
+    // called it "your banked ORE total".
+    //
+    // WHAT THE WORD NOW COVERS, stated because it is not the only ORE on screen:
+    // this number is the BANK ALONE (`oreHudModel().banked`). The squares beside
+    // it are the HOLD, and the Build wheel's hub prints `spendableOre` — hold PLUS
+    // bank — under a caption that also reads `ORE` (build-wheel-view.ts). Hold 3
+    // with 5 banked reads 5 here and 8 there. Both numbers are correct and neither
+    // changed; only this label did. Flagged for the developer in a0-03's PR rather
+    // than resolved unilaterally — renaming the HUB is their call, not this file's.
+    this.totalLabel = this.makeText('ORE', FONT_HEADING, 11, TEXT_MUTED);
     this.totalLabel.y = 0;
     this.bankedText = this.makeText('', FONT_NUMERAL, 22, PALETTE.signalYellow, 'bold');
     this.bankedText.y = TOTAL_LABEL_H;
@@ -742,16 +754,16 @@ export class Hud extends Container {
     this.updateOnboarding(frame, wheelOpen, underAttack);
   }
 
-  // --- Ore: the TOTAL (top-left) and the HOLD (under the ship) -------------
+  // --- Ore: the BANK (top-left) and the HOLD (under the ship) --------------
 
   /** Draw the two ore readouts from the one sim-driven model (field rule): the
-   *  banked TOTAL in the top-left corner, and the held-ore indicator that follows
+   *  banked total in the top-left corner, and the held-ore indicator that follows
    *  the ship under it. Each reads its own number from the same source of truth —
    *  `banked` for the total, hold/capacity for the pips — so they cannot drift. */
   private updateOre(frame: HudFrame): void {
     const model = oreHudModel(frame.cargo, frame.cargoCap, frame.banked);
 
-    // Top-left TOTAL: just the safe banked number the Build wheel spends.
+    // Top-left ORE: just the safe banked number the Build wheel spends.
     this.bankedText.text = `${model.banked}`;
     this.lastBankedTotal = model.banked;
 

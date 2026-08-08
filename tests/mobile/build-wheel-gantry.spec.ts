@@ -20,7 +20,7 @@
  *
  *  1. A real open — the BUILD button on touch, the `E` binding on desktop — puts
  *     the four-line Gantry stack on screen: the name, what it spends on, the
- *     `cost/held` string, and the count over its cap.
+ *     cost, and the count over its cap.
  *  2. The cost numeral takes BOTH of its ratified colours off the same wedge:
  *     signal yellow while it is payable, threat red the moment it is not
  *     (style-guide §2.1). Nothing else on the wheel takes red.
@@ -255,7 +255,7 @@ test.describe('the Gantry/Bone wedge, through the real click path (u7-02)', () =
 
     const drawnRadius = (await registered(page, 'build-wheel'))!.width / 2;
     const radar = wedge(all, 'satellite')!;
-    expect(radar.costLabel, `[${label}] the cost reads cost/held`).toBe('6/8');
+    expect(radar.costLabel, `[${label}] the cost is one number — the cost (a0-03)`).toBe('6');
     expect(radar.costPaint, `[${label}] a payable cost is ore-yellow`).toBe('ore');
     expect(radar.caps, `[${label}] RADAR counts against its cap`).toBe(expectedCaps(drawnRadius, 0, 1));
     expect(radar.target, `[${label}] every wedge names what it spends on (GDD §2.5)`).toBe('YOUR STATION');
@@ -264,7 +264,7 @@ test.describe('the Gantry/Bone wedge, through the real click path (u7-02)', () =
     await setOre(page, 4);
     all = await drawnWedges(page);
     const short = wedge(all, 'satellite')!;
-    expect(short.costLabel, `[${label}] the cost re-prices against the bank`).toBe('6/4');
+    expect(short.costLabel, `[${label}] the same number at 4 ore — only the COLOUR moves`).toBe('6');
     expect(short.costPaint, `[${label}] a cost that cannot be paid is threat red`).toBe('refused');
 
     // The carve-out's limits, on the same frame: red is spent ONLY on a numeral
@@ -390,7 +390,7 @@ test.describe('PORTRAIT-HELD — the wheel drives through the landscape lock', (
     expect(all.length, `[${label}] the wheel drew no wedges portrait-held`).toBe(5);
     const bounds = (await registered(page, 'build-wheel'))!;
     const radar = wedge(all, 'satellite')!;
-    expect(radar.costLabel, `[${label}] cost/held survives the rotation`).toBe('6/4');
+    expect(radar.costLabel, `[${label}] the bare cost survives the rotation`).toBe('6');
     expect(radar.costPaint, `[${label}] and so does the refused colour`).toBe('refused');
     expect(radar.caps, `[${label}] and so does the count`).toBe(expectedCaps(bounds.width / 2, 0, 1));
 

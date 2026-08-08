@@ -84,7 +84,7 @@ import { FONT_BODY as FONT_NUMERAL, FONT_HEADING } from './typography';
  *  reads back the REPAIR wedge's real effect line ("+15 HP", the partial, or a
  *  reason) off the shipped bundle, the same discipline as {@link
  *  DrawnUpgradeWedge}. Since u7-02 it carries the whole four-line stack, so the
- *  new `cost/held` and count/cap lines are read back the same way. */
+ *  cost and count/cap lines are read back the same way. */
 export interface DrawnBuildWedge {
   readonly id: WheelSegment['id'];
   readonly label: string;
@@ -104,8 +104,9 @@ export interface DrawnBuildWedge {
   readonly target: string;
   /** The count/cap line as drawn — "2 / 4 BUILT" — or `''` on an uncapped wedge. */
   readonly caps: string;
-  /** The `cost/held` line as drawn — "3/4", "FULL", or "OPEN ▸" on the one wedge
-   *  that opens a screen instead of spending. */
+  /** The cost line as drawn — "3", "FULL", or "OPEN ▸" on the one wedge that
+   *  opens a screen instead of spending. One numeral since a0-03; whether it can
+   *  be paid is {@link costPaint}, not a second number. */
   readonly costLabel: string;
   readonly cost: number | null;
   /** Whether the wedge drew bright (pressable) or dark (refused, with a reason). */
@@ -263,7 +264,7 @@ interface WedgeNodes {
   /** Line 2 — what it spends on ("YOUR STATION"), or a stat value ("10 → 13")
    *  on the upgrade wheel. */
   readonly sub: Text;
-  /** Line 3 — the `cost/held` numerals, or `FULL` / `OPEN ▸`. */
+  /** Line 3 — the cost numeral, or `FULL` / `OPEN ▸`. */
   readonly cost: Text;
   /** Line 4 — the count over its cap ("2 / 4 BUILT"), repair's effect/reason line
    *  ("+15 HP", "REPAIR in 12s"), or the upgrade wheel's ladder pips ("●●○").
@@ -551,8 +552,8 @@ export class BuildWheelView extends Container {
     );
 
     // Capture what was drawn for the ?debug=1 live-stage seams — the REAL lines
-    // each wedge rendered (repair's "+15 HP"/partial/reason, the `cost/held`
-    // string, the count over its cap), straight off the descriptors the view just
+    // each wedge rendered (repair's "+15 HP"/partial/reason, the cost line, the
+    // count over its cap), straight off the descriptors the view just
     // drew from, so a Playwright test reads the shipped client rather than a model.
     this.lastBuildDrawn = true;
     this.lastBuildWedges = model.segments.map((seg) => {
@@ -1003,7 +1004,7 @@ export class BuildWheelView extends Container {
 /**
  * A Build-wheel segment as a wedge — the handoff's four lines (u7-02):
  *
- *   NAME / what it spends on / `cost/held` / the count over its cap.
+ *   NAME / what it spends on / the cost / the count over its cap.
  *
  * Every wedge names its target on line 2 now — "every label names which" (GDD
  * §2.5), words not a number — and line 4 carries whichever of the two things a

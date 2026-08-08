@@ -51,10 +51,23 @@
  *    ({@link Nameplate.teamColor}) reinforces the word without ever replacing it.
  *    In FFA the label is empty on every plate — teams-of-one has no side worth
  *    naming — so the free-for-all HUD is unchanged, character for character.
- *  - **Fade under combat clutter.** A label over an entity that is damaged or
- *    fighting drops to {@link NAMEPLATE_FADE_ALPHA} so it never fights the health
- *    bar for the eye during a brawl (field request rule 3). It is *also* stacked
- *    ABOVE the bar cluster by the view, so it can never cover a health bar.
+ *  - **Always lit.** Every label draws at {@link NAMEPLATE_FULL_ALPHA}, whatever
+ *    the entity underneath it is doing. It used to drop to a faded alpha while
+ *    that entity was damaged or in combat (field request rule 3, "the label steps
+ *    back so the health bar owns the eye"), and the developer withdrew it on a
+ *    live build: *"sometimes other ships names are dim and sometimes they are lit,
+ *    they should always be lit."* The rule was legible in a spec and illegible on
+ *    screen — the trigger is the OTHER ship's combat state, which the player is not
+ *    tracking, so the same name reading bright, then dim, then bright again reads
+ *    as a glitch. The later word wins (a0-04), and the mechanism is gone rather
+ *    than neutered: no fade constant, no fade knob, no combat fields on
+ *    {@link Nameable}.
+ *
+ *    What rule 3 was *protecting* is untouched, because it never rested on the
+ *    fade: the view stacks the label ABOVE the whole bar cluster
+ *    ({@link ./nameplates-view} `nameplateClusterClearance`, off the health bars'
+ *    own geometry), so a label at full brightness still cannot cover a health bar.
+ *    That is the assertion nameplates.test.ts keeps after this.
  *
  * Integration (feeding this each frame, projected to screen) is the wiring in
  * `main.ts` / {@link ./hud}; the view is the thin Pixi half in
@@ -76,13 +89,10 @@ import type { SideRelation } from './lobby';
  *  over-long name is truncated with an ellipsis rather than overrunning the ship. */
 export const NAMEPLATE_MAX_CHARS = 12;
 
-/** Full opacity of a resting label (calm entity). Slightly under 1 so the name
- *  reads as chrome floating over the world, not as a solid sprite. */
+/** The opacity of EVERY label — a name is lit whatever its ship is doing (a0-04:
+ *  *"they should always be lit"*). Slightly under 1 so the name reads as chrome
+ *  floating over the world, not as a solid sprite. */
 export const NAMEPLATE_FULL_ALPHA = 0.92;
-
-/** Faded opacity while the entity is in combat or damaged — the label steps back
- *  so the health bar owns the eye during a fight (field request rule 3). */
-export const NAMEPLATE_FADE_ALPHA = 0.4;
 
 // ---------------------------------------------------------------------------
 // Model I/O
@@ -94,8 +104,9 @@ export type NameplateKind = 'ship' | 'station';
 /**
  * One label-bearing entity as the model sees it, built by the caller from sim
  * state (a {@link Ship} or a home {@link MiningStation}). The decision reads only the
- * ownership / kind / liveness / combat fields; `pos`/`radius` are passed straight
- * through to the view.
+ * ownership / kind / liveness fields; `pos`/`radius` are passed straight
+ * through to the view. It reads no combat or HP state at all — a label's
+ * brightness stopped depending on what the entity under it is doing at a0-04.
  *
  * `pos`/`radius` are **screen space, CSS px** — the caller projects world → screen
  * (via the renderer's camera) before handing them over, so the label is a fixed
@@ -118,12 +129,6 @@ export interface Nameable {
   /** True **only** for the camera-followed local ship — suppressed by default
    *  ({@link NameplateOptions.showOwnShipLabel}). Never set on a station. */
   readonly local?: boolean;
-  /** The entity is actively fighting this tick (a ship firing, a turreted station
-   *  under attack) ⇒ the label fades. Default false. */
-  readonly inCombat?: boolean;
-  /** HP as a fraction 0..1 (default 1 = full). Below full ⇒ a health bar is up ⇒
-   *  the label fades so it never competes with it. */
-  readonly hpFraction?: number;
 }
 
 /** One label to draw: everything the pooled view needs, nothing it re-derives. */
@@ -171,7 +176,10 @@ export interface Nameplate {
   readonly y: number;
   /** Entity screen radius, so the view can float the label clear of the sprite. */
   readonly radius: number;
-  /** Opacity 0..1 — full when calm, {@link NAMEPLATE_FADE_ALPHA} under clutter. */
+  /** Opacity 0..1 — {@link NAMEPLATE_FULL_ALPHA} on every plate, every frame
+   *  (a0-04). The view still multiplies it for the two *subordinate* tokens in the
+   *  row (the side tag, the difficulty suffix), which is a hierarchy inside the
+   *  plate and not a state signal. */
   readonly alpha: number;
   /** True for the local player's own-ship label (only ever present when
    *  {@link NameplateOptions.showOwnShipLabel} is on). */
@@ -213,7 +221,7 @@ export type DifficultyTable = readonly (string | undefined)[];
 export type TeamTable = readonly (number | undefined)[];
 
 /** Tunable knobs for {@link nameplateModel}. All optional; the defaults are the
- *  field-request calls (own-ship label off, the two alpha levels above). */
+ *  field-request calls (own-ship label off) plus the one alpha above. */
 export interface NameplateOptions {
   /**
    * Show the side label on every plate. **TEAMS only** — pass `mode === 'teams'`.
@@ -236,10 +244,10 @@ export interface NameplateOptions {
    *  screen-centre reads as noise (field request rule 3; the own station is still
    *  labelled either way). Wire this to a settings toggle if a player disagrees. */
   readonly showOwnShipLabel?: boolean;
-  /** Resting opacity. Default {@link NAMEPLATE_FULL_ALPHA}. */
+  /** Label opacity — the only one there is. Default {@link NAMEPLATE_FULL_ALPHA}.
+   *  A caller may dim the whole layer (every plate together, e.g. a screenshot
+   *  mode); nothing dims one plate for what its ship is doing (a0-04). */
   readonly fullAlpha?: number;
-  /** Faded opacity under combat clutter. Default {@link NAMEPLATE_FADE_ALPHA}. */
-  readonly fadeAlpha?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -347,9 +355,9 @@ export function nameplateGetsLabel(e: Nameable, opts: NameplateOptions = {}): bo
 
 /**
  * Turn a frame's label-bearing entities into the labels to draw. Pure: it filters
- * by {@link nameplateGetsLabel}, resolves text + difficulty suffix + colour + fade,
- * and passes screen position through untouched. Output order follows input, all a
- * pooled view needs.
+ * by {@link nameplateGetsLabel}, resolves text + difficulty suffix + side + colour,
+ * and passes screen position through untouched. Every plate comes out at the same
+ * alpha (a0-04). Output order follows input, all a pooled view needs.
  */
 export function nameplateModel(
   entities: readonly Nameable[],
@@ -358,8 +366,7 @@ export function nameplateModel(
   difficulties: DifficultyTable = [],
   teams: TeamTable = [],
 ): Nameplate[] {
-  const full = opts.fullAlpha ?? NAMEPLATE_FULL_ALPHA;
-  const fade = opts.fadeAlpha ?? NAMEPLATE_FADE_ALPHA;
+  const alpha = opts.fullAlpha ?? NAMEPLATE_FULL_ALPHA;
   const plates: Nameplate[] = [];
   for (const e of entities) {
     if (!nameplateGetsLabel(e, opts)) continue;
@@ -374,18 +381,11 @@ export function nameplateModel(
       x: e.pos.x,
       y: e.pos.y,
       radius: e.radius,
-      alpha: underClutter(e) ? fade : full,
+      alpha,
       local: e.kind === 'ship' && e.local === true,
     });
   }
   return plates;
-}
-
-/** True when a health bar is up over this entity (damaged or fighting), so the
- *  label steps back (field request rule 3 — never fight the bar for the eye). */
-function underClutter(e: Nameable): boolean {
-  const frac = e.hpFraction ?? 1;
-  return (e.inCombat ?? false) || frac < 1;
 }
 
 function clampLen(text: string): string {
