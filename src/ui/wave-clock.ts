@@ -7,10 +7,10 @@
  * waves each spawning closer to center (GDD §2.3); after the last wave the match
  * heads for collapse. This is the metronome of the match made visible.
  *
- * Pure and DOM-free: it derives everything from `world.time` and the ratified
- * wave constants (`WAVE_COUNT`, `WAVE_INTERVAL_S`), so it unit-tests headless
- * and never drifts from the sim's own clock. The Pixi view in {@link ./hud}
- * only formats what this returns.
+ * Pure and DOM-free: it derives everything from `world.time`, the match's own
+ * wave interval, and the ratified `WAVE_COUNT`, so it unit-tests headless and
+ * never drifts from the sim's own clock. The Pixi view in {@link ./hud} only
+ * formats what this returns.
  *
  * The countdown is computed with the sim's **own** {@link waveTime} — the
  * function `src/sim/waves.ts` spawns against — rather than a second copy of the
@@ -18,9 +18,19 @@
  * "the same function the HUD's wave clock counts down to, so the clock can never
  * promise a wave the sim does not deliver," and calling it is what makes that
  * true instead of merely intended.
+ *
+ * Calling it is not *enough*, though, and a0-16 is why. `waveTime` takes the
+ * interval as an argument and defaults it to the baseline `WAVE_INTERVAL_S`;
+ * this clock used to take that default while the spawner passed the match's own
+ * `world.economy.waveInterval`. SCARCE is the default abundance, so in a default
+ * match the rocks arrived every 165 s while this counted down 150 — the clock hit
+ * zero, nothing spawned, and the field refilled fifteen seconds later. The
+ * interval is now an argument here too, fed from the sim's `waveIntervalOf`, and
+ * the test that ties the countdown target to the tick the spawner actually
+ * spawns on is what keeps the two from parting again.
  */
 
-import { WAVE_COUNT, waveTime } from '../sim/constants';
+import { WAVE_COUNT, waveIntervalOf, waveTime } from '../sim/constants';
 
 /** Full names for the five waves — each "closer to the map center than the last"
  *  (GDD §2.3), so the names read outer→inner. Player-facing flavor (not a
@@ -62,24 +72,37 @@ export interface WaveClock {
  * Compute the wave clock at a given match time (seconds).
  *
  * Waves arrive on a metronome: wave 1 is present at t=0 and wave `n` lands at
- * the sim's own {@link waveTime}`(n)`. The countdown is the time to the next
- * wave's arrival; on the final wave there is no "next", so it is `null` (the HUD
- * reads FINAL).
+ * the sim's own {@link waveTime}`(n, waveInterval)`. The countdown is the time to
+ * the next wave's arrival; on the final wave there is no "next", so it is `null`
+ * (the HUD reads FINAL).
  *
- * @param timeSeconds `world.time`.
- * @param collapsed   The sim's `isCollapsed(world)`. Optional — a caller that
- *                    predates the endgame reads as "not collapsed".
+ * @param timeSeconds  `world.time`.
+ * @param collapsed    The sim's `isCollapsed(world)`. Optional — a caller that
+ *                     predates the endgame reads as "not collapsed".
+ * @param waveInterval The match's OWN seconds-between-waves, the sim's
+ *                     `waveIntervalOf(world)` — an abundance multiple of the
+ *                     baseline, and the exact number `spawnDueWaves` schedules
+ *                     against. Fed to the HUD on the frame beside `collapsed`,
+ *                     the same way every other sim verdict reaches it. Omitted
+ *                     (or `undefined`, from a world with no resolved economy)
+ *                     it resolves to the baseline inside `waveIntervalOf` — the
+ *                     pre-abundance cadence, which is right for a hand-built
+ *                     world that has no other.
  */
-export function computeWaveClock(timeSeconds: number, collapsed = false): WaveClock {
+export function computeWaveClock(
+  timeSeconds: number,
+  collapsed = false,
+  waveInterval: number = waveIntervalOf(),
+): WaveClock {
   const t = Math.max(0, timeSeconds);
 
   // The highest wave whose arrival time has passed, from the sim's schedule.
   let wave = 1;
-  while (wave < WAVE_COUNT && t >= waveTime(wave + 1)) wave++;
+  while (wave < WAVE_COUNT && t >= waveTime(wave + 1, waveInterval)) wave++;
   const isFinalWave = wave >= WAVE_COUNT;
 
   // Time to the next wave's arrival — null once the last wave is out.
-  const countdownToNext = isFinalWave ? null : waveTime(wave + 1) - t;
+  const countdownToNext = isFinalWave ? null : waveTime(wave + 1, waveInterval) - t;
 
   return {
     wave,
