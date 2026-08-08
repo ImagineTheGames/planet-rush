@@ -408,6 +408,70 @@ with its hull under the name, a read-only `HARD` chip, and a `?`.
 first hour purely because `a74a199` had never been pushed — one `git push` fixed
 it, no re-resolution.
 
+### Session 2026-08-08 (sixth) — main moved again, and this time it conflicted
+
+Inherited the branch **fully pushed** (`0de3741` = `origin/…`, nothing local and
+unmissed — session 5's lesson applied, `git log origin/<branch>..HEAD` checked
+FIRST and it was empty). No feature work outstanding and none invented. Two
+things needed doing.
+
+**1. `origin/main` had moved to `f3ace95`** (s9-01 alarm-once-and-ownership, PR
+#318 — a large branch, ~30 commits), so `merge-base --is-ancestor` was red.
+**This merge was the first on this brief that did NOT auto-resolve.** Two
+conflicts, both genuinely additive rather than semantic:
+
+- `docs/design-amendments.md` — s9-01 and a0-06 each inserted a new entry at the
+  **top** of the file, at the same anchor. Kept both, with the `---` separator
+  between them that each entry's format expects.
+- `src/main.ts` — both sides edited the **same import block**. s9-01 expanded
+  `./art/audio` to a multi-line list adding `deriveAlarmAllies`; a0-06 had added
+  `castDisplayNames` and `type PersonalityId` from `./bots` on the lines directly
+  above. Union of the two: a0-06's two `./bots` lines, then s9-01's audio list
+  verbatim.
+
+`GDD.md` auto-merged **clean** — a0-06 amends §2.1/§2.9, s9-01 amends §2.2, and
+they never touch the same paragraph. Verified after the fact rather than assumed:
+both amendment markers are present (§2.1 "the host picks each bot's CHARACTER",
+§2.2 "the alarm sounds ONCE per engagement").
+
+**Nothing semantic collided.** s9-01 is `src/art/audio/*` and the alarm's seat
+ownership; this brief is the cast seam. The one shared file, `src/main.ts`, has
+them in different functions — `deriveAlarmAllies` at the render loop
+(`main.ts:975`), `castDisplayNames` in `rebuildNameTable` (`main.ts:1843`).
+
+**2. Re-shot the four evidence frames (`b5799e4`)** — the committed set was from
+`f517ef7`, older than this merge, and the build badge stamps the commit hash into
+every frame.
+
+#### DoD on the merged tree
+
+- `npx tsc --noEmit` — clean (run **before** committing the resolution, which is
+  the point of running it at all).
+- `npm test -- --run` — **4001 passed, 0 failed**, 238 files.
+  `capacity-regression` passed; the box was at load ~12. Sessions 2/4/5 already
+  settled that it is a wall-clock benchmark that only trips under lane
+  contention. Do not chase it.
+- `PREVIEW_PORT=4195 npm run test:live-stage -- lobby-cast.spec.ts` — **3
+  passed** (cast round trip, `?` by click on PC, `?` by tap at 390 px landscape).
+- GDD.md differs from `origin/main`; `merge-base --is-ancestor` OK at `f3ace95`.
+
+**The proof, re-measured not re-asserted:** `lobby-cast-readback.txt` regenerated
+**byte-identical** on top of the s9-01 merge — seven Hard bots, three Wardens /
+two Sables / two Vultures, `identical: true`. **That file is the evidence; the
+PNGs are the picture of it.** Worth stating plainly, because it is the third
+merge in a row to do this: s9-01 changed *when the siege klaxon fires* and the
+cast seam did not notice. That is what "this brief changes who you choose, not
+how a bot plays" is supposed to mean, and each clean merge is a small
+re-confirmation of it.
+
+**Trap #1 bit again and the flag paid for itself:** `lane-2` was holding port
+**4173** with a `vite preview --strictPort` for its own alarm-stage build. Used
+`PREVIEW_PORT=4195` and the run never collided. **Also — `pgrep -fa "vite
+preview"` is the WRONG probe on this box:** every lane's `claude -p` process has
+the brief text in its argv, so the pattern matches a dozen agent processes and
+buries the one real server in 34 KB of prompt. Use `pgrep -fa "node.*vite"` or
+`ss -ltnp | grep 417`, which names the lane and the port directly.
+
 ## NEXT (unchanged from session 1, restated so it is not lost)
 
 - **ONLINE still carries the tier, not the name.** `LobbyChoiceMessage` has
