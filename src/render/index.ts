@@ -17,10 +17,13 @@
  * stations as patina discs with a player-colour beacon ring and a signal-yellow
  * core (GDD §5.4 — the art pass replaces the shapes, not the layers).
  *
- * **Fog is drawn, not just simulated.** A rival station's damage ring appears
- * only while the camera's ship is inside `SENSOR_RANGE` of it (GDD §2.2:
- * "enemy station health is scouted, not broadcast"). Your own home always shows
- * its ring — it is your home.
+ * **Fog is drawn, not just simulated** — but station HEALTH is not fog (GDD §2.2,
+ * amended 2026-08-07; a0-05). Every station this layer draws gets its damage
+ * ring, at every range, whoever owns it. The ring is drawn in world units at a
+ * fixed width and the camera is translate-only (no zoom), so the far read is
+ * pixel-identical to the near one. What is still fogged is the *minimap*
+ * (`sim/sensing` coverage) and enemy **ship** hulls, which are drawn only on
+ * screen.
  */
 
 import { Container, Graphics } from 'pixi.js';
@@ -28,9 +31,10 @@ import { UpgradeTrack } from '@shared/types';
 import type { PlayerId, ShipClass, Vec2 } from '@shared/types';
 import { writeCameraOffset } from '@platform/camera';
 import type { Viewport } from '@platform/camera';
-import { SENSOR_RANGE, TURRET, TURRET_MAX_TIER, turretTierShotDamage } from '../sim/constants';
+import { TURRET, TURRET_MAX_TIER, turretTierShotDamage } from '../sim/constants';
 import { inAtmosphere, turretHomeAngle, turretOrbitPos } from '../sim/buildings';
 import { areEnemies } from '../sim/allegiance';
+import { stationHealthVisible } from '../sim/sensing';
 import type { Asteroid, OreChunk, MiningStation, Projectile, Ship, World } from '../sim/state';
 import { atmosphereHaloSprite, beaconRingSprite, stationSprite, stationVariantFor } from '../art/stations';
 import { stationWreckSprite } from '../art/wrecks';
@@ -243,17 +247,6 @@ function shotTier(world: World, p: Projectile): number {
     if (turretTierShotDamage(tier) === p.damage) return tier;
   }
   return 0;
-}
-
-/** Whether `viewer` is close enough to read `station`'s health (GDD §2.2, §2.8 —
- *  sensor range is 2× the shield radius). Squared compare, no square roots
- *  (GDD §4.1). Measured to the station's surface, so a big body is legible from
- *  the same standoff distance a small one is. */
-function withinSensorRange(viewer: { pos: Vec2 }, station: MiningStation): boolean {
-  const dx = station.pos.x - viewer.pos.x;
-  const dy = station.pos.y - viewer.pos.y;
-  const reach = SENSOR_RANGE + station.radius;
-  return dx * dx + dy * dy <= reach * reach;
 }
 
 // ---------------------------------------------------------------------------
@@ -490,11 +483,16 @@ export class Renderer {
   /**
    * The eight homes (GDD §2.1) and everything standing on them: the body, the
    * owner's beacon ring, the signal-yellow core, the shield bubble, construction
-   * in progress, and the scouted damage ring.
+   * in progress, and the damage ring.
    *
-   * `viewerId`'s ship is the eye: a rival's damage ring is drawn only while that
-   * ship is inside `SENSOR_RANGE` of the station (GDD §2.2 — health you earn by
-   * scouting). Your own home is always legible, because it is yours.
+   * **The damage ring is drawn for every station, at every range** (GDD §2.2,
+   * amended 2026-08-07; `sim/sensing`'s `stationHealthVisible`). It used to be
+   * gated on the viewer's ship being inside the retired `SENSOR_RANGE` — 180
+   * units, a fifth of the way to the edge of a 1080p screen — so a rival you
+   * could see perfectly well drew *no* ring, and the always-drawn owner-colour
+   * beacon ring under it made a quarter-dead station look untouched. `viewerId`
+   * is still the eye for everything that genuinely is fog (the atmosphere halo is
+   * an own-station affordance, shots read by side), just not for health.
    */
   private drawStations(world: World, viewerId: PlayerId): void {
     const viewer = world.ships.find((s) => s.id === viewerId);
@@ -514,11 +512,10 @@ export class Renderer {
       if (station.alive) {
         this.drawShieldBubble(overlay, station);
         this.drawConstruction(overlay, station);
-        // Own station always; a rival's only from inside sensor range.
-        const scouted =
-          station.owner === viewerId ||
-          (viewer !== undefined && withinSensorRange(viewer, station));
-        if (scouted) this.drawDamageRing(overlay, station);
+        // Health is not fog (GDD §2.2, amended): every station, every range. The
+        // sim owns the rule so there is one place to change it, and exactly one
+        // answer for the renderer, the bots and the server.
+        if (stationHealthVisible(viewerId, station)) this.drawDamageRing(overlay, station);
       }
 
       for (const turret of station.turrets) {
