@@ -163,17 +163,41 @@ change the assignment.** What breaks a plan is a cost wrong *relative to its
 neighbours* — exactly what the stale table had become once §5's fixes halved two
 of its biggest rows. It also makes 17.7 min/shard the WORST case.
 
+### 8 · IT WENT GREEN — run `31259840319`, 8/8 shards, rollup green
+
+123 executed tests, **0 failures, 0 retries**. **The gate: 42m04s red → 12m19s
+green.** `build-flow:157` cost **126 s** against the >330 s it was timing out at;
+all four dying `[iphone]` goldens passed. Nothing skipped, no budget raised.
+`workers: 1` was the whole fix — `pixel|upgrade-wheel-gantry` 918 s → **190 s**.
+
+### 9 · …and then the numbers said N=6. My own §7 was wrong.
+
+§7 argued a contention tax is harmless because LPT balances on RATIOS, so a
+**uniform** scale factor cannot change an assignment. True, and it does not
+apply: the tax was **not uniform** — 4.8× on `pixel|upgrade-wheel-gantry`, 1.4×
+on `iphone|upgrade-wheel-gantry`, because it falls hardest on exactly the
+round-trip-bound specs (the ones priced in frames). It **reordered** the table
+rather than rescaling it. Hence shards 5m01s…12m19s against a plan predicting
+eight equal lanes: shard 2 was sized by a 918 s unit that really costs 190 s.
+
+Re-cut the table off the green run (total serial 8355 → **3838 s**, brick
+`iphone|goldens` **659 s**) and N drops **8 → 6**: N=7 and N=8 give the SAME
+11.0 min makespan and only widen the spread (26 → 136 → 214 s). Commit `8f48799`.
+
+**The transferable bit, now written into `MEASURED_SECONDS` and report §8:** a
+cost table is a statement about a suite AND the machine config that runs it.
+Re-measure when the config changes, not only when the specs do.
+
 ## NEXT
 
-- **Watching run `31259840319`** (8 shards, `workers: 1`). This is the DoD gate.
-- If green: take the WIP marker off #321 — **the last deliverable item.** (Body
-  was already rewritten in session 1; re-check the title/body for a stale `N=4`.)
-- If a shard is still red: read it before reacting. A per-test timeout now would
-  falsify the contention hypothesis rather than confirm it, and the honest
-  outcome would be to scope the offending spec's rewrite, not raise its budget.
-- Refresh the table once more off a green 8-shard run (report §8) — it is a
-  `workers: 2` snapshot scheduling a `workers: 1` suite. Balance is unaffected
-  (ratios); only §6b's absolute minutes read high.
+- **Push, then watch the N=6 run to zero failing checks.** This is the DoD gate.
+  N=6 is a re-balance only — every test passed at `workers: 1` regardless of
+  grouping, so this is low-risk, but it IS a fresh run and must be confirmed.
+- Then take the WIP marker off #321 — **the last deliverable item.** Body has no
+  WIP marker (session 1) but describes N=4 and scopes `workers: 1` OUT; rewrite
+  it. Editing the body does NOT retrigger CI, so do it while the run is going.
+- `a0-00c` re-scoped again: **split the `iphone|goldens` brick.** At 659 s it is
+  the only thing flooring the gate; splitting the file buys N=8 at ~480 s (~8 min).
 
 Known-unrelated: `tests/net/capacity/capacity-regression.test.ts` fails locally
 under load (34.6 ms vs a 33 ms budget) and passes both isolated and in CI. Not
