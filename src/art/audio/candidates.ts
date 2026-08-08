@@ -30,14 +30,357 @@
  * ## Review rounds
  *
  * A denied slot is regenerated *here*, in place — the file is the current offer, and
- * git carries the takes that were turned down. Round two so far:
+ * git carries the takes that were turned down. The rounds so far:
  *
  *  - **rockChip (s4-01).** All three denied, with one note: *"almost there, but they
  *    should be lower in tone."* Re-offered a transposition down — same three
- *    characters, same envelopes, pitch and filter corners moved (see the slot).
+ *    characters, same envelopes, pitch and filter corners moved.
+ *  - **All 40 slots (a0-01b).** The developer pressed **DENY ALL** on every slot on
+ *    the board, and the board promises *"generate 3 new options"* on that press. This
+ *    file is that generation: `a`, `b`, `c` are new everywhere, in the amended §4.7
+ *    register — clean, modern, futura sci-fi. The takes they replace are the ones
+ *    printed on the board as `blunt dry tick, low` · `deep slow grinding rasp` ·
+ *    `sharp metallic clang-ping` · `bright zippy sweep-hit`, and git carries them.
+ *
+ * ## What the round-2 candidates are made of, and why
+ *
+ * `a0-01`'s own post-mortem is the map, and it is not re-learnt here: the first
+ * re-voice retired `square`, replaced it with bare sine partials on a linear decay,
+ * and produced *"a glockenspiel… an arcade blip swapped for a toy xylophone. Not
+ * less toony, differently toony."* **The instrument carries the register, not the
+ * oscillator.** So every candidate below is built out of the round-2 instrument
+ * (`./synth`: `decayCurve`, `resonance`, `lowPassEnd`, `bandPass`) through the five
+ * builders under this comment, and a bare waveform with an envelope on it is not an
+ * offer this file makes any more:
+ *
+ *  - {@link band} / {@link plate} — resonant **band-passed noise**: a partial of a
+ *    struck body, made of material rather than of a tone. `plate` stacks two or three
+ *    **inharmonic** bands, deliberately *not* the ratified `GLASS_PARTIALS` spacing —
+ *    an offer that reuses the incumbent's material is the incumbent with a filter on
+ *    it, which the brief names as a fake choice.
+ *  - {@link swept} — a body with the **filter moving across it**: a coil dumping
+ *    charge, a bubble failing, a drive spinning up. §5.4 is explicit that a filter
+ *    sweep is a different gesture from a pitch chirp, and it is the one this register
+ *    is built on.
+ *  - {@link grains} — **granular** excitation: one short grain retriggered every few
+ *    milliseconds, so the texture is many tiny contacts rather than one tone. This is
+ *    `repeat` used as a rattle, the non-arcade use `docs/audio-revoice-spec.md` §5.3
+ *    keeps open with a written reason; it is never a trill and never carries pitch.
+ *  - {@link returns} — **space**, written as ordinary late layers rather than as a
+ *    reverb in the voice model (`./synth`'s own rule). Reserved for the big events;
+ *    a tail on a 28 ms interface tick only smears the mix on a phone speaker.
+ *
+ * ## The three characters, per family
+ *
+ * The brief's bar is that the three options differ **from each other and from the
+ * incumbent** in the thing that carries the register — the excitation, the body, the
+ * tail — rather than in pitch. So each family gets its own three metaphors, and they
+ * are not the same three metaphors twice:
+ *
+ * | family | a | b | c |
+ * |---|---|---|---|
+ * | mine | abrasive cutting head — grains, dry, no tone | pressure and mass — low swept body, sub weight | induction — band-passed metal that rings |
+ * | fight | coil discharge — charge into a snap | mass driver — pneumatic weight and air | particle shear — thin ionised band, room behind it |
+ * | station | magnetic clamp — dull thunk, servo settle | hydraulic seat — pressure released into a seat | telemetry — narrow filtered bands, machine-fast |
+ * | ship | drive spinning up | reaction mass — thrust and pressure | field collapse — a resonance closing |
+ * | clock | struck steel | pressure horn | swept siren band |
+ * | music | filtered analogue | granular texture bed | wide detuned space |
  */
 
-import type { SoundName, SoundSpec } from './bank';
+import type { SoundLayer, SoundName, SoundSpec } from './bank';
+import type { VoiceSpec } from './synth';
+
+// ---------------------------------------------------------------------------
+// The candidate instrument. Five builders, all of them made of the round-2 synth
+// (`./synth`) rather than of a bare oscillator, so no candidate in this file can
+// be round 1 under a new name. Everything that carries character — the corner, the
+// Q, the grain rate, the tail — is a number at the call site, not a default here.
+// ---------------------------------------------------------------------------
+
+/** `exactOptionalPropertyTypes`: an absent `at` is not `at: undefined`. */
+function place(spec: VoiceSpec, at?: number): SoundLayer {
+  return at === undefined ? { spec } : { spec, at };
+}
+
+/**
+ * One resonant band of noise — a single partial of a struck body.
+ *
+ * `bandPass` over `noise` is the transient this register runs on: narrow, pitched,
+ * and made entirely of the material that went into it. The alternative — the attack
+ * segment of a tone standing in for a strike — is what round 1 shipped.
+ */
+function band(
+  name: string,
+  freq: number,
+  o: {
+    readonly gain: number;
+    readonly decay: number;
+    /** Q. 4 is a knock, 8 is a struck plate, 12 is a tuning fork. */
+    readonly q?: number;
+    readonly attack?: number;
+    readonly hold?: number;
+    readonly curve?: number;
+    readonly punch?: number;
+    readonly hp?: number;
+    readonly at?: number;
+    readonly seed: number;
+  },
+): SoundLayer {
+  return place(
+    {
+      name,
+      wave: 'noise',
+      attack: o.attack ?? 0.0004,
+      hold: o.hold ?? 0.002,
+      decay: o.decay,
+      decayCurve: o.curve ?? 6,
+      ...(o.punch === undefined ? {} : { punch: o.punch }),
+      freq,
+      lowPass: freq,
+      resonance: o.q ?? 6,
+      bandPass: true,
+      ...(o.hp === undefined ? {} : { highPass: o.hp }),
+      gain: o.gain,
+      seed: o.seed,
+    },
+    o.at,
+  );
+}
+
+/**
+ * A struck **plate**: an edge, then two or three **inharmonic** partials ringing.
+ *
+ * Three things make this metal rather than the glockenspiel round 1 shipped, and
+ * all three are deliberate departures from the incumbent's struck note:
+ *
+ *  - **The spacing is not `GLASS_PARTIALS`** (1 · 2.76 · 5.4). That set is the
+ *    ratified Gantry/Bone material and it is what every struck slot of the shipped
+ *    bank is already made of — re-offering it would make a candidate an A/B against
+ *    itself. 1 · 2.41 · 4.17 is a different plate.
+ *  - **Each partial is a grained body behind its own resonant corner**, not a bare
+ *    sine. A pure partial is a test tone; a triangle with a third of its signal as
+ *    pitched noise, sung through a Q at its own frequency, is a body that was hit.
+ *    It is also *audible*: a narrow noise band passes so little of what enters it
+ *    that a band-only plate arrives at a tenth of the level the bank works at.
+ *  - **The edge is separate** — a short {@link band} an octave and a half up, gone
+ *    in 30 ms. Two hard things touching, ahead of the note they produce.
+ *
+ * Partials above the fundamental decay faster and roll off, so the stack collapses
+ * to its root and rings out rather than fading like a volume knob turning down.
+ */
+function plate(
+  name: string,
+  freq: number,
+  o: {
+    readonly gain: number;
+    readonly decay: number;
+    readonly ratios?: readonly number[];
+    readonly q?: number;
+    readonly curve?: number;
+    readonly punch?: number;
+    /** Grain on the fundamental, 0..1. Rises on each partial above it. */
+    readonly grain?: number;
+    /** Scale the contact edge, 0 to drop it. Default 1. */
+    readonly edge?: number;
+    readonly at?: number;
+    readonly seed: number;
+  },
+): SoundLayer[] {
+  const ratios = o.ratios ?? [1, 2.41, 4.17];
+  const grain = o.grain ?? 0.3;
+  const edge = o.edge ?? 1;
+  const layers: SoundLayer[] = [];
+
+  if (edge > 0) {
+    layers.push(
+      band(`${name}.edge`, freq * 3.1, {
+        gain: Math.min(1, o.gain * 0.55 * edge),
+        decay: Math.min(0.03, o.decay * 0.5),
+        q: 5,
+        curve: 7,
+        punch: 0.5,
+        ...(o.at === undefined ? {} : { at: o.at }),
+        seed: o.seed + 40,
+      }),
+    );
+  }
+
+  for (const [i, r] of ratios.entries()) {
+    layers.push(
+      place(
+        {
+          name: `${name}.p${i}`,
+          wave: 'triangle',
+          attack: 0.0008,
+          hold: 0.0015,
+          decay: o.decay * Math.pow(0.62, i),
+          decayCurve: (o.curve ?? 5) + i,
+          ...(i === 0 && o.punch !== undefined ? { punch: o.punch } : {}),
+          freq: freq * r,
+          noiseMix: Math.min(0.6, grain + i * 0.08),
+          lowPass: freq * r * 1.25,
+          resonance: (o.q ?? 7) + i * 1.5,
+          gain: Math.min(1, o.gain / Math.pow(i + 1, 1.4)),
+          seed: o.seed + i,
+        },
+        o.at,
+      ),
+    );
+  }
+
+  return layers;
+}
+
+/**
+ * A body with the filter travelling across it.
+ *
+ * The gesture is energy arriving or leaving — a coil charging, a field failing, a
+ * drive spinning up — and §5.4 separates it from a pitch chirp for exactly that
+ * reason: the pitch may stand still while the corner moves, which is a machine, or
+ * the pitch may slide, which is a cartoon.
+ */
+function swept(
+  name: string,
+  o: {
+    readonly wave: VoiceSpec['wave'];
+    readonly freq: number;
+    readonly freqEnd?: number;
+    /** Cutoff at the start and at the end, Hz. */
+    readonly from: number;
+    readonly to?: number;
+    readonly q: number;
+    readonly gain: number;
+    readonly attack: number;
+    readonly hold: number;
+    readonly decay: number;
+    readonly curve?: number;
+    readonly punch?: number;
+    readonly noiseMix?: number;
+    readonly hp?: number;
+    readonly vib?: readonly [depth: number, rate: number];
+    readonly at?: number;
+    readonly seed: number;
+  },
+): SoundLayer {
+  return place(
+    {
+      name,
+      wave: o.wave,
+      attack: o.attack,
+      hold: o.hold,
+      decay: o.decay,
+      ...(o.curve === undefined ? {} : { decayCurve: o.curve }),
+      ...(o.punch === undefined ? {} : { punch: o.punch }),
+      freq: o.freq,
+      ...(o.freqEnd === undefined ? {} : { freqEnd: o.freqEnd }),
+      ...(o.vib === undefined ? {} : { vibratoDepth: o.vib[0], vibratoRate: o.vib[1] }),
+      ...(o.noiseMix === undefined ? {} : { noiseMix: o.noiseMix }),
+      lowPass: o.from,
+      ...(o.to === undefined ? {} : { lowPassEnd: o.to }),
+      resonance: o.q,
+      ...(o.hp === undefined ? {} : { highPass: o.hp }),
+      gain: o.gain,
+      seed: o.seed,
+    },
+    o.at,
+  );
+}
+
+/**
+ * Granular excitation — one short grain retriggered every few milliseconds.
+ *
+ * A cutting head on stone, gravel under load, a servo stepping: many tiny contacts,
+ * not one tone with a texture painted on it. `repeat` restarts the pitch envelope,
+ * so the grain rate is audible as rate rather than as pitch, which is the
+ * non-arcade use `docs/audio-revoice-spec.md` §5.3 explicitly leaves open. It never
+ * carries a melody here and never repeats a musical interval.
+ */
+function grains(
+  name: string,
+  o: {
+    readonly freq: number;
+    readonly freqEnd?: number;
+    /** Seconds between grains. 0.002–0.008 is texture; above 0.02 is a rattle. */
+    readonly grain: number;
+    readonly gain: number;
+    readonly attack?: number;
+    readonly hold: number;
+    readonly decay: number;
+    readonly curve?: number;
+    readonly from: number;
+    readonly to?: number;
+    readonly q?: number;
+    readonly hp?: number;
+    readonly punch?: number;
+    readonly at?: number;
+    readonly seed: number;
+  },
+): SoundLayer {
+  return place(
+    {
+      name,
+      wave: 'noise',
+      attack: o.attack ?? 0.0008,
+      hold: o.hold,
+      decay: o.decay,
+      decayCurve: o.curve ?? 4,
+      ...(o.punch === undefined ? {} : { punch: o.punch }),
+      freq: o.freq,
+      ...(o.freqEnd === undefined ? {} : { freqEnd: o.freqEnd }),
+      repeat: o.grain,
+      lowPass: o.from,
+      ...(o.to === undefined ? {} : { lowPassEnd: o.to }),
+      resonance: o.q ?? 2.6,
+      ...(o.hp === undefined ? {} : { highPass: o.hp }),
+      gain: o.gain,
+      seed: o.seed,
+    },
+    o.at,
+  );
+}
+
+/**
+ * Late, quiet, diffuse returns — the space the event happened in.
+ *
+ * Written as ordinary layers because `./synth` refuses to grow a reverb into the
+ * voice model, and reserved for the handful of events big enough to have a room:
+ * an explosion, a structure failing, a station dying. Each return is darker and
+ * quieter than the one before it, which is what a real reflection does.
+ */
+function returns(
+  name: string,
+  o: {
+    readonly freq: number;
+    readonly gain: number;
+    readonly decay: number;
+    readonly from: number;
+    readonly to?: number;
+    readonly at: number;
+    /** Seconds between returns. */
+    readonly gap?: number;
+    readonly count?: number;
+    readonly seed: number;
+  },
+): SoundLayer[] {
+  const count = o.count ?? 2;
+  const gap = o.gap ?? 0.13;
+  return Array.from({ length: count }, (_, i) =>
+    swept(`${name}.r${i}`, {
+      wave: 'noise',
+      freq: o.freq * Math.pow(0.72, i),
+      from: o.from * Math.pow(0.6, i),
+      ...(o.to === undefined ? {} : { to: o.to * Math.pow(0.6, i) }),
+      q: 1.8,
+      gain: o.gain * Math.pow(0.55, i),
+      attack: 0.004 + i * 0.004,
+      hold: 0.01,
+      decay: o.decay * Math.pow(0.85, i),
+      curve: 3 - i * 0.4,
+      at: o.at + gap * i,
+      seed: o.seed + i,
+    }),
+  );
+}
 
 /** One candidate voice for a slot: an id, a short character label, and the spec itself. */
 export interface SoundCandidate {
@@ -107,38 +450,63 @@ export const CANDIDATE_SLOT_ORDER: readonly string[] = [
 
 /** Every reviewable slot, keyed by id (each id is also its shipped {@link SoundName}). */
 export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
-  // s4-01 — regenerated LOWER, on the developer's review note: *"The sounds are
-  // almost there, but they should be lower in tone."* Read as written: the three
-  // characters were right, so this is a transposition, not a redesign. In each
-  // candidate exactly five numbers moved — `freq`, `freqEnd`, the two filter
-  // corners, and a compensating `gain` — and everything that carries character
-  // (wave, attack, hold, decay, punch, vibrato, seed) is byte-identical to the
-  // take that was denied, so what the developer hears change is the tone alone.
+  // === MINE (a0-01b) ========================================================
   //
-  //   the move, per candidate:  pitch ÷1.9–2.9 (11–18 semitones)
-  //                             low-pass corner ÷4 (two octaves)
-  //                             measured spectral centre −52% to −59%
+  // Three tools, not three settings on one tool. Across the whole family:
   //
-  // All three now sit *below the darkest thing that was denied* (the old rasp), and
-  // they spread an octave apart in pitch — 38 / 76 / 130 Hz of grain — so the next
-  // pass is a choice of three, not three takes on one. The `gain` rise gives back
-  // roughly what the lower corner took: "lower" must not arrive as "quieter" on a
-  // sound that is the `TELL.mineHit` voice (`./bank`) and fires all match.
+  //   a  an abrasive **cutting head** — granular excitation, dry, no tone in it
+  //   b  **pressure and mass** — a low body under a closing filter, sub weight
+  //   c  **induction** — band-passed metal, the only one of the three with a ring
   //
-  // Why it does not go boomy at rate: the low-pass moved, the *envelope* did not —
-  // the decays are as short as they were, so a 28 Hz retrigger stacks no more energy
-  // than the denied set did. Measured, overlap-added at that rate: a 0.112 (was
-  // 0.120), c 0.113 (was 0.136), and the long rasp b 0.168 against its own 0.166 —
-  // level with what was already judged "almost there", not above it. The high-pass
-  // corner stays clear of the sub band on all three (38 / 50 / 90 Hz).
+  // The s4-01 direction on `rockChip` — *"almost there, but they should be lower
+  // in tone"* — is ratified developer feedback and survives this reset even though
+  // the takes it was given about do not: all three offers still sit under the
+  // ceiling `./candidates.test.ts` guards, and still spread far enough apart to be
+  // a choice rather than three takes on one idea.
+  //
+  // Why none of them go boomy at rate: `rockChip` fires at ~28 Hz, so what matters
+  // is not the corner but the envelope. Every offer here decays inside 60 ms with a
+  // curve of 5 or more — a real tail that is *gone* before the next tick, where the
+  // linear ramps of the denied set were still at half level when it arrived.
   rockChip: {
     label: "Rock Chip",
     context: "Per-tick mining laser hit while chipping a rock — fires rapidly, must read as a stream",
     current: 'rockChip',
     candidates: [
-      { id: 'a', character: "blunt dry tick, low", spec: {"name":"rockChip_dryTick","wave":"noise","attack":0.001,"hold":0.008,"decay":0.05,"punch":0.5,"freq":76,"freqEnd":54,"lowPass":220,"highPass":50,"gain":0.44,"seed":20480} },
-      { id: 'b', character: "deep slow grinding rasp", spec: {"name":"rockChip_grindRasp","wave":"noise","attack":0.001,"hold":0.02,"decay":0.14,"punch":0.25,"freq":38,"freqEnd":28,"vibratoDepth":0.15,"vibratoRate":14,"lowPass":175,"highPass":38,"gain":0.42,"seed":20481} },
-      { id: 'c', character: "heavy low crack, punchy", spec: {"name":"rockChip_sharpCrack","wave":"noise","attack":0.001,"hold":0.01,"decay":0.07,"punch":0.6,"freq":130,"freqEnd":86,"lowPass":420,"highPass":90,"gain":0.40,"seed":20482} },
+      {
+        id: 'a',
+        character: "abrasive cutting head, dry grit",
+        spec: {
+          name: 'rockChip_a_cuttingHead',
+          layers: [
+            grains('rockChip_a.grit', { freq: 68, grain: 0.0035, gain: 0.4, hold: 0.004, decay: 0.05, curve: 6, punch: 0.55, from: 520, to: 300, q: 3.4, hp: 90, seed: 30100 }),
+            band('rockChip_a.edge', 300, { gain: 0.18, decay: 0.026, q: 4.5, curve: 7, seed: 30103 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "blunt pressure bite, sub weight",
+        spec: {
+          name: 'rockChip_b_pressureBite',
+          layers: [
+            swept('rockChip_b.mass', { wave: 'sine', freq: 58, from: 240, to: 120, q: 2.4, gain: 0.5, attack: 0.0008, hold: 0.007, decay: 0.055, curve: 5.5, punch: 0.9, noiseMix: 0.35, seed: 30110 }),
+            grains('rockChip_b.crush', { freq: 44, grain: 0.006, gain: 0.16, hold: 0.004, decay: 0.03, curve: 6, from: 340, q: 2, hp: 40, seed: 30112 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "induction tick, short metal ring",
+        spec: {
+          name: 'rockChip_c_induction',
+          layers: [
+            ...plate('rockChip_c.ring', 250, { gain: 0.4, decay: 0.055, ratios: [1, 2.41], q: 8, curve: 5, punch: 0.5, seed: 30120 }),
+            swept('rockChip_c.floor',
+              { wave: 'noise', freq: 90, from: 300, to: 160, q: 2.2, gain: 0.2, attack: 0.0006, hold: 0.004, decay: 0.03, curve: 6, seed: 30124 }),
+          ],
+        },
+      },
     ],
   },
   hullHit: {
@@ -156,39 +524,179 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     context: "A rock advances one of its three crack stages",
     current: 'rockCrack',
     candidates: [
-      { id: 'a', character: "single sharp snap", spec: {"name":"rockCrack_snap","wave":"noise","attack":0.002,"hold":0.01,"decay":0.08,"punch":0.5,"freq":300,"freqEnd":140,"lowPass":2000,"highPass":100,"gain":0.4,"seed":20489} },
-      { id: 'b', character: "deep structural pop", spec: {"name":"rockCrack_deepPop","wave":"noise","attack":0.003,"hold":0.02,"decay":0.16,"punch":0.35,"freq":180,"freqEnd":90,"lowPass":1400,"highPass":40,"gain":0.42,"seed":20490} },
-      { id: 'c', character: "brittle jittery shatter", spec: {"name":"rockCrack_shatter","wave":"noise","attack":0.001,"hold":0.015,"decay":0.12,"punch":0.45,"freq":260,"freqEnd":200,"vibratoDepth":0.2,"vibratoRate":30,"lowPass":2600,"highPass":120,"gain":0.38,"seed":20491} },
+      {
+        id: 'a',
+        character: "fracture step, splintering grains",
+        spec: {
+          name: 'rockCrack_a_fractureStep',
+          layers: [
+            band('rockCrack_a.step', 420, { gain: 0.4, decay: 0.05, q: 5, curve: 6, punch: 0.7, seed: 30130 }),
+            grains('rockCrack_a.splinter', { freq: 190, grain: 0.009, gain: 0.24, hold: 0.012, decay: 0.11, curve: 4, from: 1500, to: 500, q: 3, hp: 140, at: 0.012, seed: 30131 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "deep stone shear, pressure released",
+        spec: {
+          name: 'rockCrack_b_shear',
+          layers: [
+            swept('rockCrack_b.shear', { wave: 'noise', freq: 150, from: 1100, to: 190, q: 3, gain: 0.44, attack: 0.0015, hold: 0.012, decay: 0.14, curve: 3.4, punch: 0.5, seed: 30140 }),
+            swept('rockCrack_b.sub', { wave: 'sine', freq: 70, freqEnd: 52, from: 180, q: 1.8, gain: 0.26, attack: 0.002, hold: 0.01, decay: 0.12, curve: 3, seed: 30142 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "crystalline shear, ringing shards",
+        spec: {
+          name: 'rockCrack_c_crystal',
+          layers: [
+            ...plate('rockCrack_c.shard', 640, { gain: 0.34, decay: 0.13, ratios: [1, 2.41, 4.17], q: 9, curve: 5, punch: 0.5, seed: 30150 }),
+            grains('rockCrack_c.dust', { freq: 260, grain: 0.011, gain: 0.12, hold: 0.008, decay: 0.09, curve: 4.5, from: 2200, to: 900, q: 2.4, hp: 300, at: 0.02, seed: 30154 }),
+          ],
+        },
+      },
     ],
   },
+  // The ore payout is the mechanic in this slot, so all three keep one element
+  // that RISES — §2.3's "signal yellow means ore" — but each pays it out in its
+  // own material: a rattles it out of the debris, b lifts it on the pressure
+  // wave, c rings it off the shards.
   rockBurst: {
     label: "Rock Burst + Ore Payout",
     context: "A rock breaks apart entirely and pays out ore",
     current: 'rockBurst',
     candidates: [
-      { id: 'a', character: "big crumble, bright glint", spec: {"name":"rockBurst_crumbleGlint","layers":[{"spec":{"name":"crumbleBig","wave":"noise","attack":0.003,"hold":0.06,"decay":0.4,"punch":0.55,"freq":300,"freqEnd":80,"lowPass":2200,"highPass":40,"gain":0.48,"seed":20492},"at":0},{"spec":{"name":"oreGlintUp","wave":"square","attack":0.004,"hold":0.02,"decay":0.14,"freq":600,"freqEnd":1300,"duty":0.3,"gain":0.24,"seed":20493},"at":0.06}]} },
-      { id: 'b', character: "sharp crack, bell chime", spec: {"name":"rockBurst_crackChime","layers":[{"spec":{"name":"crackSharp","wave":"noise","attack":0.001,"hold":0.03,"decay":0.2,"punch":0.7,"freq":400,"freqEnd":120,"lowPass":3000,"highPass":80,"gain":0.45,"seed":20494},"at":0},{"spec":{"name":"chimeArp","wave":"triangle","attack":0.003,"hold":0.03,"decay":0.18,"freq":700,"freqEnd":1400,"arpMul":1.5,"arpTime":0.05,"gain":0.28,"seed":20495},"at":0.03}]} },
-      { id: 'c', character: "deep rumble, shimmer trail", spec: {"name":"rockBurst_rumbleShimmer","layers":[{"spec":{"name":"rumbleDeep","wave":"noise","attack":0.005,"hold":0.08,"decay":0.5,"punch":0.4,"freq":220,"freqEnd":60,"lowPass":1200,"highPass":30,"gain":0.5,"seed":20496},"at":0},{"spec":{"name":"sparkleTrail","wave":"saw","attack":0.005,"hold":0.03,"decay":0.2,"freq":550,"freqEnd":1500,"vibratoDepth":0.1,"vibratoRate":18,"gain":0.22,"seed":20497},"at":0.08}]} },
+      {
+        id: 'a',
+        character: "shell fracture, debris rattle, ore lifting out",
+        spec: {
+          name: 'rockBurst_a_debrisRattle',
+          layers: [
+            band('rockBurst_a.fracture', 380, { gain: 0.4, decay: 0.09, q: 4.5, curve: 5, punch: 0.8, seed: 30160 }),
+            grains('rockBurst_a.debris', { freq: 210, freqEnd: 120, grain: 0.026, gain: 0.3, hold: 0.05, decay: 0.34, curve: 3.2, from: 1800, to: 420, q: 2.8, hp: 90, at: 0.015, seed: 30161 }),
+            ...plate('rockBurst_a.ore0', 880, { gain: 0.2, decay: 0.11, ratios: [1, 2.41], q: 9, curve: 5, edge: 0.4, at: 0.11, seed: 30163 }),
+            ...plate('rockBurst_a.ore1', 1320, { gain: 0.17, decay: 0.14, ratios: [1, 2.41], q: 10, curve: 5, edge: 0.4, at: 0.17, seed: 30166 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "pressure burst, dust settling, ore on the wave",
+        spec: {
+          name: 'rockBurst_b_pressureBurst',
+          layers: [
+            swept('rockBurst_b.burst', { wave: 'noise', freq: 320, freqEnd: 70, from: 2400, to: 260, q: 2.6, gain: 0.32, attack: 0.0015, hold: 0.03, decay: 0.42, curve: 2.8, punch: 0.85, seed: 30170 }),
+            swept('rockBurst_b.sub', { wave: 'sine', freq: 62, freqEnd: 44, from: 160, q: 1.6, gain: 0.18, attack: 0.004, hold: 0.02, decay: 0.3, curve: 2.4, seed: 30172 }),
+            swept('rockBurst_b.ore', { wave: 'noise', freq: 620, from: 700, to: 2600, q: 7, gain: 0.24, attack: 0.006, hold: 0.02, decay: 0.2, curve: 3.4, hp: 400, at: 0.09, seed: 30173 }),
+            ...returns('rockBurst_b.dust', { freq: 260, gain: 0.1, decay: 0.26, from: 900, to: 300, at: 0.16, gap: 0.15, count: 2, seed: 30175 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "shattered plate, shards ringing out",
+        spec: {
+          name: 'rockBurst_c_shatteredPlate',
+          layers: [
+            ...plate('rockBurst_c.shatter', 300, { gain: 0.42, decay: 0.3, ratios: [1, 2.41, 4.17], q: 6, curve: 4, punch: 0.7, seed: 30180 }),
+            ...plate('rockBurst_c.ore', 990, { gain: 0.2, decay: 0.2, ratios: [1, 2.05], q: 10, curve: 5, edge: 0.5, at: 0.12, seed: 30184 }),
+            ...returns('rockBurst_c.room', { freq: 340, gain: 0.08, decay: 0.22, from: 1200, to: 420, at: 0.2, gap: 0.14, count: 2, seed: 30187 }),
+          ],
+        },
+      },
     ],
   },
+  // The tightest pair in the bank is `oreCollect` / `depositTick` (§8) — *picked a
+  // chunk up* vs *banked a chunk*. Every offer here is kept in the 900–2000 Hz
+  // region and every `depositTick` offer under 700 Hz and under half its level, so
+  // the pair stays separable whichever letters the developer picks, including a
+  // mixed pair.
   oreCollect: {
     label: "Ore Collect",
     context: "A loose ore chunk is tractored in",
     current: 'oreCollect',
     candidates: [
-      { id: 'a', character: "quick bright blip", spec: {"name":"oreCollect_brightBlip","wave":"square","attack":0.002,"hold":0.01,"decay":0.05,"freq":800,"freqEnd":1200,"duty":0.25,"gain":0.24,"seed":20498} },
-      { id: 'b', character: "twinkly rounder ping", spec: {"name":"oreCollect_twinklyPing","wave":"triangle","attack":0.003,"hold":0.02,"decay":0.09,"freq":600,"freqEnd":1000,"vibratoDepth":0.08,"vibratoRate":30,"gain":0.26,"seed":20499} },
-      { id: 'c', character: "sparkly cha-ching flick", spec: {"name":"oreCollect_chaChing","wave":"square","attack":0.002,"hold":0.012,"decay":0.08,"freq":500,"freqEnd":700,"arpMul":2,"arpTime":0.03,"duty":0.4,"gain":0.24,"seed":20500} },
+      {
+        id: 'a',
+        character: "magnetic capture, one hard snap",
+        spec: {
+          name: 'oreCollect_a_magneticSnap',
+          layers: [
+            ...plate('oreCollect_a.snap', 1500, { gain: 0.4, decay: 0.05, ratios: [1, 2.41], q: 8, curve: 6, punch: 0.6, grain: 0.34, seed: 30190 }),
+            swept('oreCollect_a.pull', { wave: 'noise', freq: 300, from: 900, to: 380, q: 2.4, gain: 0.18, attack: 0.0008, hold: 0.004, decay: 0.045, curve: 5, seed: 30193 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "servo intake, filter opening",
+        spec: {
+          name: 'oreCollect_b_servoIntake',
+          layers: [
+            swept('oreCollect_b.intake', { wave: 'triangle', freq: 460, from: 380, to: 2600, q: 5.5, gain: 0.34, attack: 0.003, hold: 0.012, decay: 0.075, curve: 3.4, noiseMix: 0.22, seed: 30195 }),
+            grains('oreCollect_b.step', { freq: 900, grain: 0.004, gain: 0.14, hold: 0.004, decay: 0.03, curve: 6, from: 2600, q: 3, hp: 500, seed: 30196 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "telemetry blip, two narrow bands",
+        spec: {
+          name: 'oreCollect_c_telemetry',
+          layers: [
+            ...plate('oreCollect_c.blip', 2200, { gain: 0.3, decay: 0.055, ratios: [1, 2.05], q: 12, curve: 6, punch: 0.4, grain: 0.08, edge: 0, seed: 30200 }),
+          ],
+        },
+      },
     ],
   },
+  // The two-note insistence is the tell — that is what says *stop mining, fly
+  // home* rather than *you picked something up* — so all three keep two events
+  // and keep the interval. What changes is what is making them: a is struck
+  // steel with a mass under it, b is two pressure horns, c is a thin band swept
+  // upward twice, which is the only one of the three with no strike in it at all.
   holdFull: {
     label: "Cargo Hold Full",
     context: "Cargo hold reaches capacity — signals 'fly home'",
     current: 'holdFull',
     candidates: [
-      { id: 'a', character: "urgent descending two-tone", spec: {"name":"holdFull_descendUrgent","layers":[{"spec":{"name":"noteHigh","wave":"square","attack":0.003,"hold":0.04,"decay":0.05,"freq":988,"duty":0.5,"gain":0.32,"seed":20501},"at":0},{"spec":{"name":"noteLow","wave":"square","attack":0.003,"hold":0.04,"decay":0.08,"freq":784,"duty":0.5,"gain":0.32,"seed":20502},"at":0.09}]} },
-      { id: 'b', character: "buzzy nagging alarm", spec: {"name":"holdFull_buzzyAlarm","layers":[{"spec":{"name":"buzzA","wave":"triangle","attack":0.004,"hold":0.06,"decay":0.08,"freq":700,"vibratoDepth":0.15,"vibratoRate":12,"gain":0.34,"seed":20503},"at":0},{"spec":{"name":"buzzB","wave":"triangle","attack":0.004,"hold":0.06,"decay":0.12,"freq":940,"vibratoDepth":0.15,"vibratoRate":12,"gain":0.34,"seed":20504},"at":0.13}]} },
-      { id: 'c', character: "sharp saw double-ping", spec: {"name":"holdFull_sawDoublePing","layers":[{"spec":{"name":"pingA","wave":"saw","attack":0.002,"hold":0.03,"decay":0.05,"freq":900,"freqEnd":1000,"gain":0.28,"seed":20505},"at":0},{"spec":{"name":"pingB","wave":"saw","attack":0.002,"hold":0.03,"decay":0.09,"freq":1200,"freqEnd":1300,"gain":0.28,"seed":20506},"at":0.1}]} },
+      {
+        id: 'a',
+        character: "two clamps closing, rising",
+        spec: {
+          name: 'holdFull_a_clamps',
+          layers: [
+            ...plate('holdFull_a.one', 700, { gain: 0.34, decay: 0.1, ratios: [1, 2.41], q: 7, curve: 5, punch: 0.5, seed: 30210 }),
+            swept('holdFull_a.oneMass', { wave: 'sine', freq: 120, from: 300, to: 170, q: 2.2, gain: 0.3, attack: 0.001, hold: 0.008, decay: 0.09, curve: 4.5, noiseMix: 0.12, seed: 30213 }),
+            ...plate('holdFull_a.two', 1050, { gain: 0.34, decay: 0.16, ratios: [1, 2.41], q: 8, curve: 5, punch: 0.5, at: 0.13, seed: 30215 }),
+            swept('holdFull_a.twoMass', { wave: 'sine', freq: 150, from: 340, to: 190, q: 2.2, gain: 0.3, attack: 0.001, hold: 0.008, decay: 0.11, curve: 4.5, noiseMix: 0.12, at: 0.13, seed: 30218 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "twin pressure horns, insistent",
+        spec: {
+          name: 'holdFull_b_pressureHorns',
+          layers: [
+            swept('holdFull_b.one', { wave: 'triangle', freq: 350, from: 500, to: 1400, q: 4.5, gain: 0.36, attack: 0.006, hold: 0.05, decay: 0.09, curve: 3, noiseMix: 0.16, seed: 30220 }),
+            swept('holdFull_b.two', { wave: 'triangle', freq: 525, from: 700, to: 1800, q: 4.5, gain: 0.36, attack: 0.006, hold: 0.05, decay: 0.14, curve: 3, noiseMix: 0.16, at: 0.15, seed: 30221 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "thin band swept up, twice, no strike",
+        spec: {
+          name: 'holdFull_c_sweptBand',
+          layers: [
+            swept('holdFull_c.one', { wave: 'noise', freq: 1500, from: 900, to: 3400, q: 8, gain: 0.9, attack: 0.005, hold: 0.02, decay: 0.08, curve: 3.4, hp: 700, seed: 30230 }),
+            swept('holdFull_c.two', { wave: 'noise', freq: 1800, from: 1100, to: 4200, q: 8, gain: 0.9, attack: 0.005, hold: 0.02, decay: 0.12, curve: 3.4, hp: 800, at: 0.12, seed: 30232 }),
+          ],
+        },
+      },
     ],
   },
   turretFire: {
@@ -326,9 +834,39 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     context: "Ore banked into your economy — a drop that settles.",
     current: 'bankOre',
     candidates: [
-      { id: 'a', character: "crisp square coin-drop", spec: {"name":"bankOre_a","layers":[{"spec":{"name":"bankOre_a_drop","wave":"square","attack":0.002,"hold":0.015,"decay":0.07,"freq":990,"freqEnd":660,"duty":0.3,"gain":0.26,"seed":20576}},{"spec":{"name":"bankOre_a_settle","wave":"square","attack":0.002,"hold":0.02,"decay":0.14,"freq":495,"duty":0.4,"gain":0.2,"seed":20577},"at":0.07}]} },
-      { id: 'b', character: "woody marimba-like thud", spec: {"name":"bankOre_b","layers":[{"spec":{"name":"bankOre_b_hit","wave":"triangle","attack":0.004,"hold":0.03,"decay":0.12,"freq":660,"freqEnd":440,"gain":0.28,"seed":20578}},{"spec":{"name":"bankOre_b_resonance","wave":"triangle","attack":0.004,"hold":0.02,"decay":0.2,"freq":330,"gain":0.18,"seed":20579},"at":0.1}]} },
-      { id: 'c', character: "sparkling metallic coin clink", spec: {"name":"bankOre_c","layers":[{"spec":{"name":"bankOre_c_clink","wave":"noise","attack":0.001,"hold":0.01,"decay":0.05,"freq":1400,"freqEnd":900,"highPass":600,"gain":0.16,"seed":20580}},{"spec":{"name":"bankOre_c_drop","wave":"sine","attack":0.003,"hold":0.02,"decay":0.12,"freq":392,"freqEnd":294,"gain":0.22,"seed":20581},"at":0.02}]} },
+      {
+        id: 'a',
+        character: "hopper drop, gravel settling",
+        spec: {
+          name: 'bankOre_a_hopper',
+          layers: [
+            band('bankOre_a.drop', 560, { gain: 0.34, decay: 0.07, q: 5, curve: 5.5, punch: 0.6, seed: 30240 }),
+            grains('bankOre_a.gravel', { freq: 240, freqEnd: 170, grain: 0.014, gain: 0.22, hold: 0.02, decay: 0.19, curve: 3.6, from: 1400, to: 420, q: 2.6, hp: 120, at: 0.03, seed: 30241 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "vault clamp, low seat",
+        spec: {
+          name: 'bankOre_b_vaultClamp',
+          layers: [
+            swept('bankOre_b.clamp', { wave: 'triangle', freq: 220, freqEnd: 180, from: 1600, to: 320, q: 3.6, gain: 0.42, attack: 0.0015, hold: 0.012, decay: 0.13, curve: 4.5, punch: 0.5, noiseMix: 0.2, seed: 30250 }),
+            swept('bankOre_b.seat', { wave: 'sine', freq: 88, from: 200, q: 2, gain: 0.24, attack: 0.003, hold: 0.014, decay: 0.16, curve: 3, at: 0.07, seed: 30252 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "two filtered tones, falling to rest",
+        spec: {
+          name: 'bankOre_c_fallingPair',
+          layers: [
+            ...plate('bankOre_c.high', 780, { gain: 0.28, decay: 0.12, ratios: [1, 2.41], q: 9, curve: 5, punch: 0.4, seed: 30260 }),
+            ...plate('bankOre_c.low', 520, { gain: 0.28, decay: 0.24, ratios: [1, 2.41], q: 9, curve: 4.5, at: 0.09, seed: 30263 }),
+          ],
+        },
+      },
     ],
   },
   upgradeBought: {
@@ -496,9 +1034,36 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     context: "One ore chunk settling into the bank on a deposit flight — soft & falling, one tick per chunk.",
     current: 'depositTick',
     candidates: [
-      { id: 'a', character: "soft falling triangle pluck", spec: {"name":"depositTickTriangle","wave":"triangle","attack":0.002,"hold":0.008,"decay":0.05,"freq":480,"freqEnd":360,"gain":0.14,"seed":20731} },
-      { id: 'b', character: "falling sine droplet", spec: {"name":"depositTickSineDroplet","wave":"sine","attack":0.002,"hold":0.006,"decay":0.05,"freq":660,"freqEnd":440,"gain":0.12,"seed":20732} },
-      { id: 'c', character: "thin muted falling square tick", spec: {"name":"depositTickSquareThin","wave":"square","attack":0.002,"hold":0.01,"decay":0.045,"freq":600,"freqEnd":450,"duty":0.12,"gain":0.13,"seed":20733} },
+      {
+        id: 'a',
+        character: "soft magnetic tick, dry",
+        spec: {
+          name: 'depositTick_a_magneticTick',
+          layers: [
+            ...plate('depositTick_a.tick', 520, { gain: 0.17, decay: 0.045, ratios: [1, 2.41], q: 7, curve: 6, punch: 0.35, edge: 0.5, seed: 30270 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "muted felt thud, no edge",
+        spec: {
+          name: 'depositTick_b_feltThud',
+          layers: [
+            swept('depositTick_b.thud', { wave: 'sine', freq: 210, freqEnd: 170, from: 420, to: 220, q: 2.2, gain: 0.24, attack: 0.002, hold: 0.006, decay: 0.06, curve: 4.5, noiseMix: 0.14, seed: 30275 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "thin air tick, breath of one chunk",
+        spec: {
+          name: 'depositTick_c_airTick',
+          layers: [
+            grains('depositTick_c.air', { freq: 620, grain: 0.0035, gain: 0.5, hold: 0.003, decay: 0.05, curve: 5, from: 1600, to: 700, q: 2.4, hp: 520, seed: 30280 }),
+          ],
+        },
+      },
     ],
   },
   respawnBeep: {

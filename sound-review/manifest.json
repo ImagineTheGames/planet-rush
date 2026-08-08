@@ -12,19 +12,19 @@
         {
           "id": "a",
           "wav": "previews/rockChip/a.wav",
-          "character": "blunt dry tick, low",
+          "character": "abrasive cutting head, dry grit",
           "params": "src/art/audio/candidates.ts#rockChip.a"
         },
         {
           "id": "b",
           "wav": "previews/rockChip/b.wav",
-          "character": "deep slow grinding rasp",
+          "character": "blunt pressure bite, sub weight",
           "params": "src/art/audio/candidates.ts#rockChip.b"
         },
         {
           "id": "c",
           "wav": "previews/rockChip/c.wav",
-          "character": "heavy low crack, punchy",
+          "character": "induction tick, short metal ring",
           "params": "src/art/audio/candidates.ts#rockChip.c"
         }
       ]
@@ -64,19 +64,19 @@
         {
           "id": "a",
           "wav": "previews/rockCrack/a.wav",
-          "character": "single sharp snap",
+          "character": "fracture step, splintering grains",
           "params": "src/art/audio/candidates.ts#rockCrack.a"
         },
         {
           "id": "b",
           "wav": "previews/rockCrack/b.wav",
-          "character": "deep structural pop",
+          "character": "deep stone shear, pressure released",
           "params": "src/art/audio/candidates.ts#rockCrack.b"
         },
         {
           "id": "c",
           "wav": "previews/rockCrack/c.wav",
-          "character": "brittle jittery shatter",
+          "character": "crystalline shear, ringing shards",
           "params": "src/art/audio/candidates.ts#rockCrack.c"
         }
       ]
@@ -90,19 +90,19 @@
         {
           "id": "a",
           "wav": "previews/rockBurst/a.wav",
-          "character": "big crumble, bright glint",
+          "character": "shell fracture, debris rattle, ore lifting out",
           "params": "src/art/audio/candidates.ts#rockBurst.a"
         },
         {
           "id": "b",
           "wav": "previews/rockBurst/b.wav",
-          "character": "sharp crack, bell chime",
+          "character": "pressure burst, dust settling, ore on the wave",
           "params": "src/art/audio/candidates.ts#rockBurst.b"
         },
         {
           "id": "c",
           "wav": "previews/rockBurst/c.wav",
-          "character": "deep rumble, shimmer trail",
+          "character": "shattered plate, shards ringing out",
           "params": "src/art/audio/candidates.ts#rockBurst.c"
         }
       ]
@@ -116,19 +116,19 @@
         {
           "id": "a",
           "wav": "previews/oreCollect/a.wav",
-          "character": "quick bright blip",
+          "character": "magnetic capture, one hard snap",
           "params": "src/art/audio/candidates.ts#oreCollect.a"
         },
         {
           "id": "b",
           "wav": "previews/oreCollect/b.wav",
-          "character": "twinkly rounder ping",
+          "character": "servo intake, filter opening",
           "params": "src/art/audio/candidates.ts#oreCollect.b"
         },
         {
           "id": "c",
           "wav": "previews/oreCollect/c.wav",
-          "character": "sparkly cha-ching flick",
+          "character": "telemetry blip, two narrow bands",
           "params": "src/art/audio/candidates.ts#oreCollect.c"
         }
       ]
@@ -142,19 +142,19 @@
         {
           "id": "a",
           "wav": "previews/holdFull/a.wav",
-          "character": "urgent descending two-tone",
+          "character": "two clamps closing, rising",
           "params": "src/art/audio/candidates.ts#holdFull.a"
         },
         {
           "id": "b",
           "wav": "previews/holdFull/b.wav",
-          "character": "buzzy nagging alarm",
+          "character": "twin pressure horns, insistent",
           "params": "src/art/audio/candidates.ts#holdFull.b"
         },
         {
           "id": "c",
           "wav": "previews/holdFull/c.wav",
-          "character": "sharp saw double-ping",
+          "character": "thin band swept up, twice, no strike",
           "params": "src/art/audio/candidates.ts#holdFull.c"
         }
       ]
@@ -506,19 +506,19 @@
         {
           "id": "a",
           "wav": "previews/bankOre/a.wav",
-          "character": "crisp square coin-drop",
+          "character": "hopper drop, gravel settling",
           "params": "src/art/audio/candidates.ts#bankOre.a"
         },
         {
           "id": "b",
           "wav": "previews/bankOre/b.wav",
-          "character": "woody marimba-like thud",
+          "character": "vault clamp, low seat",
           "params": "src/art/audio/candidates.ts#bankOre.b"
         },
         {
           "id": "c",
           "wav": "previews/bankOre/c.wav",
-          "character": "sparkling metallic coin clink",
+          "character": "two filtered tones, falling to rest",
           "params": "src/art/audio/candidates.ts#bankOre.c"
         }
       ]
@@ -948,19 +948,19 @@
         {
           "id": "a",
           "wav": "previews/depositTick/a.wav",
-          "character": "soft falling triangle pluck",
+          "character": "soft magnetic tick, dry",
           "params": "src/art/audio/candidates.ts#depositTick.a"
         },
         {
           "id": "b",
           "wav": "previews/depositTick/b.wav",
-          "character": "falling sine droplet",
+          "character": "muted felt thud, no edge",
           "params": "src/art/audio/candidates.ts#depositTick.b"
         },
         {
           "id": "c",
           "wav": "previews/depositTick/c.wav",
-          "character": "thin muted falling square tick",
+          "character": "thin air tick, breath of one chunk",
           "params": "src/art/audio/candidates.ts#depositTick.c"
         }
       ]
