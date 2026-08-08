@@ -49,7 +49,7 @@ interface RepairStage {
    *  drew bright (pressable), and its cost. */
   wedge(): { sub: string; ready: boolean; cost: number | null } | null;
   /** The live core HP / max / bank / repair tell / repair COOLDOWN remaining this
-   *  frame. `repairGate > 0` ⇒ the wedge draws its "REPAIR in Ns" countdown and a
+   *  frame. `repairGate > 0` ⇒ the wedge draws its "REPAIR IN Ns" countdown and a
    *  press is refused `cooling-down`. */
   readout(): {
     coreHp: number;
@@ -258,7 +258,7 @@ test('at full, the REPAIR wedge is disabled with a reason ("REACTOR FULL")', asy
  * brightness the whole time, a ready-looking press that silently did nothing. The
  * full cycle, driven through the REAL door on the REAL bundle:
  *
- *   ready "+15 HP"  →  tap heals + arms cooldown  →  disabled "REPAIR in Ns" that
+ *   ready "+15 HP"  →  tap heals + arms cooldown  →  disabled "REPAIR IN Ns" that
  *   ticks down and refuses a second tap (no ore, no HP)  →  re-arms to "+15 HP" the
  *   moment the gate drains.
  *
@@ -290,7 +290,7 @@ async function driveFullCooldownCycle(page: import('@playwright/test').Page): Pr
   const armed = await page.evaluate(() => window.__repairStage!.readout());
   expect(armed!.repairGate, 'the successful repair armed the cooldown gate').toBeGreaterThan(0);
 
-  // --- Cooling down: the wedge is DISABLED with a live "REPAIR in Ns" countdown ---
+  // --- Cooling down: the wedge is DISABLED with a live "REPAIR IN Ns" countdown ---
   // Read the DRAWN wedge and the LIVE sim gate in the SAME evaluate, so the two
   // reflect one snapshot and the match below is not raced by a tick landing between
   // two reads.
@@ -298,7 +298,7 @@ async function driveFullCooldownCycle(page: import('@playwright/test').Page): Pr
     .waitForFunction(() => {
       const w = window.__repairStage!.wedge();
       const r = window.__repairStage!.readout();
-      return w && r && !w.ready && /^REPAIR in \d+s$/.test(w.sub)
+      return w && r && !w.ready && /^REPAIR IN \d+s$/.test(w.sub)
         ? { sub: w.sub, ready: w.ready, repairGate: r.repairGate }
         : null;
     }, undefined, { timeout: 20_000 })
@@ -308,7 +308,7 @@ async function driveFullCooldownCycle(page: import('@playwright/test').Page): Pr
   // drawn wedge lags the live sim by at most one render frame, so the shown ceil sits
   // within 1 s of `repairGate` — proving the copy TRACKS sim state (a UI timer would
   // drift free), while the exact re-arm below proves it hits zero on the sim's tick.
-  const shown = Number(/^REPAIR in (\d+)s$/.exec(cooling!.sub)![1]);
+  const shown = Number(/^REPAIR IN (\d+)s$/.exec(cooling!.sub)![1]);
   expect(
     Math.abs(shown - Math.max(1, Math.ceil(cooling!.repairGate))),
     'the countdown tracks the sim remaining, ceiled (within one render frame)',

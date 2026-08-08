@@ -178,25 +178,90 @@ silhouettes — never a new shape.
 
 ---
 
-## 5. Planets
+## 5. Facilities — THE CUTTERHEAD *(amended 2026-08-07 — the developer picked Direction D from `docs/art-direction/facility-concepts-r2.html` at 16:53Z; supersedes the "Earthlike planet" rules this section carried)*
 
-Earthlike, randomised per player from **four variants** so no two home worlds
-look identical (GDD §5.4).
+A home is a **rotary bore head clamped onto the claim, seen down its own
+throat** — not a world with machinery arranged around it. Randomised per player
+from **four arrangements** so no two claims look identical.
 
-**Rules:**
+### 5.0 Why this section was rewritten — read this before drawing a facility
 
-- **Oceans are steel-blue, continents are patina-green `#4FA08B`** — keeps
-  "Earth" inside the Cold Vacuum palette instead of importing a second one.
-- **The core is signal yellow `#F2D24B`** — it is the win condition, a thing
-  that matters, so it obeys the RESERVED rule (§2).
-- **Ownership = beacon ring in the player's colour (§3), always visible.**
+Round 1 of the facility board was **denied in full**, in one sentence:
+
+> *"none of these look like a mining space station"*
+
+The board's own diagnosis of what the pictures were saying instead is the
+standing brief, and every clause of it is a rule now:
+
+| Round 1 said | So a facility must |
+|---|---|
+| all three were **the same object** — a round planetoid with machinery laid over it | be a **machine**, not a body |
+| **nothing was visibly extracting** anything — no cut face, no teeth, no hole | show a working face being opened |
+| **there was no ore you could see** — no bin with a level, no spill | carry ore you can see, in a container you can read |
+| **nothing moved** — no chute, no conveyor, no barge | show a path from where ore comes out to where it goes |
+| the outlines were **radially symmetric** — "what planets are, and what working plants never are" | break the circle |
+
+If a facility drawing starts drifting back toward a generic space structure, it
+has walked back into round 1's failure. Amplify what reads as *mining*.
+
+### 5.1 The anatomy, and the job each part does
+
+Every mark on the body is something the rig is **doing**. Nothing is dressing.
+
+- **The cut face** at the bottom of the bore, with **ore seams** in it — the rock
+  being opened. Seams are chordal, never radial: a vein does not point at
+  anything, and radial seams turn the reactor into a sunburst.
+- **Sixteen teeth**, biting **inward** over that face, and the **kerf** — the one
+  bright arc where it is cutting right now, with ore thrown clear of it.
+- **The reactor** at the centre, signal yellow — the win condition, so it obeys
+  the RESERVED rule (§2). Radii `0.34 / 0.22 / 0.11 R`, unchanged since M1.
+- **Eight anchor lugs** on the rim: what clamps the head to the claim, what the
+  turrets seat on, and the outline that stops the silhouette being a disc.
+- **The ore circuit** — a deck truss carrying the throat chute out to **two
+  hoppers whose levels you can read from across the map**, a **smelter**, a
+  **radiator comb** hung outboard, and an **apron** where the **barge** takes the
+  product away. Storage you can read the contents of is the round-1 fix.
+- **The spoil boom** — one long arm that leaves the circle entirely, throwing
+  tailings. This is the anti-planetoid mark. It is not optional.
+- **The claim rock** it is all clamped to: irregular, in the **rock family**
+  (§6), inked at `LINE.rock` like every other rock in the game.
+
+### 5.2 Rules
+
+- **Steel is steel.** Hull steel, its value shades, and the rock family. The
+  facility takes no new hue: `hullWell` `#2D3239` (`shade(hullSteel, 0.72)`) is
+  the recess cut into a plate, and it is the only shade this direction added.
+- **The reactor is signal yellow `#F2D24B`**, and so is every other yellow on
+  the body — because every other yellow on the body **is ore**: ore in a hopper,
+  ore on the chute, an ore seam, molten ore in the smelter, ore in the barge.
+  The one non-ore yellow is **hazard tape at the apron's loading edge**, which
+  §2 names explicitly. Each carries the matching paint role, so the audit proves
+  it rather than a reviewer promising it.
+- **Ownership = beacon ring in the player's colour (§3), always visible**, plus
+  **trim marks** — the lug keyways, the apron blocks, the barge marker. Trim,
+  never the steel (§3). The ring answers at any zoom; the keyways answer close up.
 - **Health = a damage ring, visible only within sensor range** (GDD §2.2) —
-  enemy planet HP is scouted, never broadcast.
-- **Four variants** differ in continent layout / ocean-to-land ratio only;
-  all four stay within the ocean-steel-blue + continent-patina + yellow-core
-  rule. Variety comes from arrangement, not from new colours.
-- A burning/dying planet reads from further away than its numbers do (smoke) —
-  see the tone contract (§8) for the planet-death moment.
+  enemy facility HP is scouted, never broadcast.
+- **Four arrangements** differ by the bearing the whole deck circuit sits on, the
+  seeded claim rim and cut face, the hopper levels, and which face the kerf is
+  opening. All four stay in one palette: **variety comes from arrangement, not
+  from new colours.**
+- **The derelict is the same rig under a cold palette map** plus a damage mask —
+  core out, throat dark, three teeth gone, two lugs snapped, boom broken
+  mid-span, one hopper split and its ore run onto the deck. One geometry, two
+  palettes, so a wreck is recognisably *that* station. **No threat red and no
+  danger vocabulary at all**: a wreck is an absence, not a threat (§8). The only
+  yellow left is ore, which is why anyone comes.
+- A burning/dying facility reads from further away than its numbers do (smoke) —
+  see the tone contract (§8) for the station-death moment.
+
+> **Lore note for the Director.** GDD §5.4 still describes the home as "a mining
+> installation staking a claimed planetoid … oceans are steel-blue and continents
+> patina-green," and flags further industrial dressing as an open Art follow-up.
+> The developer's round-2 pick goes further than dressing: it **replaces** the
+> body, so the ocean-and-continent sentences in §5.4 are superseded in fact.
+> Proposed as a GDD amendment in a2-03's PR; this file is the art contract and
+> has moved, GDD §5.4 has not yet.
 
 ---
 

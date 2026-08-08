@@ -27,8 +27,8 @@
  * four role blurbs and the Vanguard preselected (§2.11), the host's per-seat bot
  * difficulty picks (§2.9), and the RUSH! countdown, in a layout that holds on a
  * phone in landscape and on a desktop — reached through the **entry screen**
- * (§4.2), whose three doors are PLAY SOLO (no server: §4.8 risk 6), CREATE ROOM
- * and JOIN ROOM, the last behind an on-screen keypad because the game is a
+ * (§4.2), whose three doors are SOLO CONTRACT (no server: §4.8 risk 6), OPEN A
+ * CLAIM and JOIN A CLAIM, the last behind an on-screen keypad because the game is a
  * canvas with no text field to focus.
  */
 
@@ -465,11 +465,11 @@ export { LobbyView, LOBBY_ID, LOBBY_ANCHOR } from './lobby-view';
 
 // --- The door into a room (GDD §2.1, §4.2, §4.8) ---------------------------
 //
-// The screen *before* the lobby: CAMPAIGN / PLAY SOLO / CREATE ROOM / JOIN ROOM,
-// and the on-screen keypad a room code is typed on (the game is a canvas — there
-// is no DOM input to focus, see `./lobby-entry`). CAMPAIGN is a teaser: it is lit
-// and pressable, and pressing it says `Coming Soon…` without going anywhere
-// (`chooseDoor` returns no intent for it — u9-01).
+// The screen *before* the lobby: CAMPAIGN / SOLO CONTRACT / OPEN A CLAIM /
+// JOIN A CLAIM, and the on-screen keypad a room code is typed on (the game is a
+// canvas — there is no DOM input to focus, see `./lobby-entry`). CAMPAIGN is a
+// teaser: it is lit and pressable, and pressing it says `Coming Soon…` without
+// going anywhere (`chooseDoor` returns no intent for it — u9-01).
 //
 // **Wiring seam**, continuing the one above:
 //

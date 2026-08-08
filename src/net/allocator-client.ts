@@ -216,6 +216,78 @@ export async function probeRoomLiveness(
   }
 }
 
+/**
+ * A room's advertised shape, read *before* committing to it — the same
+ * `GET /rooms/:code` {@link probeRoomLiveness} calls, keeping the body it throws
+ * away (`allocator/allocator.ts` `RoomInfo`).
+ *
+ * The field this was added for is `region`. **A room's region is its host's, for
+ * every guest** — a joiner does not get to place anything, so the creator's choice
+ * is the ping profile of everyone who joins. That is worth surfacing on the JOIN
+ * screen rather than discovering after the socket is open and the match is
+ * running: the code is typed, the room says where it is, the player's own probe
+ * says what that costs them (`./region-probe`), and only then do they commit.
+ */
+export interface RoomAdvert {
+  readonly code: RoomCode;
+  /** The Machine hosting it (informational). */
+  readonly machine: string;
+  /** The region the room lives in, or `''` when the allocator knows it only
+   *  through a reservation — a room still booting has no Machine view yet. */
+  readonly region: string;
+  /** Match size (N), when advertised. */
+  readonly size?: number;
+  /** Match mode, when advertised. */
+  readonly mode?: string;
+  /** Seats a new human can still take, when advertised. */
+  readonly joinableSeats?: number;
+  /** Whether a join would be accepted right now. */
+  readonly joinable: boolean;
+}
+
+/**
+ * Read a room's advertisement, or `null` when there is nothing to read — the room
+ * has ended (404), the allocator is unreachable, or the answer was unusable.
+ *
+ * `null` is deliberately one value for all three: this read **decides nothing**.
+ * It mints no ticket, reserves no seat, and gates no join — the allocate/join
+ * round trip remains the only authority on whether a player gets in, and it
+ * already distinguishes those failures ({@link ResolveFailure}) with copy for each.
+ * A preview that could refuse a join would be a second, weaker gate saying the
+ * same thing worse.
+ */
+export async function readRoomAdvert(
+  config: AllocatorClientConfig,
+  code: RoomCode,
+): Promise<RoomAdvert | null> {
+  const doFetch = config.fetch ?? defaultFetch();
+  let payload: unknown;
+  try {
+    const response = await doFetch(`${config.baseUrl}/rooms/${encodeURIComponent(code)}`);
+    if (!response.ok) return null;
+    payload = await response.json();
+  } catch {
+    return null;
+  }
+  if (typeof payload !== 'object' || payload === null) return null;
+  const body = payload as Record<string, unknown>;
+  if (typeof body['code'] !== 'string') return null;
+  const size = body['size'];
+  const mode = body['mode'];
+  const seats = body['joinableSeats'];
+  return {
+    code: body['code'],
+    machine: typeof body['machine'] === 'string' ? body['machine'] : '',
+    region: typeof body['region'] === 'string' ? body['region'] : '',
+    ...(typeof size === 'number' ? { size } : {}),
+    ...(typeof mode === 'string' ? { mode } : {}),
+    ...(typeof seats === 'number' ? { joinableSeats: seats } : {}),
+    // Absent means "the allocator did not say", and the honest reading of silence
+    // is that the room is joinable — the join itself is what decides (above).
+    joinable: typeof body['joinable'] === 'boolean' ? body['joinable'] : true,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Internals
 // ---------------------------------------------------------------------------

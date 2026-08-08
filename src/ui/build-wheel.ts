@@ -134,7 +134,7 @@ export type SegmentTarget = 'station' | 'ship';
  *                    because the player-facing answer is the same — this button
  *                    does nothing now — and the reason is carried by the wedge's
  *                    second line ({@link repairWedgeInfo}), which for a cooling
- *                    core is the live "REPAIR in Ns" countdown.
+ *                    core is the live "REPAIR IN Ns" countdown.
  */
 export type SegmentState = 'ready' | 'unaffordable' | 'capped' | 'inactive';
 
@@ -275,7 +275,7 @@ export interface BuildWheelSignals {
    * rule). After a repair purchase the sim arms this to `REPAIR_COOLDOWN_SECONDS`
    * and refuses every further repair order `'cooling-down'` — spending nothing —
    * until it ticks to zero (`placeOrder` / `updateStations`). While it is `> 0`
-   * the wedge must be disabled with a live "REPAIR in Ns" countdown, not a
+   * the wedge must be disabled with a live "REPAIR IN Ns" countdown, not a
    * pressable deal that silently does nothing (the field bug this signal fixes).
    *
    * Optional and treated as `0` when absent, so a caller that predates the
@@ -297,7 +297,7 @@ export interface BuildWheelSignals {
  *  - **ready** — `"+15 HP"`, or the REAL partial (`"+7 HP"`) when the core is
  *    missing less than a full tap's worth, so the near-full tap is informed.
  *  - **disabled-with-reason** — `"CORE FULL"` (nothing to heal), `"NO REPAIR"`
- *    (collapse has shut repair off, GDD §2.3), the live `"REPAIR in Ns"` countdown
+ *    (collapse has shut repair off, GDD §2.3), the live `"REPAIR IN Ns"` countdown
  *    (still cooling down from the last repair, the sim's `repairGate`), or
  *    `"NEED 1 ORE"` (empty bank).
  */
@@ -552,11 +552,11 @@ export function repairCoolingDown(signals: BuildWheelSignals): boolean {
 }
 
 /**
- * Whole seconds shown on the "REPAIR in Ns" countdown — the CEILING of the sim's
+ * Whole seconds shown on the "REPAIR IN Ns" countdown — the CEILING of the sim's
  * remaining `repairGate` (the respawn-countdown convention, {@link
  * ./respawn-countdown}), so the number never reads `0` while the press is still
  * locked and drops to re-arm exactly as `repairGate` reaches zero. Floored to `1`
- * so a sub-second remainder still shows "REPAIR in 1s" rather than a bare "0s"
+ * so a sub-second remainder still shows "REPAIR IN 1s" rather than a bare "0s"
  * that would read as ready. Only meaningful while {@link repairCoolingDown}.
  */
 export function repairCooldownSeconds(signals: BuildWheelSignals): number {
@@ -580,13 +580,13 @@ export function repairWedgeInfo(signals: BuildWheelSignals, ore = spendableOre(s
   if (signals.coreHp >= signals.maxCoreHp - 1e-9) return { restoreHp: 0, line: 'REACTOR FULL' };
   // Cooling down (RATIFIED developer, 2026-07-28): the sim refuses the next repair
   // `'cooling-down'` until `repairGate` reaches zero, so the wedge counts it down
-  // live — "REPAIR in Ns" read from sim state each frame (no UI timer), ticking to
+  // live — "REPAIR IN Ns" read from sim state each frame (no UI timer), ticking to
   // re-arm at exactly the sim's expiry tick. Checked BEFORE affordability, the same
   // order `placeOrder` uses, so a funded, damaged core still reads the countdown —
   // never a "+15 HP" deal that the sim would silently refuse. Heals nothing while
   // locked, so `restoreHp` is 0 like every other disabled state.
   if (repairCoolingDown(signals)) {
-    return { restoreHp: 0, line: `REPAIR in ${repairCooldownSeconds(signals)}s` };
+    return { restoreHp: 0, line: `REPAIR IN ${repairCooldownSeconds(signals)}s` };
   }
   // Damaged but broke: name the price the tap needs (the empty-bank reason).
   if (!affordable(ore, REPAIR_ENTRY_ORE)) return { restoreHp, line: `NEED ${REPAIR_ENTRY_ORE} ORE` };
@@ -637,7 +637,7 @@ export function segmentState(
       // order is refused `'cooling-down'`, spending nothing. Checked BEFORE
       // affordability, exactly as `placeOrder` does — a funded, damaged core is
       // still refused while cooling, so the wedge is disabled-gray (a no-op press)
-      // with the live "REPAIR in Ns" countdown ({@link repairWedgeInfo}), never a
+      // with the live "REPAIR IN Ns" countdown ({@link repairWedgeInfo}), never a
       // ready-looking deal that does nothing.
       if (repairCoolingDown(signals)) return 'inactive';
       return affordable(ore, REPAIR_ENTRY_ORE) ? 'ready' : 'unaffordable';

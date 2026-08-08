@@ -295,7 +295,7 @@ export class LobbyEntryView extends Container {
     }
 
     // SETTINGS shares the beam's trailing end with JOIN, on the home screen only.
-    // `secondary`, never primary: PLAY SOLO is this screen's affirmative action.
+    // `secondary`, never primary: SOLO CONTRACT is this screen's affirmative action.
     setVisible(home, this.settings.body, this.settings.label);
     if (home) {
       this.drawFooterPlate(this.settings, this.layout.settings, model, 'settings', false, !model.connecting, metrics);

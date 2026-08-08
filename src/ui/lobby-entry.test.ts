@@ -75,11 +75,15 @@ function typed(code: string): EntryState {
 // ---------------------------------------------------------------------------
 
 describe('the doors (GDD §2.1, §4.2 — how a match is entered)', () => {
-  it('offers CAMPAIGN first, above PLAY SOLO (u9-01 — "it goes ontop of Solo")', () => {
+  it('offers CAMPAIGN first, above the solo door (u9-01 — "it goes ontop of Solo")', () => {
+    // The ratified thing here is the ORDER — CAMPAIGN sits above SOLO in every
+    // shape this screen has. The labels are asserted alongside it; l2-02 re-worded
+    // the solo door to `SOLO CONTRACT`, which moves the word without moving the
+    // order u9-01 asked for.
     expect(DOOR_ORDER[0]).toBe('campaign');
     expect(DOOR_ORDER[1]).toBe('solo');
     expect(DOOR_OPTIONS[0]?.label).toBe('CAMPAIGN');
-    expect(DOOR_OPTIONS[1]?.label).toBe('PLAY SOLO');
+    expect(DOOR_OPTIONS[1]?.label).toBe('SOLO CONTRACT');
   });
 
   it('offers PLAY SOLO WITHOUT a server, and as the only door that needs none (GDD §4.8 risk 6)', () => {
@@ -677,12 +681,25 @@ describe('the doors in Gantry/Bone (u7-04)', () => {
 
   it('carries the title screen’s letterhead, and names the screen you are on', () => {
     // No new voice is invented for a screen the handoff never drew: the authority
-    // line is the title screen's, verbatim, and the keypad's status is the
-    // handoff's own word for that panel.
+    // line is the title screen's, verbatim, and the keypad's status names that
+    // panel in the ratified vocabulary — `CLAIM`, and a code is still a CODE.
     expect(entryModel(createEntry()).eyebrow).toBe('DEEP FIELD MINING AUTHORITY');
     expect(entryModel(createEntry()).status).toBe('CONTRACT OPEN · SECTOR 04');
     const join = chooseDoor(createEntry(), 'join', rng()).state;
-    expect(entryModel(join).status).toBe('ROOM CODE');
+    expect(entryModel(join).status).toBe('CLAIM CODE');
+  });
+
+  it('never lets the keypad hold two vocabularies at once (l2-02 merge gap)', () => {
+    // u7-04 added the header beam's status line AFTER the sweep had read this file,
+    // so the screen shipped saying ROOM CODE directly above ENTER THE CLAIM CODE.
+    // Encoded as a condition rather than pinned prose: whatever these two say, they
+    // may not disagree about what the thing is called.
+    const join = chooseDoor(createEntry(), 'join', rng()).state;
+    const model = entryModel(join);
+    expect(model.status).toContain('CLAIM');
+    expect(model.prompt).toContain('CLAIM');
+    expect(model.status).not.toContain('ROOM');
+    expect(model.prompt).not.toContain('ROOM');
   });
 
   it('keeps the footer plates inside the footer BEAM, and BACK where it was', () => {
