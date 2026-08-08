@@ -7,18 +7,18 @@
       "surfaceDistance": 90,
       "radius": 64,
       "screen": {
-        "x": 482.940258945177,
-        "y": 1010.940258945177
+        "x": 486,
+        "y": 400
       }
     },
     "a0-05-2-damaged-far.png": {
       "owner": 1,
       "coreFraction": 0.25,
-      "surfaceDistance": 700,
+      "surfaceDistance": 500,
       "radius": 64,
       "screen": {
-        "x": 640,
-        "y": 246
+        "x": 76,
+        "y": 400
       }
     },
     "a0-05-3-healthy-close.png": {
@@ -27,18 +27,18 @@
       "surfaceDistance": 90,
       "radius": 64,
       "screen": {
-        "x": 640,
-        "y": -364
+        "x": 486,
+        "y": 400
       }
     },
     "a0-05-4-healthy-far.png": {
       "owner": 1,
       "coreFraction": 1,
-      "surfaceDistance": 700,
+      "surfaceDistance": 500,
       "radius": 64,
       "screen": {
-        "x": 640,
-        "y": 246
+        "x": 76,
+        "y": 400
       }
     }
   },

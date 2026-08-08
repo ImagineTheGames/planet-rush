@@ -44,7 +44,10 @@ const VIEW = { width: 1280, height: 800 };
  *  against it, because it is the number that used to decide these frames. */
 const RETIRED_SENSOR_RANGE = 180;
 const CLOSE = 90; // half the retired gate: the ring always drew here
-const FAR = 700; // ~3.9× the retired gate, and plainly on screen
+/** The camera is translate-only at 1:1, so a 1280×800 viewport reaches ~640 world
+ *  units sideways from the centred ship. 500u + the 64u station radius = 564 —
+ *  the far end of what a player can actually SEE, and 2.8× the retired gate. */
+const FAR = 500;
 
 /** Paint a QA caption band across the top, then screenshot the frame. */
 async function capture(page, file, lines) {
@@ -97,7 +100,7 @@ try {
       core: 0.25,
       distance: FAR,
       title: 'damaged rival, FAR  ← THE FRAME THAT WAS LYING',
-      note: 'same core, same ring. Before a0-05 this drew NO ring — and the always-visible beacon ring under it read as full health.',
+      note: 'same core, same ring, near the far edge of what the camera reaches. Before a0-05 this drew NO ring — and the always-visible beacon ring under it read as full health.',
     },
     {
       file: 'a0-05-3-healthy-close.png',
@@ -116,12 +119,19 @@ try {
   ];
 
   for (const frame of FRAMES) {
+    const first = await page.evaluate(
+      ({ core, distance }) => window.__stationHealthStage.stage(core, distance),
+      frame,
+    );
+    if (!first) throw new Error(`stage() returned null for ${frame.file}`);
+    await page.waitForTimeout(250); // let the camera and the render loop catch up
+    // Stage again (idempotent) so the projected screen point in the readback is
+    // the one the CAPTURED frame holds, not the one the previous camera had.
     const staged = await page.evaluate(
       ({ core, distance }) => window.__stationHealthStage.stage(core, distance),
       frame,
     );
-    if (!staged) throw new Error(`stage() returned null for ${frame.file}`);
-    await page.waitForTimeout(250); // two render frames at 60 Hz, comfortably
+    await page.waitForTimeout(120);
     readback.frames[frame.file] = staged;
 
     const pct = Math.round(staged.coreFraction * 100);
