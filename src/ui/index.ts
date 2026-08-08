@@ -301,8 +301,9 @@ export {
   resolveTeamRelation,
   fallbackName,
   NAMEPLATE_MAX_CHARS,
+  // The one label opacity there is: a name is lit whatever its ship is doing
+  // (a0-04 — the developer withdrew the combat fade, so there is no second level).
   NAMEPLATE_FULL_ALPHA,
-  NAMEPLATE_FADE_ALPHA,
 } from './nameplates';
 export type {
   DifficultyTable,
@@ -320,6 +321,9 @@ export {
   NAMEPLATE_ANCHOR,
   NAMEPLATE_SHIP_GAP,
   NAMEPLATE_STATION_GAP,
+  // The label's clearance above the health-bar cluster — rule 3's surviving half
+  // after a0-04 retired the combat fade, so it is exported to be pinned by a test.
+  nameplateClusterClearance,
 } from './nameplates-view';
 export type { DrawnNameplate } from './nameplates-view';
 
