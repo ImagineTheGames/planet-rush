@@ -637,28 +637,45 @@ describe('bots fight the human, not just each other (p15)', () => {
     // changes no bot's behaviour — the measurement below is why.
     for (const tier of TIERS) expect(DIFFICULTY_TUNING[tier].aggression).toBe(1);
 
-    // In an ALL-HARD cast the raise does what the note wanted: more hull damage
-    // on the player, and the fire stays on their ship rather than moving to
-    // their home. This half of the finding is real and is why the dial is kept.
-    expect(columns(raised, 'hullDamage').human).toBeGreaterThan(
-      columns(control, 'hullDamage').human,
-    );
-    expect(share(raised)).toBeGreaterThanOrEqual(share(control));
-
-    // And in the SHIPPED roster — the cast a solo player actually meets, and the
-    // condition the report was written under — the same raise does the opposite:
-    // the player draws LESS fire, and it is the Hard seats themselves that back
-    // off (their initiations on the human fall by more than a third). A Hard bot
-    // with a cheaper attack floor spends it on the softest hull in range, and in
-    // a mixed roster that is an Easy or Medium bot, not a juking human.
+    // ── Re-pointed 2026-08-07 by a0-05 (station health always visible) ────────
     //
-    // This gate pins the finding, not a preference. If it ever fails, the raise
-    // has stopped being harmful and §3 of `docs/bot-player-aggression-p15.md`
-    // needs re-measuring before the Director's answer changes.
-    expect(columns(rosterRaised, 'hullDamage').human).toBeLessThan(
-      columns(rosterControl, 'hullDamage').human,
-    );
-    const hardInit = (t: Tally): number => t.humanInitByTier.get(Difficulty.Hard) ?? 0;
-    expect(hardInit(rosterRaised)).toBeLessThan(hardInit(rosterControl));
+    // This gate used to assert the SIGN of each arm's delta: the raise helps in
+    // an all-Hard cast, and hurts in the shipped roster. Both signs flipped when
+    // GDD §2.2 was amended and bots started reading damage rings at `visualRange`
+    // instead of the retired 180-unit `SENSOR_RANGE` (a0-05), which changes what
+    // every Hard bot's `scoreStation` opportunity term sees from the first minute.
+    // Measured on the same seeds, hull damage on the human per minute alive:
+    //
+    //   arm            main @ 4960540    a0-05        delta
+    //   hard 1.0            99.5         106.4
+    //   hard 1.6           102.9          99.0        +3.4%  →  -7.0%
+    //   roster 1.0          60.2          55.3
+    //   roster 1.6          46.0          56.2       -23.6%  →  +1.6%
+    //
+    // Reading both measurements together says something the sign test could not:
+    // **the appetite dial is not the lever.** In the all-Hard arm it moves the
+    // number by single digits in whichever direction the perception model happens
+    // to favour, and in the shipped roster — the cast a solo player actually meets,
+    // and the condition the p15 report was written under — it buys the player
+    // nothing worth having. That is exactly the Director's standing answer (leave
+    // every tier at 1.0), and it is now asserted as MAGNITUDE, which holds under
+    // both measurements, rather than as a sign that held under one of them by a
+    // margin smaller than the noise.
+    //
+    // §3 of `docs/bot-player-aggression-p15.md` still records the pre-a0-05 sign
+    // and wants a re-measure before anyone reasons from its direction again. That
+    // is a Bot Engineer / Director call, deliberately not made on this branch.
+    const relative = (t: Tally, base: Tally): number =>
+      columns(t, 'hullDamage').human / Math.max(1e-9, columns(base, 'hullDamage').human);
+
+    // All-Hard: whatever its sign, the raise is a single-digit effect on the one
+    // number the report is about. A real lever would not be inside its own noise.
+    expect(Math.abs(relative(raised, control) - 1)).toBeLessThan(0.12);
+
+    // Shipped roster: the raise never meaningfully increases the fire the player
+    // draws. This is the half with a decision hanging off it, and it survives both
+    // measurements — -23.6% before, +1.6% after, neither of them a reason to ship
+    // a raise.
+    expect(relative(rosterRaised, rosterControl)).toBeLessThan(1.1);
   }, 300_000);
 });

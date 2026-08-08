@@ -89,10 +89,11 @@ export interface DifficultyTuning {
    */
   readonly retreatHullFraction: number;
   /**
-   * Seconds a scouted fact stays actionable before the bot must look again.
-   * Fog is a mechanic (GDD §2.2): a bot that scouted your core ten seconds ago
-   * is acting on ten-second-old news, and a Hard bot's memory is fresher only
-   * because it re-scouts, never because it re-reads the world. TUNABLE
+   * Seconds an observed fact stays actionable before the bot must look again.
+   * A bot that saw your core ten seconds ago is acting on ten-second-old news,
+   * and a Hard bot's memory is fresher only because it looks again, never
+   * because it re-reads the world. Still true after the a0-05 amendment: the
+   * ring is always drawn, but only on stations the bot can see. TUNABLE
    */
   readonly memorySeconds: number;
   /**

@@ -119,6 +119,139 @@ is a Netcode seam (a `botPersonalities` row beside `botDifficulties`, mirrored i
 
 ---
 
+## Station health is ALWAYS VISIBLE — sensor range retired
+
+**Date:** 2026-08-07 · branch `agent/gameplay/a0-05-station-health-always-visible`
+**Ratified by:** Developer (Reinaldo), field report a0-05
+**Amends:** GDD §2.2 (folded in directly, replacing the "scouted, not broadcast"
+paragraph), the §2.8 sensor-range row (retired), §2.9's fog-honesty sentence,
+§5.4's ring line and §5.7's HUD line. **Retires one constant**
+(`SENSOR_RANGE`) and one perception field (`Perception.sensorRange`). The ring
+grammar, ship HP, and the minimap fog-of-war are untouched.
+
+### The ratification, verbatim
+
+> "you can see other stations healths only when you are near, it should always
+> show the health regardless of proximity or else it looks like a glitch
+> approaching and getting far it looks like its full health even if its damaged"
+
+### There were two things in that sentence, and the bug is the worse half
+
+**A straight bug.** Outside `SENSOR_RANGE` no damage ring was drawn at all. But
+the *ownership beacon ring* under it is always drawn, in the owner's colour — so
+what the player actually read from a distance was a ring in a player colour with
+no red in it, which is precisely what full health looks like. A station at 25%
+core and a station at 100% were **the same picture**. The unknown state was
+indistinguishable from the healthy state, and a display like that does not
+withhold information, it asserts a false one — and it fails in the direction the
+player is least able to check, because there is no tell that says "this reading
+is unavailable". The developer called it a glitch because it behaves like one.
+
+**A design retraction.** GDD §2.2's *"enemy station health is scouted, not
+broadcast … fog makes third-party awareness a skill"* is withdrawn. Rings read
+true at any range. Third-party awareness is still a skill — you still have to be
+*looking*, and the minimap is still fog-of-war until someone builds a radar
+satellite — but it is no longer bought with a 180-unit flyby.
+
+### The measurements behind the call
+
+| Thing | Value | Note |
+|---|---|---|
+| Old `SENSOR_RANGE` | 180 units (2× the 90-unit shield radius) | the ring gate |
+| Station radius | 64 units | gate measured to the surface |
+| Half a 1080p screen | ~960 units | camera is translate-only, no zoom |
+| Bot visual range | 720 units (clamped to 900) | what a bot has on screen |
+
+So the ring appeared at roughly **one fifth** of the distance at which the station
+itself was plainly on screen. Four fifths of every approach was spent looking at a
+home whose health the game was actively misrepresenting.
+
+### What the sensor-range constant gated, after the change: nothing
+
+It had exactly one consumer per layer, all three of them the same rule — the
+renderer's ring gate, the bot perception layer's station-HP gate, and the server's
+per-client health broadcast. With the rule withdrawn it gates nothing, so it is
+**deleted, not zeroed**: a `0` still reads as a live knob for the next person
+tuning the table, and putting `180` back would silently reinstate a retracted
+design. `Perception.sensorRange` went with it for the same reason. What replaced
+it is a predicate with no number in it — `stationHealthVisible` in
+`src/sim/sensing.ts` — so there is one place that says the rule and nothing to
+tune back down.
+
+The three **minimap coverage** radii (ship 520, station 300, satellite 900) are a
+different mechanic (feature f1) and are untouched. They were always distinct from
+`SENSOR_RANGE`; the §2.8 table now lists them explicitly so the retired row cannot
+be confused with them.
+
+### The radar satellite: still useful, and this pass did not touch it
+
+Measured in `src/sim/buildings.ts` / `src/sim/sensing.ts` rather than assumed. The
+satellite's `sensorRange` feeds `sensorSources`, which decides **minimap
+presence** — which stations, rocks, ships and shots are on your map — and it
+permanently maps every rock inside its disc. It never fed the damage-ring gate:
+that gate was measured from the viewer's **ship**, at a different, much smaller
+radius, and a satellite contributed nothing to it. So the amendment costs the
+satellite **nothing**. The four things it buys are all still there: a 900-unit
+live-entity window, permanent ore-field mapping inside it, coverage that survives
+your ship dying, and a target the enemy has to come and kill.
+
+That is a statement of fact, not a design proposal. Whether the satellite is
+priced right at 6 ore now that health is free is a **developer decision**, and it
+was deliberately not made here.
+
+### Bots: symmetry, not blindness
+
+`src/bots/fog-honesty.test.ts` pins that a bot perceives only what a human in its
+cockpit could (GDD §2.9). It was **re-pointed, not deleted**. Left alone, its
+scrambler would have kept lying to bots about health that humans can now read —
+silently handicapping every bot and moving the whole difficulty ladder.
+
+The gate moved from `SENSOR_RANGE` to `visualRange`, i.e. **"is the home on my
+screen"** — the same test that already governed hull bars and turret counts. It
+was *not* made unlimited: a human cannot read the ring of a home behind them
+either (the minimap draws dots and colours, never numbers), so a map-wide read
+would have been a cheat in the other direction. Symmetry is the invariant; the
+`HUMAN_VISUAL_RANGE` clamp is what keeps it enforceable.
+
+### The server was the sharper edge of the bug
+
+`FogTracker` withheld a rival's health on the wire until your ship was inside 180
+units. A client cannot draw what it was not told, so online the ring would have
+stayed **stale** even after the renderer was fixed. It now sends every station's
+health to every client: the server does not know a client's viewport and guessing
+one would put netplay back out of step with the local picture. The per-station
+signature check makes that cheap — a quiet station still costs one string compare
+per sample, not a frame. Note the payload's turret and shield HP were *already*
+drawn locally at any range (a turret's alpha tracks its HP, a shield bubble
+carries its own gauge), so the wire had been under-reporting even against the
+pre-amendment renderer.
+
+### Readability at distance
+
+Nothing was needed. The ring is stroked in **world units** at a fixed width, and
+the camera is translate-only — there is no zoom anywhere in the render layer — so
+a ring 900 units away is drawn at exactly the pixel size it is drawn at 90 units
+away. The long-range frame and the close-range frame are the same ring, which is
+what the evidence shows and what `src/render/stations.test.ts` asserts by
+instruction count.
+
+### What deliberately did NOT change
+
+- **Ship** HP and enemy ship hidden state. The report was about stations. Hull
+  bars are still an on-screen read; cargo, bank and upgrade tiers are still drawn
+  for nobody at any range.
+- **The ring grammar** (§2.2, §5.4): owner colour whole is health remaining,
+  threat red fills clockwise from twelve, red is only ever the damage. This
+  changes *when* the ring is drawn, never *what* it means.
+- **The ownership beacon ring**, always visible before and after.
+- **No HUD bar for enemy stations.** The top-right panel is still your own
+  station's, and `src/ui/station-hp.ts` still has no code path that takes another
+  player's station. The ring on the station is the whole grammar.
+- **The minimap** still draws dots and colours, no numbers, and is still
+  fog-of-war gated by the coverage discs.
+
+---
+
 ## A build wedge's cost is ONE number — and the top-left readout says `ORE`
 
 **Date:** 2026-08-07 · branch `agent/ui/a0-03-wheel-cost-one-number`

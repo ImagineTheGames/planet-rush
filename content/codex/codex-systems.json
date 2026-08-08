@@ -143,14 +143,15 @@
       "id": "sys-fog-radar",
       "title": "Fog of war and the radar satellite",
       "category": "systems",
-      "summary": "Enemy health is scouted, not broadcast — and a satellite widens what you see.",
-      "body": "You never see a rival station's HP from across the map. A rival core's damage ring appears only when your ship flies within sensor range of it, so knowing who is winning, who is wounded, and who is under siege is information you earn by scouting — or by reading the smoke, since a burning station shows from further off than its numbers do. A global HP scoreboard would let everyone free-ride on every attack; the fog makes third-party awareness a skill. To see more, build a radar satellite: a buildable body that orbits your station and lights up a large slice of the arena on the minimap. It is attackable — one shot target on a slow, legible orbit — so blinding a rival by shooting down their satellite is a real play. Bots are fog-honest too: a Hard bot that knows you're wounded knows because it scouted you.",
-      "tags": ["fog-of-war", "radar", "satellite", "scouting", "minimap"],
+      "summary": "Health is always visible — the fog is over the map, and a satellite lifts it.",
+      "body": "Every station's damage ring tells the truth, at any range and whoever owns it. Fly toward a rival home or away from it and the ring says the same thing, because a ring that went blank at distance did not hide a rival's health, it lied about it — the owner-colour ring stays drawn either way, so a quarter-dead home read exactly like an untouched one. What you still have to earn is the map itself. The minimap is fog of war: it holds the geography you have flown over and the live contacts under your own sensors, and nothing else. To see more, build a radar satellite — a buildable body that orbits your station and lights up a large slice of the arena. It is attackable, one shot target on a slow legible orbit, so blinding a rival by shooting down their satellite is a real play. Bots are honest about all of it: a Hard bot reads a damage ring on exactly the terms you do, and it has to be looking at the station to read it.",
+      "tags": ["fog-of-war", "radar", "satellite", "scouting", "minimap", "station-health"],
       "see_also": ["sys-shields", "strat-scouting", "bots-warden"],
       "facts": [
-        { "label": "Sensor range (enemy damage ring becomes visible)", "value": 180, "unit": "units", "constant": "SENSOR_RANGE" },
         { "label": "Radar satellite cost", "value": 6, "unit": "ore", "constant": "SATELLITE.cost" },
-        { "label": "Satellite minimap coverage radius", "value": 900, "unit": "units", "constant": "SATELLITE.sensorRange" }
+        { "label": "Satellite minimap coverage radius", "value": 900, "unit": "units", "constant": "SATELLITE.sensorRange" },
+        { "label": "Your own ship's minimap coverage radius", "value": 520, "unit": "units", "constant": "SHIP_SENSOR_RANGE" },
+        { "label": "Your own station's minimap coverage radius", "value": 300, "unit": "units", "constant": "STATION_SENSOR_RANGE" }
       ]
     },
     {
