@@ -14,6 +14,10 @@
 
 import { describe, it, expect } from 'vitest';
 import { BEAM, PLATE_SCALES, ROW_BAR_WIDTH, TOUCH_MIN } from '../art/materials';
+import { deriveAlarmAllies } from '../art/audio/scope';
+import { createWorld } from '../sim';
+import { sameSide } from '../sim/allegiance';
+import { ShipClass } from '../shared/types';
 import { countPrimaries, singlePrimary } from './gantry';
 import { MAIN_MENU_EYEBROW } from './main-menu';
 import { playerColor } from './station-hp';
@@ -118,6 +122,52 @@ describe('reading an outcome', () => {
       }
       expect(endKind(over(0, 0))).toBe('victory');
       expect(endKind(over(0, 7))).toBe('defeat');
+    });
+
+    /**
+     * "One predicate, one answer, everywhere" is the claim a0-09 rests on, and
+     * every case above tests it against a hand-written roster — which proves the
+     * summary is self-consistent, not that it agrees with the SIM. Those are
+     * different claims, and the bug was born of exactly that gap: the screen had
+     * its own idea of who won and the sim had allegiance, and nobody compared
+     * them.
+     *
+     * So compare them, on a real sided world, for every slot: the seat's verdict
+     * must equal `sim/allegiance` `sameSide` — the same predicate the targeting
+     * ladder and friendly fire read. The roster is not hand-written here either;
+     * it comes from `deriveAlarmAllies`, the function the shipped client actually
+     * hands `currentOutcome()`. If the UI's notion of a side ever drifts from the
+     * sim's, this fails, and it fails for the drifting slot by name.
+     */
+    it('agrees with the SIM’s own sameSide, slot for slot, on a real sided world', () => {
+      // 2v2, the developer's shape: slots 0 and 7 hold side A, 1 and 3 side B.
+      const world = createWorld({
+        seed: 9,
+        asteroidCount: 0,
+        players: [
+          { id: 0, shipClass: ShipClass.Vanguard, team: 0 },
+          { id: 1, shipClass: ShipClass.Vanguard, team: 1 },
+          { id: 3, shipClass: ShipClass.Vanguard, team: 1 },
+          { id: 7, shipClass: ShipClass.Vanguard, team: 0 },
+        ],
+      });
+      const allies = deriveAlarmAllies(world, 0);
+
+      for (const winner of [0, 1, 3, 7]) {
+        const outcome: MatchOutcome = { you: 0, winner, matchOver: true, allies };
+        expect(onYourSide(outcome, winner), `slot ${winner}: UI vs sim`).toBe(
+          sameSide(world, 0, winner),
+        );
+        expect(endKind(outcome), `slot ${winner}: the word the player is told`).toBe(
+          sameSide(world, 0, winner) ? 'victory' : 'defeat',
+        );
+      }
+
+      // And the premise the whole comparison rests on: the world really is sided.
+      // In FFA this set is {0} and the loop above would pass while proving nothing.
+      expect([...allies].sort((a, b) => a - b), 'the derived side is you AND your ally').toEqual([
+        0, 7,
+      ]);
     });
 
     it('exposes the one predicate the whole screen asks', () => {
