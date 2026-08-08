@@ -12,6 +12,7 @@ Branch: `agent/sound/s8-bank-revoice-round2`. Started 2026-08-08.
 | `8582f92` | `audio.test.ts`: the four round-2 clauses + a real headroom ceiling |
 | `3477122` | all 40 `sound-review/previews/*/current.wav` regenerated; `render.ts` no longer deletes `ui-cues/` |
 | `4b6506c` | the comments that still described round 1 as the answer |
+| `842982a` | `spikes/tone-audit/probe-live-audio.mjs` — the live-bytes probe for QA |
 
 ## DECISIONS
 
@@ -122,11 +123,27 @@ band-pass transients          0                21
 peak headroom          up to 1.000 (clamp)  max 0.897
 ```
 
+## The probe (read this before diagnosing round 3, if there is one)
+
+`node spikes/tone-audit/probe-live-audio.mjs [url] [--dist dist/assets/index-*.js]`
+
+Answers *"is the developer hearing this build?"* in two seconds. Verified to
+discriminate in both directions before it was committed:
+
+| target | result |
+|---|---|
+| live deployment, sha `4960540` (= `main`) | 6 checks FAIL, exit 1 |
+| a local build of this branch | all PASS, exit 0 |
+
+`main`'s HEAD is deployed **right now** and is still serving the rejected bank —
+H1 falsified a second time, after `main` moved mid-session.
+
 ## NEXT
 
-- [ ] push, open PR
-- [ ] hand off to QA for an evidence item captured against the **LIVE deployment**,
-      naming the served sha and attesting the shipped audio is the round-2 bank.
+- [x] push, open PR — **#314**
+- [ ] QA: after merge + deploy, run the probe against the live site, **then
+      listen**, and file the evidence item naming the served sha. The probe
+      proves the bytes and says so; it does not prove anyone listened.
       Merged is not shipped and shipped is not heard (LESSONS §2, §11).
 - Open, not acted on: `docs/audio-revoice-spec.md` §11 Q1 (VFX), Q2 (bot names),
   Q7 (`minimapPing` is a fossil name on a live sound), Q8 (identifier renames).
