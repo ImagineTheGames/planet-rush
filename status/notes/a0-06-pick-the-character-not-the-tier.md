@@ -472,6 +472,63 @@ the brief text in its argv, so the pattern matches a dozen agent processes and
 buries the one real server in 34 KB of prompt. Use `pgrep -fa "node.*vite"` or
 `ss -ltnp | grep 417`, which names the lane and the port directly.
 
+### Session 2026-08-08 (seventh) — an unpushed merge again, then main moved twice under the run
+
+Inherited the branch with **`e84cd3e` committed and unpushed** (remote sat at
+`8f002ba`) and 41 evidence PNGs dirty. Exactly session 5's failure mode, and
+session 5's check is what caught it: `git log origin/<branch>..HEAD` **before**
+believing an empty `git status`. Session 6 wrote that it had left the branch
+"fully pushed"; the merge it made afterwards never left the box. Pushed
+`8f002ba..e84cd3e` first thing, before touching anything else — a finished merge
+that is not pushed is not a deliverable.
+
+Restored the 41 PNGs with `git checkout -- tests/live-stage/` (never `git
+clean`). No feature work was outstanding and none was invented.
+
+**Main moved twice during this session**, which changed how the session was
+sequenced and is the transferable part:
+
+1. `4bb7d0c` (a0-00b closing notes, #323) — merged clean (`ca27b49`), and it
+   touched **only another brief's status note**. Pushed.
+2. `88e1454` (a0-08 looted ore, #325) — landed while the full live-stage sweep
+   was ~10 minutes into a ~2.5 h run.
+
+**Killed the running sweep rather than letting it finish.** A green full-suite
+result on a tree four commits behind main proves nothing the DoD wants: the
+`merge-base --is-ancestor` gate is evaluated on the *final* tree, and any
+evidence frame the run produced would be of a bundle that no longer exists.
+Merging first cost ten minutes of build; finishing first would have cost the
+whole run. **Merge before you measure** — if main is moving, the measurement is
+the perishable thing, not the merge.
+
+**The conflict was the same one, in the same place, for the third time.**
+`docs/design-amendments.md` — a0-08 and a0-06 each insert a new entry at the
+top-of-file anchor. Resolved as the union (`c0d2c80`), and this time ordered
+**newest-first**, which is what the rest of the file already does: a0-08
+(2026-08-08) above a0-06 (2026-08-07), `---` between. Session 6 kept both but did
+not state the ordering rule; it is stated now because this anchor will conflict
+again with the next brief that lands, and "keep both" is not enough instruction
+to resolve it the same way twice. `GDD.md` auto-merged clean — a0-08 amends
+§2.3/§2.7, this brief §2.1/§2.9 — verified by grepping both markers afterwards
+rather than assumed.
+
+Nothing semantic collided: a0-08 is `src/sim` ore-ledger and step accounting,
+this brief is the lobby→match cast seam and reads no sim internals.
+
+#### DoD on the merged tree
+
+- `npx tsc --noEmit` — clean (run **before** committing the resolution).
+- `npm test -- --run` — **4017 passed, 0 failed**, 240 files (a0-08 brought two
+  new test files in). `capacity-regression` passed; sessions 2/4/5/6 already
+  settled it as a wall-clock benchmark that only trips under lane contention.
+- `npm run test:live-stage` — see below.
+- GDD.md differs from `origin/main`; `merge-base --is-ancestor` OK at `88e1454`.
+
+**Worth stating plainly, because it is now the fourth merge in a row to do it:**
+a0-08 changed how looted ore is accounted and the cast seam did not notice. Each
+clean merge is a small re-confirmation of "this brief changes who you choose, not
+how a bot plays."
+
 ## NEXT (unchanged from session 1, restated so it is not lost)
 
 - **ONLINE still carries the tier, not the name.** `LobbyChoiceMessage` has
