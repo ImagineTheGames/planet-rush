@@ -265,6 +265,48 @@ checks have to be curl + fingerprint rather than a socket list.
   not this lane's files and they would have been noise in this PR. Expect them
   dirty again after every full-suite run; revert them, never commit them.
 
+- `98116c9` — the spec keeps the `pageerror` **stack**, and a `KNOWN_FOREIGN`
+  list so a foreign crash is named and logged rather than fatal. Full-suite run C
+  (after the `03ed194` merge, private port 4191, fingerprinted): **31 failed / 66
+  passed / 3 skipped**, and my spec was one of the 31 — on the page-error
+  assertion only, never on the seat claim. Green again after the fix, with the
+  readout `guest seat 1 → {"local":1,"allies":[1]}`.
+
+## THE TWO FAILURES I CHASED TO THE BOTTOM — do not re-derive these
+
+Both reproduce on a clean `origin/main` worktree at `03ed194`. Method, since it
+is reusable: `git worktree add --detach /tmp/main-probe origin/main`, symlink
+this repo's `node_modules` in, copy `tests/live-stage/alarm-fleet.ts` across,
+drop a throwaway spec + config in, run. **A probe script must live under the repo
+root to resolve `@playwright/test`** — running it from `/tmp` gets
+`ERR_MODULE_NOT_FOUND`.
+
+**1. `TypeError: Cannot read properties of null (reading 'clear')` — foreign.**
+`page.on('pageerror')` was storing `String(e)`, which is the message and nothing
+else, and the bundle is minified — so the net caught a crash and named no file.
+Now it keeps `e.stack`, and the minified frames map (via the entry chunk's
+`.js.map`, decoding the VLQ mappings by hand) to **`src/ui/lobby-entry-view.ts:234`**,
+`this.backdrop.clear()` in `update()`, from `main.ts:6075`. Cause: the menu
+teardown (`main.ts:7089`) destroys `entryView` — nulling the PIXI
+`GraphicsContext` — **without clearing `visible`**, so a post-teardown render
+frame updates a destroyed view. **Online route only**: a SOLO-route probe on main
+is clean, which is why only my two-client spec sees it. `src/ui/` is not mine;
+listed in `KNOWN_FOREIGN` with the repro, logged whenever it fires, handed to the
+menu-view owner in the PR. New page errors still fail the spec.
+
+**2. `audio-alive.spec.ts:239` — mine, and it is the TEST that is wrong.** The
+SFX-slider assertion reads `sfxBusGain === 0` synchronously after `setSfx(0)` and
+gets `0.8`. Cause: **`graph.setBus` ramps over 50 ms** and the spec reads
+`gain.value` in the same `page.evaluate`. Fails identically on clean `origin/main`
+(`{"before":1,"after":2,"sfxBusGain":0.8}`), so it is not this change — and
+specifically **not the alarm duck**, which would read `0.8 × SFX_DUCK`, not an
+untouched `0.8`. The one-line fix is a ~100 ms wait before the read. **Left
+unfixed on purpose**: an unrelated audio spec going green inside the alarm PR is
+how a real regression hides. Next thing this lane picks up.
+
+**The previous round's note filed this audio-alive failure under the `__lobby`
+doors shape. That was wrong** — it is the ramp. Corrected here and in the PR.
+
 ## DECISIONS, round 3
 
 **The unit suite's one red test is not this lane's.**
@@ -282,6 +324,12 @@ without saying which test it was.
   `deployed: true` and the new sha, then the by-ear attestation — online match,
   non-zero slot, own station attacked (**one** sting, arrow holds), another
   player's attacked (silence).
+- This lane's own next pick-up: the `audio-alive.spec.ts:239` ramp read (above) —
+  a ~100 ms wait before `sfxBusGain` is sampled. Deliberately not folded into
+  PR #318.
+- Handed over, not this lane's: the destroyed-`entryView` crash on the online
+  route (`src/ui/lobby-entry-view.ts:234`), and the ~20 fps alarm floor
+  (`src/art/vfx/observer.ts`). Both are in the PR body with their repros.
 - Not done and deliberately out of scope: the sting is not re-voiced, and no VFX
   or bot-naming consequence of the 2026-08-06 tone amendment is touched (those
   are explicitly unratified, GDD §4.7 blast radius).
