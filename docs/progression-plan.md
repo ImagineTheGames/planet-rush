@@ -1,8 +1,10 @@
-# Meta-Progression — XP, Levels, Unlocks (Spike s4)
+# Meta-Progression — XP, Levels, Unlocks (Spike s4, amended a0-13)
 
 **Owner:** Architect · **GDD:** §2.1, §2.5, §2.8, §2.11, §4.2 (m9/online), §4.6 · **Status:**
-decided, task-broken, **awaiting developer ratification on the fairness stance and five
-other questions** (bottom of doc).
+**RATIFIED and briefed.** Every question s4 left open was answered by the developer on
+2026-08-07; the answers are folded into the sections they change, each marked *(ratified
+2026-08-07)*. The brief chain is `docs/briefs/pr-*.md` (§7). Five NEW questions — raised by
+what the ratifications turned out to cost — are at the foot of this document.
 
 This spike **decides**, in the mold of `docs/netcode-spike.md` and
 `docs/variable-slots-plan.md`: measurements over intentions, every claim reproducible, and
@@ -11,60 +13,105 @@ the traps written down for the agents who implement. The developer's ask (2026-0
 > "I'd like to build an XP/LVL system… for now undecided what it does, but eventually
 > players unlock things… perhaps a skill tree with powers for their ships."
 
-Reproduce the one thing this spike measured rather than invented — what a real headless
-match *pays* a player in accrual events at today's shipped constants, and what that becomes
-in XP:
+and, 2026-08-07, the ask that turned this document from a plan into a build:
+
+> *"we need a fun end of match screen, that shows total ore mined, damage dealt, distance
+> travelled, ships used, ore used, etc. … some things with more weight for example ore mined
+> (1x) and stations destroyed (10x), ships destroyed (5x), damage dealt (2x) would yield more
+> XP"*
+
+> *"it needs to feel like a video game end match screen with the score counting up, the
+> progress bar filling up to show you current level, whats left till next level as it fills
+> up, and gives a rewarding animation as it fills up and completes… plus a satisfying sound"*
+
+> *"also bot difficulty needs to be taken into account for XP with real players counting as
+> HARD possibly (or perhaps their LVL also is taken into account)"*
+
+Reproduce the two things this spike measured rather than invented — what a real match *pays*
+a player in accrual events at today's shipped constants, and what that becomes in XP:
 
 ```
-npx vite-node spikes/progression/measure-xp.ts   # prints the accrual + XP + level-curve tables
-npx tsc --noEmit                                  # the shipped tree still type-checks
+npx vite-node spikes/progression/measure-xp.ts            # s4: nine candidate events, three weight sets
+npx vite-node spikes/progression/measure-ratified-xp.ts   # a0-13: the RATIFIED weights, real bot cast, attributed
+npx tsc --noEmit                                          # the shipped tree still type-checks
 ```
+
+The second run's full output is committed at `spikes/progression/measured-a0-13.txt`, so
+every number in §1.3a–§1.3c is checkable without a four-minute run.
 
 The measurement code is throwaway (`spikes/progression/`, excluded from `tsconfig.json`'s
-`include` and from the build). It reuses the shipped QA harness (`harness/match.ts`)
-**unmodified** — the harness hands every tick to an `onTick` hook and hands back the finished
-`World`; the spike observes per-player accrual by **diffing world state each tick**, because
-the sim keeps no per-player counters (only the match-wide ore ledger,
-`src/sim/ore-ledger.ts`). Harness strategies (`miner/turtle/rusher/raider`) stand in for the
-shipped bot trees, exactly as the netcode and variable-slots spikes stand in for the real
-sim — so read the *shape*, not the third decimal.
+`include` and from the build). `measure-xp.ts` reuses the shipped QA harness
+(`harness/match.ts`) **unmodified** — the harness hands every tick to an `onTick` hook and
+hands back the finished `World`; the spike observes per-player accrual by **diffing world
+state each tick**, because the sim keeps no per-player counters (only the match-wide ore
+ledger, `src/sim/ore-ledger.ts`). Harness strategies (`miner/turtle/rusher/raider`) stand in
+for the shipped bot trees, exactly as the netcode and variable-slots spikes stand in for the
+real sim — so read the *shape*, not the third decimal.
+
+**`measure-ratified-xp.ts` (a0-13) goes further where it had to.** Three of the four ratified
+weights are on events the harness strategies cannot express and the sim cannot attribute, so
+it runs the **real shipped bot cast** (`src/bots` `createBots`/`runHeadlessMatch`) by
+difficulty tier — which is what makes "what does a HARD lobby pay versus an EASY one" a
+measurement — and reconstructs kill/damage attribution with a **shadow attributor** that
+patches nothing in `src/` (§1.3a). It is a reconstruction, and the doc says so everywhere it
+is used.
+
+> **Housekeeping, found by running it.** `measure-xp.ts` had not executed since `world.planets`
+> became `world.stations` — the reproduce line above was broken for the whole life of this
+> document. Repaired in a0-13. Its numbers re-reproduce within ~1% of the 2026-07-27 tables
+> except the round-robin median, which moved 597 → 619 XP; the tables below are left at their
+> original values with this note, because re-typing them would hide that the sim moved.
 
 ---
 
 ## DECISION (up front)
 
 1. **Ship XP + levels + a local profile NOW; unlocks are a SEPARATE, gated decision.**
-   Phase 1 (§5) is XP accrual, a level curve, and the three UI moments (XP bar, level-up,
-   end-screen summary) with local persistence and **no unlocks at all**. It is fairness-neutral
-   by construction, so it ships regardless of how the developer rules on powers. Unlocks are
-   phase 2 and hang entirely on the fairness question (§3).
+   Phase 1 (§5) is XP accrual, a level curve, the **end-of-match summary as a choreographed
+   sequence** (§6) and the lobby level badge, with local persistence and **no unlocks at
+   all**. It is fairness-neutral by construction. **The fairness question is now answered —
+   COSMETIC (§3, ratified 2026-08-07) — so Phase 2 has a direction; it still has no
+   content, and this document does not design any.**
 
-2. **Almost the whole XP economy is derivable from state the sim already produces — with
-   exactly one exception: kills.** Ore gathered, ore deposited, structures built, ship
-   upgrades bought, core repairs, waves survived, and match placement are all observable by
-   watching world deltas — Phase 1 needs **zero sim changes** to pay them. The sim tracks
-   **no killer** (`main.ts:1390` says so outright; `killShip`/`damageShip` in
-   `src/sim/damage.ts` take no attacker), so **kill/assist XP is the one accrual event that
-   needs a new sim hook** — a `by: PlayerId` credit on the damage/kill path. Sized in §1, not
-   built here.
+2. **The kill/damage attribution hook is PHASE 1 now, not Phase 2** *(changed 2026-08-07 by
+   a0-13; s4's Question 6 recommended the opposite)*. Ore gathered, ore deposited, structures
+   built, ship upgrades bought, core repairs, waves survived, distance flown and match
+   placement are all observable by watching world deltas — free. The sim tracks **no killer**
+   (`main.ts:2147` says so outright; `killShip`/`damageShip` in `src/sim/damage.ts` take no
+   attacker) **and no damage dealt at all**, so kills, stations destroyed *and damage dealt*
+   need a new sim hook — a `by: PlayerId` credit on the damage/kill path. **Three of the
+   developer's four ratified weights sit on that hook.** Deferring it ships a summary screen
+   that pays only ore, which is not the screen that was asked for. Sized in §1.5.
 
-3. **Persistence rides the seam settings already use.** A single JSON profile under a new
-   `planet-rush:profile` key over `platform.storage` (`src/platform/platform.ts:35-39`),
-   read defensively like every other setting. For **m9 online, which has NO ACCOUNTS**, the
-   server-ready shape is a **signed local profile** — the client is the store of record and
-   the server HMAC-*vouches* for integrity — modeled directly on the existing signed ticket
-   (`src/net/ticket.ts`). Account-grade, tamper-proof persistence is **post-launch** and is
-   sized, not built (§2).
+3. **Persistence is LOCAL ONLY, and stays simple** *(ratified 2026-08-07: "we may need a
+   backend at some future point, but for now lets just keep it simple, locally stored")*. A
+   single JSON profile under a new `planet-rush:profile` key over `platform.storage`
+   (`src/platform/platform.ts:35-39`), read defensively like every other setting. §2.2's
+   signed-profile / HMAC-vouch work stays **sized, not built**. Two obligations follow and
+   are not optional: **version the schema from the first write** (no reset path ships, so
+   migration is the only repair tool this profile will ever have) and **keep the shape
+   backend-portable** (§2.1).
 
-4. **Fairness stance (the big one) — recommend COSMETIC + bounded SIDEGRADES, gated by the
-   balance harness.** Unlocking *powers* breaks the game's core invariant (fairness at every
-   N), so this is the developer's call, not the Architect's. The honest option space and a
-   reasoned recommendation are §3; the ≤55% win-rate gate (`harness/balance.ts`) is the
-   instrument that keeps a sidegrade honest.
+4. **Fairness stance — COSMETIC** *(ratified 2026-08-07: "probably cosmetics as you gain
+   levels you'll unlock new items things like that")*. Unlocks may not touch a sim constant.
+   The option space s4 argued is preserved in §3 as the reasoning, not as a menu. Because the
+   ruling is cosmetic-only, **§4's three skill-TREE shapes are the wrong structure** and are
+   re-opened in that light (§4): cosmetics want a level→unlock list, not a graph with
+   prerequisites.
 
-5. **Level curve: `xpToNext(L) = base · L^exp`** — early levels come in under a match each,
-   the pace is one `base` and one `exp`, both `TUNABLE`. Measured against real match pay in
-   §1.
+5. **Level curve: `xpToNext(L) = base · L^exp`, `base=300` / `exp=1.6`, UNCHANGED**
+   *(ratified 2026-08-07: "ok"; re-measured by a0-13 against the ratified weights and the
+   difficulty multiplier — §1.4)*. Re-measurement matters because the pay per match moved:
+   the curve still lands **level 2 inside a single match (0.8 matches)**, and level 10 stretches
+   from ~67 matches to ~101. No re-tune needed — but only if the participation rows are kept
+   (§1.3c), which is Question A at the foot of this document.
+
+6. **Opponent strength scales the pay: DIFFICULTY yes, LEVEL no** *(a0-13, from the
+   developer's 2026-08-07 ask)*. A kill is worth its weight **times what it cost to get**, and
+   the tier is local, deterministic, unspoofable knowledge (`PERSONALITIES[id].difficulty`).
+   Recommended table: **Easy ×0.75 · Medium ×1.0 · Hard ×1.25 · human ×1.25**. Scaling by the
+   opponent's *level* is held until profiles are integrity-checked, and the reason is now the
+   developer's own decision rather than the Director's caution (§1.3b).
 
 ---
 
@@ -73,19 +120,33 @@ sim — so read the *shape*, not the third decimal.
 ### 1.1 The accrual events, and which are free
 
 Nine candidate events, with a proposed opening weight. The **Source** column is the honest
-one — it says whether an event costs a sim change to pay:
+one — it says whether an event costs a sim change to pay. **The four rows the developer
+ratified on 2026-08-07 are marked ★; §1.3a re-prices the whole table against them.** Note
+that `planet.*` in the Source column is now `station.*` — the lore pivot renamed the field
+after this table was written.
 
 | Event | Proposed weight (set A) | Source — how it's paid | Sim change? |
 |---|---|---|---|
-| **Ore gathered** (mined + scavenged) | 1 / ore | Σ positive Δ`ship.cargo` | none |
+| ★ **Ore gathered** (mined + scavenged) | **1 / ore — RATIFIED** | Σ positive Δ`ship.cargo` | none |
 | **Ore deposited** (banked) | 2 / ore | Σ positive Δ`ship.banked` | none |
-| **Structure built** (turret/shield order) | 12 / each | new `BuildJob.id` in `planet.builds` | none |
+| **Structure built** (turret/shield order) | 12 / each | new `BuildJob.id` in `station.builds` | none |
 | **Ship upgrade bought** (one tier) | 20 / tier | Σ positive Δ Σ`ship.tiers` | none |
-| **Core repair** (one discrete tap) | 3 / repair | Σ positive Δ`planet.coreHp` ÷ 15 | none |
+| **Core repair** (one discrete tap) | 3 / repair | Σ positive Δ`station.coreHp` ÷ 15 | none |
 | **Wave survived** | 15 / wave | `match.wavesSpawned` at your death | none |
 | **Match placement** | 20 / rung | `match.eliminated` order + `winner` | none |
 | **Match won** | 200 flat | `match.winner === you` | none |
-| **Kill** (ship or core) | 25 / kill | — **no attacker recorded** — | **one hook** |
+| ★ **Damage dealt** | **2 / unit — RATIFIED** | — **not recorded anywhere** — | **the hook** |
+| ★ **Ship destroyed** | **5 / kill — RATIFIED** | — **no attacker recorded** — | **the hook** |
+| ★ **Station destroyed** | **10 / kill — RATIFIED** | — **no attacker recorded** — | **the hook** |
+
+**"Ore mined" is read as ore that entered your hold — mined *and* scavenged.** GDD §2.7 is
+explicit that "ore is ore": mined, death-dropped and scavenged ore are one pool, read
+identically by the deposit drain, and the sim does not tag a chunk with where it came from.
+Paying scavenged ore differently would need chunk provenance the simulation does not carry,
+and would make Vulture's whole design (the wreck scavenger) the worst-paid way to play. The
+**summary screen** may still split the two rows if the developer wants them split — that is a
+chunk-provenance task (a `source` tag on `Chunk`, ~half a day), and it is a display question,
+not an XP one. §6.2 marks it CUT for Phase 1 with that reason.
 
 Deposits are weighted **2× gathered** on purpose: gathering is the *effort*, banking is the
 *result the design rewards* (held ore is not safe, GDD §2.3), so XP nudges toward the loop's
@@ -94,15 +155,26 @@ chose over mining). Everything but the last row is free to pay in Phase 1.
 
 **The kill gap, stated plainly.** `killShip(world, ship)` and `damageShip(world, target,
 amount)` (`src/sim/damage.ts:25,37`) carry no source, and `destroyCore`
-(`src/sim/match.ts:92`) carries none either — a core just reaches zero. So today there is
+(`src/sim/match.ts:114`) carries none either — a core just reaches zero. So today there is
 **nobody to credit a kill to**. The hook is small and localized: thread an optional
-`by?: PlayerId` down `damageShip`/`damagePlanet` → `killShip`/`destroyCore`, and record the
+`by?: PlayerId` down `damageShip`/`damageStation` → `killShip`/`destroyCore`, and record the
 last enemy to damage a hull/core (an "assist" is any *other* enemy who damaged it inside a
 short window). It is a Gameplay-Engineer change, it must stay **write-only** like the ore
-ledger so it never perturbs a determinism hash (GDD §4.8), and until it lands, kill-XP cannot
-be per-player real. **Recommendation: ship Phase 1 with kills OFF, and add the attribution
-hook as the first task of the unlock phase** — so the economy a player sees is honest from
-day one rather than crediting kills to nobody.
+ledger so it never perturbs a determinism hash (GDD §4.8).
+
+> **s4 recommended deferring this to Phase 2, and shipping Phase 1 with kills off. That
+> recommendation is WITHDRAWN (a0-13, 2026-08-07).** Three of the developer's four ratified
+> weights — damage dealt, ships destroyed, stations destroyed — are on this hook, and the
+> fourth is ore. Phase 1 without it is a summary screen that pays only ore and prints three
+> dashes, which is not a first version of the ask; it is a different ask. **The hook is
+> Task PR-2, Phase 1, owned by the Gameplay Engineer**, and it is the first thing in the
+> chain after the pure-function profile module. It is sized and trapped in §1.5.
+
+**And "damage dealt" is a bigger gap than kills.** A kill at least leaves a mark in
+`match.eliminated`. Damage leaves nothing at all: `damageShip` mutates `target.hull` and
+returns a boolean, and no counter anywhere sums what a player has dealt. The measurement
+below had to *reconstruct* it from consumed projectiles, which is exactly why the hook must
+carry both — a `by` on the kill alone would leave the 2× weight unpayable.
 
 ### 1.2 What a match actually pays — measured
 
@@ -169,6 +241,241 @@ the hook before it means anything. It is in the spike output for completeness.)
 2. **A "typical" match pays ~600 XP** (set A/C median), an aggressive one ~1000+. That is the
    anchor the level curve is sized against.
 
+### 1.3a The RATIFIED weights, re-measured *(a0-13, 2026-08-07)*
+
+The developer ratified four: **ore mined 1× · damage dealt 2× · ships destroyed 5× · stations
+destroyed 10×.** They are not a bolt-on to §1.3's three sets; they *replace* the combat half of
+them and pin the base unit (`ore = 1`) that all three sets already shared. So the pay was
+re-measured from scratch rather than re-typed.
+
+**How, and what changed about the method.** `spikes/progression/measure-ratified-xp.ts` runs
+the **real shipped bot cast** — `createBots` + `runHeadlessMatch` from `src/bots` — in four
+lobbies (Easy mirror, Medium mirror, Hard mirror, and the shipped mixed fill order), N=8,
+octagon, seeds 1..12, all 48 matches ending inside the timeout. Two things forced the change
+from s4's harness strategies: strategies have **no difficulty tier**, so they cannot answer the
+developer's difficulty question at all; and s4's "kills" were a match-wide ship-death count ÷ N,
+which cannot be multiplied by a per-opponent tier.
+
+**The shadow attributor, and why you may trust these numbers exactly as far as its residual.**
+`Projectile` already carries `owner` (`src/sim/state.ts:524` — a shot must never hit its own
+fleet). Each tick the spike diffs two snapshots: a projectile slot whose `id` changed or which
+went active→inactive was **consumed**, and any entity that lost HP within reach of a consumed
+shot credits that shot's owner, split across candidates in proportion to nominal damage. It is
+a reconstruction, it lives entirely in the spike, and it patches nothing. Its honesty check is
+printed with the results:
+
+```
+lobby                                 attributed  unattrib   ofWhich   recon  recon*   ended
+EASY  mirror (Rusty/Bolt)                  24662     13836  90% clps     64%     95%   12/12
+MEDIUM mirror (Foreman/Patch)             139575     18879  77% clps     88%     97%   12/12
+HARD  mirror (Sable/Vulture/Warden)        85436      4310  64% clps     95%     98%   12/12
+MIXED cast (shipped fill order)            94661      8209  68% clps     92%     97%   12/12
+  recon* = attributed ÷ (total − collapse residual): the share of damage that HAD an attacker.
+```
+
+`recon*` is ≥95% everywhere: essentially all damage that *had* an attacker gets one. The gap
+between `recon` and `recon*` is the collapse — the Crush eating cores with nobody to credit —
+and it is 64–90% of the whole residual. **That is not attributor error; it is the finding in
+§1.3c.**
+
+**What a match pays, per player, in the units the weights are written in:**
+
+```
+PER-PLAYER ACCRUAL PER MATCH (median over all player-matches):
+lobby                                     ore    dmgHP    shipK    statK    spent     dist   deaths     secs
+EASY  mirror (Rusty/Bolt)                28.2      228      4.0      0.0     14.0    57705      4.0      850
+MEDIUM mirror (Foreman/Patch)            23.1     1443     21.0      0.0     17.0    62208     24.0      835
+HARD  mirror (Sable/Vulture/Warden)      12.8      689     11.0      0.0      8.0    33486     16.0      823
+MIXED cast (shipped fill order)          28.9      768     12.5      0.0     17.0    63430     16.5      835
+```
+
+Three things to read off it before any weight is applied. **Damage is measured in HP and lands
+in the hundreds-to-thousands** while a kill lands in the tens and a station kill in the units —
+that is the unit problem, below. **Median station kills are 0.0 in every lobby**, Hard included:
+a match has seven station deaths and eight players, so most players get none. And **Medium bots
+are the churniest cast in the game** — 24 own-deaths and 1443 HP dealt per player against Hard's
+16 and 689 — which is a measured property of the shipped trees, not a typo, and it is what makes
+§1.3c's farm finding land where nobody expected it.
+
+#### The unit question — "damage dealt 2×" per WHAT?
+
+A weight is not an economy until its unit is chosen, and this is the one number the developer's
+ask does not contain. Ore has an obvious unit (one ore). Damage does not: 1 HP occurs about a
+thousand times more often per match than a kill does. Measured, pooling all four lobbies, here
+is what each candidate unit does to the *composition* of one match's XP:
+
+| one unit of "damage dealt" = | ore % | damage % | ship kills % | station kills % | raw XP |
+|---|---|---|---|---|---|
+| **1 HP (the literal reading)** | 2% | **94%** | 4% | **0%** | 1518 |
+| 10 HP | 11% | 63% | 25% | 1% | 224 |
+| **25 HP — RECOMMENDED** | 17% | 41% | 40% | 2% | 145 |
+| 50 HP (one base hull) | 22% | 25% | 50% | 3% | 118 |
+| 100 HP (one core) | 25% | 15% | 58% | 3% | 105 |
+
+**The literal reading defeats the developer's own ordering.** At 1 HP per unit, "damage dealt"
+is 94% of all XP earned and "stations destroyed" — the row weighted highest, at 10× — rounds to
+0%. A player would earn more from four seconds of chipping a rival's shield than from killing
+their home. The weights say station ≫ ship ≫ damage ≫ ore; only a unit choice makes the economy
+say it too.
+
+**Recommended: one unit of damage dealt = 25 HP** (`DAMAGE_HP_PER_UNIT = 25`, `TUNABLE`). It is
+the choice where all four rows are legible at once — combat (damage + kills) is 42% of pay, ore
+is 17%, and §1.3c's participation rows carry the rest — and where a full 50-HP hull melted pays
+4 XP-points against the 5 the kill itself pays, so finishing a ship is worth about as much as
+the work of getting it there. It is one constant, it is the tuning dial, and **Question B** puts
+it in front of the developer as a number they may simply overrule.
+
+### 1.3b Opponent strength scales the pay *(a0-13)*
+
+> *"also bot difficulty needs to be taken into account for XP with real players counting as HARD
+> possibly (or perhaps their LVL also is taken into account)"* — developer, 2026-08-07
+
+A kill is not worth a flat 5×; it is worth 5× **times what it cost to get**. One table, beside
+the weights, and nothing scattered anywhere else:
+
+| Opponent | Multiplier | Where the tier comes from |
+|---|---|---|
+| **Easy** bot (Rusty, Bolt) | **×0.75** | `PERSONALITIES[id].difficulty` — local, deterministic, unspoofable |
+| **Medium** bot (Foreman, Patch) | **×1.00** | same |
+| **Hard** bot (Sable, Vulture, Warden) | **×1.25** | same |
+| **Human** | **×1.25** | a decision, not a measurement — see below |
+| *(the opponent's LEVEL)* | *(not shipped)* | untrusted, farmable, invisible — see below |
+
+The multiplier applies to the **three opponent-facing rows only** — damage dealt, ships
+destroyed, stations destroyed. Ore mined has no opponent, so it is never multiplied. Both
+numbers are `TUNABLE`.
+
+**Difficulty scaling is cheap and safe, and that is the whole argument for it.** The tier is
+already in the client, already deterministic, and cannot be spoofed by anybody: nothing about a
+bot's difficulty ever arrives over a wire. `a0-06` is moving the lobby to picking the
+*character*, and a character carries its tier, so the multiplier reads straight off the seat
+with no new data path and no new lobby field.
+
+**"Real players count as HARD" is a decision, not a fallback — and this document says so rather
+than shipping a bare constant.** A human is not reliably harder than Warden; a beginner is
+reliably easier than Rusty. The honest framing is that a human is scored at the top tier because
+**contesting a person is the point of the mode** — the multiplier pays for the *kind* of
+opposition, not for a measured difficulty. Write that reasoning down beside the constant, or
+somebody re-tunes it in six weeks on the argument that "humans lose more often than Warden
+does," which is true and irrelevant.
+
+**Scaling by the opponent's LEVEL is the risky half, and it is a different idea wearing the same
+clothes.** Three reasons it is held rather than merely deferred:
+
+1. **It is untrusted data.** §2.2 records that m9 has **no accounts** and that the profile is
+   client-local; §2.1 is now ratified local-only, with the signed-profile shape *sketched* and
+   explicitly not built. A level arriving from another client is a number that client authored.
+   Paying XP on it is paying XP on a claim.
+2. **It is farmable.** Two players who cooperate — one high-level, one grinding — turn a lobby
+   into an XP faucet. Difficulty scaling has no equivalent: a bot's tier is not something a
+   friend can inflate.
+3. **It makes your pay depend on someone else's progression**, so the same match played twice
+   pays differently for reasons the player cannot see — and cannot be shown, because the
+   visibility ratification (§Q2) hides other players' levels everywhere but the lobby. That
+   fights the readability the entire summary screen exists for.
+
+**Recommendation: ship difficulty scaling with humans at the top tier; hold level-scaling until
+profiles are integrity-checked.** That integrity work is *sized* in §2.2 — option (a), the
+HMAC-vouched profile modeled on `src/net/ticket.ts`: a `profile?: string` field beside
+`JoinMessage.ticket`, a signature check in `admitsJoin` (`match-server.ts:231`), and a wire test;
+call it two days, no new dependency, no new storage — and it is **not built here**. If the
+developer wants level-scaling sooner it is their call: **Question D** puts the trade in front of
+them with these three points rather than a refusal.
+
+**What the multiplier actually moves, measured** (at `DAMAGE_HP_PER_UNIT = 25`, combat rows only,
+no participation rows):
+
+```
+multiplier: none (control)                  multiplier: 0.75 / 1.0 / 1.25 (recommended)
+lobby                    medXP   XP/min     lobby                    medXP   XP/min
+EASY   mirror               67        5     EASY   mirror               58        4
+MEDIUM mirror              243       17     MEDIUM mirror              243       17
+HARD   mirror              133       10     HARD   mirror              162       12
+MIXED  cast                161       12     MIXED  cast                162       12
+```
+
+A wider 0.5/1.0/1.5 spread was measured too (Easy 46, Hard 192): the choice moves Hard's pay by
+about ±20% and Easy's by ∓20%, and moves nothing else. It is a dial, not a design.
+
+### 1.3c Three consequences the developer should decide about, not discover
+
+**(1) The four ratified weights have no participation floor, and the floor was the design.**
+s4's finding #1 was that winner:first-out came in at **1.1–1.7×** — "XP is a *hook* that rewards
+showing up and playing the loop, so a player who loses their first eight matches still climbs."
+The ratified four delete every row that produced that property. Measured, at
+`DAMAGE_HP_PER_UNIT = 25` with the recommended multiplier:
+
+| lobby | spread, ratified four ONLY | spread, + s4's participation rows | median, four only | median, + rows |
+|---|---|---|---|---|
+| EASY mirror | **0.3×** | 0.9× | 58 | 295 |
+| MEDIUM mirror | 1.1× | 2.1× | 243 | 513 |
+| HARD mirror | 6.7× | 12.1× | 162 | 321 |
+| MIXED cast | 7.2× | 10.8× | 162 | 407 |
+
+**A spread below 1.0× means the first player knocked out earns MORE than the winner**, and in an
+Easy lobby that is exactly what the four weights alone produce: 0.3×. The reason is plain once
+seen — a turtle who wins by outlasting everyone deals little damage and kills nobody, and under a
+purely combat-and-ore economy that is a losing hand. Adding s4's non-combat rows back (deposited
+2/ore, structure 12, upgrade 20, repair 3, wave survived 15, placement 20/rung, win 200 — all of
+them already denominated in the same 1-XP-per-ore base the developer just ratified) restores the
+floor and lifts the typical match from 149 XP to **399 XP**.
+
+The developer ratified the *combat* weights and never ruled on the rest of the table, so keeping
+them is the reading this plan recommends — but it is their table. **Question A.**
+
+**(2) The station-kill weight pays almost nobody, because the Crush does the killing.** Measured
+over the same 48 matches — who actually took a station's core to zero:
+
+| lobby | killed by a player | killed by the Crush | Crush share |
+|---|---|---|---|
+| EASY mirror | **0** | 96 | **100%** |
+| MEDIUM mirror | 2 | 82 | **98%** |
+| HARD mirror | 75 | 9 | 11% |
+| MIXED cast | 61 | 23 | 27% |
+
+Against soft opposition, **every station death in this sample was the claim closing in** (GDD
+§2.3 — "the contracting claim finishes whoever the players don't"). So the highest-weighted row
+in the developer's list is unearnable in an Easy lobby and near-unearnable in a Medium one, and
+the multiplier cannot help: ×0.75 of zero is zero. Three honest options — pay nobody
+(**recommended**: entropy is not an attacker, GDD §2.2/§2.3, and the under-attack alarm already
+refuses to ring for core decay on exactly that reasoning), pay the last player who damaged that
+core inside a window, or replace the row with a "survived to the collapse" one. **Question C.**
+
+**(3) The XP farm is real, and it is not where it was expected.** Offline XP counts the same as
+online (ratified, §Q5) and Hard bots pay a premium, so "farm Hard bots alone" is the obvious
+worry. Measured, it is **wrong**: the fastest XP per minute in the game is a **Medium** bot lobby
+at **17 XP/min**, against Hard's 12 and Easy's 4. Medium bots fight constantly and die constantly
+(24 deaths per player per match) and so hand out damage and ship kills faster than Hard bots,
+who are cagier and end matches sooner. The multiplier narrows that gap; it does not close it.
+
+So the statement to put in front of the developer is not "Hard bots are the cheapest XP" but:
+**an uncontested solo bot lobby is the highest XP/minute in the game at every tier, and which
+tier pays best is a property of the bot trees rather than of the multiplier — so it will move
+the next time the Bot Engineer touches them.** For a cosmetic-only progression that may be
+entirely fine. **Question E**, and it is a fact, not a bug.
+
+### 1.3d The recommended economy, in one place
+
+Everything above, as the numbers an implementer types. Every one is `TUNABLE` and QA owns them
+from m10 (GDD §2.8's discipline).
+
+| Row | XP | Multiplied by opponent tier? | Paid from |
+|---|---|---|---|
+| Ore mined (into the hold: mined + scavenged) | **1 / ore** | no | world delta — free |
+| Damage dealt | **2 / 25 HP** | **yes** | **the hook (PR-2)** |
+| Ship destroyed | **5 / kill** | **yes** | **the hook (PR-2)** |
+| Station destroyed | **10 / kill** | **yes** | **the hook (PR-2)** |
+| Ore banked | 2 / ore | no | world delta — free |
+| Structure ordered | 12 / each | no | world delta — free |
+| Ship upgrade bought | 20 / tier | no | world delta — free |
+| Reactor patched | 3 / repair | no | world delta — free |
+| Wave survived | 15 / wave | no | world delta — free |
+| Placement | 20 / rung | no | world delta — free |
+| Match won | 200 flat | no | world delta — free |
+
+Rows 1–4 are the developer's, verbatim. Rows 5–11 are s4's, unchanged, and are **Question A**.
+Median match pay: **399 XP** (mean 459). No global scale factor is needed — see §1.4.
+
 ### 1.4 The level curve — early-fast, pace on one dial
 
 `xpToNext(L) = base · L^exp`, sampled at `base = 300`, `exp = 1.6` (both `TUNABLE`):
@@ -194,9 +501,129 @@ apart the high levels sit). Because the curve is measured against real match pay
 matches to level 10?" is an answer, not a hope — and if the developer wants level 10 to feel
 like a season's worth, that's `exp`; if they want it in a week, that's `base`.
 
+#### Re-proved against the ratified weights *(a0-13, 2026-08-07 — "ok" ratifies `base=300`/`exp=1.6`)*
+
+The developer accepted these two numbers, and the brief was right to insist they be re-proved
+rather than re-asserted: the numbers were fitted when a match paid **634 XP** (s4 weight set A),
+and the ratified weights changed what a match pays. Measured now, at `DAMAGE_HP_PER_UNIT = 25`
+with the tier multiplier:
+
+| economy | median match pay | level 2 | level 5 | level 10 | level 20 |
+|---|---|---|---|---|---|
+| s4 set A (the numbers the curve was fitted to) | 634 XP | 0.5 matches | 9.0 | 63 | 411 |
+| **ratified four + participation rows (recommended)** | **399 XP** | **0.8 matches** | 14.3 | **101** | 654 |
+| ratified four ONLY | 149 XP | 2.0 matches | 38.4 | 270 | 1754 |
+
+**The ratification survives, unchanged, and needs no scale factor** — on the recommended
+economy. "Level 2 in one match" is still true (0.8 of a match, so a *first* match levels you
+even if it goes badly); level 5 arrives across a fortnight of casual play instead of a week;
+level 10 stretches from ~67 matches to ~101, which is a long-tail goal getting longer, not a
+wall appearing.
+
+**On the ratified four alone it does NOT survive:** level 2 takes two matches, so the hook — you
+level up your first game — is gone, and level 10 sits at 270 matches. That would need either
+`base = 75` (identical shape, quarter the numbers) or a global ×4 XP scale. Both were measured
+and both work; neither is needed if Question A goes the recommended way. **This is the concrete
+cost of dropping the participation rows, and it is why Question A is first.**
+
+**A note for whoever tunes this next.** The pay above is a *bot* number. Real humans mine more
+and die less than Medium bots do, and QA re-baselines the whole table at m10 with the shipped
+trees and real play (§1.2's discipline). If the developer wants a target instead of a
+measurement, the two dials are unchanged: `base` moves the early game, `exp` moves the tail.
+
+### 1.5 Sizing the attribution hook *(a0-13 — promoted to Phase 1)*
+
+The change, in the smallest form that pays all three ratified combat rows. It is Task **PR-2**
+(§7), owned by the **Gameplay Engineer**, and it is the only `src/sim/` change in this whole
+plan.
+
+**The shape.**
+
+```ts
+// src/sim/damage.ts:25, src/sim/buildings.ts:770,796,719 — an OPTIONAL attacker on the
+// four existing damage entry points. Every current caller keeps compiling.
+export function damageShip(world: World, target: Ship, amount: number, by?: PlayerId): boolean
+export function damageStation(world: World, station: MiningStation, amount: number, by?: PlayerId): boolean
+export function damageTurret(turret: Turret, amount: number, by?: PlayerId): boolean
+export function damageSatellite(sat: RadarSatellite, amount: number, by?: PlayerId): boolean
+```
+
+and one write-only ledger beside the ore one, keyed by slot:
+
+```ts
+// src/sim/combat-credit.ts (new) — the same discipline as src/sim/ore-ledger.ts.
+export interface CombatCredit {
+  dealtToShips: number[];    // HP, by attacker slot
+  dealtToStations: number[]; // HP, by attacker slot
+  shipKills: number[];
+  stationKills: number[];
+  /** Last enemy to damage this hull/core, and when — the killing-blow answer. */
+  lastHitBy: (PlayerId | null)[];
+  lastHitAt: number[];
+}
+```
+
+**Where `by` comes from.** Every damaging call site already knows: `projectiles.ts` holds
+`p.owner` on the shot that struck (it must, to avoid friendly fire), and turret shots carry the
+station owner. **Nothing new is inferred** — the value is passed down a call that already has
+it, which is why this is a small change rather than a design.
+
+**Five traps, and the answers this plan ratifies so a lane does not have to invent them:**
+
+1. **Assists.** An assist is any *other* enemy who damaged the same hull inside `ASSIST_WINDOW_S`
+   (`TUNABLE`, opening value 5 s) before it died. **Phase 1 pays no assist XP** — the damage they
+   dealt already paid them, at 2× per 25 HP, which is the honest version of an assist. The
+   window is still recorded, because the summary may want to name it later.
+2. **Self-damage and allies.** A shot cannot hit its own fleet (`canDamage`, `allegiance.ts:90`),
+   so friendly credit cannot arise from a projectile. It *can* arise from a collision or a future
+   mechanic: the credit call must ask the same `canDamage` predicate and refuse to credit an ally
+   or the victim themselves. Do not re-implement the question (GDD §2.9's rule).
+3. **Collateral from turrets.** A turret's kill is credited to the **station owner**, not to
+   nobody and not to the turret. A player who bought the deterrent gets the kill it makes — that
+   is what they paid for (GDD §2.6).
+4. **A kill after the attacker died.** A projectile outlives its owner's hull. Credit the
+   **owner slot**, always, even if that ship is dead or the player is eliminated: the slot is the
+   accounting key, not the hull. (A player eliminated from the match still earns the XP their
+   last shots produce — they simply stop shooting.)
+5. **A shared kill.** The killing blow — the `shipKills`/`stationKills` +1 — goes to the **last
+   enemy to land damage**, one player, never split. The *damage* rows already split the work
+   proportionally, so splitting the kill too would pay the same contribution twice, and a
+   fractional kill on a summary screen ("0.5 SHIPS DESTROYED") is a number nobody can read.
+
+**Two invariants that are not negotiable, and a test that pins each:**
+
+- **Determinism.** The credit ledger is **write-only** and **outside `hashState`**, exactly like
+  `src/sim/ore-ledger.ts`. Nothing in `step` may ever read it. *Test:* the CI replay test's final
+  hash is byte-identical with the ledger present and absent.
+- **Honesty.** A stat that cannot be credited to a real player is **not shown** rather than
+  estimated. A core the Crush finished has no killer, and the summary prints nothing for it
+  (§1.3c(2), §6.2). *Test:* a match run to full collapse with no player-dealt core damage credits
+  zero station kills to everybody.
+
+**Size:** one day for the threading and the ledger, one for the tests, assuming the ore-ledger
+pattern is copied rather than re-argued.
+
 ---
 
 ## 2. PERSISTENCE ARCHITECTURE
+
+> **RATIFIED 2026-08-07 — LOCAL ONLY, and keep it simple.** Verbatim: *"we may need a backend
+> at some future point, but for now lets just keep it simple, locally stored."* So §2.1 ships as
+> written, and §2.2's signed-profile / HMAC-vouch work stays **sized, not built** — it is the
+> option that gets *chosen* the day integrity matters, not the option that gets built now.
+>
+> Two design obligations follow, and they are the whole reason to say this out loud today
+> rather than discover it later:
+>
+> 1. **Version the schema from the first write.** No reset path ships (§Q4 below), so migration
+>    is the *only* repair tool this profile will ever have. A stored profile with no version is
+>    one nobody can fix — not the developer, not a support reply, not a future you.
+> 2. **Keep the shape backend-portable.** No device-specific fields, no data that only makes
+>    sense on this machine. A later backend should be a **sync** problem, not a rewrite; that is
+>    what *"we may need a backend at some future point"* buys, and it costs nothing today.
+>
+> It also settles §1.3b's level-scaling question by itself: opponent-**level** XP scaling needs
+> a profile somebody can trust, and a local-only profile is a claim.
 
 ### 2.1 Local-first, shipping NOW — the seam settings already use
 
@@ -217,12 +644,26 @@ export interface Profile {
   xp: number;               // lifetime XP
   level: number;            // derived from xp, cached for the UI
   matches: number;          // lifetime matches played
-  // phase 2 only, behind the fairness ruling:
-  unlocked?: string[];      // node ids the player has bought
-  points?: number;          // unspent skill points
+  // phase 2 only, behind the COSMETIC ruling (§3):
+  unlocked?: string[];      // cosmetic ids the player has earned
 }
 const PROFILE_KEY = 'planet-rush:profile';           // flat prefix, like every other key
 ```
+
+*(`points?: number` — unspent skill points — is **dropped** from this shape by the 2026-08-07
+cosmetic ratification: a level→unlock list has nothing to spend, §4.)*
+
+**Two rules the shape above is obeying, added 2026-08-07 and load-bearing:**
+
+- **`v` is written on the FIRST save and validated on every read.** The reader accepts `v: 1`,
+  folds anything it does not recognise to a fresh profile, and — critically — **a future `v: 2`
+  blob must not crash a `v: 1` reader** (Task PR-1's test says so in words). Because no reset
+  ships, a migration function is the only way a bad profile ever gets fixed, so the version
+  field is not bookkeeping; it is the repair seam.
+- **Nothing in this blob may be device-specific.** No screen size, no input scheme, no install
+  id, no "last map". Those belong to the flat `planet-rush:*` settings keys that already hold
+  them. The test for whether a field belongs here is: *would this number still be true if the
+  player picked up a different phone and signed in?* If not, it is a setting, not a profile.
 
 **Boundaries, and the traps the seam sets:**
 
@@ -233,10 +674,22 @@ const PROFILE_KEY = 'planet-rush:profile';           // flat prefix, like every 
   `JSON.parse` + **validate every field** on read (fold a corrupt blob to a fresh profile,
   exactly like `readMapId`). This is the first payload that needs a `v` version field — none
   of the existing readers have one, so establish the convention here.
-- **The seam has no `remove` and no `keys`** (`platform.ts:36-39`) — only `get`/`set`. A
-  "reset my progress" button and any future migration/enumeration **need an interface
-  extension** (add `remove(key)`; the sole implementation to touch is `platform.ts:104-119`).
-  Size that into the reset task, don't discover it.
+- **The seam has no `remove` and no `keys`** (`platform.ts:36-39`) — only `get`/`set`.
+  *(Amended 2026-08-07: the "reset my progress" button that needed this is **cancelled** — the
+  developer ruled progression is never wiped, §Q4. The seam extension is still worth doing for
+  the migration path — a migration that must **replace** a profile can do it with `set`, but one
+  that must **retire a key** cannot — so `remove(key)` stays in Task PR-6, without the button
+  that motivated it. The sole implementation to touch is `platform.ts:104-119`.)*
+
+- **Migration is the only repair tool, so it must exist before it is needed** *(2026-08-07)*.
+  Since no profile can ever be cleared, "just delete it and start again" is not available to a
+  player, to the developer, or to a support answer. `loadProfile` therefore owns three paths and
+  a lane must implement all three or the fourth one happens by accident: **known version** →
+  read; **older known version** → migrate forward, then read; **unknown / corrupt / newer** →
+  fold to a fresh profile, and *keep the raw string under `planet-rush:profile.bak`* so a
+  recoverable blob is not destroyed by a reader that could not parse it. That last clause is the
+  one that gets skipped, and it is the only thing standing between a schema bug and a wiped
+  career the player was promised would never be wiped.
 - **XP is banked at match-end, once.** The end-of-match summary (§5) is the single write
   site — compute the match's accrual, add to the profile, persist. Never write mid-match (a
   crash mid-match should cost at most the current match, and the sim must never depend on the
@@ -264,13 +717,51 @@ Three honestly-scoped options, in ascending cost:
 persistence layer *can* be trusted to store a cosmetic or a bounded sidegrade, but it
 **cannot be trusted to gate a competitive power** — a determined player edits their own
 profile. That is not a bug to fix; it is the reason the fairness recommendation lands where
-it does. (Absent doc note: `docs/hosting-plan.md` is still referenced across the allocator
-but not in the repo — the account-persistence sizing above belongs there or in a new brief
-when accounts are ratified.)
+it does. (Absent doc note: `docs/hosting-plan.md` was still referenced across the allocator
+but not in the repo when this was written; it exists now, and the account-persistence sizing
+above belongs there or in a new brief when accounts are ratified.)
+
+> **RATIFIED 2026-08-07 — none of (a), (b) or (c) is built.** *"for now lets just keep it
+> simple, locally stored."* Option **(a)** stays the chosen shape for the day integrity is
+> needed, sized in §1.3b at about two days: a `profile?: string` beside `JoinMessage.ticket`,
+> a signature check in `admitsJoin` (`match-server.ts:231`), a wire test, no new dependency and
+> no new storage. Option (c) is post-launch and needs an identity the game does not have.
+>
+> **What that costs, named once so nobody re-discovers it as a surprise:** every XP number is
+> as trustworthy as the machine it was earned on. For a **cosmetic** progression (§3, ratified)
+> that is the correct trade — the thing a cheat buys is a hat. It is also precisely why
+> opponent-**level** XP scaling does not ship (§1.3b): it would make one player's pay depend on
+> another player's unverifiable claim.
 
 ---
 
-## 3. THE FAIRNESS QUESTION — stated plainly for the developer
+## 3. THE FAIRNESS QUESTION — ANSWERED: COSMETIC *(ratified 2026-08-07)*
+
+> **The ruling, verbatim:** *"i asked for XP before and it looks like that didn't make it into
+> the list... not clear yet what it will be for, but probably cosmetics as you gain levels
+> you'll unlock new items things like that"*
+>
+> **Decision: option (1), COSMETICS ONLY. An unlock may not touch a simulation constant.** That
+> is this section's own recommendation, taken; what changes is that §3 is now a decision rather
+> than an option space, and three things follow immediately:
+>
+> - **The per-player modifier seam of §4 is not built.** It was the architectural cost of
+>   sidegrades, and sidegrades are not happening. The whole of Trap 7 (modifiers as static match
+>   config, off the per-tick snapshot) becomes *unneeded* rather than *deferred* — which is a
+>   real saving, and the reason this ruling makes Phase 2 small.
+> - **No new balance sweep is opened.** §4's "every sidegrade node re-opens a balance sweep"
+>   (Trap 9) does not apply to a livery. The ≤55% class ceiling (GDD §2.11) is untouched.
+> - **The soft local profile is now good enough, permanently** (§2.2). The thing a tampered
+>   profile buys is a hat.
+>
+> **The developer's own hedge is recorded here on purpose:** *"not clear yet what it will be
+> for."* Cosmetic is ratified as the **direction**, not as a content list. If this is revisited,
+> it is a **change** to a ratified decision — argued against §3's four options below, which are
+> kept in full for exactly that reason — and not a contradiction of something nobody wrote down.
+> **What the items are, how they are earned, and what a level grants are NOT decided, and this
+> document deliberately does not design them.**
+
+The reasoning that produced the ruling, kept in full:
 
 Planet Rush's core invariant is fairness: the field is rotationally symmetric so per-player
 ore is *exactly* equal at any N (§2.1), classes are capped at a 55% win rate (§2.11), and QA
@@ -315,7 +806,49 @@ question the rest of the plan branches on.**
 
 ---
 
-## 4. SKILL-TREE SHAPES — three sketches, grounded in real tunables
+## 4. THE TREE — RE-OPENED, AND ANSWERED: A LIST, NOT A TREE *(2026-08-07)*
+
+> **The developer, on §4 as it stood:** *"whats this tree thing?"*
+
+That question is a signal about this document, not about the developer. §4's three shapes were
+written when *powers* and *bounded sidegrades* were live options — a tree exists to make you
+**choose**, and a choice is only interesting when the branches are mutually exclusive and
+mechanically different. **With cosmetic-only ratified (§3), there is nothing to choose between.**
+A livery is not exclusive with a trail; nobody agonises over which hat to unlock first; and a
+prerequisite graph over hats is a UI a player has to learn in order to receive presents.
+
+**Decision: cosmetics ship as a LEVEL → UNLOCK LIST, not a tree.** One ordered table — *level 2
+grants X, level 4 grants Y* — read top to bottom. Concretely, that is:
+
+| | a tree | a list |
+|---|---|---|
+| data | nodes, edges, prerequisites, a spend | `Record<level, unlockId[]>` |
+| player action | choose, spend, possibly regret | none — it arrives |
+| new UI | a graph screen, pan/zoom, node states | one column on an existing screen |
+| profile fields | `unlocked[]`, `points` | `unlocked[]`, derivable from `level` alone |
+| Phase 1 cost | a screen | **zero** — the level readout already shows the level |
+
+The last row is the argument. With a list, the **profile does not even need `unlocked[]` to be
+authoritative** — it is derivable from `level`, so the stored array is a cache, and a corrupt
+profile cannot lose a player their hats.
+
+**What would earn a tree its place back, stated so the answer is falsifiable rather than a
+preference:** a tree pays for itself the moment two unlocks are *mutually exclusive* (a choice)
+or *gated on something other than level* (a challenge, a season, a purchase). If cosmetics ever
+become "pick one of three at level 5," this section reverses — and the migration is cheap,
+because a list is a degenerate tree and never the other way round.
+
+**This document does not design the unlock content**, and the brief chain contains no task that
+does. Phase 1 is fairness-neutral by construction and ships regardless; the list is empty until
+the developer fills it.
+
+### 4.1 The three tree shapes — KEPT AS REASONING, NOT AS A MENU
+
+Everything below was written for a sidegrade world and is superseded by the ruling above. It is
+kept for one reason: if §3 is ever revisited, this is the argued option space, and re-deriving
+it would cost a week. **No lane may build from §4.1.**
+
+**SKILL-TREE SHAPES — three sketches, grounded in real tunables** *(superseded 2026-08-07)*
 
 Every node below is a nudge to a constant that **already exists and is already `TUNABLE`** in
 `src/sim/constants.ts` — so these are buildable, not fiction. The architecture note that
@@ -396,147 +929,469 @@ already balance-proven.
 
 ---
 
-## 5. PHASE 1 CUT — what ships FIRST, regardless of the unlock decision
+## 5. PHASE 1 CUT — what ships FIRST *(re-cut 2026-08-07, a0-13)*
 
-XP accrual + levels + the three UI moments with local persistence and **NO unlocks**. It is
-fairness-neutral, needs **no sim change** (kills off until the attribution hook, §1.1), and
-de-risks everything after it. Needs-ordered, TDD — each task names the test to write **first**.
+XP accrual + levels + **the end-of-match summary as a choreographed sequence (§6)** + the lobby
+level badge, with local persistence and **NO unlocks**. It is fairness-neutral, and it is no
+longer a zero-sim-change cut: **the attribution hook moved into it** (§1.5), because three of
+the four ratified weights sit on it. Needs-ordered, TDD — each task names the test to write
+**first**. The tasks are emitted as claimable brief files in `docs/briefs/` and indexed in §7;
+the summaries below are the plan's view of the same work.
 
-### Task P1 — the profile module + defensive reader (UI Engineer)
-*Test first:* a round-trip test — a fresh profile persists and reloads to equal itself; a
-corrupt/absent blob folds to `{v:1, xp:0, level:1, matches:0}`; a future `v:2` blob does not
-crash a `v:1` reader. *Change:* `src/progression/profile.ts` — `loadProfile(storage)` /
-`saveProfile(storage, p)` over `platform.storage`, injected (mirror
-`createBrowserHaptics(storage)`, `main.ts:264`), JSON-encoded under `planet-rush:profile`.
-No sim import. **Trap:** the seam has no `remove` — the reset button (P5) needs the interface
-extended first.
+**Three things s4 put in this cut are now CANCELLED, and it matters that they are named rather
+than quietly missing:**
 
-### Task P2 — the accrual observer (UI Engineer, reusing the spike's logic)
-*Test first:* a fixed harness match with a scripted mining/depositing/building sequence
-yields the expected gathered/deposited/structures/upgrades/repairs/waves/placement counts.
-*Change:* promote `spikes/progression/measure-xp.ts`'s per-tick diff into
-`src/progression/accrual.ts` — but drive it off the **live match's** per-tick world (the
-render loop already holds it), not the harness. It stays **read-only over the world**, so it
-cannot perturb the sim or its hash. Kills excluded (no source yet). **Trap:** observe on the
-authoritative world online (the server's), not the predicted local one, or a mispredicted
-tick double-counts.
+- **The persistent in-match XP bar** (s4 Task P4's first UI moment). The visibility
+  ratification (§Q2) is *"we can show the LEVEL but not XP (and show it only in the lobby)."*
+  An XP bar on the HUD is exactly the thing that answer forbids: it is XP, and it is in the
+  match. It does not ship, in any size, anywhere on the HUD.
+- **The "reset progress" settings button** (s4 Task P5). Progression is never wiped (§Q4). The
+  `platform.storage` `remove` extension survives without it, for migration (§2.1).
+- **The per-player modifier seam and every tree task** (s4's Phase 2). Cosmetic-only (§3) means
+  no unlock ever touches a sim constant, so the seam has nothing to carry.
 
-### Task P3 — XP-to-level + the curve (UI Engineer)
-*Test first:* `levelForXp(0) === 1`; the boundary xp values map to the right levels;
-`xpToNext(L) = round(base·L^exp)` matches the table in §1.4. *Change:* `src/progression/curve.ts`
-— pure functions, `base`/`exp` as exported `TUNABLE` constants.
+### Task PR-1 — the profile module, versioned and migratable (Platform + UI) · *needs: nothing*
+*Test first:* a round-trip — a fresh profile persists and reloads equal to itself; a
+corrupt/absent blob folds to `{v:1, xp:0, level:1, matches:0}`; a **future `v:2` blob does not
+crash a `v:1` reader**; an unparseable blob is preserved under `planet-rush:profile.bak` before
+the fold. *Change:* `src/progression/profile.ts` — `loadProfile(storage)` / `saveProfile(storage,
+p)` over `platform.storage`, **injected** (mirror `createBrowserHaptics(storage)`,
+`main.ts:264`), JSON-encoded under `planet-rush:profile`. No sim import, no browser global.
+**Trap:** no reset path ships, so migration is the only repair this profile will ever get
+(§2.1) — write the migration seam now, empty, rather than the day it is needed.
 
-### Task P4 — the three UI moments (UI Engineer)
-*Test first:* the XP bar renders the correct fill for a given profile; a level-up fires
-exactly once when a match's XP crosses a boundary; the end-screen summary lists each accrual
-line with its XP. *Change:* an **XP bar** (persistent, small, near the existing HUD chrome),
-a **level-up moment** (the GDD's "nobody jokes for three seconds" tone is for planet death —
-a level-up is a bright Saturday-morning beat, §4.7), and the **end-of-match summary**
-extended with an XP breakdown (it already exists for Rematch — GDD §3.7, cut-list item 3).
-This is the single XP **write site**: compute → add → `saveProfile` → animate. **Trap:** write
-once, at teardown; never mid-match.
+### Task PR-2 — the attribution hook (Gameplay Engineer) · *needs: nothing*
+*Test first:* a two-ship fixture where A kills B credits A with B's hull HP and exactly one ship
+kill; a turret kill credits the **station owner**; a shot in flight when its owner dies still
+credits that owner; a **full-collapse match with no player core damage credits zero station
+kills to everybody**; and the **CI replay hash is byte-identical with the credit ledger present
+and absent**. *Change:* an optional `by?: PlayerId` on `damageShip`/`damageStation`/
+`damageTurret`/`damageSatellite`, plus `src/sim/combat-credit.ts` — **write-only, outside
+`hashState`**, exactly like `src/sim/ore-ledger.ts`. Full shape, the five attribution traps and
+the sizing are §1.5. **This is the only `src/sim/` change in the plan.**
 
-### Task P5 — reset + the seam extension (Platform + UI)
-*Test first:* `remove` deletes a key; "reset progress" restores a fresh profile. *Change:*
-add `remove(key: string): void` to the `platform.storage` interface (`platform.ts:35-39`) and
-its one browser impl (`platform.ts:104-119`); a settings-screen "reset progress" (behind a
-confirm, like EXIT).
+### Task PR-3 — the curve (UI Engineer) · *needs: nothing*
+*Test first:* `levelForXp(0) === 1`; boundary XP values map to the right levels;
+`xpToNext(L) = round(base·L^exp)` reproduces §1.4's table. *Change:* `src/progression/curve.ts` —
+pure functions, `base = 300` / `exp = 1.6` exported as `TUNABLE` constants (ratified §Q6).
 
-*(Phase 2, gated on §3 and NOT in this cut: the kill-attribution sim hook (§1.1), the
-per-player modifier seam (§4), the chosen tree, the per-node balance sweeps, and — only if
-powers go ranked — the signed-profile join field (§2.2) and eventually accounts.)*
+### Task PR-4 — the accrual observer + the XP economy (UI Engineer) · *needs: PR-2, PR-3*
+*Test first:* a scripted fixture match yields the expected ore/deposit/structure/upgrade/repair/
+wave/placement counts **and** the expected damage/kill credits read off the ledger; the tier
+multiplier applies to the three opponent-facing rows and to no other. *Change:*
+`src/progression/accrual.ts` (per-tick world diff, promoted from the spike but driven off the
+**live match's** world) and `src/progression/xp.ts` (the §1.3d table, every weight `TUNABLE`).
+Read-only over the world. **Trap:** online, observe the **authoritative** world (the server's),
+never the predicted local one, or a mispredicted tick double-counts.
+
+### Task PR-5 — the summary as a choreographed sequence (UI Engineer) · *needs: PR-1, PR-4; builds on a0-09*
+The whole of §6: the row list, the timeline, skip, reduced motion, the phone size, and the write
+site. *Test first:* skipping produces **exactly** the same final numbers as watching; the
+sequence's end state equals the reduced-motion state; the full row list fits 390 px wide with no
+scroll; the profile is written **once**, at teardown. **Trap:** the animation must never compute
+a number (§6.3 rule 2).
+
+### Task PR-6 — the lobby level badge + the storage seam (UI + Platform) · *needs: PR-1*
+*Test first:* a seat row renders its own level badge; **no other surface in the game renders a
+level or any XP** — asserted as an absence, over nameplates, HUD and the end screen's opponent
+rows; `remove` deletes a key. *Change:* the badge on the lobby seat row (§Q2), and
+`remove(key: string): void` on the `platform.storage` interface (`platform.ts:35-39`) and its one
+browser implementation (`platform.ts:104-119`).
+
+### Task PR-7 — the four summary cues (Sound Agent) · *needs: a0-01's re-voice; feeds PR-5*
+Four new bank slots, voiced against the **amended** §4.7 tone contract. Requirements in §6.5.
+**Not** the existing `matchEnd`, `musicWin` or `musicLoss`: all forty slots are under `deny-all`
+(a0-01), and a satisfying sound from the denied bank is one the developer has already rejected.
+
+### Task PR-8 — re-baseline the economy (QA Agent) · *needs: PR-4, PR-5*
+*Test first:* the pay table and the level curve are re-measured with the **shipped bot trees and
+real play**, not the spike's numbers, and the result is filed as a balance report against §1.4's
+table. §1.2's caveat applies to every number in §1.3a: the harness under-builds and under-repairs,
+and a bot economy is not a human one.
+
+*(Phase 2, and NOT in this cut: the cosmetic unlock **list** (§4) — which needs content the
+developer has not written; the signed-profile join field (§2.2a) — which unblocks opponent-level
+XP scaling (§1.3b) if Question D goes that way; and accounts (§2.2c), post-launch.)*
+
+---
+
+## 6. THE END-OF-MATCH SUMMARY — A BEAT, NOT A TABLE *(new 2026-08-07, a0-13)*
+
+> *"we need a fun end of match screen, that shows total ore mined, damage dealt, distance
+> travelled, ships used, ore used, etc. all of the stats you can think of"*
+>
+> *"it needs to feel like a video game end match screen with the score counting up, the progress
+> bar filling up to show you current level, whats left till next level as it fills up, and gives
+> a rewarding animation as it fills up and completes… plus a satisfying sound"*
+
+This is a first-class ask, not one of s4's "three UI moments". It is specified here as a
+**sequence with a timeline**, because a screen with animations sprinkled on it and a
+choreographed beat are different products and only the second one was asked for.
+
+**It builds on `a0-09`, it does not fork it.** That lane rewrote `src/ui/end-of-match.ts` to be
+team-aware and merged on 2026-08-08 (#328); `MatchOutcome`, `onYourSide`, `endKind`, `endButtons`
+and `endOfMatchLayout` are the shipped surface this sequence extends. The gate is met: PR-5 starts
+from that file rather than beside it.
+
+### 6.1 What the screen already is
+
+Pure and DOM-free: `endOfMatchModel(outcome, pointer)` derives the words and buttons,
+`endOfMatchLayout` places them, `./end-of-match-view` draws them, and the whole thing is
+gantry/bone material with **REMATCH as the one bright plate** (GDD §4.7). The tone note in that
+file's header is load-bearing and this section does not overturn it: *the station-death ache is
+carried by the result*, and the XP sequence is a separate, brighter beat that happens **after**
+the result has landed. A level-up does not make a defeat cheerful; it happens underneath it.
+
+### 6.2 The rows — every stat, then marked
+
+"All the stats you can think of" is the right instinct for a *list* and the wrong one for a
+*screen*: thirty numbers communicate nothing. So: enumerate generously, then mark each one
+**SHOW** (drawn, no XP), **XP** (pays, not drawn as its own row), **BOTH**, or **CUT**, with the
+reason. The CUT column is the Architect's call and is cheap to reverse — say the word and a row
+moves.
+
+| Stat | Verdict | Reason |
+|---|---|---|
+| **Ore mined** (into the hold) | **BOTH** | The developer's own first row, and the ratified 1× base. |
+| **Damage dealt** | **BOTH** | Ratified 2×. Shown in HP — the unit the player sees on every bar. |
+| **Ships destroyed** | **BOTH** | Ratified 5×. |
+| **Stations destroyed** | **BOTH** | Ratified 10×. Shows `—`, never `0`, when the Crush did the killing (§1.3c). |
+| **Distance travelled** | **SHOW** | Explicitly asked for. It is a *flavour* number — pays no XP, because paying it would reward flying in circles. |
+| **Ships used** (your own deaths + 1) | **SHOW** | Explicitly asked for. Never XP: paying for it rewards dying, and *charging* for it punishes the free-respawn design (GDD §2.7). |
+| **Ore used** (spent on builds/upgrades/repairs) | **SHOW** | Explicitly asked for, and the honest counterpart to ore mined. |
+| **Ore banked** | **XP** | Pays 2/ore (§1.3d). Not its own row — it is a *subset* of ore mined and two ore rows side by side read as double counting. |
+| **Defences built** | **XP** | Pays 12. A turtle's whole match, but a weak number to look at (median 3–4). |
+| **Ship upgrades bought** | **XP** | Pays 20/tier. |
+| **Reactor patched** | **XP** | Pays 3. Median 0–1 per match: a row that is usually zero is a row that teaches nothing. |
+| **Waves survived** | **XP** | Pays 15. Duplicated by "match time", below. |
+| **Placement / match won** | **XP** | Pays 20/rung + 200. Already the *headline* of this screen (VICTORY / DEFEAT) — printing it again as a row is the same fact twice. |
+| **Match time** | **SHOW** | One line under the headline, not a row. Free, and it frames every other number. |
+| **Accuracy (shots hit ÷ fired)** | **CUT** | The sim counts neither. A new counter for a flavour row is not worth a `src/sim` change. |
+| **Ore mined vs scavenged, split** | **CUT** | Needs chunk provenance the sim does not carry (§1.1). Half a day; offer it if the developer wants the Vulture fantasy on screen. |
+| **Longest life / kill streak** | **CUT** | Both derivable from PR-2's ledger, neither asked for. Phase 2 if the screen ever feels thin. |
+| **Per-opponent breakdown** | **CUT** | Another player's stats are not yours to read (§Q2), and this is the screen that answer most obviously binds. |
+
+**Seven visible rows** — ore mined, damage dealt, ships destroyed, stations destroyed, distance
+travelled, ships used, ore used — plus a match-time line, the XP total, and the level bar. That
+is the list §6.4's phone constraint is sized against, and it is why the CUT column had to be
+strict.
+
+**One display rule the row list does not soften.** A stat that cannot be credited to a real
+player is **not shown rather than estimated** (§1.5). "Stations destroyed" reads `—` when the
+core in question decayed under the Crush, not `0` and never a guess.
+
+### 6.3 The timeline — named beats, in order
+
+Times are `TUNABLE` opening values; the *order* and the rules are not.
+
+| # | Beat | Duration | What happens |
+|---|---|---|---|
+| 0 | **The result lands** | 0.0 – 1.2 s | a0-09's existing screen, alone. VICTORY / DEFEAT / DRAW / ELIMINATED, the subhead, the accent. **Nothing of the XP sequence exists yet** — the ache gets its beat first (GDD §4.7). |
+| 1 | **Rows arrive, one at a time** | 1.2 s + 0.18 s per row | Each row lands (fade + short rise) and **its number counts up from 0 to its final value over 0.5 s**, easing out. Seven rows ⇒ the last one starts at ~2.5 s. The XP each row earned lands beside it as the count-up finishes. |
+| 2 | **The XP total counts up** | +0.9 s | One number, from 0 to the match total, faster than the rows so it reads as a summation of them rather than an eighth row. |
+| 3 | **The bar fills** | +1.4 s | The level bar starts **where the player started the match** — not at zero — and fills toward the next level. The level readout and "N XP to next" are live throughout. This is the beat the developer described, and it is the reason the bar must not be a static "after" picture. |
+| 4 | **The level-up moment** *(conditional)* | +0.8 s each | The bar completes, flashes, resets to empty, the level readout ticks up, and the cue hits. Then the fill resumes with whatever XP is left. |
+| 5 | **The settle** | +0.4 s | Everything holds at its final value; the buttons (REMATCH, and SPECTATE or MENU) take focus. |
+
+**Total ≈ 5 s** for a typical match, ≈ 6 s with one level-up. That is a long time to sit through
+twice, which is why beat 6 exists:
+
+### 6.4 Four rules that hold the implementer, and are testable
+
+1. **Skippable, always.** Any input — a tap anywhere, any key, any pad button — snaps **every**
+   counter and the bar to their final values instantly and jumps to the settle. Players see this
+   screen every match, and the second time it is a toll. **Skipping must land on exactly the same
+   numbers**: never a different total because the animation was cut short. *Test:* run the
+   sequence to completion, and run it with a skip at every 100 ms mark; assert byte-identical
+   final models. **The skip must not also press a button** — the first input skips, the second
+   can act, or a player who taps twice rematches by accident.
+2. **The animation never computes the numbers.** Counters interpolate toward values the sim and
+   the accrual observer already fixed at teardown. A tween that *produces* the score is a score
+   nobody can reproduce and no test can pin. *Test:* the model is fully determined before the
+   first frame; the view is a pure function of `(model, elapsed)`.
+3. **`prefers-reduced-motion` is honoured** — the sequence collapses to its end state (every row
+   at its final number, the bar at its final fill, the buttons live), **with the level-up still
+   marked** as a static state rather than silently dropped. ⚠ **The brief that ordered this
+   section said reduced motion is "already respected elsewhere in the client." It is not.**
+   `grep -rn "reduced-motion\|reducedMotion" src/ index.html public/ style-guide.md` returns
+   **nothing** — there is no media-query read, no setting and no seam anywhere in the client
+   today. So PR-5 is where the seam gets built, not where an existing one is honoured: a
+   `prefersReducedMotion(): boolean` read on the `platform.ts` abstraction (never a bare
+   `window.matchMedia` in UI code — GDD §4.1's platform rule), with the same defensive-default
+   discipline as every other setting. It is small, and it is the honest scope note.
+4. **Landscape phone is the target size.** The seven rows, the XP total, the bar and the level
+   readout must fit at **390 px** wide with **no scroll**, alongside the existing headline and
+   buttons. If they do not, §6.2's SHOW column was too generous — cut a row, do not add a
+   scrollbar. *Test:* the layout function at 390×844 and at 844×390 places every element inside
+   the viewport, safe areas included.
+
+**Two cases the spec must answer, because they are the common ones and both look like bugs:**
+
+- **More than one level in a match.** A bar cannot fill twice in the same second and be readable.
+  Beat 4 repeats — fill, flash, reset, tick, resume — with each subsequent fill **capped at 0.5 s**
+  so three levels take 1.5 s rather than 4.2. Past **three** level-ups in one match, collapse the
+  rest: the bar jumps straight to the final level and the readout shows `LEVEL 7 (+4)`. Nobody
+  needs to watch a bar fill five times, and a first match after a long absence can do exactly that.
+- **Almost no XP at all.** The common case for a short match, and a bar that visibly does nothing
+  is the failure mode this whole section exists to avoid. The rule: **the bar always animates for
+  its full beat-3 duration**, however small the delta, so the motion is constant and only the
+  distance changes; and the readout underneath carries the number that *did* move
+  (`+34 XP · 266 TO NEXT`). A player who earned little should see that they earned little — not
+  see nothing and conclude the screen is broken.
+
+### 6.5 The sound — four cues, and NOT the ones already in the bank
+
+The sound is not free, and it is not this brief's to invent. `matchEnd` is already a bank slot,
+and `candidates.ts` carries a *Victory Sting* (`musicWin`) and a *Defeat Sting* (`musicLoss`) —
+but **all forty slots are under `deny-all` right now** (a0-01), being re-voiced to clean modern
+sci-fi because the shipped set read as retro and toony (`docs/audio-revoice-spec.md`; GDD §4.7 as
+amended 2026-08-06). So: **no lane may reach for the existing stings.** A satisfying sound drawn
+from the denied bank is a satisfying sound the developer has already rejected.
+
+Four cues, as **requirements handed to the Sound Agent** (Task PR-7), to be voiced against the
+amended §4.7 tone — clean, modern, futura sci-fi; no `square`, no `saw`, none of the arcade
+idioms §5 of the revoice spec retires:
+
+| Cue | Beat | Requirement |
+|---|---|---|
+| `xpTick` | 1–2 | The count-up tick. Heard **dozens of times in five seconds**, so it is the `pressTick` problem, not the `matchEnd` one: tiny, dry, pitched *up* slightly as the count rises, and utterly non-fatiguing. It must survive being heard every match forever. |
+| `xpBarFill` | 3 | A sustained, rising bed under the fill — a *filling* sound, not a repeated one. Ends when the bar does. Must duck cleanly under a level-up landing on top of it. |
+| `levelUp` | 4 | **The one moment allowed to be a reward.** Short, bright, decisive, and it must read as *arrival* rather than fanfare — the amended tone contract's ceiling, not the old one's fireworks. This is the "satisfying sound" the developer asked for; the other three exist so this one lands. |
+| `xpSettle` | 5 | The full stop. Quiet. Tells the player the screen is finished and their input now means something. |
+
+**Two constraints on the set, not on the individual cues.** They mix **under** whatever the
+result already sounded (a station death is still the ache), and the whole sequence must be
+**silent under a skip** past the settle cue — a player who skipped is telling you they do not
+want the beat, and firing seven queued ticks at them is the opposite of that.
+
+---
+
+## 7. THE BRIEF CHAIN
+
+The Phase 1 cut, emitted as claimable brief files. Each carries its own Definition of Done and
+its own evidence line; a lane claims one, reads its `needs:` edges, and does not improvise.
+
+| Brief | Owner | Needs | What it is |
+|---|---|---|---|
+| [`pr-01-profile-store`](briefs/pr-01-profile-store.md) | Platform + UI | — | The versioned, migratable local profile |
+| [`pr-02-attribution-hook`](briefs/pr-02-attribution-hook.md) | Gameplay | — | `by: PlayerId` on the damage path; the write-only credit ledger |
+| [`pr-03-level-curve`](briefs/pr-03-level-curve.md) | UI | — | `xpToNext` / `levelForXp`, pure |
+| [`pr-04-accrual-and-xp`](briefs/pr-04-accrual-and-xp.md) | UI | pr-02, pr-03 | The observer, the weight table, the tier multiplier |
+| [`pr-05-summary-sequence`](briefs/pr-05-summary-sequence.md) | UI | pr-01, pr-04 (a0-09 landed) | §6 — the rows, the timeline, skip, reduced motion |
+| [`pr-06-lobby-level-badge`](briefs/pr-06-lobby-level-badge.md) | UI + Platform | pr-01 | The badge, and only in the lobby; the storage seam |
+| [`pr-07-summary-cues`](briefs/pr-07-summary-cues.md) | Sound | a0-01 | Four new slots, voiced to the amended §4.7 |
+| [`pr-08-rebaseline`](briefs/pr-08-rebaseline.md) | QA | pr-04, pr-05 | Re-measure the pay and the curve with shipped bots and real play |
+
+```
+pr-01 ─┬─────────────► pr-05 ──┬──► pr-08
+       └──► pr-06              │
+pr-02 ─┬──► pr-04 ─────────────┘
+pr-03 ─┘
+pr-07 (a0-01) ────────► feeds pr-05
+```
+
+**pr-01, pr-02 and pr-03 have no dependencies and can be claimed in parallel today.** pr-02 is
+the long pole: it is the only `src/sim/` change, and pr-04 and everything downstream of it wait
+on the credit ledger existing.
 
 ---
 
 ## TRAPS (the ones that bite an implementer who skims)
 
-1. **The sim tracks no killer.** `killShip`/`damageShip`/`destroyCore` take no attacker
-   (`damage.ts:25,37`, `match.ts:92`; `main.ts:1390` says it in words). Kill/assist XP is the
-   ONE accrual event that needs a sim change — do not assume you can read it off the world.
-   (§1.1)
+1. **The sim tracks no killer, AND no damage dealt.** `killShip`/`damageShip`/`destroyCore` take
+   no attacker (`damage.ts:25,37`, `match.ts:114`; `main.ts:2147` says it in words), and nothing
+   anywhere sums the damage a player has dealt. **Three of the four ratified weights are on that
+   gap**, so it is Phase 1 work (PR-2), not a thing to read off the world. (§1.1, §1.5)
 2. **No per-player counters exist** — only the match-wide ore ledger (`ore-ledger.ts`), which
    is aggregate, not per-slot. Per-player accrual is *observed*, by diffing world deltas.
    (§1)
 3. **`platform.storage` is strings-only and has no `remove`/`keys`** (`platform.ts:36-39`).
-   The profile must JSON-encode; a reset button needs the interface extended. (§2.1, Task P5)
+   The profile must JSON-encode; the migration path needs the interface extended (PR-6). The
+   *reset button* that used to motivate that extension is cancelled — progression is never
+   wiped (§Q4). (§2.1)
 4. **The profile is the FIRST versioned payload** — no existing reader has a `v` field. Add
    one and validate every field on read, folding corrupt to default like `readMapId`. (§2.1)
 5. **m9 has no accounts and no server storage** — the server is ephemeral, the registry is
    "a cache, not a database." Server-authoritative persistence has no home; a signed *local*
    profile is the account-less answer, and it is only **soft**-trusted. (§2.2)
-6. **A soft profile cannot gate a competitive power.** The owner edits their own
-   `localStorage`; the signature stops wire-forgery, not offline self-editing. This is *why*
-   powers must be sidegrades or unranked, not because of effort. (§2.2, §3)
-7. **Unlock modifiers are static match config — keep them OFF the per-tick snapshot.** Like
-   `team`/`shipClass`, a per-player modifier set rides `matchStart`, folds into the
-   determinism hash as ints, and never inflates the snapshot budget. (§4, and s1 Trap 7)
+6. **A soft profile cannot gate a competitive power** — and, since 2026-08-07, cannot be
+   trusted to price one either. The owner edits their own `localStorage`; the signature stops
+   wire-forgery, not offline self-editing. That is why unlocks are cosmetic (§3) *and* why XP
+   does not scale by the opponent's level (§1.3b). (§2.2, §3)
+7. ~~**Unlock modifiers are static match config**~~ — **RETIRED 2026-08-07.** Cosmetic-only
+   means no unlock ever touches a sim constant, so the per-player modifier seam is not built and
+   this trap has nothing to warn about. Kept struck-through rather than deleted: if §3 is ever
+   revisited, this is the first thing that comes back. (§3, §4)
 8. **XP is written once, at match-end, and the sim must never read the profile.** A profile
    read inside `step` would break determinism (GDD §4.8) and desync online. Observe the
    world; write the profile at teardown. (§5)
-9. **Every sidegrade node re-opens a balance sweep.** A per-class tree (Shape 1) re-opens the
-   §2.11 class ceiling; any tree re-opens a new pilot-vs-field sweep. Budget QA time per node,
-   not per tree. (§3, §4)
+9. ~~**Every sidegrade node re-opens a balance sweep.**~~ — **RETIRED 2026-08-07** with Trap 7,
+   and for the same reason: a livery does not move a win rate. (§3, §4)
 10. **Harness build/repair numbers are a floor, not a typical.** The QA probes under-build;
     real bot trees and humans build more. Do not size structure/repair XP off the median-0
-    rows — re-baseline at m10. (§1.2)
+    rows — re-baseline at m10 (PR-8). (§1.2)
+11. **A weight is not an economy until its unit is chosen.** "Damage dealt 2×" at a literal
+    1 HP makes damage 94% of all XP and the highest-weighted row, stations destroyed, 0%. Pick
+    `DAMAGE_HP_PER_UNIT` deliberately; do not let it default to 1 by omission. (§1.3a)
+12. **The Crush kills most stations, and it is not an attacker.** 100% of station deaths in an
+    Easy bot lobby and 98% in a Medium one were the collapse, not a player. A stat with no
+    attacker is shown as `—`, never as `0` and never estimated — the same reasoning that stops
+    the under-attack alarm ringing for core decay (GDD §2.2, §2.3). (§1.3c, §1.5, §6.2)
+13. **The four ratified weights have no participation floor.** On their own they make the first
+    player knocked out out-earn the winner in an Easy lobby (0.3×). If Question A drops s4's
+    non-combat rows, the level curve must be re-tuned in the same change — `base=300` stops
+    landing level 2 inside a first match. (§1.3c, §1.4)
+14. **XP is never shown in a match, and another player's level is never shown at all.** The
+    ratified answer is *level yes, XP never, lobby only* (§Q2). That kills s4's persistent HUD
+    XP bar outright, and it binds the summary screen: your own level and XP, nobody else's.
+    Assert it as an **absence**, over nameplates, HUD and the end screen — an absence nobody
+    tests for is an absence that comes back. (§Q2, PR-6)
+15. **`prefers-reduced-motion` is NOT honoured anywhere in this client today.** A grep over
+    `src/`, `index.html`, `public/` and the style guide returns nothing. PR-5 builds the seam
+    (on `platform.ts`, never a bare `window.matchMedia` in UI code); it does not inherit one.
+    (§6.4 rule 3)
+16. **The end-of-match sound may not come from the existing bank.** All forty slots are under
+    `deny-all` (a0-01), including `matchEnd`, `musicWin` (Victory Sting) and `musicLoss`
+    (Defeat Sting). Reaching for them ships a sound the developer has already rejected. Four
+    new slots, voiced to the amended §4.7 tone. (§6.5, PR-7)
+17. **Skipping the sequence must not change a single number.** The animation interpolates
+    toward values fixed at teardown; a tween that produces a score is a score nobody can
+    reproduce. And the input that skips must not also press a button. (§6.4 rules 1–2)
 
 ---
 
-## QUESTIONS FOR THE DEVELOPER
+## THE DEVELOPER'S RATIFICATIONS — s4's six questions, ANSWERED 2026-08-07
 
-1. **The fairness stance (the one everything branches on).** Cosmetics only, bounded
-   sidegrades (balance-harness-gated ≤55%), powers in unranked/vs-bots only, or full power
-   progression? *Recommendation:* **cosmetics + bounded sidegrades, with mode-scoping held in
-   reserve** (§3). Phase 1 ships regardless; this decides Phase 2.
-2. **Is XP / level visible to *other* players?** A level badge on a nameplate is identity;
-   it is also information a rival reads. *Recommendation:* **show your own level in the HUD
-   and end-screen; show others' only as an optional cosmetic badge, never as a stat** — the
-   game already fogs enemy *HP* on purpose (§2.2), and a broadcast power-level would fight
-   that. Confirm.
-3. **Per-pilot or per-class progression?** One shared pilot tree, or a tree per hull?
-   *Recommendation:* **one pilot tree** (§4 Shape 2) — the per-class fantasy is already served
-   by the balance-proven upgrade ladder (§2.5), and one tree is the least content and least
-   balance risk. Confirm, or ask for per-class.
-4. **Reset policy.** Is progression ever wiped — never, per-season, or player-initiated only?
-   *Recommendation:* **player-initiated reset only** for launch (a settings button behind a
-   confirm, Task P5); seasons need accounts (§2.2c) and are post-launch. Confirm.
-5. **Does XP earn OFFLINE / vs bots count the same as online?** *Recommendation:* **yes, same
-   XP** — the offline game is a first-class product (GDD §4.3, risk 6), and the account-less
-   design means there is no ranked/casual XP distinction to enforce anyway *until* powers go
-   ranked. If powers ever go ranked-only (§3 option 3), revisit. Confirm.
-6. **Kill/assist XP — worth the sim hook now, or defer?** It is the only accrual event that
-   needs a Gameplay-Engineer change (§1.1). *Recommendation:* **defer to Phase 2, ship Phase 1
-   with kills off** — so the XP a player sees is honest (credited to a real player) from day
-   one rather than estimated. Confirm.
+Folded into the sections they change (LESSONS §17: a ratification belongs in the body, not in an
+appendix); repeated here as the dated record of who decided what. **`§Q<n>` anywhere in this
+document means the numbered item below** — `§Q2` is the visibility ruling, `§Q4` the reset one,
+and so on.
 
-*(Secondary defaults, safe if unanswered: level curve `base=300`/`exp=1.6` (level 2 in one
-match, level 10 at ~67); XP banked once at match-end; deposits weighted 2× gathered.)*
+1. **The fairness stance → COSMETIC.** *"probably cosmetics as you gain levels you'll unlock new
+   items things like that."* Folded into **§3**, with the developer's own hedge — *"not clear yet
+   what it will be for"* — recorded there, so a later change reads as a change rather than a
+   contradiction. Consequences: no modifier seam, no balance sweep, Traps 7 and 9 retired.
+2. **Visibility → LEVEL yes, XP never, and LOBBY only.** *"we can show the LEVEL but not XP (and
+   show it only in the lobby)."* This is a **stronger** answer than s4 recommended, and it
+   resolves the fog objection cleanly: a level badge sits on a **lobby seat row and nowhere
+   else** — not on an in-match nameplate, not in the HUD, and not on the end screen for anyone
+   but yourself. The badge is gone before the match starts, so it can never be read as in-match
+   information about a live opponent (GDD §2.2). **Raw XP is private to its owner, always.**
+   Folded into **§5** (which cancels s4's persistent HUD XP bar), **§6.2** (no per-opponent
+   breakdown), **PR-6**, and Trap 14.
+3. **Skill-tree shape → the developer asked what it was.** *"whats this tree thing?"* Answered as
+   a signal about the document, in **§4**: with cosmetic-only ratified, a tree is the wrong
+   structure and a **level → unlock list** is the right one. The three shapes are kept as
+   superseded reasoning. **No unlock content is designed here.**
+4. **Reset policy → NEVER.** *"no."* The player-initiated reset is dropped from the cut; the
+   storage-seam extension it needed survives for **migration**, which is now the profile's only
+   repair tool. Folded into **§2.1**, **§5** and **PR-1**/**PR-6**.
+5. **Offline XP → SAME as online.** *"yes."* Folded into **§1.3c(3)** together with the
+   difficulty multiplier, and the consequence is written down rather than left to be discovered:
+   an uncontested solo bot lobby is the highest XP/minute in the game. Measured — and the fastest
+   tier is **Medium**, not Hard, which is the opposite of what was expected.
+6. **Level curve → ACCEPTED.** *"ok."* `base=300` / `exp=1.6` kept, and **re-measured** against
+   the ratified weights and the multiplier in **§1.4**: level 2 still lands inside one match
+   (0.8), level 10 moves from ~67 matches to ~101. It survives *on the recommended economy*; on
+   the ratified four alone it does not, which is Question A.
+7. *(s4's Q6, kill/assist XP — deferred or now?)* **NOW.** Reversed by a0-13: the ratified
+   weights put three of four rows on the hook, so deferring it ships a screen that pays only ore.
+   **§1.5**, Task **PR-2**.
+
+Also ratified in the same pass and folded in: **persistence stays LOCAL ONLY and simple**
+(*"we may need a backend at some future point, but for now lets just keep it simple, locally
+stored"*) — **§2**, with the two obligations it creates (version from the first write; keep the
+shape backend-portable).
+
+---
+
+## QUESTIONS FOR THE DEVELOPER *(new, raised by what the ratifications cost)*
+
+**A. Keep the participation rows, or is XP purely combat + ore?** *(the big one)*
+Your four weights are ratified and are not in question. What they do not say is whether the
+*other* seven rows s4 measured — ore banked, defences built, upgrades bought, reactor patched,
+waves survived, placement, match won — still pay anything. Measured, dropping them changes the
+character of the whole system: in an Easy bot lobby **the first player knocked out earns more
+XP than the winner (0.3×)**, because a turtle who wins by outlasting everyone deals little
+damage and kills nobody. It also drops a typical match from 399 XP to 149, which means `base=300`
+no longer lands level 2 inside a first match. *Recommendation:* **keep them** — they are what
+makes XP "a hook that rewards showing up," and they cost nothing to pay (they are all free world
+deltas). §1.3c(1), §1.4.
+
+**B. What is one unit of "damage dealt"?** Your `2×` needs a denominator, and it is the single
+number that decides what the whole economy feels like. At **1 HP** damage becomes 94% of all XP
+and your highest-weighted row — stations destroyed — becomes 0% of it. *Recommendation:*
+**one unit = 25 HP**, which lands combat at ~42% of pay, ore at 17%, and makes a full 50-HP hull
+melted worth about as much as the kill that ends it. §1.3a.
+
+**C. A station the Crush killed — who gets the 10×?** Measured over 48 matches: **100% of station
+deaths in an Easy bot lobby and 98% in a Medium one were the collapse phase, not a player.**
+Against Hard bots it is 11%. So your highest weight is unearnable in a soft lobby. Options: pay
+**nobody** *(recommended — entropy is not an attacker, and the under-attack alarm already refuses
+to ring for core decay on exactly that reasoning)*; pay the **last player to damage that core**
+inside a window; or replace the row with a **"survived to the collapse"** one that everybody can
+earn. §1.3c(2).
+
+**D. XP scaled by the opponent's LEVEL — hold, or ship it?** You raised it as a possibility
+(*"or perhaps their LVL also is taken into account"*). *Recommendation:* **hold it** until
+profiles are integrity-checked, for three reasons: a level arriving from another client is a
+number that client authored (there are no accounts, §2.2); two cooperating players — one high
+level, one grinding — turn a lobby into a faucet; and it makes your pay depend on someone else's
+progression, invisibly, which fights the readability the summary screen exists for. The
+integrity work is sized at ~2 days (§2.2a) and is not built. If you want it sooner, say so and
+it becomes PR-9. §1.3b.
+
+**E. The bot farm — fine, or worth capping?** Offline XP counts the same as online (your call,
+and the right one for a first-class offline game), so the cheapest XP in the game is a private
+lobby full of bots. Measured, the fastest is **a MEDIUM lobby at 17 XP/min** — not Hard (12), and
+not because of the multiplier, but because Medium bots fight and die constantly. Which tier pays
+best will move whenever the Bot Engineer touches the trees. *Recommendation:* **leave it alone**
+— for a cosmetic-only progression, a player grinding hats against bots is a player playing the
+game. Say the word and it becomes a daily cap or a small offline multiplier, but both are new
+systems to maintain and neither is free. §1.3c(3).
+
+*(Secondary defaults, safe if unanswered: `DAMAGE_HP_PER_UNIT = 25`; tier multiplier
+0.75 / 1.0 / 1.25 with humans at 1.25; XP banked once at match-end; deposits weighted 2× gathered;
+level curve `base=300`/`exp=1.6`. The §6.2 SHOW/CUT verdicts are the Architect's and are cheap to
+reverse — say the word and a row moves.)*
 
 ---
 
 ## GDD SECTION DRAFT (lands in the GDD when ratified — currency policy §2)
 
-> ### 2.12 Meta-progression: XP, levels, and unlocks *(pending ratification — Architect spike
-> s4, `docs/progression-plan.md`)*
+> ### 2.12 Meta-progression: XP, levels, and the end-of-match summary *(Architect spike s4,
+> amended a0-13; `docs/progression-plan.md`)*
 >
-> A player earns **XP** every match for playing the triangle — ore gathered and banked,
-> defenses built, ship upgraded, core repaired, waves survived, and how they placed — and
-> levels up on an early-fast curve (`xpToNext = base · L^exp`, both `TUNABLE`; level 2 lands
-> inside a first match). XP is **cosmetic-neutral by default**: it is a hook that rewards
-> showing up and playing the loop, and a losing player still climbs, so it never bends the
-> match's fairness. Progression persists **locally**, in the same `platform.storage` family as
-> settings, as a single versioned profile; online, where the game has **no accounts** (§4.2),
-> the profile is **client-owned and server-vouched** (an HMAC signature modeled on the room
-> ticket), never a server-side account — so persistence costs the account-less design nothing.
+> A player earns **XP** every match for playing the triangle — **ore mined (1×), damage dealt
+> (2×), ships destroyed (5×), stations destroyed (10×)** *(developer-ratified 2026-08-07)*, plus
+> the loop's non-combat work: ore banked, defences built, ship upgraded, reactor patched, waves
+> survived, and how they placed. The three opponent-facing rows are **multiplied by the
+> opponent's difficulty** — Easy ×0.75, Medium ×1.0, Hard ×1.25, and a **human counts as Hard**,
+> because contesting a person is the point of the mode. A player levels up on an early-fast curve
+> (`xpToNext = base · L^exp`, both `TUNABLE`; level 2 lands inside a first match). A stat that
+> cannot be credited to a real player is **not shown rather than estimated** — a reactor the
+> claim's collapse finished has no killer, and the summary says so.
 >
-> **Unlocks are bounded, or they are cosmetic.** The game's core invariant is fairness at
-> every N (§2.1, §2.11), so an unlock may be a **cosmetic** (livery, trail, badge — fairness
-> untouched) or a **bounded sidegrade** (a lateral trade to an existing tunable — `+reach` for
-> `−deposit range`, say) that **must pass the balance harness at ≤55% win rate** against the
-> stock loadout before it ships. Anything that cannot be made lateral lives in **unranked /
-> vs-bots** play only, never in a fair match. Skill points buy nodes on a single **pilot
-> tree**; the hull remains the identity (§2.11). *(The exact node list and the ranked-power
-> stance are the developer's ratifications — see the spike.)*
+> **Level is shown; XP never is; and neither is anyone else's** *(ratified 2026-08-07)*. A level
+> badge sits on a **lobby seat row and nowhere else** — never on an in-match nameplate, never in
+> the HUD, never on the end screen for anyone but yourself. The badge is gone before RUSH!, so it
+> can never be read as live information about an opponent (§2.2). Raw XP is private to its owner.
+>
+> **The match ends on a beat, not a table.** The result lands alone first — the station-death
+> ache keeps its three seconds (§4.7) — and then the summary plays as a choreographed sequence:
+> the stat rows arrive one at a time, each counting up; the XP total counts up; the level bar
+> fills **from where the player started the match** toward the next level; a level-up lands as its
+> own moment; the screen settles. It is **skippable on any input, to exactly the same numbers**,
+> it honours `prefers-reduced-motion` by collapsing to its end state with the level-up still
+> marked, and it fits a landscape phone without scrolling.
+>
+> **Unlocks are cosmetic** *(ratified 2026-08-07)*. The game's core invariant is fairness at every
+> N (§2.1, §2.11), and an unlock may not touch a simulation constant — a level grants liveries,
+> trails, badges and the like, from a plain **level → unlock list**, never a stat. Progression
+> persists **locally**, in the same `platform.storage` family as settings, as a single **versioned**
+> profile; there is no account, and **progression is never wiped**, which makes schema migration
+> the only repair path the profile will ever have.
 
-*End of spike s4. Phase 1 is fairness-neutral and shippable today; Phase 2 branches on
-Question 1.*
+*End of spike s4, amended by a0-13 (2026-08-07). Every question s4 asked has been answered; the
+Phase 1 chain is §7 and is claimable today. The five questions above are what the answers cost —
+none of them blocks pr-01, pr-02 or pr-03.*
