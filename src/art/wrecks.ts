@@ -19,11 +19,10 @@
  */
 
 import { mulberry32 } from '@shared/types';
-import { continentPolygons } from './stations';
+import { STATION_ART_EXTENT, cutterheadShapes, stationVariantFor } from './stations';
 import { DERIVED, PALETTE } from './palette';
 import {
   annulusPoints,
-  arcPoints,
   blob,
   circle,
   fill,
@@ -37,29 +36,56 @@ import {
 } from './shapes';
 
 /**
- * A dead station, at the same unit radius as the living one — the wreck keeps
+ * The cold halo a wreck sits in: the dust the rig shook loose when it died,
+ * still hanging. Stacked as six faint discs rather than one, for the same reason
+ * the collection field is forty and not five (`./stations`, `HALO_STEPS`) — a
+ * single translucent disc has a findable edge, and a findable edge around a
+ * station is a ring the player will try to read a rule off.
+ */
+const SHROUD_RADIUS = 1.35;
+const SHROUD_STEPS = 6;
+const SHROUD_ALPHA = 0.036;
+
+/**
+ * A dead facility, at the same unit radius as the living one — the wreck keeps
  * its position and radius and stays solid (GDD §2.7), so the two sprites are
  * interchangeable at the same scale and the death is a straight swap.
  *
- * The variant is carried through so a wreck is recognisably *that* world: the
- * same coastlines, ashed over. Losing a stranger's station and losing the one
+ * This is the **derelict of the ratified board** (`facility-concepts-r2.html`,
+ * Direction D, picked 2026-08-07): the same cutterhead, gone cold. It is drawn
+ * by the same generator as the living rig under the dead palette map, which is
+ * what makes it recognisably *that* station rather than a generic dead disc —
+ * the arrangement, the hoppers, the boom's bearing and the corrosion are the
+ * ones it had while it was working. Losing a stranger's rig and losing the one
  * you spent the match next to should not look identical.
+ *
+ * The board's own caption is the spec, and every clause of it is drawn:
+ *
+ * > *Cold. The core is out and the throat is dark, three teeth are gone and two
+ * > lugs are snapped, the boom is broken mid-span with its outer half adrift,
+ * > one hopper has split and run its ore onto the deck. Patina has the rest. No
+ * > red, because a wreck is not a threat — it is an absence; the only yellow
+ * > left is ore, which is why anyone comes.*
+ *
+ * The same sprite serves both kinds of wreck the ruleset has: a killed player's
+ * home, and the **lootable derelicts** that fill unused board positions on the
+ * compass and diamond maps at fewer than eight players (GDD §2.1, §2.7).
  */
 export function stationWreckSprite(variant: number): SpriteDef {
-  const v = Math.abs(Math.trunc(variant)) % 4;
+  const v = stationVariantFor(variant);
   const rng = mulberry32((0x1b873593 ^ (v * 0xc2b2ae35)) >>> 0);
-  const crust = fill(DERIVED.wreckCrust, 'material');
+
+  const shapes: Shape[] = [];
+  for (let i = 0; i < SHROUD_STEPS; i++) {
+    const r = round(SHROUD_RADIUS * (1 - (i / SHROUD_STEPS) * 0.34));
+    shapes.push(circle(0, 0, r, fill(DERIVED.wreckCrust, 'material', SHROUD_ALPHA)));
+  }
+  shapes.push(...cutterheadShapes({ variant: v, dead: true }));
+
+  // Fracture lines running out of the dead throat: the crack that killed it.
+  // Seeded off the wreck rather than the rig, so two stations that died the same
+  // way did not die identically.
   const seam = stroke(DERIVED.rockFissure, 0.035, 'material', 0.95);
-
-  const shapes: Shape[] = [
-    circle(0, 0, 1, fill(DERIVED.wreckBody, 'material')),
-    // The old coastlines, one shade above the ash — the world is still legible
-    // under what happened to it.
-    ...continentPolygons(v).map((p) => poly(p, crust)),
-    circle(0, 0, 1, stroke(DERIVED.rockFissure, 0.05, 'material', 0.8)),
-  ];
-
-  // Fracture lines radiating from the dead core: the crack that killed it.
   for (let i = 0; i < 6; i++) {
     const a = (i / 6) * Math.PI * 2 + rng.next() * 0.5;
     const r = 0.55 + rng.next() * 0.42;
@@ -79,26 +105,20 @@ export function stationWreckSprite(variant: number): SpriteDef {
     );
   }
 
-  // Broken-crust ribs curving across the corpse — the "ribcage wreck" of the
-  // scene gallery (docs/art-direction, Wreck-scavenging moment), read into a body
-  // that GDD §2.7 keeps solid and full-radius. One shade above the ash, partial
-  // sweeps, so the shell reads as cracked open without the wreck ceasing to be
-  // one solid mass.
-  const rib = stroke(DERIVED.wreckCrust, 0.045, 'material', 0.9);
-  for (let i = 0; i < 3; i++) {
-    const r = 0.42 + i * 0.2;
-    const from = rng.next() * Math.PI * 2;
-    shapes.push(polyline(arcPoints(0, 0, r, from, from + 1.3 + rng.next() * 0.5, 9), rib));
+  // Plate torn off the deck, drifting just clear of the rim — the silhouette
+  // keeps breaking up as you look at it, which is what "abandoned" is made of.
+  for (let i = 0; i < 5; i++) {
+    const a = rng.next() * Math.PI * 2;
+    const d = 1.02 + rng.next() * 0.24;
+    shapes.push(
+      poly(
+        blob(round(Math.cos(a) * d), round(Math.sin(a) * d), 6, () => 0.045 + rng.next() * 0.05),
+        fill(DERIVED.wreckCrust, 'material', 0.9),
+      ),
+    );
   }
 
-  // The core, gone out. Dark steel where the yellow was — the quiet, drawn.
-  shapes.push(
-    circle(0, 0, 0.26, fill(DERIVED.hullDark, 'material')),
-    circle(0, 0, 0.26, stroke(DERIVED.rockFissure, 0.05, 'material')),
-    circle(0, 0, 0.12, fill(PALETTE.vacuum, 'material')),
-  );
-
-  return sprite(`wreck/station/v${v}`, 1, shapes);
+  return sprite(`wreck/station/v${v}`, STATION_ART_EXTENT, shapes);
 }
 
 /**

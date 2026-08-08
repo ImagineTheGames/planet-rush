@@ -29,7 +29,7 @@ import { decalDigit, decalStrokes } from './decals';
 import {
   atmosphereHaloSprite,
   beaconRingSprite,
-  continentPolygons,
+  cutterheadLayout,
   damageRingSprite,
   stationSprite,
   stationVariantFor,
@@ -201,24 +201,72 @@ describe('asteroids — the payout read (style-guide §6)', () => {
   });
 });
 
-describe('stations — four variants, arrangement only (style-guide §5)', () => {
-  it('makes four distinct worlds', () => {
-    const defs = [0, 1, 2, 3].map(stationSprite);
+describe('stations — THE CUTTERHEAD, four variants (facility-concepts-r2.html, direction D)', () => {
+  it('makes four distinct facilities', () => {
+    const defs = [0, 1, 2, 3].map((v) => stationSprite(v));
     for (let i = 0; i < defs.length; i++) {
       for (let j = i + 1; j < defs.length; j++) expect(defs[i]).not.toEqual(defs[j]);
     }
   });
 
-  it('varies by continent layout and land ratio, not by colour', () => {
+  it('varies by arrangement, not by colour — one rig, four seeds', () => {
+    // Same fill palette across all four (the rig is one machine in one palette);
+    // what moves is the circuit's bearing, the cut face, the seams and the levels.
     const palettes = [0, 1, 2, 3].map((v) => new Set(stationSprite(v).shapes.map((s) => s.fill?.color)));
     for (const p of palettes) expect(p).toEqual(palettes[0]);
-    expect(continentPolygons(0).length).not.toBe(continentPolygons(3).length);
+    const layouts = [0, 1, 2, 3].map(cutterheadLayout);
+    expect(new Set(layouts.map((l) => l.spec.deckPhase)).size).toBe(4);
+    expect(new Set(layouts.map((l) => l.seams.length)).size).toBe(4);
+    expect(layouts[0]!.face).not.toEqual(layouts[3]!.face);
   });
 
-  it('puts the signal-yellow core on every world — the win condition (§2)', () => {
+  it('puts the signal-yellow core on every rig — the win condition (§2)', () => {
     for (let v = 0; v < STATION_VARIANT_COUNT; v++) {
       expect(stationSprite(v).shapes.some((s) => s.role === 'core')).toBe(true);
     }
+  });
+
+  it('is visibly EXTRACTING: a cut face with ore seams in it, and a kerf', () => {
+    // Round 1 was denied because "nothing was visibly extracting anything ...
+    // there was no ore you could see". Ore inside the bore (r < 0.5) is the cut
+    // face's seams and the fresh kerf; ore out on the deck (r > 0.55) is the
+    // circuit carrying it away. Both have to exist or the object is a building.
+    for (let v = 0; v < STATION_VARIANT_COUNT; v++) {
+      const ore = stationSprite(v).shapes.filter((s) => s.role === 'ore');
+      const reach = (s: (typeof ore)[number]): number => {
+        if (s.path.kind === 'circle') return Math.hypot(s.path.cx, s.path.cy);
+        let far = 0;
+        for (let i = 0; i < s.path.points.length; i += 2) {
+          far = Math.max(far, Math.hypot(s.path.points[i]!, s.path.points[i + 1]!));
+        }
+        return far;
+      };
+      expect(ore.some((s) => reach(s) < 0.5), `v${v} has no ore in the bore`).toBe(true);
+      expect(ore.some((s) => reach(s) > 0.55), `v${v} has no ore on the circuit`).toBe(true);
+    }
+  });
+
+  it('is NOT radially symmetric — one arm leaves the circle (the round-1 fix)', () => {
+    // "The outlines were radially symmetric. That is what planets are, and what
+    // working plants never are." The spoil boom is the mark that fixes it, so it
+    // is asserted rather than left to a reviewer's eye: painted mass has to reach
+    // well past the collision radius on ONE bearing and not on its opposite.
+    for (let v = 0; v < STATION_VARIANT_COUNT; v++) {
+      const far = stationSprite(v).shapes.filter(
+        (s) => s.path.kind === 'circle' && Math.hypot(s.path.cx, s.path.cy) > 1.3,
+      );
+      expect(far.length, `v${v} has nothing outboard of 1.3R`).toBeGreaterThan(4);
+      const bearings = far.map((s) => (s.path.kind === 'circle' ? Math.atan2(s.path.cy, s.path.cx) : 0));
+      const spread = Math.max(...bearings) - Math.min(...bearings);
+      expect(spread, `v${v} outboard mass is spread over ${spread.toFixed(2)} rad — that is a halo, not an arm`).toBeLessThan(1.2);
+    }
+  });
+
+  it('never lets steel take the roster colour — identity is trim (§3)', () => {
+    const trim = stationSprite(0, 5).shapes.filter((s) => s.role === 'identity');
+    expect(trim.length).toBeGreaterThan(0);
+    // And the sprite differs by owner, which is the whole point of the trim.
+    expect(stationSprite(0, 0)).not.toEqual(stationSprite(0, 5));
   });
 
   it('assigns a variant per player and wraps safely', () => {
@@ -481,10 +529,24 @@ describe('radar satellite — the eyes (f1)', () => {
 });
 
 describe('wrecks — the quiet (style-guide §8)', () => {
-  it('puts the core out: no yellow anywhere on a dead station', () => {
+  it('puts the core OUT: not one core-role shape on a dead station', () => {
+    // The core going dark is the single strongest thing this palette can say, and
+    // it is the part of "the quiet" that is absolute. (Ore is a different matter —
+    // see the next test: the board's derelict spills ore on purpose.)
     for (let v = 0; v < STATION_VARIANT_COUNT; v++) {
-      const def = stationWreckSprite(v);
-      expect(def.shapes.some((s) => s.role === 'core' || s.role === 'ore')).toBe(false);
+      expect(stationWreckSprite(v).shapes.some((s) => s.role === 'core')).toBe(false);
+    }
+  });
+
+  it('LEAVES the ore — the split hopper is why anyone comes (GDD §2.7)', () => {
+    // Evolved with the ratified board (facility-concepts-r2.html, D · derelict:
+    // *"one hopper has split and run its ore onto the deck … the only yellow left
+    // is ore, which is why anyone comes"*). This test previously asserted no ore
+    // role at all, which was right when the debris field carried every scrap and
+    // is wrong now that the derelict is a lootable rig in its own right (§2.1).
+    // Yellow on a wreck is legal exactly when it is ore, and the role proves it.
+    for (let v = 0; v < STATION_VARIANT_COUNT; v++) {
+      expect(stationWreckSprite(v).shapes.some((s) => s.role === 'ore')).toBe(true);
     }
   });
 
@@ -494,10 +556,21 @@ describe('wrecks — the quiet (style-guide §8)', () => {
     }
   });
 
-  it('keeps the same coastlines as the world it was — you lose *that* station', () => {
-    const wreck = stationWreckSprite(2);
-    const crust = wreck.shapes.filter((s) => s.path.kind === 'poly' && s.path.closed);
-    expect(crust.length).toBeGreaterThanOrEqual(continentPolygons(2).length);
+  it('wears no owner: a derelict belongs to nobody (§2.7)', () => {
+    for (let v = 0; v < STATION_VARIANT_COUNT; v++) {
+      expect(stationWreckSprite(v).shapes.some((s) => s.role === 'identity')).toBe(false);
+    }
+  });
+
+  it('is the SAME rig it was — you lose *that* station, not a generic disc', () => {
+    // The wreck is the live generator under the cold palette, so its arrangement
+    // is the arrangement it worked with: same circuit bearing, same cut face.
+    for (let v = 0; v < STATION_VARIANT_COUNT; v++) {
+      expect(stationWreckSprite(v)).not.toEqual(stationWreckSprite((v + 1) % STATION_VARIANT_COUNT));
+    }
+    const live = stationSprite(2).shapes.length;
+    const dead = stationWreckSprite(2).shapes.length;
+    expect(Math.abs(live - dead) / live, 'the wreck is a repaint, not a redraw').toBeLessThan(0.35);
   });
 
   it('leaves ore-laden debris — the only yellow left, and the reason to come (GDD §2.7)', () => {
