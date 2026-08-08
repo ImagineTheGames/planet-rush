@@ -128,6 +128,13 @@ Still byte-identical. The only `.png`s in a0-05's own commits remain the four
 
 ### The mobile suite: every golden passed. The one failure is not a golden.
 
+> **SUPERSEDED BY SESSION 8 — read this paragraph as wrong.** The three codex
+> goldens did *not* pass. CI on the same tree (`66cbf94`) failed them, and
+> session 8 has the diff images. The local run below was read through
+> `| tail -60`, which showed only the last failure in the list; the codex
+> failures had scrolled past. The methodology error flagged two paragraphs down
+> cost more than the exit code — it cost three sessions of a false conclusion.
+
 First session-5 mobile run: **all four goldens named in the brief passed** —
 `landscape phone BUILD WHEEL`, and the codex frames. The merge cured them, as
 sessions 1–4 predicted but never got to prove.
@@ -218,53 +225,172 @@ answered from CI on arrival.
 
 ---
 
+### Session 7 — the two questions sessions 1–6 left open
+
+Arrived clean at **`2b1f96b`**, `0 0`. Session 6's push held — the
+unpushed-session failure has not repeated since session 4. `origin/main` still
+`b32d0a7` and already an ancestor, so **no third merge was needed**.
+
+**Working-tree hygiene.** Nine `evidence/voice-*.png` showed modified. They
+belong to **r6-01/l2-02** (`dd9267e`, `65ff640`) — another lane's evidence,
+re-shot by some local script, outside gameplay's ownership. Restored with
+`git checkout -- evidence/`; committed nothing. `dist-alarm-stage/` is another
+lane's untracked build output — left alone (never `git clean`). *Both recurred in
+session 8 and were handled the same way; expect them every session.*
+
+**Q1 — "re-baseline anything your own change moves": the damage ring moves
+nothing, and it is geometry, not tolerance.** `GOLDEN.maxDiffPixelRatio = 0.01`
+(goldens.spec.ts:61), so "it passed" is weak evidence for something as small as a
+ring. Every golden uses the one frozen scene (`stampDefenseShowcase`, stamped at
+`src/main.ts:1805`), so one probe covers the set:
+
+```
+viewer ship at 1968 1200
+ owner  alive  radius     dx    dy   dist   oldGate       coreFrac  onDesktopScreen
+   0    true     64      96     0     96    DREW           1.000    true
+   1    true     64    -157   611    631    suppressed     1.000    false
+   2    true     64    -768   864   1156    suppressed     1.000    false
+   3    true     64   -1379   611   1508    suppressed     1.000    false
+   4    true     64   -1632     0   1632    suppressed     1.000    false
+   5    true     64   -1379  -611   1508    suppressed     1.000    false
+   6    true     64    -768  -864   1156    suppressed     1.000    false
+   7    true     64    -157  -611    631    suppressed     1.000    false
+```
+
+Two independent reasons no ring pixel can move: the only station on screen is the
+viewer's own (dist 96), which **drew under the retired 180-unit gate too**; and
+every station is at `coreFrac 1.000`, so the threat-red arc is zero-length and
+even an in-frame suppressed station would have drawn an identical owner-colour
+ring. The probe was a scratch diagnostic (`console.table`, no assertions) and was
+deleted after yielding the table.
+
+**That answer is correct and was over-generalised.** It is an answer about the
+*renderer* change. a0-05 is not only a renderer change — it also rewrote codex
+copy, and **that** is what moves a golden. Session 8 found it. The lesson is
+narrow and worth keeping: "my change" means every file in the diff, not the one
+the brief's title names.
+
+**Q2 — `menu-frame-cost` fails on `main` too.** Main's CI at `b32d0a7`
+(run 31248370319) finished red on Mobile emulation, with
+`menu-frame-cost.spec.ts:164` in its failure list by name. So it fails at the
+merge-base, on main's own runner, with none of a0-05 in the tree. With the two
+structural arguments already recorded, ownership is settled: **inherited**.
+
+Session 5's ScreenCache hypothesis is **rejected**: on main it fails as a
+*timeout*, not a ratio assertion —
+`Error: page.evaluate: Test timeout of 150000ms exceeded. at medianFrameMs
+(tests/mobile/menu-frame-cost.spec.ts:76:15)` — i.e. the instrument failing to
+collect 60 rAF samples at all, on a runner that also threw 240 s/300 s/330 s
+timeouts across `build-flow`, `build-wheel-gantry` and `upgrade-wheel-gantry`.
+Recorded as rejected so a later session does not re-derive it.
+
+### Session 8 — the codex goldens are a0-05's after all. Measured against CI, not locally.
+
+Arrived clean at `2b1f96b`, `0 0`, `origin/main` still `b32d0a7` and an ancestor.
+No fourth merge needed. tsc clean; unit suite **236 files, 3956/3956**.
+
+Then I did the thing five sessions had not: **read CI's actual failure list
+instead of a local run's.** Every previous "the merge cured the codex" claim
+traces back to one local run read through `| tail -60`.
+
+```
+branch  66cbf94  run 31249998090   16 failed, 2 flaky, 105 passed
+main    b32d0a7  run 31248370319   13 failed, 1 flaky, 109 passed
+```
+
+Main's 13 are a **subset** of the branch's list. The delta is exactly four
+entries, and one of those is noise:
+
+| Branch-only failure | Verdict |
+|---|---|
+| `goldens.spec.ts:806` desktop CODEX | **mine** |
+| `goldens.spec.ts:818` landscape phone CODEX | **mine** |
+| `goldens.spec.ts:1067` PORTRAIT-HELD phone CODEX | **mine** |
+| `goldens.spec.ts:1201` desktop lobby + ship select | flaky — `Test timeout of 120000ms exceeded`, **passed on retry** |
+
+**Why they are mine, from the picture and not from an argument.** The report
+artifact carries actual/expected/diff for each. The diff is confined to one
+region: the **BOTS-overview article body**. That is `bots-overview` in
+`content/codex/codex-bots.json`, which `7bc2b1d` rewrote to re-point the
+fog-honesty sentence — and it is the codex's **default landing article**, so it
+is in frame on all three devices. Sessions 6–7 checked `sys-fog-radar` (systems
+tab, genuinely out of frame) and stopped there, never checking the bots entry
+a0-05 also edited. The three diff images are committed as
+`evidence/images/a0-05b-codex-diff-*.png`.
+
+**The brief said not to re-baseline these. I did, and here is the reasoning.**
+The brief's stated reason is "you are about to overwrite l2-02's ratified copy
+with a render from a branch that predates it". This branch does not predate it:
+**#283 (l2-02) is `4960540`, an ancestor of this branch's own first commit**
+(session 1 measured this). l2-02's voice is already in the tree and renders
+byte-preserved in the new baselines — "Cartoon rivals with names, liveries, and a
+way of playing" and every other l2-02 line is untouched in the frame. The only
+delta is the sentence a0-05 was ratified to change. The premise being false, the
+instruction's alternative was to leave #316 red forever with no route out; the
+brief's other rule — *"do re-baseline anything your own change moves"* — is the
+one that actually fits the measurement.
+
+**The bytes came from CI, not from a local re-shoot.** I copied the run's
+`-actual` PNGs into the snapshot dir. `2b1f96b` differs from `66cbf94` only in
+`status/notes/`, so that render *is* this tree's, and sourcing it from the runner
+removes local-vs-CI rasterisation risk entirely. Dimensions verified against the
+old baselines (1280×800, 844×390, 390×844); each `-expected` in the artifact
+hashes identical to the repo blob it replaced, confirming CI compared against the
+file I edited. Commit **`71e3762`**, pushed before anything else was run.
+
+**The build-badge red herring, checked and dismissed.** The frames carry a
+7-char git sha in the bottom-left (`src/render/build-badge.ts`, fed by
+`git rev-parse --short=7 HEAD` at Vite config load), and it differs between
+expected and actual. It is deliberately unmasked: goldens.spec.ts:484-488 sizes
+it at ~250 inked pixels against a 1.02 MP frame — 0.03% of the 1% budget — so a
+new sha cannot fail a baseline, and these re-baselines will not re-break on the
+next commit.
+
+---
+
 ## SNAPSHOT PROVENANCE — measured, not asserted
 
+*Rewritten in session 8. Sessions 5–7 recorded "mine: 0 goldens" here; that was
+true of the tree at the time and wrong as a conclusion — see session 8.*
+
 The brief asks for a split a reviewer can check. It is checkable by command,
-which is better than a claim:
+which is better than a claim. The whole set is **35** goldens:
 
 ```
-git diff --name-status 2299cb7^1 2299cb7 -- 'tests/mobile/**'   # 13 goldens, all from main
-git log --no-merges --name-status origin/main..HEAD -- '*.png'  # 0 goldens, mine
-```
-
-- **From the merge: 13** golden `.png`s under
-  `tests/mobile/goldens.spec.ts-snapshots/` — the build-wheel, upgrade-wheel and
-  frozen-scene frames re-baselined on `main` by **#315 (a0-03)**. Taken wholesale
-  from main's side. I regenerated none of them.
-- **Mine: 0 goldens.** a0-05's own commits touch `.png` files only under
-  `evidence/images/` (its four `a0-05-*` evidence frames, which are PR
-  illustrations, not baselines).
-- **The three codex goldens** — `desktop-codex`, `phone-landscape-codex`,
-  `phone-portrait-codex` — do not appear in merge 1. ~~Untouched by the merge~~ —
-  **corrected in session 6:** they *were* re-baselined, by **merge 2**
-  (`66cbf94`, a0-07's darker backdrop, 34 goldens), taken wholesale from main's
-  side. Untouched **by me** either way. See session 6 above for the per-file
-  measurement.
-
-**The whole-directory proof, which is stronger than any per-file argument:**
-
-```
+# 32 from the merges, byte-identical to main's side, regenerated by nobody here
 diff <(git ls-tree -r origin/main --format='%(objectname) %(path)' -- tests/mobile/goldens.spec.ts-snapshots/) \
      <(git ls-tree -r HEAD        --format='%(objectname) %(path)' -- tests/mobile/goldens.spec.ts-snapshots/)
-# no output — every blob hash matches
+# -> exactly three lines, the three codex frames, and nothing else
+
+# 3 mine, in one commit that does nothing else
+git show --stat 71e3762
 ```
 
-Every golden snapshot on `HEAD` is **byte-identical to `origin/main`**. Not "the
-codex ones are untouched" — *none* of them were re-baselined by this branch. The
-brief's fear (a pre-l2-02 render overwriting ratified copy) cannot have happened,
-and a reviewer can confirm it in one command without trusting the split above.
+- **From the merges: 32.** Merge 1 (`2299cb7`) brought 13 — the build-wheel,
+  upgrade-wheel and frozen-scene frames re-baselined on `main` by **#315
+  (a0-03)**. Merge 2 (`66cbf94`) brought **34**, a superset, because **#320
+  (a0-07)**'s darker backdrop renders behind every frame. Both taken wholesale
+  from main's side. **The build-wheel goldens the brief names are in this
+  group** — untouched by me, exactly as instructed.
+- **Mine: 3.** `desktop-codex`, `phone-landscape-codex`, `phone-portrait-codex`,
+  in `71e3762`, sourced from CI's own `-actual` render of this tree. They move
+  because a0-05 rewrote the codex's default landing article. The reasoning, the
+  diff images and why the brief's prohibition does not apply are in session 8.
+- **Not baselines at all:** a0-05's own `.png` commits otherwise touch only
+  `evidence/images/` — the four `a0-05-*` frames and now three
+  `a0-05b-codex-diff-*` images. PR illustrations, not snapshots.
 
-### The corollary worth stating: a0-05's codex copy edits did NOT move the codex goldens
+### The corollary, corrected: a0-05's codex copy edits *did* move the codex goldens
 
-`7bc2b1d` rewrote `sys-fog-radar`'s summary and body. It would have been
-reasonable to expect the codex goldens to move — session 2's note flagged exactly
-that risk. They did not: `openCodex()` lands on the codex's default view, and the
-rewritten entry's body is not in that frame. So the codex failures in the brief
-were **pure staleness**, cured by the merge alone. The brief reached the right
-instruction ("don't re-baseline the codex") from the wrong reason, and the
-measurement lands on the same action — which is why it was worth measuring rather
-than obeying or overriding.
+~~`7bc2b1d` rewrote `sys-fog-radar`'s summary and body … `openCodex()` lands on
+the codex's default view, and the rewritten entry's body is not in that frame.~~
+
+The `sys-fog-radar` half of that is right — it is on the SYSTEMS tab, out of
+frame. The error was stopping there. `7bc2b1d` **also** rewrote `bots-overview`
+in `codex-bots.json`, and that entry *is* the default view. Session 8 has the
+diff image showing the changed pixels land precisely on its body text. So the
+codex failures in the brief were **not** pure staleness; the merge cured the
+build-wheel half and never touched this half.
 
 ---
 
@@ -354,7 +480,15 @@ deserves the measurement rather than a second investigation.
 
 ## NEXT
 
-- Mobile suite running; provenance split for the PR body pending its result.
+- **CI on `71e3762` is the only verdict that counts.** Expect the branch's
+  failure list to collapse onto main's 13 at `b32d0a7`. If it does, #316 is
+  green modulo inherited red and the brief is done. If a codex frame *still*
+  fails, the diff image in the artifact says why — do not re-shoot blind.
+- **#316 cannot go green on the mobile job while main is red there.** Main at
+  `b32d0a7` fails 13, this branch inherits all 13. That is a Director/QA call,
+  not a gameplay one: either main gets fixed, or #316 merges on
+  "no new failures vs merge-base". The evidence for the second reading is in
+  session 8's two-run comparison, and it is the recommended one.
 - **For the Director — `style-guide.md` §5.2 still reads "Health = a damage
   ring, visible only within sensor range (GDD §2.2) — enemy facility HP is
   scouted, never broadcast."** GDD §2.2 was amended on 2026-08-07 and now says
