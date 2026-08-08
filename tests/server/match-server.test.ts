@@ -24,6 +24,7 @@ import { TICK_DT } from '../../src/sim';
 import { signTicket } from '../../src/net/ticket';
 import { MatchServer } from '../../server/match-server';
 import type { Connection, ServerSocket } from '../../server/match-server';
+import { seatBots } from './seat-bots';
 
 const GRACE_MS = 60_000;
 
@@ -155,6 +156,8 @@ describe('the authoritative match server', () => {
     join(connect(), code);
     join(connect(), code);
 
+    host.connection.receive(seatBots());
+
     host.connection.receive(encodeClientMessage({ type: 'startMatch' }));
     const room = host.connection.room!;
 
@@ -177,8 +180,12 @@ describe('the authoritative match server', () => {
     const guest = connect();
     join(guest, code);
 
+    guest.connection.receive(seatBots());
+
     guest.connection.receive(encodeClientMessage({ type: 'startMatch' }));
     expect(host.connection.room?.state).toBe('lobby');
+
+    host.connection.receive(seatBots());
 
     host.connection.receive(encodeClientMessage({ type: 'startMatch' }));
     expect(host.connection.room?.state).toBe('live');
@@ -188,6 +195,9 @@ describe('the authoritative match server', () => {
     const code = server.createCode();
     const host = connect();
     join(host, code);
+    // The roster first, then the hull: a later `lobbyChoice` that names no seats
+    // leaves the roster alone, but one that names no hull would reset it (a0-11).
+    host.connection.receive(seatBots());
     host.connection.receive(
       encodeClientMessage({
         type: 'lobbyChoice',
@@ -209,6 +219,7 @@ describe('the authoritative match server', () => {
     const code = server.createCode();
     const host = connect();
     join(host, code);
+    host.connection.receive(seatBots());
     host.connection.receive(encodeClientMessage({ type: 'startMatch' }));
 
     const latecomer = connect();
@@ -223,6 +234,7 @@ describe('the authoritative match server', () => {
     const code = server.createCode();
     const host = connect();
     join(host, code);
+    host.connection.receive(seatBots());
     host.connection.receive(encodeClientMessage({ type: 'startMatch' }));
     const room = host.connection.room!;
 
@@ -243,6 +255,7 @@ describe('the authoritative match server', () => {
     const code = server.createCode();
     const host = connect();
     join(host, code);
+    host.connection.receive(seatBots());
     host.connection.receive(encodeClientMessage({ type: 'startMatch' }));
     const room = host.connection.room!;
     host.socket.clear();
@@ -273,6 +286,7 @@ describe('the authoritative match server', () => {
     join(host, code);
     const guest = connect();
     join(guest, code);
+    host.connection.receive(seatBots());
     host.connection.receive(encodeClientMessage({ type: 'startMatch' }));
     advance(16);
     advance(500);
@@ -471,6 +485,7 @@ describe('the authoritative match server', () => {
       const room = server.openRoom(code, { size: 4 })!;
       const host = connect();
       join(host, code);
+      host.connection.receive(seatBots());
       host.connection.receive(encodeClientMessage({ type: 'startMatch' }));
 
       // Four seats: one human, three bots — a four-station war, not an eight.

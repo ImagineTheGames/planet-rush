@@ -207,6 +207,7 @@ import {
   // read the one authored `MatchConfig`, which is what makes an offline TEAMS
   // match and an online one the same match.
   lobbyRosterTeams,
+  lobbyWireSeats,
   lobbyWireTeams,
   startLobbyMatch,
   wireFireMode,
@@ -7786,7 +7787,12 @@ function openLobby(
       // (GDD §4.2; spike §S2, Trap 7). A joiner sends neither: the room's shape is
       // the host's, and their own toggles are local screen state until the
       // authoritative `lobbyState` folds the truth back in.
-      ...(host ? { mode: state.mode, teams: lobbyWireTeams(state) } : {}),
+      //
+      // …and the per-seat OPEN / BOT / CLOSED authoring (a0-11), which rides here
+      // for the same reason with a sharper edge: since the lobby stopped putting a
+      // bot in every empty seat, a roster the room was never told about would have
+      // it fill them all anyway — six ghost bots behind six seats drawn OPEN.
+      ...(host ? { mode: state.mode, teams: lobbyWireTeams(state), seats: lobbyWireSeats(state) } : {}),
     });
   }
 

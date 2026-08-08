@@ -47,6 +47,7 @@ import {
   SEAT_STATE_CYCLE,
   lobbyModel,
 } from './lobby';
+import type { SeatOccupant } from './lobby';
 import { lobbyHitTest, lobbyLayout } from './lobby-geometry';
 import type { LobbyLayout, LobbyTarget } from './lobby-geometry';
 import type { MatchMode } from '../sim/match-config';
@@ -303,9 +304,13 @@ describe('the room tells the server what it chose', () => {
     const richer = flowTapLobby(inLobby(0, 0), { kind: 'abundance' });
     expect(richer.state.lobby?.abundance).toBe('standard');
 
-    // Seat state: the row body cycles OPEN → BOT.
-    const botted = flowTapLobby(inLobby(0, 0), { kind: 'seat', index: 5 });
-    expect(botted.state.lobby?.seats[5]?.occupant).toBe('bot');
+    // Seat state: the row body walks the seat one rung round the ring. Which rung
+    // it *starts* on is the flavour's business since a0-11 — an online room opens
+    // its seats OPEN and the solo lobby opens them on the bot cast — so what this
+    // asserts is the routing: a tap on the body reaches the cycle and it moves.
+    const before = inLobby(0, 0);
+    const botted = flowTapLobby(before, { kind: 'seat', index: 5 });
+    expect(botted.state.lobby?.seats[5]?.occupant).toBe(nextRung(before.lobby!.seats[5]!.occupant));
 
     // …and so does the LEADING state control (u5) — the drawn, labelled button
     // that finally says a slot can be closed. Two rects, ONE action: they walk the
@@ -321,7 +326,9 @@ describe('the room tells the server what it chose', () => {
         `tap ${i + 1}: the control and the body disagree`,
       ).toBe(viaBody.lobby?.seats[5]?.occupant);
     }
-    expect(viaControl.lobby?.seats[5]?.occupant).toBe('bot'); // four taps = once round + one
+    // Four taps = once round the three-rung ring plus one, so the seat is one
+    // rung past where it started — whichever rung that was.
+    expect(viaControl.lobby?.seats[5]?.occupant).toBe(nextRung(inLobby(0, 0).lobby!.seats[5]!.occupant));
 
     // The DIFFICULTY chip cycles the bot's tier in BOTH modes (n2) — the control
     // the TEAMS lobby had lost when the side control took the only chip.
@@ -469,6 +476,19 @@ describe('one door, one lobby (ratified: PLAY opens the doors, the doors open th
 
 /** A roomy desktop viewport — every row chip has extent here, so "reachable"
  *  means "laid out", not "laid out big enough on this phone". */
+/**
+ * The next rung of the seat-state ring after `occupant` ({@link SEAT_STATE_CYCLE}).
+ *
+ * Since a0-11 the rung a seat *starts* on depends on the flavour of the lobby —
+ * an online room opens its seats OPEN and waits for people, the solo lobby opens
+ * them on the bot cast — so a test about the slot editor's ROUTING must assert
+ * that a tap moved the seat one rung, not that it landed on a particular word.
+ */
+function nextRung(occupant: SeatOccupant): SeatOccupant {
+  const at = SEAT_STATE_CYCLE.indexOf(occupant);
+  return SEAT_STATE_CYCLE[(at + 1) % SEAT_STATE_CYCLE.length]!;
+}
+
 const GUARD_VIEWPORT = { width: 1280, height: 800 };
 
 /** The target a tap at a rect's centre resolves to, through the SAME hit-test the
@@ -489,7 +509,27 @@ describe('the slot editor is reachable in EVERY mode AND both lobbies (guard the
     { name: 'the SOLO lobby (offline)', door: 'solo' },
     { name: 'the ROOM lobby (online)', door: 'create' },
   ];
-  const SEAT = 3; // an OPEN (bot-previewing) seat in either flavour
+  const SEAT = 3; // a non-human seat in either flavour
+
+  /**
+   * Walk `slot` round the seat ring until it is a BOT.
+   *
+   * Since a0-11 the two flavours no longer start that seat on the same rung — the
+   * online room opens it OPEN and empty, the solo lobby opens it on the bot cast —
+   * and two of the affordances below only *mean* anything on a bot seat: the
+   * difficulty chip has no tier to cycle on an empty chair, and RUSH! is refused
+   * below two participants (GDD §2.1, amended 2026-08-07). Getting the seat to a
+   * known rung is therefore setup, not the thing under test; the ROUTING each
+   * assertion is actually about is unchanged and still checked in both flavours.
+   */
+  function withBotAt(state: FlowState, slot: number): FlowState {
+    let next = state;
+    for (let i = 0; i < SEAT_STATE_CYCLE.length; i++) {
+      if (next.lobby?.seats[slot]?.occupant === 'bot') return next;
+      next = flowTapLobby(next, { kind: 'seatState', index: slot }).state;
+    }
+    throw new Error(`seat ${slot} never reached BOT`);
+  }
 
   for (const flavour of FLAVOURS) {
     for (const mode of MODES) {
@@ -526,10 +566,17 @@ describe('the slot editor is reachable in EVERY mode AND both lobbies (guard the
         // This is the exact control the TEAMS lobby had lost.
         const diff = tapCentre(layout, layout.seatChips[SEAT]!);
         expect(diff, `difficulty chip reachable in ${mode}`).toEqual({ kind: 'seatChip', index: SEAT });
-        const tiered = flowTapLobby(state, diff!);
+        const onBot = withBotAt(state, SEAT);
+        const tiered = flowTapLobby(onBot, diff!);
         expect(tiered.state.lobby?.seats[SEAT]?.difficulty, `bot-difficulty reachable in ${mode}`).not.toBe(
-          state.lobby?.seats[SEAT]?.difficulty,
+          onBot.lobby?.seats[SEAT]?.difficulty,
         );
+        // …and on an EMPTY seat there is no tier to cycle, so the chip is a no-op
+        // and costs the wire nothing (a0-11) — the flow stays perfectly still.
+        const empty = flowTapLobby(state, { kind: 'seatState', index: SEAT });
+        if (empty.state.lobby?.seats[SEAT]?.occupant === 'open') {
+          expect(flowTapLobby(empty.state, diff!).state).toBe(empty.state);
+        }
       });
     }
 
@@ -558,9 +605,12 @@ describe('the slot editor is reachable in EVERY mode AND both lobbies (guard the
         state.lobby?.abundance,
       );
       expect(flowTapLobby(state, { kind: 'seat', index: SEAT }).state.lobby?.seats[SEAT]?.occupant).toBe(
-        'bot',
+        nextRung(state.lobby!.seats[SEAT]!.occupant),
       );
-      expect(flowTapLobby(state, { kind: 'rush' }).state.lobby?.phase).toBe('counting');
+      // RUSH! needs a match to start: two participants (GDD §2.1, amended
+      // 2026-08-07). Offline the cast is already there; in an empty room the host
+      // seats one bot first, which is the developer's "up to player to fill it up".
+      expect(flowTapLobby(withBotAt(state, SEAT), { kind: 'rush' }).state.lobby?.phase).toBe('counting');
       expect(flowTapLobby(state, { kind: 'leave' }).state.screen).toBe('entry');
     });
   }

@@ -392,11 +392,41 @@ class ServerConnection implements Connection {
   private seatedRoom: MatchRoom | null = null;
   private seat: PlayerId | null = null;
   private closed = false;
+  /**
+   * What the ROOM is handed instead of the raw socket (a0-11).
+   *
+   * Everything on it delegates, bar one addition: `reseat`. RUSH! compacts the
+   * roster (`server/room.ts` `startMatch` — the seats nobody is in are not in the
+   * match, and the survivors are renumbered so no sparse id reaches the sim), and
+   * every message this connection routes afterwards is routed by {@link seat}. A
+   * connection that never heard about the renumbering would file one player's
+   * input against another player's ship, which is a bug with no symptom until
+   * somebody's thrust moves somebody else.
+   *
+   * A wrapper rather than making this class a `ServerSocket`: the two interfaces
+   * both spell a method `close`, and they mean different things by it (the
+   * connection's takes the clock and vacates a seat; the socket's hangs up).
+   */
+  private readonly roomSocket: ServerSocket;
 
   constructor(
     private readonly server: MatchServer,
     private readonly socket: ServerSocket,
-  ) {}
+  ) {
+    const raw = socket;
+    this.roomSocket = {
+      send: (frame) => raw.send(frame),
+      close: () => raw.close(),
+      // A getter, not a copy: the probe's reading moves under us, and the room
+      // publishes whatever is current at the instant it builds a broadcast.
+      get rttMs(): number | null {
+        return raw.rttMs ?? null;
+      },
+      reseat: (player) => {
+        if (this.seatedRoom !== null) this.seat = player;
+      },
+    };
+  }
 
   get room(): MatchRoom | null {
     return this.seatedRoom;
@@ -468,7 +498,9 @@ class ServerConnection implements Connection {
     }
 
     const outcome = room.join(
-      this.socket,
+      // The room is handed the wrapper, not the raw socket: it is how RUSH!'s
+      // roster compaction reaches back and moves this connection's seat (a0-11).
+      this.roomSocket,
       {
         ...(message.reclaim !== undefined ? { reclaim: message.reclaim } : {}),
         ...(message.reclaimToken !== undefined ? { reclaimToken: message.reclaimToken } : {}),

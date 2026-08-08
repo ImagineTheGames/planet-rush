@@ -145,9 +145,20 @@ function eightHardBotRoom(index: number): MatchRoom {
     shipClass: ShipClass.Vanguard,
     fireMode: 'auto',
     botDifficulties: Array.from({ length: 8 }, () => 'hard' as const),
+    // …and the ROSTER that puts them there (a0-11; GDD §2.1 amended 2026-08-07).
+    // An empty seat no longer becomes a bot on its own — it stays an empty chair —
+    // so the bots this file measures have to be authored, exactly as the shipping
+    // lobby authors them. Seat 0 stays OPEN because the host is sitting in it: you
+    // cannot bot a chair somebody is in, on the client or on the server.
+    seats: ['open', ...Array.from({ length: 7 }, () => 'bot' as const)] as const,
   });
-  room.disconnect(0, 0); // frees the seat; the Hard×8 difficulty list survives
-  room.startMatch(); // every empty seat becomes a Hard bot
+  // The host STAYS (a0-11). It used to drop out here so that all eight seats went
+  // to bots, which the room was happy to do; it no longer is, and a zero-human
+  // room cannot be reached through the real path at all. So the densest room this
+  // harness can build is 1 human seat + 7 Hard bots — which is exactly the room
+  // `docs/server-capacity.md` measured over the real wire, so the two now agree on
+  // what "a full room" means rather than differing by one behaviour tree.
+  room.startMatch(); // every seat the host set to BOT becomes a Hard bot
   return room;
 }
 
@@ -159,13 +170,13 @@ function percentile(samples: readonly number[], q: number): number {
 }
 
 describe('fleet density — DEFAULT_MAX_ROOMS full of Hard bots', () => {
-  it('fills every room with eight Hard bots and keeps them all live', () => {
+  it('fills every room with seven Hard bots beside one human seat, and keeps them all live', () => {
     const rooms = Array.from({ length: DEFAULT_MAX_ROOMS }, (_, i) => eightHardBotRoom(i));
     for (const room of rooms) {
       expect(room.state).toBe('live');
       expect(room.size).toBe(8);
       const bots = room.lobbyState().filter((s) => s.isBot);
-      expect(bots).toHaveLength(8);
+      expect(bots).toHaveLength(7);
       // Every bot is a Hard-tier character (its difficulty came from the list).
       expect(bots.every((s) => s.botDifficulty === 'hard')).toBe(true);
     }

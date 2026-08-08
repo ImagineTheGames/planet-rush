@@ -55,6 +55,10 @@ import {
   colorName,
   countdownLabel,
   createLobby,
+  denseSeatIndex,
+  lobbyWireSeats,
+  startRefusal,
+  NEEDS_TWO,
   cycleAbundance,
   cycleBotDifficulty,
   cycleSeatState,
@@ -143,18 +147,36 @@ function contrastOnVacuum(color: number): number {
   return a > b ? a / b : b / a;
 }
 
+/** An ONLINE room — the default flavour of {@link createLobby}. Since a0-11 it
+ *  opens **empty**: you in your seat, seven OPEN chairs and no bots at all. */
 function lobby(overrides: Partial<Parameters<typeof createLobby>[0]> = {}): LobbyState {
   return createLobby({ room: ROOM, you: 0, ...overrides });
 }
 
-/** A wire lobby snapshot: `ready` marks a seated human, `isBot` a seated bot —
- *  the two flags `server/room.ts` publishes (`lobbyState()`). */
-function wireSlots(spec: readonly ('human' | 'bot' | 'open')[]): LobbySlot[] {
+/**
+ * The SOLO lobby — the offline flavour, whose non-host seats open on the bot cast
+ * (there is no wire for a human to arrive on, so an OPEN seat would be a chair
+ * nobody could ever take).
+ *
+ * Most of the tests below are about the cast, the tiers, the sides or `N`, and
+ * every one of those needs a roster with bots in it. Before a0-11 the online room
+ * had one by default and they simply said `lobby()`; now a test that wants bots
+ * has to *say* it wants bots, which is the point of the change.
+ */
+function solo(overrides: Partial<Parameters<typeof createLobby>[0]> = {}): LobbyState {
+  return createLobby({ room: ROOM, you: 0, online: false, ...overrides });
+}
+
+/** A wire lobby snapshot: `ready` marks a seated human, `isBot` a seated bot, and
+ *  `state` is what the seat is *set* to for everything else (a0-11) — the three
+ *  fields `server/room.ts` publishes (`lobbyState()`). */
+function wireSlots(spec: readonly ('human' | 'bot' | 'open' | 'closed')[]): LobbySlot[] {
   return spec.map((kind, player) => ({
     player,
     isBot: kind === 'bot',
     shipClass: DEFAULT_SHIP_CLASS,
     ready: kind === 'human',
+    state: kind === 'human' ? ('open' as const) : kind,
   }));
 }
 
@@ -171,17 +193,51 @@ describe('slot assignment (GDD §2.1 — eight seats, humans and bots in one id 
     const you = state.seats[3];
     expect(you?.occupant).toBe('human');
     expect(you?.personality).toBeNull();
-    // Every other seat is open, and previews the bot that would fly it.
+    // Every other seat is OPEN and EMPTY — no bot, no cast preview (a0-11).
     for (const seat of state.seats.filter((s) => s.player !== 3)) {
       expect(seat.occupant).toBe('open');
-      expect(seat.personality).not.toBeNull();
+      expect(seat.personality).toBeNull();
     }
   });
 
-  it('previews the whole seven-character cast in an untouched lobby (GDD §2.9)', () => {
+  // ── a0-11 TEST 1 — the developer's report, stated as an assertion ──────────
+  // "when creating a room to play online it should start with all slots OPEN and
+  // no bots in it (it should be up to player to fill it up with bots if they want)"
+  it('a freshly created ROOM has zero bot seats and zero AI in the cast preview', () => {
+    const state = lobby();
+    expect(state.seats.filter((s) => s.occupant === 'bot')).toHaveLength(0);
+    expect(state.seats.filter((s) => s.personality !== null)).toHaveLength(0);
+    expect(state.seats.filter((s) => s.occupant === 'open')).toHaveLength(LOBBY_SLOTS - 1);
+
+    // …and the same read through the frame model the view actually draws, which
+    // is where a preview would have to show up to mislead anybody.
+    const model = lobbyModel(state);
+    expect(model.botCount).toBe(0);
+    expect(model.humanCount).toBe(1);
+    expect(model.size).toBe(1);
+    expect(model.seats.filter((s) => s.isBot)).toHaveLength(0);
+    expect(model.seats.filter((s) => s.state === 'open').map((s) => s.name)).toEqual(
+      Array.from({ length: LOBBY_SLOTS - 1 }, () => 'OPEN'),
+    );
+    // No row is offering a difficulty for a bot that is not there.
+    expect(model.seats.some((s) => s.botDifficulty !== undefined)).toBe(false);
+  });
+
+  it('the SOLO lobby still opens on the bot cast — there is no wire for a joiner', () => {
+    // The developer's report is about the room you create to play ONLINE. Offline
+    // an OPEN seat would be a chair nobody could ever take, so the solo lobby
+    // seats the cast and says BOT on the rows that are bots.
+    const state = solo();
+    expect(state.seats.filter((s) => s.occupant === 'bot')).toHaveLength(LOBBY_SLOTS - 1);
+    expect(matchSizeOf(state)).toBe(LOBBY_SLOTS);
+    expect(canStart(state)).toBe(true);
+    expect(lobbyModel(state).seats.filter((s) => s.openToJoin)).toHaveLength(0);
+  });
+
+  it('previews the whole seven-character cast in an untouched solo lobby (GDD §2.9)', () => {
     // Bots are "characters, not difficulty labels": a lobby nobody has touched
     // should read as a full house of distinct rivals, not seven Mediums.
-    const names = lobby()
+    const names = solo()
       .seats.filter((s) => s.personality)
       .map((s) => s.personality);
     expect(names).toHaveLength(LOBBY_SLOTS - 1);
@@ -197,17 +253,18 @@ describe('slot assignment (GDD §2.1 — eight seats, humans and bots in one id 
     }
   });
 
-  it('re-casts over the remaining empty seats when a human arrives', () => {
-    // The server casts by *empty-seat order* (`castFor(botIndex++)`), so a human
-    // taking seat 1 shifts everyone behind them. The roster must show that.
-    const before = lobby();
-    const after = applyLobbySlots(before, wireSlots(['human', 'human', 'open', 'open', 'open', 'open', 'open', 'open']));
+  it('re-casts over the remaining BOT seats when a human arrives', () => {
+    // The server casts by *bot-seat order* (`castFor(botIndex++)`), so a human
+    // taking seat 1 shifts every bot behind them. The roster must show that.
+    const before = solo();
+    const after = applyLobbySlots(before, wireSlots(['human', 'human', 'bot', 'bot', 'bot', 'bot', 'bot', 'bot']));
 
     expect(after.seats[1]?.occupant).toBe('human');
     expect(after.seats[1]?.personality).toBeNull();
 
-    const empties = after.seats.filter((s) => s.occupant !== 'human');
-    empties.forEach((seat, index) => {
+    const bots = after.seats.filter((s) => s.occupant === 'bot');
+    expect(bots).toHaveLength(LOBBY_SLOTS - 2);
+    bots.forEach((seat, index) => {
       expect(seat.personality).toBe(castForEmptySeat(index, seat.difficulty));
     });
   });
@@ -221,9 +278,9 @@ describe('slot assignment (GDD §2.1 — eight seats, humans and bots in one id 
   });
 
   it('reads a bot seat, a human seat and an open seat off one wire snapshot', () => {
-    // `LobbySlot` has no "empty" flag, so the rule is: isBot ⇒ bot, ready ⇒
-    // human, otherwise still open. It has to read both authorities — the match
-    // server (bots seated at RUSH!) and LocalLoopback (bots seated at once).
+    // The rule: isBot ⇒ bot, ready ⇒ human, otherwise whatever the room says the
+    // seat is SET to (`LobbySlot.state`, a0-11). It has to read both authorities
+    // — the match server (bots seated at RUSH!) and LocalLoopback (at once).
     const state = applyLobbySlots(lobby(), wireSlots(['human', 'bot', 'open', 'bot', 'open', 'open', 'open', 'open']));
     expect(state.seats.map((s) => s.occupant)).toEqual([
       'human', 'bot', 'open', 'bot', 'open', 'open', 'open', 'open',
@@ -231,10 +288,38 @@ describe('slot assignment (GDD §2.1 — eight seats, humans and bots in one id 
 
     const model = lobbyModel(state);
     expect(model.humanCount).toBe(1);
-    expect(model.botCount).toBe(7);
+    // Two bots, not seven: the five OPEN seats are empty chairs (a0-11).
+    expect(model.botCount).toBe(2);
+    expect(model.size).toBe(3);
     // Only a seat nobody holds is still claimable by room code (GDD §4.2).
     expect(model.seats.filter((s) => s.openToJoin).map((s) => s.player)).toEqual([2, 4, 5, 6, 7]);
     expect(model.seats[1]?.openToJoin).toBe(false);
+  });
+
+  // ── a0-11 — the host's authoring survives the room's own broadcast ─────────
+  it('does not let a lobbyState broadcast undo the host’s BOT and CLOSED seats', () => {
+    // The server seats no bot until RUSH!, so every broadcast before it reads
+    // "not a bot yet" for a seat the host deliberately set to BOT. Folding that
+    // in blind would wipe the host's own authoring, on the host's own screen.
+    let state = lobby();
+    state = cycleSeatState(state, 1); // OPEN → BOT
+    state = cycleSeatState(cycleSeatState(state, 2), 2); // OPEN → BOT → CLOSED
+    const echoed = applyLobbySlots(state, wireSlots(['human', 'bot', 'closed', 'open', 'open', 'open', 'open', 'open']));
+    expect(echoed.seats.map((s) => s.occupant)).toEqual([
+      'human', 'bot', 'closed', 'open', 'open', 'open', 'open', 'open',
+    ]);
+
+    // …and a pre-a0-11 room, which sends no `state` at all, leaves the seat on
+    // whatever it already was rather than re-opening it.
+    const legacy = state.seats.map((seat) => ({
+      player: seat.player,
+      isBot: false,
+      shipClass: DEFAULT_SHIP_CLASS,
+      ready: seat.occupant === 'human',
+    }));
+    expect(applyLobbySlots(state, legacy).seats.map((s) => s.occupant)).toEqual([
+      'human', 'bot', 'closed', 'open', 'open', 'open', 'open', 'open',
+    ]);
   });
 
   it('moves the local player to the slot the server welcomed them into', () => {
@@ -311,7 +396,7 @@ describe('ship-class select and the lock at start (GDD §2.11)', () => {
   });
 
   it('LOCKS the hull the moment RUSH! is pressed', () => {
-    const picked = selectShipClass(lobby(), ShipClass.Interceptor);
+    const picked = selectShipClass(solo(), ShipClass.Interceptor);
     const counting = pressRush(picked);
 
     expect(classLocked(picked)).toBe(false);
@@ -563,7 +648,7 @@ describe('arena select and the lock at start (p2 — the map picker moved into t
   });
 
   it('LOCKS the arena the moment RUSH! is pressed, exactly like the hull', () => {
-    const picked = selectMap(lobby(), 'compass');
+    const picked = selectMap(solo(), 'compass');
     const counting = pressRush(picked);
     expect(picked.mapId).toBe('compass');
     expect(selectMap(counting, 'diamond').mapId).toBe('compass');
@@ -624,7 +709,7 @@ describe('player name (field request v0.2.1 — the local name over ship + stati
   });
 
   it('nameFor: the local seat shows the lobby name, bot seats their character', () => {
-    const s = setPlayerName(lobby({ you: 0 }), 'Ace');
+    const s = setPlayerName(solo({ you: 0 }), 'Ace');
     expect(nameFor(s, 0)).toBe('Ace');
     // Slot 1 is the first bot in roster order — its personality name (GDD §2.9).
     const firstBot = s.seats[1]!;
@@ -633,7 +718,7 @@ describe('player name (field request v0.2.1 — the local name over ship + stati
   });
 
   it('playerNameTable: one entry per slot, local name + the whole bot cast', () => {
-    const s = setPlayerName(lobby({ you: 0 }), 'Ace');
+    const s = setPlayerName(solo({ you: 0 }), 'Ace');
     const table = playerNameTable(s);
     expect(table).toHaveLength(LOBBY_SLOTS);
     expect(table[0]).toBe('Ace');
@@ -726,7 +811,7 @@ describe('room codes (GDD §4.2 — created in the lobby, read across a room)', 
 
 describe('host controls (GDD §2.1 — the host picks each bot’s difficulty)', () => {
   it('cycles a bot seat easy → medium → hard → easy for the host', () => {
-    let state = lobby();
+    let state = solo();
     const start = state.seats[1]!.difficulty;
     const seen = [start];
     for (let i = 0; i < 3; i++) {
@@ -739,27 +824,31 @@ describe('host controls (GDD §2.1 — the host picks each bot’s difficulty)',
   });
 
   it('refuses the cycle from a guest, on a human seat, and after RUSH!', () => {
-    const guest = lobby({ you: 2, host: 0 });
+    const guest = solo({ you: 2, host: 0 });
     expect(cycleBotDifficulty(guest, 1)).toBe(guest);
 
-    const host = lobby();
+    const host = solo();
     expect(cycleBotDifficulty(host, 0)).toBe(host); // your own (human) seat
 
     const counting = pressRush(host);
     expect(cycleBotDifficulty(counting, 1).seats[1]?.difficulty).toBe(host.seats[1]?.difficulty);
   });
 
-  it('sends difficulties in EMPTY-SEAT order, which is the order the room reads them', () => {
-    // `server/room.ts` indexes the list with `castFor(botIndex++)` over seats
-    // with no socket — slot order would hand seat 5's tier to seat 2.
-    const state = cycleBotDifficulty(
-      applyLobbySlots(lobby(), wireSlots(['human', 'human', 'open', 'open', 'open', 'open', 'open', 'open'])),
-      4,
-    );
+  it('sends difficulties in BOT-SEAT order, which is the order the room reads them', () => {
+    // `server/room.ts` indexes the list with `castFor(botIndex++)` over the seats
+    // it seats a bot in — slot order would hand seat 5's tier to seat 2. Since
+    // a0-11 that is the BOT seats, not every empty one: an OPEN seat flies
+    // nothing, so a tier for it would shift every real bot behind it by one.
+    let state = applyLobbySlots(lobby(), wireSlots(['human', 'human', 'open', 'open', 'open', 'open', 'open', 'open']));
+    for (const slot of [3, 4, 6]) state = cycleSeatState(state, slot); // OPEN → BOT
+    state = cycleBotDifficulty(state, 4);
+
     const list = botDifficulties(state);
-    expect(list).toHaveLength(6);
-    expect(list[2]).toBe(state.seats[4]?.difficulty);
-    expect(list).toEqual(state.seats.filter((s) => s.occupant !== 'human').map((s) => s.difficulty));
+    expect(list).toHaveLength(3);
+    expect(list[1]).toBe(state.seats[4]?.difficulty);
+    expect(list).toEqual(state.seats.filter((s) => s.occupant === 'bot').map((s) => s.difficulty));
+    // The seats left OPEN contribute nothing to the list at all.
+    expect(botDifficulties(applyLobbySlots(lobby(), wireSlots(['human', 'open', 'open', 'open', 'open', 'open', 'open', 'open'])))).toEqual([]);
   });
 
   it('marks the host on the roster and hands the guest the reason they are waiting', () => {
@@ -775,8 +864,8 @@ describe('host controls (GDD §2.1 — the host picks each bot’s difficulty)',
 
 describe('RUSH! (GDD §2.1 — the countdown that starts the match)', () => {
   it('counts 5…1 and says RUSH! again at zero', () => {
-    let state = pressRush(lobby());
-    expect(canStart(lobby())).toBe(true);
+    let state = pressRush(solo());
+    expect(canStart(solo())).toBe(true);
     expect(state.countdown).toBe(RUSH_COUNTDOWN_SECONDS);
 
     const labels: string[] = [countdownLabel(state)];
@@ -789,7 +878,7 @@ describe('RUSH! (GDD §2.1 — the countdown that starts the match)', () => {
   });
 
   it('hands the screen to the match at zero, and never counts twice', () => {
-    const started = tickLobby(pressRush(lobby(), 0.5), 1);
+    const started = tickLobby(pressRush(solo(), 0.5), 1);
     expect(lobbyModel(started).phase).toBe('started');
     expect(tickLobby(started, 1)).toBe(started);
   });
@@ -827,7 +916,7 @@ describe('the mode toggle (variable-slots E — FFA ⇄ TEAMS)', () => {
   it('is a no-op from a guest and once RUSH! is pressed', () => {
     const guest = lobby({ you: 2, host: 0 });
     expect(toggleMode(guest)).toBe(guest);
-    const counting = pressRush(lobby());
+    const counting = pressRush(solo());
     expect(toggleMode(counting)).toBe(counting);
   });
 
@@ -844,15 +933,16 @@ describe('the seat-state cycle (variable-slots E — OPEN → BOT → CLOSED →
     let state = lobby();
     expect(SEAT_STATE_CYCLE).toEqual(['open', 'bot', 'closed']);
     expect(state.seats[1]!.occupant).toBe('open');
-    expect(matchSizeOf(state)).toBe(LOBBY_SLOTS);
+    // An OPEN seat is EMPTY (a0-11): only you are in this match so far.
+    expect(matchSizeOf(state)).toBe(1);
 
     state = cycleSeatState(state, 1);
     expect(state.seats[1]!.occupant).toBe('bot');
-    expect(matchSizeOf(state)).toBe(LOBBY_SLOTS); // a bot still takes the field
+    expect(matchSizeOf(state)).toBe(2); // …and a bot joins the field
 
     state = cycleSeatState(state, 1);
     expect(state.seats[1]!.occupant).toBe('closed');
-    expect(matchSizeOf(state)).toBe(LOBBY_SLOTS - 1); // a closed seat leaves it
+    expect(matchSizeOf(state)).toBe(1); // …and leaves it again when it shuts
 
     state = cycleSeatState(state, 1);
     expect(state.seats[1]!.occupant).toBe('open'); // back to the start of the ring
@@ -863,12 +953,12 @@ describe('the seat-state cycle (variable-slots E — OPEN → BOT → CLOSED →
     expect(cycleSeatState(host, 0)).toBe(host); // your own (human) seat
     const guest = lobby({ you: 2, host: 0 });
     expect(cycleSeatState(guest, 1)).toBe(guest);
-    const counting = pressRush(lobby());
+    const counting = pressRush(solo());
     expect(cycleSeatState(counting, 1)).toBe(counting);
   });
 
   it('drops a closed seat from the previewed bot cast', () => {
-    const closed = cycleSeatState(cycleSeatState(lobby(), 5), 5); // open → bot → closed
+    const closed = cycleSeatState(solo(), 5); // the solo lobby opens on BOT → closed
     expect(closed.seats[5]!.occupant).toBe('closed');
     expect(closed.seats[5]!.personality).toBeNull();
     expect(lobbyModel(closed).seats[5]!.isClosed).toBe(true);
@@ -880,15 +970,26 @@ describe('the seat-state cycle (variable-slots E — OPEN → BOT → CLOSED →
   });
 
   it('restores a match at a smaller size, closing the trailing seats', () => {
-    const four = lobby({ size: 4 });
+    // Restored offline (an online room's size is the ROOM's), so the seats that
+    // are not closed open on the bot cast and `N` is the size asked for.
+    const four = solo({ size: 4 });
     expect(matchSizeOf(four)).toBe(4);
     expect(four.seats.map((s) => s.occupant)).toEqual([
-      'human', 'open', 'open', 'open', 'closed', 'closed', 'closed', 'closed',
+      'human', 'bot', 'bot', 'bot', 'closed', 'closed', 'closed', 'closed',
     ]);
     // Clamped into the legal band, never past the physical seats.
-    expect(matchSizeOf(lobby({ size: 1 }))).toBe(MIN_MATCH_SIZE);
-    expect(matchSizeOf(lobby({ size: 99 }))).toBe(MAX_MATCH_SIZE);
-    expect(matchSizeOf(lobby())).toBe(LOBBY_SLOTS); // absent size = the eight-player game
+    expect(matchSizeOf(solo({ size: 1 }))).toBe(MIN_MATCH_SIZE);
+    expect(matchSizeOf(solo({ size: 99 }))).toBe(MAX_MATCH_SIZE);
+    expect(matchSizeOf(solo())).toBe(LOBBY_SLOTS); // absent size = the eight-player game
+
+    // Online the same shape is the same shape — the trailing seats are closed —
+    // but the middle ones are EMPTY chairs, so `N` is just you until somebody
+    // arrives or the host seats a bot (a0-11).
+    const room = lobby({ size: 4 });
+    expect(room.seats.map((s) => s.occupant)).toEqual([
+      'human', 'open', 'open', 'open', 'closed', 'closed', 'closed', 'closed',
+    ]);
+    expect(matchSizeOf(room)).toBe(1);
   });
 });
 
@@ -950,7 +1051,7 @@ describe('the seat-state control SAYS what it is (u5 — the affordance, not the
     expect(guest.seats.every((s) => !s.canCycleState), 'a guest sees a live control').toBe(true);
 
     // 2. After RUSH! the match shape is locked, so the whole roster goes dead.
-    const counting = lobbyModel(pressRush(lobby()));
+    const counting = lobbyModel(pressRush(solo()));
     expect(counting.seats.every((s) => !s.canCycleState), 'a control is live past RUSH!').toBe(true);
 
     // 3. …and a CLOSED seat stays live for the host, which is the one that would
@@ -968,7 +1069,7 @@ describe('the seat-state control SAYS what it is (u5 — the affordance, not the
     const LOBBIES: readonly { readonly name: string; readonly state: LobbyState }[] = [
       { name: 'host, gathering', state: lobby() },
       { name: 'guest', state: lobby({ you: 2, host: 0 }) },
-      { name: 'counting (post-RUSH!)', state: pressRush(lobby()) },
+      { name: 'counting (post-RUSH!)', state: pressRush(solo()) },
       { name: 'host with a closed seat', state: cycleSeatState(cycleSeatState(lobby(), 5), 5) },
     ];
     for (const { name, state } of LOBBIES) {
@@ -996,7 +1097,7 @@ describe('RUSH! gating on size and sides (variable-slots E)', () => {
   });
 
   it('in TEAMS needs at least two sides, but allows any split (3v1)', () => {
-    const teams = toggleMode(lobby());
+    const teams = toggleMode(solo());
     // Force everyone onto side A: one team, not a match.
     let oneSide = teams;
     for (let slot = 0; slot < LOBBY_SLOTS; slot++) {
@@ -1017,8 +1118,8 @@ describe('team assignment (variable-slots E — any split, counts always shown)'
       expect(defaultTeamForSlot(slot)).toBe(slot % 2);
     }
     // 2v2 at four, 1v1 at two — never one-sided.
-    expect(activeTeams(lobby({ size: 2 }))).toBe(2);
-    expect(activeTeams(lobby({ size: 4 }))).toBe(2);
+    expect(activeTeams(solo({ size: 2 }))).toBe(2);
+    expect(activeTeams(solo({ size: 4 }))).toBe(2);
   });
 
   it('cycles a seat through the sides only in TEAMS, never a closed seat', () => {
@@ -1045,7 +1146,7 @@ describe('team assignment (variable-slots E — any split, counts always shown)'
   it('is a no-op from a guest and after RUSH!', () => {
     const guest = toggleMode(lobby({ you: 2, host: 0 })); // guests cannot toggle either, but be explicit
     expect(cycleSeatTeam(guest, 1)).toBe(guest);
-    const counting = pressRush(toggleMode(lobby()));
+    const counting = pressRush(toggleMode(solo()));
     expect(cycleSeatTeam(counting, 1)).toBe(counting);
   });
 
@@ -1058,7 +1159,7 @@ describe('team assignment (variable-slots E — any split, counts always shown)'
    */
   describe('the side roster the summary reads', () => {
     it('in TEAMS holds you and every ally, and no enemy', () => {
-      const teams = toggleMode(lobby());
+      const teams = toggleMode(solo());
       // Default alternating split: evens are side A, odds side B.
       expect(sideRosterOf(teams, 0)).toEqual(new Set([0, 2, 4, 6]));
       expect(sideRosterOf(teams, 1)).toEqual(new Set([1, 3, 5, 7]));
@@ -1081,11 +1182,17 @@ describe('team assignment (variable-slots E — any split, counts always shown)'
       expect(sideRosterOf(roundTrip, 0)).toEqual(new Set([0]));
     });
 
-    it('leaves CLOSED seats out — a shut door takes no field and is on no side', () => {
-      let teams = toggleMode(lobby());
-      teams = cycleSeatState(cycleSeatState(teams, 2), 2); // open → bot → closed
+    it('leaves CLOSED and OPEN seats out — neither takes the field, so neither is on a side', () => {
+      let teams = toggleMode(solo());
+      teams = cycleSeatState(teams, 2); // bot → closed
       expect(teams.seats[2]!.occupant).toBe('closed');
       expect(sideRosterOf(teams, 0)).toEqual(new Set([0, 4, 6]));
+
+      // …and an EMPTY seat is out for the same reason (a0-11): an unclaimed
+      // chair has no ship for an ally to fight beside.
+      let room = toggleMode(lobby());
+      for (const slot of [2, 4]) room = cycleSeatState(room, slot); // OPEN → BOT
+      expect(sideRosterOf(room, 0)).toEqual(new Set([0, 2, 4]));
     });
 
     it('puts a seatless player on their own side, never on nobody’s', () => {
@@ -1098,7 +1205,7 @@ describe('team assignment (variable-slots E — any split, counts always shown)'
 
   it('surfaces per-side counts in the model, always, never blocking a split', () => {
     // 3 on A, 1 on B among four active seats — a legal handicap game.
-    let state = toggleMode(lobby({ size: 4 }));
+    let state = toggleMode(solo({ size: 4 }));
     // seats 0,2 default to A; 1,3 to B. Walk seat 1 around the ring onto A → 3v1.
     while (state.seats[1]!.team !== 0) state = cycleSeatTeam(state, 1);
     const counts = lobbyModel(state).teamCounts;
@@ -1302,14 +1409,14 @@ describe('the abundance row (ratified p11 — SCARCE / STANDARD / RICH)', () => 
   it('is a no-op from a guest and after RUSH!', () => {
     const guest = lobby({ you: 2, host: 0 });
     expect(cycleAbundance(guest)).toBe(guest);
-    const counting = pressRush(lobby());
+    const counting = pressRush(solo());
     expect(cycleAbundance(counting)).toBe(counting);
   });
 });
 
 describe('lobbyMatchConfig — the one handoff to the wire and the world', () => {
   it('round-trips through the sim config seam: FFA is teams-of-one, dense', () => {
-    const config = lobbyMatchConfig(lobby());
+    const config = lobbyMatchConfig(solo());
     expect(config.mode).toBe('ffa');
     expect(config.slots).toHaveLength(LOBBY_SLOTS);
     expect(matchSize(config)).toBe(LOBBY_SLOTS);
@@ -1321,8 +1428,8 @@ describe('lobbyMatchConfig — the one handoff to the wire and the world', () =>
 
   it('drops closed seats from the world and re-denses the roster', () => {
     // Close seats 6 and 7 → a six-player match, ids 0..5.
-    let state = lobby();
-    for (const slot of [6, 7]) state = cycleSeatState(cycleSeatState(state, slot), slot);
+    let state = solo();
+    for (const slot of [6, 7]) state = cycleSeatState(state, slot); // bot → closed
     const config = lobbyMatchConfig(state);
     expect(matchSize(config)).toBe(6);
     expect(activeSlots(config)).toHaveLength(6);
@@ -1330,7 +1437,7 @@ describe('lobbyMatchConfig — the one handoff to the wire and the world', () =>
   });
 
   it('carries the authored team table in TEAMS, and abundance in both modes', () => {
-    const teams = cycleAbundance(toggleMode(lobby({ size: 4 }))); // teams, standard abundance
+    const teams = cycleAbundance(toggleMode(solo({ size: 4 }))); // teams, standard abundance
     const config = lobbyMatchConfig(teams);
     expect(config.mode).toBe('teams');
     expect(config.abundance).toBe('standard');
@@ -1341,15 +1448,99 @@ describe('lobbyMatchConfig — the one handoff to the wire and the world', () =>
     expect(configToPlayers(config).map((p) => p.team)).toEqual([0, 1, 0, 1]);
   });
 
-  it('reads an OPEN preview as a joinable seat online but a bot offline', () => {
-    // Offline: no wire for a joiner, so an empty seat is a bot in the config.
-    const offline = lobbyMatchConfig(lobby({ online: false }));
+  it('builds the world WITHOUT the seats nobody is in (a0-11)', () => {
+    // Offline the empty seats are the bot cast, so every slot is in the world.
+    const offline = lobbyMatchConfig(solo());
     expect(offline.slots[1]!.state).toBe('bot');
     expect(offline.slots[1]!.botPersonality).toBeTruthy();
     expect(offline.slots[1]!.botDifficulty).toBeTruthy();
-    // Online: the same seat stays open to a room-code joiner.
-    expect(lobbyMatchConfig(lobby({ online: true })).slots[1]!.state).toBe('open');
     // The local human is always a live competitive seat, never a bot.
     expect(offline.slots[0]!.state).toBe('open');
+
+    // Online, an UNCLAIMED seat brings no ship and no station, so the sim must be
+    // built without it — `closed`, exactly like a shut door, because the sim has
+    // no third answer for "nobody is here". This is the whole difference the
+    // developer asked for, at the seam where it reaches the world.
+    const room = lobbyMatchConfig(lobby());
+    expect(room.slots[1]!.state).toBe('closed');
+    expect(room.slots[1]!.botPersonality).toBeUndefined();
+    expect(room.slots[1]!.botDifficulty).toBeUndefined();
+    expect(matchSize(room)).toBe(1);
+  });
+
+  // ── a0-11 TEST 2 — one tap, exactly one participant, preview and match ─────
+  it('setting a seat to BOT and back to OPEN adds and removes exactly one participant', () => {
+    const before = lobby();
+    const withBot = cycleSeatState(before, 3); // OPEN → BOT
+    const backToOpen = cycleSeatState(cycleSeatState(withBot, 3), 3); // BOT → CLOSED → OPEN
+
+    // In the PREVIEW…
+    expect(lobbyModel(withBot).size).toBe(lobbyModel(before).size + 1);
+    expect(lobbyModel(withBot).botCount).toBe(1);
+    expect(lobbyModel(withBot).seats[3]!.name).not.toBe('OPEN');
+    expect(lobbyModel(backToOpen).size).toBe(lobbyModel(before).size);
+    expect(lobbyModel(backToOpen).botCount).toBe(0);
+    expect(lobbyModel(backToOpen).seats[3]!.name).toBe('OPEN');
+
+    // …and in the LAUNCHED match, which is the half a preview can lie about.
+    expect(configToPlayers(lobbyMatchConfig(before))).toHaveLength(1);
+    expect(configToPlayers(lobbyMatchConfig(withBot))).toHaveLength(2);
+    expect(configToPlayers(lobbyMatchConfig(backToOpen))).toHaveLength(1);
+    // …and it is the seat's OWN character that arrived, at the tier its row shows.
+    const slot = lobbyMatchConfig(withBot).slots[3]!;
+    expect(slot.botPersonality).toBe(withBot.seats[3]!.personality);
+    expect(slot.botDifficulty).toBe(withBot.seats[3]!.difficulty);
+  });
+
+  // ── a0-11 TEST 3 — RUSH! below two, and the reason for it ─────────────────
+  it('refuses RUSH! with one human and no bots, WITH a reason — and launches a 2-player match with one bot', () => {
+    const alone = lobby();
+    expect(matchSizeOf(alone)).toBe(1);
+    expect(canStart(alone)).toBe(false);
+    expect(startRefusal(alone)).toBe(NEEDS_TWO);
+    expect(lobbyModel(alone).startRefusal).toBe(NEEDS_TWO);
+    // Refused for real, not just drawn refused: RUSH! does not start a countdown.
+    expect(pressRush(alone)).toBe(alone);
+
+    const withBot = cycleSeatState(alone, 5); // OPEN → BOT
+    expect(matchSizeOf(withBot)).toBe(MIN_MATCH_SIZE);
+    expect(canStart(withBot)).toBe(true);
+    expect(startRefusal(withBot)).toBeNull();
+    expect(lobbyModel(withBot).startRefusal).toBeNull();
+    expect(pressRush(withBot).phase).toBe('counting');
+    expect(configToPlayers(lobbyMatchConfig(withBot))).toHaveLength(2);
+
+    // A guest is never handed a refusal: RUSH! is not theirs to press, and
+    // "waiting for the host" is a different sentence than "this is not legal".
+    expect(startRefusal(lobby({ you: 2, host: 0 }))).toBeNull();
+  });
+
+  // ── a0-11 — the dense index the offline boot needs ────────────────────────
+  it('maps a lobby slot onto the DENSE roster the sim builds, and only for participants', () => {
+    let state = lobby();
+    for (const slot of [2, 5]) state = cycleSeatState(state, slot); // OPEN → BOT
+    // Participants are slots 0 (you), 2 and 5 → dense 0, 1, 2.
+    expect(denseSeatIndex(state, 0)).toBe(0);
+    expect(denseSeatIndex(state, 2)).toBe(1);
+    expect(denseSeatIndex(state, 5)).toBe(2);
+    // …and a seat nobody is in has no place in the sim's roster at all.
+    expect(denseSeatIndex(state, 1)).toBeNull();
+    expect(denseSeatIndex(state, 99)).toBeNull();
+    // It agrees with the seam it exists to serve, by construction.
+    expect(configToPlayers(lobbyMatchConfig(state)).map((p) => p.id)).toEqual([0, 1, 2]);
+  });
+
+  // ── a0-11 — the host's roster, on the wire ────────────────────────────────
+  it('sends the host’s per-seat authoring in SLOT order, with a human seat as open', () => {
+    let state = lobby();
+    state = cycleSeatState(state, 1); // OPEN → BOT
+    state = cycleSeatState(cycleSeatState(state, 2), 2); // OPEN → BOT → CLOSED
+    expect(lobbyWireSeats(state)).toEqual([
+      'open', 'bot', 'closed', 'open', 'open', 'open', 'open', 'open',
+    ]);
+    // A seat somebody is sitting in is the SERVER's answer, not the host's: it
+    // rides as a competitive human seat, which is what `open` means on the wire.
+    expect(lobbyWireSeats(state)[0]).toBe('open');
+    expect(lobbyWireSeats(state)).toHaveLength(LOBBY_SLOTS);
   });
 });
