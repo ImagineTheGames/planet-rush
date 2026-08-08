@@ -7,9 +7,9 @@
  *
  *  1. **The registry is complete and its hole is stated.** `MAP_NEBULA` has one
  *     entry per ratified map — checked against `sim/maps.ts` itself, so art and
- *     the sim cannot drift — and exactly two skies are left named-but-unassigned
- *     for `a0-12`. A registry with a hole a test asserts is honest; a modulo that
- *     silently repeats is not.
+ *     the sim cannot drift — and the set of unassigned skies is stated rather
+ *     than implied (empty since `a0-12` claimed the last two). A registry with a
+ *     hole a test asserts is honest; a modulo that silently repeats is not.
  *  2. **The same-hue collision is the one real check.** A darker ground does not
  *     help with additive light in the same hue as a load-bearing colour. The
  *     owner beacon ring is plasma and Plasma Reef is a cyan additive sky, so the
@@ -259,25 +259,29 @@ describe('MAP_NEBULA — a map’s sky is part of its identity', () => {
     expect(new Set(used).size).toBe(used.length);
   });
 
-  it('leaves exactly two skies named and unassigned, for the maps a0-12 is building', () => {
+  it('states its unassigned set exactly — and since a0-12 there is none left', () => {
     const assigned = new Set<NebulaId>(Object.values(MAP_NEBULA));
     const free = NEBULA_IDS.filter((id) => !assigned.has(id));
+    // The stated hole was the point while there was one, and the statement is
+    // still the point now there isn't: every sky is spoken for, by name.
     expect(free).toEqual([...UNASSIGNED_NEBULAE]);
-    expect(free).toHaveLength(2);
-    // The stated hole IS the point: four maps, six skies, and the two spare ones
-    // wait for their maps rather than being doubled up or guessed at.
+    expect(free).toHaveLength(0);
     expect(Object.keys(MAP_NEBULA)).toHaveLength(NEBULA_IDS.length - free.length);
   });
 
   it('does not put the costly sky on a derelict-fill board', () => {
-    // compass/diamond lay out all eight positions at any roster and carry wrecks
-    // plus their debris below eight — the two busiest boards. The additive sky
-    // goes anywhere but there (brief).
+    // A derelict-fill board lays out all eight positions at any roster and carries
+    // wrecks plus their debris below eight — the busiest boards in the set. The
+    // additive sky goes anywhere but there (brief). Four of the six qualify now
+    // that a0-12's two two-sided maps have landed, so the list is spelled out
+    // rather than left at the original pair.
+    const DERELICT_FILL: readonly MapId[] = ['compass', 'diamond', 'line', 'crescents'];
     const costly = NEBULA_IDS.filter((id) => NEBULAE[id].additive);
     for (const id of costly) {
       const map = (Object.keys(MAP_NEBULA) as MapId[]).find((m) => MAP_NEBULA[m] === id);
-      expect(map, `${id} is assigned to ${map}`).not.toBe('compass');
-      expect(map, `${id} is assigned to ${map}`).not.toBe('diamond');
+      for (const fill of DERELICT_FILL) {
+        expect(map, `${id} is assigned to ${map}`).not.toBe(fill);
+      }
     }
   });
 

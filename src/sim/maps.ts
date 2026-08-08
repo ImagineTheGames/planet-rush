@@ -1,8 +1,10 @@
 /**
  * src/sim/maps.ts — the ratified map registry. OWNER: Gameplay Engineer.
  *
- * Four maps, ratified by the developer off the layout board (map-layouts.html
- * r1+r2), `octagon` the default. A map is a *layout*, nothing more: it owns the
+ * Six maps, `octagon` the default: the four radial boards ratified by the
+ * developer off the layout board (map-layouts.html r1+r2), plus the two
+ * **two-sided** boards of a0-12 (`line`, `crescents` — see "Two sides" below).
+ * A map is a *layout*, nothing more: it owns the
  * arena bounds and where the `N` home stations sit, and hands those to
  * `createWorld` (`./state`). Everything downstream — the ships that orbit each
  * station, the fair home neighbourhoods stamped around them, the contested
@@ -46,6 +48,49 @@
  *    slot 0's identity never moves. Resource fairness is a claim about the LIVE
  *    homes; each gets `homeFieldOre(activeN)`, and the commons stays symmetric
  *    about every board position (eight-fold), so it is fair from every live spoke.
+ *
+ * **Two sides (a0-12, 2026-08-08).** The four radial maps are FFA-shaped and
+ * correct as such — equal spacing for any N, no wasted board, no near half and
+ * no far half. `line` and `crescents` are the first maps with sides: four homes
+ * in one cluster, four in the other, contested ground between them. The whole
+ * construction is three rules, and they are stamped rather than tuned:
+ *
+ *  1. **One side is authored; the other is its point reflection** through the
+ *     arena centre ({@link pointReflect}). Because `spawnHomeFields` stamps each
+ *     neighbourhood by a *rotation*, a point reflection (rotation by π) carries
+ *     the whole board — stations, ships, home fields, and the `N`-fold symmetric
+ *     commons — onto itself exactly. Side equality is therefore not a tuning
+ *     result but the same fact as "the stamp is a rotation."
+ *  2. **Each side is symmetric about the axis between them**, so reflecting one
+ *     side across the dividing midline lands on the other exactly too — the
+ *     mirror a player actually sees. (Ore cannot be mirror-equal: the canonical
+ *     rock pattern is chiral and a rotation stamp can never produce its mirror
+ *     image. The exact statement about ORE is the point reflection of rule 1.
+ *     `tests/sim/team-maps.test.ts` asserts both and says which is which.)
+ *  3. **Live homes are ordered side-A-first, then side-B**, never alternating —
+ *     see "Sides and slots" below.
+ *
+ * **Sides and slots — why the order is A,A,A,A,B,B,B,B.** The lobby alternates
+ * teams by slot (`ui/lobby` `defaultTeamForSlot` = `index % 2`) but the sim does
+ * NOT seat players on board positions in slot order: `createWorld`'s
+ * `teamHomeSlots` regroups teammates onto *contiguous* live-home slots, so in a
+ * 4v4 team 0 takes live homes 0..3 and team 1 takes 4..7. A map that put even
+ * slots in one cluster and odd in the other would therefore hand each team two
+ * homes on each side. The map's job is to make live homes `0..⌈N/2⌉-1` one side
+ * and the rest the other ({@link twoSided}), and the shipped default lands as
+ * four-versus-four with no change to the lobby, the transport, or the host's
+ * ability to reassign sides by hand (GDD §2.1).
+ *
+ * **The outward angle on a two-sided board is the SIDE's axis, not the radius.**
+ * `StationPlacement.angle` is what `spawnHomeFields` rotates a neighbourhood by,
+ * so on `line` all four homes of a side declare the same outward angle and their
+ * fields come out *parallel* — four neighbourhoods lying in front of a picket
+ * line — instead of fanning inward and crowding each other's launch pockets. On
+ * `line`'s column the radial reading puts a home's outermost rock **428.9 u**
+ * from its neighbour against a **499.3 u** pocket floor — an illegal board; the
+ * side-axis reading puts the same rock at **585.4 u**. Same fairness either way
+ * (a rigid motion of one pattern is congruent whichever angle it uses), a legal
+ * board only one way.
  *
  * Fully deterministic and RNG-free: station placement is pure geometry (the seed
  * threads through to the asteroid scatter in `./waves`, not to the layout), so
@@ -161,6 +206,88 @@ function fromPolar(bounds: Bounds, homes: readonly { r: number; angle: number }[
 function derelictFill(full: StationPlacement[], count: number): StationPlacement[] {
   const active = Math.max(0, Math.min(count, full.length));
   return full.map((p, i) => (i < active ? p : { ...p, derelict: true }));
+}
+
+/**
+ * Farthest a station centre may sit from the arena centre **along one axis** and
+ * still clear that wall by `WORLD_EDGE_MARGIN` — the rectangular form of
+ * {@link marginRadius}, for the two-sided maps whose clusters are placed in x
+ * and y rather than on a ring. Clamped at zero so a degenerate QA arena collapses
+ * to the centre instead of going negative.
+ */
+function marginLimit(extent: number): number {
+  return Math.max(0, extent / 2 - STATION.radius - WORLD_EDGE_MARGIN);
+}
+
+/**
+ * One home, placed in cartesian coordinates with an outward `angle` that need
+ * NOT be its radial direction — on a two-sided board the outward direction is
+ * the side's own axis (see the file header). The ship spawns `STATION.orbitOffset`
+ * *inboard* of the station along that same axis, which is the identical
+ * "orbiting its station, between the station and the field" relationship
+ * {@link fromPolar} gives a radial map (GDD §2.1).
+ */
+function facing(x: number, y: number, angle: number): StationPlacement {
+  return {
+    station: { x, y },
+    ship: { x: x - Math.cos(angle) * STATION.orbitOffset, y: y - Math.sin(angle) * STATION.orbitOffset },
+    angle,
+  };
+}
+
+/**
+ * A home's twin on the far side: the **point reflection** of `p` through the
+ * arena centre. Station and ship centres are mirrored through the centre and the
+ * outward angle turns by π, so the far side is the near side rotated by half a
+ * turn.
+ *
+ * That specific isometry is chosen because `spawnHomeFields` stamps every
+ * neighbourhood by a rotation: rotating the board by π maps each near home's
+ * field exactly onto its twin's, and the commons — already `N`-fold symmetric
+ * about the centre for every map — is invariant under it. So "the two sides are
+ * equal" needs no tolerance and no tuning; it is the same fact as "the stamp is
+ * a rotation" (`tests/sim/team-maps.test.ts` prints the residuals).
+ */
+function pointReflect(bounds: Bounds, p: StationPlacement): StationPlacement {
+  const c = centre(bounds);
+  const through = (v: Vec2): Vec2 => ({ x: 2 * c.x - v.x, y: 2 * c.y - v.y });
+  return { station: through(p.station), ship: through(p.ship), angle: norm(p.angle + Math.PI) };
+}
+
+/**
+ * Build a two-sided board from one side's homes: `near` is authored, the far
+ * side is its point reflection ({@link pointReflect}), and the result is ordered
+ * so the live homes split evenly across the two sides.
+ *
+ * The order is **side-A-first, then side-B**, never alternating, because
+ * `createWorld`'s `teamHomeSlots` seats a team on *contiguous* live-home slots
+ * (file header, "Sides and slots"). Live homes `0..⌈N/2⌉-1` are the near side and
+ * the rest the far side, so:
+ *
+ *  - **even N** — the sides are equal and exact mirrors: 4v4 at eight, 3v3, 2v2,
+ *    and a 1v1 duel straight across the middle at two;
+ *  - **odd N** — the extra player joins the near side, giving the ⌈N/2⌉ v ⌊N/2⌋
+ *    the lobby's `index % 2` produces on ANY map. A two-sided board does not
+ *    invent that imbalance, it just makes it visible; these read as team maps.
+ *
+ * Everything else is derelict-fill, exactly as `compass`/`diamond` (ratified
+ * 2026-07-26): a two-sided layout has no natural 2..7 form — halve it and it is
+ * no longer two lines facing each other — so all eight positions are always laid
+ * out and the `8-N` unused ones become unowned wrecks. Actives come first, so
+ * slot 0 is always the near side's first home and its identity never moves.
+ */
+function twoSided(bounds: Bounds, near: readonly StationPlacement[], count: number): StationPlacement[] {
+  const far = near.map((p) => pointReflect(bounds, p));
+  const perSide = near.length;
+  const live = Math.max(0, Math.min(count, perSide * 2));
+  const liveNear = Math.ceil(live / 2);
+  const liveFar = live - liveNear;
+  const out: StationPlacement[] = [];
+  for (let i = 0; i < liveNear; i++) out.push(near[i]!);
+  for (let i = 0; i < liveFar; i++) out.push(far[i]!);
+  for (let i = liveNear; i < perSide; i++) out.push({ ...near[i]!, derelict: true });
+  for (let i = liveFar; i < perSide; i++) out.push({ ...far[i]!, derelict: true });
+  return out;
 }
 
 /**
@@ -373,6 +500,114 @@ const diamond: MapDef = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// The two-sided maps (a0-12) — four homes a side, open ground between
+// ---------------------------------------------------------------------------
+
+/**
+ * How far out along x each picket line of `line` stands, as a fraction of the
+ * arena's x margin limit. 0.77 puts the two lines **2027 u apart** — four times
+ * the commons's own width (512 u) and the largest empty span on any board — so
+ * the corridor between them reads as the thing the map is about.
+ */
+const LINE_STANDOFF = 0.77;
+/** Half-length of a picket line, as a fraction of the arena's y margin limit.
+ *  0.78, not 1.0: a home's neighbourhood is stamped in FRONT of it with a lateral
+ *  spread of `homeConeOuter`, and the outermost home's outermost rock has to clear
+ *  the wall margin on its own — at 0.78 it clears by 32 u, at 0.87 it would be
+ *  clamped and the two sides would stop being exact mirrors. */
+const LINE_HALF_LENGTH = 0.78;
+
+/**
+ * "The Line". Wide arena; **four homes abreast facing four homes abreast** across
+ * a corridor of open ground four times as wide as the commons is across. Each side
+ * is a straight picket line of four evenly spaced homes, and the far side is the
+ * near side turned half a turn (the file header's rule 1), so the two lines are
+ * exact mirrors of each other about the arena's vertical midline.
+ *
+ * Its character is the corridor. Nothing on this board is ambiguous about which
+ * half it is in: there is no wrap-around, no flank that leads behind the enemy
+ * without crossing the middle, and the commons sits alone in a 2027 u gap with
+ * nothing else in it — the nearest enemy home is **5.4×** farther than the nearest
+ * ally (2027 u against 372 u), the widest such gap in the set. The four homes of a
+ * side are close enough (`marginLimit(height) × 0.52` apart) that their turret
+ * envelopes overlap, so a line genuinely covers itself — the first board in the set
+ * where standing next to your team-mate is worth something.
+ *
+ * Every home on a side declares the SAME outward angle (the side's axis, ±x), so
+ * the four neighbourhoods are parallel translations of one pattern rather than a
+ * fan converging on the arena centre. That is what keeps the launch pockets clear
+ * on a column; see the file header.
+ */
+const line: MapDef = {
+  id: 'line',
+  name: 'The Line',
+  blurb: 'Four abreast facing four, across a corridor of open ground.',
+  bounds: WIDE,
+  stations(_seed, count, bounds) {
+    const c = centre(bounds);
+    const x = marginLimit(bounds.width) * LINE_STANDOFF;
+    const half = marginLimit(bounds.height) * LINE_HALF_LENGTH;
+    // Four evenly spaced homes: ±half and ±half/3. Authored as two mirror PAIRS
+    // about the dividing midline, inner pair first — so the live set stays
+    // symmetric about that midline at every even N (a 2v2 is the inner four,
+    // head on) and slot 0 is always the near line's inner-upper home.
+    const near = [half / 3, -half / 3, half, -half].map((dy) =>
+      facing(c.x - x, c.y + dy, Math.PI),
+    );
+    return twoSided(bounds, near, count);
+  },
+};
+
+/** Half-angle of the inner pair of each crescent, radians. With
+ *  {@link CRESCENT_OUTER} at three times this the four homes of a side sit at
+ *  equal 2×{@link CRESCENT_INNER} steps along the rim — the octagon's equal-gap
+ *  virtue, applied inside a side instead of around the whole board. */
+const CRESCENT_INNER = (16 * Math.PI) / 180;
+/** Half-angle of the outer pair of each crescent, radians. Three times the inner,
+ *  which leaves 84° of empty rim above and below the two crescents against 32°
+ *  between team-mates, and keeps every home a full 613 u clear of the dividing
+ *  axis: nearest ally 505 u, nearest enemy 1226 u. Past 45° the crescents' tips
+ *  would come closer to each other than to their own far end and the two halves
+ *  would stop reading as halves — which is what sets the ceiling here, not taste. */
+const CRESCENT_OUTER = 3 * CRESCENT_INNER;
+
+/**
+ * "The Crescents". Square arena; **two arcs of four facing each other across the
+ * bowl.** Every home sits on one circle hugging the spawn margin, so this is the
+ * only two-sided board where all eight are exactly equidistant from the contested
+ * middle — the commons is reached by the same run from any home, and the sides
+ * are equal in ground as well as in ore.
+ *
+ * Its character is the bowl and the shoulder. A crescent's four homes stand 32°
+ * apart with 84° of empty rim beyond each end, so a side is a wall you stand
+ * inside: your team-mate is always the nearest station to you (505 u) and the
+ * nearest enemy is **2.4×** farther (1226 u), with a 1226 u corridor down the
+ * middle holding no station at all. Flanking means going the long way round an
+ * open rim in full view, or going straight through the middle.
+ *
+ * Because all eight radii are equal, `spawnHomeFields` takes its single-ring
+ * path — the identical arena-frame rotation stamp the default `octagon` uses —
+ * so the fairness argument here is the shortest one in the file: the eight
+ * neighbourhoods are eight rotations of one pattern about one centre.
+ */
+const crescents: MapDef = {
+  id: 'crescents',
+  name: 'The Crescents',
+  blurb: 'Two arcs of four across the bowl — shoulder to shoulder, or the long way round.',
+  bounds: SQUARE,
+  stations(_seed, count, bounds) {
+    const r = marginRadius(bounds);
+    // The near crescent, centred on due west. Inner pair first (the two homes
+    // facing most directly across the bowl), so a 2v2 is head-on and slot 0 is
+    // always the near crescent's upper-inner home.
+    const near = [-CRESCENT_INNER, CRESCENT_INNER, -CRESCENT_OUTER, CRESCENT_OUTER].map((d) =>
+      fromPolar(bounds, [{ r, angle: Math.PI + d }])[0]!,
+    );
+    return twoSided(bounds, near, count);
+  },
+};
+
 /** Angle in `[0, 2π)`. */
 function norm(a: number): number {
   const two = 2 * Math.PI;
@@ -383,8 +618,15 @@ function norm(a: number): number {
 // Registry
 // ---------------------------------------------------------------------------
 
-/** The four ratified maps, `octagon` first (the default). */
-export const MAPS: readonly MapDef[] = [octagon, compass, oval, diamond];
+/** The ratified maps, `octagon` first (the default): the four radial FFA boards,
+ *  then the two two-sided team boards (a0-12). */
+export const MAPS: readonly MapDef[] = [octagon, compass, oval, diamond, line, crescents];
+
+/** The two-sided boards — four homes a side, contested ground between them. A
+ *  named set rather than a flag on `MapDef`, because "has sides" is a fact about
+ *  these two layouts that the picker and the team tests want to ask about, not a
+ *  new field every future map has to answer. */
+export const TEAM_MAP_IDS: readonly string[] = [line.id, crescents.id];
 
 /** Look a map up by id, falling back to the default for an unknown id — boot
  *  must never crash on a stale saved map key. */
