@@ -46,7 +46,11 @@ const FONT_HEADING = 'Audiowide, "Trebuchet MS", sans-serif';
 
 /** The plate, styled inline so the module needs no stylesheet of its own. */
 const STYLE =
-  'position:fixed;left:50%;top:2.5rem;transform:translateX(-50%);z-index:40;' +
+  // Below the wave banner and its NEXT countdown, which own the top of the HUD
+  // (`src/ui/hud`): a tell that covered them would be a considerate optimisation
+  // reported by hiding the match's own clock. Measured against the real screen —
+  // see evidence/a0-11-open-rooms/a0-11-local-revert.png.
+  'position:fixed;left:50%;top:5.5rem;transform:translateX(-50%);z-index:40;' +
   // Never a control: taps go through to the match underneath it.
   'pointer-events:none;' +
   `font-family:${FONT_HEADING};font-size:clamp(11px,2.8vw,13px);letter-spacing:.1em;` +

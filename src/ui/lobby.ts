@@ -1480,11 +1480,18 @@ export function startRefusal(state: LobbyState): string | null {
   return null;
 }
 
-/** Refusal copy. Here rather than in a draw call for the reason every other string
- *  on this screen is (the copy sweep reads the models, GDD §4.7 register 2), and
- *  in the interface voice: it states the situation, then the way out. */
-export const NEEDS_TWO = 'NEEDS 2 — WAIT FOR A CREWMATE OR SET A SLOT TO BOT';
-export const NEEDS_TWO_SIDES = 'NEEDS 2 SIDES — ASSIGN A SLOT TO ANOTHER TEAM';
+/**
+ * Refusal copy. Here rather than in a draw call for the reason every other string
+ * on this screen is (the copy sweep reads the models, GDD §4.7 register 2), and in
+ * the interface voice: it states the situation, then the way out.
+ *
+ * Short on purpose. It is drawn in the footer beam's one hint strip beside RUSH!
+ * (`./lobby-view` `hintText`), which the narrowest phone spends entirely on the
+ * two plates — a line that does not fit is a line that is not drawn, and a refusal
+ * nobody reads is the dead button it was written to replace.
+ */
+export const NEEDS_TWO = 'NEEDS 2 — ADD A BOT OR WAIT';
+export const NEEDS_TWO_SIDES = 'NEEDS 2 SIDES';
 
 /**
  * Whether RUSH! can be pressed right now: the host, still gathering, with a legal
