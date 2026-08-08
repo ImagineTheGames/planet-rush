@@ -324,6 +324,14 @@ test('the audio engine listens as the seat the SERVER gave this client — on a 
       `${JSON.stringify(
         {
           what: 's9-01 — the audio engine listens as the seat the server gave this client',
+          // Which numbers below are a claim and which are weather. The seats and
+          // the ally rosters are asserted and identical every run. The HOST's
+          // active/engagements/sounds are incidental: whether a bot happens to
+          // siege the host's core inside the run's window varies, so those three
+          // churn between runs and a diff in them is not a regression. What IS
+          // asserted about them is the one-shot invariant — sounds <= engagements,
+          // on both clients, which holds at zero too.
+          reading: 'seats + allies are asserted; the host damage counters are incidental combat',
           room: room.code,
           host: { seat: room.you, alarm: hostAlarm },
           guest: { seat, alarm: guestAlarm },
@@ -360,6 +368,25 @@ test('the audio engine listens as the seat the SERVER gave this client — on a 
     // rule is counted from (`AudioEngine.alarmSounds`, one sting per engagement).
     expect(guestAlarm.engagements, 'a fresh match has raised no engagement').toBe(0);
     expect(guestAlarm.sounds, 'and sounded no alarm').toBe(0);
+
+    // Defect 1, observed in a booted client rather than in memory: at most ONE
+    // sting per engagement. Whether the host is actually under fire when we
+    // sample is incidental — bots may or may not have reached its core in the
+    // run's window — so this is written as an invariant that also holds at zero
+    // rather than as an expected count. It is the shape the old code could not
+    // produce: a loop has no per-engagement sting to count, and kept sounding
+    // for as long as `active` held. The behavioural proof stays in the unit
+    // suite (the ~20 fps floor means a siege cannot be staged reliably here);
+    // this is the live corroboration that comes free when combat does happen.
+    for (const [who, a] of [
+      ['host', hostAlarm],
+      ['guest', guestAlarm],
+    ] as const) {
+      expect(
+        a.sounds,
+        `the ${who} sounded at most one sting per engagement (${a.sounds} stings / ${a.engagements} engagements)`,
+      ).toBeLessThanOrEqual(a.engagements);
+    }
 
     for (const [who, client] of [
       ['host', host],
