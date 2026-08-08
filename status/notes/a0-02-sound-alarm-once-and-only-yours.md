@@ -130,12 +130,65 @@ Counts wobble run to run (24, 27, and 28 in a contended run without the new spec
 at all) — the box is shared across lanes. Every spec that failed on this branch
 and not on main passed when re-run alone.
 
+## THE LIVE DEPLOYMENT DOES NOT HAVE THIS FIX — measured, 2026-08-08
+
+`evidence/s9-01-live-probe.mjs` (committed, re-runnable) fetches the deployment,
+names the served sha and says whether the shipped entry chunk carries this lane's
+code. Against `https://imaginethegames.github.io/planet-rush/`:
+
+```
+servedSha    9803e3b   (= origin/main, published 2026-08-08T03:13Z)
+__alarmStage false   ·  alarmStings false  ·  __pauseStage true (control)
+verdict      the fix is NOT deployed
+```
+
+Pointed at this branch's own preview it reads `cbbc090`, both markers true,
+`deployed` — the positive control, so this is not a permanently-false grep.
+
+**Therefore the by-ear evidence item the brief asks for is blocked on the DEPLOY,
+not on the work.** The developer is still hearing the loop and still hearing slot
+0's station, because what is live is still pre-fix code. Do not write that
+attestation against 9803e3b and do not let a green suite stand in for it: after
+PR #318 merges and Pages republishes, re-run the probe, confirm `deployed`, then
+play an online match on a non-zero slot and listen. That is the only thing that
+closes it, and it is QA's to write, not this lane's to claim.
+
+## BUILT, round 2 (this session)
+
+- `5f7738c` — the probe above, plus
+  `tests/live-stage/alarm-once-and-ownership.spec.ts`: the BEHAVIOURAL half. The
+  online spec proves the *wire* but reads a fresh match, so it stops at
+  `sounds: 0` — nothing was ever shot. This one sieges real cores in the shipped
+  bundle through the `?debug=1` write seam (a queued verb `main.ts` drains on a
+  tick boundary through the sim's own `damageStation`, so `coreHit` is emitted
+  only when HP actually falls) and samples the alarm on **every frame**:
+  A 5 s on your core → raises, engagements 1, sounds peak **1**; B released →
+  still 1; C 5 s on a **rival's** core → sounds unchanged, alarm never raises;
+  D 5 s on yours again → 2 and 2. Readout to `evidence/s9-01-alarm-once.json`.
+
+  Per-frame sampling is the whole point: an end-state read looks identical
+  whether the sting fired once or three hundred times, and "not keep playing" is
+  a claim about every *instant* of the siege. It is an OFFLINE boot, so the local
+  slot is 0 — deliberately not where ownership is proven (slot 0 is exactly the
+  seat a dead wire reads correct on); that claim stays with the online spec and
+  the `local: 3` unit test.
+
+## TRAP, re-hit: the preview on 4173 is shared across lanes
+
+`tests/live-stage/playwright.config.ts` uses port 4173 with
+`reuseExistingServer: !CI`, so a run can silently be served a neighbouring lane's
+bundle. Fingerprinted before trusting this session's run: served
+`assets/index-BqT9NfUA.js` / sha `cbbc090` == `dist/` == HEAD. Ours.
+Also, again: `vite preview` listens on `::1` only — `curl 127.0.0.1:4173`
+returns nothing while `curl localhost:4173` returns 200, and Node's `fetch`
+prefers the v4 address. Use `http://[::1]:4173/` when pointing a script at it.
+
 ## NEXT
 
-- Evidence against the LIVE deployment: an online match on a non-zero slot, own
-  station attacked (alarm sounds **once**, arrow holds), then another player's
-  station attacked (silence). Name the served sha. A green suite does not close
-  this — the developer heard it in real play.
+- QA, after the deploy: re-run `node evidence/s9-01-live-probe.mjs`, confirm
+  `deployed: true` and the new sha, then the by-ear attestation — online match,
+  non-zero slot, own station attacked (**one** sting, arrow holds), another
+  player's attacked (silence).
 - Not done and deliberately out of scope: the sting is not re-voiced, and no VFX
   or bot-naming consequence of the 2026-08-06 tone amendment is touched (those
   are explicitly unratified, GDD §4.7 blast radius).
