@@ -27,8 +27,11 @@ import {
   flowLobbySlots,
   flowMatchEnded,
   flowMatchStart,
+  flowOpenHangar,
   flowOpenSettings,
   flowTapEnd,
+  flowTapHangar,
+  setFlowProfile,
   flowTapEntry,
   flowTapLobby,
   flowTapSettings,
@@ -38,6 +41,7 @@ import {
   wireFireMode,
 } from './lobby-flow';
 import type { FlowEffect, FlowResult, FlowState } from './lobby-flow';
+import { xpToReach } from '../progression/curve';
 import { DOOR_ORDER, ENTRY_COMING_SOON, ENTRY_ERRORS, KEYPAD_KEYS } from './lobby-entry';
 import {
   CLASS_ORDER,
@@ -989,5 +993,86 @@ describe('the end-of-match summary, and Rematch (resets the world cleanly)', () 
     expect(relit.state.spectating).toBe(false);
     expect(relit.state.end).toBeNull();
     expect(relit.state.screen).toBe('match');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The hangar — the sixth screen (a0-14)
+// ---------------------------------------------------------------------------
+//
+// The screen itself is proved in `./hangar.test.ts` and the two-lists-agree
+// wiring in `./main-menu.test.ts`. What is left for this file is the part it has
+// always owned: the ORDER of the calls, and the bytes (here, the *write*) they
+// owe the outside world.
+describe('the hangar', () => {
+  const SAMPLE = [
+    { id: 'livery.ashfield', name: 'ASHFIELD', slot: 'livery', level: 2 },
+    { id: 'glow.cold', name: 'COLD BURN', slot: 'glow', level: 12 },
+  ] as const;
+
+  /** A flow at the front door with a career on it. */
+  function withCareer(level: number): FlowState {
+    return setFlowProfile(createFlow(), { v: 1, xp: xpToReach(level), level, matches: 4 });
+  }
+
+  it('opens from the front door and comes back, costing the wire nothing', () => {
+    const open = flowOpenHangar(withCareer(5));
+    expect(open.state.screen).toBe('hangar');
+    expect(open.effects).toEqual([]);
+    const back = flowTapHangar(open.state, { kind: 'back' });
+    expect(back.state.screen).toBe('entry');
+    expect(back.effects).toEqual([]);
+  });
+
+  it('is a no-op from every screen a player cannot have pressed it on', () => {
+    for (const screen of ['settings', 'lobby', 'match', 'end'] as const) {
+      const state: FlowState = { ...createFlow(), screen };
+      expect(flowOpenHangar(state).state).toBe(state);
+      // …and a stray tap arriving a frame late must not move a live match.
+      expect(flowTapHangar(state, { kind: 'back' }, SAMPLE).state).toBe(state);
+    }
+  });
+
+  it('equips a cosmetic and hands the caller a save-profile to perform', () => {
+    // The flow holds no storage any more than it holds a socket, so the write
+    // comes back as an effect — and the effect carries the profile to persist,
+    // not a request to go and re-derive one.
+    const open = flowOpenHangar(withCareer(5)).state;
+    const equipped = flowTapHangar(open, { kind: 'cosmetic', index: 0 }, SAMPLE);
+    expect(equipped.state.profile.equipped).toEqual({ livery: 'livery.ashfield' });
+    expect(equipped.effects).toEqual([{ kind: 'save-profile', profile: equipped.state.profile }]);
+  });
+
+  it('writes NOTHING when the equip is refused — a locked row costs the disk zero', () => {
+    // The stillness rule, on the one screen where a spurious write lands in the
+    // file the game promises never to wipe.
+    const open = flowOpenHangar(withCareer(5)).state;
+    const locked = flowTapHangar(open, { kind: 'cosmetic', index: 1 }, SAMPLE); // needs level 12
+    expect(locked.state).toBe(open);
+    expect(locked.effects).toEqual([]);
+
+    // And an index the list does not have is just as still.
+    const missing = flowTapHangar(open, { kind: 'cosmetic', index: 9 }, SAMPLE);
+    expect(missing.state).toBe(open);
+    expect(missing.effects).toEqual([]);
+  });
+
+  it('leaves on Escape or Backspace, and ignores every other key', () => {
+    const open = flowOpenHangar(withCareer(2)).state;
+    expect(flowKey(open, 'Escape').state.screen).toBe('entry');
+    expect(flowKey(open, 'Backspace').state.screen).toBe('entry');
+    expect(flowKey(open, 'A').state).toBe(open);
+    expect(flowKey(open, 'Enter').state).toBe(open);
+  });
+
+  it('carries the career through a rematch — a profile is not match state', () => {
+    const career = { v: 1, xp: 4200, level: 5, matches: 11, equipped: { livery: 'livery.ashfield' } } as const;
+    const played = setFlowProfile({ ...createFlow(), screen: 'match' }, career);
+    const ended = flowMatchEnded(played, 0).state;
+    expect(flowTapEnd(ended, { kind: 'rematch' }).state.profile).toEqual(career);
+  });
+
+  it('starts on a fresh profile rather than none, so no screen has to guard it', () => {
+    expect(createFlow().profile).toEqual({ v: 1, xp: 0, level: 1, matches: 0 });
   });
 });

@@ -45,6 +45,10 @@ export type NavScreen =
   | 'settings'
   /** The CODEX reference (GDD §2.10). */
   | 'codex'
+  /** The HANGAR (a0-14): your ship, your level, and the cosmetics a level has
+   *  unlocked. A door that opens and comes back, like the two above it — it
+   *  builds no world and holds no settings. `src/ui/hangar`. */
+  | 'hangar'
   /** The lobby in its OFFLINE flavour (SOLO CONTRACT): roster, ship-class select, MAP
    *  SELECT, mode/abundance, RUSH — and BACK (u2 menu-back). `src/ui/lobby`, drawn
    *  by `openLobby` with no session. */
@@ -75,6 +79,7 @@ export const NAV_SCREENS: readonly NavScreen[] = [
   'online-keypad',
   'settings',
   'codex',
+  'hangar',
   'lobby',
   'lobby-online',
   'match',
@@ -127,6 +132,10 @@ export const NAV_EDGES: readonly NavEdge[] = [
   { from: 'main-menu', to: 'online', via: 'PLAY' },
   { from: 'main-menu', to: 'settings', via: 'SETTINGS' },
   { from: 'main-menu', to: 'codex', via: 'CODEX' },
+  // The fourth door (a0-14). Added in the same PR as the screen and its route,
+  // which is the rule this file states in its header — a graph that lags the
+  // code is a map of a building that has been rebuilt.
+  { from: 'main-menu', to: 'hangar', via: 'HANGAR' },
 
   // --- The doors (openMainMenu.applyEntryTarget / chooseEntryDoor) -------------
   // FOUR doors are drawn here since u9-01, but only three are edges: **CAMPAIGN
@@ -157,6 +166,11 @@ export const NAV_EDGES: readonly NavEdge[] = [
 
   // --- Codex (closeCodex / Escape / Backspace) --------------------------------
   { from: 'codex', to: 'main-menu', via: 'BACK', escape: true },
+
+  // --- Hangar (closeHangar / Escape / Backspace) ------------------------------
+  // One way out, and it is the only edge the screen has: equipping a cosmetic
+  // moves nothing, so the hangar is a leaf.
+  { from: 'hangar', to: 'main-menu', via: 'BACK', escape: true },
 
   // --- Lobby, offline (openLobby.act('leave') / Escape — u2 menu-back) --------
   { from: 'lobby', to: 'main-menu', via: 'BACK', escape: true },
