@@ -245,6 +245,37 @@ and Node's `fetch` prefers the v4 address, so a readiness probe times out agains
 a server that is up. `ss -lptn` returns nothing useful in this sandbox, so port
 checks have to be curl + fingerprint rather than a socket list.
 
+## BUILT, round 3 (this session)
+
+- `4e7abe9` — the 4173 trap write-up above (it actually bit) and the private-port
+  re-run route.
+- The PR body was **two commits stale**: it carried neither the ~20 fps finding
+  nor the live-probe result. Both are now in it — the frame-rate section names
+  `src/art/vfx/observer.ts` as the follow-up and whose call it is, and Outstanding
+  states plainly that the by-ear item is blocked on the deploy, with the served
+  sha.
+- Deploy re-probed **2026-08-08**: it has moved on from `9803e3b` to **`03ed194`**
+  and is **still pre-fix** (`__alarmStage` false, `alarmStings` false,
+  `__pauseStage` true as the control). `evidence/s9-01-live-probe.json` refreshed
+  to that reading — it does not self-write, it is
+  `node evidence/s9-01-live-probe.mjs > evidence/s9-01-live-probe.json`.
+- Housekeeping: the live-stage run of the previous session had left **35
+  `tests/live-stage/*-evidence.png`** dirty — other lanes' spec output, regenerated
+  by running their specs. Reverted with `git checkout --`, not committed: they are
+  not this lane's files and they would have been noise in this PR. Expect them
+  dirty again after every full-suite run; revert them, never commit them.
+
+## DECISIONS, round 3
+
+**The unit suite's one red test is not this lane's.**
+`tests/net/capacity/capacity-regression.test.ts` "the loop stays inside the tick
+budget at 12 rooms" failed the full run at 38.38 ms vs a 33 ms budget, and
+**passes in isolation (4/4)** — a wall-clock budget measured while the rest of a
+3911-test suite and other lanes share the box. `tests/net/` is not ownable here
+and CI's own "Typecheck, test, build" is green on this branch. Do not chase it,
+do not report it as this lane's failure, and do not report the full run as clean
+without saying which test it was.
+
 ## NEXT
 
 - QA, after the deploy: re-run `node evidence/s9-01-live-probe.mjs`, confirm
