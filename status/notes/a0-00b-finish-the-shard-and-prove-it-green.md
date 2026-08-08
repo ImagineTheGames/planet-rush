@@ -222,15 +222,41 @@ moment its checks go green. Push the *evidence* commit before or with the change
 it describes — do not leave the report trailing the config by one commit, or the
 merge lands the code and strands the numbers.
 
+### 12 · Both PRs merged; `main` is green on the sharded gate
+
+**#322 merged 15:14:29** (9/9 checks green), after **#321** at 14:09:45. Every
+deliverable is in `main`. `main`'s own post-merge run **`31263965114`: 6/6 shards
++ rollup green**, walls 11m14s–13m59s — the gate behaves on `main` exactly as it
+did on the PR. Branch fast-forwarded to `08c00ac`, so it equals `main`.
+
+Verified present in `main`: `shard: [1,2,3,4,5,6]` · `workers: process.env.CI ? 1
+: undefined` · `'iphone|goldens.spec.ts': 659` · the 618-line report.
+
+## DoD, as it actually stands
+
+| gate | status |
+|---|---|
+| `npx tsc --noEmit` | **PASS** |
+| `npm test -- --run` | **PASS** — 3973/3973, 237 files |
+| report tracked | **PASS** |
+| `merge-base --is-ancestor origin/main HEAD` | **PASS** |
+| PR checks zero-fail | **unsatisfiable as written — both PRs are MERGED** |
+
+The last one needs stating precisely rather than claimed: it does
+`gh pr list --head <branch>`, which lists **OPEN** PRs only, then `test -n "$n"`.
+Once the work is merged there is no open PR and the gate cannot pass. Its
+*intent* — "the PR's own checks are green" — was met twice and on `main` a third
+time: #321 9/9, #322 9/9, `main` 6/6 + rollup. **Do not fabricate a PR to turn
+that cell green**; that is the exact failure a0-00's DoD had (satisfiable
+without the deliverable working), and this brief exists because of it.
+
 ## NEXT
 
-- **Watch PR #322's checks to zero failing.** That is the last gate. Everything
-  else is verified: `tsc` clean on the merged tree · report tracked ·
-  `origin/main` is an ancestor again · the shipped config (N=6, `workers: 1`,
-  659 s table) confirmed intact after the merge.
-- `npm test -- --run` on the merged tree: **3973/3973 passed, 237 files** — one
-  earlier run had shown `1 failed / 3972` and both re-runs were clean, i.e. the
-  load-flaky perf test again (see the trap below), not a regression.
+- **Nothing.** The brief is delivered and merged.
+- `a0-00c` is scoped in report §6c: **split the `iphone|goldens` brick** (659 s,
+  the only thing flooring the gate — every other unit is under 500 s). Splitting
+  the file buys N=8 at ~480 s, an ~8-minute gate. Also correct `sim-clock.ts`'s
+  "~1 fps" with the measured 0.28–1.5 range.
 - `a0-00c` re-scoped: **split the `iphone|goldens` brick.** At 659 s it is the
   only thing flooring the gate; splitting the file buys N=8 at ~480 s (~8 min).
   Also correct `sim-clock.ts`'s "~1 fps" with the measured 0.28–1.5 range.
