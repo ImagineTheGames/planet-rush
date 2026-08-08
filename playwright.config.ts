@@ -19,11 +19,74 @@
  *
  * `isMobile`/`hasTouch` are Chromium-only Playwright features — fine here.
  */
+import { readdirSync } from 'node:fs';
 import { defineConfig, type PlaywrightTestConfig } from '@playwright/test';
 import { DEVICE_MATRIX } from './tests/mobile/shot-budget';
+import { filesForShard, planShards, spreadSeconds } from './tests/mobile/shard-plan';
 
 const PREVIEW_PORT = 4173;
 const PREVIEW_URL = `http://localhost:${PREVIEW_PORT}`;
+const TEST_DIR = './tests/mobile';
+
+/**
+ * ── SHARDING: BY MEASURED DURATION, NOT BY TEST COUNT (a0-00b) ─────────────
+ *
+ * Playwright's own `--shard=i/N` divides the collected tests by COUNT. Run that
+ * way, the four shards of this suite came back at **5 · 12 · 21 · 42 minutes**
+ * (PR #321, run 31249237259): a gate is as slow as its slowest shard, so four
+ * runners bought the wall time of one 42-minute job. The suite's tests span
+ * 1.4 s to 300 s and 90 of its 213 collected tests are `test.skip`ped by
+ * project, so counting tests measures almost nothing about cost.
+ *
+ * So the split is computed here instead, from a measured cost table, by
+ * `tests/mobile/shard-plan.ts` — read that file for the algorithm and for how to
+ * re-measure the table. Nothing about WHAT is asserted changes: same specs, same
+ * three projects, same budgets, same baselines, same tolerance. Only which
+ * runner picks up which spec file.
+ *
+ * Set `MOBILE_SHARD` / `MOBILE_SHARDS` (ci.yml does; `--shard` is not used).
+ * Unset — every local `npm run test:mobile` — the whole suite runs, unfiltered.
+ *
+ * The file list is read off DISK rather than off the cost table, so the union of
+ * the shards is the whole suite by construction: a spec added and never measured
+ * still runs, on some shard, on the first PR that carries it.
+ */
+const SPEC_FILES = readdirSync(TEST_DIR)
+  .filter((f) => f.endsWith('.spec.ts'))
+  .sort();
+const PROJECT_NAMES = ['iphone', 'pixel', 'desktop'] as const;
+const SHARD = Number(process.env.MOBILE_SHARD ?? '');
+const SHARDS = Number(process.env.MOBILE_SHARDS ?? '');
+const SHARDING = Number.isInteger(SHARD) && Number.isInteger(SHARDS) && SHARDS > 0;
+
+/**
+ * The spec files this shard runs on this project — or `undefined` (Playwright's
+ * default: everything) when the suite is not being sharded at all.
+ *
+ * A shard that owns NOTHING on a project gets a pattern that cannot match rather
+ * than an empty list, because an empty `testMatch` is the kind of thing that
+ * quietly reverts to "match everything" and would run the suite three times.
+ */
+function shardMatch(project: string): PlaywrightTestConfig['testMatch'] {
+  if (!SHARDING) return undefined;
+  const files = filesForShard(PROJECT_NAMES, SPEC_FILES, project, SHARD, SHARDS);
+  return files.length > 0 ? files.map((f) => `**/${f}`) : /(?!)/;
+}
+
+// Say out loud what this runner is about to do. A shard that silently ran the
+// wrong quarter of the suite is the failure mode worth one line of log.
+if (SHARDING) {
+  const plan = planShards(PROJECT_NAMES, SPEC_FILES, SHARDS);
+  const mine = plan.find((s) => s.shard === SHARD);
+  console.log(
+    `[shard-plan] shard ${SHARD}/${SHARDS} — ${mine ? Math.round(mine.seconds) : 0}s of measured work ` +
+      `(plan: ${plan.map((s) => Math.round(s.seconds)).join(' / ')}s, spread ${Math.round(spreadSeconds(plan))}s)`,
+  );
+  for (const project of PROJECT_NAMES) {
+    const files = filesForShard(PROJECT_NAMES, SPEC_FILES, project, SHARD, SHARDS);
+    console.log(`[shard-plan]   ${project}: ${files.length > 0 ? files.join(', ') : '(nothing)'}`);
+  }
+}
 
 const chromium: NonNullable<PlaywrightTestConfig['use']>['browserName'] = 'chromium';
 
@@ -37,7 +100,7 @@ const chromium: NonNullable<PlaywrightTestConfig['use']>['browserName'] = 'chrom
 const { iphone: IPHONE, pixel: PIXEL, desktop: DESKTOP } = DEVICE_MATRIX;
 
 export default defineConfig({
-  testDir: './tests/mobile',
+  testDir: TEST_DIR,
   // A hung page load is a failed test, never a hung suite (QA charter: enforced
   // timeouts). These bound each test and each assertion.
   //
@@ -101,6 +164,7 @@ export default defineConfig({
   projects: [
     {
       name: 'iphone',
+      testMatch: shardMatch('iphone'),
       // 2.96 MP a capture — ~2.9× the desktop control's, and the reason PR #291's
       // two `iphone` goldens ran out of clock on a loaded runner while passing
       // everywhere else (tests/mobile/shot-budget.ts).
@@ -114,6 +178,7 @@ export default defineConfig({
     },
     {
       name: 'pixel',
+      testMatch: shardMatch('pixel'),
       use: {
         browserName: chromium,
         viewport: { width: PIXEL.width, height: PIXEL.height },
@@ -124,6 +189,7 @@ export default defineConfig({
     },
     {
       name: 'desktop',
+      testMatch: shardMatch('desktop'),
       use: {
         browserName: chromium,
         viewport: { width: DESKTOP.width, height: DESKTOP.height },
