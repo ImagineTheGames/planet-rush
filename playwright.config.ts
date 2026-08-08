@@ -136,6 +136,46 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
 
+  // ── ONE PAGE PER RUNNER (a0-00b) ───────────────────────────────────────────
+  //
+  // Playwright defaults `workers` to `cpus / 2` — 2 on a 4-core GitHub runner.
+  // That put TWO dpr-3 pages on four cores, rasterising in software, and it is
+  // the single largest source of red in this suite's history. It is set to 1 in
+  // CI because a second page does not buy parallelism here; it buys failures.
+  //
+  // The measurements, all of them off the runner rather than off a workstation:
+  //
+  //   - A page under two workers ran at **0.28 fps**; a page with the runner
+  //     more to itself ran at **1.5 fps** (frame periods read out of the
+  //     screencast in a failure trace — report §4b). Every CDP round trip waits
+  //     on the page's main thread, so one round trip costs about one frame, and
+  //     a 5× frame period is a 5× round trip.
+  //   - `build-wheel-gantry.spec.ts:314` timed out at 300 s on `[pixel]` while
+  //     the HEAVIER `[iphone]` copy passed at 126 s **in the same run**. A test
+  //     cannot be slower than itself; what differed was the neighbour.
+  //   - `build-flow.spec.ts:157` blew a 330 s budget on `[iphone]` beside heavy
+  //     `[pixel]` wheel work, while its `[pixel]` twin passed the identical test
+  //     at 276 s. Its own in-container measurement is 32 s.
+  //   - Four `[iphone]` goldens that passed at 20–41 s in run 31249237259 timed
+  //     out at 90 s in 31258319576 — `Page.captureScreenshot: Internal server
+  //     error, session closed`, i.e. the session did not just crawl, it died —
+  //     once a duration-balanced plan sat them beside the second-heaviest brick.
+  //
+  // That last one is the one that settles it, and it is worth being blunt about
+  // because this file's own sharding caused it: balancing shards by TOTAL work
+  // says nothing about whether two expensive pages run at the same INSTANT, so
+  // a better-balanced plan simply moved the contention onto a new victim. At
+  // `workers: 1` a unit's cost is a property of the unit, which is exactly the
+  // assumption `tests/mobile/shard-plan.ts` needs in order to be worth anything.
+  //
+  // Wall time is bought back with N (ci.yml runs 8 shards), not with workers:
+  // the same total work over the same total cores, minus the contention tax.
+  // DO NOT raise this to "use the runner properly" — the runner is not idle,
+  // it is blocked, and a second worker makes both pages slower than one.
+  //
+  // Locally, `undefined` keeps Playwright's default: a dev box has the cores.
+  workers: process.env.CI ? 1 : undefined,
+
   // ── Reporters, and the one that made a golden failure inspectable (q8-01) ──
   //
   // `github` writes the inline annotations that surface a failure in the PR's

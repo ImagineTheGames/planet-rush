@@ -78,9 +78,27 @@ export interface ShardAssignment {
  * `project|file`.
  *
  * MEASURED, not estimated: summed from the `list` reporter's per-test durations
- * in the four shard jobs of run 31249237259 (the run this file exists because
- * of), first attempts only — a retry is a repeat of work already counted, and
- * counting it would inflate exactly the specs that are already the problem.
+ * in the shard jobs of run **31258319576**, first attempts only — a retry is a
+ * repeat of work already counted, and counting it would inflate exactly the
+ * specs that are already the problem.
+ *
+ * Refreshed off 31258319576 rather than the original 31249237259, for two
+ * reasons. The three spec fixes this branch shipped moved real numbers —
+ * `iphone|upgrade-wheel-gantry` 1338 → 688 s, `iphone|menu-frame-cost` 480 →
+ * 186 s — and a table that still priced them at their pre-fix cost would keep
+ * isolating files that are no longer heavy. And the old table was summed off a
+ * run whose shard 2 was a 42-minute pile-up, which distorted everything in it.
+ *
+ * ── WHY AN INFLATED SNAPSHOT IS STILL A CORRECT ONE ────────────────────────
+ * These durations were measured at `workers: 2`, i.e. every one of them carries
+ * some contention tax, and four tests in `iphone|goldens` are their 90 s budget
+ * rather than their cost. That is fine, and not by luck: **LPT balances on
+ * RATIOS, so a uniform scale factor cannot change the assignment it produces.**
+ * What would break the plan is a cost that is wrong *relative to its
+ * neighbours*, which is precisely what the stale table had become. A test that
+ * hit its budget is if anything under-counted (a ceiling truncates it), and
+ * under-counting the heaviest brick is the safe direction: it can only make
+ * this file spread that brick's shard thinner.
  *
  * A pair that is absent ran ZERO tests: `menu-frame-cost` skips off `iphone`,
  * `build-flow` skips off `desktop`, `goldens` skips off `pixel`. Absent is not
@@ -88,38 +106,38 @@ export interface ShardAssignment {
  * apart by {@link MEASURED_FILES} rather than by a zero.
  */
 export const MEASURED_SECONDS: Readonly<Record<string, number>> = {
-  'iphone|upgrade-wheel-gantry.spec.ts': 1338,
+  'iphone|goldens.spec.ts': 1032,
   'pixel|upgrade-wheel-gantry.spec.ts': 918,
-  'pixel|build-wheel-gantry.spec.ts': 552,
-  'pixel|build-flow.spec.ts': 546,
-  'iphone|menu-frame-cost.spec.ts': 480,
-  'desktop|goldens.spec.ts': 444,
-  'iphone|goldens.spec.ts': 363,
-  'pixel|landscape-lock.spec.ts': 261,
-  'pixel|campaign-door.spec.ts': 259,
-  'desktop|upgrade-wheel-gantry.spec.ts': 226,
-  'iphone|build-wheel-gantry.spec.ts': 221,
-  'desktop|build-wheel-gantry.spec.ts': 216,
-  'iphone|slot-state.spec.ts': 213,
-  'iphone|build-flow.spec.ts': 204,
-  'pixel|slot-state.spec.ts': 204,
-  'pixel|centering.spec.ts': 182,
-  'desktop|centering.spec.ts': 114,
-  'iphone|landscape-lock.spec.ts': 98,
-  'iphone|campaign-door.spec.ts': 93,
-  'pixel|emulation.spec.ts': 88,
-  'iphone|centering.spec.ts': 77,
-  'iphone|voice-copy-fit.spec.ts': 77,
-  'iphone|emulation.spec.ts': 68,
-  'iphone|layout.spec.ts': 67,
-  'pixel|layout.spec.ts': 65,
-  'pixel|voice-copy-fit.spec.ts': 61,
-  'desktop|campaign-door.spec.ts': 60,
-  'desktop|slot-state.spec.ts': 53,
-  'desktop|voice-copy-fit.spec.ts': 23,
-  'desktop|emulation.spec.ts': 21,
-  'desktop|landscape-lock.spec.ts': 14,
-  'desktop|layout.spec.ts': 10,
+  'iphone|upgrade-wheel-gantry.spec.ts': 688,
+  'iphone|build-flow.spec.ts': 570,
+  'iphone|build-wheel-gantry.spec.ts': 504,
+  'pixel|build-wheel-gantry.spec.ts': 504,
+  'pixel|build-flow.spec.ts': 492,
+  'desktop|goldens.spec.ts': 421,
+  'desktop|upgrade-wheel-gantry.spec.ts': 311,
+  'iphone|landscape-lock.spec.ts': 307,
+  'iphone|campaign-door.spec.ts': 254,
+  'iphone|slot-state.spec.ts': 240,
+  'pixel|campaign-door.spec.ts': 234,
+  'iphone|emulation.spec.ts': 218,
+  'pixel|landscape-lock.spec.ts': 206,
+  'iphone|menu-frame-cost.spec.ts': 186,
+  'pixel|emulation.spec.ts': 185,
+  'pixel|slot-state.spec.ts': 174,
+  'iphone|centering.spec.ts': 173,
+  'pixel|centering.spec.ts': 152,
+  'desktop|build-wheel-gantry.spec.ts': 94,
+  'iphone|voice-copy-fit.spec.ts': 78,
+  'desktop|campaign-door.spec.ts': 68,
+  'pixel|voice-copy-fit.spec.ts': 64,
+  'desktop|centering.spec.ts': 63,
+  'iphone|layout.spec.ts': 59,
+  'desktop|slot-state.spec.ts': 54,
+  'pixel|layout.spec.ts': 47,
+  'desktop|voice-copy-fit.spec.ts': 17,
+  'desktop|emulation.spec.ts': 17,
+  'desktop|landscape-lock.spec.ts': 13,
+  'desktop|layout.spec.ts': 13,
   'pixel|goldens.spec.ts': 0,
   'pixel|menu-frame-cost.spec.ts': 0,
   'desktop|menu-frame-cost.spec.ts': 0,

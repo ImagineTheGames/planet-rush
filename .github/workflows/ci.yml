@@ -133,13 +133,27 @@ jobs:
   # with `tests/mobile-shard-plan.test.ts` asserting on the cheap unit-test job
   # that the shards' union is exactly the suite and nothing is in two of them.
   #
-  # N=4 is chosen from the measurement, not from taste. Per-job fixed cost
-  # (checkout → npm ci → cache restore → install-deps, then the webServer's
-  # `npm run build`) is ~56 s against ~127 min of work, so wall time falls very
-  # nearly linearly up to N=8. The floor is the heaviest INDIVISIBLE unit — one
-  # spec file on one project, which `fullyParallel: false` runs serially in one
-  # worker — so there is no N that beats it. Full table, and N=3 / N=5 either
-  # side: tests/reports/mobile-shard-a0-00.md.
+  # ── N=8 AT ONE WORKER, NOT N=4 AT TWO (a0-00b) ───────────────────────────
+  # `playwright.config.ts` pins `workers: 1` in CI — read the comment there for
+  # the four measurements behind it. The short version: a second worker on a
+  # 4-core software-GL runner does not halve the wall time, it multiplies every
+  # CDP round trip by up to 5× and turns budgets into coin flips. N replaces it.
+  #
+  # N=8 is chosen from the refreshed cost table, not from taste:
+  #
+  #   - total serial work is 8355 s, so an even split at N=8 is **1044 s**;
+  #   - the floor is the heaviest INDIVISIBLE unit — one spec file on one
+  #     project, which `fullyParallel: false` runs serially in one worker — and
+  #     that is now `iphone|goldens.spec.ts` at **1032 s**, just under the even
+  #     split. N=8 is therefore the LARGEST N that still divides evenly; at N=9
+  #     the brick binds and the extra runner buys nothing.
+  #   - per-job fixed cost (checkout → npm ci → cache restore → install-deps,
+  #     then the webServer's `npm run build`) is ~2 min, paid in parallel.
+  #
+  # Those 8355 s are themselves measured at `workers: 2`, so they carry the
+  # contention tax this change removes — meaning ~17 min/shard is the WORST
+  # case, the one where relieving contention buys nothing at all. Full table,
+  # and the N either side: tests/reports/mobile-shard-a0-00.md.
   mobile:
     name: Mobile emulation (Playwright) — shard ${{ matrix.shard }}/${{ strategy.job-total }}
     # Run where gating matters (PRs + main) — not on every agent branch push.
@@ -152,7 +166,7 @@ jobs:
       # a real pass (the cancelled-checks hole that made the gate stricter).
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

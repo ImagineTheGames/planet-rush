@@ -46,8 +46,8 @@ const SPEC_FILES = readdirSync(MOBILE_DIR)
   .sort();
 
 /** The shard count ci.yml runs. Asserted at the number actually shipped, and at
- *  its neighbours, because "it balances at 4" is a weaker claim than it looks. */
-const CI_SHARDS = 4;
+ *  its neighbours, because "it balances at 8" is a weaker claim than it looks. */
+const CI_SHARDS = 8;
 
 describe('the mobile suite has spec files to shard at all', () => {
   it('finds them', () => {
