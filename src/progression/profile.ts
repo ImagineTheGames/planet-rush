@@ -233,7 +233,7 @@ export function migrate(raw: unknown): Profile | null {
  *     {@link PROFILE_BACKUP_KEY} **first**, then a fresh profile is returned.
  *
  * Never throws. A profile is read on the front door of the game; a reader that
- * could throw would be a boot that a stray character in `localStorage` can stop.
+ * could throw would be a boot that a stray character in the store can stop.
  */
 export function loadProfile(storage: ProfileStorage): Profile {
   const raw = storage.get(PROFILE_KEY);
