@@ -21,3 +21,8 @@ blob-report/
 # Editor / OS cruft
 .DS_Store
 *.log
+
+# The alarm-ownership live-stage spec's client bundle (tests/live-stage/
+# alarm-fleet.ts) — the same build with its own allocator URL baked in, kept out
+# of dist/ so it never overwrites the offline artifact.
+dist-alarm-stage/

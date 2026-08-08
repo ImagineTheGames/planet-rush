@@ -35,6 +35,7 @@
 
 import type { PlayerId } from '@shared/types';
 import { AudioEngine, type AudioEngineOptions } from './audio/engine';
+import { deriveAlarmAllies } from './audio/scope';
 import { AudioUnlock, type UnlockTarget } from './audio/unlock';
 import type { AudioContextLike } from './audio/context';
 import { TellQueue, TELL_CAPACITY } from './tells';
@@ -233,31 +234,4 @@ export class ArtPresenter {
   dispose(): void {
     this.audio.dispose();
   }
-}
-
-/**
- * The owner slots on the local player's SIDE — the under-attack alarm's roster
- * (GDD §2.2, developer report s5). A structural mirror of the sim's `teamOf` /
- * `sameSide`: art is a leaf and cannot import `src/sim`, but the rule is the same
- * plain-int `team` table (`ship.team ?? id`, `station.team ?? owner`). In FFA
- * every player is a team of one, so this is just `{local}` — your home and no
- * other rings. In TEAMS it also holds each ally's owning slot, so a teammate's
- * siege rings your klaxon while both enemies' sieges stay silent. A spectator
- * (`local < 0`) has no side, so the set is empty and nothing rings.
- */
-function deriveAlarmAllies(world: WorldView, local: PlayerId): Set<PlayerId> {
-  const allies = new Set<PlayerId>();
-  if (local < 0) return allies;
-  allies.add(local); // a player is always on their own side, even with no station left
-
-  const teamOf = (id: number): number => {
-    for (const s of world.ships) if (s.id === id) return s.team ?? s.id;
-    for (const st of world.stations) if (st.owner === id) return st.team ?? st.owner;
-    return id;
-  };
-  const localTeam = teamOf(local);
-  for (const st of world.stations) {
-    if ((st.team ?? st.owner) === localTeam) allies.add(st.owner);
-  }
-  return allies;
 }
