@@ -106,8 +106,21 @@ function encodeWav(samples: Float32Array, sampleRate: number): Buffer {
 // ---------------------------------------------------------------------------
 
 const previewsDir = resolve(HERE, 'previews');
-rmSync(previewsDir, { recursive: true, force: true });
+
+/**
+ * Clear only the slot directories this script owns.
+ *
+ * It used to `rmSync` the whole `previews/` tree, which quietly deleted
+ * `previews/ui-cues/` — the ratified Gantry/Bone set, written by the sibling
+ * `render-ui-cues.ts` and reviewed by ear by the developer in s6-01. Running one
+ * renderer should not destroy the other's output, and the loss is invisible in a
+ * terminal: the script prints a cheerful success line either way, and the damage
+ * only shows up as ten deletions in `git status` that a reviewer has to notice.
+ */
 mkdirSync(previewsDir, { recursive: true });
+for (const slotId of CANDIDATE_SLOT_ORDER) {
+  rmSync(resolve(previewsDir, slotId), { recursive: true, force: true });
+}
 
 interface ManifestCandidate {
   id: string;
