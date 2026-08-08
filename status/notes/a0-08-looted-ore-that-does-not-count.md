@@ -7,6 +7,10 @@ DoD, the PR and QA's attestation, never a line written here.
 Branch `agent/gameplay/a0-08-looted-ore-that-does-not-count`, cut from
 `origin/main` at `f3ace95`.
 
+**STATUS 2026-08-08: PR #325 is MERGED** (main `88e1454`). The verdict, the two
+tells and all three test files are in main. Branch fast-forwarded to main, then
+one follow-up commit `ff3274c` on top — see BUILT. Follow-up PR open.
+
 ## THE ANSWER, FIRST (this is the deliverable)
 
 **Conservation HOLDS.** Ran the reproduction the ledger was built for — kill a
@@ -31,6 +35,15 @@ working as designed and untold.
 
 ## BUILT
 
+- **`ff3274c` — the latch gap in my own audit (after #325 merged).** `sawBlocked`
+  only asserted the tell FIRES. A tell that fires once and sticks forever passed
+  it — and passed it *harder*, since `blockedTicks` climbs toward every tick. So
+  deleting the `lootBlocked = false` clear made the file **greener**. Now bounded:
+  blocked ticks < half the match. Measured 603–1260 of ~50,000 (1.2–2.5%); bound
+  is ~20× the worst case, so a differently-fought seed cannot flake it. Proved by
+  mutation — removing the clear takes seed 1 to 42326/49730 (85%) and fails,
+  while every other test in the file, `sawBlocked` included, stays green.
+  `step.ts` untouched; test-only.
 - **`44ad13f` — the two tells.** `Ship.lootTake` (ore that ARRIVED this tick, per
   ship, accumulated — the ore that moved, not the chunk offered) and
   `Ship.lootBlocked` (this hold is full AND loose ore is inside `TRACTOR.range`).
@@ -105,8 +118,8 @@ collide). No sim change here depends on a0-03 landing, or vice versa.
 
 ## NEXT
 
-- [ ] PR body states the verdict + ledger numbers in the first paragraph — that
-      sentence IS the deliverable per the brief.
+- [x] PR body states the verdict + ledger numbers in the first paragraph — #325,
+      merged. That sentence WAS the deliverable per the brief.
 - [ ] Render/UI handoff: `lootTake` / `lootBlocked` are published and tested but
       **nothing draws them yet**. Until a lane consumes them the player still
       sees nothing; say this plainly rather than implying the bug is closed.

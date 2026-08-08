@@ -206,6 +206,32 @@ describe('ore conservation over a full natural match (the loot black-hole soak)'
     expect(sawBlocked, 'some ship should hit a full hold over loose ore').toBe(true);
   });
 
+  it('the blocked tell is TRANSIENT in real play — it clears, it does not latch (a0-08)', () => {
+    // The check above is satisfied by a tell that fires once and sticks forever:
+    // drop the `ship.lootBlocked = false` clear at the top of `updateChunks` and
+    // `blockedTicks` climbs toward EVERY tick, so `sawBlocked` goes greener, not
+    // red. That is the failure this file exists to catch — `loot-tell.test.ts`
+    // does assert the clear, but on a staged path, and the whole premise of the
+    // ledger (see its header: three leaks, three green unit suites) is that a
+    // tell can be correct on the path a test takes and wrong on the path play
+    // takes. So hold the LATCH to real matches too.
+    //
+    // Measured across these six seeds: 603–1260 blocked ticks out of ~50,000,
+    // i.e. 1.2%–2.5% of the match. A full hold over ore is common but fleeting —
+    // the ship banks, or drifts off, or the chunk is taken by someone else. The
+    // bound below is half the match: ~20× the observed worst case, so it cannot
+    // flake on a seed that fights differently, while a latched tell (~100%)
+    // cannot slip past it.
+    for (const run of RUNS) {
+      expect(
+        run.blockedTicks,
+        `seed ${run.seed}: blocked on ${run.blockedTicks}/${run.ticks} ticks — ` +
+          `a full hold over ore is a passing state, so this must stay far below the match length. ` +
+          `Near-total means the tell latched and is no longer being cleared.`,
+      ).toBeLessThan(run.ticks / 2);
+    }
+  });
+
   it('the seeded baseline balances at world-build (no ore minted or lost in setup)', () => {
     for (const seed of SEEDS) {
       const players: PlayerSpec[] = rosterCast().map((s) => ({ id: s.id, shipClass: s.shipClass }));
