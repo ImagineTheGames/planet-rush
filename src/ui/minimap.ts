@@ -11,7 +11,7 @@
  * highlighted, a spawn-protected ship dimmed — GDD §2.1), radar satellites as
  * small dots (feature f1), the collapse ring while it is active (GDD §2.3), and
  * faint ore-field hints. **Dots and colours only** — no nameplates, no health
- * numbers (those are scouted / over-ship, GDD §2.2).
+ * numbers (those are read off the station and the ship themselves, GDD §2.2).
  *
  * **Fog of war (RATIFIED feature f1).** The map renders ONLY the player's
  * sensed-state (`../sim/sensing`): fogged regions read dark, static geography a

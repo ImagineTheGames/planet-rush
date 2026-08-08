@@ -22,7 +22,9 @@
  * Day-2 surface, landing with stations, cores and the build economy in the sim:
  *
  *  - **Your own station's HP** (top-right, in your player colour, GDD §2.2) —
- *    your own only; enemy HP is scouted, never broadcast.
+ *    your own only. A rival's health is the damage ring on their station, which
+ *    reads at any range since GDD §2.2 was amended (2026-08-07), and is still
+ *    never a HUD bar.
  *  - **The under-attack alarm** (GDD §2.2, a *mechanic, not polish*): a threat-
  *    red screen frame plus the screen-edge arrow pointing home, on the
  *    sustained-damage trigger in {@link ./alarm} — never on a taunt-tap.
@@ -871,9 +873,9 @@ export class Hud extends Container {
   // --- Own station HP (top-right, GDD §2.2) ---------------------------------
 
   /** Your own station's HP, in your player colour. **Your own only** — a rival's
-   *  health is scouted on their station within sensor range, never broadcast to
-   *  a HUD bar (GDD §2.2), and there is no code path here that takes another
-   *  player's station. */
+   *  health is the damage ring drawn on their station (always visible since GDD
+   *  §2.2 was amended on 2026-08-07), never a HUD bar, and there is no code path
+   *  here that takes another player's station. */
   private updateStationHp(frame: HudFrame): void {
     const maxCore = frame.maxCoreHp ?? 0;
     // Nothing wired yet (M1 feed) ⇒ nothing drawn. The element appears the frame
