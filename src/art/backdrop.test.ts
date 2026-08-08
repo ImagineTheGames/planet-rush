@@ -210,11 +210,18 @@ describe('the sky cost/brightness table', () => {
       // ΔE is per signal, and it is the one that answers "same hue?".
       const tax = 1 - contrast(unpack(PALETTE.plasma), b.peak) / contrast(unpack(PALETTE.plasma), unpack(FLOOR));
       const dE = (color: number): string => deltaE(unpack(color), b.peak).toFixed(0).padStart(3);
+      // The one-off CPU cost: building the geometry at phone-field size, which
+      // happens once per (map, viewport, VFX tier) and never per frame.
+      const REPS = 40;
+      const t0 = performance.now();
+      for (let i = 0; i < REPS; i++) nebulaSprite(id, VOID_SEED, 2177, 1200, 1, 844, 390);
+      const buildMs = (performance.now() - t0) / REPS;
       return [
         spec.name.padEnd(13),
         `map ${((Object.keys(MAP_NEBULA) as MapId[]).find((m) => MAP_NEBULA[m] === id) ?? '—').padEnd(8)}`,
         `shapes ${String(nebulaSprite(id, VOID_SEED, FIELD.w, FIELD.h).shapes.length).padStart(3)}`,
         `overdraw ${overdrawOf(id).toFixed(3)}`,
+        `build ${buildMs.toFixed(2).padStart(5)}ms`,
         `peak Y′ ${String(b.peakLuma).padStart(5)}`,
         `mean Y′ ${String(b.meanLuma).padStart(5)}`,
         `tax ${`${(tax * 100).toFixed(1)}%`.padStart(5)}`,

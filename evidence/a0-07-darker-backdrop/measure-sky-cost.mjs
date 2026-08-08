@@ -14,13 +14,44 @@
  * no sky at all, which is the control this experiment gets for free because the
  * developer picked it).
  *
- * **What this number is and is not.** The container has no GPU: Chromium falls
- * back to SwiftShader, a software rasterizer, so absolute frame times here are
- * nothing like a phone's. That cuts the right way for this particular question —
- * software rasterization is *dominated* by fill, so it exaggerates exactly the
- * cost being measured, and a sky that is cheap here is cheap anywhere. Read the
- * deltas as a conservative upper bound and the ordering as real; do not quote the
- * absolute milliseconds as a phone's.
+ * ## READ THIS BEFORE QUOTING THE OUTPUT: the experiment does not isolate the sky
+ *
+ * It was run, and it is committed **as a negative result**, because the numbers
+ * it produced are not evidence and it would be worse to leave the attempt
+ * unrecorded. What came back (2026-08-08, this container):
+ *
+ * ```
+ * octagon  None          overdraw 0.000   median 564.90 ms
+ * compass  Coalsack      overdraw 0.691   median 744.80 ms   +179.90
+ * diamond  Patina Drift  overdraw 0.863   median 365.20 ms   −199.70
+ * oval     Plasma Reef   overdraw 1.121   median 311.50 ms   −253.40
+ * ```
+ *
+ * The **costliest sky measured the fastest**, which is enough on its own to
+ * throw the result out. Two confounds, either fatal:
+ *
+ *  1. **Changing the sky means changing the map, by design.** A map's sky is its
+ *     identity, so there is no way to A/B one map against itself — and the maps
+ *     differ in exactly the thing that dominates a frame. `compass` and `diamond`
+ *     are derelict-fill: below eight players they lay out all eight board
+ *     positions and carry wrecks plus lootable debris. `oval` regenerates exactly
+ *     `count` homes. So "compass" is +8 wrecks against "oval", and that swamps a
+ *     sky worth ~1 screen of translucent fill.
+ *  2. **The box is loaded and has no GPU.** 565 ms/frame is 1.7 fps — Chromium on
+ *     SwiftShader on a machine several lanes are building on. Run-to-run drift at
+ *     that scale is larger than the effect.
+ *
+ * So the cost figure this brief reports is **overdraw**, measured off the
+ * geometry by `src/art/backdrop.test.ts` — device-independent, deterministic, and
+ * the input a fill-rate bound is computed from:
+ *
+ *   844×390 at dpr 3 = 2.96 Mpx/frame. The costliest sky, at 1.121 overdraw, is
+ *   ~3.3 Mpx of blended fill; on a phone GPU in the 4–10 Gpx/s class that is
+ *   **~0.3–0.8 ms**, against a 16.7 ms budget.
+ *
+ * A trustworthy per-frame measurement needs a device (or a quiet box with a real
+ * GPU) and a harness that varies the sky with everything else held still. This
+ * script is the shape of that harness; it is not that measurement.
  *
  *   node evidence/a0-07-darker-backdrop/measure-sky-cost.mjs [port]
  */
@@ -97,7 +128,9 @@ for (const m of MAPS) {
 await browser.close();
 
 const base = rows.find((r) => r.sky === 'None');
-console.log(`\nlandscape phone 844×390 @dpr3, frozen scene, ${SAMPLES} frames, software GL\n`);
+console.log(`\nlandscape phone 844×390 @dpr3, frozen scene, ${SAMPLES} frames, software GL`);
+console.log('NOT EVIDENCE — the map changes with the sky (derelict-fill boards carry +8 wrecks),');
+console.log('and the box has no GPU. See this file’s header before quoting any of it.\n');
 console.log('map      | sky           | overdraw | median ms | p90 ms | Δ median vs NONE');
 console.log('---------|---------------|----------|-----------|--------|-----------------');
 for (const r of rows) {
