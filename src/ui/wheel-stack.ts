@@ -6,7 +6,7 @@
  *
  *     TURRET            ← the name, Audiowide
  *     YOUR STATION      ← what it spends on
- *     3/4               ← cost over spendable ore
+ *     3                 ← the cost; yellow if payable, red if not (a0-03)
  *     2 / 4 BUILT       ← the count over its cap
  *
  * Since u7-06 the **upgrade** wheel's wedges are built here too, in the same
@@ -106,7 +106,7 @@ export function buildWedgeLines(seg: WheelSegment, m: WheelProfile): readonly We
     });
   }
 
-  // Line 3 — `cost/held`, `FULL`, or the words that say this one opens a screen.
+  // Line 3 — the cost, `FULL`, or the words that say this one opens a screen.
   const cost = costWords(seg);
   if (cost !== null) {
     lines.push({
@@ -285,7 +285,9 @@ export function capWords(seg: WheelSegment, m: WheelProfile): string | null {
  *  handoff's own copy). UPGRADE SHIP keeps its arrow rather than a number. */
 export const OPENS_SCREEN = 'OPEN ▸';
 
-/** What the cost slot draws: `cost/held`, `FULL`, `OPEN ▸`, or nothing. */
+/** What the cost slot draws: the bare cost, `FULL`, `OPEN ▸`, or nothing. The
+ *  cost is one numeral since a0-03 — whether it can be paid is the numeral's
+ *  COLOUR ({@link costPaintFor}), never a second number. */
 export function costWords(seg: WheelSegment): string | null {
   if (seg.opensPanel) return OPENS_SCREEN;
   return seg.costLabel;

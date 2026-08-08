@@ -434,7 +434,7 @@ describe('anchor honesty', () => {
 // ---------------------------------------------------------------------------
 //
 // The Gantry/Bone pass puts FOUR lines on a wedge — the name, what it spends on,
-// `cost/held`, and the count over its cap — in a radial space that does not grow
+// the cost, and the count over its cap — in a radial space that does not grow
 // when they do. On a 390 px phone the wheel is 280 px across and one wedge is a
 // 72° slice of it, so a line has ~100 px. l2-02 shipped copy that overflowed its
 // chrome for exactly this reason, and only the phone profiles caught it.
@@ -460,11 +460,16 @@ function textWidth(s: string, size: number, tracking: number, face: WedgeFace): 
 }
 
 /**
- * The frame that makes every line as long as it can ever be at once: a
- * late-match hoard (a three-digit spendable total, so every `cost/held` is five
- * characters), every cap full (so every count is its widest), and a station
- * cooling down from a repair (so REPAIR REACTOR draws its longest string, the
- * live two-digit countdown, rather than a comfortable "+15 HP").
+ * The frame that makes every line as long as it can ever be at once: every cap
+ * full (so every count is its widest), and a station cooling down from a repair
+ * (so REPAIR REACTOR draws its longest string, the live two-digit countdown,
+ * rather than a comfortable "+15 HP").
+ *
+ * The late-match three-digit hoard (`banked: 999`) stays, and is now a *slack*
+ * rather than a load: since a0-03 the cost line is the bare cost, so the wallet
+ * no longer widens it. Kept because the hub still prints that total and the
+ * budget should keep being computed against the richest frame the wheel can be
+ * opened in, not the one that happens to be narrowest.
  */
 const WORST_CASE: BuildWheelSignals = {
   requested: true,
