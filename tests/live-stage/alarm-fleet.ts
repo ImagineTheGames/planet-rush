@@ -147,12 +147,22 @@ async function assertServingOurBundle(): Promise<void> {
   }
 }
 
-/** Spawn a long-lived process, inheriting stderr so a crash is readable. */
+/**
+ * Spawn a long-lived process, inheriting stderr so a crash is readable.
+ *
+ * `detached` puts it in its own process GROUP, which the teardown then signals as
+ * a group. Without that, `npx vite preview` is three processes deep — npm exec,
+ * a shell, then node — and killing the one we hold the handle to leaves the
+ * listener behind. A leaked preview outlives the run, holds the port, and the
+ * NEXT run is served a bundle it did not build (which is what the fingerprint
+ * check above is there to catch — but a leak is better prevented than detected).
+ */
 function launch(command: string, args: string[], env: Record<string, string>): ChildProcess {
   const child = spawn(command, args, {
     cwd: repoRoot,
     env: { ...process.env, ...env },
     stdio: ['ignore', 'pipe', 'inherit'],
+    detached: process.platform !== 'win32',
     shell: process.platform === 'win32',
   });
   child.stdout?.on('data', (chunk: Buffer) => {
@@ -214,12 +224,23 @@ export async function startAlarmFleet(): Promise<AlarmFleet> {
   );
 
   const children = [preview, match, allocator];
+  /** Signal a child's whole process GROUP (see {@link launch}), falling back to
+   *  the child itself where there is no group to signal. */
+  const signal = (child: ChildProcess, sig: NodeJS.Signals): void => {
+    if (child.exitCode !== null || child.pid === undefined) return;
+    try {
+      if (process.platform !== 'win32') process.kill(-child.pid, sig);
+      else child.kill(sig);
+    } catch {
+      // Already gone, or never grouped — nothing to signal.
+    }
+  };
   const stop = async (): Promise<void> => {
     // SIGTERM, not SIGKILL: the match server deregisters on a graceful shutdown,
     // so the fleet does not keep a phantom host.
-    for (const child of children) if (child.exitCode === null) child.kill('SIGTERM');
+    for (const child of children) signal(child, 'SIGTERM');
     await new Promise((r) => setTimeout(r, 500));
-    for (const child of children) if (child.exitCode === null) child.kill('SIGKILL');
+    for (const child of children) signal(child, 'SIGKILL');
   };
 
   try {
