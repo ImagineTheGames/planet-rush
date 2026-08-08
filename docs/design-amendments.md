@@ -119,6 +119,112 @@ is a Netcode seam (a `botPersonalities` row beside `botDifficulties`, mirrored i
 
 ---
 
+## A build wedge's cost is ONE number — and the top-left readout says `ORE`
+
+**Date:** 2026-08-07 · branch `agent/ui/a0-03-wheel-cost-one-number`
+**Ratified by:** Developer (Reinaldo), two field reports, each with a screenshot
+**Amends:** GDD §2.5 (folded in directly, *amended 2026-08-07*) and §2.2 (the
+top-left caption). **This is the developer RETRACTING their own amendment of
+2026-08-06.** No mechanic, number, cost, cap, rule or type changes — both halves
+are player-facing strings, and the affordability rule they used to restate is
+the one that was already there.
+
+### The ratifications, verbatim
+
+On a screenshot of the live build wheel at 2 ore held — `SHIELD 5/2`,
+`RADAR 6/2`, `REPAIR REACTOR 1/2`:
+
+> "i was wrong about this we don't need to show ore need as 5/2 .. just need the
+> needed amount in yellow, and red if insufficient..."
+
+On a screenshot of the top-left ore readout:
+
+> "should not say total, it should say ORE"
+
+### What changed — the wedge
+
+The cost line lost its denominator. `5/2` → `5`. Nothing else on the wedge moved:
+
+| wedge, at 2 ore held | before | after |
+|---|---|---|
+| SHIELD | `5/2` | `5`, threat red (cannot pay) |
+| RADAR | `6/2` | `6`, threat red |
+| REPAIR REACTOR | `1/2` | `1`, signal yellow (payable) |
+
+**The colour was already carrying the whole message.** `SegmentState` has been
+`ready | unaffordable | capped | inactive` since u7-02, `affordable()` mirrors
+the sim's `spendableOre` (hold + bank) exactly, and `CostPaint` already resolved
+`ready` → signal yellow and `unaffordable` → threat red (`style-guide.md` §2.1,
+**unchanged by this amendment — not one pixel changed colour**). So this was the
+removal of a denominator from a label, not a new affordability rule: the
+one-line diff is in `segmentCostLabel`, and every state machine around it is
+untouched.
+
+**Why the denominator lost.** `build-wheel.ts` used to argue in its own source
+that a player reading `5/4` *"knows they are one ore short without the wheel
+having to say so"* — but the numeral was **already red**, saying exactly that, and
+the wheel's hub prints the live spendable total two inches away. It was a second,
+dimmer copy of two things the screen said better elsewhere. That argument has been
+deleted along with the code it defended, rather than left as a comment describing
+behaviour that no longer exists.
+
+### What deliberately did NOT change
+
+- **`4 / 4 BUILT` — the count over its cap — stays.** It is the *other* half of
+  the 2026-08-06 amendment, a separate ratification, and the developer's arrow
+  points only at the cost numeral. It is what makes a capped wedge legible and
+  the re-arm tell readable.
+- **REPAIR REACTOR still shows the HP a tap restores** (`+15 HP`, or the real
+  partial) — the one ratified exception to "the only number on a segment is its
+  cost" (p5-08).
+- `FULL`, `MAX`, `OPEN ▸`, `NEED n ORE`, the live `REPAIR IN Ns` countdown, and
+  the refusal-reason precedence (collapse → reactor full → cooling down →
+  affordability) are all character-for-character as they were.
+- **The hub's live ore total.** That is where "how much you have" belongs, and it
+  is why the denominator was redundant.
+- **`style-guide.md` §2.1's carve-out**, in both colours and all four limits.
+
+### What changed — the top-left caption
+
+`TOTAL` → `ORE`. (It had become `BANKED` in the interim: l2-02's industrial-voice
+sweep changed it as an `[OPT]` row on 2026-08-05 and that PR merged hours after
+this report. **This supersedes that row**; `docs/copy-sweep-industrial-voice.md`
+§3.5 is annotated accordingly.) GDD §2.2 already called it *"your banked ORE
+total"*, so the caption now matches the document.
+
+### ⚠ Two things this amendment deliberately leaves OPEN for the developer
+
+Neither is a defect introduced here; both are questions the two renames expose,
+and inventing an answer for either would be a UI agent overruling a ratification.
+
+**1. `ORE` now sits on two different numbers.** The top-left is the **bank
+alone** (`ship.banked`). The build wheel's hub is **`spendableOre` = hold +
+bank** (`src/sim/buildings.ts`, mirrored deliberately in
+`src/ui/build-wheel.ts`) — and its caption also reads `ORE`. Hold 3 with 5 banked
+reads **5** top-left and **8** in the hub, both correct, one word. `TOTAL` was
+chosen precisely to keep them apart (`hud.ts`: *"the two ore numbers can never be
+confused"*), so the rename spends that separation. The developer's word is the
+design and the rename shipped as asked; what is left open is whether the **hub**
+should now read something other than `ORE`. Both readouts are shown side by side,
+at a non-empty hold, in a0-03's PR body so the choice can be made on the pixels.
+
+**2. The upgrade wheel still prices in `cost/held` (`12/8`).** The retraction
+came with a build-wheel screenshot and names that screen's numerals, so a0-03
+changed that screen only. But `style-guide.md` §2.1 rules the two wheels **one
+control** — "a player crosses between them in one press; a rule that changed
+colour across that press would be the drift this section exists to prevent" — and
+the same is now true of the grammar. Flagged in GDD §2.5's own upgrade-wheel
+bullet rather than fixed unilaterally.
+
+**Related, and being tracked with a0-08.** a0-08 is investigating *"sometimes
+picked up ore from dead ships dont count."* Looting raises `cargo`, not `banked`,
+so the top-left figure correctly does not move on a pickup — very likely the same
+root as that report. A number captioned `ORE` that does not move when you pick up
+ore is a worse lie than one captioned `TOTAL` that does not, which raises the
+priority of a0-08 rather than changing anything here.
+
+---
+
 ## The CONTROLS row names the DEVICE, not the scheme's internal name
 
 **Date:** 2026-08-06 · branch `agent/ui/u8-controls-label-per-device`

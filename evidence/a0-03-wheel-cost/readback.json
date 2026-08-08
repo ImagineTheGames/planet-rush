@@ -1,0 +1,119 @@
+{
+  "wheelAt2Ore": {
+    "ore": {
+      "cargo": 0,
+      "banked": 2
+    },
+    "core": {
+      "coreHp": 40,
+      "maxCoreHp": 100,
+      "banked": 2,
+      "repairing": false,
+      "repairGate": 0
+    },
+    "wedges": [
+      {
+        "id": "turret",
+        "cost": "3",
+        "paint": "refused",
+        "caps": "0 / 4 BUILT"
+      },
+      {
+        "id": "shield",
+        "cost": "5",
+        "paint": "refused",
+        "caps": "0 / 2 BUILT"
+      },
+      {
+        "id": "satellite",
+        "cost": "6",
+        "paint": "refused",
+        "caps": "0 / 1 BUILT"
+      },
+      {
+        "id": "repair",
+        "cost": "1",
+        "paint": "ore",
+        "caps": ""
+      },
+      {
+        "id": "upgrade",
+        "cost": "OPEN ▸",
+        "paint": "none",
+        "caps": ""
+      }
+    ]
+  },
+  "wheelAt2OreClear": {
+    "ore": {
+      "cargo": 0,
+      "banked": 2
+    },
+    "wedges": [
+      {
+        "id": "turret",
+        "cost": "3",
+        "paint": "refused",
+        "caps": "0 / 4 BUILT"
+      },
+      {
+        "id": "shield",
+        "cost": "5",
+        "paint": "refused",
+        "caps": "0 / 2 BUILT"
+      },
+      {
+        "id": "satellite",
+        "cost": "6",
+        "paint": "refused",
+        "caps": "0 / 1 BUILT"
+      },
+      {
+        "id": "repair",
+        "cost": "1",
+        "paint": "ore",
+        "caps": ""
+      },
+      {
+        "id": "upgrade",
+        "cost": "OPEN ▸",
+        "paint": "none",
+        "caps": ""
+      }
+    ]
+  },
+  "collision": {
+    "sim": {
+      "cargo": 3,
+      "banked": 5
+    },
+    "drawnTopLeft": 5,
+    "wedges": [
+      {
+        "id": "turret",
+        "cost": "FULL",
+        "paint": "spent"
+      },
+      {
+        "id": "shield",
+        "cost": "FULL",
+        "paint": "spent"
+      },
+      {
+        "id": "satellite",
+        "cost": "6",
+        "paint": "ore"
+      },
+      {
+        "id": "repair",
+        "cost": "1",
+        "paint": "spent"
+      },
+      {
+        "id": "upgrade",
+        "cost": "OPEN ▸",
+        "paint": "none"
+      }
+    ]
+  }
+}
