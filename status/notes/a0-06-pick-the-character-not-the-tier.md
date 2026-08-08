@@ -210,3 +210,48 @@ which this brief does not touch.
 - `PREVIEW_PORT=4191 npm run test:live-stage -- lobby-cast.spec.ts` — **3 passed**
   on the merged tree (cast round trip, `?` by click, `?` by tap at 390px).
 - GDD.md differs from `origin/main`; `merge-base --is-ancestor` OK.
+
+### Session 2026-08-08 (third) — nothing was broken, so this one hardened and re-shot
+
+Inherited the branch green: `595538d` pushed, PR **#319** OPEN and MERGEABLE with
+CI green, `origin/main` at `b32d0a7` already an ancestor. **No feature work was
+outstanding and none was invented.** Three things happened.
+
+**1. The working tree held 41 modified evidence PNGs and none of them were mine
+to commit.** A full live-stage run rewrites every `*-evidence.png` in the folder,
+and the build badge stamps the commit hash into each frame, so *any* run dirties
+*all* of them whether or not the picture changed. Restored with `git checkout --
+tests/live-stage/` (**not** `git clean` — that is a hard rule, and it is also the
+wrong tool: these are tracked files with committed content to return to).
+
+**2. `9d65295` — re-shot the four evidence frames.** The committed set dated from
+`8ba1d53`, which is *older* than this branch's merge of a0-07's darker backdrop
+(`1325a8f`). The frames are now of the bundle the branch actually builds.
+`lobby-cast-readback.txt` is byte-identical again — lobby cast ≡ seated cast,
+duplicates and all. **The new match frame catches no rival nameplate** (it lands
+at MATCH 0:02, the old one at 0:03) and that is honest rather than worse: at
+match start every ship sits at its own station, which is exactly why the spec
+writes the seven names to the readback instead of hoping a plate drifts into
+shot. The nameplate in the old frame was luck.
+
+**3. `6436687` — the cast guard now means what its comment says.** Reading the
+seam rather than trusting this note, `fillEmptySlots` screened the cast table
+with `chosen in PERSONALITIES`. `PERSONALITIES` is an **object literal**, so `in`
+walks the prototype chain and `constructor`, `toString`, `hasOwnProperty`,
+`__proto__` and `valueOf` all passed a check meant to admit seven strings.
+Seating one yields a `BotSeat` whose personality row is a *function*, and
+`createBots` then reads `.shipClass` off it and gets `undefined`.
+
+**Unreachable today** — every cast on this branch comes from locally authored
+lobby seats, and `applyLobbySlots` only ever assigns a `castForEmptySeat` result
+(itself total: a bogus wire tier falls through `rosterAt` → `[]` → ROSTER). There
+is no `JSON.parse` and no storage key behind a cast anywhere. But the guard's own
+comment justifies itself by "a stale saved lobby", i.e. a path that does not
+exist yet, and a guard that is load-bearing only in the future should be right
+before that future lands. `hasOwnProperty.call`, plus a test over all five keys.
+**Verified the test fails against the old `in`** — and note *which* assertion
+discriminates: `PERSONALITIES['constructor']` is `Object`, so `toBeDefined()`
+passes on the bug. The `expect(ROSTER).toContain(...)` is the one that catches it.
+(`castDisplayNames` would have printed such a seat as **"Object"** —
+`PERSONALITIES['constructor']?.name` is `Function.prototype.name`. Left alone: it
+is fed from seated bots, which now pass the guard upstream.)
