@@ -24,16 +24,19 @@
  * smallest thing a scheduler can actually move: splitting one across two shards
  * would not make it finish sooner, and splitting it across two workers is not
  * something Playwright will do. Hence `iphone|goldens.spec.ts` is one indivisible
- * 363-second brick, and the floor on any plan is the largest brick in it
- * ({@link heaviestUnit}).
+ * 1032-second brick, and the floor on any plan is the largest brick in it
+ * ({@link heaviestUnit}). That floor is why N stops at 8: an even split of the
+ * suite's 8355 s is 1044 s, so N=8 is the largest N the heaviest brick does not
+ * bind. At N=9 the makespan flatlines and the spread goes 28 s → 123 s.
  *
  * ── THE ALGORITHM, AND WHY THIS ONE ────────────────────────────────────────
  * Longest-processing-time-first (LPT) greedy: sort the bricks heaviest-first,
  * drop each into the shard with the least work so far. It is four lines, it is
  * deterministic (ties break on the unit's own name, never on directory order),
- * and its makespan is provably within 4/3 − 1/(3N) of optimal — for N=4, within
- * 25% of a perfect split, and in practice much closer. Optimal bin-packing here
- * would buy single-digit seconds for a scheduler nobody could review.
+ * and its makespan is provably within 4/3 − 1/(3N) of optimal — for N=8, within
+ * 29% of a perfect split, and in practice much closer (28 s of spread on 1044 s,
+ * i.e. under 3%). Optimal bin-packing here would buy single-digit seconds for a
+ * scheduler nobody could review.
  *
  * Every shard computes the WHOLE plan and takes its own slice, so the shards
  * never have to agree about anything at run time — they agree by construction,
