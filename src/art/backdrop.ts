@@ -62,12 +62,18 @@
  * Same discipline as v2, and it has to be stricter because a nebula is a
  * per-frame fill-rate layer on a mobile GPU. Geometry is played into a **static
  * `Graphics` once per layer** at {@link VoidBackdrop.configure}; per frame the
- * only thing touched is each layer's `position`. Element counts are **fixed per
- * sky** (the developer's own numbers — 14 sheets, 22 blobs) and only their
- * *scale* follows the arena, so a wide map costs exactly what a square one does
- * and {@link NebulaSpec.overdraw} is a constant a test can pin. Each sky
- * declares its own {@link NebulaSpec.reducedDensity}: what `VfxAutoQuality`
- * leaves of it when the auto-reducer throttles a device — 0 drops the layer.
+ * only thing touched is each layer's `position`. A sky is authored **per
+ * screenful**, not per arena: feature size comes from the viewport and element
+ * count from field-area ÷ screen-area, so the developer's own numbers (14
+ * sheets, 22 blobs) are what a *phone* sees, and {@link NebulaSpec.overdraw} is
+ * a genuine per-frame constant a test can pin on any map. Each sky declares its
+ * own {@link NebulaSpec.reducedDensity}: what `VfxAutoQuality` leaves of it when
+ * the auto-reducer throttles a device — 0 drops the layer.
+ *
+ * Sizing to the *field* instead was the first build's mistake and it is worth
+ * remembering: on a wide arena the parallax field is ~2.2 screens across, so
+ * Plasma Reef's nine clots spread over five screenfuls and the evidence frame
+ * came back **with no reef in it**.
  */
 
 import { Container, Graphics } from 'pixi.js';
@@ -242,8 +248,8 @@ export interface NebulaSpec {
    *
    * ```
    *   None / Coalsack  1.9   ← the ground itself; Coalsack only ever darkens
+   *   Iron Veil        9.3
    *   Deep Ember       9.7
-   *   Iron Veil       11.0
    *   Patina Drift    15.8
    *   Plasma Reef     17.4   ← the brightest, as the developer described it
    *   ----------------------------------------------------------------
@@ -265,10 +271,33 @@ export interface NebulaSpec {
    * cost.
    */
   readonly reducedDensity: number;
-  /** The geometry, authored centred on the origin across a `width`×`height` box.
-   *  `density` scales element counts (1 = full, 0.5 = half); it never changes
-   *  feature size, so a reduced sky is the same sky with fewer parts. */
-  build(seed: number, width: number, height: number, density: number): Shape[];
+  /**
+   * The geometry, authored centred on the origin across a `width`×`height` box.
+   *
+   * `screen` is the viewport the sky will be *seen* through, and it is what the
+   * look is authored against: feature size is a fraction of the screen's short
+   * side, and the element count is `count × (field area / screen area)` — so the
+   * developer's own numbers ("14 sheets", "22 soft blobs") mean **per screenful**,
+   * which is how they were seen on the compositor board.
+   *
+   * That is not a detail. Sized to the *field* instead, a sky on a wide arena
+   * spreads its nine clots over five screens' worth of parallax field and a given
+   * frame shows one or none of them — which is exactly what the first build did:
+   * the Plasma Reef evidence frame came back with no reef in it. Per-screen
+   * sizing also makes {@link overdraw} a genuine per-frame constant instead of a
+   * number that quietly falls with arena size.
+   *
+   * `density` scales element counts (1 = full, 0.5 = half); it never changes
+   * feature size, so a reduced sky is the same sky with fewer parts.
+   */
+  build(
+    seed: number,
+    width: number,
+    height: number,
+    density: number,
+    screenW: number,
+    screenH: number,
+  ): Shape[];
 }
 
 /**
@@ -433,31 +462,35 @@ const COALSACK: NebulaSpec = {
   parallax: 0.14,
   occludes: true,
   additive: false,
-  overdraw: 0.967,
+  overdraw: 0.691,
   peakLuma: 1.9,
   // Kept whole. It is the ground colour — one opaque-ish blend, no added light —
   // and shedding it mid-match would make a wall of stars appear at once.
   reducedDensity: 1,
-  build(seed, width, height, density) {
+  build(seed, width, height, density, screenW, screenH) {
     const rng = mulberry32((seed ^ 0x0c0a_15ac) >>> 0);
     const out: Shape[] = [];
     const hw = width / 2;
     const hh = height / 2;
-    const unit = Math.min(hw, hh);
-    // A lane, not a scatter: the lobes walk a line across the field so the dust
-    // reads as one body with a direction.
+    const unit = Math.min(screenW, screenH) / 2;
+    const screens = (width * height) / (screenW * screenH);
+    // A lane, not a scatter: the lobes walk one line so the dust reads as a body
+    // with a direction. The lane spans the whole FIELD (it is one continuous
+    // thing) while each lobe is sized off the SCREEN, so the dust is the same
+    // size on a phone whatever arena it is over.
     const laneAngle = -0.42 + rng.next() * 0.84;
     const cos = Math.cos(laneAngle);
     const sin = Math.sin(laneAngle);
-    const lobes = scaled(7, density);
+    const reach = Math.max(hw, hh) * 1.15;
+    const lobes = scaled(7 * screens, density);
     for (let i = 0; i < lobes; i++) {
       const t = (i / Math.max(1, lobes - 1)) * 2 - 1; // −1 … +1 along the lane
-      const along = t * unit * 1.15;
-      const across = (rng.next() - 0.5) * unit * 0.5;
+      const along = t * reach;
+      const across = (rng.next() - 0.5) * unit * 0.9;
       const cx = round(along * cos - across * sin);
       const cy = round(along * sin + across * cos);
       const r = round(unit * (0.34 + rng.next() * 0.22));
-      // Dense at the lane's middle, thinning at both ends — a body with edges.
+      // Dense along the lane's middle, thinning at both ends — a body with edges.
       const core = 0.9 * (1 - 0.55 * Math.abs(t));
       softDisc(out, cx, cy, r, GROUND_COLOR, core);
     }
@@ -485,25 +518,29 @@ const IRON_VEIL: NebulaSpec = {
   parallax: 0.05,
   occludes: false,
   additive: false,
-  overdraw: 0.241,
-  peakLuma: 11.0,
+  overdraw: 0.208,
+  peakLuma: 9.3,
   // Half the sheets. A band with 7 sheets is still a band; the read survives.
   reducedDensity: 0.5,
-  build(seed, width, height, density) {
+  build(seed, width, height, density, screenW, screenH) {
     const rng = mulberry32((seed ^ 0x1207_e011) >>> 0);
     const out: Shape[] = [];
     const hw = width / 2;
     const hh = height / 2;
-    const unit = Math.min(hw, hh);
+    const unit = Math.min(screenW, screenH) / 2;
+    const screens = (width * height) / (screenW * screenH);
     const band = -0.38; // the band's tilt across the field
     const cos = Math.cos(band);
     const sin = Math.sin(band);
-    const sheets = scaled(14, density);
+    const sheets = scaled(14 * screens, density);
+    // The band's thickness is a screen's business (it has to read as a band on a
+    // phone); its length is the field's (it is one band, not one per screenful).
+    const reach = Math.max(hw, hh) * 1.1;
     for (let i = 0; i < sheets; i++) {
       const t = i / Math.max(1, sheets - 1);
       // Stagger across the band's thickness, drift along its length.
       const across = (t - 0.5) * unit * 0.86 + (rng.next() - 0.5) * unit * 0.07;
-      const along = (rng.next() - 0.5) * unit * 0.5;
+      const along = (rng.next() - 0.5) * reach * 2;
       const cx = round(along * cos - across * sin);
       const cy = round(along * sin + across * cos);
       const halfLen = round(unit * (0.55 + rng.next() * 0.5));
@@ -544,19 +581,18 @@ const PATINA_DRIFT: NebulaSpec = {
   // Ten of twenty-two. The drift angle and the ink mix are unchanged, so what is
   // left is the same sky thinned, not a different one.
   reducedDensity: 0.45,
-  build(seed, width, height, density) {
+  build(seed, width, height, density, screenW, screenH) {
     const rng = mulberry32((seed ^ 0x9e37_79b9) >>> 0);
     const out: Shape[] = [];
-    const hw = width / 2;
-    const hh = height / 2;
-    const unit = Math.min(hw, hh);
+    const unit = Math.min(screenW, screenH) / 2;
+    const screens = (width * height) / (screenW * screenH);
     const drift = 0.34;
     const inks: readonly (readonly [number, number])[] = [
       [PALETTE.patina, 0.04],
       [DERIVED.continentShade, 0.036],
       [DERIVED.hullShadow, 0.032],
     ];
-    const wisps = scaled(22, density);
+    const wisps = scaled(22 * screens, density);
     for (let i = 0; i < wisps; i++) {
       const cx = round((rng.next() - 0.5) * width * 0.94);
       const cy = round((rng.next() - 0.5) * height * 0.94);
@@ -597,14 +633,13 @@ const PLASMA_REEF: NebulaSpec = {
   // Dropped. Additive overdraw is the entire cost of this sky, so a fraction of
   // it saves a fraction of nothing; the map keeps its Floor and its stars.
   reducedDensity: 0,
-  build(seed, width, height, density) {
+  build(seed, width, height, density, screenW, screenH) {
     const rng = mulberry32((seed ^ 0x51a5_9aee) >>> 0);
     const out: Shape[] = [];
-    const hw = width / 2;
-    const hh = height / 2;
-    const unit = Math.min(hw, hh);
+    const unit = Math.min(screenW, screenH) / 2;
+    const screens = (width * height) / (screenW * screenH);
     // Three broad, very faint base washes — the water the reef sits in.
-    const bases = scaled(3, density);
+    const bases = scaled(3 * screens, density);
     for (let i = 0; i < bases; i++) {
       const cx = round((rng.next() - 0.5) * width * 0.7);
       const cy = round((rng.next() - 0.5) * height * 0.7);
@@ -614,7 +649,7 @@ const PLASMA_REEF: NebulaSpec = {
     // additive light adds, so a node that lands on top of its neighbour costs
     // brightness twice. The spread is wide enough that a clot reads as a knot of
     // light rather than as one bright dot.
-    const clots = scaled(9, density);
+    const clots = scaled(9 * screens, density);
     for (let i = 0; i < clots; i++) {
       const cx = (rng.next() - 0.5) * width * 0.82;
       const cy = (rng.next() - 0.5) * height * 0.82;
@@ -659,25 +694,37 @@ const DEEP_EMBER: NebulaSpec = {
   parallax: 0.05,
   occludes: false,
   additive: false,
-  overdraw: 0.697,
+  overdraw: 0.746,
   peakLuma: 9.7,
   // Kept whole. Five discs at 4% is already the cheapest coloured sky there is;
   // there is nothing to shed that would buy a frame.
   reducedDensity: 1,
-  build(seed, width, height, density) {
+  build(seed, width, height, density, screenW, screenH) {
     const rng = mulberry32((seed ^ 0x0dee_e3be) >>> 0);
     const out: Shape[] = [];
     const hw = width / 2;
     const hh = height / 2;
-    const unit = Math.min(hw, hh);
-    const bodies = scaled(5, density);
+    const unit = Math.min(screenW, screenH) / 2;
+    const screens = (width * height) / (screenW * screenH);
+    const bodies = scaled(5 * screens, density);
+    // Scattered over the field, with a **hole punched through the middle** — the
+    // sky sits at parallax 0.05, so the field's centre is very nearly the screen's
+    // centre, which is where the fight is. Rejecting that disc is what makes the
+    // warmth something you catch at the edge of the eye instead of something you
+    // are staring through. (Rejection-sampled rather than placed on a rim ring:
+    // the field is ~2.2 screens across, so a ring on the FIELD's rim would sit
+    // entirely outside the visible window and the sky would be invisible.)
+    const HOLE = 0.3;
     for (let i = 0; i < bodies; i++) {
-      // On an annulus near the rim: felt at the edges, absent in the middle.
-      const a = (i / bodies) * Math.PI * 2 + rng.next() * 0.7;
-      const rr = 0.82 + rng.next() * 0.25;
-      const cx = round(Math.cos(a) * hw * rr);
-      const cy = round(Math.sin(a) * hh * rr);
-      softDisc(out, cx, cy, round(unit * (0.42 + rng.next() * 0.24)), PALETTE.threatRed, 0.03 + rng.next() * 0.015);
+      let nx = 0;
+      let ny = 0;
+      for (let tries = 0; tries < 12; tries++) {
+        nx = rng.next() * 2 - 1;
+        ny = rng.next() * 2 - 1;
+        if (Math.hypot(nx, ny) >= HOLE) break;
+      }
+      const r = round(unit * (0.42 + rng.next() * 0.24));
+      softDisc(out, round(nx * hw), round(ny * hh), r, PALETTE.threatRed, 0.03 + rng.next() * 0.015);
     }
     return out;
   },
@@ -721,7 +768,11 @@ export type MapId = 'octagon' | 'compass' | 'oval' | 'diamond';
  * A named registry, deliberately — not a hash of the id and not `index % 6`. A
  * modulo would repeat a sky the moment a fifth map lands and would assign it
  * without anyone choosing; this way each line is a decision that can be argued
- * with. The reasoning, map by map:
+ * with. The four assigned skies, ranked by measured per-screen overdraw, are
+ * NONE `0.000` · Coalsack `0.691` · Patina Drift `0.863` · Plasma Reef `1.121`,
+ * and the rule that placed them is: **the cheapest sky goes on the board that
+ * runs on the most devices, and the costliest on the board with the fewest
+ * entities.** Map by map:
  *
  *  - **`octagon` → NONE.** The Ring is the default: it is what `?debug=1` boots,
  *    what a returning player finds pre-selected, and the first thing a phone
@@ -729,17 +780,17 @@ export type MapId = 'octagon' | 'compass' | 'oval' | 'diamond';
  *    "darker, nothing else" is the purest statement of the pick anyway.
  *  - **`compass` → Coalsack.** The Compass is corner-cover and edge-lanes, and
  *    it is a derelict-fill map, so at any roster below eight it also carries
- *    wrecks and their debris — one of the two busiest boards. It gets a sky that
- *    **adds no light to the frame at all**: Coalsack is the ground colour in
- *    front of the stars, so it can never raise a pixel's value (measured peak Y′
- *    1.9 — the ground's own), which means it takes 0% off the contrast of the
- *    ring, the threat fill or the ore. A dust lane also suits a map about cover.
+ *    wrecks and their debris — one of the two busiest boards. It gets the
+ *    cheapest sky that is not nothing (0.691), and the only one that **adds no
+ *    light to the frame at all**: Coalsack is the ground colour in front of the
+ *    stars, so it can never raise a pixel's value (measured peak Y′ 1.9 — the
+ *    ground's own) and takes 0% off the contrast of the ring, the threat fill or
+ *    the ore. A dust lane also suits a map about cover.
  *  - **`diamond` → Patina Drift.** Double Diamond is the other derelict-fill
  *    board and the most contested centre in the set — the exposed inner homes
- *    sit right on the commons. It gets the cheaper of the two remaining skies
- *    (0.863 overdraw against Coalsack's 0.967): no reserved hue, no additive
- *    pass, and the "old system" tint is the right register for the veteran board
- *    with wrecks standing on it.
+ *    sit right on the commons — so it takes the next-cheapest (0.863). No
+ *    reserved hue, no additive pass, and the "old system" tint is the right
+ *    register for the veteran board with wrecks standing on it.
  *  - **`oval` → Plasma Reef.** The costly sky goes on the *thinnest* map. The
  *    Oval regenerates exactly `count` homes rather than filling to eight, so at
  *    every roster below eight it is the board with the fewest entities on it,
@@ -856,9 +907,15 @@ export function groundSprite(width: number, height: number): SpriteDef {
 }
 
 /**
- * One sky as a {@link SpriteDef}, authored centred on the origin. Deterministic
- * in (`id`, `seed`, `width`, `height`, `density`). NONE returns an empty sprite
- * rather than null, so every caller has one shape of code.
+ * One sky as a {@link SpriteDef}, authored centred on the origin over a
+ * `width`×`height` parallax field, as seen through a `screenW`×`screenH`
+ * viewport. Deterministic in all six arguments.
+ *
+ * The screen defaults to the field, which is the right default for a review tile
+ * (one screenful, exactly the developer's declared element counts) and the wrong
+ * one for the live backdrop — {@link VoidBackdrop.configure} passes the real
+ * viewport, so a phone sees the sky at phone scale over any arena. NONE returns
+ * an empty sprite rather than null, so every caller has one shape of code.
  */
 export function nebulaSprite(
   id: NebulaId,
@@ -866,12 +923,14 @@ export function nebulaSprite(
   width: number,
   height: number,
   density = 1,
+  screenW = width,
+  screenH = height,
 ): SpriteDef {
   const spec = NEBULAE[id];
   return sprite(
-    `backdrop/nebula/${id}/${round(width)}x${round(height)}@${round(density)}`,
+    `backdrop/nebula/${id}/${round(width)}x${round(height)}@${round(density)}/${round(screenW)}x${round(screenH)}`,
     Math.max(width, height) / 2,
-    spec.build(seed, width, height, density),
+    spec.build(seed, width, height, density, screenW, screenH),
   );
 }
 
@@ -890,7 +949,7 @@ export function nebulaTileSprite(id: NebulaId, seed: number, width: number, heig
     if (layer.key === 'near') continue; // two layers is enough at tile scale
     stars.push(...starFieldSprite(layer, seed, width, height).shapes);
   }
-  const sky = spec.build(seed, width, height, 1);
+  const sky = spec.build(seed, width, height, 1, width, height);
   // The tile is rendered in a SQUARE box of half-width `extent`, so the ground
   // has to fill that square rather than the authoring rectangle — otherwise the
   // review sheet shows the sky letterboxed on two bands of Vacuum, which is the
@@ -1043,7 +1102,7 @@ export class VoidBackdrop {
       const nh = coverSpan(this.nebula.parallax, viewH, boundsH);
       const g = new Graphics();
       g.label = `void-nebula-${this.nebula.id}`;
-      drawSprite(g, nebulaSprite(this.nebula.id, this.seed, nw, nh, density), 1);
+      drawSprite(g, nebulaSprite(this.nebula.id, this.seed, nw, nh, density, viewW, viewH), 1);
       if (this.nebula.additive) g.blendMode = 'add';
       this.view.addChild(g);
       this.layers.push({ gfx: g, parallax: this.nebula.parallax });

@@ -590,13 +590,45 @@ describe('the perf budget (GDD §4.3 risk 5)', () => {
     expect(NEBULAE.none.overdraw).toBe(0);
   });
 
-  it('element counts are fixed per sky, so a wide arena costs what a square one does', () => {
-    // Feature SIZE follows the field; feature COUNT does not. That is what makes
-    // the overdraw column above a constant rather than a number per map.
+  it('costs the same per SCREEN whatever arena it is over — the number the GPU pays', () => {
+    // The invariant that makes the overdraw column one number rather than one per
+    // map. Feature size comes from the viewport and element count from
+    // field-area/screen-area, so doubling the parallax field doubles the elements
+    // and leaves the fill on any given frame exactly where it was.
+    const SCREEN = { w: 844, h: 390 } as const; // the landscape phone
     for (const id of NEBULA_IDS) {
-      const square = nebulaSprite(id, VOID_SEED, 2000, 2000).shapes.length;
-      const wide = nebulaSprite(id, VOID_SEED, 3200, 2000).shapes.length;
-      expect(wide, NEBULAE[id].name).toBe(square);
+      const small = nebulaSprite(id, VOID_SEED, 1800, 900, 1, SCREEN.w, SCREEN.h).shapes.length;
+      const big = nebulaSprite(id, VOID_SEED, 3600, 1800, 1, SCREEN.w, SCREEN.h).shapes.length;
+      if (small === 0) continue; // NONE
+      // 4× the field, ~4× the elements — and therefore the same density per screen.
+      expect(big / small, `${NEBULAE[id].name}: ${small} → ${big}`).toBeGreaterThan(3.4);
+      expect(big / small, `${NEBULAE[id].name}: ${small} → ${big}`).toBeLessThan(4.6);
+    }
+  });
+
+  it('shows the sky on the screen, not somewhere off in the parallax field', () => {
+    // The bug this pins: sized to the FIELD, a sky on a wide arena spread its nine
+    // clots across the whole parallax span and a given frame showed one or none —
+    // the first Plasma Reef evidence frame came back with no reef in it. Sampled
+    // over the viewport-sized window at the centre of a wide arena's field, every
+    // sky that is not NONE has to actually be there.
+    const SCREEN = { w: 844, h: 390 } as const;
+    const FIELD_W = 2177; // coverSpan(0.05, 844, 3200) — a wide arena on a phone
+    const FIELD_H = 1200;
+    for (const id of NEBULA_IDS) {
+      if (id === 'none') continue;
+      const shapes = nebulaSprite(id, VOID_SEED, FIELD_W, FIELD_H, 1, SCREEN.w, SCREEN.h).shapes;
+      let hit = 0;
+      const COLS = 60;
+      const ROWS = 30;
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const x = ((c + 0.5) / COLS - 0.5) * SCREEN.w;
+          const y = ((r + 0.5) / ROWS - 0.5) * SCREEN.h;
+          if (shapes.some((s) => covers(s, x, y))) hit++;
+        }
+      }
+      expect(hit / (COLS * ROWS), `${NEBULAE[id].name} covers this much of the screen`).toBeGreaterThan(0.15);
     }
   });
 
