@@ -34,7 +34,7 @@ Working note. Not evidence — the DoD, the PR and QA attestation are the record
   exist), `lobby-flow.test.ts` (the flow-level teams end), `lobby.test.ts` (the
   roster, incl. FFA, closed seats, seatless player).
 
-**`<evidence commit>` — the live-stage evidence run**
+**`10e9606` — the live-stage evidence run**
 
 - `src/main.ts` — `installEndScreenStage` gains `winAlly()` (drop every core NOT
   on the local side; the sim's own `resolveWinner` crowns the ally), `side()`
@@ -125,16 +125,91 @@ without fixing.
 
 ---
 
+## SESSION 2 (2026-08-08, after #327 merged)
+
+**PR #327 MERGED to main as `337784e`.** The fix and its evidence are shipped.
+Two of the four DoD gates then went red *because* of that, which is worth
+understanding before anyone panics at a red gate:
+
+- `git merge-base --is-ancestor origin/main HEAD` — main moved on (#326, #327).
+  Fixed by merging `origin/main` back into the branch. Nothing else to it.
+- `git diff origin/main -- src/ui/end-of-match.test.ts | grep -q .` — **this gate
+  cannot pass on merged work by construction**: once the branch is in main the
+  diff against main is empty. It is satisfied here by real added coverage (below),
+  not by touching the file to make a gate go green. If a future session finds this
+  red with nothing genuine left to add, say so plainly rather than padding.
+
+**What session 2 actually added**
+
+1. **The screenshots were byte-identical** (`md5` equal). Not a bug — the
+   end-of-match backdrop is *opaque and covers the whole viewport*
+   (`end-of-match-view.ts`), and both scenarios finish on the same headline,
+   subhead and plates, so the frames genuinely ARE the same pixels. But the PR
+   presented them side by side as two scenarios, which reads as two pictures of
+   two things. The eliminated run's distinguishing frame is the **middle** of it:
+   ELIMINATED standing with SPECTATE while the match is live. That is now shot as
+   `teams-eliminated-spectate-evidence.png`, and the spec says out loud why the
+   two end frames match.
+2. **A finding fell out of that, and it is the a0-09 family.** The new ELIMINATED
+   shot is byte-identical to the *FFA* one (`end-screens-defeated-evidence.png`),
+   and reading it explains why: in a TEAMS match the line says
+
+       8th of 8 — your reactor was destroyed.
+
+   **"8th of 8" is an FFA sentence.** Placement is a free-for-all idea; in TEAMS
+   the player is not 8th of anything, their side is still playing, and the very
+   next thing that can happen is the VICTORY this brief just fixed. So the
+   overlay tells a team player two things that are not true of their match — a
+   final rank, and nothing at all about the side fighting on — while SPECTATE
+   sits right under it. Exactly the shape of the bug a0-09 exists to fix: an
+   FFA-shaped statement rendered in a teams match.
+
+   **Deliberately not fixed here.** The brief is explicit that the ELIMINATED
+   overlay "is a separate state and stays", and its wording is ratified copy —
+   changing what it says is the Director's call, not mine, and it is a different
+   change from the one under review. Flagged in the PR body and in NEXT.
+3. **A test that pins the claim the PR rests on.** Every teams case in
+   `end-of-match.test.ts` used a hand-written roster, which proves the summary is
+   self-consistent — *not* that it agrees with the sim. That gap is where the bug
+   came from. The new test builds a real 2v2 `createWorld`, takes the roster from
+   `deriveAlarmAllies` (the function the shipped client actually passes), and
+   asserts `onYourSide`/`endKind` equal `sim/allegiance` `sameSide` slot for slot.
+   Drift between UI and sim now fails by slot name.
+
+**Checked and found sound, so nobody re-audits it:** `alarmAllies()` memoises
+(`alarmSide ??=`) from static team config and `deriveAlarmAllies` walks all
+stations regardless of liveness. The end model is rebuilt every frame from that
+Set, so the worry was a roster mutating under a displayed screen and flipping
+VICTORY to DEFEAT. It cannot: the set is derived once and never mutated, and dead
+allies stay in it.
+
+**The port trap, again, and worse.** `tests/live-stage/playwright.config.ts` pins
+4173 with `reuseExistingServer: !CI` — and **lane-1 was mid-run on that same port**
+during this session. Ran instead on a private port (4196, `strictPort`,
+`reuseExistingServer: false`) via a throwaway `playwright.a009.config.ts`,
+deleted after and never committed. Also learned: `npx playwright test --config
+tests/live-stage/...` with no file argument runs the WHOLE live-stage directory
+(~20 min), not your spec — always name the spec.
+
+---
+
 ## NEXT
 
-Nothing outstanding for this brief. Open follow-ups for whoever picks them up:
+Open follow-ups for whoever picks them up:
 
 1. **Names on the end screen** — above. Blocked on a0-06 by choice, not by code.
 2. **The side is not drawn, only worded.** GDD §2.1's "added indicator" has no
    representation on this screen. If the Director wants one, the honest form
    under §5.7 is a *side chip / underline* beside the subhead (motif surface),
    never a tint on the identity rule. Not a defect; a deliberate gap.
-3. **`world.match.winningTeam` exists and is unread by the UI.** The sim already
+3. **The ELIMINATED overlay speaks FFA in a teams match** — `8th of 8 — your
+   reactor was destroyed.` (found this session, above). A placement is meaningless
+   when your side plays on, and the line says nothing about the side that is still
+   in it. The honest teams form would drop the rank and say the side fights on,
+   which is exactly why SPECTATE is offered. Ratified copy → Director's call, and
+   it wants the same `allies` roster this brief already threads to the summary, so
+   whoever takes it has the wiring for free.
+4. **`world.match.winningTeam` exists and is unread by the UI.** The sim already
    records the winning team. This fix deliberately did not consume it (that
    would be the second notion of "my side" the brief forbids), but it is the
    natural source if the end screen ever wants to *name* the winning side.
