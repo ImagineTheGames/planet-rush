@@ -207,6 +207,8 @@ import {
   // read the one authored `MatchConfig`, which is what makes an offline TEAMS
   // match and an online one the same match.
   lobbyRosterTeams,
+  denseSeatIndex,
+  isParticipant,
   lobbyWireSeats,
   lobbyWireTeams,
   startLobbyMatch,
@@ -285,6 +287,12 @@ import {
   createOnlineSession,
   allocatorTransport,
   attachSessionLog,
+  // A room with no other humans in it plays locally, and says so (a0-11).
+  ROOM_COST_NOTE,
+  localSeat,
+  playsLocally,
+  releaseRoom,
+  showLocalRevertTell,
   // The verbose connecting screen (M10): every step of the join named as it
   // happens **in the screen's own title**, or the exact refusal there with RETRY
   // and DOWNLOAD LOG under it.
@@ -784,7 +792,10 @@ async function boot(): Promise<void> {
   // ratified flow puts one lobby between every door and every match — and only after
   // RUSH! does a world exist (GDD §4.2).
   const launch: LaunchPlan = mainMenu ? await mainMenu.untilPlay() : { kind: 'offline' };
-  const onlineSession = launch.kind === 'online' ? launch.session : null;
+  // `let`, because a room can still turn out not to need a server: if RUSH! finds
+  // the host alone, the lobby releases the room and this is dropped so the match
+  // boots on `LocalLoopback` (a0-11, `src/net/local-revert`).
+  let onlineSession = launch.kind === 'online' ? launch.session : null;
   // A JOINER is seated by the server at whatever slot was free, so the local seat
   // is only known now — bind it before any closure below reads it (a creator, and
   // every offline match, stays seat 0).
@@ -807,7 +818,9 @@ async function boot(): Promise<void> {
   // readonly by design — it colours the end-of-match tell (won or lost), and a
   // joiner on slot 3 was getting slot 0's result sting for the same reason.
   audio.setLocal(LOCAL_PLAYER);
-  const audioObserver = new WorldObserver({ local: LOCAL_PLAYER });
+  // `let` for the same reason `onlineSession` is: a room that reverts to a local
+  // match at RUSH! moves the local seat, and this captured the old one (a0-11).
+  let audioObserver = new WorldObserver({ local: LOCAL_PLAYER });
 
   // --- The lobby (GDD §2.1, §2.11; M4) — ONE component, EVERY door (ratified: the
   //     unified play flow). Every way in lands here, not in the match: the 8-slot
@@ -867,6 +880,22 @@ async function boot(): Promise<void> {
         ...(debugSize !== undefined ? { size: debugSize } : {}),
         ...(debugTeams ? { teams: debugTeams } : {}),
       };
+  // ── The room did not need a server (a0-11) ────────────────────────────────
+  // Decided at RUSH! by the lobby, which has already released the room and told
+  // the player. All that is left here is to stop treating this as an online
+  // match: drop the (now-closed) session so the boot below takes the offline
+  // path, and re-point the local seat at the DENSE roster the sim builds — the
+  // lobby's seat number and the sim's stop agreeing the moment a chair is left
+  // empty. The audio engine and the end-of-match observer took the old number as
+  // a constructor argument, so both are re-pointed too, exactly as the online
+  // seat binding above does it (s9-01: a mix that believes it is on slot 0 rings
+  // the wrong station's alarm).
+  if (chosen.local) {
+    onlineSession = null;
+    LOCAL_PLAYER = chosen.local.you;
+    audio.setLocal(LOCAL_PLAYER);
+    audioObserver = new WorldObserver({ local: LOCAL_PLAYER });
+  }
   const chosenShipClass = chosen.shipClass;
   // The name shown over the local ship and station (field request v0.2.1) — the
   // lobby's, or the persisted-or-default "YOU" under ?debug=1 where there is none.
@@ -7303,6 +7332,23 @@ interface LobbyChoice {
    * in TEAMS, where it is the whole feature (m10 teams-wire).
    */
   readonly teams?: readonly number[];
+  /**
+   * The room decided, at RUSH!, that it did not need a server (a0-11; GDD §4.2
+   * *amended 2026-08-07*, `src/net/local-revert`): the only human in it was the
+   * host, so the match boots on `LocalLoopback` and the room has been released.
+   *
+   * Absent on every other path, including an online match that really is online.
+   * When present, `boot()` drops the session it was handed and builds the world
+   * itself, from this same config — same seed, same arena, same cast, which is
+   * what makes it *the same match* (GDD §4.8).
+   */
+  readonly local?: {
+    /** The code that was handed back, for the log and the PR's own accounting. */
+    readonly releasedRoom: RoomCode;
+    /** The local player's seat in the DENSE roster the sim builds — not the
+     *  lobby's, which is sparse the moment a seat is left open (`denseSeatIndex`). */
+    readonly you: PlayerId;
+  };
 }
 
 /**
@@ -7618,6 +7664,10 @@ function openLobby(
     selectMap: (index: number): void => selectMapAt(index),
   };
 
+  /** Set by {@link revertToLocal} when RUSH! found nobody else in the room, and
+   *  carried out on the resolved {@link LobbyChoice} so `boot()` builds the world
+   *  itself (a0-11). Null on every other path. */
+  let wentLocal: LobbyChoice['local'] = undefined;
   let resolveRush: (choice: LobbyChoice) => void = () => {};
   const rushPromise = new Promise<LobbyChoice>((resolve) => {
     resolveRush = resolve;
@@ -7888,8 +7938,61 @@ function openLobby(
     render();
     // The guard above means this is the ONE frame the count reached zero.
     if (state.phase !== 'started') return;
-    if (room) room.session.startMatch();
+    // …and the ONE moment the question "does this match need a server?" is
+    // answerable (a0-11; `src/net/local-revert`). A host may open a room, read the
+    // code out and have somebody walk in, so it cannot be settled at the door — it
+    // is settled by the roster, here, at RUSH!.
+    if (room && !revertToLocal()) room.session.startMatch();
     else finish();
+  }
+
+  /**
+   * The room turned out to hold nobody but the host, so the match plays locally
+   * (a0-11; GDD §4.2 *amended 2026-08-07*). Returns true when that happened.
+   *
+   * Three things, in this order, and the order is the point:
+   *
+   *  1. **ask the roster**, not the door (`playsLocally` — the only human is you);
+   *  2. **release the room** before anything else, so the code is free and the
+   *     Machine drainable from this instant rather than from the end of a match
+   *     nobody is playing on it (`releaseRoom`, `ROOM_COST_NOTE`);
+   *  3. **say so**, once, as a line and not a dialog — they pressed a button that
+   *     said online.
+   *
+   * The `local` block it records is what makes `boot()` drop the session it was
+   * handed. Everything else about the match — seed, arena, cast, sides — is the
+   * config below, unchanged, which is what makes the two paths the same match.
+   */
+  function revertToLocal(): boolean {
+    if (!room) return false;
+    const seats = state.seats.filter((s) => isParticipant(s.occupant));
+    const census = {
+      humans: seats.filter((s) => s.occupant === 'human').length,
+      bots: seats.filter((s) => s.occupant === 'bot').length,
+    };
+    if (!playsLocally(census)) return false;
+
+    const release = releaseRoom({ code: room.code, close: () => room.session.close() });
+    // The session log is the module-level singleton (`src/net/playtest-log`), not
+    // the menu's local binding — the menu has long since resolved by the time a
+    // countdown reaches zero. Its own poll timer keeps running for a moment and
+    // records the close, which is the truth and worth having in a pasted log.
+    playtestLog().recordConnect('local revert', {
+      room: release?.room ?? room.code,
+      humans: census.humans,
+      bots: census.bots,
+      why: ROOM_COST_NOTE,
+    });
+    wentLocal = {
+      releasedRoom: release?.room ?? room.code,
+      you: localSeat(denseSeatIndex(state, state.you)),
+    };
+    // The tell, on the DOM rather than through Pixi — the same seam
+    // `installConnectTraceView` already writes through, and for the same reason:
+    // the netcode layer says the things the transport produces without needing a
+    // renderer's cooperation (`src/net/local-revert-view`).
+    showLocalRevertTell({ dom: document as unknown as Parameters<typeof showLocalRevertTell>[0]['dom'] });
+    return true;
   }
 
   /**
@@ -7913,6 +8016,7 @@ function openLobby(
       // world is the server's, built from the sides the same lobby already sent it
       // (`sendChoice`), and `matchStart` hands them back for the predicted world.
       teams: lobbyRosterTeams(state),
+      ...(wentLocal ? { local: wentLocal } : {}),
     };
     teardown();
     seam.visible = false;
