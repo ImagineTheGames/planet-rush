@@ -314,6 +314,20 @@ export class AudioEngine {
   }
 
   /**
+   * The slot this engine believes it is listening as. `-1` is a spectator.
+   *
+   * Public because it is the number s9-01 turned on: the engine took it as a
+   * constructor argument at boot, before the server had seated the joiner, and
+   * nothing ever corrected it — so the mix spent every online match convinced it
+   * was slot 0. A live-stage test reads this back and compares it against the
+   * seat the server actually welcomed the client into (`__alarmStage` in
+   * `src/main.ts`). A wire is only proven by reading the far end of it.
+   */
+  get alarmLocal(): PlayerId {
+    return this.local;
+  }
+
+  /**
    * Scope the under-attack alarm to a *side*, not just a slot (developer report
    * s5, "the alarm fires for ENEMY bases"). The alarm belongs to ownership, not
    * proximity: it rings only when a station on the local player's side takes
