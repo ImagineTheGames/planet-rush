@@ -81,10 +81,18 @@
  * |---|---|---|---|
  * | mine | abrasive cutting head — grains, dry, no tone | pressure and mass — low swept body, sub weight | induction — band-passed metal that rings |
  * | fight | coil discharge — charge into a snap | mass driver — pneumatic weight and air | particle shear — thin ionised band, room behind it |
- * | station | magnetic clamp — dull thunk, servo settle | hydraulic seat — pressure released into a seat | telemetry — narrow filtered bands, machine-fast |
- * | ship | drive spinning up | reaction mass — thrust and pressure | field collapse — a resonance closing |
- * | clock | struck steel | pressure horn | swept siren band |
- * | music | filtered analogue | granular texture bed | wide detuned space |
+ * | ship | plasma drive — matter thrown, particulate | reaction mass — pneumatic weight, a closing filter | containment field — a resonance forming or failing |
+ * | station | ratchet and teeth — stepped dry contact | hydraulic seat — pressure into weight coming to rest | magnetic lock — narrow bands closing |
+ * | clock | structure under load — stone and metal giving way | pressure — a low body, mass moving | resonance — a narrow band, and a room |
+ * | music | granular bed — particulate, no pitch centre | filtered analogue — a low body behind a corner | wide detuned space — unisons beating, metal in the smear |
+ * | interface | a dry contact — grains, nothing rings | a damped pip — felt more than heard | a narrow band — one partial, machine-clean |
+ *
+ * Read down a column and the *axis* is the same on all forty slots — `a` is always
+ * granular contact, `b` is always pressure and mass, `c` is always the one that
+ * rings — while the *metaphor* is new in every family. That is deliberate: a
+ * forty-slot board the developer has already walked away from once is swept in one
+ * pass if the question is the same question each time, and re-learnt forty times if
+ * it is not. The choice on offer is a material, made once and offered everywhere.
  */
 
 import type { SoundLayer, SoundName, SoundSpec } from './bank';
@@ -2043,14 +2051,67 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       },
     ],
   },
+  // === THE INTERFACE FALLBACKS (a0-01b) =====================================
+  //
+  // **Read §7.6 before judging these by ear in the running game.** Since s6-01
+  // the app routes `press`, `confirm`, `reject`, `hover`, `detent`, `back`,
+  // `accept`, `join` and `rush` to the ratified Gantry/Bone set in `./ui-cues`.
+  // `CUE_SOUND` — these — is the fallback for when there is no cue player at all.
+  // Choosing one of these changes what a fallback sounds like, not what the
+  // developer hears clicking around the build, and a reviewer expecting the
+  // opposite will conclude nothing changed.
+  //
+  // At interface scale the three tools are the same three, shrunk to a few tens
+  // of milliseconds, and one of them loses a limb: no offer in this family gets
+  // `returns`. A tail on a 28 ms tick is not space, it is smear, and on a phone
+  // speaker it is the difference between a click and a thud.
+  //
+  //   a  a **dry contact** — grains, no tone, nothing rings
+  //   b  a **damped pip** — a low body behind a closing corner, felt not heard
+  //   c  a **narrow band** — one resonant partial, machine-clean
+  //
+  // §8's `rejectBuzz` / `coreHit` pair runs through here — *your buy was refused*
+  // against *your reactor is taking damage* — and §7.6's own note says re-voicing
+  // reject upward is what protects it. Every offer below sits above 300 Hz of
+  // spectral centre; the fight family's core offers all sit under 250.
   pressTick: {
+    // §7.6 asks for the ratified family root, A♭6 = 1661 Hz, so the fallback and
+    // the real `pick` cue agree instead of diverging. All three are built on it
+    // or an octave under it.
     label: "Press Tick",
     context: "A wheel wedge / menu control was pressed — the lightest possible click, heard dozens of times a match.",
     current: 'pressTick',
     candidates: [
-      { id: 'a', character: "soft triangle tap", spec: {"name":"pressSoftTri","wave":"triangle","attack":0.001,"hold":0.004,"decay":0.02,"freq":900,"gain":0.12,"seed":20719} },
-      { id: 'b', character: "crisp gritty square click", spec: {"name":"pressCrispNoise","wave":"square","attack":0.001,"hold":0.004,"decay":0.018,"freq":1600,"duty":0.2,"noiseMix":0.12,"gain":0.11,"seed":20720} },
-      { id: 'c', character: "round low sine thump", spec: {"name":"pressRoundSine","wave":"sine","attack":0.001,"hold":0.003,"decay":0.02,"freq":700,"gain":0.1,"seed":20721} },
+      {
+        id: 'a',
+        character: "a dry contact, no tone in it",
+        spec: {
+          name: 'pressTick_a_dryContact',
+          layers: [
+            grains('pressTick_a.contact', { freq: 1661, freqEnd: 1200, grain: 0.002, gain: 0.26, hold: 0.004, decay: 0.02, curve: 5, from: 5200, to: 2200, q: 2.8, hp: 700, seed: 34000 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "a damped pip, felt more than heard",
+        spec: {
+          name: 'pressTick_b_dampedPip',
+          layers: [
+            swept('pressTick_b.pip', { wave: 'triangle', freq: 830, from: 2400, to: 700, q: 3.2, gain: 0.2, attack: 0.0006, hold: 0.003, decay: 0.022, curve: 5, noiseMix: 0.2, seed: 34010 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "one narrow band at the family root",
+        spec: {
+          name: 'pressTick_c_familyRoot',
+          layers: [
+            band('pressTick_c.root', 1661, { gain: 0.95, decay: 0.024, q: 5, curve: 6, seed: 34020 }),
+          ],
+        },
+      },
     ],
   },
   purchaseConfirm: {
@@ -2058,9 +2119,39 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     context: "A purchase or repair committed — a rising two-beat 'done'.",
     current: 'purchaseConfirm',
     candidates: [
-      { id: 'a', character: "bright square two-note chime", spec: {"name":"purchaseConfirmSquare","layers":[{"spec":{"name":"purchaseConfirmSquare_lo","wave":"square","attack":0.002,"hold":0.025,"decay":0.05,"freq":523.25,"duty":0.4,"gain":0.2,"seed":20722}},{"spec":{"name":"purchaseConfirmSquare_hi","wave":"square","attack":0.002,"hold":0.03,"decay":0.09,"freq":783.99,"duty":0.4,"gain":0.2,"seed":20723},"at":0.045}]} },
-      { id: 'b', character: "soft sine bell ding", spec: {"name":"purchaseConfirmBell","layers":[{"spec":{"name":"purchaseConfirmBell_lo","wave":"sine","attack":0.003,"hold":0.02,"decay":0.09,"freq":880,"punch":0.3,"gain":0.22,"seed":20724}},{"spec":{"name":"purchaseConfirmBell_hi","wave":"sine","attack":0.003,"hold":0.03,"decay":0.14,"freq":1318.51,"punch":0.2,"gain":0.2,"seed":20725},"at":0.06}]} },
-      { id: 'c', character: "synthetic saw rising blip", spec: {"name":"purchaseConfirmSaw","layers":[{"spec":{"name":"purchaseConfirmSaw_lo","wave":"saw","attack":0.003,"hold":0.02,"decay":0.06,"freq":440,"gain":0.18,"seed":20726}},{"spec":{"name":"purchaseConfirmSaw_hi","wave":"saw","attack":0.003,"hold":0.03,"decay":0.1,"freq":659.25,"lowPass":4000,"gain":0.18,"seed":20727},"at":0.045}]} },
+      {
+        id: 'a',
+        character: "two dry contacts, rising",
+        spec: {
+          name: 'purchaseConfirm_a_dryContacts',
+          layers: [
+            grains('purchaseConfirm_a.n0', { freq: 620, freqEnd: 500, grain: 0.004, gain: 0.28, hold: 0.012, decay: 0.05, curve: 5, from: 2600, to: 1100, q: 3.2, hp: 320, seed: 34030 }),
+            grains('purchaseConfirm_a.n1', { freq: 930, freqEnd: 740, grain: 0.003, gain: 0.26, hold: 0.016, decay: 0.1, curve: 4.5, from: 3600, to: 1500, q: 3.4, hp: 420, at: 0.045, seed: 34031 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "a low seat, the buy landing",
+        spec: {
+          name: 'purchaseConfirm_b_buyLanding',
+          layers: [
+            swept('purchaseConfirm_b.n0', { wave: 'triangle', freq: 330, from: 1400, to: 480, q: 3.6, gain: 0.28, attack: 0.002, hold: 0.02, decay: 0.06, curve: 4, noiseMix: 0.16, seed: 34040 }),
+            swept('purchaseConfirm_b.n1', { wave: 'triangle', freq: 440, from: 1700, to: 560, q: 3.8, gain: 0.32, attack: 0.002, hold: 0.026, decay: 0.13, curve: 3.4, punch: 0.3, noiseMix: 0.12, at: 0.05, seed: 34041 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "two narrow bands, a fourth apart",
+        spec: {
+          name: 'purchaseConfirm_c_bandsFourth',
+          layers: [
+            band('purchaseConfirm_c.n0', 587, { gain: 0.44, decay: 0.05, q: 6.5, curve: 5.5, seed: 34050 }),
+            ...plate('purchaseConfirm_c.n1', 784, { gain: 0.28, decay: 0.13, ratios: [1, 2.41], q: 8, curve: 4.5, grain: 0.2, edge: 0.6, at: 0.045, seed: 34052 }),
+          ],
+        },
+      },
     ],
   },
   rejectBuzz: {
@@ -2068,9 +2159,42 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     context: "A buy the player can't afford — a low, flat, faintly gritty 'nope' that falls a little and stops.",
     current: 'rejectBuzz',
     candidates: [
-      { id: 'a', character: "flat gritty square drone", spec: {"name":"rejectBuzzSquare","wave":"square","attack":0.002,"hold":0.07,"decay":0.05,"freq":140,"freqEnd":130,"duty":0.5,"noiseMix":0.05,"lowPass":1800,"gain":0.24,"seed":20728} },
-      { id: 'b', character: "short low triangle thud", spec: {"name":"rejectThudTriangle","wave":"triangle","attack":0.002,"hold":0.03,"decay":0.05,"freq":110,"punch":0.3,"gain":0.22,"seed":20729} },
-      { id: 'c', character: "gritty pitchless noise rasp", spec: {"name":"rejectRaspNoise","wave":"noise","attack":0.002,"hold":0.05,"decay":0.06,"freq":160,"lowPass":1200,"gain":0.2,"seed":20730} },
+      // §7.6: two notes a **minor second** apart resolving nowhere — the ratified
+      // `refused` shape, so the fallback carries the same meaning as the real cue.
+      // All three keep the interval and the "goes nowhere"; the material differs.
+      {
+        id: 'a',
+        character: "grit refusal, dry and flat",
+        spec: {
+          name: 'rejectBuzz_a_gritRefusal',
+          layers: [
+            grains('rejectBuzz_a.n0', { freq: 440, freqEnd: 400, grain: 0.0055, gain: 0.34, hold: 0.03, decay: 0.05, curve: 3.4, from: 1500, to: 900, q: 2.8, hp: 200, seed: 34060 }),
+            grains('rejectBuzz_a.n1', { freq: 415.3, freqEnd: 380, grain: 0.006, gain: 0.32, hold: 0.04, decay: 0.06, curve: 3, from: 1300, to: 760, q: 2.8, hp: 190, at: 0.055, seed: 34061 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "a blocked thud, nothing opens",
+        spec: {
+          name: 'rejectBuzz_b_blockedThud',
+          layers: [
+            swept('rejectBuzz_b.n0', { wave: 'triangle', freq: 466.16, from: 1700, to: 640, q: 3, gain: 0.34, attack: 0.002, hold: 0.03, decay: 0.05, curve: 3.6, punch: 0.3, noiseMix: 0.2, seed: 34070 }),
+            swept('rejectBuzz_b.n1', { wave: 'triangle', freq: 440, from: 1450, to: 540, q: 3, gain: 0.32, attack: 0.002, hold: 0.04, decay: 0.07, curve: 3, noiseMix: 0.22, at: 0.055, seed: 34071 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "two bands a semitone apart, unresolved",
+        spec: {
+          name: 'rejectBuzz_c_semitoneBands',
+          layers: [
+            band('rejectBuzz_c.n0', 523.25, { gain: 0.95, decay: 0.06, q: 5, curve: 4.5, attack: 0.002, hold: 0.02, seed: 34080 }),
+            band('rejectBuzz_c.n1', 493.88, { gain: 0.92, decay: 0.09, q: 5.2, curve: 4, attack: 0.002, hold: 0.02, at: 0.055, seed: 34081 }),
+          ],
+        },
+      },
     ],
   },
   depositTick: {
@@ -2111,13 +2235,45 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     ],
   },
   respawnBeep: {
+    // §8 guards this against `spawnPulse` at ×1.20 of centroid — the respawn
+    // countdown against the spawn-protection tick, two quiet repeating sounds a
+    // dead player hears back to back. They are given opposite metaphors on
+    // purpose: spawnPulse is a **field** (soft, particulate, low) and this is a
+    // **clock** (hard, narrow, and above it on every offer).
     label: "Respawn Beep",
     context: "A tick of the respawn countdown — one clean mid beep a second, deliberately plain, a clock.",
     current: 'respawnBeep',
     candidates: [
-      { id: 'a', character: "pure plain sine tone", spec: {"name":"respawnBeepSine","wave":"sine","attack":0.004,"hold":0.03,"decay":0.07,"freq":600,"gain":0.18,"seed":20734} },
-      { id: 'b', character: "crisp digital square clock", spec: {"name":"respawnBeepSquareDigital","wave":"square","attack":0.003,"hold":0.025,"decay":0.05,"freq":880,"duty":0.5,"gain":0.14,"seed":20735} },
-      { id: 'c', character: "warm low triangle beep", spec: {"name":"respawnBeepTriangleWarm","wave":"triangle","attack":0.005,"hold":0.04,"decay":0.09,"freq":494,"gain":0.19,"seed":20736} },
+      {
+        id: 'a',
+        character: "a dry clock contact, no ring",
+        spec: {
+          name: 'respawnBeep_a_clockContact',
+          layers: [
+            grains('respawnBeep_a.tick', { freq: 1100, freqEnd: 880, grain: 0.0025, gain: 0.3, hold: 0.02, decay: 0.06, curve: 4.5, from: 3800, to: 1600, q: 3, hp: 500, seed: 34090 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "a countdown pip with weight in it",
+        spec: {
+          name: 'respawnBeep_b_weightedPip',
+          layers: [
+            swept('respawnBeep_b.pip', { wave: 'triangle', freq: 587, from: 2000, to: 760, q: 3.6, gain: 0.3, attack: 0.003, hold: 0.026, decay: 0.07, curve: 3.6, punch: 0.3, noiseMix: 0.14, seed: 34100 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "a narrow band tone, machine-clean",
+        spec: {
+          name: 'respawnBeep_c_machineClean',
+          layers: [
+            band('respawnBeep_c.tone', 880, { gain: 0.95, decay: 0.09, q: 5.5, curve: 4.5, attack: 0.003, hold: 0.02, seed: 34110 }),
+          ],
+        },
+      },
     ],
   },
   respawnGo: {
@@ -2125,19 +2281,82 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     context: "Respawn launch — the ship back on the field, brighter & a step up from the countdown beeps.",
     current: 'respawnGo',
     candidates: [
-      { id: 'a', character: "punchy square power-up rise", spec: {"name":"respawnGoSquarePower","layers":[{"spec":{"name":"respawnGoSquarePower_rise","wave":"square","attack":0.004,"hold":0.03,"decay":0.12,"freq":700,"freqEnd":1100,"duty":0.4,"punch":0.3,"gain":0.22,"seed":20737}},{"spec":{"name":"respawnGoSquarePower_top","wave":"square","attack":0.003,"hold":0.015,"decay":0.08,"freq":1568,"duty":0.3,"gain":0.14,"seed":20738},"at":0.1}]} },
-      { id: 'b', character: "bright sine and triangle launch chime", spec: {"name":"respawnGoChime","layers":[{"spec":{"name":"respawnGoChime_rise","wave":"sine","attack":0.004,"hold":0.03,"decay":0.14,"freq":523.25,"freqEnd":783.99,"vibratoDepth":0.03,"vibratoRate":10,"gain":0.24,"seed":20739}},{"spec":{"name":"respawnGoChime_top","wave":"triangle","attack":0.003,"hold":0.02,"decay":0.1,"freq":1046.5,"gain":0.15,"seed":20740},"at":0.1}]} },
-      { id: 'c', character: "energetic saw double-step launch", spec: {"name":"respawnGoSawStep","layers":[{"spec":{"name":"respawnGoSawStep_1","wave":"saw","attack":0.003,"hold":0.02,"decay":0.06,"freq":660,"gain":0.18,"seed":20741}},{"spec":{"name":"respawnGoSawStep_2","wave":"saw","attack":0.003,"hold":0.03,"decay":0.12,"freq":990,"lowPass":5000,"gain":0.2,"seed":20742},"at":0.06}]} },
+      {
+        id: 'a',
+        character: "release into a dry contact",
+        spec: {
+          name: 'respawnGo_a_releaseContact',
+          layers: [
+            grains('respawnGo_a.release', { freq: 520, freqEnd: 900, grain: 0.0035, gain: 0.3, hold: 0.03, decay: 0.05, curve: 3, from: 1400, to: 4200, q: 3, hp: 300, seed: 34120 }),
+            grains('respawnGo_a.top', { freq: 1200, freqEnd: 950, grain: 0.003, gain: 0.28, hold: 0.016, decay: 0.11, curve: 4, from: 4400, to: 1800, q: 3.4, hp: 550, at: 0.1, seed: 34121 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "pressure dumping, mass leaving",
+        spec: {
+          name: 'respawnGo_b_massLeaving',
+          layers: [
+            swept('respawnGo_b.dump', { wave: 'noise', freq: 200, freqEnd: 320, from: 500, to: 2400, q: 2.6, gain: 0.3, attack: 0.006, hold: 0.04, decay: 0.06, curve: 2.6, seed: 34130 }),
+            swept('respawnGo_b.body', { wave: 'triangle', freq: 262, from: 900, to: 380, q: 3.4, gain: 0.36, attack: 0.003, hold: 0.03, decay: 0.14, curve: 3, punch: 0.4, noiseMix: 0.14, at: 0.09, seed: 34131 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "a band sweeping open, launch clear",
+        spec: {
+          name: 'respawnGo_c_bandOpening',
+          layers: [
+            swept('respawnGo_c.open', { wave: 'noise', freq: 440, from: 700, to: 4600, q: 8, gain: 0.42, attack: 0.005, hold: 0.04, decay: 0.06, curve: 2.6, seed: 34140 }),
+            ...plate('respawnGo_c.clear', 1046, { gain: 0.4, decay: 0.14, ratios: [1, 2.41], q: 9, curve: 4.5, grain: 0.18, edge: 0.7, at: 0.1, seed: 34142 }),
+          ],
+        },
+      },
     ],
   },
   minimapPing: {
+    // §7.6: the *name* is a fossil. The minimap ping mechanic was cut (§2.4, §4.9)
+    // and this cue is raised for the minimap **toggle**, so the sound is live and
+    // the label is not. Renaming a `SoundName` is a bank change and this brief does
+    // not make those — but the board prints the context, so the context says it.
     label: "Minimap Ping",
-    context: "A minimap ping — a rising sonar blip that rings a moment & fades; it locates, it must never read as an alarm.",
+    context: "The minimap toggle (the ping mechanic itself was cut) — it locates; it must never read as an alarm.",
     current: 'minimapPing',
     candidates: [
-      { id: 'a', character: "clean rising sine sonar sweep", spec: {"name":"minimapPingSineSweep","wave":"sine","attack":0.004,"hold":0.04,"decay":0.3,"freq":700,"freqEnd":1400,"vibratoDepth":0.015,"vibratoRate":8,"gain":0.2,"seed":20743} },
-      { id: 'b', character: "soft triangle pulse with airy overtone", spec: {"name":"minimapPingTrianglePulse","layers":[{"spec":{"name":"minimapPingTrianglePulse_pulse","wave":"triangle","attack":0.004,"hold":0.03,"decay":0.22,"freq":900,"freqEnd":1300,"gain":0.2,"seed":20744}},{"spec":{"name":"minimapPingTrianglePulse_overtone","wave":"sine","attack":0.005,"hold":0.02,"decay":0.18,"freq":1800,"gain":0.08,"seed":20745},"at":0.03}]} },
-      { id: 'c', character: "bright bell-like two-partial ping", spec: {"name":"minimapPingBellTwoPartial","layers":[{"spec":{"name":"minimapPingBellTwoPartial_fundamental","wave":"sine","attack":0.003,"hold":0.03,"decay":0.24,"freq":1046.5,"freqEnd":1568,"gain":0.19,"seed":20746}},{"spec":{"name":"minimapPingBellTwoPartial_partial","wave":"sine","attack":0.004,"hold":0.02,"decay":0.16,"freq":2093,"gain":0.07,"seed":20747},"at":0.04}]} },
+      {
+        id: 'a',
+        character: "a grained sweep, sonar through dust",
+        spec: {
+          name: 'minimapPing_a_dustSonar',
+          layers: [
+            grains('minimapPing_a.sweep', { freq: 600, freqEnd: 1150, grain: 0.004, gain: 0.3, attack: 0.004, hold: 0.05, decay: 0.24, curve: 3, from: 1500, to: 4000, q: 3.2, hp: 320, seed: 34150 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "a round pulse returning, low and soft",
+        spec: {
+          name: 'minimapPing_b_returningPulse',
+          layers: [
+            swept('minimapPing_b.out', { wave: 'triangle', freq: 392, from: 700, to: 2200, q: 3.6, gain: 0.42, attack: 0.006, hold: 0.04, decay: 0.08, curve: 2.6, noiseMix: 0.12, seed: 34160 }),
+            swept('minimapPing_b.back', { wave: 'triangle', freq: 294, from: 1800, to: 520, q: 3.4, gain: 0.4, attack: 0.006, hold: 0.03, decay: 0.2, curve: 3, noiseMix: 0.1, at: 0.1, seed: 34161 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "two narrow bands, a sonar return",
+        spec: {
+          name: 'minimapPing_c_sonarReturn',
+          layers: [
+            band('minimapPing_c.out', 1760, { gain: 0.95, decay: 0.11, q: 5.5, curve: 4.5, attack: 0.003, hold: 0.014, seed: 34170 }),
+            band('minimapPing_c.back', 1175, { gain: 0.8, decay: 0.18, q: 6, curve: 4, attack: 0.004, hold: 0.014, at: 0.09, seed: 34171 }),
+          ],
+        },
+      },
     ],
   },
 };

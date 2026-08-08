@@ -870,19 +870,19 @@
         {
           "id": "a",
           "wav": "previews/pressTick/a.wav",
-          "character": "soft triangle tap",
+          "character": "a dry contact, no tone in it",
           "params": "src/art/audio/candidates.ts#pressTick.a"
         },
         {
           "id": "b",
           "wav": "previews/pressTick/b.wav",
-          "character": "crisp gritty square click",
+          "character": "a damped pip, felt more than heard",
           "params": "src/art/audio/candidates.ts#pressTick.b"
         },
         {
           "id": "c",
           "wav": "previews/pressTick/c.wav",
-          "character": "round low sine thump",
+          "character": "one narrow band at the family root",
           "params": "src/art/audio/candidates.ts#pressTick.c"
         }
       ]
@@ -896,19 +896,19 @@
         {
           "id": "a",
           "wav": "previews/purchaseConfirm/a.wav",
-          "character": "bright square two-note chime",
+          "character": "two dry contacts, rising",
           "params": "src/art/audio/candidates.ts#purchaseConfirm.a"
         },
         {
           "id": "b",
           "wav": "previews/purchaseConfirm/b.wav",
-          "character": "soft sine bell ding",
+          "character": "a low seat, the buy landing",
           "params": "src/art/audio/candidates.ts#purchaseConfirm.b"
         },
         {
           "id": "c",
           "wav": "previews/purchaseConfirm/c.wav",
-          "character": "synthetic saw rising blip",
+          "character": "two narrow bands, a fourth apart",
           "params": "src/art/audio/candidates.ts#purchaseConfirm.c"
         }
       ]
@@ -922,19 +922,19 @@
         {
           "id": "a",
           "wav": "previews/rejectBuzz/a.wav",
-          "character": "flat gritty square drone",
+          "character": "grit refusal, dry and flat",
           "params": "src/art/audio/candidates.ts#rejectBuzz.a"
         },
         {
           "id": "b",
           "wav": "previews/rejectBuzz/b.wav",
-          "character": "short low triangle thud",
+          "character": "a blocked thud, nothing opens",
           "params": "src/art/audio/candidates.ts#rejectBuzz.b"
         },
         {
           "id": "c",
           "wav": "previews/rejectBuzz/c.wav",
-          "character": "gritty pitchless noise rasp",
+          "character": "two bands a semitone apart, unresolved",
           "params": "src/art/audio/candidates.ts#rejectBuzz.c"
         }
       ]
@@ -974,19 +974,19 @@
         {
           "id": "a",
           "wav": "previews/respawnBeep/a.wav",
-          "character": "pure plain sine tone",
+          "character": "a dry clock contact, no ring",
           "params": "src/art/audio/candidates.ts#respawnBeep.a"
         },
         {
           "id": "b",
           "wav": "previews/respawnBeep/b.wav",
-          "character": "crisp digital square clock",
+          "character": "a countdown pip with weight in it",
           "params": "src/art/audio/candidates.ts#respawnBeep.b"
         },
         {
           "id": "c",
           "wav": "previews/respawnBeep/c.wav",
-          "character": "warm low triangle beep",
+          "character": "a narrow band tone, machine-clean",
           "params": "src/art/audio/candidates.ts#respawnBeep.c"
         }
       ]
@@ -1000,19 +1000,19 @@
         {
           "id": "a",
           "wav": "previews/respawnGo/a.wav",
-          "character": "punchy square power-up rise",
+          "character": "release into a dry contact",
           "params": "src/art/audio/candidates.ts#respawnGo.a"
         },
         {
           "id": "b",
           "wav": "previews/respawnGo/b.wav",
-          "character": "bright sine and triangle launch chime",
+          "character": "pressure dumping, mass leaving",
           "params": "src/art/audio/candidates.ts#respawnGo.b"
         },
         {
           "id": "c",
           "wav": "previews/respawnGo/c.wav",
-          "character": "energetic saw double-step launch",
+          "character": "a band sweeping open, launch clear",
           "params": "src/art/audio/candidates.ts#respawnGo.c"
         }
       ]
@@ -1020,25 +1020,25 @@
     {
       "id": "minimapPing",
       "label": "Minimap Ping",
-      "context": "A minimap ping — a rising sonar blip that rings a moment & fades; it locates, it must never read as an alarm.",
+      "context": "The minimap toggle (the ping mechanic itself was cut) — it locates; it must never read as an alarm.",
       "current": "previews/minimapPing/current.wav",
       "candidates": [
         {
           "id": "a",
           "wav": "previews/minimapPing/a.wav",
-          "character": "clean rising sine sonar sweep",
+          "character": "a grained sweep, sonar through dust",
           "params": "src/art/audio/candidates.ts#minimapPing.a"
         },
         {
           "id": "b",
           "wav": "previews/minimapPing/b.wav",
-          "character": "soft triangle pulse with airy overtone",
+          "character": "a round pulse returning, low and soft",
           "params": "src/art/audio/candidates.ts#minimapPing.b"
         },
         {
           "id": "c",
           "wav": "previews/minimapPing/c.wav",
-          "character": "bright bell-like two-partial ping",
+          "character": "two narrow bands, a sonar return",
           "params": "src/art/audio/candidates.ts#minimapPing.c"
         }
       ]
