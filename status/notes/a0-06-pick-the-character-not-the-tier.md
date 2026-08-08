@@ -677,3 +677,153 @@ whoever is in the seat and cannot disagree with it.
   `playwright.config.ts` for the mobile suite (`7701b62`, QA's). Either owner can
   drop their own; both default to 4173 unchanged.
 - No other feature work outstanding. Do not invent any.
+
+### Session 2026-08-08 (tenth) — the first merge that genuinely FOUGHT, and what it taught
+
+Inherited the branch **fully pushed** (`d953b4c` = `origin/…`; `git log
+origin/<branch>..HEAD` empty — checked FIRST, session 5's lesson) with 40 dirty
+evidence PNGs. Read `git status` before restoring (session 9's rule): all 40 were
+`*-evidence.png` churn, nothing deliberate this time, so `git checkout --
+tests/live-stage/`. No feature work outstanding; none invented.
+
+**`origin/main` moved to `fa5495d` — a0-11 open-rooms-and-offline-revert, PR
+#329.** Merged first, before measuring (session 7's rule). This is the **first
+merge on this brief that did not auto-resolve**: **six files, twenty-one hunks** —
+`GDD.md`, `src/main.ts`, `src/ui/index.ts`, `src/ui/lobby.ts`,
+`src/ui/lobby.test.ts`, `src/ui/lobby-flow.test.ts`.
+
+It fought because a0-11 rewrote **the same seat model this brief rewrote**. Its
+change: an `open` slot is now EMPTY — `isBotSeat` is exactly `'bot'`, an open seat
+casts nobody, `N` counts humans plus bots, and RUSH! is refused below two.
+
+#### The resolutions that were judgement, not text
+
+- **GDD §2.1 — kept BOTH amendments.** They compose rather than compete: a0-11
+  says *which* slots get bots, a0-06 says *what you pick* for them. The merged
+  sentence carries both: "**Bots fill the slots the host set to `bot`, and only
+  those**; before the match, **the host picks each bot's CHARACTER … and that
+  character's difficulty is *shown***". Both markers verified by grep afterwards.
+- **`withCast` / `seatDifficulty` — kept a0-06's, and a0-11's worry evaporated.**
+  a0-11's doc agonises over which seats consume a **cast index** (it must match
+  `server/room.ts` `castFor`). On this branch **there is no index to spend** —
+  each seat carries the character the host gave it. Said so in the comment rather
+  than deleting a0-11's concern silently.
+- **`botDifficulties` auto-merged CORRECTLY and that is worth noting:** it now
+  filters `isBotSeat` (a0-11) and derives the tier from the character (a0-06).
+  Neither side had to give way.
+- **`ping` — took a0-11's predicate over mine.** Mine read `isBot || isClosed`;
+  under a0-11's narrowed `isBotSeat` that **silently stops covering an OPEN
+  seat**, which would have drawn a ping on an empty chair. Theirs
+  (`occupant !== 'human'`) is strictly better. A conflict I *won* on my own file
+  would have been the wrong outcome.
+- **`seatSlotState` lost its `online` arg** (a0-11) — took theirs; my
+  `lobbyRosterCast` sits above it untouched and still drops closed slots, which
+  now correctly includes unclaimed OPEN ones.
+- **`src/main.ts` `LobbyChoice` — pure union**, a0-06's `cast` beside a0-11's
+  `local`.
+
+#### The trap this merge set, and it is a NEW class
+
+**a0-11 changed the FIXTURES out from under my tests, in a way that fails silently
+rather than loudly.** Four of my tests would have kept compiling and passing while
+asserting nothing:
+
+- An **online** `lobby()` now seats everything OPEN, and `cycleSeatCharacter`
+  refuses a non-bot seat. My "cycles through the whole roster" test would have
+  cycled **nothing** and compared a value to itself. Now uses `solo()`, or
+  a0-11's `withBotAt()` helper where the flavour is parameterised.
+- My "keeps every other seat's character when a human arrives" ran over an
+  all-`open` fixture — under a0-11 a roster **with no bots in it**. Now `bot`.
+- The seat-state ring test asserted `toBe('open')` after a full lap; which rung a
+  seat *starts* on is now flavour-dependent, so it asserts **return-to-start**
+  instead of naming a rung.
+- The host-affordance guard tapped RUSH! on a one-participant online room, which
+  a0-11 now **refuses**. Seats a bot first via `withBotAt`.
+
+**The lesson, and it generalises past this merge:** when the other side changes
+what a *default fixture means*, a green test is not evidence. Re-read what your
+own fixtures now contain — `tsc` cannot see a test that has quietly become
+vacuous, and neither can a passing run.
+
+- **Two of main's tests asserted behaviour this brief DELETED** — re-casting the
+  roster on join, and a tappable difficulty chip (`kind: 'seatChip'`). Dropped
+  both, and replaced the second with its inverse: a test that the tier chip's rect
+  **does not** resolve to a target, so the deleted control cannot creep back.
+- **One of a0-11's own tests read `seat.difficulty`**, the field this brief
+  deleted; `tsc` caught it. Re-pointed at `seatDifficulty(seat)`.
+
+#### The two features actually compose — verified, not assumed
+
+a0-11's **local revert** (an online room with no other humans boots offline and
+gives the room back) nulls `onlineSession`, so it falls through to `bootMatch` →
+`bootOfflineMatch` → **the `cast` seam this brief added**. So a reverted room now
+seats the host's chosen cast rather than the roster-order default. Traced through
+`main.ts:895` rather than assumed, and the comment on `LobbyChoice.cast` now says
+so. **This is the first merge that made the seam do MORE work rather than none.**
+
+### Session 2026-08-08 (eleventh) — session ten's merge was RESOLVED but never staged
+
+**Read this before anything else: the failure mode was new, and `git status` was
+the only thing that showed it.** Session ten did the hardest merge on this brief
+— a0-11 open-rooms (`fa5495d`, PR #329), six files and twenty-one hunks — wrote
+its 83-line account into this note, and then **stopped without staging a single
+resolved file**. The tree was left mid-merge: `MERGE_HEAD` present, six paths at
+`UU`, and **zero conflict markers in any of them**, because the resolution work
+was genuinely finished and sitting in the working tree unstaged.
+
+That combination is worth naming, because it does not look like either thing it
+resembles:
+
+- It is **not** session 5/7's unpushed-merge trap. There was no commit to push;
+  `git log origin/<branch>..HEAD` was **empty** and would have reassured you.
+- It is **not** an abandoned half-resolution. Every file was clean, and `npx tsc
+  --noEmit` passed on the working tree **before** anything was staged — which is
+  what told me the resolution was finished rather than merely started.
+
+So the check that catches it is neither of the two this note already teaches. It
+is: **`git status` first, and read the index column, not just the filenames.**
+`UU` with no markers means "somebody finished and walked away," and the correct
+response is to verify and commit it, not to redo it and not to abort it. Aborting
+would have thrown away twenty-one hunks of real judgement.
+
+**Verified session ten's resolution rather than trusting its own account of
+itself** (it is a note about work that was never committed, so it had never been
+checked by anything):
+
+- `npx tsc --noEmit` clean on the unstaged tree.
+- `GDD.md` §2.1 carries **both** amendment markers in one sentence — a0-11's
+  *"Bots fill the slots the host set to `bot`, and only those"* and a0-06's *"the
+  host picks each bot's CHARACTER … and that character's difficulty is shown"*.
+  §2.9's *"characters, not difficulty labels"* intact at line 235.
+- The seat model is coherent: `LobbySeat.character` (authored, on every seat) and
+  `LobbySeat.personality` (**derived**, `character` gated by a0-11's narrowed
+  `isBotSeat`, so an open seat now casts nobody). Two fields, one authored —
+  which is still one control, so the brief's "a mismatch is unrepresentable"
+  property survives a0-11 intact.
+- The `ping` predicate is a0-11's `occupant !== 'human'`, not mine — session ten
+  gave way on its own file and was right to.
+- `seatTrailing` (the `?` / tier / side order-of-surrender) untouched.
+
+Committed as `a9442c7` and **pushed before doing anything else with it**.
+
+#### Then main had moved AGAIN, to `854fa64` — a0-12 two-sided team maps, PR #330
+
+Merged second, **clean, no conflicts** (`80e3a01`), pushed immediately. It shares
+exactly one file with this brief, `src/ui/lobby-geometry.ts`, and the two changes
+are in different halves of it: a0-12 took `LOBBY_MAP_COUNT` 4 → 6 and rewrote the
+**arena/map row** (`placeMaps`, a new `LOBBY_MAP_GAP_MIN`, the fold threshold 48 →
+44); this brief owns the **seat row** (`seatTrailing`). Checked the diff rather
+than trusting the clean auto-merge, because "no conflict" on a file both sides
+edited is a claim to verify.
+
+**This is the eighth merge in a row to leave the cast seam untouched** — and the
+seventh to change something real while doing it (a0-12 added two maps and a sky).
+
+#### The sequencing decision, and it cost a running test job
+
+A targeted vitest run was already going when I found main had moved. **Killed it
+rather than letting it finish.** Session 7 wrote the rule and it applied exactly:
+`merge-base --is-ancestor` is evaluated on the *final* tree, so a green result on
+a tree two merges behind main proves nothing the DoD asks for. **Merge before you
+measure** — the measurement is the perishable thing, not the merge.
+
