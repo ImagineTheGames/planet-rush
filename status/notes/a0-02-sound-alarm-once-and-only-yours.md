@@ -1,0 +1,848 @@
+# s9-01 — the alarm plays once, and only for YOUR station · working notes
+
+Branch: `agent/sound/s9-alarm-once-and-ownership` · from `4960540` (main),
+merged up to `9803e3b`. **PR #318.**
+
+Working note, not evidence. The DoD, the PR body and QA attestation are the record.
+
+## The developer, 2026-08-07, verbatim
+
+> "also for the alarm, it should only play once, and not keep playing (and should
+> only play for your station not others)..."
+
+The brief located both defects, and both were exactly where it said. No time was
+spent re-finding them.
+
+## BUILT
+
+- `bb28884` — **defect 1, the loop.** `syncAlarm` now sounds one one-shot per
+  *engagement* instead of starting a loop while `alarm.active`. Ducking follows
+  the sting (`ALARM_DUCK_S`), not the siege. `SOUND.alarm` stops being a `loop`
+  spec (same bar, same two tones, ordinary edge fades). `alarmSounds` counts
+  stings headless. `deriveAlarmAllies` moved presenter.ts → `audio/scope.ts`.
+  Nine unit tests.
+- `64b4a4c` — **defect 2, the wire.** `audio.setLocal(LOCAL_PLAYER)` and the
+  `WorldObserver` construction moved to the seat assignment; `setAlarmScope` fed
+  every frame from live world truth; `window.__alarmStage` installed on BOTH boots.
+- `ffd5d00` — the live-stage online spec + its own fleet, the GDD §2.2 fold-in,
+  the `docs/design-amendments.md` entry.
+- `6688ce9` — the sting retries when the mix is full; the seam is read in-match.
+- `4625945` — the preview is fingerprinted; the readout lands in
+  `evidence/s9-01-alarm-ownership.json`.
+- `1543429` — the fleet is killed by process group, so a preview cannot outlive
+  the run.
+- `f053f2e` — merge `origin/main` (`9803e3b`). One conflict, in
+  `docs/design-amendments.md`: a0-03 added its entry at the top of the file on
+  the same day. Both kept, mine first. GDD §2.2 auto-merged — a0-03's `ORE`
+  caption and this lane's alarm paragraphs are in different parts of the section.
+
+## DECISIONS, and what was rejected
+
+**The hysteresis stays, and changes job.** `MIN_HOLD_S` / `RELEASE` were written
+against a *looping* alarm stuttering. Deleting them with the loop was the obvious
+tidy-up and would have been the bug: with a one-shot they are the re-trigger
+guard that stops a dodge-and-return attacker machine-gunning the klaxon. Same
+constants, better job — the brief called this and it is right.
+
+**The sting is one bar, not two.** The alarm buffer is a single bar of two rising
+tones (~0.6 s). "Play once" is taken literally; padding it to two bars would be
+re-litigating "unmistakable" without a ratification. What carries the duration
+now is the arrow, which is the design content of the amendment.
+
+**The arrow was verified before the sound was cut**, per the brief's BLOCKED
+clause. `src/ui/alarm.ts` `homeArrow` is real, drawn by `Hud.drawHomeArrow` off
+the HUD's own sustained-damage trigger (`ALARM_HOLD_S = 5`), and hidden only when
+home is already on screen — where the station itself is the tell. It is fed from
+`LOCAL_PLAYER` through a closure, so unlike the audio it was never mis-seated.
+Not blocked.
+
+**The sting kept the ALARM bus.** `flat()` defaults to `sfx`; the loop had named
+`'alarm'`. Taking the default would have quietly put a not-cuttable mechanic
+under the SFX slider. Also `rate 1` — no pitch jitter on an emergency signal.
+
+**`deriveAlarmAllies` moved rather than being copied.** `main.ts` and
+`presenter.ts` are two wirings of the same engine and only one of them knew the
+rule, which is how "an ally's siege never rang" survived. One copy, in
+`src/art/audio/scope.ts`, imported by both. `presenter.ts` is a two-line import
+change and is flagged in the PR body.
+
+**A new seam rather than widening `__audioStage`.** `__audioStage` is `?debug=1`
+only, and `?debug=1` skips the menu into an OFFLINE match — it can never see an
+online one. `__alarmStage` ships on both boots for the same reason
+`__pauseStage` does, and is pure read-back.
+
+**The live-stage spec stands up its OWN fleet.** The DoD names
+`npm run test:live-stage`, which is the offline config — its bundle has no
+allocator baked in, so CREATE ROOM there can only refuse. `tests/live-stage-online/`
+solves that with a `globalSetup` on a config that is not mine to change, so
+`tests/live-stage/alarm-fleet.ts` spawns the same three shipped processes from
+the spec's own `beforeAll`, on its own ports (8795/8796/4176) and its own
+out-dir (`dist-alarm-stage/`). Slow, and the only route to the claim.
+
+**Slot 0 cannot pass.** The spec asserts on the GUEST and fails outright if the
+guest was seated at 0, because with the wire dead `local` defaults to 0 and reads
+identical to a live one — which is precisely how this survived merged and tested.
+
+**The sting retries when the mix is full.** Found while reviewing the diff, not
+by a test: `graph.play` refuses a one-shot past the 24-voice cap, and a fierce
+siege frame is exactly when that happens — which is exactly when a not-cuttable
+mechanic must not be the thing dropped. A loop never had to survive this; one
+sting does. The engagement stays unclaimed until a sting actually starts. The
+headless engine and the death hush fall through instead, because retrying through
+the three seconds of quiet would fire the klaxon on the far side of them.
+
+**The preview is fingerprinted, not just polled.** The first green run of the
+spec was served by a *leftover* preview from an earlier failed run — same outDir,
+so it happened to be right, and would silently have been wrong the first time the
+bundle changed. `--strictPort` does not help: it kills the new child while the
+old one keeps answering 200. `alarm-fleet.ts` now compares the served
+`index.html` against the one just built (the entry chunk is content-hashed), so a
+stale run or a neighbouring working copy on the port fails loudly and by name.
+Also `--host 127.0.0.1` on both ends: left alone `vite preview` listens on `::1`
+while Node's `fetch` tries `127.0.0.1` first, and the readiness probe times out
+against a server printing its own URL to the log.
+
+## THE LIVE-STAGE SUITE IS ALREADY RED ON MAIN — read this before re-running it
+
+`npm run test:live-stage` does not pass on `origin/main`, untouched. Measured, not
+assumed: a worktree at `4960540` with this repo's `node_modules`, the suite's
+preview port moved off 4173 so it could not borrow anything, full run —
+
+| run | failed | passed | skipped |
+|---|---|---|---|
+| `origin/main`, untouched | 25 | 70 | 3 |
+| this branch (run A) | 24 | 72 | 3 |
+| this branch (run B, final HEAD) | 27 | 69 | 3 |
+
+The new spec passes in every run. Run A's failing set is a strict **subset** of
+main's; run B adds `minimap.spec.ts:662` and `ore-conservation.spec.ts:98`, and
+**both pass in isolation on this branch** (9/9) — they are load flakes on a box
+shared with other lanes, not this change. The shared failure mode is `__lobby`
+never appearing after
+`__mainMenu.play()` — the doors screen now sits between them — across
+`fullscreen`, `unified-play-flow`, `lobby-flow`, `map-picker`, `upgrade-wheel`,
+`connect-trace`, `codex-lobby`, `repair-core`, `tap-markers`, `minimap` and one
+`audio-alive` test. It is not this lane's to fix and it is not this lane's to
+hide: do not spend a session chasing it here, and do not report the suite as
+green.
+
+Counts wobble run to run (24, 27, and 28 in a contended run without the new spec
+at all) — the box is shared across lanes. Every spec that failed on this branch
+and not on main passed when re-run alone.
+
+## THE LIVE DEPLOYMENT DOES NOT HAVE THIS FIX — measured, 2026-08-08
+
+`evidence/s9-01-live-probe.mjs` (committed, re-runnable) fetches the deployment,
+names the served sha and says whether the shipped entry chunk carries this lane's
+code. Against `https://imaginethegames.github.io/planet-rush/`:
+
+```
+servedSha    9803e3b   (= origin/main, published 2026-08-08T03:13Z)
+__alarmStage false   ·  alarmStings false  ·  __pauseStage true (control)
+verdict      the fix is NOT deployed
+```
+
+Pointed at this branch's own preview it reads `cbbc090`, both markers true,
+`deployed` — the positive control, so this is not a permanently-false grep.
+
+**Therefore the by-ear evidence item the brief asks for is blocked on the DEPLOY,
+not on the work.** The developer is still hearing the loop and still hearing slot
+0's station, because what is live is still pre-fix code. Do not write that
+attestation against 9803e3b and do not let a green suite stand in for it: after
+PR #318 merges and Pages republishes, re-run the probe, confirm `deployed`, then
+play an online match on a non-zero slot and listen. That is the only thing that
+closes it, and it is QA's to write, not this lane's to claim.
+
+## BUILT, round 2 (this session)
+
+- `5f7738c` — `evidence/s9-01-live-probe.mjs` + its readout, and the behavioural
+  live-stage spec that the next commit removes (see below — it cannot pass here).
+- the frame-rate finding, pinned as a unit test in `audio.test.ts`
+  (`KNOWN LIMIT: …below ~20 fps`), with the live-stage spec removed in the same
+  commit and the reasoning kept in this file and the PR body.
+
+## FINDING: the alarm cannot fire below ~20 fps, and it is not this lane's to fix
+
+Found by trying to prove the one-shot in a booted client instead of in memory.
+The behavioural live-stage spec (written, run, **deleted** — see below) could not
+raise the alarm in headless Chromium *at all*, however hard the core was hit.
+Measured, `?debug=1`, this bundle: **2.0 fps at 1280×800** (the live-stage
+viewport), 3.0 at 800×600, 6.7 at 640×400, 12.9 at 400×300. `setTimeout(4ms)`
+got 13 ticks in 6 s, so the main thread is saturated by the render loop.
+
+The cause is a units mismatch that predates this lane:
+
+- pressure is deposited per **event** — `damage()`, `+WEIGHTS[kind]`;
+- it leaks per **second** — `update(dt)`, `−LEAK·dt`;
+- and `art/vfx/observer.ts` emits at most **one `coreHit` per station per
+  rendered frame** (it diffs core HP against last frame, so ten hits in one
+  frame are one tell).
+
+So deposits scale with frame rate while the leak scales with time, and the
+break-even is a frame rate: `LEAK / WEIGHTS[coreHit]` = `1.2 / 0.06` = **20 fps**.
+Above it pressure climbs to ENGAGE; below it every frame leaks more than it
+deposits and no siege can ever ring the klaxon.
+
+Not the whole mechanic: `shieldDown` / `turretDown` weigh 0.8 — over ENGAGE on
+their own — so a station actually losing its defences still rings at any frame
+rate (GDD §2.6). It is the slow grind on a bare core that goes unannounced, which
+is also the case the player is most likely to be away from (§2.2's whole point).
+
+**Not fixed here, deliberately.** The honest fix is in the *observer* (emit
+`coreHit` proportional to damage, or accumulate per tick rather than per frame)
+— `src/art/vfx/observer.ts`, which is not this lane's file — and it would move
+*when* a ratified §2.2 mechanic fires. That is a Director/Art call, not a
+sound-lane one, and s9-01 is about the sting and the seat. Pinned instead by a
+unit test, `KNOWN LIMIT: sustained core fire cannot raise the alarm below ~20
+fps`, which asserts 60 fps and 30 fps engage, 10 fps never does over 30 s of
+unbroken fire, and the 20 fps arithmetic off the shipped constants. Named in the
+PR body as a follow-up.
+
+## The behavioural live-stage spec was written, run, and REMOVED
+
+`tests/live-stage/alarm-once-and-ownership.spec.ts` sieged real cores through the
+`?debug=1` write seam and sampled the alarm every frame (A: 5 s on your core →
+one sting; B: release; C: 5 s on a rival's → silence; D: re-engage → two). It is
+the right test and it cannot pass in this suite's environment, for the reason
+above — 22 frames in 5 s, and the pressure never reaches ENGAGE. Committed in
+`5f7738c`, removed in the follow-up commit rather than left red or left skipped:
+a spec that cannot pass on the box the DoD runs on is worse than no spec.
+
+**Do not re-add it without first fixing the frame rate or the deposit model.**
+The behavioural claim is carried by ten unit tests against the real `AudioEngine`
+and a recording AudioContext, which is the finer instrument anyway; the live
+class earns its keep on the *wire* (`alarm-ownership-online.spec.ts`), which is
+where the defect actually was.
+
+## TRAP, and this time it actually bit: 4173 served a NEIGHBOUR'S bundle
+
+`tests/live-stage/playwright.config.ts` uses port 4173 with
+`reuseExistingServer: !CI`, and the lanes share one box.
+
+- The `cbbc090` run was fingerprinted first and was **ours** (served
+  `assets/index-BqT9NfUA.js` / sha `cbbc090` == `dist/` == HEAD).
+- The run after the `03ed194` merge was **not**. Served sha `5665364` against a
+  HEAD of `52c137a` and a `dist/` of `e293990` — Playwright found something
+  already answering on 4173 and reused it, so the whole suite ran to completion
+  describing another lane's build, with nothing in the output saying so. Killed
+  and re-run. Other lanes were also holding 4207 and 4208.
+
+**Fingerprint before believing any live-stage result.** `version.json` carries
+the sha, so it is one comparison:
+`curl -s http://localhost:4173/version.json` vs `dist/version.json` vs
+`git rev-parse --short HEAD`.
+
+**The re-run route, since the suite config is the Platform Engineer's file and
+not ours to edit:** a throwaway copy at the repo root on a free port
+(`playwright.live-stage-private.tmp.config.ts`, port 4191,
+`reuseExistingServer: false`, `--host 127.0.0.1`), run with
+`npx playwright test --config …`, then deleted. **Do not kill a neighbour's
+preview** to free the port.
+
+Also, again: `vite preview` binds `::1` only unless told otherwise —
+`curl 127.0.0.1:4173` returns nothing while `curl localhost:4173` returns 200,
+and Node's `fetch` prefers the v4 address, so a readiness probe times out against
+a server that is up. `ss -lptn` returns nothing useful in this sandbox, so port
+checks have to be curl + fingerprint rather than a socket list.
+
+## BUILT, round 3 (this session)
+
+- `4e7abe9` — the 4173 trap write-up above (it actually bit) and the private-port
+  re-run route.
+- The PR body was **two commits stale**: it carried neither the ~20 fps finding
+  nor the live-probe result. Both are now in it — the frame-rate section names
+  `src/art/vfx/observer.ts` as the follow-up and whose call it is, and Outstanding
+  states plainly that the by-ear item is blocked on the deploy, with the served
+  sha.
+- Deploy re-probed **2026-08-08**: it has moved on from `9803e3b` to **`03ed194`**
+  and is **still pre-fix** (`__alarmStage` false, `alarmStings` false,
+  `__pauseStage` true as the control). `evidence/s9-01-live-probe.json` refreshed
+  to that reading — it does not self-write, it is
+  `node evidence/s9-01-live-probe.mjs > evidence/s9-01-live-probe.json`.
+- Housekeeping: the live-stage run of the previous session had left **35
+  `tests/live-stage/*-evidence.png`** dirty — other lanes' spec output, regenerated
+  by running their specs. Reverted with `git checkout --`, not committed: they are
+  not this lane's files and they would have been noise in this PR. Expect them
+  dirty again after every full-suite run; revert them, never commit them.
+
+- `98116c9` — the spec keeps the `pageerror` **stack**, and a `KNOWN_FOREIGN`
+  list so a foreign crash is named and logged rather than fatal. Full-suite run C
+  (after the `03ed194` merge, private port 4191, fingerprinted): **31 failed / 66
+  passed / 3 skipped**, and my spec was one of the 31 — on the page-error
+  assertion only, never on the seat claim. Green again after the fix, with the
+  readout `guest seat 1 → {"local":1,"allies":[1]}`.
+
+## THE TWO FAILURES I CHASED TO THE BOTTOM — do not re-derive these
+
+Both reproduce on a clean `origin/main` worktree at `03ed194`. Method, since it
+is reusable: `git worktree add --detach /tmp/main-probe origin/main`, symlink
+this repo's `node_modules` in, copy `tests/live-stage/alarm-fleet.ts` across,
+drop a throwaway spec + config in, run. **A probe script must live under the repo
+root to resolve `@playwright/test`** — running it from `/tmp` gets
+`ERR_MODULE_NOT_FOUND`.
+
+**1. `TypeError: Cannot read properties of null (reading 'clear')` — foreign.**
+`page.on('pageerror')` was storing `String(e)`, which is the message and nothing
+else, and the bundle is minified — so the net caught a crash and named no file.
+Now it keeps `e.stack`, and the minified frames map (via the entry chunk's
+`.js.map`, decoding the VLQ mappings by hand) to **`src/ui/lobby-entry-view.ts:234`**,
+`this.backdrop.clear()` in `update()`, from `main.ts:6075`. Cause: the menu
+teardown (`main.ts:7089`) destroys `entryView` — nulling the PIXI
+`GraphicsContext` — **without clearing `visible`**, so a post-teardown render
+frame updates a destroyed view. **Online route only**: a SOLO-route probe on main
+is clean, which is why only my two-client spec sees it. `src/ui/` is not mine;
+listed in `KNOWN_FOREIGN` with the repro, logged whenever it fires, handed to the
+menu-view owner in the PR. New page errors still fail the spec.
+
+**2. `audio-alive.spec.ts:239` — mine, and it is the TEST that is wrong.** The
+SFX-slider assertion reads `sfxBusGain === 0` synchronously after `setSfx(0)` and
+gets `0.8`. Cause: **`graph.setBus` ramps over 50 ms** and the spec reads
+`gain.value` in the same `page.evaluate`. Fails identically on clean `origin/main`
+(`{"before":1,"after":2,"sfxBusGain":0.8}`), so it is not this change — and
+specifically **not the alarm duck**, which would read `0.8 × SFX_DUCK`, not an
+untouched `0.8`. The one-line fix is a ~100 ms wait before the read. **Left
+unfixed on purpose**: an unrelated audio spec going green inside the alarm PR is
+how a real regression hides. Next thing this lane picks up.
+
+**The previous round's note filed this audio-alive failure under the `__lobby`
+doors shape. That was wrong** — it is the ramp. Corrected here and in the PR.
+
+## DECISIONS, round 3
+
+**The unit suite's one red test is not this lane's.**
+`tests/net/capacity/capacity-regression.test.ts` "the loop stays inside the tick
+budget at 12 rooms" failed the full run at 38.38 ms vs a 33 ms budget, and
+**passes in isolation (4/4)** — a wall-clock budget measured while the rest of a
+3911-test suite and other lanes share the box. `tests/net/` is not ownable here
+and CI's own "Typecheck, test, build" is green on this branch. Do not chase it,
+do not report it as this lane's failure, and do not report the full run as clean
+without saying which test it was.
+
+## ROUND 4 (this session) — nothing to build; the branch was already complete
+
+Inspected first, per RESUME. `b2ecfaa` is HEAD, **fully pushed**, PR #318 open and
+`MERGEABLE`. No code commit was needed and none was invented.
+
+Re-verified at HEAD rather than trusting round 3's numbers:
+
+| gate | result |
+|---|---|
+| `npx tsc --noEmit` | **pass**, exit 0 |
+| `npm test -- --run` | **fully green — 3911 passed / 234 files, 0 failed** |
+| `git merge-base --is-ancestor origin/main HEAD` | **pass** — `origin/main` is still `03ed194`, already merged in at `52c137a` |
+| `alarm-ownership-online.spec.ts`, private port 4191 | **pass** — `guest seat 1 → {"local":1,"localPlayer":1,"allies":[1]}` |
+| deploy probe | **still `03ed194`, still pre-fix** — unchanged, `evidence/s9-01-live-probe.json` already reads this |
+
+The guest readout is the whole claim in one line: a second engine on the same
+bundle reporting seat 1, which the captured-constant wiring could not produce.
+
+**The unit suite came back CLEAN this round — 0 failed.** Round 3 ran it with
+`tests/net/capacity/capacity-regression.test.ts` red at 38.38 ms against a 33 ms
+budget and called it a load flake on a shared box; a full green run at the same
+HEAD **confirms that call**. The PR body's DoD table still says "1 failed"; that
+was true when written and is worth updating to the clean run rather than leaving
+a reader to wonder. Nothing about the code changed between the two runs — only
+how busy the box was, which is the point.
+
+**CI note:** "Typecheck, test, build" is green on both runs; "Mobile emulation
+(Playwright)" has sat **pending since 05:38Z** — a queue, not a failure. It is why
+`mergeStateStatus` reads UNSTABLE rather than CLEAN. Nothing to act on here; if it
+is still pending at merge time it is the Platform Engineer's runner, not this lane.
+
+**The 4173 trap did not bite this round** because I never went near it — the
+throwaway private-port config (`playwright.live-stage-private.tmp.config.ts`,
+port 4191, `reuseExistingServer: false`, `--host 127.0.0.1`) was written before the
+first run, not after a suspicious result. Delete it after use; it is deliberately
+untracked. Also: `git checkout -- tests/live-stage/` cleared **39** foreign
+`*-evidence.png` left dirty by the previous session's full run. As predicted — they
+come back after every full-suite run, revert them, never commit them.
+
+**Re-confirmed the `audio-alive.spec.ts:239` call rather than re-opening it.**
+`graph.setBus` really does default to a 50 ms ramp (`src/art/audio/graph.ts:223`)
+and the spec really does read `r.sfxBusGain` synchronously inside the same
+`page.evaluate` as `setSfx(0)` (lines 316-326). Round 3's diagnosis holds. **Left
+unfixed again, deliberately** — it is a different brief, it fails identically on
+clean `origin/main`, and slipping an unrelated audio spec green into the alarm PR
+is exactly how a real regression hides. It stays this lane's next pick-up.
+
+## ROUND 5 (this session) — nothing to build again; re-verified, and the deploy has not moved
+
+Inspected first, per RESUME. HEAD `3f426ee`, **pushed** (`origin/…` identical), PR
+#318 **OPEN / MERGEABLE**. No code commit was needed and none was invented. The PR
+body was checked and is **current** — round 4's clean-run update to the DoD table
+is in it, so nothing was stale this round.
+
+Re-verified at HEAD rather than trusting round 4's numbers:
+
+| gate | result |
+|---|---|
+| `npx tsc --noEmit` | **pass**, exit 0 |
+| `npm test -- --run` | **3911 passed / 234 files, 0 failed** — clean a second consecutive round |
+| `alarm-ownership-online.spec.ts`, private port 4191 | **pass** (2.1 m) — `host seat 0 {"local":0,…}` · `guest seat 1 {"local":1,"localPlayer":1,"allies":[1]}` |
+| `git merge-base --is-ancestor origin/main HEAD` | **pass** — `origin/main` still `03ed194`, merged in at `52c137a` |
+| deploy probe | **still `03ed194`, still pre-fix** (`__alarmStage` false, `alarmStings` false, `__pauseStage` true) |
+
+`evidence/s9-01-alarm-ownership.json` came back **byte-identical** to the committed
+one — the re-run reproduced the readout exactly, which is the point of committing it.
+
+The capacity flake call is now confirmed by **two** consecutive clean full runs at
+the same code. Round 3's single red `tests/net/capacity` test was load, not this lane.
+
+**The code was read at HEAD, not just trusted from these notes**: `syncAlarm`
+(engine.ts:635) sounds one sting per `alarm.count` bump with the voice-cap retry and
+the death-hush fall-through intact; `audio.setLocal(LOCAL_PLAYER)` + the
+`WorldObserver` sit at main.ts:808-809, immediately after the seat assignment at 790;
+`setAlarmScope` is fed every frame at main.ts:1954. All as described.
+
+**Housekeeping, as predicted:** 34 foreign `tests/live-stage/*-evidence.png` were
+dirty at session start (previous session's full run). Reverted with
+`git checkout -- tests/live-stage/`, never committed. The throwaway
+`playwright.live-stage-private.tmp.config.ts` was reused for the seat spec and then
+deleted again — the recipe to recreate it is in the 4173 section above, and the 4173
+trap did not bite because the private port was used from the first run.
+
+**The `audio-alive.spec.ts:239` ramp fix was left out for the third time, on
+purpose.** Same reasoning, unchanged: different brief, fails identically on clean
+`origin/main`, and an unrelated audio spec going green inside the alarm PR is how a
+real regression hides.
+
+**Note on the notes:** `/status/notes/a0-02-…` (absolute, the shared status dir) was
+still the **empty template** — the real file is the committed one at
+`status/notes/a0-02-…` in the repo. Synced this round so both read the same. If a
+future session finds the absolute copy empty again, trust the repo copy.
+
+## ROUND 6 (this session) — one real commit: the live spec now asserts the one-shot
+
+Inspected first, per RESUME. HEAD was `011deee`, pushed, PR #318 OPEN / MERGEABLE,
+PR body checked and **current** (it already carries the ~20 fps finding, the live
+probe with `03ed194`, and round 4's clean-run DoD table).
+
+Re-verified at HEAD:
+
+| gate | result |
+|---|---|
+| `npx tsc --noEmit` | **pass**, exit 0 (twice — before and after this round's edit) |
+| `npm test -- --run` | 3910 passed / **1 failed**: `tests/net/capacity` again, 48.19 ms vs the 33 ms budget |
+| the same capacity test, in isolation | **4/4 pass** — the load-flake call, confirmed a third time |
+| `alarm-ownership-online.spec.ts`, private port 4191 | **pass**, twice (3.0 m, 3.9 m) |
+| `git merge-base --is-ancestor origin/main HEAD` | **pass** — `origin/main` still `03ed194` |
+| deploy probe | **still `03ed194`, still pre-fix** — unchanged for a third round |
+| CI | "Typecheck, test, build" **pass**; "Mobile emulation" pending (a queue, as before) |
+
+**The capacity test went red again this round and is still not this lane's.** Rounds
+4 and 5 ran it clean at this same code; round 3 saw 38.38 ms, this round 48.19 ms,
+isolation 4/4. Three data points now say wall-clock budget on a shared box. Report
+the run as "1 failed, and here is which test" — never as clean, and never as this
+lane's.
+
+### What actually got built, and why it was not nothing
+
+The seat spec **recorded** the host's `active/engagements/sounds` but asserted
+nothing about them. This round's first run sampled the host mid-siege and rewrote
+the committed evidence from `0/0` to `1 engagement / 1 sting` — which, read cold by
+a future session, looks exactly like a regression. It is not; it is whether a bot
+reached the host's core inside the run's window.
+
+`ff17356` fixes both halves of that:
+
+- **`sounds <= engagements`, asserted on both clients.** That is defect 1 — at most
+  one sting per engagement — observed in a *booted client* rather than in memory,
+  which is the one thing the behavioural claim did not have. Written as an
+  invariant, not an expected count, precisely because the siege is incidental: it
+  holds at zero, so it cannot flake, and it is still a shape the old code could not
+  produce (a loop has no per-engagement sting to count and sounded for as long as
+  `active` held). The real behavioural proof stays in the unit suite for the ~20 fps
+  reason above; this is the corroboration that comes free when combat happens.
+- **A `reading` caption in the evidence JSON** saying which numbers are a claim
+  (seats, ally rosters — identical every run) and which are weather (the host
+  counters).
+
+Verified both ways rather than asserted once: run 1 sampled the host at `1/1`, run 2
+sampled it at `0/0`, and the spec passes on both. The committed artifact is back to
+byte-stable apart from the new caption line.
+
+**This is why "nothing to build" was the wrong read for round 6.** Rounds 4 and 5
+correctly built nothing. The difference here was a *changed file in `git status`*
+that had to be explained rather than reverted — the churn was the signal.
+
+**Housekeeping, as predicted:** 36 foreign `tests/live-stage/*-evidence.png` dirty at
+session start; `git checkout -- tests/live-stage/`, never committed. Throwaway
+private-port config created before the first run (so the 4173 trap again did not
+bite) and deleted after each. The `audio-alive.spec.ts:239` ramp fix was left out
+for the **fourth** time, same reasoning, unchanged.
+
+## ROUND 7 (this session) — main moved, so the branch moved; and a RESUME failure worth recording
+
+**Read this part first if you are a future session of this lane.** I did not
+inspect the branch before working. `git status` was clean, `git log` showed
+`main`'s tip, and I took the brief at face value and **re-implemented the whole
+lane from `main`** — the one-shot, the seat wiring, the scope wiring, a
+live-stage spec, the GDD amendment, a fresh working note — four commits, all of
+it duplicating work that was already six rounds deep and already on a PR. It
+surfaced only when `git push` was rejected as non-fast-forward.
+
+Nothing was lost: the push was rejected, not forced, and the parallel branch was
+deleted after diffing it against the real one. But the hour was. **The RESUME
+step is not optional and it is not `git status` — it is
+`git fetch origin <branch> && git log origin/<branch>`, before reading the
+brief.** A brief describes the *task*; only the remote describes the *state*. A
+clean tree on `main` is exactly what a resumed lane looks like from the inside.
+
+The diff was checked before discarding, in case the parallel attempt held
+anything the real branch did not. It did not: this branch's `scope.ts` also
+dedupes `presenter.ts` (mine left two copies of the rule), its `syncAlarm` has
+the voice-cap retry mine lacked, and it has the live probe, the evidence JSON
+and the ~20 fps finding. The one genuine difference was a **two-bar** sting
+against this branch's one bar — deliberately not adopted, because re-voicing is
+out of scope for this brief (GDD §4.7's blast radius) and the developer's
+sentence was about *how often*, not about *what it sounds like*.
+
+### What actually needed doing
+
+`origin/main` had moved from `03ed194` to **`b32d0a7`** (PR #320, the darker
+backdrop), so the **ancestry gate was failing** — the first round where a real
+gate was red at session start. Merged `origin/main` in (60 files, the a0-07
+backdrop work and its re-baselined goldens) and re-verified everything on the
+merged tree rather than trusting round 6's numbers:
+
+| gate | result |
+|---|---|
+| `npx tsc --noEmit` | **pass**, exit 0 (before and after the merge) |
+| `npm test -- --run` | **3955 passed / 235 files, 0 failed** — clean |
+| `alarm-ownership-online.spec.ts`, private port 4191 | **pass** (1.9 m) — `host seat 0 {"local":0,…}` · `guest seat 1 {"local":1,"localPlayer":1,"allies":[1]}` |
+| `git merge-base --is-ancestor origin/main HEAD` | **pass**, after the merge |
+| deploy probe | **moved to `b32d0a7`, still pre-fix** |
+
+The suite count moved 3910 → **3955** because main brought `src/art/backdrop.test.ts`
+and the a0-07 goldens with it, not because anything here grew.
+
+**The capacity test was green this round**, on a full parallel run, at 235 files.
+That is the fourth data point and it agrees with rounds 4 and 5: load, not this
+lane. (I also hit it red once on the parallel attempt's tree and green in
+isolation minutes later — same box, same code. Same story.)
+
+`evidence/s9-01-alarm-ownership.json` came back **byte-identical** again;
+`evidence/s9-01-live-probe.json` was refreshed to the new served sha.
+
+**The deploy is on `b32d0a7`, which is `origin/main` exactly** — so the pipeline
+is current and simply has not been given this branch yet. The by-ear item is
+blocked on the merge, not on a stuck deploy. That is a slightly better answer
+than rounds 3-6 could give, when the served sha lagged main.
+
+**Housekeeping.** The throwaway private-port config was created before the first
+run and deleted after, as prescribed — the 4173 trap did not bite the seat spec.
+It *may* have bitten the parallel attempt's full-suite run on 4173 earlier in the
+session; that run is void either way and its numbers are not recorded here.
+`tests/live-stage/` was reverted clean before the reset.
+
+The `audio-alive.spec.ts:239` ramp fix was left out for the **fifth** time, same
+reasoning, unchanged: different brief, fails identically on clean `origin/main`,
+and an unrelated audio spec going green inside the alarm PR is how a real
+regression hides.
+
+## ROUND 8 (this session) — nothing to build; every gate green, and the deploy has not moved
+
+**Inspected the remote first**, which is round 7's own lesson and it cost nothing:
+`git fetch origin` → `origin/agent/sound/s9-alarm-once-and-ownership` is `e88d49c`,
+**identical to local HEAD**, so the branch is fully pushed and six rounds of work
+were already there. PR #318 **OPEN / MERGEABLE**. The PR body was checked and is
+**current** — round 7 already put `b32d0a7` and the 3955-test clean run into it,
+so nothing was stale.
+
+Re-verified at HEAD rather than trusting round 7's numbers:
+
+| gate | result |
+|---|---|
+| `npx tsc --noEmit` | **pass**, exit 0 |
+| `npm test -- --run` | **3955 passed / 235 files, 0 failed** — clean (450 s) |
+| `alarm-ownership-online.spec.ts`, private port 4191 | **pass** (1.5 m test / 4.0 m with the build) — `host seat 0 {"local":0,…}` · `guest seat 1 {"local":1,"localPlayer":1,"allies":[1]}` |
+| `git merge-base --is-ancestor origin/main HEAD` | **pass** — `origin/main` still `b32d0a7`, merged in at `927ba98` |
+| deploy probe | **still `b32d0a7`, still pre-fix** (`__alarmStage` false, `alarmStings` false, `__pauseStage` true) |
+| CI | "Typecheck, test, build" **SUCCESS**; "Mobile emulation" IN_PROGRESS — the same queue as rounds 4-7, which is why `mergeStateStatus` reads UNSTABLE |
+
+**The ancestry gate was watched, per round 7's warning, and it held**: `origin/main`
+did not move between rounds 7 and 8, so the merge at `927ba98` still covers it.
+
+**The capacity test was green again** on a full parallel run — sixth data point,
+same call: contended box, not this lane, not a regression.
+
+**Both evidence artifacts came back byte-identical.** `git status` after the live
+run showed *only* the untracked throwaway config — no evidence churn at all. That
+is round 6's caption fix doing its job: the numbers that are a claim (seats, ally
+rosters) are stable, and the host's incidental `0/0` counters no longer rewrite the
+committed file when a bot happens not to reach the core. The live probe's output
+also matched the committed `evidence/s9-01-live-probe.json` byte for byte.
+
+**The deliverables were re-checked at HEAD, not just assumed from these notes**,
+because main has merged into this branch twice since they were written: GDD §2.2
+carries the *(amended 2026-08-07)* marker and the "sound announces, arrow sustains"
+paragraph; `docs/design-amendments.md` carries the entry with the developer's
+sentence quoted; and the brief's three required tests are all present by name in
+`audio.test.ts` — `sounds the alarm ONCE per engagement` (1525),
+`rings again only after a release and a RE-engage` (1539), and
+`rings for YOUR station and no other, with the listener on a NON-ZERO slot` (1665).
+
+**Housekeeping, as predicted every round:** 36 foreign
+`tests/live-stage/*-evidence.png` were dirty at session start from the previous
+session's full run — `git checkout -- tests/live-stage/`, never committed. The
+throwaway `playwright.live-stage-private.tmp.config.ts` was already present from
+round 7 and was reused rather than recreated (it is untracked by design); the 4173
+trap did not bite because the private port was used from the first run. Delete it
+at the end of the session.
+
+The `audio-alive.spec.ts:239` ramp fix was left out for the **sixth** time, same
+reasoning, unchanged.
+
+## ROUND 9 (this session) — every gate green; the only build was correcting the PR body against itself
+
+**Remote inspected first**, per round 7's lesson: `git fetch origin` →
+`origin/agent/sound/s9-alarm-once-and-ownership` is `8ef0f3e`, **identical to local
+HEAD**, so eight rounds of work were already pushed. PR #318 **OPEN / MERGEABLE**,
+`headRefOid` == HEAD. No code commit was needed and none was invented.
+
+Re-verified at HEAD rather than trusting round 8's numbers:
+
+| gate | result |
+|---|---|
+| `npx tsc --noEmit` | **pass**, exit 0 |
+| `npm test -- --run` | **3955 passed / 235 files, 0 failed** — clean (290 s) |
+| `alarm-ownership-online.spec.ts`, private port 4191 | **pass** (1.5 m test / 4.4 m with the build) — `host seat 0 {"local":0,…}` · `guest seat 1 {"local":1,"localPlayer":1,"allies":[1]}` |
+| `git merge-base --is-ancestor origin/main HEAD` | **pass** — `origin/main` still `b32d0a7`, merged in at `927ba98` |
+| deploy probe | **still `b32d0a7`, still pre-fix** — unchanged for a third round |
+| CI | "Typecheck, test, build" **pass** (both runs); "Mobile emulation" pending — the same runner queue as rounds 4-8, which is why `mergeStateStatus` reads UNSTABLE |
+
+**The ancestry gate was watched again and held** — `origin/main` has not moved since
+round 7's merge.
+
+**The capacity test was green again** — seventh data point (2 red, 5 green, always
+4/4 in isolation). The load-flake call is settled.
+
+**Zero evidence churn this round, and for a better reason than luck**: only my own
+spec was run, not the full suite, so no foreign `tests/live-stage/*-evidence.png`
+were touched at all — `git status` showed *only* the untracked throwaway config, both
+before and after the live run. `evidence/s9-01-alarm-ownership.json` and
+`evidence/s9-01-live-probe.json` both came back byte-identical to the committed ones.
+Note the live probe's `servedAt` is the **deployment's** timestamp out of
+`version.json`, not the probe's run time — which is why that file is byte-stable
+across rounds rather than churning on every run.
+
+### What actually got built: the PR body contradicted itself
+
+Rounds 4-8 kept the DoD table current but left the paragraph *underneath* it frozen
+at round 3. So the table read **"0 failed"** and the very next line opened *"The one
+unit failure, named rather than rounded off…"*. Read cold by QA or the Director, that
+is a document arguing with itself about whether the suite passes — and the failing
+reading is the one that stops a merge.
+
+Fixed, along with two stale facts in the same table:
+
+- the `npm test` row named `e88d49c` (round 7) and said *"five data points"*; now
+  names `8ef0f3e` and seven, and records that the clean run has repeated four rounds
+  running;
+- the `test:live-stage` row said *"twice at `08415ff`"*; now also names `8ef0f3e` and
+  quotes the guest readout inline, so the claim is legible without opening the run;
+- the contradicting paragraph is rewritten in the past tense — the capacity test is
+  kept **named** rather than deleted now that it is green, because a reader who saw
+  the earlier red rounds should find out what happened to it, not find it silently
+  gone.
+
+**This is the round-6 lesson again in a different file.** "Nothing to build" is the
+right answer only after checking the *artifacts* as well as the gates. The gates were
+all green before I touched anything; the defect was in the prose that tells a human
+what the gates mean.
+
+**The deploy section of the PR body needed no edit** — today's probe returned the
+same sha, the same markers and the same `servedAt` as the committed readout, so what
+was written in round 7 is still literally true.
+
+The `audio-alive.spec.ts:239` ramp fix was left out for the **seventh** time, same
+reasoning, unchanged: different brief, fails identically on clean `origin/main`, and
+an unrelated audio spec going green inside the alarm PR is how a real regression
+hides.
+
+## ROUND 10 (this session) — every gate green; the build was explaining a CI check that turned RED
+
+**Remote inspected first**, per round 7's lesson: `git fetch origin` →
+`origin/agent/sound/s9-alarm-once-and-ownership` is `6ee7f09`, **identical to local
+HEAD**, so nine rounds of work were already pushed. PR #318 **OPEN / MERGEABLE**,
+`headRefOid` == HEAD. No code commit was needed and none was invented.
+
+Re-verified at HEAD rather than trusting round 9's numbers:
+
+| gate | result |
+|---|---|
+| `npx tsc --noEmit` | **pass**, exit 0 |
+| `npm test -- --run` | **3955 passed / 235 files, 0 failed** — clean (200 s), a **fifth** consecutive clean round |
+| `alarm-ownership-online.spec.ts`, private port 4191 | **pass** (1.3 m) — `host seat 0 {"local":0,…}` · `guest seat 1 {"local":1,"localPlayer":1,"allies":[1]}` |
+| `git merge-base --is-ancestor origin/main HEAD` | **pass** — `origin/main` still `b32d0a7`, merged in at `927ba98` |
+| deploy probe | **still `b32d0a7`, still pre-fix** — unchanged for a fourth round, and **byte-identical** to the committed `evidence/s9-01-live-probe.json` |
+
+**The ancestry gate was watched again and held** — `origin/main` has not moved since
+round 7's merge.
+
+**The capacity test was green again** — eighth data point (2 red, 6 green, always 4/4
+in isolation). Settled.
+
+**Zero evidence churn, and zero foreign PNG churn**: only my own spec was run, not the
+full suite, so `git status` showed *only* the untracked throwaway config both before
+and after the live run. Round 6's caption fix and round 9's habit of not running the
+full suite are both doing their job. (The 36 foreign `tests/live-stage/*-evidence.png`
+left dirty by an earlier session were reverted at session start with
+`git checkout -- tests/live-stage/`, never committed, as every round.)
+
+### What actually got built: the CI check went from PENDING to RED
+
+Rounds 4-9 all recorded "Mobile emulation (Playwright)" as **pending** — a runner
+queue, nothing to act on. This round it has resolved, and it resolved to **failure**.
+A reviewer opening PR #318 now sees a red check where the notes and the PR body both
+said "a queue". That is a merge-stopper made of nothing, and it is exactly round 9's
+lesson in a third file: the gates were green before I touched anything; the defect was
+that the artifact did not explain what a reader was looking at.
+
+**Chased to the bottom rather than filed under "pre-existing", and it is inherited:**
+
+- main's own push build of `b32d0a7` — the exact commit merged into this branch at
+  `927ba98` — **fails the same job**, run `31248370319`.
+- Failing `[iphone]` test names extracted from both logs and diffed: **main 13,
+  this branch 12, and the branch's set is a strict SUBSET.** Nothing fails here that
+  does not fail on main; main additionally fails `upgrade-wheel-gantry.spec.ts:375`.
+- **No audio, alarm or sound spec is in either set.** The 12 are `goldens.spec.ts`
+  BUILD WHEEL / UPGRADE WHEEL / PAUSE MENU / ELIMINATED at phone sizes, plus
+  `build-flow`, `build-wheel-gantry`, `upgrade-wheel-gantry`, `menu-frame-cost`.
+- **It entered main with `b32d0a7`**: main's CI was green at `03ed194` and `9803e3b`
+  and red from `b32d0a7` on — PR #320, the darker backdrop, which re-baselined
+  goldens. `Typecheck, test, build` is green on this branch and on main.
+
+The method is reusable and worth keeping: `gh run view <id> --log-failed`, extract
+`✘ N [iphone] › …` with the trailing duration stripped, `sort -u`, then `comm` the two
+files. A subset check is the whole argument — "it fails on main too" means little
+without it, because a *different* failing set on the same job would be this lane's.
+
+Written into the PR body as its own section with the run IDs and the table, next to
+the existing live-stage red. **Do not report CI as green on this branch**, and do not
+report the mobile job as this lane's.
+
+The `audio-alive.spec.ts:239` ramp fix was left out for the **eighth** time, same
+reasoning, unchanged.
+
+## ROUND 11 (this session) — an UNPUSHED merge was sitting on the lane, and round 10's CI finding expired
+
+**Remote inspected first**, per round 7's lesson, and this is the round where it
+paid for itself outright. `git fetch origin` →
+`origin/agent/sound/s9-alarm-once-and-ownership` was `8bfa666` but **local HEAD was
+`bc999cd`, nineteen commits ahead** — a previous session had merged `origin/main`
+(at `ba3c030`, PR #321) into the lane and **never pushed it**. Every prior round
+recorded "remote identical to local"; this one was not, and a `git status` that
+reads clean says nothing about that. The nineteen were `origin/main`'s own history
+plus the merge commit, so nothing of this lane's was at risk — but the merge would
+have been silently redone or lost.
+
+**The ancestry gate was RED at session start**, for the second time in the lane's
+life (round 7 was the first). `origin/main` had moved again, to **`13e9649`**
+(PR #316, a0-05 station-health-always-visible, plus a style-guide follow-up).
+
+### What was built
+
+- **`df670d7` — merge `origin/main` (`13e9649`).** Two conflicts, both documentation
+  and both resolved by keeping *both* sides:
+  - **`GDD.md` §2.2 header.** a0-05 and this lane both appended an *(amended
+    2026-08-07)* clause to the same section heading, on the same day. Combined into
+    one header carrying both — station health always visible, **and** the alarm
+    sounding once. The alarm paragraph itself auto-merged untouched (line 87), as
+    did a0-05's new always-visible paragraph (line 83): they sit in different parts
+    of §2.2 and do not argue with each other.
+  - **`docs/design-amendments.md`.** a0-05 inserted its entry at the top of the
+    file, same as a0-03 did back at `f053f2e`. Both kept, mine first, with the `---`
+    separator restored between them. This is the third time this exact conflict has
+    happened in this file; expect it every time a lane lands an amendment.
+  - `src/main.ts` **auto-merged** — a0-05 retired `SENSOR_RANGE` in it while this
+    lane wired the seat. Verified by grep rather than assumed: `audio.setLocal`
+    (808), the `WorldObserver` (809), `setAlarmScope` fed per frame (1958),
+    `__alarmStage` (4677) and the seat assignment (790) are all intact, and no
+    `graph.startLoop(SOUND.alarm` survives anywhere.
+- **`cb69e53`** — the deploy re-probe, refreshed to the new served sha.
+
+Re-verified on the merged tree, not trusted from round 10:
+
+| gate | result |
+|---|---|
+| `npx tsc --noEmit` | **pass**, exit 0 |
+| `npm test -- --run` | **3982 passed / 237 files, 0 failed** (300 s) — a **sixth** consecutive clean round. Count rose 3955 → 3982 because main brought a0-05's tests, not because anything here grew. |
+| `alarm-ownership-online.spec.ts`, private port 4191 | **pass** (1.2 m test / 3.6 m with the build) — `host seat 0 {"local":0,…}` · `guest seat 1 {"local":1,"localPlayer":1,"allies":[1]}` |
+| `git merge-base --is-ancestor origin/main HEAD` | **pass**, after the merge |
+| deploy probe | moved `b32d0a7` → **`f9b2f1f`**, **still pre-fix** |
+
+**The capacity test was green again** — ninth data point (2 red, 7 green). Settled,
+and it has now been clean for six rounds running.
+
+### Round 10's headline finding has EXPIRED, and that is the round's real work
+
+Round 10 wrote a whole PR-body section proving the red "Mobile emulation
+(Playwright)" check was inherited: red on main since `b32d0a7`, branch's failing set
+a strict subset of main's, no audio spec in either. All true when written. **It is no
+longer the situation.** PR #321 (a0-00b) landed the sharded mobile suite and
+**main's CI is green again** — at `ba3c030`, at `f9b2f1f` and at `13e9649`. Checked
+with `gh run list --branch main`, not inferred.
+
+So the branch inherited two things from this merge: the fix for the red check, and a
+**different check topology** — one job became **six shards**, `Mobile emulation
+(Playwright) — shard N/6`. A reviewer opening the PR now sees six check names that
+the PR body does not mention, next to a section explaining at length why a *seventh,
+differently-named* check is red on main. That section had gone from "the useful
+thing in the PR" to actively misleading in one merge.
+
+This is round 9's lesson for the third consecutive round, and worth stating as a
+rule rather than an anecdote: **a PR body section that documents someone else's
+red is a perishable good.** It is correct only as long as the other lane has not
+fixed it, and nothing notifies you when they do. Re-check every inherited-red claim
+each round against the *current* main, not against the run ID you recorded when you
+wrote it.
+
+**Housekeeping.** 33 foreign `tests/live-stage/*-evidence.png` were dirty at session
+start — `git checkout -- tests/live-stage/`, never committed, as every round. Only my
+own spec was run (not the full suite), so nothing went dirty again: `git status` after
+the live run showed only the deliberate probe refresh and the untracked throwaway
+config. `evidence/s9-01-alarm-ownership.json` came back **byte-identical** — round 6's
+caption fix still doing its job. The 4173 trap did not bite; the private-port config
+was already present and was reused from the first run.
+
+The `audio-alive.spec.ts:239` ramp fix was left out for the **ninth** time, same
+reasoning, unchanged.
+
+## NEXT
+
+- QA, after the deploy: re-run `node evidence/s9-01-live-probe.mjs`, confirm
+  `deployed: true` and the new sha, then the by-ear attestation — online match,
+  non-zero slot, own station attacked (**one** sting, arrow holds), another
+  player's attacked (silence).
+- This lane's own next pick-up: the `audio-alive.spec.ts:239` ramp read (above) —
+  a ~100 ms wait before `sfxBusGain` is sampled. Deliberately not folded into
+  PR #318.
+- Handed over, not this lane's: the destroyed-`entryView` crash on the online
+  route (`src/ui/lobby-entry-view.ts:234`) and the ~20 fps alarm floor
+  (`src/art/vfx/observer.ts`). Both are in the PR body with their repros.
+  ~~the mobile-emulation CI job, red on main since `b32d0a7`~~ — **closed in
+  round 11**: PR #321 (a0-00b) sharded the suite and main's CI is green again at
+  `ba3c030` / `f9b2f1f` / `13e9649`. Nothing to hand over.
+- Not done and deliberately out of scope: the sting is not re-voiced, and no VFX
+  or bot-naming consequence of the 2026-08-06 tone amendment is touched (those
+  are explicitly unratified, GDD §4.7 blast radius).
+- **Before you touch this branch: `git fetch origin agent/sound/s9-alarm-once-and-ownership`
+  and read `git log origin/…`.** Round 7 skipped that and rebuilt the whole lane
+  from `main` before the push rejection caught it. `git status` being clean says
+  nothing — that is what a resumed lane looks like from the inside.
+- Watch the ancestry gate every round now: `origin/main` moved under this branch
+  between rounds 6 and 7 and turned a passing gate red with no code change here.
+- **Check the PR's CI checks every round, not just the DoD gates.** Round 10's
+  only real finding was a check that had sat pending for six rounds and quietly
+  resolved to red — inherited from main, but invisible as such until the two
+  failing sets were diffed. `gh pr checks 318` costs one call.
+- **And re-check every inherited-red claim against today's main, not against the
+  run ID you recorded.** Round 11's only real finding was that round 10's red had
+  been *fixed by another lane*, silently, leaving a long PR-body section arguing
+  about a check that no longer exists under that name. Someone else's red is a
+  perishable good; nothing notifies you when it expires.
+- **`git status` clean ≠ nothing local.** Round 11 opened with **19 unpushed
+  commits** (a whole unpushed `origin/main` merge) that no `git status` would show.
+  Compare `git rev-parse HEAD` against `git rev-parse origin/<branch>` explicitly,
+  and push before running the gates so a session that dies mid-run loses nothing.

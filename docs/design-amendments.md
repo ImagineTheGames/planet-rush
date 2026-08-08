@@ -8,6 +8,89 @@ half of these amendments; this file is the human-readable why.
 
 ---
 
+## The under-attack alarm SOUNDS ONCE, and only for YOUR station
+
+**Date:** 2026-08-07 · branch `agent/sound/s9-alarm-once-and-ownership`
+**Ratified by:** Developer (Reinaldo), field report from real play
+**Amends:** GDD §2.2 (folded in directly). **No constant, threshold, or state
+machine changes** — the alarm's own numbers (`ENGAGE`, `RELEASE`, `LEAK`,
+`MIN_HOLD_S`, `PRESSURE_CAP`) are untouched, and it stays on the not-cuttable
+list (§4.9) and stays the loudest thing in the bank.
+
+### The ratification, verbatim
+
+> "also for the alarm, it should only play once, and not keep playing (and should
+> only play for your station not others)..."
+
+### What changed — one sentence, two defects
+
+**It played forever, because it was a loop.** `AudioEngine.syncAlarm` started a
+continuous loop the moment the state machine went `active` and stopped it on
+release. `UnderAttackAlarm` holds `active` for at least `MIN_HOLD_S` and keeps
+holding while the pressure stays over `RELEASE`, so under sustained fire the
+klaxon ran for as long as the siege did — working exactly as built, and not what
+was wanted. It is now **one one-shot per engagement**: `alarm.count` bumps when
+the pressure crosses `ENGAGE`, and nothing sounds again until the alarm has
+released and re-engaged.
+
+**It rang for the wrong station, and that one was a wire.** `src/main.ts` built
+the audio engine before the menu (it must — the audio unlock has to be armed
+before the first user gesture, GDD risk 7) and handed it `LOCAL_PLAYER` as a
+constructor argument. A joiner's real slot is not assigned until the server
+welcomes them, two hundred lines later; the `let` was reassigned there, but the
+engine had captured the value, and `audio.setLocal()` — which existed the whole
+time — was never called from that file. **So in every online match the mix
+believed it was slot 0**: on slot 3, damage to *slot 0's* station rang your alarm
+and damage to your own was silent. `setAlarmScope()` was likewise never called
+from the real client, so the engine fell back to "you alone" — FFA-correct and
+TEAMS-wrong, since an ally's station under siege never rang.
+
+### The hysteresis keeps its numbers and changes job
+
+`MIN_HOLD_S` (2.5 s) and the separate, lower `RELEASE` (0.35) were written as
+hysteresis so a *looping* alarm would not stutter on and off while an attacker
+dodged a turret. With a one-shot they do a strictly better job under the same
+numbers: they are the **re-trigger guard**, the thing that stops an attacker's
+dodge-and-return machine-gunning the klaxon. They were not deleted, and deleting
+them would reintroduce a defect the one-shot cannot survive.
+
+### What carries "unmistakable" now — the arrow
+
+§2.2 has always specified *"an unmistakable alarm **plus** a screen-edge arrow
+pointing home."* A one-shot moves which half carries what: **the sound announces,
+the arrow sustains.** That is the whole design content of this amendment, and it
+is why the change is safe — the arrow (`src/ui/alarm.ts` `homeArrow`, drawn by
+the HUD off its own sustained-damage trigger with its own 5-second hold) remains
+for the duration of the attack, so a player who is deep in the asteroid field and
+looks up still has a live tell pointing home. Had the arrow not been on the live
+build, this amendment would have removed the only tell and the lane would have
+handed the decision back.
+
+The ducking follows the same rule: the mix ducks for the **sting**, not the
+siege. Leaving music and ambience pinned down for two minutes under an alarm that
+is no longer sounding would be the whole game quiet with nothing to show for it.
+
+### Where it lives
+
+`src/art/audio/engine.ts` (`syncAlarm`, `ALARM_DUCK_S`, `alarmSounds`),
+`src/art/audio/bank.ts` (`SOUND.alarm` is a one-shot spec now, same bar and same
+two tones), `src/art/audio/scope.ts` (the side roster, moved out of
+`src/art/presenter.ts` so the shipped client and the presenter read one copy of
+the rule), and the wiring in `src/main.ts` at the seat assignment.
+
+### The test class this needed
+
+Every audio unit test passed straight through the ownership bug, because the
+defect was in *who the engine was told it was*, not in what it does with that —
+the merged-tested-and-dead-wired class. So the guard is a **live-stage** spec
+(`tests/live-stage/alarm-ownership-online.spec.ts`) that stands up a real
+allocator, a real match server and an online client bundle, joins a real room
+with two real browsers, and asserts the audio engine's local id equals the seat
+the server gave it — **on a non-zero slot, failing outright if the joiner is
+seated at 0**, because on slot 0 a dead wire and a live one read identically.
+
+---
+
 ## Station health is ALWAYS VISIBLE — sensor range retired
 
 **Date:** 2026-08-07 · branch `agent/gameplay/a0-05-station-health-always-visible`
