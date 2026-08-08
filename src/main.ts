@@ -3630,6 +3630,45 @@ async function boot(): Promise<void> {
         }
         return true;
       },
+      /**
+       * **The developer's a0-09 scenario, staged:** every core NOT on the local
+       * player's side falls, and the side wins with an ALLY crowned.
+       *
+       * The crowning is the sim's, untouched — `resolveWinner` reports the last
+       * surviving core it walks, so a side left holding several reports its
+       * highest slot, which is an ally whenever more than the local core stands.
+       * That is precisely how the developer's screenshot came to read *"Player 7
+       * took the claim"* over DEFEAT while their own reactor was intact.
+       *
+       * Reaches nothing `endMatch`/`winLocal` do not: the sim's own `destroyCore`,
+       * on enemy cores only. Needs a sided world (`?debug=1&sides=2`) to mean
+       * anything — in FFA every other slot is an enemy, so this collapses to
+       * `winLocal` and is refused (there is no ally to crown).
+       */
+      winAlly(): boolean {
+        const allies = alarmAllies();
+        const standing = world.stations.filter((p) => p.alive && allies.has(p.owner));
+        // An ally other than the local seat must be left holding a core, or the
+        // sim would crown the local player and this stages nothing.
+        if (!standing.some((p) => p.owner !== LOCAL_PLAYER)) return false;
+        for (const p of world.stations) {
+          if (p.alive && !allies.has(p.owner)) destroyCore(world, p);
+        }
+        return true;
+      },
+      /** The slots this client believes are on its side — the one roster the
+       *  klaxon, the arrow and the end screen all read (a0-09). */
+      side(): number[] {
+        return [...alarmAllies()].sort((a, b) => a - b);
+      },
+      /** The WORDS the summary actually resolved this frame — the result kind and
+       *  the two lines. The a0-09 report was about what the screen SAID, so the
+       *  evidence run reads the sentence rather than inferring it from state. */
+      result(): { kind: string; headline: string; subhead: string } | null {
+        if (endScreen === 'none') return null;
+        const model = endOfMatchModel(currentOutcome(endScreen === 'result'));
+        return { kind: model.kind, headline: model.headline, subhead: model.subhead };
+      },
       screen(): 'none' | 'defeated' | 'result' {
         return endScreen;
       },
