@@ -108,11 +108,40 @@ jobs:
             -d "${body}" \
             "https://ntfy.sh/${NTFY_TOPIC}"
 
+  # --- The mobile gate, sharded across parallel runners (a0-00). -----------
+  #
+  # The suite is 213 tests, ~117 minutes of SERIAL test time on a GitHub
+  # runner (measured off PR #320's own log: tests/reports/mobile-shard-a0-00.md
+  # §2), executed at `workers: 2` — so one runner spent ~60 minutes on it and
+  # every PR paid that once, twice when a timeout forced a re-run. Nothing
+  # about what is asserted changes here: same specs, same three projects, same
+  # budgets, same baselines, same `maxDiffPixelRatio`. The work is only spread
+  # across N runners with Playwright's native `--shard=i/N`.
+  #
+  # Sharded by TEST, not by project, and that is not a preference — `[iphone]`
+  # alone is 67.6 of the 116.9 serial minutes (58%), so a project-level split
+  # would floor the job at ~34 minutes no matter how many runners it got.
+  #
+  # N=4 is chosen from the measurement, not from taste. Per-job fixed cost
+  # (checkout → npm ci → cache restore → install-deps, then the webServer's
+  # `npm run build`) is ~56 s against ~117 min of work, so wall time falls very
+  # nearly linearly up to N=8; N=4 lands the gate at ~16 min, and the next
+  # doubling buys ~8 min for double the runner-minutes. The floor is the
+  # single slowest test (4.2 min) plus the fixed cost, so there is no N that
+  # beats ~5 min. Full table, and N=3 / N=5 either side: the report above.
   mobile:
-    name: Mobile emulation (Playwright)
+    name: Mobile emulation (Playwright) — shard ${{ matrix.shard }}/${{ strategy.job-total }}
     # Run where gating matters (PRs + main) — not on every agent branch push.
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    strategy:
+      # Every shard runs to completion. A red shard must not cancel its
+      # siblings: the point of the gate is the WHOLE failure list in one pass,
+      # and a cancelled sibling is also a check the supervisor cannot read as
+      # a real pass (the cancelled-checks hole that made the gate stricter).
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -137,14 +166,60 @@ jobs:
       - if: steps.pw-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium
 
-      - run: npm run test:mobile
+      # `strategy.job-total` is the length of the matrix above, so N is stated
+      # in exactly one place — add a shard to the list and the denominator
+      # follows. A hardcoded `/4` here is how a suite silently stops running a
+      # quarter of itself.
+      - run: npm run test:mobile -- --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
+      # Per-shard artifact name. Required by upload-artifact@v4 (same-name
+      # uploads from parallel jobs are an error), and it is also what keeps
+      # q8-01's inspectability: each shard writes its own self-contained
+      # `playwright-report/index.html` with the actual/expected/diff PNGs and
+      # the trace inlined, so a failure in shard 3 downloads and opens by
+      # double-clicking, exactly as it did when there was one job.
       - if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-shard-${{ matrix.shard }}
           path: playwright-report/
           retention-days: 7
+
+  # --- The rollup: N shards, ONE required check. ---------------------------
+  #
+  # This job deliberately keeps the name the single-job gate used to have —
+  # `Mobile emulation (Playwright)` — so the repository's required-check
+  # setting keeps resolving without being re-pointed. It is red unless every
+  # shard succeeded: `needs.mobile.result` is the matrix's AGGREGATE result,
+  # which is `success` only when all matrix jobs succeeded, and `failure` /
+  # `cancelled` / `skipped` otherwise. `!cancelled()` makes it run even when a
+  # shard failed (a `needs` job that is skipped because its dependency failed
+  # would report as SKIPPED, which a merge gate reads as "not red" — the exact
+  # hole this closes).
+  #
+  # The `if` repeats the shards' own gate so that on an ordinary agent-branch
+  # push, where the shards are skipped by design, this does not fire and paint
+  # the branch red.
+  mobile-gate:
+    name: Mobile emulation (Playwright)
+    needs: mobile
+    if: ${{ !cancelled() && (github.event_name == 'pull_request' || github.ref == 'refs/heads/main') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: All shards must be green
+        env:
+          SHARDS_RESULT: ${{ needs.mobile.result }}
+        run: |
+          set -euo pipefail
+          echo "Aggregate result of the mobile shard matrix: ${SHARDS_RESULT}"
+          if [ "${SHARDS_RESULT}" != "success" ]; then
+            echo "::error::The mobile suite is red — at least one shard did not pass" \
+                 "(aggregate: ${SHARDS_RESULT}). Open the failing shard's job for the" \
+                 "inline annotation, and its playwright-report-shard-N artifact for the" \
+                 "actual/expected/diff PNGs and the trace."
+            exit 1
+          fi
+          echo "Every mobile shard passed."
 
   # --- After deploy: prove the LIVE url actually boots (twice — the second
   # --- visit goes through the service worker, the path that once shipped dead).
