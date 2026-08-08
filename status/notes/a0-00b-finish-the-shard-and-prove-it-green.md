@@ -188,16 +188,38 @@ Re-cut the table off the green run (total serial 8355 → **3838 s**, brick
 cost table is a statement about a suite AND the machine config that runs it.
 Re-measure when the config changes, not only when the specs do.
 
+### 10 · N=6 shipped and green — run `31260614369`
+
+**6/6 shards green, rollup green, 123 tests, 0 failures, 0 retries.** Job walls
+10m32s…13m55s, spread **3m23s** (was 7m18s at N=8 on the stale table). Total
+serial 3977 s against the table's 3838 s (**+3.6%**) and the brick at 663 s vs
+659 s — the table predicts the runner well.
+
+Stated in report §6e rather than buried: **N=6 is not strictly faster than N=8**
+(13m55s vs 12m19s). It trades ~1.5 min of gate latency for two runners at the
+same runner-minutes. Splitting the golden brick (`a0-00c`) is the thing that
+would actually make a larger N pay.
+
+PR #321 title + body rewritten to what shipped; no WIP marker, not a draft.
+
 ## NEXT
 
-- **Push, then watch the N=6 run to zero failing checks.** This is the DoD gate.
-  N=6 is a re-balance only — every test passed at `workers: 1` regardless of
-  grouping, so this is low-risk, but it IS a fresh run and must be confirmed.
-- Then take the WIP marker off #321 — **the last deliverable item.** Body has no
-  WIP marker (session 1) but describes N=4 and scopes `workers: 1` OUT; rewrite
-  it. Editing the body does NOT retrigger CI, so do it while the run is going.
-- `a0-00c` re-scoped again: **split the `iphone|goldens` brick.** At 659 s it is
-  the only thing flooring the gate; splitting the file buys N=8 at ~480 s (~8 min).
+- **Nothing outstanding.** All five DoD gates verified locally at `caa24d5` +
+  the report commit: `tsc` clean · `npm test -- --run` 3963/3963 · report tracked
+  · `origin/main` is an ancestor · PR checks green. Final push is the report's
+  §6e numbers; watch that run to zero failing checks and the brief is done.
+- `a0-00c` re-scoped: **split the `iphone|goldens` brick.** At 659 s it is the
+  only thing flooring the gate; splitting the file buys N=8 at ~480 s (~8 min).
+  Also correct `sim-clock.ts`'s "~1 fps" with the measured 0.28–1.5 range.
+
+### Trap for a future you
+
+`npx tsc --noEmit` and `npm test` share this box with other lanes. The perf
+tests (`capacity-regression`, and the live-stage suite) fail under that load and
+pass isolated — check `pgrep -fa vitest|playwright|vite` before believing one.
+Do NOT measure contention on this box for the same reason: the local
+`workers: 1` vs `2` A/B was started and thrown away (DECISIONS §5). The real
+runner answers it in one push, and one push is ~13 minutes now.
 
 Known-unrelated: `tests/net/capacity/capacity-regression.test.ts` fails locally
 under load (34.6 ms vs a 33 ms budget) and passes both isolated and in CI. Not
