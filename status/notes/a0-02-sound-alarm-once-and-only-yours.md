@@ -411,6 +411,66 @@ still the **empty template** — the real file is the committed one at
 `status/notes/a0-02-…` in the repo. Synced this round so both read the same. If a
 future session finds the absolute copy empty again, trust the repo copy.
 
+## ROUND 6 (this session) — one real commit: the live spec now asserts the one-shot
+
+Inspected first, per RESUME. HEAD was `011deee`, pushed, PR #318 OPEN / MERGEABLE,
+PR body checked and **current** (it already carries the ~20 fps finding, the live
+probe with `03ed194`, and round 4's clean-run DoD table).
+
+Re-verified at HEAD:
+
+| gate | result |
+|---|---|
+| `npx tsc --noEmit` | **pass**, exit 0 (twice — before and after this round's edit) |
+| `npm test -- --run` | 3910 passed / **1 failed**: `tests/net/capacity` again, 48.19 ms vs the 33 ms budget |
+| the same capacity test, in isolation | **4/4 pass** — the load-flake call, confirmed a third time |
+| `alarm-ownership-online.spec.ts`, private port 4191 | **pass**, twice (3.0 m, 3.9 m) |
+| `git merge-base --is-ancestor origin/main HEAD` | **pass** — `origin/main` still `03ed194` |
+| deploy probe | **still `03ed194`, still pre-fix** — unchanged for a third round |
+| CI | "Typecheck, test, build" **pass**; "Mobile emulation" pending (a queue, as before) |
+
+**The capacity test went red again this round and is still not this lane's.** Rounds
+4 and 5 ran it clean at this same code; round 3 saw 38.38 ms, this round 48.19 ms,
+isolation 4/4. Three data points now say wall-clock budget on a shared box. Report
+the run as "1 failed, and here is which test" — never as clean, and never as this
+lane's.
+
+### What actually got built, and why it was not nothing
+
+The seat spec **recorded** the host's `active/engagements/sounds` but asserted
+nothing about them. This round's first run sampled the host mid-siege and rewrote
+the committed evidence from `0/0` to `1 engagement / 1 sting` — which, read cold by
+a future session, looks exactly like a regression. It is not; it is whether a bot
+reached the host's core inside the run's window.
+
+`ff17356` fixes both halves of that:
+
+- **`sounds <= engagements`, asserted on both clients.** That is defect 1 — at most
+  one sting per engagement — observed in a *booted client* rather than in memory,
+  which is the one thing the behavioural claim did not have. Written as an
+  invariant, not an expected count, precisely because the siege is incidental: it
+  holds at zero, so it cannot flake, and it is still a shape the old code could not
+  produce (a loop has no per-engagement sting to count and sounded for as long as
+  `active` held). The real behavioural proof stays in the unit suite for the ~20 fps
+  reason above; this is the corroboration that comes free when combat happens.
+- **A `reading` caption in the evidence JSON** saying which numbers are a claim
+  (seats, ally rosters — identical every run) and which are weather (the host
+  counters).
+
+Verified both ways rather than asserted once: run 1 sampled the host at `1/1`, run 2
+sampled it at `0/0`, and the spec passes on both. The committed artifact is back to
+byte-stable apart from the new caption line.
+
+**This is why "nothing to build" was the wrong read for round 6.** Rounds 4 and 5
+correctly built nothing. The difference here was a *changed file in `git status`*
+that had to be explained rather than reverted — the churn was the signal.
+
+**Housekeeping, as predicted:** 36 foreign `tests/live-stage/*-evidence.png` dirty at
+session start; `git checkout -- tests/live-stage/`, never committed. Throwaway
+private-port config created before the first run (so the 4173 trap again did not
+bite) and deleted after each. The `audio-alive.spec.ts:239` ramp fix was left out
+for the **fourth** time, same reasoning, unchanged.
+
 ## NEXT
 
 - QA, after the deploy: re-run `node evidence/s9-01-live-probe.mjs`, confirm
