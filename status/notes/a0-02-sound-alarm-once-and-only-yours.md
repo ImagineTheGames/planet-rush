@@ -365,6 +365,52 @@ unfixed again, deliberately** — it is a different brief, it fails identically 
 clean `origin/main`, and slipping an unrelated audio spec green into the alarm PR
 is exactly how a real regression hides. It stays this lane's next pick-up.
 
+## ROUND 5 (this session) — nothing to build again; re-verified, and the deploy has not moved
+
+Inspected first, per RESUME. HEAD `3f426ee`, **pushed** (`origin/…` identical), PR
+#318 **OPEN / MERGEABLE**. No code commit was needed and none was invented. The PR
+body was checked and is **current** — round 4's clean-run update to the DoD table
+is in it, so nothing was stale this round.
+
+Re-verified at HEAD rather than trusting round 4's numbers:
+
+| gate | result |
+|---|---|
+| `npx tsc --noEmit` | **pass**, exit 0 |
+| `npm test -- --run` | **3911 passed / 234 files, 0 failed** — clean a second consecutive round |
+| `alarm-ownership-online.spec.ts`, private port 4191 | **pass** (2.1 m) — `host seat 0 {"local":0,…}` · `guest seat 1 {"local":1,"localPlayer":1,"allies":[1]}` |
+| `git merge-base --is-ancestor origin/main HEAD` | **pass** — `origin/main` still `03ed194`, merged in at `52c137a` |
+| deploy probe | **still `03ed194`, still pre-fix** (`__alarmStage` false, `alarmStings` false, `__pauseStage` true) |
+
+`evidence/s9-01-alarm-ownership.json` came back **byte-identical** to the committed
+one — the re-run reproduced the readout exactly, which is the point of committing it.
+
+The capacity flake call is now confirmed by **two** consecutive clean full runs at
+the same code. Round 3's single red `tests/net/capacity` test was load, not this lane.
+
+**The code was read at HEAD, not just trusted from these notes**: `syncAlarm`
+(engine.ts:635) sounds one sting per `alarm.count` bump with the voice-cap retry and
+the death-hush fall-through intact; `audio.setLocal(LOCAL_PLAYER)` + the
+`WorldObserver` sit at main.ts:808-809, immediately after the seat assignment at 790;
+`setAlarmScope` is fed every frame at main.ts:1954. All as described.
+
+**Housekeeping, as predicted:** 34 foreign `tests/live-stage/*-evidence.png` were
+dirty at session start (previous session's full run). Reverted with
+`git checkout -- tests/live-stage/`, never committed. The throwaway
+`playwright.live-stage-private.tmp.config.ts` was reused for the seat spec and then
+deleted again — the recipe to recreate it is in the 4173 section above, and the 4173
+trap did not bite because the private port was used from the first run.
+
+**The `audio-alive.spec.ts:239` ramp fix was left out for the third time, on
+purpose.** Same reasoning, unchanged: different brief, fails identically on clean
+`origin/main`, and an unrelated audio spec going green inside the alarm PR is how a
+real regression hides.
+
+**Note on the notes:** `/status/notes/a0-02-…` (absolute, the shared status dir) was
+still the **empty template** — the real file is the committed one at
+`status/notes/a0-02-…` in the repo. Synced this round so both read the same. If a
+future session finds the absolute copy empty again, trust the repo copy.
+
 ## NEXT
 
 - QA, after the deploy: re-run `node evidence/s9-01-live-probe.mjs`, confirm
