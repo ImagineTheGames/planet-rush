@@ -1466,6 +1466,25 @@ export const WEDGE_SLIDE_RUN_S: Tunable<number> = 1.5;
 export const WEAPON_RANGE: Tunable<number> = 260;
 
 // ---------------------------------------------------------------------------
+// Combat attribution (docs/progression-plan.md §1.5)
+// ---------------------------------------------------------------------------
+
+/**
+ * How long before a body died another enemy's damage still counts as an assist
+ * on it (seconds) — read by `./combat-credit` `assistsOn`, never by `step`.
+ *
+ * **Phase 1 pays no assist XP.** An assisting player's damage already paid them
+ * at 2× per unit, which is the honest version of an assist; paying the assist
+ * too would pay one contribution twice (§1.5 trap 1). The window is recorded
+ * anyway because the end-of-match summary may want to *name* an assist, and a
+ * window that was never recorded cannot be added retroactively to a match that
+ * has already been played. Opening value 5 s — long enough that softening a
+ * target and someone else finishing it reads as one exchange, short enough that
+ * a chip landed a minute earlier does not. TUNABLE
+ */
+export const ASSIST_WINDOW_S: Tunable<number> = 5;
+
+// ---------------------------------------------------------------------------
 // Asteroids and ore chunks (GDD §2.3, §5.5)
 // ---------------------------------------------------------------------------
 
