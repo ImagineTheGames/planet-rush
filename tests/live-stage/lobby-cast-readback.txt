@@ -1,0 +1,13 @@
+a0-06 — the cast the lobby picked vs the cast the match seated
+(read off window.__lobby: seatCharacters before RUSH!, worldCast after)
+
+  slot 0  lobby: null      match: null
+  slot 1  lobby: warden    match: warden
+  slot 2  lobby: warden    match: warden
+  slot 3  lobby: sable     match: sable
+  slot 4  lobby: vulture   match: vulture
+  slot 5  lobby: warden    match: warden
+  slot 6  lobby: sable     match: sable
+  slot 7  lobby: vulture   match: vulture
+
+identical: true

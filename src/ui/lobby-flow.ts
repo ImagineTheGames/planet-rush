@@ -97,7 +97,7 @@ import {
   lobbyWireTeams,
   createLobby,
   cycleAbundance,
-  cycleBotDifficulty,
+  cycleSeatCharacter,
   cycleSeatState,
   cycleSeatTeam,
   pressRush,
@@ -518,24 +518,38 @@ export function flowTapLobby(state: FlowState, target: LobbyTarget): FlowResult 
       const shipClass: ShipClass | undefined = CLASS_ORDER[target.index];
       return shipClass === undefined ? rest(state) : withLobby(state, selectShipClass(lobby, shipClass));
     }
-    case 'seat':
+    case 'seat': {
+      // **The row BODY cycles the seat's CHARACTER** (a0-06). The body is where the
+      // row draws the name, so the tap that lands on a name is the tap that changes
+      // it — and the state cycle lost nothing for it, because it has had its own
+      // drawn, labelled, leading control since u5 (the case below).
+      //
+      // A CLOSED row is the exception and it is one rule, not a special case: the
+      // body edits whatever the row is showing, and a closed row shows no character
+      // at all, so a tap there re-opens the seat exactly as it always did. Every
+      // other refusal — a guest, a human seat, a lobby past RUSH! — is a no-op in
+      // `./lobby` that returns the identical object, so it costs the wire zero.
+      const seat = lobby.seats[target.index];
+      return withLobby(
+        state,
+        seat && seat.occupant === 'closed'
+          ? cycleSeatState(lobby, target.index)
+          : cycleSeatCharacter(lobby, target.index),
+      );
+    }
     case 'seatState':
       // The seat's OPEN → BOT → CLOSED cycle (variable-slots Milestone E); the host
-      // shrinks or shapes the match here. TWO rects reach it and they are the same
-      // action, deliberately: the row BODY, which is where the cycle has always
-      // lived, and — since u5 — the row's LEADING STATE control, the drawn, labelled
-      // button that finally SAYS a slot can be closed (the developer could not tell
-      // that it could). One case, so the control and the body can never drift into
-      // doing two different things. A guest's tap and a human seat are no-ops in
-      // `./lobby`, so a refused tap costs the wire zero.
+      // shrinks or shapes the match here, through the drawn, labelled button that
+      // finally SAYS a slot can be closed (u5 — the developer could not tell that it
+      // could). A guest's tap and a human seat are no-ops in `./lobby`, so a refused
+      // tap costs the wire zero.
       return withLobby(state, cycleSeatState(lobby, target.index));
-    case 'seatChip':
-      // The row's trailing DIFFICULTY chip — the bot-tier cycle, in BOTH modes
-      // (n2). It is the one slot-editor control every mode shares, so a bot's tier
-      // is reachable in TEAMS exactly as in FFA (the TEAMS lobby had lost it when
-      // the side control took the only chip). A human/closed seat is a no-op in
-      // `./lobby`, so a refused tap costs the wire zero.
-      return withLobby(state, cycleBotDifficulty(lobby, target.index));
+    case 'seatHelp':
+      // The row's trailing `?` — the codex dossier for that seat's character
+      // (a0-06). It changes no lobby state at all: it is a screen the WIRING opens
+      // (`main.ts` `openLobby`), the way the hull tiles' hover hint is, so there is
+      // nothing here to fold in and nothing to send.
+      return rest(state);
     case 'seatTeamChip':
       // The row's TEAM chip — the side cycle, composed alongside the difficulty
       // chip in TEAMS (n2). A no-op outside TEAMS (FFA is teams-of-one) and from a
