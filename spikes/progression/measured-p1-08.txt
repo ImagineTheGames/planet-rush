@@ -1,0 +1,203 @@
+# Captured 2026-08-09T14:32:45Z — npx vite-node harness/cli.ts pay --seeds 12
+# HEAD: d482e10 (rig committed at 9264ba2; the floor-candidate table added after)
+# 240 matches, all ended. Reproducible: two runs of this command diff to zero.
+
+# p1-08 — what a match pays, re-measured against the shipped code
+
+sample: seeds 1..12 (12 per cell) · real shipped bot cast
+instruments: src/progression/accrual.ts (observer, fed every tick) + src/progression/xp.ts (pricer)
+weights: ore 1× · damage 2/25HP · ship 5× · station 10×
+tier multiplier: easy 0.75 · medium 1 · hard 1.25
+curve: base 300 · exp 1.6
+abundance: shipped lobby default is SCARCE; createWorld's own default (what a0-13 measured) is STANDARD
+
+## By lobby, octagon, N=8 — STANDARD (the abundance a0-13 measured)
+
+| cell | medXP | meanXP | winner | firstOut | spread | XP/min | ore | dmgHP | shipK | statK | struct | upgr | rep | len | max | ended |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| EASY mirror · standard | 327 | 354 | 495 | 327 | 1.5× | 23.1 | 28.2 | 234 | 4.0 | 0.0 | 4.0 | 0.0 | 0.0 | 14:10 | 14:10 | 12/12 |
+| MEDIUM mirror · standard | 521 | 544 | 760 | 369 | 2.1× | 37.4 | 23.1 | 1524 | 22.0 | 0.0 | 3.0 | 2.0 | 0.0 | 13:55 | 14:00 | 12/12 |
+| HARD mirror · standard | 321 | 492 | 1208 | 100 | 12.1× | 23.9 | 12.8 | 696 | 12.0 | 0.0 | 2.0 | 1.0 | 0.0 | 13:43 | 13:52 | 12/12 |
+| MIXED cast · standard | 416 | 494 | 1120 | 104 | 10.8× | 29.9 | 28.9 | 796 | 14.0 | 0.0 | 4.0 | 1.0 | 0.0 | 13:55 | 14:00 | 12/12 |
+
+## By lobby, octagon, N=8 — SCARCE (the shipped lobby default)
+
+| cell | medXP | meanXP | winner | firstOut | spread | XP/min | ore | dmgHP | shipK | statK | struct | upgr | rep | len | max | ended |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| EASY mirror · scarce | 296 | 326 | 485 | 240 | 2.0× | 20.9 | 19.4 | 182 | 3.0 | 0.0 | 4.0 | 0.0 | 0.0 | 14:10 | 14:10 | 12/12 |
+| MEDIUM mirror · scarce | 509 | 540 | 821 | 386 | 2.1× | 36.6 | 20.9 | 1606 | 23.0 | 0.0 | 3.0 | 1.0 | 0.0 | 13:55 | 14:02 | 12/12 |
+| HARD mirror · scarce | 336 | 481 | 1205 | 77 | 15.6× | 24.7 | 16.7 | 756 | 14.0 | 0.0 | 2.0 | 1.0 | 1.0 | 13:33 | 13:57 | 12/12 |
+| MIXED cast · scarce | 445 | 482 | 1123 | 68 | 16.6× | 32.4 | 26.5 | 871 | 13.0 | 0.0 | 3.0 | 1.0 | 0.0 | 13:52 | 14:05 | 12/12 |
+
+## By lobby size, octagon, MIXED cast, SCARCE
+
+| cell | medXP | meanXP | winner | firstOut | spread | XP/min | ore | dmgHP | shipK | statK | struct | upgr | rep | len | max | ended |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| N=8 · scarce | 445 | 482 | 1123 | 68 | 16.6× | 32.4 | 26.5 | 871 | 13.0 | 0.0 | 3.0 | 1.0 | 0.0 | 13:52 | 14:05 | 12/12 |
+| N=6 · scarce | 529 | 542 | 848 | 374 | 2.3× | 38.1 | 34.5 | 1184 | 22.0 | 0.0 | 4.0 | 2.0 | 0.0 | 13:52 | 14:02 | 12/12 |
+| N=5 · scarce | 518 | 525 | 770 | 384 | 2.0× | 37.0 | 39.0 | 908 | 16.0 | 0.0 | 4.0 | 2.0 | 0.0 | 14:01 | 14:10 | 12/12 |
+| N=4 · scarce | 454 | 491 | 715 | 318 | 2.2× | 32.1 | 55.7 | 280 | 4.0 | 0.0 | 4.0 | 4.0 | 0.0 | 14:10 | 14:10 | 12/12 |
+| N=3 · scarce | 404 | 529 | 834 | 365 | 2.3× | 28.5 | 59.9 | 159 | 2.5 | 0.0 | 4.0 | 3.0 | 0.0 | 14:10 | 14:10 | 12/12 |
+
+## By map, N=8, MIXED cast, SCARCE
+
+| cell | medXP | meanXP | winner | firstOut | spread | XP/min | ore | dmgHP | shipK | statK | struct | upgr | rep | len | max | ended |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| map octagon · scarce | 445 | 482 | 1123 | 68 | 16.6× | 32.4 | 26.5 | 871 | 13.0 | 0.0 | 3.0 | 1.0 | 0.0 | 13:52 | 14:05 | 12/12 |
+| map compass · scarce | 453 | 489 | 1002 | 126 | 8.0× | 32.7 | 24.0 | 1030 | 17.0 | 0.0 | 3.5 | 1.0 | 1.0 | 13:29 | 14:06 | 12/12 |
+| map oval · scarce | 470 | 505 | 982 | 126 | 7.8× | 33.9 | 30.5 | 647 | 11.5 | 0.0 | 4.0 | 1.0 | 0.0 | 14:00 | 14:07 | 12/12 |
+| map diamond · scarce | 423 | 478 | 1237 | 87 | 14.3× | 31.0 | 25.0 | 789 | 14.0 | 0.0 | 3.0 | 1.0 | 0.0 | 13:41 | 13:57 | 12/12 |
+
+## By abundance, octagon, N=8, MIXED cast
+
+| cell | medXP | meanXP | winner | firstOut | spread | XP/min | ore | dmgHP | shipK | statK | struct | upgr | rep | len | max | ended |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| abundance scarce | 445 | 482 | 1123 | 68 | 16.6× | 32.4 | 26.5 | 871 | 13.0 | 0.0 | 3.0 | 1.0 | 0.0 | 13:52 | 14:05 | 12/12 |
+| abundance standard | 416 | 494 | 1120 | 104 | 10.8× | 29.9 | 28.9 | 796 | 14.0 | 0.0 | 4.0 | 1.0 | 0.0 | 13:55 | 14:00 | 12/12 |
+| abundance rich | 401 | 478 | 1224 | 107 | 11.4× | 29.2 | 20.6 | 654 | 10.5 | 0.0 | 3.0 | 0.0 | 0.0 | 13:50 | 14:02 | 12/12 |
+
+## Plan Question A — the ratified four rows ONLY, beside the full table
+
+| cell | full medXP | four-only medXP | full spread | four-only spread | four-only L2 |
+|---|---|---|---|---|---|
+| EASY mirror · standard | 327 | 59 | 1.5× | 0.3× | 5.1 |
+| MEDIUM mirror · standard | 521 | 260 | 2.1× | 1.2× | 1.2 |
+| HARD mirror · standard | 321 | 167 | 12.1× | 6.6× | 1.8 |
+| MIXED cast · standard | 416 | 171 | 10.8× | 6.5× | 1.8 |
+| EASY mirror · scarce | 296 | 47 | 2.0× | 0.4× | 6.5 |
+| MEDIUM mirror · scarce | 509 | 268 | 2.1× | 1.2× | 1.1 |
+| HARD mirror · scarce | 336 | 185 | 15.6× | 11.4× | 1.6 |
+| MIXED cast · scarce | 445 | 169 | 16.6× | 14.8× | 1.8 |
+| N=8 · scarce | 445 | 169 | 16.6× | 14.8× | 1.8 |
+| N=6 · scarce | 529 | 257 | 2.3× | 1.2× | 1.2 |
+| N=5 · scarce | 518 | 207 | 2.0× | 1.5× | 1.5 |
+| N=4 · scarce | 454 | 98 | 2.2× | 1.6× | 3.1 |
+| N=3 · scarce | 404 | 93 | 2.3× | 1.8× | 3.2 |
+| map octagon · scarce | 445 | 169 | 16.6× | 14.8× | 1.8 |
+| map compass · scarce | 453 | 201 | 8.0× | 5.2× | 1.5 |
+| map oval · scarce | 470 | 159 | 7.8× | 5.4× | 1.9 |
+| map diamond · scarce | 423 | 166 | 14.3× | 11.6× | 1.8 |
+| abundance scarce | 445 | 169 | 16.6× | 14.8× | 1.8 |
+| abundance standard | 416 | 171 | 10.8× | 6.5× | 1.8 |
+| abundance rich | 401 | 134 | 11.4× | 7.5× | 2.2 |
+
+## Composition of the pay, by row (share of all XP paid in the cell)
+
+| cell | oreMined | damage | shipKills | stationKills | oreBanked | structures | upgrades | repairs | waves | placement | win |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| EASY mirror · standard | 9% | 5% | 6% | 0% | 14% | 12% | 6% | 0% | 21% | 20% | 7% |
+| MEDIUM mirror · standard | 5% | 23% | 21% | 0% | 6% | 7% | 7% | 0% | 14% | 13% | 5% |
+| HARD mirror · standard | 7% | 18% | 19% | 2% | 8% | 8% | 9% | 1% | 9% | 14% | 5% |
+| MIXED cast · standard | 7% | 17% | 17% | 1% | 8% | 10% | 8% | 1% | 12% | 14% | 5% |
+| EASY mirror · scarce | 8% | 4% | 5% | 0% | 13% | 12% | 5% | 0% | 23% | 22% | 8% |
+| MEDIUM mirror · scarce | 4% | 24% | 22% | 0% | 5% | 7% | 6% | 0% | 14% | 13% | 5% |
+| HARD mirror · scarce | 6% | 20% | 21% | 2% | 6% | 7% | 7% | 1% | 9% | 15% | 5% |
+| MIXED cast · scarce | 6% | 19% | 19% | 1% | 7% | 10% | 5% | 1% | 12% | 15% | 5% |
+| N=8 · scarce | 6% | 19% | 19% | 1% | 7% | 10% | 5% | 1% | 12% | 15% | 5% |
+| N=6 · scarce | 7% | 19% | 21% | 0% | 7% | 11% | 6% | 1% | 13% | 9% | 6% |
+| N=5 · scarce | 8% | 14% | 15% | 0% | 11% | 11% | 11% | 0% | 14% | 8% | 8% |
+| N=4 · scarce | 11% | 5% | 5% | 0% | 18% | 9% | 20% | 0% | 15% | 6% | 10% |
+| N=3 · scarce | 13% | 3% | 3% | 0% | 21% | 9% | 20% | 0% | 14% | 4% | 13% |
+| map octagon · scarce | 6% | 19% | 19% | 1% | 7% | 10% | 5% | 1% | 12% | 15% | 5% |
+| map compass · scarce | 5% | 20% | 20% | 1% | 6% | 10% | 5% | 1% | 12% | 14% | 5% |
+| map oval · scarce | 7% | 17% | 18% | 1% | 8% | 11% | 6% | 1% | 13% | 14% | 5% |
+| map diamond · scarce | 6% | 17% | 18% | 2% | 8% | 10% | 8% | 0% | 11% | 15% | 5% |
+| abundance scarce | 6% | 19% | 19% | 1% | 7% | 10% | 5% | 1% | 12% | 15% | 5% |
+| abundance standard | 7% | 17% | 17% | 1% | 8% | 10% | 8% | 1% | 12% | 14% | 5% |
+| abundance rich | 7% | 15% | 15% | 1% | 9% | 10% | 9% | 1% | 13% | 15% | 5% |
+
+## The curve at each measured pay (base 300, exp 1.6)
+
+| cell | medXP | L2 | L5 | L10 | L20 | base for L2 in one match |
+|---|---|---|---|---|---|---|
+| EASY mirror · standard | 327 | 0.9 | 17.4 | 122.7 | 797.0 | 327 |
+| MEDIUM mirror · standard | 521 | 0.6 | 11.0 | 77.1 | 500.7 | 521 |
+| HARD mirror · standard | 321 | 0.9 | 17.8 | 125.0 | 811.9 | 321 |
+| MIXED cast · standard | 416 | 0.7 | 13.7 | 96.6 | 627.3 | 416 |
+| EASY mirror · scarce | 296 | 1.0 | 19.3 | 135.5 | 880.5 | 296 |
+| MEDIUM mirror · scarce | 509 | 0.6 | 11.2 | 78.9 | 512.6 | 509 |
+| HARD mirror · scarce | 336 | 0.9 | 17.0 | 119.6 | 776.8 | 336 |
+| MIXED cast · scarce | 445 | 0.7 | 12.8 | 90.3 | 586.4 | 445 |
+| N=8 · scarce | 445 | 0.7 | 12.8 | 90.3 | 586.4 | 445 |
+| N=6 · scarce | 529 | 0.6 | 10.8 | 75.8 | 492.7 | 529 |
+| N=5 · scarce | 518 | 0.6 | 11.0 | 77.5 | 503.6 | 518 |
+| N=4 · scarce | 454 | 0.7 | 12.6 | 88.5 | 574.7 | 454 |
+| N=3 · scarce | 404 | 0.7 | 14.1 | 99.4 | 645.9 | 404 |
+| map octagon · scarce | 445 | 0.7 | 12.8 | 90.3 | 586.4 | 445 |
+| map compass · scarce | 453 | 0.7 | 12.6 | 88.6 | 575.3 | 453 |
+| map oval · scarce | 470 | 0.6 | 12.2 | 85.4 | 555.1 | 470 |
+| map diamond · scarce | 423 | 0.7 | 13.5 | 95.0 | 616.9 | 423 |
+| abundance scarce | 445 | 0.7 | 12.8 | 90.3 | 586.4 | 445 |
+| abundance standard | 416 | 0.7 | 13.7 | 96.6 | 627.3 | 416 |
+| abundance rich | 401 | 0.7 | 14.2 | 100.0 | 650.0 | 401 |
+
+## "Level 2 inside a single match" — for WHOM (matches to level 2)
+
+| cell | worst seat | p25 | median | winner | first out | L2 @ p25 | L2 @ first out |
+|---|---|---|---|---|---|---|---|
+| EASY mirror · standard | 151 | 258 | 327 | 495 | 327 | 1.2 | 0.9 |
+| MEDIUM mirror · standard | 217 | 426 | 521 | 760 | 369 | 0.7 | 0.8 |
+| HARD mirror · standard | 76 | 160 | 321 | 1208 | 100 | 1.9 | 3.0 |
+| MIXED cast · standard | 40 | 232 | 416 | 1120 | 104 | 1.3 | 2.9 |
+| EASY mirror · scarce | 147 | 226 | 296 | 485 | 240 | 1.3 | 1.3 |
+| MEDIUM mirror · scarce | 267 | 412 | 509 | 821 | 386 | 0.7 | 0.8 |
+| HARD mirror · scarce | 48 | 176 | 336 | 1205 | 77 | 1.7 | 3.9 |
+| MIXED cast · scarce | 38 | 255 | 445 | 1123 | 68 | 1.2 | 4.4 |
+| N=8 · scarce | 38 | 255 | 445 | 1123 | 68 | 1.2 | 4.4 |
+| N=6 · scarce | 94 | 406 | 529 | 848 | 374 | 0.7 | 0.8 |
+| N=5 · scarce | 70 | 369 | 518 | 770 | 384 | 0.8 | 0.8 |
+| N=4 · scarce | 269 | 360 | 454 | 715 | 318 | 0.8 | 0.9 |
+| N=3 · scarce | 265 | 351 | 404 | 834 | 365 | 0.9 | 0.8 |
+| map octagon · scarce | 38 | 255 | 445 | 1123 | 68 | 1.2 | 4.4 |
+| map compass · scarce | 29 | 282 | 453 | 1002 | 126 | 1.1 | 2.4 |
+| map oval · scarce | 49 | 317 | 470 | 982 | 126 | 0.9 | 2.4 |
+| map diamond · scarce | 42 | 156 | 423 | 1237 | 87 | 1.9 | 3.5 |
+| abundance scarce | 38 | 255 | 445 | 1123 | 68 | 1.2 | 4.4 |
+| abundance standard | 40 | 232 | 416 | 1120 | 104 | 1.3 | 2.9 |
+| abundance rich | 52 | 182 | 401 | 1224 | 107 | 1.6 | 2.8 |
+
+## Candidate participation floors, priced against the shipped default lobby
+
+(MIXED cast · octagon · N=8 · SCARCE — the lobby an offline match actually seats)
+
+| candidate | median | p25 | first out | L2 @ median | L2 @ p25 | L2 @ first out | spread |
+|---|---|---|---|---|---|---|---|
+| shipped (control) | 445 | 255 | 68 | 0.7 | 1.2 | 4.4 | 16.6× |
+| XP_PER_WAVE 15 → 40 | 561 | 330 | 93 | 0.5 | 0.9 | 3.2 | 13.5× |
+| XP_PER_PLACEMENT_RUNG 20 → 40 | 537 | 295 | 68 | 0.6 | 1.0 | 4.4 | 18.7× |
+| flat MATCH PLAYED +100 | 545 | 355 | 168 | 0.6 | 0.8 | 1.8 | 7.3× |
+| flat MATCH PLAYED +200 | 645 | 455 | 268 | 0.5 | 0.7 | 1.1 | 4.9× |
+| flat +100 and XP_PER_WAVE 40 | 661 | 430 | 193 | 0.5 | 0.7 | 1.6 | 7.0× |
+
+## The summary sequence in the loop (pr-05 `buildSummary`, watched not skipped)
+
+| cell | 1st match | median | max | ×50 matches | with level-up | level @50 | match+summary |
+|---|---|---|---|---|---|---|---|
+| EASY mirror · standard | 6.8s | 5.5s | 6.8s | 4:42 | 6/50 | 7 | 14:15 |
+| MEDIUM mirror · standard | 6.8s | 5.5s | 6.8s | 4:43 | 7/50 | 8 | 14:01 |
+| HARD mirror · standard | 6.8s | 5.5s | 6.8s | 4:42 | 6/50 | 7 | 13:48 |
+| MIXED cast · standard | 6.8s | 5.5s | 6.8s | 4:42 | 6/50 | 7 | 14:00 |
+| EASY mirror · scarce | 5.5s | 5.5s | 6.8s | 4:40 | 5/50 | 6 | 14:15 |
+| MEDIUM mirror · scarce | 6.8s | 5.5s | 6.8s | 4:43 | 7/50 | 8 | 14:01 |
+| HARD mirror · scarce | 6.8s | 5.5s | 6.8s | 4:42 | 6/50 | 7 | 13:39 |
+| MIXED cast · scarce | 6.8s | 5.5s | 6.8s | 4:43 | 7/50 | 8 | 13:58 |
+| N=8 · scarce | 6.8s | 5.5s | 6.8s | 4:43 | 7/50 | 8 | 13:58 |
+| N=6 · scarce | 6.8s | 5.5s | 6.8s | 4:43 | 7/50 | 8 | 13:58 |
+| N=5 · scarce | 6.8s | 5.5s | 6.8s | 4:43 | 7/50 | 8 | 14:06 |
+| N=4 · scarce | 6.8s | 5.5s | 6.8s | 4:43 | 7/50 | 8 | 14:15 |
+| N=3 · scarce | 6.8s | 5.5s | 6.8s | 4:42 | 6/50 | 7 | 14:15 |
+| map octagon · scarce | 6.8s | 5.5s | 6.8s | 4:43 | 7/50 | 8 | 13:58 |
+| map compass · scarce | 6.8s | 5.5s | 6.8s | 4:43 | 7/50 | 8 | 13:35 |
+| map oval · scarce | 6.8s | 5.5s | 6.8s | 4:43 | 7/50 | 8 | 14:06 |
+| map diamond · scarce | 6.8s | 5.5s | 6.8s | 4:42 | 6/50 | 7 | 13:47 |
+| abundance scarce | 6.8s | 5.5s | 6.8s | 4:43 | 7/50 | 8 | 13:58 |
+| abundance standard | 6.8s | 5.5s | 6.8s | 4:42 | 6/50 | 7 | 14:00 |
+| abundance rich | 6.8s | 5.5s | 6.8s | 4:42 | 6/50 | 7 | 13:56 |
+
+## Verdicts
+
+  measurement: ALL MATCHES ENDED
+  match length 10–15 min: ALL CELLS IN TARGET
+  "level 2 inside one match": 1 cell(s) miss it
+    EASY mirror · scarce: 1.01 matches
+
