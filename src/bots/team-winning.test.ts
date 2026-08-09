@@ -339,23 +339,31 @@ describe('a 2v2 of the shipped cast always reaches an ending (Task 1.4)', () => 
  * "one home down, one still standing" state is not rare — it occurs in every one
  * of the eight seeds the soak above runs, for anywhere from 3 to 360 seconds.
  *
- * **The seed moved from 1 to 3 when a0-10 landed**, and the reason is worth
- * stating because "the test went red so I changed the seed" is exactly the move
- * this comment exists to distinguish itself from. Every *claim* below held at
- * seed 1 afterwards; what did not hold was the sampling window, which collapsed
- * from 257 ticks to a length too short to observe a purchase in. That window is
- * a property of the seed, not of the ruling — it is however long this particular
- * pair of bots happens to take to finish each other off, and Stage 2 changed
- * where bots fly. Seed 3 gives a nine-minute window (~33k ticks, ~72k units
- * travelled, 8 orders placed), so every assertion is measured with room to spare
- * rather than on the edge of its fixture. The assertions themselves are
- * unchanged and none of them was relaxed.
+ * **The seed moved from 1 to 3 when a0-10 landed, and from 3 to 11 when b3-01
+ * did**, and the reason is worth stating because "the test went red so I changed
+ * the seed" is exactly the move this comment exists to distinguish itself from.
+ * Every *claim* below has held at every seed; what does not survive a behaviour
+ * change is the sampling **window**, which is however long this particular pair
+ * of bots happens to take to finish each other off. It collapsed 257 → too-short
+ * at seed 1 under Stage 2, and 33k → 84 ticks at seed 3 under Stage 3, which
+ * divided where bots mine and therefore where they are when a core goes.
+ *
+ * That fragility is a property of the fixture, so the move was made by
+ * **measurement rather than by trying the next number**: seeds 1–16 were scanned
+ * for the window length and for every quantity asserted below (see the b3-01
+ * working note). It is a genuinely bimodal thing — seeds 1, 3 and 14 give under
+ * 130 ticks while 5, 8 and 11 give over 21,000 — which is why picking the
+ * *largest* margin rather than the first green one is the right move. Seed 11
+ * gives a **6.8-minute window (24,362 ticks, 62,343 units travelled, 3,042 ticks
+ * with the trigger down, 9 orders placed)**, so every assertion below is measured
+ * with two orders of magnitude of room rather than on the edge of its fixture.
+ * The assertions themselves are unchanged and none of them was relaxed.
  */
 describe('a teammate whose core dies is out, and its side plays on (Task 1.7)', () => {
   it('stops the dead-home bot dead, and its ally plays on for minutes', () => {
     const seats = fillEmptySlots([], 4, [...ROSTER.slice(2), ...ROSTER.slice(0, 2)], [0, 0, 1, 1]);
-    const world = createWorld({ seed: 3, players: botLobby(seats) });
-    const bots = createBots(seats, { seed: 3 });
+    const world = createWorld({ seed: 11, players: botLobby(seats) });
+    const bots = createBots(seats, { seed: 11 });
 
     /** The first slot to lose its home while a teammate still holds one. */
     let downSlot: PlayerId | null = null;

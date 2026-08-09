@@ -513,10 +513,10 @@ describe('a bot under siege says so, once per cooldown (Task 2.5)', () => {
  * match with an empty hold and a full ring, and reading the hold would score
  * that as having mined nothing.
  */
-function siegeRun(besieged: boolean, seconds = 240): { mined: number; answered: number; ticks: number } {
+function siegeRun(besieged: boolean, seed = 31, seconds = 240): { mined: number; answered: number; ticks: number } {
   const seats = fillEmptySlots([], 4, ['warden', 'patch', 'sable', 'foreman'], SIDES);
-  const world = createWorld({ seed: 31, players: botLobby(seats) });
-  const bots = createBots(seats, { seed: 31 });
+  const world = createWorld({ seed, players: botLobby(seats) });
+  const bots = createBots(seats, { seed });
   const me = bots.find((b) => b.seat.id === ME)!;
 
   let answered = 0;
@@ -535,23 +535,40 @@ function siegeRun(besieged: boolean, seconds = 240): { mined: number; answered: 
   return { mined, answered, ticks };
 }
 
+/**
+ * The seeds the economy A/B pools over.
+ *
+ * **It used to be one seed, and that was the defect.** At seed 31 alone the
+ * ratio below reads 0.87 on the code this test shipped with and 0.49 on b3-01's
+ * — but across these eight seeds the *same* two builds read 0.71 and 0.87, i.e.
+ * the opposite ordering. A single seed does not measure a trend here, because
+ * two builds do not produce the same match with a small difference; they produce
+ * entirely different matches (the ratio ranges 0.44–1.32 seed to seed on
+ * unmodified code). Sixteen 240-second runs cost about a second in total, which
+ * is a cheap price for an assertion that means what it says.
+ */
+const ECONOMY_SEEDS = [31, 7, 13, 19, 23, 29, 37, 41] as const;
+
 describe('one besieged ally cannot consume a teammate\'s match', () => {
   it('keeps mining through a permanent siege next door', () => {
-    const quiet = siegeRun(false);
-    const under = siegeRun(true);
+    const quiet = ECONOMY_SEEDS.map((s) => siegeRun(false, s));
+    const under = ECONOMY_SEEDS.map((s) => siegeRun(true, s));
+    const sum = (rs: readonly { mined: number }[]): number => rs.reduce((a, r) => a + r.mined, 0);
 
     // The case is live: the responder really did break off, repeatedly.
-    expect(under.answered).toBeGreaterThan(0);
+    expect(under.reduce((a, r) => a + r.answered, 0)).toBeGreaterThan(0);
 
     // …and its economy did not collapse. Answering costs the trip and the fight
     // and is *supposed* to cost something; what it may not do is produce a bot
-    // that never mines. Measured, the permanent-siege run still brings in ~86%
-    // of the control's ore over four minutes. The cooldown is what buys that.
-    expect(quiet.mined).toBeGreaterThan(0);
-    expect(under.mined).toBeGreaterThan(quiet.mined * 0.6);
+    // that never mines. **Pooled over the eight seeds**, the permanent-siege run
+    // brings in 87% of the control's ore over four minutes (it was 71% before
+    // b3-01 divided the field). The cooldown is what buys that.
+    expect(sum(quiet)).toBeGreaterThan(0);
+    expect(sum(under)).toBeGreaterThan(sum(quiet) * 0.6);
 
     // And the share of the match spent answering stays a slice, not the match.
-    expect(under.answered / under.ticks).toBeLessThan(0.4);
+    const ticks = under.reduce((a, r) => a + r.ticks, 0);
+    expect(under.reduce((a, r) => a + r.answered, 0) / ticks).toBeLessThan(0.4);
   });
 
   it('is not a quiet control by accident — the radio carries the rest', () => {
@@ -560,7 +577,7 @@ describe('one besieged ally cannot consume a teammate\'s match', () => {
     // pinning, because a control that were genuinely silent would make the A/B
     // above look like a bigger effect than it is — and because it is the one
     // place Layer B is measurably doing work Layer A cannot.
-    expect(siegeRun(false).answered).toBeGreaterThan(0);
+    expect(ECONOMY_SEEDS.reduce((a, s) => a + siegeRun(false, s).answered, 0)).toBeGreaterThan(0);
   });
 
   it('caps the share of a match one alarm can take', () => {

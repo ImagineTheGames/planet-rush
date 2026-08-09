@@ -273,8 +273,16 @@ function segmentDist(a: Vec2, b: Vec2, p: Vec2): number {
  * perfectly good field's score by up to four and sent the bot somewhere worse —
  * in TEAMS, where allies spawn adjacent and therefore mine the same fields, that
  * was most of them (p16-01).
+ *
+ * **Exported for the tests**, like {@link TargetScore}'s three terms and for the
+ * same reason: it is the *explanation* behind a pick, and since Stage 3 the pick
+ * alone can no longer carry the claim this function makes. With the crowd reach
+ * set to one visual range ({@link allyCrowdRadius}), *"on my approach to that
+ * rock"* and *"competing with me for that rock"* are the same set of ships, so
+ * "an ally is not a threat" and "an ally is competition" move the pick the same
+ * way — and only the two terms, read separately, tell them apart.
  */
-function pathClearance(ctx: BotCtx, to: Vec2): number {
+export function pathClearance(ctx: BotCtx, to: Vec2): number {
   const from = ctx.self.pos;
   let worst = 0;
   for (const ship of ctx.view.ships) {
@@ -408,7 +416,7 @@ function crowdLean(weights: PersonalityWeights): number {
  * identity, so an FFA bot's rock scores are the same bits they were before this
  * function existed (`ffa-parity.test.ts`'s pinned hashes).
  */
-function allyCrowding(ctx: BotCtx, rock: PerceivedAsteroid): number {
+export function allyCrowding(ctx: BotCtx, rock: PerceivedAsteroid): number {
   const reach = allyCrowdRadius(ctx);
   let worst = 0;
   for (const ship of ctx.view.ships) {
