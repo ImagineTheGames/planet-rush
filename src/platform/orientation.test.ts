@@ -23,7 +23,7 @@ function fakePlatform(over: Partial<Platform>): Platform {
     isFullscreen: () => false,
     canFullscreen: () => false,
     vibrate: () => {},
-    storage: { get: () => null, set: () => {} },
+    storage: { get: () => null, set: () => {}, remove: () => {} },
     lockOrientation: () => Promise.resolve(),
     canLockOrientation: () => false,
     prefersReducedMotion: () => false,
