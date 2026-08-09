@@ -89,6 +89,15 @@ import { createBrowserHaptics } from '@platform/haptics';
 // nothing in this file invents a second store for progression.
 import { loadProfile, saveProfile } from './progression/profile';
 import type { Profile } from './progression/profile';
+// The end-of-match sequence's numbers (a0-13's chain, pr-03/pr-04/pr-05). The
+// observer watches the match, `xpForMatch` prices it, the curve says what level
+// that is, and `buildSummary` fixes every number ONCE at teardown. None of it is
+// ever read by the sim (GDD §4.8).
+import { createAccrualObserver, totalByTier } from './progression/accrual';
+import type { AccrualObserver, MatchAccrual } from './progression/accrual';
+import { HUMAN_TIER, xpForMatch } from './progression/xp';
+import { levelForXp } from './progression/curve';
+import type { Difficulty } from './bots';
 import { FullscreenLifecycle } from '@platform/fullscreen';
 import { InstallPromptController } from '@platform/install-prompt';
 import { writeAffordanceRects } from '@platform/touch-visuals';
@@ -207,6 +216,8 @@ import {
   DEFAULT_VOLUMES,
   EndOfMatchView,
   endOfMatchModel,
+  buildSummary,
+  summaryFrame,
   LobbyView,
   createLobby,
   lobbyModel,
@@ -281,6 +292,8 @@ import type {
   EndButton,
   MatchOutcome,
   DeathCause,
+  SummaryFrame,
+  SummarySequence,
   LobbyState,
   PauseScreen,
   PauseButton,
@@ -1005,6 +1018,47 @@ async function boot(): Promise<void> {
   let match: ClientMatch = onlineSession ? onlineMatchAdapter(onlineSession) : bootMatch(matchSeed);
   let world = match.world;
 
+  /**
+   * The difficulty each seat's opposition is SCORED at (plan §1.3b), for the
+   * accrual observer's tier buckets.
+   *
+   * Lobby knowledge, not wire knowledge: a bot's difficulty is read off the cast
+   * this client seated, and nothing about it ever arrives over a socket — which is
+   * what makes the multiplier unspoofable. A human is scored at
+   * {@link HUMAN_TIER} by decision rather than measurement (`progression/xp.ts`
+   * says why at length), and that is the default here.
+   *
+   * **Online, every non-local seat reads as a human.** The server owns the cast,
+   * so `match.bots` is empty on that path and there is no per-seat difficulty to
+   * read; a bot seat in an online room is therefore scored one rung high. The
+   * lobby roster could refine it later — it is a wiring change, not a design one.
+   */
+  function seatTiers(): Difficulty[] {
+    const seats = Math.max(world.ships.length, world.stations.length);
+    const tiers: Difficulty[] = new Array<Difficulty>(seats).fill(HUMAN_TIER);
+    for (const bot of match.bots) tiers[bot.seat.id] = bot.difficulty;
+    return tiers;
+  }
+
+  /**
+   * The accrual observer for the match being played (pr-04).
+   *
+   * Fed the world every sim tick, read exactly once at teardown. It is a
+   * *spectator*: read-only over the world, outside `hashState`, and the sim never
+   * learns it exists (GDD §4.8, the `ore-ledger.ts` pattern).
+   *
+   * **The one honest limit, stated where the wiring is.** Plan Trap "observe the
+   * AUTHORITATIVE world" asks for the server's world online. This client is not
+   * handed one: `session.world` is the locally predicted world, reconciled against
+   * snapshots (`src/net/session.ts`), and there is no second `World` object to
+   * observe. What is fed here is therefore the reconciled world, which the
+   * observer's own rollback covers for a re-delivered tick; a genuinely
+   * authoritative feed needs a snapshot-side world the netcode lane would have to
+   * expose. Offline — every match today — the world IS authority and the rule is
+   * met exactly.
+   */
+  let accrual: AccrualObserver = createAccrualObserver(world, seatTiers());
+
   /** Cached owner slots on the local player's side — the under-attack alarm's
    *  roster (`art/audio/scope`). Cleared on a rematch, below. */
   let alarmSide: ReadonlySet<PlayerId> | null = null;
@@ -1565,6 +1619,15 @@ async function boot(): Promise<void> {
     // NEVER falls through to fly a dead ship or open the wheel. First refusal,
     // and it always consumes the event.
     if (endOverlay.visible) {
+      // …and while the summary is still playing, the FIRST tap anywhere skips it
+      // and does nothing else (plan §6.4 rule 1). A player who taps twice must not
+      // rematch by accident; from the settle onward every tap goes where it was
+      // aimed, because a settled sequence refuses the skip.
+      if (skipSummary()) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        return;
+      }
       const target = endOverlay.hitTest(lp.x, lp.y);
       endPress = target?.kind ?? null;
       endHover = endPress;
@@ -1986,6 +2049,10 @@ async function boot(): Promise<void> {
       // client's input advances the authoritative sim (GDD §4.2, §2.9).
       match.tick(sampleInput());
       simTicks++;
+      // Watch the match for the end-of-match summary (pr-04/pr-05). Read-only,
+      // outside determinism, and per TICK rather than per frame so a window is
+      // always one step of the authoritative clock.
+      accrual.observe(world);
       // Apply any queued ?debug=1 write-seam actions (damageShip/damageCore) for
       // this tick, in FIFO order — a no-op in a normal build. Drained HERE, right
       // after the authoritative step, so a debug write lands on a tick boundary
@@ -2113,7 +2180,7 @@ async function boot(): Promise<void> {
       // and show the screen that fits — nothing, the DEFEATED overlay, or the final
       // result. The whole "your station died and nothing happened" fix (field report
       // v0.1.2) lives on this one call, fed truth the sim decides.
-      syncEndScreen();
+      syncEndScreen(nowMs);
       // Pause overlay (developer p10): draw whichever pause screen is up and the
       // touch corner button. Runs every rendered frame, including while the sim is
       // frozen above — so the overlay stays live over a stopped world.
@@ -2160,8 +2227,15 @@ async function boot(): Promise<void> {
    * when the desired screen changes or its model does. The screen is derived, not
    * latched, so a match that resolves while you're staring at DEFEATED rolls the
    * overlay straight over to the result screen on its own.
+   *
+   * ── pr-05: AND IT IS WHERE THE MATCH IS BANKED ──────────────────────────────
+   * The result screen is the one moment the career is written (plan §6, GDD §4.8:
+   * the sim must never read the profile, and a crash mid-match may cost at most
+   * the current match). {@link bankMatch} runs ONCE per match, here, *before* the
+   * first frame of the sequence exists — so the animation interpolates toward
+   * numbers that are already on disk rather than producing them.
    */
-  function syncEndScreen(): void {
+  function syncEndScreen(nowMs: number): void {
     const over = isOver(world);
     const eliminatedLocal = world.match.eliminated.includes(LOCAL_PLAYER);
     const desired: typeof endScreen = over ? 'result' : eliminatedLocal && !spectating ? 'defeated' : 'none';
@@ -2177,9 +2251,185 @@ async function boot(): Promise<void> {
       return;
     }
     if (!endOverlay.visible) endOverlay.visible = true;
+    // Compute → add → save → *then* animate. One write, at teardown, never
+    // mid-match, and never on the DEFEATED overlay: that screen is shown while the
+    // others fight on, and this seat's match is not over.
+    if (desired === 'result') bankMatch(nowMs);
     const model = endOfMatchModel(currentOutcome(over), { hover: endHover, press: endPress });
     endButtonsShown = model.buttons.map((b) => b.id);
-    endOverlay.update(model);
+    endOverlay.update(model, desired === 'result' ? currentSummaryFrame(nowMs) : null);
+  }
+
+  // --- The end-of-match sequence (pr-05, plan §6) -----------------------------
+
+  /** The choreography for the match that just ended — null until the result
+   *  screen lands, and dropped again on a rematch. */
+  let summary: SummarySequence | null = null;
+  /** When beat 0 started, on the render clock. */
+  let summaryStartMs = 0;
+  /** The player skipped, or their OS asked for less motion. Both resolve to the
+   *  sequence's own end state, which is what makes them impossible to disagree. */
+  let summarySkipped = false;
+  let summaryReduced = false;
+  /** Whether the last frame had finished — what decides whether an input SKIPS or
+   *  presses a button (§6.4 rule 1: the first input skips, the second may act). */
+  let summaryDone = false;
+  /** Cue bookkeeping: the counters are READ off the model, never queued, so a
+   *  skip fires nothing that was still pending (plan §6.5). */
+  let summaryTicks = 0;
+  let summaryLevels = 0;
+  let summaryFilling = false;
+  let summarySettled = false;
+  /** Whether a stick/pad was already being held when the sequence began — a thumb
+   *  resting on a stick as your reactor dies is not a request to skip. */
+  let summaryHeldInput = false;
+  /** `?debug=1` only: the sequence's clock, pinned to one instant so an evidence
+   *  run can photograph four named beats of ONE sequence instead of racing it
+   *  with a stopwatch (`__endScreenStage.summarySeek`). Null in every real boot. */
+  let summaryPinned: number | null = null;
+
+  /** Seconds into the sequence this frame is — the pin, when one is set. */
+  function summarySeconds(nowMs: number = performance.now()): number {
+    return summaryPinned ?? (nowMs - summaryStartMs) / 1000;
+  }
+
+  /** How the sequence is being read: skipped, reduced, or neither. Freeze pins it
+   *  to the end state for the same reason a golden exists. */
+  function summaryOptions(): { skipped: boolean; reducedMotion: boolean } {
+    return { skipped: summarySkipped || flags.freeze, reducedMotion: summaryReduced };
+  }
+
+  /**
+   * Bank the finished match: compute, add, save, and only then build the sequence.
+   *
+   * Idempotent per match (`summary !== null` is the latch), which is the whole of
+   * "one `saveProfile` call per match" — and skipping the animation cannot skip
+   * the write, because the write happens before there is anything to skip.
+   *
+   * The profile is re-read here rather than held from boot: it is the freshest
+   * copy of a value the hangar may have written while the menu was up, and one
+   * reader, one key, one module (`progression/profile.ts`) is the rule this
+   * chain ships under.
+   */
+  function bankMatch(nowMs: number): void {
+    if (summary !== null) return;
+    const finals = accrual.finalize(world);
+    const mine = finals.find((a) => a.slot === LOCAL_PLAYER);
+    if (!mine) return;
+    const priced = xpForMatch(mine);
+    const before = loadProfile(platform.storage);
+    const xp = before.xp + priced.total;
+    saveProfile(platform.storage, {
+      ...before,
+      xp,
+      // The cache is rebuilt from the source it caches, by the same function every
+      // other screen reads the level through (`progression/curve.ts`).
+      level: levelForXp(xp),
+      matches: before.matches + 1,
+    });
+    summary = buildSummary({
+      accrual: mine,
+      xp: priced,
+      startXp: before.xp,
+      uncreditedStationDeaths: uncreditedStationDeaths(finals),
+    });
+    summaryStartMs = nowMs;
+    summarySkipped = false;
+    // Read the OS preference once, here, at the one moment it can change what this
+    // screen does. Never a bare `matchMedia` in UI code (GDD §4.1).
+    summaryReduced = platform.prefersReducedMotion();
+    summaryDone = false;
+    summaryTicks = 0;
+    summaryLevels = 0;
+    summaryFilling = false;
+    summarySettled = false;
+    summaryHeldInput = controlActive(merged);
+  }
+
+  /**
+   * Whether any station died in this match that NOBODY was credited with — the
+   * Crush, which kills most of them and is not an attacker (GDD §2.3, plan
+   * §1.3c). It is what turns a zero station-kill row into `—` rather than `0`: a
+   * stat that cannot be credited to a real player is not shown rather than
+   * estimated. A credited zero stays a zero.
+   */
+  function uncreditedStationDeaths(finals: readonly MatchAccrual[]): boolean {
+    let dead = 0;
+    for (const station of world.stations) if (!station.alive) dead += 1;
+    let credited = 0;
+    for (const a of finals) credited += totalByTier(a.stationKills);
+    return dead > credited + 1e-6;
+  }
+
+  /**
+   * The sequence at this frame, and the sound that goes with it.
+   *
+   * Under `?freeze=1` the sequence is pinned to its end state along with
+   * everything else the freeze pins: a golden screenshot is a promise that nothing
+   * on the frame moves with the wall clock, and a counter that does would break
+   * the one gate that catches a visual regression.
+   */
+  function currentSummaryFrame(nowMs: number): SummaryFrame | null {
+    if (summary === null) return null;
+    const frame = summaryFrame(summary, summarySeconds(nowMs), summaryOptions());
+    // Any input skips — the sticks and the pad, on a RISING edge only.
+    if (!summaryDone && !summarySkipped) {
+      const active = controlActive(merged);
+      if (active && !summaryHeldInput) skipSummary();
+      summaryHeldInput = active;
+    }
+    driveSummaryAudio(frame);
+    summaryDone = frame.done;
+    return frame;
+  }
+
+  /**
+   * Skip the sequence. Returns whether this input WAS the skip — which is how the
+   * tap handler knows to consume it: the first input skips and must not also press
+   * REMATCH, or a double-tapping player rematches by accident (§6.4 rule 1).
+   *
+   * A settled sequence is not skippable, so from the settle onward every input
+   * goes where the player aimed it.
+   */
+  function skipSummary(): boolean {
+    if (summary === null || summarySkipped || summaryDone) return false;
+    summarySkipped = true;
+    // A player who skipped is telling you they do not want the beat: the bar's bed
+    // goes silent immediately rather than tapering behind the buttons (plan §6.5).
+    audio.stopXpFill();
+    summaryFilling = false;
+    return true;
+  }
+
+  /**
+   * Sound the sequence (pr-07's four cues), driven off the model's own monotonic
+   * counters rather than off a queue.
+   *
+   * That is what makes a skip silent: the counters jump straight to their final
+   * values with the phase already at `settle`, and every cue below is gated on the
+   * phase it belongs to — so nothing that was "pending" fires late. The settle cue
+   * is the one exception, and it is the one plan §6.5 explicitly allows.
+   */
+  function driveSummaryAudio(frame: SummaryFrame): void {
+    if (frame.ticks > summaryTicks) {
+      if (frame.phase === 'rows' || frame.phase === 'total') audio.cue('xpTick', frame.ticks);
+      summaryTicks = frame.ticks;
+    }
+    if (frame.levelsShown > summaryLevels) {
+      if (frame.phase === 'levelUp') audio.cue('levelUp');
+      summaryLevels = frame.levelsShown;
+    }
+    if (frame.barMoving) {
+      audio.xpFill(frame.barProgress);
+      summaryFilling = true;
+    } else if (summaryFilling) {
+      audio.stopXpFill();
+      summaryFilling = false;
+    }
+    if (!summarySettled && frame.phase === 'settle') {
+      summarySettled = true;
+      audio.cue('xpSettle');
+    }
   }
 
   /**
@@ -2275,6 +2525,15 @@ async function boot(): Promise<void> {
     match = bootMatch(matchSeed);
     world = match.world;
     rebuildNameTable();
+    // A new match is a new tally and a new summary: the observer is rebuilt on the
+    // fresh world, and the banked sequence is dropped so the NEXT teardown writes
+    // once again (`bankMatch`'s latch is this binding).
+    accrual = createAccrualObserver(world, seatTiers());
+    summary = null;
+    summaryDone = false;
+    summaryPinned = null;
+    audio.stopXpFill();
+    summaryFilling = false;
     spectating = false;
     cameraTarget = LOCAL_PLAYER;
     endScreen = 'none';
@@ -3754,6 +4013,60 @@ async function boot(): Promise<void> {
       buttons(): EndButton[] {
         return endButtonsShown.slice();
       },
+      /**
+       * **pr-05's sequence, as the real client resolved it this frame** — the beat,
+       * the counted numbers, the bar and whether the buttons are live yet. Read
+       * off the same model the view drew, so an evidence run photographs a frame
+       * and can also *state* what was in it.
+       */
+      summary(): {
+        phase: string;
+        rows: { label: string; text: string; xp: string | null }[];
+        matchTime: string;
+        xp: string;
+        level: string;
+        barFrac: number;
+        leveledUp: boolean;
+        buttonsLive: boolean;
+        done: boolean;
+      } | null {
+        const frame = summary === null ? null : summaryFrame(summary, summarySeconds(), summaryOptions());
+        if (!frame) return null;
+        return {
+          phase: frame.phase,
+          rows: frame.rows.map((r) => ({ label: r.label, text: r.text, xp: r.xpText })),
+          matchTime: frame.matchTime,
+          xp: frame.xpText,
+          level: frame.levelText,
+          barFrac: frame.barFrac,
+          leveledUp: frame.leveledUp,
+          buttonsLive: frame.buttonsLive,
+          done: frame.done,
+        };
+      },
+      /**
+       * Pin the sequence's clock at `seconds`, or `null` to let it run again.
+       *
+       * The evidence run needs beat 0, a mid-count, a bar mid-fill and the settle
+       * as four still frames of the SAME sequence; a stopwatch race against a 5 s
+       * animation would photograph four different ones. It pins the clock the view
+       * reads and nothing else — every number in the frame is still the sequence's
+       * own, which is exactly what makes the photograph worth taking.
+       */
+      summarySeek(seconds: number | null): void {
+        summaryPinned = seconds === null || !Number.isFinite(seconds) ? null : Math.max(0, seconds);
+      },
+      /** Skip the sequence exactly as an input does — returns whether it was
+       *  still running (i.e. whether that input WAS the skip). */
+      summarySkip(): boolean {
+        return skipSummary();
+      },
+      /** The career this boot has on disk, read back through the profile module —
+       *  the proof the single write site actually wrote. */
+      career(): { xp: number; level: number; matches: number } {
+        const p = loadProfile(platform.storage);
+        return { xp: p.xp, level: p.level, matches: p.matches };
+      },
       spectate(): void {
         startSpectate();
       },
@@ -5157,6 +5470,10 @@ async function boot(): Promise<void> {
 
   // --- Fire-mode toggle: single key for day-1 (UI owns the settings screen).
   window.addEventListener('keydown', (e) => {
+    // ANY key skips the end-of-match sequence, and does nothing else with that
+    // press (plan §6.4 rule 1) — the keyboard half of "tap anywhere, any key, any
+    // pad button". A settled sequence refuses, so the shortcuts below come back.
+    if (endOverlay.visible && skipSummary()) return;
     if (e.code === 'KeyF') {
       fireMode = fireMode === FireMode.Manual ? FireMode.AutoAim : FireMode.Manual;
       touch.setFireMode(fireMode);
