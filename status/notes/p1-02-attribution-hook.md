@@ -15,8 +15,9 @@ The branch was later fast-forwarded to `origin/main` (`fa55346`) so the DoD's
 `git merge-base --is-ancestor origin/main HEAD` line keeps passing as main moves — the
 branch had gone stale behind p1-03's merge. Nothing was re-edited to make it pass.
 
-Re-verified on the merged tree: `npx tsc --noEmit` clean, `npm test -- --run` →
-**255 files / 4414 tests, all green**.
+Re-verified on the fast-forwarded tree (`853520a`): `npx tsc --noEmit` clean,
+`npm test -- --run` → **255 files / 4416 tests, all green**. (4414 of those were green
+before the fast-forward; the extra two arrived with p1-03, not from this lane.)
 
 ## BUILT
 
