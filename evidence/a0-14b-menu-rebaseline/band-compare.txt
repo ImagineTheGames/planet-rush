@@ -1,0 +1,35 @@
+=== a0-14b: what the two menu goldens accepted ===
+HEAD: 7243a77  (post-merge, includes a0-07b's sky)
+BEFORE = the baseline as it stood on origin/main; AFTER = what this branch wrote.
+
+--- landscape phone MAIN MENU ---
+evidence/a0-14b-menu-rebaseline/before-390-landscape.png
+  vs evidence/a0-14b-menu-rebaseline/after-390-landscape.png
+size 844x390, per-channel threshold 8/255
+
+differing px: 138313 (ratio 0.4202)
+bands that differ:
+  y   65– 324 (260 rows)  x   24– 819  max  796 px/row
+  y  340– 341 (  2 rows)  x   93– 750  max  658 px/row
+  y  371– 378 (  8 rows)  x    9–  45  max   21 px/row
+
+--- PORTRAIT-HELD phone MAIN MENU ---
+evidence/a0-14b-menu-rebaseline/before-390-portrait.png
+  vs evidence/a0-14b-menu-rebaseline/after-390-portrait.png
+size 390x844, per-channel threshold 8/255
+
+differing px: 138313 (ratio 0.4202)
+bands that differ:
+  y    9–  11 (  3 rows)  x   11–  16  max    6 px/row
+  y   14–  17 (  4 rows)  x   11–  17  max    5 px/row
+  y   19– 819 (801 rows)  x   11– 324  max  245 px/row
+
+--- DESKTOP MAIN MENU (1280x800) ---
+evidence/a0-14b-menu-rebaseline/before-desktop.png
+  vs evidence/a0-14b-menu-rebaseline/after-desktop.png
+size 1280x800, per-channel threshold 8/255
+
+differing px: 205238 (ratio 0.2004)
+bands that differ:
+  y  229– 570 (342 rows)  x  240–1039  max  800 px/row
+  y  782– 789 (  8 rows)  x   14–  45  max   22 px/row
