@@ -31,7 +31,8 @@
 import type { PlayerId } from '@shared/types';
 import { ShipClass } from '@shared/types';
 import type { PlayerSpec, World } from '../src/sim';
-import { TICK_DT, createWorld, fieldOre, isOver, step } from '../src/sim';
+import type { Abundance } from '../src/sim';
+import { TICK_DT, createWorld, fieldOre, isOver, resolveEconomy, step, waveIntervalOf } from '../src/sim';
 import type { Bot, PersonalityId } from '../src/bots';
 import {
   Difficulty,
@@ -80,6 +81,17 @@ export interface BotMatchResult {
   readonly winnerClass: ShipClass | null;
   readonly fieldOreLeft: number;
   readonly hash: string;
+  /** Ore chipped out of rock over the whole match (`world.ledger.mined`) — the
+   *  numerator of the ore-per-minute the scarcity reports are measured on (p11,
+   *  a0-17). `0` on a world built without a ledger. */
+  readonly oreMined: number;
+  /** Sim time collapse opened, or `-1` if it never did (GDD §2.3). */
+  readonly collapseTime: number;
+  /** Waves actually delivered. Below `WAVE_COUNT` means the schedule outran the
+   *  match — the "the last wave never mattered" check (a0-17). */
+  readonly wavesSpawned: number;
+  /** The wave interval this match actually ran on (`world.economy.waveInterval`). */
+  readonly waveInterval: number;
 }
 
 /** How a soak match is run. Defaults are the probe harness's ceilings, so the
@@ -88,6 +100,16 @@ export interface SoakRunOptions {
   readonly dt?: number;
   readonly maxSeconds?: number;
   readonly maxWallClockMs?: number;
+  /** Ore scarcity this match runs at (p11). Omitted keeps `createWorld`'s
+   *  legacy-safe `standard` baseline, so every pre-a0-17 soak is unchanged. */
+  readonly abundance?: Abundance;
+  /** Candidate wave interval (seconds) forced onto the resolved economy right
+   *  after construction — the a0-17 measuring instrument, so a candidate
+   *  `respawnInterval` can be priced without editing the constants table between
+   *  runs. See `./match` `MatchSetup.waveIntervalOverride` for why this is exact:
+   *  `world.economy.waveInterval` is the one number every consumer reads
+   *  (`waveIntervalOf`, a0-16) and wave 1 lands at t=0 regardless. */
+  readonly waveIntervalOverride?: number;
 }
 
 /** Wall-clock guard cadence — mirrors `./match`. */
@@ -110,7 +132,16 @@ export function runBotMatch(
   const maxTicks = Math.ceil((maxSeconds / dt) * 1.5) + 1;
 
   const players: PlayerSpec[] = slots.map((s) => ({ id: s.id, shipClass: s.shipClass }));
-  const world: World = createWorld({ seed, players });
+  const world: World = createWorld({
+    seed,
+    players,
+    ...(options.abundance !== undefined ? { abundance: options.abundance } : {}),
+  });
+  if (options.waveIntervalOverride !== undefined) {
+    const iv = options.waveIntervalOverride;
+    if (!(iv > 0)) throw new Error(`runBotMatch: waveIntervalOverride must be positive, got ${iv}`);
+    world.economy = { ...(world.economy ?? resolveEconomy()), waveInterval: iv };
+  }
   const bots: Bot[] = slots.map((s) => createBot({ id: s.id, personality: s.personality }, { seed }));
 
   const startedAt = performance.now();
@@ -154,6 +185,10 @@ export function runBotMatch(
     winnerClass: wSlot?.shipClass ?? null,
     fieldOreLeft: fieldOre(world),
     hash: hashState(world),
+    oreMined: world.ledger?.mined ?? 0,
+    collapseTime: world.match.collapseTime,
+    wavesSpawned: world.match.wavesSpawned,
+    waveInterval: waveIntervalOf(world),
   };
 }
 

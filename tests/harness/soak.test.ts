@@ -15,6 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import { ShipClass } from '@shared/types';
 import { MATCH_SLOTS } from '../../src/bots';
+import { WAVE_INTERVAL_S } from '../../src/sim';
 import {
   CLASSES,
   HARD_POOL,
@@ -107,6 +108,10 @@ describe('the statistics the report quotes', () => {
       winnerClass: ShipClass.Vanguard,
       fieldOreLeft: 0,
       hash: '0',
+      oreMined: 0,
+      collapseTime: -1,
+      wavesSpawned: 0,
+      waveInterval: WAVE_INTERVAL_S,
       ...over,
     };
   }
