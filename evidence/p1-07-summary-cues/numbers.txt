@@ -1,5 +1,5 @@
 p1-07 — the four end-of-match summary cues. Evidence, generated out of the modules.
-       npx vite-node evidence/p1-07-summary-cues.ts
+       npx vite-node evidence/p1-07-summary-cues/numbers.ts
 
 === 1. THE REVIEW BOARD — four new slots, three candidates each ===
 

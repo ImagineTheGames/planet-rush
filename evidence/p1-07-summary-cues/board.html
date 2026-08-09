@@ -1,0 +1,151 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Planet Rush — sound review (p1-07, the four summary cues)</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; padding: 28px; background: #0b0e13; color: #dfe6f2;
+         font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: .01em; }
+  .lede { color: #8d9ab0; margin: 0 0 26px; font-size: 13.5px; max-width: 74ch; }
+  .slot { background: #131822; border: 1px solid #1f2836; border-radius: 10px;
+          padding: 18px 20px 16px; margin-bottom: 16px; }
+  .slot header { margin-bottom: 14px; }
+  h2 { font-size: 16.5px; margin: 0 0 3px; display: flex; align-items: baseline; gap: 10px; }
+  .id { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: #66748c; }
+  .beat { font-size: 12px; color: #7f8ea8; margin-left: auto; letter-spacing: .02em; }
+  .context { margin: 0; color: #8d9ab0; font-size: 13px; }
+  .current, .cand { display: grid; grid-template-columns: 78px 300px 1fr;
+                    align-items: center; gap: 14px; padding: 7px 0; }
+  .current { border-bottom: 1px solid #1f2836; margin-bottom: 6px; padding-bottom: 12px; }
+  .badge { font: 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em;
+           text-transform: uppercase; text-align: center; padding: 5px 0; border-radius: 4px;
+           background: #26344a; color: #9fb4d4; }
+  .badge.cur { background: #2b2f26; color: #b6c48d; }
+  audio { width: 300px; height: 32px; }
+  .character { font-size: 14px; color: #eaf0fa; }
+  .character.shipped { color: #97a08c; font-style: italic; }
+  .deny { margin-top: 12px; background: #2a1a1c; color: #d99aa2; border: 1px solid #472329;
+          border-radius: 6px; padding: 7px 13px; font-size: 12.5px; font-family: inherit; }
+</style>
+<h1>Planet Rush — sound review</h1>
+<p class="lede">The four end-of-match summary cues (p1-07), new slots 41–44 on the board.
+   <b>current</b> is the voice this brief ships; <b>a</b>, <b>b</b>, <b>c</b> are the three
+   options to choose against it. They are heard in the order below, under a result that has
+   already sounded — and none of them is <code>matchEnd</code>, <code>musicWin</code> or
+   <code>musicLoss</code>, which are three of the forty slots already denied.</p>
+
+    <section class="slot" id="slot-xpTick">
+      <header>
+        <h2>XP Tick<span class="id">xpTick</span><span class="beat">beat 1–2 · the count-up</span></h2>
+        <p class="context">One step of the end-of-match count-up — dozens in five seconds, every match. If it is interesting, it is wrong.</p>
+      </header>
+      <div class="current">
+        <div class="badge cur">current</div>
+        <audio controls preload="none" src="../../sound-review/previews/xpTick/current.wav"></audio>
+        <div class="character shipped">the voice this brief ships — the incumbent to choose against</div>
+      </div>
+      <div class="cands">
+        <div class="cand">
+          <div class="badge">a</div>
+          <audio controls preload="none" src="../../sound-review/previews/xpTick/a.wav"></audio>
+          <div class="character">a counter contact, dry grit</div>
+        </div>
+        <div class="cand">
+          <div class="badge">b</div>
+          <audio controls preload="none" src="../../sound-review/previews/xpTick/b.wav"></audio>
+          <div class="character">a damped pip, felt not heard</div>
+        </div>
+        <div class="cand">
+          <div class="badge">c</div>
+          <audio controls preload="none" src="../../sound-review/previews/xpTick/c.wav"></audio>
+          <div class="character">one narrow band, machine-clean</div>
+        </div></div>
+      <button class="deny">DENY ALL — generate 3 new options</button>
+    </section>
+
+    <section class="slot" id="slot-xpBarFill">
+      <header>
+        <h2>XP Bar Fill<span class="id">xpBarFill</span><span class="beat">beat 3 · the bar fills</span></h2>
+        <p class="context">The bed under the level bar filling — starts and ends with the bar, and ducks under a level-up landing on it.</p>
+      </header>
+      <div class="current">
+        <div class="badge cur">current</div>
+        <audio controls preload="none" src="../../sound-review/previews/xpBarFill/current.wav"></audio>
+        <div class="character shipped">the voice this brief ships — the incumbent to choose against</div>
+      </div>
+      <div class="cands">
+        <div class="cand">
+          <div class="badge">a</div>
+          <audio controls preload="none" src="../../sound-review/previews/xpBarFill/a.wav"></audio>
+          <div class="character">particulate fill, poured in</div>
+        </div>
+        <div class="cand">
+          <div class="badge">b</div>
+          <audio controls preload="none" src="../../sound-review/previews/xpBarFill/b.wav"></audio>
+          <div class="character">a low bed under pressure</div>
+        </div>
+        <div class="cand">
+          <div class="badge">c</div>
+          <audio controls preload="none" src="../../sound-review/previews/xpBarFill/c.wav"></audio>
+          <div class="character">an induction hum, taking charge</div>
+        </div></div>
+      <button class="deny">DENY ALL — generate 3 new options</button>
+    </section>
+
+    <section class="slot" id="slot-levelUp">
+      <header>
+        <h2>Level Up<span class="id">levelUp</span><span class="beat">beat 4 · the level-up</span></h2>
+        <p class="context">The bar completed and the level ticked over — the one moment in the beat allowed to be a reward. Arrival, not fanfare.</p>
+      </header>
+      <div class="current">
+        <div class="badge cur">current</div>
+        <audio controls preload="none" src="../../sound-review/previews/levelUp/current.wav"></audio>
+        <div class="character shipped">the voice this brief ships — the incumbent to choose against</div>
+      </div>
+      <div class="cands">
+        <div class="cand">
+          <div class="badge">a</div>
+          <audio controls preload="none" src="../../sound-review/previews/levelUp/a.wav"></audio>
+          <div class="character">a dry arrival, contacts landing</div>
+        </div>
+        <div class="cand">
+          <div class="badge">b</div>
+          <audio controls preload="none" src="../../sound-review/previews/levelUp/b.wav"></audio>
+          <div class="character">pressure seating, weight arriving</div>
+        </div>
+        <div class="cand">
+          <div class="badge">c</div>
+          <audio controls preload="none" src="../../sound-review/previews/levelUp/c.wav"></audio>
+          <div class="character">a struck plate, one bare fifth</div>
+        </div></div>
+      <button class="deny">DENY ALL — generate 3 new options</button>
+    </section>
+
+    <section class="slot" id="slot-xpSettle">
+      <header>
+        <h2>XP Settle<span class="id">xpSettle</span><span class="beat">beat 5 · the settle</span></h2>
+        <p class="context">The end of the sequence — everything holds at its final value and the buttons take focus. Quiet: the full stop.</p>
+      </header>
+      <div class="current">
+        <div class="badge cur">current</div>
+        <audio controls preload="none" src="../../sound-review/previews/xpSettle/current.wav"></audio>
+        <div class="character shipped">the voice this brief ships — the incumbent to choose against</div>
+      </div>
+      <div class="cands">
+        <div class="cand">
+          <div class="badge">a</div>
+          <audio controls preload="none" src="../../sound-review/previews/xpSettle/a.wav"></audio>
+          <div class="character">a dry stop, one contact</div>
+        </div>
+        <div class="cand">
+          <div class="badge">b</div>
+          <audio controls preload="none" src="../../sound-review/previews/xpSettle/b.wav"></audio>
+          <div class="character">a damped seat, closing</div>
+        </div>
+        <div class="cand">
+          <div class="badge">c</div>
+          <audio controls preload="none" src="../../sound-review/previews/xpSettle/c.wav"></audio>
+          <div class="character">one low band, ringing out</div>
+        </div></div>
+      <button class="deny">DENY ALL — generate 3 new options</button>
+    </section>

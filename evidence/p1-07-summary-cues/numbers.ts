@@ -1,8 +1,8 @@
 /**
- * evidence/p1-07-summary-cues.ts — the brief's evidence line, generated.
+ * evidence/p1-07-summary-cues/numbers.ts — the brief's evidence line, generated.
  * OWNER: Sound Agent. NOT part of the game bundle. Run by hand:
  *
- *     npx vite-node evidence/p1-07-summary-cues.ts > evidence/p1-07-summary-cues.txt
+ *     npx vite-node evidence/p1-07-summary-cues/numbers.ts > evidence/p1-07-summary-cues/numbers.txt
  *
  * The brief asks for two things, *"so 'it is in the amended envelope' is a number
  * rather than an opinion"*:
@@ -33,10 +33,10 @@ import {
   voiceDuration,
   type VoiceSpec,
   type Wave,
-} from '../src/art/audio/synth';
-import { isLayered, loops, soundSpec, SOUND_NAMES, XP_TICK_SEMITONES, XP_TICK_STEPS_MAX, type SoundName, type SoundSpec } from '../src/art/audio/bank';
-import { CANDIDATE_SLOTS } from '../src/art/audio/candidates';
-import { XP_FILL_GAIN } from '../src/art/audio/engine';
+} from '../../src/art/audio/synth';
+import { isLayered, loops, soundSpec, SOUND_NAMES, XP_TICK_SEMITONES, XP_TICK_STEPS_MAX, type SoundName, type SoundSpec } from '../../src/art/audio/bank';
+import { CANDIDATE_SLOTS } from '../../src/art/audio/candidates';
+import { XP_FILL_GAIN } from '../../src/art/audio/engine';
 
 const SUMMARY: readonly SoundName[] = ['xpTick', 'xpBarFill', 'levelUp', 'xpSettle'];
 /** Printed beside the four, because each is the bound one of them is held to. */
@@ -210,7 +210,7 @@ function line(r: Row): string {
 // ---------------------------------------------------------------------------
 
 console.log('p1-07 — the four end-of-match summary cues. Evidence, generated out of the modules.');
-console.log('       npx vite-node evidence/p1-07-summary-cues.ts');
+console.log('       npx vite-node evidence/p1-07-summary-cues/numbers.ts');
 console.log('');
 
 // --- 1. the review board ----------------------------------------------------
