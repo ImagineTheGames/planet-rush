@@ -135,6 +135,47 @@ export interface DifficultyTuning {
    * `docs/bot-player-aggression-p15.md` §3. TUNABLE
    */
   readonly aggression: number;
+  /**
+   * **Seconds between speaking and being understood** on the team channel
+   * (`./radio`; `docs/team-bots-plan.md` §2.3, Stage 2 Task 2.4).
+   *
+   * Cooperation is a *skill*, and this is the first of the three dials that make
+   * it one — with no separate "be bad at teamwork" knob anywhere. An Easy team
+   * misses calls and arrives late out of the same latency/miss model that makes
+   * an Easy bot shoot late, which is the identical discipline as
+   * {@link aimLatency}: one mechanism, visible competence, no cheat in either
+   * direction.
+   *
+   * **The floor is a determinism rule, not a taste call.** This must be ≥ one
+   * tick (`TICK_DT`) at every tier, forever. Below it, a call sent at tick *T*
+   * would be readable at tick *T*, so a higher-numbered slot would act on it and
+   * a lower-numbered one — already decided this tick — would not, coupling
+   * behaviour to bot iteration order (`./harness`) and desyncing against the
+   * match server, which drives bots one at a time. `team-radio.test.ts` pins it;
+   * do not lower it to make an "instant Hard" feel snappier (plan Trap 4). Every
+   * tier below sits far above the floor anyway. TUNABLE
+   */
+  readonly callLatency: number;
+  /**
+   * Chance a given teammate simply **did not hear** a call (0..1), rolled from
+   * the *sender's* seeded stream once per recipient at send time — so who missed
+   * it is a pure function of the seed (plan §2.4).
+   *
+   * The call nobody heard is what keeps a coordinated team from reading as one
+   * mind. Eight teammates reacting in the same frame and never missing anything
+   * is inhuman in the *other* direction from a bot that never cooperates at all.
+   * TUNABLE
+   */
+  readonly callMissChance: number;
+  /**
+   * Minimum seconds between two calls from the same bot — one voice, one channel.
+   *
+   * It is also the only thing bounding radio traffic: a send is not an `Action`,
+   * so it does not travel in the action stream and `holdable` (`./harness`) is
+   * not protecting it. A tree that called for help once per *decision* would emit
+   * twenty a second at Hard. TUNABLE
+   */
+  readonly callCooldown: number;
 }
 
 /** Per-tier competence. All TUNABLE, all owned by this agent. */
@@ -152,6 +193,13 @@ export const DIFFICULTY_TUNING: Readonly<Record<Difficulty, DifficultyTuning>> =
     blockadeDetectSeconds: 1.6,
     /** "EASY stays timid" — the shipped floor, untouched. */
     aggression: 1,
+    // An Easy team is a team that shouts across a noisy room: over a second to
+    // be understood, a third of every call lost, and one voice every six
+    // seconds. It answers alarms rarely and late, and both bots chase the same
+    // thing when it does — by construction, out of these three numbers.
+    callLatency: 1.2,
+    callMissChance: 0.35,
+    callCooldown: 6,
   },
   [Difficulty.Medium]: {
     reactionInterval: 1 / 12,
@@ -163,6 +211,10 @@ export const DIFFICULTY_TUNING: Readonly<Record<Difficulty, DifficultyTuning>> =
     blockadeDetectSeconds: 0.6,
     /** The note raises HARD only; Medium keeps the balance it was tuned to. */
     aggression: 1,
+    /** Half a beat to be understood, and one call in seven goes unheard. */
+    callLatency: 0.6,
+    callMissChance: 0.15,
+    callCooldown: 3,
   },
   [Difficulty.Hard]: {
     // Tuned *down* from v0.2.2's perfection (aimJitter 0.02, no latency): the
@@ -192,6 +244,12 @@ export const DIFFICULTY_TUNING: Readonly<Record<Difficulty, DifficultyTuning>> =
     // table in `docs/bot-player-aggression-p15.md` §3. TUNABLE, and the whole
     // implementation of the ratified note is this one number.
     aggression: 1,
+    // Crisp, but not telepathic: a quarter-second to be understood is fifteen
+    // ticks, so a Hard team still cannot react inside the frame a call was made
+    // — which is the determinism floor doing its job as well as the feel.
+    callLatency: 0.25,
+    callMissChance: 0.05,
+    callCooldown: 1.5,
   },
 };
 

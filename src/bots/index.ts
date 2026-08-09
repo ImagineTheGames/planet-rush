@@ -18,6 +18,11 @@
  *    forgets. Only the view goes in, so memory cannot launder hidden state.
  *  - `./steering`      — hands on the controls: the only file that turns a
  *    decision into `Action`s.
+ *  - `./radio`         — the team callout channel: what allied bots may say to
+ *    each other, with a latency, a miss rate and a cooldown, so cooperation is a
+ *    skill rather than telepathy (`docs/team-bots-plan.md` §2).
+ *  - `./ally`          — the memory of having answered a teammate's alarm, and
+ *    the budget that stops one besieged ally consuming a whole match.
  *  - `./targeting`     — threat × proximity × opportunity, the nerve threshold,
  *    and the fog-honest guess at who is winning.
  *  - `./behaviors`     — the verbs every tier shares: mine, haul, spend, guard,
@@ -40,6 +45,8 @@ export * from './personalities';
 export * from './perception';
 export * from './memory';
 export * from './steering';
+export * from './radio';
+export * from './ally';
 export * from './tree';
 export * from './targeting';
 export * from './behaviors';

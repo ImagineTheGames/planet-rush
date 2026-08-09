@@ -29,6 +29,8 @@ import type { Bot, BotOptions, BotSeat } from './bot';
 import { NO_ACTIONS, createBot } from './bot';
 import type { Perception } from './perception';
 import { DEFAULT_PERCEPTION, perceive } from './perception';
+import type { TeamRadio } from './radio';
+import { teamRadio } from './radio';
 import type { PersonalityId } from './personalities';
 import { PERSONALITIES, ROSTER } from './personalities';
 
@@ -137,9 +139,43 @@ export function botLobby(seats: readonly BotSeat[]): PlayerSpec[] {
   });
 }
 
-/** Construct the bots for a seated cast (`./bot`). */
+/**
+ * Construct the bots for a seated cast (`./bot`), **and open one radio per
+ * side** (`./radio`; `docs/team-bots-plan.md` Stage 2).
+ *
+ * The channel is built here rather than inside `createBot` because it is the one
+ * piece of bot state that is *shared*: a team's calls have to land in the same
+ * ring, so somebody has to know the whole lineup, and this is the only function
+ * that does. It lives beside the bots and never inside `World`, exactly like
+ * `Brain` (`./tree`), so the determinism replay cannot desync on it (plan Trap 5).
+ *
+ * **FFA gets no radio at all, structurally.** A seat with no `team` key is
+ * teams-of-one, and `teamRadio` returns `null` for a side of one — so `send` is a
+ * no-op with no recipients, `receive` is the shared empty array, and every
+ * team-aware branch degrades to exactly the behaviour that shipped before this
+ * file knew what a team was. There is no mode flag anywhere in a tree (§2.5).
+ *
+ * A caller that seats bots one at a time — the match server, the QA harness's
+ * per-seat builder — gets `createBot`'s quiet default (`radio: null`) and
+ * therefore Layer A only: the ally klaxon still reaches those bots through the
+ * view, because `perceive` derives allies from the world rather than from the
+ * seat. That is a degradation in Layer B alone, and a deliberate seam: wiring a
+ * shared channel through the server's slot table is netcode's file, not this one.
+ */
 export function createBots(seats: readonly BotSeat[], options: BotOptions = {}): Bot[] {
-  return seats.map((seat) => createBot(seat, options));
+  const sides = new Map<number, PlayerId[]>();
+  for (const seat of seats) {
+    if (seat.team === undefined) continue;
+    const side = sides.get(seat.team);
+    if (side) side.push(seat.id);
+    else sides.set(seat.team, [seat.id]);
+  }
+  const radios = new Map<number, TeamRadio | null>();
+  for (const [team, members] of sides) radios.set(team, teamRadio(members));
+  return seats.map((seat) => {
+    const radio = seat.team === undefined ? null : radios.get(seat.team) ?? null;
+    return createBot(seat, radio ? { ...options, radio } : options);
+  });
 }
 
 // ---------------------------------------------------------------------------
