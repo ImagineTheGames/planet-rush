@@ -1,0 +1,771 @@
+{
+  "what": "b2-03 — a bot joins its teammate's attack, and stays home when its own core is burning",
+  "ask": "the developer, 2026-08-07: \"…and equally should try to attack when team mates go on offensive\"",
+  "plan": "docs/team-bots-plan.md Stage 4 (focus fire); the defensive half is a0-10 / Stage 2",
+  "fixture": {
+    "seed": 20260809,
+    "lineup": "TEAMS 2v2 — sable + vulture vs warden + foreman",
+    "observer": "slot 0 (Sable), starting 900 units from the home its teammate is hitting",
+    "assaultJoinRange": "ASSAULT_JOIN_RANGE 1000 × (0.55 + opportunism 0.9) = 1450",
+    "note": "both runs are the same seed, cast, board and tick; the ONLY difference is whether slot 0's own home is also taking fire",
+    "unscripted": "no callout is injected — slot 1 opens the raid and announces it through the ordinary attack verbs"
+  },
+  "frame1_theJoin": {
+    "reading": "my teammate called a push on that home, my home is quiet — I go",
+    "closestApproachToObjective": 82,
+    "startedAtFromObjective": 900,
+    "behaviourTickShare": {
+      "join-assault": "35.6%",
+      "defend": "24.1%",
+      "defend-ally": "18.5%",
+      "dead": "12.5%",
+      "attack": "7.8%",
+      "mine": "0.6%",
+      "retreat": "0.5%",
+      "cornered-fight": "0.4%"
+    },
+    "pushCallsOnTheChannel": 1,
+    "calloutsOnTheChannel": 16,
+    "trace": [
+      {
+        "t": 1,
+        "behavior": "join-assault",
+        "joining": 2,
+        "toObjective": 761,
+        "toOwnHome": 440,
+        "pushCallsHeard": 2,
+        "ownAlarm": false
+      },
+      {
+        "t": 2,
+        "behavior": "join-assault",
+        "joining": 2,
+        "toObjective": 591,
+        "toOwnHome": 609,
+        "pushCallsHeard": 3,
+        "ownAlarm": false
+      },
+      {
+        "t": 3,
+        "behavior": "join-assault",
+        "joining": 2,
+        "toObjective": 426,
+        "toOwnHome": 774,
+        "pushCallsHeard": 3,
+        "ownAlarm": false
+      },
+      {
+        "t": 4,
+        "behavior": "join-assault",
+        "joining": 2,
+        "toObjective": 282,
+        "toOwnHome": 935,
+        "pushCallsHeard": 3,
+        "ownAlarm": false
+      },
+      {
+        "t": 5,
+        "behavior": "join-assault",
+        "joining": 2,
+        "toObjective": 173,
+        "toOwnHome": 1058,
+        "pushCallsHeard": 3,
+        "ownAlarm": false
+      },
+      {
+        "t": 6,
+        "behavior": "join-assault",
+        "joining": 2,
+        "toObjective": 83,
+        "toOwnHome": 1142,
+        "pushCallsHeard": 3,
+        "ownAlarm": false
+      },
+      {
+        "t": 7,
+        "behavior": "join-assault",
+        "joining": 2,
+        "toObjective": 153,
+        "toOwnHome": 1184,
+        "pushCallsHeard": 5,
+        "ownAlarm": false
+      },
+      {
+        "t": 8,
+        "behavior": "join-assault",
+        "joining": 2,
+        "toObjective": 169,
+        "toOwnHome": 1078,
+        "pushCallsHeard": 5,
+        "ownAlarm": false
+      },
+      {
+        "t": 9,
+        "behavior": "join-assault",
+        "joining": 2,
+        "toObjective": 173,
+        "toOwnHome": 1027,
+        "pushCallsHeard": 7,
+        "ownAlarm": false
+      },
+      {
+        "t": 10,
+        "behavior": "join-assault",
+        "joining": 2,
+        "toObjective": 172,
+        "toOwnHome": 1073,
+        "pushCallsHeard": 9,
+        "ownAlarm": false
+      },
+      {
+        "t": 11,
+        "behavior": "join-assault",
+        "joining": 2,
+        "toObjective": 168,
+        "toOwnHome": 1192,
+        "pushCallsHeard": 9,
+        "ownAlarm": false
+      },
+      {
+        "t": 12,
+        "behavior": "join-assault",
+        "joining": 2,
+        "toObjective": 169,
+        "toOwnHome": 1321,
+        "pushCallsHeard": 11,
+        "ownAlarm": false
+      },
+      {
+        "t": 13,
+        "behavior": "join-assault",
+        "joining": 2,
+        "toObjective": 194,
+        "toOwnHome": 1391,
+        "pushCallsHeard": 11,
+        "ownAlarm": false
+      },
+      {
+        "t": 14,
+        "behavior": "join-assault",
+        "joining": 2,
+        "toObjective": 237,
+        "toOwnHome": 1426,
+        "pushCallsHeard": 11,
+        "ownAlarm": false
+      },
+      {
+        "t": 15,
+        "behavior": "defend-ally",
+        "joining": 2,
+        "toObjective": 325,
+        "toOwnHome": 1478,
+        "pushCallsHeard": 11,
+        "ownAlarm": false
+      },
+      {
+        "t": 16,
+        "behavior": "defend-ally",
+        "joining": 2,
+        "toObjective": 460,
+        "toOwnHome": 1578,
+        "pushCallsHeard": 11,
+        "ownAlarm": false
+      },
+      {
+        "t": 17,
+        "behavior": "defend-ally",
+        "joining": 2,
+        "toObjective": 326,
+        "toOwnHome": 1463,
+        "pushCallsHeard": 11,
+        "ownAlarm": false
+      },
+      {
+        "t": 18,
+        "behavior": "defend-ally",
+        "joining": 2,
+        "toObjective": 237,
+        "toOwnHome": 1373,
+        "pushCallsHeard": 11,
+        "ownAlarm": false
+      },
+      {
+        "t": 19,
+        "behavior": "defend-ally",
+        "joining": 2,
+        "toObjective": 295,
+        "toOwnHome": 1407,
+        "pushCallsHeard": 11,
+        "ownAlarm": false
+      },
+      {
+        "t": 20,
+        "behavior": "retreat",
+        "joining": 2,
+        "toObjective": 301,
+        "toOwnHome": 1335,
+        "pushCallsHeard": 11,
+        "ownAlarm": false
+      },
+      {
+        "t": 21,
+        "behavior": "dead",
+        "joining": -1,
+        "toObjective": 288,
+        "toOwnHome": 1302,
+        "pushCallsHeard": 10,
+        "ownAlarm": false
+      },
+      {
+        "t": 22,
+        "behavior": "dead",
+        "joining": -1,
+        "toObjective": 288,
+        "toOwnHome": 1302,
+        "pushCallsHeard": 10,
+        "ownAlarm": false
+      },
+      {
+        "t": 23,
+        "behavior": "dead",
+        "joining": -1,
+        "toObjective": 288,
+        "toOwnHome": 1302,
+        "pushCallsHeard": 9,
+        "ownAlarm": false
+      },
+      {
+        "t": 24,
+        "behavior": "dead",
+        "joining": -1,
+        "toObjective": 288,
+        "toOwnHome": 1302,
+        "pushCallsHeard": 8,
+        "ownAlarm": false
+      },
+      {
+        "t": 25,
+        "behavior": "dead",
+        "joining": -1,
+        "toObjective": 288,
+        "toOwnHome": 1302,
+        "pushCallsHeard": 8,
+        "ownAlarm": false
+      },
+      {
+        "t": 26,
+        "behavior": "defend-ally",
+        "joining": -1,
+        "toObjective": 1085,
+        "toOwnHome": 145,
+        "pushCallsHeard": 8,
+        "ownAlarm": false
+      },
+      {
+        "t": 27,
+        "behavior": "defend-ally",
+        "joining": -1,
+        "toObjective": 915,
+        "toOwnHome": 298,
+        "pushCallsHeard": 8,
+        "ownAlarm": false
+      },
+      {
+        "t": 28,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 836,
+        "toOwnHome": 365,
+        "pushCallsHeard": 7,
+        "ownAlarm": false
+      },
+      {
+        "t": 29,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 960,
+        "toOwnHome": 251,
+        "pushCallsHeard": 6,
+        "ownAlarm": false
+      },
+      {
+        "t": 30,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1111,
+        "toOwnHome": 179,
+        "pushCallsHeard": 6,
+        "ownAlarm": false
+      },
+      {
+        "t": 31,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1165,
+        "toOwnHome": 80,
+        "pushCallsHeard": 5,
+        "ownAlarm": false
+      },
+      {
+        "t": 32,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1154,
+        "toOwnHome": 146,
+        "pushCallsHeard": 5,
+        "ownAlarm": false
+      },
+      {
+        "t": 33,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1038,
+        "toOwnHome": 220,
+        "pushCallsHeard": 4,
+        "ownAlarm": false
+      },
+      {
+        "t": 34,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 967,
+        "toOwnHome": 317,
+        "pushCallsHeard": 3,
+        "ownAlarm": false
+      },
+      {
+        "t": 35,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 908,
+        "toOwnHome": 329,
+        "pushCallsHeard": 3,
+        "ownAlarm": false
+      },
+      {
+        "t": 36,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1009,
+        "toOwnHome": 232,
+        "pushCallsHeard": 2,
+        "ownAlarm": false
+      },
+      {
+        "t": 37,
+        "behavior": "attack",
+        "joining": -1,
+        "toObjective": 1121,
+        "toOwnHome": 193,
+        "pushCallsHeard": 1,
+        "ownAlarm": false
+      },
+      {
+        "t": 38,
+        "behavior": "attack",
+        "joining": -1,
+        "toObjective": 974,
+        "toOwnHome": 277,
+        "pushCallsHeard": 1,
+        "ownAlarm": false
+      },
+      {
+        "t": 39,
+        "behavior": "attack",
+        "joining": -1,
+        "toObjective": 804,
+        "toOwnHome": 418,
+        "pushCallsHeard": 1,
+        "ownAlarm": false
+      },
+      {
+        "t": 40,
+        "behavior": "attack",
+        "joining": -1,
+        "toObjective": 634,
+        "toOwnHome": 577,
+        "pushCallsHeard": 1,
+        "ownAlarm": false
+      }
+    ]
+  },
+  "frame2_theLadder": {
+    "reading": "the same callout, and my own core is burning too — I stay",
+    "closestApproachToObjective": 863,
+    "startedAtFromObjective": 900,
+    "behaviourTickShare": {
+      "defend": "99.9%",
+      "mine": "0.1%"
+    },
+    "pushCallsOnTheChannel": 0,
+    "calloutsOnTheChannel": 16,
+    "trace": [
+      {
+        "t": 1,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1015,
+        "toOwnHome": 192,
+        "pushCallsHeard": 1,
+        "ownAlarm": true
+      },
+      {
+        "t": 2,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1096,
+        "toOwnHome": 148,
+        "pushCallsHeard": 1,
+        "ownAlarm": true
+      },
+      {
+        "t": 3,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1169,
+        "toOwnHome": 141,
+        "pushCallsHeard": 1,
+        "ownAlarm": true
+      },
+      {
+        "t": 4,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1244,
+        "toOwnHome": 140,
+        "pushCallsHeard": 1,
+        "ownAlarm": true
+      },
+      {
+        "t": 5,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1305,
+        "toOwnHome": 140,
+        "pushCallsHeard": 1,
+        "ownAlarm": true
+      },
+      {
+        "t": 6,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1337,
+        "toOwnHome": 139,
+        "pushCallsHeard": 1,
+        "ownAlarm": true
+      },
+      {
+        "t": 7,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1332,
+        "toOwnHome": 139,
+        "pushCallsHeard": 1,
+        "ownAlarm": true
+      },
+      {
+        "t": 8,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1292,
+        "toOwnHome": 139,
+        "pushCallsHeard": 1,
+        "ownAlarm": true
+      },
+      {
+        "t": 9,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1226,
+        "toOwnHome": 139,
+        "pushCallsHeard": 1,
+        "ownAlarm": true
+      },
+      {
+        "t": 10,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1150,
+        "toOwnHome": 139,
+        "pushCallsHeard": 1,
+        "ownAlarm": true
+      },
+      {
+        "t": 11,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1088,
+        "toOwnHome": 139,
+        "pushCallsHeard": 1,
+        "ownAlarm": true
+      },
+      {
+        "t": 12,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1061,
+        "toOwnHome": 139,
+        "pushCallsHeard": 1,
+        "ownAlarm": true
+      },
+      {
+        "t": 13,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1079,
+        "toOwnHome": 139,
+        "pushCallsHeard": 1,
+        "ownAlarm": true
+      },
+      {
+        "t": 14,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1136,
+        "toOwnHome": 139,
+        "pushCallsHeard": 1,
+        "ownAlarm": true
+      },
+      {
+        "t": 15,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1211,
+        "toOwnHome": 139,
+        "pushCallsHeard": 1,
+        "ownAlarm": true
+      },
+      {
+        "t": 16,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1281,
+        "toOwnHome": 139,
+        "pushCallsHeard": 1,
+        "ownAlarm": true
+      },
+      {
+        "t": 17,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1327,
+        "toOwnHome": 139,
+        "pushCallsHeard": 1,
+        "ownAlarm": true
+      },
+      {
+        "t": 18,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1339,
+        "toOwnHome": 139,
+        "pushCallsHeard": 1,
+        "ownAlarm": true
+      },
+      {
+        "t": 19,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1314,
+        "toOwnHome": 139,
+        "pushCallsHeard": 1,
+        "ownAlarm": true
+      },
+      {
+        "t": 20,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1258,
+        "toOwnHome": 139,
+        "pushCallsHeard": 1,
+        "ownAlarm": true
+      },
+      {
+        "t": 21,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1184,
+        "toOwnHome": 139,
+        "pushCallsHeard": 1,
+        "ownAlarm": true
+      },
+      {
+        "t": 22,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1113,
+        "toOwnHome": 139,
+        "pushCallsHeard": 1,
+        "ownAlarm": true
+      },
+      {
+        "t": 23,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1067,
+        "toOwnHome": 139,
+        "pushCallsHeard": 1,
+        "ownAlarm": true
+      },
+      {
+        "t": 24,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1065,
+        "toOwnHome": 139,
+        "pushCallsHeard": 1,
+        "ownAlarm": true
+      },
+      {
+        "t": 25,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1107,
+        "toOwnHome": 139,
+        "pushCallsHeard": 0,
+        "ownAlarm": true
+      },
+      {
+        "t": 26,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1177,
+        "toOwnHome": 139,
+        "pushCallsHeard": 0,
+        "ownAlarm": true
+      },
+      {
+        "t": 27,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1252,
+        "toOwnHome": 139,
+        "pushCallsHeard": 0,
+        "ownAlarm": true
+      },
+      {
+        "t": 28,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1323,
+        "toOwnHome": 142,
+        "pushCallsHeard": 0,
+        "ownAlarm": true
+      },
+      {
+        "t": 29,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1441,
+        "toOwnHome": 248,
+        "pushCallsHeard": 0,
+        "ownAlarm": true
+      },
+      {
+        "t": 30,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1407,
+        "toOwnHome": 218,
+        "pushCallsHeard": 0,
+        "ownAlarm": true
+      },
+      {
+        "t": 31,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1106,
+        "toOwnHome": 155,
+        "pushCallsHeard": 0,
+        "ownAlarm": true
+      },
+      {
+        "t": 32,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 870,
+        "toOwnHome": 371,
+        "pushCallsHeard": 0,
+        "ownAlarm": true
+      },
+      {
+        "t": 33,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1026,
+        "toOwnHome": 224,
+        "pushCallsHeard": 0,
+        "ownAlarm": true
+      },
+      {
+        "t": 34,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1191,
+        "toOwnHome": 107,
+        "pushCallsHeard": 0,
+        "ownAlarm": true
+      },
+      {
+        "t": 35,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1223,
+        "toOwnHome": 105,
+        "pushCallsHeard": 0,
+        "ownAlarm": true
+      },
+      {
+        "t": 36,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1339,
+        "toOwnHome": 200,
+        "pushCallsHeard": 0,
+        "ownAlarm": true
+      },
+      {
+        "t": 37,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1462,
+        "toOwnHome": 328,
+        "pushCallsHeard": 0,
+        "ownAlarm": true
+      },
+      {
+        "t": 38,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1381,
+        "toOwnHome": 255,
+        "pushCallsHeard": 0,
+        "ownAlarm": true
+      },
+      {
+        "t": 39,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1255,
+        "toOwnHome": 161,
+        "pushCallsHeard": 0,
+        "ownAlarm": true
+      },
+      {
+        "t": 40,
+        "behavior": "defend",
+        "joining": -1,
+        "toObjective": 1174,
+        "toOwnHome": 143,
+        "pushCallsHeard": 0,
+        "ownAlarm": true
+      }
+    ]
+  },
+  "verdict": {
+    "joinedClosed": "818 units closed toward the objective",
+    "heldClosed": "37 units closed",
+    "ladderIntact": true,
+    "theCallWasUnscripted": true
+  }
+}
