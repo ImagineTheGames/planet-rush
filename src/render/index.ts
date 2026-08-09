@@ -17,10 +17,13 @@
  * stations as patina discs with a player-colour beacon ring and a signal-yellow
  * core (GDD §5.4 — the art pass replaces the shapes, not the layers).
  *
- * **Fog is drawn, not just simulated.** A rival station's damage ring appears
- * only while the camera's ship is inside `SENSOR_RANGE` of it (GDD §2.2:
- * "enemy station health is scouted, not broadcast"). Your own home always shows
- * its ring — it is your home.
+ * **Fog is drawn, not just simulated** — but station HEALTH is not fog (GDD §2.2,
+ * amended 2026-08-07; a0-05). Every station this layer draws gets its damage
+ * ring, at every range, whoever owns it. The ring is drawn in world units at a
+ * fixed width and the camera is translate-only (no zoom), so the far read is
+ * pixel-identical to the near one. What is still fogged is the *minimap*
+ * (`sim/sensing` coverage) and enemy **ship** hulls, which are drawn only on
+ * screen.
  */
 
 import { Container, Graphics } from 'pixi.js';
@@ -28,11 +31,13 @@ import { UpgradeTrack } from '@shared/types';
 import type { PlayerId, ShipClass, Vec2 } from '@shared/types';
 import { writeCameraOffset } from '@platform/camera';
 import type { Viewport } from '@platform/camera';
-import { SENSOR_RANGE, TURRET, TURRET_MAX_TIER, turretTierShotDamage } from '../sim/constants';
+import { TURRET, TURRET_MAX_TIER, turretTierShotDamage } from '../sim/constants';
 import { inAtmosphere, turretHomeAngle, turretOrbitPos } from '../sim/buildings';
 import { areEnemies } from '../sim/allegiance';
+import { stationHealthVisible } from '../sim/sensing';
 import type { Asteroid, OreChunk, MiningStation, Projectile, Ship, World } from '../sim/state';
-import { atmosphereHaloSprite } from '../art/stations';
+import { atmosphereHaloSprite, beaconRingSprite, stationSprite, stationVariantFor } from '../art/stations';
+import { stationWreckSprite } from '../art/wrecks';
 import { asteroidArt } from '../art/atlas';
 import { shipSprite } from '../art/ships';
 import { turretSprite, shieldSprite, shieldStrength, type TurretState } from '../art/buildings';
@@ -96,6 +101,15 @@ export interface RenderView {
   readonly cameraTarget: PlayerId;
   /** Active muzzle-flash segments this frame (one per turret that fired). */
   readonly muzzles: readonly MuzzleView[];
+  /**
+   * The map this world was built from (`sim/maps.ts` id) — which is what picks
+   * the backdrop's sky (a0-07, `../art/backdrop` `MAP_NEBULA`: a map's sky is
+   * part of its identity, like its layout). Optional and last-wins: `World`
+   * itself does not carry its map id, so the caller that chose the map passes it
+   * here, and an omitted one falls back to the default map's sky rather than to
+   * a blank one — a harness or a test fixture keeps working unchanged.
+   */
+  readonly mapId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -244,27 +258,18 @@ function shotTier(world: World, p: Projectile): number {
   return 0;
 }
 
-/** Whether `viewer` is close enough to read `station`'s health (GDD §2.2, §2.8 —
- *  sensor range is 2× the shield radius). Squared compare, no square roots
- *  (GDD §4.1). Measured to the station's surface, so a big body is legible from
- *  the same standoff distance a small one is. */
-function withinSensorRange(viewer: { pos: Vec2 }, station: MiningStation): boolean {
-  const dx = station.pos.x - viewer.pos.x;
-  const dy = station.pos.y - viewer.pos.y;
-  const reach = SENSOR_RANGE + station.radius;
-  return dx * dx + dy * dy <= reach * reach;
-}
-
 // ---------------------------------------------------------------------------
 // The renderer
 // ---------------------------------------------------------------------------
 
 export class Renderer {
-  /** The void (a2-06): a layered parallax star-field + nebula washes, drawn in
-   *  *screen* space behind the world so it scrolls at a fraction of the camera —
-   *  depth the fleet flies against. The look and the geometry live in the art
-   *  layer (`../art/backdrop`); the renderer only places it behind the world and
-   *  feeds it the camera offset it already computes. */
+  /** The void (a2-06, re-grounded a0-07): the Floor ground plane, a layered
+   *  parallax star-field with seeded-scatter bloom, and the map's own sky, drawn
+   *  in *screen* space behind the world so it scrolls at a fraction of the
+   *  camera — depth the fleet flies against. The look and the geometry live in
+   *  the art layer (`../art/backdrop`); the renderer only places it behind the
+   *  world and feeds it three things it already has: the camera offset, the VFX
+   *  tier, and which map is being played. */
   private readonly backdrop = new VoidBackdrop();
   /** World-space root; the camera moves this so the target ship stays centered. */
   private readonly worldRoot = new Container();
@@ -423,6 +428,7 @@ export class Renderer {
     // The void, behind the world: sized once to cover the arena+viewport (a
     // cheap no-op when neither changed), then scrolled by the camera offset
     // centerCamera just wrote — parallax, allocation-free (GDD §4.3).
+    this.backdrop.setMap(view.mapId);
     this.backdrop.configure(world.bounds.width, world.bounds.height, this.viewport.width, this.viewport.height);
     this.backdrop.update(this.offsetScratch.x, this.offsetScratch.y, this.viewport.width, this.viewport.height);
     this.drawBoundary(world.bounds);
@@ -489,11 +495,16 @@ export class Renderer {
   /**
    * The eight homes (GDD §2.1) and everything standing on them: the body, the
    * owner's beacon ring, the signal-yellow core, the shield bubble, construction
-   * in progress, and the scouted damage ring.
+   * in progress, and the damage ring.
    *
-   * `viewerId`'s ship is the eye: a rival's damage ring is drawn only while that
-   * ship is inside `SENSOR_RANGE` of the station (GDD §2.2 — health you earn by
-   * scouting). Your own home is always legible, because it is yours.
+   * **The damage ring is drawn for every station, at every range** (GDD §2.2,
+   * amended 2026-08-07; `sim/sensing`'s `stationHealthVisible`). It used to be
+   * gated on the viewer's ship being inside the retired `SENSOR_RANGE` — 180
+   * units, a fifth of the way to the edge of a 1080p screen — so a rival you
+   * could see perfectly well drew *no* ring, and the always-drawn owner-colour
+   * beacon ring under it made a quarter-dead station look untouched. `viewerId`
+   * is still the eye for everything that genuinely is fog (the atmosphere halo is
+   * an own-station affordance, shots read by side), just not for health.
    */
   private drawStations(world: World, viewerId: PlayerId): void {
     const viewer = world.ships.find((s) => s.id === viewerId);
@@ -513,11 +524,10 @@ export class Renderer {
       if (station.alive) {
         this.drawShieldBubble(overlay, station);
         this.drawConstruction(overlay, station);
-        // Own station always; a rival's only from inside sensor range.
-        const scouted =
-          station.owner === viewerId ||
-          (viewer !== undefined && withinSensorRange(viewer, station));
-        if (scouted) this.drawDamageRing(overlay, station);
+        // Health is not fog (GDD §2.2, amended): every station, every range. The
+        // sim owns the rule so there is one place to change it, and exactly one
+        // answer for the renderer, the bots and the server.
+        if (stationHealthVisible(viewerId, station)) this.drawDamageRing(overlay, station);
       }
 
       for (const turret of station.turrets) {
@@ -669,25 +679,34 @@ export class Renderer {
     g.x = station.pos.x;
     g.y = station.pos.y;
 
+    // THE CUTTERHEAD, from the art pipeline (a2-03; `src/art/stations.ts`,
+    // `src/art/wrecks.ts`), drawn by the same `drawSprite` verb as every turret,
+    // shield and hull on this stage.
+    //
+    // This block used to hand-draw a blue-green planetoid — three discs and a
+    // ring stroke, in hexes (`0x2f4a63`, `0x2a3038`, `0x1a1f26`) that are not in
+    // the palette and that no compliance audit could ever see, because the audit
+    // walks the sprite IR and this was never a sprite. So the generators were
+    // reviewed, catalogued and audited while the game drew something else, and
+    // the facility board's whole verdict — *"none of these look like a mining
+    // space station"* — was being passed on art the player never saw.
+    // `stationSprite`/`stationWreckSprite`/`beaconRingSprite` are now what
+    // renders, which is what makes the ratified direction reach the screen and
+    // what puts the station inside the palette contract for the first time.
+    const variant = stationVariantFor(station.owner);
     if (dead) {
-      // A wreck: the ocean has gone out, the beacon is off, the core is spent.
-      // Still solid, still on the map, still worth flying to for its debris.
-      g.circle(0, 0, r).fill({ color: 0x2a3038, alpha: 0.95 });
-      g.circle(0, 0, r).stroke({ width: 2, color: PALETTE.hullSteel, alpha: 0.35 });
-      g.circle(0, 0, r * 0.34).fill({ color: 0x1a1f26 });
+      // A derelict: the core is out, the beacon is off, the ore is still there.
+      // Still solid, still on the map, still worth flying to (GDD §2.7).
+      drawSprite(g, stationWreckSprite(variant), r);
       g.alpha = 1;
       return;
     }
 
-    // Earthlike inside the Cold Vacuum palette (style-guide §5.4): steel-blue
-    // ocean, patina continents, and a signal-yellow core — the win condition, so
-    // it obeys the yellow rule.
-    g.circle(0, 0, r).fill(0x2f4a63); // ocean
-    g.circle(-r * 0.3, -r * 0.25, r * 0.42).fill({ color: PALETTE.patina, alpha: 0.85 });
-    g.circle(r * 0.34, r * 0.22, r * 0.3).fill({ color: PALETTE.patina, alpha: 0.7 });
-    // Beacon ring: ownership, always visible (style-guide §5.4).
-    g.circle(0, 0, r + 5).stroke({ width: 3, color: playerColor(station.owner), alpha: 0.9 });
-    g.circle(0, 0, r * 0.28).fill(PALETTE.signalYellow); // core
+    drawSprite(g, stationSprite(variant, station.owner), r);
+    // Ownership, always visible (style-guide §5.4): four arcs and four pips, so
+    // the beacon reads as a beacon rather than an outline and keeps a shape a
+    // colourblind player can pick out next to a neighbouring slot's ring.
+    drawSprite(g, beaconRingSprite(station.owner), r);
     g.alpha = station.spawnProtect > 0 ? 0.75 : 1;
   }
 

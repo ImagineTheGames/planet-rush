@@ -27,8 +27,11 @@ import {
   flowLobbySlots,
   flowMatchEnded,
   flowMatchStart,
+  flowOpenHangar,
   flowOpenSettings,
   flowTapEnd,
+  flowTapHangar,
+  setFlowProfile,
   flowTapEntry,
   flowTapLobby,
   flowTapSettings,
@@ -38,6 +41,7 @@ import {
   wireFireMode,
 } from './lobby-flow';
 import type { FlowEffect, FlowResult, FlowState } from './lobby-flow';
+import { xpToReach } from '../progression/curve';
 import { DOOR_ORDER, ENTRY_COMING_SOON, ENTRY_ERRORS, KEYPAD_KEYS } from './lobby-entry';
 import {
   CLASS_ORDER,
@@ -47,6 +51,7 @@ import {
   SEAT_STATE_CYCLE,
   lobbyModel,
 } from './lobby';
+import type { SeatOccupant } from './lobby';
 import { lobbyHitTest, lobbyLayout } from './lobby-geometry';
 import type { LobbyLayout, LobbyTarget } from './lobby-geometry';
 import type { MatchMode } from '../sim/match-config';
@@ -303,9 +308,13 @@ describe('the room tells the server what it chose', () => {
     const richer = flowTapLobby(inLobby(0, 0), { kind: 'abundance' });
     expect(richer.state.lobby?.abundance).toBe('standard');
 
-    // Seat state: the row body cycles OPEN → BOT.
-    const botted = flowTapLobby(inLobby(0, 0), { kind: 'seat', index: 5 });
-    expect(botted.state.lobby?.seats[5]?.occupant).toBe('bot');
+    // Seat state: the row body walks the seat one rung round the ring. Which rung
+    // it *starts* on is the flavour's business since a0-11 — an online room opens
+    // its seats OPEN and the solo lobby opens them on the bot cast — so what this
+    // asserts is the routing: a tap on the body reaches the cycle and it moves.
+    const before = inLobby(0, 0);
+    const botted = flowTapLobby(before, { kind: 'seat', index: 5 });
+    expect(botted.state.lobby?.seats[5]?.occupant).toBe(nextRung(before.lobby!.seats[5]!.occupant));
 
     // …and so does the LEADING state control (u5) — the drawn, labelled button
     // that finally says a slot can be closed. Two rects, ONE action: they walk the
@@ -321,7 +330,9 @@ describe('the room tells the server what it chose', () => {
         `tap ${i + 1}: the control and the body disagree`,
       ).toBe(viaBody.lobby?.seats[5]?.occupant);
     }
-    expect(viaControl.lobby?.seats[5]?.occupant).toBe('bot'); // four taps = once round + one
+    // Four taps = once round the three-rung ring plus one, so the seat is one
+    // rung past where it started — whichever rung that was.
+    expect(viaControl.lobby?.seats[5]?.occupant).toBe(nextRung(inLobby(0, 0).lobby!.seats[5]!.occupant));
 
     // The DIFFICULTY chip cycles the bot's tier in BOTH modes (n2) — the control
     // the TEAMS lobby had lost when the side control took the only chip.
@@ -469,6 +480,19 @@ describe('one door, one lobby (ratified: PLAY opens the doors, the doors open th
 
 /** A roomy desktop viewport — every row chip has extent here, so "reachable"
  *  means "laid out", not "laid out big enough on this phone". */
+/**
+ * The next rung of the seat-state ring after `occupant` ({@link SEAT_STATE_CYCLE}).
+ *
+ * Since a0-11 the rung a seat *starts* on depends on the flavour of the lobby —
+ * an online room opens its seats OPEN and waits for people, the solo lobby opens
+ * them on the bot cast — so a test about the slot editor's ROUTING must assert
+ * that a tap moved the seat one rung, not that it landed on a particular word.
+ */
+function nextRung(occupant: SeatOccupant): SeatOccupant {
+  const at = SEAT_STATE_CYCLE.indexOf(occupant);
+  return SEAT_STATE_CYCLE[(at + 1) % SEAT_STATE_CYCLE.length]!;
+}
+
 const GUARD_VIEWPORT = { width: 1280, height: 800 };
 
 /** The target a tap at a rect's centre resolves to, through the SAME hit-test the
@@ -489,7 +513,27 @@ describe('the slot editor is reachable in EVERY mode AND both lobbies (guard the
     { name: 'the SOLO lobby (offline)', door: 'solo' },
     { name: 'the ROOM lobby (online)', door: 'create' },
   ];
-  const SEAT = 3; // an OPEN (bot-previewing) seat in either flavour
+  const SEAT = 3; // a non-human seat in either flavour
+
+  /**
+   * Walk `slot` round the seat ring until it is a BOT.
+   *
+   * Since a0-11 the two flavours no longer start that seat on the same rung — the
+   * online room opens it OPEN and empty, the solo lobby opens it on the bot cast —
+   * and two of the affordances below only *mean* anything on a bot seat: the
+   * difficulty chip has no tier to cycle on an empty chair, and RUSH! is refused
+   * below two participants (GDD §2.1, amended 2026-08-07). Getting the seat to a
+   * known rung is therefore setup, not the thing under test; the ROUTING each
+   * assertion is actually about is unchanged and still checked in both flavours.
+   */
+  function withBotAt(state: FlowState, slot: number): FlowState {
+    let next = state;
+    for (let i = 0; i < SEAT_STATE_CYCLE.length; i++) {
+      if (next.lobby?.seats[slot]?.occupant === 'bot') return next;
+      next = flowTapLobby(next, { kind: 'seatState', index: slot }).state;
+    }
+    throw new Error(`seat ${slot} never reached BOT`);
+  }
 
   for (const flavour of FLAVOURS) {
     for (const mode of MODES) {
@@ -526,17 +570,24 @@ describe('the slot editor is reachable in EVERY mode AND both lobbies (guard the
         // This is the exact control the TEAMS lobby had lost.
         const diff = tapCentre(layout, layout.seatChips[SEAT]!);
         expect(diff, `difficulty chip reachable in ${mode}`).toEqual({ kind: 'seatChip', index: SEAT });
-        const tiered = flowTapLobby(state, diff!);
+        const onBot = withBotAt(state, SEAT);
+        const tiered = flowTapLobby(onBot, diff!);
         expect(tiered.state.lobby?.seats[SEAT]?.difficulty, `bot-difficulty reachable in ${mode}`).not.toBe(
-          state.lobby?.seats[SEAT]?.difficulty,
+          onBot.lobby?.seats[SEAT]?.difficulty,
         );
+        // …and on an EMPTY seat there is no tier to cycle, so the chip is a no-op
+        // and costs the wire nothing (a0-11) — the flow stays perfectly still.
+        const empty = flowTapLobby(state, { kind: 'seatState', index: SEAT });
+        if (empty.state.lobby?.seats[SEAT]?.occupant === 'open') {
+          expect(flowTapLobby(empty.state, diff!).state).toBe(empty.state);
+        }
       });
     }
 
     it(`reaches the whole host affordance SET in ${flavour.name} — nothing exists in one lobby and not the other`, () => {
       // The ratified guard, stated positively: every control the lobby offers its
       // host is laid out and takes effect, in BOTH flavours. The online room used to
-      // have none of these, because CREATE ROOM skipped the lobby entirely.
+      // have none of these, because HOST skipped the lobby entirely.
       const layout = lobbyLayout(GUARD_VIEWPORT);
       const state = inLobbyVia(flavour.door, 0, 0);
 
@@ -558,9 +609,12 @@ describe('the slot editor is reachable in EVERY mode AND both lobbies (guard the
         state.lobby?.abundance,
       );
       expect(flowTapLobby(state, { kind: 'seat', index: SEAT }).state.lobby?.seats[SEAT]?.occupant).toBe(
-        'bot',
+        nextRung(state.lobby!.seats[SEAT]!.occupant),
       );
-      expect(flowTapLobby(state, { kind: 'rush' }).state.lobby?.phase).toBe('counting');
+      // RUSH! needs a match to start: two participants (GDD §2.1, amended
+      // 2026-08-07). Offline the cast is already there; in an empty room the host
+      // seats one bot first, which is the developer's "up to player to fill it up".
+      expect(flowTapLobby(withBotAt(state, SEAT), { kind: 'rush' }).state.lobby?.phase).toBe('counting');
       expect(flowTapLobby(state, { kind: 'leave' }).state.screen).toBe('entry');
     });
   }
@@ -843,11 +897,48 @@ describe('the end-of-match summary, and Rematch (resets the world cleanly)', () 
   it('shows VICTORY to the winner and DEFEAT to everyone else', () => {
     const ended = flowMatchEnded(inMatch(4, 0), 4); // seat 4 won, and seat 4 is you
     expect(ended.state.screen).toBe('end');
-    expect(ended.state.end).toEqual({ you: 4, winner: 4, matchOver: true });
+    // In FFA your side is you alone — teams-of-one, so this is the outcome the
+    // flow always built, plus the roster that says exactly that (a0-09).
+    expect(ended.state.end).toEqual({ you: 4, winner: 4, matchOver: true, allies: new Set([4]) });
     expect(endOfMatchModel(ended.state.end!).kind).toBe('victory');
 
     const lost = flowMatchEnded(inMatch(4, 0), 0);
     expect(endOfMatchModel(lost.state.end!).kind).toBe('defeat');
+  });
+
+  /**
+   * a0-09 — the developer's report, driven through the flow the online client
+   * actually runs: a TEAMS match ends on a `matchEnd` naming a TEAMMATE, and the
+   * summary must read VICTORY. Before the fix this path had no notion of a side
+   * at all, so an ally's win and an enemy's win arrived here identical.
+   *
+   * The side is read off the lobby the match was built from — legal because
+   * allegiance is static match config fixed at match start (GDD §2.1, §4.2).
+   */
+  it('shows VICTORY in TEAMS when a TEAMMATE takes the claim', () => {
+    // The host taps TEAMS on the real roster control, then RUSHes. Sides
+    // alternate by slot (`defaultTeamForSlot`), so you at seat 0 hold side A with
+    // seats 2, 4 and 6, and the odd seats hold side B.
+    const teams = flowTapLobby(inLobby(0, 0), { kind: 'mode' }).state;
+    expect(teams.lobby!.mode).toBe('teams');
+    const state = flowMatchStart(teams).state;
+    expect(state.screen).toBe('match');
+
+    const allyWon = flowMatchEnded(state, 2);
+    expect(allyWon.state.end!.allies).toEqual(new Set([0, 2, 4, 6]));
+    expect(endOfMatchModel(allyWon.state.end!).kind).toBe('victory');
+    expect(endOfMatchModel(allyWon.state.end!).subhead).toContain('Your side');
+
+    // …and an enemy's win is still a defeat.
+    expect(endOfMatchModel(flowMatchEnded(state, 1).state.end!).kind).toBe('defeat');
+
+    // Eliminated, then your side finishes it: SPECTATE, then VICTORY.
+    const dead = flowEliminated(state);
+    expect(endOfMatchModel(dead.state.end!).kind).toBe('eliminated');
+    const watching = flowTapEnd(dead.state, { kind: 'spectate' }).state;
+    expect(watching.screen).toBe('match');
+    const sideWon = flowMatchEnded(watching, 2);
+    expect(endOfMatchModel(sideWon.state.end!).kind).toBe('victory');
   });
 
   it('ignores a matchEnd that did not arrive during a live match', () => {
@@ -902,5 +993,86 @@ describe('the end-of-match summary, and Rematch (resets the world cleanly)', () 
     expect(relit.state.spectating).toBe(false);
     expect(relit.state.end).toBeNull();
     expect(relit.state.screen).toBe('match');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The hangar — the sixth screen (a0-14)
+// ---------------------------------------------------------------------------
+//
+// The screen itself is proved in `./hangar.test.ts` and the two-lists-agree
+// wiring in `./main-menu.test.ts`. What is left for this file is the part it has
+// always owned: the ORDER of the calls, and the bytes (here, the *write*) they
+// owe the outside world.
+describe('the hangar', () => {
+  const SAMPLE = [
+    { id: 'livery.ashfield', name: 'ASHFIELD', slot: 'livery', level: 2 },
+    { id: 'glow.cold', name: 'COLD BURN', slot: 'glow', level: 12 },
+  ] as const;
+
+  /** A flow at the front door with a career on it. */
+  function withCareer(level: number): FlowState {
+    return setFlowProfile(createFlow(), { v: 1, xp: xpToReach(level), level, matches: 4 });
+  }
+
+  it('opens from the front door and comes back, costing the wire nothing', () => {
+    const open = flowOpenHangar(withCareer(5));
+    expect(open.state.screen).toBe('hangar');
+    expect(open.effects).toEqual([]);
+    const back = flowTapHangar(open.state, { kind: 'back' });
+    expect(back.state.screen).toBe('entry');
+    expect(back.effects).toEqual([]);
+  });
+
+  it('is a no-op from every screen a player cannot have pressed it on', () => {
+    for (const screen of ['settings', 'lobby', 'match', 'end'] as const) {
+      const state: FlowState = { ...createFlow(), screen };
+      expect(flowOpenHangar(state).state).toBe(state);
+      // …and a stray tap arriving a frame late must not move a live match.
+      expect(flowTapHangar(state, { kind: 'back' }, SAMPLE).state).toBe(state);
+    }
+  });
+
+  it('equips a cosmetic and hands the caller a save-profile to perform', () => {
+    // The flow holds no storage any more than it holds a socket, so the write
+    // comes back as an effect — and the effect carries the profile to persist,
+    // not a request to go and re-derive one.
+    const open = flowOpenHangar(withCareer(5)).state;
+    const equipped = flowTapHangar(open, { kind: 'cosmetic', index: 0 }, SAMPLE);
+    expect(equipped.state.profile.equipped).toEqual({ livery: 'livery.ashfield' });
+    expect(equipped.effects).toEqual([{ kind: 'save-profile', profile: equipped.state.profile }]);
+  });
+
+  it('writes NOTHING when the equip is refused — a locked row costs the disk zero', () => {
+    // The stillness rule, on the one screen where a spurious write lands in the
+    // file the game promises never to wipe.
+    const open = flowOpenHangar(withCareer(5)).state;
+    const locked = flowTapHangar(open, { kind: 'cosmetic', index: 1 }, SAMPLE); // needs level 12
+    expect(locked.state).toBe(open);
+    expect(locked.effects).toEqual([]);
+
+    // And an index the list does not have is just as still.
+    const missing = flowTapHangar(open, { kind: 'cosmetic', index: 9 }, SAMPLE);
+    expect(missing.state).toBe(open);
+    expect(missing.effects).toEqual([]);
+  });
+
+  it('leaves on Escape or Backspace, and ignores every other key', () => {
+    const open = flowOpenHangar(withCareer(2)).state;
+    expect(flowKey(open, 'Escape').state.screen).toBe('entry');
+    expect(flowKey(open, 'Backspace').state.screen).toBe('entry');
+    expect(flowKey(open, 'A').state).toBe(open);
+    expect(flowKey(open, 'Enter').state).toBe(open);
+  });
+
+  it('carries the career through a rematch — a profile is not match state', () => {
+    const career = { v: 1, xp: 4200, level: 5, matches: 11, equipped: { livery: 'livery.ashfield' } } as const;
+    const played = setFlowProfile({ ...createFlow(), screen: 'match' }, career);
+    const ended = flowMatchEnded(played, 0).state;
+    expect(flowTapEnd(ended, { kind: 'rematch' }).state.profile).toEqual(career);
+  });
+
+  it('starts on a fresh profile rather than none, so no screen has to guard it', () => {
+    expect(createFlow().profile).toEqual({ v: 1, xp: 0, level: 1, matches: 0 });
   });
 });

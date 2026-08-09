@@ -6,7 +6,7 @@
  * dropped the player "right in the match", so the menu was never reached.
  *
  * **PLAY opens the doors, and it is the only way in** (ratified: one play flow).
- * PLAY leads to {@link ./lobby-entry} — PLAY SOLO / CREATE ROOM / JOIN ROOM — and
+ * PLAY leads to {@link ./lobby-entry} — SOLO / HOST / JOIN — and
  * all three of those lead to the *same* lobby ({@link ./lobby}), offline or
  * online. Nothing on this screen builds a match world; SETTINGS opens the Day-7
  * settings screen ({@link ./settings}). The wiring lives in `src/main.ts`; this
@@ -27,6 +27,7 @@ import { beamContent, gantryFrame, stackPlates } from './gantry';
 import { hitRect } from './menu-geometry';
 import type { Insets } from './menu-geometry';
 import { CODEX_TABS } from './codex';
+import type { NavScreen } from './menu-nav';
 
 // ---------------------------------------------------------------------------
 // The buttons
@@ -35,7 +36,7 @@ import { CODEX_TABS } from './codex';
 /**
  * What a tap on the main menu resolves to.
  *
- * `play` opens **the doors** — PLAY SOLO / CREATE ROOM / JOIN ROOM
+ * `play` opens **the doors** — SOLO / HOST / JOIN
  * ({@link ./lobby-entry}) — and nothing else. It does not build a match and it no
  * longer has an offline lobby of its own: the developer ratified ONE way in
  * ("PLAY → goes to the same online menu, which already has offline play … right
@@ -44,9 +45,11 @@ import { CODEX_TABS } from './codex';
  * to all three ways a match starts.
  *
  * `codex` opens the optional reference (GDD §2.10) and comes back; `settings`
- * opens the fire-mode / VFX / volume screen and comes back.
+ * opens the fire-mode / VFX / volume screen and comes back; `hangar` opens the
+ * fourth door (a0-14) — your ship, your level, and what a level has unlocked —
+ * and comes back too.
  */
-export type MainMenuOption = 'play' | 'codex' | 'settings';
+export type MainMenuOption = 'play' | 'codex' | 'settings' | 'hangar';
 
 /** One button's identity, in screen order. The layout, the view and the hit test
  *  all walk this same list, so a re-ordered screen can never mis-route a tap —
@@ -91,13 +94,18 @@ export function itemPlate(item: MainMenuItem): { role: PlateRole; scale: PlateSc
  * The buttons, top to bottom. **PLAY is the only door into a match** (plasma, the
  * one primary action) and it opens the three ways in rather than one of them: the
  * ratified single play flow. There used to be a second button here — ONLINE —
- * whose screen already carried PLAY SOLO, which made PLAY a redundant shortcut to
+ * whose screen already carried the solo door, which made PLAY a redundant shortcut to
  * an offline lobby the doors screen could reach anyway; two front doors is one
  * more than a player can be told about, so the redundant one was removed rather
  * than relabelled.
  *
- * CODEX and SETTINGS are the two secondary screens that open and come back —
- * active steel, never gray (the gray-means-disabled theme rule).
+ * CODEX, SETTINGS and HANGAR are the three secondary screens that open and come
+ * back — active steel, never gray (the gray-means-disabled theme rule).
+ *
+ * **HANGAR is appended, and the first three do not move** (a0-14: the existing
+ * items, their order and the codex sub-line are all things that must not
+ * change). It is a door that comes back, like the two above it, so it is
+ * secondary: PLAY is still the screen's one bright plate.
  */
 export const MAIN_MENU_ITEMS: readonly MainMenuItem[] = [
   // The two sub-lines the handoff draws are taken verbatim; CODEX's is derived
@@ -107,7 +115,70 @@ export const MAIN_MENU_ITEMS: readonly MainMenuItem[] = [
   { kind: 'play', label: 'PLAY', primary: true, sub: 'Open a rig and take the field' },
   { kind: 'codex', label: 'CODEX', primary: false, sub: codexSubLine() },
   { kind: 'settings', label: 'SETTINGS', primary: false, sub: 'Controls, audio, visual effects' },
+  // The hangar's own line, in the same construction as SETTINGS': it names what
+  // is behind the door rather than promising content. It is honest on the day it
+  // ships, when there is nothing to unlock yet — see `./hangar`.
+  { kind: 'hangar', label: 'HANGAR', primary: false, sub: 'Your ship, your level, what you have unlocked' },
 ];
+
+/**
+ * The screen each button opens — the menu's half of the wiring contract.
+ *
+ * A `MAIN_MENU_ITEMS` entry with no route is LESSONS §20 exactly: a button that
+ * renders, presses, sounds, and goes nowhere. So the route is a **total function
+ * of the option**, checked two ways: the compiler rejects a missing case (the
+ * switch is exhaustive over {@link MainMenuOption}), and `default` returns
+ * `null` so a case deleted at runtime is a red test rather than a dead button
+ * ({@link ./main-menu.test}).
+ *
+ * The vocabulary is {@link ./menu-nav}'s, deliberately: routing to a `NavScreen`
+ * means the same test can then ask the navigation graph whether that screen has
+ * a way back — a door that opens onto a room with no exit is the other half of
+ * the same bug.
+ */
+export function mainMenuRoute(option: MainMenuOption): NavScreen | null {
+  switch (option) {
+    // PLAY opens THE DOORS (`online` is that screen's id — see `./menu-nav`).
+    case 'play':
+      return 'online';
+    case 'codex':
+      return 'codex';
+    case 'settings':
+      return 'settings';
+    case 'hangar':
+      return 'hangar';
+    default:
+      return null;
+  }
+}
+
+/**
+ * Move the keyboard focus `delta` places through the stack, wrapping at both
+ * ends, and answer the option it lands on.
+ *
+ * The menu used to answer exactly one key — Enter/Space, which was PLAY — so a
+ * keyboard player could reach the first plate and nothing else. That was
+ * survivable while the other two doors were also reachable by mouse on the same
+ * screen; it stops being survivable the moment a screen has to be *demonstrably*
+ * reachable without a pointer (a0-14). Focus starts at PLAY, so Enter with
+ * nothing moved is still PLAY and every existing keyboard path is unchanged.
+ *
+ * Pure and index-based, so "three steps down reaches HANGAR" is a unit test
+ * rather than a click-through.
+ */
+export function mainMenuStep(index: number, delta: number): MainMenuOption {
+  const count = MAIN_MENU_ITEMS.length;
+  const safe = Number.isFinite(index) ? Math.trunc(index) : 0;
+  const next = (((safe + delta) % count) + count) % count;
+  return MAIN_MENU_ITEMS[next]!.kind;
+}
+
+/** The index of an option in the stack — the inverse of {@link mainMenuStep},
+ *  for a wiring layer that holds the focus as a `MainMenuOption`. */
+export function mainMenuIndexOf(option: MainMenuOption): number {
+  const index = MAIN_MENU_ITEMS.findIndex((item) => item.kind === option);
+  return index < 0 ? 0 : index;
+}
 
 /** The wordmark, in Audiowide (style-guide §5.6) — the one place the game names
  *  itself before a match. */

@@ -50,14 +50,7 @@
 import { Container, Graphics, Text } from 'pixi.js';
 import type { TextStyleFontWeight } from 'pixi.js';
 import { PALETTE } from '@render/index';
-import {
-  DISPLAY_TRACKING,
-  MATERIAL_SHADES,
-  TRACKING,
-  trackingPx,
-  WHEEL_HALO,
-  wheelMetrics,
-} from '../art/materials';
+import { MATERIAL_SHADES, TRACKING, trackingPx, WHEEL_HALO, wheelMetrics } from '../art/materials';
 import type { WheelProfile } from '../art/materials';
 import { SEGMENT_ARC } from './build-wheel';
 import type { BuildWheelModel, SegmentState, WheelSegment } from './build-wheel';
@@ -65,21 +58,19 @@ import {
   buildWedgeLines,
   capWords,
   costWords,
+  pipRows,
   segmentCostPaint,
+  statWords,
   targetWords,
-  WEDGE_LEAD,
-  wrapWedgeName,
+  upgradeCostPaint,
+  upgradeCostWords,
+  upgradeWedgeLines,
 } from './wheel-stack';
 import type { CostPaint, WedgeLine } from './wheel-stack';
 
 export type { CostPaint } from './wheel-stack';
 import { upgradeWedgeArc } from './upgrade-wheel';
-import type {
-  UpgradeWheelModel,
-  UpgradeWedge,
-  UpgradeWedgeState,
-  UpgradeSummaryPip,
-} from './upgrade-wheel';
+import type { UpgradeWheelModel, UpgradeWedge, UpgradeWedgeState } from './upgrade-wheel';
 import { WheelToggle } from './wheel-toggle';
 import type { HubBack } from './wheel-nav';
 import { NEUTRAL_FEEDBACK } from './press-feedback';
@@ -93,7 +84,7 @@ import { FONT_BODY as FONT_NUMERAL, FONT_HEADING } from './typography';
  *  reads back the REPAIR wedge's real effect line ("+15 HP", the partial, or a
  *  reason) off the shipped bundle, the same discipline as {@link
  *  DrawnUpgradeWedge}. Since u7-02 it carries the whole four-line stack, so the
- *  new `cost/held` and count/cap lines are read back the same way. */
+ *  cost and count/cap lines are read back the same way. */
 export interface DrawnBuildWedge {
   readonly id: WheelSegment['id'];
   readonly label: string;
@@ -113,8 +104,9 @@ export interface DrawnBuildWedge {
   readonly target: string;
   /** The count/cap line as drawn — "2 / 4 BUILT" — or `''` on an uncapped wedge. */
   readonly caps: string;
-  /** The `cost/held` line as drawn — "3/4", "FULL", or "OPEN ▸" on the one wedge
-   *  that opens a screen instead of spending. */
+  /** The cost line as drawn — "3", "FULL", or "OPEN ▸" on the one wedge that
+   *  opens a screen instead of spending. One numeral since a0-03; whether it can
+   *  be paid is {@link costPaint}, not a second number. */
   readonly costLabel: string;
   readonly cost: number | null;
   /** Whether the wedge drew bright (pressable) or dark (refused, with a reason). */
@@ -125,19 +117,39 @@ export interface DrawnBuildWedge {
   readonly costPaint: CostPaint;
 }
 
-/** One upgrade wedge as the view drew it — the ?debug=1 live-stage seam's shape
- *  (a bought tier must re-render its wedge here). */
+/**
+ * One upgrade wedge as the view drew it — the ?debug=1 live-stage seam's shape (a
+ * bought tier must re-render its wedge here). Since u7-06 it carries the whole
+ * four-line stack as well as the model values behind it, so a real-input spec
+ * reads the strings the shipped bundle actually rendered rather than re-deriving
+ * them — the same discipline as {@link DrawnBuildWedge}.
+ */
 export interface DrawnUpgradeWedge {
   readonly kind: UpgradeWedge['kind'];
   readonly track: UpgradeWedge['track'];
   readonly label: string;
   readonly tier: number;
+  readonly maxTier: number;
   readonly current: string;
   readonly next: string | null;
   readonly cost: number | null;
   readonly state: UpgradeWedgeState;
   /** The WEAPON wedge's tier summary (pips), or `null` on other wedges. */
   readonly summary: UpgradeWedge['summary'];
+  /** The stat line as drawn — `"111% → 123%"`, its compact phone form, or the
+   *  WEAPON wedge's stacked pip rows. */
+  readonly stat: string;
+  /** The cost line as drawn — `"12/8"`, `"MAX"`, or `"OPEN ▸"` on the wedge that
+   *  opens a screen instead of spending. `''` where no cost slot was drawn. */
+  readonly costLabel: string;
+  /** The ladder-position pips as drawn — `"●●○"`. `''` on the WEAPON wedge. */
+  readonly tiers: string;
+  /** Whether the wedge drew bright (pressable) or dark (refused, with a reason). */
+  readonly ready: boolean;
+  /** How the cost numeral was painted — the style-guide §2 carve-out: `ore`
+   *  (payable), `refused` (threat red, not payable), `spent` (steel, maxed), or
+   *  `none` (the `OPEN ▸` signpost, chalk). */
+  readonly costPaint: CostPaint;
 }
 
 // ---------------------------------------------------------------------------
@@ -252,14 +264,12 @@ interface WedgeNodes {
   /** Line 2 — what it spends on ("YOUR STATION"), or a stat value ("10 → 13")
    *  on the upgrade wheel. */
   readonly sub: Text;
-  /** Line 3 — the `cost/held` numerals, or `FULL` / `OPEN ▸`. */
+  /** Line 3 — the cost numeral, or `FULL` / `OPEN ▸`. */
   readonly cost: Text;
-  /** Line 4 — the count over its cap ("2 / 4 BUILT"), or repair's effect/reason
-   *  line ("+15 HP", "REPAIR in 12s"). Empty on a wedge that has neither. */
+  /** Line 4 — the count over its cap ("2 / 4 BUILT"), repair's effect/reason line
+   *  ("+15 HP", "REPAIR in 12s"), or the upgrade wheel's ladder pips ("●●○").
+   *  Empty on a wedge that has none of them. */
   readonly detail: Text;
-  /** The arrow that marks the upgrade wheel's WEAPON wedge as one that opens a
-   *  screen. (The Build wheel's UPGRADE SHIP says it in words — `OPEN ▸`.) */
-  readonly arrow: Graphics;
 }
 
 /** The normalised descriptor {@link BuildWheelView.drawWedge} draws — the one
@@ -275,21 +285,11 @@ interface WedgeDraw {
   readonly ready: boolean;
   /** How the cost slot is painted (style-guide §2's carve-out, both colours). */
   readonly costPaint: CostPaint;
-  /** Draw the "opens a screen" arrow — the upgrade wheel's WEAPON wedge. */
-  readonly arrow: boolean;
 }
 
 /** The text a `WedgeDraw` put in one slot, or `''` if the slot is unused. */
 function slotText(d: WedgeDraw, slot: WedgeLine['slot']): string {
   return d.lines.find((l) => l.slot === slot)?.text ?? '';
-}
-
-/** A weapon track's tiers as filled-vs-empty pip glyphs: `●●○` at tier 2 of 3.
- *  A compact, palette-neutral summary that reads without opening the sub-wheel. */
-function pipRow(pip: UpgradeSummaryPip): string {
-  const filled = '●'.repeat(Math.max(0, pip.tier));
-  const empty = '○'.repeat(Math.max(0, pip.maxTier - pip.tier));
-  return `${pip.label} ${filled}${empty}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -552,8 +552,8 @@ export class BuildWheelView extends Container {
     );
 
     // Capture what was drawn for the ?debug=1 live-stage seams — the REAL lines
-    // each wedge rendered (repair's "+15 HP"/partial/reason, the `cost/held`
-    // string, the count over its cap), straight off the descriptors the view just
+    // each wedge rendered (repair's "+15 HP"/partial/reason, the cost line, the
+    // count over its cap), straight off the descriptors the view just
     // drew from, so a Playwright test reads the shipped client rather than a model.
     this.lastBuildDrawn = true;
     this.lastBuildWedges = model.segments.map((seg) => {
@@ -611,17 +611,28 @@ export class BuildWheelView extends Container {
     // Capture what was drawn for the ?debug=1 live-stage seam (a bought tier must
     // re-render here). Rebuilt from the model the view just drew from.
     this.lastUpgradeDrawn = true;
-    this.lastUpgradeWedges = model.wedges.map((w) => ({
-      kind: w.kind,
-      track: w.track,
-      label: w.label,
-      tier: w.tier,
-      current: w.current,
-      next: w.next,
-      cost: w.cost,
-      state: w.state,
-      summary: w.summary,
-    }));
+    this.lastUpgradeWedges = model.wedges.map((w) => {
+      const d = upgradeWedgeDraw(w, m);
+      return {
+        kind: w.kind,
+        track: w.track,
+        label: w.label,
+        tier: w.tier,
+        maxTier: w.maxTier,
+        current: w.current,
+        next: w.next,
+        cost: w.cost,
+        state: w.state,
+        summary: w.summary,
+        // The lines the view just drew from, read back off the SAME descriptors
+        // rather than recomposed — a spec that reads these is reading the client.
+        stat: w.kind === 'weapon' ? pipRows(w.summary ?? []) : statWords(w, m),
+        costLabel: upgradeCostWords(w) ?? '',
+        tiers: slotText(d, 'detail'),
+        ready: d.ready,
+        costPaint: d.costPaint,
+      };
+    });
   }
 
   // --- ?debug=1 live-stage seam --------------------------------------------
@@ -943,18 +954,6 @@ export class BuildWheelView extends Container {
     nodes.cluster.x = lx + fb.shakeX;
     nodes.cluster.y = ly;
     nodes.cluster.scale.set(fb.scale);
-
-    // An "opens a screen" arrow points right, off the name's trailing edge — the
-    // upgrade wheel's WEAPON wedge. The Build wheel's UPGRADE SHIP says it in
-    // words instead (`OPEN ▸`, the handoff's own copy), which is the same
-    // affordance in the slot the other wedges spend on a cost.
-    nodes.arrow.visible = d.arrow;
-    if (d.arrow) {
-      nodes.arrow.clear();
-      nodes.arrow.poly([0, -5, 8, 0, 0, 5]).fill({ color: PALETTE.plasma, alpha: d.ready ? 0.95 : 0.5 });
-      nodes.arrow.x = nodes.label.width / 2 + 10;
-      nodes.arrow.y = nodes.label.y + nodes.label.height / 2 - 5;
-    }
   }
 
   /** Lazily create (and then reuse) one wedge's children, parented to `group`. */
@@ -971,16 +970,15 @@ export class BuildWheelView extends Container {
     const sub = makeText('', FONT_NUMERAL, 12, TEXT_MUTED, 'bold');
     const cost = makeText('', FONT_NUMERAL, 20, PALETTE.signalYellow, 'bold');
     const detail = makeText('', FONT_NUMERAL, 12, TEXT_MUTED, 'bold');
-    const arrow = new Graphics();
     for (const t of [label, sub, cost, detail]) {
       t.anchor.set(0.5, 0);
       t.style.align = 'center';
     }
-    cluster.addChild(label, sub, cost, detail, arrow);
+    cluster.addChild(label, sub, cost, detail);
     group.addChild(body);
     group.addChild(cluster);
 
-    const nodes: WedgeNodes = { body, cluster, label, sub, cost, detail, arrow };
+    const nodes: WedgeNodes = { body, cluster, label, sub, cost, detail };
     pool[index] = nodes;
     return nodes;
   }
@@ -992,8 +990,8 @@ export class BuildWheelView extends Container {
       const n = pool[i];
       if (!n) continue;
       n.body.visible = false;
-      // The label/sub/cost/arrow all live under the cluster, so one flag hides the
-      // whole wedge's words.
+      // The four lines all live under the cluster, so one flag hides the whole
+      // wedge's words.
       n.cluster.visible = false;
     }
   }
@@ -1006,7 +1004,7 @@ export class BuildWheelView extends Container {
 /**
  * A Build-wheel segment as a wedge — the handoff's four lines (u7-02):
  *
- *   NAME / what it spends on / `cost/held` / the count over its cap.
+ *   NAME / what it spends on / the cost / the count over its cap.
  *
  * Every wedge names its target on line 2 now — "every label names which" (GDD
  * §2.5), words not a number — and line 4 carries whichever of the two things a
@@ -1026,96 +1024,33 @@ function buildSegmentDraw(seg: WheelSegment, m: WheelProfile): WedgeDraw {
     // that opens a second screen (GDD §2.5), and the handoff says so in the slot
     // the others spend on a price: `OPEN ▸`, in chalk rather than in ore yellow.
     costPaint: segmentCostPaint(seg),
-    arrow: false,
   };
 }
 
-/** An Upgrade-wheel wedge. A `track` wedge carries its current → next stat value
- *  (GDD §2.5 — the one screen a stat value ever shows): `10 → 13`, or `MAX` on a
- *  finished ladder. The WEAPON wedge carries its tier pips and an arrow (it opens
- *  the sub-wheel). BACK is not a wedge any more — it lives on the hub (field
- *  report v0.2.4). */
+/**
+ * An Upgrade-wheel wedge, in the same four slots the Build wheel's uses (u7-06):
+ *
+ *   NAME / the stat this tier moves / `cost/held` / where it sits on its ladder.
+ *
+ * Everything about which slot carries what is {@link ./wheel-stack}'s call, so
+ * the stat line — the densest text on any wheel in the game — is held to the arc
+ * by the same headless fit budget as the Build wheel's copy, at every profile
+ * (`hud-geometry.test.ts`). This function only says which model the lines come
+ * from and how the cost slot is painted.
+ *
+ * The WEAPON wedge is the exception, and it is the Build wheel's exception too:
+ * it opens a screen rather than spending, so it says `OPEN ▸` where the others
+ * quote a price — the same words in the same slot as UPGRADE SHIP. BACK is not a
+ * wedge on either wheel any more; it lives on the hub (field report v0.2.4).
+ */
 function upgradeWedgeDraw(wedge: UpgradeWedge, m: WheelProfile): WedgeDraw {
-  if (wedge.kind === 'weapon') {
-    // The pips ARE the second line — the main wheel says the weapon tiers at a
-    // glance without the sub-wheel (RATIFIED v0.2.2, item 3). No cost: it opens a
-    // screen rather than spending, exactly like UPGRADE SHIP on the Build wheel.
-    const sub = (wedge.summary ?? []).map(pipRow).join('\n');
-    return {
-      angle: wedge.angle,
-      lines: upgradeLines(wedge.label, sub, null, m),
-      cost: null,
-      ready: wedgeReady(wedge.state),
-      costPaint: 'none',
-      arrow: true,
-    };
-  }
-  const sub = wedge.state === 'maxed' ? `${wedge.current} · MAX` : `${wedge.current} → ${wedge.next}`;
-  // The upgrade panel prices a row, not a purchase against a wallet: `cost/held`
-  // is the Build wheel's grammar (GDD §2.5 leaves this screen alone), so the cost
-  // slot here stays the bare numeral it has always been — painted by the same
-  // ore/refused/spent rule, which is what makes an unaffordable tier legible.
   return {
     angle: wedge.angle,
-    lines: upgradeLines(wedge.label, sub, wedge.cost === null ? null : `${wedge.cost}`, m),
+    lines: upgradeWedgeLines(wedge, m),
     cost: wedge.cost,
     ready: wedgeReady(wedge.state),
-    costPaint: upgradeCostPaint(wedge.state),
-    arrow: false,
+    costPaint: upgradeCostPaint(wedge),
   };
-}
-
-/** An upgrade wedge's stack: name, its stat value (or pip rows), its cost. Same
- *  three slots and the same profile type as the Build wheel's, so both wheels
- *  scale from one place. */
-function upgradeLines(
-  label: string,
-  sub: string,
-  cost: string | null,
-  m: WheelProfile,
-): readonly WedgeLine[] {
-  const lines: WedgeLine[] = [
-    {
-      slot: 'name',
-      text: wrapWedgeName(label),
-      face: 'display',
-      size: m.name,
-      tracking: DISPLAY_TRACKING.heading,
-      lead: WEDGE_LEAD.name,
-      gap: m.gapName,
-    },
-  ];
-  if (sub.length > 0) {
-    lines.push({
-      slot: 'sub',
-      text: sub,
-      face: 'numeral',
-      size: m.sub,
-      tracking: TRACKING.label,
-      lead: WEDGE_LEAD.body,
-      gap: m.gapSub,
-    });
-  }
-  if (cost !== null) {
-    lines.push({
-      slot: 'cost',
-      text: cost,
-      face: 'numeral',
-      size: m.cost,
-      tracking: TRACKING.name,
-      lead: WEDGE_LEAD.body,
-      gap: 0,
-    });
-  }
-  return lines;
-}
-
-/** The upgrade wheel's cost paint. `ready` is ore; a tier the player cannot pay
- *  for is refused-red, the same carve-out as the Build wheel's; a maxed or
- *  otherwise dead row is steel. */
-function upgradeCostPaint(state: UpgradeWedgeState): CostPaint {
-  if (state === 'ready') return 'ore';
-  return state === 'unaffordable' ? 'refused' : 'spent';
 }
 
 // ---------------------------------------------------------------------------

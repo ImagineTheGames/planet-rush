@@ -32,9 +32,11 @@ const BAND: Rect = { x: 20, y: 100, width: 900, height: 200 };
 const center = (r: Rect) => ({ x: r.x + r.width / 2, y: r.y + r.height / 2 });
 
 describe('the model', () => {
-  it('shows exactly the four ratified maps, octagon first', () => {
+  it('shows exactly the ratified maps, octagon first', () => {
     const model = mapPickerModel(DEFAULT_MAP_ID);
-    expect(model.cards).toHaveLength(4);
+    // Six since a0-12 added the two two-sided boards. Counted off the registry
+    // rather than pinned to a literal, so the picker follows `MAPS` by definition.
+    expect(model.cards).toHaveLength(MAPS.length);
     expect(model.cards.map((c) => c.id)).toEqual(MAPS.map((m) => m.id));
     expect(model.cards[0]?.id).toBe('octagon');
   });
@@ -166,10 +168,10 @@ describe('layout', () => {
     }
   });
 
-  it('lays four across in a wide band, and 2×2 when it cannot', () => {
+  it('lays the whole registry across in a wide band, and 2 columns when it cannot', () => {
     const wide = mapPickerLayout({ x: 0, y: 0, width: 900, height: 180 });
     expect(wide.shape).toBe('row');
-    expect(wide.columns).toBe(4);
+    expect(wide.columns).toBe(MAPS.length);
 
     const narrow = mapPickerLayout({ x: 0, y: 0, width: 320, height: 320 });
     expect(narrow.shape).toBe('grid');
@@ -177,12 +179,33 @@ describe('layout', () => {
   });
 
   it('keeps every card a thumb-sized target (tall enough to read)', () => {
-    // A phone-landscape-sized band still yields cards at least the min height.
-    const layout = mapPickerLayout({ x: 16, y: 90, width: 780, height: 150 });
+    // A band wide enough for a ROW still yields cards at least the min height.
+    const layout = mapPickerLayout({ x: 16, y: 90, width: 940, height: 150 });
+    expect(layout.shape).toBe('row');
     for (const rect of layout.cards) {
       expect(rect.height).toBeGreaterThanOrEqual(MAP_CARD_MIN_HEIGHT - 40); // capped, but never a strip
       expect(rect.width).toBeGreaterThan(0);
     }
+  });
+
+  it('FOR THE UI OWNER: six cards fold to a 3-row grid sooner, and 3 rows is a strip', () => {
+    // Measured, not loosened (a0-12). The band this file used to check the thumb
+    // floor on was 780×150 — a phone-landscape strip. At four maps that was a row
+    // of 195 u cards; at six, `rowWidth` is (780 − 5×GAP)/6 = 121.7, under
+    // MAP_CARD_MIN_WIDTH (132), so it folds to 2×3 and each card is
+    // (150 − 2×GAP)/3 = 43.3 tall — 0.7 under the MAP_CARD_MIN_HEIGHT − 40 floor
+    // the test above defends.
+    //
+    // Pinned here rather than papered over, because the fix is a UI call and not
+    // a gameplay one: drop MAP_CARD_MIN_WIDTH to ~122, give the band more height,
+    // or let the grid run 3 columns instead of 2. NOTE this is the standalone
+    // picker geometry — the SHIPPED lobby arena row is `lobby-geometry`
+    // `placeMaps`, which has its own (looser, 48 u) width floor and still lays six
+    // across; nothing a player sees is broken today.
+    const strip = mapPickerLayout({ x: 16, y: 90, width: 780, height: 150 });
+    expect(strip.shape).toBe('grid');
+    expect(strip.columns).toBe(2);
+    expect(strip.cards[0]!.height).toBeCloseTo(43.333, 2);
   });
 
   it('yields no cards, not a backwards rect, on a zero band', () => {

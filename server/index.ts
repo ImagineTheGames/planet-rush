@@ -30,6 +30,8 @@
  *                 that never joins a fleet                 (default: none)
  *   MACHINE_ID    this Machine's id, falling back to FLY_MACHINE_ID  (fleet only)
  *   REGION        this Machine's datacentre, falling back to FLY_REGION (fleet only)
+ *   ALLOW_ORIGINS browser origins that may READ /health — the lobby's region probe
+ *                 times this route (default: the GitHub Pages origin + localhost)
  *
  * A fleet Machine (both TICKET_SECRET and ALLOCATOR_URL set) enforces tickets,
  * beats its rooms and load to the allocator, and cordons on `POST /drain`. Unset
@@ -53,6 +55,8 @@ import {
 } from './heartbeat';
 import type { DeregistrationBody, HeartbeatBody, RegistrationBody } from './heartbeat';
 import { FLEET_AUTH_HEADER, signFleetRequest } from '../src/net/fleet-auth';
+import { allowOriginsFromEnv, corsHeaders, firstHeaderValue, preflightHeaders } from '../src/net/cors';
+import { FLY_PREFER_REGION_HEADER } from '../allocator/probe-target';
 import { attachWebSocketServer } from './ws';
 import type { UpgradeGuard } from './ws';
 import { armReplayGuard } from './upgrade-router';
@@ -115,10 +119,40 @@ const cpuMs = (): number => {
   return (user + system) / 1000;
 };
 
+/**
+ * Browser origins that may READ `/health` (n3 region picker). The lobby measures a
+ * real round trip to each region by timing this route, and a browser will not let
+ * it see the answer without a grant — so the same allow-list the allocator keeps
+ * (`src/net/cors.ts`, one implementation for both processes) is applied here.
+ *
+ * It is a read of already-public liveness data, and the grant is still per-origin
+ * rather than `*`: nothing here becomes writable, and no origin gains anything it
+ * could not learn by dialling the socket.
+ */
+const allowOrigins = allowOriginsFromEnv(process.env['ALLOW_ORIGINS']);
+
+/** The preflight this route answers. The probe sends `fly-prefer-region` behind a
+ *  Fly edge (`allocator/probe-target.ts`), which is a non-simple header and so
+ *  costs a preflight — cached for a day, or its round trip would be measured as
+ *  the region's latency. `GET` only: nothing here is writable from a browser. */
+const HEALTH_PREFLIGHT = preflightHeaders({
+  methods: 'GET, OPTIONS',
+  headers: ['content-type', FLY_PREFER_REGION_HEADER],
+});
+
 const http = createServer((request: IncomingMessage, response: ServerResponse) => {
+  // The CORS grant for this caller, decided once and merged onto whatever answer
+  // the routes below produce — the empty preflight and the health body alike.
+  const cors = corsHeaders(firstHeaderValue(request.headers['origin']), allowOrigins);
+  // A browser asks "may I GET this, with that header?" before the probe itself.
+  if (request.method === 'OPTIONS') {
+    response.writeHead(204, { ...cors, ...HEALTH_PREFLIGHT });
+    response.end();
+    return;
+  }
   // Plain HTTP routes, so a health check or a cordon never has to speak WebSocket.
   if (request.url === '/health') {
-    response.writeHead(200, { 'content-type': 'application/json' });
+    response.writeHead(200, { 'content-type': 'application/json', ...cors });
     response.end(
       JSON.stringify({
         status: cordon.draining ? 'draining' : 'ok',

@@ -1,0 +1,122 @@
+{
+  "base": "http://localhost:4188",
+  "viewport": {
+    "width": 1280,
+    "height": 800
+  },
+  "deviceScaleFactor": 2,
+  "build": {
+    "sha": "c2d401f",
+    "time": "2026-08-07T18:30:04.615Z"
+  },
+  "frames": [
+    {
+      "name": "scene-arena-full",
+      "what": "whole pinned arena, nothing staged",
+      "geo": {
+        "shipScreen": {
+          "x": 640,
+          "y": 400
+        },
+        "shipWorld": {
+          "x": 1968,
+          "y": 1200
+        },
+        "viewport": {
+          "w": 1280,
+          "h": 800
+        },
+        "ticks": 0,
+        "worldHash": "4302b39e",
+        "freezeTick": 120,
+        "build": {
+          "sha": "c2d401f",
+          "time": "2026-08-07T18:30:04.615Z"
+        }
+      }
+    },
+    {
+      "name": "scene-field-crop",
+      "what": "asteroid field, left of the home ring, nothing staged"
+    },
+    {
+      "name": "scene-home-defended",
+      "what": "local home: freeze-stamped turrets, mid-build scaffold, two shields",
+      "center": {
+        "x": 640,
+        "y": 400
+      }
+    },
+    {
+      "name": "scene-staged-muzzle-full",
+      "what": "pinned arena with a rival turret muzzle staged",
+      "staged": {
+        "firingShip": 1,
+        "turret": {
+          "shooter": 1,
+          "origin": {
+            "x": 1810.940258945177,
+            "y": 1734.940258945177
+          },
+          "end": {
+            "x": 1810.940258945177,
+            "y": 1644.940258945177
+          },
+          "hit": {
+            "x": 1810.940258945177,
+            "y": 1644.940258945177
+          }
+        }
+      },
+      "muzzleCount": 1
+    },
+    {
+      "name": "scene-siege-full",
+      "what": "pinned arena, station spawn protection lifted, core besieged",
+      "siege": {
+        "coreHp": 55,
+        "maxCoreHp": 100,
+        "banked": 11
+      },
+      "shipAlphaNote": {
+        "ticks": 0
+      }
+    },
+    {
+      "name": "scene-siege-home",
+      "what": "the defended home at full opacity with a damaged core",
+      "siege": {
+        "coreHp": 55,
+        "maxCoreHp": 100,
+        "banked": 11
+      }
+    }
+  ],
+  "freeze": {
+    "shipScreen": {
+      "x": 640,
+      "y": 400
+    },
+    "shipWorld": {
+      "x": 1968,
+      "y": 1200
+    },
+    "viewport": {
+      "w": 1280,
+      "h": 800
+    },
+    "ticks": 0,
+    "worldHash": "4302b39e",
+    "freezeTick": 120,
+    "build": {
+      "sha": "c2d401f",
+      "time": "2026-08-07T18:30:04.615Z"
+    }
+  },
+  "siege": {
+    "coreHp": 55,
+    "maxCoreHp": 100,
+    "banked": 11
+  },
+  "sceneErrors": []
+}

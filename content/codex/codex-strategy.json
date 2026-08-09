@@ -39,7 +39,7 @@
       "title": "Scout — because health is fog",
       "category": "strategy",
       "summary": "You only see a rival's HP up close; earning that sight is an edge, not a chore.",
-      "body": "There's no scoreboard of who's hurt — a rival core's damage ring only shows when your ship is within sensor range, so knowing who's wounded, who's leading, and who's under siege is intelligence you earn. Use it: a station already burning from someone else's attack is the cheap kill; a rival hauling a full hold far from home is the free spill. A radar satellite widens your minimap read for six ore, and shooting down a rival's satellite blinds them for the cost of a detour. Read the smoke, too — a burning station carries further than its numbers. And remember the fog cuts both ways: the Hard bots scout you exactly as you scout them.",
+      "body": "Every core's damage ring reads true wherever you are, so who's wounded is there to be seen — but only on the homes you are actually looking at, and the map itself is still dark. Use it: a station already burning from someone else's attack is the cheap kill; a rival hauling a full hold far from home is the free spill. A radar satellite widens your minimap read for six ore, and shooting down a rival's satellite blinds them for the cost of a detour. Read the smoke, too — a burning station carries further than anything else on the board. And remember it cuts both ways: the Hard bots read your rings exactly as you read theirs.",
       "tags": ["scouting", "fog-of-war", "radar", "intel"],
       "see_also": ["sys-fog-radar", "bots-sable", "strat-triangle"],
       "facts": []

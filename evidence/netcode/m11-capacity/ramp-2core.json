@@ -1,0 +1,3160 @@
+{
+  "label": "local · bundled server · pinned to core(s) 0,1 · via allocator",
+  "startedAt": "2026-08-07T00:22:40.907Z",
+  "baseline": {
+    "rooms": 0,
+    "serverRooms": 0,
+    "liveMatches": 0,
+    "endedMatches": 0,
+    "samples": [
+      {
+        "atMs": 1786062165911,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 0.65,
+        "cpuMs": 88,
+        "rssMb": 58,
+        "uptimeSeconds": 5,
+        "draining": false
+      },
+      {
+        "atMs": 1786062166914,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 0.65,
+        "cpuMs": 95,
+        "rssMb": 58,
+        "uptimeSeconds": 6,
+        "draining": false
+      },
+      {
+        "atMs": 1786062167917,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 0.65,
+        "cpuMs": 102,
+        "rssMb": 58,
+        "uptimeSeconds": 7,
+        "draining": false
+      },
+      {
+        "atMs": 1786062168920,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 0.65,
+        "cpuMs": 108,
+        "rssMb": 58,
+        "uptimeSeconds": 8,
+        "draining": false
+      },
+      {
+        "atMs": 1786062169923,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 0.65,
+        "cpuMs": 132,
+        "rssMb": 56,
+        "uptimeSeconds": 9,
+        "draining": false
+      },
+      {
+        "atMs": 1786062170925,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 0.65,
+        "cpuMs": 139,
+        "rssMb": 56,
+        "uptimeSeconds": 10,
+        "draining": false
+      },
+      {
+        "atMs": 1786062171928,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 0.65,
+        "cpuMs": 145,
+        "rssMb": 56,
+        "uptimeSeconds": 11,
+        "draining": false
+      },
+      {
+        "atMs": 1786062172930,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 0.65,
+        "cpuMs": 151,
+        "rssMb": 62,
+        "uptimeSeconds": 12,
+        "draining": false
+      },
+      {
+        "atMs": 1786062173932,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 0.65,
+        "cpuMs": 157,
+        "rssMb": 62,
+        "uptimeSeconds": 13,
+        "draining": false
+      },
+      {
+        "atMs": 1786062174933,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 0.65,
+        "cpuMs": 164,
+        "rssMb": 62,
+        "uptimeSeconds": 14,
+        "draining": false
+      },
+      {
+        "atMs": 1786062175934,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 0.65,
+        "cpuMs": 171,
+        "rssMb": 62,
+        "uptimeSeconds": 15,
+        "draining": false
+      },
+      {
+        "atMs": 1786062176936,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 0.89,
+        "cpuMs": 177,
+        "rssMb": 62,
+        "uptimeSeconds": 16,
+        "draining": false
+      },
+      {
+        "atMs": 1786062177938,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 0.89,
+        "cpuMs": 183,
+        "rssMb": 62,
+        "uptimeSeconds": 17,
+        "draining": false
+      },
+      {
+        "atMs": 1786062178940,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 0.89,
+        "cpuMs": 190,
+        "rssMb": 62,
+        "uptimeSeconds": 18,
+        "draining": false
+      },
+      {
+        "atMs": 1786062179942,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 0.89,
+        "cpuMs": 197,
+        "rssMb": 62,
+        "uptimeSeconds": 19,
+        "draining": false
+      },
+      {
+        "atMs": 1786062180944,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 2.28,
+        "cpuMs": 236,
+        "rssMb": 66,
+        "uptimeSeconds": 20,
+        "draining": false
+      },
+      {
+        "atMs": 1786062181946,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 2.28,
+        "cpuMs": 243,
+        "rssMb": 66,
+        "uptimeSeconds": 21,
+        "draining": false
+      },
+      {
+        "atMs": 1786062182947,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 2.28,
+        "cpuMs": 250,
+        "rssMb": 66,
+        "uptimeSeconds": 22,
+        "draining": false
+      },
+      {
+        "atMs": 1786062183948,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 2.28,
+        "cpuMs": 257,
+        "rssMb": 66,
+        "uptimeSeconds": 23,
+        "draining": false
+      },
+      {
+        "atMs": 1786062184949,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 2.28,
+        "cpuMs": 262,
+        "rssMb": 66,
+        "uptimeSeconds": 24,
+        "draining": false
+      },
+      {
+        "atMs": 1786062185951,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 2.28,
+        "cpuMs": 270,
+        "rssMb": 67,
+        "uptimeSeconds": 25,
+        "draining": false
+      },
+      {
+        "atMs": 1786062186953,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 2.28,
+        "cpuMs": 277,
+        "rssMb": 67,
+        "uptimeSeconds": 26,
+        "draining": false
+      },
+      {
+        "atMs": 1786062187955,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 2.28,
+        "cpuMs": 283,
+        "rssMb": 67,
+        "uptimeSeconds": 27,
+        "draining": false
+      },
+      {
+        "atMs": 1786062188957,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 2.28,
+        "cpuMs": 289,
+        "rssMb": 67,
+        "uptimeSeconds": 28,
+        "draining": false
+      },
+      {
+        "atMs": 1786062189959,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 2.28,
+        "cpuMs": 293,
+        "rssMb": 67,
+        "uptimeSeconds": 29,
+        "draining": false
+      },
+      {
+        "atMs": 1786062190961,
+        "rooms": 0,
+        "capacity": 168,
+        "loopLagMs": 2.28,
+        "cpuMs": 301,
+        "rssMb": 67,
+        "uptimeSeconds": 30,
+        "draining": false
+      }
+    ],
+    "lagMedianMs": 0.89,
+    "lagMaxMs": 2.28,
+    "lagMinMs": 0.65,
+    "cpuCores": 0.008502994011976047,
+    "cpuMsPerRoomPerSecond": 8.502994011976046,
+    "rssMbPeak": 67,
+    "bytesPerRoomPerSecond": 0,
+    "inputsPerSecond": 0,
+    "breached": false
+  },
+  "steps": [
+    {
+      "window": {
+        "rooms": 8,
+        "serverRooms": 8,
+        "liveMatches": 8,
+        "endedMatches": 0,
+        "samples": [
+          {
+            "atMs": 1786062216302,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 3705,
+            "rssMb": 110,
+            "uptimeSeconds": 55,
+            "draining": false
+          },
+          {
+            "atMs": 1786062217303,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 3766,
+            "rssMb": 110,
+            "uptimeSeconds": 56,
+            "draining": false
+          },
+          {
+            "atMs": 1786062218304,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 3846,
+            "rssMb": 110,
+            "uptimeSeconds": 57,
+            "draining": false
+          },
+          {
+            "atMs": 1786062219305,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 3944,
+            "rssMb": 111,
+            "uptimeSeconds": 58,
+            "draining": false
+          },
+          {
+            "atMs": 1786062220308,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 4010,
+            "rssMb": 111,
+            "uptimeSeconds": 59,
+            "draining": false
+          },
+          {
+            "atMs": 1786062221309,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 4079,
+            "rssMb": 111,
+            "uptimeSeconds": 60,
+            "draining": false
+          },
+          {
+            "atMs": 1786062222309,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 4141,
+            "rssMb": 112,
+            "uptimeSeconds": 61,
+            "draining": false
+          },
+          {
+            "atMs": 1786062223311,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 4208,
+            "rssMb": 113,
+            "uptimeSeconds": 62,
+            "draining": false
+          },
+          {
+            "atMs": 1786062224312,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 4280,
+            "rssMb": 113,
+            "uptimeSeconds": 63,
+            "draining": false
+          },
+          {
+            "atMs": 1786062225313,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 4336,
+            "rssMb": 113,
+            "uptimeSeconds": 64,
+            "draining": false
+          },
+          {
+            "atMs": 1786062226315,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 4403,
+            "rssMb": 113,
+            "uptimeSeconds": 65,
+            "draining": false
+          },
+          {
+            "atMs": 1786062227317,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 4478,
+            "rssMb": 114,
+            "uptimeSeconds": 66,
+            "draining": false
+          },
+          {
+            "atMs": 1786062228318,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 4546,
+            "rssMb": 114,
+            "uptimeSeconds": 67,
+            "draining": false
+          },
+          {
+            "atMs": 1786062229319,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 4650,
+            "rssMb": 115,
+            "uptimeSeconds": 68,
+            "draining": false
+          },
+          {
+            "atMs": 1786062230320,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 4813,
+            "rssMb": 114,
+            "uptimeSeconds": 69,
+            "draining": false
+          },
+          {
+            "atMs": 1786062231322,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 4910,
+            "rssMb": 114,
+            "uptimeSeconds": 70,
+            "draining": false
+          },
+          {
+            "atMs": 1786062232324,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 4987,
+            "rssMb": 115,
+            "uptimeSeconds": 71,
+            "draining": false
+          },
+          {
+            "atMs": 1786062233326,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 5078,
+            "rssMb": 115,
+            "uptimeSeconds": 72,
+            "draining": false
+          },
+          {
+            "atMs": 1786062234327,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 5141,
+            "rssMb": 115,
+            "uptimeSeconds": 73,
+            "draining": false
+          },
+          {
+            "atMs": 1786062235328,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 5219,
+            "rssMb": 115,
+            "uptimeSeconds": 74,
+            "draining": false
+          },
+          {
+            "atMs": 1786062236329,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 5288,
+            "rssMb": 115,
+            "uptimeSeconds": 75,
+            "draining": false
+          },
+          {
+            "atMs": 1786062237331,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 5351,
+            "rssMb": 115,
+            "uptimeSeconds": 76,
+            "draining": false
+          },
+          {
+            "atMs": 1786062238332,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 5426,
+            "rssMb": 116,
+            "uptimeSeconds": 77,
+            "draining": false
+          },
+          {
+            "atMs": 1786062239333,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 5487,
+            "rssMb": 116,
+            "uptimeSeconds": 79,
+            "draining": false
+          },
+          {
+            "atMs": 1786062240335,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 5553,
+            "rssMb": 116,
+            "uptimeSeconds": 80,
+            "draining": false
+          },
+          {
+            "atMs": 1786062241337,
+            "rooms": 8,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 5611,
+            "rssMb": 116,
+            "uptimeSeconds": 81,
+            "draining": false
+          }
+        ],
+        "lagMedianMs": 1.02,
+        "lagMaxMs": 1.02,
+        "lagMinMs": 1.02,
+        "cpuCores": 0.0761334132214899,
+        "cpuMsPerRoomPerSecond": 9.516676652686238,
+        "rssMbPeak": 116,
+        "bytesPerRoomPerSecond": 4531.970241661674,
+        "inputsPerSecond": 495.6261234272019,
+        "breached": false
+      },
+      "confirm": null,
+      "breached": false
+    },
+    {
+      "window": {
+        "rooms": 16,
+        "serverRooms": 16,
+        "liveMatches": 16,
+        "endedMatches": 0,
+        "samples": [
+          {
+            "atMs": 1786062266674,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 8217,
+            "rssMb": 117,
+            "uptimeSeconds": 106,
+            "draining": false
+          },
+          {
+            "atMs": 1786062267676,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 8461,
+            "rssMb": 119,
+            "uptimeSeconds": 107,
+            "draining": false
+          },
+          {
+            "atMs": 1786062268676,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 8564,
+            "rssMb": 119,
+            "uptimeSeconds": 108,
+            "draining": false
+          },
+          {
+            "atMs": 1786062269677,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 8674,
+            "rssMb": 119,
+            "uptimeSeconds": 109,
+            "draining": false
+          },
+          {
+            "atMs": 1786062270679,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 8771,
+            "rssMb": 120,
+            "uptimeSeconds": 110,
+            "draining": false
+          },
+          {
+            "atMs": 1786062271681,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 8900,
+            "rssMb": 120,
+            "uptimeSeconds": 111,
+            "draining": false
+          },
+          {
+            "atMs": 1786062272683,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 8997,
+            "rssMb": 120,
+            "uptimeSeconds": 112,
+            "draining": false
+          },
+          {
+            "atMs": 1786062273684,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 9103,
+            "rssMb": 120,
+            "uptimeSeconds": 113,
+            "draining": false
+          },
+          {
+            "atMs": 1786062274684,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 9202,
+            "rssMb": 120,
+            "uptimeSeconds": 114,
+            "draining": false
+          },
+          {
+            "atMs": 1786062275686,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 9290,
+            "rssMb": 120,
+            "uptimeSeconds": 115,
+            "draining": false
+          },
+          {
+            "atMs": 1786062276688,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 9396,
+            "rssMb": 120,
+            "uptimeSeconds": 116,
+            "draining": false
+          },
+          {
+            "atMs": 1786062277690,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 9506,
+            "rssMb": 120,
+            "uptimeSeconds": 117,
+            "draining": false
+          },
+          {
+            "atMs": 1786062278691,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 9616,
+            "rssMb": 120,
+            "uptimeSeconds": 118,
+            "draining": false
+          },
+          {
+            "atMs": 1786062279692,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 9719,
+            "rssMb": 120,
+            "uptimeSeconds": 119,
+            "draining": false
+          },
+          {
+            "atMs": 1786062280693,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 9830,
+            "rssMb": 120,
+            "uptimeSeconds": 120,
+            "draining": false
+          },
+          {
+            "atMs": 1786062281694,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 9933,
+            "rssMb": 120,
+            "uptimeSeconds": 121,
+            "draining": false
+          },
+          {
+            "atMs": 1786062282695,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 10033,
+            "rssMb": 120,
+            "uptimeSeconds": 122,
+            "draining": false
+          },
+          {
+            "atMs": 1786062283696,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 10133,
+            "rssMb": 120,
+            "uptimeSeconds": 123,
+            "draining": false
+          },
+          {
+            "atMs": 1786062284696,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 10230,
+            "rssMb": 120,
+            "uptimeSeconds": 124,
+            "draining": false
+          },
+          {
+            "atMs": 1786062285698,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 10315,
+            "rssMb": 120,
+            "uptimeSeconds": 125,
+            "draining": false
+          },
+          {
+            "atMs": 1786062286701,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 10435,
+            "rssMb": 120,
+            "uptimeSeconds": 126,
+            "draining": false
+          },
+          {
+            "atMs": 1786062287702,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 10540,
+            "rssMb": 120,
+            "uptimeSeconds": 127,
+            "draining": false
+          },
+          {
+            "atMs": 1786062288703,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.02,
+            "cpuMs": 10645,
+            "rssMb": 120,
+            "uptimeSeconds": 128,
+            "draining": false
+          },
+          {
+            "atMs": 1786062289706,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.05,
+            "cpuMs": 10744,
+            "rssMb": 120,
+            "uptimeSeconds": 129,
+            "draining": false
+          },
+          {
+            "atMs": 1786062290707,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.05,
+            "cpuMs": 10854,
+            "rssMb": 120,
+            "uptimeSeconds": 130,
+            "draining": false
+          },
+          {
+            "atMs": 1786062291709,
+            "rooms": 16,
+            "capacity": 168,
+            "loopLagMs": 1.05,
+            "cpuMs": 10951,
+            "rssMb": 120,
+            "uptimeSeconds": 131,
+            "draining": false
+          }
+        ],
+        "lagMedianMs": 1.02,
+        "lagMaxMs": 1.05,
+        "lagMinMs": 1.02,
+        "cpuCores": 0.10920711004593568,
+        "cpuMsPerRoomPerSecond": 6.82544437787098,
+        "rssMbPeak": 120,
+        "bytesPerRoomPerSecond": 4455.567205911723,
+        "inputsPerSecond": 991.8913521070501,
+        "breached": false
+      },
+      "confirm": null,
+      "breached": false
+    },
+    {
+      "window": {
+        "rooms": 32,
+        "serverRooms": 32,
+        "liveMatches": 32,
+        "endedMatches": 0,
+        "samples": [
+          {
+            "atMs": 1786062317383,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.23,
+            "cpuMs": 15063,
+            "rssMb": 123,
+            "uptimeSeconds": 157,
+            "draining": false
+          },
+          {
+            "atMs": 1786062318385,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.23,
+            "cpuMs": 15259,
+            "rssMb": 120,
+            "uptimeSeconds": 158,
+            "draining": false
+          },
+          {
+            "atMs": 1786062319386,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.23,
+            "cpuMs": 15436,
+            "rssMb": 120,
+            "uptimeSeconds": 159,
+            "draining": false
+          },
+          {
+            "atMs": 1786062320388,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.23,
+            "cpuMs": 15620,
+            "rssMb": 120,
+            "uptimeSeconds": 160,
+            "draining": false
+          },
+          {
+            "atMs": 1786062321389,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.23,
+            "cpuMs": 15787,
+            "rssMb": 120,
+            "uptimeSeconds": 161,
+            "draining": false
+          },
+          {
+            "atMs": 1786062322391,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.23,
+            "cpuMs": 15950,
+            "rssMb": 120,
+            "uptimeSeconds": 162,
+            "draining": false
+          },
+          {
+            "atMs": 1786062323391,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.23,
+            "cpuMs": 16114,
+            "rssMb": 120,
+            "uptimeSeconds": 163,
+            "draining": false
+          },
+          {
+            "atMs": 1786062324393,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.23,
+            "cpuMs": 16280,
+            "rssMb": 120,
+            "uptimeSeconds": 164,
+            "draining": false
+          },
+          {
+            "atMs": 1786062325394,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.23,
+            "cpuMs": 16436,
+            "rssMb": 120,
+            "uptimeSeconds": 165,
+            "draining": false
+          },
+          {
+            "atMs": 1786062326395,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.23,
+            "cpuMs": 16609,
+            "rssMb": 120,
+            "uptimeSeconds": 166,
+            "draining": false
+          },
+          {
+            "atMs": 1786062327396,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.39,
+            "cpuMs": 16783,
+            "rssMb": 120,
+            "uptimeSeconds": 167,
+            "draining": false
+          },
+          {
+            "atMs": 1786062328397,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.39,
+            "cpuMs": 16953,
+            "rssMb": 120,
+            "uptimeSeconds": 168,
+            "draining": false
+          },
+          {
+            "atMs": 1786062329399,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.39,
+            "cpuMs": 17104,
+            "rssMb": 120,
+            "uptimeSeconds": 169,
+            "draining": false
+          },
+          {
+            "atMs": 1786062330400,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.39,
+            "cpuMs": 17268,
+            "rssMb": 120,
+            "uptimeSeconds": 170,
+            "draining": false
+          },
+          {
+            "atMs": 1786062331402,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.39,
+            "cpuMs": 17436,
+            "rssMb": 120,
+            "uptimeSeconds": 171,
+            "draining": false
+          },
+          {
+            "atMs": 1786062332404,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.39,
+            "cpuMs": 17583,
+            "rssMb": 120,
+            "uptimeSeconds": 172,
+            "draining": false
+          },
+          {
+            "atMs": 1786062333406,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.39,
+            "cpuMs": 17759,
+            "rssMb": 121,
+            "uptimeSeconds": 173,
+            "draining": false
+          },
+          {
+            "atMs": 1786062334410,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.39,
+            "cpuMs": 17934,
+            "rssMb": 121,
+            "uptimeSeconds": 174,
+            "draining": false
+          },
+          {
+            "atMs": 1786062335410,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.39,
+            "cpuMs": 18090,
+            "rssMb": 121,
+            "uptimeSeconds": 175,
+            "draining": false
+          },
+          {
+            "atMs": 1786062336411,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.39,
+            "cpuMs": 18251,
+            "rssMb": 121,
+            "uptimeSeconds": 176,
+            "draining": false
+          },
+          {
+            "atMs": 1786062337413,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.39,
+            "cpuMs": 18407,
+            "rssMb": 121,
+            "uptimeSeconds": 177,
+            "draining": false
+          },
+          {
+            "atMs": 1786062338414,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.39,
+            "cpuMs": 18570,
+            "rssMb": 121,
+            "uptimeSeconds": 178,
+            "draining": false
+          },
+          {
+            "atMs": 1786062339416,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.39,
+            "cpuMs": 18723,
+            "rssMb": 121,
+            "uptimeSeconds": 179,
+            "draining": false
+          },
+          {
+            "atMs": 1786062340416,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.39,
+            "cpuMs": 18872,
+            "rssMb": 121,
+            "uptimeSeconds": 180,
+            "draining": false
+          },
+          {
+            "atMs": 1786062341418,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.39,
+            "cpuMs": 19071,
+            "rssMb": 122,
+            "uptimeSeconds": 181,
+            "draining": false
+          },
+          {
+            "atMs": 1786062342418,
+            "rooms": 32,
+            "capacity": 168,
+            "loopLagMs": 1.39,
+            "cpuMs": 19215,
+            "rssMb": 122,
+            "uptimeSeconds": 182,
+            "draining": false
+          }
+        ],
+        "lagMedianMs": 1.39,
+        "lagMaxMs": 1.39,
+        "lagMinMs": 1.23,
+        "cpuCores": 0.16584781306171362,
+        "cpuMsPerRoomPerSecond": 5.182744158178551,
+        "rssMbPeak": 123,
+        "bytesPerRoomPerSecond": 4470.011983223487,
+        "inputsPerSecond": 1985.060914719393,
+        "breached": false
+      },
+      "confirm": null,
+      "breached": false
+    },
+    {
+      "window": {
+        "rooms": 48,
+        "serverRooms": 48,
+        "liveMatches": 48,
+        "endedMatches": 0,
+        "samples": [
+          {
+            "atMs": 1786062368083,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 24978,
+            "rssMb": 126,
+            "uptimeSeconds": 207,
+            "draining": false
+          },
+          {
+            "atMs": 1786062369084,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 25200,
+            "rssMb": 126,
+            "uptimeSeconds": 208,
+            "draining": false
+          },
+          {
+            "atMs": 1786062370085,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 25425,
+            "rssMb": 126,
+            "uptimeSeconds": 209,
+            "draining": false
+          },
+          {
+            "atMs": 1786062371086,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 25647,
+            "rssMb": 126,
+            "uptimeSeconds": 210,
+            "draining": false
+          },
+          {
+            "atMs": 1786062372087,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 25890,
+            "rssMb": 126,
+            "uptimeSeconds": 211,
+            "draining": false
+          },
+          {
+            "atMs": 1786062373088,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 26121,
+            "rssMb": 126,
+            "uptimeSeconds": 212,
+            "draining": false
+          },
+          {
+            "atMs": 1786062374092,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 26339,
+            "rssMb": 126,
+            "uptimeSeconds": 213,
+            "draining": false
+          },
+          {
+            "atMs": 1786062375093,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 26562,
+            "rssMb": 126,
+            "uptimeSeconds": 214,
+            "draining": false
+          },
+          {
+            "atMs": 1786062376094,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 26789,
+            "rssMb": 126,
+            "uptimeSeconds": 215,
+            "draining": false
+          },
+          {
+            "atMs": 1786062377095,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 27054,
+            "rssMb": 126,
+            "uptimeSeconds": 216,
+            "draining": false
+          },
+          {
+            "atMs": 1786062378097,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 27267,
+            "rssMb": 126,
+            "uptimeSeconds": 217,
+            "draining": false
+          },
+          {
+            "atMs": 1786062379097,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 27501,
+            "rssMb": 126,
+            "uptimeSeconds": 218,
+            "draining": false
+          },
+          {
+            "atMs": 1786062380098,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 27723,
+            "rssMb": 126,
+            "uptimeSeconds": 219,
+            "draining": false
+          },
+          {
+            "atMs": 1786062381099,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 27945,
+            "rssMb": 126,
+            "uptimeSeconds": 220,
+            "draining": false
+          },
+          {
+            "atMs": 1786062382101,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 28160,
+            "rssMb": 126,
+            "uptimeSeconds": 221,
+            "draining": false
+          },
+          {
+            "atMs": 1786062383102,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 28396,
+            "rssMb": 126,
+            "uptimeSeconds": 222,
+            "draining": false
+          },
+          {
+            "atMs": 1786062384103,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 28615,
+            "rssMb": 126,
+            "uptimeSeconds": 223,
+            "draining": false
+          },
+          {
+            "atMs": 1786062385104,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 28842,
+            "rssMb": 126,
+            "uptimeSeconds": 224,
+            "draining": false
+          },
+          {
+            "atMs": 1786062386106,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 29067,
+            "rssMb": 126,
+            "uptimeSeconds": 225,
+            "draining": false
+          },
+          {
+            "atMs": 1786062387107,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 29301,
+            "rssMb": 126,
+            "uptimeSeconds": 226,
+            "draining": false
+          },
+          {
+            "atMs": 1786062388110,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 29567,
+            "rssMb": 127,
+            "uptimeSeconds": 227,
+            "draining": false
+          },
+          {
+            "atMs": 1786062389115,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 29828,
+            "rssMb": 125,
+            "uptimeSeconds": 228,
+            "draining": false
+          },
+          {
+            "atMs": 1786062390117,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 30047,
+            "rssMb": 125,
+            "uptimeSeconds": 229,
+            "draining": false
+          },
+          {
+            "atMs": 1786062391118,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 30273,
+            "rssMb": 125,
+            "uptimeSeconds": 230,
+            "draining": false
+          },
+          {
+            "atMs": 1786062392119,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 30492,
+            "rssMb": 125,
+            "uptimeSeconds": 231,
+            "draining": false
+          },
+          {
+            "atMs": 1786062393121,
+            "rooms": 48,
+            "capacity": 168,
+            "loopLagMs": 3.8,
+            "cpuMs": 30732,
+            "rssMb": 125,
+            "uptimeSeconds": 232,
+            "draining": false
+          }
+        ],
+        "lagMedianMs": 3.8,
+        "lagMaxMs": 3.8,
+        "lagMinMs": 3.8,
+        "cpuCores": 0.22981068775461297,
+        "cpuMsPerRoomPerSecond": 4.787722661554437,
+        "rssMbPeak": 127,
+        "bytesPerRoomPerSecond": 4372.482992518039,
+        "inputsPerSecond": 2981.0687754612986,
+        "breached": false
+      },
+      "confirm": null,
+      "breached": false
+    },
+    {
+      "window": {
+        "rooms": 64,
+        "serverRooms": 64,
+        "liveMatches": 64,
+        "endedMatches": 0,
+        "samples": [
+          {
+            "atMs": 1786062418787,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.43,
+            "cpuMs": 38133,
+            "rssMb": 127,
+            "uptimeSeconds": 258,
+            "draining": false
+          },
+          {
+            "atMs": 1786062419790,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.43,
+            "cpuMs": 38431,
+            "rssMb": 128,
+            "uptimeSeconds": 259,
+            "draining": false
+          },
+          {
+            "atMs": 1786062420791,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.43,
+            "cpuMs": 38723,
+            "rssMb": 128,
+            "uptimeSeconds": 260,
+            "draining": false
+          },
+          {
+            "atMs": 1786062421792,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.43,
+            "cpuMs": 38998,
+            "rssMb": 130,
+            "uptimeSeconds": 261,
+            "draining": false
+          },
+          {
+            "atMs": 1786062422793,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.43,
+            "cpuMs": 39257,
+            "rssMb": 130,
+            "uptimeSeconds": 262,
+            "draining": false
+          },
+          {
+            "atMs": 1786062423795,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.43,
+            "cpuMs": 39562,
+            "rssMb": 130,
+            "uptimeSeconds": 263,
+            "draining": false
+          },
+          {
+            "atMs": 1786062424797,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.43,
+            "cpuMs": 39823,
+            "rssMb": 130,
+            "uptimeSeconds": 264,
+            "draining": false
+          },
+          {
+            "atMs": 1786062425799,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.43,
+            "cpuMs": 40098,
+            "rssMb": 130,
+            "uptimeSeconds": 265,
+            "draining": false
+          },
+          {
+            "atMs": 1786062426801,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.43,
+            "cpuMs": 40379,
+            "rssMb": 130,
+            "uptimeSeconds": 266,
+            "draining": false
+          },
+          {
+            "atMs": 1786062427802,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.43,
+            "cpuMs": 40673,
+            "rssMb": 130,
+            "uptimeSeconds": 267,
+            "draining": false
+          },
+          {
+            "atMs": 1786062428803,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.43,
+            "cpuMs": 40951,
+            "rssMb": 130,
+            "uptimeSeconds": 268,
+            "draining": false
+          },
+          {
+            "atMs": 1786062429804,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.43,
+            "cpuMs": 41231,
+            "rssMb": 130,
+            "uptimeSeconds": 269,
+            "draining": false
+          },
+          {
+            "atMs": 1786062430805,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.43,
+            "cpuMs": 41515,
+            "rssMb": 130,
+            "uptimeSeconds": 270,
+            "draining": false
+          },
+          {
+            "atMs": 1786062431805,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.43,
+            "cpuMs": 41825,
+            "rssMb": 130,
+            "uptimeSeconds": 271,
+            "draining": false
+          },
+          {
+            "atMs": 1786062432807,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.43,
+            "cpuMs": 42095,
+            "rssMb": 130,
+            "uptimeSeconds": 272,
+            "draining": false
+          },
+          {
+            "atMs": 1786062433808,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.43,
+            "cpuMs": 42377,
+            "rssMb": 130,
+            "uptimeSeconds": 273,
+            "draining": false
+          },
+          {
+            "atMs": 1786062434813,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 42680,
+            "rssMb": 130,
+            "uptimeSeconds": 274,
+            "draining": false
+          },
+          {
+            "atMs": 1786062435815,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 42968,
+            "rssMb": 130,
+            "uptimeSeconds": 275,
+            "draining": false
+          },
+          {
+            "atMs": 1786062436817,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 43255,
+            "rssMb": 130,
+            "uptimeSeconds": 276,
+            "draining": false
+          },
+          {
+            "atMs": 1786062437818,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 43556,
+            "rssMb": 130,
+            "uptimeSeconds": 277,
+            "draining": false
+          },
+          {
+            "atMs": 1786062438822,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 43869,
+            "rssMb": 130,
+            "uptimeSeconds": 278,
+            "draining": false
+          },
+          {
+            "atMs": 1786062439824,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 44149,
+            "rssMb": 130,
+            "uptimeSeconds": 279,
+            "draining": false
+          },
+          {
+            "atMs": 1786062440826,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 44427,
+            "rssMb": 130,
+            "uptimeSeconds": 280,
+            "draining": false
+          },
+          {
+            "atMs": 1786062441827,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 44711,
+            "rssMb": 130,
+            "uptimeSeconds": 281,
+            "draining": false
+          },
+          {
+            "atMs": 1786062442831,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 45027,
+            "rssMb": 130,
+            "uptimeSeconds": 282,
+            "draining": false
+          },
+          {
+            "atMs": 1786062443832,
+            "rooms": 64,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 45319,
+            "rssMb": 130,
+            "uptimeSeconds": 283,
+            "draining": false
+          }
+        ],
+        "lagMedianMs": 4.43,
+        "lagMaxMs": 4.88,
+        "lagMinMs": 4.43,
+        "cpuCores": 0.2869235376322619,
+        "cpuMsPerRoomPerSecond": 4.483180275504092,
+        "rssMbPeak": 130,
+        "bytesPerRoomPerSecond": 4336.33646935516,
+        "inputsPerSecond": 3973.647434617688,
+        "breached": false
+      },
+      "confirm": null,
+      "breached": false
+    },
+    {
+      "window": {
+        "rooms": 96,
+        "serverRooms": 96,
+        "liveMatches": 96,
+        "endedMatches": 0,
+        "samples": [
+          {
+            "atMs": 1786062470169,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 5.14,
+            "cpuMs": 56250,
+            "rssMb": 135,
+            "uptimeSeconds": 309,
+            "draining": false
+          },
+          {
+            "atMs": 1786062471170,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 56629,
+            "rssMb": 135,
+            "uptimeSeconds": 310,
+            "draining": false
+          },
+          {
+            "atMs": 1786062472171,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 57053,
+            "rssMb": 135,
+            "uptimeSeconds": 311,
+            "draining": false
+          },
+          {
+            "atMs": 1786062473171,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 57444,
+            "rssMb": 135,
+            "uptimeSeconds": 312,
+            "draining": false
+          },
+          {
+            "atMs": 1786062474177,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 57871,
+            "rssMb": 135,
+            "uptimeSeconds": 313,
+            "draining": false
+          },
+          {
+            "atMs": 1786062475178,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 58281,
+            "rssMb": 135,
+            "uptimeSeconds": 314,
+            "draining": false
+          },
+          {
+            "atMs": 1786062476185,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 58738,
+            "rssMb": 135,
+            "uptimeSeconds": 315,
+            "draining": false
+          },
+          {
+            "atMs": 1786062477187,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 59180,
+            "rssMb": 135,
+            "uptimeSeconds": 316,
+            "draining": false
+          },
+          {
+            "atMs": 1786062478195,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 59578,
+            "rssMb": 135,
+            "uptimeSeconds": 317,
+            "draining": false
+          },
+          {
+            "atMs": 1786062479197,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 59987,
+            "rssMb": 135,
+            "uptimeSeconds": 318,
+            "draining": false
+          },
+          {
+            "atMs": 1786062480200,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 60393,
+            "rssMb": 135,
+            "uptimeSeconds": 319,
+            "draining": false
+          },
+          {
+            "atMs": 1786062481201,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 60803,
+            "rssMb": 135,
+            "uptimeSeconds": 320,
+            "draining": false
+          },
+          {
+            "atMs": 1786062482203,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 61206,
+            "rssMb": 135,
+            "uptimeSeconds": 321,
+            "draining": false
+          },
+          {
+            "atMs": 1786062483208,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 61632,
+            "rssMb": 135,
+            "uptimeSeconds": 322,
+            "draining": false
+          },
+          {
+            "atMs": 1786062484209,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 62043,
+            "rssMb": 135,
+            "uptimeSeconds": 323,
+            "draining": false
+          },
+          {
+            "atMs": 1786062485211,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 62468,
+            "rssMb": 135,
+            "uptimeSeconds": 324,
+            "draining": false
+          },
+          {
+            "atMs": 1786062486212,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 62904,
+            "rssMb": 135,
+            "uptimeSeconds": 325,
+            "draining": false
+          },
+          {
+            "atMs": 1786062487214,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 63311,
+            "rssMb": 135,
+            "uptimeSeconds": 326,
+            "draining": false
+          },
+          {
+            "atMs": 1786062488217,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 63728,
+            "rssMb": 135,
+            "uptimeSeconds": 327,
+            "draining": false
+          },
+          {
+            "atMs": 1786062489219,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 64143,
+            "rssMb": 135,
+            "uptimeSeconds": 328,
+            "draining": false
+          },
+          {
+            "atMs": 1786062490220,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 64567,
+            "rssMb": 135,
+            "uptimeSeconds": 329,
+            "draining": false
+          },
+          {
+            "atMs": 1786062491221,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 64964,
+            "rssMb": 135,
+            "uptimeSeconds": 330,
+            "draining": false
+          },
+          {
+            "atMs": 1786062492221,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 65391,
+            "rssMb": 135,
+            "uptimeSeconds": 331,
+            "draining": false
+          },
+          {
+            "atMs": 1786062493222,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 65800,
+            "rssMb": 135,
+            "uptimeSeconds": 332,
+            "draining": false
+          },
+          {
+            "atMs": 1786062494224,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 66236,
+            "rssMb": 135,
+            "uptimeSeconds": 333,
+            "draining": false
+          },
+          {
+            "atMs": 1786062495227,
+            "rooms": 96,
+            "capacity": 168,
+            "loopLagMs": 4.88,
+            "cpuMs": 66675,
+            "rssMb": 135,
+            "uptimeSeconds": 334,
+            "draining": false
+          }
+        ],
+        "lagMedianMs": 4.88,
+        "lagMaxMs": 5.14,
+        "lagMinMs": 4.88,
+        "cpuCores": 0.4160347992657036,
+        "cpuMsPerRoomPerSecond": 4.333695825684412,
+        "rssMbPeak": 135,
+        "bytesPerRoomPerSecond": 4362.420434591747,
+        "inputsPerSecond": 5965.041104637242,
+        "breached": false
+      },
+      "confirm": null,
+      "breached": false
+    },
+    {
+      "window": {
+        "rooms": 128,
+        "serverRooms": 128,
+        "liveMatches": 128,
+        "endedMatches": 0,
+        "samples": [
+          {
+            "atMs": 1786062521560,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.82,
+            "cpuMs": 81381,
+            "rssMb": 149,
+            "uptimeSeconds": 361,
+            "draining": false
+          },
+          {
+            "atMs": 1786062522560,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.82,
+            "cpuMs": 81932,
+            "rssMb": 149,
+            "uptimeSeconds": 362,
+            "draining": false
+          },
+          {
+            "atMs": 1786062523564,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.82,
+            "cpuMs": 82483,
+            "rssMb": 149,
+            "uptimeSeconds": 363,
+            "draining": false
+          },
+          {
+            "atMs": 1786062524571,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.82,
+            "cpuMs": 83016,
+            "rssMb": 149,
+            "uptimeSeconds": 364,
+            "draining": false
+          },
+          {
+            "atMs": 1786062525572,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.82,
+            "cpuMs": 83576,
+            "rssMb": 149,
+            "uptimeSeconds": 365,
+            "draining": false
+          },
+          {
+            "atMs": 1786062526574,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.82,
+            "cpuMs": 84121,
+            "rssMb": 149,
+            "uptimeSeconds": 366,
+            "draining": false
+          },
+          {
+            "atMs": 1786062527575,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.82,
+            "cpuMs": 84682,
+            "rssMb": 149,
+            "uptimeSeconds": 367,
+            "draining": false
+          },
+          {
+            "atMs": 1786062528579,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.82,
+            "cpuMs": 85255,
+            "rssMb": 149,
+            "uptimeSeconds": 368,
+            "draining": false
+          },
+          {
+            "atMs": 1786062529580,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.82,
+            "cpuMs": 85762,
+            "rssMb": 149,
+            "uptimeSeconds": 369,
+            "draining": false
+          },
+          {
+            "atMs": 1786062530580,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.82,
+            "cpuMs": 86321,
+            "rssMb": 149,
+            "uptimeSeconds": 370,
+            "draining": false
+          },
+          {
+            "atMs": 1786062531587,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.82,
+            "cpuMs": 86888,
+            "rssMb": 149,
+            "uptimeSeconds": 371,
+            "draining": false
+          },
+          {
+            "atMs": 1786062532588,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.82,
+            "cpuMs": 87399,
+            "rssMb": 149,
+            "uptimeSeconds": 372,
+            "draining": false
+          },
+          {
+            "atMs": 1786062533590,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.88,
+            "cpuMs": 87986,
+            "rssMb": 149,
+            "uptimeSeconds": 373,
+            "draining": false
+          },
+          {
+            "atMs": 1786062534591,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.88,
+            "cpuMs": 88533,
+            "rssMb": 149,
+            "uptimeSeconds": 374,
+            "draining": false
+          },
+          {
+            "atMs": 1786062535599,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.88,
+            "cpuMs": 89099,
+            "rssMb": 149,
+            "uptimeSeconds": 375,
+            "draining": false
+          },
+          {
+            "atMs": 1786062536600,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.88,
+            "cpuMs": 89677,
+            "rssMb": 149,
+            "uptimeSeconds": 376,
+            "draining": false
+          },
+          {
+            "atMs": 1786062537604,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.88,
+            "cpuMs": 90201,
+            "rssMb": 149,
+            "uptimeSeconds": 377,
+            "draining": false
+          },
+          {
+            "atMs": 1786062538606,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.88,
+            "cpuMs": 90764,
+            "rssMb": 149,
+            "uptimeSeconds": 378,
+            "draining": false
+          },
+          {
+            "atMs": 1786062539608,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.88,
+            "cpuMs": 91311,
+            "rssMb": 149,
+            "uptimeSeconds": 379,
+            "draining": false
+          },
+          {
+            "atMs": 1786062540615,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.88,
+            "cpuMs": 91837,
+            "rssMb": 149,
+            "uptimeSeconds": 380,
+            "draining": false
+          },
+          {
+            "atMs": 1786062541616,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.88,
+            "cpuMs": 92399,
+            "rssMb": 149,
+            "uptimeSeconds": 381,
+            "draining": false
+          },
+          {
+            "atMs": 1786062542617,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.88,
+            "cpuMs": 92928,
+            "rssMb": 149,
+            "uptimeSeconds": 382,
+            "draining": false
+          },
+          {
+            "atMs": 1786062543621,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.88,
+            "cpuMs": 93493,
+            "rssMb": 149,
+            "uptimeSeconds": 383,
+            "draining": false
+          },
+          {
+            "atMs": 1786062544622,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.88,
+            "cpuMs": 94028,
+            "rssMb": 149,
+            "uptimeSeconds": 384,
+            "draining": false
+          },
+          {
+            "atMs": 1786062545623,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.88,
+            "cpuMs": 94587,
+            "rssMb": 149,
+            "uptimeSeconds": 385,
+            "draining": false
+          },
+          {
+            "atMs": 1786062546625,
+            "rooms": 128,
+            "capacity": 168,
+            "loopLagMs": 7.88,
+            "cpuMs": 95144,
+            "rssMb": 149,
+            "uptimeSeconds": 386,
+            "draining": false
+          }
+        ],
+        "lagMedianMs": 7.88,
+        "lagMaxMs": 7.88,
+        "lagMinMs": 7.82,
+        "cpuCores": 0.5490923598643527,
+        "cpuMsPerRoomPerSecond": 4.289784061440256,
+        "rssMbPeak": 149,
+        "bytesPerRoomPerSecond": 4339.632268601636,
+        "inputsPerSecond": 7951.166965888689,
+        "breached": false
+      },
+      "confirm": null,
+      "breached": false
+    },
+    {
+      "window": {
+        "rooms": 160,
+        "serverRooms": 160,
+        "liveMatches": 160,
+        "endedMatches": 0,
+        "samples": [
+          {
+            "atMs": 1786062572950,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 113492,
+            "rssMb": 180,
+            "uptimeSeconds": 412,
+            "draining": false
+          },
+          {
+            "atMs": 1786062573950,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 114201,
+            "rssMb": 180,
+            "uptimeSeconds": 413,
+            "draining": false
+          },
+          {
+            "atMs": 1786062574953,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 114994,
+            "rssMb": 180,
+            "uptimeSeconds": 414,
+            "draining": false
+          },
+          {
+            "atMs": 1786062575963,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 115800,
+            "rssMb": 180,
+            "uptimeSeconds": 415,
+            "draining": false
+          },
+          {
+            "atMs": 1786062576963,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 116569,
+            "rssMb": 180,
+            "uptimeSeconds": 416,
+            "draining": false
+          },
+          {
+            "atMs": 1786062577964,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 117333,
+            "rssMb": 180,
+            "uptimeSeconds": 417,
+            "draining": false
+          },
+          {
+            "atMs": 1786062578966,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 118126,
+            "rssMb": 180,
+            "uptimeSeconds": 418,
+            "draining": false
+          },
+          {
+            "atMs": 1786062579975,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 118810,
+            "rssMb": 180,
+            "uptimeSeconds": 419,
+            "draining": false
+          },
+          {
+            "atMs": 1786062580977,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 119476,
+            "rssMb": 180,
+            "uptimeSeconds": 420,
+            "draining": false
+          },
+          {
+            "atMs": 1786062581983,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 120169,
+            "rssMb": 180,
+            "uptimeSeconds": 421,
+            "draining": false
+          },
+          {
+            "atMs": 1786062582984,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 120901,
+            "rssMb": 186,
+            "uptimeSeconds": 422,
+            "draining": false
+          },
+          {
+            "atMs": 1786062583985,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 121585,
+            "rssMb": 186,
+            "uptimeSeconds": 423,
+            "draining": false
+          },
+          {
+            "atMs": 1786062584987,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 122261,
+            "rssMb": 186,
+            "uptimeSeconds": 424,
+            "draining": false
+          },
+          {
+            "atMs": 1786062585988,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 122974,
+            "rssMb": 186,
+            "uptimeSeconds": 425,
+            "draining": false
+          },
+          {
+            "atMs": 1786062586996,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 123676,
+            "rssMb": 186,
+            "uptimeSeconds": 426,
+            "draining": false
+          },
+          {
+            "atMs": 1786062587998,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 124350,
+            "rssMb": 186,
+            "uptimeSeconds": 427,
+            "draining": false
+          },
+          {
+            "atMs": 1786062589000,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 125079,
+            "rssMb": 186,
+            "uptimeSeconds": 428,
+            "draining": false
+          },
+          {
+            "atMs": 1786062590010,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 125752,
+            "rssMb": 186,
+            "uptimeSeconds": 429,
+            "draining": false
+          },
+          {
+            "atMs": 1786062591012,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 126420,
+            "rssMb": 186,
+            "uptimeSeconds": 430,
+            "draining": false
+          },
+          {
+            "atMs": 1786062592019,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 127143,
+            "rssMb": 186,
+            "uptimeSeconds": 431,
+            "draining": false
+          },
+          {
+            "atMs": 1786062593022,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 127810,
+            "rssMb": 186,
+            "uptimeSeconds": 432,
+            "draining": false
+          },
+          {
+            "atMs": 1786062594029,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 128480,
+            "rssMb": 186,
+            "uptimeSeconds": 433,
+            "draining": false
+          },
+          {
+            "atMs": 1786062595032,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 129201,
+            "rssMb": 186,
+            "uptimeSeconds": 434,
+            "draining": false
+          },
+          {
+            "atMs": 1786062596032,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 129871,
+            "rssMb": 186,
+            "uptimeSeconds": 435,
+            "draining": false
+          },
+          {
+            "atMs": 1786062597033,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 130561,
+            "rssMb": 186,
+            "uptimeSeconds": 436,
+            "draining": false
+          },
+          {
+            "atMs": 1786062598037,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 131306,
+            "rssMb": 186,
+            "uptimeSeconds": 437,
+            "draining": false
+          }
+        ],
+        "lagMedianMs": 11.99,
+        "lagMaxMs": 11.99,
+        "lagMinMs": 11.99,
+        "cpuCores": 0.7100888906605015,
+        "cpuMsPerRoomPerSecond": 4.438055566628135,
+        "rssMbPeak": 186,
+        "bytesPerRoomPerSecond": 4355.446795152868,
+        "inputsPerSecond": 9949.376170925181,
+        "breached": true
+      },
+      "confirm": {
+        "rooms": 160,
+        "serverRooms": 160,
+        "liveMatches": 160,
+        "endedMatches": 0,
+        "samples": [
+          {
+            "atMs": 1786062598039,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 131308,
+            "rssMb": 186,
+            "uptimeSeconds": 437,
+            "draining": false
+          },
+          {
+            "atMs": 1786062599041,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 132013,
+            "rssMb": 186,
+            "uptimeSeconds": 438,
+            "draining": false
+          },
+          {
+            "atMs": 1786062600041,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 132698,
+            "rssMb": 186,
+            "uptimeSeconds": 439,
+            "draining": false
+          },
+          {
+            "atMs": 1786062601043,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 133433,
+            "rssMb": 187,
+            "uptimeSeconds": 440,
+            "draining": false
+          },
+          {
+            "atMs": 1786062602051,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 134124,
+            "rssMb": 187,
+            "uptimeSeconds": 441,
+            "draining": false
+          },
+          {
+            "atMs": 1786062603051,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 134847,
+            "rssMb": 187,
+            "uptimeSeconds": 442,
+            "draining": false
+          },
+          {
+            "atMs": 1786062604053,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 135530,
+            "rssMb": 187,
+            "uptimeSeconds": 443,
+            "draining": false
+          },
+          {
+            "atMs": 1786062605059,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 136216,
+            "rssMb": 187,
+            "uptimeSeconds": 444,
+            "draining": false
+          },
+          {
+            "atMs": 1786062606060,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 11.99,
+            "cpuMs": 136901,
+            "rssMb": 187,
+            "uptimeSeconds": 445,
+            "draining": false
+          },
+          {
+            "atMs": 1786062607073,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 137602,
+            "rssMb": 187,
+            "uptimeSeconds": 446,
+            "draining": false
+          },
+          {
+            "atMs": 1786062608083,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 138334,
+            "rssMb": 188,
+            "uptimeSeconds": 447,
+            "draining": false
+          },
+          {
+            "atMs": 1786062609084,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 139007,
+            "rssMb": 188,
+            "uptimeSeconds": 448,
+            "draining": false
+          },
+          {
+            "atMs": 1786062610092,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 139715,
+            "rssMb": 188,
+            "uptimeSeconds": 449,
+            "draining": false
+          },
+          {
+            "atMs": 1786062611093,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 140434,
+            "rssMb": 188,
+            "uptimeSeconds": 450,
+            "draining": false
+          },
+          {
+            "atMs": 1786062612101,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 141125,
+            "rssMb": 188,
+            "uptimeSeconds": 451,
+            "draining": false
+          },
+          {
+            "atMs": 1786062613101,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 141801,
+            "rssMb": 188,
+            "uptimeSeconds": 452,
+            "draining": false
+          },
+          {
+            "atMs": 1786062614116,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 142505,
+            "rssMb": 189,
+            "uptimeSeconds": 453,
+            "draining": false
+          },
+          {
+            "atMs": 1786062615117,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 143238,
+            "rssMb": 189,
+            "uptimeSeconds": 454,
+            "draining": false
+          },
+          {
+            "atMs": 1786062616118,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 143911,
+            "rssMb": 189,
+            "uptimeSeconds": 455,
+            "draining": false
+          },
+          {
+            "atMs": 1786062617127,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 144610,
+            "rssMb": 189,
+            "uptimeSeconds": 456,
+            "draining": false
+          },
+          {
+            "atMs": 1786062618128,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 145283,
+            "rssMb": 189,
+            "uptimeSeconds": 457,
+            "draining": false
+          },
+          {
+            "atMs": 1786062619129,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 146016,
+            "rssMb": 189,
+            "uptimeSeconds": 458,
+            "draining": false
+          },
+          {
+            "atMs": 1786062620131,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 146721,
+            "rssMb": 189,
+            "uptimeSeconds": 459,
+            "draining": false
+          },
+          {
+            "atMs": 1786062621142,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 147407,
+            "rssMb": 189,
+            "uptimeSeconds": 460,
+            "draining": false
+          },
+          {
+            "atMs": 1786062622143,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 148116,
+            "rssMb": 189,
+            "uptimeSeconds": 461,
+            "draining": false
+          },
+          {
+            "atMs": 1786062623145,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 148793,
+            "rssMb": 189,
+            "uptimeSeconds": 462,
+            "draining": false
+          },
+          {
+            "atMs": 1786062624147,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 149457,
+            "rssMb": 189,
+            "uptimeSeconds": 463,
+            "draining": false
+          },
+          {
+            "atMs": 1786062625153,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 150191,
+            "rssMb": 189,
+            "uptimeSeconds": 464,
+            "draining": false
+          },
+          {
+            "atMs": 1786062626154,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 150849,
+            "rssMb": 189,
+            "uptimeSeconds": 465,
+            "draining": false
+          },
+          {
+            "atMs": 1786062627156,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 151583,
+            "rssMb": 191,
+            "uptimeSeconds": 466,
+            "draining": false
+          },
+          {
+            "atMs": 1786062628164,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 152283,
+            "rssMb": 191,
+            "uptimeSeconds": 467,
+            "draining": false
+          },
+          {
+            "atMs": 1786062629166,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 152965,
+            "rssMb": 191,
+            "uptimeSeconds": 468,
+            "draining": false
+          },
+          {
+            "atMs": 1786062630167,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 153759,
+            "rssMb": 192,
+            "uptimeSeconds": 469,
+            "draining": false
+          },
+          {
+            "atMs": 1786062631167,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 154451,
+            "rssMb": 192,
+            "uptimeSeconds": 470,
+            "draining": false
+          },
+          {
+            "atMs": 1786062632168,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 155134,
+            "rssMb": 192,
+            "uptimeSeconds": 471,
+            "draining": false
+          },
+          {
+            "atMs": 1786062633175,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 155859,
+            "rssMb": 192,
+            "uptimeSeconds": 472,
+            "draining": false
+          },
+          {
+            "atMs": 1786062634176,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 156530,
+            "rssMb": 192,
+            "uptimeSeconds": 473,
+            "draining": false
+          },
+          {
+            "atMs": 1786062635177,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 157203,
+            "rssMb": 192,
+            "uptimeSeconds": 474,
+            "draining": false
+          },
+          {
+            "atMs": 1786062636187,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 157930,
+            "rssMb": 192,
+            "uptimeSeconds": 475,
+            "draining": false
+          },
+          {
+            "atMs": 1786062637188,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 158601,
+            "rssMb": 192,
+            "uptimeSeconds": 476,
+            "draining": false
+          },
+          {
+            "atMs": 1786062638196,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 159261,
+            "rssMb": 192,
+            "uptimeSeconds": 477,
+            "draining": false
+          },
+          {
+            "atMs": 1786062639197,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 159975,
+            "rssMb": 192,
+            "uptimeSeconds": 478,
+            "draining": false
+          },
+          {
+            "atMs": 1786062640198,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 160647,
+            "rssMb": 192,
+            "uptimeSeconds": 479,
+            "draining": false
+          },
+          {
+            "atMs": 1786062641199,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 161314,
+            "rssMb": 192,
+            "uptimeSeconds": 480,
+            "draining": false
+          },
+          {
+            "atMs": 1786062642199,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 162029,
+            "rssMb": 192,
+            "uptimeSeconds": 481,
+            "draining": false
+          },
+          {
+            "atMs": 1786062643204,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 162717,
+            "rssMb": 192,
+            "uptimeSeconds": 482,
+            "draining": false
+          },
+          {
+            "atMs": 1786062644208,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 163387,
+            "rssMb": 192,
+            "uptimeSeconds": 483,
+            "draining": false
+          },
+          {
+            "atMs": 1786062645219,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 164138,
+            "rssMb": 192,
+            "uptimeSeconds": 484,
+            "draining": false
+          },
+          {
+            "atMs": 1786062646221,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 164804,
+            "rssMb": 192,
+            "uptimeSeconds": 485,
+            "draining": false
+          },
+          {
+            "atMs": 1786062647221,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 165493,
+            "rssMb": 192,
+            "uptimeSeconds": 486,
+            "draining": false
+          },
+          {
+            "atMs": 1786062648224,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 166175,
+            "rssMb": 192,
+            "uptimeSeconds": 487,
+            "draining": false
+          },
+          {
+            "atMs": 1786062649228,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 166909,
+            "rssMb": 192,
+            "uptimeSeconds": 488,
+            "draining": false
+          },
+          {
+            "atMs": 1786062650230,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 167600,
+            "rssMb": 192,
+            "uptimeSeconds": 489,
+            "draining": false
+          },
+          {
+            "atMs": 1786062651236,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 168288,
+            "rssMb": 192,
+            "uptimeSeconds": 490,
+            "draining": false
+          },
+          {
+            "atMs": 1786062652236,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 168966,
+            "rssMb": 192,
+            "uptimeSeconds": 491,
+            "draining": false
+          },
+          {
+            "atMs": 1786062653239,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 169685,
+            "rssMb": 192,
+            "uptimeSeconds": 492,
+            "draining": false
+          },
+          {
+            "atMs": 1786062654247,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 170390,
+            "rssMb": 192,
+            "uptimeSeconds": 493,
+            "draining": false
+          },
+          {
+            "atMs": 1786062655250,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 171090,
+            "rssMb": 192,
+            "uptimeSeconds": 494,
+            "draining": false
+          },
+          {
+            "atMs": 1786062656250,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 171829,
+            "rssMb": 192,
+            "uptimeSeconds": 495,
+            "draining": false
+          },
+          {
+            "atMs": 1786062657252,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 172519,
+            "rssMb": 192,
+            "uptimeSeconds": 496,
+            "draining": false
+          },
+          {
+            "atMs": 1786062658253,
+            "rooms": 160,
+            "capacity": 168,
+            "loopLagMs": 12.35,
+            "cpuMs": 173197,
+            "rssMb": 192,
+            "uptimeSeconds": 497,
+            "draining": false
+          }
+        ],
+        "lagMedianMs": 12.35,
+        "lagMaxMs": 12.35,
+        "lagMinMs": 11.99,
+        "cpuCores": 0.6956687813465308,
+        "cpuMsPerRoomPerSecond": 4.3479298834158175,
+        "rssMbPeak": 192,
+        "bytesPerRoomPerSecond": 4259.508378450194,
+        "inputsPerSecond": 9951.174145547548,
+        "breached": true
+      },
+      "breached": true
+    }
+  ],
+  "sustainableRooms": 128,
+  "breachedAt": 160,
+  "lagSafetyMs": 10
+}

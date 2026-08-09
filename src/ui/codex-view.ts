@@ -622,7 +622,7 @@ export class CodexView extends Container {
       const headPx = typeSize(EYEBROW_PX, m);
       this.detailFactsHead.style.fontSize = headPx;
       this.detailFactsHead.style.letterSpacing = trackingPx(TRACKING.eyebrow, headPx);
-      y = this.placeBlock(this.detailFactsHead, 'BY THE NUMBERS', left, y, wrap);
+      y = this.placeBlock(this.detailFactsHead, 'FIGURES', left, y, wrap);
       y += Math.round(gap / 2);
       const factPx = typeSize(DETAIL_FACT_PX, m);
       const column = Math.min(Math.round(FACT_VALUE_COLUMN * m.scale), wrap / 2);

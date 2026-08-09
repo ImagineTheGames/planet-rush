@@ -11,8 +11,10 @@
  *    when a slot has no name — identity never vanishes.
  *  - **Which colour:** the owner's identity colour from the ratified roster, never
  *    signal yellow / threat red (RESERVED).
- *  - **Fade under clutter:** a label over a damaged or fighting entity fades so it
- *    never competes with the health bar.
+ *  - **Always lit (a0-04):** a label over a damaged entity, over a fighting entity
+ *    and over a calm one all draw at the SAME full opacity — and the label still
+ *    sorts above the health-bar cluster, which is what the retired fade was
+ *    actually protecting.
  */
 import { describe, it, expect } from 'vitest';
 import { PALETTE, PLAYER_COLORS } from '@render/index';
@@ -25,10 +27,15 @@ import {
   resolveTeamRelation,
   fallbackName,
   NAMEPLATE_FULL_ALPHA,
-  NAMEPLATE_FADE_ALPHA,
   NAMEPLATE_MAX_CHARS,
 } from './nameplates';
-import type { DifficultyTable, Nameable, NameTable, TeamTable } from './nameplates';
+import type { DifficultyTable, Nameable, Nameplate, NameTable, TeamTable } from './nameplates';
+// The stack the label sits on top of — rule 3's surviving half after a0-04. The
+// clearance is read from the label layer and the bar's own geometry from the bar
+// layer, so the assertion below compares the two REAL numbers, not a restatement.
+import { NAMEPLATE_SHIP_GAP, nameplateClusterClearance } from './nameplates-view';
+import { HEALTHBAR_GAP, HEALTHBAR_HEIGHT, combatantGetsBar } from './healthbar';
+import type { Combatant } from './healthbar';
 // The side vocabulary and its motif colours live with the lobby's `teamName`, so
 // the roster and the battlefield cannot drift (u3).
 import { SIDE_COLORS } from './lobby';
@@ -178,20 +185,146 @@ describe('which colour (identity, never RESERVED)', () => {
   });
 });
 
-describe('fade under combat clutter', () => {
+// ---------------------------------------------------------------------------
+// Always lit (a0-04 — the developer: "sometimes other ships names are dim and
+// sometimes they are lit, they should always be lit")
+// ---------------------------------------------------------------------------
+//
+// These three tests were the fade's pins. They are re-pointed, not deleted: the
+// same three entities — damaged, fighting, calm — now have to come out at ONE
+// brightness. The old rule (a label steps back so the health bar owns the eye)
+// was legible in a spec and illegible on screen, because its trigger was the
+// other ship's combat state and the player is not tracking that.
+//
+// The entity states are built as the health-bar model's OWN `Combatant`s and
+// asserted to be bar-worthy by `combatantGetsBar`, because after this change the
+// nameplate model cannot represent "damaged" or "fighting" at all — it takes no
+// such field. So "damaged" and "in combat" mean here exactly what they mean to
+// the layer that draws the bar, and the pairing is the test: the bar layer sees a
+// fight, the label layer does not dim for it.
+
+/** The health-bar model's view of the same ship — the definition of "damaged"
+ *  and "in combat" this suite borrows, rather than inventing a second one. */
+function combatant(over: Partial<Combatant> = {}): Combatant {
+  return {
+    owner: 3,
+    hp: 70,
+    maxHp: 70,
+    alive: true,
+    inCombat: false,
+    pos: { x: 100, y: 100 },
+    radius: 12,
+    turret: false,
+    ...over,
+  };
+}
+const LOCAL_SLOT = 0;
+
+describe('always lit (a0-04)', () => {
   it('draws a calm label at full opacity', () => {
     const [plate] = nameplateModel([ship()], NAMES);
     expect(plate!.alpha).toBeCloseTo(NAMEPLATE_FULL_ALPHA, 5);
   });
 
-  it('fades a label over a fighting entity', () => {
-    const [plate] = nameplateModel([ship({ inCombat: true })], NAMES);
-    expect(plate!.alpha).toBeCloseTo(NAMEPLATE_FADE_ALPHA, 5);
+  it('draws a label over a FIGHTING entity at that same full opacity', () => {
+    // The bar layer agrees this one is in a fight…
+    expect(combatantGetsBar(combatant({ inCombat: true }), LOCAL_SLOT)).toBe(true);
+    // …and its name is lit exactly as brightly as a calm ship's.
+    const [plate] = nameplateModel([ship()], NAMES);
+    expect(plate!.alpha).toBeCloseTo(NAMEPLATE_FULL_ALPHA, 5);
   });
 
-  it('fades a label over a damaged entity (a health bar is up)', () => {
-    const [plate] = nameplateModel([ship({ hpFraction: 0.5 })], NAMES);
-    expect(plate!.alpha).toBeCloseTo(NAMEPLATE_FADE_ALPHA, 5);
+  it('draws a label over a DAMAGED entity at that same full opacity', () => {
+    expect(combatantGetsBar(combatant({ hp: 35 }), LOCAL_SLOT)).toBe(true);
+    const [plate] = nameplateModel([ship()], NAMES);
+    expect(plate!.alpha).toBeCloseTo(NAMEPLATE_FULL_ALPHA, 5);
+  });
+
+  it('gives the same brightness to the calm, the damaged and the fighting ship', () => {
+    // The developer's sentence, as one assertion: three ships in three states,
+    // one number. The states are the health-bar model's, all three bar-worthy or
+    // not — the label layer is told none of it.
+    const states: Combatant[] = [
+      combatant({ owner: 1 }), // calm, full hull → no bar
+      combatant({ owner: 2, hp: 20 }), // shot up → bar
+      combatant({ owner: 3, inCombat: true }), // firing → bar
+    ];
+    expect(states.map((c) => combatantGetsBar(c, LOCAL_SLOT))).toEqual([false, true, true]);
+
+    const plates = nameplateModel(
+      states.map((c) => ship({ owner: c.owner, pos: c.pos, radius: c.radius })),
+      NAMES,
+    );
+    expect(plates).toHaveLength(3);
+    expect(new Set(plates.map((p) => p.alpha)).size).toBe(1);
+    for (const p of plates) expect(p.alpha).toBeCloseTo(NAMEPLATE_FULL_ALPHA, 5);
+  });
+
+  it('takes no combat or HP fact at all — there is nothing left to dim on', () => {
+    // The mechanism is retired, not neutered (a0-04): no fade constant, no fade
+    // knob, and no field on `Nameable` for a caller to feed one from. A stray
+    // combat fact on the record cannot change a single drawn pixel.
+    const withStrayCombatState = { ...ship(), inCombat: true, hpFraction: 0.1 } as Nameable;
+    const [plate] = nameplateModel([withStrayCombatState], NAMES);
+    expect(plate!.alpha).toBeCloseTo(NAMEPLATE_FULL_ALPHA, 5);
+  });
+
+  it('still dims the whole layer together when a caller asks it to', () => {
+    // The one alpha knob that survives is per-LAYER, never per-plate: it cannot
+    // reproduce the bug, because it cannot make two ships differ.
+    const plates = nameplateModel([ship({ owner: 1 }), ship({ owner: 3 })], NAMES, {
+      fullAlpha: 0.5,
+    });
+    expect(plates.map((p) => p.alpha)).toEqual([0.5, 0.5]);
+  });
+});
+
+describe('the label still sorts above the bar cluster (rule 3’s intent)', () => {
+  // What the fade was protecting: the health bar owns the eye in a brawl. That
+  // never rested on opacity — the view floats the label above the whole bar
+  // cluster, so it cannot cover a bar at ANY brightness. With the fade gone this
+  // is the only thing left holding the promise, so it is pinned here.
+
+  /** The bar layer's own top edge for this entity (healthbar-view.ts:
+   *  `bottom = y - radius - GAP`, `top = bottom - height`). */
+  function barTop(y: number, radius: number): number {
+    return y - radius - HEALTHBAR_GAP - HEALTHBAR_HEIGHT;
+  }
+
+  function plateFor(over: Partial<Nameable> = {}): Nameplate {
+    return nameplateModel([ship(over)], NAMES)[0]!;
+  }
+
+  it('puts the label’s bottom edge strictly above the health bar’s top edge', () => {
+    const plate = plateFor();
+    const labelBottom = plate.y - nameplateClusterClearance(plate);
+    expect(labelBottom).toBeLessThan(barTop(plate.y, plate.radius));
+    // …by exactly the declared gap, off the bar's own geometry — one number, not
+    // two drifting copies.
+    expect(labelBottom).toBeCloseTo(barTop(plate.y, plate.radius) - NAMEPLATE_SHIP_GAP, 5);
+  });
+
+  it('holds for a damaged and a fighting ship — the two that used to fade', () => {
+    // Same entities as the re-pointed tests above: bar-worthy by the bar layer's
+    // own predicate, fully lit, and still stacked clear of the bar.
+    for (const c of [combatant({ hp: 20 }), combatant({ inCombat: true })]) {
+      expect(combatantGetsBar(c, LOCAL_SLOT)).toBe(true);
+      const plate = plateFor({ pos: c.pos, radius: c.radius });
+      expect(plate.alpha).toBeCloseTo(NAMEPLATE_FULL_ALPHA, 5);
+      expect(plate.y - nameplateClusterClearance(plate)).toBeLessThan(barTop(c.pos.y, c.radius));
+    }
+  });
+
+  it('holds for any ship radius, so a big hull cannot push the label onto its bar', () => {
+    for (const radius of [4, 12, 28, 64]) {
+      const plate = plateFor({ radius });
+      expect(plate.y - nameplateClusterClearance(plate)).toBeLessThan(barTop(plate.y, radius));
+    }
+  });
+
+  it('floats a station label clear of its HP pin too', () => {
+    const [plate] = nameplateModel([station()], NAMES);
+    expect(nameplateClusterClearance(plate!)).toBeGreaterThan(plate!.radius);
   });
 });
 

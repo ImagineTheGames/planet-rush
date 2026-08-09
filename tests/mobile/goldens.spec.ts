@@ -20,7 +20,26 @@
 import { test, expect, type Page } from '@playwright/test';
 import { budgetTest } from './budgets';
 import { settleFrames } from './render-settle';
-import { GOLDEN_SHOT_TIMEOUT_MS } from './shot-budget';
+import { GOLDEN_RETRIES, GOLDEN_SHOT_TIMEOUT_MS } from './shot-budget';
+
+/**
+ * One extra attempt on CI, for this file and no other (q9-01).
+ *
+ * A 31× runner took the phone BUILD WHEEL golden past its 90 s budget and past
+ * its single retry, and reddened `main` against a baseline that was correct — a
+ * timeout, with no actual/expected/diff, because nothing was ever captured. The
+ * fix is an attempt, not a bigger ceiling: chasing 31× with budgets would give a
+ * genuine hang minutes to hide in.
+ *
+ * It cannot mask a real regression. Every scene in this file is frozen and
+ * deterministic, so a frame that mismatches its baseline mismatches on all three
+ * attempts, and Playwright reports `flaky` only when an attempt PASSES. The
+ * scope is the reviewable part, and it is pinned mechanically by
+ * tests/mobile-shot-budget-contract.test.ts: the number lives in
+ * ./shot-budget.ts, it is applied here at file scope, and the suite-wide
+ * `retries: 1` in playwright.config.ts is unchanged for every behavioural spec.
+ */
+test.describe.configure({ retries: GOLDEN_RETRIES });
 
 /**
  * The options every golden in this file passes, and the two things they say.
@@ -270,10 +289,11 @@ test('golden: landscape phone frozen TEAMS scene — FRIENDLY A / ENEMY B', asyn
 // makes this frame carry the cap counts at all.
 //
 // What each baseline is FOR, so a reviewer knows what a diff means:
-//   · the four-line wedge stack — name / target / `cost/held` / count over cap;
+//   · the four-line wedge stack — name / target / the cost / count over cap;
 //   · `FULL` and `4 / 4 BUILT` on a capped wedge (turret, shield);
 //   · the cost numeral in BOTH of its ratified colours — signal yellow at ore 8
-//     where RADAR's 6 is payable, threat red at ore 4 where it is not;
+//     where RADAR's 6 is payable, threat red at ore 4 where it is not, and the
+//     SAME numeral in both, because the colour is now the whole message (a0-03);
 //   · `OPEN ▸` where UPGRADE SHIP would otherwise carry a price;
 //   · and the whole look at a phone's radius, where the copy goes compact.
 
@@ -305,6 +325,7 @@ async function bootFrozenBuildWheel(page: Page, ore: number): Promise<void> {
   // was retired everywhere else in this file: opening the wheel is exactly the
   // kind of state change ./render-settle.ts exists for, and a software-GL runner
   // that fits no frames into 500 ms would shoot the wheel before it had wedges.
+  // `tests/mobile-shot-budget-contract.test.ts` is what catches a relapse.
   await settleFrames(page);
   const wedges = await page.evaluate(() => {
     const s = (window as unknown as { __pressStage?: PressStage }).__pressStage;
@@ -314,7 +335,11 @@ async function bootFrozenBuildWheel(page: Page, ore: number): Promise<void> {
   const radar = wedges.find((w) => w.id === 'satellite');
   expect(turret?.caps, 'the capped TURRET wedge is counting (u7-02)').toMatch(/^4\s*\/\s*4 BUILT$/);
   expect(turret?.costLabel, 'a capped wedge quotes no price').toBe('FULL');
-  expect(radar?.costLabel, 'the RADAR wedge shows cost over spendable ore').toBe(`6/${ore}`);
+  // a0-03: the cost is ONE number at every ore level, and the COLOUR is what
+  // says whether it can be paid. Both baselines below open the same wedge at the
+  // same price — if the two frames differ anywhere but the hue, that is the
+  // regression these two shots exist to catch.
+  expect(radar?.costLabel, 'the RADAR wedge shows its cost, and only its cost').toBe('6');
   expect(radar?.costPaint, 'the cost numeral takes the colour its state ratifies').toBe(
     ore >= 6 ? 'ore' : 'refused',
   );
@@ -382,6 +407,138 @@ test('golden: PORTRAIT-HELD phone BUILD WHEEL — the wheel survives the lock', 
   // this project has been bitten by exactly that (PR #93).
   await bootFrozenBuildWheel(page, WHEEL_ORE_SHORT);
   await expect(page).toHaveScreenshot('phone-portrait-build-wheel.png', GOLDEN);
+});
+
+// ---------------------------------------------------------------------------
+// The Gantry/Bone UPGRADE WHEEL (u7-06)
+// ---------------------------------------------------------------------------
+//
+// The screen behind the build wheel's UPGRADE SHIP wedge, and **the place ship
+// stats are shown** (GDD §2.5). It is closed in every frozen scene above and it
+// is not the wheel the four baselines above open, so a total restyle of it would
+// leave the whole golden suite byte-identical.
+//
+// Staged through `__upgradeWheelStage.openUpgrade(ore)` — the ?debug=1 seam that
+// parks the local ship docked, banks it a stated amount and opens the upgrade
+// wheel directly. The seeded world is still pinned at FREEZE_TICK, so the frame
+// is as deterministic as the scenes above.
+//
+// What each baseline is FOR, so a reviewer knows what a diff means:
+//   · the four-line upgrade stack — name / the stat this tier moves / `cost/held`
+//     / the ladder pips;
+//   · the cost numeral in BOTH of its ratified colours — signal yellow at 99 ore
+//     where every track is payable, threat red at 1 ore where none is;
+//   · `OPEN ▸` on the WEAPON wedge, in the same slot as the build wheel's, with
+//     its DAMAGE/SPEED pip rows above it;
+//   · and the stat line — the densest text on any wheel in the game — at a
+//     phone's radius, where it goes compact.
+
+/** Every track payable: the cost numerals draw in signal yellow. */
+const UPGRADE_ORE_FLUSH = 99;
+/** One ore buys nothing on this ladder (the cheapest tier is 2), so every cost
+ *  numeral draws in threat red. */
+const UPGRADE_ORE_SHORT = 1;
+
+interface UpgradeStage {
+  openUpgrade(ore: number): { open: boolean } | null;
+  wedges(): Array<{
+    label: string;
+    stat: string;
+    costLabel: string;
+    tiers: string;
+    costPaint: string;
+  }>;
+}
+
+/**
+ * Boot the frozen scene and open the UPGRADE wheel with `ore` banked. Fails
+ * naming what is missing rather than baselining a scene that quietly stopped
+ * carrying the thing it is a baseline OF.
+ */
+async function bootFrozenUpgradeWheel(page: Page, ore: number): Promise<void> {
+  await bootFrozen(page);
+  const staged = await page.evaluate((o) => {
+    const s = (window as unknown as { __upgradeWheelStage?: UpgradeStage }).__upgradeWheelStage;
+    return s ? s.openUpgrade(o) : null;
+  }, ore);
+  expect(staged, 'the ?debug=1 upgrade stage is installed').not.toBeNull();
+  expect(staged!.open, 'the upgrade wheel is up').toBe(true);
+  // The wedges are drawn from the render loop, not from the call above.
+  await settleFrames(page);
+  const wedges = await page.evaluate(() => {
+    const s = (window as unknown as { __upgradeWheelStage?: UpgradeStage }).__upgradeWheelStage;
+    return s ? s.wedges() : [];
+  });
+  const engine = wedges.find((w) => w.label === 'ENGINE');
+  const weapon = wedges.find((w) => w.label === 'WEAPON');
+  expect(engine?.stat, 'the ENGINE wedge is drawing its stat line (u7-06)').toMatch(/^\d+% ?→ ?\d+%$/);
+  expect(engine?.costLabel, 'the ENGINE wedge prices its next tier as cost/held').toBe(`3/${ore}`);
+  expect(engine?.tiers, 'the ENGINE wedge pips its ladder position').toMatch(/^[●○]+$/);
+  expect(engine?.costPaint, 'the cost numeral takes the colour its state ratifies').toBe(
+    ore >= 3 ? 'ore' : 'refused',
+  );
+  expect(weapon?.costLabel, 'the WEAPON wedge signposts the sub-wheel').toBe('OPEN ▸');
+}
+
+test('golden: desktop UPGRADE WHEEL — payable tiers, in signal yellow', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot of the frozen scene → open the upgrade wheel with 99 ore → font settle → one full-frame golden comparison',
+    measuredSeconds: 6,
+  });
+
+  await bootFrozenUpgradeWheel(page, UPGRADE_ORE_FLUSH);
+  await expect(page).toHaveScreenshot('desktop-upgrade-wheel.png', GOLDEN);
+});
+
+test('golden: desktop UPGRADE WHEEL — tiers that cannot be paid for, in threat red', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot of the frozen scene → open the upgrade wheel with 1 ore → font settle → one full-frame golden comparison',
+    measuredSeconds: 6,
+  });
+
+  // The second half of the style-guide §2.1 carve-out, on this wheel. Two
+  // baselines rather than one because a single frame can only show one colour,
+  // and "the red one still looks right" is exactly what a reviewer has to be
+  // able to check with their eyes.
+  await bootFrozenUpgradeWheel(page, UPGRADE_ORE_SHORT);
+  await expect(page).toHaveScreenshot('desktop-upgrade-wheel-short.png', GOLDEN);
+});
+
+test('golden: landscape phone UPGRADE WHEEL — the compact stat line, at 390 px', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'iphone', 'one landscape phone baseline only (iphone)');
+  budgetTest({
+    work: 'rotate to landscape → boot the frozen scene → open the upgrade wheel with 99 ore → font settle → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 9,
+  });
+
+  // The hard one. `111% → 123%` is two formatted values and a glyph on one row —
+  // the densest text on any wheel in the game — and at a 140 px radius it is
+  // drawn at 9 px. This baseline is what proves the derived phone column landed.
+  const vp = page.viewportSize();
+  if (vp) await page.setViewportSize({ width: vp.height, height: vp.width }); // portrait → landscape
+  await bootFrozenUpgradeWheel(page, UPGRADE_ORE_FLUSH);
+  await expect(page).toHaveScreenshot('phone-landscape-upgrade-wheel.png', GOLDEN);
+});
+
+test('golden: PORTRAIT-HELD phone UPGRADE WHEEL — the wheel survives the lock', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'iphone', 'one portrait-held phone baseline only (iphone)');
+  budgetTest({
+    work: 'boot the frozen scene PORTRAIT-HELD (landscape lock rotation) → open the upgrade wheel with 99 ore → font settle → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 9,
+  });
+
+  // Held in portrait the whole game root is rotated 90° by the landscape lock,
+  // and this wheel is drawn as a child of it (PR #93's lesson).
+  await bootFrozenUpgradeWheel(page, UPGRADE_ORE_FLUSH);
+  await expect(page).toHaveScreenshot('phone-portrait-upgrade-wheel.png', GOLDEN);
 });
 
 // ---------------------------------------------------------------------------

@@ -61,6 +61,7 @@ import type {
   BotDifficulty,
   ClientMessage,
   FireMode,
+  LobbySeatState,
   RoomCode,
   ServerMessage,
 } from './transport';
@@ -196,6 +197,9 @@ export function parseClientMessage(frame: WireFrame): ClientMessage | null {
       // the server ignores them from anyone but the creator anyway.
       const mode = parseMatchMode(raw['mode']);
       const teams = parseTeams(raw['teams']);
+      // …and the per-seat OPEN / BOT / CLOSED authoring (a0-11), on the same
+      // dropped-not-refused terms as the two above.
+      const seats = parseSeatStates(raw['seats']);
       return {
         type: 'lobbyChoice',
         shipClass,
@@ -203,6 +207,7 @@ export function parseClientMessage(frame: WireFrame): ClientMessage | null {
         ...(difficulties ? { botDifficulties: difficulties } : {}),
         ...(mode ? { mode } : {}),
         ...(teams ? { teams } : {}),
+        ...(seats ? { seats } : {}),
       };
     }
     case 'startMatch':
@@ -397,6 +402,26 @@ function parseTeams(value: unknown): number[] | null {
  *  (`src/ui/lobby`), restated here because the wire may not import the UI. Eight
  *  seats can never usefully hold more sides than the lobby can author. */
 export const MAX_TEAMS_ON_WIRE = 4;
+
+/**
+ * The host's per-seat OPEN / BOT / CLOSED authoring (`./transport`
+ * {@link LobbySeatState}, a0-11), bounded like every other array on this hostile
+ * surface: at most eight entries, each one of exactly three words.
+ *
+ * Rejected whole rather than per-entry, like {@link parseTeams}: a roster with one
+ * unreadable seat is a roster whose *indices* can no longer be trusted, and
+ * silently dropping one entry would shift every seat after it by one — which is
+ * the same class of off-by-one that would hand seat 5's difficulty to seat 2.
+ */
+function parseSeatStates(value: unknown): LobbySeatState[] | null {
+  if (!Array.isArray(value) || value.length > MAX_PLAYERS) return null;
+  const out: LobbySeatState[] = [];
+  for (const entry of value) {
+    if (entry !== 'open' && entry !== 'bot' && entry !== 'closed') return null;
+    out.push(entry);
+  }
+  return out;
+}
 
 function parseBotDifficulties(value: unknown): BotDifficulty[] | null {
   if (!Array.isArray(value) || value.length > MAX_PLAYERS) return null;

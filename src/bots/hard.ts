@@ -12,7 +12,7 @@
  * because it is the line GDD §2.9 draws and this file is where it would be
  * crossed:
  *
- *  - It sees exactly what Easy sees. Same `BotView`, same `SENSOR_RANGE`, same
+ *  - It sees exactly what Easy sees. Same `BotView`, same `visualRange`, same
  *    `null` where a core has not been scouted. A Hard bot that knows you are
  *    wounded flew over and looked.
  *  - It decides more often (`reactionInterval` 1/20 s), aims straighter (tightest

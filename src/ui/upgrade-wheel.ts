@@ -2,11 +2,21 @@
  * src/ui/upgrade-wheel.ts — the ship upgrade WHEEL. OWNER: UI Engineer.
  *
  * The second screen behind the Build wheel's UPGRADE SHIP arrow (GDD §2.5), and
- * **the only place ship stats are ever shown**:
+ * **the place ship stats are shown during a match**:
  *
  * > Ship stats — power, engine, cargo, hull tiers — are deliberately *not* on the
  * > HUD. They appear only in the upgrade screen, where they are a spending
  * > decision rather than clutter. (GDD §2.2, §2.5)
+ *
+ * This header used to say "the ONLY place ship stats are ever shown", quoting a
+ * sentence GDD §2.5 no longer contains. It was amended 2026-08-05: asked whether
+ * ship stats could appear on the lobby's ship-select screen, the developer
+ * answered ***"both pips and numbers"***, so there are **two** screens now, and
+ * they answer different questions — ship-select is a *comparison* made once,
+ * before the match; this wheel is a *spending decision* made repeatedly during
+ * it, against turrets and repair. Stats on ship-select (u4-01) are ratified and
+ * are not a violation of anything. What is unchanged is that stats are not on
+ * the **HUD**, and that this screen is the detailed one.
  *
  * ── WHY THIS IS A WHEEL AND NOT A PANEL (the field report) ──────────────────
  * A developer reported the upgrade screen *"is not immediately readable, and
@@ -30,18 +40,42 @@
  * plus the ladder, so it unit-tests headless and the Pixi view only draws what
  * it returns.
  *
+ * ── WHAT A WEDGE SAYS, SINCE THE GANTRY/BONE PASS (u7-06) ───────────────────
+ * The upgrade wheel is the same radial control as the Build wheel, so it takes
+ * the Build wheel's own four-slot stack (u7-02, `./wheel-stack`) rather than a
+ * parallel one, and this module produces three of the four lines:
+ *
+ *   ENGINE            ← the words                  (label)
+ *   111% → 123%       ← the stat this tier moves    ({@link UpgradeWedge.statLabel})
+ *   12/8              ← cost over spendable ore     ({@link UpgradeWedge.costLabel})
+ *   ●●○               ← where the track sits on its ladder ({@link UpgradeWedge.tierLabel})
+ *
+ * All three are **strings**, never numbers, and that is deliberate rather than
+ * incidental: the wedge's only *numeric* fields stay `cost`, `tier`, `maxTier`
+ * and `angle`, so nothing merely printed here can be mistaken for something
+ * spendable. It is the same door the Build wheel's `cost/held` and `2 / 4 BUILT`
+ * lines ship through.
+ *
+ * Two of them are new, and both are the Build wheel's answer rather than a new
+ * one. `cost/held` is that wheel's grammar for "what it costs, over what you
+ * hold" — the wedge that dims stops being a mystery, because the numbers already
+ * say why. The pips are the summary this wheel already drew on its WEAPON wedge,
+ * extended to every track: "how many rungs are left" is half of a comparison
+ * between two upgrades, and this screen is where that comparison is made.
+ *
  * ── DATA-DRIVEN OFF THE LADDER (so new tracks appear for free) ──────────────
  * {@link upgradeWheelModel} builds one wedge per entry in the ladder's track
  * order and takes the ladder as a parameter. That is the load-bearing bit: the
  * day p2-03's projectile tracks (speed / damage) land as new rungs on the ladder,
  * they become wedges here with **no change to this file or the view** — the wheel
  * lays out however many wedges the ladder has and prints whatever numbers it
- * carries. The provisional numbers below match the sim's ratified `UPGRADES`
- * table (`../sim/constants`), so what a player is shown is what they are sold.
+ * carries. Those numbers are not copied out of the sim's ratified `UPGRADES`
+ * table any more; they *are* it ({@link UPGRADE_LADDER}), so what a player is
+ * shown cannot drift from what they are sold.
  */
 
 import { ShipClass } from '@shared/types';
-import { CARGO_CAP_MAX, CARGO_PER_TIER, SHIP_STATS } from '../sim/constants';
+import { CARGO_CAP_MAX, SHIP_STATS, UPGRADES } from '../sim/constants';
 import { affordable } from './affordability';
 import { hubBack } from './wheel-nav';
 import type { HubBack } from './wheel-nav';
@@ -140,74 +174,67 @@ export interface UpgradeTrackSpec {
 /** A full ladder: one spec per track. */
 export type UpgradeLadder = Readonly<Record<UpgradeTrack, UpgradeTrackSpec>>;
 
+/** The sim's `unit` string that means "print this as a percentage of the base".
+ *  Named rather than inlined so the mapping from a sim unit to a UI format is a
+ *  thing a reader can find, not a bare `'%'` in a ternary. */
+const PERCENT_UNIT = '%';
+
 /**
- * The provisional ladder (see the module header). Three buyable tiers per
- * track, costs escalating and the first tier cheap (GDD §2.5, §2.8).
- * Every number here is TUNABLE and hands over to QA with the constants table.
+ * The ladder, **derived from the sim** (u7-06).
+ *
+ * Every number a player is *sold* on — the step a tier moves the stat by, what
+ * it costs, the ceiling it clamps to — and the words on the wedge come straight
+ * out of the sim's ratified `UPGRADES` table (`../sim/constants`). There is
+ * exactly one copy of them in the repo, and it is the one `buyUpgrade` charges
+ * against.
+ *
+ * This file used to re-type all of it and assert in a comment that the numbers
+ * "match the sim's ratified UPGRADES table". They did — and nothing checked it.
+ * Two hand-kept copies of one table is exactly how the `UpgradeTrack` enum
+ * copies drifted until typechecking caught them (#108), and the brief for this
+ * screen is blunt about the stakes: **the wheel can never print a price the sim
+ * does not honour.** So it no longer holds a price of its own to drift from.
+ *
+ * The sim already owns `label` for this reason too ("the UI's upgrade wheel
+ * prints this, so a rename is a data edit here, never UI code" — `constants.ts`)
+ * and `group`, which decides whether a track is drawn on the main wheel or
+ * inside the WEAPON sub-wheel. The one thing left for this file to decide is
+ * {@link TrackFormat}: how a value is *printed*, which is typography rather than
+ * balance — and even that is read off the sim's `unit`, so a track that starts
+ * reporting a percentage starts printing one.
  */
-export const UPGRADE_LADDER: UpgradeLadder = {
-  // Power: mining speed *and* weapon damage — one stat (GDD §2.5). Multiplies
-  // the class power, so the Excavator stays the mining engine at every tier.
-  [UpgradeTrack.Power]: {
-    track: UpgradeTrack.Power,
-    // Reads DAMAGE, not POWER (v0.2.2 field report): the wedge means one thing to
-    // a player — how hard each shot bites. Enum key stays `Power` for wire/replay
-    // stability (see @shared/types). Lives in the WEAPON sub-wheel.
-    label: 'DAMAGE',
-    steps: [1, 1.25, 1.5, 1.8],
-    costs: [4, 8, 14], // TUNABLE
-    mode: 'multiply',
-    format: 'integer',
-    max: null,
-    group: WEAPON_GROUP,
-  },
-  // Engine: top speed, printed as a percentage of the Vanguard baseline — the
-  // same way GDD §2.11 states class speed, so the two read against each other.
-  [UpgradeTrack.Engine]: {
-    track: UpgradeTrack.Engine,
-    label: 'ENGINE',
-    steps: [1, 1.15, 1.3, 1.45],
-    costs: [3, 7, 12], // TUNABLE
-    mode: 'multiply',
-    format: 'percent',
-    max: null,
-  },
-  // Cargo: "+2 per tier" with a hard cap of 8 — both ratified numbers, read
-  // from the constants table rather than typed twice (GDD §2.8).
-  [UpgradeTrack.Cargo]: {
-    track: UpgradeTrack.Cargo,
-    label: 'CARGO',
-    steps: [0, CARGO_PER_TIER, CARGO_PER_TIER * 2, CARGO_PER_TIER * 3],
-    costs: [2, 6, 12], // TUNABLE — "first tier cheap, escalating" (GDD §2.8)
-    mode: 'add',
-    format: 'integer',
-    max: CARGO_CAP_MAX,
-  },
-  // Hull: ships are cheap and respawn free, and hull is not repairable at all
-  // (GDD §2.5) — buying hull buys time in a fight, never a heal.
-  [UpgradeTrack.Hull]: {
-    track: UpgradeTrack.Hull,
-    label: 'HULL',
-    steps: [1, 1.2, 1.4, 1.6],
-    costs: [3, 7, 12], // TUNABLE
-    mode: 'multiply',
-    format: 'integer',
-    max: null,
-  },
-  // Speed: projectile muzzle velocity (v0.2.2 split). Mirrors the sim's
-  // SHOT_SPEED_STEPS/COSTS; renders in the WEAPON sub-wheel (p4-10), not this
-  // flat panel — present here so the tier record and ladder types stay total.
-  [UpgradeTrack.Speed]: {
-    track: UpgradeTrack.Speed,
-    label: 'SPEED',
-    steps: [1, 1.15, 1.3],
-    costs: [8, 14], // TUNABLE — a tier above DAMAGE at each rung (sim ratified)
-    mode: 'multiply',
-    format: 'percent',
-    max: null,
-    group: WEAPON_GROUP,
-  },
-};
+export const UPGRADE_LADDER: UpgradeLadder = Object.fromEntries(
+  (Object.values(UpgradeTrack) as UpgradeTrack[]).map((track) => [track, ladderSpec(track)]),
+) as UpgradeLadder;
+
+/**
+ * One track's ladder, from the sim's own spec.
+ *
+ * `mode`, `steps`, `costs` and `max` are passed through untouched — the wheel
+ * prints the sim's arithmetic or it prints a lie. `format` is the only thing
+ * decided here, and it is decided from the sim's `unit`: a track measured in
+ * `'%'` (ENGINE's top speed, SPEED's muzzle velocity) prints as a percentage of
+ * its base, and everything else — DAMAGE's `/hit`, CARGO's slots, HULL's
+ * absolute HP — prints as a bare integer.
+ */
+function ladderSpec(track: UpgradeTrack): UpgradeTrackSpec {
+  const sim = UPGRADES[track];
+  return {
+    track,
+    // DAMAGE, not POWER (v0.2.2 field report): the wedge means one thing to a
+    // player — how hard each shot bites. The enum key stays `Power` for wire and
+    // replay stability (see @shared/types); the words come from the sim's label.
+    label: sim.label,
+    steps: sim.steps,
+    costs: sim.costs,
+    mode: sim.mode,
+    format: sim.unit === PERCENT_UNIT ? 'percent' : 'integer',
+    // CARGO's hard ceiling of 8 (GDD §2.8) rides here, on the sim's table, so the
+    // wheel clamps to the same number `buyUpgrade` refuses past.
+    max: sim.max ?? (track === UpgradeTrack.Cargo ? CARGO_CAP_MAX : null),
+    ...(sim.group === undefined ? {} : { group: sim.group }),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Class bases — what a tier multiplies
@@ -255,6 +282,61 @@ export function trackValue(shipClass: ShipClass, spec: UpgradeTrackSpec, tier: n
 /** Print a track value for the panel's current/next columns. */
 export function formatTrackValue(value: number, format: TrackFormat): string {
   return format === 'percent' ? `${Math.round(value)}%` : `${Math.round(value)}`;
+}
+
+// ---------------------------------------------------------------------------
+// The wedge's own lines — strings, so `cost` stays the only number (u7-06)
+// ---------------------------------------------------------------------------
+//
+// Everything below composes a line a wedge draws. All of it returns strings, and
+// that is the same discipline the Build wheel's `cost/held` and `2 / 4 BUILT`
+// lines were built with (u7-02, `./build-wheel`): a wedge shows several numbers
+// and carries exactly one *numeric field*, so nothing that is merely printed can
+// be mistaken by a caller for something spendable.
+
+/** The arrow between a track's current value and what the next tier buys. One
+ *  glyph, stated once, so the full and compact forms cannot drift apart. */
+export const STAT_ARROW = '→';
+
+/** The word a finished ladder's cost slot carries instead of a price — the
+ *  upgrade wheel's `FULL`. There is nothing left to buy, so there is no price to
+ *  quote (the Build wheel's answer for a capped wedge, in this wheel's noun). */
+export const MAXED_COST = 'MAX';
+
+/**
+ * The stat line: `"111% → 123%"`, or the bare current value once the ladder is
+ * finished (the `MAX` is said in the cost slot, where the Build wheel says
+ * `FULL`, rather than twice).
+ *
+ * `compact` drops the padding around the arrow and nothing else — `"111%→123%"`
+ * — for the phone profile, the same move `capBuiltLabelCompact` makes on the
+ * Build wheel. Both values survive it; only the spaces go.
+ */
+export function statLabelOf(current: string, next: string | null, compact = false): string {
+  if (next === null) return current;
+  return compact ? `${current}${STAT_ARROW}${next}` : `${current} ${STAT_ARROW} ${next}`;
+}
+
+/**
+ * The cost line: `cost/held` — what the next tier costs over the ore the player
+ * can actually spend. A finished ladder has no price to quote and takes
+ * {@link MAXED_COST} instead.
+ *
+ * `held` is floored, because it is the same number the hub prints and the hub
+ * floors it (`upgradeWheelModel`): a wheel that quoted `12/7.6` in one place and
+ * `7` in the other would be disagreeing with itself about the player's wallet.
+ */
+export function costLabelOf(cost: number, ore: number): string {
+  return `${cost}/${Math.floor(Math.max(0, ore))}`;
+}
+
+/** Filled-vs-empty pips for a position on a ladder: `"●●○"` at tier 2 of 3.
+ *  Glyphs rather than a count, so the row spends no colour and adds no numeral —
+ *  the language the WEAPON wedge's summary has spoken since v0.2.2, now on every
+ *  track wedge. */
+export function tierPips(tier: number, maxTier: number): string {
+  const filled = Math.max(0, Math.min(tier, maxTier));
+  return '●'.repeat(filled) + '○'.repeat(Math.max(0, maxTier - filled));
 }
 
 // ---------------------------------------------------------------------------
@@ -348,6 +430,54 @@ export interface UpgradeWedge {
   /** The WEAPON wedge's tier summary (one pip row per weapon track), or `null` on
    *  every other wedge. Drives the at-a-glance pips (RATIFIED v0.2.2, item 3). */
   readonly summary: readonly UpgradeSummaryPip[] | null;
+  /**
+   * The **stat line** as the wedge draws it: `"111% → 123%"`, or just the current
+   * value on a finished ladder. This is the densest text on any wheel in the game
+   * and the reason this screen exists (GDD §2.5 — the one place ship stats
+   * appear), so it is decided here rather than assembled in the view.
+   *
+   * A **string**, and that is load-bearing rather than incidental: {@link current}
+   * and {@link next} stay exactly what they were, and the composed line ships
+   * through the same door the Build wheel's `cost/held` and `2 / 4 BUILT` lines
+   * use (`./build-wheel`, u7-02). No second numeric field is added to a wedge, so
+   * no rate or stat can leak into one. `''` on the WEAPON wedge, whose stat line
+   * is its pip rows.
+   */
+  readonly statLabel: string;
+  /**
+   * {@link statLabel} with the padding around the arrow gone — `"111%→123%"` —
+   * for the phone profile's narrower arc, exactly the move the Build wheel makes
+   * from `"2 / 4 BUILT"` to `"2/4 BUILT"`. Nothing is dropped: both values are
+   * still there, said in fewer characters.
+   */
+  readonly statLabelCompact: string;
+  /**
+   * The cost line, in the Build wheel's own grammar (u7-02): **`cost/held`** —
+   * what the next tier costs over what the player can actually spend (`"12/8"`),
+   * or `"MAX"` on a finished ladder, where there is no price to quote because
+   * there is nothing left to buy. `null` on the WEAPON wedge, which opens a
+   * screen rather than spending.
+   *
+   * A string, for the same reason the Build wheel's is; {@link cost} stays the
+   * single numeric truth underneath it. The second half is not new information —
+   * it is the same spendable total the hub already prints, restated at the point
+   * of decision, so a player looking at a red `12/8` knows they are four ore
+   * short without the wheel having to say so in words.
+   */
+  readonly costLabel: string | null;
+  /**
+   * Where this track sits on its ladder, as filled-vs-empty pips: `"●●○"` at
+   * tier 2 of 3. `''` on the WEAPON wedge, which carries a pip row per weapon
+   * track instead ({@link summary}).
+   *
+   * The wheel already spoke this language — it is exactly the summary the WEAPON
+   * wedge has shown since v0.2.2 — but only behind that one wedge, so a player
+   * could see how many DAMAGE rungs were left and not how many ENGINE ones were.
+   * "How much of this ladder is left" is half of a comparison between two
+   * upgrades, and this screen is where that comparison is made. Glyphs, not
+   * numerals: no colour is spent and no numeric field is added.
+   */
+  readonly tierLabel: string;
   /** Centre angle on the wheel, radians, y-down (`-π/2` = twelve o'clock). */
   readonly angle: number;
 }
@@ -511,6 +641,13 @@ function weaponWedge(
     // the weapon tracks exist (same rule as the Build wheel's UPGRADE SHIP).
     state: 'ready',
     summary: weaponSummary(signals, ladder, order),
+    // This wedge's stat line IS its pip rows, one per weapon track, so it has no
+    // single current→next value of its own; and it opens a screen rather than
+    // spending, so it quotes no price and has no ladder position to pip.
+    statLabel: '',
+    statLabelCompact: '',
+    costLabel: null,
+    tierLabel: '',
     angle,
   };
 }
@@ -555,6 +692,13 @@ export function upgradeWedge(
       cost: null,
       state: 'maxed',
       summary: null,
+      // A finished ladder keeps showing what it finished AT — this is the screen
+      // where a player finds out ship stats exist — and says MAX once, in the cost
+      // slot, where a capped Build-wheel wedge says FULL.
+      statLabel: statLabelOf(current, null),
+      statLabelCompact: statLabelOf(current, null, true),
+      costLabel: MAXED_COST,
+      tierLabel: tierPips(tier, maxTier),
       angle,
     };
   }
@@ -572,6 +716,13 @@ export function upgradeWedge(
     cost,
     state: cost !== null && affordable(signals.ore, cost) ? 'ready' : 'unaffordable',
     summary: null,
+    statLabel: statLabelOf(current, next),
+    statLabelCompact: statLabelOf(current, next, true),
+    // A ladder rung with no price in its `costs` array is malformed rather than
+    // finished, and it is already refused by the `unaffordable` state above — so
+    // it quotes nothing rather than claiming to be MAX.
+    costLabel: cost === null ? null : costLabelOf(cost, signals.ore),
+    tierLabel: tierPips(tier, maxTier),
     angle,
   };
 }

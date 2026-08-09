@@ -34,22 +34,26 @@
 export type NavScreen =
   /** The front door and the one true destination — a clean boot opens here. */
   | 'main-menu'
-  /** **The doors** — the one screen PLAY opens (ratified: one play flow): PLAY SOLO
-   *  / CREATE ROOM / JOIN ROOM, and BACK (u2 menu-back). `src/ui/lobby-entry`,
+  /** **The doors** — the one screen PLAY opens (ratified: one play flow): SOLO
+   *  / HOST / JOIN, and BACK (u2 menu-back). `src/ui/lobby-entry`,
    *  `screen: 'home'`. Kept named `online` because that is the screen id `main.ts`
    *  and the `__mainMenu` seam already use. */
   | 'online'
-  /** The room-code keypad reached by JOIN ROOM. `lobby-entry`, `screen: 'join'`. */
+  /** The room-code keypad reached by JOIN. `lobby-entry`, `screen: 'join'`. */
   | 'online-keypad'
   /** The pre-match settings screen (fire mode / controls / VFX / volume). */
   | 'settings'
   /** The CODEX reference (GDD §2.10). */
   | 'codex'
-  /** The lobby in its OFFLINE flavour (PLAY SOLO): roster, ship-class select, MAP
+  /** The HANGAR (a0-14): your ship, your level, and the cosmetics a level has
+   *  unlocked. A door that opens and comes back, like the two above it — it
+   *  builds no world and holds no settings. `src/ui/hangar`. */
+  | 'hangar'
+  /** The lobby in its OFFLINE flavour (SOLO): roster, ship-class select, MAP
    *  SELECT, mode/abundance, RUSH — and BACK (u2 menu-back). `src/ui/lobby`, drawn
    *  by `openLobby` with no session. */
   | 'lobby'
-  /** The SAME lobby component, online (CREATE ROOM / JOIN ROOM): one screen, one
+  /** The SAME lobby component, online (HOST / JOIN): one screen, one
    *  model, one view — plus the room code up top and live seats. It is a distinct
    *  *node* here for one reason only: its BACK has a room to give back, so the exit
    *  it owes is stronger than the offline one (close the socket, free the seat, let
@@ -75,6 +79,7 @@ export const NAV_SCREENS: readonly NavScreen[] = [
   'online-keypad',
   'settings',
   'codex',
+  'hangar',
   'lobby',
   'lobby-online',
   'match',
@@ -123,10 +128,14 @@ export const NAV_EDGES: readonly NavEdge[] = [
   // PLAY is now the ONE door into a match, and what it opens is the doors screen
   // (ratified: one play flow). It builds no world and no lobby of its own — the
   // second front door that used to live here (ONLINE) is gone, and with it the
-  // offline-lobby shortcut that made PLAY redundant with PLAY SOLO.
+  // offline-lobby shortcut that made PLAY redundant with the SOLO door.
   { from: 'main-menu', to: 'online', via: 'PLAY' },
   { from: 'main-menu', to: 'settings', via: 'SETTINGS' },
   { from: 'main-menu', to: 'codex', via: 'CODEX' },
+  // The fourth door (a0-14). Added in the same PR as the screen and its route,
+  // which is the rule this file states in its header — a graph that lags the
+  // code is a map of a building that has been rebuilt.
+  { from: 'main-menu', to: 'hangar', via: 'HANGAR' },
 
   // --- The doors (openMainMenu.applyEntryTarget / chooseEntryDoor) -------------
   // FOUR doors are drawn here since u9-01, but only three are edges: **CAMPAIGN
@@ -139,24 +148,29 @@ export const NAV_EDGES: readonly NavEdge[] = [
   //
   // BACK leaves for the menu (closeOnline); Escape does the same on a pointer.
   { from: 'online', to: 'main-menu', via: 'BACK', escape: true },
-  { from: 'online', to: 'online-keypad', via: 'JOIN ROOM' },
-  // PLAY SOLO opens the lobby offline (chooseEntryDoor('solo') → play()).
-  { from: 'online', to: 'lobby', via: 'PLAY SOLO' },
-  // CREATE ROOM opens the SAME lobby online, host flavour: the allocator mints the
+  { from: 'online', to: 'online-keypad', via: 'JOIN' },
+  // SOLO opens the lobby offline (chooseEntryDoor('solo') → play()).
+  { from: 'online', to: 'lobby', via: 'SOLO' },
+  // HOST opens the SAME lobby online, host flavour: the allocator mints the
   // code, the socket opens, and the room's `welcome` hands the lobby the seat.
-  { from: 'online', to: 'lobby-online', via: 'CREATE ROOM' },
+  { from: 'online', to: 'lobby-online', via: 'HOST' },
 
   // --- Room-code keypad (backToDoors / Escape) --------------------------------
   { from: 'online-keypad', to: 'online', via: 'BACK', escape: true },
   // A submitted code joins the host's room and lands in the same lobby, guest
   // flavour — the seats fill live, the map and mode read-only.
-  { from: 'online-keypad', to: 'lobby-online', via: 'JOIN ROOM (code)' },
+  { from: 'online-keypad', to: 'lobby-online', via: 'JOIN (code)' },
 
   // --- Settings (closeSettings / Escape) --------------------------------------
   { from: 'settings', to: 'main-menu', via: 'DONE', escape: true },
 
   // --- Codex (closeCodex / Escape / Backspace) --------------------------------
   { from: 'codex', to: 'main-menu', via: 'BACK', escape: true },
+
+  // --- Hangar (closeHangar / Escape / Backspace) ------------------------------
+  // One way out, and it is the only edge the screen has: equipping a cosmetic
+  // moves nothing, so the hangar is a leaf.
+  { from: 'hangar', to: 'main-menu', via: 'BACK', escape: true },
 
   // --- Lobby, offline (openLobby.act('leave') / Escape — u2 menu-back) --------
   { from: 'lobby', to: 'main-menu', via: 'BACK', escape: true },

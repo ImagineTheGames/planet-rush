@@ -8,6 +8,397 @@ half of these amendments; this file is the human-readable why.
 
 ---
 
+## Looted ore that "doesn't count" — the ledger says it always counted
+
+**Date:** 2026-08-08 · branch `agent/gameplay/a0-08-looted-ore-that-does-not-count`
+**Reported by:** Developer (Reinaldo), from real play
+**Amends:** GDD §2.3 and §2.7 (folded in directly). **No rule, constant, or ore
+flow changed** — `CARGO_BASE`, `DEATH_ORE_DROP_FRACTION` and the full-hold refusal
+are untouched. This entry is here because the *finding* is the deliverable.
+
+### The report, verbatim
+
+> "sometimes picked up ore from dead ships dont count"
+
+### The verdict: nothing was ever lost
+
+This is the **fourth** report of this shape, and the ore ledger
+(`src/sim/ore-ledger.ts`) was built after the third precisely to settle the next
+one. Ran the reproduction it was built for — kill a loaded ship, fly the wreck
+drop, once with an empty hold and once with a full one — and
+
+> `liveOre === seeded + injected + debrisFloor − spent − deathLoss − capLoss`
+
+held **exactly**, residual `0.0e+0`, at every frame of every run, and holds every
+tick of six full natural matches. **No ore is leaking.** The previous three
+reports were leaks; this one is not, and the difference is the whole point of
+having the instrument. The trace is `evidence/a0-08-loot-tell/trace.txt`.
+
+### "Sometimes" was three outcomes of the same kill, told apart by nothing
+
+Same wreck, same 2 ore on the field, three holds:
+
+| looter's hold | ore taken | left floating | what the player sees |
+|---|---|---|---|
+| **0 / 2** empty | 2 | 0 | hold fills — but the big readout is the **bank**, which correctly does not move |
+| **2 / 2** full | **0** | 2 | *nothing whatsoever*: a full hold exerts no tractor pull and refuses the chunk in silence |
+| **1 / 2** partial | 1 | 1 | takes one of the two — a partial take that looks exactly like a whole one |
+
+The base hold is **2** (GDD §2.8), so the middle row is the *normal* state, not an
+edge case. And a fourth thing stacks on top: looted ore lands in `cargo`, while
+the prominent top-left readout is `banked`, which only moves in your own
+atmosphere. So a *correct, complete* pickup moves no number the player is
+watching. **`a0-03` is renaming that readout `BANKED` → `ORE`** on the same day —
+which makes this worse, not better, if it lands alone: a number labelled `ORE`
+that does not move when you pick up ore. The two reports are one problem.
+
+### The fix is a tell, and only a tell
+
+Two per-tick, write-only fields on `Ship`, decided in the chunk step and read by
+nothing in the simulation:
+
+- **`lootTake`** — ore that arrived in this hold on this tick. The ore that
+  *moved*, not the chunk that was offered, so a partial take reads as partial.
+- **`lootBlocked`** — this hold is full and loose ore sits inside tractor range:
+  the wreck it is floating over that is never coming.
+
+Both are pure derivations of already-hashed state, stay out of `hashState`, and
+cannot perturb determinism (GDD §4.8). Drawing them is the render/UI lanes' call;
+the hold pips are the obvious home, since they already drain visibly on deposit.
+
+### Explicitly NOT done — three balance questions left for the developer
+
+Raising `cargoCap`, lowering `DEATH_ORE_DROP_FRACTION`, or letting a pickup
+ignore the cap would each make the complaint go away, and each is a §2.8 balance
+decision with no ratification. They are listed in the PR body as questions, not
+taken. In particular **a kill never gives you what the victim was holding** — half
+their hold is destroyed with the hull (GDD §2.3, working as designed) — and if the
+expectation is otherwise, that is a rules change and needs saying out loud.
+
+---
+
+## The under-attack alarm SOUNDS ONCE, and only for YOUR station
+
+**Date:** 2026-08-07 · branch `agent/sound/s9-alarm-once-and-ownership`
+**Ratified by:** Developer (Reinaldo), field report from real play
+**Amends:** GDD §2.2 (folded in directly). **No constant, threshold, or state
+machine changes** — the alarm's own numbers (`ENGAGE`, `RELEASE`, `LEAK`,
+`MIN_HOLD_S`, `PRESSURE_CAP`) are untouched, and it stays on the not-cuttable
+list (§4.9) and stays the loudest thing in the bank.
+
+### The ratification, verbatim
+
+> "also for the alarm, it should only play once, and not keep playing (and should
+> only play for your station not others)..."
+
+### What changed — one sentence, two defects
+
+**It played forever, because it was a loop.** `AudioEngine.syncAlarm` started a
+continuous loop the moment the state machine went `active` and stopped it on
+release. `UnderAttackAlarm` holds `active` for at least `MIN_HOLD_S` and keeps
+holding while the pressure stays over `RELEASE`, so under sustained fire the
+klaxon ran for as long as the siege did — working exactly as built, and not what
+was wanted. It is now **one one-shot per engagement**: `alarm.count` bumps when
+the pressure crosses `ENGAGE`, and nothing sounds again until the alarm has
+released and re-engaged.
+
+**It rang for the wrong station, and that one was a wire.** `src/main.ts` built
+the audio engine before the menu (it must — the audio unlock has to be armed
+before the first user gesture, GDD risk 7) and handed it `LOCAL_PLAYER` as a
+constructor argument. A joiner's real slot is not assigned until the server
+welcomes them, two hundred lines later; the `let` was reassigned there, but the
+engine had captured the value, and `audio.setLocal()` — which existed the whole
+time — was never called from that file. **So in every online match the mix
+believed it was slot 0**: on slot 3, damage to *slot 0's* station rang your alarm
+and damage to your own was silent. `setAlarmScope()` was likewise never called
+from the real client, so the engine fell back to "you alone" — FFA-correct and
+TEAMS-wrong, since an ally's station under siege never rang.
+
+### The hysteresis keeps its numbers and changes job
+
+`MIN_HOLD_S` (2.5 s) and the separate, lower `RELEASE` (0.35) were written as
+hysteresis so a *looping* alarm would not stutter on and off while an attacker
+dodged a turret. With a one-shot they do a strictly better job under the same
+numbers: they are the **re-trigger guard**, the thing that stops an attacker's
+dodge-and-return machine-gunning the klaxon. They were not deleted, and deleting
+them would reintroduce a defect the one-shot cannot survive.
+
+### What carries "unmistakable" now — the arrow
+
+§2.2 has always specified *"an unmistakable alarm **plus** a screen-edge arrow
+pointing home."* A one-shot moves which half carries what: **the sound announces,
+the arrow sustains.** That is the whole design content of this amendment, and it
+is why the change is safe — the arrow (`src/ui/alarm.ts` `homeArrow`, drawn by
+the HUD off its own sustained-damage trigger with its own 5-second hold) remains
+for the duration of the attack, so a player who is deep in the asteroid field and
+looks up still has a live tell pointing home. Had the arrow not been on the live
+build, this amendment would have removed the only tell and the lane would have
+handed the decision back.
+
+The ducking follows the same rule: the mix ducks for the **sting**, not the
+siege. Leaving music and ambience pinned down for two minutes under an alarm that
+is no longer sounding would be the whole game quiet with nothing to show for it.
+
+### Where it lives
+
+`src/art/audio/engine.ts` (`syncAlarm`, `ALARM_DUCK_S`, `alarmSounds`),
+`src/art/audio/bank.ts` (`SOUND.alarm` is a one-shot spec now, same bar and same
+two tones), `src/art/audio/scope.ts` (the side roster, moved out of
+`src/art/presenter.ts` so the shipped client and the presenter read one copy of
+the rule), and the wiring in `src/main.ts` at the seat assignment.
+
+### The test class this needed
+
+Every audio unit test passed straight through the ownership bug, because the
+defect was in *who the engine was told it was*, not in what it does with that —
+the merged-tested-and-dead-wired class. So the guard is a **live-stage** spec
+(`tests/live-stage/alarm-ownership-online.spec.ts`) that stands up a real
+allocator, a real match server and an online client bundle, joins a real room
+with two real browsers, and asserts the audio engine's local id equals the seat
+the server gave it — **on a non-zero slot, failing outright if the joiner is
+seated at 0**, because on slot 0 a dead wire and a live one read identically.
+
+---
+
+## Station health is ALWAYS VISIBLE — sensor range retired
+
+**Date:** 2026-08-07 · branch `agent/gameplay/a0-05-station-health-always-visible`
+**Ratified by:** Developer (Reinaldo), field report a0-05
+**Amends:** GDD §2.2 (folded in directly, replacing the "scouted, not broadcast"
+paragraph), the §2.8 sensor-range row (retired), §2.9's fog-honesty sentence,
+§5.4's ring line and §5.7's HUD line. **Retires one constant**
+(`SENSOR_RANGE`) and one perception field (`Perception.sensorRange`). The ring
+grammar, ship HP, and the minimap fog-of-war are untouched.
+
+### The ratification, verbatim
+
+> "you can see other stations healths only when you are near, it should always
+> show the health regardless of proximity or else it looks like a glitch
+> approaching and getting far it looks like its full health even if its damaged"
+
+### There were two things in that sentence, and the bug is the worse half
+
+**A straight bug.** Outside `SENSOR_RANGE` no damage ring was drawn at all. But
+the *ownership beacon ring* under it is always drawn, in the owner's colour — so
+what the player actually read from a distance was a ring in a player colour with
+no red in it, which is precisely what full health looks like. A station at 25%
+core and a station at 100% were **the same picture**. The unknown state was
+indistinguishable from the healthy state, and a display like that does not
+withhold information, it asserts a false one — and it fails in the direction the
+player is least able to check, because there is no tell that says "this reading
+is unavailable". The developer called it a glitch because it behaves like one.
+
+**A design retraction.** GDD §2.2's *"enemy station health is scouted, not
+broadcast … fog makes third-party awareness a skill"* is withdrawn. Rings read
+true at any range. Third-party awareness is still a skill — you still have to be
+*looking*, and the minimap is still fog-of-war until someone builds a radar
+satellite — but it is no longer bought with a 180-unit flyby.
+
+### The measurements behind the call
+
+| Thing | Value | Note |
+|---|---|---|
+| Old `SENSOR_RANGE` | 180 units (2× the 90-unit shield radius) | the ring gate |
+| Station radius | 64 units | gate measured to the surface |
+| Half a 1080p screen | ~960 units | camera is translate-only, no zoom |
+| Bot visual range | 720 units (clamped to 900) | what a bot has on screen |
+
+So the ring appeared at roughly **one fifth** of the distance at which the station
+itself was plainly on screen. Four fifths of every approach was spent looking at a
+home whose health the game was actively misrepresenting.
+
+### What the sensor-range constant gated, after the change: nothing
+
+It had exactly one consumer per layer, all three of them the same rule — the
+renderer's ring gate, the bot perception layer's station-HP gate, and the server's
+per-client health broadcast. With the rule withdrawn it gates nothing, so it is
+**deleted, not zeroed**: a `0` still reads as a live knob for the next person
+tuning the table, and putting `180` back would silently reinstate a retracted
+design. `Perception.sensorRange` went with it for the same reason. What replaced
+it is a predicate with no number in it — `stationHealthVisible` in
+`src/sim/sensing.ts` — so there is one place that says the rule and nothing to
+tune back down.
+
+The three **minimap coverage** radii (ship 520, station 300, satellite 900) are a
+different mechanic (feature f1) and are untouched. They were always distinct from
+`SENSOR_RANGE`; the §2.8 table now lists them explicitly so the retired row cannot
+be confused with them.
+
+### The radar satellite: still useful, and this pass did not touch it
+
+Measured in `src/sim/buildings.ts` / `src/sim/sensing.ts` rather than assumed. The
+satellite's `sensorRange` feeds `sensorSources`, which decides **minimap
+presence** — which stations, rocks, ships and shots are on your map — and it
+permanently maps every rock inside its disc. It never fed the damage-ring gate:
+that gate was measured from the viewer's **ship**, at a different, much smaller
+radius, and a satellite contributed nothing to it. So the amendment costs the
+satellite **nothing**. The four things it buys are all still there: a 900-unit
+live-entity window, permanent ore-field mapping inside it, coverage that survives
+your ship dying, and a target the enemy has to come and kill.
+
+That is a statement of fact, not a design proposal. Whether the satellite is
+priced right at 6 ore now that health is free is a **developer decision**, and it
+was deliberately not made here.
+
+### Bots: symmetry, not blindness
+
+`src/bots/fog-honesty.test.ts` pins that a bot perceives only what a human in its
+cockpit could (GDD §2.9). It was **re-pointed, not deleted**. Left alone, its
+scrambler would have kept lying to bots about health that humans can now read —
+silently handicapping every bot and moving the whole difficulty ladder.
+
+The gate moved from `SENSOR_RANGE` to `visualRange`, i.e. **"is the home on my
+screen"** — the same test that already governed hull bars and turret counts. It
+was *not* made unlimited: a human cannot read the ring of a home behind them
+either (the minimap draws dots and colours, never numbers), so a map-wide read
+would have been a cheat in the other direction. Symmetry is the invariant; the
+`HUMAN_VISUAL_RANGE` clamp is what keeps it enforceable.
+
+### The server was the sharper edge of the bug
+
+`FogTracker` withheld a rival's health on the wire until your ship was inside 180
+units. A client cannot draw what it was not told, so online the ring would have
+stayed **stale** even after the renderer was fixed. It now sends every station's
+health to every client: the server does not know a client's viewport and guessing
+one would put netplay back out of step with the local picture. The per-station
+signature check makes that cheap — a quiet station still costs one string compare
+per sample, not a frame. Note the payload's turret and shield HP were *already*
+drawn locally at any range (a turret's alpha tracks its HP, a shield bubble
+carries its own gauge), so the wire had been under-reporting even against the
+pre-amendment renderer.
+
+### Readability at distance
+
+Nothing was needed. The ring is stroked in **world units** at a fixed width, and
+the camera is translate-only — there is no zoom anywhere in the render layer — so
+a ring 900 units away is drawn at exactly the pixel size it is drawn at 90 units
+away. The long-range frame and the close-range frame are the same ring, which is
+what the evidence shows and what `src/render/stations.test.ts` asserts by
+instruction count.
+
+### What deliberately did NOT change
+
+- **Ship** HP and enemy ship hidden state. The report was about stations. Hull
+  bars are still an on-screen read; cargo, bank and upgrade tiers are still drawn
+  for nobody at any range.
+- **The ring grammar** (§2.2, §5.4): owner colour whole is health remaining,
+  threat red fills clockwise from twelve, red is only ever the damage. This
+  changes *when* the ring is drawn, never *what* it means.
+- **The ownership beacon ring**, always visible before and after.
+- **No HUD bar for enemy stations.** The top-right panel is still your own
+  station's, and `src/ui/station-hp.ts` still has no code path that takes another
+  player's station. The ring on the station is the whole grammar.
+- **The minimap** still draws dots and colours, no numbers, and is still
+  fog-of-war gated by the coverage discs.
+
+---
+
+## A build wedge's cost is ONE number — and the top-left readout says `ORE`
+
+**Date:** 2026-08-07 · branch `agent/ui/a0-03-wheel-cost-one-number`
+**Ratified by:** Developer (Reinaldo), two field reports, each with a screenshot
+**Amends:** GDD §2.5 (folded in directly, *amended 2026-08-07*) and §2.2 (the
+top-left caption). **This is the developer RETRACTING their own amendment of
+2026-08-06.** No mechanic, number, cost, cap, rule or type changes — both halves
+are player-facing strings, and the affordability rule they used to restate is
+the one that was already there.
+
+### The ratifications, verbatim
+
+On a screenshot of the live build wheel at 2 ore held — `SHIELD 5/2`,
+`RADAR 6/2`, `REPAIR REACTOR 1/2`:
+
+> "i was wrong about this we don't need to show ore need as 5/2 .. just need the
+> needed amount in yellow, and red if insufficient..."
+
+On a screenshot of the top-left ore readout:
+
+> "should not say total, it should say ORE"
+
+### What changed — the wedge
+
+The cost line lost its denominator. `5/2` → `5`. Nothing else on the wedge moved:
+
+| wedge, at 2 ore held | before | after |
+|---|---|---|
+| SHIELD | `5/2` | `5`, threat red (cannot pay) |
+| RADAR | `6/2` | `6`, threat red |
+| REPAIR REACTOR | `1/2` | `1`, signal yellow (payable) |
+
+**The colour was already carrying the whole message.** `SegmentState` has been
+`ready | unaffordable | capped | inactive` since u7-02, `affordable()` mirrors
+the sim's `spendableOre` (hold + bank) exactly, and `CostPaint` already resolved
+`ready` → signal yellow and `unaffordable` → threat red (`style-guide.md` §2.1,
+**unchanged by this amendment — not one pixel changed colour**). So this was the
+removal of a denominator from a label, not a new affordability rule: the
+one-line diff is in `segmentCostLabel`, and every state machine around it is
+untouched.
+
+**Why the denominator lost.** `build-wheel.ts` used to argue in its own source
+that a player reading `5/4` *"knows they are one ore short without the wheel
+having to say so"* — but the numeral was **already red**, saying exactly that, and
+the wheel's hub prints the live spendable total two inches away. It was a second,
+dimmer copy of two things the screen said better elsewhere. That argument has been
+deleted along with the code it defended, rather than left as a comment describing
+behaviour that no longer exists.
+
+### What deliberately did NOT change
+
+- **`4 / 4 BUILT` — the count over its cap — stays.** It is the *other* half of
+  the 2026-08-06 amendment, a separate ratification, and the developer's arrow
+  points only at the cost numeral. It is what makes a capped wedge legible and
+  the re-arm tell readable.
+- **REPAIR REACTOR still shows the HP a tap restores** (`+15 HP`, or the real
+  partial) — the one ratified exception to "the only number on a segment is its
+  cost" (p5-08).
+- `FULL`, `MAX`, `OPEN ▸`, `NEED n ORE`, the live `REPAIR IN Ns` countdown, and
+  the refusal-reason precedence (collapse → reactor full → cooling down →
+  affordability) are all character-for-character as they were.
+- **The hub's live ore total.** That is where "how much you have" belongs, and it
+  is why the denominator was redundant.
+- **`style-guide.md` §2.1's carve-out**, in both colours and all four limits.
+
+### What changed — the top-left caption
+
+`TOTAL` → `ORE`. (It had become `BANKED` in the interim: l2-02's industrial-voice
+sweep changed it as an `[OPT]` row on 2026-08-05 and that PR merged hours after
+this report. **This supersedes that row**; `docs/copy-sweep-industrial-voice.md`
+§3.5 is annotated accordingly.) GDD §2.2 already called it *"your banked ORE
+total"*, so the caption now matches the document.
+
+### ⚠ Two things this amendment deliberately leaves OPEN for the developer
+
+Neither is a defect introduced here; both are questions the two renames expose,
+and inventing an answer for either would be a UI agent overruling a ratification.
+
+**1. `ORE` now sits on two different numbers.** The top-left is the **bank
+alone** (`ship.banked`). The build wheel's hub is **`spendableOre` = hold +
+bank** (`src/sim/buildings.ts`, mirrored deliberately in
+`src/ui/build-wheel.ts`) — and its caption also reads `ORE`. Hold 3 with 5 banked
+reads **5** top-left and **8** in the hub, both correct, one word. `TOTAL` was
+chosen precisely to keep them apart (`hud.ts`: *"the two ore numbers can never be
+confused"*), so the rename spends that separation. The developer's word is the
+design and the rename shipped as asked; what is left open is whether the **hub**
+should now read something other than `ORE`. Both readouts are shown side by side,
+at a non-empty hold, in a0-03's PR body so the choice can be made on the pixels.
+
+**2. The upgrade wheel still prices in `cost/held` (`12/8`).** The retraction
+came with a build-wheel screenshot and names that screen's numerals, so a0-03
+changed that screen only. But `style-guide.md` §2.1 rules the two wheels **one
+control** — "a player crosses between them in one press; a rule that changed
+colour across that press would be the drift this section exists to prevent" — and
+the same is now true of the grammar. Flagged in GDD §2.5's own upgrade-wheel
+bullet rather than fixed unilaterally.
+
+**Related, and being tracked with a0-08.** a0-08 is investigating *"sometimes
+picked up ore from dead ships dont count."* Looting raises `cargo`, not `banked`,
+so the top-left figure correctly does not move on a pickup — very likely the same
+root as that report. A number captioned `ORE` that does not move when you pick up
+ore is a worse lie than one captioned `TOTAL` that does not, which raises the
+priority of a0-08 rather than changing anything here.
+
+---
+
 ## The CONTROLS row names the DEVICE, not the scheme's internal name
 
 **Date:** 2026-08-06 · branch `agent/ui/u8-controls-label-per-device`

@@ -12,7 +12,7 @@
  *
  * The scrambler (below) rewrites, on a clone of a real mid-match world:
  *
- *   - the core and shield HP of every station outside sensor range;
+ *   - the core and shield HP of every station outside visual range;
  *   - the turret count of every station outside visual range;
  *   - every rival's held ore, banked ore and upgrade tiers — numbers the game
  *     never draws for anyone (GDD §2.2);
@@ -29,6 +29,23 @@
  * The last test guards the guard: it asserts the scrambler really did change
  * facts a cheating bot would have noticed, so this file can never pass by
  * scrambling nothing.
+ *
+ * ### Station health (a0-05, GDD §2.2 amended 2026-08-07)
+ *
+ * **The invariant this file defends is SYMMETRY, not blindness.** Station health
+ * used to hide behind a 180-unit `SENSOR_RANGE`, and this scrambler lied about
+ * every core outside it. The developer withdrew that rule — the damage ring is
+ * now drawn on every station the renderer draws — so the lie moved out to
+ * `visualRange` with it. Re-pointed, deliberately, rather than deleted: if the
+ * line had simply gone, a bot could start reading the HP of a home four thousand
+ * units behind it and no test would object, which is the *opposite* failure and
+ * a worse one. And left where it was, the scrambler would have been asserting a
+ * blindness humans no longer have, quietly handicapping every bot and shifting
+ * the whole difficulty ladder (GDD §2.9).
+ *
+ * What did NOT move: enemy **ship** hull past the screen edge, enemy cargo, bank
+ * and tiers at any range, and the ore left inside a rock. The amendment was about
+ * stations.
  *
  * ### Teams (Stage 1 Task 1.5, `docs/team-bots-plan.md`)
  *
@@ -51,7 +68,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { mulberry32, type Rng } from '@shared/types';
-import { SENSOR_RANGE, createWorld, type World } from '../sim';
+import { createWorld, type World } from '../sim';
 import { createBot } from './bot';
 import { MATCH_SLOTS, botLobby, createBots, fillEmptySlots, runHeadlessMatch } from './harness';
 import { DEFAULT_PERCEPTION, perceive } from './perception';
@@ -107,16 +124,19 @@ function scrambleHidden(world: World, id: number, rng: Rng): void {
   for (const station of world.stations) {
     if (station.owner === id) continue;
     const surface = Math.max(0, dist(eye, station.pos) - station.radius);
-    if (surface > SENSOR_RANGE) {
-      // Not scouted: the numbers are invisible, so they may be anything.
+    if (surface > DEFAULT_PERCEPTION.visualRange) {
+      // Off screen. Since a0-05 the damage ring is drawn on every station the
+      // renderer draws — so a home the bot could see IS a home whose health it
+      // may read, and the lie starts exactly where the screen ends. (This gate
+      // was `SENSOR_RANGE`, 180 units, until GDD §2.2 was amended on 2026-08-07.)
       station.coreHp = 1 + noise(rng, station.maxCoreHp - 1);
       station.sinceDamage = noise(rng, 30);
       station.repairing = rng.next() < 0.5;
       for (const shield of station.shields) shield.hp = noise(rng, shield.maxHp);
-    }
-    if (surface > DEFAULT_PERCEPTION.visualRange && station.turrets.length > 0) {
-      // Too far to count barrels: drop them all.
-      station.turrets = [];
+      if (station.turrets.length > 0) {
+        // Too far to count barrels either: drop them all.
+        station.turrets = [];
+      }
     }
   }
 

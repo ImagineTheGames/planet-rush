@@ -19,9 +19,17 @@ import {
   mainMenuHitTest,
   mainMenuLayout,
   mainMenuModel,
+  mainMenuRoute,
+  mainMenuStep,
+  mainMenuIndexOf,
 } from './main-menu';
 import type { Rect } from '@platform/layout-registry';
+import type { MainMenuOption } from './main-menu';
 import { CODEX_TABS } from './codex';
+import { NAV_EDGES, NAV_SCREENS, reachesMainMenuWithoutMatch } from './menu-nav';
+import type { NavScreen } from './menu-nav';
+import * as flow from './lobby-flow';
+import { FLOW_SCREENS, createFlow, flowKey, flowOpenHangar, flowScreenHandler, flowTapHangar } from './lobby-flow';
 import { singlePrimary } from './gantry';
 import { BEAM, COLUMN, PLATE_SCALES, TOUCH_MIN, frameMetrics } from '../art/materials';
 
@@ -32,10 +40,22 @@ const PHONE = { width: 844, height: 390 };
 const center = (r: Rect) => ({ x: r.x + r.width / 2, y: r.y + r.height / 2 });
 
 describe('the model', () => {
-  it('shows the wordmark and exactly PLAY, CODEX then SETTINGS', () => {
+  it('shows the wordmark and exactly PLAY, CODEX, SETTINGS then HANGAR', () => {
     const model = mainMenuModel();
     expect(model.title).toBe(MAIN_MENU_TITLE);
-    expect(model.buttons.map((b) => b.label)).toEqual(['PLAY', 'CODEX', 'SETTINGS']);
+    expect(model.buttons.map((b) => b.label)).toEqual(['PLAY', 'CODEX', 'SETTINGS', 'HANGAR']);
+  });
+
+  it('leaves the first three items and their ORDER untouched by the fourth door', () => {
+    // a0-14, in as many words: "The main menu's existing three items, their
+    // order, and the codex sub-line" must not change. HANGAR is appended, so the
+    // three plates a player already knows are in the places they were.
+    const first = MAIN_MENU_ITEMS.slice(0, 3);
+    expect(first.map((i) => i.kind)).toEqual(['play', 'codex', 'settings']);
+    expect(first.map((i) => i.label)).toEqual(['PLAY', 'CODEX', 'SETTINGS']);
+    expect(first[0]?.sub).toBe('Open a rig and take the field');
+    expect(first[1]?.sub).toBe(codexSubLine());
+    expect(first[2]?.sub).toBe('Controls, audio, visual effects');
   });
 
   it('carries the header beam\'s eyebrow cluster, verbatim from the handoff', () => {
@@ -57,8 +77,8 @@ describe('the model', () => {
   });
 
   it('offers ONE way into a match — no second front door beside PLAY', () => {
-    // The ratified single play flow: PLAY opens the doors screen (PLAY SOLO /
-    // CREATE ROOM / JOIN ROOM), which already carries offline play, so the separate
+    // The ratified single play flow: PLAY opens the doors screen (SOLO /
+    // HOST / JOIN), which already carries offline play, so the separate
     // ONLINE button — and the offline-lobby shortcut PLAY used to be — are gone.
     // Asserted as an absence, because a redundant door is exactly the kind of thing
     // that gets quietly re-added.
@@ -67,8 +87,9 @@ describe('the model', () => {
     expect(kinds).not.toContain('online');
   });
 
-  it('marks PLAY as the primary action and CODEX/SETTINGS as secondary', () => {
-    const [play, codex, settings] = mainMenuModel().buttons;
+  it('marks PLAY as the primary action and CODEX/SETTINGS/HANGAR as secondary', () => {
+    const [play, codex, settings, hangar] = mainMenuModel().buttons;
+    expect(hangar?.primary).toBe(false);
     expect(play?.primary).toBe(true);
     // CODEX and SETTINGS are doors that come back — secondary, but fully active
     // (never gray): the gray-means-disabled theme rule (GDD §2.10 point 4). PLAY is
@@ -102,7 +123,7 @@ describe('the model', () => {
     expect(rest.buttons.every((b) => b.state === 'rest')).toBe(true);
 
     const hovered = mainMenuModel({ hover: 'codex' });
-    expect(hovered.buttons.map((b) => b.state)).toEqual(['rest', 'hover', 'rest']);
+    expect(hovered.buttons.map((b) => b.state)).toEqual(['rest', 'hover', 'rest', 'rest']);
 
     // A finger that is down is not hovering — the same plate cannot be both.
     const pressed = mainMenuModel({ hover: 'play', press: 'play' });
@@ -110,8 +131,131 @@ describe('the model', () => {
   });
 
   it('keeps the item list, the model and the hit test in the same order', () => {
-    // The three walk one list — a re-order can never mis-route a tap.
-    expect(MAIN_MENU_ITEMS.map((i) => i.kind)).toEqual(['play', 'codex', 'settings']);
+    // The four walk one list — a re-order can never mis-route a tap.
+    expect(MAIN_MENU_ITEMS.map((i) => i.kind)).toEqual(['play', 'codex', 'settings', 'hangar']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE WIRING CONTRACT (a0-14)
+// ---------------------------------------------------------------------------
+//
+// Two lists must now agree — the menu's items and the flow's screens — and
+// LESSONS §20 is exactly the shape of what happens when they quietly do not: a
+// `FlowScreen` case with no handler, or a menu item with no route, fails
+// silently and renders an empty room that looks like a working room reporting
+// bad news.
+//
+// So the agreement is asserted rather than reviewed. Both `mainMenuRoute` and
+// `flowScreenHandler` are exhaustive switches with a `default` that returns
+// null: the compiler catches a case deleted *from the union*, and these tests
+// catch a case deleted *from the switch* — which is the failure the compiler
+// cannot see. Delete `case 'hangar'` from either one and this block goes red.
+describe('the wiring contract: every screen handled, every item routed', () => {
+  it('routes EVERY main-menu item to a screen the navigation graph declares', () => {
+    for (const item of MAIN_MENU_ITEMS) {
+      const route = mainMenuRoute(item.kind);
+      expect(route, `${item.label} routes nowhere`).not.toBeNull();
+      expect(NAV_SCREENS, `${item.label} routes to an undeclared screen`).toContain(route);
+    }
+  });
+
+  it('gives every routed screen an edge FROM the main menu — the door is real', () => {
+    // A route is a claim about the wiring; the graph is where that claim is
+    // checked. An item that routed to a screen with no edge from `main-menu`
+    // would be a button that opens a room nobody can prove is connected.
+    for (const item of MAIN_MENU_ITEMS) {
+      const route = mainMenuRoute(item.kind);
+      const edge = NAV_EDGES.find((e) => e.from === 'main-menu' && e.to === route);
+      expect(edge, `no main-menu → ${String(route)} edge for ${item.label}`).toBeTruthy();
+    }
+  });
+
+  it('gives every routed screen a way BACK to the menu without starting a match', () => {
+    // The other half of the same bug: a door that opens onto a room with no
+    // exit. HANGAR included, which is why it is asserted here and not only in
+    // `menu-nav.test.ts` — this is the test that walks the MENU's own list.
+    for (const item of MAIN_MENU_ITEMS) {
+      const route = mainMenuRoute(item.kind) as NavScreen;
+      expect(reachesMainMenuWithoutMatch(route), `${item.label} → ${route} is a trap`).toBe(true);
+    }
+  });
+
+  it('names HANGAR explicitly — the fourth door is routed, not merely present', () => {
+    // The regression this whole block exists for. `MAIN_MENU_ITEMS` gaining an
+    // entry is easy; the entry going somewhere is the part that gets forgotten.
+    expect(MAIN_MENU_ITEMS.map((i) => i.kind)).toContain('hangar');
+    expect(mainMenuRoute('hangar')).toBe('hangar');
+    expect(NAV_SCREENS).toContain('hangar');
+  });
+
+  it('resolves EVERY FlowScreen to a handler this module actually exports', () => {
+    // The string could be a lie, so it is resolved against the module's real
+    // exports rather than eyeballed.
+    for (const screen of FLOW_SCREENS) {
+      const handler = flowScreenHandler(screen);
+      expect(handler, `the ${screen} screen has no handler`).not.toBeNull();
+      expect(typeof (flow as Record<string, unknown>)[handler as string], `${handler} is not exported`).toBe(
+        'function',
+      );
+    }
+  });
+
+  it('lists every FlowScreen exactly once, and routes the hangar among them', () => {
+    expect(new Set(FLOW_SCREENS).size).toBe(FLOW_SCREENS.length);
+    expect(FLOW_SCREENS).toContain('hangar');
+    expect(flowScreenHandler('hangar')).toBe('flowTapHangar');
+  });
+
+  it('reaches HANGAR by KEYBOARD — every door is on the focus ring', () => {
+    // The menu used to answer exactly one key (Enter, which was PLAY), so a
+    // keyboard player could reach the first plate and nothing else. a0-14 asks
+    // for the fourth door to be reachable by keyboard as well as by tap, so the
+    // focus ring is the menu's own list and this proves it lands on all four.
+    const walk: MainMenuOption[] = [];
+    let at: MainMenuOption = 'play';
+    for (let i = 0; i < MAIN_MENU_ITEMS.length; i++) {
+      at = mainMenuStep(mainMenuIndexOf(at), 1);
+      walk.push(at);
+    }
+    expect(walk).toEqual(['codex', 'settings', 'hangar', 'play']); // and it wraps
+    expect(walk).toContain('hangar');
+
+    // Backwards too — HANGAR is one step UP from PLAY, which is the fastest way
+    // to the newest door and the reason the ring wraps at all.
+    expect(mainMenuStep(mainMenuIndexOf('play'), -1)).toBe('hangar');
+  });
+
+  it('starts the focus ring on PLAY, so Enter alone still means PLAY', () => {
+    // The compatibility clause: every keyboard path that existed before a0-14
+    // behaves identically. Index 0 is PLAY and a zero step never moves.
+    expect(MAIN_MENU_ITEMS[0]?.kind).toBe('play');
+    expect(mainMenuIndexOf('play')).toBe(0);
+    expect(mainMenuStep(0, 0)).toBe('play');
+  });
+
+  it('folds a junk focus index rather than stepping off the list', () => {
+    for (const index of [Number.NaN, -99, 999, 2.5]) {
+      expect(MAIN_MENU_ITEMS.map((i) => i.kind)).toContain(mainMenuStep(index, 1));
+    }
+    expect(mainMenuIndexOf('hangar')).toBe(MAIN_MENU_ITEMS.length - 1);
+  });
+
+  it('opens and leaves the hangar through the flow, by tap and by key', () => {
+    // The contract end to end: the menu's fourth item routes to `hangar`, the
+    // flow can *be* on that screen, and BACK / Escape both come home. A screen
+    // you can enter and not leave is the trap `menu-nav` forbids.
+    const open = flowOpenHangar(createFlow()).state;
+    expect(open.screen).toBe('hangar');
+
+    expect(flowTapHangar(open, { kind: 'back' }).state.screen).toBe('entry');
+    expect(flowKey(open, 'Escape').state.screen).toBe('entry');
+    expect(flowKey(open, 'Backspace').state.screen).toBe('entry');
+  });
+
+  it('refuses to open the hangar from anywhere but the front door', () => {
+    const inMatch = { ...createFlow(), screen: 'match' as const };
+    expect(flowOpenHangar(inMatch).state).toBe(inMatch);
   });
 });
 

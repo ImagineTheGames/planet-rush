@@ -158,7 +158,9 @@ describe('the sides survive the shapes a lobby can actually be in', () => {
     // would put the wrong side on every seat after the hole.
     let lobby = soloLobby(5);
     lobby = authorSplit(lobby, [0, 0, 0, 1, 1]);
-    lobby = cycleSeatState(lobby, 1); // open → bot
+    // The solo lobby opens on the bot cast (a0-11 — offline there is no wire for
+    // a joiner, so an OPEN seat would be a chair nobody could ever take), so one
+    // step round the ring shuts it.
     lobby = cycleSeatState(lobby, 1); // bot → closed
     expect(lobby.seats[1]!.occupant).toBe('closed');
 

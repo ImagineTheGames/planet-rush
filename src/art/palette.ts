@@ -27,7 +27,7 @@
  * it turns those inputs into the shades every generator paints with.
  */
 
-import { PALETTE as TOKEN_PALETTE, PLAYER_ROSTER, WHITE as TOKEN_WHITE } from './tokens';
+import { FLOOR as TOKEN_FLOOR, PALETTE as TOKEN_PALETTE, PLAYER_ROSTER, WHITE as TOKEN_WHITE } from './tokens';
 
 // ---------------------------------------------------------------------------
 // The six (frozen — style-guide §1), sourced from tokens.ts
@@ -48,6 +48,19 @@ export type PaletteKey = keyof typeof PALETTE;
  * Vacuum is the endpoint of a darkening one.
  */
 export const WHITE = TOKEN_WHITE;
+
+/**
+ * The **ground** the play-field is composited on (a0-07, ratified 2026-08-07):
+ * `#010204`, the same cool blue-black as Vacuum two-and-a-half hue-degrees over
+ * and eight times darker. Sourced from {@link ./tokens} `FLOOR`, where the
+ * Vacuum-vs-Floor division of labour is written down.
+ *
+ * It is not a seventh hue and not a new material: **only `./backdrop` may paint
+ * it**, and it paints exactly two things with it — the ground plane, and the
+ * Coalsack dust that occludes stars by being the ground in front of them. Vacuum
+ * is untouched and remains the ramp's dark endpoint and the HUD's panel fill.
+ */
+export const FLOOR = TOKEN_FLOOR;
 
 /**
  * The 8-slot player identity roster (style-guide §3.1), indexed by `PlayerId`.
@@ -122,14 +135,45 @@ export const DERIVED_RECIPES = {
   hullDark: { base: 'hullSteel', toward: 'vacuum', t: 0.62, why: 'Panel gaps, thruster wells, a dead station core.' },
   decalInk: { base: 'hullSteel', toward: 'vacuum', t: 0.78, why: 'The player-number hull decal, stencilled into the steel.' },
 
-  rockBody: { base: 'hullSteel', toward: 'white', t: 0.16, why: 'Asteroid mineral body — neutral steel-grey (§6).' },
-  rockShadow: { base: 'hullSteel', toward: 'vacuum', t: 0.32, why: 'Asteroid facets, so a rock reads as a solid at 24px.' },
-  rockFissure: { base: 'hullSteel', toward: 'vacuum', t: 0.72, why: 'Crack lines across the three mining stages (§6).' },
+  // The rock family sits on the DARK half of the ramp (a3-01). It used to be a
+  // white-tint, which put the body at luminance 154 against the boards' 77 — the
+  // one family the a2 art campaign's value lever (GAP-ANALYSIS §2, Lever B) never
+  // reached, and the measured reason `art-vs-board-scene` failed. All three stops
+  // move together so the field reads as one material: a body, a facet one stop
+  // under it, and the ink the boards draw every rock inside. Each is the nearest
+  // vacuum-shade of `hullSteel` to its board tone — the board hexes are not on the
+  // ramp (no consistent `t` reproduces them channel-for-channel), so "nearest stop"
+  // is as close as "no seventh hue" permits, and each lands within 3/255 per
+  // channel of the board with its luminance matched to ±1.
+  rockBody: {
+    base: 'hullSteel',
+    toward: 'vacuum',
+    t: 0.48,
+    why: 'Asteroid mineral body — dark charcoal steel (§6; boards #454E59, luma 77).',
+  },
+  rockShadow: {
+    base: 'hullSteel',
+    toward: 'vacuum',
+    t: 0.545,
+    why: 'Asteroid facets and satellite pebbles, one stop under the body (boards #3E4750).',
+  },
+  rockFissure: {
+    base: 'hullSteel',
+    toward: 'vacuum',
+    t: 0.77,
+    why: 'The rock ink: rim and crack lines across the three mining stages (§6; boards #262C34).',
+  },
 
-  oceanSteel: { base: 'hullSteel', toward: 'vacuum', t: 0.42, why: 'MiningStation oceans — steel-blue, inside the palette (§5).' },
-  oceanDeep: { base: 'hullSteel', toward: 'vacuum', t: 0.62, why: 'Limb darkening / night side of a station.' },
-  continentShade: { base: 'patina', toward: 'vacuum', t: 0.38, why: 'Coastline under-shadow on patina continents.' },
-  continentLight: { base: 'patina', toward: 'white', t: 0.2, why: 'Sunward continent highlight.' },
+  // The machined recess (a2-03, THE CUTTERHEAD): the value one stop above the
+  // outline ink, used where a plate is *cut into* rather than merely shaded — the
+  // bore throat, a hopper's window well, a smelter slot's floor. `hullDark` is the
+  // panel gap between two plates and reads 12 luma brighter; `decalInk` is the
+  // outline itself. This is the hole between them, and it is the one value that
+  // reproduces the facility board's recess hex channel-for-channel.
+  hullWell: { base: 'hullSteel', toward: 'vacuum', t: 0.72, why: 'A recess cut into a plate: bore throat, hopper well, slot floor (board #2D3239).' },
+
+  continentShade: { base: 'patina', toward: 'vacuum', t: 0.38, why: 'Deep corrosion: patina in a crack, oxidation band, a derelict’s bloom.' },
+  continentLight: { base: 'patina', toward: 'white', t: 0.2, why: 'Sunward patina highlight / the repair bloom’s lit edge.' },
 
   oreDeep: { base: 'signalYellow', toward: 'vacuum', t: 0.38, why: 'Shadowed facet of an ore vein or chunk — still ore.' },
   coreHot: { base: 'signalYellow', toward: 'white', t: 0.35, why: 'The lit centre of a station core — still the win condition.' },
@@ -166,12 +210,12 @@ export const DERIVED = {
   hullDark: 0x383e45,
   decalInk: 0x262a31,
 
-  rockBody: 0x939ba5,
-  rockShadow: 0x5a626b,
-  rockFissure: 0x2d3239,
+  rockBody: 0x484e57,
+  rockShadow: 0x40474f,
+  rockFissure: 0x272c32,
 
-  oceanSteel: 0x4f565f,
-  oceanDeep: 0x383e45,
+  hullWell: 0x2d3239,
+
   continentShade: 0x36695e,
   continentLight: 0x72b3a2,
 
@@ -207,12 +251,14 @@ export const MATERIAL_COLORS: ReadonlySet<number> = new Set(Object.values(PALETT
 /** The eight identity colours, as a lookup. */
 export const IDENTITY_COLORS: ReadonlySet<number> = new Set(PLAYER_COLORS);
 
-/** Every colour any sprite is allowed to carry: six + derived + roster + white. */
+/** Every colour any sprite is allowed to carry: six + derived + roster + white
+ *  + the backdrop ground (Floor — backdrop-only, see {@link FLOOR}). */
 export const ALLOWED_COLORS: ReadonlySet<number> = new Set<number>([
   ...Object.values(PALETTE),
   ...Object.values(DERIVED),
   ...PLAYER_COLORS,
   WHITE,
+  FLOOR,
 ]);
 
 /** `0x7e8894` → `'#7e8894'`. For the SVG artifacts (./svg). */

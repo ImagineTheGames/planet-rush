@@ -1,0 +1,21 @@
+{
+  "empty-fresh": {
+    "ship": "VANGUARD · Anvil",
+    "level": "LEVEL 1",
+    "empty": "No cosmetics yet — they unlock as you level up."
+  },
+  "desktop": {
+    "ship": "VANGUARD · Anvil",
+    "level": "LEVEL 7",
+    "empty": "No cosmetics yet — they unlock as you level up."
+  },
+  "phone": {
+    "ship": "VANGUARD · Anvil",
+    "level": "LEVEL 7",
+    "empty": "No cosmetics yet — they unlock as you level up.",
+    "back": {
+      "x": 25,
+      "y": 691.5
+    }
+  }
+}

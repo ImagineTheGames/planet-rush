@@ -23,6 +23,32 @@
  *     A new number here would be a claim that FFA is allowed to move, and it is
  *     not (plan §6: "FFA must not move at all").
  *
+ * ### Re-baselined once, 2026-08-07 (a0-05) — and why that is not a loophole
+ *
+ * Rule 3 is about **Stage 1 leaking into FFA**. A ratified change to what *every*
+ * bot perceives in *every* mode is a different animal, and there is no honest way
+ * to hold a state hash across one: GDD §2.2 was amended so a station's damage
+ * ring reads at any range, the bot layer's station-HP gate widened with it
+ * (`SENSOR_RANGE` → `visualRange`, so bots and humans learn the same things at
+ * the same moment — GDD §2.9), and bots consequently steer, commit and besiege
+ * differently from the first minute. Freezing the old hashes would have meant
+ * keeping bots blind to a ring their human opponents can read, which is the
+ * handicap the amendment exists to prevent.
+ *
+ * So the goldens below moved **once**, deliberately, in the commit that carries
+ * the amendment. The previous values are kept so the movement is traceable rather
+ * than silent:
+ *
+ * | Seed | Pre-a0-05 (main @ 5d66213) | Post-a0-05 |
+ * |---|---|---|
+ * | 20260806 | `6d78b590` | `ed228be2` |
+ * | 7 | `f358341a` | `c28d0f6b` |
+ * | 991 | `210f7504` | `1c0cdaa3` |
+ *
+ * **Rule 3 still stands for everything else.** The bar for touching these numbers
+ * is a *ratified developer amendment recorded in `docs/design-amendments.md`* —
+ * not a refactor, not a tuning pass, and never "the test went red".
+ *
  * The last case is the one that stops this file from being vacuous: it asserts
  * the harness can build a team world *at all*, and that the same lineup on two
  * sides hashes differently. Without it, a `botLobby` that quietly dropped the
@@ -46,15 +72,19 @@ import { ROSTER } from './personalities';
 const SECONDS = 180;
 
 /**
- * The goldens. Measured on `main` at 5d66213 — before `BotSeat.team`,
- * `BotView.allies`, or the elimination-cadence fix — with exactly the run below.
+ * The goldens. Originally measured on `main` at 5d66213 — before `BotSeat.team`,
+ * `BotView.allies`, or the elimination-cadence fix — with exactly the run below;
+ * re-measured on `agent/gameplay/a0-05-station-health-always-visible` when the
+ * always-visible amendment widened what every bot can read (see the module note
+ * for the old values and the reasoning).
  *
- * **Do not re-baseline these.** See the module note.
+ * **Do not re-baseline these.** The only thing that has ever earned it is a
+ * ratified amendment in `docs/design-amendments.md`.
  */
 const GOLDEN: readonly (readonly [seed: number, hash: string])[] = [
-  [20260806, '6d78b590'],
-  [7, 'f358341a'],
-  [991, '210f7504'],
+  [20260806, 'ed228be2'],
+  [7, 'c28d0f6b'],
+  [991, '1c0cdaa3'],
 ];
 
 /** One eight-bot match, the shipped cast, the offline lobby's own roster path. */

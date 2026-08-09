@@ -8,14 +8,28 @@
  * the HUD does not draw. A tree cannot peek at a hidden core's HP because the
  * field it would read is `null` (GDD §2.2, §2.9).
  *
- * Two ranges, because the GDD names two different things:
+ * **One range, since a0-05 (GDD §2.2, amended 2026-08-07).**
  *
  *  - **Visual range** — near enough to be on screen at all. Ships, their hull
  *    bars (GDD §2.2: "a narrow hull bar … floating over every ship"), asteroids,
- *    chunks, and the turrets ringing a station are drawn here.
- *  - **Sensor range** (`SENSOR_RANGE`, the sim's own constant) — near enough to
- *    scout. "Enemy station health is scouted, not broadcast": a rival's core and
- *    shield HP appear only inside this radius, and nowhere else.
+ *    chunks, the turrets ringing a station, and — since the amendment — a
+ *    station's **damage ring** are all read here.
+ *
+ * There used to be a second, much smaller radius: `SENSOR_RANGE` (180 units),
+ * inside which alone a rival's core and shield HP could be read. The developer
+ * withdrew that rule — *"it should always show the health regardless of
+ * proximity"* — and the sim retired the constant (`sim/sensing`'s
+ * {@link stationHealthVisible}). **A bot must gain exactly what the human gained,
+ * or this fix silently handicaps every bot and moves the whole difficulty
+ * ladder** (GDD §2.9: a bot perceives only what a human in its cockpit could).
+ *
+ * So the station-health gate is now `visualRange` — the same "is it on my screen"
+ * test that already governs hull bars and turret counts, and the same thing that
+ * bounds a human, whose screen is what the renderer draws the ring onto. It is
+ * deliberately NOT unlimited: a human cannot read the health of a home four
+ * thousand units behind them (the minimap draws dots and colours, never numbers),
+ * so a bot that could would be *cheating* rather than symmetric, and the
+ * {@link HUMAN_VISUAL_RANGE} clamp exists to make that impossible.
  *
  * Three things are deliberately public at any distance, because the game draws
  * them that way: a station's **position** and its owner's **beacon ring**
@@ -38,7 +52,7 @@
  * they were ever told to ask.
  *
  * Hostility gates *targeting*, not *knowledge*: an ally's core and shields are
- * still read through the same sensor-range gate an enemy's are, because sharing a
+ * still read through the same on-screen gate an enemy's are, because sharing a
  * side is not a scouting report and widening what a teammate knows is a design
  * question, not a bug fix (see docs/bot-teams-allegiance-p16.md).
  *
@@ -54,7 +68,6 @@ import type { PlayerId, Vec2 } from '@shared/types';
 import {
   ASTEROID,
   STATION,
-  SENSOR_RANGE,
   WAVE_COUNT,
   areEnemies,
   isCollapsed,
@@ -62,6 +75,7 @@ import {
   shieldPool,
   stockTiers,
   teamOf,
+  waveIntervalOf,
   waveTime,
 } from '../sim';
 import type { Asteroid, Bounds, MatchPhase, MiningStation, Ship, UpgradeTiers, World } from '../sim';
@@ -78,10 +92,12 @@ import type { Asteroid, Bounds, MatchPhase, MiningStation, Ship, UpgradeTiers, W
  * — that would be a cheat, and GDD §2.9 forbids it.
  */
 export interface Perception {
-  /** Radius within which entities are perceived at all (world units). */
+  /** Radius within which entities are perceived at all (world units) — and,
+   *  since a0-05, within which a station's damage ring is read too. There is no
+   *  separate `sensorRange` any more: it was the retired `SENSOR_RANGE` gate on
+   *  enemy station HP, and GDD §2.2 withdrew it on 2026-08-07. It is gone rather
+   *  than widened to `visualRange` so nobody can narrow it again by accident. */
   readonly visualRange: number;
-  /** Radius within which an enemy station's core and shields can be read. */
-  readonly sensorRange: number;
   /** Seconds since a station last took damage that still count as "under
    *  attack" — the bot's half of the alarm (GDD §2.2). */
   readonly alarmWindow: number;
@@ -98,7 +114,6 @@ export const HUMAN_VISUAL_RANGE = 900;
 /** The day-2 baseline envelope. TUNABLE (by this agent). */
 export const DEFAULT_PERCEPTION: Perception = {
   visualRange: 720,
-  sensorRange: SENSOR_RANGE,
   alarmWindow: 2,
 };
 
@@ -106,7 +121,6 @@ export const DEFAULT_PERCEPTION: Perception = {
 export function resolvePerception(p?: Partial<Perception>): Perception {
   return {
     visualRange: Math.min(p?.visualRange ?? DEFAULT_PERCEPTION.visualRange, HUMAN_VISUAL_RANGE),
-    sensorRange: Math.min(p?.sensorRange ?? DEFAULT_PERCEPTION.sensorRange, HUMAN_VISUAL_RANGE),
     alarmWindow: p?.alarmWindow ?? DEFAULT_PERCEPTION.alarmWindow,
   };
 }
@@ -199,8 +213,8 @@ export interface PerceivedShip {
   readonly spawnProtected: boolean | null;
 }
 
-/** Another player's home station, as seen. Position and ownership are public;
- *  the numbers are scouted. */
+/** Another player's home station, as seen. Position and ownership are public at
+ *  any range; the numbers need the home to be on screen. */
 export interface PerceivedStation {
   readonly owner: PlayerId;
   /**
@@ -216,15 +230,24 @@ export interface PerceivedStation {
   /** False for a wreck. Public at any range — smoke carries (GDD §2.2). */
   readonly alive: boolean;
   readonly distance: number;
-  /** True when this station is inside sensor range this tick, i.e. its numbers
-   *  below are real rather than `null`. */
+  /**
+   * True when the numbers below are real rather than `null`.
+   *
+   * **The meaning changed with a0-05** (GDD §2.2, amended 2026-08-07): it used to
+   * mean "inside the 180-unit sensor radius", and now it means "on screen" —
+   * exactly `seen`, the gate the turret count already used. The field keeps its
+   * name because what it answers is unchanged ("are this home's numbers readable
+   * this tick?"), and the whole targeting/memory stack asks it by that name; only
+   * the radius moved, from a scouting bubble to the edge of the screen.
+   */
   readonly scouted: boolean;
   readonly coreHp: number | null;
   readonly maxCoreHp: number;
   readonly shieldHp: number | null;
   /** Turret count — the barrels are sprites, so this is a visual-range read. */
   readonly turrets: number | null;
-  /** Under-attack tell on someone else's home; scouted, like the HP. */
+  /** Under-attack tell on someone else's home — a ring visibly filling with red,
+   *  so it is read on the same on-screen terms as the HP it is drawn beside. */
   readonly underAttack: boolean | null;
 }
 
@@ -470,9 +493,16 @@ function perceiveShip(ship: Ship, from: Vec2, env: Perception, hostile: boolean)
 }
 
 /**
- * Another player's home. Position, ownership, and wreck state are public; the
- * core and shield numbers require sensor range, and the turret count requires
- * being close enough to see the barrels.
+ * Another player's home. Position, ownership, and wreck state are public at any
+ * range; the core and shield numbers, like the turret count, require the home to
+ * be on screen — the damage ring and the barrels are both things you read off
+ * the station itself.
+ *
+ * Since a0-05 the health gate and the barrel gate are the SAME distance
+ * (`visualRange`), because the renderer now draws the damage ring on every
+ * station it draws. Before the amendment health used a separate, four-times
+ * smaller radius; keeping that would have left bots blind to a ring their human
+ * opponents could read from across the screen (GDD §2.9 symmetry).
  */
 function perceiveStation(
   station: MiningStation,
@@ -484,8 +514,10 @@ function perceiveStation(
   // Measured to the station's surface, not its centre: a 64-unit rock you are
   // standing on must not read as out of sensor range.
   const surface = Math.max(0, d - station.radius);
-  const scouted = surface <= env.sensorRange;
   const seen = surface <= env.visualRange;
+  // One gate since a0-05: if the home is on screen, everything drawn on it —
+  // the damage ring, the shield bubbles, the barrels — is readable.
+  const scouted = seen;
   return {
     owner: station.owner,
     hostile,
@@ -686,12 +718,20 @@ function selfView(
   };
 }
 
-/** Seconds until the next wave, or null once the last one has landed. Public
- *  information: it is printed on the HUD (GDD §2.2). */
+/**
+ * Seconds until the next wave, or null once the last one has landed. Public
+ * information: it is printed on the HUD (GDD §2.2).
+ *
+ * Read on the match's OWN interval (`waveIntervalOf`, the accessor the spawner
+ * reads), never `waveTime`'s baseline default — that default is what made a bot
+ * in a default SCARCE match expect the wave 15 s early and commit to the centre
+ * to find nothing there (a0-16). A world with no resolved economy falls back to
+ * the baseline inside `waveIntervalOf`, so a hand-built bot fixture is unchanged.
+ */
 function nextWaveIn(world: World): number | null {
   const next = world.match.wavesSpawned + 1;
   if (next > WAVE_COUNT) return null;
-  return Math.max(0, waveTime(next) - world.time);
+  return Math.max(0, waveTime(next, waveIntervalOf(world)) - world.time);
 }
 
 // ---------------------------------------------------------------------------

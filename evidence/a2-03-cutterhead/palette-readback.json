@@ -1,0 +1,304 @@
+{
+  "what": "Direction D (facility-concepts-r2.html) vs the shipped facility body, by pixel count",
+  "note": "LIVE is composited under two plasma shield bubbles and the collection-field haze; SPRITE is the like-for-like half.",
+  "board": [
+    {
+      "hex": "#7E8894",
+      "share": 12.88,
+      "luma": 134.4,
+      "token": "hullSteel",
+      "distance": 0
+    },
+    {
+      "hex": "#262A31",
+      "share": 12.36,
+      "luma": 41.6,
+      "token": "decalInk",
+      "distance": 0
+    },
+    {
+      "hex": "#515861",
+      "share": 9.91,
+      "luma": 86.9,
+      "token": "hullShadow",
+      "distance": 0
+    },
+    {
+      "hex": "#383E45",
+      "share": 7.85,
+      "luma": 61,
+      "token": "hullDark",
+      "distance": 0
+    },
+    {
+      "hex": "#F2D24B",
+      "share": 5.14,
+      "luma": 204.2,
+      "token": "signalYellow",
+      "distance": 0
+    },
+    {
+      "hex": "#A5ACB4",
+      "share": 3.91,
+      "luma": 170.8,
+      "token": "hullLight",
+      "distance": 0
+    },
+    {
+      "hex": "#7C7E70",
+      "share": 3.84,
+      "luma": 123.8,
+      "token": "hullSteel",
+      "distance": 37
+    },
+    {
+      "hex": "#3A75F3",
+      "share": 3.56,
+      "luma": 113.7,
+      "token": "plasma",
+      "distance": 81
+    },
+    {
+      "hex": "#737466",
+      "share": 1.9,
+      "luma": 114.1,
+      "token": "hullShadow",
+      "distance": 44
+    },
+    {
+      "hex": "#939BA5",
+      "share": 1.58,
+      "luma": 153.7,
+      "token": "hullLight",
+      "distance": 29
+    },
+    {
+      "hex": "#F7E28A",
+      "share": 1.37,
+      "luma": 222.2,
+      "token": "coreHot",
+      "distance": 0
+    },
+    {
+      "hex": "#5A626B",
+      "share": 1.29,
+      "luma": 96.6,
+      "token": "hullShadow",
+      "distance": 17
+    },
+    {
+      "hex": "#0D1015",
+      "share": 1.05,
+      "luma": 15.7,
+      "token": "vacuum",
+      "distance": 0
+    },
+    {
+      "hex": "#2E333A",
+      "share": 1.02,
+      "luma": 50.3,
+      "token": "hullWell",
+      "distance": 2
+    }
+  ],
+  "sprite": [
+    {
+      "hex": "#7E8894",
+      "share": 15.48,
+      "luma": 134.4,
+      "token": "hullSteel",
+      "distance": 0
+    },
+    {
+      "hex": "#262A31",
+      "share": 12.9,
+      "luma": 41.6,
+      "token": "decalInk",
+      "distance": 0
+    },
+    {
+      "hex": "#0D1015",
+      "share": 12.55,
+      "luma": 15.7,
+      "token": "vacuum",
+      "distance": 0
+    },
+    {
+      "hex": "#515861",
+      "share": 11.09,
+      "luma": 86.9,
+      "token": "hullShadow",
+      "distance": 0
+    },
+    {
+      "hex": "#383E45",
+      "share": 6.91,
+      "luma": 61,
+      "token": "hullDark",
+      "distance": 0
+    },
+    {
+      "hex": "#F2D24B",
+      "share": 4.57,
+      "luma": 204.2,
+      "token": "signalYellow",
+      "distance": 0
+    },
+    {
+      "hex": "#A5ACB4",
+      "share": 3.41,
+      "luma": 170.8,
+      "token": "hullLight",
+      "distance": 0
+    },
+    {
+      "hex": "#737365",
+      "share": 2.42,
+      "luma": 113.4,
+      "token": "hullShadow",
+      "distance": 44
+    },
+    {
+      "hex": "#636455",
+      "share": 2.37,
+      "luma": 98,
+      "token": "hullShadow",
+      "distance": 25
+    },
+    {
+      "hex": "#939BA5",
+      "share": 2.04,
+      "luma": 153.7,
+      "token": "hullLight",
+      "distance": 29
+    },
+    {
+      "hex": "#24292F",
+      "share": 1.46,
+      "luma": 40.2,
+      "token": "decalInk",
+      "distance": 3
+    },
+    {
+      "hex": "#F7E28A",
+      "share": 1.31,
+      "luma": 222.2,
+      "token": "coreHot",
+      "distance": 0
+    },
+    {
+      "hex": "#2D3239",
+      "share": 1.13,
+      "luma": 49.3,
+      "token": "hullWell",
+      "distance": 0
+    },
+    {
+      "hex": "#2A2F35",
+      "share": 1.05,
+      "luma": 46.2,
+      "token": "rockFissure",
+      "distance": 5
+    }
+  ],
+  "live": [
+    {
+      "hex": "#3F5766",
+      "share": 8.34,
+      "luma": 81.5,
+      "token": "hullShadow",
+      "distance": 19
+    },
+    {
+      "hex": "#496171",
+      "share": 5.1,
+      "luma": 91.6,
+      "token": "hullShadow",
+      "distance": 20
+    },
+    {
+      "hex": "#BAB96A",
+      "share": 4.46,
+      "luma": 176.3,
+      "token": "signalYellow",
+      "distance": 69
+    },
+    {
+      "hex": "#607376",
+      "share": 3.15,
+      "luma": 109.7,
+      "token": "hullShadow",
+      "distance": 37
+    },
+    {
+      "hex": "#556869",
+      "share": 2.94,
+      "luma": 98.4,
+      "token": "hullShadow",
+      "distance": 18
+    },
+    {
+      "hex": "#6B8597",
+      "share": 2.5,
+      "luma": 127.3,
+      "token": "hullSteel",
+      "distance": 19
+    },
+    {
+      "hex": "#162B3A",
+      "share": 2.06,
+      "luma": 38.4,
+      "token": "decalInk",
+      "distance": 18
+    },
+    {
+      "hex": "#4F6777",
+      "share": 1.79,
+      "luma": 97.6,
+      "token": "hullShadow",
+      "distance": 27
+    },
+    {
+      "hex": "#D5D48F",
+      "share": 1.49,
+      "luma": 204.4,
+      "token": "coreHot",
+      "distance": 37
+    },
+    {
+      "hex": "#829AA8",
+      "share": 1.33,
+      "luma": 148.4,
+      "token": "hullSteel",
+      "distance": 27
+    },
+    {
+      "hex": "#344A58",
+      "share": 1.21,
+      "luma": 69,
+      "token": "rockShadow",
+      "distance": 15
+    },
+    {
+      "hex": "#2E4352",
+      "share": 1.06,
+      "luma": 62.4,
+      "token": "hullDark",
+      "distance": 17
+    },
+    {
+      "hex": "#405767",
+      "share": 0.93,
+      "luma": 81.9,
+      "token": "hullShadow",
+      "distance": 18
+    },
+    {
+      "hex": "#688194",
+      "share": 0.86,
+      "luma": 123.7,
+      "token": "hullSteel",
+      "distance": 23
+    }
+  ]
+}

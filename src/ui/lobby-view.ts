@@ -120,7 +120,7 @@ import { pingFits } from '../net/ping';
 // and this file's own local copy drifting from it is what a1-01 found on the CI
 // runner. Nothing below re-declares one.
 
-/** `CREW MUSTER` in the header beam, and `ROOM` above the code. */
+/** `CREW MUSTER` in the header beam, and `CLAIM` above the code. */
 const HEADING_PX = 22;
 const EYEBROW_PX = 12;
 /** The room code itself — the number a classroom reads off one screen. */
@@ -480,11 +480,15 @@ export class LobbyView extends Container {
     // The host sees the shape of the match they are about to start — the head
     // count in FFA, and the always-visible per-side tally in TEAMS (ratified:
     // counts shown, never blocking a split).
+    // "Claim holder", not "host": the guest came through JOIN, so the
+    // claim is the noun already on screen, and "host" is the network's word for
+    // it (GDD §4.7 worked examples). Measured at 11px against the content box
+    // before it shipped — see tests/mobile/voice-copy-fit.spec.ts.
     const text = model.countdown.active
       ? ''
       : model.hostControls
         ? hintText(model)
-        : 'WAITING FOR THE HOST';
+        : 'WAITING FOR THE CLAIM HOLDER';
     const px = typeSize(HINT_PX, m);
     this.rushHint.text = text;
     this.rushHint.style.fontSize = px;
@@ -862,7 +866,7 @@ export class LobbyView extends Container {
     this.drawToggle(
       this.abundanceText,
       this.layout.abundance,
-      `ORE · ${ABUNDANCE_LABELS[model.abundance]}`,
+      `YIELD · ${ABUNDANCE_LABELS[model.abundance]}`,
       enabled,
       m,
     );
@@ -1103,6 +1107,18 @@ export function lobbyPlateRoles(model: LobbyModel): PlateRole[] {
  *  (`A 2 · B 2`), which is always shown so an uneven split is visible and never
  *  blocked (ratified). */
 function hintText(model: LobbyModel): string {
+  // WHY the button is dead comes first (a0-11; GDD §2.1 *amended 2026-08-07*:
+  // "RUSH! is refused, with a reason on screen, below two participants"). Before
+  // a0-11 the host's RUSH! could only be refused by something they had just done
+  // — closing the seventh seat, putting everyone on one side — so the head count
+  // beside it was explanation enough. It is not any more: a fresh room is one
+  // person in seven empty chairs, and `1 PLAYING · 0 BOTS` states that without
+  // saying it is the problem, or which of the two ways out to take.
+  //
+  // It replaces the tally rather than sitting beside it because there is one
+  // strip and the tally is the *count* the reason already contains.
+  const refusal = model.startRefusal;
+  if (refusal !== null) return refusal;
   if (model.mode === 'teams') {
     const sides = model.teamCounts.map((c) => `${c.label} ${c.count}`).join(' · ');
     return sides || `${model.size} PLAYERS`;

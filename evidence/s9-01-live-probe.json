@@ -1,0 +1,16 @@
+{
+  "what": "s9-01 — is the alarm fix (one-shot + correct seat) on the live deployment?",
+  "url": "https://imaginethegames.github.io/planet-rush/",
+  "servedSha": "f3ace95",
+  "servedAt": "2026-08-08T15:34:31.919Z",
+  "entryChunk": "assets/index-DRdviTAb.js",
+  "entryBytes": 768326,
+  "markers": {
+    "__alarmStage": true,
+    "alarmStings": true,
+    "__pauseStage": true
+  },
+  "methodValid": true,
+  "deployed": true,
+  "verdict": "the fix IS deployed — the by-ear attestation (one sting on your own station, silence on another) can now be written against this sha"
+}

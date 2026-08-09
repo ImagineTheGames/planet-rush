@@ -54,7 +54,7 @@ export function wheelRadius(viewportWidth: number, viewportHeight: number): numb
 // --- One wedge: is it thumb-sized, and do its words fit? (u7-02) ------------
 //
 // The Gantry/Bone pass puts four lines of text on a wedge — the name, what it
-// spends on, `cost/held`, and the count over its cap — inside a fixed radial
+// spends on, the cost, and the count over its cap — inside a fixed radial
 // space. On a 390 px phone that space is 95 px deep and ~115 px across, and a
 // line that runs past it crosses a spoke into its neighbour. l2-02's copy
 // overflowed its chrome for exactly this reason and only the phone profiles
@@ -118,7 +118,7 @@ export function wheelBounds(viewportWidth: number, viewportHeight: number): Rect
 }
 
 // ---------------------------------------------------------------------------
-// The upgrade panel (GDD §2.5 — the only place ship stats appear)
+// The upgrade panel (GDD §2.5 — where ship stats appear during a match)
 // ---------------------------------------------------------------------------
 
 /** Widest the upgrade panel ever gets, CSS px — past this the four rows stop

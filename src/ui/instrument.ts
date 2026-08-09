@@ -120,7 +120,7 @@ export function hudSpace(referencePx: number, m: HudMetrics): number {
  * a fourth. Which tier a piece of HUD copy takes is decided by its **job**, never
  * by how the element felt on the day:
  *
- *  - `eyebrow` — the uppercase tag above a readout: `TOTAL`, `HOME`, `MATCH`.
+ *  - `eyebrow` — the uppercase tag above a readout: `ORE`, `HOME`, `MATCH`.
  *  - `label` — a control's own word, or a line of instruction: a controls-strip
  *    action, an onboarding prompt, `RESPAWNING 3…`.
  *  - `name` — a proper noun or a value: `WAVE 1/5 · Outer Drift`, a player name,

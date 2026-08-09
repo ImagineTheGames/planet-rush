@@ -15,6 +15,12 @@ import { mulberry32 } from '@shared/types';
 import { DEFAULT_LIVENESS_MS, InMemoryRoomRegistry, type Heartbeat } from '../../allocator/registry';
 import { Allocator } from '../../allocator/allocator';
 import { DirectRouter, FlyReplayRouter, type Router } from '../../allocator/router';
+import {
+  DirectProbeTargeter,
+  FLY_PREFER_REGION_HEADER,
+  FlyPreferRegionTargeter,
+  type ProbeTargeter,
+} from '../../allocator/probe-target';
 import { verifyTicket } from '../../src/net/ticket';
 import { FLEET_AUTH_HEADER, signFleetRequest } from '../../src/net/fleet-auth';
 import { createAllocatorServer } from '../../allocator/index';
@@ -46,6 +52,9 @@ interface ServeOptions {
   readonly secret?: string;
   /** Browser origins the CORS layer grants (M10). */
   readonly allowOrigins?: readonly string[];
+  /** How a client is told to time a region (the picker, n3). Omitted → /regions
+   *  publishes capacity alone, exactly as it did before there was a picker. */
+  readonly probeTargeter?: ProbeTargeter;
 }
 
 /** A live server on an ephemeral port, plus a `now` the test controls. `logs`
@@ -69,6 +78,7 @@ async function serve(opts: ServeOptions = {}): Promise<{
     log: (line) => logs.push(line),
     ...(opts.secret !== undefined ? { secret: opts.secret } : {}),
     ...(opts.allowOrigins !== undefined ? { allowOrigins: opts.allowOrigins } : {}),
+    ...(opts.probeTargeter !== undefined ? { probeTargeter: opts.probeTargeter } : {}),
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const { port } = server.address() as AddressInfo;
@@ -120,6 +130,43 @@ describe('GET /regions', () => {
     const lhr = regions.find((r: { region: string }) => r.region === 'lhr');
     expect(iad).toMatchObject({ machines: 1, capacity: 8, rooms: 1, free: 7 });
     expect(lhr).toMatchObject({ machines: 1, capacity: 4, rooms: 0, free: 4 });
+  });
+
+  it('publishes where to TIME each region, from the deployment’s targeter', async () => {
+    const { base, registry, now } = await fixture({
+      probeTargeter: new DirectProbeTargeter((m) => `ws://${m}.test:8080/`),
+    });
+    registry.observe(heartbeat('m-1', 'iad', []), now.value);
+    registry.observe(heartbeat('m-2', 'gru', []), now.value);
+
+    const { regions } = await (await fetch(`${base}/regions`)).json();
+    const target = (id: string): unknown =>
+      regions.find((r: { region: string }) => r.region === id)?.probe;
+    expect(target('iad')).toEqual({ url: 'http://m-1.test:8080/health' });
+    expect(target('gru')).toEqual({ url: 'http://m-2.test:8080/health' });
+  });
+
+  it('behind the edge, every region shares one URL and differs by its steer', async () => {
+    const { base, registry, now } = await fixture({
+      probeTargeter: new FlyPreferRegionTargeter('https://gameserver.fly.dev/health'),
+    });
+    registry.observe(heartbeat('m-1', 'iad', []), now.value);
+    registry.observe(heartbeat('m-2', 'gru', []), now.value);
+
+    const { regions } = await (await fetch(`${base}/regions`)).json();
+    for (const region of regions as { region: string; probe: { url: string; headers: Record<string, string> } }[]) {
+      expect(region.probe.url).toBe('https://gameserver.fly.dev/health');
+      expect(region.probe.headers[FLY_PREFER_REGION_HEADER]).toBe(region.region);
+    }
+  });
+
+  it('with no targeter configured, answers exactly the capacity shape it always has', async () => {
+    const { base, registry, now } = await fixture();
+    registry.observe(heartbeat('m-1', 'iad', []), now.value);
+
+    const { regions } = await (await fetch(`${base}/regions`)).json();
+    expect(regions[0].probe).toBeUndefined();
+    expect(regions[0]).toMatchObject({ region: 'iad', machines: 1 });
   });
 });
 

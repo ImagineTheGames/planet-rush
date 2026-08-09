@@ -25,7 +25,9 @@
  *    contract's three seconds (GDD §4.7) as two lines of code, in the one place
  *    they cannot be optimised away by someone tidying the mixer.
  *  - **The alarm** (`./alarm`), fed only by damage against the local player's
- *    own home — a mechanic, not a notification (GDD §2.2).
+ *    own home — a mechanic, not a notification (GDD §2.2). It sounds **once per
+ *    engagement** and does not repeat while the siege lasts (developer, s9-01);
+ *    the screen-edge arrow is what sustains (GDD §2.2, amended 2026-08-07).
  *  - **The held voice** (`./weapons`): the thruster, a state rather than a moment.
  *    Firing is no longer one — since amendment v0.3 a shot is a discrete one-shot
  *    (`./bank` rockChip / hullHit), routed like any other tell.
@@ -54,7 +56,7 @@ import { SOUND, TELL_SOUND, CUE_SOUND, CUE_UI, type SoundName, type AudioCue } f
 import { UiCuePlayer, type UiCuePlayerOptions } from './ui-cues';
 import { SustainedVoice } from './weapons';
 import type { AudioContextLike } from './context';
-import { AudioGraph, type LoopHandle, type MixOptions, type Spatial } from './graph';
+import { AudioGraph, type Bus, type LoopHandle, type MixOptions, type Spatial } from './graph';
 import { HERE, place, R_NEAR, R_FAR, type Placement } from './spatial';
 import { MusicDirector, MusicScore, type MusicDirectorOptions } from './music';
 
@@ -91,10 +93,27 @@ const HUSHED = 0.001;
  * mechanics (turret fire, a shield falling) the alarm is telling you about
  * (GDD §2.2). These are duck *factors*, not levels — the player's sliders survive
  * underneath them (`./graph` setBusDuck).
+ *
+ * Since s9-01 the duck lasts **the sting**, not the siege ({@link ALARM_DUCK_S}).
+ * A one-shot alarm that left the mix pinned down for a two-minute siege would be
+ * ducking under something no longer sounding — the whole game quiet with nothing
+ * to show for it.
  */
 const AMBIENT_DUCK = 0.25;
 const MUSIC_DUCK = 0.3;
 const SFX_DUCK = 0.7;
+
+/**
+ * How long the mix stays under the alarm, in seconds — one sting plus a short
+ * tail for the release ramp.
+ *
+ * A constant rather than the rendered buffer's length, because the duck has to
+ * run **headless** too (the server, the QA harness, every unit test) where there
+ * is no buffer to measure. `audio.test.ts` asserts it still covers the alarm as
+ * the bank renders it, so re-voicing the klaxon cannot silently leave the mix
+ * ducked short of its own sound.
+ */
+export const ALARM_DUCK_S = 0.85;
 
 /** Options for {@link AudioEngine}. */
 export interface AudioEngineOptions {
@@ -154,7 +173,18 @@ export class AudioEngine {
   private wantsMusic: boolean;
 
   private ambientLoop: LoopHandle | null = null;
-  private alarmLoop: LoopHandle | null = null;
+  /**
+   * The engagement number the last sting was raised for (`UnderAttackAlarm.count`).
+   * The alarm is a one-shot per engagement, so this — not `alarm.active` — is what
+   * `syncAlarm` compares against: the state machine can hold `active` for a whole
+   * siege and this still fires exactly once (developer, s9-01).
+   */
+  private alarmSounded = 0;
+  /** Seconds left of the current sting's duck. Counted down in {@link update}. */
+  private alarmDuckLeft = 0;
+  /** Stings raised since construction — one per engagement. The test's eye, and
+   *  the live-stage seam's (`__alarmStage` in `src/main.ts`). */
+  private alarmStings = 0;
   private local: PlayerId;
   /**
    * The player slots whose home damage rings THIS listener's alarm — the local
@@ -216,6 +246,20 @@ export class AudioEngine {
   }
 
   /**
+   * Alarm stings raised since construction — **one per engagement**, never one
+   * per frame of a siege (developer, s9-01: *"it should only play once, and not
+   * keep playing"*).
+   *
+   * Counted whether or not there is a mix behind the engine, like the alarm state
+   * machine itself, so the "once per engagement" rule is testable in the headless
+   * mode the server and the harness run in. A sting swallowed by the three-second
+   * hush (GDD §4.7) is not counted here — it lands on {@link hushedCount}.
+   */
+  get alarmSounds(): number {
+    return this.alarmStings;
+  }
+
+  /**
    * The placement of the most recent spatial one-shot — the audio spy's readout.
    * Sound cannot screenshot, so the evidence is numbers: the gain a far siege was
    * heard at, the pan a shot flew in on (ratified a3-03, evidence note). A global
@@ -267,6 +311,20 @@ export class AudioEngine {
   /** Which slot's home rings the alarm. Set on join, and on a rejoin. */
   setLocal(id: PlayerId): void {
     this.local = id;
+  }
+
+  /**
+   * The slot this engine believes it is listening as. `-1` is a spectator.
+   *
+   * Public because it is the number s9-01 turned on: the engine took it as a
+   * constructor argument at boot, before the server had seated the joiner, and
+   * nothing ever corrected it — so the mix spent every online match convinced it
+   * was slot 0. A live-stage test reads this back and compares it against the
+   * seat the server actually welcomed the client into (`__alarmStage` in
+   * `src/main.ts`). A wire is only proven by reading the far end of it.
+   */
+  get alarmLocal(): PlayerId {
+    return this.local;
   }
 
   /**
@@ -452,7 +510,7 @@ export class AudioEngine {
     if (this.started) this.music?.update(step, this.death.gain);
 
     this.graph?.setDuck(this.death.gain);
-    this.syncAlarm();
+    this.syncAlarm(step);
   }
 
   /** Stop everything and drop the graph. A match teardown, or a page unload. */
@@ -461,8 +519,7 @@ export class AudioEngine {
     this.music?.stop();
     this.ambientLoop?.stop(0.2);
     this.ambientLoop = null;
-    this.alarmLoop?.stop(0.1);
-    this.alarmLoop = null;
+    this.alarmDuckLeft = 0;
     this.uiCues?.dispose();
     this.graph?.dispose();
     this.started = false;
@@ -471,6 +528,11 @@ export class AudioEngine {
   /** Back to the start of a match — a rematch, or a rejoin (GDD §4.2). */
   reset(): void {
     this.alarm.reset();
+    // The state machine's engagement count went back to zero with it, so the
+    // sting's memory has to as well — otherwise the new match's FIRST engagement
+    // reads as "the one we already sounded" and the alarm opens the match mute.
+    this.alarmSounded = 0;
+    this.releaseAlarmDuck();
     if (this.ownsDeath) this.death.reset();
     this.thruster?.stop();
     this.musicScore.reset();
@@ -527,41 +589,94 @@ export class AudioEngine {
    * A non-spatial one-shot: full level, centred, no falloff — a sting or a global
    * klaxon (the death fall, the wave horn, the match-end fanfare). Still obeys the
    * three-second hush like everything else (GDD §4.7).
+   *
+   * @param bus Which bus to sum into. The under-attack alarm keeps its own
+   *   (`./graph` — a mechanic that stays audible over everything else, §2.2, and
+   *   one the SFX slider does not turn down); everything else is `sfx`.
+   * @param rate Playback rate. Defaults to the mix's deterministic pitch jitter,
+   *   which is what keeps a repeated sound from sounding cheap — but the alarm
+   *   passes 1: an emergency signal that drifts in pitch is a worse signal, and
+   *   §2.2's "unmistakable" is the same two tones every time.
    */
-  private flat(sound: SoundName, level: number): void {
+  private flat(sound: SoundName, level: number, bus: Bus = 'sfx', rate?: number): boolean {
     const graph = this.graph;
-    if (!graph) return;
+    if (!graph) return false;
     if (this.death.gain <= HUSHED) {
       this.skipped++;
-      return;
+      return false;
     }
-    if (graph.play(sound, clamp01(level), graph.jitter())) this.played++;
+    const started = graph.play(sound, clamp01(level), rate ?? graph.jitter(), bus);
+    if (started) this.played++;
+    return started;
   }
 
-  /** Start or stop the alarm loop to match the state machine. */
-  private syncAlarm(): void {
-    const graph = this.graph;
-    if (!graph) return;
-    if (this.alarm.active) {
-      if (!this.alarmLoop) {
-        this.alarmLoop = graph.startLoop(SOUND.alarm, 0, 'alarm');
-        this.alarmLoop.setGain(1, 0.08);
-        // Your home is being taken apart; everything else gets out of the way.
-        // The soundtrack and the ambience drop hard, the SFX only step aside —
-        // they are the mechanics the alarm is about (GDD §2.2).
-        graph.setBusDuck('ambient', AMBIENT_DUCK, 0.3);
-        graph.setBusDuck('music', MUSIC_DUCK, 0.3);
-        graph.setBusDuck('sfx', SFX_DUCK, 0.2);
+  /**
+   * Sound the alarm **once per engagement**, and duck for the sting.
+   *
+   * *"Also for the alarm, it should only play once, and not keep playing"* —
+   * the developer, 2026-08-07 (s9-01). This used to start a continuous loop
+   * while `alarm.active` and stop it on release, so a siege that held the state
+   * machine up for two minutes rang the klaxon for two minutes. It is now one
+   * one-shot per **engagement**: {@link UnderAttackAlarm.count} bumps when the
+   * pressure crosses `ENGAGE`, and nothing sounds again until the alarm has
+   * released and re-engaged.
+   *
+   * `MIN_HOLD_S` and the separate lower `RELEASE` are why that is safe. They
+   * were written as hysteresis against a *looping* alarm stuttering; with a
+   * one-shot they do a better job — they are the **re-trigger guard**, the thing
+   * that stops an attacker's dodge-and-return machine-gunning the klaxon. Same
+   * constants, same numbers, new job. Do not delete them.
+   *
+   * The mechanic did not get quieter, it moved: GDD §2.2 pairs the alarm with a
+   * screen-edge arrow, and the arrow (`src/ui/alarm.ts`, its own hold) is what
+   * now carries the *duration* of the attack. The sound announces; the arrow
+   * sustains (GDD §2.2, amended 2026-08-07).
+   */
+  private syncAlarm(dt: number): void {
+    if (this.alarm.count !== this.alarmSounded) {
+      // The klaxon is a cockpit alert, not a located hit: full and centred, like
+      // the wave horn and the death fall. `flat` also enforces the three seconds
+      // of quiet — nothing sounds over a dying home, the alarm included (§4.7).
+      const hushed = this.death.gain <= HUSHED;
+      const started = this.flat(SOUND.alarm, 1, 'alarm', 1);
+      // The mix can REFUSE a one-shot: the voice cap is 24 and a fierce siege
+      // frame spends them. A loop never had to survive that; a single sting does,
+      // and a dropped one would silently cost a not-cuttable mechanic its whole
+      // announcement (§4.9). So leave the engagement unclaimed and try again next
+      // frame — it lands as soon as a voice frees, which is milliseconds. The
+      // headless engine (no graph) and the death hush both fall through instead:
+      // there is nothing to retry for, and retrying through the three seconds of
+      // quiet would fire the klaxon on the far side of them.
+      if (!started && !hushed && this.graph) return;
+      this.alarmSounded = this.alarm.count;
+      if (!hushed) {
+        this.alarmStings++;
+        this.alarmDuckLeft = ALARM_DUCK_S;
+        // Your home is being taken apart; everything else gets out of the way —
+        // for the length of the sting. The soundtrack and the ambience drop hard,
+        // the SFX only step aside, because they are the mechanics the alarm is
+        // about (GDD §2.2).
+        const graph = this.graph;
+        graph?.setBusDuck('ambient', AMBIENT_DUCK, 0.12);
+        graph?.setBusDuck('music', MUSIC_DUCK, 0.12);
+        graph?.setBusDuck('sfx', SFX_DUCK, 0.08);
       }
       return;
     }
-    if (this.alarmLoop) {
-      this.alarmLoop.stop(0.12);
-      this.alarmLoop = null;
-      graph.setBusDuck('ambient', 1, 0.8);
-      graph.setBusDuck('music', 1, 0.8);
-      graph.setBusDuck('sfx', 1, 0.4);
+    if (this.alarmDuckLeft > 0) {
+      this.alarmDuckLeft -= dt;
+      if (this.alarmDuckLeft <= 0) this.releaseAlarmDuck();
     }
+  }
+
+  /** Let the mix back up after a sting. Idempotent — a restore is a ramp to 1. */
+  private releaseAlarmDuck(): void {
+    this.alarmDuckLeft = 0;
+    const graph = this.graph;
+    if (!graph) return;
+    graph.setBusDuck('ambient', 1, 0.6);
+    graph.setBusDuck('music', 1, 0.6);
+    graph.setBusDuck('sfx', 1, 0.3);
   }
 
   private startAmbient(): void {

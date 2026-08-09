@@ -1,0 +1,421 @@
+{
+  "capture": "u7-06-gantry-upgrade-wheel",
+  "side": "before",
+  "base": "http://localhost:4174",
+  "profiles": [
+    {
+      "id": "desktop",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "shots": [
+        {
+          "name": "upgrade",
+          "file": "images/u7-gantry-upgrade-wheel/before-desktop-upgrade.png",
+          "wedges": [
+            {
+              "label": "WEAPON",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "",
+              "next": null,
+              "cost": null,
+              "state": "ready",
+              "costPaint": null
+            },
+            {
+              "label": "ENGINE",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "100%",
+              "next": "115%",
+              "cost": 3,
+              "state": "ready",
+              "costPaint": null
+            },
+            {
+              "label": "CARGO",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "2",
+              "next": "4",
+              "cost": 2,
+              "state": "ready",
+              "costPaint": null
+            },
+            {
+              "label": "HULL",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "50",
+              "next": "60",
+              "cost": 3,
+              "state": "ready",
+              "costPaint": null
+            }
+          ]
+        },
+        {
+          "name": "upgrade-short",
+          "file": "images/u7-gantry-upgrade-wheel/before-desktop-upgrade-short.png",
+          "wedges": [
+            {
+              "label": "WEAPON",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "",
+              "next": null,
+              "cost": null,
+              "state": "ready",
+              "costPaint": null
+            },
+            {
+              "label": "ENGINE",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "100%",
+              "next": "115%",
+              "cost": 3,
+              "state": "unaffordable",
+              "costPaint": null
+            },
+            {
+              "label": "CARGO",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "2",
+              "next": "4",
+              "cost": 2,
+              "state": "unaffordable",
+              "costPaint": null
+            },
+            {
+              "label": "HULL",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "50",
+              "next": "60",
+              "cost": 3,
+              "state": "unaffordable",
+              "costPaint": null
+            }
+          ]
+        },
+        {
+          "name": "weapon",
+          "file": "images/u7-gantry-upgrade-wheel/before-desktop-weapon.png",
+          "wedges": [
+            {
+              "label": "DAMAGE",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "10",
+              "next": "13",
+              "cost": 4,
+              "state": "ready",
+              "costPaint": null
+            },
+            {
+              "label": "SPEED",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "100%",
+              "next": "115%",
+              "cost": 8,
+              "state": "ready",
+              "costPaint": null
+            }
+          ]
+        }
+      ],
+      "errors": []
+    },
+    {
+      "id": "phone-landscape",
+      "viewport": {
+        "width": 844,
+        "height": 390
+      },
+      "shots": [
+        {
+          "name": "upgrade",
+          "file": "images/u7-gantry-upgrade-wheel/before-phone-landscape-upgrade.png",
+          "wedges": [
+            {
+              "label": "WEAPON",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "",
+              "next": null,
+              "cost": null,
+              "state": "ready",
+              "costPaint": null
+            },
+            {
+              "label": "ENGINE",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "100%",
+              "next": "115%",
+              "cost": 3,
+              "state": "ready",
+              "costPaint": null
+            },
+            {
+              "label": "CARGO",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "2",
+              "next": "4",
+              "cost": 2,
+              "state": "ready",
+              "costPaint": null
+            },
+            {
+              "label": "HULL",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "50",
+              "next": "60",
+              "cost": 3,
+              "state": "ready",
+              "costPaint": null
+            }
+          ]
+        },
+        {
+          "name": "upgrade-short",
+          "file": "images/u7-gantry-upgrade-wheel/before-phone-landscape-upgrade-short.png",
+          "wedges": [
+            {
+              "label": "WEAPON",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "",
+              "next": null,
+              "cost": null,
+              "state": "ready",
+              "costPaint": null
+            },
+            {
+              "label": "ENGINE",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "100%",
+              "next": "115%",
+              "cost": 3,
+              "state": "unaffordable",
+              "costPaint": null
+            },
+            {
+              "label": "CARGO",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "2",
+              "next": "4",
+              "cost": 2,
+              "state": "unaffordable",
+              "costPaint": null
+            },
+            {
+              "label": "HULL",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "50",
+              "next": "60",
+              "cost": 3,
+              "state": "unaffordable",
+              "costPaint": null
+            }
+          ]
+        },
+        {
+          "name": "weapon",
+          "file": "images/u7-gantry-upgrade-wheel/before-phone-landscape-weapon.png",
+          "wedges": [
+            {
+              "label": "DAMAGE",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "10",
+              "next": "13",
+              "cost": 4,
+              "state": "ready",
+              "costPaint": null
+            },
+            {
+              "label": "SPEED",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "100%",
+              "next": "115%",
+              "cost": 8,
+              "state": "ready",
+              "costPaint": null
+            }
+          ]
+        }
+      ],
+      "errors": []
+    },
+    {
+      "id": "phone-portrait",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "shots": [
+        {
+          "name": "upgrade",
+          "file": "images/u7-gantry-upgrade-wheel/before-phone-portrait-upgrade.png",
+          "wedges": [
+            {
+              "label": "WEAPON",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "",
+              "next": null,
+              "cost": null,
+              "state": "ready",
+              "costPaint": null
+            },
+            {
+              "label": "ENGINE",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "100%",
+              "next": "115%",
+              "cost": 3,
+              "state": "ready",
+              "costPaint": null
+            },
+            {
+              "label": "CARGO",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "2",
+              "next": "4",
+              "cost": 2,
+              "state": "ready",
+              "costPaint": null
+            },
+            {
+              "label": "HULL",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "50",
+              "next": "60",
+              "cost": 3,
+              "state": "ready",
+              "costPaint": null
+            }
+          ]
+        },
+        {
+          "name": "upgrade-short",
+          "file": "images/u7-gantry-upgrade-wheel/before-phone-portrait-upgrade-short.png",
+          "wedges": [
+            {
+              "label": "WEAPON",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "",
+              "next": null,
+              "cost": null,
+              "state": "ready",
+              "costPaint": null
+            },
+            {
+              "label": "ENGINE",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "100%",
+              "next": "115%",
+              "cost": 3,
+              "state": "unaffordable",
+              "costPaint": null
+            },
+            {
+              "label": "CARGO",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "2",
+              "next": "4",
+              "cost": 2,
+              "state": "unaffordable",
+              "costPaint": null
+            },
+            {
+              "label": "HULL",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "50",
+              "next": "60",
+              "cost": 3,
+              "state": "unaffordable",
+              "costPaint": null
+            }
+          ]
+        },
+        {
+          "name": "weapon",
+          "file": "images/u7-gantry-upgrade-wheel/before-phone-portrait-weapon.png",
+          "wedges": [
+            {
+              "label": "DAMAGE",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "10",
+              "next": "13",
+              "cost": 4,
+              "state": "ready",
+              "costPaint": null
+            },
+            {
+              "label": "SPEED",
+              "stat": null,
+              "costLabel": null,
+              "tiers": null,
+              "current": "100%",
+              "next": "115%",
+              "cost": 8,
+              "state": "ready",
+              "costPaint": null
+            }
+          ]
+        }
+      ],
+      "errors": []
+    }
+  ]
+}

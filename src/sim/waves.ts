@@ -63,9 +63,9 @@ import {
   RESOURCE_FIELD,
   SPAWN_CLEAR_POCKET,
   WAVE_COUNT,
-  WAVE_INTERVAL_S,
   clampToMargin,
   homeFieldOreFor,
+  waveIntervalOf,
   waveOreFor,
   waveRadiusFraction,
   waveTime,
@@ -267,7 +267,24 @@ export function spawnHomeFields(world: World): void {
   // inboard of each home wherever the home sits.
   const radii = stations.map((p) => Math.hypot(p.pos.x - cx, p.pos.y - cy));
   const ref = radii[0]!;
-  const singleRing = radii.every((r) => Math.abs(r - ref) <= 1e-9);
+  // The arena-frame stamp below is only equivalent to the per-station one when
+  // BOTH hold: every live home is the same distance from the centre, AND each
+  // home's declared spoke IS its radial direction. The second half is not a
+  // formality since a0-12 — `line` declares the SIDE's axis as its outward angle
+  // (`maps.ts`, "Two sides"), and at N≤4 its live homes happen to share a radius,
+  // so a radius-only test would have sent a board whose spokes point due west
+  // down the arena-frame path and stamped every neighbourhood due west of the
+  // arena centre instead of in front of its own station. The two paths are
+  // algebraically identical when both conditions hold, so this narrowing changes
+  // no shipped board: `octagon` (and any `bounds`-overridden QA octagon) is
+  // radial and stays byte-for-byte on the historical branch.
+  const singleRing =
+    radii.every((r) => Math.abs(r - ref) <= 1e-9) &&
+    stations.every((p) => {
+      const radial = Math.atan2(p.pos.y - cy, p.pos.x - cx);
+      // Compare as an angle, so 0 vs 2π is no difference.
+      return Math.abs(Math.atan2(Math.sin(p.angle - radial), Math.cos(p.angle - radial))) <= 1e-9;
+    });
   // The field-band reference: the ring radius on a single-ring map (identical to
   // the historical `ringR`, so that path stays byte-for-byte unchanged), else
   // the SMALLEST station radius, so the shared pattern fits inboard of even the
@@ -419,9 +436,11 @@ export function spawnWave(world: World, count: number = world.asteroidsPerWave):
 export function spawnDueWaves(world: World): void {
   if (world.match.collapseTime >= 0) return;
   // Waves land on the abundance-resolved interval (`world.economy.waveInterval`):
-  // a SCARCE match waits longer between refills. A legacy world reads the baseline
-  // `WAVE_INTERVAL_S`, so the pre-p11 schedule is unchanged.
-  const interval = world.economy?.waveInterval ?? WAVE_INTERVAL_S;
+  // a SCARCE match waits longer between refills. Read through `waveIntervalOf`,
+  // the one accessor the HUD clock and bot perception read too (a0-16), so the
+  // countdown on screen can never target a tick this loop does not spawn on. A
+  // legacy world resolves to the baseline, so the pre-p11 schedule is unchanged.
+  const interval = waveIntervalOf(world);
   while (!allWavesSpawned(world) && world.time >= waveTime(world.match.wavesSpawned + 1, interval)) {
     spawnWave(world);
   }

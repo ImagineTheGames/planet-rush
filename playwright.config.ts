@@ -19,11 +19,79 @@
  *
  * `isMobile`/`hasTouch` are Chromium-only Playwright features — fine here.
  */
+import { readdirSync } from 'node:fs';
 import { defineConfig, type PlaywrightTestConfig } from '@playwright/test';
 import { DEVICE_MATRIX } from './tests/mobile/shot-budget';
+import { filesForShard, planShards, spreadSeconds } from './tests/mobile/shard-plan';
+import { browserWorkerCap } from './harness/pool-size';
 
 const PREVIEW_PORT = 4173;
 const PREVIEW_URL = `http://localhost:${PREVIEW_PORT}`;
+const TEST_DIR = './tests/mobile';
+
+/**
+ * ── SHARDING: BY MEASURED DURATION, NOT BY TEST COUNT (a0-00b) ─────────────
+ *
+ * Playwright's own `--shard=i/N` divides the collected tests by COUNT. Run that
+ * way, the four shards of this suite came back at **5 · 12 · 21 · 42 minutes**
+ * (PR #321, run 31249237259): a gate is as slow as its slowest shard, so four
+ * runners bought the wall time of one 42-minute job. The suite's tests span
+ * 1.4 s to 300 s and 90 of its 213 collected tests are `test.skip`ped by
+ * project, so counting tests measures almost nothing about cost.
+ *
+ * So the split is computed here instead, from a measured cost table, by
+ * `tests/mobile/shard-plan.ts` — read that file for the algorithm and for how to
+ * re-measure the table. Nothing about WHAT is asserted changes: same specs, same
+ * three projects, same budgets, same baselines, same tolerance. Only which
+ * runner picks up which spec file.
+ *
+ * Set `MOBILE_SHARD` / `MOBILE_SHARDS` (ci.yml does; `--shard` is not used).
+ * Unset — every local `npm run test:mobile` — the whole suite runs, unfiltered.
+ *
+ * The file list is read off DISK rather than off the cost table, so the union of
+ * the shards is the whole suite by construction: a spec added and never measured
+ * still runs, on some shard, on the first PR that carries it.
+ */
+const SPEC_FILES = readdirSync(TEST_DIR)
+  .filter((f) => f.endsWith('.spec.ts'))
+  .sort();
+const PROJECT_NAMES = ['iphone', 'pixel', 'desktop'] as const;
+const SHARD = Number(process.env.MOBILE_SHARD ?? '');
+const SHARDS = Number(process.env.MOBILE_SHARDS ?? '');
+const SHARDING = Number.isInteger(SHARD) && Number.isInteger(SHARDS) && SHARDS > 0;
+
+/**
+ * The spec files this shard runs on this project — or `undefined` (Playwright's
+ * default: everything) when the suite is not being sharded at all.
+ *
+ * A shard that owns NOTHING on a project gets a pattern that cannot match rather
+ * than an empty list, because an empty `testMatch` is the kind of thing that
+ * quietly reverts to "match everything" and would run the suite three times.
+ */
+function shardMatch(project: string): PlaywrightTestConfig['testMatch'] {
+  if (!SHARDING) return undefined;
+  const files = filesForShard(PROJECT_NAMES, SPEC_FILES, project, SHARD, SHARDS);
+  return files.length > 0 ? files.map((f) => `**/${f}`) : /(?!)/;
+}
+
+// Say out loud what this runner is about to do. A shard that silently ran the
+// wrong quarter of the suite is the failure mode worth one line of log.
+//
+// Once, though: every worker process loads this config too, and Playwright sets
+// TEST_WORKER_INDEX in them, so the plan is printed by the runner alone rather
+// than three times over.
+if (SHARDING && process.env.TEST_WORKER_INDEX === undefined) {
+  const plan = planShards(PROJECT_NAMES, SPEC_FILES, SHARDS);
+  const mine = plan.find((s) => s.shard === SHARD);
+  console.log(
+    `[shard-plan] shard ${SHARD}/${SHARDS} — ${mine ? Math.round(mine.seconds) : 0}s of measured work ` +
+      `(plan: ${plan.map((s) => Math.round(s.seconds)).join(' / ')}s, spread ${Math.round(spreadSeconds(plan))}s)`,
+  );
+  for (const project of PROJECT_NAMES) {
+    const files = filesForShard(PROJECT_NAMES, SPEC_FILES, project, SHARD, SHARDS);
+    console.log(`[shard-plan]   ${project}: ${files.length > 0 ? files.join(', ') : '(nothing)'}`);
+  }
+}
 
 const chromium: NonNullable<PlaywrightTestConfig['use']>['browserName'] = 'chromium';
 
@@ -37,7 +105,7 @@ const chromium: NonNullable<PlaywrightTestConfig['use']>['browserName'] = 'chrom
 const { iphone: IPHONE, pixel: PIXEL, desktop: DESKTOP } = DEVICE_MATRIX;
 
 export default defineConfig({
-  testDir: './tests/mobile',
+  testDir: TEST_DIR,
   // A hung page load is a failed test, never a hung suite (QA charter: enforced
   // timeouts). These bound each test and each assertion.
   //
@@ -68,6 +136,60 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
+
+  // ── ONE PAGE PER RUNNER (a0-00b) ───────────────────────────────────────────
+  //
+  // Playwright defaults `workers` to `cpus / 2` — 2 on a 4-core GitHub runner.
+  // That put TWO dpr-3 pages on four cores, rasterising in software, and it is
+  // the single largest source of red in this suite's history. It is set to 1 in
+  // CI because a second page does not buy parallelism here; it buys failures.
+  //
+  // The measurements, all of them off the runner rather than off a workstation:
+  //
+  //   - A page under two workers ran at **0.28 fps**; a page with the runner
+  //     more to itself ran at **1.5 fps** (frame periods read out of the
+  //     screencast in a failure trace — report §4b). Every CDP round trip waits
+  //     on the page's main thread, so one round trip costs about one frame, and
+  //     a 5× frame period is a 5× round trip.
+  //   - `build-wheel-gantry.spec.ts:314` timed out at 300 s on `[pixel]` while
+  //     the HEAVIER `[iphone]` copy passed at 126 s **in the same run**. A test
+  //     cannot be slower than itself; what differed was the neighbour.
+  //   - `build-flow.spec.ts:157` blew a 330 s budget on `[iphone]` beside heavy
+  //     `[pixel]` wheel work, while its `[pixel]` twin passed the identical test
+  //     at 276 s. Its own in-container measurement is 32 s.
+  //   - Four `[iphone]` goldens that passed at 20–41 s in run 31249237259 timed
+  //     out at 90 s in 31258319576 — `Page.captureScreenshot: Internal server
+  //     error, session closed`, i.e. the session did not just crawl, it died —
+  //     once a duration-balanced plan sat them beside the second-heaviest brick.
+  //
+  // That last one is the one that settles it, and it is worth being blunt about
+  // because this file's own sharding caused it: balancing shards by TOTAL work
+  // says nothing about whether two expensive pages run at the same INSTANT, so
+  // a better-balanced plan simply moved the contention onto a new victim. At
+  // `workers: 1` a unit's cost is a property of the unit, which is exactly the
+  // assumption `tests/mobile/shard-plan.ts` needs in order to be worth anything.
+  //
+  // Wall time is bought back with N (ci.yml runs 8 shards), not with workers:
+  // the same total work over the same total cores, minus the contention tax.
+  // DO NOT raise this to "use the runner properly" — the runner is not idle,
+  // it is blocked, and a second worker makes both pages slower than one.
+  //
+  // Locally this used to be a bare `undefined` — "a dev box has the cores" —
+  // and on a dev box it still resolves to exactly that. What it missed is that
+  // the studio lanes are not a dev box: Playwright's default is
+  // `os.cpus().length / 2`, and inside a container `os.cpus()` reports the
+  // HOST's cores, not the cgroup quota. Three lanes on a 6-core container each
+  // read the 16-core host and each opened ~8 pages — the same mis-sized-runner
+  // bug a0-00c fixed for vitest, on the runner whose own evidence (above) is
+  // that TWO pages on four cores is the single largest source of red in this
+  // suite's history.
+  //
+  // `browserWorkerCap()` returns `undefined` when there is no cgroup quota, so
+  // a laptop and a GitHub runner are bit-for-bit unaffected; under the studio's
+  // quota it is 6 cores ÷ 3 lanes ÷ 2 cores-per-page = **1**, which is the
+  // number CI arrived at independently by measurement. See harness/pool-size.ts.
+  // `--workers=N` on the command line still overrides it for a one-off.
+  workers: process.env.CI ? 1 : browserWorkerCap(),
 
   // ── Reporters, and the one that made a golden failure inspectable (q8-01) ──
   //
@@ -101,6 +223,7 @@ export default defineConfig({
   projects: [
     {
       name: 'iphone',
+      testMatch: shardMatch('iphone'),
       // 2.96 MP a capture — ~2.9× the desktop control's, and the reason PR #291's
       // two `iphone` goldens ran out of clock on a loaded runner while passing
       // everywhere else (tests/mobile/shot-budget.ts).
@@ -114,6 +237,7 @@ export default defineConfig({
     },
     {
       name: 'pixel',
+      testMatch: shardMatch('pixel'),
       use: {
         browserName: chromium,
         viewport: { width: PIXEL.width, height: PIXEL.height },
@@ -124,6 +248,7 @@ export default defineConfig({
     },
     {
       name: 'desktop',
+      testMatch: shardMatch('desktop'),
       use: {
         browserName: chromium,
         viewport: { width: DESKTOP.width, height: DESKTOP.height },

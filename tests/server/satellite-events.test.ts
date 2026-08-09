@@ -22,7 +22,7 @@ import { ShipClass } from '@shared/types';
 import { applyEntityEvent, resetStaticEntities } from '../../src/net/entity-events';
 import type { SatelliteEventData, StationHealthData } from '../../src/net/entity-events';
 import type { EntityEventMessage } from '../../src/net/transport';
-import { createWorld, SATELLITE, SENSOR_RANGE, step, updateSatellites } from '../../src/sim';
+import { createWorld, SATELLITE, step, updateSatellites } from '../../src/sim';
 import type { MiningStation, World } from '../../src/sim';
 import { FogTracker, fullEntityState, StaticEntityTracker } from '../../server/static-events';
 
@@ -161,8 +161,14 @@ describe('the satellite producer', () => {
   });
 });
 
-describe('the satellite is scouted like a turret', () => {
-  it('sends its HP to its owner, and to a rival only from inside sensor range', () => {
+describe('the satellite rides the station health payload, like a turret', () => {
+  it('sends its HP to its owner and to a rival at any range (a0-05)', () => {
+    // Re-pointed by a0-05: station health stopped being range-gated on
+    // 2026-08-07 (GDD §2.2 amended), and the satellite travels in that payload,
+    // so it stopped being range-gated with it. The claim the case still makes is
+    // the one that matters for a siege — **a besieger can read the damage they
+    // are doing** — only now they can read it from wherever they are shooting
+    // from rather than only from the doorstep.
     const w = world();
     const satellite = orbit(w, 0);
     satellite.hp = 11;
@@ -174,23 +180,26 @@ describe('the satellite is scouted like a turret', () => {
       .find((d) => d.id === stationOf(w, 0).id);
     expect(ownHealth?.satellites).toEqual([{ id: satellite.id, hp: 11 }]);
 
-    // The rival, parked well outside sensor range of station 0, earns nothing.
+    // The rival, parked three times the retired 180-unit radius away: told.
     const station = stationOf(w, 0);
     const rivalShip = w.ships.find((s) => s.id === 1)!;
-    rivalShip.pos.x = station.pos.x + SENSOR_RANGE * 3;
+    rivalShip.pos.x = station.pos.x + 540;
     rivalShip.pos.y = station.pos.y;
     const far = new FogTracker(1);
-    expect(far.events(w).map((e) => (e.data as StationHealthData).id)).not.toContain(station.id);
-
-    // Fly them in, and the same number is theirs — a besieger has to be able to
-    // read the damage they are doing to it.
-    rivalShip.pos.x = station.pos.x + SENSOR_RANGE / 2;
-    const near = new FogTracker(1);
-    const scouted = near
+    const fromAfar = far
       .events(w)
       .map((e) => e.data as StationHealthData)
       .find((d) => d.id === station.id);
-    expect(scouted?.satellites).toEqual([{ id: satellite.id, hp: 11 }]);
+    expect(fromAfar?.satellites).toEqual([{ id: satellite.id, hp: 11 }]);
+
+    // …and the doorstep read is the same read, not a better one.
+    rivalShip.pos.x = station.pos.x + 90;
+    const near = new FogTracker(1);
+    const fromClose = near
+      .events(w)
+      .map((e) => e.data as StationHealthData)
+      .find((d) => d.id === station.id);
+    expect(fromClose).toEqual(fromAfar);
   });
 
   it('omits the field entirely for a station with no satellite', () => {

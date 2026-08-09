@@ -6,6 +6,40 @@
 
 ---
 
+## 0. RATIFIED EXCEPTION — THE FOUR ENTRY DOORS ARE PLAIN. READ THIS FIRST. (2026-08-07)
+
+**The four buttons on the entry screen are outside the voice.** They are
+`CAMPAIGN`, `SOLO`, `HOST`, `JOIN`, and a voice pass may not re-word them. The
+developer, 2026-08-07, looking at the screen this document's §3.2 produced:
+
+> *"you took this too far, its too complicated, you can switch it back to how it
+> was CAMPAIGN, SOLO, HOST, JOIN... its way too complex for new players to
+> understand"*
+
+Delivered by **a0-15** (UI, branch `agent/ui/a0-15-plain-entry-doors`). The rows
+in §3.2 below that produced `SOLO CONTRACT` / `OPEN A CLAIM` / `JOIN A CLAIM` are
+**spent** — they are kept as the record of what was tried, not as work to do
+again. Same for the `[REQ]` door-label sync rows in §3.2 and §5, and for the
+`SOLO CONTRACT` quoted inside `ENTRY_ERRORS.offline`, the allocator's `network`
+message, the reconnect `room-gone` detail and the disconnect panel's fallback:
+those four sentences now name the door as `SOLO`, and they follow the label
+wherever it goes next.
+
+**Why this one screen and not the rest.** The entry screen is the only screen a
+player meets *before they have played the game*, so it has no context to lean on
+and no second chance. The rest of the sweep stands: the developer pointed at the
+front door, not at the in-match copy, and §4.7's own rule — clarity outranks
+flavour — is what settles the case rather than an exception to it. The hints
+under the four buttons are plain for the same reason and by the same ratification.
+
+**If you are here to run a voice pass:** the door labels and their hints
+(`src/ui/lobby-entry.ts` `DOOR_OPTIONS`) are not yours. `src/ui/lobby-entry.test.ts`
+pins the four words with the quote above, and `src/ui/voice-door-labels.test.ts`
+will red if a rename leaves any refusal naming a door that is not on the screen.
+Both are cheaper to read than to argue with.
+
+---
+
 ## 0. What was decided, and where the decision lives
 
 The developer ratified the industrial interface voice on 2026-08-05. Asked whether
@@ -137,6 +171,15 @@ the shipped name of a shipped feature (`CODEX_TITLE`, `content/codex/codex-*.jso
 The concentration of work. Three door labels, three hints, four error lines, one
 tagline.
 
+> **SPENT — the door rows are closed by ratification (§0, a0-15, 2026-08-07).**
+> The three `label:` rows and their three `hint:` rows below shipped, the
+> developer read the result and sent them back to plain words, and the labels are
+> now `CAMPAIGN` / `SOLO` / `HOST` / `JOIN` with literal hints under them. Do not
+> re-apply them. The `full:` and `offline:` rows still hold their *shape* — both
+> quote the door label — but they now quote `SOLO`, which is a fact they read out
+> of `DOOR_OPTIONS` in test rather than out of this table. Everything else in this
+> section (the `claim` noun, the code-pad title) stands as delivered.
+
 | Line | Current | Proposed | |
 |---|---|---|---|
 | 98 | `label: 'PLAY SOLO'` | `label: 'SOLO CONTRACT'` | `[REC]` |
@@ -236,7 +279,7 @@ is the corporate-joke register §4.7 explicitly forbids ("never winking").
 |---|---|---|---|
 | `hud.ts:614` | `stationLabel = 'HOME'` | *(unchanged)* | `[FIXED]` — **§4, the sanctioned exception** |
 | `hud.ts:904` | `'HOME LOST'` | *(unchanged)* | `[FIXED]` — same |
-| `hud.ts:576` | `totalLabel = 'TOTAL'` | `'BANKED'` | `[OPT]` |
+| `hud.ts:576` | `totalLabel = 'TOTAL'` | ~~`'BANKED'`~~ → **`'ORE'`** | `[OPT]`, **SUPERSEDED 2026-08-07** |
 | `hud.ts:776` | `'COLLAPSE'` | *(unchanged)* | `[OPT]` → `'THE CRUSH'`, see Q5 |
 | `hud.ts:780` | `'FINAL WAVE'` | *(unchanged)* | `[HOLD]` |
 | `hud.ts:771/781/784` | `WAVE 3/5 · Mid Field`, `NEXT 1:23`, `MATCH 8:42` | *(unchanged)* | `[FIXED]` — clocks and numbers, §4.7 |
@@ -252,6 +295,15 @@ is the corporate-joke register §4.7 explicitly forbids ("never winking").
 "banked total") and slightly more in register, but the string is asserted in
 `affordability.test.ts` and three live-stage specs, and the win is small. l2-02's
 call; if in doubt, leave it.
+
+> **SUPERSEDED 2026-08-07 (a0-03).** l2-02 took the `[OPT]` and shipped `BANKED`.
+> The developer then ruled on this readout directly — *"should not say total, it
+> should say ORE"* — so the label is now **`ORE`**, and the row above is history
+> rather than a live proposal. The developer's word outranks a voice-sweep
+> preference; the reasoning that `TOTAL` invites "hold + bank" is still true and
+> is *why* the rename has an open question attached to it (the wheel hub prints
+> hold + bank under the same word). See `docs/design-amendments.md`, "A build
+> wedge's cost is ONE number — and the top-left readout says `ORE`".
 
 **`RESPAWNING 3...` stays.** Considered and rejected: `HULL IN 3`, `NEW HULL 3`,
 `DISPATCH IN 3`. Respawning is a word every player knows, the string appears at the
@@ -365,6 +417,13 @@ are different strings in different files and it is easy to conflate them — the
 keypad button is the confirm action for a code you have already typed, and `JOIN` is
 the shortest true word for it.
 
+> **a0-15 update:** the door came back as `JOIN`, so the two strings now read the
+> same. That is not the conflation this paragraph warns about and it is not a
+> collision to fix: they are never on screen together (the door is on `home`, the
+> submit is on `join`), and the sequence a player performs is *press JOIN → type
+> the code → press JOIN*. One word for one intent, said twice. They remain two
+> separate strings in two files, exactly as this paragraph requires.
+
 **The codex screen — three uninventoried strings, one of them interesting.**
 
 | File · line | Current | Proposed | |
@@ -463,9 +522,16 @@ Verified by grep, not assumed. The exact set — five assertions, in four files:
 
 And one that **survives the rename by design**, worth copying: `lobby-entry.test.ts:213`
 asserts `expect(ENTRY_ERRORS.offline).toContain('SOLO')` — a substring, not the
-sentence. `'Cannot reach the server. SOLO CONTRACT still works.'` still passes. That
-is the right way to pin "this error must point at the offline door" without pinning
-the prose, and step 2's guard test should be written in the same spirit.
+sentence. Both the sweep's wording and a0-15's still pass. That is the right way to
+pin "this error must point at the offline door" without pinning the prose, and
+step 2's guard test should be written in the same spirit.
+
+> **a0-15 caveat on the substring idiom.** A substring is sound only while no door
+> label contains another one — the moment a label grows a second word, a sentence
+> naming the *old* short label passes a `toContain` against the new long one and
+> the guard goes quiet. `voice-door-labels.test.ts` therefore compares whole
+> all-caps phrases and separately forbids one label from nesting inside another.
+> Copy the idiom, but copy that guard with it.
 
 **None of these is a decision to surface.** Each is a test that pins the *current*
 copy as documentation, and updating it alongside the string is the normal cost of a

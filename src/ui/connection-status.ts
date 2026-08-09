@@ -16,7 +16,7 @@
  *     exists only when something is wrong or pending, so its mere presence is the
  *     signal.
  *  3. **A lost connection still names the door that works.** `closed` points the
- *     player back at PLAY SOLO, exactly as the entry screen's offline error does
+ *     player back at SOLO, exactly as the entry screen's offline error does
  *     (`./lobby-entry` ENTRY_ERRORS.offline) — a dead server costs a session,
  *     never the game.
  *
@@ -126,7 +126,7 @@ export function connectionStatusModel(input: ConnectionStatusInput): ConnectionS
         visible: true,
         severity: 'error',
         headline: ended ? ended.headline : 'DISCONNECTED',
-        detail: ended ? ended.detail : 'Lost the match server. PLAY SOLO still works offline.',
+        detail: ended ? ended.detail : 'Lost the match server. SOLO still works offline.',
         spinner: false,
         grace: null,
         action: 'BACK TO MENU',

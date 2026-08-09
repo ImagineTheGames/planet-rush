@@ -46,6 +46,7 @@ import {
   cycleSeatState,
   cycleSeatTeam,
   lobbyModel,
+  lobbyWireSeats,
   lobbyWireTeams,
   matchSizeOf,
   pressRush,
@@ -108,7 +109,11 @@ function openClient(
       // side. Until this rode along, the mode toggle three screens up moved nothing
       // on the server — the room stayed FFA and built a free-for-all world under a
       // lobby that said TEAMS.
-      ...(isHost ? { mode: state.mode, teams: lobbyWireTeams(state) } : {}),
+      // …and the per-seat OPEN / BOT / CLOSED roster (a0-11). Same rule again,
+      // and the one with the sharpest edge: since the lobby stopped putting a bot
+      // in every empty chair, a roster the room was never told about would have it
+      // fill them all anyway — bots behind seats drawn OPEN.
+      ...(isHost ? { mode: state.mode, teams: lobbyWireTeams(state), seats: lobbyWireSeats(state) } : {}),
     });
   };
 
@@ -145,6 +150,33 @@ function openClient(
  */
 function seatOf(room: { lobbyState(): LobbySlot[] }, player: PlayerId): LobbySlot | undefined {
   return room.lobbyState().find((slot) => slot.player === player);
+}
+
+/**
+ * Wait for a joiner to have read its OWN `welcome` — the barrier that has to come
+ * before `openClient(guestSession, …, guestSession.you, …)`.
+ *
+ * `room.humanCount === 2` is the SERVER's barrier, and it rises one hop too early:
+ * the count goes up when the socket is seated, which is strictly before the
+ * `welcome` carrying this client's player id has crossed back and been read here.
+ * `OnlineSession.player` starts at `0` (`src/net/session`), so a guest opened inside
+ * that window builds its lobby with `you: 0` — and in a room whose creator IS player
+ * 0, `you === host`, so the guest's model believes it is the CREATOR. Every host-only
+ * rule then inverts silently: `pressRush` is accepted from a guest, `isYou` lands on
+ * the host's seat, and the bot difficulties and match shape ride out from a client
+ * that has no business sending them.
+ *
+ * Two live humans in one room never share an id, so "the two sessions disagree about
+ * who they are" is exactly "the joiner has been welcomed" — and it is a state to wait
+ * for, not a duration to sleep through.
+ */
+async function welcomed(guest: OnlineSession, host: OnlineSession): Promise<void> {
+  await until(
+    'the joiner to read its own welcome — until it does it still answers to the host’s id',
+    () => guest.you !== host.you,
+    5_000,
+    () => `guest says ${guest.you}, host says ${host.you}`,
+  );
 }
 
 /** Run the RUSH! countdown the way the render ticker does, and send `startMatch` on
@@ -232,6 +264,7 @@ describe('CREATE ROOM opens the SAME lobby PLAY SOLO opens (the unified play flo
     expect(guestSeat?.state).toBe('human');
 
     // --- The guest's own lobby: their seat, and read-only room config -----------
+    await welcomed(guestSession, hostSession);
     const guest = openClient(guestSession, 'RUSH', guestSession.you, host.lobby().you);
     const guestModel = lobbyModel(guest.lobby());
     expect(guestModel.seats[guest.lobby().you]?.isYou, 'a joiner sees themselves in their slot').toBe(
@@ -262,15 +295,27 @@ describe('CREATE ROOM opens the SAME lobby PLAY SOLO opens (the unified play flo
     // → world path, which is the whole reason the room needed a lobby at all.
     const authority = room.world;
     if (!authority) throw new Error('the room never started its match');
-    const hostShip = authority.ships.find((s) => s.id === host.lobby().you);
-    const guestShip = authority.ships.find((s) => s.id === guest.lobby().you);
+    // By the SIM's seat, not the lobby's: RUSH! compacts the roster (a0-11), and
+    // `matchStart.you` is how each client learns which ship came out of it.
+    const hostShip = authority.ships.find((s) => s.id === hostSession.you);
+    const guestShip = authority.ships.find((s) => s.id === guestSession.you);
     expect(hostShip?.shipClass, 'the host flies the hull they picked in the room').toBe(
       ShipClass.Excavator,
     );
     expect(guestShip?.shipClass, 'the guest flies theirs').toBe(ShipClass.Interceptor);
-    // Eight seats, two humans: the rest are the cast, exactly as the roster previewed.
-    expect(matchSizeOf(host.lobby())).toBe(8);
-    expect(authority.ships.length).toBe(8);
+    // ── a0-11 TEST 5 + the server mirror, over a real socket ──────────────────
+    // Eight CHAIRS; three PLAYERS. Two humans turned up and the host seated one
+    // bot (seat 7, above), so that is the match — the five seats left OPEN are
+    // empty chairs and bring nothing (GDD §2.1 amended 2026-08-07). This is the
+    // assertion that would fail if the room kept its old rule and filled them:
+    // the roster would say three and authority would build eight.
+    expect(matchSizeOf(host.lobby()), 'the roster counts humans plus bots').toBe(3);
+    expect(authority.ships.length, 'and authority built exactly that').toBe(3);
+    expect(lobbyModel(host.lobby()).botCount).toBe(1);
+    // A second human was present, so the match stayed ONLINE — there is a room,
+    // it is live, and both clients are predicting against it.
+    expect(room.state).toBe('live');
+    expect(guestSession.world).not.toBeNull();
   }, netBudget({
     work: 'boot an 8-seat server → host CREATE ROOM → six lobby configuration gestures → a guest joins by code → RUSH! countdown → both predicted worlds and authority agree on the roster',
     measuredSeconds: 0.35,
@@ -303,6 +348,7 @@ describe('CREATE ROOM opens the SAME lobby PLAY SOLO opens (the unified play flo
     });
     sessions.push(guestSession);
     await until('both seats to be filled', () => room.humanCount === 2);
+    await welcomed(guestSession, hostSession);
     const guest = openClient(guestSession, 'WAIT', guestSession.you, hostSession.you);
 
     // A guest's RUSH! is refused twice over — by the lobby model (it is not theirs to
@@ -379,6 +425,7 @@ describe('CREATE ROOM opens the SAME lobby PLAY SOLO opens (the unified play flo
     });
     sessions.push(guestSession);
     await until('both seats to be filled', () => room.humanCount === 2);
+    await welcomed(guestSession, hostSession);
     const guest = openClient(guestSession, 'BACK', guestSession.you, hostSession.you);
     const host = openClient(hostSession, 'BACK', hostSession.you, hostSession.you);
 
@@ -456,6 +503,7 @@ describe('CREATE ROOM opens the SAME lobby PLAY SOLO opens (the unified play flo
     });
     sessions.push(guestSession);
     await until('both seats to be filled', () => room.humanCount === 2);
+    await welcomed(guestSession, hostSession);
     await until('the joiner to reach the host roster', () => lobbyModel(host.lobby()).humanCount === 2);
 
     // The SEAT arrives — requirement 2's live-fill half, on the host's screen.
@@ -522,6 +570,7 @@ describe('a TEAMS room is a teams match, over a real socket (m10)', () => {
     });
     sessions.push(guestSession);
     await until('both seats to be filled', () => room.humanCount === 2);
+    await welcomed(guestSession, hostSession);
     const guest = openClient(guestSession, 'TEAM', guestSession.you, hostSession.you);
 
     // The host flips TEAMS and puts the two humans on ONE side, the two bot seats
@@ -529,6 +578,14 @@ describe('a TEAMS room is a teams match, over a real socket (m10)', () => {
     // was played in.
     host.apply((s) => toggleMode(s));
     await until('the room to advertise TEAMS', () => room.mode === 'teams');
+
+    // …and seats the two bots the 2v2 is played against. Since a0-11 they do not
+    // arrive on their own: an OPEN chair stays empty (GDD §2.1 amended), so the
+    // host puts them there — "up to player to fill it up with bots if they want".
+    for (const slot of [2, 3]) host.apply((s) => cycleSeatState(s, slot));
+    await until('the room to hold four participants', () =>
+      lobbyModel(host.lobby()).size === 4,
+    );
 
     const sideOf = (player: number): number => host.lobby().seats[player]!.team;
     const wanted = [0, 0, 1, 1];
