@@ -202,10 +202,30 @@ the frame, two bands (stack rows 229–570, sha stamp rows 782–789), no third.
 
 ## NEXT
 
-1. **Waiting on CI run `31295127781`** (`pull_request`, head `194c2d5`) — the
-   first run that carries all three re-baselined frames. Needs
-   `Mobile emulation (Playwright)` = **SUCCESS**, and specifically shard 4/6,
-   which is the one that was red.
-2. If a shard is red on something else, read it before assuming flake: shards
-   1/2/3/5/6 were already green on the two-golden tree, so a new failure there
-   would be real.
+Nothing outstanding. The DoD is green, and green on a gate that actually ran.
+
+Run **`31295157868`** (`pull_request`, head `dc55efc`) — the first run carrying
+all three re-baselined frames:
+
+```
+pass  Typecheck, test, build
+pass  Mobile emulation (Playwright) — shard 1/6 .. 6/6   (all six)
+pass  Mobile emulation (Playwright)                      (the rollup)
+RUN COMPLETE: success
+```
+
+Shard 4/6 — the one that was red on the desktop golden — is green. Run
+`31295127781` (head `194c2d5`, same tree minus this note) came back green
+independently, so it is not a one-off. The DoD's last line was then run
+verbatim: `fail == 0`, and this time that is a real zero rather than a skipped
+job's, which is the whole point of the line.
+
+Local, for the record: `tsc` clean; `npm test -- --run` 4228 passed / 247 files,
+0 failed; exactly 3 files differ from `origin/main` under the snapshot
+directory; `origin/main` is an ancestor of HEAD.
+
+If a future session resumes this branch: the work is done and pushed. Do not
+re-shoot anything without first re-reading "THE BRIEF NAMED TWO GOLDENS" above —
+the three frames are `desktop-title`, `phone-landscape-title` and
+`phone-portrait-title`, and that set is derived from which frames draw the main
+menu, not from a failure list.
