@@ -76,6 +76,12 @@ import {
   lobbyModel,
   makeRoomCode,
   matchSizeOf,
+  // The room's three screens (u10-01) and the two picks their cards open.
+  openMapSelect,
+  openShipSelect,
+  pickMap,
+  pickShipClass,
+  shipCardFor,
   nameFor,
   normalizePlayerName,
   normalizeRoomCode,
@@ -697,14 +703,18 @@ describe('Gantry/Bone: RUSH! is the lobby’s ONE bright plate (u7-03)', () => {
     }
   });
 
-  it('marks the picked hull as a RAISED plate, not as a second primary', () => {
+  it('marks the two summary cards as RAISED plates, never as second primaries', () => {
     const model = lobbyModel(selectShipClass(lobby(), ShipClass.Hauler));
     const roles = lobbyPlateRoles(model);
-    // One `secondary` for BACK plus one for the picked hull; the other three
-    // hulls are surfaces, which is the handoff's own example of `inert`
-    // ("a settings row, an unselected ship").
-    expect(roles.filter((r) => r === 'secondary')).toHaveLength(2);
-    expect(roles.filter((r) => r === 'inert')).toHaveLength(3 + LOBBY_SLOTS);
+    // Three `secondary`: BACK, the one hull card and the one arena card (u10-01 —
+    // the lobby shows the PICK, so both cards are always the pick and both are
+    // always raised; the unselected-hull `inert` case moved to SHIP SELECT with the
+    // three tiles it belonged to). The eight roster rows are the surfaces.
+    expect(roles.filter((r) => r === 'secondary')).toHaveLength(3);
+    expect(roles.filter((r) => r === 'inert')).toHaveLength(LOBBY_SLOTS);
+    // …and still exactly one bright plate, which is the rule this whole block is
+    // about: adding a card must not add a primary.
+    expect(countPrimaries(roles)).toBe(1);
   });
 });
 
@@ -1716,5 +1726,87 @@ describe('lobbyRosterCast — the lobby’s pick, in the order the world builds'
     expect(lobbyRosterCast(state).filter((c) => c === 'warden')).toHaveLength(2);
     expect(lobbyRosterCast(state)[4]).toBe('warden');
     expect(lobbyRosterCast(state)[7]).toBe('warden');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// u10-01 — one ship card, one map card, and nothing else on this screen moved
+// ---------------------------------------------------------------------------
+//
+// The developer, 2026-08-07, over a screenshot of the live lobby: *"in the lobby
+// page select ship and select map need to open different pages, we should only
+// show 1 ship and 1 map in lobby because it's too cluttered now"*.
+//
+// The two picker screens have their own suites (`./ship-select.test.ts`,
+// `./map-select.test.ts`). What is asserted here is the LOBBY's half: it shows one
+// of each, and it shows everything else exactly as it did — because two of the
+// three things on this screen that were developer reports in their own right (the
+// seat-state control, u5; the FRIENDLY / ENEMY labels, u3) are neighbours of what
+// moved, and the brief is explicit that neither is in scope to alter.
+
+describe('the lobby shows ONE ship card and ONE map card (u10-01)', () => {
+  it('publishes the pick, once each, as whole cards', () => {
+    const model = lobbyModel(lobby());
+    // A card, not a list: there is no array here that could grow back to four.
+    expect(model.shipCard.shipClass).toBe(DEFAULT_SHIP_CLASS);
+    expect(model.mapCard.id).toBe(DEFAULT_MAP_ID);
+    // …and the ship card is the WHOLE option, so u4's ruling is untouched: pips
+    // AND numbers, off the sim's own table, on the card the lobby draws.
+    expect(model.shipCard.stats).toHaveLength(shipStatLines(DEFAULT_SHIP_CLASS).length);
+    for (const line of model.shipCard.stats) {
+      expect(line.text.length).toBeGreaterThan(0);
+      expect(line.pips).toBeGreaterThanOrEqual(1);
+      expect(line.pips).toBeLessThanOrEqual(line.pipMax);
+    }
+  });
+
+  it('follows the pick — the card is whatever the two screens last returned', () => {
+    for (const cls of CLASS_ORDER) {
+      expect(lobbyModel(pickShipClass(lobby(), cls)).shipCard.shipClass).toBe(cls);
+    }
+    for (const map of MAPS) {
+      expect(lobbyModel(pickMap(lobby({ online: false }), map.id)).mapCard.id).toBe(map.id);
+    }
+  });
+
+  it('falls back to a real card rather than a hole if the hull is nonsense', () => {
+    // The roster has exactly one ship card now, so "no card" would be a gap where
+    // the pick should be. Only reachable from a corrupt store, and answered.
+    expect(shipCardFor('not-a-hull' as ShipClass).shipClass).toBe(DEFAULT_SHIP_CLASS);
+  });
+
+  it('never lets the screen state reach the match — it is not match config', () => {
+    // Which of the three screens a player is standing on is where they are LOOKING.
+    // RUSH! must resolve the identical match from any of them, or the picker would
+    // be a setting nobody knew they were making.
+    const base = lobby({ online: false });
+    for (const state of [base, openShipSelect(base), openMapSelect(base)]) {
+      expect(lobbyMatchConfig(state)).toEqual(lobbyMatchConfig(base));
+      expect(lobbyWireSeats(state)).toEqual(lobbyWireSeats(base));
+      expect(lobbyRosterCast(state)).toEqual(lobbyRosterCast(base));
+    }
+  });
+
+  it('leaves the ROSTER, the seat-state control and the team labels untouched', () => {
+    // The two developer reports that live next door (u5's slot-state control and
+    // u3's FRIENDLY / ENEMY labels), asserted through the model, on the roster and
+    // in TEAMS — the modes and rows they were reported on.
+    const teams = toggleMode(lobby({ online: false }));
+    const model = lobbyModel(teams);
+    expect(model.seats).toHaveLength(LOBBY_SLOTS);
+    for (const seat of model.seats) {
+      // u5: every row states what it is, and whether it may be cycled.
+      expect(SEAT_STATE_LABELS[seat.state]).toBe(seat.stateLabel);
+      expect(seat.stateLabel.length).toBeGreaterThan(0);
+      expect(seat.canCycleState).toBe(seat.state !== 'human');
+      // u3: every row names its side in the viewer's words plus the absolute letter.
+      expect(seat.teamName).toBe(teamName(seat.team, model.viewerTeam));
+      expect(seat.teamName.startsWith('FRIENDLY') || seat.teamName.startsWith('ENEMY')).toBe(true);
+      expect(seat.teamLabel).toBe(teamLabel(seat.team));
+    }
+    // …and the cycle still moves a seat, on the roster and from either picker
+    // screen's state (the screen is not a lock).
+    expect(cycleSeatState(teams, 3).seats[3]?.occupant).not.toBe(teams.seats[3]?.occupant);
+    expect(cycleSeatTeam(teams, 3).seats[3]?.team).not.toBe(teams.seats[3]?.team);
   });
 });

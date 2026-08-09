@@ -114,14 +114,18 @@ export interface ShardAssignment {
  * apart by {@link MEASURED_FILES} rather than by a zero.
  */
 export const MEASURED_SECONDS: Readonly<Record<string, number>> = {
-  'iphone|goldens.spec.ts': 659,
+  // +36 s for u10-01's two new landscape-phone baselines (SHIP SELECT and MAP
+  // SELECT, 18 s each measured): a spec that grows and is never re-measured makes
+  // its shard the slow one, which is the failure this table exists to prevent.
+  'iphone|goldens.spec.ts': 695,
   'iphone|upgrade-wheel-gantry.spec.ts': 483,
   'iphone|build-wheel-gantry.spec.ts': 230,
   'iphone|build-flow.spec.ts': 222,
   'pixel|build-flow.spec.ts': 222,
   'pixel|build-wheel-gantry.spec.ts': 204,
   'pixel|upgrade-wheel-gantry.spec.ts': 190,
-  'desktop|goldens.spec.ts': 163,
+  // +28 s for the same two screens' desktop baselines (14 s each measured).
+  'desktop|goldens.spec.ts': 191,
   'iphone|landscape-lock.spec.ts': 142,
   'iphone|campaign-door.spec.ts': 139,
   'desktop|upgrade-wheel-gantry.spec.ts': 133,

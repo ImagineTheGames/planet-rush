@@ -36,6 +36,11 @@ interface MainMenuSeam {
 interface LobbySeam {
   visible: boolean;
   hintTitle: string | null;
+  /** Which of the room's three screens is up (u10-01). */
+  screen: string;
+  /** The lobby's ONE ship card — the control that opens SHIP SELECT. */
+  shipCardControl: { physicalCenter: PhysicalPoint };
+  /** The four hull tiles, once SHIP SELECT is open. Empty on the roster. */
   classControls: readonly ClassControl[];
   rush(): void;
 }
@@ -51,8 +56,14 @@ async function canvasOrigin(page: Page): Promise<{ x: number; y: number }> {
   return { x: box.x, y: box.y };
 }
 
-/** Boot clean, open the lobby off a real PLAY press, and return the canvas
- *  origin + the physical page point of hull tile #`tile`. */
+/**
+ * Boot clean, open the lobby off a real PLAY press, **press the lobby's one ship
+ * card to open SHIP SELECT** (u10-01 — the four hull tiles moved there), and
+ * return the canvas origin + the physical page point of hull tile #`tile`.
+ *
+ * The dossiers moved with the tiles rather than being dropped: GDD §2.10 point 2's
+ * codex reuse is a property of a hull tile, so it is wherever the tiles are.
+ */
 async function openLobbyToTile(
   page: Page,
   press: (x: number, y: number) => Promise<void>,
@@ -71,7 +82,19 @@ async function openLobbyToTile(
   await press(origin.x + play.x, origin.y + play.y);
 
   await page.waitForFunction(() => window.__lobby?.visible === true, undefined, { timeout: 20_000 });
-  await page.waitForFunction((t) => (window.__lobby?.classControls.length ?? 0) > t, tile, { timeout: 10_000 });
+
+  // …then the ship card, pressed the way a player presses it.
+  const card = await page.evaluate(() => {
+    const c = window.__lobby?.shipCardControl;
+    return c ? { x: c.physicalCenter.x, y: c.physicalCenter.y } : null;
+  });
+  if (!card) throw new Error('no ship card control');
+  await press(origin.x + card.x, origin.y + card.y);
+  await page.waitForFunction(
+    (t) => window.__lobby?.screen === 'ship-select' && (window.__lobby?.classControls.length ?? 0) > t,
+    tile,
+    { timeout: 10_000 },
+  );
   const point = await page.evaluate((t) => {
     const c = window.__lobby!.classControls.find((x) => x.index === t)!;
     return { x: c.physicalCenter.x, y: c.physicalCenter.y };

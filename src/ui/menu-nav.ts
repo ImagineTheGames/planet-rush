@@ -59,6 +59,20 @@ export type NavScreen =
    *  it owes is stronger than the offline one (close the socket, free the seat, let
    *  the room deallocate — no ghost rooms). `openLobby` with a session. */
   | 'lobby-online'
+  /**
+   * **SHIP SELECT** (u10-01) — the four hulls with their full stats, opened from
+   * the lobby's one ship card. `src/ui/ship-select`.
+   *
+   * One node for both lobby flavours, unlike the lobby itself: the two lobbies are
+   * separate nodes because their BACK differs (the online one owes the room a
+   * closed socket), and this screen's BACK owes nothing — it returns to whichever
+   * roster opened it, with the pick applied. Modelled as returning to the offline
+   * `lobby`, which is the reachability the proof cares about.
+   */
+  | 'ship-select'
+  /** **MAP SELECT** — the six arenas, opened from the lobby's one arena card. A
+   *  guest reaches it too and reads it; the pick is the host's (`src/ui/map-select`). */
+  | 'map-select'
   /** A live match (including spectating after elimination). */
   | 'match'
   /** The pause overlay over a match: RESUME / SETTINGS / EXIT TO MENU. */
@@ -82,6 +96,8 @@ export const NAV_SCREENS: readonly NavScreen[] = [
   'hangar',
   'lobby',
   'lobby-online',
+  'ship-select',
+  'map-select',
   'match',
   'pause',
   'pause-settings',
@@ -175,6 +191,29 @@ export const NAV_EDGES: readonly NavEdge[] = [
   // --- Lobby, offline (openLobby.act('leave') / Escape — u2 menu-back) --------
   { from: 'lobby', to: 'main-menu', via: 'BACK', escape: true },
   { from: 'lobby', to: 'match', via: 'RUSH', startsMatch: true },
+
+  // --- The two screens a lobby card opens (u10-01; openLobby.goToScreen) -------
+  // Added in the same PR as the screens and their routes, which is the rule this
+  // file's header states — a graph that lags the code is a map of a building that
+  // has been rebuilt.
+  //
+  // The exits are the load-bearing half here, and they are why Escape on these two
+  // screens returns to the ROSTER rather than to the main menu: BACK is one step.
+  // An Escape that skipped the roster would drop a player out of a room they had
+  // only opened a card in — and would make these the only two screens in the shell
+  // where the exit key does two things at once.
+  { from: 'lobby', to: 'ship-select', via: 'SHIP · CHANGE' },
+  { from: 'lobby', to: 'map-select', via: 'MAP · CHANGE' },
+  { from: 'lobby-online', to: 'ship-select', via: 'SHIP · CHANGE' },
+  // A GUEST reaches this one too, and reads it: what the arena screen refuses is
+  // the pick, never the look (`src/ui/lobby` `openMapSelect`). A card that would
+  // not open would read as broken and withhold the board they are about to fly.
+  { from: 'lobby-online', to: 'map-select', via: 'MAP · CHANGE' },
+  // …and both come back with the pick applied, by BACK, by Escape, or by picking.
+  { from: 'ship-select', to: 'lobby', via: 'BACK', escape: true },
+  { from: 'ship-select', to: 'lobby', via: '(pick a hull)' },
+  { from: 'map-select', to: 'lobby', via: 'BACK', escape: true },
+  { from: 'map-select', to: 'lobby', via: '(pick an arena)' },
 
   // --- Lobby, online (the same component; openLobby with a session) ------------
   // BACK closes the socket BEFORE reloading onto the menu, so the seat is freed

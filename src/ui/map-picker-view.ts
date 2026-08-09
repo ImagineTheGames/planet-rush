@@ -157,6 +157,16 @@ export class MapPickerView extends Container {
       nodes.blurb.style.wordWrapWidth = Math.max(0, rect.width - 2 * CARD_PAD);
       nodes.blurb.x = textX;
       nodes.blurb.y = cursorY;
+      // The card RESERVES room for a blurb by height; how many WRAPPED lines the
+      // sentence really takes at this width is a measurement only Pixi can make, so
+      // the final say is here. Dropped whole rather than run out of the bottom of
+      // its own card — the same "protect the read, drop the detail" ladder the hull
+      // tile keeps (`./class-tile-view`).
+      //
+      // Found by looking (u10-01): on the desktop MAP SELECT baseline, The
+      // Crescents' four-line blurb had its last word cut in half by the card's
+      // lower edge while the five cards beside it fitted in three.
+      nodes.blurb.visible = cursorY + nodes.blurb.height <= rect.y + rect.height - CARD_PAD;
     }
 
     // --- The VETERAN tag, a small pill in the top-right corner ----------------
