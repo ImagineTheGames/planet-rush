@@ -1,0 +1,723 @@
+{
+  "what": "b3-01 — mean ally separation and ore per side, before and after Stage 3",
+  "plan": "docs/team-bots-plan.md Stage 3 (§1.6 measured allies 434 units apart in a 2v2)",
+  "arm": "baseline",
+  "fixture": {
+    "seeds": [
+      11,
+      23,
+      37,
+      41,
+      59,
+      67,
+      73,
+      89
+    ],
+    "mapId": "octagon",
+    "abundance": "scarce",
+    "maxSeconds": 900,
+    "cast": "the shipped rotation (`fillEmptySlots` with no cast argument) — the real cast, not the QA probe strategies (plan §6)",
+    "note": "the identical script runs on both arms; it imports no Stage 3 symbol on any measurement path"
+  },
+  "dials": {
+    "ALLY_CROWD_RADIUS": null,
+    "ALLY_CROWD_PENALTY": null,
+    "CLAIM_TABU_SECONDS": null
+  },
+  "byLineup": {
+    "TEAMS 2v2": {
+      "matches": 8,
+      "ended": "8/8",
+      "meanSeconds": 827.6,
+      "meanAllySeparation": 577.9,
+      "meanFoeSeparation": 706.5,
+      "allyWithinOneVisualRange": "70.2%",
+      "foeWithinOneVisualRange": "55.2%",
+      "allyPairsSameRock": "12.5%",
+      "foePairsSameRock": "6.1%",
+      "oreMinedPerSide": 108.4,
+      "oreMinedPerSidePerMinute": 7.86
+    },
+    "FFA 4": {
+      "matches": 8,
+      "ended": "8/8",
+      "meanSeconds": 844.9,
+      "meanAllySeparation": null,
+      "meanFoeSeparation": 819,
+      "allyWithinOneVisualRange": null,
+      "foeWithinOneVisualRange": "42.7%",
+      "allyPairsSameRock": null,
+      "foePairsSameRock": "6.7%",
+      "oreMinedPerSide": 55.4,
+      "oreMinedPerSidePerMinute": 3.93
+    },
+    "TEAMS 4v4": {
+      "matches": 8,
+      "ended": "8/8",
+      "meanSeconds": 678,
+      "meanAllySeparation": 664,
+      "meanFoeSeparation": 743.5,
+      "allyWithinOneVisualRange": "59.7%",
+      "foeWithinOneVisualRange": "50.7%",
+      "allyPairsSameRock": "15.2%",
+      "foePairsSameRock": "7.7%",
+      "oreMinedPerSide": 122.8,
+      "oreMinedPerSidePerMinute": 10.86
+    },
+    "FFA 8": {
+      "matches": 8,
+      "ended": "8/8",
+      "meanSeconds": 825.6,
+      "meanAllySeparation": null,
+      "meanFoeSeparation": 881.9,
+      "allyWithinOneVisualRange": null,
+      "foeWithinOneVisualRange": "39.2%",
+      "allyPairsSameRock": null,
+      "foePairsSameRock": "6.8%",
+      "oreMinedPerSide": 27.9,
+      "oreMinedPerSidePerMinute": 2.03
+    }
+  },
+  "runs": [
+    {
+      "lineup": "TEAMS 2v2",
+      "seed": 11,
+      "seconds": 843.7,
+      "ended": true,
+      "allyPairTicks": 99929,
+      "allySepSum": 56890391.15837894,
+      "allyCloseTicks": 75149,
+      "allySameRockTicks": 12725,
+      "foePairTicks": 199856,
+      "foeSepSum": 145148146.62482953,
+      "foeCloseTicks": 102219,
+      "foeSameRockTicks": 11265,
+      "minedPerSide": [
+        91.46075632666378,
+        113.93012195441773
+      ]
+    },
+    {
+      "lineup": "TEAMS 2v2",
+      "seed": 23,
+      "seconds": 793.6,
+      "ended": true,
+      "allyPairTicks": 90635,
+      "allySepSum": 47006878.89551811,
+      "allyCloseTicks": 74968,
+      "allySameRockTicks": 10836,
+      "foePairTicks": 180366,
+      "foeSepSum": 119250197.03342585,
+      "foeCloseTicks": 116020,
+      "foeSameRockTicks": 9935,
+      "minedPerSide": [
+        98.40526949845938,
+        119.75737019088952
+      ]
+    },
+    {
+      "lineup": "TEAMS 2v2",
+      "seed": 37,
+      "seconds": 778.2,
+      "ended": true,
+      "allyPairTicks": 66478,
+      "allySepSum": 41632287.538101636,
+      "allyCloseTicks": 40241,
+      "allySameRockTicks": 15011,
+      "foePairTicks": 130871,
+      "foeSepSum": 85477185.46489665,
+      "foeCloseTicks": 80815,
+      "foeSameRockTicks": 13511,
+      "minedPerSide": [
+        81.63242214712348,
+        150.00705956316676
+      ]
+    },
+    {
+      "lineup": "TEAMS 2v2",
+      "seed": 41,
+      "seconds": 829.4,
+      "ended": true,
+      "allyPairTicks": 93054,
+      "allySepSum": 53818954.26209838,
+      "allyCloseTicks": 55156,
+      "allySameRockTicks": 10052,
+      "foePairTicks": 185775,
+      "foeSepSum": 130171470.74543503,
+      "foeCloseTicks": 115599,
+      "foeSameRockTicks": 9226,
+      "minedPerSide": [
+        122.8767858987198,
+        101.09843206248458
+      ]
+    },
+    {
+      "lineup": "TEAMS 2v2",
+      "seed": 59,
+      "seconds": 838.6,
+      "ended": true,
+      "allyPairTicks": 99358,
+      "allySepSum": 61629466.395654745,
+      "allyCloseTicks": 61508,
+      "allySameRockTicks": 10455,
+      "foePairTicks": 198714,
+      "foeSepSum": 151049894.69583172,
+      "foeCloseTicks": 86617,
+      "foeSameRockTicks": 11856,
+      "minedPerSide": [
+        74.53586158948985,
+        124.65335015172181
+      ]
+    },
+    {
+      "lineup": "TEAMS 2v2",
+      "seed": 67,
+      "seconds": 850,
+      "ended": true,
+      "allyPairTicks": 96023,
+      "allySepSum": 55399939.14822902,
+      "allyCloseTicks": 72632,
+      "allySameRockTicks": 10572,
+      "foePairTicks": 190377,
+      "foeSepSum": 129885142.48434885,
+      "foeCloseTicks": 119414,
+      "foeSameRockTicks": 14426,
+      "minedPerSide": [
+        128.09593799372982,
+        116.61907147987054
+      ]
+    },
+    {
+      "lineup": "TEAMS 2v2",
+      "seed": 73,
+      "seconds": 845.3,
+      "ended": true,
+      "allyPairTicks": 96288,
+      "allySepSum": 58289296.51122262,
+      "allyCloseTicks": 61249,
+      "allySameRockTicks": 10905,
+      "foePairTicks": 192961,
+      "foeSepSum": 142407226.35675308,
+      "foeCloseTicks": 85683,
+      "foeSameRockTicks": 10825,
+      "minedPerSide": [
+        92.46225501413974,
+        119.21416434821096
+      ]
+    },
+    {
+      "lineup": "TEAMS 2v2",
+      "seed": 89,
+      "seconds": 842.1,
+      "ended": true,
+      "allyPairTicks": 100408,
+      "allySepSum": 54254251.158171594,
+      "allyCloseTicks": 80144,
+      "allySameRockTicks": 12509,
+      "foePairTicks": 200814,
+      "foeSepSum": 142111531.15090302,
+      "foeCloseTicks": 110922,
+      "foeSameRockTicks": 8575,
+      "minedPerSide": [
+        91.98871391696814,
+        107.8666250820312
+      ]
+    },
+    {
+      "lineup": "FFA 4",
+      "seed": 11,
+      "seconds": 850,
+      "ended": true,
+      "allyPairTicks": 0,
+      "allySepSum": 0,
+      "allyCloseTicks": 0,
+      "allySameRockTicks": 0,
+      "foePairTicks": 290276,
+      "foeSepSum": 234718736.56833705,
+      "foeCloseTicks": 128167,
+      "foeSameRockTicks": 16280,
+      "minedPerSide": [
+        41.30192466655656,
+        53.307666308034094,
+        68.31634271663769,
+        77.41298523439058
+      ]
+    },
+    {
+      "lineup": "FFA 4",
+      "seed": 23,
+      "seconds": 840.9,
+      "ended": true,
+      "allyPairTicks": 0,
+      "allySepSum": 0,
+      "allyCloseTicks": 0,
+      "allySameRockTicks": 0,
+      "foePairTicks": 286042,
+      "foeSepSum": 222359022.29125214,
+      "foeCloseTicks": 136952,
+      "foeSameRockTicks": 18897,
+      "minedPerSide": [
+        47.35275736726154,
+        45.201979664229334,
+        51.387959598216774,
+        73.82444576971683
+      ]
+    },
+    {
+      "lineup": "FFA 4",
+      "seed": 37,
+      "seconds": 850,
+      "ended": true,
+      "allyPairTicks": 0,
+      "allySepSum": 0,
+      "allyCloseTicks": 0,
+      "allySameRockTicks": 0,
+      "foePairTicks": 291983,
+      "foeSepSum": 207362512.2601668,
+      "foeCloseTicks": 166751,
+      "foeSameRockTicks": 32550,
+      "minedPerSide": [
+        72.79007551558112,
+        40.1921236415277,
+        59.26956038622553,
+        52.9161723901676
+      ]
+    },
+    {
+      "lineup": "FFA 4",
+      "seed": 41,
+      "seconds": 840.9,
+      "ended": true,
+      "allyPairTicks": 0,
+      "allySepSum": 0,
+      "allyCloseTicks": 0,
+      "allySameRockTicks": 0,
+      "foePairTicks": 274784,
+      "foeSepSum": 236514692.4370088,
+      "foeCloseTicks": 105992,
+      "foeSameRockTicks": 20422,
+      "minedPerSide": [
+        56.576693580581356,
+        46.820780273704,
+        44.6877970940129,
+        60.21575654323252
+      ]
+    },
+    {
+      "lineup": "FFA 4",
+      "seed": 59,
+      "seconds": 848.4,
+      "ended": true,
+      "allyPairTicks": 0,
+      "allySepSum": 0,
+      "allyCloseTicks": 0,
+      "allySameRockTicks": 0,
+      "foePairTicks": 280385,
+      "foeSepSum": 222622151.01241523,
+      "foeCloseTicks": 124611,
+      "foeSameRockTicks": 17311,
+      "minedPerSide": [
+        50.10288513571424,
+        43.72484194673872,
+        69.57985319114103,
+        61.67605410950221
+      ]
+    },
+    {
+      "lineup": "FFA 4",
+      "seed": 67,
+      "seconds": 842.1,
+      "ended": true,
+      "allyPairTicks": 0,
+      "allySepSum": 0,
+      "allyCloseTicks": 0,
+      "allySameRockTicks": 0,
+      "foePairTicks": 286551,
+      "foeSepSum": 253456679.91409028,
+      "foeCloseTicks": 102315,
+      "foeSameRockTicks": 10998,
+      "minedPerSide": [
+        43.236971219614325,
+        44.992806979326915,
+        59.541935331577456,
+        58.13041670150192
+      ]
+    },
+    {
+      "lineup": "FFA 4",
+      "seed": 73,
+      "seconds": 843.7,
+      "ended": true,
+      "allyPairTicks": 0,
+      "allySepSum": 0,
+      "allyCloseTicks": 0,
+      "allySameRockTicks": 0,
+      "foePairTicks": 270840,
+      "foeSepSum": 223761078.036374,
+      "foeCloseTicks": 109646,
+      "foeSameRockTicks": 25810,
+      "minedPerSide": [
+        61.18663284305585,
+        41.44886939591761,
+        77.23853876759439,
+        44.03214414227518
+      ]
+    },
+    {
+      "lineup": "FFA 4",
+      "seed": 89,
+      "seconds": 843.2,
+      "ended": true,
+      "allyPairTicks": 0,
+      "allySepSum": 0,
+      "allyCloseTicks": 0,
+      "allySameRockTicks": 0,
+      "foePairTicks": 286927,
+      "foeSepSum": 256421433.603406,
+      "foeCloseTicks": 93892,
+      "foeSameRockTicks": 8937,
+      "minedPerSide": [
+        46.83432448086302,
+        45.37973125769041,
+        68.32025741977927,
+        64.64894739977032
+      ]
+    },
+    {
+      "lineup": "TEAMS 4v4",
+      "seed": 11,
+      "seconds": 803.3,
+      "ended": true,
+      "allyPairTicks": 455308,
+      "allySepSum": 314916563.00706524,
+      "allyCloseTicks": 256607,
+      "allySameRockTicks": 65419,
+      "foePairTicks": 600710,
+      "foeSepSum": 451688870.3871781,
+      "foeCloseTicks": 300117,
+      "foeSameRockTicks": 46990,
+      "minedPerSide": [
+        120.39330273434958,
+        143.06192770150375
+      ]
+    },
+    {
+      "lineup": "TEAMS 4v4",
+      "seed": 23,
+      "seconds": 832.1,
+      "ended": true,
+      "allyPairTicks": 450823,
+      "allySepSum": 297807324.36885077,
+      "allyCloseTicks": 274834,
+      "allySameRockTicks": 81503,
+      "foePairTicks": 587338,
+      "foeSepSum": 431228315.25375634,
+      "foeCloseTicks": 304363,
+      "foeSameRockTicks": 81854,
+      "minedPerSide": [
+        109.16801469047364,
+        181.226262217769
+      ]
+    },
+    {
+      "lineup": "TEAMS 4v4",
+      "seed": 37,
+      "seconds": 779.6,
+      "ended": true,
+      "allyPairTicks": 325220,
+      "allySepSum": 188498759.33285162,
+      "allyCloseTicks": 227187,
+      "allySameRockTicks": 46614,
+      "foePairTicks": 328686,
+      "foeSepSum": 236669508.8052582,
+      "foeCloseTicks": 177495,
+      "foeSameRockTicks": 18769,
+      "minedPerSide": [
+        64.57880035140987,
+        206.40935802977123
+      ]
+    },
+    {
+      "lineup": "TEAMS 4v4",
+      "seed": 41,
+      "seconds": 655.4,
+      "ended": true,
+      "allyPairTicks": 336224,
+      "allySepSum": 232150321.98560458,
+      "allyCloseTicks": 189608,
+      "allySameRockTicks": 54751,
+      "foePairTicks": 422050,
+      "foeSepSum": 323269754.6824865,
+      "foeCloseTicks": 205548,
+      "foeSameRockTicks": 23949,
+      "minedPerSide": [
+        84.67704341342319,
+        152.21947082121335
+      ]
+    },
+    {
+      "lineup": "TEAMS 4v4",
+      "seed": 59,
+      "seconds": 554.3,
+      "ended": true,
+      "allyPairTicks": 254059,
+      "allySepSum": 177251439.7381788,
+      "allyCloseTicks": 142596,
+      "allySameRockTicks": 41596,
+      "foePairTicks": 306390,
+      "foeSepSum": 230272819.7922979,
+      "foeCloseTicks": 149489,
+      "foeSameRockTicks": 19419,
+      "minedPerSide": [
+        76.57676410048137,
+        151.80148227126034
+      ]
+    },
+    {
+      "lineup": "TEAMS 4v4",
+      "seed": 67,
+      "seconds": 495.6,
+      "ended": true,
+      "allyPairTicks": 225517,
+      "allySepSum": 148628411.37473503,
+      "allyCloseTicks": 134677,
+      "allySameRockTicks": 28404,
+      "foePairTicks": 266653,
+      "foeSepSum": 202982609.41764224,
+      "foeCloseTicks": 126933,
+      "foeSameRockTicks": 7110,
+      "minedPerSide": [
+        65.0179528459523,
+        126.00686013964443
+      ]
+    },
+    {
+      "lineup": "TEAMS 4v4",
+      "seed": 73,
+      "seconds": 529.6,
+      "ended": true,
+      "allyPairTicks": 258327,
+      "allySepSum": 181762977.23201084,
+      "allyCloseTicks": 143869,
+      "allySameRockTicks": 41029,
+      "foePairTicks": 321938,
+      "foeSepSum": 244877228.89949298,
+      "foeCloseTicks": 159575,
+      "foeSameRockTicks": 10280,
+      "minedPerSide": [
+        73.86331999162378,
+        128.8542731667271
+      ]
+    },
+    {
+      "lineup": "TEAMS 4v4",
+      "seed": 89,
+      "seconds": 774.1,
+      "ended": true,
+      "allyPairTicks": 340552,
+      "allySepSum": 216076893.949728,
+      "allyCloseTicks": 210931,
+      "allySameRockTicks": 44149,
+      "foePairTicks": 417153,
+      "foeSepSum": 296206917.68942004,
+      "foeCloseTicks": 225380,
+      "foeSameRockTicks": 40377,
+      "minedPerSide": [
+        98.3048481550184,
+        182.17441758243152
+      ]
+    },
+    {
+      "lineup": "FFA 8",
+      "seed": 11,
+      "seconds": 822.3,
+      "ended": true,
+      "allyPairTicks": 0,
+      "allySepSum": 0,
+      "allyCloseTicks": 0,
+      "allySameRockTicks": 0,
+      "foePairTicks": 591267,
+      "foeSepSum": 486676931.29380715,
+      "foeCloseTicks": 250215,
+      "foeSameRockTicks": 42168,
+      "minedPerSide": [
+        38.87600592801985,
+        20.998596338443836,
+        27.397000717508437,
+        24.707066104234706,
+        40.03625916233486,
+        7.3713185303213145,
+        70.16981509035256,
+        4.287985196987983
+      ]
+    },
+    {
+      "lineup": "FFA 8",
+      "seed": 23,
+      "seconds": 821.5,
+      "ended": true,
+      "allyPairTicks": 0,
+      "allySepSum": 0,
+      "allyCloseTicks": 0,
+      "allySameRockTicks": 0,
+      "foePairTicks": 643028,
+      "foeSepSum": 568205647.6594813,
+      "foeCloseTicks": 252770,
+      "foeSameRockTicks": 33863,
+      "minedPerSide": [
+        32.56857134554945,
+        20.802861177051064,
+        32.02961949123843,
+        17.115197673992874,
+        37.54452748908437,
+        4.08333333333333,
+        82.39989810384631,
+        3.266666666666666
+      ]
+    },
+    {
+      "lineup": "FFA 8",
+      "seed": 37,
+      "seconds": 818.3,
+      "ended": true,
+      "allyPairTicks": 0,
+      "allySepSum": 0,
+      "allyCloseTicks": 0,
+      "allySameRockTicks": 0,
+      "foePairTicks": 649047,
+      "foeSepSum": 598324276.4239649,
+      "foeCloseTicks": 237577,
+      "foeSameRockTicks": 54830,
+      "minedPerSide": [
+        23.42357112550361,
+        6.913547169299754,
+        22.77246930295147,
+        9.79797581968159,
+        25.63481286712047,
+        7.75,
+        60.5626231655151,
+        21.55435221303886
+      ]
+    },
+    {
+      "lineup": "FFA 8",
+      "seed": 41,
+      "seconds": 839,
+      "ended": true,
+      "allyPairTicks": 0,
+      "allySepSum": 0,
+      "allyCloseTicks": 0,
+      "allySameRockTicks": 0,
+      "foePairTicks": 388887,
+      "foeSepSum": 309891484.4064422,
+      "foeCloseTicks": 178355,
+      "foeSameRockTicks": 24371,
+      "minedPerSide": [
+        21.09183996067715,
+        13.237984511348921,
+        78.76162734173066,
+        7.619395754640012,
+        47.45584726856672,
+        1.5749999999999957,
+        83.08118018873411,
+        13.004736846204166
+      ]
+    },
+    {
+      "lineup": "FFA 8",
+      "seed": 59,
+      "seconds": 827.3,
+      "ended": true,
+      "allyPairTicks": 0,
+      "allySepSum": 0,
+      "allyCloseTicks": 0,
+      "allySameRockTicks": 0,
+      "foePairTicks": 847265,
+      "foeSepSum": 835295379.3403667,
+      "foeCloseTicks": 269279,
+      "foeSameRockTicks": 32753,
+      "minedPerSide": [
+        8.83206590475245,
+        8.80400028006084,
+        11.008003670340715,
+        8.13895654534686,
+        30.572855279067433,
+        1.6749999999999978,
+        46.27678304930841,
+        64.75539295734082
+      ]
+    },
+    {
+      "lineup": "FFA 8",
+      "seed": 67,
+      "seconds": 831.5,
+      "ended": true,
+      "allyPairTicks": 0,
+      "allySepSum": 0,
+      "allyCloseTicks": 0,
+      "allySameRockTicks": 0,
+      "foePairTicks": 582557,
+      "foeSepSum": 517977875.5599753,
+      "foeCloseTicks": 218308,
+      "foeSameRockTicks": 26033,
+      "minedPerSide": [
+        45.751049204735395,
+        12.478250532559176,
+        44.444833492374,
+        8.755491250766132,
+        44.96565344135397,
+        6.625,
+        69.7037332922247,
+        17.555491250766135
+      ]
+    },
+    {
+      "lineup": "FFA 8",
+      "seed": 73,
+      "seconds": 839.1,
+      "ended": true,
+      "allyPairTicks": 0,
+      "allySepSum": 0,
+      "allyCloseTicks": 0,
+      "allySameRockTicks": 0,
+      "foePairTicks": 675187,
+      "foeSepSum": 541298307.1918331,
+      "foeCloseTicks": 305490,
+      "foeSameRockTicks": 72826,
+      "minedPerSide": [
+        45.35867721970789,
+        15.901673180690695,
+        33.61317176978219,
+        26.330224089577648,
+        40.16961844486314,
+        4.285416666666669,
+        53.404446571933434,
+        18.999164757009936
+      ]
+    },
+    {
+      "lineup": "FFA 8",
+      "seed": 89,
+      "seconds": 805.5,
+      "ended": true,
+      "allyPairTicks": 0,
+      "allySepSum": 0,
+      "allyCloseTicks": 0,
+      "allySameRockTicks": 0,
+      "foePairTicks": 448250,
+      "foeSepSum": 398032308.37194407,
+      "foeCloseTicks": 179413,
+      "foeSameRockTicks": 40737,
+      "minedPerSide": [
+        37.744860988576974,
+        6.591666666666668,
+        71.9459657714477,
+        14.145837092827598,
+        9.337239402083227,
+        3.269063680664707,
+        55.90663651942818,
+        12.88697537354674
+      ]
+    }
+  ]
+}

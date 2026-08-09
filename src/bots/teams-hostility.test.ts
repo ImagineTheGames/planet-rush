@@ -59,9 +59,11 @@ import { perceive } from './perception';
 import { Difficulty, PERSONALITIES, ROSTER } from './personalities';
 import type { PersonalityId } from './personalities';
 import {
+  allyCrowding,
   bestRock,
   bestTarget,
   homeIntruder,
+  pathClearance,
   isFoe,
   isTargetable,
   leaderStation,
@@ -457,14 +459,48 @@ describe('an ally never contributes to threat scoring', () => {
     return world;
   }
 
-  it('a teammate on the approach does not spoil a mining site; an enemy still does', () => {
+  it('a teammate on the approach is not a THREAT to the site — asserted on the term, not the pick', () => {
+    // **This assertion moved from the pick to the term, and it was not relaxed
+    // — it was sharpened.** It used to read "an ally on the corridor leaves the
+    // pick alone (900); a foe there costs that site the pick (901)". Since
+    // b3-01 an ally on the corridor *also* costs the site the pick, for an
+    // entirely different reason: `allyCrowding` discounts a rock a teammate is
+    // nearer to than I am (`docs/team-bots-plan.md` Stage 3).
+    //
+    // The two cannot be told apart by geometry, and that is a property of the
+    // design rather than an accident of this fixture: the crowd reach is one
+    // *visual range*, and any ship strictly on my approach segment to a rock I
+    // can see is necessarily nearer to that rock than I am and inside that
+    // reach. **"On my path to that rock" and "competing with me for that rock"
+    // are the same set of ships.** So an outcome assertion can no longer carry
+    // the p16-01 claim, and the two terms are read directly instead — which is
+    // the stronger statement anyway, and the same reason `TargetScore` carries
+    // its three terms beside its total.
     for (const character of ROSTER) {
-      // Equal rocks, equal trips: the lower id wins an honest tie.
-      expect(bestRock(ctxOf(corridorWorld('ally'), character))?.id, character).toBe(900);
-      // The p11 behaviour is untouched where it belongs — a hostile on the line
-      // still costs that site the pick.
-      expect(bestRock(ctxOf(corridorWorld('foe'), character))?.id, character).toBe(901);
-      expect(bestRock(ctxOf(corridorWorld('ffa'), character))?.id, character).toBe(901);
+      const ally = ctxOf(corridorWorld('ally'), character);
+      const foe = ctxOf(corridorWorld('foe'), character);
+      const ffa = ctxOf(corridorWorld('ffa'), character);
+      const rock = ally.view.asteroids.find((r) => r.id === 900)!;
+
+      // **p16-01, exactly.** A teammate contributes NOTHING to the threat on a
+      // corridor — not "less", nothing — while a hostile in the identical
+      // position divides the site down. This is the assertion that would catch
+      // an ally leaking back into `pathClearance`.
+      expect(pathClearance(ally, rock.pos), character).toBe(1);
+      expect(pathClearance(foe, rock.pos), character).toBeLessThan(1);
+      expect(pathClearance(ffa, rock.pos), character).toBeLessThan(1);
+
+      // …and the mirror image on the Stage 3 term: a *foe* near a rock is not
+      // competition for it, at any character. Only a teammate crowds.
+      expect(allyCrowding(foe, rock), character).toBe(1);
+      expect(allyCrowding(ffa, rock), character).toBe(1);
+      expect(allyCrowding(ally, rock), character).toBeLessThan(1);
+
+      // The pick, now that both terms are accounted for: every table takes the
+      // *other* rock, and the tables differ in why.
+      expect(bestRock(ally)?.id, character).toBe(901);
+      expect(bestRock(foe)?.id, character).toBe(901);
+      expect(bestRock(ffa)?.id, character).toBe(901);
     }
   });
 
