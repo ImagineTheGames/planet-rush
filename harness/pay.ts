@@ -282,6 +282,15 @@ export const median = (xs: readonly number[]): number => {
 export const mean = (xs: readonly number[]): number =>
   xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0;
 
+/** The `p`-th percentile (0..1), nearest-rank — no interpolation, so every value
+ *  a percentile reports is a value some seat actually earned. */
+export const percentile = (xs: readonly number[], p: number): number => {
+  if (xs.length === 0) return 0;
+  const s = [...xs].sort((a, b) => a - b);
+  const i = Math.min(s.length - 1, Math.max(0, Math.ceil(p * s.length) - 1));
+  return s[i]!;
+};
+
 /** One player-match, flattened — the unit every median below is taken over. */
 export interface PlayerMatch {
   readonly accrual: MatchAccrual;
@@ -316,6 +325,18 @@ export interface PayStats {
   readonly meanXp: number;
   readonly winnerXp: number;
   readonly firstOutXp: number;
+  /**
+   * The bottom of the table — the 25th percentile and the worst seat in the
+   * sample.
+   *
+   * The brief's second falsification is about a *particular* player: "a real
+   * first match — a new player, probably losing, probably on a phone". That
+   * player is not the median. A curve fitted to the median can land level 2 in
+   * one match for half the lobby and in five for the half that most needs the
+   * hook, and only a percentile shows it.
+   */
+  readonly p25Xp: number;
+  readonly worstXp: number;
   /** winner ÷ first-out — s4's participation floor, in one number. Below 1.0 the
    *  first player knocked out out-earns the winner (plan §1.3c(1)). */
   readonly spread: number;
@@ -415,6 +436,8 @@ export function payStats(results: readonly PayResult[]): PayStats {
     meanXp: mean(totals),
     winnerXp: median(pool.filter((p) => p.won).map((p) => p.xp.total)),
     firstOutXp: firstOut,
+    p25Xp: percentile(totals, 0.25),
+    worstXp: percentile(totals, 0),
     spread: firstOut > 0 ? median(pool.filter((p) => p.won).map((p) => p.xp.total)) / firstOut : 0,
     xpPerMinute: median(pool.map((p) => (p.seconds > 0 ? p.xp.total / (p.seconds / 60) : 0))),
 
@@ -451,6 +474,61 @@ export const XP_ROW_KEYS: readonly XpRowKey[] = [
 // ---------------------------------------------------------------------------
 // The curve, re-fitted against a measured pay
 // ---------------------------------------------------------------------------
+
+/**
+ * What a candidate change to the participation floor would pay, priced against
+ * an already-measured sample.
+ *
+ * The same discipline `harness/abundance.ts` uses for `respawnInterval`: a
+ * candidate is priced **without editing the constants table between runs**, so
+ * two candidates are comparable and neither reading is a different afternoon's
+ * matches. The bonus is a function of one player-match, so it can express a flat
+ * row ("+100 for playing"), a re-weighted row (`waves.count × 25` for
+ * `XP_PER_WAVE` 15 → 40), or any combination — all of them read off the rows the
+ * shipped pricer already itemised.
+ *
+ * QA recommends these values; it does not apply them. `src/progression/xp.ts` is
+ * the UI Engineer's file, and its numbers are plan Question A's territory.
+ */
+export interface FloorCandidate {
+  readonly label: string;
+  readonly medianXp: number;
+  readonly firstOutXp: number;
+  readonly p25Xp: number;
+  /** Matches to level 2 for the median seat, the p25 seat, and the first out. */
+  readonly medianL2: number;
+  readonly p25L2: number;
+  readonly firstOutL2: number;
+  readonly spread: number;
+}
+
+export function floorCandidate(
+  results: readonly PayResult[],
+  label: string,
+  bonus: (p: PlayerMatch) => number,
+): FloorCandidate {
+  const pool = playerMatches(results);
+  const totalOf = (p: PlayerMatch): number => p.xp.total + bonus(p);
+  const totals = pool.map(totalOf);
+  const winner = median(pool.filter((p) => p.won).map(totalOf));
+  const firstOut = median(pool.filter((p) => p.firstOut).map(totalOf));
+  const p25 = percentile(totals, 0.25);
+  const med = median(totals);
+  return {
+    label,
+    medianXp: med,
+    firstOutXp: firstOut,
+    p25Xp: p25,
+    medianL2: matchesToLevel(med, 2),
+    p25L2: matchesToLevel(p25, 2),
+    firstOutL2: matchesToLevel(firstOut, 2),
+    spread: firstOut > 0 ? winner / firstOut : 0,
+  };
+}
+
+/** The count on one priced row of a player-match — what a candidate re-weights. */
+export const rowCount = (p: PlayerMatch, key: XpRowKey): number =>
+  p.xp.rows.find((r) => r.key === key)?.count ?? 0;
 
 /**
  * How many matches at `payPerMatch` it takes to reach `level` from a fresh

@@ -76,14 +76,16 @@ import {
   MIXED_ROSTER,
   XP_ROW_KEYS,
   baseForLevel2In,
+  floorCandidate,
   matchesToLevel,
   medianPlayerMatch,
   payStats,
+  rowCount,
   runPayMatch,
   seeds,
   summaryCost,
 } from './pay';
-import type { PayStats, PaySetup, PlayerMatch } from './pay';
+import type { PayResult, PayStats, PaySetup, PlayerMatch } from './pay';
 import { DEFAULT_ABUNDANCE } from '../src/sim';
 import { XP_CURVE_BASE, XP_CURVE_EXP } from '../src/progression/curve';
 import {
@@ -583,13 +585,16 @@ interface Cell {
   readonly label: string;
   readonly stats: PayStats;
   readonly median: PlayerMatch | null;
+  /** Kept so a candidate floor can be priced against the SAME matches rather
+   *  than a second sweep — `harness/abundance.ts`'s discipline. */
+  readonly results: readonly PayResult[];
 }
 
 function pay(seedCount: number): number {
   const seedList = seeds(seedCount);
   const cell = (label: string, setup: Omit<PaySetup, 'seed'>): Cell => {
     const results = seedList.map((seed) => runPayMatch({ ...setup, seed }));
-    return { label, stats: payStats(results), median: medianPlayerMatch(results) };
+    return { label, stats: payStats(results), median: medianPlayerMatch(results), results };
   };
 
   log('# p1-08 — what a match pays, re-measured against the shipped code');
@@ -699,6 +704,52 @@ function pay(seedCount: number): number {
     );
   }
   log('');
+
+  // The hook, asked about the player it was written for: not the median seat,
+  // but a new player losing their first match (the brief's falsification 2).
+  log('## "Level 2 inside a single match" — for WHOM (matches to level 2)');
+  log('');
+  log('| cell | worst seat | p25 | median | winner | first out | L2 @ p25 | L2 @ first out |');
+  log('|---|---|---|---|---|---|---|---|');
+  for (const { label, stats: s } of cells) {
+    log(
+      `| ${label} | ${s.worstXp.toFixed(0)} | ${s.p25Xp.toFixed(0)} | ${s.medianXp.toFixed(0)} | ` +
+        `${s.winnerXp.toFixed(0)} | ${s.firstOutXp.toFixed(0)} | ` +
+        `${matchesToLevel(s.p25Xp, 2).toFixed(1)} | ${matchesToLevel(s.firstOutXp, 2).toFixed(1)} |`,
+    );
+  }
+  log('');
+
+  // What it would take to make the hook true for the player it was written for
+  // — a new player losing their first match. Priced against the SHIPPED default
+  // lobby's own matches, so the candidates are comparable to each other and to
+  // the row above them. QA recommends; it does not apply (`src/progression/xp.ts`
+  // is the UI Engineer's file, and its rows are plan Question A's territory).
+  const shipped = cells.find((c) => c.label === 'MIXED cast · scarce');
+  if (shipped) {
+    log('## Candidate participation floors, priced against the shipped default lobby');
+    log('');
+    log(`(MIXED cast · octagon · N=8 · SCARCE — the lobby an offline match actually seats)`);
+    log('');
+    log('| candidate | median | p25 | first out | L2 @ median | L2 @ p25 | L2 @ first out | spread |');
+    log('|---|---|---|---|---|---|---|---|');
+    const candidates: { label: string; bonus: (p: PlayerMatch) => number }[] = [
+      { label: 'shipped (control)', bonus: () => 0 },
+      { label: 'XP_PER_WAVE 15 → 40', bonus: (p) => rowCount(p, 'waves') * 25 },
+      { label: 'XP_PER_PLACEMENT_RUNG 20 → 40', bonus: (p) => rowCount(p, 'placement') * 20 },
+      { label: 'flat MATCH PLAYED +100', bonus: () => 100 },
+      { label: 'flat MATCH PLAYED +200', bonus: () => 200 },
+      { label: 'flat +100 and XP_PER_WAVE 40', bonus: (p) => 100 + rowCount(p, 'waves') * 25 },
+    ];
+    for (const c of candidates) {
+      const r = floorCandidate(shipped.results, c.label, c.bonus);
+      log(
+        `| ${r.label} | ${r.medianXp.toFixed(0)} | ${r.p25Xp.toFixed(0)} | ${r.firstOutXp.toFixed(0)} | ` +
+          `${r.medianL2.toFixed(1)} | ${r.p25L2.toFixed(1)} | ${r.firstOutL2.toFixed(1)} | ${r.spread.toFixed(1)}× |`,
+      );
+    }
+    log('');
+  }
 
   // The summary sequence, in the loop. The brief's question: a five-second beat
   // every match is not free at the fiftieth.
