@@ -29,6 +29,9 @@ the five decisions the brief left open are annotated in it under *AS BUILT*.
 | `de06c76` | **The wiring.** Observer per match, `observe()` per sim tick, `bankMatch()` once at teardown (compute → add → `saveProfile` → *then* animate), skip on tap/key/pad, pr-07's cues off the model's counters, the `__endScreenStage` additions. |
 | `0322995` | **Evidence** — `evidence/p1-05-summary-sequence/`: `capture.mjs`, five PNGs at 844×390 dpr 3, `frames.json`, `README.md`. |
 | `4f234f0` | **The golden re-baselined** (`desktop-end-of-match`), and staged boots pinned to the end state. |
+| `8f407ca` | The brief's *AS BUILT* block, and this note. |
+| `d2a64ed` | **The bed runs UNDER the level-up beat.** pr-07 built `levelUp` to duck it and expects it still sounding; the wiring was stopping it on `barMoving === false`, which is exactly that beat. |
+| PR | **[#347](https://github.com/ImagineTheGames/planet-rush/pull/347)** against `main`. |
 
 ## DECISIONS (why, and what was rejected)
 
@@ -69,7 +72,9 @@ the five decisions the brief left open are annotated in it under *AS BUILT*.
 ## VERIFIED
 
 - `npx tsc --noEmit` — clean.
-- `npm test -- --run` — see the PR body for the count on the branch tip.
+- `npm test -- --run` — **259 files, 4521 tests, all passing** (496 s), taken at
+  `8f407ca`; `d2a64ed` after it touches only the audio wiring in `src/main.ts`,
+  which no unit test covers, and typechecks clean.
 - Golden suite (`tests/mobile/goldens.spec.ts`, both projects): **38 passed**, on
   the re-baselined `desktop-end-of-match`; the `phone-portrait-eliminated` shot
   did not move. The end-of-match golden was re-run twice more and held.
