@@ -1,0 +1,271 @@
+[
+  {
+    "frame": "1-beat0-result-alone",
+    "at": "0.6s",
+    "model": {
+      "phase": "result",
+      "rows": [
+        {
+          "label": "ORE MINED",
+          "text": "0",
+          "xp": null
+        },
+        {
+          "label": "DAMAGE DEALT",
+          "text": "0 HP",
+          "xp": null
+        },
+        {
+          "label": "SHIPS DESTROYED",
+          "text": "0",
+          "xp": null
+        },
+        {
+          "label": "STATIONS DESTROYED",
+          "text": "—",
+          "xp": null
+        },
+        {
+          "label": "DISTANCE TRAVELLED",
+          "text": "0",
+          "xp": null
+        },
+        {
+          "label": "SHIPS USED",
+          "text": "0",
+          "xp": null
+        },
+        {
+          "label": "ORE USED",
+          "text": "0",
+          "xp": null
+        }
+      ],
+      "matchTime": "00:16",
+      "xp": "+0 XP",
+      "level": "LEVEL 1",
+      "barFrac": 0,
+      "leveledUp": false,
+      "buttonsLive": false,
+      "done": false
+    }
+  },
+  {
+    "frame": "2-beat1-mid-count",
+    "at": "2.2s",
+    "model": {
+      "phase": "rows",
+      "rows": [
+        {
+          "label": "ORE MINED",
+          "text": "0",
+          "xp": "+0 XP"
+        },
+        {
+          "label": "DAMAGE DEALT",
+          "text": "0 HP",
+          "xp": "+0 XP"
+        },
+        {
+          "label": "SHIPS DESTROYED",
+          "text": "0",
+          "xp": "+0 XP"
+        },
+        {
+          "label": "STATIONS DESTROYED",
+          "text": "—",
+          "xp": null
+        },
+        {
+          "label": "DISTANCE TRAVELLED",
+          "text": "1 340",
+          "xp": null
+        },
+        {
+          "label": "SHIPS USED",
+          "text": "1",
+          "xp": null
+        },
+        {
+          "label": "ORE USED",
+          "text": "0",
+          "xp": null
+        }
+      ],
+      "matchTime": "00:16",
+      "xp": "+0 XP",
+      "level": "LEVEL 1",
+      "barFrac": 0,
+      "leveledUp": false,
+      "buttonsLive": false,
+      "done": false
+    }
+  },
+  {
+    "frame": "3-beat3-bar-mid-fill",
+    "at": "4.3s",
+    "model": {
+      "phase": "fill",
+      "rows": [
+        {
+          "label": "ORE MINED",
+          "text": "0",
+          "xp": "+0 XP"
+        },
+        {
+          "label": "DAMAGE DEALT",
+          "text": "0 HP",
+          "xp": "+0 XP"
+        },
+        {
+          "label": "SHIPS DESTROYED",
+          "text": "0",
+          "xp": "+0 XP"
+        },
+        {
+          "label": "STATIONS DESTROYED",
+          "text": "—",
+          "xp": "+0 XP"
+        },
+        {
+          "label": "DISTANCE TRAVELLED",
+          "text": "1 465",
+          "xp": null
+        },
+        {
+          "label": "SHIPS USED",
+          "text": "2",
+          "xp": null
+        },
+        {
+          "label": "ORE USED",
+          "text": "0",
+          "xp": null
+        }
+      ],
+      "matchTime": "00:16",
+      "xp": "+355 XP",
+      "level": "LEVEL 1",
+      "barFrac": 0.8270583090379007,
+      "leveledUp": false,
+      "buttonsLive": false,
+      "done": false
+    }
+  },
+  {
+    "frame": "4-beat5-settle",
+    "at": "30s",
+    "model": {
+      "phase": "settle",
+      "rows": [
+        {
+          "label": "ORE MINED",
+          "text": "0",
+          "xp": "+0 XP"
+        },
+        {
+          "label": "DAMAGE DEALT",
+          "text": "0 HP",
+          "xp": "+0 XP"
+        },
+        {
+          "label": "SHIPS DESTROYED",
+          "text": "0",
+          "xp": "+0 XP"
+        },
+        {
+          "label": "STATIONS DESTROYED",
+          "text": "—",
+          "xp": "+0 XP"
+        },
+        {
+          "label": "DISTANCE TRAVELLED",
+          "text": "1 465",
+          "xp": null
+        },
+        {
+          "label": "SHIPS USED",
+          "text": "2",
+          "xp": null
+        },
+        {
+          "label": "ORE USED",
+          "text": "0",
+          "xp": null
+        }
+      ],
+      "matchTime": "00:16",
+      "xp": "+355 XP",
+      "level": "LEVEL 2",
+      "barFrac": 0.06050605060506051,
+      "leveledUp": true,
+      "buttonsLive": true,
+      "done": true
+    }
+  },
+  {
+    "career": {
+      "xp": 355,
+      "level": 2,
+      "matches": 1
+    }
+  },
+  {
+    "frame": "5-reduced-motion",
+    "at": "0.6s",
+    "model": {
+      "phase": "settle",
+      "rows": [
+        {
+          "label": "ORE MINED",
+          "text": "0",
+          "xp": "+0 XP"
+        },
+        {
+          "label": "DAMAGE DEALT",
+          "text": "0 HP",
+          "xp": "+0 XP"
+        },
+        {
+          "label": "SHIPS DESTROYED",
+          "text": "0",
+          "xp": "+0 XP"
+        },
+        {
+          "label": "STATIONS DESTROYED",
+          "text": "—",
+          "xp": "+0 XP"
+        },
+        {
+          "label": "DISTANCE TRAVELLED",
+          "text": "1 468",
+          "xp": null
+        },
+        {
+          "label": "SHIPS USED",
+          "text": "2",
+          "xp": null
+        },
+        {
+          "label": "ORE USED",
+          "text": "0",
+          "xp": null
+        }
+      ],
+      "matchTime": "00:16",
+      "xp": "+355 XP",
+      "level": "LEVEL 2",
+      "barFrac": 0.06050605060506051,
+      "leveledUp": true,
+      "buttonsLive": true,
+      "done": true
+    }
+  },
+  {
+    "career": {
+      "xp": 355,
+      "level": 2,
+      "matches": 1
+    }
+  }
+]

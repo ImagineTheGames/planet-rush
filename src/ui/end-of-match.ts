@@ -428,13 +428,80 @@ export const END_RULE_WIDTH = 200;
 /** Air above and below the identity rule, at the reference. */
 export const END_RULE_GAP = 14;
 
+// --- The summary block (pr-05, plan §6.2/§6.4) ------------------------------
+//
+// Reference heights at 1280×720, scaled like every other chrome metric. Each has
+// a floor, because plan §6.4 rule 4 is a *fit* rule: at 844×390 a linearly
+// scaled row is 16px and a linearly scaled bar is 8px, and neither may collapse
+// to nothing just because the screen is short.
+
+/** The match-time line under the result — one line, not a row (§6.2). */
+export const END_MATCH_TIME_HEIGHT = 20;
+/** One stat row's height. */
+export const END_SUMMARY_ROW_HEIGHT = 30;
+/** The XP total's own strip — the one number that summarises the rows. */
+export const END_SUMMARY_XP_HEIGHT = 40;
+/** The `LEVEL 7` readout above the bar. */
+export const END_SUMMARY_LEVEL_HEIGHT = 22;
+/** The level bar itself. */
+export const END_SUMMARY_BAR_HEIGHT = 14;
+/** The `+34 XP · 266 TO NEXT` line under it. */
+export const END_SUMMARY_PROGRESS_HEIGHT = 18;
+/** How much of the band the result + actions column takes when the screen is too
+ *  short to stack the summary under the result (see {@link EndSummaryLayout}). */
+export const END_SPLIT_LEFT_FRACTION = 0.44;
+
 export interface EndOfMatchLayoutOptions {
   readonly isTouch?: boolean;
   readonly insets?: Insets;
+  /**
+   * How many summary rows to make room for — `0`/absent means **no summary at
+   * all**, and the layout is then character for character the one a0-09 shipped.
+   *
+   * That default is load-bearing rather than tidy: the DEFEATED overlay is shown
+   * *during* a live match, and XP is never shown in a match (plan §Q2, Trap 14).
+   * The elimination screen therefore asks for no summary and keeps the exact
+   * composition — and the exact golden — it had before this lane.
+   */
+  readonly summaryRows?: number;
+}
+
+/**
+ * Where the summary's furniture sits. Two compositions, chosen by fit and not by
+ * device (plan §6.4 rule 4 — *"the layout function at 390×844 and at 844×390
+ * places every element inside the viewport"*):
+ *
+ *  - **`stacked`** — the result, then the rows, then the actions, down the
+ *    screen. What a portrait phone gets, and any viewport tall enough.
+ *  - **`split`** — the result and the actions in a left column, the stat sheet in
+ *    a right one. What a landscape phone gets (844×390 leaves ~106px under the
+ *    plates, which is not seven rows however small the type) and what a 720p
+ *    desktop gets, for the same arithmetic.
+ *
+ * There is deliberately no scrollbar in either: §6.4 says cut a row rather than
+ * scroll, so the block scales to its column and every rect stays inside the band.
+ */
+export interface EndSummaryLayout {
+  readonly mode: 'stacked' | 'split';
+  /** One rect per row, in {@link ./summary-sequence} `SUMMARY_ROW_ORDER`. */
+  readonly rows: readonly Rect[];
+  /** The XP total's strip. */
+  readonly xpTotal: Rect;
+  /** The `LEVEL n` readout. */
+  readonly levelLabel: Rect;
+  /** The level bar. */
+  readonly bar: Rect;
+  /** The `+34 XP · 266 TO NEXT` line. */
+  readonly progress: Rect;
 }
 
 export interface EndOfMatchLayout {
   readonly content: Rect;
+  /** The match-time line under the result — zero-extent when the screen carries
+   *  no summary (the DEFEATED overlay, and every pre-pr-05 caller). */
+  readonly matchTime: Rect;
+  /** The summary's furniture, or `null` when this screen carries none. */
+  readonly summary: EndSummaryLayout | null;
   /** The header beam, full width inside the safe area. */
   readonly header: Rect;
   /** The footer beam. */
@@ -453,6 +520,152 @@ export interface EndOfMatchLayout {
   readonly metrics: FrameMetrics;
 }
 
+/** The result's own furniture, placed in one column. */
+interface ResultBlock {
+  readonly headline: Rect;
+  readonly rule: Rect;
+  readonly subhead: Rect;
+  readonly matchTime: Rect;
+}
+
+/**
+ * Place the result — headline, identity rule, line, and (when the screen carries
+ * a summary) the match-time line — centred in `area`.
+ *
+ * Every height is clamped against what is actually left, in order, so a viewport
+ * with no room yields zero-extent rects rather than backwards ones. With
+ * `matchTimeHeight = 0` this reproduces the pre-pr-05 placement to the pixel,
+ * which is what keeps the DEFEATED overlay's golden where it was.
+ */
+function placeResult(area: Rect, m: FrameMetrics, matchTimeHeight: number): ResultBlock {
+  const avail = Math.max(0, area.height);
+  const headlineHeight = Math.min(Math.round(END_HEADLINE_HEIGHT * m.scale), avail);
+  const ruleGap = Math.round(END_RULE_GAP * m.scale);
+  const subheadHeight = Math.min(
+    Math.round(END_SUBHEAD_HEIGHT * m.scale),
+    Math.max(0, avail - headlineHeight),
+  );
+  const ruleHeight = Math.min(ROW_BAR_WIDTH, Math.max(0, avail - headlineHeight - subheadHeight));
+  const ruleBlock = ruleHeight > 0 ? ruleHeight + ruleGap * 2 : 0;
+  const timeHeight = Math.min(
+    matchTimeHeight,
+    Math.max(0, avail - headlineHeight - subheadHeight - ruleBlock),
+  );
+  const blockHeight = headlineHeight + ruleBlock + subheadHeight + timeHeight;
+  const top = area.y + Math.max(0, (avail - blockHeight) / 2);
+
+  const headline: Rect = { x: area.x, y: top, width: area.width, height: headlineHeight };
+  const ruleWidth = Math.min(Math.round(END_RULE_WIDTH * m.scale), area.width);
+  return {
+    headline,
+    rule: {
+      x: area.x + (area.width - ruleWidth) / 2,
+      y: top + headlineHeight + ruleGap,
+      width: ruleHeight > 0 ? ruleWidth : 0,
+      height: ruleHeight,
+    },
+    subhead: { x: area.x, y: top + headlineHeight + ruleBlock, width: area.width, height: subheadHeight },
+    matchTime: {
+      x: area.x,
+      y: top + headlineHeight + ruleBlock + subheadHeight,
+      width: area.width,
+      height: timeHeight,
+    },
+  };
+}
+
+/** The result block's natural height at these metrics, with no clamping — what
+ *  the stacked/split decision is taken against. */
+function resultNaturalHeight(m: FrameMetrics, matchTimeHeight: number): number {
+  return (
+    Math.round(END_HEADLINE_HEIGHT * m.scale) +
+    ROW_BAR_WIDTH +
+    Math.round(END_RULE_GAP * m.scale) * 2 +
+    Math.round(END_SUBHEAD_HEIGHT * m.scale) +
+    matchTimeHeight
+  );
+}
+
+/** The summary block's own heights, floored so nothing collapses on a phone. */
+function summaryHeights(m: FrameMetrics, rows: number): {
+  row: number;
+  xp: number;
+  level: number;
+  bar: number;
+  progress: number;
+  natural: number;
+} {
+  const row = Math.max(12, Math.round(END_SUMMARY_ROW_HEIGHT * m.scale));
+  const xp = Math.max(14, Math.round(END_SUMMARY_XP_HEIGHT * m.scale));
+  const level = Math.max(10, Math.round(END_SUMMARY_LEVEL_HEIGHT * m.scale));
+  const bar = Math.max(6, Math.round(END_SUMMARY_BAR_HEIGHT * m.scale));
+  const progress = Math.max(10, Math.round(END_SUMMARY_PROGRESS_HEIGHT * m.scale));
+  const natural =
+    rows * row +
+    Math.max(0, rows - 1) * m.rowGap +
+    m.gutter +
+    xp +
+    m.rowGap +
+    level +
+    m.rowGap +
+    bar +
+    m.rowGap +
+    progress;
+  return { row, xp, level, bar, progress, natural };
+}
+
+/**
+ * Place the seven rows, the XP total and the level bar inside one column.
+ *
+ * If the natural block is taller than the column it is **scaled to fit** rather
+ * than clipped or scrolled (§6.4 rule 4). That is the whole of the "no scrollbar"
+ * rule as code: the block's proportions survive, its absolute size does not, and
+ * every rect this returns is inside `area` by construction.
+ */
+function placeSummaryBlock(area: Rect, rows: number, m: FrameMetrics): EndSummaryLayout {
+  const h = summaryHeights(m, rows);
+  const fit = area.height > 0 && h.natural > 0 ? Math.min(1, area.height / h.natural) : 0;
+  const at = (v: number): number => Math.max(0, Math.floor(v * fit));
+  const rowH = at(h.row);
+  const gapRows = at(m.rowGap);
+  const gutter = at(m.gutter);
+  const xpH = at(h.xp);
+  const levelH = at(h.level);
+  const barH = at(h.bar);
+  const progressH = at(h.progress);
+
+  const width = Math.min(COLUMN.settings, area.width);
+  const x = area.x + Math.max(0, (area.width - width) / 2);
+  const used =
+    rows * rowH +
+    Math.max(0, rows - 1) * gapRows +
+    gutter +
+    xpH +
+    gapRows +
+    levelH +
+    gapRows +
+    barH +
+    gapRows +
+    progressH;
+  let y = area.y + Math.max(0, (area.height - used) / 2);
+
+  const rowRects: Rect[] = [];
+  for (let i = 0; i < rows; i++) {
+    rowRects.push({ x, y, width, height: rowH });
+    y += rowH + (i < rows - 1 ? gapRows : 0);
+  }
+  y += gutter;
+  const xpTotal: Rect = { x, y, width, height: xpH };
+  y += xpH + gapRows;
+  const levelLabel: Rect = { x, y, width, height: levelH };
+  y += levelH + gapRows;
+  const bar: Rect = { x, y, width, height: barH };
+  y += barH + gapRows;
+  const progress: Rect = { x, y, width, height: progressH };
+
+  return { mode: 'stacked', rows: rowRects, xpTotal, levelLabel, bar, progress };
+}
+
 /**
  * Lay the summary out for a viewport.
  *
@@ -467,6 +680,15 @@ export interface EndOfMatchLayout {
  * `buttonIds` rather than a count, because REMATCH is a `hero` plate and its
  * companion is a `standard` one ({@link endButtonPlate}) — size is half of what
  * marks the primary, and a count cannot say which is which.
+ *
+ * ── pr-05: THE SUMMARY, AND WHY IT MAY MOVE THE ACTIONS ─────────────────────
+ * With `summaryRows` the screen also carries the stat sheet, the XP total and
+ * the level bar, and there is not always room for all of it under the result: a
+ * landscape phone leaves ~106px below the plates, which is not seven rows at any
+ * type size. So the band is split into two columns when it has to be — result and
+ * actions on the left, the sheet on the right — and stacked when it fits. The
+ * decision is taken on measured heights, here, so the 390 px test in
+ * `end-of-match.test.ts` is testing the rule and not a device string.
  */
 export function endOfMatchLayout(
   viewport: Viewport,
@@ -479,58 +701,71 @@ export function endOfMatchLayout(
   const band = frame.band;
 
   const title = beamContent(frame.header, m);
+  const rows = Math.max(0, Math.floor(options.summaryRows ?? 0));
+  const matchTimeHeight = rows > 0 ? Math.round(END_MATCH_TIME_HEIGHT * m.scale) : 0;
 
-  // The plates, bottom-anchored in the band at their own heights.
-  const columnWidth = Math.min(COLUMN.title, band.width);
   const heights = buttonIds.map((id) => plateHeight(endButtonPlate(id).scale, m));
   const stackHeight = Math.min(
     band.height,
     heights.reduce((a, b) => a + b, 0) + Math.max(0, heights.length - 1) * m.gap,
   );
+
+  // Does the whole thing stack? Result, sheet and plates down one column.
+  const summary = rows > 0 ? summaryHeights(m, rows) : null;
+  const stacked =
+    summary === null ||
+    resultNaturalHeight(m, matchTimeHeight) + m.gutter + summary.natural + m.gutter + stackHeight <=
+      band.height;
+
+  // The actions' column: the whole band when stacked, the left column when not.
+  const actionWidth = stacked ? band.width : Math.max(0, Math.round(band.width * END_SPLIT_LEFT_FRACTION));
+  const columnWidth = Math.min(COLUMN.title, actionWidth);
   const stackBand: Rect = {
     x: band.x,
     y: band.y + band.height - stackHeight,
-    width: band.width,
+    width: actionWidth,
     height: stackHeight,
   };
   const buttons = stackPlates(stackBand, columnWidth, heights, m.gap);
 
-  // …and the result, centred in what is left above them.
+  // …and the result, centred in what is left above them, in that same column.
   const resultHeight = Math.max(0, band.height - stackHeight - m.gutter);
-  const headlineHeight = Math.min(Math.round(END_HEADLINE_HEIGHT * m.scale), resultHeight);
-  const ruleGap = Math.round(END_RULE_GAP * m.scale);
-  const subheadHeight = Math.min(
-    Math.round(END_SUBHEAD_HEIGHT * m.scale),
-    Math.max(0, resultHeight - headlineHeight),
-  );
-  const ruleHeight = Math.min(ROW_BAR_WIDTH, Math.max(0, resultHeight - headlineHeight - subheadHeight));
-  const ruleBlock = ruleHeight > 0 ? ruleHeight + ruleGap * 2 : 0;
-  const blockHeight = headlineHeight + ruleBlock + subheadHeight;
-  const blockTop = band.y + Math.max(0, (resultHeight - blockHeight) / 2);
-
-  const headline: Rect = { x: band.x, y: blockTop, width: band.width, height: headlineHeight };
-  const ruleWidth = Math.min(Math.round(END_RULE_WIDTH * m.scale), band.width);
-  const rule: Rect = {
-    x: band.x + (band.width - ruleWidth) / 2,
-    y: headline.y + headlineHeight + ruleGap,
-    width: ruleHeight > 0 ? ruleWidth : 0,
-    height: ruleHeight,
-  };
-  const subhead: Rect = {
+  const resultArea: Rect = {
     x: band.x,
-    y: headline.y + headlineHeight + ruleBlock,
-    width: band.width,
-    height: subheadHeight,
+    y: band.y,
+    width: actionWidth,
+    height: summary && stacked ? Math.min(resultNaturalHeight(m, matchTimeHeight), resultHeight) : resultHeight,
   };
+  const result = placeResult(resultArea, m, matchTimeHeight);
+
+  let summaryLayout: EndSummaryLayout | null = null;
+  if (summary) {
+    const area: Rect = stacked
+      ? {
+          x: band.x,
+          y: resultArea.y + resultArea.height + m.gutter,
+          width: band.width,
+          height: Math.max(0, resultHeight - resultArea.height - m.gutter),
+        }
+      : {
+          x: band.x + actionWidth + m.gutter,
+          y: band.y,
+          width: Math.max(0, band.width - actionWidth - m.gutter),
+          height: band.height,
+        };
+    summaryLayout = { ...placeSummaryBlock(area, rows, m), mode: stacked ? 'stacked' : 'split' };
+  }
 
   return {
     content: frame.content,
     header: frame.header,
     footer: frame.footer,
     title,
-    headline,
-    rule,
-    subhead,
+    headline: result.headline,
+    rule: result.rule,
+    subhead: result.subhead,
+    matchTime: result.matchTime,
+    summary: summaryLayout,
     buttons,
     isTouch,
     metrics: m,

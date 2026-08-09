@@ -495,3 +495,118 @@ describe('the Gantry/Bone summary', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// pr-05 — the summary block, and plan §6.4 rule 4: it FITS, at 390px, no scroll
+// ---------------------------------------------------------------------------
+
+describe('the summary block', () => {
+  const ROWS = 7; // the plan's seven visible rows (§6.2)
+  const rectsOf = (layout: ReturnType<typeof endOfMatchLayout>): { name: string; r: { x: number; y: number; width: number; height: number } }[] => {
+    const s = layout.summary!;
+    return [
+      { name: 'headline', r: layout.headline },
+      { name: 'rule', r: layout.rule },
+      { name: 'subhead', r: layout.subhead },
+      { name: 'matchTime', r: layout.matchTime },
+      ...s.rows.map((r, i) => ({ name: `row ${i}`, r })),
+      { name: 'xpTotal', r: s.xpTotal },
+      { name: 'levelLabel', r: s.levelLabel },
+      { name: 'bar', r: s.bar },
+      { name: 'progress', r: s.progress },
+      ...layout.buttons.map((r, i) => ({ name: `button ${i}`, r })),
+    ];
+  };
+
+  it('is ABSENT unless the screen asks for it — the DEFEATED overlay is untouched', () => {
+    // XP is never shown *in* a match (plan §Q2, Trap 14), and the elimination
+    // overlay is shown while the others fight on. So it asks for no summary, and
+    // its layout is the one a0-09 shipped, to the pixel.
+    const bare = endOfMatchLayout(VIEWPORT, ['rematch', 'spectate']);
+    expect(bare.summary).toBeNull();
+    expect(bare.matchTime.height).toBe(0);
+    const withSummary = endOfMatchLayout(VIEWPORT, ['rematch', 'menu'], { summaryRows: ROWS });
+    expect(withSummary.summary).not.toBeNull();
+    expect(withSummary.matchTime.height).toBeGreaterThan(0);
+  });
+
+  for (const [name, vp] of [
+    ['portrait phone, 390×844', { width: 390, height: 844 }],
+    ['landscape phone, 844×390', { width: 844, height: 390 }],
+    ['the desktop control, 1280×800', { width: 1280, height: 800 }],
+    ['the reference, 1280×720', { width: 1280, height: 720 }],
+  ] as const) {
+    it(`${name}: places every element inside the viewport, safe areas included`, () => {
+      const insets = { top: 24, bottom: 20, left: 12, right: 12 };
+      const layout = endOfMatchLayout(vp, ['rematch', 'menu'], { isTouch: true, insets, summaryRows: ROWS });
+      for (const { name: what, r } of rectsOf(layout)) {
+        expect(r.width, `${what} width`).toBeGreaterThanOrEqual(0);
+        expect(r.height, `${what} height`).toBeGreaterThanOrEqual(0);
+        expect(r.x, `${what} left`).toBeGreaterThanOrEqual(insets.left - 0.001);
+        expect(r.y, `${what} top`).toBeGreaterThanOrEqual(insets.top - 0.001);
+        expect(r.x + r.width, `${what} right`).toBeLessThanOrEqual(vp.width - insets.right + 0.001);
+        expect(r.y + r.height, `${what} bottom`).toBeLessThanOrEqual(vp.height - insets.bottom + 0.001);
+      }
+    });
+
+    it(`${name}: draws all seven rows, in order, without overlapping`, () => {
+      const layout = endOfMatchLayout(vp, ['rematch', 'menu'], { isTouch: true, summaryRows: ROWS });
+      const rows = layout.summary!.rows;
+      expect(rows.length).toBe(ROWS);
+      for (const r of rows) expect(r.height).toBeGreaterThan(0);
+      for (let i = 1; i < rows.length; i++) {
+        expect(rows[i]!.y, `row ${i} under row ${i - 1}`).toBeGreaterThanOrEqual(
+          rows[i - 1]!.y + rows[i - 1]!.height - 0.001,
+        );
+      }
+      // …and the bar is under the total, which is under the last row.
+      const s = layout.summary!;
+      expect(s.xpTotal.y).toBeGreaterThanOrEqual(rows[ROWS - 1]!.y + rows[ROWS - 1]!.height - 0.001);
+      expect(s.bar.y).toBeGreaterThanOrEqual(s.levelLabel.y + s.levelLabel.height - 0.001);
+      expect(s.progress.y).toBeGreaterThanOrEqual(s.bar.y + s.bar.height - 0.001);
+      expect(s.bar.height).toBeGreaterThan(0);
+    });
+
+    it(`${name}: keeps both plates over the 48px thumb floor with the sheet on screen`, () => {
+      const layout = endOfMatchLayout(vp, ['rematch', 'menu'], { isTouch: true, summaryRows: ROWS });
+      for (const r of layout.buttons) expect(r.height).toBeGreaterThanOrEqual(TOUCH_MIN);
+      for (const r of layout.buttons) expect(r.width).toBeGreaterThan(0);
+    });
+  }
+
+  it('SPLITS the band when the screen is too short to stack, and stacks when it is not', () => {
+    // The rule is measured height, not a device string: a landscape phone has
+    // ~106px under the plates, which is not seven rows at any type size.
+    expect(endOfMatchLayout({ width: 844, height: 390 }, ['rematch', 'menu'], { summaryRows: 7 }).summary!.mode)
+      .toBe('split');
+    expect(endOfMatchLayout({ width: 390, height: 844 }, ['rematch', 'menu'], { summaryRows: 7 }).summary!.mode)
+      .toBe('stacked');
+  });
+
+  it('never lets the sheet collide with the result or the actions', () => {
+    for (const vp of [{ width: 844, height: 390 }, { width: 390, height: 844 }, { width: 1280, height: 800 }]) {
+      const layout = endOfMatchLayout(vp, ['rematch', 'menu'], { summaryRows: 7 });
+      const s = layout.summary!;
+      const first = s.rows[0]!;
+      const last = layout.buttons[layout.buttons.length - 1]!;
+      if (s.mode === 'stacked') {
+        expect(first.y).toBeGreaterThanOrEqual(layout.matchTime.y + layout.matchTime.height - 0.001);
+        expect(s.progress.y + s.progress.height).toBeLessThanOrEqual(layout.buttons[0]!.y + 0.001);
+      } else {
+        // Two columns: the sheet starts to the right of everything on the left.
+        expect(first.x).toBeGreaterThanOrEqual(layout.headline.x + layout.headline.width - 0.001);
+        expect(first.x).toBeGreaterThanOrEqual(last.x + last.width - 0.001);
+      }
+    }
+  });
+
+  it('yields zero-extent rects on a viewport with no room, never backwards ones', () => {
+    for (const vp of [{ width: 4, height: 4 }, { width: 0, height: 0 }]) {
+      const layout = endOfMatchLayout(vp, ['rematch', 'menu'], { summaryRows: 7 });
+      for (const { name, r } of rectsOf(layout)) {
+        expect(r.width, `${name} width`).toBeGreaterThanOrEqual(0);
+        expect(r.height, `${name} height`).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+});

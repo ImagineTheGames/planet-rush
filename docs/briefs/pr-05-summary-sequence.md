@@ -118,6 +118,36 @@ Four frames from the real booted client at 844×390: the result alone (beat 0), 
 showing the same final numbers with the level-up marked. And the skip test's identical-models
 assertion, named.
 
+## AS BUILT — annotations from the lane (`agent/ui/p1-05-summary-sequence`)
+
+Read against `docs/progression-plan.md` §6 line by line: **the brief and the plan do not
+disagree anywhere**, so nothing here is a correction of the brief. These are the five
+decisions the brief left open, recorded where the next reader will look.
+
+1. **The DEFEATED overlay carries no summary at all.** Neither document says so outright,
+   but §Q2 and Trap 14 do: *level yes, XP never, lobby only*, and an eliminated player is
+   still **in** a match — the others fight on, their `wavesSurvived` and placement are not
+   final, and the profile may not be written mid-match (§6.4, GDD §4.8). So the sequence
+   rides the **result** screen only, and the elimination overlay keeps a0-09's screen to
+   the pixel (`endOfMatchLayout` with no `summaryRows` is character for character what it
+   was, and the `phone-portrait-eliminated` golden did not move).
+2. **No row was cut.** Rule 4's fallback is *"cut a row, do not add a scrollbar"* — the
+   fallback is conditional and was not needed. At 844×390 the band splits into two
+   columns (result + actions | the stat sheet) and all seven rows fit; at 390×844 it
+   stacks. The choice is made on measured heights, so it is a rule and not a device list.
+3. **A STAGED boot rests the sequence at its end state** (`?debug=1`, and `?freeze=1`
+   which already pinned everything else). A screenshot harness captures two frames and
+   compares them, so a screen mid-count between them is a gate that fails on its own
+   animation. `__endScreenStage.summarySeek(t)` asks for a beat by name, which is how the
+   evidence run photographs four beats of one sequence.
+4. **Online, the observer is fed the reconciled predicted world**, because there is no
+   other one: `session.world` is the predicted world and this client is handed no
+   authoritative `World` object (`src/net/session.ts`). The plan's trap is met exactly
+   offline — where the world *is* authority — and the honest limit is written at the
+   wiring in `src/main.ts`. A genuinely authoritative feed is a netcode-lane change.
+5. **Distance is shown in arena units**, ungrouped by any invented unit (`1 465`), because
+   the sim has no metre and a screen is a bad place to mint one.
+
 ## Open questions this brief is exposed to
 
 - **Question C** — a station the Crush killed. *Ships as:* `—`, credited to nobody. If the

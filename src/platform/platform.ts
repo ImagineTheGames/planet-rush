@@ -44,6 +44,32 @@ export interface Platform {
    *  locking (mobile amendment §2). Feature-detected, no bare global in game
    *  code (GDD §4.1). */
   canLockOrientation(): boolean;
+  /**
+   * Whether the player has asked their operating system for **less motion**
+   * (`prefers-reduced-motion: reduce`).
+   *
+   * ── WHY THIS ARRIVES WITH pr-05, AND WHAT IT IS NOT ────────────────────────
+   * Nothing in this client honoured the preference before the end-of-match
+   * sequence: a grep over `src/`, `index.html`, `public/` and the style guide
+   * returned nothing (plan `docs/progression-plan.md` Trap 15). The nearest
+   * neighbour is **`reduceVfx`** (`src/render/index.ts`), and it is *not* this —
+   * that is a performance reducer driven by a sustained frame-rate drop plus a
+   * match setting, it sheds decorative VFX while keeping the load-bearing tells
+   * (GDD §4.3 risk 5), and it says nothing about what the player asked their OS
+   * for. The two answer different questions and are read separately.
+   *
+   * It lives on this seam rather than as a `window.matchMedia` call in the UI for
+   * the reason every other capability does (GDD §4.1): game code never touches a
+   * bare browser global, and a preference this screen reads must be answerable
+   * headless, in a unit test, and by a native shell later.
+   *
+   * **Read it per use, never cached.** A player can change the setting while the
+   * game is open, and the answer is one media-query lookup.
+   *
+   * Defaults to `false` where the query is unavailable — full motion is the
+   * shipped experience, and a browser that cannot answer has not asked for less.
+   */
+  prefersReducedMotion(): boolean;
 }
 
 /** The non-standard-typed `screen.orientation.lock` surface, feature-detected
@@ -133,6 +159,18 @@ export function createBrowserPlatform(): Platform {
     canLockOrientation(): boolean {
       const orient = orientationLock();
       return !!orient && typeof orient.lock === 'function';
+    },
+
+    prefersReducedMotion(): boolean {
+      // Feature-detected and wrapped: `matchMedia` is absent in a jsdom-less test
+      // environment and in some embeds, and an unsupported query must read as "no
+      // preference" rather than throw into a screen the player cannot leave.
+      try {
+        if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+        return window.matchMedia('(prefers-reduced-motion: reduce)').matches === true;
+      } catch {
+        return false;
+      }
     },
   };
 }

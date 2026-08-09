@@ -741,11 +741,39 @@ export type {
   EndOfMatchLayout,
   EndOfMatchModel,
   EndPointer,
+  EndSummaryLayout,
   EndTarget,
   MatchOutcome,
 } from './end-of-match';
 
 export { EndOfMatchView, END_OF_MATCH_ANCHOR } from './end-of-match-view';
+
+// --- The summary as a choreographed sequence (pr-05, plan §6) ---------------
+//
+// The end screen counts its stats up, fills the level bar toward the next level,
+// and is skippable at any moment onto exactly the same numbers. `buildSummary`
+// fixes every value at teardown; `summaryFrame` reads that timeline at an
+// instant and is pure in `(sequence, elapsed, skipped)`.
+
+export {
+  SUMMARY_MATCH_TIME_LABEL,
+  SUMMARY_MAX_LEVEL_UPS,
+  SUMMARY_ROW_ORDER,
+  SUMMARY_TIMING,
+  buildSummary,
+  formatMatchTime,
+  summaryFrame,
+} from './summary-sequence';
+export type {
+  SummaryFrame,
+  SummaryFrameOptions,
+  SummaryInput,
+  SummaryPhase,
+  SummaryRow,
+  SummaryRowFrame,
+  SummaryRowKey,
+  SummarySequence,
+} from './summary-sequence';
 
 // --- The pause menu — exit / settings mid-match, offline-only pause (p10) ----
 //
