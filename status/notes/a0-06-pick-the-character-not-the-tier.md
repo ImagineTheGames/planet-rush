@@ -1004,3 +1004,50 @@ on a run that was fine. The log answers it in one read.
 **byte-identical** — slots 1–7 `warden warden sable vulture warden sable vulture`
 in the lobby and the same seven in the match, `identical: true`. It is absent from
 `ad30e9d`'s diff and that absence IS the result.
+
+#### Then main moved to `aaf2733` (a0-16 wave clock, #334) and it touched MY files
+
+Merged first, before re-measuring (session 7's rule). **Clean, no conflicts** —
+and worth reading rather than trusting, because a0-16 edits **`src/bots/`**: it
+changes `perception.ts`'s `nextWaveIn` to read the match's own interval
+(`waveIntervalOf`) instead of `waveTime`'s baseline default, which had a bot in a
+default SCARCE match expecting the wave 15 s early. **Fog honesty is intact** —
+the wave clock is printed on the HUD (GDD §2.2), so it was already public
+information; a0-16 makes the bot read the *true* public value rather than a
+wrong one. Ratified through main, not this brief's to litigate.
+
+**This is the tenth merge in a row to leave the cast seam untouched.**
+
+##### DoD re-run on the a0-16 merge
+
+- `npx tsc --noEmit` — clean.
+- `npm test -- --run` — **4128 passed, 0 failed**, 244 files, 336 s.
+  **`capacity-regression` passed this time**, at load 17 — which retires the last
+  doubt about it: same branch, same benchmark, red at load 31 and green at load
+  17. It is the box.
+- `PREVIEW_PORT=4198 npm run test:live-stage -- lobby-cast.spec.ts` — **3 passed**
+  (cast round trip 41.0 s, `?` by click 11.1 s, `?` by tap at 390 px 1.2 m).
+- GDD.md differs from `origin/main`; `merge-base --is-ancestor` OK at `aaf2733`.
+- `lobby-cast-readback.txt` regenerated **byte-identical** again, on top of a
+  merge that changed how bots read the wave clock. That is the cleanest statement
+  of this brief's own boundary: a0-16 changed how a bot *plays*, and who the
+  lobby *seats* did not move.
+
+## NEXT
+
+- **ONLINE still carries the tier, not the name** (unchanged, and still the only
+  known gap). `LobbyChoiceMessage` has `botDifficulties` and no character row, so
+  an online room seats the right *tiers* and may seat different *names* within
+  them. Offline — the flavour both developer reports were filed against — is
+  exact. Closing it is a **Netcode** seam (`transport.ts` → `wire.ts` →
+  `session.ts` → `server/room.ts` `castFor`), four files across two other agents'
+  ownership and outside this brief. Stated in the PR body and in
+  `docs/design-amendments.md`.
+- `PREVIEW_PORT` remains marked *(a0-06, proposed)* in two configs —
+  `tests/live-stage/playwright.config.ts` (`a1bc039`, Platform's) and the root
+  `playwright.config.ts` (`7701b62`, QA's). Either owner can drop their own; both
+  default to 4173 unchanged.
+- **No feature work outstanding. Do not invent any.** If you inherit this branch
+  green, the useful things to do are: check `git log origin/<branch>..HEAD`
+  first, merge main if it has moved, and re-run the gates — **with the run
+  redirected to a file, never piped**, so you can see a hang if one returns.
