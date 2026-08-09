@@ -5886,6 +5886,24 @@ function readMapId(platform: ReturnType<typeof createBrowserPlatform>): string {
 }
 
 /**
+ * The local player's career LEVEL, for the lobby seat badge (pr-06; plan §Q2,
+ * ratified 2026-08-07: *"we can show the LEVEL but not XP (and show it only in
+ * the lobby)"*).
+ *
+ * Read **here, when the lobby opens**, and not once at boot: the summary screen
+ * banks XP at the end of every match (`bankMatch`), so a player who rematches or
+ * walks back to the roster has a level the front door's read is already stale
+ * about. One `loadProfile` per lobby costs one `localStorage` read.
+ *
+ * The level goes in and **nothing else does** — no XP, no match count. The lobby
+ * model has one field for one number ({@link LobbyState.level}) and no room to
+ * carry a total that is private to its owner.
+ */
+function readCareerLevel(platform: ReturnType<typeof createBrowserPlatform>): number {
+  return loadProfile(platform.storage).level;
+}
+
+/**
  * `?sides=N` (debug only) — the side table a `?debug=1` boot builds its world
  * with, or `null` for the ordinary free-for-all.
  *
@@ -8204,6 +8222,10 @@ function openLobby(
     shipClass: readShipClass(platform),
     name: readPlayerName(platform),
     mapId: readMapId(platform),
+    // Your career level, for the badge on your own seat row — the ONE place in
+    // the game a level is shown (pr-06; plan §Q2). Nobody else's is read, and no
+    // XP total travels with it.
+    level: readCareerLevel(platform),
     // The whole match shape the host last set (variable-slots Milestone E): the
     // mode, the abundance, and the size (trailing seats pre-closed) — folded to
     // legal values on read, so a stale key can never open an illegal lobby.

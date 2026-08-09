@@ -40,6 +40,7 @@ import { readFileSync } from 'node:fs';
 import { ShipClass } from '@shared/types';
 import {
   LEVEL_BADGE_PREFIX,
+  applyLobbySlots,
   createLobby,
   cycleSeatState,
   levelBadgeLabel,
@@ -47,6 +48,7 @@ import {
   seatLocalPlayer,
 } from './lobby';
 import type { LobbyState } from './lobby';
+import type { LobbySlot } from '../net/transport';
 import { freshProfile, loadProfile, saveProfile } from '../progression/profile';
 import type { ProfileStorage } from '../progression/profile';
 import { levelForXp, xpToReach } from '../progression/curve';
@@ -176,18 +178,29 @@ describe('…and nobody else’s — a bot has no career, and a stranger’s is 
 
   it('a REMOTE HUMAN’s seat carries no badge — it is not read, requested or drawn', () => {
     // Plan §2.2: m9 has no accounts, so a level arriving from another client is
-    // a number that client authored. §Q2 forbids showing it; this asserts the
-    // lobby does not even have a shape to put one in — a remote human is a human
-    // seat that is not yours, and it draws nothing.
-    const state = seatLocalPlayer(
-      createLobby({ room: 'ABCD', you: 0, host: 0, slots: 8, level: 9 }),
-      0,
-      1,
+    // a number that client authored. This folds in a real `lobbyState` broadcast
+    // — a person seated in slot 3 by the server — and asserts two things at once:
+    // their row draws no badge, and there was nothing on the wire to draw it from
+    // (`../net/transport` `LobbySlot` carries no level, and none may be added).
+    const slots: LobbySlot[] = [
+      { player: 0, isBot: false, shipClass: ShipClass.Vanguard, ready: true },
+      { player: 1, isBot: true, botDifficulty: 'hard', shipClass: ShipClass.Vanguard, ready: false },
+      { player: 2, isBot: false, shipClass: ShipClass.Vanguard, ready: false, state: 'open' },
+      { player: 3, isBot: false, shipClass: ShipClass.Interceptor, ready: true },
+    ];
+    for (const slot of slots) expect(Object.keys(slot)).not.toContain('level');
+
+    const state = applyLobbySlots(
+      seatLocalPlayer(createLobby({ room: 'ABCD', you: 0, host: 0, slots: 8, level: 9 }), 0, 0),
+      slots,
     );
-    const remote = lobbyModel(state).seats.find((s) => s.player === 1);
+    const rows = lobbyModel(state).seats;
+    const remote = rows.find((s) => s.player === 3);
     expect(remote?.state).toBe('human');
     expect(remote?.isYou).toBe(false);
     expect(remote?.levelBadge).toBeNull();
+    // …and only your own row still carries one, in a room with two people in it.
+    expect(rows.filter((s) => s.levelBadge !== null).map((s) => s.player)).toEqual([0]);
   });
 
   it('OPEN and CLOSED seats carry no badge — an empty chair has no career', () => {
