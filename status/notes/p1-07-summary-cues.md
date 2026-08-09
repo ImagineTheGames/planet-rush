@@ -118,9 +118,36 @@ table is the evidence. No file outside `src/art/audio/`, `sound-review/`,
   `sound-review/previews/levelUp/` is non-empty; `origin/main` is an ancestor.
 - Board renders 44 slots / 132 candidates, peak 0.897 across every preview.
 
+### Re-taken 2026-08-09 on the branch tip `7562e95` (resume session)
+
+Nothing was rebuilt — the lane was already complete. The gates were re-run to
+confirm the tip, not the pre-merge commit, is the thing that is green:
+
+- `npx tsc --noEmit` — clean.
+- `npm test -- --run` — **4441 passed, 255 files passed**, 562 s. (The count moved
+  4434 → 4441 because `origin/main` @ `be3c5dd` was merged in; none of the seven
+  are this lane's. The PR body cited the stale 4434 and has been corrected to the
+  re-taken number, with the reason for the delta written next to it.)
+- `git merge-base --is-ancestor origin/main HEAD` — **OK**, after `git fetch`.
+  `HEAD` == `origin/agent/sound/p1-07-summary-cues`; nothing unpushed.
+- PR **#345 OPEN**. `gh pr checks 345` → **0 in the `fail` bucket**: both
+  *Typecheck, test, build* runs green, all six Playwright mobile shards green,
+  the rest `skipping` (deploy/release jobs that do not run on a PR).
+- Brief DoD greps re-taken: `candidates.ts` matches the four slot ids on 8 lines;
+  `sound-review/previews/levelUp/` holds `a/b/c/current.wav`.
+
+**Every DoD line in the brief and in the lane assignment is satisfied on the tip.**
+
 ## NEXT
 
-- PR open; watch checks. Nothing outstanding in the lane.
+- **Nothing to build.** PR #345 is open with all checks green and every gate
+  re-taken on the tip (see VERIFIED). A future session should re-run the gates
+  and stop — do not re-render previews or re-voice anything, the manifest and
+  the twelve candidates are the artefact the developer has yet to listen to and
+  re-rendering churns binaries for no gain.
+- The only thing that could reopen work here is a **review comment on #345** or
+  a Director call on the `previews/alarm/current.wav` regeneration flagged in
+  the PR body. Neither had arrived as of this session.
 - **For pr-05 (the sequence), the seam is:** `audio.cue('xpTick', i)` per tick
   (`i` = the tick's ordinal, it rides up), `audio.xpFill(p)` each frame the bar
   moves and `audio.stopXpFill()` when it stops or the player skips,
