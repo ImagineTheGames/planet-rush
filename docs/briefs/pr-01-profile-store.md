@@ -38,6 +38,24 @@ export function saveProfile(storage: Storage, p: Profile): void;
 (`src/main.ts:264`). A progression module that takes the seam as a dependency tests headless and
 never touches a browser global.
 
+> **AS SHIPPED** *(amended p1-01, 2026-08-09 — this brief was implemented inside a0-14/PR #333
+> before this lane opened, then hardened on `agent/platform/p1-01-profile-store`).* The sketch
+> above is accurate except in three details, and pr-05/pr-06 should read the module, not the
+> sketch:
+>
+> - **`ProfileStorage`, not `Storage`** — `Storage` is a DOM lib global and a local interface by
+>   that name shadows it silently. Identical shape; `platform.storage` passes straight in.
+> - **`saveProfile` returns `boolean`, not `void`** — it validates with the same reader that will
+>   read it back and refuses a profile `loadProfile` would reject, leaving the stored career
+>   untouched. `JSON.stringify` turns `NaN` into `null` without a murmur, so an unguarded write
+>   site loses a career on a *later* boot.
+> - **`equipped?: Record<slot, id>` is on the shape**, added by a0-14 and absent from plan §2.1.
+>   Unlocking and equipping are different verbs, and it passes the plan's own device-independence
+>   test. Kept, and flagged here because the plan's shape does not show it.
+>
+> **Plan vs brief: checked, no conflict found.** Everything else here agrees with
+> `docs/progression-plan.md` §2.1.
+
 ## Why this one is load-bearing out of proportion to its size
 
 **Progression is never wiped** — the developer's own ruling, 2026-08-07, verbatim: *"no."* There
