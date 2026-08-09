@@ -43,6 +43,7 @@ import {
 } from './ally';
 import type { Callout, CalloutKind } from './radio';
 import { NO_KEY, receive, send } from './radio';
+import { holdsDefenderRole } from './roles';
 import {
   ARRIVE_RADIUS,
   aimAndFire,
@@ -836,6 +837,21 @@ export interface AllyDistress {
    * core, which is the win condition (GDD §1).
    */
   readonly live: boolean;
+  /**
+   * True when the trouble is at this teammate's **own front door** — the klaxon,
+   * or a `siege` call, which is the same signal arriving by the other layer.
+   * False for a `help`, which is a teammate jumped in open space.
+   *
+   * The distinction exists for exactly one reader: the role split
+   * ({@link assignedToAnswer}, Stage 4). A home alarm is a *shared* signal — it
+   * is range-free, so every teammate receives it simultaneously and identically,
+   * which is precisely what produces N simultaneous responders — and it is the
+   * one a roster-derived role can divide. A `help` is heard by whichever subset
+   * the miss roll allowed (`DifficultyTuning.callMissChance`), so dividing it by
+   * a role nobody negotiated would forbid the one bot that heard the scream from
+   * going while the designated bot never heard it at all.
+   */
+  readonly atHome: boolean;
 }
 
 /**
@@ -863,7 +879,8 @@ export function allyDistress(ctx: BotCtx, id: PlayerId): AllyDistress | null {
   for (const ally of ctx.view.allies) {
     if (ally.id !== id) continue;
     if (ally.underAttack && ally.stationAlive && ally.stationPos) {
-      return { id, pos: ally.stationPos, distance: dist(ctx.self.pos, ally.stationPos), live: true };
+      const pos = ally.stationPos;
+      return { id, pos, distance: dist(ctx.self.pos, pos), live: true, atHome: true };
     }
     break;
   }
@@ -877,7 +894,14 @@ export function allyDistress(ctx: BotCtx, id: PlayerId): AllyDistress | null {
     if (!isAlly(ctx, call.about)) continue;
     latest = call;
   }
-  if (latest) return { id, pos: latest.pos, distance: dist(ctx.self.pos, latest.pos), live: false };
+  if (latest) {
+    // A `siege` is about a home and a `help` is about a ship in open space —
+    // the one thing the role split has to tell apart (see {@link
+    // AllyDistress.atHome}). Leaving a `siege` ungated would be a hole the
+    // klaxon's own two-second flicker could walk a second responder through.
+    const atHome = latest.kind === 'siege';
+    return { id, pos: latest.pos, distance: dist(ctx.self.pos, latest.pos), live: false, atHome };
+  }
   return null;
 }
 
@@ -890,8 +914,63 @@ function isAlly(ctx: BotCtx, id: PlayerId): boolean {
 }
 
 /**
+ * **Is this bot the one, of its whole side, that answers this alarm?** The role
+ * split (`./roles`, `docs/team-bots-plan.md` Stage 4).
+ *
+ * A home alarm is divided by the derived assignment; an open-space `help` is not
+ * (the argument is in {@link AllyDistress.atHome}). Note what is *not* here:
+ * there is no negotiation, no message, and no state — every teammate calls the
+ * same function over the same public roster on the same alarm and exactly one of
+ * them gets `true`, which is why two allies can never both believe they are the
+ * defender and never both believe the other is.
+ *
+ * Gates the **start** of a run only, by being asked from
+ * {@link nearestAllyDistress} rather than from {@link allyDistress}. A response
+ * already in flight is held by `./ally`'s latch and is not re-tested, for the same
+ * reason the range is not re-tested mid-flight: releasing a commitment exactly
+ * when it is closest to paying off is the flap the latch exists to prevent, and a
+ * defender that arrived to find its teammate's *own* home had started burning
+ * would otherwise turn around at the door.
+ */
+export function assignedToAnswer(ctx: BotCtx, distress: AllyDistress): boolean {
+  if (!distress.atHome && !klaxonRinging(ctx, distress.id)) return true;
+  return holdsDefenderRole(ctx.view, distress.id);
+}
+
+/**
+ * Is the whole side already hearing about this teammate? The klaxon is
+ * range-free, so if it is ringing then *every* teammate knows, whatever layer
+ * the distress in hand arrived by.
+ *
+ * This is what makes {@link assignedToAnswer}'s test the honest one rather than
+ * a test of the message's *kind*. A besieged bot flees and sends `help`
+ * ({@link callHelp} from `retreat`) while its home is still burning, so the same
+ * teammate is simultaneously the subject of a divided klaxon and an undivided
+ * cry — and answering the cry lands a second bot on the same doorstep by the
+ * back door.
+ *
+ * **It closed no measured gap, and it stays anyway.** Adding this clause moved
+ * every figure in `evidence/b4-01-defender-role.json` by exactly zero over eight
+ * 4v4 seeds, so it is not what the double-response rate turns on; the honest
+ * reading is that a `help` and a klaxon rarely coincide in the response window.
+ * It is here because the alternative is a gate that tests the *kind* of message
+ * rather than whether the signal is shared, and that distinction is the one this
+ * whole exemption rests on.
+ *
+ * A genuinely open-space `help` — a teammate jumped in the field, no home
+ * burning — still passes ungated, which is the case the exemption exists for.
+ */
+function klaxonRinging(ctx: BotCtx, id: PlayerId): boolean {
+  for (const ally of ctx.view.allies) {
+    if (ally.id === id) return ally.underAttack && ally.stationAlive;
+  }
+  return false;
+}
+
+/**
  * The teammate this bot would break off for — nearest first, inside
- * {@link allyResponseRange}, klaxon before hearsay.
+ * {@link allyResponseRange}, klaxon before hearsay, **and only the alarms this
+ * bot holds the defender role for** ({@link assignedToAnswer}).
  *
  * The scan is over `view.allies`, which is ascending by id (`./perception`), and
  * ties are broken by that order, so two equidistant alarms resolve the same way
@@ -903,6 +982,7 @@ export function nearestAllyDistress(ctx: BotCtx): AllyDistress | null {
   for (const ally of ctx.view.allies) {
     const distress = allyDistress(ctx, ally.id);
     if (!distress || distress.distance > reach) continue;
+    if (!assignedToAnswer(ctx, distress)) continue;
     if (best === null || betterDistress(distress, best)) best = distress;
   }
   return best;

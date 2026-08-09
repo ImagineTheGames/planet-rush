@@ -23,6 +23,9 @@
  *    skill rather than telepathy (`docs/team-bots-plan.md` §2).
  *  - `./ally`          — the memory of having answered a teammate's alarm, and
  *    the budget that stops one besieged ally consuming a whole match.
+ *  - `./roles`         — which one of a side answers that alarm: a deterministic
+ *    assignment derived from the public roster, so no two teammates abandon two
+ *    economies for the same klaxon (`docs/team-bots-plan.md` Stage 4).
  *  - `./targeting`     — threat × proximity × opportunity, the nerve threshold,
  *    and the fog-honest guess at who is winning.
  *  - `./behaviors`     — the verbs every tier shares: mine, haul, spend, guard,
@@ -47,6 +50,7 @@ export * from './memory';
 export * from './steering';
 export * from './radio';
 export * from './ally';
+export * from './roles';
 export * from './tree';
 export * from './targeting';
 export * from './behaviors';
