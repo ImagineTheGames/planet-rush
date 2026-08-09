@@ -1,0 +1,23 @@
+{
+  "base": "https://imaginethegames.github.io/planet-rush/",
+  "servedSha": "7e175ac",
+  "log": [
+    {
+      "step": "menu up, idle 6s",
+      "errorsSoFar": 0
+    },
+    {
+      "step": "doors up, idle 3s",
+      "errorsSoFar": 0
+    },
+    {
+      "step": "lobby up, idle 4s",
+      "errorsSoFar": 0
+    },
+    {
+      "step": "match running, idle 6s",
+      "errorsSoFar": 0
+    }
+  ],
+  "errors": []
+}

@@ -1378,5 +1378,225 @@
     "buildSha": "369d7a6",
     "verdict": "verified",
     "attestation": "SELF-WITNESSED, 2026-08-07T13:20Z–14:35Z, on the build under test 369d7a6 — the repo at this branch's merge base, built HERE with `npx vite build` and served by `vite preview` on :4188. dist/version.json reads sha 369d7a6, built 2026-08-07T13:14:08.671Z, and the badge bottom-left of every clean-boot frame reads \"369d7a6*\". Viewport 1280x800, deviceScaleFactor 2 (3 for the hull crops). The BOARD half of every composite is docs/art-direction/*.html shot from this same repo state, addressed BY DOM SELECTOR (the board's own .scene / .card / svg / .lobby / .menuwrap elements), so a board edit moves the crop instead of silently changing what the composite claims. Nothing is retouched, colour-corrected or composited except the nearest-neighbour magnification labelled on the ships figure. Instruments committed beside this manifest: capture-art-boards.mjs, capture-art-live.mjs, probe-art-palette.mjs, build-art-composites.mjs.\n\nWHICH HALF OF THIS BOARD IS STILL THE TARGET — ESTABLISHED BEFORE SCORING ANYTHING. ui-mockup.html is only half in force. Its menu, lobby, ship-select, build-wheel and settings drawings were superseded on 2026-08-05 by the developer-ratified Gantry / Bone direction: docs/design/gantry-bone-handoff.md is subtitled \"menu / lobby / HUD / build-wheel visual + audio direction\" and states it is \"applied across the five screens that set the game's tone: title, build wheel, lobby, ship select, settings\", and style-guide.md names it \"the worked example\" of the direction. Its governing rule is the one the live screens are obeying: \"the primary action is simply the brightest plate on screen. It spends no colour on the menu.\" So a missing gold wordmark on the live lobby is the ratified direction being followed, not the board being missed. The one part of ui-mockup.html that still governs is the IN-MATCH HUD — style-guide §2.1's 2026-08-06 amendment says in terms that it \"licenses nothing in a menu, on the HUD, in the lobby, or on any other screen\". The composite states this on its face rather than quietly scoring a lobby against a drawing nobody is building to any more.\n\nPAIR 1, THE WHOLE SCREEN — the part of the board still in force. The board: ORE 11 with two filled hold squares top-left, a ghosted PLANET RUSH wordmark with \"ASTEROID WAVE 3/5 · NEXT 0:47 · 07:12\" on ONE line top-centre, MY PLANET as a plasma bar top-right, rival planets ringed and labelled, a radial BUILD & UPGRADE wheel over the ship, a rounded minimap bottom-right, a seven-item control strip. The live build, first seconds of a real PLAY SOLO match: TOTAL 3 top-left; \"WAVE 1/5 · Outer Drift\", then NEXT 2:25, then MATCH 0:06, on THREE stacked lines with no wordmark; \"100/100 HOME\" top-right, numerals then word, over a full plasma bar; rival SHIPS labelled \"Warden (HARD)\" and \"Rusty (EASY)\" in their roster colours with HP bars, though the rival PLANETS are outside this zoom; a circular minimap bottom-right; a four-item control strip \"WASD Thrust · Mouse Aim · Left mouse Fire / Mine · E Build & Upgrade\". Same furniture in the same corners; the differences are line-breaking, wording (HOME for MY PLANET) and three fewer control hints, not a different screen. Measured: bone #C6CDD6 against #C6CDD6, gold #F2D24B against #F2D24B, vacuum #0D1015 against #0D1015 — three exact matches. The friendly bar reads #3C77F4 against the board's #4DC3FF, which is the §5.1 roster supersession again: the bar wears its OWNER's colour, and P1 is Azure. The HUD face is split — a display face for headings, mono numerals — against the board's all-Audiowide, which GAP-ANALYSIS §5.3 resolves explicitly in the split's favour.\n\nPAIR 2, THE BUILD WHEEL, opened by the ratified __upgradeWheelStage.openBuild() seam (it parks the ship docked and toggles the REAL wheel — the same state a press produces; it returned {open:true}). The radial form and the UPGRADE SHIP arrow survive from the board, and so does the five-wedge count. The contents differ: the board draws TURRET 3 / SHIELD 5 / BANK / REPAIR CORE 1 / UPGRADE SHIP; the build draws TURRET / SHIELD / RADAR / REPAIR REACTOR / UPGRADE SHIP — BANK is gone, RADAR is new, REPAIR CORE is renamed REPAIR REACTOR. The hub holds the ore count and CLOSE · ESC where the board drew the ship. Each wedge carries a target line (\"YOUR STATION\") and a state line (\"FULL 4 / 4 BUILT\"). I checked one thing that looked wrong and it is not: RADAR showed a red \"6 / 3\" on one frame and a gold \"6 / 11\" on another — that is cost over ore, red when unaffordable and gold when affordable, consistent with the style-guide §2.1 cost-numeral carve-out, not a broken count.\n\nPAIR 3, UPGRADE. The board draws a rectangular PANEL — title UPGRADE SHIP, ORE 11, the ship at left, four full-width rows BEAM / ENGINE / CARGO / HULL each with a tier bar, a before->after figure and a cost, and a gold BUY · 4 button. The build re-forms the same four tracks as a RADIAL WHEEL: WEAPON (with its own DAMAGE / SPEED pips and a sub-wheel arrow), ENGINE 100% -> 115%, CARGO, HULL 50 -> 60, costs 3 / 2 / 3 in gold on the wedges, hub carrying ore 11, the hull name VANGUARD and BACK · ESC. The wedge readback confirms the drawn state: four wedges, tiers 0, costs 3/2/3, all \"ready\". The table became a wheel and BEAM became WEAPON — a form change ratified by the same Gantry pass (main.ts: \"The upgrade screen is now a radial wheel drawn by the same view as the Build wheel\").\n\nPAIRS 4 AND 5, THE LOBBY AND THE MENU — scored against Gantry/Bone, not against the superseded drawings. The board lobby is a huge gold PLANET RUSH wordmark over ROOM GRAV-7, eight roster rows and a solid-gold LAUNCH. The live lobby is titled CREW MUSTER and has NO wordmark and NO gold anywhere: machined steel plates with lit top edges and rivets, MODE · FFA and ORE · SCARCE chips, eight seat rows (P1 \"YOU ★ INTERCEPTOR\" TAKEN, seven OPEN bots at EASY/MEDIUM/HARD) each carrying a roster-coloured spine, four hull cards with SPD/ACC/TRN/HULL/PWR/HOLD as both pips AND numbers, four arena cards, and RUSH! as the single brightest plate. Those eight spine colours are the ratified PLAYER_ROSTER — azure, cyan, spring, violet, magenta, orange, chalk, slate-blue — visibly NOT the board's cyan/red/gold/pink/white, which is §5.1 landing where a player can see it. The menu is the same discipline: DEEP FIELD MINING AUTHORITY / CONTRACT OPEN · SECTOR 04, a chalk wordmark, and four bevelled plates of which PLAY SOLO is the one raised bright one — one primary per screen, carried by brightness rather than hue, exactly as the handoff requires.\n\nTHE DEFECT, HANDED TO UI. THE COACH PLATE IS DRAWN OVER THE WHEEL'S BOTTOM WEDGE. On the build wheel the persistent hint plate \"Spend ore on defense — or UPGRADE SHIP to mine and hit harder\" covers the REPAIR REACTOR wedge and cuts its \"1 / 3\" in half; on the upgrade wheel the same plate cuts CARGO's label in half and hides its cost entirely. A cost numeral a player cannot read is the one thing style-guide §2.1 carved an exception out of the palette to guarantee, so this is worth fixing even though it is a layout bug rather than an art-direction one. It is visible in both wheel panels of the composite. OWNER: UI.\n\nA TRAP I DID NOT FILE. Every live arena frame carries a bright vertical rule at ~83% width (#454C54, peak column delta 103). It is ARENA_WALL_BANDS — \"the crisp outer frame — the world ends here\" — not a render seam: it holds at a fixed WORLD x and leaves the frame once the ship flies away from it. Detailed in art-vs-board-scene.\n\nWHAT I DID NOT WITNESS. The settings screen, the pause overlay, the end-of-match screen and the phone layouts are not in this composite; ui-mockup.html draws a settings panel I did not pair. This entry is the title screen, the doors, the lobby, the in-match HUD and the two wheels, on desktop, at 1280x800 only.\n\nVERDICT: VERIFIED. Against the half of ui-mockup.html still in force — the in-match HUD — the build carries the board's furniture in the board's corners and its bone, gold and vacuum shades match to the byte. Against the half superseded on 2026-08-05, the menu, lobby and wheels are visibly obeying Gantry/Bone rather than the drawing, which is the correct outcome and not a miss. The game reads as this board's world where the board still speaks for it. The coach-plate overlap is carried as a named, unresolved defect rather than folded into the pass."
+  },
+  {
+    "id": "a1-05-alarm-online-nonzero-slot",
+    "title": "The alarm engine's idea of 'me' on a REAL online join, at a NON-ZERO seat",
+    "area": "online",
+    "image": "images/a1-05-alarm-online-guest-match.png",
+    "capturedAt": "2026-08-09T22:07:41Z",
+    "buildSha": "7e175ac",
+    "attestation": "Two clean-boot clients against the LIVE fleet (allocator + gameserver on fly.io, both answering /health): the host pressed PLAY → CREATE A CLAIM and got room XBPW, the guest pressed PLAY → JOIN, typed X-B-P-W on the drawn keypad, and was welcomed into SEAT 1. Both rosters then read TAKEN·TAKEN·OPEN×6 with humanCount 2, and the guest's own seam reports isHost false. The host RUSHed and both clients rendered the same match. In that match the GUEST's audio engine reports local: 1, localPlayer: 1, allies: [1] — the seat the server gave it — and the host reports local: 0. The frame is the guest's: its own station is labelled YOU and drawn in P2's teal rather than P1's blue, the HOME bar top-right is teal at 100/100, and the badge along the bottom edge reads '7e175ac 0800d5b6 (iad) 228ms' — the shipped sha, the machine id of the real gameserver and a live round-trip. This is the exact shape of the s9-01 bug (every online client believing it was slot 0) and it is not present: on a non-zero slot, which is the only slot that can tell the difference, the engine is listening as the seat it was given.",
+    "verdict": "verified"
+  },
+  {
+    "id": "a1-05-alarm-rings-once-under-a-real-siege",
+    "title": "The under-attack alarm fires ONCE across a 22-second siege, and only for your own station",
+    "area": "audio",
+    "image": "images/a1-05-alarm-under-attack.png",
+    "capturedAt": "2026-08-09T22:05:11Z",
+    "buildSha": "7e175ac",
+    "attestation": "Home abandoned on the live build (?debug=1 offline match, ship flown out to open space, core left undefended) and the alarm seam polled every 1.5 s for 111 s. Nothing at all until t=88.5 s, when a bot reached the undefended reactor: engagements went 0 → 1, sounds went 0 → 1 and active went true. Fifteen further samples across the next 22.5 s all read the same — active true, engagements 1, sounds 1. The sting did not repeat once per frame, or once per hit; it rang once for the engagement, which is the developer's 'it should only play once', on the shipped bundle. `allies` reads [0] throughout, i.e. this client's own seat and nothing else, so a rival's home taking fire cannot ring it. WHAT THE FRAME DOES NOT SHOW: no on-screen under-attack tell is visible in it — the home station is off-frame and the HOME readout top-right still reads 100/100, because the engagement had not yet landed damage. The audio half of §2.2 is what this proves; the red-frame/edge-arrow half is not in this picture.",
+    "verdict": "verified"
+  },
+  {
+    "id": "a1-05-station-health-reads-true-at-any-range",
+    "title": "A damaged rival station's ring, near and far, in one figure — and the two are the same ring",
+    "area": "hud",
+    "image": "images/a1-05-station-health-figure.png",
+    "capturedAt": "2026-08-09T21:57:57Z",
+    "buildSha": "7e175ac",
+    "attestation": "Four frames from one frozen boot of the live build, composited: top row a rival core at 35%, bottom row the same core at 100%; left column staged 120 units off the station surface, right column 480. Every panel draws a ring around the station and a lit 'Rusty (EASY)' plate over it — there is no range at which the ring stops being drawn. The two damaged panels read identically: sampling the drawn circle at radius 69 px gives 34.9% cyan / 65.1% red at 120 units AND 34.9% / 65.1% at 480 units, against a staged core fraction of 0.35 — the arc is proportional to the core and does not change with distance. The two healthy panels are 100.0% cyan / 0.0% red at both ranges. The display this replaced asserted a falsehood at range; this one does not.",
+    "verdict": "verified"
+  },
+  {
+    "id": "a1-05-end-screen-calls-an-ally-win-a-victory",
+    "title": "Your side wins with an ALLY crowned — the end screen says CLAIM HELD, not DEFEAT",
+    "area": "match",
+    "image": "images/a1-05-end-ally-victory.png",
+    "capturedAt": "2026-08-09T21:55:48Z",
+    "buildSha": "7e175ac",
+    "attestation": "A sided match on the live build (?debug=1&sides=2; this client's side is slots [0,2,4,6]) with every core outside that side destroyed, leaving an ALLY — slot 6 — holding a reactor alongside the local one. The screen the client resolved reads kind 'victory', headline 'CLAIM HELD', subhead 'Your side took the claim — Player 7 held it.', with REMATCH and BACK TO MENU offered. Nothing on it says defeat, and the sentence names the ally who held it rather than pretending the local player did. The developer's screenshot of this scenario read DEFEAT with 'Player 7 took the claim' underneath it; on this build the same staging reads as a win.",
+    "verdict": "verified"
+  },
+  {
+    "id": "a1-05-eliminated-then-ally-wins",
+    "title": "…including the path the report came from: eliminated first, then your side wins",
+    "area": "match",
+    "image": "images/a1-05-end-eliminated-then-ally-wins.png",
+    "capturedAt": "2026-08-09T21:55:54Z",
+    "buildSha": "7e175ac",
+    "attestation": "The same sided match, walked the hard way. The local reactor is destroyed first and the DEFEATED overlay comes up correctly: 'ELIMINATED' in threat red, '8th of 8 — your reactor was destroyed.', REMATCH and SPECTATE (a1-05-end-eliminated-defeated.png). SPECTATE is taken, the match plays on, and then every core outside this client's side falls. The result screen that follows reads 'CLAIM HELD' with 'Your side took the claim — Player 7 held it.' and +215 XP still paid to a player who was already out. So a client that has been eliminated and is watching from the outside is still told its side won, in a win's words. Note for the record: the rule under the headline is drawn grey here and blue on a win the local player was alive for (a1-05-summary-settled.png); both frames say CLAIM HELD, but they do not carry the same accent.",
+    "verdict": "verified"
+  },
+  {
+    "id": "a1-05-lobby-picks-the-character-not-the-tier",
+    "title": "The roster names a CHARACTER per seat and shows its tier as a label",
+    "area": "boot",
+    "image": "images/a1-05-lobby-character-cycled.png",
+    "capturedAt": "2026-08-09T22:03:55Z",
+    "buildSha": "7e175ac",
+    "attestation": "PLAY → PLAY SOLO on the live build, driven by real clicks at the points the client itself reported drawing. The roster comes up with a named cast, one per bot seat — P2 Rusty (HAULER), P3 Bolt (INTERCEPTOR), P4 Foreman (EXCAVATOR), P5 Patch, P6 Sable, P7 Vulture, P8 Warden — each row carrying its hull under the name, its difficulty in a column of its own as a WORD (EASY / MEDIUM / HARD) and a `?`. The tier column holds no control: it is shown, not chosen. A real click on P2's row BODY cycled the character rusty → bolt, and this frame is that state — P2 now reads 'Bolt 1 · INTERCEPTOR' beside P3's 'Bolt 2 · INTERCEPTOR', the duplicate disambiguated by the view rather than refused, and P2's tier following the new character from MEDIUM-for-Rusty to EASY. RUSH! was then pressed and the built world's own cast reads [null, bolt, bolt, foreman, patch, sable, vulture, warden] — the pick reached the sim, which is the half of a0-06 that was missing. Also on screen: MODE · FFA, YIELD · SCARCE, '1 PLAYING · 7 BOTS', and the badge 7e175ac.",
+    "verdict": "verified"
+  },
+  {
+    "id": "a1-05-codex-opens-by-tap-at-390px",
+    "title": "`?` opens the dossier BY TAP on a 390 px phone",
+    "area": "mobile",
+    "image": "images/a1-05-codex-390-after-tap.png",
+    "capturedAt": "2026-08-09T22:04:07Z",
+    "buildSha": "7e175ac",
+    "attestation": "A 390×844 phone (deviceScaleFactor 3, hasTouch) on the live build, held portrait so the whole lobby is under the landscape lock — the frame is rotated 90°, which is the shipped behaviour. Every roster row draws a `?`. ONE touchscreen tap on P2's `?`, at the physical point the client reported for it, opened the dossier: a panel over the roster reading 'Rusty — the timid hoarder / Easy · Hauler (Hammerhead) / Easy. Mines slowly, over-defends, and clutches its ore. Flies a Hauler.' No long press was needed — the seam read back hintTitle 'Rusty — the timid hoarder' after the single tap. The rest of the screen is legible at this width too: MODE · FFA, YIELD · SCARCE, '1 PLAYING · 7 BOTS', the ship card, MAP · CHANGE showing The Ring, and RUSH!. ONE BLEMISH: the dossier's last line is clipped by the panel's right edge — 'Flies a Hauler. LVL…' runs into the border rather than wrapping.",
+    "verdict": "verified"
+  },
+  {
+    "id": "a1-05-build-wedge-one-cost-number-payable",
+    "title": "The build wheel at 9 ore: one number per wedge, all of them yellow, ORE top-left",
+    "area": "build-wheel",
+    "image": "images/a1-05-wheel-ore-9.png",
+    "capturedAt": "2026-08-09T21:58:30Z",
+    "buildSha": "7e175ac",
+    "attestation": "The Build wheel open on the live build with 9 ore banked. Five wedges. TURRET shows the single numeral 3, SHIELD 5, RADAR 6, all in signal yellow; under each is its cap count ('0 / 4 BUILT', '0 / 2 BUILT', '0 / 1 BUILT') and above it what it spends on ('YOUR STATION'). REPAIR REACTOR shows 1 in grey with 'REACTOR FULL' as its reason, and UPGRADE SHIP shows 'OPEN ▸' rather than a price. Nowhere on the wheel is a cost written as a pair — no '3/9', no 'cost/held'. The held total appears once, in the hub: a large 9 over the word ORE, with CLOSE · ESC beneath it, and once more in the top-left corner where the word ORE sits above the numeral 9. The prompt band reads 'Spend ore on defense — or UPGRADE SHIP to mine and hit harder'.",
+    "verdict": "verified"
+  },
+  {
+    "id": "a1-05-build-wedge-unpayable-is-red",
+    "title": "…and at 2 ore the same three numbers turn red, in place",
+    "area": "build-wheel",
+    "image": "images/a1-05-wheel-ore-2.png",
+    "capturedAt": "2026-08-09T21:58:30Z",
+    "buildSha": "7e175ac",
+    "attestation": "The same open wheel, same boot, bank re-priced to 2 ore without closing it. TURRET's 3, SHIELD's 5 and RADAR's 6 are unchanged as numbers and are now drawn in threat red; their labels have dimmed with them. The hub reads 2 over ORE and the top-left reads ORE / 2, both still yellow — the total is what you have, not a price, and it is not recoloured. REPAIR REACTOR's 1 stays grey ('REACTOR FULL' — refused for a different reason) and UPGRADE SHIP still reads 'OPEN ▸'. So the wedge carries exactly one number and that number carries the affordability: yellow when the bank covers it, red when it does not.",
+    "verdict": "verified"
+  },
+  {
+    "id": "a1-05-full-hold-tell-flashes-and-clears",
+    "title": "A full hold flashes under the ship; a hold with room in it does not",
+    "area": "hud",
+    "image": "images/a1-05-hold-flash-figure.png",
+    "capturedAt": "2026-08-09T22:04:17Z",
+    "buildSha": "7e175ac",
+    "attestation": "Three panels, each a 3× nearest-neighbour blow-up of the same 160×36 strip under the ship, from one live boot. Top: hold 6/6 — six pips in full signal yellow. Middle: the SAME full hold ~90 ms later — the identical six pips, dimmed to olive. Bottom: hold 3/6 — three bright pips and three dark ones. A 16-frame burst measures it rather than leaving it to the eye: with the hold FULL the strip's mean luminance alternates between 12.57 and 22.19 (spread 9.6) across the burst; with the hold at 3/6 it is 15.253 in all sixteen frames, spread 0.0. So the full hold has a tell — a ~2 Hz blink of the pips — and the tell is gone the moment there is room in the hold. The clearing was also watched end to end: 6 in the hold, docked, and over five seconds the hold drains to 0 while the top-left total climbs 3 → 8 and the flashing row disappears (a1-05-loot-hold-freed.png). CAVEAT ON SCOPE: what is proven here is the FULL-HOLD tell. The sim also sets a per-kill `lootTake` / `lootBlocked` on the ship each tick, and I could find nothing outside src/sim that reads either, so I cannot claim a distinct tell for 'this particular kill's ore bounced off a full hold'.",
+    "verdict": "verified"
+  },
+  {
+    "id": "a1-05-new-room-starts-empty",
+    "title": "A freshly created room: eight seats, the host in one, seven OPEN and no bots",
+    "area": "online",
+    "image": "images/a1-05-room-starts-empty-crop.png",
+    "capturedAt": "2026-08-09T22:01:14Z",
+    "buildSha": "7e175ac",
+    "attestation": "PLAY → CREATE A CLAIM on the live build against the live allocator, which minted room PLJ4. The roster that comes up is: P1 TAKEN — 'YOU ★', VANGUARD — and P2 through P8 all reading OPEN, with no character named on any of them (seatCharacters is eight nulls) and no BOT anywhere. N reads 1, humanCount 1. The room is real, not a local fiction: the allocator answers a join for PLJ4 with 200 while the lobby is up. This is the developer's report satisfied — the room fills with people if people come, and it is up to the host to add bots.",
+    "verdict": "verified"
+  },
+  {
+    "id": "a1-05-all-bot-match-reverts-to-offline",
+    "title": "Host plus bots presses RUSH!: the match plays, and the room is handed back",
+    "area": "online",
+    "image": "images/a1-05-all-bot-match-offline.png",
+    "capturedAt": "2026-08-09T22:01:14Z",
+    "buildSha": "7e175ac",
+    "attestation": "From that same empty room PLJ4, two seats were cycled OPEN → BOT with real clicks (roster then TAKEN·BOT·OPEN·OPEN·BOT·OPEN·OPEN·OPEN, N=3) and RUSH! pressed. The match boots and this frame is it, three seconds in: the world is up, the local station labelled YOU, and one line sits under the wave clock — 'NOBODY JOINED — PLAYING LOCALLY' — with zero buttons on it. A tell, not a dialog. The claim that matters was put to the ALLOCATOR rather than the client: a join for PLJ4 is refused after RUSH, so the room really was released rather than merely abandoned by this client. Twelve seconds later the match is still running with bots flying it (a1-05-all-bot-match-running.png).",
+    "verdict": "verified"
+  },
+  {
+    "id": "a1-05-nameplates-lit-over-a-ship-in-combat",
+    "title": "A nameplate over a ship taking fire — same plate, same brightness as at rest",
+    "area": "hud",
+    "image": "images/a1-05-nameplates-in-combat-crop.png",
+    "capturedAt": "2026-08-09T22:09:14Z",
+    "buildSha": "7e175ac",
+    "attestation": "A frozen frame on the live build with a bot parked in open space beside the local ship, put into a real fight: hull knocked to 45% and the sim's own firing flag set. In the crop the bot carries 'Rusty (EASY)' above it, a health bar under the name reading 32/70 part-filled, and a cyan turret beam running up into it from a turret whose own bar reads 10/10. The plate is not dimmed, hidden or deferred by the combat: the layer reports alpha 0.92 for it, which is the same 0.92 it reported for the same plate in the quiet frame taken moments earlier from the same boot (a1-05-nameplates-quiet.png), and the station plate below is drawn at 0.92 too. Corroborated on the ordinary player path as well — a lobby-booted match shows 'Warden (HARD)' and 'Bolt (EASY)' both lit at once, the latter over a 35/35 bar (a1-05-wave-clock-lobby-full.png).",
+    "verdict": "verified"
+  },
+  {
+    "id": "a1-05-wave-clock-counts-150-not-180",
+    "title": "FAILED — the lobby says YIELD · SCARCE and the clock counts to 150 s",
+    "area": "hud",
+    "image": "images/a1-05-wave-clock-lobby-early.png",
+    "capturedAt": "2026-08-09T22:00:25Z",
+    "buildSha": "7e175ac",
+    "attestation": "The real player path on the live build: PLAY → PLAY SOLO → a lobby whose own chip reads 'YIELD · SCARCE' and whose seam reports abundance 'scarce' → RUSH!. Four seconds into the match the clock reads 'WAVE 1/5 · Outer Drift / NEXT 2:27 / MATCH 0:04'. 4 + 147 = 151. SCARCE's interval is WAVE_INTERVAL_S × 1.2 = 150 × 1.2 = 180 s, so the first wave should be 2:56 away at that moment, not 2:27. The same reading appears everywhere I looked on this build, always summing to ~151: MATCH 0:05 → NEXT 2:26 and MATCH 0:37 → NEXT 1:54 in a ?debug=1 match; MATCH 0:03 → NEXT 2:28 in a lobby-booted one; MATCH 1:39 → NEXT 0:52 later in the same match. The clock is counting the BASELINE 150 s. I cannot tell from the screen alone whether the clock is reading the wrong interval or the SCARCE abundance the lobby shows never reached the world it built — but the promise 'the wave clock counts to the interval the match actually uses, and SCARCE is the default at 180 s' is not kept on the served build either way.",
+    "verdict": "failed"
+  },
+  {
+    "id": "a1-05-wave-clock-150-in-an-online-match-too",
+    "title": "FAILED — and it is 150 s in a real ONLINE match as well",
+    "area": "hud",
+    "image": "images/a1-05-alarm-online-guest-match.png",
+    "capturedAt": "2026-08-09T22:07:41Z",
+    "buildSha": "7e175ac",
+    "attestation": "The guest's frame from the live online match on the fly.io gameserver (badge '7e175ac 0800d5b6 (iad) 228ms'), six seconds in: 'WAVE 1/5 · Outer Drift / NEXT 2:25 / MATCH 0:06'. 6 + 145 = 151 again. So this is not an artefact of the offline boot or of the local-revert path: a match created through the doors, hosted on a real server and joined by a second client counts its first wave down from 150 s, the baseline, not from SCARCE's 180. Recorded separately from the solo reading because a wave interval that is wrong on the wire is a different blast radius from one that is wrong offline.",
+    "verdict": "failed"
+  },
+  {
+    "id": "a1-05-darker-backdrop-is-floor",
+    "title": "The backdrop the shipped build paints is Floor #010204",
+    "area": "art",
+    "image": "images/a1-05-backdrop-frozen-desktop.png",
+    "capturedAt": "2026-08-09T21:57:46Z",
+    "buildSha": "7e175ac",
+    "attestation": "A frozen 1280×800 scene from the live build. Sampling the play area (x 20–1040, y 100–740, every other pixel) the modal colour is #010204 at 64.7% of the pixels, with #020206 (15.5%) and #010207 (9.4%) behind it — the star-field's own dither over the same ground. #010204 is Floor exactly, the ground the developer picked off the backdrop compositor on 2026-08-07 ('i like floor'), and it is a long way below the Vacuum #0D1015 it replaced as the backdrop. The frame carries it too: the rock family reads as a dark slab (the fourth-commonest colour in the sample is the rocks' #484E57 at 1.25%), the station's blue rings and the ore's yellow are the brightest things on screen, and the HUD text sits over near-black rather than over a wash. The darker backdrop is on the served build.",
+    "verdict": "verified"
+  },
+  {
+    "id": "a1-05-sky-parallax-not-camera-locked",
+    "title": "INCONCLUSIVE — the backdrop is provably not glued to the camera, but this arena has no sky to track",
+    "area": "art",
+    "image": "images/a1-05-sky-flight-1.png",
+    "capturedAt": "2026-08-09T21:57:50Z",
+    "buildSha": "7e175ac",
+    "attestation": "Three frames along one straight flight on the live build, the camera moved 844 world units (one screen-width) between each. Between the second and third frames — both of which are open sky with no station or asteroid in them — the best horizontal re-alignment of one onto the other is a shift of 219 px, at which the mean absolute difference is 0.108; at a shift of ZERO it is 0.464, more than four times worse, with no local minimum there at all. So the backdrop travels when the ship travels: nothing in it is pinned to the glass, which is the shape of the developer's complaint. What I CANNOT show from these frames is the claim as stated — that the SKY rides with the far stars rather than ahead of them. The arena the boot builds (The Ring, wave 'Outer Drift') paints almost no sky: only 2.4% of the sampled region carries any luminance between 4 and 20, and there is no clot bright enough to track across three frames. Separating a 72 px sky from an 84 px deep-star layer needs a sky-rich arena, and I could not reach one from the live build without hand-flying a lobby match onto a specific map. Reported as unproven rather than passed.",
+    "verdict": "inconclusive"
+  },
+  {
+    "id": "a1-05-summary-sequence-counts-up",
+    "title": "The end-of-match summary counted, beat by beat, off one match",
+    "area": "match",
+    "image": "images/a1-05-summary-beat-2.png",
+    "capturedAt": "2026-08-09T21:56:03Z",
+    "buildSha": "7e175ac",
+    "attestation": "One match on the live build, won, with its summary clock pinned at four points so the same sequence could be photographed four times instead of raced. Beat 0 (phase 'result'): the headline and the stat labels are up, every value reads 0 or '—', XP EARNED reads +0 XP, LEVEL 1, the bar is empty and the buttons are dead. Beat 1.2 s (phase 'rows'): still counting in. Beat 3.0 s (phase 'total', the frame here): the rows have landed on their real values — ORE MINED 6 with '+6 XP' beside it, DAMAGE DEALT 0 HP, SHIPS DESTROYED 0, SHIPS USED 1 — and XP EARNED has climbed to +395 XP. Beat 6.0 s (phase 'fill'): LEVEL 2 with the bar part-filled and leveledUp true. It counts up; it does not simply appear.",
+    "verdict": "verified"
+  },
+  {
+    "id": "a1-05-xp-paid-and-a-level-earned",
+    "title": "The settled summary: +395 XP, LEVEL 2, and the profile written to disk",
+    "area": "match",
+    "image": "images/a1-05-summary-settled.png",
+    "capturedAt": "2026-08-09T21:56:03Z",
+    "buildSha": "7e175ac",
+    "attestation": "The same sequence, let go and allowed to settle. 'CLAIM HELD / You took the claim. / MATCH TIME · 00:08' on the left; on the right, the ledger with its per-row XP — ORE MINED 6 → +6 XP (one XP per ore, the ratified weight), DAMAGE DEALT 0 HP → +0 XP, SHIPS DESTROYED 0 → +0 XP, STATIONS DESTROYED — → +0 XP, and the three unpaid rows (DISTANCE TRAVELLED, SHIPS USED, ORE USED) carrying no XP column at all. Then XP EARNED +395 XP, LEVEL 2, a part-filled bar and '+395 XP · 814 TO NEXT'. That last number is the ratified curve visible on screen: 300 XP to reach level 2 and 909 more to reach level 3 (300 × L^1.6), and 395 + 814 = 1209 = 300 + 909. The career the boot read back afterwards is xp 395, level 2, matches 1, and localStorage holds {\"v\":1,\"xp\":395,\"level\":2,\"matches\":1} under planet-rush:profile. The build badge in the corner of the frame reads 7e175ac.",
+    "verdict": "verified"
+  },
+  {
+    "id": "a1-05-lobby-level-badge-after-the-win",
+    "title": "The level the match paid, back on the lobby roster after a reload",
+    "area": "boot",
+    "image": "images/a1-05-lobby-level-badge.png",
+    "capturedAt": "2026-08-09T22:01:40Z",
+    "buildSha": "7e175ac",
+    "attestation": "The same browser, the same origin, the chain walked end to end. A match on the live build was won and its summary skipped; the career went from xp 0 / level 1 / 0 matches to xp 355 / level 2 / 1 match. The page was then RELOADED clean — no debug flag, main menu, PLAY, PLAY SOLO — and the roster that comes up carries 'LVL 2' on the local player's row. Exactly one row carries a badge: the seam reports ['LVL 2', null, null, null, null, null, null, null], and no row anywhere shows an XP total, which is the ratified ruling (show the level, in the lobby, never the XP). The badge was drawn, not merely modelled — the client reported its bounds as a real 54×63 px box on the roster, and the crop at a1-05-lobby-level-badge-crop.png is that box.",
+    "verdict": "verified"
+  },
+  {
+    "id": "a1-05-hangar-honest-empty-state",
+    "title": "The HANGAR, and the sentence it says instead of nothing",
+    "area": "boot",
+    "image": "images/a1-05-hangar-empty-state.png",
+    "capturedAt": "2026-08-09T22:01:40Z",
+    "buildSha": "7e175ac",
+    "attestation": "The fourth door on the live build, opened from the main menu after that same win. Title HANGAR, 'FLEET BAY · YOUR RECORD' opposite. Left: the ship in the bay, drawn — a VANGUARD, named ANVIL, with its line 'All-rounder. Does everything second-best — the one to learn the game in.' Right: 'LEVEL 2', '55 / 909 XP', a part-filled bar, '854 TO LEVEL 3' and '1 MATCH'. Below that, the panel where cosmetics would go, and in it the sentence that makes this screen honest rather than broken: 'No cosmetics yet — they unlock as you level up.' BACK is the only other control. A hangar with no cosmetics and no sentence would be indistinguishable from a hangar that failed to load; this one tells you which it is.",
+    "verdict": "verified"
+  },
+  {
+    "id": "a1-05-clean-boot-typeerror",
+    "title": "INCONCLUSIVE — one uncaught TypeError per clean-boot session that I could not pin down",
+    "area": "boot",
+    "image": "images/a1-05-menu-after-a-win.png",
+    "capturedAt": "2026-08-09T22:01:40Z",
+    "buildSha": "7e175ac",
+    "attestation": "Recording this because it is real and I could not make it reproducible, not because it broke anything visible. Every one of the six clean-boot captures in this round logged exactly ONE uncaught exception from the served bundle: 'TypeError: Cannot read properties of null (reading \"clear\")', thrown inside a Pixi Graphics clear() from an update on the shipped index-De5ilkwi.js — i.e. something being drawn after its context is gone. It appeared once per session on desktop and on the 390 px phone, on the doors, in the lobby and in a match, and never on a ?debug=1 boot. Nothing on screen went wrong in any frame I shot. I then tried to isolate it: a scripted walk of menu → doors → lobby → RUSH with generous idles logged ZERO errors, and adding full and clipped screenshots to that walk still logged zero. So I can say the shipped client throws it during ordinary front-door use, and I cannot say what provokes it. Someone who owns this code should read the stack in evidence/a1-05-live-round/readback.json before it becomes a crash rather than a log line.",
+    "verdict": "inconclusive"
   }
 ]
