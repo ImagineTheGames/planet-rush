@@ -117,9 +117,12 @@ function positiveInt(raw: string | undefined): number | null {
 /**
  * The cap, and the arithmetic behind it.
  *
- * `VITEST_MAX_WORKERS` > (cgroup cores / LANES) > host parallelism. The result
- * is clamped to [1, hostParallelism]: never zero workers, and never more than
- * the machine claims to have even if someone sets `LANES=0.5`-shaped nonsense.
+ * `VITEST_MAX_WORKERS` > (cgroup cores / LANES) > host parallelism. The derived
+ * result is clamped to [1, hostParallelism]: never zero workers, and never more
+ * than the machine claims to have even if someone sets `LANES=0.5`-shaped
+ * nonsense. An explicit override is **not** clamped — reproducing an oversized
+ * pool is exactly what it is for, and a measurement rig that silently got the
+ * capped number back would report no difference and call the bug fixed.
  */
 export function resolveWorkerCap(reading: BoxReading): WorkerCap {
   const lanes = positiveInt(reading.lanes) ?? 1;

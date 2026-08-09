@@ -191,8 +191,15 @@ describe('workerCap on the box actually running this', () => {
   it('is at least one worker and never more than the host claims', () => {
     const cap = workerCap();
     expect(cap.workers).toBeGreaterThanOrEqual(1);
-    expect(cap.workers).toBeLessThanOrEqual(hostParallelism());
     expect(Number.isInteger(cap.workers)).toBe(true);
+    // The host ceiling is a property of the *derivation*, not of an explicit
+    // override — `VITEST_MAX_WORKERS` deliberately bypasses the clamp, because
+    // its job is to reproduce the oversized pool the cap exists to prevent.
+    // Asserting the ceiling unconditionally would mean the a0-00c "before" run
+    // reddened this spec on its way to measuring itself.
+    if (process.env['VITEST_MAX_WORKERS'] === undefined) {
+      expect(cap.workers).toBeLessThanOrEqual(hostParallelism());
+    }
   });
 
   it('reports a quota when it is running under one', () => {
