@@ -2429,7 +2429,11 @@ async function boot(): Promise<void> {
       if (frame.phase === 'levelUp') audio.cue('levelUp');
       summaryLevels = frame.levelsShown;
     }
-    if (frame.barMoving) {
+    // The bed runs from the first fill to the last, INCLUDING the level-up beats
+    // in between: pr-07 built `levelUp` to duck it and expects it to still be
+    // there underneath — *"beat 4 is a pause in the fill, not the end of it… a bed
+    // that cut out and restarted would announce the seam"*.
+    if (frame.barMoving || frame.phase === 'levelUp') {
       audio.xpFill(frame.barProgress);
       summaryFilling = true;
     } else if (summaryFilling) {
