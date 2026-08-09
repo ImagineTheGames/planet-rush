@@ -30,6 +30,16 @@ rows* — and that is what this session did. It does not pass. See REGRESSION.
 2. **No PNG under `tests/mobile/goldens.spec.ts-snapshots` is touched, and that
    is a RESULT, not an omission.** Proof in DECISIONS below.
 
+3. **Merged `origin/main` again mid-session** (`6523f1a`) — main moved
+   `22bf4e7..87159d3` while the audit was running: **a0-06b** (PR #339, the cast
+   on the wire — the ONLINE gap this brief was told to leave alone, now closed by
+   netcode) and **a2-04** (no hull turrets). Clean merge, no conflicts; this
+   branch carries no source changes for anything to collide with.
+   **Re-verified rather than assumed, because the measurement is the perishable
+   thing:** main changed no golden snapshot and does not touch
+   `src/ui/lobby-view.ts`, and the five lobby goldens were re-run on the merged
+   tree — **5 passed**, no snapshot rewritten. `tsc` clean on the merged tree.
+
 ## DECISIONS
 
 - **Three renders, not two.** A re-baseline PNG blends three separate briefs'
