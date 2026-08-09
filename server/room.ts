@@ -69,7 +69,11 @@ import { TICK_DT, createWorld, isOver, step } from '../src/sim';
 // 2-8). The room checks it too — a client refuses first, with a reason on
 // screen, but authority does not take a client's word for what it refused.
 import { MIN_MATCH_SIZE } from '../src/sim/match-config';
-import type { Bounds, MatchMode, PlayerInput, World } from '../src/sim';
+// The ratified product default for the ore economy — SCARCE (GDD §2.8, p11). A
+// room that was never told a level opens on it, because that is the level the
+// lobby's YIELD row shows a host who has touched nothing (n5-01).
+import { DEFAULT_ABUNDANCE } from '../src/sim/constants';
+import type { Abundance, Bounds, MatchMode, PlayerInput, World } from '../src/sim';
 import {
   FogTracker,
   ShipLifecycleTracker,
@@ -350,6 +354,21 @@ export interface RoomConfig {
   readonly bounds?: Bounds;
   /** Asteroids per wave — the QA harness runs cramped worlds on purpose. */
   readonly asteroidCount?: number;
+  /**
+   * The ore ABUNDANCE the room opens at (GDD §2.8, ratified p11) — `scarce |
+   * standard | rich`, the named multiplier set over the field's total ore, its
+   * rock counts and the wait between waves.
+   *
+   * Default {@link DEFAULT_ABUNDANCE} — SCARCE, "by default more scarce so combat
+   * and resource management is deeper" (developer, p11) — because that is what the
+   * lobby's YIELD row shows a host who has touched nothing, and a room that built
+   * `standard` behind a screen reading SCARCE is the n5-01 bug stated in one line.
+   * The host's own pick arrives on `lobbyChoice.abundance` and replaces it while
+   * the room is still in the lobby; at RUSH! this is handed to `createWorld` and
+   * to every client on `matchStart`, so authority and every prediction run the
+   * same economy.
+   */
+  readonly abundance?: Abundance;
   /** Issues reclaim tokens. Injected so the server owns its randomness in one
    *  place and a test can make it predictable. */
   readonly makeToken: () => string;
@@ -377,6 +396,17 @@ export class MatchRoom {
    * match is live the mode is the world's, not the room's.
    */
   private matchMode: MatchMode;
+  /**
+   * The room's ore abundance (n5-01) — SCARCE unless the room was opened at
+   * another level or the host's lobby says otherwise.
+   *
+   * Settable for exactly the reason {@link matchMode} is: the YIELD row lives in
+   * the lobby and the host may move it after the room exists, so a `readonly`
+   * field would mean an online room could only ever run the level it was
+   * allocated with. Lobby-phase only; once the match is live the economy is the
+   * world's (`world.economy`), not the room's.
+   */
+  private matchAbundance: Abundance;
   private readonly queue = new InputQueue();
   private readonly statics = new StaticEntityTracker();
   /** Watches every ship's `alive` flag so a death and a respawn reach the clients
@@ -477,6 +507,7 @@ export class MatchRoom {
     this.snapshotInterval = config.snapshotIntervalTicks ?? DEFAULT_SNAPSHOT_INTERVAL_TICKS;
     this.eventInterval = config.eventIntervalTicks ?? DEFAULT_EVENT_INTERVAL_TICKS;
     this.matchMode = config.mode ?? 'ffa';
+    this.matchAbundance = config.abundance ?? DEFAULT_ABUNDANCE;
     const count = config.slots ?? MATCH_SLOTS;
     this.slots = Array.from({ length: count }, (_, player) => ({
       player,
@@ -821,6 +852,13 @@ export class MatchRoom {
         // state and is ignored here, or a guest could re-side the room under the
         // host.
         if (player === this.creator) this.applyTeamConfig(message.mode, message.teams);
+        // …and the ore ABUNDANCE, which is match shape in exactly the same sense
+        // (n5-01): it is resolved once at world-build and carried on the match, so
+        // it must be settled before the sim exists and it is the host's to settle.
+        // A joiner's YIELD row is their own screen's local state until the room
+        // says otherwise, and is ignored here — one guest must not re-price
+        // everyone else's economy.
+        if (player === this.creator && message.abundance) this.matchAbundance = message.abundance;
         // …and the per-seat OPEN / BOT / CLOSED authoring (a0-11). Same rule, same
         // reason: the roster is match shape, and only the creator shapes the match.
         if (player === this.creator && message.seats) this.applySeatStates(message.seats);
@@ -1095,6 +1133,12 @@ export class MatchRoom {
       ...(this.config.asteroidCount !== undefined
         ? { asteroidCount: this.config.asteroidCount }
         : {}),
+      // The economy the lobby promised (n5-01). Always passed, never omitted: an
+      // omitted level is `resolveEconomy`'s pre-p11 `standard` baseline, which is
+      // exactly the 150 s wave interval a live SCARCE room was measured spawning
+      // at. Every client is told the same value on `matchStart` below, so nobody
+      // predicts against a metronome authority is not keeping.
+      abundance: this.matchAbundance,
     });
     this.phase = 'live';
     this.lastUpdateMs = -1;
@@ -1679,6 +1723,12 @@ export class MatchRoom {
       ...(this.config.asteroidCount !== undefined
         ? { asteroidCount: this.config.asteroidCount }
         : {}),
+      // …and the ore abundance authority just built with (n5-01), so the client's
+      // predicted world resolves the same economy — the same field yield, the same
+      // rock counts, the same wave metronome. Read from the room rather than from
+      // the world so this message states the argument `createWorld` was given, on
+      // the same terms as the seed and the roster above it.
+      abundance: this.matchAbundance,
     });
   }
 

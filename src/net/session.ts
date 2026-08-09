@@ -27,7 +27,7 @@
 
 import type { Action, PlayerId, ShipClass } from '@shared/types';
 import { TICK_DT, createWorld } from '../sim';
-import type { MatchMode, World } from '../sim';
+import type { Abundance, MatchMode, World } from '../sim';
 import { resetStaticEntities } from './entity-events';
 import { LocalLoopback, OFFLINE_ROOM, isLocalAuthority } from './loopback';
 import type { LoopbackConfig } from './loopback';
@@ -293,6 +293,9 @@ export class TransportSession implements MatchSession {
     teams?: readonly number[];
     /** The host's per-seat OPEN / BOT / CLOSED authoring, by slot (a0-11). */
     seats?: readonly LobbySeatState[];
+    /** The ore ABUNDANCE the host's YIELD row is on (n5-01) — match shape like
+     *  the mode beside it, so the room builds the economy the lobby promised. */
+    abundance?: Abundance;
   }): void {
     this.transport.send({
       type: 'lobbyChoice',
@@ -303,6 +306,7 @@ export class TransportSession implements MatchSession {
       ...(options.mode ? { mode: options.mode } : {}),
       ...(options.teams ? { teams: options.teams } : {}),
       ...(options.seats ? { seats: options.seats } : {}),
+      ...(options.abundance ? { abundance: options.abundance } : {}),
     });
   }
 
@@ -796,9 +800,9 @@ export class TransportSession implements MatchSession {
    * predicting inside it.
    *
    * `createWorld` is called with exactly what the server called it with — seed,
-   * roster, bounds, rock count (`MatchStartMessage`) — so the two worlds are
-   * identical before a single tick has run, which is the whole basis for
-   * predicting anything (GDD §4.1 determinism, §4.2 prediction).
+   * roster, bounds, rock count, **ore abundance** (`MatchStartMessage`) — so the
+   * two worlds are identical before a single tick has run, which is the whole
+   * basis for predicting anything (GDD §4.1 determinism, §4.2 prediction).
    *
    * A `matchStart` at a tick past zero is a *reclaim*: the player dropped and
    * came back inside the grace window (GDD §4.2), and the seed only rebuilds the
@@ -820,6 +824,14 @@ export class TransportSession implements MatchSession {
       })),
       ...(message.bounds ? { bounds: { ...message.bounds } } : {}),
       ...(message.asteroidCount !== undefined ? { asteroidCount: message.asteroidCount } : {}),
+      // The economy the room RUSHed with (n5-01). Threaded verbatim, and ABSENT
+      // when the message is absent rather than defaulted to the product's SCARCE:
+      // the value that matters here is not the one the lobby promised but the one
+      // authority actually built with, and a pre-n5-01 server built with none —
+      // so substituting a default is how a client predicts a field of rocks that
+      // is not there. Before this line the client never passed one at all, which
+      // is why an online SCARCE match ran the `standard` 150 s metronome.
+      ...(message.abundance ? { abundance: message.abundance } : {}),
     });
     if (message.tick > 0) {
       resetStaticEntities(world);

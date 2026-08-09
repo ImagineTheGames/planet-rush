@@ -995,9 +995,9 @@ async function boot(): Promise<void> {
   // The match SIZE the lobby resolved (variable-slots Milestone E). Threads into
   // `bootOfflineMatch` as the seat count, so closing seats in the lobby actually
   // builds a smaller world (local + N-1 bots). Undefined = the design's eight.
-  // (The TEAM table threads through below, m10; the ore ABUNDANCE rides the same
-  // resolved config and is the last thing still awaiting its offline world-build
-  // wiring — Task C4, Netcode.)
+  // (The TEAM table threads through below, m10; the ore ABUNDANCE threads through
+  // beside it since n5-01 — it used to stop at this config and never reach
+  // `createWorld`, so a SCARCE lobby built a STANDARD economy.)
   const chosenSize = chosen.size;
   // The sides the lobby authored, in the sim's dense player order (m10 teams-wire).
   // THIS is the offline half of teams: without it the roster reached `createWorld`
@@ -1013,6 +1013,24 @@ async function boot(): Promise<void> {
   // enemy to HARD and met a mixed field. Absent under `?debug=1` (no lobby), where
   // the roster-order fallback keeps every existing harness on the cast it had.
   const chosenCast = chosen.cast;
+  /**
+   * The ore ABUNDANCE the lobby RUSHed with (n5-01) — the last of the lobby's
+   * picks that never reached world-build.
+   *
+   * The YIELD row has shown a level since p11 and `LobbyChoice` has carried it to
+   * this line since Milestone E; nothing passed it to `bootOfflineMatch`, so every
+   * offline match was built with no abundance at all — the pre-p11 `standard`
+   * baseline, whose 150 s wave interval is what the lobby's own `YIELD · SCARCE`
+   * chip sat above on the live build at `7e175ac` (SCARCE is 180).
+   *
+   * **Only when there is a lobby**, exactly like the three picks persisted above.
+   * Under `?debug=1` there is no lobby, nothing on screen has promised the player
+   * an economy, and the harness contract is that the debug boot builds the world it
+   * has always built — a level threaded in there would silently re-roll the frozen
+   * scenes' asteroid field (SCARCE scales rock counts and yield, not just the
+   * clock) and re-baseline goldens this brief has no business moving.
+   */
+  const chosenAbundance = lobby ? chosen.abundance : undefined;
   let matchSeed = MATCH_SEED;
   let matchId = 0;
   function bootMatch(seed: number): MatchBoot {
@@ -1025,6 +1043,7 @@ async function boot(): Promise<void> {
       ...(chosenSize !== undefined ? { slots: chosenSize } : {}),
       ...(chosenTeams !== undefined ? { teams: chosenTeams } : {}),
       ...(chosenCast !== undefined ? { cast: chosenCast } : {}),
+      ...(chosenAbundance !== undefined ? { abundance: chosenAbundance } : {}),
     });
   }
   // Online the match is already running on the server: present the live session as
@@ -7911,9 +7930,9 @@ function installOnlineSeam(seam: object): void {
 /** The choices the player locks in at RUSH! — the hull, the arena (p2), the
  *  name shown over their ship and station (field request v0.2.1), and the match
  *  shape (variable-slots Milestone E): the MODE, the ore ABUNDANCE, the SIZE
- *  (`N`) and the per-player TEAM table. Size and teams thread into
- *  `bootOfflineMatch`; abundance still rides the config seam awaiting the rest of
- *  the offline world-build wiring (Task C4). */
+ *  (`N`) and the per-player TEAM table. Size, teams and — since n5-01 — the
+ *  ABUNDANCE all thread into `bootOfflineMatch`, so the economy the YIELD row
+ *  promises is the one `createWorld` resolves. */
 interface LobbyChoice {
   readonly shipClass: ShipClass;
   readonly mapId: string;
@@ -8786,7 +8805,21 @@ function openLobby(
       // for the same reason with a sharper edge: since the lobby stopped putting a
       // bot in every empty seat, a roster the room was never told about would have
       // it fill them all anyway — six ghost bots behind six seats drawn OPEN.
-      ...(host ? { mode: state.mode, teams: lobbyWireTeams(state), seats: lobbyWireSeats(state) } : {}),
+      //
+      // …and the ore ABUNDANCE the YIELD row is on (n5-01). It is match shape in
+      // precisely the sense the mode is — resolved once at world-build and carried
+      // on the match — so it has to be settled before the sim exists, and it was
+      // the one row on this screen that never left the client: the room built
+      // `standard` behind a lobby reading SCARCE, which is a 150 s wave metronome
+      // under a chip promising 180.
+      ...(host
+        ? {
+            mode: state.mode,
+            teams: lobbyWireTeams(state),
+            seats: lobbyWireSeats(state),
+            abundance: state.abundance,
+          }
+        : {}),
     });
   }
 
