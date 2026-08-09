@@ -23,14 +23,14 @@
  *
  * Three rules this file has to keep on its own:
  *
- *  1. **One primary, and it is PLAY SOLO.** Bone spends no colour, so the primary
+ *  1. **One primary, and it is SOLO.** Bone spends no colour, so the primary
  *     action is simply the biggest and brightest plate — which only works while
  *     there is exactly one ({@link ./gantry} `singlePrimary`, held by
  *     `lobby-entry.test.ts`). CAMPAIGN is a full-contrast `secondary` plate, never
  *     `inert`: `inert` is Gantry's word for a *surface*, and a teaser drawn as a
  *     surface is the greyed-out door u9-01 exists to prevent, wearing a bevel.
  *  2. **Bone spends no hue, so neither does this screen.** The plasma that used to
- *     fill PLAY SOLO, tint the caret and letter the `Coming Soon…` answer is gone;
+ *     fill SOLO, tint the caret and letter the `Coming Soon…` answer is gone;
  *     emphasis is brightness now. The ONE exception is unchanged and deliberate:
  *     a join that came back refused is the only genuinely wrong thing this screen
  *     can show, and it stays threat red (style-guide §2).
@@ -286,7 +286,7 @@ export class LobbyEntryView extends Container {
     for (const [nodes, rect, key, primary, enabled] of [
       [this.erase, this.layout.erase, 'erase', false, model.canErase],
       // JOIN is the keypad screen's one affirmative action — its single bright
-      // plate, exactly as PLAY SOLO is the doors screen's. The two never share a
+      // plate, exactly as SOLO is the doors screen's. The two never share a
       // screen, so the one-primary rule holds in both states.
       [this.submit, this.layout.submit, 'submit', true, model.canSubmit],
     ] as const) {
@@ -295,7 +295,7 @@ export class LobbyEntryView extends Container {
     }
 
     // SETTINGS shares the beam's trailing end with JOIN, on the home screen only.
-    // `secondary`, never primary: SOLO CONTRACT is this screen's affirmative action.
+    // `secondary`, never primary: SOLO is this screen's affirmative action.
     setVisible(home, this.settings.body, this.settings.label);
     if (home) {
       this.drawFooterPlate(this.settings, this.layout.settings, model, 'settings', false, !model.connecting, metrics);
@@ -408,7 +408,7 @@ export class LobbyEntryView extends Container {
    * The offline door is the PRIMARY (it always works — GDD §4.8 risk 6) and is the
    * only bright plate on the screen. A COMING-SOON door (CAMPAIGN, u9-01) is
    * `secondary`, never primary and never `inert`: fully lit and fully pressable,
-   * because pressing it is how the screen answers — while PLAY SOLO keeps the
+   * because pressing it is how the screen answers — while SOLO keeps the
    * brightness, so the teaser does not take the emphasis off the door that works.
    */
   private drawDoor(nodes: DoorNodes, door: EntryDoorView, rect: Rect, m: FrameMetrics): void {
