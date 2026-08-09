@@ -41,6 +41,7 @@ import {
   turretCount,
   sensorSources,
   rememberedOreIds,
+  waveIntervalOf,
 } from './sim';
 import type { MuzzleFlash, MiningStation, Turret, World, SensorSource } from './sim';
 // The sim's real, validated upgrade purchase — used only by the ?debug=1
@@ -2797,8 +2798,9 @@ async function boot(): Promise<void> {
    *    core + shields + turrets between frames, so a turret being picked off at
    *    the edge of its range rings it exactly as a shot on the core does — and a
    *    single stray shot does not (the sustained-damage trigger is `src/ui`'s).
-   *  - **The wave clock and the collapse state** are `world.time` and the sim's
-   *    own `isCollapsed`, so the clock on screen is the clock the match runs on.
+   *  - **The wave clock and the collapse state** are `world.time`, the sim's own
+   *    `isCollapsed`, and the match's own `waveIntervalOf` — so the clock on
+   *    screen is the clock the match runs on, at the cadence this match runs it.
    */
   function feedHud(): void {
     hudFrame.time = world.time;
@@ -2807,6 +2809,11 @@ async function boot(): Promise<void> {
     hudFrame.isTouch = isTouch;
     hudFrame.owner = LOCAL_PLAYER;
     hudFrame.collapsed = isCollapsed(world);
+    // The match's OWN wave interval, the same number `spawnDueWaves` schedules
+    // against (a0-16). Read here for the same reason `collapsed` is: the sim
+    // answers it, the HUD never guesses — and before this the clock guessed the
+    // baseline and was 15 s wrong in every default (SCARCE) match.
+    hudFrame.waveInterval = waveIntervalOf(world);
     hudFrame.buildRequested = buildWheel.open;
     hudFrame.upgradePanelOpen = buildWheel.panelOpen;
     // The nested weapon wheel only exists inside the open upgrade panel; drop it

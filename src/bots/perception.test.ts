@@ -19,7 +19,15 @@
 
 import { describe, it, expect } from 'vitest';
 import { ShipClass } from '@shared/types';
-import { createWorld, WAVE_COUNT, WAVE_INTERVAL_S, type World } from '../sim';
+import {
+  createWorld,
+  step,
+  waveIntervalOf,
+  WAVE_COUNT,
+  WAVE_INTERVAL_S,
+  type Abundance,
+  type World,
+} from '../sim';
 import {
   DEFAULT_PERCEPTION,
   HUMAN_VISUAL_RANGE,
@@ -299,6 +307,62 @@ describe('perception — the envelope', () => {
 
     expect(perceive(w, 0, resolvePerception({ visualRange: 400 })).ships).toHaveLength(1);
     expect(perceive(w, 0, resolvePerception({ visualRange: 200 })).ships).toHaveLength(0);
+  });
+});
+
+describe("perception — the wave a bot is waiting for is the one that comes (a0-16)", () => {
+  // `nextWaveIn` used to take `waveTime`'s baseline default while the spawner
+  // scheduled on `world.economy.waveInterval`. In a default (SCARCE) match that
+  // told every bot the wave was 15 s sooner than it was: it committed to the
+  // centre early and found an empty field waiting for it. Not cosmetic — this
+  // one moved ships.
+
+  /** A two-slot world at one abundance level, with its real commons field: we
+   *  are timing the wave schedule, so the rocks have to actually arrive. */
+  function matchAt(abundance: Abundance): World {
+    return createWorld({
+      seed: 11,
+      players: [
+        { id: 0, shipClass: ShipClass.Vanguard },
+        { id: 1, shipClass: ShipClass.Interceptor },
+      ],
+      abundance,
+    });
+  }
+
+  for (const abundance of ['scarce', 'standard', 'rich'] as const) {
+    it(`a bot expects the next wave when it really lands, at ${abundance.toUpperCase()}`, () => {
+      const w = matchAt(abundance);
+      const interval = waveIntervalOf(w);
+      // The perceived wait is on the match's own metronome from the first frame.
+      expect(perceive(w, 0).nextWaveIn).toBeCloseTo(interval, 6);
+
+      // Step to the wave and check the bot's expectation stayed honest: it must
+      // run down to (about) zero exactly as the wave lands, never reaching zero
+      // while the field is still empty.
+      let guard = 0;
+      while (w.match.wavesSpawned < 2 && guard < 10_000) {
+        const expected = perceive(w, 0).nextWaveIn!;
+        expect(expected, `${abundance}: the wait is still running`).toBeGreaterThan(0);
+        // What the bot expects plus where it is now IS the arrival time.
+        expect(w.time + expected, `${abundance}: expected arrival`).toBeCloseTo(interval, 6);
+        step(w, [], 1);
+        guard++;
+      }
+      expect(w.match.wavesSpawned).toBe(2);
+      // The wave landed on the first tick at or after the time the bot expected.
+      expect(w.time).toBeGreaterThanOrEqual(interval - 1e-9);
+      expect(w.time - 1).toBeLessThan(interval + 1e-9);
+    });
+  }
+
+  it('a world with no resolved economy keeps the baseline expectation', () => {
+    // Bot fixtures and net snapshots hand-build worlds without `economy` (as they
+    // do without `ledger`). The bot must fall back to the baseline, not throw.
+    const w = world2();
+    delete (w as { economy?: unknown }).economy;
+    expect(() => perceive(w, 0)).not.toThrow();
+    expect(perceive(w, 0).nextWaveIn).toBeCloseTo(WAVE_INTERVAL_S, 6);
   });
 });
 
