@@ -39,6 +39,13 @@ rows* — and that is what this session did. It does not pass. See REGRESSION.
    thing:** main changed no golden snapshot and does not touch
    `src/ui/lobby-view.ts`, and the five lobby goldens were re-run on the merged
    tree — **5 passed**, no snapshot rewritten. `tsc` clean on the merged tree.
+   And because a0-06b moves `main.ts` / `transport.ts` / `session.ts` — the cast
+   seam's own neighbourhood — the brief's *"what must not change"* list was
+   re-run rather than trusted: `PREVIEW_PORT=4194 npm run test:live-stage --
+   lobby-cast.spec.ts` → **3 passed** (the lobby's cast is the cast the match
+   seats; the `?` opens the dossier on PC; the `?` is a **tap** at 390 px
+   landscape and the row still carries a cast the match honours). **This is the
+   fourteenth merge in a row to leave the cast seam untouched.**
 
 ## DECISIONS
 
