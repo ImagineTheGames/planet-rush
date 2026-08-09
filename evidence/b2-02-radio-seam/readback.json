@@ -1,0 +1,47 @@
+{
+  "brief": "b2-02",
+  "what": "a served Teams match carries one bot’s help call to its ally’s decision",
+  "seed": 32419,
+  "cast": [
+    "sable",
+    "warden",
+    "warden"
+  ],
+  "teams": [
+    0,
+    0,
+    1,
+    1
+  ],
+  "channel": {
+    "members": [
+      2,
+      3
+    ],
+    "sharedObject": true,
+    "loneBotOnTheOtherSide": true
+  },
+  "timeline": {
+    "call": {
+      "kind": "help",
+      "from": 2,
+      "about": 2,
+      "seenAt": 0
+    },
+    "sentAtSeconds": 0.016666666666666666,
+    "readableAtSeconds": 0.25,
+    "heardAtSeconds": 0.26666666666666666,
+    "answeredAtSeconds": 0.31666666666666665,
+    "latencySeconds": 0.25,
+    "readableInTheTickItWasSent": false
+  },
+  "allyDecision": {
+    "target": 2,
+    "behavior": "defend-ally"
+  },
+  "beforeB2_02": {
+    "everyBotsRadio": null,
+    "callsHeard": 0,
+    "allyResponses": 0
+  }
+}
