@@ -22,9 +22,10 @@ export interface MatchAccrual {
   repairs: number;       // Σ +Δ station.coreHp ÷ REPAIR_HP_PER_ORE
   wavesSurvived: number;
   placement: number;     // 1 = winner … n = first out
+  slots: number;         // ADDED by the build — see (1) below
   won: boolean;
   seconds: number;
-  // from pr-02's ledger, bucketed by the OPPONENT's difficulty tier:
+  // from pr-02's ledger, bucketed by the OPPONENT's difficulty tier:  — see (2)
   damageDealt: Record<Difficulty, number>;   // HP
   shipKills: Record<Difficulty, number>;
   stationKills: Record<Difficulty, number>;
@@ -106,6 +107,35 @@ bash -c "git fetch origin main && git merge-base --is-ancestor origin/main HEAD"
 One real headless match's `MatchAccrual` and its XP rows, printed in the PR body, beside the
 same match's numbers from `spikes/progression/measured-a0-13.txt` — they should be the same
 shape and the same order of magnitude. Where they differ, say why.
+
+## Amended by the build *(p1-04, 2026-08-09 — the plan wins where the two disagree)*
+
+Three places where this brief and the shipped tree disagreed. All three are recorded in the PR.
+
+1. **`MatchAccrual` gained `slots` (and `slot`).** The sketch above carries `placement` but not
+   the lobby size, and the placement row is priced at **20 / rung** (§1.3d) — a rung is a player
+   you outlasted, so the row cannot be priced without `n`. `slot` comes free with it: the observer
+   tallies every seat, because QA's re-baseline (pr-08) wants the whole lobby, not one player.
+
+2. **"from pr-02's ledger, bucketed by the OPPONENT's difficulty tier" is not something pr-02's
+   ledger can hand over.** As shipped, `CombatCredit.dealtToShips` / `dealtToStations` /
+   `shipKills` / `stationKills` are **one number per ATTACKER slot** — there is no victim
+   dimension anywhere in them, so a per-tier bucket cannot be read out directly. What the ledger
+   *does* carry is `lastDamageAt[victim][attacker]` (the per-pair clock) and `lastHitBy[victim]`
+   (the killing blow), and the observer buckets by reading those: an attacker's damage in an
+   observation window is charged to exactly the victims the ledger says they hit in that window.
+   Fed every tick — or every authoritative snapshot — that is exact. It is still a **read of the
+   ledger**, never the shadow attributor this brief rightly forbids (test 2); the fallbacks for a
+   coarse window are named in the module header. **A victim-bucketed damage row on the ledger
+   itself would make this exact in every case; that is a `src/sim/` change for the Gameplay lane
+   to weigh, and this lane may not make it.**
+
+3. **Test 7 is met in the half a module can meet it.** "Observe the authoritative world" is a
+   *wiring* rule, and the wiring is pr-05's. What ships here is what the observer can enforce
+   alone: `observe()` is idempotent for the newest tick and **revisable** for it — a tick
+   re-delivered with corrected content has its window rolled back before the correction is
+   applied, and a world older than that is ignored rather than silently rewound. Pinned by the
+   fixture in `accrual.test.ts`.
 
 ## Open questions this brief is exposed to
 
