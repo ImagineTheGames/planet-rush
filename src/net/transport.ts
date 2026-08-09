@@ -37,6 +37,12 @@ import type { Action, PlayerId, ShipClass } from '@shared/types';
 // (`MatchConfig`), because the lobby, the wire and the world must all spell the
 // two modes identically or "TEAMS" means something different at each hop.
 import type { MatchMode } from '../sim/match-config';
+// Type-only, and for the same reason as the mode above: the cast the host picks
+// is `src/bots`' own union (GDD §2.9), because the lobby, the wire and the room
+// must spell "warden" identically or the character does not survive the hop —
+// which is precisely the bug a0-06b exists to close. A hand-copied union here
+// would be a seventh place for the roster to drift.
+import type { PersonalityId } from '../bots';
 
 // ---------------------------------------------------------------------------
 // Primitives
@@ -128,6 +134,39 @@ export interface LobbyChoiceMessage {
    * Only honored from the room creator; ignored otherwise (GDD §4.2).
    */
   botDifficulties?: readonly BotDifficulty[];
+  /**
+   * **The characters the host picked**, one entry per BOT seat in exactly the
+   * order — and of exactly the length — {@link botDifficulties} uses (a0-06b).
+   *
+   * ---------------------------------------------------------------------------
+   * THIS ROW IS AUTHORITATIVE; THE TIER ROW IS DERIVED
+   * ---------------------------------------------------------------------------
+   * GDD §2.1 *amended 2026-08-07* is that **the host picks the character and its
+   * difficulty is shown, not chosen** — so a tier and a name that can disagree is
+   * exactly the control the amendment deleted. Offline that became
+   * unrepresentable (the lobby stores one character per seat and derives the
+   * chip). Online it survived on the wire: this message carried a tier, the room
+   * re-derived *a* character of that tier, and a host who picked Sable got
+   * Vulture.
+   *
+   * The rule, stated once and kept in one place (`server/room.ts` `castFor`):
+   * **where entry `i` names a character, that character is seated and
+   * `botDifficulties[i]` is never read for that seat.** The tier the room then
+   * publishes is `PERSONALITIES[character].difficulty`, so the two rows cannot
+   * disagree about seat `i` — one of them is simply not consulted. Both are sent
+   * because the tier is still *shown*, and a client that reads only the tier
+   * (an older lobby, a spectator view) keeps working.
+   *
+   * **Duplicates ride through untouched.** Eight seats, seven characters and only
+   * three Hard ones, so the developer's own balanced 4v4 of Hard bots needs a
+   * repeat: `['warden','warden']` in is two Wardens seated, never one.
+   *
+   * Absent from a pre-a0-06b client, and from a shorter array's tail — both read
+   * as "no opinion about that seat", and the room falls back to the tier-derived
+   * cast it has always built. Honored from the room creator only, like every
+   * other field here; a joiner cannot re-cast the room.
+   */
+  botPersonalities?: readonly PersonalityId[];
   /**
    * The host's per-seat OPEN / BOT / CLOSED authoring, indexed by slot id
    * (0..7) — the lobby's own roster, on the wire (a0-11).
@@ -326,6 +365,21 @@ export interface LobbySlot {
   player: PlayerId;
   isBot: boolean;
   botDifficulty?: BotDifficulty;
+  /**
+   * **Which character is in this seat** — the room's echo of the cast it really
+   * built (a0-06b), present exactly where {@link botDifficulty} is: on a seat with
+   * a bot actually flying it.
+   *
+   * `botDifficulty` alone can only ever say *a* Hard bot is here, which is a
+   * different claim from *Sable* is here, and a reader that re-derives a name from
+   * the tier will sometimes name the wrong one (`src/ui/lobby` `castForEmptySeat`
+   * — three Hard characters, one tier). This says which, so a roster can show what
+   * authority seated rather than a plausible guess at it.
+   *
+   * Optional, so a pre-a0-06b server's slot still satisfies the type; absent, a
+   * reader keeps deriving from the tier exactly as before.
+   */
+  botPersonality?: PersonalityId;
   shipClass: ShipClass;
   ready: boolean;
   /**

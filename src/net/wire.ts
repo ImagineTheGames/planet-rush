@@ -57,6 +57,14 @@ import type { Action, ActionType, BuildItem, Vec2 } from '@shared/types';
 import { ShipClass, UpgradeTrack } from '@shared/types';
 import { playtestLog } from './playtest-log';
 import type { MatchMode } from '../sim/match-config';
+// The one RUNTIME import this parser takes from outside `src/net`, and it is
+// deliberate: the set of characters the wire admits is the cast itself (GDD §2.9),
+// read from `ROSTER` rather than re-typed as a seven-word union here. A hand-copied
+// list would be a second roster, free to drift from the first the day an eighth
+// character lands — and the failure mode of a *stale allow-list* is a host's pick
+// silently dropped on the wire, which is the whole bug a0-06b closes.
+import { ROSTER } from '../bots';
+import type { PersonalityId } from '../bots';
 import type {
   BotDifficulty,
   ClientMessage,
@@ -191,6 +199,11 @@ export function parseClientMessage(frame: WireFrame): ClientMessage | null {
       const fireMode = parseFireMode(raw['fireMode']);
       if (shipClass === null || fireMode === null) return null;
       const difficulties = parseBotDifficulties(raw['botDifficulties']);
+      // …and the CHARACTERS behind those tiers (a0-06b) — the authoritative half
+      // of the pair. Same shape, same order, same dropped-not-refused terms: a
+      // malformed cast costs the host their cast, never their hull, and the room
+      // then falls back to the tier-derived one it built before this row existed.
+      const personalities = parseBotPersonalities(raw['botPersonalities']);
       // The match SHAPE the host is on (m10 teams-wire): the mode and the per-seat
       // side. Both are optional and both are dropped rather than refused when
       // malformed — a bad team array must not cost the sender their hull pick, and
@@ -205,6 +218,7 @@ export function parseClientMessage(frame: WireFrame): ClientMessage | null {
         shipClass,
         fireMode,
         ...(difficulties ? { botDifficulties: difficulties } : {}),
+        ...(personalities ? { botPersonalities: personalities } : {}),
         ...(mode ? { mode } : {}),
         ...(teams ? { teams } : {}),
         ...(seats ? { seats } : {}),
@@ -429,6 +443,32 @@ function parseBotDifficulties(value: unknown): BotDifficulty[] | null {
   for (const entry of value) {
     if (entry !== 'easy' && entry !== 'medium' && entry !== 'hard') return null;
     out.push(entry);
+  }
+  return out;
+}
+
+/**
+ * The characters the host picked (a0-06b, `./transport`
+ * {@link LobbyChoiceMessage.botPersonalities}) — bounded like every other array on
+ * this hostile surface, and rejected **whole** rather than per-entry for the reason
+ * {@link parseSeatStates} states: dropping one unreadable entry would shift every
+ * seat after it by one, and hand seat 5's character to seat 2.
+ *
+ * Membership is tested against {@link ROSTER} — an ARRAY, with `includes` — and
+ * that is not an incidental choice. a0-06 shipped this same guard written as
+ * `chosen in PERSONALITIES`, and `PERSONALITIES` is an object literal, so `in`
+ * walks the prototype chain: `constructor`, `toString`, `valueOf` and `__proto__`
+ * all passed a check meant to admit seven strings, and seating one yields a bot
+ * whose personality row is a *function*. On the client that was unreachable
+ * (every cast came from locally authored seats); **here it is the front door**,
+ * and the sender is whoever is holding the socket.
+ */
+function parseBotPersonalities(value: unknown): PersonalityId[] | null {
+  if (!Array.isArray(value) || value.length > MAX_PLAYERS) return null;
+  const out: PersonalityId[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'string' || !ROSTER.includes(entry as PersonalityId)) return null;
+    out.push(entry as PersonalityId);
   }
   return out;
 }
