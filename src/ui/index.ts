@@ -35,6 +35,12 @@
 export { Hud } from './hud';
 export type { HudFrame } from './hud';
 
+// The latch every screen shell tears down through, so a promise, a timer or a
+// socket message that lands after `teardown()` cannot draw into destroyed
+// Graphics (u12-01 — the one uncaught TypeError on every clean boot).
+export { createShellLifetime } from './shell-lifetime';
+export type { ShellLifetime } from './shell-lifetime';
+
 export { Onboarding, PromptId, resolvePromptText } from './onboarding';
 export type { OnboardingSignals } from './onboarding';
 
