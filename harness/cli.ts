@@ -10,6 +10,7 @@
  *   npx vite-node harness/cli.ts balance [seeds] [--out FILE]
  *   npx vite-node harness/cli.ts perf [ticks]
  *   npx vite-node harness/cli.ts determinism [seconds]
+ *   npx vite-node harness/cli.ts pay [--seeds n]     # the XP economy, re-baselined
  *
  * Every command exits non-zero when the thing it measured failed a target, so
  * the CLI is usable as a gate as well as an instrument. Nothing here reads a
@@ -67,7 +68,32 @@ import {
   winRates,
 } from './soak';
 import type { BotMatchResult } from './soak';
-import { PERSONALITIES } from '../src/bots';
+import { Difficulty, PERSONALITIES } from '../src/bots';
+import {
+  CURVE_MILESTONES,
+  FFA_MAP_IDS,
+  LOBBIES,
+  MIXED_ROSTER,
+  XP_ROW_KEYS,
+  baseForLevel2In,
+  matchesToLevel,
+  medianPlayerMatch,
+  payStats,
+  runPayMatch,
+  seeds,
+  summaryCost,
+} from './pay';
+import type { PayStats, PaySetup, PlayerMatch } from './pay';
+import { DEFAULT_ABUNDANCE } from '../src/sim';
+import { XP_CURVE_BASE, XP_CURVE_EXP } from '../src/progression/curve';
+import {
+  DAMAGE_HP_PER_UNIT,
+  TIER_MULTIPLIER,
+  XP_PER_DAMAGE_UNIT,
+  XP_PER_ORE_MINED,
+  XP_PER_SHIP_KILL,
+  XP_PER_STATION_KILL,
+} from '../src/progression/xp';
 
 /** Probes that actually play; `idle` is kept out of competitive sweeps because
  *  a seat that never acts is not a contestant, it is a control. */
@@ -531,11 +557,195 @@ function intervals(arg: string | undefined): number[] {
 }
 
 // ---------------------------------------------------------------------------
+// pay — what a match pays, across map, N and abundance (p1-08)
+// ---------------------------------------------------------------------------
+
+/**
+ * The re-baseline of the XP economy (plan §1.2, §1.3a–d, §1.4).
+ *
+ * Everything printed is a *measurement* taken with the shipped observer and the
+ * shipped pricer; the argument built on it is
+ * `docs/progression-balance-p1-08.md`. Redirect this to a file and commit it
+ * beside the report, exactly as `spikes/progression/measured-a0-13.txt` was, so
+ * the next lane diffs two runs rather than trusting two prose summaries.
+ *
+ * Exits non-zero when a match failed to reach an ending: a hung match is a
+ * failed measurement (GDD §3.8), and a pay table pooled over partial matches is
+ * a wrong number rather than a missing one.
+ */
+/** The career length the summary-sequence cost is modelled over — the brief's
+ *  own "at the fiftieth match". */
+const SUMMARY_CAREER_MATCHES = 50;
+
+/** One measured cell of the grid: what it was, what it paid, and a real
+ *  median player-match from it to hand the summary sequence. */
+interface Cell {
+  readonly label: string;
+  readonly stats: PayStats;
+  readonly median: PlayerMatch | null;
+}
+
+function pay(seedCount: number): number {
+  const seedList = seeds(seedCount);
+  const cell = (label: string, setup: Omit<PaySetup, 'seed'>): Cell => {
+    const results = seedList.map((seed) => runPayMatch({ ...setup, seed }));
+    return { label, stats: payStats(results), median: medianPlayerMatch(results) };
+  };
+
+  log('# p1-08 — what a match pays, re-measured against the shipped code');
+  log('');
+  log(`sample: seeds ${seedList[0]}..${seedList[seedList.length - 1]} (${seedList.length} per cell) · real shipped bot cast`);
+  log('instruments: src/progression/accrual.ts (observer, fed every tick) + src/progression/xp.ts (pricer)');
+  log(`weights: ore ${XP_PER_ORE_MINED}× · damage ${XP_PER_DAMAGE_UNIT}/${DAMAGE_HP_PER_UNIT}HP · ship ${XP_PER_SHIP_KILL}× · station ${XP_PER_STATION_KILL}×`);
+  log(`tier multiplier: easy ${TIER_MULTIPLIER[Difficulty.Easy]} · medium ${TIER_MULTIPLIER[Difficulty.Medium]} · hard ${TIER_MULTIPLIER[Difficulty.Hard]}`);
+  log(`curve: base ${XP_CURVE_BASE} · exp ${XP_CURVE_EXP}`);
+  log(`abundance: shipped lobby default is ${DEFAULT_ABUNDANCE.toUpperCase()}; createWorld's own default (what a0-13 measured) is STANDARD`);
+  log('');
+
+  const cells: Cell[] = [];
+  const section = (title: string, rows: Cell[]): void => {
+    cells.push(...rows);
+    log(`## ${title}`);
+    log('');
+    log('| cell | medXP | meanXP | winner | firstOut | spread | XP/min | ore | dmgHP | shipK | statK | struct | upgr | rep | len | max | ended |');
+    log('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|');
+    for (const { label, stats: s } of rows) {
+      log(
+        `| ${label} | ${s.medianXp.toFixed(0)} | ${s.meanXp.toFixed(0)} | ${s.winnerXp.toFixed(0)} | ` +
+          `${s.firstOutXp.toFixed(0)} | ${s.spread.toFixed(1)}× | ${s.xpPerMinute.toFixed(1)} | ` +
+          `${s.oreMined.toFixed(1)} | ${s.damageHp.toFixed(0)} | ${s.shipKills.toFixed(1)} | ${s.stationKills.toFixed(1)} | ` +
+          `${s.structures.toFixed(1)} | ${s.upgrades.toFixed(1)} | ${s.repairs.toFixed(1)} | ` +
+          `${mmss(s.medianSeconds)} | ${mmss(s.maxSeconds)} | ${s.ended}/${s.matches} |`,
+      );
+    }
+    log('');
+  };
+
+  // 1. The four lobbies §1.3a measured, at BOTH abundances — the standard column
+  //    is the apples-to-apples control against the plan's own numbers, the scarce
+  //    column is the game as it actually ships.
+  section(
+    'By lobby, octagon, N=8 — STANDARD (the abundance a0-13 measured)',
+    LOBBIES.map((l) => cell(`${l.label} · standard`, { slots: 8, roster: l.roster, abundance: 'standard' })),
+  );
+  section(
+    'By lobby, octagon, N=8 — SCARCE (the shipped lobby default)',
+    LOBBIES.map((l) => cell(`${l.label} · scarce`, { slots: 8, roster: l.roster, abundance: 'scarce' })),
+  );
+
+  // 2. N — the axis the plan never checked. Per-player ore density rises ~4× as
+  //    N falls (`homeFieldOre(n)`), so this is where the curve is most exposed.
+  section(
+    'By lobby size, octagon, MIXED cast, SCARCE',
+    [8, 6, 5, 4, 3].map((n) =>
+      cell(`N=${n} · scarce`, { slots: n, roster: MIXED_ROSTER, abundance: 'scarce' }),
+    ),
+  );
+
+  // 3. Map.
+  section(
+    'By map, N=8, MIXED cast, SCARCE',
+    FFA_MAP_IDS.map((mapId) =>
+      cell(`map ${mapId} · scarce`, { slots: 8, mapId, roster: MIXED_ROSTER, abundance: 'scarce' }),
+    ),
+  );
+
+  // 4. Abundance.
+  section(
+    'By abundance, octagon, N=8, MIXED cast',
+    (['scarce', 'standard', 'rich'] as const).map((abundance) =>
+      cell(`abundance ${abundance}`, { slots: 8, roster: MIXED_ROSTER, abundance }),
+    ),
+  );
+
+  // Question A, as a measurement: what the pay and the participation floor look
+  // like with s4's seven rows dropped and only the developer's four kept.
+  log('## Plan Question A — the ratified four rows ONLY, beside the full table');
+  log('');
+  log('| cell | full medXP | four-only medXP | full spread | four-only spread | four-only L2 |');
+  log('|---|---|---|---|---|---|');
+  for (const { label, stats: s } of cells) {
+    log(
+      `| ${label} | ${s.medianXp.toFixed(0)} | ${s.fourOnlyMedianXp.toFixed(0)} | ` +
+        `${s.spread.toFixed(1)}× | ${s.fourOnlySpread.toFixed(1)}× | ` +
+        `${matchesToLevel(s.fourOnlyMedianXp, 2).toFixed(1)} |`,
+    );
+  }
+  log('');
+
+  // Composition — which rows actually pay, pooled over each lobby cell. The
+  // §1.3a unit question, re-asked of the shipped economy.
+  log('## Composition of the pay, by row (share of all XP paid in the cell)');
+  log('');
+  log(`| cell | ${XP_ROW_KEYS.join(' | ')} |`);
+  log(`|---|${XP_ROW_KEYS.map(() => '---').join('|')}|`);
+  for (const { label, stats } of cells) {
+    log(
+      `| ${label} | ${XP_ROW_KEYS.map((k) => `${(stats.composition[k] * 100).toFixed(0)}%`).join(' | ')} |`,
+    );
+  }
+  log('');
+
+  // The curve, re-fitted against every cell measured above.
+  log(`## The curve at each measured pay (base ${XP_CURVE_BASE}, exp ${XP_CURVE_EXP})`);
+  log('');
+  log(`| cell | medXP | ${CURVE_MILESTONES.map((l) => `L${l}`).join(' | ')} | base for L2 in one match |`);
+  log(`|---|---|${CURVE_MILESTONES.map(() => '---').join('|')}|---|`);
+  for (const { label, stats } of cells) {
+    log(
+      `| ${label} | ${stats.medianXp.toFixed(0)} | ` +
+        `${CURVE_MILESTONES.map((l) => matchesToLevel(stats.medianXp, l).toFixed(1)).join(' | ')} | ` +
+        `${baseForLevel2In(stats.medianXp).toFixed(0)} |`,
+    );
+  }
+  log('');
+
+  // The summary sequence, in the loop. The brief's question: a five-second beat
+  // every match is not free at the fiftieth.
+  log('## The summary sequence in the loop (pr-05 `buildSummary`, watched not skipped)');
+  log('');
+  log('| cell | 1st match | median | max | ×50 matches | with level-up | level @50 | match+summary |');
+  log('|---|---|---|---|---|---|---|---|');
+  for (const c of cells) {
+    if (!c.median) continue;
+    const cost = summaryCost(c.median.accrual, c.median.xp, SUMMARY_CAREER_MATCHES);
+    log(
+      `| ${c.label} | ${cost.firstMatchSeconds.toFixed(1)}s | ${cost.medianSeconds.toFixed(1)}s | ` +
+        `${cost.maxSeconds.toFixed(1)}s | ${mmss(cost.totalSeconds)} | ` +
+        `${cost.withLevelUp}/${cost.matches} | ${cost.finalLevel} | ` +
+        `${mmss(c.stats.medianSeconds + cost.medianSeconds)} |`,
+    );
+  }
+  log('');
+
+  // Verdicts.
+  const failed = cells.filter((c) => c.stats.ended < c.stats.matches);
+  const long = cells.filter(
+    (c) => c.stats.medianSeconds > LENGTH_TARGET_MAX_S || c.stats.medianSeconds < LENGTH_TARGET_MIN_S,
+  );
+  const noHook = cells.filter((c) => matchesToLevel(c.stats.medianXp, 2) > 1);
+  log('## Verdicts');
+  log('');
+  log(`  measurement: ${failed.length === 0 ? 'ALL MATCHES ENDED' : `${failed.length} cell(s) lost matches to a ceiling`}`);
+  for (const c of failed) log(`    ${c.label}: ${c.stats.ended}/${c.stats.matches} ended · ${c.stats.failures.join(',')}`);
+  log(
+    `  match length 10–15 min: ${long.length === 0 ? 'ALL CELLS IN TARGET' : `${long.length} cell(s) outside`}`,
+  );
+  for (const c of long) log(`    ${c.label}: median ${mmss(c.stats.medianSeconds)}`);
+  log(
+    `  "level 2 inside one match": ${noHook.length === 0 ? 'HOLDS IN EVERY CELL' : `${noHook.length} cell(s) miss it`}`,
+  );
+  for (const c of noHook) log(`    ${c.label}: ${matchesToLevel(c.stats.medianXp, 2).toFixed(2)} matches`);
+  log('');
+  return failed.length === 0 ? 0 : 1;
+}
+
+// ---------------------------------------------------------------------------
 // Entry
 // ---------------------------------------------------------------------------
 
 function usage(): number {
-  log('usage: vite-node harness/cli.ts <smoke|balance|perf|determinism|soak|abundance> [args]');
+  log('usage: vite-node harness/cli.ts <smoke|balance|perf|determinism|soak|abundance|pay> [args]');
   return 2;
 }
 
@@ -559,6 +769,10 @@ function main(argv: readonly string[]): number {
       const rotFlag = rest.indexOf('--rotations');
       const rotations = rotFlag >= 0 ? Number(rest[rotFlag + 1] ?? 4) : 4;
       return soak(matches, rotations);
+    }
+    case 'pay': {
+      const seedsFlag = rest.indexOf('--seeds');
+      return pay(seedsFlag >= 0 ? Number(rest[seedsFlag + 1] ?? 12) : 12);
     }
     case 'abundance': {
       const flagValue = (name: string): string | undefined => {
