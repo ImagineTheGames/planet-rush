@@ -40,7 +40,14 @@ interface LobbySeam {
   defaultMapId: string;
   veteranMapId: string;
   mapOrder: readonly string[];
+  /** Which of the room's three screens is up (u10-01). */
+  screen: string;
+  /** The arena cards on MAP SELECT, once it is open. Empty on the roster, which
+   *  shows ONE card — the pick — as a control that opens this screen. */
   mapCards: readonly { x: number; y: number; width: number; height: number }[];
+  /** Open MAP SELECT / come back, the way the lobby's one arena card does. */
+  openMapSelect(): void;
+  closeScreen(): void;
   logicalViewport: { width: number; height: number };
   expectedStations: Record<string, { x: number; y: number }[]>;
   worldMapId: string | null;
@@ -79,9 +86,15 @@ async function openLobby(page: Page): Promise<void> {
   await page.waitForFunction(() => typeof window.__lobby?.selectMap === 'function', undefined, {
     timeout: 20_000,
   });
+  // …and on to MAP SELECT, where the arena cards live since u10-01 (the lobby
+  // keeps one card — the pick — as the control that opens this screen).
+  await page.evaluate(() => window.__lobby!.openMapSelect());
+  await page.waitForFunction(() => window.__lobby?.screen === 'map-select', undefined, {
+    timeout: 20_000,
+  });
 }
 
-test('the lobby shows four arena cards — octagon selected, diamond VETERAN — thumb-sized in landscape', async ({
+test('MAP SELECT shows one card per arena — octagon selected, diamond VETERAN — thumb-sized in landscape', async ({
   page,
 }) => {
   const pageErrors: string[] = [];
@@ -104,9 +117,10 @@ test('the lobby shows four arena cards — octagon selected, diamond VETERAN —
   });
 
   expect(p.visible, 'the lobby is on screen after PLAY').toBe(true);
-  // Four cards — the four ratified maps (GDD §2.1; registry m8-01).
-  expect(p.order).toEqual(['octagon', 'compass', 'oval', 'diamond']);
-  expect(p.cards, 'one rect per card').toHaveLength(4);
+  // One card per ratified map, counted off the registry rather than pinned to a
+  // literal — a0-12 took it from four to six and this line said four for a while.
+  expect(p.cards, 'one rect per card').toHaveLength(p.order.length);
+  expect(p.order.slice(0, 4)).toEqual(['octagon', 'compass', 'oval', 'diamond']);
   // Octagon preselected; diamond is the VETERAN map.
   expect(p.selectedMapId, 'octagon preselected the first time out').toBe('octagon');
   expect(p.defaultMapId).toBe('octagon');

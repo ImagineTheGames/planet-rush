@@ -89,6 +89,12 @@ interface LobbySeam {
   selectedClass: string;
   classOrder: readonly string[];
   classControls: readonly { index: number; physicalCenter: PhysicalPoint }[];
+  /** The lobby's ONE ship card and ONE arena card (u10-01) — the two controls
+   *  that open the picker screens, and what "the affordance set is DRAWN" means
+   *  on the roster now. */
+  screen: string;
+  shipCardControl: { logical: { width: number; height: number }; physicalCenter: PhysicalPoint };
+  mapCardControl: { logical: { width: number; height: number }; physicalCenter: PhysicalPoint };
   mapCards: readonly { width: number; height: number }[];
   seatHeight: number;
   rushControl: { physicalCenter: PhysicalPoint };
@@ -217,8 +223,8 @@ async function walkThePlayFlow(page: Page, press: Press, evidence: string): Prom
       humanCount: l.humanCount,
       slotCount: l.slotCount,
       size: l.size,
-      mapCards: l.mapCards.length,
-      classControls: l.classControls.length,
+      shipCardWidth: l.shipCardControl.logical.width,
+      mapCardWidth: l.mapCardControl.logical.width,
       seatHeight: l.seatHeight,
       rush: l.rushControl.physicalCenter,
       selectedClass: l.selectedClass,
@@ -229,15 +235,30 @@ async function walkThePlayFlow(page: Page, press: Press, evidence: string): Prom
   expect(lobby.online, 'the SOLO lobby is the offline flavour — no room code').toBe(false);
   expect(lobby.isHost, 'offline you are the host, so every control is live').toBe(true);
   expect(lobby.slotCount, 'eight seats (GDD §2.1)').toBe(8);
-  // The whole affordance set is DRAWN, not just modelled: the arena cards and hull
-  // tiles have rects, the roster rows have thumb height, RUSH! has a press point.
-  expect(lobby.mapCards, 'the arena cards are laid out').toBeGreaterThan(0);
-  expect(lobby.classControls, 'the four hull tiles are laid out').toBe(4);
+  // The whole affordance set is DRAWN, not just modelled: the ONE ship card and
+  // the ONE arena card have rects (u10-01 — the four hull tiles and six arena
+  // cards are on the screens those two open), the roster rows have thumb height,
+  // and RUSH! has a press point.
+  expect(lobby.shipCardWidth, 'the ship card is laid out').toBeGreaterThan(0);
+  expect(lobby.mapCardWidth, 'the arena card is laid out').toBeGreaterThan(0);
   expect(lobby.seatHeight, 'the roster rows have height').toBeGreaterThan(0);
   expect(lobby.matchStarted, 'still no world — RUSH! gates it').toBe(false);
   await page.screenshot({ path: `tests/live-stage/${evidence}-lobby-evidence.png` });
 
-  // --- 5. Configure it with a real press: pick a hull that is not the default. ---
+  // --- 5. Configure it with real presses: open SHIP SELECT off the lobby's one
+  //        ship card (u10-01), pick a hull that is not the default, and let the
+  //        pick hand us back to the roster. Two presses now, both real.
+  const card = await page.evaluate(() => {
+    const c = window.__lobby!.shipCardControl;
+    return { x: c.physicalCenter.x, y: c.physicalCenter.y };
+  });
+  await pressPoint(card);
+  await page.waitForFunction(
+    () => window.__lobby?.screen === 'ship-select' && (window.__lobby?.classControls.length ?? 0) === 4,
+    undefined,
+    { timeout: 20_000 },
+  );
+
   const other = lobby.classOrder.findIndex((c) => c !== lobby.selectedClass);
   const tile = await page.evaluate((i) => {
     const c = window.__lobby!.classControls.find((x) => x.index === i);
@@ -245,6 +266,8 @@ async function walkThePlayFlow(page: Page, press: Press, evidence: string): Prom
   }, other);
   if (!tile) throw new Error('no hull tile reported');
   await pressPoint(tile);
+  // …and picking RETURNS to the roster, which is where RUSH! is.
+  await page.waitForFunction(() => window.__lobby?.screen === 'roster', undefined, { timeout: 20_000 });
   await page.waitForFunction(
     (want) => window.__lobby?.selectedClass === want,
     lobby.classOrder[other],
