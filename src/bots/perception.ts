@@ -269,7 +269,7 @@ export interface PerceivedStation {
  * side is the `FRIENDLY A` label over the hull (`src/ui/hud.ts`), which is the
  * lobby's, not a scouting report.
  *
- * **Three things are deliberately NOT here**, and the next person to add one
+ * **Two things are deliberately NOT here**, and the next person to add one
  * should read this first:
  *
  *  - **The ally's core and shield HP.** Scouted for everyone, ally included
@@ -281,10 +281,12 @@ export interface PerceivedStation {
  *    absent when it is not — which is exactly right. (The plan's sketch of this
  *    record listed a bare `alive`; it is left out because nothing in Stage 1
  *    needs it and fog honesty is structural, not a preference.)
- *  - **Whether the ally's home is under attack.** That one is Stage 2's, and it
- *    is licensed by the shipped human klaxon being team-scoped and range-free
- *    (`src/art/presenter.ts`, `src/art/audio/engine.ts`) — a separate argument
- *    from this one, to be made when it ships and not smuggled in early.
+ *
+ * The third thing on that list — **whether the ally's home is under attack** —
+ * ships here as of Stage 2 ({@link AllyView.underAttack}), and it is the one
+ * range-free addition the whole plan licenses. Its argument is in the field's own
+ * doc comment; it is a *separate* argument from the one above, which is why it
+ * was not smuggled in with Stage 1.
  */
 export interface AllyView {
   readonly id: PlayerId;
@@ -297,6 +299,38 @@ export interface AllyView {
    * home carries (GDD §2.2).
    */
   readonly stationAlive: boolean;
+  /**
+   * **Is this ally's home taking fire right now?** The teammate klaxon, and the
+   * one range-free number in the whole team plan (`docs/team-bots-plan.md` §4,
+   * Task 2.1).
+   *
+   * Computed exactly as {@link OwnStationView.underAttack} is —
+   * `alive && sinceDamage < alarmWindow` — with **no distance test at all**.
+   *
+   * **The licence, stated once so it is not re-argued into something wider.** In
+   * TEAMS a human *already* hears their teammate's under-attack klaxon map-wide,
+   * with no scouting: `deriveAlarmAllies` walks every station and adds every
+   * same-team owner (`src/art/presenter.ts`), `setAlarmScope` is called every
+   * frame, and `alarmRingsFor` gates the ring on that scope
+   * (`src/art/audio/engine.ts`). A bot's view is defined as what a human in that
+   * cockpit could perceive, so giving a bot this boolean is **parity, not
+   * telepathy** — and withholding it would make bots worse than a human for the
+   * wrong reason, the identical argument `./memory` already makes about
+   * fog-*amnesia*.
+   *
+   * **Do NOT bring the HP along with it.** The klaxon is a boolean and a boolean
+   * is what the human gets; an ally's `coreHp`, `shieldHp` and turret count stay
+   * scouted through {@link PerceivedStation}'s on-screen gate, for allies exactly
+   * as for enemies. "Just the HP too" would be the first real fog-honesty
+   * regression in this codebase and it would pass every existing test
+   * (`docs/team-bots-plan.md` Trap 8, and Question 2 — it is a **UI** decision
+   * before it is a bot one, and it must not leak in through this layer).
+   *
+   * It **flickers**, by construction: `alarmWindow` is 2 s, so an attacker who
+   * pauses for two seconds switches it off and back on. Anything that reads it as
+   * a trigger must latch (`./ally`, Trap 7).
+   */
+  readonly underAttack: boolean;
 }
 
 /** A rock, as seen: its size and its crack stage — enough to judge a payout
@@ -555,7 +589,7 @@ const NO_ALLIES: readonly AllyView[] = Object.freeze([]);
  * the ordering a property of *this* function rather than of the engine's sort
  * (GDD §4.8).
  */
-function allyRoster(world: World, id: PlayerId): readonly AllyView[] {
+function allyRoster(world: World, id: PlayerId, env: Perception): readonly AllyView[] {
   let allies: AllyView[] | null = null;
   for (const other of world.ships) {
     if (other.id === id || areEnemies(world, id, other.id)) continue;
@@ -564,6 +598,9 @@ function allyRoster(world: World, id: PlayerId): readonly AllyView[] {
       id: other.id,
       stationPos: station ? { x: station.pos.x, y: station.pos.y } : null,
       stationAlive: station !== null && station.alive,
+      // Range-free on purpose, and only this one field — see the doc comment.
+      // The same expression `ownStationView` uses, because it is the same klaxon.
+      underAttack: station !== null && station.alive && station.sinceDamage < env.alarmWindow,
     };
     allies ??= [];
     // Insertion sort by id: ids are unique, so the order is total and there is
@@ -637,7 +674,7 @@ export function perceive(world: World, id: PlayerId, env: Perception = DEFAULT_P
     // The roster is filled even for a bot whose cockpit is wreckage: it is the
     // lobby plus map-wide public state, not a sighting, and a dead player's
     // screen still shows the board they are about to respawn into.
-    allies: allyRoster(world, id),
+    allies: allyRoster(world, id, env),
     ships,
     stations,
     asteroids,

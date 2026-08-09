@@ -23,6 +23,8 @@
  */
 
 import type { Action, Rng, Vec2 } from '@shared/types';
+import type { AllyResponse } from './ally';
+import { newAllyResponse, releaseAllyResponse } from './ally';
 import type { Latch } from './commitment';
 import { newLatch, release } from './commitment';
 import type { CorneredLatch } from './cornered';
@@ -31,6 +33,7 @@ import { BotMemory } from './memory';
 import type { BotView, SelfView } from './perception';
 import type { DifficultyTuning, Personality, PersonalityWeights } from './personalities';
 import { tuningFor } from './personalities';
+import type { TeamRadio } from './radio';
 import type { AimTrack } from './steering';
 import { NEUTRAL, newAimTrack } from './steering';
 
@@ -162,10 +165,45 @@ export interface Brain {
    * lifts `spendable` back above the line. `-1` until the first decision sets it.
    */
   endowment: number;
+  /**
+   * This bot's side of the **team callout channel** (`./radio`), or `null` when
+   * it has nobody to talk to — which is every FFA bot, because a team of one has
+   * no recipients. That `null` is how every team-aware branch degrades to exactly
+   * today's behaviour with no mode flag anywhere in a tree
+   * (`docs/team-bots-plan.md` §2.5).
+   *
+   * Shared with this bot's teammates, and **deliberately not inside `World`**:
+   * the determinism replay hashes the world and replays recorded inputs
+   * (GDD §4.8), so a channel in there could desync it — and it would be on the
+   * wire budget, which is 494 bytes and not ours (plan Trap 5). It lives here for
+   * the same reason everything else on this record does.
+   *
+   * `null` by default: `createBots` (`./harness`) builds one per side and hands
+   * it in, so a caller that seats bots one at a time gets a quiet channel rather
+   * than a crash.
+   */
+  radio: TeamRadio | null;
+  /**
+   * The **ally-response** commitment (`./ally`): who this bot broke off to help,
+   * when that alarm was last live, and when it may answer again. The ally alarm
+   * flickers on a two-second window, so a raw read of it flaps; this is the
+   * memory between the flickers, and the budget that stops one besieged teammate
+   * consuming a whole match.
+   */
+  readonly allyResponse: AllyResponse;
+  /**
+   * Sim time this bot last spoke on the channel — the `callCooldown` clock
+   * (`./behaviors` `callOut`). `-1` until it has said anything.
+   *
+   * Here rather than on the radio because the cooldown is **per speaker**, not
+   * per channel: one voice at a time is a property of a bot's mouth, and one
+   * chatty teammate must not be able to mute the rest of the side.
+   */
+  lastCallAt: number;
 }
 
 /** Build the mind for a character. */
-export function createBrain(personality: Personality, rng: Rng): Brain {
+export function createBrain(personality: Personality, rng: Rng, radio: TeamRadio | null = null): Brain {
   return {
     personality,
     weights: personality.weights,
@@ -184,6 +222,9 @@ export function createBrain(personality: Personality, rng: Rng): Brain {
     mineSite: -1,
     tabu: new Map(),
     endowment: -1,
+    radio,
+    allyResponse: newAllyResponse(),
+    lastCallAt: -1,
   };
 }
 
@@ -242,6 +283,11 @@ export function context(view: BotView, brain: Brain): BotCtx {
   if (!view.self.alive) {
     release(brain.fleeing);
     resetCornered(brain.cornered);
+    // And it is not still flying to a teammate's rescue: a respawned bot that
+    // resumed a run which ended two lives ago would be answering an alarm nobody
+    // is ringing (`./ally`, plan Task 2.7's trap). The *cooldown* survives, on
+    // purpose — see `releaseAllyResponse`.
+    releaseAllyResponse(brain.allyResponse);
   }
   // Book the endowment once, on the first decision. A bot seated at the opening
   // (`tick 0`) earns its `STARTING_ORE` grant and owes nothing; a bot that takes
