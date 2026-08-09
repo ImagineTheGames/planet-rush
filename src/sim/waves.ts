@@ -63,9 +63,9 @@ import {
   RESOURCE_FIELD,
   SPAWN_CLEAR_POCKET,
   WAVE_COUNT,
-  WAVE_INTERVAL_S,
   clampToMargin,
   homeFieldOreFor,
+  waveIntervalOf,
   waveOreFor,
   waveRadiusFraction,
   waveTime,
@@ -436,9 +436,11 @@ export function spawnWave(world: World, count: number = world.asteroidsPerWave):
 export function spawnDueWaves(world: World): void {
   if (world.match.collapseTime >= 0) return;
   // Waves land on the abundance-resolved interval (`world.economy.waveInterval`):
-  // a SCARCE match waits longer between refills. A legacy world reads the baseline
-  // `WAVE_INTERVAL_S`, so the pre-p11 schedule is unchanged.
-  const interval = world.economy?.waveInterval ?? WAVE_INTERVAL_S;
+  // a SCARCE match waits longer between refills. Read through `waveIntervalOf`,
+  // the one accessor the HUD clock and bot perception read too (a0-16), so the
+  // countdown on screen can never target a tick this loop does not spawn on. A
+  // legacy world resolves to the baseline, so the pre-p11 schedule is unchanged.
+  const interval = waveIntervalOf(world);
   while (!allWavesSpawned(world) && world.time >= waveTime(world.match.wavesSpawned + 1, interval)) {
     spawnWave(world);
   }
