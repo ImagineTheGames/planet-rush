@@ -101,3 +101,19 @@ await figure(browser, {
 });
 
 await browser.close();
+
+// The desktop menu — the third menu frame, found by CI shard 4 after the two
+// phone frames were already re-shot. Same change, same reason, wider viewport.
+const browser2 = await chromium.launch();
+await figure(browser2, {
+  out: 'before-after-desktop.png',
+  before: 'before-desktop.png',
+  after: 'after-desktop.png',
+  w: 1280,
+  h: 800,
+  pageW: 2652,
+  pageH: 900,
+  beforeSub: 'desktop 1280x800 — PLAY · CODEX · SETTINGS',
+  afterSub: 'desktop 1280x800 — PLAY · CODEX · SETTINGS · HANGAR',
+});
+await browser2.close();

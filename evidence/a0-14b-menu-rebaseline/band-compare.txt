@@ -23,3 +23,13 @@ bands that differ:
   y    9–  11 (  3 rows)  x   11–  16  max    6 px/row
   y   14–  17 (  4 rows)  x   11–  17  max    5 px/row
   y   19– 819 (801 rows)  x   11– 324  max  245 px/row
+
+--- DESKTOP MAIN MENU (1280x800) ---
+evidence/a0-14b-menu-rebaseline/before-desktop.png
+  vs evidence/a0-14b-menu-rebaseline/after-desktop.png
+size 1280x800, per-channel threshold 8/255
+
+differing px: 205238 (ratio 0.2004)
+bands that differ:
+  y  229– 570 (342 rows)  x  240–1039  max  800 px/row
+  y  782– 789 (  8 rows)  x   14–  45  max   22 px/row
