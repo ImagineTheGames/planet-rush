@@ -1,0 +1,145 @@
+{
+  "what": "src/progression/profile.ts — the four load paths and the write guard, off a real seam",
+  "brief": "docs/briefs/pr-01-profile-store.md",
+  "profileVersion": 1,
+  "keys": {
+    "profile": "planet-rush:profile",
+    "backup": "planet-rush:profile.bak"
+  },
+  "loads": [
+    {
+      "path": "1. current version",
+      "note": "reads straight back; nothing is written and nothing is backed up",
+      "before": {
+        "planet-rush:profile": "{\"v\":1,\"xp\":9646,\"level\":6,\"matches\":20}",
+        "planet-rush:profile.bak": null
+      },
+      "read": {
+        "v": 1,
+        "xp": 9646,
+        "level": 6,
+        "matches": 20
+      },
+      "after": {
+        "planet-rush:profile": "{\"v\":1,\"xp\":9646,\"level\":6,\"matches\":20}",
+        "planet-rush:profile.bak": null
+      },
+      "backedUp": false,
+      "backupIsVerbatim": null
+    },
+    {
+      "path": "2. older known version (migrate)",
+      "note": "v:0 walks the ladder to v:1 — the numbers survive, so nothing is backed up",
+      "before": {
+        "planet-rush:profile": "{\"v\":0,\"xp\":9646,\"level\":6,\"matches\":20}",
+        "planet-rush:profile.bak": null
+      },
+      "read": {
+        "v": 1,
+        "xp": 9646,
+        "level": 6,
+        "matches": 20
+      },
+      "after": {
+        "planet-rush:profile": "{\"v\":0,\"xp\":9646,\"level\":6,\"matches\":20}",
+        "planet-rush:profile.bak": null
+      },
+      "backedUp": false,
+      "backupIsVerbatim": null
+    },
+    {
+      "path": "3. absent",
+      "note": "a fresh profile; the reader writes NOTHING — an empty store is not a corrupt one",
+      "before": {
+        "planet-rush:profile": null,
+        "planet-rush:profile.bak": null
+      },
+      "read": {
+        "v": 1,
+        "xp": 0,
+        "level": 1,
+        "matches": 0
+      },
+      "after": {
+        "planet-rush:profile": null,
+        "planet-rush:profile.bak": null
+      },
+      "backedUp": false,
+      "backupIsVerbatim": null
+    },
+    {
+      "path": "4a. unparseable (truncated write)",
+      "note": "THE BACKUP CASE — the raw blob is copied verbatim BEFORE the fold",
+      "before": {
+        "planet-rush:profile": "{\"v\":1,\"xp\":9646,\"level\":6,\"",
+        "planet-rush:profile.bak": null
+      },
+      "read": {
+        "v": 1,
+        "xp": 0,
+        "level": 1,
+        "matches": 0
+      },
+      "after": {
+        "planet-rush:profile": "{\"v\":1,\"xp\":9646,\"level\":6,\"",
+        "planet-rush:profile.bak": "{\"v\":1,\"xp\":9646,\"level\":6,\""
+      },
+      "backedUp": true,
+      "backupIsVerbatim": true
+    },
+    {
+      "path": "4b. parseable but invalid",
+      "note": "same rule: a career this reader cannot use is preserved, not dropped",
+      "before": {
+        "planet-rush:profile": "{\"v\":1,\"xp\":\"lots\",\"level\":6,\"matches\":20}",
+        "planet-rush:profile.bak": null
+      },
+      "read": {
+        "v": 1,
+        "xp": 0,
+        "level": 1,
+        "matches": 0
+      },
+      "after": {
+        "planet-rush:profile": "{\"v\":1,\"xp\":\"lots\",\"level\":6,\"matches\":20}",
+        "planet-rush:profile.bak": "{\"v\":1,\"xp\":\"lots\",\"level\":6,\"matches\":20}"
+      },
+      "backedUp": true,
+      "backupIsVerbatim": true
+    },
+    {
+      "path": "4c. newer version (v:2 from a future build)",
+      "note": "folds without throwing, and is KEPT — a future build may know what it is",
+      "before": {
+        "planet-rush:profile": "{\"v\":2,\"xp\":9646,\"level\":6,\"matches\":20,\"prestige\":3}",
+        "planet-rush:profile.bak": null
+      },
+      "read": {
+        "v": 1,
+        "xp": 0,
+        "level": 1,
+        "matches": 0
+      },
+      "after": {
+        "planet-rush:profile": "{\"v\":2,\"xp\":9646,\"level\":6,\"matches\":20,\"prestige\":3}",
+        "planet-rush:profile.bak": "{\"v\":2,\"xp\":9646,\"level\":6,\"matches\":20,\"prestige\":3}"
+      },
+      "backedUp": true,
+      "backupIsVerbatim": true
+    }
+  ],
+  "writeGuard": {
+    "note": "saveProfile never writes a blob loadProfile would reject",
+    "wouldHaveWritten": "{\"v\":1,\"xp\":null,\"level\":6,\"matches\":20}",
+    "accepted": false,
+    "before": {
+      "planet-rush:profile": "{\"v\":1,\"xp\":9646,\"level\":6,\"matches\":20}",
+      "planet-rush:profile.bak": null
+    },
+    "after": {
+      "planet-rush:profile": "{\"v\":1,\"xp\":9646,\"level\":6,\"matches\":20}",
+      "planet-rush:profile.bak": null
+    },
+    "careerSurvived": true
+  }
+}
