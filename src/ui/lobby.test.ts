@@ -20,8 +20,10 @@
  */
 import { describe, it, expect } from 'vitest';
 import { ShipClass, mulberry32 } from '@shared/types';
+import type { PlayerId } from '@shared/types';
 import { PALETTE, PLAYER_COLORS } from '@render/index';
 import { PERSONALITIES, ROSTER } from '../bots';
+import type { PersonalityId } from '../bots';
 import type { LobbySlot } from '../net/transport';
 import {
   ABUNDANCE_CYCLE,
@@ -96,7 +98,7 @@ import {
   DEFAULT_PLAYER_NAME,
   PLAYER_NAME_MAX_CHARS,
 } from './lobby';
-import type { LobbyState } from './lobby';
+import type { LobbyState, SeatOccupant } from './lobby';
 import { nameplateModel, resolveTeamLabel } from './nameplates';
 import { countPrimaries, singlePrimary } from './gantry';
 import { lobbyPlateRoles } from './lobby-view';
@@ -168,6 +170,62 @@ function lobby(overrides: Partial<Parameters<typeof createLobby>[0]> = {}): Lobb
  */
 function solo(overrides: Partial<Parameters<typeof createLobby>[0]> = {}): LobbyState {
   return createLobby({ room: ROOM, you: 0, online: false, ...overrides });
+}
+
+/**
+ * Tap a seat's character until it reads `want` — **bounded**, and that bound is
+ * the whole point.
+ *
+ * These used to be bare `while` loops. Every cycler in this file is a no-op on a
+ * seat it refuses (`cycleSeatCharacter` ignores a non-bot seat, `cycleSeatTeam` a
+ * closed one), so a loop pointed at the wrong fixture does not fail — it spins,
+ * silently, forever. That is not a theoretical worry: after a0-11 made an online
+ * `lobby()` open EMPTY, one such loop hung this whole file, and a hung file means
+ * `npm test` never finishes and never reports, which reads exactly like a slow
+ * box. Two of those runs were still spinning hours later.
+ *
+ * A full lap is the most any cycler can need, so anything past one lap is proof
+ * the seat is refusing the tap. Throw and name the seat: a wrong fixture should
+ * cost one red test, not the suite.
+ */
+function cycleCharacterTo(state: LobbyState, slot: PlayerId, want: PersonalityId): LobbyState {
+  let next = state;
+  for (let i = 0; i <= ROSTER.length; i++) {
+    if (next.seats[slot]!.character === want) return next;
+    next = cycleSeatCharacter(next, slot);
+  }
+  throw new Error(
+    `seat ${slot} never reached '${want}' — occupant '${state.seats[slot]!.occupant}' refuses the tap`,
+  );
+}
+
+/**
+ * {@link cycleCharacterTo}'s twin for the seat-state ring.
+ *
+ * Counting taps is what broke here: which rung a seat *starts* on is the
+ * flavour's business since a0-11 (solo opens on `bot`, online on `open`), so
+ * "two taps reaches CLOSED" was only ever true of the old default. Name the rung
+ * you want and let the ring find it.
+ */
+function cycleStateTo(state: LobbyState, slot: PlayerId, want: SeatOccupant): LobbyState {
+  let next = state;
+  for (let i = 0; i <= SEAT_STATE_CYCLE.length; i++) {
+    if (next.seats[slot]!.occupant === want) return next;
+    next = cycleSeatState(next, slot);
+  }
+  throw new Error(`seat ${slot} never reached '${want}' — the ring refuses the tap`);
+}
+
+/** {@link cycleCharacterTo}'s twin for sides, bounded by one lap of MAX_TEAMS. */
+function cycleTeamTo(state: LobbyState, slot: PlayerId, want: number): LobbyState {
+  let next = state;
+  for (let i = 0; i <= MAX_TEAMS; i++) {
+    if (next.seats[slot]!.team === want) return next;
+    next = cycleSeatTeam(next, slot);
+  }
+  throw new Error(
+    `seat ${slot} never reached side ${want} — occupant '${state.seats[slot]!.occupant}' refuses the tap`,
+  );
 }
 
 /** A wire lobby snapshot: `ready` marks a seated human, `isBot` a seated bot, and
@@ -855,7 +913,10 @@ describe('host controls (GDD §2.1 amended — the host picks each bot’s CHARA
     // disagree with the cast, so a row can never advertise a difficulty the bot in
     // it will not fly (the developer's "i chose HARD … they were at other
     // difficulties"). Walk every character and check the chip follows.
-    let state = lobby();
+    //
+    // SOLO for the same reason as the lap test above: an online seat is OPEN and
+    // refuses the tap, so this would walk nowhere and assert one row seven times.
+    let state = solo();
     for (let i = 0; i < ROSTER.length; i++) {
       const seat = state.seats[1]!;
       expect(seatDifficulty(seat)).toBe(PERSONALITIES[seat.character].difficulty);
@@ -869,9 +930,12 @@ describe('host controls (GDD §2.1 amended — the host picks each bot’s CHARA
     // Eight slots, seven characters, three of them Hard: the developer's stated
     // goal of four Hard bots is not reachable without a repeat, so forbidding one
     // would make their own use case impossible.
-    let state = lobby();
+    //
+    // SOLO, because seating a character needs seats with bots in them: since
+    // a0-11 an online `lobby()` opens with seven OPEN chairs and no cast at all.
+    let state = solo();
     for (const slot of [1, 2, 3, 4]) {
-      while (state.seats[slot]!.character !== 'warden') state = cycleSeatCharacter(state, slot);
+      state = cycleCharacterTo(state, slot, 'warden');
     }
     expect([1, 2, 3, 4].map((i) => state.seats[i]!.character)).toEqual([
       'warden', 'warden', 'warden', 'warden',
@@ -1164,7 +1228,7 @@ describe('RUSH! gating on size and sides (variable-slots E)', () => {
     // Force everyone onto side A: one team, not a match.
     let oneSide = teams;
     for (let slot = 0; slot < LOBBY_SLOTS; slot++) {
-      while (oneSide.seats[slot]!.team !== 0) oneSide = cycleSeatTeam(oneSide, slot);
+      oneSide = cycleTeamTo(oneSide, slot, 0);
     }
     expect(activeTeams(oneSide)).toBe(1);
     expect(canStart(oneSide)).toBe(false);
@@ -1228,7 +1292,7 @@ describe('team assignment (variable-slots E — any split, counts always shown)'
       expect(sideRosterOf(teams, 1)).toEqual(new Set([1, 3, 5, 7]));
       // Move seat 3 across and both rosters follow — one table, not two.
       let moved = teams;
-      while (moved.seats[3]!.team !== 0) moved = cycleSeatTeam(moved, 3);
+      moved = cycleTeamTo(moved, 3, 0);
       expect(moved.seats[3]!.team).toBe(0);
       expect(sideRosterOf(moved, 0)).toContain(3);
       expect(sideRosterOf(moved, 1)).not.toContain(3);
@@ -1270,7 +1334,7 @@ describe('team assignment (variable-slots E — any split, counts always shown)'
     // 3 on A, 1 on B among four active seats — a legal handicap game.
     let state = toggleMode(solo({ size: 4 }));
     // seats 0,2 default to A; 1,3 to B. Walk seat 1 around the ring onto A → 3v1.
-    while (state.seats[1]!.team !== 0) state = cycleSeatTeam(state, 1);
+    state = cycleTeamTo(state, 1, 0);
     const counts = lobbyModel(state).teamCounts;
     const byLabel = Object.fromEntries(counts.map((c) => [c.label, c.count]));
     expect(byLabel[teamLabel(0)]).toBe(3);
@@ -1356,7 +1420,7 @@ describe('a side says FRIENDLY or ENEMY, and says it to the right player (u3)', 
 
     // Walk YOUR OWN seat onto side B. The letters do not move; the words swap.
     let state = teams;
-    while (state.seats[0]!.team !== 1) state = cycleSeatTeam(state, 0);
+    state = cycleTeamTo(state, 0, 1);
     const after = lobbyModel(state);
     expect(after.seats[0]!.teamName).toBe('FRIENDLY B');
     expect(after.seats[1]!.teamName).toBe('FRIENDLY B'); // slot 1 was already B
@@ -1435,7 +1499,7 @@ describe('a side says FRIENDLY or ENEMY, and says it to the right player (u3)', 
     for (const viewerSlot of [0, 1]) {
       let state = toggleMode(lobby({ you: viewerSlot }));
       // A three-side split, so the assertion covers more than "us and them".
-      while (state.seats[2]!.team !== 2) state = cycleSeatTeam(state, 2);
+      state = cycleTeamTo(state, 2, 2);
       const model = lobbyModel(state);
       const teams = model.seats.map((s) => s.team);
       for (const seat of model.seats) {
@@ -1619,7 +1683,7 @@ describe('lobbyRosterCast — the lobby’s pick, in the order the world builds'
     // 0..N-1 — because the two are stamped onto the same roster.
     let state = lobby({ online: false });
     for (const slot of [1, 2, 3]) {
-      while (state.seats[slot]!.character !== 'warden') state = cycleSeatCharacter(state, slot);
+      state = cycleCharacterTo(state, slot, 'warden');
     }
     const cast = lobbyRosterCast(state);
     expect(cast).toHaveLength(LOBBY_SLOTS);
@@ -1633,7 +1697,7 @@ describe('lobbyRosterCast — the lobby’s pick, in the order the world builds'
     // `i` has to be the character of the ship the sim will call player `i`. Getting
     // this wrong hands seat 5's character to seat 2 — the same class of bug the
     // empty-seat-order rule exists for.
-    const closed = cycleSeatState(cycleSeatState(lobby({ online: false }), 3), 3);
+    const closed = cycleStateTo(solo(), 3, 'closed');
     expect(closed.seats[3]?.occupant).toBe('closed');
     const cast = lobbyRosterCast(closed);
     expect(cast).toHaveLength(LOBBY_SLOTS - 1);
@@ -1648,7 +1712,7 @@ describe('lobbyRosterCast — the lobby’s pick, in the order the world builds'
     // SECOND one on seat 4 and count: the table must carry both, not fold them.
     let state = lobby({ online: false });
     expect(lobbyRosterCast(state).filter((c) => c === 'warden')).toHaveLength(1);
-    while (state.seats[4]!.character !== 'warden') state = cycleSeatCharacter(state, 4);
+    state = cycleCharacterTo(state, 4, 'warden');
     expect(lobbyRosterCast(state).filter((c) => c === 'warden')).toHaveLength(2);
     expect(lobbyRosterCast(state)[4]).toBe('warden');
     expect(lobbyRosterCast(state)[7]).toBe('warden');

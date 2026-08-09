@@ -827,3 +827,97 @@ rather than letting it finish.** Session 7 wrote the rule and it applied exactly
 a tree two merges behind main proves nothing the DoD asks for. **Merge before you
 measure** — the measurement is the perishable thing, not the merge.
 
+
+### Session 2026-08-08 (twelfth) — the note that recorded two sessions and was never staged, and a lane full of orphans
+
+Inherited the branch **fully pushed** (`git log origin/<branch>..HEAD` empty —
+checked FIRST, session 5's lesson) with 42 dirty paths. Read `git status` before
+restoring (session 9's rule) and **the forty-second line was not churn**: this
+note itself, carrying **150 uncommitted lines** — sessions ten and eleven's
+entire account of the a0-11 merge, the hardest one on this brief. Session eleven
+committed the merge resolution (`a9442c7`) and pushed it, then left the
+explanation unstaged. Committed as `5b688fc` before touching anything else. The
+41 PNGs were genuine churn; `git checkout -- tests/live-stage/` (never `git
+clean`).
+
+**A session that is not in this note also happened.** `e94db05` — re-pointing
+four `lobby-flow` tests at a0-11's new seat fixtures — and the merge `772221d`
+(`c13890b`, a0-13 progression, PR #331) are on the branch with no entry
+describing them. Read the commit message; it is good work and it is exactly
+session ten's "a0-11 changed what the fixtures MEAN" trap being paid off for a
+fourth test file. Recording it here so the next session does not go looking for
+who did it.
+
+**`origin/main` had moved to `525440c`** (a0-01b sound candidates round 2, PR
+#332), so `merge-base --is-ancestor` was red. Merged first, before measuring
+anything (session 7's rule) — **clean, no conflicts**, and it does not come near:
+the only non-asset files in it are `src/art/audio/candidates.ts` and
+`spikes/tone-audit/measure-candidates.ts`, the rest being ~90 `.wav` previews and
+an evidence board. Pushed `772221d..1b77f2f` **immediately**, before running a
+single gate.
+
+**This is the ninth merge in a row to leave the cast seam untouched.**
+
+#### The mistake this session made, written down because it cost 25 minutes
+
+**I killed a healthy test run on the strength of a `pcpu` sample.** The unit
+suite had been going 23 minutes with one pool worker at 83% and the other five at
+0%, which I read as a hang. It was not: the `tail -25` I had piped it through
+flushed on kill and showed **normal progress**, fast test files completing
+one after another. One busy worker and five idle ones is just what vitest's pool
+looks like at a sampling instant.
+
+Two real lessons under that one false alarm:
+
+- **Trap #2's rule is not "don't pipe to tail when watching," it is "don't pipe
+  at all."** Redirect to a file (`> /tmp/unit-run.log 2>&1`) and the progress is
+  there to read the whole time. I had the rule in this note, applied half of it,
+  and then diagnosed a hang from process stats because I had no output. The
+  re-run with a plain redirect was legible from the first second.
+- **CPU share is not liveness.** The check that would have answered it is the
+  log, and the log existed — it was just inside a pipe buffer.
+
+#### The orphans, which were real and were mine
+
+`ps -eo pid,etime,args | grep vitest` showed **three** `vitest --run` roots with
+cwd `/lanes/lane-1`: mine at 23 minutes, and two abandoned ones at **1h04m and
+1h54m**, each pinning a core. They are earlier sessions of *this lane* whose
+`npm test` outlived the session that started it. The box was at load 13 and my
+run was being starved by my own predecessors. Reaped them (`kill -TERM` the
+roots, `kill -9` the two spinning workers); load fell 13 → 4.6 within a minute.
+
+**So check for these on resume.** `pgrep -f "sh -c vitest --run"` then
+`readlink /proc/<pid>/cwd` names the lane — a stray in your own lane is yours to
+reap, one in another lane's is not. Note also that a `pgrep`-based wait loop on
+that pattern is **wrong on this box**: it matches other lanes and will never
+fire. Wait on your own PID (`until [ ! -d /proc/$PID ]`) or on a sentinel line in
+your own log.
+
+#### DoD on the merged tree
+
+- `npx tsc --noEmit` — clean (run before committing the merge, which is the point).
+- `npm test -- --run` — see below.
+- `PREVIEW_PORT=4198 npm run test:live-stage -- lobby-cast.spec.ts` — **3 passed**
+  in 2.3 m: cast round trip 30.2 s, `?` by click on PC 8.3 s, `?` by tap at 390 px
+  landscape 45.1 s.
+- GDD.md differs from `origin/main`; `merge-base --is-ancestor` OK at `525440c`.
+  Both markers verified by grep, not assumed — §2.1 line 56 carries a0-11's *"an
+  `open` slot is EMPTY"* and a0-06's *"the host picks each bot's CHARACTER"* side
+  by side, and §2.9 line 235 still reads *"characters, not difficulty labels"*.
+
+**The proof, re-measured not re-asserted:** `lobby-cast-readback.txt` regenerated
+**byte-identical** — slot 0 `null`, slots 1–7 `warden warden sable vulture warden
+sable vulture` in the lobby and the *same seven* in the match, `identical: true`.
+It does not appear in `git status` after the run and **that absence IS the
+result**. That file is the evidence; the PNGs are the picture of it.
+
+`ad30e9d` re-shot the four frames (badge now reads `1b77f2f`). Because the run was
+**scoped to `lobby-cast.spec.ts`**, only my four PNGs were touched — no other
+brief's evidence was dirtied, and there was nothing to restore afterwards.
+**Worth adopting: a scoped live-stage run sidesteps trap #2 entirely.** Run the
+full sweep when you need the baseline; run your own spec when you need your
+frames.
+
+The lobby frame is the developer's case in one picture: seven rows reading
+`Warden 1 / Warden 2 / Sable 1 / Vulture 1 / Warden 3 / Sable 2 / Vulture 2`,
+the hull under each name, a read-only `HARD` chip, a `?`.
