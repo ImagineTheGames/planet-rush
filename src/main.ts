@@ -8403,12 +8403,20 @@ function openLobby(
   function render(): void {
     const model = lobbyModel(state);
     view.update(model);
+    // Each picker's model is built ONLY while its screen is up. `render()` runs
+    // every frame of the RUSH! countdown, and `mapSelectModel` walks the whole
+    // registry re-normalising six boards' worth of station dots — work that would
+    // be thrown away by the view's own visibility guard a line later.
     shipSelectView.setVisible(model.screen === 'ship-select' && model.phase !== 'started');
-    shipSelectView.update(shipSelectModel({ shipClass: model.shipClass, locked: model.classLocked }));
+    if (shipSelectView.visible) {
+      shipSelectView.update(shipSelectModel({ shipClass: model.shipClass, locked: model.classLocked }));
+    }
     mapSelectView.setVisible(model.screen === 'map-select' && model.phase !== 'started');
-    mapSelectView.update(
-      mapSelectModel({ mapId: model.mapId, canPick: model.canPickMap && !model.classLocked }),
-    );
+    if (mapSelectView.visible) {
+      mapSelectView.update(
+        mapSelectModel({ mapId: model.mapId, canPick: model.canPickMap && !model.classLocked }),
+      );
+    }
     const { w, h } = ctx.logicalSize();
     const layout = lobbyLayout({ width: w, height: h }, { isTouch });
     seam.screen = model.screen;
@@ -9143,7 +9151,19 @@ function openLobby(
     // Keyed on the control's identity, so moving within one row is silent: a hover
     // is a state change, not a stream (rule 1). Touch never gets here with no
     // button down, so a finger dragging the roster sounds nothing.
-    const key = keyOf(view.hitTest(x, y));
+    //
+    // Hit-tested against **whichever of the three screens is up** (u10-01). The
+    // roster's geometry still resolves while a picker is open — the layout is a
+    // pure function of the viewport, not of what is drawn — so asking it here would
+    // sound a hover for a control nobody can see. Invisible ⇒ untappable is a rule
+    // this file keeps for taps; a cue is a tap's quieter half.
+    const key = keyOf(
+      state.screen === 'ship-select'
+        ? shipSelectView.hitTest(x, y)
+        : state.screen === 'map-select'
+          ? mapSelectView.hitTest(x, y)
+          : view.hitTest(x, y),
+    );
     if (key !== hovered) {
       hovered = key;
       if (key !== null && e.pointerType !== 'touch') ctx.cue('hover');
