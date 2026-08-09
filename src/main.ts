@@ -84,6 +84,11 @@ import {
 import type { RootTransform } from '@platform/orientation';
 import { createBrowserPlatform } from '@platform/platform';
 import { createBrowserHaptics } from '@platform/haptics';
+// The career profile (a0-13's chain, pr-01): ONE profile, ONE key, ONE reader.
+// The hangar reads it and the equip write goes back through the same module —
+// nothing in this file invents a second store for progression.
+import { loadProfile, saveProfile } from './progression/profile';
+import type { Profile } from './progression/profile';
 import { FullscreenLifecycle } from '@platform/fullscreen';
 import { InstallPromptController } from '@platform/install-prompt';
 import { writeAffordanceRects } from '@platform/touch-visuals';
@@ -136,6 +141,8 @@ import {
   SettingsView,
   mainMenuModel,
   mainMenuLayout,
+  mainMenuStep,
+  mainMenuIndexOf,
   MAIN_MENU_ITEMS,
   // THE DOORS (ratified: one play flow) — the room-code screen the menu's one PLAY
   // button opens: PLAY SOLO, CREATE a room, or JOIN one by code. All three land in
@@ -172,6 +179,15 @@ import {
   CodexHintView,
   codexBotHint,
   codexShipHint,
+  // THE HANGAR (a0-14) — the fourth main-menu door: your ship from the real
+  // generators, your level read off the one profile, and the level→unlock list
+  // of cosmetics (empty today, and honest about it).
+  HangarView,
+  hangarModel,
+  hangarLayout,
+  hangarTargetKey,
+  equipCosmetic,
+  COSMETICS,
   mapIdAt,
   normalizeMapId,
   registryStations,
@@ -260,6 +276,7 @@ import type {
   MainMenuOption,
   CodexState,
   CodexTarget,
+  HangarTarget,
   EndButton,
   MatchOutcome,
   DeathCause,
@@ -5707,7 +5724,7 @@ interface CodexControlReport {
 /** The read-only `window.__mainMenu` seam, extended for the landscape lock. */
 interface MainMenuSeam {
   visible: boolean;
-  screen: 'menu' | 'settings' | 'codex' | 'online';
+  screen: 'menu' | 'settings' | 'codex' | 'online' | 'hangar';
   matchStarted: boolean;
   /** The LOGICAL (landscape) viewport the menu laid out against. */
   logicalViewport: { width: number; height: number };
@@ -5726,6 +5743,23 @@ interface MainMenuSeam {
    *  press on a tab / entry took effect (no hit-test seam). */
   codexTab: string;
   codexEntry: string;
+  /** The HANGAR's controls (BACK, and one per cosmetic row), each with the
+   *  physical press point through the landscape-lock remap — so a live-stage or
+   *  evidence run reaches the fourth door with a real press on both form
+   *  factors, exactly as it reaches the codex. */
+  hangarControls: readonly CodexControlReport[];
+  /**
+   * What the hangar is SAYING, read back as plain strings: the hull in the bay,
+   * the level line, and the empty-state line (`''` once there are rows).
+   *
+   * The empty line is the one that matters. It is Pixi text, so this is how a
+   * capture proves the screen is honest rather than blank — a hangar with no
+   * cosmetics and no sentence is the bug report a0-14 exists to prevent, and it
+   * is indistinguishable from a working one in a screenshot alone.
+   */
+  hangarShip: string;
+  hangarLevel: string;
+  hangarEmpty: string;
   /** The control scheme the settings screen currently shows and persists — the
    *  menu's live value, written to the same storage the match reads at boot.
    *  Readback proof that a tap on the CONTROLS row took effect immediately. */
@@ -5744,6 +5778,9 @@ interface MainMenuSeam {
   /** The same screen, under its old name — kept because PLAY *is* the doors now, so
    *  a caller that asked for either gets one screen. */
   online(): void;
+  /** HANGAR — the fourth door (a0-14). Opens a screen, never a room: no
+   *  transport, no world, and BACK comes home. */
+  hangar(): void;
 }
 
 /**
@@ -5876,8 +5913,12 @@ function openMainMenu(
   // `online` is the DOORS screen's id — the screen PLAY now opens. Kept under its
   // old name because the `__mainMenu.screen` seam and every live-stage spec already
   // read that string, and renaming a wire-visible id buys nothing.
-  let screen: 'menu' | 'settings' | 'codex' | 'online' = 'menu';
+  let screen: 'menu' | 'settings' | 'codex' | 'online' | 'hangar' = 'menu';
   let played = false;
+  // The career, read once when the front door opens (a0-14). The hangar shows
+  // it and the equip write persists it through the same module; nothing else on
+  // this screen touches it, and the sim never sees it at all (GDD §4.8).
+  let profile: Profile = loadProfile(platform.storage);
   // The doors' own state. `entry` is the SOLO/CREATE/JOIN model; `onlineResolved`
   // holds the allocator's minted code once a CREATE succeeds (never client-guessed
   // — M3 rule). One region at launch, so the picker stays suppressed by config
@@ -5934,6 +5975,8 @@ function openMainMenu(
   // phone `hover` stays null and only `press` moves.
   let menuHover: MainMenuOption | null = null;
   let menuPress: MainMenuOption | null = null;
+  /** The plate the keyboard is on. Starts at PLAY, so Enter alone is unchanged. */
+  let menuFocus: MainMenuOption = 'play';
   let settingsHover: SettingsTarget | null = null;
   let settingsPress: SettingsTarget | null = null;
   // The doors and the CODEX joined the Gantry/Bone set in u7-04, so they get the
@@ -5944,7 +5987,12 @@ function openMainMenu(
   let entryPress: string | null = null;
   let codexHover: string | null = null;
   let codexPress: string | null = null;
-  ctx.root.addChild(menuView, settingsView, codexView, entryView);
+  // The hangar (a0-14) — the fourth door, on the same hover/press routing as the
+  // three screens above it.
+  const hangarView = new HangarView(menu0.w, menu0.h, isTouch);
+  let hangarHover: string | null = null;
+  let hangarPress: string | null = null;
+  ctx.root.addChild(menuView, settingsView, codexView, entryView, hangarView);
 
   // The read-only test seam. `matchStarted` is flipped by `handle.matchStarted()`
   // once the real world is built, never here — so the suite's "no sim on the
@@ -5963,6 +6011,10 @@ function openMainMenu(
     codexControls: [],
     codexTab: codexState.activeTab,
     codexEntry: activeEntries(codexState).find((e) => e.id === codexState.selectedId)?.title ?? '',
+    hangarControls: [],
+    hangarShip: '',
+    hangarLevel: '',
+    hangarEmpty: '',
     controlScheme,
     // Live match readback, wired by boot() through `bindMatch` once the world is
     // built; both read the live match binding each access so a rematch is tracked.
@@ -5976,6 +6028,7 @@ function openMainMenu(
     // screen under its old name, so a caller that asked for either gets one screen.
     play: (): void => openDoors(),
     online: (): void => openDoors(),
+    hangar: (): void => openHangar(),
   };
 
   // The doors' own read-only seam. Its methods drive the same pure transitions a tap
@@ -6216,16 +6269,41 @@ function openMainMenu(
     seam.codexTab = codexState.activeTab;
     seam.codexEntry = activeEntries(codexState).find((e) => e.id === codexState.selectedId)?.title ?? '';
 
+    // The HANGAR's controls and its readback (a0-14). BACK is always reported;
+    // a row is reported only when the layout actually placed one, so a capture
+    // can never press a row that was not drawn.
+    const hangarRects = hangarLayout({ width: w, height: h }, { isTouch, rowCount: COSMETICS.length });
+    const hangar = hangarModelNow();
+    seam.hangarControls = [
+      { kind: 'back', index: -1, physicalCenter: physCenter(hangarRects.back) },
+      ...hangarRects.rows.map((r, i) => ({ kind: 'entry' as const, index: i, physicalCenter: physCenter(r) })),
+    ];
+    seam.hangarShip = `${hangar.ship.name} · ${hangar.ship.hull}`;
+    seam.hangarLevel = hangar.level.levelLabel;
+    seam.hangarEmpty = hangar.empty ?? '';
+
     seam.controlScheme = controlScheme;
   }
 
   /** Redraw the live screen from current state. Static content, so this runs on
    *  a state change or a resize — Pixi's own ticker keeps painting between. */
+  /** The hangar for the current profile and the player's persisted hull — built
+   *  the same way for the view and for the seam, so the readback can never
+   *  describe a different screen from the one on the glass. */
+  function hangarModelNow(): ReturnType<typeof hangarModel> {
+    return hangarModel(
+      { profile, shipClass: readShipClass(platform) },
+      { hover: hangarTargetOf(hangarHover), press: hangarTargetOf(hangarPress) },
+    );
+  }
+
   function render(): void {
     menuView.visible = screen === 'menu';
     settingsView.visible = screen === 'settings';
     codexView.visible = screen === 'codex';
     entryView.visible = screen === 'online';
+    hangarView.visible = screen === 'hangar';
+    if (hangarView.visible) hangarView.update(hangarModelNow());
     if (menuView.visible) menuView.update(mainMenuModel({ hover: menuHover, press: menuPress }));
     if (settingsView.visible) {
       settingsView.update(
@@ -6932,6 +7010,55 @@ function openMainMenu(
     resolvePlay({ kind: 'offline' });
   }
 
+  // --- The HANGAR (a0-14) ----------------------------------------------------
+
+  /** The hover/press key back as a target — the hangar's keys are `back` and
+   *  `cosmetic:<i>`, so the round trip is exact rather than a re-hit-test. */
+  function hangarTargetOf(key: string | null): HangarTarget | null {
+    if (key === null) return null;
+    if (key === 'back') return { kind: 'back' };
+    const index = Number.parseInt(key.slice('cosmetic:'.length), 10);
+    return Number.isFinite(index) ? { kind: 'cosmetic', index } : null;
+  }
+
+  function openHangar(): void {
+    screen = 'hangar';
+    render();
+  }
+
+  function closeHangar(): void {
+    screen = 'menu';
+    render();
+  }
+
+  /**
+   * Apply a tap on the hangar. BACK returns to the menu; a row equips (or
+   * un-equips) the cosmetic it names and persists the profile.
+   *
+   * **This is the only write on the screen**, and it goes through the same
+   * module the profile was read from — one profile, one key, one reader. A
+   * refused equip (a locked row) returns the identical profile, so it sounds a
+   * refusal and touches neither the disk nor the frame.
+   */
+  function applyHangar(target: HangarTarget): void {
+    if (target.kind === 'back') {
+      ctx.cue('back');
+      closeHangar();
+      return;
+    }
+    const cosmetic = COSMETICS[target.index];
+    const next = cosmetic ? equipCosmetic(profile, cosmetic) : profile;
+    if (next === profile) {
+      ctx.cue('reject');
+      render();
+      return;
+    }
+    profile = next;
+    saveProfile(platform.storage, profile);
+    ctx.cue('detent');
+    render();
+  }
+
   function openSettings(): void {
     screen = 'settings';
     render();
@@ -6995,16 +7122,12 @@ function openMainMenu(
       // PLAY opens the doors — the one way in (ratified). There is no second front
       // door to route, and no path from here that builds a world.
       // PLAY is the screen's one headline action, so it gets the two-note rising
-      // `accept`; the two side doors are plain forward picks (s6-01).
-      if (hit === 'play') {
-        ctx.cue('accept');
-        openDoors();
-      } else if (hit === 'codex') {
-        ctx.cue('press');
-        openCodex();
-      } else if (hit === 'settings') {
-        ctx.cue('press');
-        openSettings();
+      // `accept`; the three side doors are plain forward picks (s6-01). A tap and
+      // a keypress go through the SAME `activateMenu`, so a fifth item can never
+      // be wired for one and not the other.
+      if (hit) {
+        menuFocus = hit;
+        activateMenu(hit);
       } else {
         // A press on the bare screen: nothing to sound, but the plate states may
         // have moved (a press released off every control), so redraw (u7-01).
@@ -7026,6 +7149,14 @@ function openMainMenu(
       settingsPress = hit;
       settingsHover = hit;
       if (hit) applySettings(hit);
+      else render();
+    } else if (screen === 'hangar') {
+      // The hangar acts on pointer-DOWN like the menu and the settings screen: it
+      // has no scrollable pane, so there is no drag to disambiguate from a tap.
+      const hit = hangarView.hitTest(x, y);
+      hangarPress = hangarTargetKey(hit);
+      hangarHover = hangarPress;
+      if (hit) applyHangar(hit);
       else render();
     } else {
       // Codex: begin a tap-or-drag. The tap fires on pointer-up only if the finger
@@ -7056,6 +7187,7 @@ function openMainMenu(
     if (screen === 'menu') return menuView.hitTest(x, y);
     if (screen === 'online') return entryTargetKey(entryView.hitTest(x, y));
     if (screen === 'settings') return keyOf(settingsView.hitTest(x, y));
+    if (screen === 'hangar') return hangarTargetKey(hangarView.hitTest(x, y));
     return codexTargetKey(codexView.hitTest(x, y));
   }
 
@@ -7103,6 +7235,12 @@ function openMainMenu(
           codexHover = hit;
           render();
         }
+      } else if (screen === 'hangar') {
+        const hit = hangarTargetKey(hangarView.hitTest(p.x, p.y));
+        if (hit !== hangarHover) {
+          hangarHover = hit;
+          render();
+        }
       }
     }
     if (screen !== 'codex' || !codexDrag) return;
@@ -7125,11 +7263,18 @@ function openMainMenu(
     // A finger lifting releases the plate it was holding, on whichever screen it
     // was held. `pointercancel` routes here too, so a gesture the browser steals
     // cannot strand a plate in its pressed state.
-    if (menuPress !== null || settingsPress !== null || entryPress !== null || codexPress !== null) {
+    if (
+      menuPress !== null ||
+      settingsPress !== null ||
+      entryPress !== null ||
+      codexPress !== null ||
+      hangarPress !== null
+    ) {
       menuPress = null;
       settingsPress = null;
       entryPress = null;
       codexPress = null;
+      hangarPress = null;
       // Touch has no hover to fall back to: a lifted finger leaves nothing under
       // it, so the plate returns to rest rather than to a hover it never had.
       if (e.pointerType === 'touch') {
@@ -7137,6 +7282,7 @@ function openMainMenu(
         settingsHover = null;
         entryHover = null;
         codexHover = null;
+        hangarHover = null;
       }
       render();
     }
@@ -7187,9 +7333,52 @@ function openMainMenu(
       if (e.code === 'Escape' || e.code === 'Backspace') closeCodex();
       return;
     }
-    // On the menu, Enter or Space is PLAY — a keyboard player never has to reach
-    // for the mouse to get in. It opens the doors, like the button.
-    if (e.code === 'Enter' || e.code === 'Space') openDoors();
+    if (screen === 'hangar') {
+      // The same one key out. The hangar is a door that comes back, so it can
+      // never be a place a keyboard player is stuck (`./ui/menu-nav`).
+      if (e.code === 'Escape' || e.code === 'Backspace') closeHangar();
+      return;
+    }
+    // On the menu, the arrows (or W/S) move the focus down the stack and Enter or
+    // Space activates it — so every door, HANGAR included, is reachable without a
+    // pointer (a0-14). The focus starts on PLAY, so a keyboard player who presses
+    // Enter and nothing else gets exactly what they always got.
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+      focusMenu(mainMenuStep(mainMenuIndexOf(menuFocus), 1));
+    } else if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+      focusMenu(mainMenuStep(mainMenuIndexOf(menuFocus), -1));
+    } else if (e.code === 'Enter' || e.code === 'Space') {
+      activateMenu(menuFocus);
+    }
+  }
+
+  /** Move the keyboard focus and light the plate under it — the focused plate
+   *  wears the same `hover` state a mouse would give it, so there is one visual
+   *  language for "this is the one you are about to press". */
+  function focusMenu(option: MainMenuOption): void {
+    if (menuFocus === option) return;
+    menuFocus = option;
+    menuHover = option;
+    ctx.cue('hover');
+    render();
+  }
+
+  /** Open whatever a menu item names — the one place a press and a keypress
+   *  meet, so the two can never route differently. */
+  function activateMenu(option: MainMenuOption): void {
+    if (option === 'play') {
+      ctx.cue('accept');
+      openDoors();
+    } else if (option === 'codex') {
+      ctx.cue('press');
+      openCodex();
+    } else if (option === 'settings') {
+      ctx.cue('press');
+      openSettings();
+    } else {
+      ctx.cue('press');
+      openHangar();
+    }
   }
 
   /** The pointer left the canvas: nothing is hovered and nothing is held. Without

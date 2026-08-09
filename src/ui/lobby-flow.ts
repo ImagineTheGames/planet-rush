@@ -111,6 +111,10 @@ import {
 } from './lobby';
 import type { LobbyState } from './lobby';
 import { mapIdAt } from './map-picker';
+import { equipCosmetic, COSMETICS } from './hangar';
+import type { Cosmetic, HangarTarget } from './hangar';
+import { freshProfile } from '../progression/profile';
+import type { Profile } from '../progression/profile';
 
 // ---------------------------------------------------------------------------
 // The state
@@ -123,12 +127,54 @@ import { mapIdAt } from './map-picker';
  *  - `settings` — the fire mode, reduce-VFX and volumes ({@link ./settings-view}),
  *                 reached from the main menu and returned from to wherever it was
  *                 opened ({@link FlowState.settingsReturn}).
+ *  - `hangar`   — the fourth door (a0-14, {@link ./hangar-view}): your ship, your
+ *                 level, and the cosmetics a level has unlocked. Opens from the
+ *                 front door and comes back; it starts nothing.
  *  - `lobby`    — the roster, the hulls and RUSH! ({@link ./lobby-view}).
  *  - `match`    — the world has the screen; this module is watching for the end.
  *  - `end`      — the end-of-match summary ({@link ./end-of-match-view}): VICTORY /
  *                 DEFEAT / DRAW / ELIMINATED, with Rematch and maybe Spectate.
  */
-export type FlowScreen = 'entry' | 'settings' | 'lobby' | 'match' | 'end';
+export type FlowScreen = 'entry' | 'settings' | 'hangar' | 'lobby' | 'match' | 'end';
+
+/** Every screen, in a stable order — the audit list {@link flowScreenHandler}
+ *  is walked over. */
+export const FLOW_SCREENS: readonly FlowScreen[] = ['entry', 'settings', 'hangar', 'lobby', 'match', 'end'];
+
+/**
+ * The exported function that owns input on each screen — the flow's half of the
+ * wiring contract, and the reason a sixth screen cannot land half-wired.
+ *
+ * LESSONS §20 is exactly this shape: a screen case with no handler renders an
+ * empty room that looks like a working room reporting bad news. So the mapping
+ * is a **total function of the screen**, checked two ways — the compiler rejects
+ * a missing case (the switch is exhaustive over {@link FlowScreen}), and
+ * `default` returns `null`, so a case deleted at runtime is a red test rather
+ * than a screen nobody can leave ({@link ./main-menu.test}).
+ *
+ * The value is the handler's *name*, not the function: the test resolves it
+ * against this module's own exports, so the string cannot be a lie either.
+ */
+export function flowScreenHandler(screen: FlowScreen): string | null {
+  switch (screen) {
+    case 'entry':
+      return 'flowTapEntry';
+    case 'settings':
+      return 'flowTapSettings';
+    case 'hangar':
+      return 'flowTapHangar';
+    case 'lobby':
+      return 'flowTapLobby';
+    // The match screen takes no taps from this module — the world has the
+    // screen — but it is still routed: `flowMatchEnded` is what takes it back.
+    case 'match':
+      return 'flowMatchEnded';
+    case 'end':
+      return 'flowTapEnd';
+    default:
+      return null;
+  }
+}
 
 /** The whole front-of-match, as one immutable value. */
 export interface FlowState {
@@ -164,6 +210,18 @@ export interface FlowState {
   /** Where DONE on the settings screen returns to — the screen it was opened
    *  from. The main menu is `entry`; a future pause menu would set `match`. */
   readonly settingsReturn: FlowScreen;
+  /**
+   * The player's career (`src/progression/profile.ts`) — what the hangar reads
+   * and, when a cosmetic is equipped, what it writes back through a
+   * `save-profile` effect.
+   *
+   * Always present, so no screen has to guard it; a caller with no storage yet
+   * gets `freshProfile()`. It is **not match state** and survives a rematch
+   * ({@link resetFlow}) for the same reason the settings do. This module never
+   * computes XP: banking is the end-of-match summary's single write site (plan
+   * §2.1), and the hangar only ever changes which cosmetic is worn.
+   */
+  readonly profile: Profile;
 }
 
 /**
@@ -185,7 +243,16 @@ export type FlowEffect =
    * classroom can still type and nobody is behind. Offline there is nothing to
    * close, so nothing is asked for.
    */
-  | { readonly kind: 'close-transport' };
+  | { readonly kind: 'close-transport' }
+  /**
+   * Persist this profile — `saveProfile(platform.storage, profile)` (a0-14).
+   *
+   * The flow holds no storage any more than it holds a socket, so a write comes
+   * back as an effect like a `send` does. Emitted only when something actually
+   * moved: a refused equip returns the identical profile and owes the disk
+   * nothing.
+   */
+  | { readonly kind: 'save-profile'; readonly profile: Profile };
 
 /** A transition, plus whatever it owes the outside world. */
 export interface FlowResult {
@@ -201,9 +268,11 @@ export function createFlow(
   fireMode: FireMode = FireMode.Manual,
   settings: SettingsState = createSettings(),
   controlScheme: ControlScheme = 'sticks',
+  profile: Profile = freshProfile(),
 ): FlowState {
   return {
     screen: 'entry',
+    profile,
     entry: createEntry(),
     lobby: null,
     room: null,
@@ -354,6 +423,11 @@ export function flowKey(state: FlowState, key: string): FlowResult {
   // Escape backs out of the settings screen the way DONE does — the one key the
   // settings screen listens for, since everything else on it is a tap.
   if (state.screen === 'settings') return key === 'Escape' ? flowCloseSettings(state) : rest(state);
+  // The hangar takes Escape and Backspace out, exactly as the codex does — one
+  // key out of a screen that is never a gate.
+  if (state.screen === 'hangar') {
+    return key === 'Escape' || key === 'Backspace' ? flowCloseHangar(state) : rest(state);
+  }
   if (state.screen !== 'entry') return rest(state);
   if (key === 'Enter') return resolve(state, submitJoin(state.entry));
   if (key === 'Backspace') return withEntry(state, eraseEntryCode(state.entry));
@@ -611,6 +685,62 @@ function applyFireMode(state: FlowState, fireMode: FireMode): FlowResult {
 }
 
 // ---------------------------------------------------------------------------
+// The hangar — the fourth main-menu screen (a0-14)
+// ---------------------------------------------------------------------------
+
+/**
+ * Open the hangar. Reachable from the front door only: it is a door that comes
+ * back, not a thing you can reach mid-match, and a stray call from anywhere else
+ * is a no-op rather than a screen swapped out from under a live world.
+ */
+export function flowOpenHangar(state: FlowState): FlowResult {
+  if (state.screen !== 'entry') return rest(state);
+  return rest({ ...state, screen: 'hangar' });
+}
+
+/** Leave the hangar for the front door. BACK and Escape both land here; an equip
+ *  was applied and persisted when it happened, so there is nothing to confirm. */
+export function flowCloseHangar(state: FlowState): FlowResult {
+  if (state.screen !== 'hangar') return rest(state);
+  return rest({ ...state, screen: 'entry' });
+}
+
+/**
+ * Apply a tap on the hangar — from {@link ./hangar} `hangarHitTest`.
+ *
+ * BACK leaves. A cosmetic row equips (or un-equips, if it was already worn) —
+ * and **that is the only thing on this screen that writes anything**: there is
+ * no currency here and no purchase, so a row press changes which cosmetic is
+ * worn or it changes nothing at all.
+ *
+ * A locked row, or a row index the list does not have, is refused by
+ * {@link ./hangar} `equipCosmetic` returning the identical profile — so the flow
+ * stays identical too, and no `save-profile` goes out. The stillness rule, kept
+ * on the one screen where a spurious write lands in a file the game promises
+ * never to wipe.
+ */
+export function flowTapHangar(
+  state: FlowState,
+  target: HangarTarget,
+  cosmetics: readonly Cosmetic[] = COSMETICS,
+): FlowResult {
+  if (state.screen !== 'hangar') return rest(state);
+  if (target.kind === 'back') return flowCloseHangar(state);
+  const cosmetic = cosmetics[target.index];
+  if (!cosmetic) return rest(state);
+  const profile = equipCosmetic(state.profile, cosmetic);
+  if (profile === state.profile) return rest(state);
+  return { state: { ...state, profile }, effects: [{ kind: 'save-profile', profile }] };
+}
+
+/** Fold a loaded profile in — what the caller calls once, after reading storage,
+ *  so the hangar and the summary screen show the career this machine has rather
+ *  than the fresh one {@link createFlow} starts with. */
+export function setFlowProfile(state: FlowState, profile: Profile): FlowState {
+  return state.profile === profile ? state : { ...state, profile };
+}
+
+// ---------------------------------------------------------------------------
 // The end of a match
 // ---------------------------------------------------------------------------
 
@@ -689,8 +819,8 @@ export function setFlowFireMode(state: FlowState, fireMode: FireMode): FlowState
 /** Leave the match and come back to a clean door — Rematch's way out, and the
  *  reset the end-of-match summary performs. Deliberately a full reset: a stale
  *  roster behind a new door is how a player ends up looking at the previous
- *  match's colours. Fire mode, the control scheme and the rest of settings survive
- *  it — they are the player's, not the match's. */
+ *  match's colours. Fire mode, the control scheme, the rest of settings and the
+ *  career profile all survive it — they are the player's, not the match's. */
 export function resetFlow(state: FlowState): FlowState {
-  return createFlow(state.fireMode, state.settings, state.controlScheme);
+  return createFlow(state.fireMode, state.settings, state.controlScheme, state.profile);
 }
