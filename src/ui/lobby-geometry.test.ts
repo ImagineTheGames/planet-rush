@@ -36,8 +36,7 @@ import { describe, it, expect } from 'vitest';
 import { resolveAnchor, rectContains } from '@platform/layout-registry';
 import type { Rect, Viewport } from '@platform/layout-registry';
 import { TOUCH_MIN, rosterRowHeight, frameMetrics } from '../art/materials';
-import { CLASS_OPTIONS, CLASS_ORDER, LOBBY_SLOTS } from './lobby';
-import { MAP_ORDER } from './map-picker';
+import { CLASS_OPTIONS, LOBBY_SLOTS } from './lobby';
 import {
   CLASS_HULL_LINE,
   CLASS_NAME_LINE,
@@ -45,7 +44,7 @@ import {
   CLASS_TILE_MIN,
   CLASS_TILE_MIN_WIDTH,
   CLASS_TILE_PAD,
-  LOBBY_MAP_COUNT,
+  PICK_CARD_MIN_WIDTH,
   SEAT_CHIP_MAX_FRACTION,
   SEAT_CHIP_MIN,
   SEAT_HELP_MIN,
@@ -117,8 +116,11 @@ function allRects(layout: LobbyLayout): Array<{ label: string; rect: Rect }> {
     { label: 'modeToggle', rect: layout.modeToggle },
     { label: 'abundance', rect: layout.abundance },
     ...layout.seats.map((rect, i) => ({ label: `seat[${i}]`, rect })),
-    ...layout.classOptions.map((rect, i) => ({ label: `class[${i}]`, rect })),
-    ...layout.maps.map((rect, i) => ({ label: `map[${i}]`, rect })),
+    // ONE ship card and ONE arena card since u10-01 — the pick, twice. The four
+    // hull tiles and the six arena cards are on their own screens now, with their
+    // own containment suites (`./ship-select.test.ts`, `./map-select.test.ts`).
+    { label: 'shipPick', rect: layout.shipPick },
+    { label: 'mapPick', rect: layout.mapPick },
     { label: 'rushButton', rect: layout.rushButton },
   ];
   // NB: seatChips AND seatTeamChips are DELIBERATELY absent — they nest inside
@@ -257,10 +259,25 @@ describe('the roster and the hull tiles', () => {
     it(`lays out eight rows and four tiles without overlap — ${name}`, () => {
       const layout = lobbyLayout(vp, { isTouch: touch });
       expect(layout.seats).toHaveLength(LOBBY_SLOTS);
-      expect(layout.classOptions).toHaveLength(CLASS_ORDER.length);
-      // The arena row: one card per ratified map (p2 field rule; `MAP_ORDER`).
-      expect(layout.maps).toHaveLength(LOBBY_MAP_COUNT);
-      expect(LOBBY_MAP_COUNT).toBe(MAP_ORDER.length);
+      // **ONE ship card and ONE arena card** (u10-01, the developer: *"we should
+      // only show 1 ship and 1 map in lobby because it's too cluttered now"*).
+      // Stated as the SHAPE of the layout rather than as a count of an array,
+      // because that is what makes it un-regressable: there is no array here to
+      // grow back to four, and the four hull tiles and six arena cards a reader
+      // might look for live on `./ship-select` and `./map-select` instead.
+      for (const [label, rect] of [
+        ['ship card', layout.shipCard],
+        ['arena card', layout.mapCard],
+      ] as const) {
+        expect(rect.width, `${label} missing on ${name}`).toBeGreaterThan(0);
+        expect(rect.height, `${label} missing on ${name}`).toBeGreaterThan(0);
+      }
+      // …and each card sits inside its own pressable block, which is what the hit
+      // test registers (the eyebrow strip is part of the control, not beside it).
+      expect(rectContains(layout.shipPick, layout.shipCard), `ship card escapes its block on ${name}`).toBe(true);
+      expect(rectContains(layout.mapPick, layout.mapCard), `arena card escapes its block on ${name}`).toBe(true);
+      expect(rectContains(layout.shipPick, layout.shipLabel), `ship eyebrow escapes its block on ${name}`).toBe(true);
+      expect(rectContains(layout.mapPick, layout.mapLabel), `arena eyebrow escapes its block on ${name}`).toBe(true);
 
       const rects = allRects(layout).filter((r) => r.label !== 'title');
       for (let i = 0; i < rects.length; i++) {
@@ -301,16 +318,36 @@ describe('the roster and the hull tiles', () => {
     const narrow = lobbyLayout({ width: 390, height: 844 }, { isTouch: true });
 
     expect(wide.twoColumn).toBe(true);
-    // Roster on the left, tiles on the right, both spanning the same band.
-    expect(wide.classOptions[0]!.x).toBeGreaterThan(wide.seats[0]!.x + wide.seats[0]!.width - 1);
-    expect(wide.classOptions.map((r) => r.x)).toEqual(Array(4).fill(wide.classOptions[0]!.x));
+    // Roster on the left, the two summary cards on the right, both spanning the
+    // same band.
+    expect(wide.shipPick.x).toBeGreaterThan(wide.seats[0]!.x + wide.seats[0]!.width - 1);
+    expect(wide.mapPick.x).toBeGreaterThan(wide.seats[0]!.x + wide.seats[0]!.width - 1);
 
     expect(narrow.twoColumn).toBe(false);
-    // Tiles below the roster, in a 2×2 grid: [0][1] over [2][3].
-    expect(narrow.classOptions[0]!.y).toBeGreaterThan(narrow.seats[7]!.y);
-    expect(narrow.classOptions[1]!.y).toBe(narrow.classOptions[0]!.y);
-    expect(narrow.classOptions[2]!.y).toBeGreaterThan(narrow.classOptions[0]!.y);
-    expect(narrow.classOptions[1]!.x).toBeGreaterThan(narrow.classOptions[0]!.x);
+    // The cards go BELOW the roster in one column — and side by side wherever the
+    // band can hold two (u10-01), because the height that buys goes to the roster,
+    // which is what the developer's report is ultimately about.
+    expect(narrow.shipPick.y).toBeGreaterThan(narrow.seats[7]!.y);
+    expect(narrow.mapPick.y).toBeGreaterThan(narrow.seats[7]!.y);
+  });
+
+  it('gives the two cards a ROW where the band can hold one, and stacks them otherwise', () => {
+    // A 390px phone in portrait: 364px of band, two ~176px halves — both over
+    // PICK_CARD_MIN_WIDTH, so they sit side by side and the roster keeps the
+    // height a stacked pair would have cost it.
+    const phone = lobbyLayout({ width: 390, height: 844 }, { isTouch: true });
+    expect(phone.pickRow).toBe(true);
+    expect(phone.shipPick.width).toBeGreaterThanOrEqual(PICK_CARD_MIN_WIDTH);
+    expect(phone.mapPick.y).toBeCloseTo(phone.shipPick.y, 6);
+    expect(phone.mapPick.x).toBeGreaterThan(phone.shipPick.x);
+
+    // …and a band too narrow to halve stacks them rather than producing two cards
+    // no hull name fits on. Dropping to a stack is the fallback, never the default.
+    const sliver = lobbyLayout({ width: 320, height: 900 });
+    expect(sliver.band.width).toBeLessThan(2 * PICK_CARD_MIN_WIDTH);
+    expect(sliver.pickRow).toBe(false);
+    expect(sliver.mapPick.y).toBeGreaterThan(sliver.shipPick.y);
+    expect(sliver.mapPick.x).toBeCloseTo(sliver.shipPick.x, 6);
   });
 
   it('is decided by BAND width, not by device — a narrow desktop window is a phone layout', () => {
@@ -341,7 +378,7 @@ describe('the roster and the hull tiles', () => {
       expect(layout.shipColumn.height).toBeCloseTo(layout.band.height, 6);
       expect(rectContains(layout.band, layout.shipColumn), `ship column escapes band on ${name}`).toBe(true);
       // Nothing in the right column touches the rule…
-      for (const rect of [...layout.classOptions, ...layout.maps]) {
+      for (const rect of [layout.shipPick, layout.mapPick]) {
         expect(rect.x, `right column crowds the separator on ${name}`).toBeGreaterThanOrEqual(
           layout.separator.x + layout.separator.width - 1e-9,
         );
@@ -370,13 +407,15 @@ describe('thumb scale (GDD §2.4 — menus are plain taps)', () => {
       // thumb floor (the view drops the blurb, keeping the name + hull) rather than
       // vanishing — but they never go below a fingertip (p2 fit rule).
       expect(
-        layout.classOptions[0]!.height,
-        `hull tile untappable on ${name}`,
+        layout.shipCard.height,
+        `hull card untappable on ${name}`,
       ).toBeGreaterThanOrEqual(CLASS_TILE_COMPACT);
-      for (let i = 0; i < layout.maps.length; i++) {
-        expect(layout.maps[i]!.width, `arena card ${i} untappable wide on ${name}`).toBeGreaterThanOrEqual(44);
-        expect(layout.maps[i]!.height, `arena card ${i} untappable tall on ${name}`).toBeGreaterThanOrEqual(44);
-      }
+      expect(layout.mapCard.width, `arena card untappable wide on ${name}`).toBeGreaterThanOrEqual(44);
+      expect(layout.mapCard.height, `arena card untappable tall on ${name}`).toBeGreaterThanOrEqual(44);
+      // The PRESSABLE block is bigger than either card — it carries the eyebrow —
+      // so the thumb floor is met with room to spare on the thing a finger hits.
+      expect(layout.shipPick.height, `ship block untappable on ${name}`).toBeGreaterThanOrEqual(TOUCH_MIN);
+      expect(layout.mapPick.height, `arena block untappable on ${name}`).toBeGreaterThanOrEqual(TOUCH_MIN);
       // RUSH! keeps the thumb floor on EVERY viewport, including the ones whose
       // footer beam is itself under it — a 390-wide phone in portrait resolves a
       // 28px beam, and the plate grows up into the gutter rather than shrinking.
@@ -407,7 +446,7 @@ describe('thumb scale (GDD §2.4 — menus are plain taps)', () => {
       (p) => p.name === 'desktop' || p.name === 'iphone/portrait' || p.name === 'ipad/portrait',
     )) {
       const layout = lobbyLayout(vp, { isTouch: touch, insets: insetsFor(vp) });
-      expect(layout.classOptions[0]!.height, `hull tile blurb height on ${name}`).toBeGreaterThanOrEqual(
+      expect(layout.shipCard.height, `hull card blurb height on ${name}`).toBeGreaterThanOrEqual(
         CLASS_TILE_MIN,
       );
     }
@@ -462,11 +501,11 @@ describe('thumb scale (GDD §2.4 — menus are plain taps)', () => {
         expect(layout.modeToggle.height, `MODE on ${name} (${tag})`).toBeGreaterThanOrEqual(TOUCH_MIN);
         expect(layout.abundance.height, `ORE on ${name} (${tag})`).toBeGreaterThanOrEqual(TOUCH_MIN);
         // …and the two thumb CHOICES beside the roster keep their floors.
-        expect(layout.classOptions[0]!.height, `hull tile on ${name} (${tag})`).toBeGreaterThanOrEqual(
+        expect(layout.shipCard.height, `hull card on ${name} (${tag})`).toBeGreaterThanOrEqual(
           CLASS_TILE_COMPACT,
         );
-        expect(layout.maps[0]!.height, `arena card on ${name} (${tag})`).toBeGreaterThanOrEqual(44);
-        expect(layout.maps[0]!.width, `arena card on ${name} (${tag})`).toBeGreaterThanOrEqual(44);
+        expect(layout.mapCard.height, `arena card on ${name} (${tag})`).toBeGreaterThanOrEqual(44);
+        expect(layout.mapCard.width, `arena card on ${name} (${tag})`).toBeGreaterThanOrEqual(44);
       }
     }
   });
@@ -500,26 +539,9 @@ describe('thumb scale (GDD §2.4 — menus are plain taps)', () => {
     }
   });
 
-  it('changes the tiles’ ARRANGEMENT rather than squashing them', () => {
-    // Tall and wide: four stacked down the right column.
-    expect(lobbyLayout({ width: 1280, height: 800 }).tileShape).toBe('stack');
-    // Tall and narrow: a 2×2 under the roster.
-    expect(lobbyLayout({ width: 390, height: 844 }, { isTouch: true }).tileShape).toBe('grid');
-    // Wide and very short: a single row of four — height is the scarce axis, so
-    // the tiles spend width instead and keep their blurb.
-    //
-    // The viewport that reaches this shape MOVED with u7-03, and the move is the
-    // restructure rather than a tuning slip: the tiles used to divide a band that
-    // ran the full width of the screen, so a 690×400 phone-ish window reached it;
-    // they now live in the ship-select column, which is 40% of the band, so the
-    // `row` shape is what a wide-and-short DESKTOP window falls into instead. The
-    // chooser is unchanged — stack, then grid, then row — and this is the window
-    // where the first two genuinely do not fit.
-    const short = lobbyLayout({ width: 1620, height: 255 });
-    expect(short.tileShape).toBe('row');
-    expect(short.classOptions[0]!.height).toBeGreaterThanOrEqual(CLASS_TILE_MIN);
-    expect(short.classOptions.map((r) => r.y)).toEqual(Array(4).fill(short.classOptions[0]!.y));
-  });
+  // The tiles' ARRANGEMENT test moved with the tiles (u10-01): `stack` / `grid` /
+  // `row` is now `./ship-select.test.ts`'s, because `placeClassTiles` is called
+  // from there and the lobby has one card rather than four.
 
   it('sizes every control by the VIEWPORT, never by isTouch (u7-03)', () => {
     // `isTouch` used to choose between a desktop row height and a taller "touch"
@@ -546,7 +568,31 @@ describe('thumb scale (GDD §2.4 — menus are plain taps)', () => {
     // 48px promise above is deliberately not made.
     const layout = lobbyLayout({ width: 320, height: 568 }, { isTouch: true });
     expect(layout.seats[0]!.height).toBeLessThan(TOUCH_MIN);
-    expect(layout.classOptions[0]!.height).toBeGreaterThanOrEqual(CLASS_TILE_MIN);
+    expect(layout.shipCard.height).toBeGreaterThanOrEqual(CLASS_TILE_MIN);
+  });
+
+  it('hands the roster the height the three tiles and five cards used to take (u10-01)', () => {
+    // The point of the developer's report, measured. Before u10-01 the one-column
+    // shape divided the band three ways — roster, a 2x2 of hull tiles, an arena row
+    // — and the roster got what was left. It now shares with ONE row of two cards,
+    // so on the phone the report was filed from, the roster is strictly taller and
+    // its rows are strictly closer to the thumb floor than they were.
+    //
+    // Asserted against the floor and the wanted height rather than against a
+    // remembered number: what must hold is that the roster is no longer the block
+    // paying for the others, and a hard-coded 'was 45, is now 55' would fail on the
+    // next frame-metric change for a reason that has nothing to do with this brief.
+    const phone = lobbyLayout({ width: 390, height: 844 }, { isTouch: true });
+    expect(phone.twoColumn).toBe(false);
+    // Eight rows at the frame's own row height — the roster gets what it ASKS for
+    // on this device now, which it did not before.
+    const cap = rosterRowHeight(frameMetrics(390, 844));
+    expect(phone.seats[0]!.height).toBeCloseTo(cap, 6);
+    expect(phone.seats[0]!.height).toBeGreaterThanOrEqual(TOUCH_MIN);
+    // …and the cards below it still clear their own floors, so the height did not
+    // come out of them either.
+    expect(phone.shipCard.height).toBeGreaterThanOrEqual(CLASS_TILE_COMPACT);
+    expect(phone.mapCard.height).toBeGreaterThanOrEqual(44);
   });
 });
 
@@ -580,10 +626,12 @@ describe('the hull tile’s contents (u4 — pips and numbers, at every size)', 
   });
 
   for (const { name, vp, touch } of PROFILES) {
-    it(`shows all six stats, inside the tile and never overlapping — ${name}`, () => {
+    it(`shows all six stats, inside the card and never overlapping — ${name}`, () => {
       const layout = lobbyLayout(vp, { isTouch: touch, insets: insetsFor(vp) });
-      for (let t = 0; t < layout.classOptions.length; t++) {
-        const tile = layout.classOptions[t]!;
+      // ONE card since u10-01 — the pick. The other three hulls' tiles are
+      // asserted the same way, on their own screen, in `./ship-select.test.ts`.
+      for (const tile of [layout.shipCard]) {
+        const t = 0;
         const content = classTileContent(tile);
         expect(content.showStats, `stats dropped on ${name} tile ${t} ${fmt(tile)}`).toBe(true);
         expect(content.statColumns * content.statRows).toBeGreaterThanOrEqual(STAT_COUNT);
@@ -620,15 +668,14 @@ describe('the hull tile’s contents (u4 — pips and numbers, at every size)', 
   it('lays the six across in ONE row when the tile is wide, 3×2 on a phone', () => {
     // A desktop `stack` tile is wide and reads like GDD §2.11's own table row…
     const desktop = lobbyLayout({ width: 1280, height: 800 });
-    const wide = classTileContent(desktop.classOptions[0]!);
-    expect(desktop.tileShape).toBe('stack');
+    const wide = classTileContent(desktop.shipCard);
     expect(wide.statColumns).toBe(STAT_COUNT);
     expect(wide.statRows).toBe(1);
     expect(wide.showBlurb).toBe(true);
 
     // …and a phone tile folds to 3×2, which is what fits beside four of them.
     const phone = lobbyLayout({ width: 390, height: 844 }, { isTouch: true, insets: PORTRAIT_INSETS });
-    const narrow = classTileContent(phone.classOptions[0]!);
+    const narrow = classTileContent(phone.shipCard);
     expect(narrow.statColumns).toBe(3);
     expect(narrow.statRows).toBe(2);
     expect(narrow.showStats).toBe(true);
@@ -708,19 +755,20 @@ describe('hit testing (a tap hits what it looks like it hits)', () => {
           index: i,
         });
       }
-      for (let i = 0; i < layout.classOptions.length; i++) {
-        const p = center(layout.classOptions[i]!);
-        expect(lobbyHitTest(layout, p.x, p.y), `class[${i}] on ${name}`).toEqual({
-          kind: 'class',
-          index: i,
-        });
-      }
-      for (let i = 0; i < layout.maps.length; i++) {
-        const p = center(layout.maps[i]!);
-        expect(lobbyHitTest(layout, p.x, p.y), `map[${i}] on ${name}`).toEqual({
-          kind: 'map',
-          index: i,
-        });
+      // The two summary cards OPEN their screens; neither is a pick (u10-01).
+      // Tested at the card's centre AND at the eyebrow's, because the eyebrow says
+      // `CHANGE` and a caption that says CHANGE and is not itself pressable is a
+      // control smaller than it looks.
+      for (const [label, target, card, eyebrow] of [
+        ['ship', { kind: 'shipCard' }, layout.shipCard, layout.shipLabel],
+        ['arena', { kind: 'mapCard' }, layout.mapCard, layout.mapLabel],
+      ] as const) {
+        const c = center(card);
+        expect(lobbyHitTest(layout, c.x, c.y), `${label} card on ${name}`).toEqual(target);
+        if (eyebrow.height > 0) {
+          const e = center(eyebrow);
+          expect(lobbyHitTest(layout, e.x, e.y), `${label} eyebrow on ${name}`).toEqual(target);
+        }
       }
       const rush = center(layout.rushButton);
       expect(lobbyHitTest(layout, rush.x, rush.y)).toEqual({ kind: 'rush' });
@@ -1185,5 +1233,95 @@ describe('the seat-state control is DRAWN on every row (u5 — the affordance)',
       expect(control.width).toBe(0);
       expect(control.height).toBe(0);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// u10-01 — what must NOT have moved, on the 390px phone the brief names
+// ---------------------------------------------------------------------------
+//
+// The brief is explicit that two neighbours of the block that moved are out of
+// scope: the seat-state control (u5) and the FRIENDLY / ENEMY labels (u3) were
+// developer reports in their own right, and *"keep working exactly as they do"*.
+// Both are per-ROW geometry, and what moved is the column beside the roster — so
+// this is the assertion that the move stayed on its own side of the separator.
+//
+// 390 is the brief's own number. It is checked in BOTH the shapes a 390-wide
+// handset produces: landscape (844×390 logical, which is what a held phone becomes
+// under the landscape lock — `src/platform/orientation.ts`) and portrait-raw
+// (390×844), which is the one-column shape.
+
+describe('the roster is untouched at 390px (u10-01)', () => {
+  for (const [tag, vp] of [
+    ['landscape (the held phone, under the lock)', { width: 844, height: 390 }],
+    ['portrait-raw (the one-column shape)', { width: 390, height: 844 }],
+  ] as const) {
+    it(`draws and hit-tests every row control — ${tag}`, () => {
+      const layout = lobbyLayout(vp, { isTouch: true, insets: insetsFor(vp) });
+      expect(layout.seats).toHaveLength(LOBBY_SLOTS);
+      for (let i = 0; i < LOBBY_SLOTS; i++) {
+        const seat = layout.seats[i]!;
+        expect(seat.width, `row ${i} missing`).toBeGreaterThan(0);
+        expect(seat.height, `row ${i} missing`).toBeGreaterThan(0);
+
+        // …the u5 STATE control: drawn, inside its row, and the target a press on
+        // it resolves to — not the row body behind it.
+        const state = layout.seatStates[i]!;
+        expect(state.width, `state control ${i} dropped`).toBeGreaterThan(0);
+        expect(rectContains(seat, state), `state control ${i} escapes its row`).toBe(true);
+        const sp = center(state);
+        expect(lobbyHitTest(layout, sp.x, sp.y), `state control ${i} unhittable`).toEqual({
+          kind: 'seatState',
+          index: i,
+        });
+
+        // …the u3 SIDE chip, which carries `FRIENDLY A` / `ENEMY B`.
+        const team = layout.seatTeamChips[i]!;
+        expect(team.width, `side chip ${i} dropped`).toBeGreaterThanOrEqual(SEAT_TEAM_CHIP_MIN);
+        expect(rectContains(seat, team), `side chip ${i} escapes its row`).toBe(true);
+        const tp = center(team);
+        expect(lobbyHitTest(layout, tp.x, tp.y), `side chip ${i} unhittable`).toEqual({
+          kind: 'seatTeamChip',
+          index: i,
+        });
+
+        // …and the row BODY still cycles the character between them.
+        const bp = bodyPoint(layout, i);
+        expect(lobbyHitTest(layout, bp.x, bp.y), `row body ${i} unhittable`).toEqual({
+          kind: 'seat',
+          index: i,
+        });
+      }
+      // The MODE / YIELD strip above them, and the two footer plates, are all still
+      // there and still theirs.
+      expect(lobbyHitTest(layout, center(layout.modeToggle).x, center(layout.modeToggle).y)).toEqual({
+        kind: 'mode',
+      });
+      expect(lobbyHitTest(layout, center(layout.abundance).x, center(layout.abundance).y)).toEqual({
+        kind: 'abundance',
+      });
+      expect(lobbyHitTest(layout, center(layout.rushButton).x, center(layout.rushButton).y)).toEqual({
+        kind: 'rush',
+      });
+      expect(lobbyHitTest(layout, center(layout.leave).x, center(layout.leave).y)).toEqual({
+        kind: 'leave',
+      });
+    });
+  }
+
+  it('gives the roster MORE height than the four tiles and six cards left it', () => {
+    // The developer's report, as a number. The landscape phone's roster column is
+    // unchanged (it always spanned the band), so the measurable gain is the
+    // one-column shape, where the roster used to divide the band with a 2x2 of hull
+    // tiles AND an arena row and now shares it with one row of two cards.
+    const layout = lobbyLayout({ width: 390, height: 844 }, { isTouch: true });
+    // Every row clears the thumb floor, which is the promise the old three-way
+    // split could not make on this device.
+    for (let i = 0; i < LOBBY_SLOTS; i++) {
+      expect(layout.seats[i]!.height, `row ${i} under the thumb`).toBeGreaterThanOrEqual(TOUCH_MIN);
+    }
+    // …and the roster's own block is more than half the band, which it was not.
+    const rosterBottom = layout.seats[LOBBY_SLOTS - 1]!.y + layout.seats[LOBBY_SLOTS - 1]!.height;
+    expect(rosterBottom - layout.band.y).toBeGreaterThan(layout.band.height * 0.5);
   });
 });

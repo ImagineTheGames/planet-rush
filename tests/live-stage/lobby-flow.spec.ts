@@ -53,7 +53,10 @@ interface LobbySeam {
   defaultMapId: string;
   veteranMapId: string;
   mapOrder: readonly string[];
+  screen: string;
   mapCards: readonly { x: number; y: number; width: number; height: number }[];
+  openMapSelect(): void;
+  closeScreen(): void;
   expectedStations: Record<string, { x: number; y: number }[]>;
   worldMapId: string | null;
   worldStations: { x: number; y: number }[] | null;
@@ -102,6 +105,14 @@ test('PLAY → lobby → pick a non-default hull AND arena → RUSH → the sim 
     timeout: 20_000,
   });
 
+  // MAP SELECT is where the arena cards are since u10-01, and the readback below
+  // covers both screens in one pass — so open it before reading, and come back to
+  // the roster after, exactly as a player does.
+  await page.evaluate(() => window.__lobby!.openMapSelect());
+  await page.waitForFunction(() => window.__lobby?.screen === 'map-select', undefined, {
+    timeout: 20_000,
+  });
+
   // The lobby is on screen with all EIGHT slots, laid out at thumb scale and
   // wholly inside the safe (landscape) viewport — "layout-registered, thumb-sized".
   const opened = await page.evaluate(() => {
@@ -125,6 +136,8 @@ test('PLAY → lobby → pick a non-default hull AND arena → RUSH → the sim 
       selectedMapId: l.selectedMapId,
     };
   });
+  await page.evaluate(() => window.__lobby!.closeScreen());
+  await page.waitForFunction(() => window.__lobby?.screen === 'roster', undefined, { timeout: 20_000 });
 
   expect(opened.visible, 'the lobby is visible after PLAY').toBe(true);
   expect(opened.slotCount, 'the lobby shows all eight slots (GDD §2.1)').toBe(8);
@@ -159,16 +172,16 @@ test('PLAY → lobby → pick a non-default hull AND arena → RUSH → the sim 
   expect(afterPick, 'the tile the finger landed on is now selected').toBe(picked);
   expect(afterPick, 'and it is not the default').not.toBe(opened.defaultClass);
 
-  // The ARENA cards are here in the LOBBY now (p2), not on a separate step: four
-  // cards, octagon preselected, diamond the VETERAN, all thumb-sized inside the
-  // safe viewport.
-  expect(opened.mapOrder, 'four arena cards, in registry order').toEqual([
+  // The ARENA cards are on MAP SELECT, a screen the lobby's ONE arena card opens
+  // (u10-01) — octagon preselected, diamond the VETERAN, all thumb-sized inside
+  // the safe viewport. Counted off the registry, never pinned to a literal.
+  expect(opened.mapOrder.slice(0, 4), 'the registry order, unchanged').toEqual([
     'octagon',
     'compass',
     'oval',
     'diamond',
   ]);
-  expect(opened.mapCards, 'one rect per arena card').toHaveLength(4);
+  expect(opened.mapCards, 'one rect per arena card').toHaveLength(opened.mapOrder.length);
   expect(opened.selectedMapId, 'opens on the default arena (octagon)').toBe(opened.defaultMapId);
   expect(opened.defaultMapId).toBe('octagon');
   expect(opened.veteranMapId).toBe('diamond');

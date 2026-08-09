@@ -297,71 +297,92 @@ export function statGridHeight(rows: number): number {
 }
 
 // ---------------------------------------------------------------------------
-// The arena (map) row — the four map cards, moved off the PLAY flow into the
-// lobby (p2 field rule: one pre-match room where you pick your HULL and your
-// ARENA, then RUSH!). A row of four registry-preview cards along the bottom of
-// the middle band, above RUSH! — a thumb choice, so it keeps a floor height and
-// compresses the roster (a list) rather than itself.
+// The arena row is GONE from this file (u10-01)
+// ---------------------------------------------------------------------------
+//
+// It lived here from p2 (the arena picker moved off the PLAY flow into the
+// lobby) through u7-03 (it moved into the bottom of the ship-select column) and
+// a0-12 (four maps became six, and its gutter compressed to two pixels because
+// there was nothing left to give). The developer, 2026-08-07, looking at the
+// result: *"we should only show 1 ship and 1 map in lobby because it's too
+// cluttered now"*.
+//
+// So the six cards moved to a screen of their own ({@link ./map-select}), which
+// lays them out through the picker's own `mapPickerLayout` — the layout that was
+// written for exactly this job, before the row was ever squeezed into a lobby
+// column. Everything a0-12's note defended (six cards, the thumb floor, the fold)
+// is defended there, in a band the width of the whole screen, where the numbers
+// are no longer tight: the constant that recorded "a SEVENTH map cannot join this
+// row" is retired with the row it was about.
+//
+// What is left in this file is the ONE arena card the lobby still shows — the
+// pick — and it is dimensioned with the ship card beside it, below.
+
+// ---------------------------------------------------------------------------
+// The lobby's TWO summary cards (u10-01) — one hull, one arena, each a control
+// that opens the screen it was picked on
+//
+// The developer, 2026-08-07, over a screenshot of the live lobby: *"in the lobby
+// page select ship and select map need to open different pages, we should only
+// show 1 ship and 1 map in lobby because it's too cluttered now"*. So the four
+// hull tiles and the six arena cards leave this file's LOBBY layout entirely —
+// they are laid out by `./ship-select` and `./map-select` now, through the same
+// two placement helpers ({@link placeClassTiles}, {@link placeMapCards}), which
+// is why those are exported rather than copied.
+//
+// What is left here is two blocks in the ship-select column, each an EYEBROW over
+// a CARD:
+//
+//     SHIP · TAP TO CHANGE          <- the eyebrow strip: says what it opens
+//     ┌────────────────────────┐
+//     │ VANGUARD  Anvil        │    <- the card: the pick, drawn by the same
+//     │ SPD 100% ACC 100% …    │       renderer the picker screen uses
+//     └────────────────────────┘
+//
+// The pair is ONE hit target ({@link LobbyLayout.shipPick}): a caption that says
+// "tap to change" and is not itself tappable is a smaller control than it looks,
+// and this screen's whole rule is that a control looks like what it does.
 // ---------------------------------------------------------------------------
 
-/** Map cards in the row — the ratified maps (`../sim/maps` MAPS, and
- *  `./map-picker` MAP_ORDER, asserted equal in the tests). Mirrored rather than
- *  imported so the geometry stays free of the model, exactly like
- *  {@link LOBBY_SLOT_ROWS}. Six since a0-12 added the two two-sided team boards;
- *  the row is `n`-generic ({@link placeMaps}), so this is the only line that
- *  moved and {@link LOBBY_MAP_MIN_WIDTH}'s 48 u thumb floor still holds six
- *  across on every device in the geometry suite. */
-export const LOBBY_MAP_COUNT = 6;
-/** Map card height ceiling — cards are capped here (a tall desktop/portrait band
- *  does not blow the cards up into banners) and compress below it on a short
- *  landscape band. */
-export const LOBBY_MAP_ROW_MAX = 108;
-/** The height the map band aims to keep so a card can show its preview over its
- *  name — the row's equivalent of the tile's blurb height. Defended down to what
- *  the middle band can actually spare on the tightest landscape phone. */
-export const LOBBY_MAP_ROW_MIN = 52;
-/** Share of the middle band the arena row takes off the bottom before the roster
- *  and the hull tiles divide the rest. */
-export const LOBBY_MAP_BAND_FRACTION = 0.26;
 /**
- * Below this per-card width the arena row folds to 2 columns.
+ * The eyebrow strip over each summary card — `SHIP · TAP TO CHANGE`.
  *
- * **44 since a0-12, down from 48; 48 since u7-03, down from 60 — the thumb floor,
- * not a taste.** The arena row rides the bottom of the ship-select column rather
- * than the full width of the band, so a fold there is *half as tall* as the row it
- * replaces — on the iPhone SE in landscape the u7-03 fold turned four 57×65 cards
- * into four 119×29 ones, which is a card no thumb can hit. A slim card reads fine
- * (a preview over a name); a short one does not, so the ROW is what is defended.
- *
- * a0-12 took the registry from four maps to six and re-ran exactly that argument.
- * At six the row wants 44.4 u a card on small/portrait, 45.2 on ipad/portrait and
- * 47.4 on iphone/landscape — all three just under the old 48, so all three folded,
- * to *three* rows, giving cards 32, 32 and **18.5** u tall against a 44 u thumb
- * floor. Held as one row instead, the same three come out 44.4×108, 45.2×108 and
- * 47.4×67.6: over the floor in BOTH dimensions on every profile in the geometry
- * suite, which the fold is not in either. So the trigger is now the thumb floor
- * itself — fold only when a card would be untappably narrow, because the thing on
- * the other side of the fold is always worse.
+ * Reference px, scaled with the frame. Sized for one line of the eyebrow type
+ * (12px at reference, `./lobby-view` `EYEBROW_PX`) with a little air: this strip is
+ * what turns a card from a label into a control, so it is drawn on every viewport
+ * the band can spare it on and dropped whole — never clipped — below that.
  */
-export const LOBBY_MAP_MIN_WIDTH = 44;
+export const PICK_LABEL_HEIGHT = 18;
+
 /**
- * Tightest gutter the arena row will squeeze to before it gives up and folds
- * ({@link placeMaps}). Cards still read as separate cards this close; the thing
- * on the other side of the fold — a 17 u card — reads as nothing.
+ * The tallest a summary card grows.
  *
- * **The arena row is now FULL, and this constant is where that shows.** At six
- * maps the binding case is a notched iPhone in landscape: the band is 277.6 u
- * wide, six thumb-floor cards need 264 of it, and the five gutters get the
- * remaining 13.6 — 2.7 each. So the worst device lands *exactly* on the 44 u
- * floor with no slack left anywhere: not in the gutter, not in the card, not in
- * the band. A SEVENTH map cannot join this row. Whoever adds one needs a real UI
- * answer first — a scrolling or paged row, a taller arena band, or an explicit
- * decision to drop under the thumb floor on that device — and not another
- * downward nudge to a constant here, because there is nothing left to nudge.
+ * The four-tile block was capped at {@link CLASS_TILE_MAX} because four of them
+ * shared a column. One does not — but "not competing" is not the same as "take the
+ * column": a card allowed to fill a desktop's right column reads as a banner rather
+ * than as the current pick, and the first cut of this (160) drew the hull card's
+ * name, stats and two-line blurb across its top two-thirds with a hand's width of
+ * empty plate under them.
+ *
+ * 124 is what the CONTENT wants, measured off `classTileContent`'s own ladder: the
+ * 3px pad, the 14px name line, the 12px hull line, the 13px stat row with its air,
+ * a two-line blurb, and the pad again. Above that a card gains dead metal, not
+ * information. The leftover column height becomes AIR between the two blocks —
+ * which is what the Gantry material wants anyway — rather than being spent
+ * stretching either of them.
  */
-export const LOBBY_MAP_GAP_MIN = 2;
-/** Cards don't sprawl on a wide desktop. */
-export const LOBBY_MAP_CARD_MAX_WIDTH = 240;
+export const PICK_CARD_MAX_HEIGHT = 124;
+
+/**
+ * Below this block width the two cards stop sitting side by side and stack.
+ *
+ * It is {@link CLASS_TILE_MIN_WIDTH} — a hull card narrower than that cannot carry
+ * its name over a wrapped blurb, which is the same bound the four-tile block used
+ * and for the same reason. Side by side is preferred wherever it holds, because
+ * the height it gives back goes to the roster, which is what the developer's report
+ * is ultimately about.
+ */
+export const PICK_CARD_MIN_WIDTH = CLASS_TILE_MIN_WIDTH;
 
 // ---------------------------------------------------------------------------
 // The control strip — MODE toggle + ABUNDANCE (variable-slots Milestone E). Two
@@ -882,30 +903,37 @@ export interface LobbyLayout {
   readonly modeToggle: Rect;
   /** The ABUNDANCE toggle (SCARCE / STANDARD / RICH), top-right of the roster. */
   readonly abundance: Rect;
-  /** The four hull tiles, in `CLASS_ORDER`. */
-  readonly classOptions: readonly Rect[];
-  /** The four arena cards, in `MAP_ORDER` (`./map-picker`). A row along the
-   *  bottom of the SHIP-SELECT column (u7-03 — it used to cut across the whole
-   *  band, which is the width the roster now has); the view draws them through
-   *  the shared `MapPickerView`, so the registry previews come for free. */
-  readonly maps: readonly Rect[];
-  /** The band the arena cards were laid out inside — handed to the map view as
-   *  its `MapPickerLayout.band`. */
-  readonly mapBand: Rect;
-  /** Columns the arena cards fell into — 4 (a row) or 2 (a narrow 2×2). */
-  readonly mapColumns: number;
+  /**
+   * **The SHIP block — eyebrow plus card — and the whole of it is the hit target**
+   * that opens SHIP SELECT (u10-01). One block, because the lobby shows one hull:
+   * the pick.
+   */
+  readonly shipPick: Rect;
+  /** The eyebrow strip inside {@link shipPick} — `SHIP · TAP TO CHANGE`.
+   *  Zero-extent on a block too short to carry it, where the card takes the lot. */
+  readonly shipLabel: Rect;
+  /** …and the card itself, the rect `classTileContent` is measured against — the
+   *  same renderer SHIP SELECT draws its four tiles with. */
+  readonly shipCard: Rect;
+  /** The ARENA block, its eyebrow and its card — the twin of the three above, and
+   *  the target that opens MAP SELECT. */
+  readonly mapPick: Rect;
+  readonly mapLabel: Rect;
+  readonly mapCard: Rect;
   /** RUSH! / the countdown. */
   readonly rushButton: Rect;
   /** Whether this layout was built at thumb scale. */
   readonly isTouch: boolean;
-  /** Whether the roster and the tiles sit side by side. */
+  /** Whether the roster and the two picks sit side by side. */
   readonly twoColumn: boolean;
   /** Roster columns — 2 where one column of eight would fall under the thumb
    *  floor and the column is wide enough to halve ({@link placeSeats}). Seats
    *  fill column-major, so slot order still reads top-to-bottom. */
   readonly seatColumns: number;
-  /** How the four hull tiles are arranged. */
-  readonly tileShape: TileShape;
+  /** Whether the two summary cards sit side by side (`true`) or stacked. Side by
+   *  side wherever the block is wide enough ({@link PICK_CARD_MIN_WIDTH}), because
+   *  the height it gives back goes to the roster. */
+  readonly pickRow: boolean;
 }
 
 /** What a tap landed on. Index-based, so the geometry never has to know what a
@@ -949,8 +977,16 @@ export type LobbyTarget =
   | { readonly kind: 'mode' }
   /** The ABUNDANCE toggle (variable-slots E). */
   | { readonly kind: 'abundance' }
-  | { readonly kind: 'class'; readonly index: number }
-  | { readonly kind: 'map'; readonly index: number }
+  /**
+   * **The ship card — opens SHIP SELECT** (u10-01). It is not a pick: the lobby
+   * shows one hull and there is nothing to choose between here, so the only thing
+   * a press on it can mean is "show me the four". The pick itself is a
+   * {@link ./ship-select} `ShipSelectTarget` on the screen this opens.
+   */
+  | { readonly kind: 'shipCard' }
+  /** **The arena card — opens MAP SELECT.** Open to a guest as well as the host:
+   *  the screen refuses the *pick*, never the *look* (`./lobby` `openMapSelect`). */
+  | { readonly kind: 'mapCard' }
   | { readonly kind: 'rush' }
   | { readonly kind: 'roomCode' };
 
@@ -1051,17 +1087,14 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
   const twoColumn = band.width >= TWO_COLUMN_MIN_WIDTH;
 
   const seats: Rect[] = [];
-  const classOptions: Rect[] = [];
-  const maps: Rect[] = [];
-  let tileShape: TileShape;
   let rosterBox: Rect;
   let shipColumn: Rect;
   let separator: Rect;
-  let mapBand: Rect;
+  let picks: PickBlocks;
 
   if (twoColumn) {
-    // Roster left, ship select right, **both spanning the whole band** — the
-    // handoff's rule, and the reason the roster can hand every row a thumb.
+    // Roster left, the two summary cards right, **both spanning the whole band** —
+    // the handoff's rule, and the reason the roster can hand every row a thumb.
     const rosterWidth = Math.max(0, band.width * ROSTER_COLUMN_FRACTION - gap / 2);
     const shipX = band.x + rosterWidth + gap;
     rosterBox = { x: band.x, y: band.y, width: rosterWidth, height: band.height };
@@ -1077,55 +1110,47 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
       width: band.width > 0 && rosterWidth > 0 ? SEPARATOR_WIDTH : 0,
       height: band.height,
     };
-    // Inside the right column: the four hull tiles, then the arena row along its
-    // bottom. The cards are a thumb choice, so they keep a floor and the tiles —
-    // which have a floor of their own — take what is left.
-    const mapHeight = mapRowHeight(shipColumn.height);
-    const tilesHeight = Math.max(0, shipColumn.height - mapHeight - (mapHeight > 0 ? gap : 0));
-    tileShape = placeTiles(
-      classOptions,
-      shipColumn.x,
-      shipColumn.y,
-      shipColumn.width,
-      tilesHeight,
-      'stack',
-    );
-    mapBand = {
-      x: shipColumn.x,
-      y: shipColumn.y + tilesHeight + (mapHeight > 0 ? gap : 0),
-      width: shipColumn.width,
-      height: mapHeight,
-    };
+    // **Stacked, always, in the two-column shape.** The picks column here is tall
+    // and narrow (40% of the band, the full height of it), so halving its width
+    // costs the ship card the thing this brief gave it: a 470px card lays GDD
+    // §2.11's six stats out as one table-like row, and a 231px one folds them to
+    // 3×2 — which is the phone layout, on a desktop, for no gain. Height is the
+    // axis this column has to spare.
+    picks = placePicks(shipColumn, metrics, false);
   } else {
-    // One column: roster, then the tiles, then the arena row off the bottom.
-    const mapHeight = mapRowHeight(band.height);
-    const upperHeight = Math.max(0, band.height - mapHeight - (mapHeight > 0 ? BLOCK_GAP : 0));
+    // One column: the roster, then the two summary cards under it.
+    //
     // The roster asks for what eight thumb-sized rows and the strip above them
-    // actually need, and is refused only by the tiles' own floor. It used to take
-    // whatever was left after the tiles claimed a *fraction* of the band, which
-    // is how a 390px phone ended up with 45px rows on a band that could afford 55.
-    const tilesFloor = Math.min(2 * CLASS_TILE_MIN + ROW_GAP + BLOCK_GAP, upperHeight);
-    const rosterHeight = Math.max(
-      0,
-      Math.min(rosterWantedHeight(metrics), upperHeight - tilesFloor),
+    // actually need, and is refused only by what the two cards must keep. Since
+    // u10-01 that is **one** card's floor rather than two rows of tiles plus an
+    // arena row — the whole of the breathing room the developer's report asks for,
+    // handed to the list that had none.
+    // The floor is computed for the arrangement the cards will REALLY take, not
+    // for the best case: a band too narrow to halve stacks them, and a stacked pair
+    // needs twice the height. Guessing the row here is how a 320px window ended up
+    // reserving one block's worth of height for two.
+    const row = pickRowFits(band.width, metrics);
+    const blocks = row ? 1 : 2;
+    const label = scaled(PICK_LABEL_HEIGHT, metrics);
+    const picksFloor = Math.min(
+      blocks * (CLASS_TILE_MIN + label) + (blocks - 1) * gap + BLOCK_GAP,
+      band.height,
     );
-    const tilesHeight = Math.max(0, upperHeight - rosterHeight - (rosterHeight > 0 ? BLOCK_GAP : 0));
+    const rosterHeight = Math.max(0, Math.min(rosterWantedHeight(metrics), band.height - picksFloor));
+    const picksY = band.y + rosterHeight + (rosterHeight > 0 ? BLOCK_GAP : 0);
     rosterBox = { x: band.x, y: band.y, width: band.width, height: rosterHeight };
-    const tilesY = band.y + rosterHeight + (rosterHeight > 0 ? BLOCK_GAP : 0);
     shipColumn = {
       x: band.x,
-      y: tilesY,
+      y: picksY,
       width: band.width,
-      height: Math.max(0, band.y + band.height - tilesY),
+      height: Math.max(0, band.y + band.height - picksY),
     };
     separator = { x: band.x, y: band.y, width: 0, height: 0 };
-    tileShape = placeTiles(classOptions, band.x, tilesY, band.width, tilesHeight, 'grid');
-    mapBand = {
-      x: band.x,
-      y: band.y + upperHeight + (mapHeight > 0 ? BLOCK_GAP : 0),
-      width: band.width,
-      height: mapHeight,
-    };
+    // **A row where it fits, in the one-column shape.** Here the block is wide and
+    // short — the opposite of the two-column column — so width is what there is to
+    // spend, and every pixel a row saves vertically goes to the roster, which is
+    // the block the developer's report is ultimately about.
+    picks = placePicks(shipColumn, metrics, true);
   }
 
   // The MODE / ABUNDANCE strip is carved off the TOP of the roster box (never a
@@ -1147,7 +1172,6 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
   const seatHelp = trailing.map((t) => t.help);
   const seatChips = trailing.map((t) => t.tier);
   const seatTeamChips = trailing.map((t) => t.team);
-  const mapColumns = placeMaps(maps, mapBand);
 
   return {
     content,
@@ -1168,15 +1192,127 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     seatHelp,
     modeToggle: controls.modeToggle,
     abundance: controls.abundance,
-    classOptions,
-    maps,
-    mapBand,
-    mapColumns,
+    shipPick: picks.shipPick,
+    shipLabel: picks.shipLabel,
+    shipCard: picks.shipCard,
+    mapPick: picks.mapPick,
+    mapLabel: picks.mapLabel,
+    mapCard: picks.mapCard,
     rushButton,
     isTouch,
     twoColumn,
     seatColumns,
-    tileShape,
+    pickRow: picks.pickRow,
+  };
+}
+
+/**
+ * Whether a block of `width` can be halved into two summary cards that still read
+ * — {@link PICK_CARD_MIN_WIDTH} each, which is the width below which a hull card
+ * cannot carry its name over a wrapped blurb.
+ *
+ * It is a named predicate rather than an inline comparison because **two places
+ * have to agree about it**: the one-column branch reserves the picks' height
+ * before they are placed, and that reservation is twice as large for a stacked
+ * pair. The first cut inlined the test in `placePicks` alone, so a 320px window
+ * reserved one block's worth of band and then stacked two blocks into it — 28px
+ * cards, under every floor this file keeps.
+ */
+function pickRowFits(width: number, m: FrameMetrics): boolean {
+  return (width - m.gap) / 2 >= PICK_CARD_MIN_WIDTH;
+}
+
+/** The six rects {@link placePicks} returns, plus the arrangement it settled on. */
+interface PickBlocks {
+  readonly shipPick: Rect;
+  readonly shipLabel: Rect;
+  readonly shipCard: Rect;
+  readonly mapPick: Rect;
+  readonly mapLabel: Rect;
+  readonly mapCard: Rect;
+  readonly pickRow: boolean;
+}
+
+/**
+ * Divide the ship-select column between the **two summary cards** (u10-01): the
+ * hull this client is flying and the arena this room is on.
+ *
+ * Side by side wherever both halves clear {@link PICK_CARD_MIN_WIDTH}, stacked
+ * otherwise. The preference runs that way round because the height a row gives
+ * back goes to the roster — which is what the developer's report is ultimately
+ * about — and because two cards are the only things left competing for this
+ * column, so there is no third block a wrong guess here could squeeze.
+ *
+ * Each block is an eyebrow strip over a card, and the block is **capped, then
+ * centred** in the column: a card allowed to stretch to a desktop column's full
+ * height reads as a banner rather than as the current pick.
+ */
+function placePicks(column: Rect, m: FrameMetrics, preferRow: boolean): PickBlocks {
+  if (column.width <= 0 || column.height <= 0) {
+    const empty: Rect = { x: column.x, y: column.y, width: 0, height: 0 };
+    return {
+      shipPick: empty,
+      shipLabel: empty,
+      shipCard: empty,
+      mapPick: empty,
+      mapLabel: empty,
+      mapCard: empty,
+      pickRow: false,
+    };
+  }
+
+  const gap = m.gap;
+  const rowWidth = (column.width - gap) / 2;
+  const pickRow = preferRow && pickRowFits(column.width, m);
+  const blockWidth = pickRow ? rowWidth : column.width;
+  // Stacked, the two blocks split the column's height; in a row they each take all
+  // of it. Capped either way, so a tall column leaves air rather than banners.
+  const wanted = pickRow ? column.height : (column.height - gap) / 2;
+  const blockHeight = Math.max(0, Math.min(wanted, PICK_CARD_MAX_HEIGHT + scaled(PICK_LABEL_HEIGHT, m)));
+  const usedHeight = pickRow ? blockHeight : blockHeight * 2 + gap;
+  const originY = column.y + Math.max(0, (column.height - usedHeight) / 2);
+
+  const shipPick: Rect = { x: column.x, y: originY, width: blockWidth, height: blockHeight };
+  const mapPick: Rect = pickRow
+    ? { x: column.x + blockWidth + gap, y: originY, width: blockWidth, height: blockHeight }
+    : { x: column.x, y: originY + blockHeight + gap, width: blockWidth, height: blockHeight };
+
+  const ship = splitPick(shipPick, m);
+  const map = splitPick(mapPick, m);
+  return {
+    shipPick,
+    shipLabel: ship.label,
+    shipCard: ship.card,
+    mapPick,
+    mapLabel: map.label,
+    mapCard: map.card,
+    pickRow,
+  };
+}
+
+/**
+ * One summary block, split into its eyebrow and its card.
+ *
+ * The eyebrow is what makes the card read as a control rather than a label
+ * (*"each reads as a control that opens something — not as a dead label"*), so it
+ * is drawn wherever the block can spare it — and **dropped whole** below that,
+ * never clipped, the ladder every block on this screen keeps. A block that has lost
+ * its eyebrow is still a thumb-sized target: the whole block is the hit rect
+ * ({@link lobbyHitTest}), eyebrow or no eyebrow.
+ */
+function splitPick(block: Rect, m: FrameMetrics): { label: Rect; card: Rect } {
+  const wanted = scaled(PICK_LABEL_HEIGHT, m);
+  // The eyebrow may never cost the card its thumb floor: below that the strip goes
+  // and the card takes the whole block.
+  const labelHeight = block.height - wanted >= TOUCH_MIN ? wanted : 0;
+  return {
+    label: { x: block.x, y: block.y, width: block.width, height: labelHeight },
+    card: {
+      x: block.x,
+      y: block.y + labelHeight,
+      width: block.width,
+      height: Math.max(0, block.height - labelHeight),
+    },
   };
 }
 
@@ -1185,17 +1321,6 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
  *  widths deliberately do NOT (`../art/materials` `ROSTER`). */
 function scaled(referencePx: number, m: FrameMetrics): number {
   return Math.max(0, Math.round(referencePx * m.plateScale));
-}
-
-/** The arena row's height inside the column it hangs off the bottom of: a share
- *  of that column, floored so a card can still show its preview over its name and
- *  capped so it never balloons on a tall desktop. */
-function mapRowHeight(columnHeight: number): number {
-  const wanted = Math.max(
-    columnHeight * LOBBY_MAP_BAND_FRACTION,
-    Math.min(LOBBY_MAP_ROW_MIN, columnHeight / 2),
-  );
-  return Math.max(0, Math.min(wanted, LOBBY_MAP_ROW_MAX, columnHeight));
 }
 
 /** What the roster column would like: the MODE/ORE strip, then eight rows at the
@@ -1364,14 +1489,12 @@ export function lobbyHitTest(layout: LobbyLayout, x: number, y: number): LobbyTa
   // control, and a mis-hit toward the edge should favour leaving over nothing.
   if (hit(layout.leave, x, y)) return { kind: 'leave' };
   if (hit(layout.rushButton, x, y)) return { kind: 'rush' };
-  for (let i = 0; i < layout.classOptions.length; i++) {
-    const rect = layout.classOptions[i];
-    if (rect && hit(rect, x, y)) return { kind: 'class', index: i };
-  }
-  for (let i = 0; i < layout.maps.length; i++) {
-    const rect = layout.maps[i];
-    if (rect && hit(rect, x, y)) return { kind: 'map', index: i };
-  }
+  // The two summary blocks (u10-01). The EYEBROW is inside the target, not beside
+  // it: a caption reading `TAP TO CHANGE` that is not itself tappable would be a
+  // control smaller than it looks, on the screen whose one rule is that a control
+  // looks like what it does.
+  if (hit(layout.shipPick, x, y)) return { kind: 'shipCard' };
+  if (hit(layout.mapPick, x, y)) return { kind: 'mapCard' };
   // The MODE / ABUNDANCE toggles (variable-slots E) — above the roster rows.
   if (hit(layout.modeToggle, x, y)) return { kind: 'mode' };
   if (hit(layout.abundance, x, y)) return { kind: 'abundance' };
@@ -1826,23 +1949,38 @@ function placeSeats(out: Rect[], box: Rect, max: number, gapX: number): number {
  * Every branch caps rather than stretches, so a tile is only ever smaller than
  * the band it was handed — which is what makes "nothing escapes the content
  * box" true by construction.
+ *
+ * **Exported since u10-01, and the lobby is no longer its caller.** The four
+ * tiles live on {@link ./ship-select} now; this stayed here because everything it
+ * is dimensioned by — {@link CLASS_TILE_MIN}, {@link CLASS_TILE_MAX},
+ * {@link CLASS_TILE_MIN_WIDTH}, {@link classTileContent} — is here, and splitting a
+ * placement from the constants that decide it is how two files end up with two
+ * opinions about the same tile.
  */
-function placeTiles(
+export function placeClassTiles(
   out: Rect[],
   x: number,
   y: number,
   width: number,
   bandHeight: number,
   preferred: TileShape,
+  /**
+   * The tile height ceiling. {@link CLASS_TILE_MAX} is the LOBBY's number — it was
+   * chosen while four tiles shared a column beside a roster and an arena row — and
+   * SHIP SELECT is a whole screen with nothing else on it, so it passes a taller
+   * one ({@link ./ship-select} `SHIP_TILE_MAX`). A cap, never a target: the tiles
+   * still take the smaller of this and what the band can give.
+   */
+  max: number = CLASS_TILE_MAX,
 ): TileShape {
-  const stackH = rowHeight(bandHeight, 4, ROW_GAP, CLASS_TILE_MAX);
-  const gridH = rowHeight(bandHeight, 2, ROW_GAP, CLASS_TILE_MAX);
+  const stackH = rowHeight(bandHeight, 4, ROW_GAP, max);
+  const gridH = rowHeight(bandHeight, 2, ROW_GAP, max);
   const gridW = (width - ROW_GAP) / 2;
   const rowW = (width - 3 * ROW_GAP) / 4;
 
   const stackOk = stackH >= CLASS_TILE_MIN && width >= CLASS_TILE_MIN_WIDTH;
   const gridOk = gridH >= CLASS_TILE_MIN && gridW >= CLASS_TILE_MIN_WIDTH;
-  const rowOk = Math.min(CLASS_TILE_MAX, bandHeight) >= CLASS_TILE_MIN && rowW >= CLASS_TILE_MIN_WIDTH;
+  const rowOk = Math.min(max, bandHeight) >= CLASS_TILE_MIN && rowW >= CLASS_TILE_MIN_WIDTH;
 
   const shape: TileShape =
     preferred === 'stack'
@@ -1862,7 +2000,7 @@ function placeTiles(
   const columns = shape === 'stack' ? 1 : shape === 'grid' ? 2 : 4;
   const rows = 4 / columns;
   const tileWidth = Math.max(0, (width - (columns - 1) * ROW_GAP) / columns);
-  const tileHeight = rowHeight(bandHeight, rows, ROW_GAP, CLASS_TILE_MAX);
+  const tileHeight = rowHeight(bandHeight, rows, ROW_GAP, max);
   for (let i = 0; i < 4; i++) {
     // Reading order is CLASS_ORDER: across a grid row, then down.
     const column = columns === 1 ? 0 : i % columns;
@@ -2000,51 +2138,6 @@ export function classStatCell(content: ClassTileContent, index: number): Rect {
     width: content.cellWidth,
     height: STAT_ROW_HEIGHT,
   };
-}
-
-/**
- * Lay the four arena cards out inside `band`: a single row of four where each
- * card is wide enough to read (desktop, phone-landscape, most portraits), a 2×2
- * only on the narrowest portrait windows (all behind the ROTATE overlay). Cards
- * are *capped* in width and *centred*, so the block never escapes the band —
- * the same discipline {@link placeTiles} keeps. Returns the column count.
- */
-function placeMaps(out: Rect[], band: Rect): number {
-  const n = LOBBY_MAP_COUNT;
-  if (band.width <= 0 || band.height <= 0) {
-    for (let i = 0; i < n; i++) out.push({ x: band.x, y: band.y, width: 0, height: 0 });
-    return 0;
-  }
-  // Gutters compress BEFORE the row folds (a0-12). At six cards a notched iPhone
-  // in landscape hands this band 277.6 u, and six thumb-floor cards need 264 of
-  // it — leaving 13.6 for five gutters where the standard `ROW_GAP` wants 30. The
-  // fold is not the cheaper answer: that band is 64 u tall, so folding to three
-  // rows gives 17.4 u cards and folding to two gives 29.1, both far under the
-  // floor a single row clears outright. So the gutter gives way first, down to
-  // {@link LOBBY_MAP_GAP_MIN} — cards still read as separate cards at 3 u apart,
-  // and a card no thumb can hit does not read as anything.
-  const solved = (band.width - n * LOBBY_MAP_MIN_WIDTH) / (n - 1);
-  const gap = Math.min(ROW_GAP, Math.max(LOBBY_MAP_GAP_MIN, solved));
-  const rowWidth = (band.width - (n - 1) * gap) / n;
-  const columns = rowWidth >= LOBBY_MAP_MIN_WIDTH ? n : 2;
-  const rows = Math.ceil(n / columns);
-  const cardWidth = Math.min((band.width - (columns - 1) * gap) / columns, LOBBY_MAP_CARD_MAX_WIDTH);
-  const cardHeight = Math.min(rowHeight(band.height, rows, gap, LOBBY_MAP_ROW_MAX), band.height);
-  const blockWidth = columns * cardWidth + (columns - 1) * gap;
-  const blockHeight = rows * cardHeight + (rows - 1) * gap;
-  const originX = band.x + Math.max(0, (band.width - blockWidth) / 2);
-  const originY = band.y + Math.max(0, (band.height - blockHeight) / 2);
-  for (let i = 0; i < n; i++) {
-    const column = i % columns;
-    const row = Math.floor(i / columns);
-    out.push({
-      x: originX + column * (cardWidth + gap),
-      y: originY + row * (cardHeight + gap),
-      width: cardWidth,
-      height: cardHeight,
-    });
-  }
-  return columns;
 }
 
 /** The height of one of `count` equal rows in a band, capped at `max`. The

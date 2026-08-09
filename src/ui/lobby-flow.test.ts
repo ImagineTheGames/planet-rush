@@ -39,8 +39,11 @@ import {
   setFlowFireMode,
   tickFlow,
   wireFireMode,
+  flowTapMapSelect,
+  flowTapShipSelect,
 } from './lobby-flow';
 import type { FlowEffect, FlowResult, FlowState } from './lobby-flow';
+import { MAP_SELECT_GUEST_HINT, mapSelectModel } from './map-select';
 import { xpToReach } from '../progression/curve';
 import { DOOR_ORDER, ENTRY_COMING_SOON, ENTRY_ERRORS, KEYPAD_KEYS } from './lobby-entry';
 import {
@@ -98,6 +101,20 @@ function inLobby(you = 0, host = you): FlowState {
  * ratified play flow is that all three doors land in the same room, so a guard that
  * only ever walks in through SOLO is only testing a third of it.
  */
+/** …standing on SHIP SELECT, the way a player gets there: by pressing the lobby's
+ *  one hull card (u10-01). Never by writing the screen into the state — the point
+ *  of these two helpers is that every test below reaches the picker through the
+ *  control a player uses. */
+function onShipSelect(state: FlowState): FlowState {
+  return flowTapLobby(state, { kind: 'shipCard' }).state;
+}
+
+/** …and MAP SELECT, likewise. Open to a guest as well as the host: the refusal is
+ *  on the pick, never on the look. */
+function onMapSelect(state: FlowState): FlowState {
+  return flowTapLobby(state, { kind: 'mapCard' }).state;
+}
+
 function inLobbyVia(door: 'solo' | 'create' | 'join', you = 0, host = you): FlowState {
   const rng = mulberry32(7);
   let state = createFlow();
@@ -244,16 +261,24 @@ describe('the room tells the server what it chose', () => {
   });
 
   it('sends the hull a tile tap picked, and the tile the model records', () => {
-    const state = inLobby();
-    const picked = flowTapLobby(state, { kind: 'class', index: CLASS_ORDER.indexOf(ShipClass.Excavator) });
+    // The tiles are on SHIP SELECT since u10-01, so the card opens it and the tile
+    // is tapped there — one press further than it used to be, and the same message.
+    const opened = flowTapLobby(inLobby(), { kind: 'shipCard' });
+    expect(opened.state.lobby?.screen).toBe('ship-select');
+    const picked = flowTapShipSelect(opened.state, {
+      kind: 'hull',
+      index: CLASS_ORDER.indexOf(ShipClass.Excavator),
+    });
 
     expect(picked.state.lobby?.shipClass).toBe(ShipClass.Excavator);
+    // …and it comes back to the roster with the pick showing on the one card.
+    expect(picked.state.lobby?.screen).toBe('roster');
     expect(sent(picked)[0]).toMatchObject({ type: 'lobbyChoice', shipClass: ShipClass.Excavator });
   });
 
   it('carries the fire mode settings set, without a message of its own', () => {
-    const state = setFlowFireMode(inLobby(), FireMode.AutoAim);
-    const picked = flowTapLobby(state, { kind: 'class', index: CLASS_ORDER.indexOf(ShipClass.Hauler) });
+    const state = onShipSelect(setFlowFireMode(inLobby(), FireMode.AutoAim));
+    const picked = flowTapShipSelect(state, { kind: 'hull', index: CLASS_ORDER.indexOf(ShipClass.Hauler) });
     // …spelled the WIRE's way: transport.ts says 'auto' where the action layer
     // says 'auto-aim', and sending the action layer's spelling would have the
     // server drop every touch player's fire mode. See wireFireMode().
@@ -275,7 +300,7 @@ describe('the room tells the server what it chose', () => {
 
     // A guest's choice message carries no difficulties at all — the server
     // ignores them from a guest, so putting them on the wire would be noise.
-    const guest = flowTapLobby(inLobby(4, 0), { kind: 'class', index: 0 });
+    const guest = flowTapShipSelect(onShipSelect(inLobby(4, 0)), { kind: 'hull', index: 0 });
     expect(sent(guest)[0]).not.toHaveProperty('botDifficulties');
   });
 
@@ -287,9 +312,22 @@ describe('the room tells the server what it chose', () => {
     expect(cycled.effects).toEqual([]);
     expect(cycled.state).toBe(guest);
 
-    // …and re-picking the hull already selected.
-    const same = flowTapLobby(inLobby(), { kind: 'class', index: CLASS_ORDER.indexOf(DEFAULT_SHIP_CLASS) });
+    // …and re-picking the hull already selected. It still RETURNS to the roster
+    // (pressing the card you are already flying is a player agreeing with
+    // themselves, not a reason to strand them), and it still owes the room nothing.
+    const same = flowTapShipSelect(onShipSelect(inLobby()), {
+      kind: 'hull',
+      index: CLASS_ORDER.indexOf(DEFAULT_SHIP_CLASS),
+    });
     expect(same.effects).toEqual([]);
+    expect(same.state.lobby?.screen).toBe('roster');
+
+    // …and opening or closing a picker at all: which screen a player is standing
+    // on is not match config, so it never rides a `lobbyChoice`.
+    for (const target of [{ kind: 'shipCard' }, { kind: 'mapCard' }] as const) {
+      const opened = flowTapLobby(inLobby(), target);
+      expect(opened.effects, `${target.kind} costs the wire nothing`).toEqual([]);
+    }
   });
 
   it('treats the room code as a label, not a control', () => {
@@ -437,16 +475,31 @@ describe('one door, one lobby (ratified: PLAY opens the doors, the doors open th
     // The host owns the board and the mode for the whole room; a guest reads them.
     const guest = inLobbyVia('join', 3, 0);
     const before = lobbyModel(guest.lobby!);
-    for (const target of [{ kind: 'map', index: 2 } as const, { kind: 'mode' } as const]) {
-      const tapped = flowTapLobby(guest, target);
-      expect(tapped.state, `${target.kind} from a joiner`).toBe(guest);
-      expect(tapped.effects).toEqual([]);
-    }
+    // The MODE toggle is on the roster and refuses outright…
+    const mode = flowTapLobby(guest, { kind: 'mode' });
+    expect(mode.state, 'mode from a joiner').toBe(guest);
+    expect(mode.effects).toEqual([]);
+    // …and the ARENA is refused on the screen the card opens (u10-01). The screen
+    // OPENS for a guest — the refusal is on the pick, never on the look, and a card
+    // that would not open would read as broken while withholding the board they are
+    // about to fly — and a tap on a card hands them back with nothing changed.
+    const opened = flowTapLobby(guest, { kind: 'mapCard' });
+    expect(opened.state.lobby?.screen, 'a guest may OPEN map select').toBe('map-select');
+    expect(opened.effects, 'opening it costs the wire nothing').toEqual([]);
+    const tried = flowTapMapSelect(opened.state, { kind: 'arena', index: 2 });
+    expect(tried.state.lobby?.mapId, 'a guest cannot change the arena').toBe(before.mapId);
+    expect(tried.state.lobby?.screen, 'and is handed back to the roster').toBe('roster');
+    expect(tried.effects, 'a refused pick costs the wire nothing').toEqual([]);
+    // …and the screen SAYS so, before they press anything.
+    expect(mapSelectModel({ mapId: before.mapId, canPick: false }).hint).toBe(MAP_SELECT_GUEST_HINT);
+    expect(mapSelectModel({ mapId: before.mapId, canPick: false }).canPick).toBe(false);
+    expect(lobbyModel(guest.lobby!).canPickMap).toBe(false);
     expect(lobbyModel(guest.lobby!).mapId).toBe(before.mapId);
     // …and the host of that same online room CAN change both — read-only is the
     // guest's condition, not the online lobby's.
     const host = inLobbyVia('create', 0, 0);
-    expect(flowTapLobby(host, { kind: 'map', index: 2 }).state.lobby?.mapId).not.toBe(
+    expect(lobbyModel(host.lobby!).canPickMap).toBe(true);
+    expect(flowTapMapSelect(onMapSelect(host), { kind: 'arena', index: 2 }).state.lobby?.mapId).not.toBe(
       host.lobby?.mapId,
     );
     expect(flowTapLobby(host, { kind: 'mode' }).state.lobby?.mode).toBe('teams');
@@ -605,18 +658,26 @@ describe('the slot editor is reachable in EVERY mode AND both lobbies (guard the
       const state = inLobbyVia(flavour.door, 0, 0);
 
       // Every affordance, by the rect the view draws → the target a tap resolves to.
-      expect(tapCentre(layout, layout.classOptions[0]!)).toEqual({ kind: 'class', index: 0 });
-      expect(tapCentre(layout, layout.maps[1]!)).toEqual({ kind: 'map', index: 1 });
+      // The hull and the arena are ONE card each since u10-01, and each opens a
+      // screen rather than being a pick (the developer: *"select ship and select
+      // map need to open different pages"*).
+      expect(tapCentre(layout, layout.shipCard)).toEqual({ kind: 'shipCard' });
+      expect(tapCentre(layout, layout.mapCard)).toEqual({ kind: 'mapCard' });
       expect(tapCentre(layout, layout.modeToggle)).toEqual({ kind: 'mode' });
       expect(tapCentre(layout, layout.abundance)).toEqual({ kind: 'abundance' });
       expect(tapCentre(layout, layout.rushButton)).toEqual({ kind: 'rush' });
       expect(tapCentre(layout, layout.leave)).toEqual({ kind: 'leave' });
 
       // …and each one takes effect through the flow, in this flavour.
-      expect(flowTapLobby(state, { kind: 'class', index: 0 }).state.lobby?.shipClass).not.toBe(
-        state.lobby?.shipClass,
-      );
-      expect(flowTapLobby(state, { kind: 'map', index: 1 }).state.lobby?.mapId).not.toBe(state.lobby?.mapId);
+      // …and each one takes effect through the flow, in this flavour — the two
+      // picks now via the screens their cards open, which is one press further and
+      // the same outcome.
+      expect(
+        flowTapShipSelect(onShipSelect(state), { kind: 'hull', index: 0 }).state.lobby?.shipClass,
+      ).not.toBe(state.lobby?.shipClass);
+      expect(
+        flowTapMapSelect(onMapSelect(state), { kind: 'arena', index: 1 }).state.lobby?.mapId,
+      ).not.toBe(state.lobby?.mapId);
       expect(flowTapLobby(state, { kind: 'mode' }).state.lobby?.mode).toBe('teams');
       expect(flowTapLobby(state, { kind: 'abundance' }).state.lobby?.abundance).not.toBe(
         state.lobby?.abundance,
@@ -709,7 +770,12 @@ describe('RUSH! (rule 2 — the countdown is real, and it is the host’s)', () 
 
   it('locks the hull from the instant of the press (GDD §2.11)', () => {
     const pressed = flowTapLobby(inLobby(), { kind: 'rush' }).state;
-    const late = flowTapLobby(pressed, { kind: 'class', index: CLASS_ORDER.indexOf(ShipClass.Interceptor) });
+    // The picker still OPENS while locked — a player who cannot change their hull
+    // may still want to see what the four are — and the pick is what is refused.
+    const late = flowTapShipSelect(onShipSelect(pressed), {
+      kind: 'hull',
+      index: CLASS_ORDER.indexOf(ShipClass.Interceptor),
+    });
 
     expect(late.state.lobby?.shipClass).toBe(DEFAULT_SHIP_CLASS);
     expect(late.effects).toEqual([]); // and the late pick never reaches the wire
@@ -803,7 +869,9 @@ describe('the whole front of a match, in one pass', () => {
     const room = state.room!;
     drain(flowConnected(state, 0));
     drain(flowLobbySlots(state, slots(8, [0, 1])));
-    drain(flowTapLobby(state, { kind: 'class', index: CLASS_ORDER.indexOf(ShipClass.Interceptor) }));
+    // The hull, through the screen its card opens (u10-01): open, pick, return.
+    drain(flowTapLobby(state, { kind: 'shipCard' }));
+    drain(flowTapShipSelect(state, { kind: 'hull', index: CLASS_ORDER.indexOf(ShipClass.Interceptor) }));
     // Seat 4 has to BE a bot before it can be cast (a0-11: a wire slot arrives
     // OPEN, and the character cycle refuses a non-bot seat). Both taps are real
     // host edits and both are broadcast, which is why two sends appear below.
