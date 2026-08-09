@@ -34,7 +34,18 @@ import {
 } from '../sim';
 import { ALL_SPRITES, ART_CATALOGUE } from './catalogue';
 import { turretSilhouetteForTier, turretSprite } from './buildings';
-import { STATION_HULL_EXCLUSIONS, stationHullParts, stationSprite, STATION_VARIANT_COUNT } from './stations';
+import {
+  beaconRingSprite,
+  cutterheadHullParts,
+  cutterheadShapes,
+  stationHullParts,
+  stationSprite,
+  stationVariantFor,
+  STATION_ART_EXTENT,
+  STATION_HULL_EXCLUSIONS,
+  STATION_VARIANT_COUNT,
+  type CutterheadOptions,
+} from './stations';
 import { assertPaletteCompliance, auditAll, auditSprite, formatViolations } from './compliance';
 import {
   ALLOWED_COLORS,
@@ -46,7 +57,7 @@ import {
   hex,
   type DerivedKey,
 } from './palette';
-import { circle, fill, sprite, spriteColors, type Shape } from './shapes';
+import { circle, fill, sprite, spriteColors, type Shape, type SpriteDef } from './shapes';
 import {
   MATERIALS,
   PALETTE as TOKENS,
@@ -224,6 +235,21 @@ function hullInstructions(stage: Container, index: number): number {
   return (node as Graphics).context.instructions.length;
 }
 
+/**
+ * How many draw instructions a sprite definition is worth, by `drawSprite`'s own
+ * rule (`src/art/textures.ts`): one per fill and one per stroke, in shape order.
+ * This is what lets the shipped-hull check below be **derived** from the art
+ * rather than pinned to a hand-maintained magic number.
+ */
+function spriteInstructionCount(def: SpriteDef): number {
+  let n = 0;
+  for (const s of def.shapes) {
+    if (s.fill) n++;
+    if (s.stroke) n++;
+  }
+  return n;
+}
+
 /** How far from the station centre a shape reaches, in the sprite's unit space. */
 function shapeExtent(s: Shape): number {
   if (s.path.kind === 'circle') return Math.hypot(s.path.cx, s.path.cy) + s.path.r;
@@ -234,34 +260,18 @@ function shapeExtent(s: Shape): number {
   return far;
 }
 
-/**
- * The same measurement over the RENDERER's hull graphic, in world units — every
- * filled primitive it draws, and how far out each reaches. Pixi keeps a circle as
- * a primitive (`{action:'circle', data:[cx,cy,r]}`), which is exactly what the
- * hull is made of, so this reads real geometry rather than a bounding box that a
- * stroke could inflate.
- */
-function hullFillExtents(stage: Container, index: number): number[] {
-  const node = stage.getChildByLabel(`station-${index}`, true);
-  if (!node) throw new Error(`station-${index} missing`);
-  const out: number[] = [];
-  for (const ins of (node as Graphics).context.instructions as readonly GraphicsInstruction[]) {
-    if (ins.action !== 'fill') continue; // the beacon RING is a stroke — see below
-    for (const p of ins.data?.path?.instructions ?? []) {
-      if (p.action !== 'circle') continue;
-      const [cx, cy, r] = p.data as [number, number, number];
-      out.push(Math.hypot(cx, cy) + r);
-    }
-  }
-  expect(out.length, 'read no hull geometry — the probe is broken, not the hull').toBeGreaterThan(0);
-  return out;
-}
-
-/** The slice of Pixi's instruction record this file reads. */
-interface GraphicsInstruction {
-  readonly action: string;
-  readonly data?: { readonly path?: { readonly instructions?: readonly { action: string; data: unknown }[] } };
-}
+/** Every way the hull can be asked to draw itself: four arrangements, eight
+ *  rosters, and the derelict — the exclusion holds on all of them or it is not
+ *  an exclusion. A wreck takes no owner, which is why it is asked for once. */
+const HULL_CONFIGS: readonly { label: string; opts: CutterheadOptions }[] = [
+  ...Array.from({ length: STATION_VARIANT_COUNT }, (_, v) =>
+    [0, 1, 2, 3, 4, 5, 6, 7].map((p) => ({ label: `v${v} p${p}`, opts: { variant: v, playerId: p } })),
+  ).flat(),
+  ...Array.from({ length: STATION_VARIANT_COUNT }, (_, v) => ({
+    label: `v${v} derelict`,
+    opts: { variant: v, dead: true },
+  })),
+];
 
 describe('STATION_HULL_EXCLUSIONS — the ratified removals (a2-04)', () => {
   it('is the list, and the list is short on purpose — one entry per design decision', () => {
@@ -273,14 +283,21 @@ describe('STATION_HULL_EXCLUSIONS — the ratified removals (a2-04)', () => {
   });
 
   // --- Direction 1: the hull emits nothing on the list ---------------------
+  //
+  // Aimed at THE CUTTERHEAD (a2-03) — the hull the developer's amendment is
+  // actually about. A guard aimed at a sprite that never had turrets proves
+  // nothing; these run against `cutterheadHullParts`, which is what the shipped
+  // `stationSprite` is composed from and what the renderer now draws.
 
-  it('the hull manifest names no excluded feature, on any variant', () => {
-    for (let v = 0; v < STATION_VARIANT_COUNT; v++) {
-      for (const { part } of stationHullParts(v)) {
+  it('the hull manifest names no excluded feature — on any variant, any roster, live or derelict', () => {
+    for (const { label, opts } of HULL_CONFIGS) {
+      const parts = cutterheadHullParts(opts);
+      expect(parts.length, `${label} drew nothing`).toBeGreaterThan(0);
+      for (const { part } of parts) {
         for (const banned of STATION_HULL_EXCLUSIONS) {
           expect(
             part.toLowerCase().includes(banned),
-            `station variant ${v} emits a "${part}" part, which is on the exclusion list`,
+            `cutterhead ${label} emits a "${part}" part, which is on the exclusion list`,
           ).toBe(false);
         }
       }
@@ -290,60 +307,84 @@ describe('STATION_HULL_EXCLUSIONS — the ratified removals (a2-04)', () => {
   it('and the manifest is EXHAUSTIVE — every shape the hull draws belongs to a named part', () => {
     // Without this, the check above proves nothing: shapes appended after the
     // manifest is flattened would be unnamed, and therefore unexcludable.
-    for (let v = 0; v < STATION_VARIANT_COUNT; v++) {
-      const named = stationHullParts(v).reduce((n, p) => n + p.shapes.length, 0);
-      expect(stationSprite(v).shapes.length, `station variant ${v} draws unnamed shapes`).toBe(named);
+    for (const { label, opts } of HULL_CONFIGS) {
+      const parts = cutterheadHullParts(opts);
+      const named = parts.reduce((n, p) => n + p.shapes.length, 0);
+      expect(cutterheadShapes(opts).length, `cutterhead ${label} draws unnamed shapes`).toBe(named);
       expect(named).toBeGreaterThan(0);
       // And no part is a placeholder that names ground it never draws.
-      for (const p of stationHullParts(v)) expect(p.shapes.length, `empty part "${p.part}"`).toBeGreaterThan(0);
+      for (const p of parts) expect(p.shapes.length, `empty part "${p.part}" on ${label}`).toBeGreaterThan(0);
     }
   });
 
-  it('every shape the hull draws is inside the extent the hull declares', () => {
-    // Not a turret check — deliberately. There is NO geometric rule that
-    // separates a hull gun from an anchor lug or a spoil boom: all three are
-    // outboard structure, and a rule that banned outboard geometry would ban the
-    // mining read the facility body exists for (a2-03's spoil boom reaches ~1.85
-    // R by design). So the exclusion is carried by the NAMED manifest above, and
-    // this is the far weaker thing geometry can honestly say: the hull fits in
-    // the box it claims, so `extent` stays a usable pooling/culling bound.
+  it('the sprite the game asks for is that same manifest — no second drawing to drift', () => {
     for (let v = 0; v < STATION_VARIANT_COUNT; v++) {
-      const def = stationSprite(v);
-      const GRID_SLACK = 1e-3; // `round()` quantises coordinates to 1e-4
-      for (const s of def.shapes) {
-        expect(shapeExtent(s), `station v${v} draws to ${shapeExtent(s)}, past its extent ${def.extent}`)
-          .toBeLessThanOrEqual(def.extent + GRID_SLACK);
+      for (const p of [0, 3, 7]) {
+        const named = stationHullParts(v, p).reduce((n, part) => n + part.shapes.length, 0);
+        expect(stationSprite(v, p).shapes.length, `station v${v} p${p} draws unnamed shapes`).toBe(named);
       }
     }
   });
 
-  it('the SHIPPED hull draws exactly what it is declared to draw, and no more', () => {
-    // A TRIPWIRE, not a classifier, and stated as one. The renderer's station
-    // body is hand-authored Pixi geometry rather than `stationSprite` (a2-03 is
-    // the brief that closes that gap), so the named manifest cannot reach it and
-    // nothing else would notice four anonymous circles appearing on the body
-    // radius — which is precisely the regression this brief exists to prevent.
+  it('the eight anchor lugs are still there — the seat is structure; only the gun was unwelcome', () => {
+    // The other half of the amendment, and the half it would be easy to get
+    // wrong: "no turrets on the hull" must not become "no mounting ground on the
+    // hull." The lug is what clamps the head to its claim AND the seat a bought
+    // turret bolts to, and the keyway is where the roster colour lives — so
+    // deleting it would cost ownership legibility as well as the mount.
+    for (let v = 0; v < STATION_VARIANT_COUNT; v++) {
+      const lugs = stationHullParts(v, 3).find((p) => p.part === 'anchor-lugs');
+      expect(lugs, `station v${v} has no anchor-lugs part`).toBeDefined();
+      // Eight lugs: body + ink outline + lit face + two bolts + one keyway each.
+      expect(lugs!.shapes.length, `station v${v} lost lug geometry`).toBe(8 * 6);
+      const keyways = lugs!.shapes.filter((s) => s.role === 'identity');
+      expect(keyways.length, `station v${v} lost its lug keyways — the roster colour`).toBe(8);
+    }
+    // A derelict has come loose from its claim: two lugs snapped off, no owner,
+    // so no keyways. Still lugs, still not turrets.
+    const dead = cutterheadHullParts({ variant: 0, dead: true }).find((p) => p.part === 'anchor-lugs');
+    expect(dead!.shapes.length).toBe(6 * 5);
+    expect(dead!.shapes.some((s) => s.role === 'identity')).toBe(false);
+  });
+
+  it('every shape the hull draws is inside the extent the hull declares', () => {
+    // NOT a turret check — deliberately. There is no geometric rule that
+    // separates a hull gun from an anchor lug or a spoil boom: all three are
+    // outboard structure, and a rule that banned outboard geometry would ban the
+    // mining read the Cutterhead was picked for (its spoil boom's tailings drift
+    // to ~1.85 R by design). So the exclusion is carried by the NAMED manifest
+    // above, and this is the far weaker thing geometry can honestly say: the hull
+    // fits in the box it claims, so `extent` stays a usable pooling/culling bound.
+    for (const { label, opts } of HULL_CONFIGS) {
+      const GRID_SLACK = 1e-3; // `round()` quantises coordinates to 1e-4
+      for (const s of cutterheadShapes(opts)) {
+        expect(shapeExtent(s), `cutterhead ${label} draws to ${shapeExtent(s)}, past ${STATION_ART_EXTENT}`)
+          .toBeLessThanOrEqual(STATION_ART_EXTENT + GRID_SLACK);
+      }
+    }
+  });
+
+  it('the SHIPPED hull is that sprite and nothing else — mark for mark', () => {
+    // a2-03 closed the gap this test used to work around: the renderer's station
+    // body was hand-authored Pixi (three discs and a ring stroke, in hexes no
+    // audit could see), so the named manifest could not reach the picture the
+    // player sees and the best available check was a hand-maintained draw-call
+    // tripwire. `src/render/index.ts` now plays `stationSprite` + `beaconRingSprite`
+    // through `drawSprite`, so the count below is DERIVED from the art itself.
     //
-    // IF YOU ARE HERE BECAUSE THIS FAILED: you changed what a station draws.
-    // That is allowed, and it re-baselines the goldens (look at every one). Set
-    // the number below to the new count in the same commit, and satisfy yourself
-    // that what you added is not a gun — because if it is, the silhouette has
-    // started lying about how many turrets are standing (GDD §2.5's re-arm tell).
-    const SHIPPED_HULL_DRAW_CALLS = 5; // ocean, two landmasses, beacon ring, core
+    // IF YOU ARE HERE BECAUSE THIS FAILED: the renderer is drawing station
+    // geometry that does not come from `src/art/stations.ts` — which is exactly
+    // how four anonymous guns would get onto a hull without the manifest, the
+    // palette audit or the concept board ever seeing them.
     const { world } = dockedArena();
+    const station = stationOf(world, 0)!;
     const stage = new Container();
     new Renderer(stage, VIEW).draw(world, { cameraTarget: 0, muzzles: [] });
-    expect(hullInstructions(stage, 0)).toBe(SHIPPED_HULL_DRAW_CALLS);
 
-    // And every one of them is centred structure, not a ring of mounts: a turret
-    // sits at `radius + mountOffset` (src/sim/constants.ts), so a hull gun is
-    // outboard of the body by construction. The shipped hull's only outboard
-    // mark is the beacon RING — identity, one stroke, not a fill.
-    const station = stationOf(world, 0)!;
-    for (const reach of hullFillExtents(stage, 0)) {
-      expect(reach, `a hull FILL reaches ${reach}, out where a mount would sit`)
-        .toBeLessThan(station.radius + TURRET.mountOffset);
-    }
+    const expected =
+      spriteInstructionCount(stationSprite(stationVariantFor(station.owner), station.owner)) +
+      spriteInstructionCount(beaconRingSprite(station.owner));
+    expect(hullInstructions(stage, 0)).toBe(expected);
   });
 
   it('no station-family sprite is a turret by another name', () => {
@@ -394,13 +435,16 @@ describe('STATION_HULL_EXCLUSIONS — the ratified removals (a2-04)', () => {
     expect(turretCount(station)).toBe(TURRET.capPerStation - 1);
   });
 
-  it('the turret art still renders, from the buildings layer and not from the hull', () => {
+  it('the turret art still renders, from the buildings layer and not from the Cutterhead', () => {
+    // THE FRAME PAIR THIS BRIEF TURNS ON, as an assertion: a station with four
+    // built and the same station shot empty are different pictures, and the
+    // difference is entirely in the turret layer. The hull does not move.
     const { world, ship } = dockedArena();
     const station = stationOf(world, 0)!;
     const stage = new Container();
     const r = new Renderer(stage, VIEW);
 
-    // Empty ring: the hull is drawn, and nothing stands on it.
+    // Empty ring: the Cutterhead is drawn, and nothing stands on its lugs.
     r.draw(world, { cameraTarget: 0, muzzles: [] });
     const bareHull = hullInstructions(stage, 0);
     expect(bareHull).toBeGreaterThan(0);
@@ -424,26 +468,28 @@ describe('STATION_HULL_EXCLUSIONS — the ratified removals (a2-04)', () => {
     expect(hullInstructions(stage, 0)).toBe(bareHull);
   });
 
-  it('and the SHIPPED hull draws nothing outboard either — the same rule, on the renderer', () => {
-    // The check above is a comparison, so it holds equally well for a hull that
-    // draws four permanent guns — it just draws them in both frames. This is the
-    // one that catches that, on the geometry the player actually sees. The
-    // renderer's station body is hand-authored Pixi rather than `stationSprite`
-    // (a2-03 is the brief that closes that gap), so the exclusion has to be
-    // asserted here in its own right or it does not cover the shipped picture.
-    const { world } = dockedArena();
+  it('the turret layer tracks the sim count at every step, not just at the ends', () => {
+    // The check above compares three snapshots; this one walks the count up and
+    // back down and asserts the picture at each stop, which is the re-arm tell
+    // (GDD §2.5) stated as a test rather than as a pair of screenshots.
+    const { world, ship } = dockedArena();
     const station = stationOf(world, 0)!;
     const stage = new Container();
-    new Renderer(stage, VIEW).draw(world, { cameraTarget: 0, muzzles: [] });
+    const r = new Renderer(stage, VIEW);
 
-    for (const reach of hullFillExtents(stage, 0)) {
-      expect(reach, `the hull fills out to ${reach}, past its radius ${station.radius}`).toBeLessThanOrEqual(
-        station.radius + 1e-6,
-      );
-      // Where a turret would sit is beyond every one of them, by the sim's own
-      // mount offset — so this bound is the exclusion, stated in world units.
-      expect(reach).toBeLessThan(station.radius + TURRET.mountOffset);
+    for (let n = 1; n <= TURRET.capPerStation; n++) {
+      placeOrder(world, ship, 'turret');
+      buildOut(world, () => station.turrets.length === n);
+      r.draw(world, { cameraTarget: 0, muzzles: [] });
+      expect(turretsOnScreen(stage), `${n} built, ${turretsOnScreen(stage)} drawn`).toBe(turretCount(station));
     }
+    for (let n = TURRET.capPerStation; n > 0; n--) {
+      damageTurret(station.turrets[0]!, TURRET.hp);
+      sweepDeadTurrets(world);
+      r.draw(world, { cameraTarget: 0, muzzles: [] });
+      expect(turretsOnScreen(stage), `${n - 1} standing, ${turretsOnScreen(stage)} drawn`).toBe(turretCount(station));
+    }
+    expect(turretCount(station)).toBe(0);
   });
 
   it('the whole turret art pool is still reachable — every Mk, every state', () => {
