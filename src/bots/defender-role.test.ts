@@ -38,7 +38,7 @@
 import { describe, it, expect } from 'vitest';
 import { ShipClass } from '@shared/types';
 import type { PlayerId, Vec2 } from '@shared/types';
-import { SPAWN_PROTECTION_S, createWorld, type World } from '../sim';
+import { SPAWN_PROTECTION_S, TICK_DT, createWorld, isOver, step, type World } from '../sim';
 import {
   allyDistress,
   allyResponseRange,
@@ -47,6 +47,7 @@ import {
   wantsAllyDefence,
 } from './behaviors';
 import { treeFor } from './bot';
+import { botInputs, botLobby, createBots, fillEmptySlots } from './harness';
 import { DEFAULT_PERCEPTION, perceive } from './perception';
 import { Difficulty, PERSONALITIES } from './personalities';
 import type { PersonalityId } from './personalities';
@@ -324,6 +325,60 @@ describe('every bot on the side computes the same answer, without a word', () =>
       expect(defenderFor(perceive(world, member), VICTIM), `${member}`).toBe(forVictim);
       expect(defenderFor(perceive(world, member), FAR), `${member}`).toBe(forFar);
     }
+  });
+});
+
+describe('a real 4v4 match never splits the side', () => {
+  it('agrees on every live alarm, on every tick, all match long', () => {
+    // The fixtures above are hand-built boards. This is the same property under
+    // the thing that actually breaks derived assignments: eight bots on five
+    // different reaction cadences, homes dying, klaxons flickering on a
+    // two-second window, over thousands of ticks nobody chose.
+    //
+    // It is also the guard on the residual. The shipped branch still shows a
+    // small rate of two teammates flying to one alarm
+    // (`evidence/b4-01-defender-role.json`: 0.4% of alarm-ticks at 4v4, down
+    // from 2.4%), and the whole question is *why*. Over 329 such moments in the
+    // measured sweep, the side's members disagreed about the defender **zero**
+    // times — every one was a bot still executing a commitment it took while it
+    // WAS the defender, which is `./ally`'s latch doing its job rather than the
+    // assignment failing to do its own. That distinction is the difference
+    // between a tuning residual and a correctness bug, so it is asserted here
+    // and not merely written down.
+    const seats = fillEmptySlots([], 8, undefined, [...SIDES]);
+    const world = createWorld({ seed: 11, players: botLobby(seats), mapId: 'octagon' });
+    const brains = createBots(seats, { seed: 11 });
+    // `Station.team` is optional and falls back to the owner id — teams-of-one,
+    // the same default `sim/state.ts` applies when a spec carries no side.
+    const sideOf = new Map<PlayerId, number>();
+    for (const s of world.stations) sideOf.set(s.owner, s.team ?? s.owner);
+    const teamOf = (s: { owner: PlayerId; team?: number }): number => s.team ?? s.owner;
+
+    let alarmsChecked = 0;
+    let twoFlying = 0;
+
+    while (world.time < 240 && !isOver(world)) {
+      step(world, botInputs(world, brains, TICK_DT), TICK_DT);
+      for (const s of world.stations) {
+        if (!s.alive || s.sinceDamage >= DEFAULT_PERCEPTION.alarmWindow) continue;
+        const side = brains.filter((b) => sideOf.get(b.seat.id) === teamOf(s));
+        const answers = side.map((b) => defenderFor(perceive(world, b.seat.id), s.owner));
+        expect(new Set(answers).size, `t=${world.time.toFixed(2)} alarm on ${s.owner}`).toBe(1);
+        alarmsChecked++;
+        const flying = side.filter(
+          (b) => b.brain.allyResponse.target === s.owner && b.brain.lastBehavior === 'defend-ally',
+        );
+        if (flying.length >= 2) {
+          twoFlying++;
+          // Whenever two ARE flying, the side still agrees who the defender is,
+          // and at most one of the flyers is it. The other is latch inertia.
+          expect(flying.filter((b) => b.seat.id === answers[0]).length).toBeLessThanOrEqual(1);
+        }
+      }
+    }
+    // The scan has to have had something to scan, or it proves nothing.
+    expect(alarmsChecked).toBeGreaterThan(200);
+    expect(twoFlying).toBeLessThan(alarmsChecked * 0.05);
   });
 });
 

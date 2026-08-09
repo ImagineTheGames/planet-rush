@@ -933,8 +933,38 @@ function isAlly(ctx: BotCtx, id: PlayerId): boolean {
  * would otherwise turn around at the door.
  */
 export function assignedToAnswer(ctx: BotCtx, distress: AllyDistress): boolean {
-  if (!distress.atHome) return true;
+  if (!distress.atHome && !klaxonRinging(ctx, distress.id)) return true;
   return holdsDefenderRole(ctx.view, distress.id);
+}
+
+/**
+ * Is the whole side already hearing about this teammate? The klaxon is
+ * range-free, so if it is ringing then *every* teammate knows, whatever layer
+ * the distress in hand arrived by.
+ *
+ * This is what makes {@link assignedToAnswer}'s test the honest one rather than
+ * a test of the message's *kind*. A besieged bot flees and sends `help`
+ * ({@link callHelp} from `retreat`) while its home is still burning, so the same
+ * teammate is simultaneously the subject of a divided klaxon and an undivided
+ * cry — and answering the cry lands a second bot on the same doorstep by the
+ * back door.
+ *
+ * **It closed no measured gap, and it stays anyway.** Adding this clause moved
+ * every figure in `evidence/b4-01-defender-role.json` by exactly zero over eight
+ * 4v4 seeds, so it is not what the double-response rate turns on; the honest
+ * reading is that a `help` and a klaxon rarely coincide in the response window.
+ * It is here because the alternative is a gate that tests the *kind* of message
+ * rather than whether the signal is shared, and that distinction is the one this
+ * whole exemption rests on.
+ *
+ * A genuinely open-space `help` — a teammate jumped in the field, no home
+ * burning — still passes ungated, which is the case the exemption exists for.
+ */
+function klaxonRinging(ctx: BotCtx, id: PlayerId): boolean {
+  for (const ally of ctx.view.allies) {
+    if (ally.id === id) return ally.underAttack && ally.stationAlive;
+  }
+  return false;
 }
 
 /**
