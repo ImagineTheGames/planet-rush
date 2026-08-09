@@ -29,6 +29,7 @@ import {
   RETREAT_CLEAR_RANGE,
   corneredBlockader,
   coreUnderFinalAssault,
+  defendAlly,
   defendHome,
   engage,
   haulHome,
@@ -48,6 +49,7 @@ import {
   wantsCorneredFight,
   wantsHomeErrand,
   wantsRetreat,
+  wantsAllyDefence,
   wantsToHaul,
 } from './behaviors';
 import { WEAPON_RANGE, NEUTRAL } from './steering';
@@ -160,6 +162,19 @@ export const easyTree: Node = selector('easy', [
     },
     (ctx) => defendHome(ctx),
   ),
+
+  // **Answer a teammate's alarm** (`docs/team-bots-plan.md` Stage 2; the
+  // developer, 2026-08-07: *"enemies on teams should try to defend their
+  // teammates bases when under attack (if they are under threat as well) …
+  // same thing for bots on your team"*).
+  //
+  // Its position in this list IS the design. Below `last-stand`,
+  // `cornered-fight`, `retreat` and this bot's own `defend`, so **my home
+  // outranks yours** — the alarm rings for the team, the ladder stays
+  // selfish-first. Above `spend`, so a teammate under siege beats a shopping
+  // trip. In FFA the branch cannot fire at all: a teams-of-one side has no
+  // allies, so `wantsAllyDefence` returns on an empty roster (plan §2.5).
+  when('defend-ally', (ctx) => wantsAllyDefence(ctx), (ctx) => defendAlly(ctx)),
 
   // At the wheel with something worth buying.
   when('spend', () => true, (ctx) => spendAtHome(ctx, easySpendPlan)),

@@ -68,7 +68,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { mulberry32, type Rng } from '@shared/types';
-import { createWorld, type World } from '../sim';
+import { areEnemies, createWorld, type World } from '../sim';
 import { createBot } from './bot';
 import { MATCH_SLOTS, botLobby, createBots, fillEmptySlots, runHeadlessMatch } from './harness';
 import { DEFAULT_PERCEPTION, perceive } from './perception';
@@ -130,7 +130,24 @@ function scrambleHidden(world: World, id: number, rng: Rng): void {
       // may read, and the lie starts exactly where the screen ends. (This gate
       // was `SENSOR_RANGE`, 180 units, until GDD §2.2 was amended on 2026-08-07.)
       station.coreHp = 1 + noise(rng, station.maxCoreHp - 1);
-      station.sinceDamage = noise(rng, 30);
+      // **The one exemption in this scrambler, and it is an ALLY's alarm clock.**
+      //
+      // `sinceDamage` is what `AllyView.underAttack` is derived from (Stage 2
+      // Task 2.1), and that field is deliberately range-free: in TEAMS a human
+      // *already* hears their teammate's under-attack klaxon map-wide, with no
+      // scouting — `deriveAlarmAllies` walks every station and adds every
+      // same-team owner (`src/art/presenter.ts`), and `alarmRingsFor` gates the
+      // ring on that scope (`src/art/audio/engine.ts`). Lying to a bot about it
+      // would not be enforcing fog honesty; it would be asserting a **deafness no
+      // human has**, which is the same handicap this file's a0-05 note warns
+      // about for station health, in the same direction.
+      //
+      // The exemption is exactly one boolean's worth, and it is one line so it
+      // stays that way. An ally's `coreHp` above and its shields and barrels below
+      // are still scrambled — the klaxon is a boolean and a boolean is what the
+      // human gets (plan Trap 8). A **stranger's** `sinceDamage` is still a lie at
+      // any range, because nothing rings for them.
+      if (areEnemies(world, id, station.owner)) station.sinceDamage = noise(rng, 30);
       station.repairing = rng.next() < 0.5;
       for (const shield of station.shields) shield.hp = noise(rng, shield.maxHp);
       if (station.turrets.length > 0) {
@@ -174,6 +191,32 @@ function scrambleHidden(world: World, id: number, rng: Rng): void {
   // Nobody reads the future.
   world.rngState = (world.rngState ^ 0x5bf0_3635) >>> 0;
   world.nextEntityId += 1000;
+}
+
+/**
+ * The slots on `eye`'s own side whose **home is off `eye`'s screen** — the allies
+ * whose core, shields and barrels the scrambler is entitled to lie about.
+ * (Their *klaxon* is not on that list; see the exemption in `scrambleHidden`.)
+ */
+function hiddenAllyHomes(world: World, eye: number): number[] {
+  const me = world.ships.find((s) => s.id === eye)!;
+  const out: number[] = [];
+  for (const station of world.stations) {
+    if (station.owner === eye || areEnemies(world, eye, station.owner)) continue;
+    const d = Math.sqrt((me.pos.x - station.pos.x) ** 2 + (me.pos.y - station.pos.y) ** 2);
+    if (Math.max(0, d - station.radius) > DEFAULT_PERCEPTION.visualRange) out.push(station.owner);
+  }
+  return out;
+}
+
+/** The first slot, ascending, that has at least one teammate it cannot see the
+ *  home of; `-1` if the whole board is huddled together. */
+function observerWithHiddenAlly(world: World): number {
+  const ids = world.ships.map((s) => s.id).sort((a, b) => a - b);
+  for (const id of ids) {
+    if (hiddenAllyHomes(world, id).length > 0) return id;
+  }
+  return -1;
 }
 
 /** Decide one tick with a *fresh* mind, so the comparison is view-vs-view and
@@ -253,35 +296,50 @@ describe.each(LINEUPS)('fog-honesty in $name — the trees decide on the view, a
     const { world, bots } = match(5, teams);
     runHeadlessMatch(world, bots, { maxSeconds: 120 });
 
+    // **Whose eyes?** In FFA, any slot's. In TEAMS the claim under test is
+    // specifically that the lie lands on a *teammate's* hidden numbers, and a
+    // teammate whose home is on this bot's screen has no hidden numbers to lie
+    // about — so an observer parked between all three of its allies' front doors
+    // satisfies "we ran it on teams" while asserting nothing. Slot 0 is exactly
+    // that bot at this seed once Stage 2 ships and bots fly to each other's
+    // homes, which is how this was found. Pick the observer *by the property
+    // under test* instead, and assert one exists.
+    const eye = teams ? observerWithHiddenAlly(world) : 0;
+    expect(eye).toBeGreaterThanOrEqual(0);
+
     const lied = clone(world);
-    scrambleHidden(lied, 0, mulberry32(99));
+    scrambleHidden(lied, eye, mulberry32(99));
 
     const changed = (pick: (w: World) => number): boolean => pick(world) !== pick(lied);
     // Enemy holds, enemy banks, and the ore inside the rocks all moved.
-    expect(changed((w) => w.ships.reduce((sum, s) => sum + (s.id === 0 ? 0 : s.cargo + s.banked), 0))).toBe(true);
+    expect(changed((w) => w.ships.reduce((sum, s) => sum + (s.id === eye ? 0 : s.cargo + s.banked), 0))).toBe(true);
     expect(changed((w) => w.asteroids.reduce((sum, a) => sum + a.ore, 0))).toBe(true);
     // And at least one unscouted core is now telling a different story.
-    const cores = (w: World): number[] => w.stations.filter((p) => p.owner !== 0).map((p) => p.coreHp);
+    const cores = (w: World): number[] => w.stations.filter((p) => p.owner !== eye).map((p) => p.coreHp);
     expect(cores(lied)).not.toEqual(cores(world));
 
     // Meanwhile the view a bot is *given* is unchanged — which is the whole
     // point: the lie lives entirely in the half of the world it cannot see.
     // In TEAMS this is also the structural statement about `BotView.allies`:
-    // the roster is three public facts, so a world that lied about everything
-    // else on this bot's own side still produces a byte-identical view.
-    expect(perceive(lied, 0)).toEqual(perceive(world, 0));
+    // the roster is public facts plus the klaxon, so a world that lied about
+    // everything else on this bot's own side still produces a byte-identical view.
+    expect(perceive(lied, eye)).toEqual(perceive(world, eye));
 
     // …and in TEAMS, the lie landed on a TEAMMATE, not only on strangers.
     // Without this the teams half of the sweep would be "we ran it twice" and
     // nothing more: FFA is teams-of-one, so an ally guarantee that is never
     // aimed at an actual ally is a tautology (p16-01's lesson, §2).
     if (teams) {
-      const allies = perceive(world, 0).allies.map((a) => a.id);
+      const allies = perceive(world, eye).allies.map((a) => a.id);
       expect(allies.length).toBeGreaterThan(0);
       const bank = (w: World): number[] =>
         allies.map((id) => w.ships.find((s) => s.id === id)!.banked);
+      // Cores only for the allies whose homes are genuinely off this bot's
+      // screen — the ones there is something to lie about.
+      const hidden = hiddenAllyHomes(world, eye);
+      expect(hidden.length).toBeGreaterThan(0);
       const core = (w: World): number[] =>
-        allies.map((id) => w.stations.find((p) => p.owner === id)!.coreHp);
+        hidden.map((id) => w.stations.find((p) => p.owner === id)!.coreHp);
       expect(bank(lied)).not.toEqual(bank(world));
       expect(core(lied)).not.toEqual(core(world));
     }
