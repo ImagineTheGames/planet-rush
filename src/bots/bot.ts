@@ -37,6 +37,7 @@ import { easyTree } from './easy';
 import { hardTree } from './hard';
 import { mediumTree } from './medium';
 import type { BotView } from './perception';
+import type { TeamRadio } from './radio';
 import type { Personality, PersonalityId } from './personalities';
 import { Difficulty, personality, tuningFor } from './personalities';
 import type { Brain, Node } from './tree';
@@ -151,6 +152,17 @@ export interface BotOptions {
    * way. Defaults to a fixed constant — deterministic, never `Date.now()`.
    */
   readonly seed?: number;
+  /**
+   * This bot's side of the team callout channel (`./radio`), shared with its
+   * teammates. Omit it — as every FFA caller does, and as any caller seating one
+   * bot at a time does — and the bot gets a quiet channel: every send is a no-op
+   * and every receive is empty, which is how team behaviour degrades structurally
+   * rather than behind a mode flag (`docs/team-bots-plan.md` §2.5).
+   *
+   * `createBots` (`./harness`) is the thing that builds one per side, because it
+   * is the only function that sees a whole lineup.
+   */
+  readonly radio?: TeamRadio;
 }
 
 /** Default bot seed. Any constant will do; it must not be time-derived. */
@@ -181,7 +193,7 @@ export function createBot(seat: BotSeat, options: BotOptions = {}): Bot {
   const character = personality(seat.personality);
   const tuning = tuningFor(seat.personality);
   const rng = mulberry32(botSeed(options.seed ?? DEFAULT_BOT_SEED, seat.id));
-  const brain = createBrain(character, rng);
+  const brain = createBrain(character, rng, options.radio ?? null);
   const tree = treeFor(character.difficulty);
 
   return {

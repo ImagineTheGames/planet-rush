@@ -182,8 +182,59 @@ describe('perception — my own side', () => {
     const ally = perceive(w, 0).allies[0]!;
     expect(ally.stationAlive).toBe(false);
     // …and nothing else about it came along for the ride. The roster is three
-    // public facts; an ally's HP is scouted like anyone else's (Trap 8).
-    expect(Object.keys(ally).sort()).toEqual(['id', 'stationAlive', 'stationPos']);
+    // public facts plus the klaxon; an ally's **HP** is scouted like anyone
+    // else's, at any range and on both sides (Trap 8). This list is the whole
+    // fog surface of `AllyView`: adding a field to it should have to fail a test
+    // and be argued for, not slip in behind a feature.
+    expect(Object.keys(ally).sort()).toEqual(['id', 'stationAlive', 'stationPos', 'underAttack']);
+  });
+
+  it('rings a teammate\'s klaxon from across the map — and only the klaxon', () => {
+    // The one range-free addition the team plan licenses (Stage 2 Task 2.1): in
+    // TEAMS a human already hears their teammate's under-attack alarm map-wide
+    // with no scouting (`src/art/presenter.ts` `deriveAlarmAllies`), so a bot
+    // hearing it is parity, not telepathy.
+    const w = world4([0, 0, 1, 1]);
+    ship(w, 0).pos = { x: 9000, y: 9000 };
+    station(w, 1).sinceDamage = 0.1;
+
+    const view = perceive(w, 0);
+    expect(view.allies[0]!.id).toBe(1);
+    expect(view.allies[0]!.underAttack).toBe(true);
+    // The HP did NOT come with it: the home is far off screen, so the ring is
+    // unreadable and `perceiveStation` says so with a `null`.
+    const home = view.stations.find((p) => p.owner === 1);
+    expect(home?.coreHp ?? null).toBeNull();
+    expect(home?.underAttack ?? null).toBeNull();
+  });
+
+  it('does not ring for an ENEMY home across the map — nothing rings for them', () => {
+    const w = world4([0, 0, 1, 1]);
+    ship(w, 0).pos = { x: 9000, y: 9000 };
+    station(w, 2).sinceDamage = 0.1;
+    const view = perceive(w, 0);
+    expect(view.allies.map((a) => a.id)).toEqual([1]);
+    expect(view.stations.find((p) => p.owner === 2)?.underAttack ?? null).toBeNull();
+  });
+
+  it('has no klaxon to ring in FFA — a side of one has no ally', () => {
+    const w = world4();
+    station(w, 1).sinceDamage = 0.1;
+    expect(perceive(w, 0).allies).toEqual([]);
+  });
+
+  it('stops ringing once the alarm window passes, and once the home is a wreck', () => {
+    const w = world4([0, 0, 1, 1]);
+    ship(w, 0).pos = { x: 9000, y: 9000 };
+
+    station(w, 1).sinceDamage = DEFAULT_PERCEPTION.alarmWindow + 0.01;
+    expect(perceive(w, 0).allies[0]!.underAttack).toBe(false);
+
+    // A dead home is not "under attack"; it is over. Same guard the own-station
+    // view uses, so a responder cannot be sent to defend a wreck.
+    station(w, 1).sinceDamage = 0;
+    station(w, 1).alive = false;
+    expect(perceive(w, 0).allies[0]!.underAttack).toBe(false);
   });
 
   it('still knows its own side while dead — the roster is not a sighting', () => {

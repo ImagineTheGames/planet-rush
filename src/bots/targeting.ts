@@ -191,11 +191,26 @@ export function homeProximity(ctx: BotCtx, pos: Vec2): number {
 export function homeIntruder(ctx: BotCtx): PerceivedShip | null {
   const station = ctx.self.station;
   if (!station) return null;
+  return intruderNear(ctx, station.pos);
+}
+
+/**
+ * The nearest enemy ship inside the alarm ring around **any** point — the same
+ * question {@link homeIntruder} asks, with the doorstep as a parameter.
+ *
+ * It exists because Stage 2 of `docs/team-bots-plan.md` gave a bot a *second*
+ * doorstep to care about: a teammate's. A responder needs "is there anything to
+ * fight at the home I flew to?" and the answer must be the identical predicate,
+ * at the identical radius, with the identical hostility read — two spellings of
+ * one question is how the two answers drift apart (plan Trap 9). `homeIntruder`
+ * is now this function with the bot's own station passed in.
+ */
+export function intruderNear(ctx: BotCtx, pos: Vec2): PerceivedShip | null {
   let best: PerceivedShip | null = null;
   let bestD = HOME_ALARM_RANGE;
   for (const ship of ctx.view.ships) {
     if (!isTargetable(ship)) continue;
-    const d = dist(station.pos, ship.pos);
+    const d = dist(pos, ship.pos);
     if (d < bestD) {
       bestD = d;
       best = ship;

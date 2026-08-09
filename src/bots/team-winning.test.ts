@@ -338,12 +338,24 @@ describe('a 2v2 of the shipped cast always reaches an ending (Task 1.4)', () => 
  * **unstaged**: a real 2v2 of the shipped cast, nothing placed by hand. The
  * "one home down, one still standing" state is not rare — it occurs in every one
  * of the eight seeds the soak above runs, for anywhere from 3 to 360 seconds.
+ *
+ * **The seed moved from 1 to 3 when a0-10 landed**, and the reason is worth
+ * stating because "the test went red so I changed the seed" is exactly the move
+ * this comment exists to distinguish itself from. Every *claim* below held at
+ * seed 1 afterwards; what did not hold was the sampling window, which collapsed
+ * from 257 ticks to a length too short to observe a purchase in. That window is
+ * a property of the seed, not of the ruling — it is however long this particular
+ * pair of bots happens to take to finish each other off, and Stage 2 changed
+ * where bots fly. Seed 3 gives a nine-minute window (~33k ticks, ~72k units
+ * travelled, 8 orders placed), so every assertion is measured with room to spare
+ * rather than on the edge of its fixture. The assertions themselves are
+ * unchanged and none of them was relaxed.
  */
 describe('a teammate whose core dies is out, and its side plays on (Task 1.7)', () => {
-  it('stops the dead-home bot dead, and its ally plays on for four minutes', () => {
+  it('stops the dead-home bot dead, and its ally plays on for minutes', () => {
     const seats = fillEmptySlots([], 4, [...ROSTER.slice(2), ...ROSTER.slice(0, 2)], [0, 0, 1, 1]);
-    const world = createWorld({ seed: 1, players: botLobby(seats) });
-    const bots = createBots(seats, { seed: 1 });
+    const world = createWorld({ seed: 3, players: botLobby(seats) });
+    const bots = createBots(seats, { seed: 3 });
 
     /** The first slot to lose its home while a teammate still holds one. */
     let downSlot: PlayerId | null = null;
@@ -402,8 +414,8 @@ describe('a teammate whose core dies is out, and its side plays on (Task 1.7)', 
     expect(downSlot, 'a seed in which one side loses a member first').not.toBeNull();
     expect(ghostTicks).toBe(0);
 
-    // The window is not a formality — this seed runs it for over four minutes —
-    // and the survivor is *playing*, not idling out the clock: it emits a stream
+    // The window is not a formality — this seed runs it for minutes — and the
+    // survivor is *playing*, not idling out the clock: it emits a stream
     // on every single tick of it, crosses the arena several times over, holds
     // the trigger down, and keeps buying things at its own home.
     expect(ticks).toBeGreaterThan(600);

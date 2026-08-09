@@ -29,6 +29,17 @@ import {
 } from '../sim';
 import type { PerceivedShip } from './perception';
 import {
+  ALLY_RESPONSE_COOLDOWN,
+  ALLY_RESPONSE_MAX,
+  ALLY_RESPONSE_QUIET,
+  ALLY_RESPONSE_RANGE,
+  allyResponseCommit,
+  allyResponseTarget,
+  releaseAllyResponse,
+} from './ally';
+import type { Callout, CalloutKind } from './radio';
+import { receive, send } from './radio';
+import {
   ARRIVE_RADIUS,
   aimAndFire,
   aimAt,
@@ -47,9 +58,9 @@ import {
   topSpeedOf,
   toward,
 } from './steering';
-import { commit, release } from './commitment';
+import { commit, committed, release } from './commitment';
 import { corneredCommit, corneredCommitted, corneredHeld, resetCornered } from './cornered';
-import { homeIntruder, isTargetable, isWounded, retreatThreshold } from './targeting';
+import { homeIntruder, intruderNear, isTargetable, isWounded, retreatThreshold } from './targeting';
 import type { TargetScore } from './targeting';
 import { STUCK_DECISIONS } from './tree';
 import type { BotCtx } from './tree';
@@ -646,9 +657,307 @@ export function haulHome(ctx: BotCtx): readonly Action[] | null {
 export function defendHome(ctx: BotCtx): readonly Action[] | null {
   const station = ctx.self.station;
   if (!station) return null;
+  // Say so, on the way. A siege call is a fact about the sender's own home and
+  // therefore always legal to send (`./radio` §2.2), and it is the one thing a
+  // teammate out of visual range cannot otherwise learn from anything but the
+  // klaxon. Cooldown-gated, so this is not one call per decision.
+  callSiege(ctx);
   const intruder = homeIntruder(ctx);
   if (!intruder) return [go(ctx, orbit(ctx.self, station.pos, GUARD_RADIUS)), fire(false)];
   return engage(ctx, intruder.pos, 16, WEAPON_RANGE * 0.6, intruder.vel, intruder.id);
+}
+
+// ---------------------------------------------------------------------------
+// Defending an ALLY (GDD §2.6, §2.9; `docs/team-bots-plan.md` Stage 2 —
+// the developer, 2026-08-07: "enemies on teams should try to defend their
+// teammates bases when under attack (if they are under threat as well) …
+// same thing for bots on your team")
+// ---------------------------------------------------------------------------
+
+/**
+ * Everything a teammate said that this bot can hear right now (`./radio`).
+ *
+ * Freshness is the receiver's own {@link DifficultyTuning.memorySeconds} clock —
+ * the same clock its own eyes are on — applied to the **hearsay-discounted** age,
+ * so second-hand news expires at twice the rate first-hand news does and a bot
+ * always prefers to go and look. Empty and allocation-free on a quiet tick, and
+ * empty *always* in FFA, where the radio is `null` because a team of one has
+ * nobody to talk to (plan §2.5).
+ */
+export function allyCalls(ctx: BotCtx): readonly Callout[] {
+  return receive(ctx.brain.radio, ctx.self.id, ctx.view.time, ctx.tuning.memorySeconds);
+}
+
+/**
+ * Speak, if this bot's voice is off cooldown. Returns whether it spoke.
+ *
+ * The cooldown is the only thing bounding traffic: a call is **not** an `Action`,
+ * so it does not travel in the action stream and `holdable` (`./harness`) — which
+ * exists to stop exactly this class of bug for wheel presses — is not protecting
+ * it. A tree that called once per *decision* would emit twenty a second at Hard.
+ *
+ * `lastCallAt` advances even when nobody hears, because the cooldown models a
+ * mouth rather than an outcome. And the whole function is a no-op with **no RNG
+ * draw** when the radio is `null`: that is what keeps an FFA match byte-identical
+ * to the one that shipped before the radio existed (plan §2.5, Task 1.6's hash).
+ */
+export function callOut(ctx: BotCtx, kind: CalloutKind, about: PlayerId, pos: Vec2): boolean {
+  const brain = ctx.brain;
+  if (!brain.radio) return false;
+  const now = ctx.view.time;
+  if (brain.lastCallAt >= 0 && now - brain.lastCallAt < ctx.tuning.callCooldown) return false;
+  brain.lastCallAt = now;
+  send(
+    brain.radio,
+    { kind, from: ctx.self.id, about, pos, seenAt: now },
+    ctx.tuning.callLatency,
+    ctx.tuning.callMissChance,
+    ctx.rng,
+  );
+  return true;
+}
+
+/** *"My home is being hit."* Legal from the sender's own `underAttack`, which is
+ *  own-cockpit knowledge (`./radio`'s `siege` row). Silent when the home is not
+ *  actually taking fire, so a bot orbiting its guard ring on a false alarm does
+ *  not summon the side. */
+export function callSiege(ctx: BotCtx): boolean {
+  const station = ctx.self.station;
+  if (!station || !station.alive || !station.underAttack) return false;
+  return callOut(ctx, 'siege', ctx.self.id, station.pos);
+}
+
+/** *"I am in trouble, here."* A fact about the sender's own ship, so it is legal
+ *  under any fog — and it is the one thing Layer A genuinely cannot carry: the
+ *  klaxon rings for a **home**, and a teammate jumped in open space has no
+ *  klaxon. */
+export function callHelp(ctx: BotCtx): boolean {
+  return callOut(ctx, 'help', ctx.self.id, ctx.self.pos);
+}
+
+/**
+ * How far *this character* will break off to answer a teammate, leaned by
+ * `homebody` around the plan's measured {@link ALLY_RESPONSE_RANGE}.
+ *
+ * The dial is the one that already decides how territorial a character is, and
+ * `errandRange` above uses it for the same shape of question ("is the trip
+ * worth it?"), so this is a reuse rather than a new knob — which is what the plan
+ * asks for (§4.5: "`homebody` … *is* the ally-response range multiplier").
+ *
+ * The multiplier is `0.5 + homebody`, so the plan's 1200 is exactly the value at
+ * the **midpoint of the dial** and the cast spreads around it: Bolt (0.1) 720 and
+ * Sable (0.2) 840 barely turn around, Warden (0.55) 1260 and Patch (0.9) 1680
+ * cross the map. The cast mean lands at ~1175, within 2% of the measured
+ * recommendation, so the character spread costs the team nothing on average.
+ * TUNABLE
+ */
+export function allyResponseRange(ctx: BotCtx): number {
+  return ALLY_RESPONSE_RANGE * (0.5 + ctx.weights.homebody);
+}
+
+/** A teammate in trouble, and where. */
+export interface AllyDistress {
+  /** The slot in trouble. */
+  readonly id: PlayerId;
+  /** Where to go: the besieged home, or where the caller said it was. */
+  readonly pos: Vec2;
+  /** How far this bot is from that point, now. */
+  readonly distance: number;
+  /**
+   * True when this came from the **klaxon** — Layer A, live and range-free —
+   * rather than from a call that travelled. A live alarm outranks a call in
+   * {@link nearestAllyDistress}, because it is happening *now* and it is about a
+   * core, which is the win condition (GDD §1).
+   */
+  readonly live: boolean;
+}
+
+/**
+ * Is slot `id` in trouble, as far as this bot can legitimately tell? **At any
+ * range** — deliberately.
+ *
+ * A bot most of the way to a rescue has flown out of the range it started in, so
+ * re-testing distance mid-flight would release the commitment exactly when it is
+ * closest to paying off. Range gates *starting* a run ({@link
+ * nearestAllyDistress}), never continuing one.
+ *
+ * Two legitimate sources, and no third:
+ *
+ *  - **Layer A**, the ally klaxon on the view ({@link AllyView.underAttack}) —
+ *    the same map-wide, scouting-free signal a human teammate already hears
+ *    (`src/art/presenter.ts`). Parity, not telepathy.
+ *  - **Layer B**, a `help` or `siege` call this bot actually heard, still fresh
+ *    on its discounted clock ({@link allyCalls}).
+ *
+ * A call about a slot that is not on this bot's side is ignored rather than
+ * trusted: Stage 2 never sends one, and a branch that would fly at an *enemy's*
+ * distress on the strength of a malformed record is not a branch worth shipping.
+ */
+export function allyDistress(ctx: BotCtx, id: PlayerId): AllyDistress | null {
+  for (const ally of ctx.view.allies) {
+    if (ally.id !== id) continue;
+    if (ally.underAttack && ally.stationAlive && ally.stationPos) {
+      return { id, pos: ally.stationPos, distance: dist(ctx.self.pos, ally.stationPos), live: true };
+    }
+    break;
+  }
+  // The FRESHEST call about this slot, not the first: `receive` returns them in
+  // ascending delivery order, so the last match is the newest thing said. Taking
+  // the first would send a responder to where a moving teammate was six seconds
+  // ago while a newer call sat unread behind it.
+  let latest: Callout | null = null;
+  for (const call of allyCalls(ctx)) {
+    if (call.about !== id || call.about === ctx.self.id) continue;
+    if (!isAlly(ctx, call.about)) continue;
+    latest = call;
+  }
+  if (latest) return { id, pos: latest.pos, distance: dist(ctx.self.pos, latest.pos), live: false };
+  return null;
+}
+
+/** Is this slot on my side? A roster read, not a sighting (`./perception`). */
+function isAlly(ctx: BotCtx, id: PlayerId): boolean {
+  for (const ally of ctx.view.allies) {
+    if (ally.id === id) return true;
+  }
+  return false;
+}
+
+/**
+ * The teammate this bot would break off for — nearest first, inside
+ * {@link allyResponseRange}, klaxon before hearsay.
+ *
+ * The scan is over `view.allies`, which is ascending by id (`./perception`), and
+ * ties are broken by that order, so two equidistant alarms resolve the same way
+ * on every engine (GDD §4.8).
+ */
+export function nearestAllyDistress(ctx: BotCtx): AllyDistress | null {
+  const reach = allyResponseRange(ctx);
+  let best: AllyDistress | null = null;
+  for (const ally of ctx.view.allies) {
+    const distress = allyDistress(ctx, ally.id);
+    if (!distress || distress.distance > reach) continue;
+    if (best === null || betterDistress(distress, best)) best = distress;
+  }
+  return best;
+}
+
+/** A live klaxon beats a call; then nearer beats further. Ties keep the earlier
+ *  (lower-id) candidate, because the scan runs in ascending id order. */
+function betterDistress(candidate: AllyDistress, best: AllyDistress): boolean {
+  if (candidate.live !== best.live) return candidate.live;
+  return candidate.distance < best.distance;
+}
+
+/** Is this bot's *own* doorstep the one that needs it? The identical expression
+ *  the trees' own `defend` test uses, so the two can never disagree about which
+ *  alarm outranks which. */
+export function ownHomeThreatened(ctx: BotCtx): boolean {
+  const station = ctx.self.station;
+  if (!station || !station.alive) return false;
+  return station.underAttack || homeIntruder(ctx) !== null;
+}
+
+/** Arrived at the post, with nothing left to fight — the response's happy ending
+ *  ({@link allyResponseCommit}'s `arrived`). The radius is the defender's guard
+ *  ring with margin, so "there" means close enough to be standing in front of
+ *  the teammate's turrets rather than merely on the same side of the map. */
+function atAllyPost(ctx: BotCtx, at: Vec2): boolean {
+  return dist(ctx.self.pos, at) <= GUARD_RADIUS * 1.5 && intruderNear(ctx, at) === null;
+}
+
+/**
+ * **Does this bot want to answer a teammate's alarm right now?** The trigger, and
+ * the whole selfish-first ladder, in one place (`docs/team-bots-plan.md` Stage 2).
+ *
+ * The plan's trigger, clause by clause: an ally's home reads `underAttack` **or**
+ * a `help`/`siege` call arrives, **and** the bot is within
+ * {@link allyResponseRange} of it, **and** its own home is not itself under
+ * attack, **and** it is not fleeing or cornered.
+ *
+ * That third clause is the developer's parenthesis — *"(if they are under threat
+ * as well)"* — and it is the half that keeps this from becoming a bot that
+ * abandons its economy. **My home outranks yours.** The alarm rings for the team;
+ * the priority ladder stays selfish-first.
+ *
+ * The gates fall into two kinds, and the difference matters:
+ *
+ *  - **Terminal** — FFA (no allies at all, so nothing here can ever fire: the
+ *    structural degradation, not a mode flag), death, and collapse. Collapse
+ *    ends it for the same reason the trees switch their *own* `defend` off there:
+ *    nothing can be repaired, the endgame is a damage race, and a player who
+ *    spends it guarding cannot win it (GDD §2.3, `./hard`).
+ *  - **Transient** — my own home, my own skin, my own hold. These *hold* the
+ *    commitment rather than ending it: the teammate may still be under siege when
+ *    the emergency at this end passes, and {@link ALLY_RESPONSE_MAX} bounds how
+ *    long that hold can last. A full hold blocks only the *start* of a run, so a
+ *    bot never answers a call, dies, and hands half a full hold to the attacker
+ *    (GDD §2.7) — but a run already under way is not abandoned over cargo.
+ *
+ * Folds the commitment exactly once per decision, like every other `wants*` in
+ * this file; the branch body ({@link defendAlly}) only reads what this wrote.
+ */
+export function wantsAllyDefence(ctx: BotCtx): boolean {
+  const brain = ctx.brain;
+  const latch = brain.allyResponse;
+  const now = ctx.view.time;
+
+  if (ctx.view.allies.length === 0) return false;
+  if (!ctx.self.alive || ctx.view.collapsed) {
+    releaseAllyResponse(latch);
+    return false;
+  }
+  if (ownHomeThreatened(ctx) || committed(brain.fleeing) || corneredCommitted(brain.cornered, now)) {
+    return false;
+  }
+
+  const answering = allyResponseTarget(latch);
+  const held = answering >= 0 ? allyDistress(ctx, answering) : null;
+  const candidate = answering >= 0 || wantsToHaul(ctx) ? null : nearestAllyDistress(ctx);
+  const arrived = answering >= 0 && atAllyPost(ctx, latch.at);
+
+  const target = allyResponseCommit(
+    latch,
+    now,
+    candidate ? candidate.id : -1,
+    held !== null,
+    arrived,
+    ALLY_RESPONSE_QUIET,
+    ALLY_RESPONSE_MAX,
+    ALLY_RESPONSE_COOLDOWN,
+  );
+  if (target < 0) return false;
+  // Remember where the trouble is while it is still readable. The alarm blinks
+  // off between an attacker's bursts, so a responder that re-derived this every
+  // decision would lose its destination mid-flight (`./ally`'s `at`).
+  const seen = held ?? candidate;
+  if (seen) {
+    latch.at.x = seen.pos.x;
+    latch.at.y = seen.pos.y;
+  }
+  return true;
+}
+
+/**
+ * Go. Fight what is at the teammate's doorstep, or fly to the doorstep.
+ *
+ * There is no third case: the response *arriving* with nothing to fight is not a
+ * behaviour, it is the end of the commitment, and {@link wantsAllyDefence} has
+ * already turned this branch off by the time that is true. So this never loiters
+ * at a teammate's home — which is the difference between answering an alarm and
+ * becoming a free escort that makes a defended team uncrackable (plan §4, Stage 2
+ * risks).
+ *
+ * The stand-off and the lead are {@link defendHome}'s exactly: a defender is a
+ * defender, and the only thing that changed is whose doorstep it is.
+ */
+export function defendAlly(ctx: BotCtx): readonly Action[] | null {
+  const latch = ctx.brain.allyResponse;
+  if (allyResponseTarget(latch) < 0) return null;
+  const at = latch.at;
+  const intruder = intruderNear(ctx, at);
+  if (intruder) return engage(ctx, intruder.pos, 16, WEAPON_RANGE * 0.6, intruder.vel, intruder.id);
+  return [go(ctx, arrive(ctx.self, at, ARRIVE_RADIUS)), fire(false)];
 }
 
 // ---------------------------------------------------------------------------
@@ -897,6 +1206,12 @@ export function wantsRetreat(ctx: BotCtx): boolean {
  */
 export function retreat(ctx: BotCtx, threat: PerceivedShip | null): readonly Action[] {
   const station = ctx.self.station;
+  // Say it out loud on the way out. This is the `help` call, and it is the one
+  // thing the ally klaxon genuinely cannot carry: the klaxon rings for a *home*,
+  // and a teammate jumped in open space has no klaxon (`./radio`). A call for
+  // help is a fact about yourself, so it is legal under any fog; cooldown-gated,
+  // and silent in FFA, where there is nobody to hear it.
+  callHelp(ctx);
   if (station && station.alive && !threatAtHome(ctx, threat)) {
     return [go(ctx, arrive(ctx.self, station.pos, ARRIVE_RADIUS)), fire(false)];
   }
