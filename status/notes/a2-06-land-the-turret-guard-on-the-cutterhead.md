@@ -128,12 +128,15 @@ in the meantime.
 - [x] tests re-aimed + mutation-proved
 - [x] evidence re-shot on the Cutterhead and measured
 - [x] goldens confirmed, nothing moved, said explicitly
-- [ ] push, rewrite the PR body, state that the hold can come off
+- [x] push, rewrite the PR body, state that the hold can come off
 
-**`main` moves fast.** It advanced twice while I worked (#333, then #338 a0-17).
-Re-check `git merge-base --is-ancestor origin/main HEAD` immediately before
-claiming the DoD — it flipped to FAIL on me once. The second merge (a0-17, sim
-constants) was conflict-free and touches no art.
+**`main` moves fast.** It advanced three times while I worked (#333, #338 a0-17,
+#319 a0-06 — the last a 60-commit branch). Re-check
+`git merge-base --is-ancestor origin/main HEAD` immediately before claiming the
+DoD; it flipped to FAIL on me twice. Both later merges were conflict-free and
+touch nothing in `src/art` or `src/render`, so the golden result stands.
+
+Final DoD on the a0-06 merge: tsc clean, **249 files / 4273 tests / 0 failed**.
 
 ### Known and NOT mine
 

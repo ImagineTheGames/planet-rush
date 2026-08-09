@@ -152,7 +152,7 @@ The four **UPGRADE WHEEL** goldens a2-04 reported as pre-existing failures now
 pass too — they were fixed on `main` in the meantime. Reported then, not adopted
 then, and gone now.
 
-**Unit suite: 247 files, 4242 passed, 0 failed.** `npx tsc --noEmit` clean. Note
+**Unit suite: 249 files, 4273 passed, 0 failed.** `npx tsc --noEmit` clean. Note
 that `tests/net/capacity/capacity-regression.test.ts` — load-flaky on this shared
 box and red during a2-04's run — passed here. It is still the same wall-clock
 test on the same shared box; a green is not a fix.
