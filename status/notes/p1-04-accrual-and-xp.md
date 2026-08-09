@@ -23,6 +23,10 @@ in `docs/briefs/pr-04-accrual-and-xp.md` and in the PR.
 2. `f34f0fb` — **evidence.** `evidence/p1-04-accrual-and-xp.ts` runs the shipped
    bot cast through the shipped observer on `onTick`; `…-accrual-and-xp.txt` is
    the committed output and the PR body's evidence line.
+3. `e5048d1` — the brief's three amendments, and this note.
+4. **PR [#346](https://github.com/ImagineTheGames/planet-rush/pull/346)** opened
+   against `main` — carries the three amendments, the evidence table beside the
+   spike's, and Questions A/B/C as the PR's stated exposure.
 
 ## DECISIONS (and what was rejected)
 
@@ -73,8 +77,13 @@ in `docs/briefs/pr-04-accrual-and-xp.md` and in the PR.
 ## VERIFIED
 
 - `npx tsc --noEmit` clean.
-- `npx vitest run src/progression/` → 66 tests green (accrual 15, xp 12, plus
-  curve and profile untouched).
+- `npm test -- --run` on `e5048d1` — **257 files, 4450 tests, all passing** (556s).
+  The earlier `npx vitest run src/progression/` → 66 green (accrual 15, xp 12,
+  plus curve and profile untouched) was the narrow gate; this is the DoD's.
+- `git merge-base --is-ancestor origin/main HEAD` — yes, on `be3c5dd`.
+- CI on #346: **Typecheck, test, build → pass**; every other job skipped by its
+  own trigger (Pages deploy, the Playwright mobile shards, live-deploy boot,
+  ntfy) — zero in the `fail` bucket, which is what the DoD's last line asks.
 - Evidence reproduces run to run (MIXED median 397.5 XP both times) and lands on
   top of `measured-a0-13.txt`: ore 28.8 vs 28.9, dist 61819 vs 63430, deaths 19.0
   vs 16.5, secs 772 vs 835. Combat reads a little **higher** than the spike, which
