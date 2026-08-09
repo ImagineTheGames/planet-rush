@@ -114,6 +114,24 @@ function startedRoom(mode: MatchMode, teams: readonly number[]): MatchRoom {
       mode,
       teams: [...teams],
       botPersonalities: [...CAST],
+      // **The economy this file was measured at, named out loud (n5-01).**
+      //
+      // The room used to have no abundance to pass, so `createWorld` fell back to
+      // the pre-p11 `standard` baseline and every number in this file — the
+      // golden below, and the Teams half's callout timeline — was measured
+      // against that field. n5-01 gave `lobbyChoice` the level it was always
+      // missing and made a room nobody prices open at the ratified SCARCE
+      // default, so an unpriced control would now build a leaner field with
+      // fewer rocks: a different world, and a different hash, for a reason that
+      // has nothing to do with what this file tests.
+      //
+      // So the control states its own economy instead of inheriting the
+      // product's. That keeps `FFA_GOLDEN` the literal measured on `origin/main`
+      // — the header's "do not re-baseline this" holds character for character —
+      // and it makes both halves immune to a QA retune of the ABUNDANCE table,
+      // which would otherwise redden a test about team channels. The two halves
+      // still differ in the mode and in nothing else.
+      abundance: 'standard',
     }),
   );
   host.receive(encodeClientMessage({ type: 'startMatch' }));

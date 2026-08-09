@@ -53,6 +53,7 @@ import type { Connection, ServerSocket } from '../../server/match-server';
 import { encodeClientMessage, parseClientMessage, parseServerMessage } from '../../src/net/wire';
 import type { WireFrame } from '../../src/net/wire';
 import { TransportSession } from '../../src/net/session';
+import { netBudget } from './budgets';
 import type {
   ClientMessage,
   ConnectionState,
@@ -125,7 +126,10 @@ describe('offline: the lobby YIELD row is the economy the world is built at (n5-
     } finally {
       boot.close();
     }
-  });
+  }, netBudget({
+    work: 'wind the lobby row to SCARCE → boot the offline match → read world.economy',
+    measuredSeconds: 0.01,
+  }));
 
   it('and SCARCE is what an untouched lobby is on — the ratified default', () => {
     // The developer's "by default more scarce" (p11): a host who never touches
@@ -134,7 +138,10 @@ describe('offline: the lobby YIELD row is the economy the world is built at (n5-
       createLobby({ room: 'LOCAL', you: 0, host: 0, shipClass: ShipClass.Vanguard, size: 4, online: false }),
     );
     expect(matchAbundance(config)).toBe('scarce');
-  });
+  }, netBudget({
+    work: 'author one untouched solo lobby and read its MatchConfig',
+    measuredSeconds: 0.01,
+  }));
 
   it('carries every level, so the spread the developer asked for is real', () => {
     for (const level of LEVELS) {
@@ -150,7 +157,10 @@ describe('offline: the lobby YIELD row is the economy the world is built at (n5-
     // difference"* — 67.5 s between the lean and the generous wait, where the
     // shipped build delivered 0.
     expect(RATIFIED_INTERVAL.scarce - RATIFIED_INTERVAL.rich).toBe(67.5);
-  });
+  }, netBudget({
+    work: 'boot three offline matches, one per abundance level, and read each economy',
+    measuredSeconds: 0.02,
+  }));
 
   it('threads the ORE as well as the CLOCK — abundance is three multipliers, not one', () => {
     const scarce = bootSoloAt('scarce');
@@ -167,7 +177,10 @@ describe('offline: the lobby YIELD row is the economy the world is built at (n5-
       scarce.close();
       standard.close();
     }
-  });
+  }, netBudget({
+    work: 'boot a SCARCE and a STANDARD offline match and compare their resolved ore, not just their clocks',
+    measuredSeconds: 0.02,
+  }));
 
   /**
    * The rail this brief must not move (GDD §1, §2.8). A genuinely-180 s SCARCE
@@ -191,7 +204,10 @@ describe('offline: the lobby YIELD row is the economy the world is built at (n5-
       scarce.close();
       standard.close();
     }
-  });
+  }, netBudget({
+    work: 'boot a SCARCE and a STANDARD offline match and compare their collapse deadlines against the 15-minute rail',
+    measuredSeconds: 0.02,
+  }));
 });
 
 // ---------------------------------------------------------------------------
@@ -291,7 +307,10 @@ describe('online: the room builds the promised economy and states it (n5-01)', (
     const world = host.room!.world!;
     expect(world.economy?.abundance).toBe('scarce');
     expect(world.economy?.waveInterval).toBe(RATIFIED_INTERVAL.scarce);
-  });
+  }, netBudget({
+    work: 'stand a three-seat room up through the wire → RUSH! → read the authoritative world.economy',
+    measuredSeconds: 0.02,
+  }));
 
   /**
    * The client must be TOLD, not guess: `matchStart` is its world-constructor
@@ -302,7 +321,10 @@ describe('online: the room builds the promised economy and states it (n5-01)', (
     const start = matchStartOf(socket);
     expect(start.abundance).toBe('scarce');
     expect(predictedWorldFrom(start).economy?.waveInterval).toBe(RATIFIED_INTERVAL.scarce);
-  });
+  }, netBudget({
+    work: 'stand a room up through the wire → RUSH! → parse the matchStart it sent → build a predicting session from it',
+    measuredSeconds: 0.02,
+  }));
 
   /**
    * And they agree — the property the field exists for. A predicted 180 against
@@ -318,7 +340,10 @@ describe('online: the room builds the promised economy and states it (n5-01)', (
       expect(predicted.economy, level).toEqual(authoritative.economy);
       expect(waveIntervalOf(predicted), level).toBe(RATIFIED_INTERVAL[level]);
     }
-  });
+  }, netBudget({
+    work: 'three rooms, one per abundance level, each RUSHed and each rebuilt client-side from its own matchStart',
+    measuredSeconds: 0.05,
+  }));
 
   it('a room nobody priced opens on the ratified SCARCE default, not standard', () => {
     // A pre-n5-01 client sends no abundance at all. The room must land where the
@@ -327,7 +352,10 @@ describe('online: the room builds the promised economy and states it (n5-01)', (
     const { host, socket } = startOnlineRoom(undefined);
     expect(host.room!.world!.economy?.waveInterval).toBe(RATIFIED_INTERVAL.scarce);
     expect(matchStartOf(socket).abundance).toBe('scarce');
-  });
+  }, netBudget({
+    work: 'stand a room up whose lobbyChoice names no level → RUSH! → read the world and the matchStart',
+    measuredSeconds: 0.02,
+  }));
 });
 
 describe('the wire admits three levels and nothing else (n5-01)', () => {
@@ -341,7 +369,10 @@ describe('the wire admits three levels and nothing else (n5-01)', () => {
       const parsed = choice(level);
       expect(parsed?.type === 'lobbyChoice' ? parsed.abundance : null, level).toBe(level);
     }
-  });
+  }, netBudget({
+    work: 'parse three lobbyChoice frames, one per level — no server, no socket',
+    measuredSeconds: 0.01,
+  }));
 
   it('drops an unknown level rather than coercing it — and keeps the hull pick', () => {
     for (const junk of ['SCARCE', 'lavish', 7, null, {}]) {
@@ -350,5 +381,8 @@ describe('the wire admits three levels and nothing else (n5-01)', () => {
       expect(parsed?.type, String(junk)).toBe('lobbyChoice');
       expect(parsed?.type === 'lobbyChoice' ? parsed.abundance : 'set', String(junk)).toBeUndefined();
     }
-  });
+  }, netBudget({
+    work: 'parse five malformed lobbyChoice frames — no server, no socket',
+    measuredSeconds: 0.01,
+  }));
 });
