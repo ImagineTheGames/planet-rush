@@ -1102,7 +1102,13 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
       width: band.width > 0 && rosterWidth > 0 ? SEPARATOR_WIDTH : 0,
       height: band.height,
     };
-    picks = placePicks(shipColumn, metrics);
+    // **Stacked, always, in the two-column shape.** The picks column here is tall
+    // and narrow (40% of the band, the full height of it), so halving its width
+    // costs the ship card the thing this brief gave it: a 470px card lays GDD
+    // §2.11's six stats out as one table-like row, and a 231px one folds them to
+    // 3×2 — which is the phone layout, on a desktop, for no gain. Height is the
+    // axis this column has to spare.
+    picks = placePicks(shipColumn, metrics, false);
   } else {
     // One column: the roster, then the two summary cards under it.
     //
@@ -1111,7 +1117,17 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     // u10-01 that is **one** card's floor rather than two rows of tiles plus an
     // arena row — the whole of the breathing room the developer's report asks for,
     // handed to the list that had none.
-    const picksFloor = Math.min(CLASS_TILE_COMPACT + PICK_LABEL_HEIGHT + BLOCK_GAP, band.height);
+    // The floor is computed for the arrangement the cards will REALLY take, not
+    // for the best case: a band too narrow to halve stacks them, and a stacked pair
+    // needs twice the height. Guessing the row here is how a 320px window ended up
+    // reserving one block's worth of height for two.
+    const row = pickRowFits(band.width, metrics);
+    const blocks = row ? 1 : 2;
+    const label = scaled(PICK_LABEL_HEIGHT, metrics);
+    const picksFloor = Math.min(
+      blocks * (CLASS_TILE_MIN + label) + (blocks - 1) * gap + BLOCK_GAP,
+      band.height,
+    );
     const rosterHeight = Math.max(0, Math.min(rosterWantedHeight(metrics), band.height - picksFloor));
     const picksY = band.y + rosterHeight + (rosterHeight > 0 ? BLOCK_GAP : 0);
     rosterBox = { x: band.x, y: band.y, width: band.width, height: rosterHeight };
@@ -1122,7 +1138,11 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
       height: Math.max(0, band.y + band.height - picksY),
     };
     separator = { x: band.x, y: band.y, width: 0, height: 0 };
-    picks = placePicks(shipColumn, metrics);
+    // **A row where it fits, in the one-column shape.** Here the block is wide and
+    // short — the opposite of the two-column column — so width is what there is to
+    // spend, and every pixel a row saves vertically goes to the roster, which is
+    // the block the developer's report is ultimately about.
+    picks = placePicks(shipColumn, metrics, true);
   }
 
   // The MODE / ABUNDANCE strip is carved off the TOP of the roster box (never a
@@ -1178,6 +1198,22 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
   };
 }
 
+/**
+ * Whether a block of `width` can be halved into two summary cards that still read
+ * — {@link PICK_CARD_MIN_WIDTH} each, which is the width below which a hull card
+ * cannot carry its name over a wrapped blurb.
+ *
+ * It is a named predicate rather than an inline comparison because **two places
+ * have to agree about it**: the one-column branch reserves the picks' height
+ * before they are placed, and that reservation is twice as large for a stacked
+ * pair. The first cut inlined the test in `placePicks` alone, so a 320px window
+ * reserved one block's worth of band and then stacked two blocks into it — 28px
+ * cards, under every floor this file keeps.
+ */
+function pickRowFits(width: number, m: FrameMetrics): boolean {
+  return (width - m.gap) / 2 >= PICK_CARD_MIN_WIDTH;
+}
+
 /** The six rects {@link placePicks} returns, plus the arrangement it settled on. */
 interface PickBlocks {
   readonly shipPick: Rect;
@@ -1203,7 +1239,7 @@ interface PickBlocks {
  * centred** in the column: a card allowed to stretch to a desktop column's full
  * height reads as a banner rather than as the current pick.
  */
-function placePicks(column: Rect, m: FrameMetrics): PickBlocks {
+function placePicks(column: Rect, m: FrameMetrics, preferRow: boolean): PickBlocks {
   if (column.width <= 0 || column.height <= 0) {
     const empty: Rect = { x: column.x, y: column.y, width: 0, height: 0 };
     return {
@@ -1219,7 +1255,7 @@ function placePicks(column: Rect, m: FrameMetrics): PickBlocks {
 
   const gap = m.gap;
   const rowWidth = (column.width - gap) / 2;
-  const pickRow = rowWidth >= PICK_CARD_MIN_WIDTH;
+  const pickRow = preferRow && pickRowFits(column.width, m);
   const blockWidth = pickRow ? rowWidth : column.width;
   // Stacked, the two blocks split the column's height; in a row they each take all
   // of it. Capped either way, so a tall column leaves air rather than banners.

@@ -10,7 +10,9 @@
 
 import { describe, it, expect } from 'vitest';
 import {
+  MAP_CARD_MAX_WIDTH,
   MAP_CARD_MIN_HEIGHT,
+  MAP_CARD_MIN_WIDTH,
   MAP_ORDER,
   MAP_PREVIEW_SEED,
   MAP_PREVIEW_SLOTS,
@@ -168,10 +170,16 @@ describe('layout', () => {
     }
   });
 
-  it('lays the whole registry across in a wide band, and 2 columns when it cannot', () => {
+  it('lays the whole registry across in a wide band, then 3 columns, then 2', () => {
     const wide = mapPickerLayout({ x: 0, y: 0, width: 900, height: 180 });
     expect(wide.shape).toBe('row');
     expect(wide.columns).toBe(MAPS.length);
+
+    // The middle rung, added u10-01 (see below): a landscape-phone band that
+    // cannot hold six across still holds three, and three is what it takes.
+    const middling = mapPickerLayout({ x: 0, y: 0, width: 600, height: 320 });
+    expect(middling.shape).toBe('grid');
+    expect(middling.columns).toBe(3);
 
     const narrow = mapPickerLayout({ x: 0, y: 0, width: 320, height: 320 });
     expect(narrow.shape).toBe('grid');
@@ -188,24 +196,31 @@ describe('layout', () => {
     }
   });
 
-  it('FOR THE UI OWNER: six cards fold to a 3-row grid sooner, and 3 rows is a strip', () => {
-    // Measured, not loosened (a0-12). The band this file used to check the thumb
-    // floor on was 780×150 — a phone-landscape strip. At four maps that was a row
-    // of 195 u cards; at six, `rowWidth` is (780 − 5×GAP)/6 = 121.7, under
-    // MAP_CARD_MIN_WIDTH (132), so it folds to 2×3 and each card is
-    // (150 − 2×GAP)/3 = 43.3 tall — 0.7 under the MAP_CARD_MIN_HEIGHT − 40 floor
-    // the test above defends.
+  it('ANSWERS a0-12’s note to the UI owner: the phone-landscape strip is 3×2, not 2×3', () => {
+    // a0-12 measured this band — 780×150, the phone-landscape strip — and found the
+    // six-map registry folding straight from a row to 2×3 with **43.3px** cards,
+    // 0.7 under the floor the test above defends. It pinned the failure rather than
+    // loosening anything, wrote down the three ways out (*"drop
+    // MAP_CARD_MIN_WIDTH to ~122, give the band more height, or let the grid run 3
+    // columns instead of 2"*), and noted that nothing a player saw was broken
+    // because the SHIPPED arena row was `lobby-geometry` `placeMaps`, with its own
+    // looser 48u floor.
     //
-    // Pinned here rather than papered over, because the fix is a UI call and not
-    // a gameplay one: drop MAP_CARD_MIN_WIDTH to ~122, give the band more height,
-    // or let the grid run 3 columns instead of 2. NOTE this is the standalone
-    // picker geometry — the SHIPPED lobby arena row is `lobby-geometry`
-    // `placeMaps`, which has its own (looser, 48 u) width floor and still lays six
-    // across; nothing a player sees is broken today.
+    // **u10-01 deleted `placeMaps`.** The arena row left the lobby for a screen of
+    // its own and this function became the shipped path, so the note stopped being
+    // a note. The third option is taken — three columns — because it is the only one
+    // that costs nothing: no floor is lowered and no band is enlarged.
     const strip = mapPickerLayout({ x: 16, y: 90, width: 780, height: 150 });
     expect(strip.shape).toBe('grid');
-    expect(strip.columns).toBe(2);
-    expect(strip.cards[0]!.height).toBeCloseTo(43.333, 2);
+    expect(strip.columns).toBe(3);
+    // Three columns SOLVE to 253.3px, which the max-width cap then trims to 240 —
+    // cards do not sprawl, on a desktop or here. 240 × 70 clears MAP_CARD_MIN_WIDTH
+    // and the thumb floor in both dimensions, where the 2-column fold cleared
+    // neither (43.3px tall).
+    expect(strip.cards[0]!.width).toBeCloseTo(MAP_CARD_MAX_WIDTH, 2);
+    expect(strip.cards[0]!.height).toBeCloseTo(70, 2);
+    expect(strip.cards[0]!.width).toBeGreaterThanOrEqual(MAP_CARD_MIN_WIDTH);
+    expect(strip.cards[0]!.height).toBeGreaterThanOrEqual(44);
   });
 
   it('yields no cards, not a backwards rect, on a zero band', () => {

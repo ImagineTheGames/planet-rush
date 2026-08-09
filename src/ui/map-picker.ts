@@ -227,11 +227,11 @@ export interface MapPickerLayout {
 
 /**
  * Lay `count` cards out inside `band`, choosing the arrangement that keeps each
- * card wide enough to read its blurb (m8-02): one row of four where the band is
- * wide enough (desktop, phone-landscape), a 2×2 grid where it is not (a narrow
- * portrait window). Cards are **capped**, never stretched, and the block is
- * centred — so nothing escapes the band by construction, the same discipline
- * every geometry file here keeps.
+ * card wide enough to read its blurb (m8-02): the whole registry in one row where
+ * the band is wide enough (desktop), then **three columns** (a landscape phone),
+ * then two (a narrow portrait window). Cards are **capped**, never stretched, and
+ * the block is centred — so nothing escapes the band by construction, the same
+ * discipline every geometry file here keeps.
  *
  * `isTouch` is a *scale* input, not a layout one: the cards are already large
  * enough to be thumb targets on every device (a card is ≥ {@link MAP_CARD_MIN_HEIGHT}
@@ -244,9 +244,23 @@ export function mapPickerLayout(band: Rect, count = MAPS.length, _isTouch = fals
     return { band, cards: [], columns: 0, shape: 'row' };
   }
 
-  const rowWidth = (band.width - (n - 1) * MAP_CARD_GAP) / n;
-  const shape: MapCardShape = rowWidth >= MAP_CARD_MIN_WIDTH ? 'row' : 'grid';
-  const columns = shape === 'row' ? n : Math.min(2, n);
+  // The widest arrangement whose cards still read: the whole registry across, then
+  // three columns, then two.
+  //
+  // **Three is new (u10-01), and it closes a note this file left for its own
+  // owner.** a0-12 took the registry to six maps, found that a 780×150
+  // phone-landscape strip folded straight from a row to 2×3 with 43px cards, and
+  // wrote down the three ways out — *"drop MAP_CARD_MIN_WIDTH to ~122, give the
+  // band more height, or let the grid run 3 columns instead of 2"* — while noting
+  // that nothing a player saw was broken, because the shipped lobby row had its own
+  // looser geometry. u10-01 deleted that row: this function is the shipped path now,
+  // so the note had to be answered rather than carried. Three columns is the answer
+  // that costs nothing — the same 780px band gives 253px cards, 70px tall, over
+  // both floors, where the fold to two gave 43.
+  const columns = [n, 3, 2].find(
+    (c) => c <= n && (band.width - (c - 1) * MAP_CARD_GAP) / c >= MAP_CARD_MIN_WIDTH,
+  ) ?? Math.min(2, n);
+  const shape: MapCardShape = columns === n ? 'row' : 'grid';
   const rows = Math.ceil(n / columns);
 
   const cardWidth = clamp((band.width - (columns - 1) * MAP_CARD_GAP) / columns, 0, MAP_CARD_MAX_WIDTH);

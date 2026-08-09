@@ -49,9 +49,8 @@
  */
 
 import type { Rect, Viewport } from '@platform/layout-registry';
-import { plateHeight } from '../art/materials';
 import type { FrameMetrics, PlateRole, PlateState } from '../art/materials';
-import { beamContent, gantryFrame } from './gantry';
+import { beamActionPlate, beamContent, gantryFrame } from './gantry';
 import { hitRect } from './menu-geometry';
 import type { Insets } from './menu-geometry';
 import { MAP_ORDER, mapIdAt, mapPickerLayout, mapPickerModel } from './map-picker';
@@ -253,19 +252,17 @@ export function mapSelectLayout(
   const title = beamContent(frame.header, metrics);
 
   const footerStrip = beamContent(frame.footer, metrics, 'footer');
-  const backHeight = Math.max(0, Math.min(plateHeight('compact', metrics), footerStrip.height));
   const backWidth = Math.max(
     0,
     Math.min(Math.round(BACK_WIDTH * metrics.plateScale), footerStrip.width),
   );
-  const back: Rect = {
-    x: footerStrip.x,
-    y: footerStrip.y + (footerStrip.height - backHeight) / 2,
-    width: backWidth,
-    height: backHeight,
-  };
-
-  const band = frame.band;
+  // BACK takes the thumb floor even where the beam cannot hold one, and the band
+  // gives up the overflow — the lobby's own RUSH! arithmetic, shared
+  // (`./gantry` `beamActionPlate`). It is the only way off this screen for a guest,
+  // so it is the last control here that may be allowed to shrink.
+  const action = beamActionPlate(frame, metrics, backWidth);
+  const back = action.rect;
+  const band: Rect = { ...frame.band, height: Math.max(0, frame.band.height - action.overflow) };
   const hintHeight = Math.max(
     0,
     Math.min(Math.round(HINT_HEIGHT * metrics.plateScale), band.height / 4),

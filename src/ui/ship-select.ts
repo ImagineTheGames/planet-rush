@@ -45,9 +45,8 @@
 
 import type { Rect, Viewport } from '@platform/layout-registry';
 import type { ShipClass } from '@shared/types';
-import { plateHeight } from '../art/materials';
 import type { FrameMetrics, PlateRole, PlateState } from '../art/materials';
-import { beamContent, gantryFrame } from './gantry';
+import { beamActionPlate, beamContent, gantryFrame } from './gantry';
 import { hitRect } from './menu-geometry';
 import type { Insets } from './menu-geometry';
 import { CLASS_ORDER, CLASS_OPTIONS } from './lobby';
@@ -294,19 +293,19 @@ export function shipSelectLayout(
   const title = beamContent(frame.header, metrics);
 
   const footerStrip = beamContent(frame.footer, metrics, 'footer');
-  const backHeight = Math.max(0, Math.min(plateHeight('compact', metrics), footerStrip.height));
   const backWidth = Math.max(
     0,
     Math.min(Math.round(BACK_WIDTH * metrics.plateScale), footerStrip.width),
   );
-  const back: Rect = {
-    x: footerStrip.x,
-    y: footerStrip.y + (footerStrip.height - backHeight) / 2,
-    width: backWidth,
-    height: backHeight,
-  };
-
-  const band = frame.band;
+  // BACK takes the THUMB FLOOR even where the beam cannot hold one — the same
+  // arithmetic the lobby does for RUSH! (`./lobby-geometry`), and for the same
+  // reason: a 390-wide phone in portrait resolves a 28px footer beam, and BACK is
+  // the one control on this screen a player has to be able to press. It grows
+  // UPWARD out of the beam and the band gives up exactly those pixels, which is air
+  // between the band and the beam by construction.
+  const action = beamActionPlate(frame, metrics, backWidth);
+  const back = action.rect;
+  const band: Rect = { ...frame.band, height: Math.max(0, frame.band.height - action.overflow) };
   // The hint gives way before the tiles do: it explains the grid, and a grid you
   // cannot read needs no explanation. Dropped whole rather than clipped.
   const hintHeight = Math.max(0, Math.min(Math.round(HINT_HEIGHT * metrics.plateScale), band.height / 4));
