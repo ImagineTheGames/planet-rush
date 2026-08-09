@@ -3,6 +3,21 @@
 Branch: `agent/gameplay/p1-02-attribution-hook` · Brief: `docs/briefs/pr-02-attribution-hook.md`
 Contract: `docs/progression-plan.md` §1.1, §1.5 (the plan wins where the two disagree).
 
+## SHIPPED — PR #343, merged 2026-08-09 09:57Z
+
+**This brief is done and in `main`. Do not rebuild it.** Verified in `origin/main`, not
+just assumed from the merge: `src/sim/combat-credit.ts` and its test are tracked there,
+`ASSIST_WINDOW_S` is in `constants.ts`, and `by?: PlayerId` is on `damageShip` /
+`killShip` / `damageStation` / `damageTurret` / `damageSatellite` / `destroyCore` /
+`eliminate`. No review comments on the PR.
+
+The branch was later fast-forwarded to `origin/main` (`fa55346`) so the DoD's
+`git merge-base --is-ancestor origin/main HEAD` line keeps passing as main moves — the
+branch had gone stale behind p1-03's merge. Nothing was re-edited to make it pass.
+
+Re-verified on the merged tree: `npx tsc --noEmit` clean, `npm test -- --run` →
+**255 files / 4414 tests, all green**.
+
 ## BUILT
 
 `6e4b0e6` — sim(p1-02): `by: PlayerId` on the damage path + the write-only credit ledger
@@ -66,7 +81,9 @@ p1-02 determinism evidence — credit ledger PRESENT: 14ab34ee · ABSENT: 14ab34
 
 ## NEXT
 
-Nothing outstanding on this brief. Open items that belong to other lanes:
+Nothing outstanding on this brief — it is merged. If a future session lands here, the
+only live work is keeping the branch an ancestor-descendant of `main` (fast-forward, never
+a force-push) should the DoD be re-run later. Open items that belong to other lanes:
 
 - **Question C** (a station the Crush killed — who gets the 10×?) changes only what pr-05
   *shows*. This lane's answer is unchanged: record the truth, credit nobody.
