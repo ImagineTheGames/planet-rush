@@ -72,7 +72,10 @@ both keys (the brief's evidence line).
 
 ## NEXT
 
-- Nothing outstanding for this brief. DoD gates run clean; PR open.
+- Nothing outstanding. **PR #342 open, all four DoD gates PASS**, CI fully green
+  (Typecheck/test/build + all 6 mobile Playwright shards). Suite re-taken on the
+  merge actually proposed (main moved to #341 mid-session): 254 files / 4402
+  tests / 0 failures. Awaiting review + merge.
 - For whoever takes **pr-06**: backup rotation (see the clobber above) wants the
   `remove(key)` that brief adds.
 - For whoever takes **pr-04** (accrual, the single write site): `saveProfile`
