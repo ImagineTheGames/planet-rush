@@ -1237,3 +1237,130 @@ then running `git checkout -- tests/live-stage/` over the rest — `git add` the
 ones you are keeping, then restore the directory, and the staged four survive.
 That is a cleaner shape than restoring 38 paths by name and it is the same one
 line either way.
+
+### Session 2026-08-09 (third) — a merge nobody wrote down, and a false alarm about a door
+
+Inherited the branch **fully pushed** (`git log origin/<branch>..HEAD` empty —
+checked FIRST, before believing anything else; sessions 5 and 7 each lost an hour
+to skipping it), no merge in progress, PR **#319** OPEN and MERGEABLE at
+`a535046`, and `origin/main` (`fdf460e`) **already an ancestor**. 43 dirty paths;
+**read `git status` before restoring** (session 9's rule — the fortieth line has
+been a real change before), confirmed all 43 were `tests/live-stage/*-evidence.png`
+and nothing else, restored with `git checkout -- tests/live-stage/` (never `git
+clean`). **No feature work was outstanding and none was invented.** Both copies of
+the note were already in sync at 1239 lines.
+
+**The thing to know: `a535046` is a merge of `origin/main` that NO note entry
+describes.** The previous entry ends at the a0-15 merge; a session after it merged
+`fdf460e` (a0-07b sky parallax, PR #336; a0-00c cap-the-test-pool, PR #337),
+pushed it, and recorded nothing. Nothing was wrong with it — this is not session
+5/7's unpushed-merge trap, and not session 11's resolved-but-unstaged trap. It was
+simply undocumented, so it gets verified here rather than assumed.
+
+**Verified rather than trusted:** the merge touches **no file in `src/bots/`,
+`src/ui/`, `src/platform/` or `src/main.ts`** — 49 files, and they are a0-07b's
+evidence board, `src/art/backdrop.ts`, a0-00c's `harness/pool-size.ts` +
+`playwright.config.ts` + mobile goldens. `tsc --noEmit` clean on it.
+
+**a0-00c edited the root `playwright.config.ts`, which is where this brief's
+PROPOSED `PREVIEW_PORT` lives (`7701b62`) — it survived intact**, and a0-00c even
+kept the rationale comment above it, adding `browserWorkerCap()` on the `workers:`
+line below. Both configs still read `Number(process.env.PREVIEW_PORT ?? 4173)`.
+
+**This is the twelfth merge in a row to leave the cast seam untouched.**
+
+#### The false alarm, written down because the note caused it
+
+I grepped `kind: 'solo'` in `src/ui/lobby-entry.ts` — the check session 2's entry
+prescribes before a live-stage run — and **got nothing**, which for a minute looked
+like a0-15's door rebuild had finally broken the spec's front-door walk. It had
+not. The note's claim that *"`kind: 'solo'` exists at `lobby-entry.ts:158`"* is
+imprecise: line 158 is `door: 'solo'`, a field of `DOOR_OPTIONS`. The **`kind`**
+comes from `main.ts:6350`, `DOOR_OPTIONS.map((option, i) => control(option.door,
+…))`, which maps the door id onto the control kind.
+
+So the rule session 2 wrote is still right — **select front-door controls by kind,
+never by label; a label is copy and copy is somebody else's to change** — but the
+*grep that verifies it* is `grep -n "control(option.door" src/main.ts`, not a
+search for a literal `kind: 'solo'` that does not exist anywhere in the tree.
+Corrected here so the next session does not lose the same minute.
+
+#### DoD on the inherited tree
+
+- `npx tsc --noEmit` — clean.
+- `npm test -- --run` — **4162 passed, 0 failed**, 245 files, 531 s. A **complete**
+  run, verified session 13's way rather than assumed: `src/ui/lobby.test.ts`
+  reported its **100 tests** (session 13's hang stays fixed), `lobby-geometry` 126,
+  `lobby-flow` 60, `cast-seam` 8, `match-boot` 16. **`capacity-regression` passed**
+  (62.7 s) at load ~4 — consistent with every session since 2: a wall-clock
+  benchmark over code this branch does not touch. Do not chase it.
+  Redirected to a file, never piped (trap #2).
+- `PREVIEW_PORT=4194 npm run test:live-stage -- lobby-cast.spec.ts` — **3 passed**
+  (2.0 m): cast round trip, `?` by click on PC, `?` by tap at 390 px landscape.
+- GDD.md differs from `origin/main`; `merge-base --is-ancestor` OK at `fdf460e`.
+  Markers verified by grep, not assumed — §2.1 line 56 carries a0-11's *"an `open`
+  slot is EMPTY"* and a0-06's *"the host picks each bot's CHARACTER"* side by side,
+  §2.1 lines 62/64 the full amendment, §2.9 line 235 *"characters, not difficulty
+  labels"*.
+
+**The proof, re-measured not re-asserted:** the run regenerated
+`lobby-cast-readback.txt` **byte-identical** — slot 0 `null` (the human), slots
+1–7 `warden warden sable vulture warden sable vulture` in the lobby and the *same
+seven* in the match, `identical: true`. It is absent from `eb40d5b`'s diff and
+**that absence IS the result.** That file is the evidence; the PNGs picture it.
+Worth stating plainly, since it is the twelfth time: a0-07b changed how the *sky*
+moves and a0-00c changed how many *workers* the runners get, and the cast seam did
+not notice. That is what "this brief changes who you choose, not how a bot plays"
+is supposed to mean.
+
+`eb40d5b` re-shot the four frames and was **pushed immediately after committing**.
+This was not just badge churn: a0-07b rewrote `src/art/backdrop.ts` (116 lines —
+the sky drifts with the far stars, not with the ship), so the match frame is
+genuinely of a different bundle. The lobby frame is the developer's case in one
+picture: seven rows reading `Warden 1 / Warden 2 / Sable 1 / Vulture 1 / Warden 3
+/ Sable 2 / Vulture 2`, the hull under each name, a read-only `HARD` chip, a `?`.
+The codex frame is the better picture of the *principle* — the dossier open
+(`Vulture — the wreck scavenger`) over a **mixed-tier** cast (`EASY` / `HARD` /
+`MEDIUM` / `MEDIUM` / `HARD` / `HARD` / `HARD` down the column), so the chip is
+visibly derived from whoever is in the seat and cannot disagree with it. The match
+frame catches **no** rival nameplate this run (it lands at MATCH 0:01); `f517ef7`
+caught one and `2f3acf4` did not. **It is luck either way** — do not treat either
+outcome as a regression.
+
+#### A cheaper way to watch a live-stage run, since the note keeps its own errata
+
+The scoped run (`-- lobby-cast.spec.ts`) again dirtied **only my four PNGs**, so
+there was nothing to restore afterwards — session 12's advice holds and is worth
+repeating: **run the full sweep when you need the baseline, run your own spec when
+you need your frames.**
+
+One correction to how I watched it. I used `ss -ltn | grep ':4194'` as a
+"still building / preview up" indicator and it read *building* for the entire run,
+including while Chromium was already driving the spec. The probe was wrong, not
+the run. `ps -eo pid,etime,pcpu,args | grep -E "vite|playwright|headless_shell"`
+showed the truth in one call — preview server up, three Chromium processes
+burning CPU. **Same lesson as trap #2 in a new costume: when a cheap indicator
+disagrees with reality, check the processes or the log, and do not let a bad
+probe convince you a healthy run is stuck.**
+
+## NEXT (restated at the end so it is the last word, not buried mid-file)
+
+- **ONLINE still carries the tier, not the name** — unchanged, and still the only
+  known gap. `LobbyChoiceMessage` has `botDifficulties` and no character row, so an
+  online room seats the right *tiers* and may seat different *names* within them.
+  Offline — the flavour both developer reports were filed against — is exact.
+  Closing it is a **Netcode** seam (`transport.ts` → `wire.ts` → `session.ts` →
+  `server/room.ts` `castFor`), four files across two other agents' ownership and
+  outside this brief. Stated in the PR body and in `docs/design-amendments.md`.
+- `PREVIEW_PORT` remains marked *(a0-06, proposed)* in two configs —
+  `tests/live-stage/playwright.config.ts` (`a1bc039`, Platform's) and the root
+  `playwright.config.ts` (`7701b62`, QA's). Either owner can drop their own; both
+  default to 4173 unchanged. **a0-00c edited the root config around it and left it
+  intact**, which is a small vote of confidence in the shape.
+- **Keep BOTH copies of this note in step** — `/status/notes/…` (the shared 9p
+  mount the harness briefs you from) and `status/notes/…` (the repo copy the DoD
+  sees). They drifted three sessions apart once; `diff -q` them before you finish.
+- **No feature work outstanding. Do not invent any.** If you inherit this branch
+  green, the useful things to do are: check `git log origin/<branch>..HEAD` first,
+  read `git status` before restoring it, merge main if it has moved (**merge before
+  you measure**), and re-run the gates — **redirected to a file, never piped**.
