@@ -1,6 +1,14 @@
 /**
  * src/art/backdrop.ts — the void, v3: the darker space. OWNER: Art Agent.
  *
+ * **a0-07b — how the sky MOVES.** One number changed since the ratification
+ * below, and nothing about what the sky *is*: the distant skies drift at
+ * {@link SKY_PARALLAX} `0.085` instead of `0.05`, so they travel with the far
+ * star-field instead of falling half a screen-width behind it and reading as
+ * stuck to the glass. The reasoning, the measurements and the rejected
+ * alternatives are on that constant. Ground, bloom rule, bloom intensity, the
+ * six skies and {@link MAP_NEBULA} are untouched.
+ *
  * v2 (a2-06) gave the void a body — a layered parallax star-field over a single
  * patina/steel wash. **a0-07 replaces the ground under it and turns the wash
  * into map identity.** Both halves are ratifications off the developer's
@@ -173,6 +181,71 @@ export const STAR_LAYERS: readonly StarLayerSpec[] = [
 ];
 
 /**
+ * **How fast a distant sky drifts** — the whole of a0-07b, in one number.
+ *
+ * The developer, from live play: *"the parallax effect is kind of broken, those
+ * bloom as moving with the ship on the front layer, they are supposed to be
+ * attached to stars…"*. Nothing was screen-locked in code; the sky sat at
+ * **0.05**, half the parallax of the farthest star layer (`deep`, 0.10), and at
+ * that rate a discrete clot reads as a foreground overlay riding the ship.
+ *
+ * The reason half-speed reads as *attached to the camera* rather than as *twice
+ * as far away* is grouping, not speed. The eye has no absolute ruler for how
+ * fast a backdrop should move — it only has the other things in the frame. A
+ * layer that visibly falls behind the star-field it is drawn among is not read
+ * as "further than the stars"; it is read as **not part of the stars**, and the
+ * only other thing in a cockpit view that a layer can be part of is the glass.
+ * The developer's own words name the fix exactly: *attached to stars*.
+ *
+ * So the sky is moved to sit **just behind the far star layer** — near enough to
+ * travel with it, still strictly slower, so the depth order stated in
+ * {@link NebulaSpec.parallax} survives:
+ *
+ * ```
+ *   layer          parallax   px/s at top speed   per screen-width flown (844 u)
+ *   sky (was)        0.05           13                 42
+ *   sky (now)        0.085          22                 72
+ *   stars, deep      0.10           26                 84
+ *   stars, mid       0.26           68                219
+ *   stars, near      0.50          130                422
+ *   the world        1.00          260                844
+ * ```
+ *
+ * (Top speed is a stock Vanguard's 260 u/s; the camera is 1:1, so world units
+ * per second are screen px per second.) The number that changed the *read* is
+ * the last column against the deep stars': the sky used to fall **42 px behind
+ * the far field for every screen-width flown — half of it**; it now falls 12 px
+ * behind, so it travels with the stars and separates from them slowly, which is
+ * what a nebula among those stars does. Over a whole arena crossing the far
+ * field still slides past it by a real, measurable amount — 36 px on a square
+ * board (2400 u), 47 px on the wide one (3200 u) — so the sky is still the
+ * furthest thing in the frame, not a tie.
+ *
+ * **Why not further, why not nearer.**
+ *  - **Nearer than 0.10** inverts the depth order: the sky would out-run the
+ *    stars it is behind. 0.10 exactly is no better — it makes the sky and the
+ *    far stars one plane, and the ordering above becomes a coincidence rather
+ *    than an invariant a test can hold.
+ *  - **Back toward 0.05** is the reported bug.
+ *  - So the honest statement of the trade is that under the depth-order
+ *    constraint the sky's drift is *bounded by the far star layer's*, and 0.085
+ *    is 85% of that bound. There is no value that both drifts faster than the
+ *    stars and stays behind them; if the void is ever wanted faster wholesale,
+ *    the lever is {@link STAR_LAYERS} itself, not this.
+ *
+ * It costs one thing, and it is a build cost rather than a frame cost: a faster
+ * layer must cover more ground, so {@link coverSpan} grows the field by ~22% of
+ * its area on a wide arena, and per-screen authoring turns that into ~22% more
+ * elements to bake **once**, at {@link VoidBackdrop.configure}. Per-frame fill —
+ * {@link NebulaSpec.overdraw}, the number the mobile GPU actually pays — is
+ * defined per screenful and does not move at all.
+ *
+ * Coalsack is deliberately not on this constant: it is dust *in front* of the
+ * deep layer (0.14) and already out-runs the stars it eats, which is its look.
+ */
+export const SKY_PARALLAX = 0.085;
+
+/**
  * **Bloom — seeded scatter, subtle** (the developer's pick, a0-07).
  *
  * The compositor showed two rules: bloom by *brightness threshold* (the top N%
@@ -223,7 +296,9 @@ export interface NebulaSpec {
   /** One line: what it does to the frame. */
   readonly blurb: string;
   /** Parallax factor — every sky sits further than the farthest stars, except
-   *  the one that is *in front* of them (Coalsack), which sits nearer. */
+   *  the one that is *in front* of them (Coalsack), which sits nearer. The
+   *  distant skies all take {@link SKY_PARALLAX}; see it for why the value is
+   *  where it is (a0-07b). */
   readonly parallax: number;
   /**
    * True for a sky drawn **over** the star layers, so stars go missing behind
@@ -434,7 +509,7 @@ const NONE: NebulaSpec = {
   id: 'none',
   name: 'None',
   blurb: 'Floor and the star-field. Nothing else — and it costs nothing else.',
-  parallax: 0.05,
+  parallax: SKY_PARALLAX,
   occludes: false,
   additive: false,
   overdraw: 0,
@@ -458,7 +533,9 @@ const COALSACK: NebulaSpec = {
   name: 'Coalsack',
   blurb: 'A dust lane in front of the field — stars go missing behind it.',
   // Nearer than the deep star layer it eats, so it reads as foreground dust
-  // rather than as a hole punched in the far sky.
+  // rather than as a hole punched in the far sky. The one sky NOT on
+  // SKY_PARALLAX: it already out-runs the stars it takes out of the frame,
+  // which is the whole read, so a0-07b left it where it was.
   parallax: 0.14,
   occludes: true,
   additive: false,
@@ -515,7 +592,7 @@ const IRON_VEIL: NebulaSpec = {
   id: 'ironVeil',
   name: 'Iron Veil',
   blurb: 'Fourteen flat sheets in one band — iron with rust through it.',
-  parallax: 0.05,
+  parallax: SKY_PARALLAX,
   occludes: false,
   additive: false,
   overdraw: 0.208,
@@ -573,7 +650,7 @@ const PATINA_DRIFT: NebulaSpec = {
   id: 'patinaDrift',
   name: 'Patina Drift',
   blurb: 'Twenty-two teal wisps on one drift — the corroded void, v2’s wash grown up.',
-  parallax: 0.05,
+  parallax: SKY_PARALLAX,
   occludes: false,
   additive: false,
   overdraw: 0.863,
@@ -625,7 +702,7 @@ const PLASMA_REEF: NebulaSpec = {
   id: 'plasmaReef',
   name: 'Plasma Reef',
   blurb: 'Clotted cyan, additive — the brightest sky and the only one that costs real fill.',
-  parallax: 0.05,
+  parallax: SKY_PARALLAX,
   occludes: false,
   additive: true,
   overdraw: 1.121,
@@ -691,7 +768,7 @@ const DEEP_EMBER: NebulaSpec = {
   id: 'deepEmber',
   name: 'Deep Ember',
   blurb: 'Five dying coals at the rim — the warmth you notice only at the edges.',
-  parallax: 0.05,
+  parallax: SKY_PARALLAX,
   occludes: false,
   additive: false,
   overdraw: 0.746,
@@ -708,9 +785,9 @@ const DEEP_EMBER: NebulaSpec = {
     const screens = (width * height) / (screenW * screenH);
     const bodies = scaled(5 * screens, density);
     // Scattered over the field, with a **hole punched through the middle** — the
-    // sky sits at parallax 0.05, so the field's centre is very nearly the screen's
-    // centre, which is where the fight is. Rejecting that disc is what makes the
-    // warmth something you catch at the edge of the eye instead of something you
+    // sky sits at SKY_PARALLAX, so the field's centre stays within ~±0.085·arena
+    // of the screen's centre, which is where the fight is. Rejecting that disc is
+    // what makes the warmth something you catch at the edge of the eye rather than something you
     // are staring through. (Rejection-sampled rather than placed on a rim ring:
     // the field is ~2.2 screens across, so a ring on the FIELD's rim would sit
     // entirely outside the visible window and the sky would be invisible.)
@@ -1021,11 +1098,20 @@ interface Layer {
   readonly parallax: number;
 }
 
-/** The area a field must span to cover the screen at any camera offset, given a
- *  parallax factor `f`, the viewport size and the arena bound on that axis.
- *  Derivation in the module header: the field, positioned at `f·cameraOffset`,
- *  must overlap `[0, view]` for `cameraOffset ∈ [center − bound, center]`. */
-function coverSpan(f: number, view: number, bound: number): number {
+/**
+ * The area a field must span to cover the screen at any camera offset, given a
+ * parallax factor `f`, the viewport size and the arena bound on that axis. The
+ * field, positioned at `f·cameraOffset`, must overlap `[0, view]` for every
+ * `cameraOffset ∈ [center − bound, center]`; the two extremes ask for
+ * `view·(1 + f)` and `view·(1 − f) + 2·bound·f`, and this returns more than
+ * both, plus a quarter-view of slack.
+ *
+ * Exported because it is the *reason* a faster sky costs anything at all: raise
+ * `f` and the field grows, so `backdrop.test.ts` can hold both halves of that
+ * trade — the field genuinely covers the screen at {@link SKY_PARALLAX}, and
+ * what it costs to do so is the ~22% of build-time geometry a0-07b declares.
+ */
+export function coverSpan(f: number, view: number, bound: number): number {
   return (2 - f) * view + 2 * f * bound + view * 0.25; // + a quarter-view of slack
 }
 
