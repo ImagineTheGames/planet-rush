@@ -15,6 +15,10 @@
  *    cast (`src/bots`), each bringing its character's hull — and since a0-06 the
  *    cast is **the one the lobby picked** ({@link MatchBootConfig.cast}), not a
  *    round-robin of the roster that ignored it.
+ *  - The lobby's **sides**, onto both halves that need them: the roster the world
+ *    is built from, and the **seat table the bot layer opens its team radios
+ *    from** ({@link MatchBootConfig.teams}). Only the first was wired until b2-01,
+ *    which left allied bots able to defend each other and unable to *call*.
  *  - A `LocalLoopback` holding the authoritative sim in this process — no
  *    server, no internet, and the same protocol the online match speaks.
  *  - One pulse per fixed tick: the bots file first, then the local client, whose
@@ -59,8 +63,20 @@ export interface MatchBootConfig {
    * targetable, their shots stop landing, and their homes spawn adjacent — all from
    * this table and nothing else.
    *
+   * **It goes to the SEAT table as well as the roster** *(b2-01, 2026-08-09)*. This
+   * table used to be stamped onto the roster only, which is the half the *world*
+   * reads; the bot layer's seats were filled with no sides at all. `createBots`
+   * groups seats by `BotSeat.team` to open one radio per side (`src/bots/harness`),
+   * so every side was a side of one, `teamRadio` returned `null` for each, and the
+   * team radio's whole Layer B — `help` and `siege` — was sent into a no-op. It was
+   * invisible because Layer A (the ally klaxon and the `defend-ally` branch) reads
+   * allies off the *world*, which this table did reach. `radio-seam.test.ts` is the
+   * standing guard, and it asserts on a callout **arriving**: `send` on a `null`
+   * radio returns quietly, so any test of the sender passes on the broken build.
+   *
    * A seat the table does not name keeps its default (its own side), so a short or
-   * absent table can never crash a boot, only leave a seat in FFA.
+   * absent table can never crash a boot, only leave a seat in FFA — where a side of
+   * one gets no radio by the same rule, and no mode flag is consulted anywhere.
    */
   readonly teams?: readonly number[];
   /**
@@ -114,10 +130,12 @@ export function bootOfflineMatch(config: MatchBootConfig): MatchBoot {
   const slots = config.slots ?? MATCH_SLOTS;
   const dt = config.dt ?? TICK_DT;
 
-  // The lobby's cast reaches the seats here — the one line the whole a0-06 report
-  // turned on. `ROSTER` is passed explicitly because it is now the *fallback* for
-  // a slot the cast does not name, not the thing that decides the match.
-  const seats = fillEmptySlots([config.localPlayer], slots, ROSTER, undefined, config.cast);
+  // The lobby's cast AND the lobby's sides reach the seats here. `ROSTER` is
+  // passed explicitly because it is now the *fallback* for a slot the cast does
+  // not name, not the thing that decides the match; `config.teams` is the fourth
+  // argument because a seat without a `team` is a side of one, and a side of one
+  // gets no radio — which is b2-01's whole bug (see the `teams` field above).
+  const seats = fillEmptySlots([config.localPlayer], slots, ROSTER, config.teams, config.cast);
   const bots = createBots(seats, { seed: config.seed });
   const roster: PlayerSpec[] = [
     { id: config.localPlayer, shipClass: config.shipClass },
