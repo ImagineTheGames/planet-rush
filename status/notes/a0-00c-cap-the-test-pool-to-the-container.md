@@ -21,7 +21,22 @@ Branch: `agent/qa/a0-00c-cap-test-pool`. Working note, not evidence.
 - `tests/perf/playwright.perf.config.ts` — `workers: 1` unconditionally. Not the
   container cap: a frame-time instrument must never run beside a second copy of
   itself, on any box.
-- `tests/reports/test-pool-a0-00c.md` — the before/after numbers.
+- Merged `origin/main` into the branch (the DoD's ancestor check was failing:
+  the branch was cut before a0-16 landed). Clean merge, no conflicts.
+
+- `harness/pool-contention-bench.sh` — the measurement rig (2026-08-09). Supplies
+  the competing load itself (one spin loop per worker the other two lanes would
+  spawn) so a before/after pair is taken against the same box, not against two
+  different afternoons. See DECISIONS for why the opportunistic measurement had
+  to be thrown away.
+
+## NOT BUILT YET
+
+- `tests/reports/test-pool-a0-00c.md` — the before/after numbers. A session
+  before last listed it under BUILT; it was never written. Controlled runs are
+  executing now (2026-08-09).
+- Nothing pushed yet. `origin/agent/qa/a0-00c-cap-test-pool` does not exist;
+  `5eb4163` + the merge `86af420` are local only. Push + PR outstanding.
 
 ## DECISIONS
 
@@ -46,6 +61,27 @@ Branch: `agent/qa/a0-00c-cap-test-pool`. Working note, not evidence.
   left at the host-sized default keeps the pool the max just shrank.
 - **`VITEST_MAX_WORKERS` override.** Not a convenience — it is how the before and
   after numbers were taken on one commit, with the same specs, on the same box.
+- **The opportunistic before/after was discarded, and the rig replaced it.** Two
+  real runs on 2026-08-09: capped (2 workers) 574 s at load 17, uncapped (6
+  workers) 214 s at load 8. That reads backwards from the truth, because the two
+  other lanes went quiet between them — it measures the afternoon, not the
+  change. `harness/pool-contention-bench.sh` supplies the competing load itself
+  (12 spinners = 2 lanes × 6 uncapped workers; 4 = 2 lanes × 2 capped) and runs
+  the pair interleaved, twice, so drift shows up in both arms instead of in one.
+- **Spinners, not three real suite runs.** Three vitest runs in one working tree
+  collide over test artifacts, and the red that produces would be an artifact of
+  the measurement. CPU demand is the thing an oversized pool takes from its
+  neighbours, and CPU demand is what the rig reproduces — without writing into
+  another lane's tree.
+- **The brief's diagnosis is right about the bug and off by one detail about the
+  mechanism.** vitest 2.1.8 sizes from `os.availableParallelism()` (falling back
+  to `os.cpus().length`), and libuv *does* read the cgroup quota: on this box
+  `availableParallelism()` = 6 while `os.cpus().length` = 8. So vitest was not
+  reading the host's 16 — it was reading the quota correctly and still being
+  wrong, because 6 is the *container's* budget and three lanes each claimed all
+  of it. The division by `LANES` is what does the work here, not the cgroup read;
+  the cgroup read is what keeps the laptop fallback honest. Playwright is the one
+  that reads `os.cpus().length` straight (`/2`), so it saw 8 → 4 workers.
 - Rejected: hardcoding `2`. Rejected: `os.cpus().length / 3` — same lie, divided.
   Rejected: touching the CI shard config (a0-00b); different axis, machines not
   workers, and CI runners have no quota so this changes nothing there.
