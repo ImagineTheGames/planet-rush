@@ -1,0 +1,50 @@
+{
+  // Typecheck gate for the match server's container build (server/Dockerfile).
+  // OWNER: Netcode Engineer — added by Platform in a1-03, see the note below.
+  //
+  // The build stage used to run a bare `npx tsc --noEmit`, i.e. the ROOT config,
+  // whose `include` is `["src", "server", "tests", "harness", "vite.config.ts"]`.
+  // The image COPYs `src/`, `content/`, `server/` and `allocator/` — so `tests/`
+  // and `harness/` simply are not there, and a missing `include` entry is not an
+  // error to tsc: the program silently narrowed to src/ + server/. That was fine
+  // until a `src/**/*.test.ts` grew an `import … from '../../harness/hash'`, at
+  // which point the image was compiling a test whose imports the image cannot
+  // resolve, and `docker build` failed on an error about a file the server never
+  // runs (LESSONS §12; a1-03 — `docs/briefs` and the PR body carry the full log).
+  //
+  // That failure was INVISIBLE: `Deploy server (Fly.io)` deploys the allocator
+  // first, the allocator image had the identical defect, and the workflow died
+  // there — so the gameserver's own build had not been executed since
+  // 2026-08-07 and would have gone red the moment the allocator's was fixed.
+  //
+  // This config states the program explicitly instead of relying on which of the
+  // root config's `include` entries happen to exist inside the image:
+  //
+  //   npx tsc --noEmit -p server/tsconfig.json
+  //
+  //   - `../src`      — @shared types, src/net/* protocol and ticket code;
+  //   - `../server`   — the thing being built;
+  //   - `../allocator`— a BUILD-TIME dependency (server/upgrade-router.ts reuses
+  //                     the allocator's FlyReplayRouter; see the COPY comment in
+  //                     server/Dockerfile and tests/server/docker-context.test.ts).
+  //
+  // Tests are excluded because the server does not run one, and because the
+  // harness/soak/bench tooling they import has no business in a runtime image.
+  // Nothing stops being checked: the repo-wide `npx tsc --noEmit` in CI still
+  // compiles every test against the whole tree, where `harness/` exists.
+  //
+  // If you widen `include` here, widen the Dockerfile's COPY set to match.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    // baseUrl relative to this file (the repo root) so the aliases resolve the
+    // same way they do from the root config.
+    "baseUrl": "..",
+    "paths": {
+      "@shared/*": ["src/shared/*"],
+      "@platform/*": ["src/platform/*"],
+      "@render/*": ["src/render/*"]
+    }
+  },
+  "include": ["../src", "../server", "../allocator"],
+  "exclude": ["../src/**/*.test.ts", "../server/**/*.test.ts", "../allocator/**/*.test.ts"]
+}
