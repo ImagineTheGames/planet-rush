@@ -33,6 +33,20 @@ reduced-motion run, which never watched a frame of animation, banked **the ident
 355 / level 2 / 1 match**. Skipping the beat cannot skip the write, because the write
 happens before there is anything to skip.
 
+## The other half of rule 1, on the real client
+
+`skip-consumes-the-first-tap.mjs` — *"the first input skips and does not also press a
+button, or a double-tapping player rematches by accident"* lives in the wiring, not in a
+pure model, so it is checked through a **real tap on the real REMATCH plate** with
+`matchId()` (how many worlds this boot has built) as the witness:
+
+```
+before      { matchId: 1, done: false, buttons: [rematch, menu] }
+after tap 1 { matchId: 1, screen: 'result', done: true }   ← skipped, did NOT rematch
+after tap 2 { matchId: 2, screen: 'none' }                 ← the second tap acted
+PASS
+```
+
 ## The skip assertion, named
 
 `src/ui/summary-sequence.test.ts` →
