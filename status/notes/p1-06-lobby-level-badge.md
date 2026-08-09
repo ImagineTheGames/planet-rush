@@ -83,15 +83,43 @@ it is recorded under DECISIONS 1 below and fixed in the brief.
 
 ## NEXT
 
-- [x] `npx tsc --noEmit`
-- [x] `npm test -- --run` — 260 files / 4542 tests green (before the goldens
-      commit; re-run before the PR since `goldens.spec.ts` gained two tests that
-      the two vitest *contract* files scan).
-- [x] goldens differ from `origin/main`
+**Nothing. PR #348 is MERGED — `479ca3a` on `main`, 2026-08-09.** The brief is
+delivered; the branch is fast-forwarded to the merge commit and pushed.
+
+- [x] `npx tsc --noEmit` — clean, re-run on the merged tip.
+- [x] `npm test -- --run` — **260 files / 4542 tests green**, re-run on the tip
+      after the goldens commit (the earlier run predated it).
 - [x] `git merge-base --is-ancestor origin/main HEAD`
-- [ ] push, open the PR, and say in it: the plan/brief disagreement above, the
-      copy choice (`LVL`), and the golden-tolerance finding.
-- [ ] PR checks green.
+- [x] PR checks green — 0 fail, 0 pending; the 6 Playwright shards and both
+      "Typecheck, test, build" runs all passed.
+- [x] PR opened and merged, carrying all three things it had to say: the
+      plan/brief disagreement, the `LVL` copy choice, the golden-tolerance
+      finding.
+
+### The one gate that no longer passes, and why it is not a defect
+
+`git diff --name-only origin/main -- tests/mobile/goldens.spec.ts-snapshots
+| grep -q .` now returns **empty → FAIL**, and it will never pass again. It asks
+"do this branch's goldens differ from main's?" — and since #348 merged, main's
+goldens *are* this branch's goldens, so the diff is empty by construction. It
+failed at the pre-merge tip `53cf1af` too, for the same reason; the fast-forward
+did not cause it.
+
+The substance the gate was written to check is satisfied and now verifiable in
+main's own history: `git diff --stat 6a644e4 479ca3a` shows **7 snapshot files**
+— the five lobby baselines re-generated, plus the two new region goldens
+(`desktop-lobby-level-badge`, `phone-landscape-lobby-level-badge`). Sibling gate
+5 anticipates exactly this state with its `[ "$S" = MERGED ]` short-circuit;
+gate 3 has no such clause. **A future session: do not "fix" this by touching a
+baseline to manufacture a diff** — that would corrupt a merged golden to satisfy
+a check whose premise has expired.
+
+### Housekeeping this session did
+
+`/status/notes/` (the absolute path the role names) still held the empty
+template — the previous session wrote its notes only to the repo copy at
+`status/notes/`. Synced. **Both paths exist and are not the same file**; write
+the repo copy, then copy it across.
 
 **Not in scope, deliberately:** no reset button (§Q4 — `remove` exists for
 migration and nothing calls it yet); no unlock content (§4 — the plan designs
