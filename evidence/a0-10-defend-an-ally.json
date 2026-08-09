@@ -1,0 +1,765 @@
+{
+  "what": "a0-10 — a bot answers its ally's alarm, and stays home when its own is ringing",
+  "plan": "docs/team-bots-plan.md Stage 2 (Tasks 2.1–2.7)",
+  "fixture": {
+    "seed": 20260809,
+    "lineup": "TEAMS 2v2 — warden + patch vs sable + foreman",
+    "observer": "slot 0 (Warden), starting 1150 units from its teammate's home",
+    "allyResponseRange": "ALLY_RESPONSE_RANGE 1200 × (0.5 + homebody 0.55) = 1260",
+    "note": "both runs are the same seed, cast, board and tick; the ONLY difference is whether slot 0's own home is also taking fire"
+  },
+  "frame1_theAnswer": {
+    "reading": "the ally home is burning, my home is quiet — I go",
+    "closestApproachToAllyHome": 190,
+    "startedAtFromAllyHome": 1150,
+    "behaviourTickShare": {
+      "attack": "25.5%",
+      "defend-ally": "19.9%",
+      "haul": "19.7%",
+      "mine": "18.0%",
+      "defend": "16.9%"
+    },
+    "calloutsOnTheChannel": 13,
+    "trace": [
+      {
+        "t": 1,
+        "behavior": "defend-ally",
+        "answering": 1,
+        "toAllyHome": 1050,
+        "toOwnHome": 350,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 2,
+        "behavior": "defend-ally",
+        "answering": 1,
+        "toAllyHome": 922,
+        "toOwnHome": 478,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 3,
+        "behavior": "defend-ally",
+        "answering": 1,
+        "toAllyHome": 794,
+        "toOwnHome": 607,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 4,
+        "behavior": "defend-ally",
+        "answering": 1,
+        "toAllyHome": 667,
+        "toOwnHome": 734,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 5,
+        "behavior": "defend-ally",
+        "answering": 1,
+        "toAllyHome": 539,
+        "toOwnHome": 862,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 6,
+        "behavior": "defend-ally",
+        "answering": 1,
+        "toAllyHome": 416,
+        "toOwnHome": 984,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 7,
+        "behavior": "defend-ally",
+        "answering": 1,
+        "toAllyHome": 303,
+        "toOwnHome": 1105,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 8,
+        "behavior": "defend-ally",
+        "answering": 1,
+        "toAllyHome": 198,
+        "toOwnHome": 1226,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 9,
+        "behavior": "mine",
+        "answering": -1,
+        "toAllyHome": 231,
+        "toOwnHome": 1220,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 10,
+        "behavior": "mine",
+        "answering": -1,
+        "toAllyHome": 318,
+        "toOwnHome": 1168,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 11,
+        "behavior": "mine",
+        "answering": -1,
+        "toAllyHome": 369,
+        "toOwnHome": 1193,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 12,
+        "behavior": "mine",
+        "answering": -1,
+        "toAllyHome": 383,
+        "toOwnHome": 1264,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 13,
+        "behavior": "haul",
+        "answering": -1,
+        "toAllyHome": 377,
+        "toOwnHome": 1266,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 14,
+        "behavior": "haul",
+        "answering": -1,
+        "toAllyHome": 425,
+        "toOwnHome": 1138,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 15,
+        "behavior": "haul",
+        "answering": -1,
+        "toAllyHome": 502,
+        "toOwnHome": 1008,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 16,
+        "behavior": "haul",
+        "answering": -1,
+        "toAllyHome": 597,
+        "toOwnHome": 880,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 17,
+        "behavior": "haul",
+        "answering": -1,
+        "toAllyHome": 703,
+        "toOwnHome": 751,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 18,
+        "behavior": "haul",
+        "answering": -1,
+        "toAllyHome": 816,
+        "toOwnHome": 623,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 19,
+        "behavior": "haul",
+        "answering": -1,
+        "toAllyHome": 932,
+        "toOwnHome": 494,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 20,
+        "behavior": "haul",
+        "answering": -1,
+        "toAllyHome": 1051,
+        "toOwnHome": 366,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 21,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1173,
+        "toOwnHome": 266,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 22,
+        "behavior": "mine",
+        "answering": -1,
+        "toAllyHome": 1259,
+        "toOwnHome": 234,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 23,
+        "behavior": "mine",
+        "answering": -1,
+        "toAllyHome": 1371,
+        "toOwnHome": 239,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 24,
+        "behavior": "mine",
+        "answering": -1,
+        "toAllyHome": 1486,
+        "toOwnHome": 276,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 25,
+        "behavior": "attack",
+        "answering": -1,
+        "toAllyHome": 1583,
+        "toOwnHome": 392,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 26,
+        "behavior": "attack",
+        "answering": -1,
+        "toAllyHome": 1657,
+        "toOwnHome": 455,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 27,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1545,
+        "toOwnHome": 374,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 28,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1384,
+        "toOwnHome": 303,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 29,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1410,
+        "toOwnHome": 263,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 30,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1502,
+        "toOwnHome": 301,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 31,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1578,
+        "toOwnHome": 360,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 32,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1582,
+        "toOwnHome": 445,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 33,
+        "behavior": "attack",
+        "answering": -1,
+        "toAllyHome": 1678,
+        "toOwnHome": 537,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 34,
+        "behavior": "attack",
+        "answering": -1,
+        "toAllyHome": 1802,
+        "toOwnHome": 647,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 35,
+        "behavior": "attack",
+        "answering": -1,
+        "toAllyHome": 1926,
+        "toOwnHome": 764,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 36,
+        "behavior": "attack",
+        "answering": -1,
+        "toAllyHome": 2049,
+        "toOwnHome": 886,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 37,
+        "behavior": "attack",
+        "answering": -1,
+        "toAllyHome": 2172,
+        "toOwnHome": 1009,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 38,
+        "behavior": "attack",
+        "answering": -1,
+        "toAllyHome": 2296,
+        "toOwnHome": 1135,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 39,
+        "behavior": "attack",
+        "answering": -1,
+        "toAllyHome": 2419,
+        "toOwnHome": 1261,
+        "allyAlarm": true,
+        "ownAlarm": false
+      },
+      {
+        "t": 40,
+        "behavior": "attack",
+        "answering": -1,
+        "toAllyHome": 2543,
+        "toOwnHome": 1387,
+        "allyAlarm": true,
+        "ownAlarm": false
+      }
+    ]
+  },
+  "frame2_theLadder": {
+    "reading": "the same alarm, and my own home is burning too — I stay",
+    "closestApproachToAllyHome": 1150,
+    "startedAtFromAllyHome": 1150,
+    "behaviourTickShare": {
+      "defend": "94.3%",
+      "cornered-fight": "5.1%",
+      "retreat": "0.5%",
+      "mine": "0.1%"
+    },
+    "calloutsOnTheChannel": 16,
+    "trace": [
+      {
+        "t": 1,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1225,
+        "toOwnHome": 180,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 2,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1278,
+        "toOwnHome": 151,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 3,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1328,
+        "toOwnHome": 142,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 4,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1385,
+        "toOwnHome": 139,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 5,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1441,
+        "toOwnHome": 138,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 6,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1490,
+        "toOwnHome": 138,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 7,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1524,
+        "toOwnHome": 138,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 8,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1538,
+        "toOwnHome": 138,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 9,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1529,
+        "toOwnHome": 138,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 10,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1501,
+        "toOwnHome": 138,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 11,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1455,
+        "toOwnHome": 138,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 12,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1399,
+        "toOwnHome": 138,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 13,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1343,
+        "toOwnHome": 138,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 14,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1295,
+        "toOwnHome": 138,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 15,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1267,
+        "toOwnHome": 138,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 16,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1264,
+        "toOwnHome": 138,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 17,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1287,
+        "toOwnHome": 138,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 18,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1331,
+        "toOwnHome": 138,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 19,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1386,
+        "toOwnHome": 138,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 20,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1446,
+        "toOwnHome": 109,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 21,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1527,
+        "toOwnHome": 129,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 22,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1520,
+        "toOwnHome": 149,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 23,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1473,
+        "toOwnHome": 141,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 24,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1419,
+        "toOwnHome": 139,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 25,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1361,
+        "toOwnHome": 138,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 26,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1310,
+        "toOwnHome": 138,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 27,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1326,
+        "toOwnHome": 139,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 28,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1416,
+        "toOwnHome": 178,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 29,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1414,
+        "toOwnHome": 85,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 30,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1512,
+        "toOwnHome": 164,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 31,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1510,
+        "toOwnHome": 228,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 32,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1514,
+        "toOwnHome": 313,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 33,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1501,
+        "toOwnHome": 297,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 34,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1577,
+        "toOwnHome": 376,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 35,
+        "behavior": "cornered-fight",
+        "answering": -1,
+        "toAllyHome": 1554,
+        "toOwnHome": 405,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 36,
+        "behavior": "cornered-fight",
+        "answering": -1,
+        "toAllyHome": 1482,
+        "toOwnHome": 398,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 37,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1396,
+        "toOwnHome": 299,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 38,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1340,
+        "toOwnHome": 194,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 39,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1301,
+        "toOwnHome": 155,
+        "allyAlarm": true,
+        "ownAlarm": true
+      },
+      {
+        "t": 40,
+        "behavior": "defend",
+        "answering": -1,
+        "toAllyHome": 1272,
+        "toOwnHome": 143,
+        "allyAlarm": true,
+        "ownAlarm": true
+      }
+    ]
+  },
+  "verdict": {
+    "answeredClosed": "960 units closed toward the teammate's home",
+    "heldClosed": "0 units closed",
+    "ladderIntact": true
+  }
+}
