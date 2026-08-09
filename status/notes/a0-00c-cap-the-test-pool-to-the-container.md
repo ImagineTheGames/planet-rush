@@ -88,11 +88,17 @@ without that call.
   change. `harness/pool-contention-bench.sh` supplies the competing load itself
   (12 spinners = 2 lanes × 6 uncapped workers; 4 = 2 lanes × 2 capped) and runs
   the pair interleaved, twice, so drift shows up in both arms instead of in one.
-- **Spinners, not three real suite runs.** Three vitest runs in one working tree
-  collide over test artifacts, and the red that produces would be an artifact of
-  the measurement. CPU demand is the thing an oversized pool takes from its
-  neighbours, and CPU demand is what the rig reproduces — without writing into
-  another lane's tree.
+- **Spinners, then real lanes — and the spinner rig was wrong.** The first rig
+  avoided three real suite runs because they collide over test artifacts. Both of
+  its premises failed. Fair share is equal *by construction* — 6/(6+12) and
+  2/(2+4) are each a third of six cores — so the comparison was flat before a
+  test ran; and spinners never block, so a 2-worker lane cannot reclaim its share
+  during I/O while a 6-worker lane can, which is why the capped arm looked
+  catastrophic (970 s, 1075 s vs 604 s, 436 s). Real neighbours block constantly.
+  `pool-lane-aggregate.sh` does run three real suites, giving each a disjoint
+  `--shard` third: no two runs touch the same spec, so the collision worry goes
+  away, and total CPU work is pinned at one suite in both arms. **Judge the cap on
+  the aggregate rig, not the spinner one.**
 - **The brief's diagnosis is right about the bug and off by one detail about the
   mechanism.** vitest 2.1.8 sizes from `os.availableParallelism()` (falling back
   to `os.cpus().length`), and libuv *does* read the cgroup quota: on this box
@@ -105,9 +111,13 @@ without that call.
 - Rejected: hardcoding `2`. Rejected: `os.cpus().length / 3` — same lie, divided.
   Rejected: touching the CI shard config (a0-00b); different axis, machines not
   workers, and CI runners have no quota so this changes nothing there.
-- Left alone: `tests/live-stage/*` (Platform Engineer's) and
-  `tests/live-stage-online/*` (Gameplay Engineer's) — same uncapped default, not
-  my files. Flagged in the report.
+- Left alone, and **not** as this line first claimed. `tests/live-stage-online/`
+  and three of the `tests/live-stage/` configs already set `workers: 1`. The three
+  that do not are `tests/live-stage/playwright.config.ts`,
+  `tests/live-stage/playwright.live-stage.config.ts` and
+  `tests/live/playwright.live.config.ts` — all Platform Engineer's, all
+  lane-runnable via `npm run test:live-stage`. Checked file by file rather than
+  assumed; flagged in the report and the PR, not edited.
 
 ## SHIPPED
 
