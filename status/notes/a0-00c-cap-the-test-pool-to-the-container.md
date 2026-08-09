@@ -109,6 +109,15 @@ without that call.
   `tests/live-stage-online/*` (Gameplay Engineer's) — same uncapped default, not
   my files. Flagged in the report.
 
+## SHIPPED
+
+- Pushed to `origin/agent/qa/a0-00c-cap-test-pool`; **PR #337** open against
+  `main`, mergeable. `origin/main` merged in twice (a0-16, then a0-15) — merged,
+  never rebased, never force-pushed.
+- DoD all four green on the pushed tree: `tsc --noEmit` clean; `npm test --run`
+  rc=0, 244 files / 4136 tests / 775 s with both other lanes live;
+  `vitest.config.ts` present on the remote branch; `origin/main` an ancestor.
+
 ## NEXT
 
 - `vitest.config.ts` is not in `tsconfig.json`'s `include` (which lists
