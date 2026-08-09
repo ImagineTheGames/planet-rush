@@ -34,6 +34,7 @@ import type { WireFrame } from '../../src/net/wire';
 import { INTENT_HOLD_TICKS } from '../../server/room';
 import { MatchServer } from '../../server/match-server';
 import type { Connection, ServerSocket } from '../../server/match-server';
+import { seatBots } from './seat-bots';
 
 class FakeSocket implements ServerSocket {
   readonly frames: WireFrame[] = [];
@@ -83,6 +84,7 @@ describe('a human seat with nothing filed for a tick', () => {
     const code = server.createCode();
     connection = server.connect(new FakeSocket());
     connection.receive(encodeClientMessage({ type: 'join', room: code }));
+    connection.receive(seatBots());
     connection.receive(encodeClientMessage({ type: 'startMatch' }));
     tick(2);
     // A ship at rest in open space — parked at the arena centre, clear of its own
@@ -168,6 +170,7 @@ describe('a retransmit burst', () => {
     const code = server.createCode();
     connection = server.connect(new FakeSocket());
     connection.receive(encodeClientMessage({ type: 'join', room: code }));
+    connection.receive(seatBots());
     connection.receive(encodeClientMessage({ type: 'startMatch' }));
     // A second of match, so the burst below can name ticks that are genuinely in
     // this match's past rather than negative (the codec refuses those outright).

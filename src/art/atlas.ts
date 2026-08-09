@@ -134,11 +134,19 @@ export function oreChunkTexture(cache: SpriteTextureCache, chunkId: number, size
   return cache.getBy(`ore:${seed}:${size}`, () => oreChunkSprite(seed), size);
 }
 
-/** The home world — or its wreck, once the core is gone (GDD §2.7). */
+/**
+ * The home facility — or its derelict, once the core is gone (GDD §2.7).
+ *
+ * The live rig is keyed by **owner**, not just by variant: the roster colour
+ * reaches the lug keyways and the apron blocks (style-guide §3 — trim, never the
+ * steel), so two owners on the same arrangement are two textures. That is at most
+ * eight of them in a match, built once each, which is what the cache is for. A
+ * derelict has no owner, so it stays keyed by variant alone.
+ */
 export function stationTexture(cache: SpriteTextureCache, station: StationLike, size: number): Texture {
   const variant = stationVariantFor(station.owner);
   return station.alive
-    ? cache.getBy(`station:${variant}:${size}`, () => stationSprite(variant), size)
+    ? cache.getBy(`station:${variant}:${station.owner}:${size}`, () => stationSprite(variant, station.owner), size)
     : cache.getBy(`wreck:${variant}:${size}`, () => stationWreckSprite(variant), size);
 }
 
@@ -148,10 +156,10 @@ export function beaconTexture(cache: SpriteTextureCache, owner: number, size: nu
 }
 
 /**
- * The scouted damage ring. **Call this only when the viewer is inside sensor
- * range** — enemy station HP is earned by scouting, never broadcast (GDD §2.2).
- * The atlas cannot enforce that; it just refuses to make it convenient to draw
- * a ring nobody asked for.
+ * The damage ring. Draw it for every station you draw: station health reads true
+ * at any range (GDD §2.2, amended 2026-08-07 — the previous "call this only
+ * inside sensor range" rule was withdrawn, and out of range the always-visible
+ * beacon ring made a wounded home look untouched).
  */
 export function damageRingTexture(cache: SpriteTextureCache, station: StationLike, size: number): Texture {
   const fraction = station.maxCoreHp > 0 ? station.coreHp / station.maxCoreHp : 0;

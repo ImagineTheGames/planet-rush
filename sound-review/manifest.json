@@ -12,19 +12,19 @@
         {
           "id": "a",
           "wav": "previews/rockChip/a.wav",
-          "character": "blunt dry tick, low",
+          "character": "abrasive cutting head, dry grit",
           "params": "src/art/audio/candidates.ts#rockChip.a"
         },
         {
           "id": "b",
           "wav": "previews/rockChip/b.wav",
-          "character": "deep slow grinding rasp",
+          "character": "blunt pressure bite, sub weight",
           "params": "src/art/audio/candidates.ts#rockChip.b"
         },
         {
           "id": "c",
           "wav": "previews/rockChip/c.wav",
-          "character": "heavy low crack, punchy",
+          "character": "induction tick, short metal ring",
           "params": "src/art/audio/candidates.ts#rockChip.c"
         }
       ]
@@ -38,19 +38,19 @@
         {
           "id": "a",
           "wav": "previews/hullHit/a.wav",
-          "character": "sharp metallic clang-ping",
+          "character": "coil bite on plate, hard and dry",
           "params": "src/art/audio/candidates.ts#hullHit.a"
         },
         {
           "id": "b",
           "wav": "previews/hullHit/b.wav",
-          "character": "meaty crunching impact",
+          "character": "mass driver round, weight behind it",
           "params": "src/art/audio/candidates.ts#hullHit.b"
         },
         {
           "id": "c",
           "wav": "previews/hullHit/c.wav",
-          "character": "bright zippy sweep-hit",
+          "character": "particle shear, thin and ionised",
           "params": "src/art/audio/candidates.ts#hullHit.c"
         }
       ]
@@ -64,19 +64,19 @@
         {
           "id": "a",
           "wav": "previews/rockCrack/a.wav",
-          "character": "single sharp snap",
+          "character": "fracture step, splintering grains",
           "params": "src/art/audio/candidates.ts#rockCrack.a"
         },
         {
           "id": "b",
           "wav": "previews/rockCrack/b.wav",
-          "character": "deep structural pop",
+          "character": "deep stone shear, pressure released",
           "params": "src/art/audio/candidates.ts#rockCrack.b"
         },
         {
           "id": "c",
           "wav": "previews/rockCrack/c.wav",
-          "character": "brittle jittery shatter",
+          "character": "crystalline shear, ringing shards",
           "params": "src/art/audio/candidates.ts#rockCrack.c"
         }
       ]
@@ -90,19 +90,19 @@
         {
           "id": "a",
           "wav": "previews/rockBurst/a.wav",
-          "character": "big crumble, bright glint",
+          "character": "shell fracture, debris rattle, ore lifting out",
           "params": "src/art/audio/candidates.ts#rockBurst.a"
         },
         {
           "id": "b",
           "wav": "previews/rockBurst/b.wav",
-          "character": "sharp crack, bell chime",
+          "character": "pressure burst, dust settling, ore on the wave",
           "params": "src/art/audio/candidates.ts#rockBurst.b"
         },
         {
           "id": "c",
           "wav": "previews/rockBurst/c.wav",
-          "character": "deep rumble, shimmer trail",
+          "character": "shattered plate, shards ringing out",
           "params": "src/art/audio/candidates.ts#rockBurst.c"
         }
       ]
@@ -116,19 +116,19 @@
         {
           "id": "a",
           "wav": "previews/oreCollect/a.wav",
-          "character": "quick bright blip",
+          "character": "magnetic capture, one hard snap",
           "params": "src/art/audio/candidates.ts#oreCollect.a"
         },
         {
           "id": "b",
           "wav": "previews/oreCollect/b.wav",
-          "character": "twinkly rounder ping",
+          "character": "servo intake, filter opening",
           "params": "src/art/audio/candidates.ts#oreCollect.b"
         },
         {
           "id": "c",
           "wav": "previews/oreCollect/c.wav",
-          "character": "sparkly cha-ching flick",
+          "character": "telemetry blip, two narrow bands",
           "params": "src/art/audio/candidates.ts#oreCollect.c"
         }
       ]
@@ -142,19 +142,19 @@
         {
           "id": "a",
           "wav": "previews/holdFull/a.wav",
-          "character": "urgent descending two-tone",
+          "character": "two clamps closing, rising",
           "params": "src/art/audio/candidates.ts#holdFull.a"
         },
         {
           "id": "b",
           "wav": "previews/holdFull/b.wav",
-          "character": "buzzy nagging alarm",
+          "character": "twin pressure horns, insistent",
           "params": "src/art/audio/candidates.ts#holdFull.b"
         },
         {
           "id": "c",
           "wav": "previews/holdFull/c.wav",
-          "character": "sharp saw double-ping",
+          "character": "thin band swept up, twice, no strike",
           "params": "src/art/audio/candidates.ts#holdFull.c"
         }
       ]
@@ -168,19 +168,19 @@
         {
           "id": "a",
           "wav": "previews/turretFire/a.wav",
-          "character": "sharp bright arcade zap",
+          "character": "coil discharge, corner snapping open",
           "params": "src/art/audio/candidates.ts#turretFire.a"
         },
         {
           "id": "b",
           "wav": "previews/turretFire/b.wav",
-          "character": "meaty punchy cannon thud",
+          "character": "gas-driven slug, breech and air",
           "params": "src/art/audio/candidates.ts#turretFire.b"
         },
         {
           "id": "c",
           "wav": "previews/turretFire/c.wav",
-          "character": "airy breathy pulse",
+          "character": "particle lance, thin band and hiss",
           "params": "src/art/audio/candidates.ts#turretFire.c"
         }
       ]
@@ -194,19 +194,19 @@
         {
           "id": "a",
           "wav": "previews/shotImpact/a.wav",
-          "character": "sharp tight crack",
+          "character": "hard contact tick, no body",
           "params": "src/art/audio/candidates.ts#shotImpact.a"
         },
         {
           "id": "b",
           "wav": "previews/shotImpact/b.wav",
-          "character": "meaty low thump",
+          "character": "dull thump into structure",
           "params": "src/art/audio/candidates.ts#shotImpact.b"
         },
         {
           "id": "c",
           "wav": "previews/shotImpact/c.wav",
-          "character": "airy muffled puff",
+          "character": "spray of grit off the hull",
           "params": "src/art/audio/candidates.ts#shotImpact.c"
         }
       ]
@@ -220,19 +220,19 @@
         {
           "id": "a",
           "wav": "previews/shieldHit/a.wav",
-          "character": "crystal chime shimmer",
+          "character": "field skin ringing, tight",
           "params": "src/art/audio/candidates.ts#shieldHit.a"
         },
         {
           "id": "b",
           "wav": "previews/shieldHit/b.wav",
-          "character": "rubbery elastic bounce",
+          "character": "absorbed pressure, elastic give",
           "params": "src/art/audio/candidates.ts#shieldHit.b"
         },
         {
           "id": "c",
           "wav": "previews/shieldHit/c.wav",
-          "character": "synthetic energy-field buzz",
+          "character": "static discharge across the bubble",
           "params": "src/art/audio/candidates.ts#shieldHit.c"
         }
       ]
@@ -246,19 +246,19 @@
         {
           "id": "a",
           "wav": "previews/shieldDown/a.wav",
-          "character": "descending power-down wail",
+          "character": "field collapsing, resonance closing",
           "params": "src/art/audio/candidates.ts#shieldDown.a"
         },
         {
           "id": "b",
           "wav": "previews/shieldDown/b.wav",
-          "character": "bubble-burst pop and splash",
+          "character": "pressure loss, air dumping out",
           "params": "src/art/audio/candidates.ts#shieldDown.b"
         },
         {
           "id": "c",
           "wav": "previews/shieldDown/c.wav",
-          "character": "electrical fizzle-out crackle",
+          "character": "ionised skin tearing, room behind it",
           "params": "src/art/audio/candidates.ts#shieldDown.c"
         }
       ]
@@ -272,19 +272,19 @@
         {
           "id": "a",
           "wav": "previews/coreHit/a.wav",
-          "character": "deep sub thud with grit",
+          "character": "reactor slug, deep and closing",
           "params": "src/art/audio/candidates.ts#coreHit.a"
         },
         {
           "id": "b",
           "wav": "previews/coreHit/b.wav",
-          "character": "low metallic groan and creak",
+          "character": "structural groan under the hit",
           "params": "src/art/audio/candidates.ts#coreHit.b"
         },
         {
           "id": "c",
           "wav": "previews/coreHit/c.wav",
-          "character": "muffled distant boom",
+          "character": "distant concussion, room answering",
           "params": "src/art/audio/candidates.ts#coreHit.c"
         }
       ]
@@ -298,19 +298,19 @@
         {
           "id": "a",
           "wav": "previews/turretDown/a.wav",
-          "character": "sparking short-circuit collapse",
+          "character": "mount shearing, metal letting go",
           "params": "src/art/audio/candidates.ts#turretDown.a"
         },
         {
           "id": "b",
           "wav": "previews/turretDown/b.wav",
-          "character": "heavy metal collapse thud",
+          "character": "collapse onto the deck, weight down",
           "params": "src/art/audio/candidates.ts#turretDown.b"
         },
         {
           "id": "c",
           "wav": "previews/turretDown/c.wav",
-          "character": "brittle glassy shatter-clang",
+          "character": "power cell venting, then quiet",
           "params": "src/art/audio/candidates.ts#turretDown.c"
         }
       ]
@@ -318,25 +318,25 @@
     {
       "id": "shipExplode",
       "label": "Ship Explosion",
-      "context": "A ship blows up — firework: bang then sparkle, quickly over.",
+      "context": "A ship blows up — a pressure failure, over quickly. No sparkle (§4.7).",
       "current": "previews/shipExplode/current.wav",
       "candidates": [
         {
           "id": "a",
           "wav": "previews/shipExplode/a.wav",
-          "character": "deep boom with shimmer trail",
+          "character": "hull rupture, debris scattering",
           "params": "src/art/audio/candidates.ts#shipExplode.a"
         },
         {
           "id": "b",
           "wav": "previews/shipExplode/b.wav",
-          "character": "chaotic popcorn crackle burst",
+          "character": "pressure blast, air dumping out",
           "params": "src/art/audio/candidates.ts#shipExplode.b"
         },
         {
           "id": "c",
           "wav": "previews/shipExplode/c.wav",
-          "character": "cartoon whistle then bang",
+          "character": "containment breach, shear and room",
           "params": "src/art/audio/candidates.ts#shipExplode.c"
         }
       ]
@@ -350,19 +350,19 @@
         {
           "id": "a",
           "wav": "previews/shipSpawn/a.wav",
-          "character": "smooth rise, soft landing thud",
+          "character": "drive spooling into a contact",
           "params": "src/art/audio/candidates.ts#shipSpawn.a"
         },
         {
           "id": "b",
           "wav": "previews/shipSpawn/b.wav",
-          "character": "sci-fi sweep, bell settle",
+          "character": "mass arriving, pressure seating",
           "params": "src/art/audio/candidates.ts#shipSpawn.b"
         },
         {
           "id": "c",
           "wav": "previews/shipSpawn/c.wav",
-          "character": "impact thud then power-up rise",
+          "character": "field forming, band closing on a note",
           "params": "src/art/audio/candidates.ts#shipSpawn.c"
         }
       ]
@@ -376,19 +376,19 @@
         {
           "id": "a",
           "wav": "previews/spawnPulse/a.wav",
-          "character": "soft sine blip",
+          "character": "field grain, a soft particulate tick",
           "params": "src/art/audio/candidates.ts#spawnPulse.a"
         },
         {
           "id": "b",
           "wav": "previews/spawnPulse/b.wav",
-          "character": "gentle round pulse",
+          "character": "a low bubble pip, pressure holding",
           "params": "src/art/audio/candidates.ts#spawnPulse.b"
         },
         {
           "id": "c",
           "wav": "previews/spawnPulse/c.wav",
-          "character": "faint shimmer tick",
+          "character": "a thin band shimmering, barely there",
           "params": "src/art/audio/candidates.ts#spawnPulse.c"
         }
       ]
@@ -402,19 +402,19 @@
         {
           "id": "a",
           "wav": "previews/thruster/a.wav",
-          "character": "deep gritty roar",
+          "character": "plasma drive, particulate and dry",
           "params": "src/art/audio/candidates.ts#thruster.a"
         },
         {
           "id": "b",
           "wav": "previews/thruster/b.wav",
-          "character": "buzzy electric hum",
+          "character": "reaction mass, low pressure roar",
           "params": "src/art/audio/candidates.ts#thruster.b"
         },
         {
           "id": "c",
           "wav": "previews/thruster/c.wav",
-          "character": "airy whoosh thrust",
+          "character": "induction turbine, one narrow band",
           "params": "src/art/audio/candidates.ts#thruster.c"
         }
       ]
@@ -428,19 +428,19 @@
         {
           "id": "a",
           "wav": "previews/buildPlaced/a.wav",
-          "character": "heavy iron clank and settle",
+          "character": "ratchet teeth, a dry stepped bite",
           "params": "src/art/audio/candidates.ts#buildPlaced.a"
         },
         {
           "id": "b",
           "wav": "previews/buildPlaced/b.wav",
-          "character": "soft magnetic snap and lock",
+          "character": "clamp seating under load, weight down",
           "params": "src/art/audio/candidates.ts#buildPlaced.b"
         },
         {
           "id": "c",
           "wav": "previews/buildPlaced/c.wav",
-          "character": "ratchet click-lock, stepped texture",
+          "character": "magnetic lock, one narrow band shutting",
           "params": "src/art/audio/candidates.ts#buildPlaced.c"
         }
       ]
@@ -448,25 +448,25 @@
     {
       "id": "buildComplete",
       "label": "Build Complete",
-      "context": "A paid-for defence finishes building — rising perfect fifth confirmation.",
+      "context": "A paid-for defence finishes building — a rising confirmation.",
       "current": "previews/buildComplete/current.wav",
       "candidates": [
         {
           "id": "a",
           "wav": "previews/buildComplete/a.wav",
-          "character": "single-voice chiptune arpeggio fifth",
+          "character": "assembly settling, three dry contacts",
           "params": "src/art/audio/candidates.ts#buildComplete.a"
         },
         {
           "id": "b",
           "wav": "previews/buildComplete/b.wav",
-          "character": "warm sine swell, soft glow",
+          "character": "pressure system coming up to seat",
           "params": "src/art/audio/candidates.ts#buildComplete.b"
         },
         {
           "id": "c",
           "wav": "previews/buildComplete/c.wav",
-          "character": "chunky retro two-step blip",
+          "character": "two bands locking, a fifth apart",
           "params": "src/art/audio/candidates.ts#buildComplete.c"
         }
       ]
@@ -474,25 +474,25 @@
     {
       "id": "repairTick",
       "label": "Repair Tick",
-      "context": "A soft repair tick while a structure heals — noticed mostly when it stops.",
+      "context": "A soft tick as a repair purchase is applied to a structure.",
       "current": "previews/repairTick/current.wav",
       "candidates": [
         {
           "id": "a",
           "wav": "previews/repairTick/a.wav",
-          "character": "gentle rising sine chirp",
+          "character": "weld grain, dry and stepped",
           "params": "src/art/audio/candidates.ts#repairTick.a"
         },
         {
           "id": "b",
           "wav": "previews/repairTick/b.wav",
-          "character": "mellow steady triangle pulse",
+          "character": "sealant press, low and closing",
           "params": "src/art/audio/candidates.ts#repairTick.b"
         },
         {
           "id": "c",
           "wav": "previews/repairTick/c.wav",
-          "character": "tiny narrow-duty square blip",
+          "character": "servo pip, one narrow band",
           "params": "src/art/audio/candidates.ts#repairTick.c"
         }
       ]
@@ -506,19 +506,19 @@
         {
           "id": "a",
           "wav": "previews/bankOre/a.wav",
-          "character": "crisp square coin-drop",
+          "character": "hopper drop, gravel settling",
           "params": "src/art/audio/candidates.ts#bankOre.a"
         },
         {
           "id": "b",
           "wav": "previews/bankOre/b.wav",
-          "character": "woody marimba-like thud",
+          "character": "vault clamp, low seat",
           "params": "src/art/audio/candidates.ts#bankOre.b"
         },
         {
           "id": "c",
           "wav": "previews/bankOre/c.wav",
-          "character": "sparkling metallic coin clink",
+          "character": "two filtered tones, falling to rest",
           "params": "src/art/audio/candidates.ts#bankOre.c"
         }
       ]
@@ -532,19 +532,19 @@
         {
           "id": "a",
           "wav": "previews/upgradeBought/a.wav",
-          "character": "fast bright square arpeggio sparkle",
+          "character": "three dry contacts rising, no shine",
           "params": "src/art/audio/candidates.ts#upgradeBought.a"
         },
         {
           "id": "b",
           "wav": "previews/upgradeBought/b.wav",
-          "character": "shimmering layered bell harmonics",
+          "character": "pressure lifting into a seat, sub under it",
           "params": "src/art/audio/candidates.ts#upgradeBought.b"
         },
         {
           "id": "c",
           "wav": "previews/upgradeBought/c.wav",
-          "character": "glissando sparkle sweep upward",
+          "character": "three narrow bands rising, metal ringing",
           "params": "src/art/audio/candidates.ts#upgradeBought.c"
         }
       ]
@@ -558,19 +558,19 @@
         {
           "id": "a",
           "wav": "previews/waveArrive/a.wav",
-          "character": "deep dual-note saw foghorn",
+          "character": "two horn blasts, air-driven and grained",
           "params": "src/art/audio/candidates.ts#waveArrive.a"
         },
         {
           "id": "b",
           "wav": "previews/waveArrive/b.wav",
-          "character": "pulsing square siren, mechanical",
+          "character": "twin pressure horns, mass behind them",
           "params": "src/art/audio/candidates.ts#waveArrive.b"
         },
         {
           "id": "c",
           "wav": "previews/waveArrive/c.wav",
-          "character": "gritty noise-and-sub drone horn",
+          "character": "two swept bands, siren metal",
           "params": "src/art/audio/candidates.ts#waveArrive.c"
         }
       ]
@@ -584,19 +584,19 @@
         {
           "id": "a",
           "wav": "previews/collapseBegin/a.wav",
-          "character": "grinding low noise rumble bed",
+          "character": "structure grinding, grains under load",
           "params": "src/art/audio/candidates.ts#collapseBegin.a"
         },
         {
           "id": "b",
           "wav": "previews/collapseBegin/b.wav",
-          "character": "throbbing vibrato dread pulse",
+          "character": "pressure dropping, a long low swallow",
           "params": "src/art/audio/candidates.ts#collapseBegin.b"
         },
         {
           "id": "c",
           "wav": "previews/collapseBegin/c.wav",
-          "character": "crumbling stepped structural groan",
+          "character": "resonance opening, metal under strain",
           "params": "src/art/audio/candidates.ts#collapseBegin.c"
         }
       ]
@@ -610,19 +610,19 @@
         {
           "id": "a",
           "wav": "previews/stationDeath/a.wav",
-          "character": "deep collapsing sine descent",
+          "character": "the floor going out, everything letting go",
           "params": "src/art/audio/candidates.ts#stationDeath.a"
         },
         {
           "id": "b",
           "wav": "previews/stationDeath/b.wav",
-          "character": "muffled noise implosion, sub-bass swallow",
+          "character": "pressure loss, a long fall with no bottom",
           "params": "src/art/audio/candidates.ts#stationDeath.b"
         },
         {
           "id": "c",
           "wav": "previews/stationDeath/c.wav",
-          "character": "slow tolling drone, cracking decay",
+          "character": "one detuned resonance, leaving the room",
           "params": "src/art/audio/candidates.ts#stationDeath.c"
         }
       ]
@@ -636,19 +636,19 @@
         {
           "id": "a",
           "wav": "previews/matchEnd/a.wav",
-          "character": "triumphant triangle fanfare",
+          "character": "three dry contacts, rising and settling",
           "params": "src/art/audio/candidates.ts#matchEnd.a"
         },
         {
           "id": "b",
           "wav": "previews/matchEnd/b.wav",
-          "character": "warm blended sine chord swell",
+          "character": "a low swell coming to rest",
           "params": "src/art/audio/candidates.ts#matchEnd.b"
         },
         {
           "id": "c",
           "wav": "previews/matchEnd/c.wav",
-          "character": "bouncy square staircase climb",
+          "character": "wide bands opening, metal resolving",
           "params": "src/art/audio/candidates.ts#matchEnd.c"
         }
       ]
@@ -656,25 +656,25 @@
     {
       "id": "alarm",
       "label": "Home Alarm",
-      "context": "Your home is under attack (GDD §2.2) — a mechanic, not music; loops until the threat clears.",
+      "context": "Your home is under attack (GDD §2.2) — a mechanic, not music; sounded once per engagement.",
       "current": "previews/alarm/current.wav",
       "candidates": [
         {
           "id": "a",
           "wav": "previews/alarm/a.wav",
-          "character": "classic twin-tone klaxon",
+          "character": "klaxon with grain in it, driven hard",
           "params": "src/art/audio/candidates.ts#alarm.a"
         },
         {
           "id": "b",
           "wav": "previews/alarm/b.wav",
-          "character": "slow blaring foghorn siren",
+          "character": "pressure siren, a horn body under the tone",
           "params": "src/art/audio/candidates.ts#alarm.b"
         },
         {
           "id": "c",
           "wav": "previews/alarm/c.wav",
-          "character": "rapid stuttering distress pulse",
+          "character": "swept band klaxon, metal in the corner",
           "params": "src/art/audio/candidates.ts#alarm.c"
         }
       ]
@@ -688,19 +688,19 @@
         {
           "id": "a",
           "wav": "previews/ambient/a.wav",
-          "character": "deep frozen drone, distant creak",
+          "character": "hull grain, distant particulate",
           "params": "src/art/audio/candidates.ts#ambient.a"
         },
         {
           "id": "b",
           "wav": "previews/ambient/b.wav",
-          "character": "thin metallic hull hum, static crackle",
+          "character": "a low pressure swell, slow and deep",
           "params": "src/art/audio/candidates.ts#ambient.b"
         },
         {
           "id": "c",
           "wav": "previews/ambient/c.wav",
-          "character": "void breath, slow pressure swell",
+          "character": "resonant hull, one band breathing",
           "params": "src/art/audio/candidates.ts#ambient.c"
         }
       ]
@@ -714,19 +714,19 @@
         {
           "id": "a",
           "wav": "previews/musicBed/a.wav",
-          "character": "warm hollow triad, breathing",
+          "character": "granular bed, texture under an open fifth",
           "params": "src/art/audio/candidates.ts#musicBed.a"
         },
         {
           "id": "b",
           "wav": "previews/musicBed/b.wav",
-          "character": "sparse open fifth, airy",
+          "character": "filtered analogue triad, low and seated",
           "params": "src/art/audio/candidates.ts#musicBed.b"
         },
         {
           "id": "c",
           "wav": "previews/musicBed/c.wav",
-          "character": "murky sub-heavy triad, muffled",
+          "character": "wide detuned space, unisons beating",
           "params": "src/art/audio/candidates.ts#musicBed.c"
         }
       ]
@@ -740,19 +740,19 @@
         {
           "id": "a",
           "wav": "previews/musicPulse/a.wav",
-          "character": "single deep thud heartbeat",
+          "character": "a dry contact pulse, machine-timed",
           "params": "src/art/audio/candidates.ts#musicPulse.a"
         },
         {
           "id": "b",
           "wav": "previews/musicPulse/b.wav",
-          "character": "double-thump lub-dub heartbeat",
+          "character": "a low pressure thud, a room under it",
           "params": "src/art/audio/candidates.ts#musicPulse.b"
         },
         {
           "id": "c",
           "wav": "previews/musicPulse/c.wav",
-          "character": "fast nervous ticking pulse",
+          "character": "a narrow band pip, doubling",
           "params": "src/art/audio/candidates.ts#musicPulse.c"
         }
       ]
@@ -766,19 +766,19 @@
         {
           "id": "a",
           "wav": "previews/musicTheme/a.wav",
-          "character": "marching square-lead riff",
+          "character": "the riff as grained plucks, no sustain",
           "params": "src/art/audio/candidates.ts#musicTheme.a"
         },
         {
           "id": "b",
           "wav": "previews/musicTheme/b.wav",
-          "character": "syncopated staccato stabs",
+          "character": "the riff on filtered analogue, corner closing",
           "params": "src/art/audio/candidates.ts#musicTheme.b"
         },
         {
           "id": "c",
           "wav": "previews/musicTheme/c.wav",
-          "character": "slow rising modal march",
+          "character": "the riff in detuned metal, space behind it",
           "params": "src/art/audio/candidates.ts#musicTheme.c"
         }
       ]
@@ -792,19 +792,19 @@
         {
           "id": "a",
           "wav": "previews/musicDread/a.wav",
-          "character": "grinding semitone clash",
+          "character": "a grinding grain bed, no pitch centre",
           "params": "src/art/audio/candidates.ts#musicDread.a"
         },
         {
           "id": "b",
           "wav": "previews/musicDread/b.wav",
-          "character": "distant sub rumble, faint flutter",
+          "character": "sub rumble with pressure in the room",
           "params": "src/art/audio/candidates.ts#musicDread.b"
         },
         {
           "id": "c",
           "wav": "previews/musicDread/c.wav",
-          "character": "detuned unison smear",
+          "character": "detuned unisons beating, metal in the smear",
           "params": "src/art/audio/candidates.ts#musicDread.c"
         }
       ]
@@ -818,19 +818,19 @@
         {
           "id": "a",
           "wav": "previews/musicWin/a.wav",
-          "character": "quick bright fanfare pop",
+          "character": "three dry hits rising, no shine",
           "params": "src/art/audio/candidates.ts#musicWin.a"
         },
         {
           "id": "b",
           "wav": "previews/musicWin/b.wav",
-          "character": "cascading bell shimmer",
+          "character": "a low swell lifting, weight behind it",
           "params": "src/art/audio/candidates.ts#musicWin.b"
         },
         {
           "id": "c",
           "wav": "previews/musicWin/c.wav",
-          "character": "big brassy triumphant swell",
+          "character": "bands opening, metal ringing out",
           "params": "src/art/audio/candidates.ts#musicWin.c"
         }
       ]
@@ -844,19 +844,19 @@
         {
           "id": "a",
           "wav": "previews/musicLoss/a.wav",
-          "character": "slow descending sigh",
+          "character": "a grained fall, everything letting go",
           "params": "src/art/audio/candidates.ts#musicLoss.a"
         },
         {
           "id": "b",
           "wav": "previews/musicLoss/b.wav",
-          "character": "dissonant stumbling collapse",
+          "character": "a low descent, pressure leaving",
           "params": "src/art/audio/candidates.ts#musicLoss.b"
         },
         {
           "id": "c",
           "wav": "previews/musicLoss/c.wav",
-          "character": "single low tolling bell",
+          "character": "one detuned toll, unresolved",
           "params": "src/art/audio/candidates.ts#musicLoss.c"
         }
       ]
@@ -870,19 +870,19 @@
         {
           "id": "a",
           "wav": "previews/pressTick/a.wav",
-          "character": "soft triangle tap",
+          "character": "a dry contact, no tone in it",
           "params": "src/art/audio/candidates.ts#pressTick.a"
         },
         {
           "id": "b",
           "wav": "previews/pressTick/b.wav",
-          "character": "crisp gritty square click",
+          "character": "a damped pip, felt more than heard",
           "params": "src/art/audio/candidates.ts#pressTick.b"
         },
         {
           "id": "c",
           "wav": "previews/pressTick/c.wav",
-          "character": "round low sine thump",
+          "character": "one narrow band at the family root",
           "params": "src/art/audio/candidates.ts#pressTick.c"
         }
       ]
@@ -896,19 +896,19 @@
         {
           "id": "a",
           "wav": "previews/purchaseConfirm/a.wav",
-          "character": "bright square two-note chime",
+          "character": "two dry contacts, rising",
           "params": "src/art/audio/candidates.ts#purchaseConfirm.a"
         },
         {
           "id": "b",
           "wav": "previews/purchaseConfirm/b.wav",
-          "character": "soft sine bell ding",
+          "character": "a low seat, the buy landing",
           "params": "src/art/audio/candidates.ts#purchaseConfirm.b"
         },
         {
           "id": "c",
           "wav": "previews/purchaseConfirm/c.wav",
-          "character": "synthetic saw rising blip",
+          "character": "two narrow bands, a fourth apart",
           "params": "src/art/audio/candidates.ts#purchaseConfirm.c"
         }
       ]
@@ -922,19 +922,19 @@
         {
           "id": "a",
           "wav": "previews/rejectBuzz/a.wav",
-          "character": "flat gritty square drone",
+          "character": "grit refusal, dry and flat",
           "params": "src/art/audio/candidates.ts#rejectBuzz.a"
         },
         {
           "id": "b",
           "wav": "previews/rejectBuzz/b.wav",
-          "character": "short low triangle thud",
+          "character": "a blocked thud, nothing opens",
           "params": "src/art/audio/candidates.ts#rejectBuzz.b"
         },
         {
           "id": "c",
           "wav": "previews/rejectBuzz/c.wav",
-          "character": "gritty pitchless noise rasp",
+          "character": "two bands a semitone apart, unresolved",
           "params": "src/art/audio/candidates.ts#rejectBuzz.c"
         }
       ]
@@ -948,19 +948,19 @@
         {
           "id": "a",
           "wav": "previews/depositTick/a.wav",
-          "character": "soft falling triangle pluck",
+          "character": "soft magnetic tick, dry",
           "params": "src/art/audio/candidates.ts#depositTick.a"
         },
         {
           "id": "b",
           "wav": "previews/depositTick/b.wav",
-          "character": "falling sine droplet",
+          "character": "muted felt thud, no edge",
           "params": "src/art/audio/candidates.ts#depositTick.b"
         },
         {
           "id": "c",
           "wav": "previews/depositTick/c.wav",
-          "character": "thin muted falling square tick",
+          "character": "thin air tick, breath of one chunk",
           "params": "src/art/audio/candidates.ts#depositTick.c"
         }
       ]
@@ -974,19 +974,19 @@
         {
           "id": "a",
           "wav": "previews/respawnBeep/a.wav",
-          "character": "pure plain sine tone",
+          "character": "a dry clock contact, no ring",
           "params": "src/art/audio/candidates.ts#respawnBeep.a"
         },
         {
           "id": "b",
           "wav": "previews/respawnBeep/b.wav",
-          "character": "crisp digital square clock",
+          "character": "a countdown pip with weight in it",
           "params": "src/art/audio/candidates.ts#respawnBeep.b"
         },
         {
           "id": "c",
           "wav": "previews/respawnBeep/c.wav",
-          "character": "warm low triangle beep",
+          "character": "a narrow band tone, machine-clean",
           "params": "src/art/audio/candidates.ts#respawnBeep.c"
         }
       ]
@@ -1000,19 +1000,19 @@
         {
           "id": "a",
           "wav": "previews/respawnGo/a.wav",
-          "character": "punchy square power-up rise",
+          "character": "release into a dry contact",
           "params": "src/art/audio/candidates.ts#respawnGo.a"
         },
         {
           "id": "b",
           "wav": "previews/respawnGo/b.wav",
-          "character": "bright sine and triangle launch chime",
+          "character": "pressure dumping, mass leaving",
           "params": "src/art/audio/candidates.ts#respawnGo.b"
         },
         {
           "id": "c",
           "wav": "previews/respawnGo/c.wav",
-          "character": "energetic saw double-step launch",
+          "character": "a band sweeping open, launch clear",
           "params": "src/art/audio/candidates.ts#respawnGo.c"
         }
       ]
@@ -1020,25 +1020,25 @@
     {
       "id": "minimapPing",
       "label": "Minimap Ping",
-      "context": "A minimap ping — a rising sonar blip that rings a moment & fades; it locates, it must never read as an alarm.",
+      "context": "The minimap toggle (the ping mechanic itself was cut) — it locates; it must never read as an alarm.",
       "current": "previews/minimapPing/current.wav",
       "candidates": [
         {
           "id": "a",
           "wav": "previews/minimapPing/a.wav",
-          "character": "clean rising sine sonar sweep",
+          "character": "a grained sweep, sonar through dust",
           "params": "src/art/audio/candidates.ts#minimapPing.a"
         },
         {
           "id": "b",
           "wav": "previews/minimapPing/b.wav",
-          "character": "soft triangle pulse with airy overtone",
+          "character": "a round pulse returning, low and soft",
           "params": "src/art/audio/candidates.ts#minimapPing.b"
         },
         {
           "id": "c",
           "wav": "previews/minimapPing/c.wav",
-          "character": "bright bell-like two-partial ping",
+          "character": "two narrow bands, a sonar return",
           "params": "src/art/audio/candidates.ts#minimapPing.c"
         }
       ]

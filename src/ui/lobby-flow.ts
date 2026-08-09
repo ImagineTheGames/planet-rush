@@ -33,7 +33,7 @@
  * ONE DOOR, ONE LOBBY (ratified — the unified play flow)
  * ---------------------------------------------------------------------------
  * There is exactly one entry point and exactly one lobby. The main menu's PLAY
- * opens {@link ./lobby-entry} — PLAY SOLO / CREATE ROOM / JOIN ROOM — and all
+ * opens {@link ./lobby-entry} — SOLO / HOST / JOIN — and all
  * three of those doors resolve into the same {@link ./lobby} through the same
  * {@link flowConnected}. The single difference between "the solo lobby" and "the
  * online lobby" is the `online` flag the door already decided, which the lobby
@@ -93,6 +93,7 @@ import {
   CLASS_ORDER,
   applyLobbySlots,
   botDifficulties,
+  lobbyWireSeats,
   lobbyWireTeams,
   createLobby,
   cycleAbundance,
@@ -103,12 +104,17 @@ import {
   seatLocalPlayer,
   selectMap,
   selectShipClass,
+  sideRosterOf,
   startLobbyMatch,
   tickLobby,
   toggleMode,
 } from './lobby';
 import type { LobbyState } from './lobby';
 import { mapIdAt } from './map-picker';
+import { equipCosmetic, COSMETICS } from './hangar';
+import type { Cosmetic, HangarTarget } from './hangar';
+import { freshProfile } from '../progression/profile';
+import type { Profile } from '../progression/profile';
 
 // ---------------------------------------------------------------------------
 // The state
@@ -121,12 +127,54 @@ import { mapIdAt } from './map-picker';
  *  - `settings` — the fire mode, reduce-VFX and volumes ({@link ./settings-view}),
  *                 reached from the main menu and returned from to wherever it was
  *                 opened ({@link FlowState.settingsReturn}).
+ *  - `hangar`   — the fourth door (a0-14, {@link ./hangar-view}): your ship, your
+ *                 level, and the cosmetics a level has unlocked. Opens from the
+ *                 front door and comes back; it starts nothing.
  *  - `lobby`    — the roster, the hulls and RUSH! ({@link ./lobby-view}).
  *  - `match`    — the world has the screen; this module is watching for the end.
  *  - `end`      — the end-of-match summary ({@link ./end-of-match-view}): VICTORY /
  *                 DEFEAT / DRAW / ELIMINATED, with Rematch and maybe Spectate.
  */
-export type FlowScreen = 'entry' | 'settings' | 'lobby' | 'match' | 'end';
+export type FlowScreen = 'entry' | 'settings' | 'hangar' | 'lobby' | 'match' | 'end';
+
+/** Every screen, in a stable order — the audit list {@link flowScreenHandler}
+ *  is walked over. */
+export const FLOW_SCREENS: readonly FlowScreen[] = ['entry', 'settings', 'hangar', 'lobby', 'match', 'end'];
+
+/**
+ * The exported function that owns input on each screen — the flow's half of the
+ * wiring contract, and the reason a sixth screen cannot land half-wired.
+ *
+ * LESSONS §20 is exactly this shape: a screen case with no handler renders an
+ * empty room that looks like a working room reporting bad news. So the mapping
+ * is a **total function of the screen**, checked two ways — the compiler rejects
+ * a missing case (the switch is exhaustive over {@link FlowScreen}), and
+ * `default` returns `null`, so a case deleted at runtime is a red test rather
+ * than a screen nobody can leave ({@link ./main-menu.test}).
+ *
+ * The value is the handler's *name*, not the function: the test resolves it
+ * against this module's own exports, so the string cannot be a lie either.
+ */
+export function flowScreenHandler(screen: FlowScreen): string | null {
+  switch (screen) {
+    case 'entry':
+      return 'flowTapEntry';
+    case 'settings':
+      return 'flowTapSettings';
+    case 'hangar':
+      return 'flowTapHangar';
+    case 'lobby':
+      return 'flowTapLobby';
+    // The match screen takes no taps from this module — the world has the
+    // screen — but it is still routed: `flowMatchEnded` is what takes it back.
+    case 'match':
+      return 'flowMatchEnded';
+    case 'end':
+      return 'flowTapEnd';
+    default:
+      return null;
+  }
+}
 
 /** The whole front-of-match, as one immutable value. */
 export interface FlowState {
@@ -162,6 +210,18 @@ export interface FlowState {
   /** Where DONE on the settings screen returns to — the screen it was opened
    *  from. The main menu is `entry`; a future pause menu would set `match`. */
   readonly settingsReturn: FlowScreen;
+  /**
+   * The player's career (`src/progression/profile.ts`) — what the hangar reads
+   * and, when a cosmetic is equipped, what it writes back through a
+   * `save-profile` effect.
+   *
+   * Always present, so no screen has to guard it; a caller with no storage yet
+   * gets `freshProfile()`. It is **not match state** and survives a rematch
+   * ({@link resetFlow}) for the same reason the settings do. This module never
+   * computes XP: banking is the end-of-match summary's single write site (plan
+   * §2.1), and the hangar only ever changes which cosmetic is worn.
+   */
+  readonly profile: Profile;
 }
 
 /**
@@ -183,7 +243,16 @@ export type FlowEffect =
    * classroom can still type and nobody is behind. Offline there is nothing to
    * close, so nothing is asked for.
    */
-  | { readonly kind: 'close-transport' };
+  | { readonly kind: 'close-transport' }
+  /**
+   * Persist this profile — `saveProfile(platform.storage, profile)` (a0-14).
+   *
+   * The flow holds no storage any more than it holds a socket, so a write comes
+   * back as an effect like a `send` does. Emitted only when something actually
+   * moved: a refused equip returns the identical profile and owes the disk
+   * nothing.
+   */
+  | { readonly kind: 'save-profile'; readonly profile: Profile };
 
 /** A transition, plus whatever it owes the outside world. */
 export interface FlowResult {
@@ -199,9 +268,11 @@ export function createFlow(
   fireMode: FireMode = FireMode.Manual,
   settings: SettingsState = createSettings(),
   controlScheme: ControlScheme = 'sticks',
+  profile: Profile = freshProfile(),
 ): FlowState {
   return {
     screen: 'entry',
+    profile,
     entry: createEntry(),
     lobby: null,
     room: null,
@@ -274,7 +345,12 @@ function choiceFor(state: FlowState, lobby: LobbyState): FlowEffect {
       // the server was never told about is a roster that lies about the match being
       // built. A side authored and never sent is the whole of the developer's
       // report: a lobby that says TEAMS over a free-for-all world.
-      ...(host ? { mode: lobby.mode, teams: lobbyWireTeams(lobby) } : {}),
+      //
+      // …and the per-seat OPEN / BOT / CLOSED authoring (a0-11), for exactly the
+      // same reason and with a sharper edge: the lobby no longer auto-seats a bot
+      // in an empty seat, so a roster the server was never told about would have
+      // it fill every one of them behind the screen's back.
+      ...(host ? { mode: lobby.mode, teams: lobbyWireTeams(lobby), seats: lobbyWireSeats(lobby) } : {}),
     },
   };
 }
@@ -347,6 +423,11 @@ export function flowKey(state: FlowState, key: string): FlowResult {
   // Escape backs out of the settings screen the way DONE does — the one key the
   // settings screen listens for, since everything else on it is a tap.
   if (state.screen === 'settings') return key === 'Escape' ? flowCloseSettings(state) : rest(state);
+  // The hangar takes Escape and Backspace out, exactly as the codex does — one
+  // key out of a screen that is never a gate.
+  if (state.screen === 'hangar') {
+    return key === 'Escape' || key === 'Backspace' ? flowCloseHangar(state) : rest(state);
+  }
   if (state.screen !== 'entry') return rest(state);
   if (key === 'Enter') return resolve(state, submitJoin(state.entry));
   if (key === 'Backspace') return withEntry(state, eraseEntryCode(state.entry));
@@ -385,7 +466,7 @@ export function flowConnected(
   const host = options.host ?? (state.entry.screen === 'join' ? 0 : you);
   // ONE lobby component, both modes (ratified): the same `createLobby` opens the
   // solo room and the online one, and the ONLY thing that differs is the flag the
-  // door already resolved — `online: false` for PLAY SOLO (no room code, the empty
+  // door already resolved — `online: false` for SOLO (no room code, the empty
   // seats are the bot cast), `true` for CREATE / JOIN (code up, seats claimable).
   // Every other affordance — hulls, map, mode, abundance, slot states, difficulty,
   // teams, RUSH — is the same model function in both, which is the property the
@@ -604,33 +685,110 @@ function applyFireMode(state: FlowState, fireMode: FireMode): FlowResult {
 }
 
 // ---------------------------------------------------------------------------
+// The hangar — the fourth main-menu screen (a0-14)
+// ---------------------------------------------------------------------------
+
+/**
+ * Open the hangar. Reachable from the front door only: it is a door that comes
+ * back, not a thing you can reach mid-match, and a stray call from anywhere else
+ * is a no-op rather than a screen swapped out from under a live world.
+ */
+export function flowOpenHangar(state: FlowState): FlowResult {
+  if (state.screen !== 'entry') return rest(state);
+  return rest({ ...state, screen: 'hangar' });
+}
+
+/** Leave the hangar for the front door. BACK and Escape both land here; an equip
+ *  was applied and persisted when it happened, so there is nothing to confirm. */
+export function flowCloseHangar(state: FlowState): FlowResult {
+  if (state.screen !== 'hangar') return rest(state);
+  return rest({ ...state, screen: 'entry' });
+}
+
+/**
+ * Apply a tap on the hangar — from {@link ./hangar} `hangarHitTest`.
+ *
+ * BACK leaves. A cosmetic row equips (or un-equips, if it was already worn) —
+ * and **that is the only thing on this screen that writes anything**: there is
+ * no currency here and no purchase, so a row press changes which cosmetic is
+ * worn or it changes nothing at all.
+ *
+ * A locked row, or a row index the list does not have, is refused by
+ * {@link ./hangar} `equipCosmetic` returning the identical profile — so the flow
+ * stays identical too, and no `save-profile` goes out. The stillness rule, kept
+ * on the one screen where a spurious write lands in a file the game promises
+ * never to wipe.
+ */
+export function flowTapHangar(
+  state: FlowState,
+  target: HangarTarget,
+  cosmetics: readonly Cosmetic[] = COSMETICS,
+): FlowResult {
+  if (state.screen !== 'hangar') return rest(state);
+  if (target.kind === 'back') return flowCloseHangar(state);
+  const cosmetic = cosmetics[target.index];
+  if (!cosmetic) return rest(state);
+  const profile = equipCosmetic(state.profile, cosmetic);
+  if (profile === state.profile) return rest(state);
+  return { state: { ...state, profile }, effects: [{ kind: 'save-profile', profile }] };
+}
+
+/** Fold a loaded profile in — what the caller calls once, after reading storage,
+ *  so the hangar and the summary screen show the career this machine has rather
+ *  than the fresh one {@link createFlow} starts with. */
+export function setFlowProfile(state: FlowState, profile: Profile): FlowState {
+  return state.profile === profile ? state : { ...state, profile };
+}
+
+// ---------------------------------------------------------------------------
 // The end of a match
 // ---------------------------------------------------------------------------
 
 /**
  * The whole match resolved (`matchEnd`, `src/net/transport.ts`). Moves to the
- * summary with the winner named — VICTORY if it is you, DEFEAT if it is someone
- * else, DRAW on the no-survivor end. Only from a live match: a `matchEnd` arriving
- * on the door or twice over is ignored.
+ * summary with the winner named — VICTORY if the winner is on **your side**,
+ * DEFEAT if they are not, DRAW on the no-survivor end. Only from a live match: a
+ * `matchEnd` arriving on the door or twice over is ignored.
  *
- * `you` is read from the lobby the match was built from, so the summary knows
- * whose result it is showing without a wire field for it.
+ * `you` **and your side** are read from the lobby the match was built from, so the
+ * summary knows whose result it is showing without a wire field for either. That
+ * is legal because allegiance is static match config fixed at match start (GDD
+ * §2.1, §4.2) — the roster that RUSHed is the roster that finished.
+ *
+ * The side is the a0-09 fix on this path: without it a Teams win by a teammate
+ * arrived here indistinguishable from an enemy's, and the summary called it a
+ * DEFEAT ({@link ./end-of-match} `endKind`). In FFA `sideRosterOf` returns you
+ * alone, so nothing about the free-for-all changes.
  */
 export function flowMatchEnded(state: FlowState, winner: PlayerId | null): FlowResult {
   if (state.screen !== 'match') return rest(state);
   const you = state.lobby?.you ?? 0;
-  return rest({ ...state, screen: 'end', end: { you, winner, matchOver: true } });
+  const allies = sideOf(state, you);
+  return rest({ ...state, screen: 'end', end: { you, winner, matchOver: true, allies } });
 }
 
 /**
  * Your core was destroyed but the match goes on (GDD §2 wreck rule). Moves to the
  * summary in its ELIMINATED form — Rematch and Spectate, because there is still a
  * match to watch. Only from a live match.
+ *
+ * It carries the side too, even though ELIMINATED does not read it: this outcome
+ * is the one a player SPECTATES from, and the `matchEnd` that follows lands on
+ * {@link flowMatchEnded} — but a seat whose side wins while it watches must reach
+ * VICTORY by the same roster it was eliminated holding, not a re-derived one.
  */
 export function flowEliminated(state: FlowState): FlowResult {
   if (state.screen !== 'match') return rest(state);
   const you = state.lobby?.you ?? 0;
-  return rest({ ...state, screen: 'end', end: { you, winner: null, matchOver: false } });
+  const allies = sideOf(state, you);
+  return rest({ ...state, screen: 'end', end: { you, winner: null, matchOver: false, allies } });
+}
+
+/** The slots on `you`'s side, for the outcome the two ends above build. Straight
+ *  through to the lobby's own roster ({@link ./lobby} `sideRosterOf`); with no
+ *  lobby to read there is no side but your own — teams-of-one, which is FFA. */
+function sideOf(state: FlowState, you: PlayerId): ReadonlySet<PlayerId> {
+  return state.lobby ? sideRosterOf(state.lobby, you) : new Set([you]);
 }
 
 /**
@@ -661,8 +819,8 @@ export function setFlowFireMode(state: FlowState, fireMode: FireMode): FlowState
 /** Leave the match and come back to a clean door — Rematch's way out, and the
  *  reset the end-of-match summary performs. Deliberately a full reset: a stale
  *  roster behind a new door is how a player ends up looking at the previous
- *  match's colours. Fire mode, the control scheme and the rest of settings survive
- *  it — they are the player's, not the match's. */
+ *  match's colours. Fire mode, the control scheme, the rest of settings and the
+ *  career profile all survive it — they are the player's, not the match's. */
 export function resetFlow(state: FlowState): FlowState {
-  return createFlow(state.fireMode, state.settings, state.controlScheme);
+  return createFlow(state.fireMode, state.settings, state.controlScheme, state.profile);
 }

@@ -5,8 +5,9 @@
  * (`@render`) in the same canvas — it does NOT move with the camera. The HUD
  * "shows only what the player acts on" (GDD §2.2). Day-1 surface (GDD §4.6):
  *
- *  - **Ore at a glance**, split per the field rule: the banked **TOTAL** in the
- *    top-left corner (the safe bank the Build wheel spends), and a compact
+ *  - **Ore at a glance**, split per the field rule: the banked total in the
+ *    top-left corner, captioned **ORE** (the safe bank the Build wheel spends —
+ *    a0-03, 2026-08-07), and a compact
  *    **hold indicator under the ship** — one pip per cargo slot, flashing when
  *    full — that follows the local ship in screen space and drains during a dock
  *    deposit ({@link ./ore-hold}). Two forms, two places, so held and banked ore
@@ -21,7 +22,9 @@
  * Day-2 surface, landing with stations, cores and the build economy in the sim:
  *
  *  - **Your own station's HP** (top-right, in your player colour, GDD §2.2) —
- *    your own only; enemy HP is scouted, never broadcast.
+ *    your own only. A rival's health is the damage ring on their station, which
+ *    reads at any range since GDD §2.2 was amended (2026-08-07), and is still
+ *    never a HUD bar.
  *  - **The under-attack alarm** (GDD §2.2, a *mechanic, not polish*): a threat-
  *    red screen frame plus the screen-edge arrow pointing home, on the
  *    sustained-damage trigger in {@link ./alarm} — never on a taunt-tap.
@@ -129,7 +132,7 @@ import {
 
 /** Neutral light HUD text. Chalk-white — NOT signal yellow (RESERVED, §2). */
 const TEXT_PRIMARY = 0xdce3ec;
-// Muted secondary labels (TOTAL, HOME, MATCH, a strip action) draw in the void
+// Muted secondary labels (ORE, HOME, MATCH, a strip action) draw in the void
 // material's muted tone {@link TEXT_MUTED} from ./chrome — the ui-mockup's HUD
 // grey, one step lighter than the disabled `hullSteel`, so a readable-but-inert
 // label never wears the "you can't press this" costume.
@@ -144,7 +147,7 @@ const PAD = HUD_PAD;
 /** Bottom strip's baseline offset from the screen bottom, CSS px. */
 const STRIP_ROW = 18;
 const STRIP_PAD = 12;
-/** Gap between the top-left TOTAL label and the banked number below it, CSS px. */
+/** Gap between the top-left ORE label and the banked number below it, CSS px. */
 const TOTAL_LABEL_H = 14;
 
 
@@ -274,10 +277,18 @@ export interface HudFrame {
    *  no repair, no new ore. Greys out REPAIR CORE on the wheel and puts
    *  COLLAPSE on the wave clock. Default false. */
   readonly collapsed?: boolean;
+  /** Seconds between asteroid waves in THIS match — the sim's
+   *  `waveIntervalOf(world)`, an abundance multiple of the baseline and the exact
+   *  number the spawner schedules against. The wave clock counts down on it, so a
+   *  SCARCE match's longer wait is what the player sees (a0-16: before this the
+   *  countdown ran on the baseline and reached zero 15 s before the rocks landed
+   *  in every default match). Default: the baseline cadence, for a feed that has
+   *  no world to ask. */
+  readonly waveInterval?: number;
   /** Seconds left on the own station's repair COOLDOWN — the sim's
    *  `station.repairGate`, read each frame. While `> 0` the sim refuses every
    *  repair order `'cooling-down'`, so REPAIR REACTOR draws disabled-gray with a
-   *  live "REPAIR in Ns" countdown rather than a pressable "+15 HP" deal. Default
+   *  live "REPAIR IN Ns" countdown rather than a pressable "+15 HP" deal. Default
    *  0 ⇒ not cooling (the pre-cooldown behaviour). */
   readonly repairGate?: number;
 
@@ -407,9 +418,11 @@ export class Hud extends Container {
   /** Onboarding state machine — each prompt fires once (GDD §2.10). */
   private readonly onboarding = new Onboarding();
 
-  // --- Ore TOTAL — the banked bank the Build wheel spends (top-left) --------
-  //     Field rule: top-left shows the TOTAL only; held ore moved under the ship
-  //     (see `oreHold` below), so the two ore numbers can never be confused.
+  // --- Ore — the banked total the Build wheel spends (top-left) -------------
+  //     Field rule: top-left shows the BANK only; held ore moved under the ship
+  //     (see `oreHold` below), so the two ore numbers can never be confused. The
+  //     label above it reads `ORE` since a0-03; the rule is about the NUMBER, and
+  //     the number did not move.
   private readonly oreGroup = new Container();
   private readonly totalLabel: Text;
   private readonly bankedText: Text;
@@ -586,10 +599,22 @@ export class Hud extends Container {
     // spend chimes, all from the same state that drives the visual tell.
     this.pressFeedback = new PressFeedback(sfx);
 
-    // Ore TOTAL (top-left): a dim `TOTAL` heading over the banked number in ore
-    // yellow. The heading names it as the safe bank total, distinct in both form
-    // and place from the pips carried under the ship (field rule).
-    this.totalLabel = this.makeText('TOTAL', FONT_HEADING, 11, TEXT_MUTED);
+    // Ore (top-left): a dim `ORE` heading over the banked number in ore yellow.
+    //
+    // `ORE`, ratified 2026-08-07 (a0-03) — the developer, on a screenshot of this
+    // readout: "should not say total, it should say ORE". It has been `TOTAL`
+    // (the field rule below) and briefly `BANKED` (l2-02's voice sweep, an [OPT]
+    // this supersedes); the developer's word is the design, and GDD §2.2 already
+    // called it "your banked ORE total".
+    //
+    // WHAT THE WORD NOW COVERS, stated because it is not the only ORE on screen:
+    // this number is the BANK ALONE (`oreHudModel().banked`). The squares beside
+    // it are the HOLD, and the Build wheel's hub prints `spendableOre` — hold PLUS
+    // bank — under a caption that also reads `ORE` (build-wheel-view.ts). Hold 3
+    // with 5 banked reads 5 here and 8 there. Both numbers are correct and neither
+    // changed; only this label did. Flagged for the developer in a0-03's PR rather
+    // than resolved unilaterally — renaming the HUB is their call, not this file's.
+    this.totalLabel = this.makeText('ORE', FONT_HEADING, 11, TEXT_MUTED);
     this.totalLabel.y = 0;
     this.bankedText = this.makeText('', FONT_NUMERAL, 22, PALETTE.signalYellow, 'bold');
     this.bankedText.y = TOTAL_LABEL_H;
@@ -737,16 +762,16 @@ export class Hud extends Container {
     this.updateOnboarding(frame, wheelOpen, underAttack);
   }
 
-  // --- Ore: the TOTAL (top-left) and the HOLD (under the ship) -------------
+  // --- Ore: the BANK (top-left) and the HOLD (under the ship) --------------
 
   /** Draw the two ore readouts from the one sim-driven model (field rule): the
-   *  banked TOTAL in the top-left corner, and the held-ore indicator that follows
+   *  banked total in the top-left corner, and the held-ore indicator that follows
    *  the ship under it. Each reads its own number from the same source of truth —
    *  `banked` for the total, hold/capacity for the pips — so they cannot drift. */
   private updateOre(frame: HudFrame): void {
     const model = oreHudModel(frame.cargo, frame.cargoCap, frame.banked);
 
-    // Top-left TOTAL: just the safe banked number the Build wheel spends.
+    // Top-left ORE: just the safe banked number the Build wheel spends.
     this.bankedText.text = `${model.banked}`;
     this.lastBankedTotal = model.banked;
 
@@ -783,7 +808,10 @@ export class Hud extends Container {
   // --- Wave clock ----------------------------------------------------------
 
   private updateWaveClock(frame: HudFrame): void {
-    const clock = computeWaveClock(frame.time, frame.collapsed ?? false);
+    // The match's own wave interval, not the baseline (a0-16). Passed straight
+    // through: an absent field falls to `computeWaveClock`'s own fallback, so the
+    // baseline is named in one place rather than re-derived here.
+    const clock = computeWaveClock(frame.time, frame.collapsed ?? false, frame.waveInterval);
     this.waveName.text = `WAVE ${clock.wave}/${clock.waveCount} · ${clock.name}`;
     // COLLAPSE outranks FINAL WAVE: the field is spent, repair is off and
     // shields no longer regenerate (GDD §2.3). It is threat red because it is
@@ -856,9 +884,9 @@ export class Hud extends Container {
   // --- Own station HP (top-right, GDD §2.2) ---------------------------------
 
   /** Your own station's HP, in your player colour. **Your own only** — a rival's
-   *  health is scouted on their station within sensor range, never broadcast to
-   *  a HUD bar (GDD §2.2), and there is no code path here that takes another
-   *  player's station. */
+   *  health is the damage ring drawn on their station (always visible since GDD
+   *  §2.2 was amended on 2026-08-07), never a HUD bar, and there is no code path
+   *  here that takes another player's station. */
   private updateStationHp(frame: HudFrame): void {
     const maxCore = frame.maxCoreHp ?? 0;
     // Nothing wired yet (M1 feed) ⇒ nothing drawn. The element appears the frame

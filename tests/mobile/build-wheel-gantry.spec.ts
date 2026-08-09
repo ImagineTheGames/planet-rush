@@ -20,7 +20,7 @@
  *
  *  1. A real open — the BUILD button on touch, the `E` binding on desktop — puts
  *     the four-line Gantry stack on screen: the name, what it spends on, the
- *     `cost/held` string, and the count over its cap.
+ *     cost, and the count over its cap.
  *  2. The cost numeral takes BOTH of its ratified colours off the same wedge:
  *     signal yellow while it is payable, threat red the moment it is not
  *     (style-guide §2.1). Nothing else on the wheel takes red.
@@ -42,16 +42,15 @@ const TOUCH_PROJECTS = ['iphone', 'pixel'];
 const isTouchProject = (name: string): boolean => TOUCH_PROJECTS.includes(name);
 
 // --- Touch-visuals BUILD button geometry (mirrors src/platform/touch-visuals.ts)
+//
+// The centre these four numbers describe is computed IN THE PAGE, inside
+// `pressBuildAffordance`: the logical viewport it needs has to be read across
+// the wire anyway, and doing the subtraction on this side would cost a second
+// crossing (see the round-trip note below).
 const EDGE_MARGIN = 28;
 const R_STICK = 64;
 const BUILD_GAP = 18;
 const R_BUILD = 38;
-
-/** Screen-space centre of the BUILD button for a viewport, CSS px. */
-function buildButtonCenter(_w: number, h: number): { x: number; y: number } {
-  const stickCenterY = h - EDGE_MARGIN - R_STICK;
-  return { x: EDGE_MARGIN + R_STICK, y: stickCenterY - R_STICK - BUILD_GAP - R_BUILD };
-}
 
 // --- What the shipped view drew ---------------------------------------------
 
@@ -101,11 +100,45 @@ interface Rect {
   height: number;
 }
 
+/**
+ * ── WHY THIS FILE COUNTS ITS ROUND TRIPS (a0-00b) ──────────────────────────
+ * Profiled on PR #321's shard 2, `page.evaluate` accounted for the great bulk of
+ * what this spec family spent — across calls that each read a getter or found an
+ * id in an array, and each cost **2–3 seconds**. Nothing was computing for 2.5 s.
+ * A CDP `Runtime.evaluate` cannot run until the page's main thread yields, and
+ * under the runner's software GL the main thread is painting for very nearly the
+ * whole frame, so **one round trip costs about one frame** — ~1 s there against
+ * ~16 ms here. That, and not the work it does, is why `[pixel] :314` timed out at
+ * 300 s while the same test passed in 126 s on `iphone`.
+ *
+ * So the reads below are batched into as few crossings as the journey allows.
+ * Not one assertion moves: the seams read are the same seams, the values the same
+ * values, and every press is still a real synthesized event.
+ */
+
 /** Read the drawn Build-wheel wedges off the real client. Read-back only. */
 async function drawnWedges(page: Page): Promise<DrawnWedge[]> {
   return page.evaluate(() => {
     const s = (window as unknown as { __pressStage?: PressStage }).__pressStage;
     return s ? s.wedges() : [];
+  });
+}
+
+/** The wheel's drawn bounds, its wedges and the bank, off ONE frame — so the
+ *  three can no longer disagree with each other by a frame either. */
+async function drawnState(page: Page): Promise<{ wheel: Rect | null; wedges: DrawnWedge[]; bank: number | null }> {
+  return page.evaluate(() => {
+    interface Entry {
+      id: string;
+      bounds: { x: number; y: number; width: number; height: number };
+    }
+    const pr = (window as unknown as { __planetRush?: { layout: Entry[] } }).__planetRush;
+    const s = (window as unknown as { __pressStage?: PressStage }).__pressStage;
+    return {
+      wheel: pr?.layout.find((e) => e.id === 'build-wheel')?.bounds ?? null,
+      wedges: s ? s.wedges() : [],
+      bank: s ? s.bank() : null,
+    };
   });
 }
 
@@ -154,13 +187,18 @@ async function useLandscape(page: Page): Promise<void> {
 async function pressBuildAffordance(page: Page, touch: boolean): Promise<void> {
   if (touch) {
     // The button is drawn in LOGICAL space (landscape, even portrait-held), so
-    // the tap point crosses the client's own transform on the way back out.
-    const lvp = await page.evaluate(() => {
+    // the tap point crosses the client's own transform on the way back out —
+    // in the same crossing that reads the viewport, because the geometry
+    // between them is arithmetic that does not need to come home to be done.
+    const p = await page.evaluate((geom) => {
       const s = (window as unknown as { __pressStage?: PressStage }).__pressStage!;
-      return s.logicalViewport();
-    });
-    const c = buildButtonCenter(lvp.width, lvp.height);
-    const p = await toClient(page, c.x, c.y);
+      const lvp = s.logicalViewport();
+      const stickCenterY = lvp.height - geom.edgeMargin - geom.rStick;
+      return s.clientPoint(
+        geom.edgeMargin + geom.rStick,
+        stickCenterY - geom.rStick - geom.buildGap - geom.rBuild,
+      );
+    }, { edgeMargin: EDGE_MARGIN, rStick: R_STICK, buildGap: BUILD_GAP, rBuild: R_BUILD });
     await page.touchscreen.tap(p.x, p.y);
   } else {
     await page.locator('canvas').click({ position: { x: 8, y: 8 } }); // focus the canvas
@@ -204,30 +242,49 @@ async function setOre(page: Page, ore: number): Promise<void> {
   await waitForSimTicks(page, 3, { what: 'the wheel re-pricing' });
 }
 
-/** A LOGICAL point in client space — identity on desktop and in landscape, a 90°
- *  turn on a portrait-held phone, which is the whole reason it goes through the
- *  client's own transform rather than being guessed here. */
-async function toClient(page: Page, x: number, y: number): Promise<{ x: number; y: number }> {
-  return page.evaluate((p: { x: number; y: number }) => {
-    const s = (window as unknown as { __pressStage?: PressStage }).__pressStage!;
-    return s.clientPoint(p.x, p.y);
-  }, { x, y });
-}
+// A LOGICAL point becomes a client point through the client's OWN transform —
+// identity on desktop and in landscape, a 90° turn on a portrait-held phone,
+// which is the whole reason it is never guessed on this side. Every caller now
+// applies it inside the crossing that reads the geometry it is transforming
+// (`pressBuildAffordance`, `pressWedge`), so there is no separate hop for it.
 
-/** A real press at the drawn centre of wedge `index`, through the device's own
- *  event: a thumb tap on touch, a mouse click on desktop. */
+/**
+ * A real press at the drawn centre of wedge `index`, through the device's own
+ * event: a thumb tap on touch, a mouse click on desktop.
+ *
+ * Finding the wheel and turning the wedge's centre into a client point is ONE
+ * crossing, not two: both readings come off the same seams on the same frame,
+ * and the trigonometry between them does not need to travel to be done. It is
+ * also strictly more correct — the rect the angle is measured from and the
+ * transform applied to it are now guaranteed to be the same frame's.
+ */
 async function pressWedge(page: Page, index: number, count: number, touch: boolean): Promise<void> {
-  const bounds = await registered(page, 'build-wheel');
-  expect(bounds, 'the wheel is not drawn, so there is nothing to press').not.toBeNull();
-  const cx = bounds!.x + bounds!.width / 2;
-  const cy = bounds!.y + bounds!.height / 2;
-  const r = bounds!.width / 2;
-  // Segment 0 sits at twelve o'clock and the rest run clockwise (build-wheel.ts).
-  const angle = -Math.PI / 2 + (index * 2 * Math.PI) / count;
-  const p = await toClient(page, cx + Math.cos(angle) * r * 0.6, cy + Math.sin(angle) * r * 0.6);
-  if (touch) await page.touchscreen.tap(p.x, p.y);
-  else await page.mouse.click(p.x, p.y);
-  await waitForSimTicks(page, 3, { what: 'the press to resolve' });
+  const p = await page.evaluate(
+    (want: { index: number; count: number }) => {
+      interface Entry {
+        id: string;
+        bounds: { x: number; y: number; width: number; height: number };
+      }
+      const pr = (window as unknown as { __planetRush?: { layout: Entry[] } }).__planetRush;
+      const b = pr?.layout.find((e) => e.id === 'build-wheel')?.bounds;
+      if (!b) return null;
+      const cx = b.x + b.width / 2;
+      const cy = b.y + b.height / 2;
+      const r = b.width / 2;
+      // Segment 0 sits at twelve o'clock and the rest run clockwise (build-wheel.ts).
+      const angle = -Math.PI / 2 + (want.index * 2 * Math.PI) / want.count;
+      const s = (window as unknown as { __pressStage?: PressStage }).__pressStage!;
+      return s.clientPoint(cx + Math.cos(angle) * r * 0.6, cy + Math.sin(angle) * r * 0.6);
+    },
+    { index, count },
+  );
+  expect(p, 'the wheel is not drawn, so there is nothing to press').not.toBeNull();
+  if (touch) await page.touchscreen.tap(p!.x, p!.y);
+  else await page.mouse.click(p!.x, p!.y);
+  // No settle here: both callers settle for longer immediately afterwards, so
+  // this one only ever cost a second crossing for sim time the caller was going
+  // to wait for anyway. Their counts absorb it (3 + 5 -> 8, 3 + 10 -> 13), so
+  // the press still resolves against exactly as much simulation as before.
 }
 
 // ===========================================================================
@@ -255,7 +312,7 @@ test.describe('the Gantry/Bone wedge, through the real click path (u7-02)', () =
 
     const drawnRadius = (await registered(page, 'build-wheel'))!.width / 2;
     const radar = wedge(all, 'satellite')!;
-    expect(radar.costLabel, `[${label}] the cost reads cost/held`).toBe('6/8');
+    expect(radar.costLabel, `[${label}] the cost is one number — the cost (a0-03)`).toBe('6');
     expect(radar.costPaint, `[${label}] a payable cost is ore-yellow`).toBe('ore');
     expect(radar.caps, `[${label}] RADAR counts against its cap`).toBe(expectedCaps(drawnRadius, 0, 1));
     expect(radar.target, `[${label}] every wedge names what it spends on (GDD §2.5)`).toBe('YOUR STATION');
@@ -264,7 +321,7 @@ test.describe('the Gantry/Bone wedge, through the real click path (u7-02)', () =
     await setOre(page, 4);
     all = await drawnWedges(page);
     const short = wedge(all, 'satellite')!;
-    expect(short.costLabel, `[${label}] the cost re-prices against the bank`).toBe('6/4');
+    expect(short.costLabel, `[${label}] the same number at 4 ore — only the COLOUR moves`).toBe('6');
     expect(short.costPaint, `[${label}] a cost that cannot be paid is threat red`).toBe('refused');
 
     // The carve-out's limits, on the same frame: red is spent ONLY on a numeral
@@ -332,14 +389,18 @@ test.describe('the Gantry/Bone wedge, through the real click path (u7-02)', () =
     const SHIELD_INDEX = 1; // WHEEL_ORDER: turret, shield, satellite, repair, upgrade
     await setOre(page, 99);
     for (let i = 0; i < 3; i++) {
-      const before = await drawnWedges(page);
-      if (wedge(before, 'shield')!.costLabel === 'FULL') break;
+      // Still governed by the DRAWN wedge — what the client rendered, not what
+      // the model thinks. `pressWedge` now finds the wheel and applies the
+      // client transform in its own single crossing, so a turn of this loop
+      // costs three frames rather than four.
+      if (wedge(await drawnWedges(page), 'shield')!.costLabel === 'FULL') break;
       await pressWedge(page, SHIELD_INDEX, 5, touch);
-      await waitForSimTicks(page, 5, { what: 'the shield order to be counted' });
+      await waitForSimTicks(page, 8, { what: 'the press to resolve and the shield order to be counted' });
     }
 
-    let all = await drawnWedges(page);
-    const drawnRadius = (await registered(page, 'build-wheel'))!.width / 2;
+    const capState = await drawnState(page);
+    let all = capState.wedges;
+    const drawnRadius = capState.wheel!.width / 2;
     const atCap = expectedCaps(drawnRadius, 2, 2);
     const capped = wedge(all, 'shield')!;
     expect(capped.caps, `[${label}] the SHIELD wedge should be at its cap`).toBe(atCap);
@@ -352,19 +413,17 @@ test.describe('the Gantry/Bone wedge, through the real click path (u7-02)', () =
     // The refusal itself: press it for real and prove NOTHING moved. Queued
     // construction counts against the cap (GDD §2.5), so this is also the proof
     // that a player cannot buy past one by tapping fast.
-    const bankBefore = await page.evaluate(() => {
-      const s = (window as unknown as { __pressStage?: PressStage }).__pressStage;
-      return s ? s.bank() : null;
-    });
+    // The bank BEFORE came off the same frame the cap state did (`drawnState`
+    // above), so this costs no crossing of its own; the bank AFTER comes off the
+    // same frame as the count it is asserted beside, which is the frame the
+    // claim "nothing moved" is actually about.
+    const bankBefore = capState.bank;
     await pressWedge(page, SHIELD_INDEX, 5, touch);
-    await waitForSimTicks(page, 10, { what: 'any order the refused press might have placed' });
-    const bankAfter = await page.evaluate(() => {
-      const s = (window as unknown as { __pressStage?: PressStage }).__pressStage;
-      return s ? s.bank() : null;
-    });
-    all = await drawnWedges(page);
+    await waitForSimTicks(page, 13, { what: 'the press to resolve, and any order it might have placed' });
+    const settled = await drawnState(page);
+    all = settled.wedges;
     expect(wedge(all, 'shield')!.caps, `[${label}] the capped press moved the count`).toBe(atCap);
-    expect(bankAfter, `[${label}] the capped press spent ore`).toBe(bankBefore);
+    expect(settled.bank, `[${label}] the capped press spent ore`).toBe(bankBefore);
   });
 });
 
@@ -390,7 +449,7 @@ test.describe('PORTRAIT-HELD — the wheel drives through the landscape lock', (
     expect(all.length, `[${label}] the wheel drew no wedges portrait-held`).toBe(5);
     const bounds = (await registered(page, 'build-wheel'))!;
     const radar = wedge(all, 'satellite')!;
-    expect(radar.costLabel, `[${label}] cost/held survives the rotation`).toBe('6/4');
+    expect(radar.costLabel, `[${label}] the bare cost survives the rotation`).toBe('6');
     expect(radar.costPaint, `[${label}] and so does the refused colour`).toBe('refused');
     expect(radar.caps, `[${label}] and so does the count`).toBe(expectedCaps(bounds.width / 2, 0, 1));
 

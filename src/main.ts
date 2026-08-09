@@ -41,6 +41,7 @@ import {
   turretCount,
   sensorSources,
   rememberedOreIds,
+  waveIntervalOf,
 } from './sim';
 import type { MuzzleFlash, MiningStation, Turret, World, SensorSource } from './sim';
 // The sim's real, validated upgrade purchase — used only by the ?debug=1
@@ -83,6 +84,11 @@ import {
 import type { RootTransform } from '@platform/orientation';
 import { createBrowserPlatform } from '@platform/platform';
 import { createBrowserHaptics } from '@platform/haptics';
+// The career profile (a0-13's chain, pr-01): ONE profile, ONE key, ONE reader.
+// The hangar reads it and the equip write goes back through the same module —
+// nothing in this file invents a second store for progression.
+import { loadProfile, saveProfile } from './progression/profile';
+import type { Profile } from './progression/profile';
 import { FullscreenLifecycle } from '@platform/fullscreen';
 import { InstallPromptController } from '@platform/install-prompt';
 import { writeAffordanceRects } from '@platform/touch-visuals';
@@ -135,6 +141,8 @@ import {
   SettingsView,
   mainMenuModel,
   mainMenuLayout,
+  mainMenuStep,
+  mainMenuIndexOf,
   MAIN_MENU_ITEMS,
   // THE DOORS (ratified: one play flow) — the room-code screen the menu's one PLAY
   // button opens: PLAY SOLO, CREATE a room, or JOIN one by code. All three land in
@@ -154,6 +162,7 @@ import {
   eraseEntryCode,
   backToDoors,
   submitJoin,
+  canSubmitJoin,
   DOOR_ORDER,
   KEYPAD_KEYS,
   regionPickerVisible,
@@ -170,6 +179,15 @@ import {
   CodexHintView,
   codexBotHint,
   codexShipHint,
+  // THE HANGAR (a0-14) — the fourth main-menu door: your ship from the real
+  // generators, your level read off the one profile, and the level→unlock list
+  // of cosmetics (empty today, and honest about it).
+  HangarView,
+  hangarModel,
+  hangarLayout,
+  hangarTargetKey,
+  equipCosmetic,
+  COSMETICS,
   mapIdAt,
   normalizeMapId,
   registryStations,
@@ -206,6 +224,9 @@ import {
   // read the one authored `MatchConfig`, which is what makes an offline TEAMS
   // match and an online one the same match.
   lobbyRosterTeams,
+  denseSeatIndex,
+  isParticipant,
+  lobbyWireSeats,
   lobbyWireTeams,
   startLobbyMatch,
   wireFireMode,
@@ -255,6 +276,7 @@ import type {
   MainMenuOption,
   CodexState,
   CodexTarget,
+  HangarTarget,
   EndButton,
   MatchOutcome,
   DeathCause,
@@ -273,9 +295,22 @@ import {
   allocatorUrlFromEnv,
   allocateRoom,
   joinRoom,
+  // The region picker (n3): the fleet's regions with a ping this client measured,
+  // the room's region on the JOIN screen, and the two lines that say either.
+  readRoomAdvert,
+  surveyRegions,
+  formatRegionChoices,
+  formatRoomRegion,
+  regionLabel,
   createOnlineSession,
   allocatorTransport,
   attachSessionLog,
+  // A room with no other humans in it plays locally, and says so (a0-11).
+  ROOM_COST_NOTE,
+  localSeat,
+  playsLocally,
+  releaseRoom,
+  showLocalRevertTell,
   // The verbose connecting screen (M10): every step of the join named as it
   // happens **in the screen's own title**, or the exact refusal there with RETRY
   // and DOWNLOAD LOG under it.
@@ -318,6 +353,8 @@ import type {
   ConnectTrace,
   ConnectStep,
   SessionLogHandle,
+  /** The fleet's regions with their measured pings, and the default they imply. */
+  RegionSurvey,
   // The room code the doors resolved and the lobby opens on — one code, end to end
   // (the unified play flow; `./ui/lobby-flow` rule 1).
   RoomCode,
@@ -331,7 +368,14 @@ import codexShips from '../content/codex/codex-ships.json';
 import codexSystems from '../content/codex/codex-systems.json';
 import codexStrategy from '../content/codex/codex-strategy.json';
 import { personality } from './bots';
-import { AudioEngine, AudioUnlock, defaultUnlockTarget, openAudioContext, type AudioCue } from './art/audio';
+import {
+  AudioEngine,
+  AudioUnlock,
+  defaultUnlockTarget,
+  deriveAlarmAllies,
+  openAudioContext,
+  type AudioCue,
+} from './art/audio';
 import { TellQueue, TELL_CAPACITY } from './art/tells';
 import { WorldObserver } from './art/vfx/observer';
 
@@ -550,6 +594,18 @@ async function boot(): Promise<void> {
   //          them — the audible twin of the VFX field (GDD §3.6), fed in the loop.
   //     The starting mix is the settings screen's own DEFAULT_VOLUMES, so what the
   //     player hears matches what the sliders show, and every default is audible.
+  //
+  //     THE SEAT IS NOT KNOWN YET, AND THAT IS THE s9-01 BUG (fixed below).
+  //     The engine is built HERE, before the menu, because the unlock has to be
+  //     armed before the first gesture and the doors need a voice — but a joiner's
+  //     slot is only assigned two hundred lines down, when the server welcomes
+  //     them. `local` here is therefore a placeholder, and it is captured BY
+  //     VALUE: reassigning the `LOCAL_PLAYER` binding afterwards cannot reach the
+  //     engine. So every online client believed it was slot 0, and a player in
+  //     slot 3 heard slot 0's station being attacked and heard nothing when their
+  //     own was. `audio.setLocal` / `audioObserver` are rebound at the seat
+  //     assignment — search "s9-01" below. Do not read `LOCAL_PLAYER` into a
+  //     construction argument up here again without doing the same.
   const audioCtx = openAudioContext();
   const audio = new AudioEngine({
     context: audioCtx,
@@ -557,7 +613,6 @@ async function boot(): Promise<void> {
     mix: { master: DEFAULT_VOLUMES.master, sfx: DEFAULT_VOLUMES.sfx, music: DEFAULT_VOLUMES.music },
   });
   const audioTells = new TellQueue(TELL_CAPACITY);
-  const audioObserver = new WorldObserver({ local: LOCAL_PLAYER });
   const unlockTarget = defaultUnlockTarget();
   const audioUnlock =
     audioCtx && unlockTarget
@@ -755,11 +810,35 @@ async function boot(): Promise<void> {
   // ratified flow puts one lobby between every door and every match — and only after
   // RUSH! does a world exist (GDD §4.2).
   const launch: LaunchPlan = mainMenu ? await mainMenu.untilPlay() : { kind: 'offline' };
-  const onlineSession = launch.kind === 'online' ? launch.session : null;
+  // `let`, because a room can still turn out not to need a server: if RUSH! finds
+  // the host alone, the lobby releases the room and this is dropped so the match
+  // boots on `LocalLoopback` (a0-11, `src/net/local-revert`).
+  let onlineSession = launch.kind === 'online' ? launch.session : null;
   // A JOINER is seated by the server at whatever slot was free, so the local seat
   // is only known now — bind it before any closure below reads it (a creator, and
   // every offline match, stays seat 0).
   if (launch.kind === 'online') LOCAL_PLAYER = launch.you;
+
+  // …and tell the two things that could not read the live binding (s9-01).
+  //
+  // Rebinding the `let` above is enough for every closure — they read it when
+  // they run. It is NOT enough for anything handed the slot as a CONSTRUCTOR
+  // ARGUMENT before this line, and there are exactly two: the audio engine
+  // (built above, for the unlock and the menu's voice) and the tell observer.
+  // Both captured `0` and kept it, so in every online match on a non-zero slot
+  // the mix believed it was slot 0 — damage to slot 0's station rang the
+  // player's under-attack alarm and damage to their OWN station was silent
+  // (developer report s9, "it should only play for your station not others").
+  // `audio.setLocal()` existed the whole time and this file never called it; its
+  // only caller was `art/presenter.ts`, which is not on this boot path.
+  //
+  // The observer is CONSTRUCTED here rather than set, because its `local` is
+  // readonly by design — it colours the end-of-match tell (won or lost), and a
+  // joiner on slot 3 was getting slot 0's result sting for the same reason.
+  audio.setLocal(LOCAL_PLAYER);
+  // `let` for the same reason `onlineSession` is: a room that reverts to a local
+  // match at RUSH! moves the local seat, and this captured the old one (a0-11).
+  let audioObserver = new WorldObserver({ local: LOCAL_PLAYER });
 
   // --- The lobby (GDD §2.1, §2.11; M4) — ONE component, EVERY door (ratified: the
   //     unified play flow). Every way in lands here, not in the match: the 8-slot
@@ -819,6 +898,22 @@ async function boot(): Promise<void> {
         ...(debugSize !== undefined ? { size: debugSize } : {}),
         ...(debugTeams ? { teams: debugTeams } : {}),
       };
+  // ── The room did not need a server (a0-11) ────────────────────────────────
+  // Decided at RUSH! by the lobby, which has already released the room and told
+  // the player. All that is left here is to stop treating this as an online
+  // match: drop the (now-closed) session so the boot below takes the offline
+  // path, and re-point the local seat at the DENSE roster the sim builds — the
+  // lobby's seat number and the sim's stop agreeing the moment a chair is left
+  // empty. The audio engine and the end-of-match observer took the old number as
+  // a constructor argument, so both are re-pointed too, exactly as the online
+  // seat binding above does it (s9-01: a mix that believes it is on slot 0 rings
+  // the wrong station's alarm).
+  if (chosen.local) {
+    onlineSession = null;
+    LOCAL_PLAYER = chosen.local.you;
+    audio.setLocal(LOCAL_PLAYER);
+    audioObserver = new WorldObserver({ local: LOCAL_PLAYER });
+  }
   const chosenShipClass = chosen.shipClass;
   // The name shown over the local ship and station (field request v0.2.1) — the
   // lobby's, or the persisted-or-default "YOU" under ?debug=1 where there is none.
@@ -899,6 +994,25 @@ async function boot(): Promise<void> {
   // local `LocalLoopback` (GDD §4.2). Offline, `bootMatch` builds the loopback.
   let match: ClientMatch = onlineSession ? onlineMatchAdapter(onlineSession) : bootMatch(matchSeed);
   let world = match.world;
+
+  /** Cached owner slots on the local player's side — the under-attack alarm's
+   *  roster (`art/audio/scope`). Cleared on a rematch, below. */
+  let alarmSide: ReadonlySet<PlayerId> | null = null;
+
+  /**
+   * Whose home rings THIS client's alarm, from live world truth (s9-01).
+   *
+   * Allegiance is static match config (GDD §4.2 — it travels with the match-start
+   * roster, not the per-tick snapshot), so the side is derived once from the first
+   * world it is asked about and reused every frame after; `rematch` drops it, and
+   * a reconnect reclaims the same seat on the same side. In FFA this is `{you}`
+   * and the engine would have behaved identically without it; in TEAMS it is you
+   * and your allies, which is the case the fallback got wrong.
+   */
+  function alarmAllies(): ReadonlySet<PlayerId> {
+    alarmSide ??= deriveAlarmAllies(world, LOCAL_PLAYER);
+    return alarmSide;
+  }
 
   // Reconnect grace, the render half (GDD §4.2). When a dropped client redials
   // inside the window and reclaims its seat, the server replays `matchStart` at
@@ -1056,6 +1170,7 @@ async function boot(): Promise<void> {
     installTapCommanderStage();
     installTapMarkerStage();
     installMinimapStage();
+    installStationHealthStage();
     installAudioStage();
   }
 
@@ -1072,6 +1187,14 @@ async function boot(): Promise<void> {
   // read-back plus the physical points the client itself drew, no mutators, and it
   // computes nothing until something calls `read()`.
   installPauseStage();
+  // The alarm-ownership seam ships on BOTH boots for exactly the same reason, and
+  // it is the reason s9-01 needed a new test class at all: "the audio engine
+  // believes it is the slot the server seated me at" is a claim about an ONLINE
+  // match, and `?debug=1` cannot reach one. Every audio unit test in the repo
+  // passed straight through this bug, because the defect was in who the engine
+  // was told it was, not in what it does with that. Same discipline as the pause
+  // seam — pure read-back, no mutators, nothing computed until `read()` is called.
+  installAlarmStage();
 
   // --- Touch controls made visible (touch-visuals.ts) — the dynamic sticks and
   //     the fire-mode morph the player actually sees. On top of the HUD so the
@@ -1858,7 +1981,10 @@ async function boot(): Promise<void> {
       // the golden frame is byte-deterministic.
       renderer.setReduceVfx(flags.freeze ? false : vfxQuality.sample(frameSeconds) || matchSettings.reduceVfx);
 
-      renderer.draw(world, { cameraTarget, muzzles: currentMuzzles() });
+      // `mapId` picks the backdrop's sky (a0-07): a map's nebula is part of its
+      // identity, like its layout, and `World` does not carry the id it was built
+      // from — so the boot that chose the map is what hands it to the renderer.
+      renderer.draw(world, { cameraTarget, muzzles: currentMuzzles(), mapId: chosenMapId });
       // Audio (src/art/audio): sound this frame the same way it is drawn. Derive
       // tells off the live world (the audible twin of the VFX field, GDD §3.6),
       // sound them, then advance the standing voices, the alarm, the adaptive
@@ -1869,6 +1995,15 @@ async function boot(): Promise<void> {
       if (heard) audio.setListener(heard.pos.x, heard.pos.y);
       audioTells.clear();
       audioObserver.observe(world, frameSeconds, audioTells);
+      // Scope the alarm to the local player's SIDE from LIVE world truth, before
+      // the mix hears the tells (s9-01). `setAlarmScope` shipped with the engine
+      // and was called from nowhere but `art/presenter.ts` and its tests — never
+      // from this file, which is the one the shipped client actually boots. With
+      // it uncalled the engine falls back to "you alone", which is FFA-correct
+      // and TEAMS-wrong: an ally's station under siege never rang. The `collapse`
+      // flag is the second half — every core decays on its own once the claim
+      // closes in, and entropy is not an attacker (GDD §2.3 vs §2.2).
+      audio.setAlarmScope(alarmAllies(), world.match.phase === 'collapse');
       audio.consume(audioTells);
       audio.update(frameSeconds);
       // Phones lock and tabs get backgrounded mid-match; the context comes back
@@ -2029,17 +2164,27 @@ async function boot(): Promise<void> {
    * coarse cause of death: the collapse if the field had closed over the core by
    * the time it fell, otherwise a rival destroyed it (the sim tracks no killer, so
    * this is the honest limit of what it can say — field report v0.1.2).
+   *
+   * **The side rides along (a0-09).** `world.match.winner` is a *representative*
+   * of the winning side, not necessarily this seat — `resolveWinner` crowns the
+   * last surviving core it walks, so a side that ends with two cores standing
+   * reports the higher slot. Handing the summary the same `alarmAllies()` roster
+   * the klaxon uses is what lets it answer "did MY side take the claim?" instead
+   * of "is the winner literally me?", which is the identity check that told the
+   * developer they had lost a match their team won. One predicate, one answer —
+   * the alarm, the arrow and this screen all read the one set.
    */
   function currentOutcome(over: boolean): MatchOutcome {
     const total = world.stations.length;
-    if (over) return { you: LOCAL_PLAYER, winner: world.match.winner, matchOver: true };
+    const allies = alarmAllies();
+    if (over) return { you: LOCAL_PLAYER, winner: world.match.winner, matchOver: true, allies };
 
     const k = world.match.eliminated.indexOf(LOCAL_PLAYER);
     const station = stationOf(world, LOCAL_PLAYER);
     const byCollapse =
       isCollapsed(world) && station !== null && station.deathTime >= world.match.collapseTime;
     const cause: DeathCause = byCollapse ? 'collapse' : 'destroyed';
-    const base: MatchOutcome = { you: LOCAL_PLAYER, winner: null, matchOver: false, totalPlayers: total, cause };
+    const base: MatchOutcome = { you: LOCAL_PLAYER, winner: null, matchOver: false, totalPlayers: total, cause, allies };
     // First core to fall places last; the survivor is 1st — so `N − k`. Present
     // only when we actually found the seat in the elimination order.
     return k >= 0 ? { ...base, placement: total - k } : base;
@@ -2118,6 +2263,9 @@ async function boot(): Promise<void> {
     // ended on (the observer's first post-reset frame primes and emits nothing).
     audioObserver.reset();
     audio.reset();
+    // A rematch may re-team the board, so last match's alarm roster is a stale
+    // claim about who is on your side — the next frame re-derives it (s9-01).
+    alarmSide = null;
     pauseScreen = 'closed'; // a fresh match is never mid-pause
   }
 
@@ -2642,8 +2790,9 @@ async function boot(): Promise<void> {
    *    core + shields + turrets between frames, so a turret being picked off at
    *    the edge of its range rings it exactly as a shot on the core does — and a
    *    single stray shot does not (the sustained-damage trigger is `src/ui`'s).
-   *  - **The wave clock and the collapse state** are `world.time` and the sim's
-   *    own `isCollapsed`, so the clock on screen is the clock the match runs on.
+   *  - **The wave clock and the collapse state** are `world.time`, the sim's own
+   *    `isCollapsed`, and the match's own `waveIntervalOf` — so the clock on
+   *    screen is the clock the match runs on, at the cadence this match runs it.
    */
   function feedHud(): void {
     hudFrame.time = world.time;
@@ -2652,6 +2801,11 @@ async function boot(): Promise<void> {
     hudFrame.isTouch = isTouch;
     hudFrame.owner = LOCAL_PLAYER;
     hudFrame.collapsed = isCollapsed(world);
+    // The match's OWN wave interval, the same number `spawnDueWaves` schedules
+    // against (a0-16). Read here for the same reason `collapsed` is: the sim
+    // answers it, the HUD never guesses — and before this the clock guessed the
+    // baseline and was 15 s wrong in every default (SCARCE) match.
+    hudFrame.waveInterval = waveIntervalOf(world);
     hudFrame.buildRequested = buildWheel.open;
     hudFrame.upgradePanelOpen = buildWheel.panelOpen;
     // The nested weapon wheel only exists inside the open upgrade panel; drop it
@@ -2845,11 +2999,15 @@ async function boot(): Promise<void> {
    * v0.2.1): a label over **every ship** and **every owned station**, tinted the
    * owner's identity colour and captioned from {@link playerNames}. The pure model
    * ({@link ./ui} `nameplateModel`) decides who is labelled (a dead ship, a
-   * destroyed station — a wreck — and the local ship's own label are all dropped)
-   * and fades a label under combat clutter; here we only project world → screen
-   * (via the same camera transform the bars use, after `renderer.draw`) and pass
-   * the sim liveness/combat facts through. Stations carry no HP/combat signal, so a
-   * rival station's label never leaks its scouted-only HP (GDD §2.2).
+   * destroyed station — a wreck — and the local ship's own label are all dropped);
+   * here we only project world → screen (via the same camera transform the bars
+   * use, after `renderer.draw`) and pass the sim liveness facts through.
+   *
+   * No combat or HP fact crosses this seam any more. It used to — `ship.firing`
+   * and the hull fraction drove the label's combat fade — and the developer
+   * withdrew that fade at a0-04 (*"they should always be lit"*), so the feed stops
+   * at ownership, liveness and position. A rival station's scouted-only HP (GDD
+   * §2.2) could never leak through a label's brightness now even in principle.
    *
    * Allocation-free after warm-up (GDD §4.3): the records are pooled and the frame
    * array reused, bounded by the entity caps (≤8 ships, ≤8 stations).
@@ -2862,8 +3020,6 @@ async function boot(): Promise<void> {
       c.kind = 'ship';
       c.alive = ship.alive && !ship.eliminated;
       c.local = ship.id === LOCAL_PLAYER;
-      c.inCombat = ship.firing;
-      c.hpFraction = ship.maxHull > 0 ? ship.hull / ship.maxHull : 1;
       renderer.projectToScreen(ship.pos, c.pos);
       c.radius = ship.radius;
     }
@@ -2874,10 +3030,6 @@ async function boot(): Promise<void> {
       // A standing (owned) station is labelled; a wreck (`alive` false) is not.
       c.alive = station.alive;
       c.local = false;
-      // No combat signal on a station: a rival's HP is scouted only (GDD §2.2), so
-      // the fade never becomes a back-door HP readout. Full alpha, always.
-      c.inCombat = false;
-      c.hpFraction = 1;
       renderer.projectToScreen(station.pos, c.pos);
       c.radius = station.radius;
     }
@@ -2901,7 +3053,7 @@ async function boot(): Promise<void> {
   function nameableSlot(i: number): MutNameable {
     let c = nameablePool[i];
     if (!c) {
-      c = { owner: 0, kind: 'ship', alive: false, local: false, inCombat: false, hpFraction: 1, pos: { x: 0, y: 0 }, radius: 0 };
+      c = { owner: 0, kind: 'ship', alive: false, local: false, pos: { x: 0, y: 0 }, radius: 0 };
       nameablePool[i] = c;
     }
     return c;
@@ -3531,6 +3683,45 @@ async function boot(): Promise<void> {
           if (p.owner !== LOCAL_PLAYER && p.alive) destroyCore(world, p);
         }
         return true;
+      },
+      /**
+       * **The developer's a0-09 scenario, staged:** every core NOT on the local
+       * player's side falls, and the side wins with an ALLY crowned.
+       *
+       * The crowning is the sim's, untouched — `resolveWinner` reports the last
+       * surviving core it walks, so a side left holding several reports its
+       * highest slot, which is an ally whenever more than the local core stands.
+       * That is precisely how the developer's screenshot came to read *"Player 7
+       * took the claim"* over DEFEAT while their own reactor was intact.
+       *
+       * Reaches nothing `endMatch`/`winLocal` do not: the sim's own `destroyCore`,
+       * on enemy cores only. Needs a sided world (`?debug=1&sides=2`) to mean
+       * anything — in FFA every other slot is an enemy, so this collapses to
+       * `winLocal` and is refused (there is no ally to crown).
+       */
+      winAlly(): boolean {
+        const allies = alarmAllies();
+        const standing = world.stations.filter((p) => p.alive && allies.has(p.owner));
+        // An ally other than the local seat must be left holding a core, or the
+        // sim would crown the local player and this stages nothing.
+        if (!standing.some((p) => p.owner !== LOCAL_PLAYER)) return false;
+        for (const p of world.stations) {
+          if (p.alive && !allies.has(p.owner)) destroyCore(world, p);
+        }
+        return true;
+      },
+      /** The slots this client believes are on its side — the one roster the
+       *  klaxon, the arrow and the end screen all read (a0-09). */
+      side(): number[] {
+        return [...alarmAllies()].sort((a, b) => a - b);
+      },
+      /** The WORDS the summary actually resolved this frame — the result kind and
+       *  the two lines. The a0-09 report was about what the screen SAID, so the
+       *  evidence run reads the sentence rather than inferring it from state. */
+      result(): { kind: string; headline: string; subhead: string } | null {
+        if (endScreen === 'none') return null;
+        const model = endOfMatchModel(currentOutcome(endScreen === 'result'));
+        return { kind: model.kind, headline: model.headline, subhead: model.subhead };
       },
       screen(): 'none' | 'defeated' | 'result' {
         return endScreen;
@@ -4349,6 +4540,81 @@ async function boot(): Promise<void> {
   }
 
   /**
+   * Install `window.__stationHealthStage` — the ?debug=1 live-stage seam for the
+   * a0-05 evidence: **a rival station's damage ring reads true at any range**
+   * (GDD §2.2, amended 2026-08-07). The unit tests assert the rule in the sim and
+   * the instruction count in the renderer; what they cannot reach is the one
+   * thing the developer actually reported — what the ring looks like on a real
+   * boot, approaching and going away.
+   *
+   * `stage(coreFraction, distance)` parks the local ship a given distance from a
+   * RIVAL home and sets that home's core to a fraction of max, then reports the
+   * geometry back (the rival's slot, the exact fraction, the surface distance,
+   * and where the station projects on screen) so the capture can prove the frame
+   * is the frame it claims to be rather than trusting a screenshot. Four calls
+   * make the four frames: damaged near, damaged far, healthy near, healthy far.
+   *
+   * The distance is measured to the station's SURFACE, the same way the retired
+   * `SENSOR_RANGE` was, so "180" in a capture script means exactly the old cut.
+   *
+   * Staging only — it writes the same plain sim data the render loop already
+   * reads every frame (`coreHp`, `pos`), never a render or fog decision, so the
+   * ring in the frame is drawn by the real pipeline and the seam cannot fake the
+   * thing it is evidence for. Best paired with `?freeze=1`, which pins the sim so
+   * the staged frame holds still. Behind ?debug=1 only.
+   */
+  function installStationHealthStage(): void {
+    const stage = {
+      stage(
+        coreFraction: number,
+        distance: number,
+      ): {
+        owner: PlayerId;
+        coreFraction: number;
+        surfaceDistance: number;
+        radius: number;
+        screen: Vec2;
+      } | null {
+        const local = world.ships.find(isLocalShip);
+        const rival = world.stations.find((p) => p.owner !== LOCAL_PLAYER && p.alive);
+        if (!local || !rival) return null;
+        const f = coreFraction < 0 ? 0 : coreFraction > 1 ? 1 : coreFraction;
+        rival.coreHp = f * rival.maxCoreHp;
+        // Offset along X, the wider screen axis: the camera is translate-only at
+        // 1:1, so a 16:9 viewport reaches ~640 world units sideways and only ~400
+        // vertically. Staging sideways is what lets a genuinely long-range frame
+        // still contain the station — and the fact that there IS a ceiling here
+        // is the honest shape of the amendment: "always visible" means the ring
+        // never lies about a station you can see, not that the screen got bigger.
+        local.pos.x = rival.pos.x + rival.radius + distance;
+        local.pos.y = rival.pos.y;
+        local.vel.x = 0;
+        local.vel.y = 0;
+        local.alive = true;
+        const at: Vec2 = { x: 0, y: 0 };
+        renderer.projectToScreen(rival.pos, at);
+        return {
+          owner: rival.owner,
+          coreFraction: rival.coreHp / rival.maxCoreHp,
+          surfaceDistance: distance,
+          radius: rival.radius,
+          screen: at,
+        };
+      },
+    };
+    try {
+      Object.defineProperty(window, '__stationHealthStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
+  /**
    * Install `window.__audioStage` — the ?debug=1 live-stage seam that proves, on a
    * REAL boot, that the game actually MAKES SOUND (field report v0.2.4: "why don't
    * I hear ANY sounds yet?"). The unit tests build the whole graph headless against
@@ -4446,6 +4712,72 @@ async function boot(): Promise<void> {
     };
     try {
       Object.defineProperty(window, '__audioStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
+  /**
+   * Install `window.__alarmStage` — who the mix thinks you are, on a REAL boot.
+   *
+   * The s9-01 seam, and the reason it is not part of `__audioStage`: it ships on
+   * BOTH boots. `?debug=1` skips the menu straight into an offline match, so
+   * every gated seam in this file is unreachable from an online one — and the
+   * defect this exists to catch was *only* visible online. `main.ts` handed the
+   * audio engine `LOCAL_PLAYER` as a constructor argument at boot, two hundred
+   * lines before the server told this client which slot it had been seated at, so
+   * the whole mix believed it was slot 0 for the entire match. The state machine
+   * behind it is thoroughly unit-tested and every one of those tests passed:
+   * nothing was wrong with the logic, only with what it had been told.
+   *
+   * So the assertion a live-stage test makes off this is "the number the engine
+   * is using equals the seat the server actually gave me", and it can only be
+   * made from a real online join on a NON-ZERO slot — on slot 0 a broken wire and
+   * a working one produce identical readings, which is exactly why this survived.
+   *
+   * Pure read-back: three numbers and two booleans, no mutators, nothing computed
+   * until `read()` is called. Safe to ship for the same reason `__pauseStage`,
+   * `__lobby` and `__mainMenu` are.
+   */
+  function installAlarmStage(): void {
+    const stage = {
+      read(): {
+        /** The slot the AUDIO ENGINE is using as "you" — the number that was
+         *  wrong. Compare it against the seat the server welcomed this client
+         *  into (`__lobby.you`); anything else is the s9-01 bug, back. */
+        local: PlayerId;
+        /** The slot this client is flying, as the rest of `main.ts` reads it. */
+        localPlayer: PlayerId;
+        /** The owner slots whose home damage rings THIS client's alarm — you in
+         *  FFA, you and your allies in TEAMS (`art/audio/scope`). Empty before the
+         *  first match frame has derived it. */
+        allies: readonly PlayerId[];
+        /** True while the under-attack state machine is up. The screen-edge arrow
+         *  keys off the HUD's own trigger, but this is the audio half of §2.2. */
+        active: boolean;
+        /** Engagements the state machine has counted this match. */
+        engagements: number;
+        /** Alarm stings actually SOUNDED — one per engagement, never one per
+         *  frame of a siege (the developer's "it should only play once"). */
+        sounds: number;
+      } {
+        return {
+          local: audio.alarmLocal,
+          localPlayer: LOCAL_PLAYER,
+          allies: [...alarmAllies()].sort((a, b) => a - b),
+          active: audio.alarm.active,
+          engagements: audio.alarm.count,
+          sounds: audio.alarmSounds,
+        };
+      },
+    };
+    try {
+      Object.defineProperty(window, '__alarmStage', {
         value: stage,
         writable: false,
         configurable: false,
@@ -4886,8 +5218,6 @@ interface MutNameable {
   kind: 'ship' | 'station';
   alive: boolean;
   local: boolean;
-  inCombat: boolean;
-  hpFraction: number;
   pos: Vec2;
   radius: number;
 }
@@ -5394,7 +5724,7 @@ interface CodexControlReport {
 /** The read-only `window.__mainMenu` seam, extended for the landscape lock. */
 interface MainMenuSeam {
   visible: boolean;
-  screen: 'menu' | 'settings' | 'codex' | 'online';
+  screen: 'menu' | 'settings' | 'codex' | 'online' | 'hangar';
   matchStarted: boolean;
   /** The LOGICAL (landscape) viewport the menu laid out against. */
   logicalViewport: { width: number; height: number };
@@ -5413,6 +5743,23 @@ interface MainMenuSeam {
    *  press on a tab / entry took effect (no hit-test seam). */
   codexTab: string;
   codexEntry: string;
+  /** The HANGAR's controls (BACK, and one per cosmetic row), each with the
+   *  physical press point through the landscape-lock remap — so a live-stage or
+   *  evidence run reaches the fourth door with a real press on both form
+   *  factors, exactly as it reaches the codex. */
+  hangarControls: readonly CodexControlReport[];
+  /**
+   * What the hangar is SAYING, read back as plain strings: the hull in the bay,
+   * the level line, and the empty-state line (`''` once there are rows).
+   *
+   * The empty line is the one that matters. It is Pixi text, so this is how a
+   * capture proves the screen is honest rather than blank — a hangar with no
+   * cosmetics and no sentence is the bug report a0-14 exists to prevent, and it
+   * is indistinguishable from a working one in a screenshot alone.
+   */
+  hangarShip: string;
+  hangarLevel: string;
+  hangarEmpty: string;
   /** The control scheme the settings screen currently shows and persists — the
    *  menu's live value, written to the same storage the match reads at boot.
    *  Readback proof that a tap on the CONTROLS row took effect immediately. */
@@ -5431,6 +5778,9 @@ interface MainMenuSeam {
   /** The same screen, under its old name — kept because PLAY *is* the doors now, so
    *  a caller that asked for either gets one screen. */
   online(): void;
+  /** HANGAR — the fourth door (a0-14). Opens a screen, never a room: no
+   *  transport, no world, and BACK comes home. */
+  hangar(): void;
 }
 
 /**
@@ -5465,8 +5815,21 @@ interface OnlineSeam {
   title: string;
   /** The code typed so far on the join screen. */
   code: string;
-  /** Whether the region picker draws — `false` at one region (launch). */
+  /** Whether the region picker draws — `false` until the fleet advertises more
+   *  than one region, which is a count, not a flag (n3). */
   regionPickerVisible: boolean;
+  /** The fleet's regions in survey order (fastest measured first), each with the
+   *  ping this client measured or `null` when it could not be measured. */
+  regions: readonly RegionInfo[];
+  /** The region a CREATE will ask for: the player's override, else the lowest
+   *  measured, else `null` — and `null` sends no region, leaving the allocator's
+   *  edge inference to decide exactly as it did before there was a picker. */
+  regionSelected: string | null;
+  /** That list as one line — `GRU 38ms · [IAD 224ms]`, the selection bracketed. */
+  regionLine: string;
+  /** Pick a region for the next CREATE. Ignores an id the fleet does not
+   *  advertise: a picker cannot select a row it did not draw. */
+  selectRegion(id: string): void;
   /** The globally-unique code the allocator minted on a successful CREATE, or
    *  `null`. Never client-guessed (M3 — use `assignment.code` verbatim). */
   resolvedCode: string | null;
@@ -5550,15 +5913,33 @@ function openMainMenu(
   // `online` is the DOORS screen's id — the screen PLAY now opens. Kept under its
   // old name because the `__mainMenu.screen` seam and every live-stage spec already
   // read that string, and renaming a wire-visible id buys nothing.
-  let screen: 'menu' | 'settings' | 'codex' | 'online' = 'menu';
+  let screen: 'menu' | 'settings' | 'codex' | 'online' | 'hangar' = 'menu';
   let played = false;
+  // The career, read once when the front door opens (a0-14). The hangar shows
+  // it and the equip write persists it through the same module; nothing else on
+  // this screen touches it, and the sim never sees it at all (GDD §4.8).
+  let profile: Profile = loadProfile(platform.storage);
   // The doors' own state. `entry` is the SOLO/CREATE/JOIN model; `onlineResolved`
   // holds the allocator's minted code once a CREATE succeeds (never client-guessed
   // — M3 rule). One region at launch, so the picker stays suppressed by config
   // (`regionPickerVisible === false`).
   let entry: EntryState = createEntry();
   let onlineResolved: string | null = null;
-  const onlineRegions: readonly RegionInfo[] = [{ id: 'iad', label: 'US East' }];
+  // The fleet's regions, MEASURED (n3). Empty until the survey lands — and empty
+  // is the honest state for the offline build, an allocator that is down, and a
+  // fleet with no /regions route, all of which keep the picker suppressed by count
+  // (`regionPickerVisible`) rather than by a flag. No region is named in this file:
+  // the list is the allocator's, and the number beside each one is a round trip
+  // this client timed (`src/net/region-probe`).
+  let onlineRegions: readonly RegionInfo[] = [];
+  let regionSurvey: RegionSurvey | null = null;
+  /** The region the PLAYER picked, when they overrode the measured default. */
+  let regionChoice: string | null = null;
+  /** The probe in flight, so two callers share one sweep of the fleet. */
+  let regionProbe: Promise<void> | null = null;
+  /** The last line the picker wrote into the doors' message slot, so a re-measure
+   *  may replace its own line and nothing else's. */
+  let lastRegionLine = '';
   // A room code the entry model needs for an offline-loopback create; discarded
   // for online (the allocator mints the real one). Seeded, never `Math.random()`.
   const onlineRng = mulberry32(0x51ac37);
@@ -5594,6 +5975,8 @@ function openMainMenu(
   // phone `hover` stays null and only `press` moves.
   let menuHover: MainMenuOption | null = null;
   let menuPress: MainMenuOption | null = null;
+  /** The plate the keyboard is on. Starts at PLAY, so Enter alone is unchanged. */
+  let menuFocus: MainMenuOption = 'play';
   let settingsHover: SettingsTarget | null = null;
   let settingsPress: SettingsTarget | null = null;
   // The doors and the CODEX joined the Gantry/Bone set in u7-04, so they get the
@@ -5604,7 +5987,12 @@ function openMainMenu(
   let entryPress: string | null = null;
   let codexHover: string | null = null;
   let codexPress: string | null = null;
-  ctx.root.addChild(menuView, settingsView, codexView, entryView);
+  // The hangar (a0-14) — the fourth door, on the same hover/press routing as the
+  // three screens above it.
+  const hangarView = new HangarView(menu0.w, menu0.h, isTouch);
+  let hangarHover: string | null = null;
+  let hangarPress: string | null = null;
+  ctx.root.addChild(menuView, settingsView, codexView, entryView, hangarView);
 
   // The read-only test seam. `matchStarted` is flipped by `handle.matchStarted()`
   // once the real world is built, never here — so the suite's "no sim on the
@@ -5623,6 +6011,10 @@ function openMainMenu(
     codexControls: [],
     codexTab: codexState.activeTab,
     codexEntry: activeEntries(codexState).find((e) => e.id === codexState.selectedId)?.title ?? '',
+    hangarControls: [],
+    hangarShip: '',
+    hangarLevel: '',
+    hangarEmpty: '',
     controlScheme,
     // Live match readback, wired by boot() through `bindMatch` once the world is
     // built; both read the live match binding each access so a rematch is tracked.
@@ -5636,6 +6028,7 @@ function openMainMenu(
     // screen under its old name, so a caller that asked for either gets one screen.
     play: (): void => openDoors(),
     online: (): void => openDoors(),
+    hangar: (): void => openHangar(),
   };
 
   // The doors' own read-only seam. Its methods drive the same pure transitions a tap
@@ -5651,6 +6044,10 @@ function openMainMenu(
     title: '',
     code: '',
     regionPickerVisible: regionPickerVisible(onlineRegions),
+    regions: onlineRegions,
+    regionSelected: null,
+    regionLine: '',
+    selectRegion: (id: string): void => chooseRegion(id),
     resolvedCode: null,
     doorControls: [],
     messageBounds: { x: 0, y: 0, width: 0, height: 0 },
@@ -5872,16 +6269,41 @@ function openMainMenu(
     seam.codexTab = codexState.activeTab;
     seam.codexEntry = activeEntries(codexState).find((e) => e.id === codexState.selectedId)?.title ?? '';
 
+    // The HANGAR's controls and its readback (a0-14). BACK is always reported;
+    // a row is reported only when the layout actually placed one, so a capture
+    // can never press a row that was not drawn.
+    const hangarRects = hangarLayout({ width: w, height: h }, { isTouch, rowCount: COSMETICS.length });
+    const hangar = hangarModelNow();
+    seam.hangarControls = [
+      { kind: 'back', index: -1, physicalCenter: physCenter(hangarRects.back) },
+      ...hangarRects.rows.map((r, i) => ({ kind: 'entry' as const, index: i, physicalCenter: physCenter(r) })),
+    ];
+    seam.hangarShip = `${hangar.ship.name} · ${hangar.ship.hull}`;
+    seam.hangarLevel = hangar.level.levelLabel;
+    seam.hangarEmpty = hangar.empty ?? '';
+
     seam.controlScheme = controlScheme;
   }
 
   /** Redraw the live screen from current state. Static content, so this runs on
    *  a state change or a resize — Pixi's own ticker keeps painting between. */
+  /** The hangar for the current profile and the player's persisted hull — built
+   *  the same way for the view and for the seam, so the readback can never
+   *  describe a different screen from the one on the glass. */
+  function hangarModelNow(): ReturnType<typeof hangarModel> {
+    return hangarModel(
+      { profile, shipClass: readShipClass(platform) },
+      { hover: hangarTargetOf(hangarHover), press: hangarTargetOf(hangarPress) },
+    );
+  }
+
   function render(): void {
     menuView.visible = screen === 'menu';
     settingsView.visible = screen === 'settings';
     codexView.visible = screen === 'codex';
     entryView.visible = screen === 'online';
+    hangarView.visible = screen === 'hangar';
+    if (hangarView.visible) hangarView.update(hangarModelNow());
     if (menuView.visible) menuView.update(mainMenuModel({ hover: menuHover, press: menuPress }));
     if (settingsView.visible) {
       settingsView.update(
@@ -5925,6 +6347,12 @@ function openMainMenu(
     onlineSeam.notice = model.notice;
     onlineSeam.code = entry.code;
     onlineSeam.resolvedCode = onlineResolved;
+    // The measured fleet (n3), republished every render so the picker's rows and
+    // its selection are read from one place rather than remembered in two.
+    onlineSeam.regions = onlineRegions;
+    onlineSeam.regionPickerVisible = regionPickerVisible(onlineRegions);
+    onlineSeam.regionSelected = selectedRegion() ?? null;
+    onlineSeam.regionLine = formatRegionChoices(onlineRegions, selectedRegion());
     const { w, h } = ctx.logicalSize();
     const layout = entryLayout({ width: w, height: h }, { isTouch });
     const point = (r: Rect): { x: number; y: number } =>
@@ -5972,6 +6400,128 @@ function openMainMenu(
     // A fresh visit starts a fresh story; a panel left over from a previous
     // refusal must not sit under a door the player has not tapped yet.
     endConnectTrace();
+    render();
+    // …and the fleet is measured while the player reads the doors, so CREATE has
+    // a real number behind its region by the time it is pressed. Fire-and-forget:
+    // nothing on this screen waits for it, and a fleet that never answers costs
+    // the picker, never the doors (n3).
+    void surveyFleet();
+  }
+
+  // --- The region picker (n3) ----------------------------------------------
+
+  /**
+   * The region the next CREATE will ask for: the player's override first, then the
+   * lowest ping this client MEASURED, then nothing at all.
+   *
+   * "Nothing at all" is a real answer and the most important one: with no fleet,
+   * no allocator, or nothing measurable, the allocate carries no `region` field
+   * and `allocator/edge-region.ts` infers the creator's region from Fly's edge —
+   * the behaviour that shipped in m10-15a and that this picker sits on top of
+   * rather than replaces. The old bug was the opposite: a hard-coded `iad` that
+   * outranked the inference and pinned every creator to Virginia.
+   */
+  function selectedRegion(): string | undefined {
+    if (regionChoice !== null && onlineRegions.some((r) => r.id === regionChoice)) {
+      return regionChoice;
+    }
+    return regionSurvey?.defaultId;
+  }
+
+  /** The player's override. An id the fleet does not advertise is ignored — a
+   *  picker cannot select a row it did not draw. */
+  function chooseRegion(id: string): void {
+    if (!onlineRegions.some((r) => r.id === id)) return;
+    regionChoice = id;
+    ctx.cue('press');
+    if (entry.screen === 'home' && entry.status === 'idle') {
+      lastRegionLine = formatRegionChoices(onlineRegions, selectedRegion());
+      entry = { ...entry, notice: lastRegionLine };
+    }
+    render();
+  }
+
+  /**
+   * Measure the fleet: every region the allocator advertises, each timed by a real
+   * round trip to that region's own `/health` (`src/net/region-probe`), plus the
+   * line the player reads before choosing.
+   *
+   * Run **on every visit to the doors**, because a ping is only worth showing if
+   * it is this session's — a number measured twenty minutes and one network ago is
+   * a stale claim about a live connection. Concurrent callers share the one probe
+   * in flight rather than starting a second (the JOIN preview joins whatever the
+   * doors already began).
+   *
+   * It cannot fail loudly: no allocator (the offline build), no `/regions` route,
+   * or a fleet nobody can reach all leave the list empty, the picker suppressed,
+   * and CREATE exactly as it was.
+   */
+  function surveyFleet(): Promise<void> {
+    if (regionProbe !== null) return regionProbe;
+    const run = measureFleet().finally(() => {
+      if (regionProbe === run) regionProbe = null;
+    });
+    regionProbe = run;
+    return run;
+  }
+
+  /** The probe itself; {@link surveyFleet} owns the de-duplication. */
+  async function measureFleet(): Promise<void> {
+    const base = allocatorUrlFromEnv();
+    if (base === null) return;
+    const survey = await surveyRegions({ baseUrl: base });
+    // The player may have left the doors while the probes were in flight; the
+    // measurement is still worth keeping (it is this client's, not this screen's),
+    // but nothing is drawn from it.
+    regionSurvey = survey;
+    onlineRegions = survey.regions.map((region) => ({
+      id: region.id,
+      label: regionLabel(region.id),
+      pingMs: region.pingMs,
+    }));
+    playtest.recordConnect('regions', {
+      regions: survey.regions.map((r) => ({ region: r.id, pingMs: r.pingMs, free: r.free })),
+      default: survey.defaultId ?? null,
+    });
+    if (screen !== 'online') return;
+    // The doors' message slot carries the fleet: `GRU 38ms · [IAD 224ms]`. It is
+    // the same slot the CAMPAIGN teaser answers in, so it yields to an error and
+    // to a live connect narration — a ping is never the most urgent line. A line
+    // this function wrote before is replaced (the numbers are fresher); anything
+    // else on the slot is left alone.
+    const ours = entry.notice === '' || entry.notice === lastRegionLine;
+    if (entry.screen === 'home' && entry.status === 'idle' && ours) {
+      lastRegionLine = formatRegionChoices(onlineRegions, selectedRegion());
+      entry = { ...entry, notice: lastRegionLine };
+    }
+    render();
+  }
+
+  /**
+   * What the JOIN screen says once a full code is typed, BEFORE the player commits:
+   * where the room is, and what that region costs *them*.
+   *
+   * A joiner places nothing — the room is where its creator put it — so this is
+   * not a choice, it is a disclosure: the host's region is the ping profile of
+   * every guest, and the honest moment to say so is while BACK is still one tap
+   * away. It decides nothing (`readRoomAdvert` is advisory by construction): the
+   * join itself remains the only thing that can refuse a player.
+   */
+  async function previewJoinRoom(code: string): Promise<void> {
+    const base = allocatorUrlFromEnv();
+    if (base === null) return;
+    const config = { baseUrl: base };
+    const advert = await readRoomAdvert(config, code);
+    // Stale by the time it answered — the player erased, backed out, or has already
+    // committed. Drop it rather than write over a screen that has moved on.
+    if (advert === null || screen !== 'online' || entry.screen !== 'join') return;
+    if (entry.code !== code || entry.status !== 'idle') return;
+    if (regionSurvey === null) await surveyFleet();
+    if (entry.code !== code || entry.screen !== 'join' || entry.status !== 'idle') return;
+    const measured = regionSurvey?.regions.find((r) => r.id === advert.region);
+    const line = formatRoomRegion(advert.region, measured?.pingMs ?? null);
+    if (line === '') return;
+    entry = { ...entry, notice: line };
     render();
   }
 
@@ -6033,12 +6583,18 @@ function openMainMenu(
           ctx.cue(next === entry ? 'reject' : 'press');
           entry = next;
           render();
+          // A complete code is worth asking the allocator about *before* the
+          // player commits: where the room is, and what that costs them (n3).
+          if (canSubmitJoin(entry)) void previewJoinRoom(entry.code);
         }
         return;
       }
       case 'erase':
         ctx.cue('back');
         entry = eraseEntryCode(entry);
+        // The room preview described a code that is no longer typed; a line about
+        // someone else's room must not outlive the code it was read for (n3).
+        if (entry.notice !== '' && !canSubmitJoin(entry)) entry = { ...entry, notice: '' };
         render();
         return;
       case 'back':
@@ -6093,14 +6649,17 @@ function openMainMenu(
       return;
     }
     const config = { baseUrl: base };
-    // The region the player CHOSE, and only that. At launch there is one region in
-    // the list and the picker is suppressed (`regionPickerVisible === false`), so
-    // nobody has chosen anything — and sending `iad` anyway is what pinned every
-    // creator to Virginia, including the one in Minas Gerais. Sent empty, the
-    // allocator infers the creator's region from Fly's edge and prefers it whenever
-    // it has capacity (`allocator/edge-region.ts`); a real picker, once there is one
-    // to pick from, overrides that inference exactly as before.
-    const region = regionPickerVisible(onlineRegions) ? onlineRegions[0]?.id : undefined;
+    // The region this CREATE asks for: the one the player picked, else the one this
+    // client MEASURED fastest, else nothing (n3, `selectedRegion`).
+    //
+    // "Nothing" is the load-bearing case and it is unchanged from m10-15a: sent
+    // empty, the allocator infers the creator's region from Fly's edge and prefers
+    // it whenever it has capacity (`allocator/edge-region.ts`). What was wrong
+    // before that fix was a hard-coded `iad` — not a preference but a pin, and it
+    // outranked the inference, which is how a creator in Minas Gerais was placed in
+    // Virginia on purpose. Nothing here may reintroduce a region this client did
+    // not either measure or get told to use.
+    const region = selectedRegion();
     // Step 1 of the lifecycle the log carries end to end (brief §1): the allocate.
     // It is now also the first line the *player* reads — "ALLOCATING ROOM…" — and
     // every step below likewise reaches the screen through `traceStep`, so the
@@ -6451,6 +7010,55 @@ function openMainMenu(
     resolvePlay({ kind: 'offline' });
   }
 
+  // --- The HANGAR (a0-14) ----------------------------------------------------
+
+  /** The hover/press key back as a target — the hangar's keys are `back` and
+   *  `cosmetic:<i>`, so the round trip is exact rather than a re-hit-test. */
+  function hangarTargetOf(key: string | null): HangarTarget | null {
+    if (key === null) return null;
+    if (key === 'back') return { kind: 'back' };
+    const index = Number.parseInt(key.slice('cosmetic:'.length), 10);
+    return Number.isFinite(index) ? { kind: 'cosmetic', index } : null;
+  }
+
+  function openHangar(): void {
+    screen = 'hangar';
+    render();
+  }
+
+  function closeHangar(): void {
+    screen = 'menu';
+    render();
+  }
+
+  /**
+   * Apply a tap on the hangar. BACK returns to the menu; a row equips (or
+   * un-equips) the cosmetic it names and persists the profile.
+   *
+   * **This is the only write on the screen**, and it goes through the same
+   * module the profile was read from — one profile, one key, one reader. A
+   * refused equip (a locked row) returns the identical profile, so it sounds a
+   * refusal and touches neither the disk nor the frame.
+   */
+  function applyHangar(target: HangarTarget): void {
+    if (target.kind === 'back') {
+      ctx.cue('back');
+      closeHangar();
+      return;
+    }
+    const cosmetic = COSMETICS[target.index];
+    const next = cosmetic ? equipCosmetic(profile, cosmetic) : profile;
+    if (next === profile) {
+      ctx.cue('reject');
+      render();
+      return;
+    }
+    profile = next;
+    saveProfile(platform.storage, profile);
+    ctx.cue('detent');
+    render();
+  }
+
   function openSettings(): void {
     screen = 'settings';
     render();
@@ -6514,16 +7122,12 @@ function openMainMenu(
       // PLAY opens the doors — the one way in (ratified). There is no second front
       // door to route, and no path from here that builds a world.
       // PLAY is the screen's one headline action, so it gets the two-note rising
-      // `accept`; the two side doors are plain forward picks (s6-01).
-      if (hit === 'play') {
-        ctx.cue('accept');
-        openDoors();
-      } else if (hit === 'codex') {
-        ctx.cue('press');
-        openCodex();
-      } else if (hit === 'settings') {
-        ctx.cue('press');
-        openSettings();
+      // `accept`; the three side doors are plain forward picks (s6-01). A tap and
+      // a keypress go through the SAME `activateMenu`, so a fifth item can never
+      // be wired for one and not the other.
+      if (hit) {
+        menuFocus = hit;
+        activateMenu(hit);
       } else {
         // A press on the bare screen: nothing to sound, but the plate states may
         // have moved (a press released off every control), so redraw (u7-01).
@@ -6545,6 +7149,14 @@ function openMainMenu(
       settingsPress = hit;
       settingsHover = hit;
       if (hit) applySettings(hit);
+      else render();
+    } else if (screen === 'hangar') {
+      // The hangar acts on pointer-DOWN like the menu and the settings screen: it
+      // has no scrollable pane, so there is no drag to disambiguate from a tap.
+      const hit = hangarView.hitTest(x, y);
+      hangarPress = hangarTargetKey(hit);
+      hangarHover = hangarPress;
+      if (hit) applyHangar(hit);
       else render();
     } else {
       // Codex: begin a tap-or-drag. The tap fires on pointer-up only if the finger
@@ -6575,6 +7187,7 @@ function openMainMenu(
     if (screen === 'menu') return menuView.hitTest(x, y);
     if (screen === 'online') return entryTargetKey(entryView.hitTest(x, y));
     if (screen === 'settings') return keyOf(settingsView.hitTest(x, y));
+    if (screen === 'hangar') return hangarTargetKey(hangarView.hitTest(x, y));
     return codexTargetKey(codexView.hitTest(x, y));
   }
 
@@ -6622,6 +7235,12 @@ function openMainMenu(
           codexHover = hit;
           render();
         }
+      } else if (screen === 'hangar') {
+        const hit = hangarTargetKey(hangarView.hitTest(p.x, p.y));
+        if (hit !== hangarHover) {
+          hangarHover = hit;
+          render();
+        }
       }
     }
     if (screen !== 'codex' || !codexDrag) return;
@@ -6644,11 +7263,18 @@ function openMainMenu(
     // A finger lifting releases the plate it was holding, on whichever screen it
     // was held. `pointercancel` routes here too, so a gesture the browser steals
     // cannot strand a plate in its pressed state.
-    if (menuPress !== null || settingsPress !== null || entryPress !== null || codexPress !== null) {
+    if (
+      menuPress !== null ||
+      settingsPress !== null ||
+      entryPress !== null ||
+      codexPress !== null ||
+      hangarPress !== null
+    ) {
       menuPress = null;
       settingsPress = null;
       entryPress = null;
       codexPress = null;
+      hangarPress = null;
       // Touch has no hover to fall back to: a lifted finger leaves nothing under
       // it, so the plate returns to rest rather than to a hover it never had.
       if (e.pointerType === 'touch') {
@@ -6656,6 +7282,7 @@ function openMainMenu(
         settingsHover = null;
         entryHover = null;
         codexHover = null;
+        hangarHover = null;
       }
       render();
     }
@@ -6706,9 +7333,52 @@ function openMainMenu(
       if (e.code === 'Escape' || e.code === 'Backspace') closeCodex();
       return;
     }
-    // On the menu, Enter or Space is PLAY — a keyboard player never has to reach
-    // for the mouse to get in. It opens the doors, like the button.
-    if (e.code === 'Enter' || e.code === 'Space') openDoors();
+    if (screen === 'hangar') {
+      // The same one key out. The hangar is a door that comes back, so it can
+      // never be a place a keyboard player is stuck (`./ui/menu-nav`).
+      if (e.code === 'Escape' || e.code === 'Backspace') closeHangar();
+      return;
+    }
+    // On the menu, the arrows (or W/S) move the focus down the stack and Enter or
+    // Space activates it — so every door, HANGAR included, is reachable without a
+    // pointer (a0-14). The focus starts on PLAY, so a keyboard player who presses
+    // Enter and nothing else gets exactly what they always got.
+    if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+      focusMenu(mainMenuStep(mainMenuIndexOf(menuFocus), 1));
+    } else if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+      focusMenu(mainMenuStep(mainMenuIndexOf(menuFocus), -1));
+    } else if (e.code === 'Enter' || e.code === 'Space') {
+      activateMenu(menuFocus);
+    }
+  }
+
+  /** Move the keyboard focus and light the plate under it — the focused plate
+   *  wears the same `hover` state a mouse would give it, so there is one visual
+   *  language for "this is the one you are about to press". */
+  function focusMenu(option: MainMenuOption): void {
+    if (menuFocus === option) return;
+    menuFocus = option;
+    menuHover = option;
+    ctx.cue('hover');
+    render();
+  }
+
+  /** Open whatever a menu item names — the one place a press and a keypress
+   *  meet, so the two can never route differently. */
+  function activateMenu(option: MainMenuOption): void {
+    if (option === 'play') {
+      ctx.cue('accept');
+      openDoors();
+    } else if (option === 'codex') {
+      ctx.cue('press');
+      openCodex();
+    } else if (option === 'settings') {
+      ctx.cue('press');
+      openSettings();
+    } else {
+      ctx.cue('press');
+      openHangar();
+    }
   }
 
   /** The pointer left the canvas: nothing is hovered and nothing is held. Without
@@ -6858,6 +7528,23 @@ interface LobbyChoice {
    * in TEAMS, where it is the whole feature (m10 teams-wire).
    */
   readonly teams?: readonly number[];
+  /**
+   * The room decided, at RUSH!, that it did not need a server (a0-11; GDD §4.2
+   * *amended 2026-08-07*, `src/net/local-revert`): the only human in it was the
+   * host, so the match boots on `LocalLoopback` and the room has been released.
+   *
+   * Absent on every other path, including an online match that really is online.
+   * When present, `boot()` drops the session it was handed and builds the world
+   * itself, from this same config — same seed, same arena, same cast, which is
+   * what makes it *the same match* (GDD §4.8).
+   */
+  readonly local?: {
+    /** The code that was handed back, for the log and the PR's own accounting. */
+    readonly releasedRoom: RoomCode;
+    /** The local player's seat in the DENSE roster the sim builds — not the
+     *  lobby's, which is sparse the moment a seat is left open (`denseSeatIndex`). */
+    readonly you: PlayerId;
+  };
 }
 
 /**
@@ -7173,6 +7860,10 @@ function openLobby(
     selectMap: (index: number): void => selectMapAt(index),
   };
 
+  /** Set by {@link revertToLocal} when RUSH! found nobody else in the room, and
+   *  carried out on the resolved {@link LobbyChoice} so `boot()` builds the world
+   *  itself (a0-11). Null on every other path. */
+  let wentLocal: LobbyChoice['local'] = undefined;
   let resolveRush: (choice: LobbyChoice) => void = () => {};
   const rushPromise = new Promise<LobbyChoice>((resolve) => {
     resolveRush = resolve;
@@ -7342,7 +8033,12 @@ function openLobby(
       // (GDD §4.2; spike §S2, Trap 7). A joiner sends neither: the room's shape is
       // the host's, and their own toggles are local screen state until the
       // authoritative `lobbyState` folds the truth back in.
-      ...(host ? { mode: state.mode, teams: lobbyWireTeams(state) } : {}),
+      //
+      // …and the per-seat OPEN / BOT / CLOSED authoring (a0-11), which rides here
+      // for the same reason with a sharper edge: since the lobby stopped putting a
+      // bot in every empty seat, a roster the room was never told about would have
+      // it fill them all anyway — six ghost bots behind six seats drawn OPEN.
+      ...(host ? { mode: state.mode, teams: lobbyWireTeams(state), seats: lobbyWireSeats(state) } : {}),
     });
   }
 
@@ -7438,8 +8134,61 @@ function openLobby(
     render();
     // The guard above means this is the ONE frame the count reached zero.
     if (state.phase !== 'started') return;
-    if (room) room.session.startMatch();
+    // …and the ONE moment the question "does this match need a server?" is
+    // answerable (a0-11; `src/net/local-revert`). A host may open a room, read the
+    // code out and have somebody walk in, so it cannot be settled at the door — it
+    // is settled by the roster, here, at RUSH!.
+    if (room && !revertToLocal()) room.session.startMatch();
     else finish();
+  }
+
+  /**
+   * The room turned out to hold nobody but the host, so the match plays locally
+   * (a0-11; GDD §4.2 *amended 2026-08-07*). Returns true when that happened.
+   *
+   * Three things, in this order, and the order is the point:
+   *
+   *  1. **ask the roster**, not the door (`playsLocally` — the only human is you);
+   *  2. **release the room** before anything else, so the code is free and the
+   *     Machine drainable from this instant rather than from the end of a match
+   *     nobody is playing on it (`releaseRoom`, `ROOM_COST_NOTE`);
+   *  3. **say so**, once, as a line and not a dialog — they pressed a button that
+   *     said online.
+   *
+   * The `local` block it records is what makes `boot()` drop the session it was
+   * handed. Everything else about the match — seed, arena, cast, sides — is the
+   * config below, unchanged, which is what makes the two paths the same match.
+   */
+  function revertToLocal(): boolean {
+    if (!room) return false;
+    const seats = state.seats.filter((s) => isParticipant(s.occupant));
+    const census = {
+      humans: seats.filter((s) => s.occupant === 'human').length,
+      bots: seats.filter((s) => s.occupant === 'bot').length,
+    };
+    if (!playsLocally(census)) return false;
+
+    const release = releaseRoom({ code: room.code, close: () => room.session.close() });
+    // The session log is the module-level singleton (`src/net/playtest-log`), not
+    // the menu's local binding — the menu has long since resolved by the time a
+    // countdown reaches zero. Its own poll timer keeps running for a moment and
+    // records the close, which is the truth and worth having in a pasted log.
+    playtestLog().recordConnect('local revert', {
+      room: release?.room ?? room.code,
+      humans: census.humans,
+      bots: census.bots,
+      why: ROOM_COST_NOTE,
+    });
+    wentLocal = {
+      releasedRoom: release?.room ?? room.code,
+      you: localSeat(denseSeatIndex(state, state.you)),
+    };
+    // The tell, on the DOM rather than through Pixi — the same seam
+    // `installConnectTraceView` already writes through, and for the same reason:
+    // the netcode layer says the things the transport produces without needing a
+    // renderer's cooperation (`src/net/local-revert-view`).
+    showLocalRevertTell({ dom: document as unknown as Parameters<typeof showLocalRevertTell>[0]['dom'] });
+    return true;
   }
 
   /**
@@ -7463,6 +8212,7 @@ function openLobby(
       // world is the server's, built from the sides the same lobby already sent it
       // (`sendChoice`), and `matchStart` hands them back for the predicted world.
       teams: lobbyRosterTeams(state),
+      ...(wentLocal ? { local: wentLocal } : {}),
     };
     teardown();
     seam.visible = false;

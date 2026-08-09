@@ -43,6 +43,7 @@ import type {
   BotDifficulty,
   ConnectionState,
   FireMode,
+  LobbySeatState,
   MatchStartMessage,
   PlayerEconomy,
   RoomCode,
@@ -282,6 +283,8 @@ export class TransportSession implements MatchSession {
     botDifficulties?: readonly BotDifficulty[];
     mode?: MatchMode;
     teams?: readonly number[];
+    /** The host's per-seat OPEN / BOT / CLOSED authoring, by slot (a0-11). */
+    seats?: readonly LobbySeatState[];
   }): void {
     this.transport.send({
       type: 'lobbyChoice',
@@ -290,6 +293,7 @@ export class TransportSession implements MatchSession {
       ...(options.botDifficulties ? { botDifficulties: options.botDifficulties } : {}),
       ...(options.mode ? { mode: options.mode } : {}),
       ...(options.teams ? { teams: options.teams } : {}),
+      ...(options.seats ? { seats: options.seats } : {}),
     });
   }
 
@@ -641,6 +645,17 @@ export class TransportSession implements MatchSession {
         this.pendingEconomy = message.economy ?? null;
         break;
       case 'matchStart':
+        // The seat this client came out of RUSH! on (a0-11). The room compacts
+        // its roster there — the chairs nobody is in are not in the match, and
+        // the survivors are renumbered so no sparse id reaches the sim
+        // (`server/room.ts` `compactRoster`) — so the number the `welcome` named
+        // is a LOBBY seat and this is the SIM one. They are equal whenever
+        // nothing was dropped, which is every room that filled up and every
+        // pre-a0-11 server (which omits the field entirely and leaves this
+        // untouched). Adopted before `beginPredicting`, which builds the
+        // predicted world around it: predicting the wrong ship would mispredict
+        // every input this client ever sends, and reconcile forever.
+        if (message.you !== undefined) this.player = message.you;
         // RUSH! (or a reclaim's replay) re-bases the clock: the server names the
         // tick to predict from, and nothing this client sent before it is on that
         // timeline (`beginPredicting`).
@@ -882,6 +897,8 @@ export interface OnlineSession extends MatchSession {
     botDifficulties?: readonly BotDifficulty[];
     mode?: MatchMode;
     teams?: readonly number[];
+    /** The host's per-seat OPEN / BOT / CLOSED authoring, by slot (a0-11). */
+    seats?: readonly LobbySeatState[];
   }): void;
   /** RUSH! — the room creator starts the match. */
   startMatch(): void;

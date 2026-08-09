@@ -1,0 +1,36 @@
+a0-16 — "the wave clock counts down to the wrong time"
+
+A default match: DEFAULT_ABUNDANCE=scarce, so this world's waves
+land every 165.0 s (WAVE_INTERVAL_S 150 × respawnInterval).
+BEFORE = the HUD clock as it shipped, counting down the baseline 150 s.
+AFTER  = the HUD clock now, counting down world.economy.waveInterval.
+The gap between them is 15.0 s of dead air, below.
+
+Reproduce: A0_16_WRITE_EVIDENCE=1 npx vitest run tests/harness/a0-16-evidence.test.ts
+
+--- SCARCE · the run-up to wave 2 (real sim, TICK_DT steps) ---
+match start      t=   0.00s  BEFORE WAVE 1  NEXT  2:30  | AFTER WAVE 1  NEXT  2:45  | sim wave 1/5  rocks  20
+BEFORE at 0      t= 149.98s  BEFORE WAVE 1  NEXT  0:01  | AFTER WAVE 1  NEXT  0:16  | sim wave 1/5  rocks  20
+BEFORE lies      t= 150.00s  BEFORE WAVE 2  NEXT  2:30  | AFTER WAVE 1  NEXT  0:15  | sim wave 1/5  rocks  20
++3s dead air     t= 153.00s  BEFORE WAVE 2  NEXT  2:27  | AFTER WAVE 1  NEXT  0:12  | sim wave 1/5  rocks  20
++6s dead air     t= 156.00s  BEFORE WAVE 2  NEXT  2:24  | AFTER WAVE 1  NEXT  0:09  | sim wave 1/5  rocks  20
++9s dead air     t= 159.00s  BEFORE WAVE 2  NEXT  2:21  | AFTER WAVE 1  NEXT  0:06  | sim wave 1/5  rocks  20
++12s dead air    t= 162.00s  BEFORE WAVE 2  NEXT  2:18  | AFTER WAVE 1  NEXT  0:03  | sim wave 1/5  rocks  20
+ROCKS LAND       t= 164.98s  BEFORE WAVE 2  NEXT  2:16  | AFTER WAVE 1  NEXT  0:01  | sim wave 1/5  rocks  20
+wave 2 in        t= 165.00s  BEFORE WAVE 2  NEXT  2:15  | AFTER WAVE 2  NEXT  2:45  | sim wave 2/5  rocks  36
+
+VERDICT: the shipped clock (BEFORE) emptied at t=150.00s and the rocks
+         landed at t=165.00s — 15.0 s apart, every default match.
+         The fixed clock (AFTER) runs out on the landing frame itself, and
+         turns over to WAVE 2 on the same tick the sim does. It shows 0:01
+         rather than 0:00 right up to the arrival because formatClock ceils —
+         deliberately, so the HUD never reads 0:00 with a wave still pending.
+
+--- every abundance · where the clock points vs where the wave lands ---
+level     interval   clock target (wave 2)   spawner landed   BEFORE would have said
+scarce      165.0s           165.00s          165.00s              150.00s
+standard    150.0s           150.00s          150.00s              150.00s
+rich        127.5s           127.50s          127.52s              150.00s
+
+The right-hand column is the one number the clock used to print at every
+level. It is right in exactly one of the three, and that one is not the default.

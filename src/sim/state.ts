@@ -107,6 +107,40 @@ export interface Ship {
    * glow key off. Reset to `false` every tick before the fire step decides it.
    */
   firing: boolean;
+  /**
+   * **Loot tell** — ore that entered THIS hold on THIS tick (chunk → cargo), and
+   * `0` on every tick nothing arrived. The developer's report a0-08, "sometimes
+   * picked up ore from dead ships dont count": no ore was ever lost (the ledger
+   * conserves exactly), but looted ore lands in `cargo` while the prominent
+   * readout is `banked` — which correctly does not move until the hold is drained
+   * inside your own atmosphere. So a correct pickup looks like nothing happening.
+   * This is the number that lets a pickup be *seen* arriving: it is the exact ore
+   * the LOOT step moved, so a partial take (`room` 1 against a 3-ore chunk) reads
+   * as the 1 it actually was, never as the whole chunk.
+   *
+   * Reset to `0` for every ship at the top of the chunk step, which is the only
+   * chunk → cargo path there is (`updateChunks`), so the tell can never outlive
+   * the tick that earned it. Optional, on the same backward-compatible terms as
+   * `weaponCooldown`: an absent value reads as "took nothing".
+   */
+  lootTake?: number;
+  /**
+   * **Full-hold tell** — true when this ship's hold has no room AND real loose ore
+   * (never a deposit courier) sits within `TRACTOR.range` of it: the ore it would
+   * be pulling in if it could. This is the frame in the a0-08 report — floating
+   * over a wreck you just made, the ore right there, nothing happening — because a
+   * full hold exerts no tractor pull at all and refuses the chunk silently (GDD
+   * §2.3). The base hold is 2, so this is the normal state, not an edge case.
+   * Publishing it lets the hold pips say "full" at the moment it costs the player
+   * a pickup, rather than the pickup simply not occurring.
+   *
+   * Reset to `false` every tick beside {@link lootTake}, and absent reads as
+   * `false`. It is a pure *derivation* of already-hashed state (cargo, cargoCap,
+   * chunk positions) — the sim never reads either tell to make a decision, so
+   * neither can perturb determinism (GDD §4.8) and neither is fingerprinted by
+   * `hashState`.
+   */
+  lootBlocked?: boolean;
   /** Seconds until the ship's weapon may loose its next projectile (0 = ready).
    *  The weapon fires on `SHIP_WEAPON.fireInterval`, the projectile analogue of
    *  the old hitscan's per-tick damage (design amendment v0.2). Match
@@ -774,6 +808,10 @@ function makeShip(spec: PlayerSpec, pos: Vec2): Ship {
     eliminated: false,
     radius: SHIP_RADIUS,
     firing: false,
+    // The loot tells start quiet and are re-decided every tick by `updateChunks`
+    // (a0-08); the sim's own ships always carry them, foreign literals need not.
+    lootTake: 0,
+    lootBlocked: false,
     weaponCooldown: 0,
     wedgeContactS: 0,
     wedgeAnchor: { x: pos.x, y: pos.y },

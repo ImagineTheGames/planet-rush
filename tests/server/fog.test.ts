@@ -1,23 +1,37 @@
 /**
- * tests/server/fog.test.ts — a rival's health is scouted, not broadcast, and
- * the server is where that is true. OWNER: Netcode Engineer (GDD §2.2, §4.2).
+ * tests/server/fog.test.ts — station health reaches every client, at every
+ * range, and the server is where that is true. OWNER: Netcode Engineer
+ * (GDD §2.2 amended 2026-08-07, §4.2).
  *
- * "Enemy station health is scouted, not broadcast … Knowing who is winning, who
- * is wounded, and who is under siege is information you *earn* by scouting"
- * (GDD §2.2). A HUD that merely declines to draw a number it was sent is not
- * fog — it is an honour system, and it survives exactly as long as the first
- * modified client. So the rule is enforced on the wire: a client is never sent
- * a core HP its ship has not flown close enough to read.
+ * **This file used to assert the opposite, and it was re-pointed by a0-05, not
+ * deleted.** The old rule was "enemy station health is scouted, not broadcast":
+ * the server withheld a rival's core HP until your ship flew inside 180 units of
+ * it. The developer withdrew it — *"it should always show the health regardless
+ * of proximity or else it looks like a glitch … approaching and getting far it
+ * looks like its full health even if its damaged."*
+ *
+ * The wire is still where this is decided, for the same reason it always was: a
+ * client can only draw what it was told. Under the old rule the *networked*
+ * version of the bug was the worse one — a player could fly to 400 units, see the
+ * enemy home filling their screen, and be looking at a ring the server had not
+ * updated since the last time they were on its doorstep. So the assertions
+ * flipped: what these cases now guard is that no station's health is ever
+ * withheld, and that a client's picture does not go stale the moment it turns
+ * around.
+ *
+ * What is still enforced here, unchanged: the payload carries **health and
+ * nothing else** — no cargo, no bank, no upgrade tiers. Those are drawn for
+ * nobody at any range (GDD §2.2) and the amendment did not touch them.
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { encodeClientMessage, parseServerMessage } from '../../src/net/wire';
 import type { WireFrame } from '../../src/net/wire';
 import type { EntityEventMessage, ServerMessage } from '../../src/net/transport';
-import { SENSOR_RANGE } from '../../src/sim';
 import { MatchServer } from '../../server/match-server';
 import type { Connection, ServerSocket } from '../../server/match-server';
 import type { StationHealthData } from '../../src/net/entity-events';
+import { seatBots } from './seat-bots';
 
 class FakeSocket implements ServerSocket {
   readonly frames: WireFrame[] = [];
@@ -63,56 +77,84 @@ describe('station health on the wire', () => {
     socket = new FakeSocket();
     client = server.connect(socket);
     client.receive(encodeClientMessage({ type: 'join', room: 'FOGY' }));
+    client.receive(seatBots());
     client.receive(encodeClientMessage({ type: 'startMatch' }));
     advance(16);
     socket.clear();
     advance(300);
   });
 
-  it('tells a player their own station’s numbers, and nobody else’s', () => {
+  /** The retired `SENSOR_RANGE` — 2× the 90-unit shield radius. Written out
+   *  rather than imported: the constant is gone, and these cases exist to show
+   *  the distance has stopped mattering. */
+  const RETIRED_SENSOR_RANGE = 180;
+
+  it('tells a player every station’s numbers, not just their own', () => {
     const seen = new Set(socket.healthUpdates().map((p) => p.id));
-    const own = client.room!.world!.stations.find((p) => p.owner === 0)!;
+    const world = client.room!.world!;
 
-    expect(seen.has(own.id)).toBe(true);
-    // Seven rivals, all of them across the map, none of them scouted.
-    expect(seen.size).toBe(1);
+    // Eight homes, all of them across the map from this client's ship, all of
+    // them reported. Under the old rule this set had exactly one member.
+    expect(seen.size).toBe(world.stations.length);
+    for (const station of world.stations) expect(seen.has(station.id)).toBe(true);
   });
 
-  it('starts telling them a rival’s numbers once they fly over and look', () => {
-    const room = client.room!;
-    const world = room.world!;
+  it('keeps a besieged rival’s numbers flowing after the scout flies away', () => {
+    // The networked half of the a0-05 report. The scout looks, then leaves, then
+    // the siege starts: the ring on their screen must move, not freeze.
+    const world = client.room!.world!;
     const target = world.stations.find((p) => p.owner === 4)!;
-    expect(new Set(socket.healthUpdates().map((p) => p.id)).has(target.id)).toBe(false);
-
-    // Fly the scout to the rival's doorstep — inside sensor range (GDD §2.2).
     const ship = world.ships.find((s) => s.id === 0)!;
-    ship.pos = { x: target.pos.x + SENSOR_RANGE * 0.5, y: target.pos.y };
+
+    ship.pos = { x: target.pos.x + RETIRED_SENSOR_RANGE * 0.5, y: target.pos.y };
+    target.coreHp = 88; // a first hit, taken while the scout is standing there
     socket.clear();
     advance(300);
+    expect(socket.healthUpdates().find((p) => p.id === target.id)?.coreHp).toBe(88);
 
-    const scouted = socket.healthUpdates().find((p) => p.id === target.id);
-    expect(scouted).toBeDefined();
-    expect(scouted?.coreHp).toBe(target.coreHp);
-
-    // And it goes quiet again when the scout leaves: the client keeps its last
-    // read and grows stale, exactly like a human's memory of what they saw.
-    ship.pos = { x: target.pos.x + SENSOR_RANGE * 8, y: target.pos.y };
-    target.coreHp = 42; // a siege the scout is no longer watching
+    // Half the map away — twenty times the radius that used to cut this off.
+    ship.pos = { x: target.pos.x + RETIRED_SENSOR_RANGE * 20, y: target.pos.y };
+    target.coreHp = 42; // a siege the scout is no longer standing next to
     socket.clear();
     advance(300);
-    expect(socket.healthUpdates().some((p) => p.id === target.id)).toBe(false);
+    expect(socket.healthUpdates().find((p) => p.id === target.id)?.coreHp).toBe(42);
   });
 
-  it('says nothing new to a client whose ship is not in the sky', () => {
+  it('keeps telling a client whose ship is not in the sky', () => {
+    // Dead or eliminated, you still watch the match — and a spectating client
+    // that could not see who was winning was the same lie in another costume.
     const world = client.room!.world!;
     const ship = world.ships.find((s) => s.id === 0)!;
     const target = world.stations.find((p) => p.owner === 4)!;
-    // Parked next to a rival, but dead: a wrecked cockpit scouts nothing.
-    ship.pos = { x: target.pos.x, y: target.pos.y };
     ship.alive = false;
+    target.coreHp = 37;
     socket.clear();
     advance(300);
 
-    expect(socket.healthUpdates().some((p) => p.id === target.id)).toBe(false);
+    expect(socket.healthUpdates().find((p) => p.id === target.id)?.coreHp).toBe(37);
+  });
+
+  it('says nothing at all while nothing changes — always-visible is not a flood', () => {
+    // The signature check is what makes an unconditional send affordable: a quiet
+    // station costs one string compare per sample, not a frame.
+    socket.clear();
+    advance(300);
+    expect(socket.healthUpdates()).toHaveLength(0);
+  });
+
+  it('carries health and nothing else — cargo, bank and tiers are still nobody’s', () => {
+    const world = client.room!.world!;
+    world.stations[4]!.coreHp -= 5; // make it speak
+    socket.clear();
+    advance(300);
+
+    const payloads = socket.healthUpdates();
+    expect(payloads.length).toBeGreaterThan(0);
+    for (const data of payloads) {
+      const json = JSON.stringify(data);
+      expect(json).not.toContain('cargo');
+      expect(json).not.toContain('banked');
+      expect(json).not.toContain('tiers');
+    }
   });
 });

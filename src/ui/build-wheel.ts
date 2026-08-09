@@ -51,15 +51,24 @@
  *
  *   TURRET            ← the words        (label)
  *   YOUR STATION      ← what it spends on (target)
- *   3/4               ← cost over spendable ore  ({@link WheelSegment.costLabel})
- *   2 / 4 BUILT       ← the count and its cap    ({@link WheelSegment.capLabel})
+ *   3                 ← the cost, and only the cost ({@link WheelSegment.costLabel})
+ *   2 / 4 BUILT       ← the count and its cap      ({@link WheelSegment.capLabel})
  *
- * Both of the new lines are **strings**, never numbers, and that is deliberate
- * rather than incidental: the guarantee this file exists to keep is that a
- * segment's only *numeric* field is `cost` (build-wheel.test.ts asserts the
- * numeric keys are exactly `['angle', 'cost']`), which is what stops a rate or a
- * stat leaking onto the wheel. `cost/held` and `2 / 4 BUILT` ship the design's
- * pixels through the same door the RADAR count already used.
+ * **The cost line is one number (a0-03, ratified 2026-08-07).** It briefly read
+ * `cost/held` — `3/4` — and the developer retracted their own amendment with a
+ * screenshot of the live wheel: *"i was wrong about this we don't need to show
+ * ore need as 5/2 .. just need the needed amount in yellow, and red if
+ * insufficient..."* The colour carries what the denominator was carrying: signal
+ * yellow when the cost is payable, threat red when it is not
+ * ({@link ./wheel-stack.costPaintFor}), which is a rule this module already had.
+ * The count line is a DIFFERENT amendment and is untouched — `4 / 4 BUILT` stays.
+ *
+ * The count line is a **string**, never a number, and that is deliberate rather
+ * than incidental: the guarantee this file exists to keep is that a segment's
+ * only *numeric* field is `cost` (build-wheel.test.ts asserts the numeric keys
+ * are exactly `['angle', 'cost']`), which is what stops a rate or a stat leaking
+ * onto the wheel. `2 / 4 BUILT` ships the design's pixels through the same door
+ * the RADAR count already used.
  */
 
 import type { BuildItem } from '@shared/types';
@@ -134,7 +143,7 @@ export type SegmentTarget = 'station' | 'ship';
  *                    because the player-facing answer is the same — this button
  *                    does nothing now — and the reason is carried by the wedge's
  *                    second line ({@link repairWedgeInfo}), which for a cooling
- *                    core is the live "REPAIR in Ns" countdown.
+ *                    core is the live "REPAIR IN Ns" countdown.
  */
 export type SegmentState = 'ready' | 'unaffordable' | 'capped' | 'inactive';
 
@@ -275,7 +284,7 @@ export interface BuildWheelSignals {
    * rule). After a repair purchase the sim arms this to `REPAIR_COOLDOWN_SECONDS`
    * and refuses every further repair order `'cooling-down'` — spending nothing —
    * until it ticks to zero (`placeOrder` / `updateStations`). While it is `> 0`
-   * the wedge must be disabled with a live "REPAIR in Ns" countdown, not a
+   * the wedge must be disabled with a live "REPAIR IN Ns" countdown, not a
    * pressable deal that silently does nothing (the field bug this signal fixes).
    *
    * Optional and treated as `0` when absent, so a caller that predates the
@@ -297,7 +306,7 @@ export interface BuildWheelSignals {
  *  - **ready** — `"+15 HP"`, or the REAL partial (`"+7 HP"`) when the core is
  *    missing less than a full tap's worth, so the near-full tap is informed.
  *  - **disabled-with-reason** — `"CORE FULL"` (nothing to heal), `"NO REPAIR"`
- *    (collapse has shut repair off, GDD §2.3), the live `"REPAIR in Ns"` countdown
+ *    (collapse has shut repair off, GDD §2.3), the live `"REPAIR IN Ns"` countdown
  *    (still cooling down from the last repair, the sim's `repairGate`), or
  *    `"NEED 1 ORE"` (empty bank).
  */
@@ -363,22 +372,24 @@ export interface WheelSegment {
    */
   readonly capLabelCompact: string | null;
   /**
-   * The cost line as the design draws it: **`cost/held`** — what the thing costs
-   * over what the player can actually spend (`"3/4"`, `"5/4"`), or `"FULL"` on a
+   * The cost line: **the cost, one number** (`"3"`, `"5"`), or `"FULL"` on a
    * capped segment, where there is no price to quote because there is nothing to
    * buy. `null` on UPGRADE SHIP, which opens a screen instead of spending.
    *
-   * A **string**, and that is the load-bearing part. The design shows two numbers
-   * here; a second numeric field on a segment would break the guarantee that a
-   * segment's only number is its cost — the guarantee that keeps rates and stats
-   * off the wheel. So the pair ships as one label, the same trick
-   * {@link capLabel} uses, and {@link cost} stays the single numeric truth
-   * underneath it.
+   * **Whether the player can pay it is said in COLOUR, not in a second numeral**
+   * — signal yellow when payable, threat red when not
+   * ({@link ./wheel-stack.costPaintFor}, style-guide §2.1). Ratified 2026-08-07
+   * (a0-03), the developer retracting their own 2026-08-06 amendment: *"we don't
+   * need to show ore need as 5/2 .. just need the needed amount in yellow, and
+   * red if insufficient."* This line briefly read `cost/held` — `3/4` — on the
+   * argument that a player reading `5/4` knows they are one ore short without the
+   * wheel saying so. The colour was already saying so, and how much you hold is
+   * what the hub is for. GDD §2.5's older sentence — *"the only number on a
+   * segment is its cost"* — is true again, character for character.
    *
-   * The second half is not new information: it is the same spendable total the
-   * hub already prints, restated at the point of decision so a player reading
-   * `5/4` knows they are one ore short without the wheel having to say so in
-   * words ("no 'need 2 more' copy, because the numbers already say it").
+   * Still a **string**, so `FULL` can occupy the same slot and so the guarantee
+   * that a segment's only numeric field is {@link cost} survives a label that
+   * sometimes is not a number at all.
    */
   readonly costLabel: string | null;
 }
@@ -479,13 +490,16 @@ export function capBuiltLabelCompact(id: WheelSegmentId, signals: BuildWheelSign
 }
 
 /**
- * The cost line: `cost/held` — `"3/4"` — or `"FULL"` at the cap, where there is
- * nothing left to buy and so no price worth quoting (the design's own copy).
- * `null` where a segment has no price at all (UPGRADE SHIP).
+ * The cost line: **the cost, and nothing else** — `"3"` — or `"FULL"` at the cap,
+ * where there is nothing left to buy and so no price worth quoting (the design's
+ * own copy). `null` where a segment has no price at all (UPGRADE SHIP).
  *
- * `held` is the same spendable total the hub prints ({@link spendableOre},
- * floored to whole ore because costs are whole ore), so the two can never
- * disagree — one is the other, restated where the decision is made.
+ * No denominator. Whether the player can *pay* the cost is carried by the
+ * numeral's colour — yellow payable, red not ({@link ./wheel-stack.costPaintFor},
+ * driven by {@link segmentState}, which mirrors the sim's `spendableOre`) — so
+ * the affordability answer is said once, in the channel the developer ratified
+ * for it on 2026-08-07, and how much ore the player holds stays where it belongs:
+ * the hub ({@link BuildWheelModel.ore}).
  */
 export function segmentCostLabel(
   id: WheelSegmentId,
@@ -495,7 +509,7 @@ export function segmentCostLabel(
   const cost = segmentCost(id);
   if (cost === null) return null;
   if (state === 'capped') return 'FULL';
-  return `${cost}/${Math.floor(spendableOre(signals))}`;
+  return `${cost}`;
 }
 
 /** Ore a press can actually draw on — hold plus bank, mirroring the sim's
@@ -552,11 +566,11 @@ export function repairCoolingDown(signals: BuildWheelSignals): boolean {
 }
 
 /**
- * Whole seconds shown on the "REPAIR in Ns" countdown — the CEILING of the sim's
+ * Whole seconds shown on the "REPAIR IN Ns" countdown — the CEILING of the sim's
  * remaining `repairGate` (the respawn-countdown convention, {@link
  * ./respawn-countdown}), so the number never reads `0` while the press is still
  * locked and drops to re-arm exactly as `repairGate` reaches zero. Floored to `1`
- * so a sub-second remainder still shows "REPAIR in 1s" rather than a bare "0s"
+ * so a sub-second remainder still shows "REPAIR IN 1s" rather than a bare "0s"
  * that would read as ready. Only meaningful while {@link repairCoolingDown}.
  */
 export function repairCooldownSeconds(signals: BuildWheelSignals): number {
@@ -580,13 +594,13 @@ export function repairWedgeInfo(signals: BuildWheelSignals, ore = spendableOre(s
   if (signals.coreHp >= signals.maxCoreHp - 1e-9) return { restoreHp: 0, line: 'REACTOR FULL' };
   // Cooling down (RATIFIED developer, 2026-07-28): the sim refuses the next repair
   // `'cooling-down'` until `repairGate` reaches zero, so the wedge counts it down
-  // live — "REPAIR in Ns" read from sim state each frame (no UI timer), ticking to
+  // live — "REPAIR IN Ns" read from sim state each frame (no UI timer), ticking to
   // re-arm at exactly the sim's expiry tick. Checked BEFORE affordability, the same
   // order `placeOrder` uses, so a funded, damaged core still reads the countdown —
   // never a "+15 HP" deal that the sim would silently refuse. Heals nothing while
   // locked, so `restoreHp` is 0 like every other disabled state.
   if (repairCoolingDown(signals)) {
-    return { restoreHp: 0, line: `REPAIR in ${repairCooldownSeconds(signals)}s` };
+    return { restoreHp: 0, line: `REPAIR IN ${repairCooldownSeconds(signals)}s` };
   }
   // Damaged but broke: name the price the tap needs (the empty-bank reason).
   if (!affordable(ore, REPAIR_ENTRY_ORE)) return { restoreHp, line: `NEED ${REPAIR_ENTRY_ORE} ORE` };
@@ -637,7 +651,7 @@ export function segmentState(
       // order is refused `'cooling-down'`, spending nothing. Checked BEFORE
       // affordability, exactly as `placeOrder` does — a funded, damaged core is
       // still refused while cooling, so the wedge is disabled-gray (a no-op press)
-      // with the live "REPAIR in Ns" countdown ({@link repairWedgeInfo}), never a
+      // with the live "REPAIR IN Ns" countdown ({@link repairWedgeInfo}), never a
       // ready-looking deal that does nothing.
       if (repairCoolingDown(signals)) return 'inactive';
       return affordable(ore, REPAIR_ENTRY_ORE) ? 'ready' : 'unaffordable';

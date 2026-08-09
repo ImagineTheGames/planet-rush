@@ -14,6 +14,10 @@
 
 import { describe, it, expect } from 'vitest';
 import { BEAM, PLATE_SCALES, ROW_BAR_WIDTH, TOUCH_MIN } from '../art/materials';
+import { deriveAlarmAllies } from '../art/audio/scope';
+import { createWorld } from '../sim';
+import { sameSide } from '../sim/allegiance';
+import { ShipClass } from '../shared/types';
 import { countPrimaries, singlePrimary } from './gantry';
 import { MAIN_MENU_EYEBROW } from './main-menu';
 import { playerColor } from './station-hp';
@@ -23,6 +27,7 @@ import {
   endOfMatchHitTest,
   endOfMatchLayout,
   endOfMatchModel,
+  onYourSide,
 } from './end-of-match';
 import type { EndButton, MatchOutcome } from './end-of-match';
 
@@ -35,12 +40,146 @@ const center = (r: { x: number; y: number; width: number; height: number }) => (
 const over = (you: number, winner: number | null): MatchOutcome => ({ you, winner, matchOver: true });
 const eliminated = (you: number): MatchOutcome => ({ you, winner: null, matchOver: false });
 
+/** A TEAMS outcome: the whole match over, with the seat's own side named. The
+ *  roster is the shape the wiring hands over — `main.ts` `alarmAllies()`, the
+ *  same set the under-attack klaxon is scoped to. */
+const teamOver = (
+  you: number,
+  winner: number | null,
+  allies: readonly number[],
+): MatchOutcome => ({ you, winner, matchOver: true, allies: new Set(allies) });
+
+/** The 2v2 the developer played: you and Player 8 (slot 7) hold side A, slots 1
+ *  and 3 hold side B. Slot 7 is the ally whose win read as a DEFEAT. */
+const MY_SIDE = [0, 7] as const;
+
 describe('reading an outcome', () => {
   it('names victory, defeat, draw and elimination', () => {
     expect(endKind(over(2, 2))).toBe('victory');
     expect(endKind(over(2, 5))).toBe('defeat');
     expect(endKind(over(2, null))).toBe('draw');
     expect(endKind(eliminated(2))).toBe('eliminated');
+  });
+
+  /**
+   * ── a0-09: THE BUG THIS FILE USED TO PIN ────────────────────────────────
+   *
+   * `endKind` was `winner === you` — a pure identity check on a type with no
+   * notion of a side — and the case below did not exist, so the suite passed the
+   * defect happily for as long as it shipped. The developer's report, 2026-08-07,
+   * with a screenshot of the end screen: *"i lost somehow but my team is the one
+   * that won..."* The screen read DEFEAT over *"Player 7 took the claim."* and
+   * Player 7 was their teammate.
+   *
+   * Not an edge case: in TEAMS an ally's win is arithmetically identical to an
+   * enemy's under an identity check, so **every** Teams win by anyone other than
+   * the local player reported a loss to that player.
+   */
+  describe('in TEAMS — whose side the winner is on, not whether they are you', () => {
+    it('calls an ALLY’s win a VICTORY — the developer’s case', () => {
+      expect(endKind(teamOver(0, 7, MY_SIDE))).toBe('victory');
+    });
+
+    it('still calls an ENEMY’s win a DEFEAT', () => {
+      expect(endKind(teamOver(0, 1, MY_SIDE))).toBe('defeat');
+      expect(endKind(teamOver(0, 3, MY_SIDE))).toBe('defeat');
+    });
+
+    it('calls YOUR own win a VICTORY, roster or no roster', () => {
+      expect(endKind(teamOver(0, 0, MY_SIDE))).toBe('victory');
+      // A roster that somehow forgot to list you cannot make you your own enemy —
+      // the same self-immunity `sim/allegiance` guarantees ahead of any team
+      // accounting.
+      expect(endKind(teamOver(0, 0, [7]))).toBe('victory');
+    });
+
+    it('reads an ELIMINATED seat whose side then WINS as a VICTORY', () => {
+      // The developer's screenshot in slow motion: your core dies, you take
+      // SPECTATE, and your side finishes the job. The match-over screen that
+      // follows must land on the right word — not DEFEAT, and not ELIMINATED
+      // (that state ended when the match did).
+      const watching = { you: 0, winner: null, matchOver: false, allies: new Set(MY_SIDE) };
+      expect(endKind(watching)).toBe('eliminated');
+      expect(endButtons(watching)).toContain('spectate');
+
+      const sideWon = teamOver(0, 7, MY_SIDE);
+      expect(endKind(sideWon)).toBe('victory');
+      expect(endButtons(sideWon)).toEqual(['rematch', 'menu']);
+    });
+
+    it('leaves the draw and no-survivor ends exactly where they were', () => {
+      expect(endKind(teamOver(0, null, MY_SIDE))).toBe('draw');
+      expect(endKind({ you: 0, winner: null, matchOver: false, allies: new Set(MY_SIDE) })).toBe(
+        'eliminated',
+      );
+    });
+
+    it('is FFA character for character with no roster — teams-of-one', () => {
+      // The absent `allies` IS the FFA case (`sim/allegiance`: "FFA is
+      // teams-of-one"), and an explicit side of one must agree with it.
+      for (const winner of [0, 1, 4, 7]) {
+        expect(endKind(over(0, winner))).toBe(endKind(teamOver(0, winner, [0])));
+      }
+      expect(endKind(over(0, 0))).toBe('victory');
+      expect(endKind(over(0, 7))).toBe('defeat');
+    });
+
+    /**
+     * "One predicate, one answer, everywhere" is the claim a0-09 rests on, and
+     * every case above tests it against a hand-written roster — which proves the
+     * summary is self-consistent, not that it agrees with the SIM. Those are
+     * different claims, and the bug was born of exactly that gap: the screen had
+     * its own idea of who won and the sim had allegiance, and nobody compared
+     * them.
+     *
+     * So compare them, on a real sided world, for every slot: the seat's verdict
+     * must equal `sim/allegiance` `sameSide` — the same predicate the targeting
+     * ladder and friendly fire read. The roster is not hand-written here either;
+     * it comes from `deriveAlarmAllies`, the function the shipped client actually
+     * hands `currentOutcome()`. If the UI's notion of a side ever drifts from the
+     * sim's, this fails, and it fails for the drifting slot by name.
+     */
+    it('agrees with the SIM’s own sameSide, slot for slot, on a real sided world', () => {
+      // 2v2, the developer's shape: slots 0 and 7 hold side A, 1 and 3 side B.
+      const world = createWorld({
+        seed: 9,
+        asteroidCount: 0,
+        players: [
+          { id: 0, shipClass: ShipClass.Vanguard, team: 0 },
+          { id: 1, shipClass: ShipClass.Vanguard, team: 1 },
+          { id: 3, shipClass: ShipClass.Vanguard, team: 1 },
+          { id: 7, shipClass: ShipClass.Vanguard, team: 0 },
+        ],
+      });
+      const allies = deriveAlarmAllies(world, 0);
+
+      for (const winner of [0, 1, 3, 7]) {
+        const outcome: MatchOutcome = { you: 0, winner, matchOver: true, allies };
+        expect(onYourSide(outcome, winner), `slot ${winner}: UI vs sim`).toBe(
+          sameSide(world, 0, winner),
+        );
+        expect(endKind(outcome), `slot ${winner}: the word the player is told`).toBe(
+          sameSide(world, 0, winner) ? 'victory' : 'defeat',
+        );
+      }
+
+      // And the premise the whole comparison rests on: the world really is sided.
+      // In FFA this set is {0} and the loop above would pass while proving nothing.
+      expect([...allies].sort((a, b) => a - b), 'the derived side is you AND your ally').toEqual([
+        0, 7,
+      ]);
+    });
+
+    it('exposes the one predicate the whole screen asks', () => {
+      // Headline, subhead and identity rule all route through this, so they
+      // cannot answer "is that mine?" three different ways.
+      const o = teamOver(0, 7, MY_SIDE);
+      expect(onYourSide(o, 0)).toBe(true); // you
+      expect(onYourSide(o, 7)).toBe(true); // your ally
+      expect(onYourSide(o, 1)).toBe(false); // an enemy
+      expect(onYourSide(o, null)).toBe(false); // nobody
+      expect(onYourSide(over(0, 0), 7)).toBe(false); // FFA: nobody but you
+    });
   });
 
   it('offers spectate ONLY while the match is still live for others', () => {
@@ -69,7 +208,9 @@ describe('reading an outcome', () => {
 describe('the frame model', () => {
   it('headlines each end and marks Rematch primary', () => {
     const victory = endOfMatchModel(over(1, 1));
-    expect(victory.headline).toBe('VICTORY');
+    expect(victory.headline).toBe('CLAIM HELD');
+    expect(endOfMatchModel(over(2, 5)).headline).toBe('CLAIM LOST');
+    expect(endOfMatchModel(over(2, null)).headline).toBe('NO CLAIMANT');
     expect(victory.buttons[0]).toMatchObject({ id: 'rematch', primary: true });
 
     const elim = endOfMatchModel(eliminated(1));
@@ -78,9 +219,23 @@ describe('the frame model', () => {
     expect(elim.buttons[1]).toMatchObject({ id: 'spectate', primary: false });
   });
 
-  it('accents victory with your colour and defeat with the victor’s', () => {
-    expect(endOfMatchModel(over(3, 3)).accent).toBe(playerColor(3));
-    expect(endOfMatchModel(over(3, 6)).accent).toBe(playerColor(6));
+  /**
+   * a0-09 settled the colour seam: the identity rule carries **the winner's**
+   * colour on every end that has one. It read `playerColor(you)` on victory and
+   * `playerColor(winner)` on defeat, which were the same number while victory
+   * meant "you won"; an ally victory is the first outcome to take the victory
+   * path with someone else's name under it, and the rule must point at whoever
+   * the line under it names — one fact, two carriers, never in disagreement.
+   *
+   * The SIDE is not drawn here on purpose: GDD §5.7 keeps the team motif's
+   * blue/red off identity surfaces (*"never a hull, never a ship's trim, never an
+   * HP bar"*), and this rule is the end screen's identity surface. The side is
+   * carried in words, by the subhead.
+   */
+  it('accents every end that has a winner with THAT winner’s colour', () => {
+    expect(endOfMatchModel(over(3, 3)).accent).toBe(playerColor(3)); // your win
+    expect(endOfMatchModel(over(3, 6)).accent).toBe(playerColor(6)); // a loss
+    expect(endOfMatchModel(teamOver(0, 7, MY_SIDE)).accent).toBe(playerColor(7)); // an ally's win
     // No one to colour on a draw or an elimination.
     expect(endOfMatchModel(over(3, null)).accent).toBeNull();
     expect(endOfMatchModel(eliminated(3)).accent).toBeNull();
@@ -88,6 +243,62 @@ describe('the frame model', () => {
 
   it('names the victor in a defeat’s subhead, one-based', () => {
     expect(endOfMatchModel(over(0, 4)).subhead).toContain('Player 5');
+  });
+
+  /**
+   * The other half of the developer's screenshot. DEFEAT was the wrong headline,
+   * and *"Player 7 took the claim."* was the wrong sentence under it — that is an
+   * opponent's line, printed about a friend. An ally's win gets its own: your
+   * side took the claim, and here is who held it.
+   */
+  it('reads an ally’s win as YOUR SIDE taking the claim, and names who held it', () => {
+    const allyWon = endOfMatchModel(teamOver(0, 7, MY_SIDE));
+    expect(allyWon.headline).toBe('CLAIM HELD');
+    expect(allyWon.subhead).toBe('Your side took the claim — Player 8 held it.');
+    // It is never the opponent's sentence…
+    expect(allyWon.subhead).not.toBe('Player 8 took the claim.');
+    // …and never claims YOU held a claim your teammate held.
+    expect(allyWon.subhead).not.toBe('You took the claim.');
+
+    // Your own win is untouched — no "your side" hedge on a solo hold.
+    expect(endOfMatchModel(teamOver(0, 0, MY_SIDE)).subhead).toBe('You took the claim.');
+    // And an enemy's win keeps the line it always had.
+    expect(endOfMatchModel(teamOver(0, 1, MY_SIDE)).subhead).toBe('Player 2 took the claim.');
+  });
+
+  /**
+   * The condition on the in-register headlines, not a nicety. GDD §4.7's
+   * accessibility clause permits `CLAIM HELD` / `CLAIM LOST` / `NO CLAIMANT`
+   * **only** while the line underneath states the outcome plainly — the headline
+   * may never be the sole statement of who won. If a refactor empties
+   * `subheadFor()`, this fails and the headlines must revert to plain words
+   * rather than the screen shipping an outcome the player has to infer.
+   */
+  it('never lets an in-register headline be the only statement of the outcome', () => {
+    const victory = endOfMatchModel(over(1, 1));
+    expect(victory.headline).toBe('CLAIM HELD');
+    expect(victory.subhead).toBe('You took the claim.');
+
+    const defeat = endOfMatchModel(over(1, 4));
+    expect(defeat.headline).toBe('CLAIM LOST');
+    // Says who took it — the loss is stated, not left to the headline's colour.
+    expect(defeat.subhead).toContain('took the claim');
+    expect(defeat.subhead).toContain('Player 5');
+
+    // An ally's win is the newest headline/line pair (a0-09) and it obeys the
+    // same clause: strip `CLAIM HELD` and the sentence still says who won and
+    // that they were on your side.
+    const allied = endOfMatchModel(teamOver(0, 7, MY_SIDE));
+    expect(allied.headline).toBe('CLAIM HELD');
+    expect(allied.subhead).toContain('Your side');
+    expect(allied.subhead).toContain('took the claim');
+    expect(allied.subhead).toContain('Player 8');
+
+    // The draw's plain line names the outcome without the fiction word, which is
+    // the clause working as written: strip "NO CLAIMANT" and the meaning survives.
+    const draw = endOfMatchModel(over(1, null));
+    expect(draw.headline).toBe('NO CLAIMANT');
+    expect(draw.subhead).toBe('No reactor survived the collapse.');
   });
 
   it('offers REMATCH + BACK TO MENU on a whole-match-over screen', () => {
@@ -212,9 +423,15 @@ describe('the Gantry/Bone summary', () => {
   it('keeps the four results reporting exactly what they reported', () => {
     // The re-skin is not allowed to change a word or a button. Pinned here so a
     // later material pass cannot quietly edit the screen's content.
-    expect(endOfMatchModel(over(1, 1)).headline).toBe('VICTORY');
-    expect(endOfMatchModel(over(1, 2)).headline).toBe('DEFEAT');
-    expect(endOfMatchModel(over(1, null)).headline).toBe('DRAW');
+    //
+    // l2-02: the three in-register headlines were re-worded by the ratified voice
+    // sweep (§4.7) — a deliberate copy change, which is the one thing this pin does
+    // NOT guard against. Its intent is intact and re-pinned on the new words: a
+    // material pass still cannot touch them, and the accessibility condition that
+    // makes them legal is asserted above, on `subheadFor()`.
+    expect(endOfMatchModel(over(1, 1)).headline).toBe('CLAIM HELD');
+    expect(endOfMatchModel(over(1, 2)).headline).toBe('CLAIM LOST');
+    expect(endOfMatchModel(over(1, null)).headline).toBe('NO CLAIMANT');
     expect(endOfMatchModel(eliminated(1)).headline).toBe('ELIMINATED');
     expect(endOfMatchModel(over(1, 2)).subhead).toBe('Player 3 took the claim.');
   });

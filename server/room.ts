@@ -54,6 +54,7 @@ import type {
   ClientMessage,
   EntityEventMessage,
   InputMessage,
+  LobbySeatState,
   LobbySlot,
   PlayerEconomy,
   RoomCode,
@@ -63,6 +64,10 @@ import type {
 import { encodeServerMessage } from '../src/net/wire';
 import type { WireFrame } from '../src/net/wire';
 import { TICK_DT, createWorld, isOver, step } from '../src/sim';
+// The floor a match is legal at (GDD §2.1 amended: N counts humans plus bots,
+// 2-8). The room checks it too — a client refuses first, with a reason on
+// screen, but authority does not take a client's word for what it refused.
+import { MIN_MATCH_SIZE } from '../src/sim/match-config';
 import type { Bounds, MatchMode, PlayerInput, World } from '../src/sim';
 import {
   FogTracker,
@@ -85,6 +90,21 @@ export interface ServerSocket {
   send(frame: WireFrame): void;
   /** Hang up. */
   close(): void;
+  /**
+   * This connection's seat has been renumbered (a0-11 — {@link MatchRoom.startMatch}
+   * compacts the roster at RUSH!, so the seats that survive are `0..N-1`).
+   *
+   * The room routes every client message by the seat the *connection* holds
+   * (`server/match-server.ts`), never by anything the client says, so a
+   * renumbering the connection did not hear about would file one player's input
+   * against another player's ship. It is called synchronously, inside the same
+   * `startMatch()` that moved the seat, so there is no instant at which the two
+   * disagree.
+   *
+   * Optional for the same reason `rttMs` is: the seam stays deliberately tiny, and
+   * a test double that never reads its own seat back has nothing to update.
+   */
+  reseat?(player: PlayerId): void;
   /**
    * This connection's measured round trip in ms, null when nothing current has
    * been measured, and **absent entirely on a socket that does not measure** —
@@ -184,7 +204,17 @@ export type JoinOutcome =
 /** One seat in the room: who is in it, who is flying it, and whether the seat
  *  is being held open for someone who dropped. */
 interface Slot {
-  readonly player: PlayerId;
+  /**
+   * This seat's id — the ship it flies, the colour it wears, the number a client
+   * files input against.
+   *
+   * **Not readonly since a0-11.** RUSH! compacts the roster (seats nobody is in
+   * are not in the match), and the surviving seats are renumbered `0..N-1` so no
+   * sparse id ever reaches the sim ({@link RoomConfig.slots}, spike §S2 / Trap 6).
+   * Before that nothing was ever dropped, so a seat's id was fixed for the life of
+   * the room.
+   */
+  player: PlayerId;
   /** The live human connection, or null when a bot has the controls. */
   socket: ServerSocket | null;
   shipClass: ShipClass;
@@ -377,6 +407,24 @@ export class MatchRoom {
    *  client like any other. */
   private creator: PlayerId | null = null;
   private botDifficulties: readonly BotDifficulty[] = [];
+  /**
+   * What the host set each seat to — OPEN / BOT / CLOSED, indexed by slot
+   * (a0-11; `src/net/transport` `LobbyChoiceMessage.seats`, GDD §2.1 *amended
+   * 2026-08-07*).
+   *
+   * The room used to need no such table, because it had no decision to make: at
+   * RUSH! every seat without a socket became a bot. That is exactly the rule the
+   * developer asked to be undone — *"it should start with all slots OPEN and no
+   * bots in it"* — so the question "does a bot go here?" now has an author, and
+   * this is where their answer lives.
+   *
+   * Defaults to all-OPEN, which is what a fresh room is: nobody has said anything
+   * about it yet. A pre-a0-11 client sends no `seats` at all and leaves it that
+   * way, which means such a client can now only start a match with the humans who
+   * actually turned up — the honest reading of "no opinion", and the one that
+   * cannot conjure a bot nobody asked for.
+   */
+  private seatStates: LobbySeatState[];
   /** Wall clock of the last update, so elapsed real time becomes whole ticks. */
   private lastUpdateMs = -1;
   /** Fractional tick time carried between updates — dropping it would make the
@@ -422,6 +470,9 @@ export class MatchRoom {
       orders: [],
     }));
     this.publishedRtt = Array.from({ length: count }, () => null);
+    // A fresh room is all-OPEN: eight chairs and nobody having said anything
+    // about them yet (a0-11).
+    this.seatStates = Array.from({ length: count }, () => 'open' as LobbySeatState);
   }
 
   // --- Read-only surface --------------------------------------------------
@@ -459,7 +510,11 @@ export class MatchRoom {
    */
   get joinableSeats(): number {
     if (this.phase !== 'lobby') return 0;
-    return this.slots.filter((s) => s.socket === null).length;
+    // Free *and* open (a0-11): a seat the host shut or put a bot in is not one a
+    // router may send a player to, so advertising it would route somebody into a
+    // room that then refuses them — the exact miss the room ad exists to prevent
+    // (GDD §4.2, "a player is never routed into a lobby that doesn't fit").
+    return this.slots.filter((s) => s.socket === null && this.seatStates[s.player] === 'open').length;
   }
 
   /** True while somebody may still come back to a held seat (GDD §4.2). */
@@ -485,6 +540,12 @@ export class MatchRoom {
         shipClass: slot.shipClass,
         team: slot.team,
         ready: slot.ready,
+        // What the seat is SET to, as against who is in it (a0-11). `ready`
+        // answers the second; nothing answered the first, and without it every
+        // broadcast would read "not a bot yet" for a seat the host deliberately
+        // set to BOT — quietly undoing the host's own authoring on their own
+        // screen, one broadcast at a time.
+        state: this.seatStates[slot.player] ?? 'open',
         ...(rtt === null ? {} : { rtt }),
       };
     });
@@ -526,7 +587,11 @@ export class MatchRoom {
     if (request.reclaim !== undefined) return this.reclaim(socket, request, nowMs);
 
     if (this.phase !== 'lobby') return { ok: false, reason: 'match-live' };
-    const slot = this.slots.find((s) => s.socket === null);
+    // The lowest seat that is free AND still a seat: a chair the host shut is not
+    // one a joiner may sit in (GDD §2.1 — closed is "excluded from the match
+    // entirely"), and a chair they put a bot in is spoken for. A room with neither
+    // left is full, which is exactly what the code says to the person typing it.
+    const slot = this.slots.find((s) => s.socket === null && this.seatStates[s.player] === 'open');
     if (!slot) return { ok: false, reason: 'room-full' };
 
     slot.socket = socket;
@@ -691,6 +756,9 @@ export class MatchRoom {
         // state and is ignored here, or a guest could re-side the room under the
         // host.
         if (player === this.creator) this.applyTeamConfig(message.mode, message.teams);
+        // …and the per-seat OPEN / BOT / CLOSED authoring (a0-11). Same rule, same
+        // reason: the roster is match shape, and only the creator shapes the match.
+        if (player === this.creator && message.seats) this.applySeatStates(message.seats);
         this.broadcastLobby();
         break;
       case 'startMatch':
@@ -841,6 +909,30 @@ export class MatchRoom {
    * keeps the side it had; the values are compared for equality alone
    * (`src/sim/allegiance`), so only which seats share one matters.
    */
+  /**
+   * Adopt the host's roster (a0-11): which seats are OPEN, which the host put a
+   * bot in, and which are shut.
+   *
+   * Indexed by slot, and a seat the array does not name keeps what it had — the
+   * same discipline {@link applyTeamConfig} keeps, and for the same reason: a
+   * short or partial array from an older client must not silently reopen seats
+   * the host closed.
+   *
+   * **A seat somebody is sitting in is never re-authored.** The host cannot bot or
+   * close a chair with a person in it, and while a client's own lobby already
+   * refuses that, authority does not take a client's word for what it refused —
+   * this is the server-side half of "you cannot cycle a seat somebody is sitting
+   * in" (`src/ui/lobby` `cycleSeatState`).
+   */
+  private applySeatStates(seats: readonly LobbySeatState[]): void {
+    for (const slot of this.slots) {
+      const wanted = seats[slot.player];
+      if (wanted === undefined) continue;
+      if (slot.socket !== null) continue;
+      this.seatStates[slot.player] = wanted;
+    }
+  }
+
   private applyTeamConfig(mode: MatchMode | undefined, teams: readonly number[] | undefined): void {
     if (mode !== undefined) this.matchMode = mode;
     if (this.matchMode === 'ffa') {
@@ -856,16 +948,56 @@ export class MatchRoom {
   }
 
   /**
-   * RUSH! (GDD §2.1). Every seat without a human becomes a bot — server-side,
-   * so a three-human classroom match is still an eight-station war (GDD §4.2) —
-   * and the world is built from the lobby as it stands, so a hull picked a
-   * moment ago is the hull that spawns — and the side the host put it on.
+   * RUSH! (GDD §2.1) — where a room stops having lobby seats and starts having a
+   * world.
+   *
+   * ---------------------------------------------------------------------------
+   * WHO IS IN THE MATCH *(rewritten a0-11, 2026-08-07)*
+   * ---------------------------------------------------------------------------
+   * The humans who turned up, plus **the seats the host set to BOT** — and
+   * nothing else. This used to read "every seat without a human becomes a bot",
+   * which is the rule GDD §2.1 was amended to remove: a seat left OPEN is an
+   * empty chair, and it takes the field with no ship, no station and no colour.
+   *
+   * The room mirrors the lobby here rather than keeping a prettier rule of its
+   * own, exactly as {@link castFor} mirrors the cast. If it did not, the client
+   * that stopped auto-seating bots would be looking at six seats drawn OPEN while
+   * authority built six bots behind them — the whole class of bug §2.1's preview
+   * exists to prevent, and the one that is hardest to see, because both halves
+   * look right on their own.
+   *
+   * ---------------------------------------------------------------------------
+   * AND WHY THE SEATS ARE RENUMBERED HERE
+   * ---------------------------------------------------------------------------
+   * The sim's roster is dense by ratified design — "no sparse id ever enters the
+   * sim" ({@link RoomConfig.slots}, spike §S2 / Trap 6) — because a `PlayerId` is
+   * an array index in half a dozen places (`stations[owner]`, `PLAYER_COLORS[id]`,
+   * the snapshot's own layout). Until a0-11 nothing was ever dropped, so the
+   * room's seats were already `0..N-1` and the question never came up. Now it
+   * does: the participants are whichever chairs people happen to be in.
+   *
+   * So the survivors are compacted, in slot order, and each client is told the
+   * seat it came out on ({@link sendMatchStart}, `matchStart.you`). Compacting
+   * *here* is what makes it safe: everything a seat carries that is keyed by id —
+   * queued input, order ids, arrivals, fog, the wallet — is still empty at this
+   * instant, because none of it exists until the world does. A minute later this
+   * would be a data migration; at RUSH! it is a re-index.
+   *
+   * A room that cannot field two players does not start at all (GDD §2.1
+   * amended). The lobby refuses first, with a reason on screen; this is authority
+   * declining to build a one-player war if the roster changed under the request.
    */
   startMatch(): void {
     if (this.phase !== 'lobby') return;
 
+    // Who takes the field: a human in the chair, or a bot the host put there.
+    const playing = this.slots.filter(
+      (slot) => slot.socket !== null || this.seatStates[slot.player] === 'bot',
+    );
+    if (playing.length < MIN_MATCH_SIZE) return;
+
     let botIndex = 0;
-    for (const slot of this.slots) {
+    for (const slot of playing) {
       if (slot.socket !== null) continue;
       this.seatBot(slot, this.castFor(botIndex++));
       // A bot flies the hull its character flies (style-guide §4: the livery is
@@ -873,6 +1005,8 @@ export class MatchRoom {
       slot.shipClass = PERSONALITIES[slot.personality as PersonalityId].shipClass;
       slot.ready = true;
     }
+
+    this.compactRoster(playing);
 
     this.authoritative = createWorld({
       seed: this.config.seed,
@@ -897,7 +1031,14 @@ export class MatchRoom {
     }
     this.statics.prime(this.authoritative);
     this.lifecycle.prime(this.authoritative);
-    this.broadcastLobby();
+    // NO trailing `broadcastLobby()` here (a0-11). It used to publish the seated
+    // bots so the roster showed the finished cast — harmless while the room's
+    // seats never moved, and actively wrong now that RUSH! compacts them: the
+    // broadcast is indexed by the NEW numbering and every client is still holding
+    // the old one, so folding it in would paint bots onto seats that no longer
+    // exist. `matchStart` above already carried the whole roster, per recipient,
+    // in the numbering its own world is built from — strictly better information,
+    // and the one the lobby is ended by (`src/ui/lobby-flow` rule 3).
     this.broadcastSnapshot(this.authoritative);
   }
 
@@ -1279,12 +1420,60 @@ export class MatchRoom {
 
   /** RUSH!, and the arguments the world was built from — the client rebuilds the
    *  same arena from them and predicts inside it (GDD §4.2, `src/net/prediction`). */
+  /**
+   * Drop the seats nobody is in and renumber the survivors `0..N-1` (a0-11).
+   *
+   * Called from {@link startMatch} and nowhere else, in the one instant when a
+   * seat's id can still be changed cheaply: after the bots are seated (so the
+   * roster is final) and before `createWorld` (so no ship, station or snapshot
+   * has ever been keyed by the old number).
+   *
+   * Three things travel with the renumbering, and all three are bugs if they do
+   * not:
+   *
+   *  - **the connection's own seat**, through {@link ServerSocket.reseat}. Every
+   *    client message is routed by the seat the connection holds, so a stale one
+   *    would file player 4's thrust against player 1's ship;
+   *  - **the creator**, or the host loses RUSH! and the slot editor to whoever
+   *    inherited their old number;
+   *  - **the published-ping table**, which is keyed by seat and would otherwise
+   *    compare this seat's ping against a different seat's last reading.
+   *
+   * FFA teams are re-derived rather than carried: FFA *is* teams-of-one, so a
+   * side is the seat's own id and must follow it. TEAMS sides are carried
+   * through untouched — `areEnemies` compares them for equality alone, so only
+   * which seats share a value matters (`src/sim/allegiance`).
+   */
+  private compactRoster(playing: readonly Slot[]): void {
+    if (playing.length === this.slots.length) return; // nothing was dropped
+    const creatorSlot = this.creator === null ? null : this.slots[this.creator];
+    playing.forEach((slot, dense) => {
+      slot.player = dense;
+      if (this.matchMode === 'ffa') slot.team = dense;
+      if (slot.fog) slot.fog = new FogTracker(dense);
+      slot.socket?.reseat?.(dense);
+    });
+    this.slots.length = 0;
+    this.slots.push(...playing);
+    // The creator may themselves have been dropped — a room whose host walked out
+    // between RUSH! and this line. Then nobody holds the room, which is the same
+    // answer `vacate` gives, and the next join takes it.
+    this.creator = creatorSlot && playing.includes(creatorSlot) ? creatorSlot.player : null;
+    this.publishedRtt.length = 0;
+    for (let i = 0; i < this.slots.length; i++) this.publishedRtt.push(null);
+    this.seatStates = this.slots.map(() => 'open' as LobbySeatState);
+  }
+
   private sendMatchStart(slot: Slot): void {
     if (!this.authoritative) return;
     this.sendTo(slot, {
       type: 'matchStart',
       tick: this.authoritative.tick,
       seed: this.config.seed,
+      // The seat THIS recipient came out of the compaction on (a0-11). Per
+      // recipient, which is why it rides `matchStart` and not the broadcast
+      // roster beside it.
+      you: slot.player,
       slots: this.slots.map((s) => ({ player: s.player, shipClass: s.shipClass, team: s.team })),
       ...(this.config.bounds ? { bounds: { ...this.config.bounds } } : {}),
       ...(this.config.asteroidCount !== undefined

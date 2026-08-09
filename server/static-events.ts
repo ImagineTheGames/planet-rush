@@ -38,7 +38,7 @@ import type {
 } from '../src/net/entity-events';
 import { shipLifecycleOf } from '../src/net/entity-events';
 import type { EntityEventMessage, Tick } from '../src/net/transport';
-import { SENSOR_RANGE, TICK_DT } from '../src/sim';
+import { stationHealthVisible, TICK_DT } from '../src/sim';
 import type { MiningStation, Ship, World } from '../src/sim';
 
 // ---------------------------------------------------------------------------
@@ -362,45 +362,54 @@ export class StaticEntityTracker {
 }
 
 // ---------------------------------------------------------------------------
-// Health — scouted, never broadcast (GDD §2.2)
+// Health — always visible (GDD §2.2, amended 2026-08-07; a0-05)
 // ---------------------------------------------------------------------------
 
 /**
  * Per-client station health. One tracker per connected player: it remembers what
- * that client was last told, and it will only tell them what they are allowed
- * to know.
+ * that client was last told, so a besieged station reports every sample and a
+ * quiet one reports nothing.
  *
- * The rule, straight from the GDD: your own station's numbers are always yours;
- * a rival's numbers exist for you only while your ship is within sensor range of
- * their station (§2.2 — "information you *earn* by scouting"). When a scouting
- * ship leaves range, the client keeps its last read and grows stale, exactly
- * like a human's memory of what they saw — the server simply stops updating it.
+ * **It no longer withholds.** The rule it used to enforce — a rival's numbers
+ * exist for you only while your ship is within `SENSOR_RANGE` of their station
+ * ("information you *earn* by scouting") — was withdrawn by the developer on
+ * 2026-08-07: *"it should always show the health regardless of proximity or else
+ * it looks like a glitch."* The sim states the replacement in one place
+ * (`sim/sensing`'s `stationHealthVisible`), and this class asks it.
+ *
+ * **Online, this half was the sharper edge of the bug.** The old radius was 180
+ * units — a fifth of the way to the edge of a 1080p screen. So even after the
+ * client started drawing every ring, a networked player would have watched
+ * *stale* rings: the server would simply never have mentioned that the home they
+ * were looking at had lost half its core. A client cannot draw what it was not
+ * told. And the numbers in this payload beyond the core — turret and shield HP —
+ * were already being drawn locally at any range (a turret's alpha tracks its HP,
+ * a shield bubble carries its own gauge), so the wire was under-reporting even
+ * against the pre-amendment renderer.
+ *
+ * The gate could not sensibly be narrowed to "on screen" instead: the server does
+ * not know a client's viewport, and guessing one would put the netplay picture
+ * back out of step with the local one. It sends everything; the client draws what
+ * it draws. The signature check below is what keeps that cheap.
+ *
+ * The class keeps its name — it is still the thing that tracks per-client
+ * knowledge, and it still tracks the fog that remains (which is now none, for
+ * health specifically). {@link StaticEventTracker} above still gates nothing on
+ * range either; presence has always been public.
  */
 export class FogTracker {
   private readonly lastSent = new Map<number, string>();
 
-  constructor(
-    private readonly viewer: PlayerId,
-    private readonly sensorRange: number = SENSOR_RANGE,
-  ) {}
+  constructor(private readonly viewer: PlayerId) {}
 
-  /** Health events this viewer has earned and has not already been told. */
+  /** Health events this viewer has not already been told. */
   events(world: World): EntityEventMessage[] {
-    const eye = world.ships.find((s) => s.id === this.viewer);
-    const looking = eye !== undefined && eye.alive;
-    const range2 = this.sensorRange * this.sensorRange;
     const events: EntityEventMessage[] = [];
 
     for (const station of world.stations) {
-      const own = station.owner === this.viewer;
-      if (!own) {
-        // No ship in the sky, no scouting: a dead or eliminated player's client
-        // learns nothing new about anyone else's core.
-        if (!looking) continue;
-        const dx = station.pos.x - eye.pos.x;
-        const dy = station.pos.y - eye.pos.y;
-        if (dx * dx + dy * dy > range2) continue;
-      }
+      // Always true since a0-05 — asked rather than assumed, so the wire and the
+      // renderer can never drift apart on the answer.
+      if (!stationHealthVisible(this.viewer, station)) continue;
 
       const data: StationHealthData = {
         id: station.id,

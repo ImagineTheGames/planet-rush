@@ -20,7 +20,7 @@
  * The routes:
  *   GET  /health           liveness + fleet occupancy (plain HTTP, like the server)
  *   GET  /machines         the live fleet, listed — the operator's "who is registered?"
- *   GET  /regions          per-region capacity, for a client's region picker
+ *   GET  /regions          per-region capacity + where to TIME each one (the picker)
  *   POST /register         a Machine announces itself on boot (authenticated, M10)
  *   POST /fleet/heartbeat  a Machine restates its rooms + load (authenticated, M10)
  *   POST /deregister       a Machine leaves the fleet at once (authenticated, M10)
@@ -69,6 +69,8 @@
  *                    Fly; the SOCKET hop pins it to the room's host
  *                    (default wss://planet-rush-gameserver.fly.dev/play)  (fly router only)
  *   MATCH_URL_TEMPLATE  direct connect URL, '{machine}' expanded (default ws://{machine}:8080/)
+ *   MATCH_HEALTH_URL   the region-probe address a client times, when it is not the
+ *                    /health beside the socket URL above  (default: derived)
  *   ALLOW_ORIGINS    comma-separated browser origins the CORS layer permits, on top
  *                    of any localhost dev origin (default the GitHub Pages origin)
  *
@@ -91,10 +93,17 @@ import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import { pathToFileURL } from 'node:url';
 import { mulberry32 } from '@shared/types';
 import { FLEET_AUTH_HEADER, verifyFleetRequest } from '../src/net/fleet-auth';
+import { allowOriginsFromEnv, corsHeaders, firstHeaderValue, preflightHeaders } from '../src/net/cors';
 import { Allocator, AllocatorError, type Allocation } from './allocator';
 import { edgeRegion } from './edge-region';
 import { InMemoryRoomRegistry, type Heartbeat, type RoomRegistry } from './registry';
 import { DirectRouter, FlyReplayRouter, type Router } from './router';
+import {
+  DirectProbeTargeter,
+  FlyPreferRegionTargeter,
+  healthUrlFrom,
+  type ProbeTargeter,
+} from './probe-target';
 import { InMemoryMachineProvider, type MachineProvider } from './provider';
 import { FlyMachineProvider } from './provider-fly';
 import { FleetController, type FleetSignal } from './fleet-controller';
@@ -124,6 +133,14 @@ export interface AllocatorServerDeps {
    */
   readonly allowOrigins?: readonly string[];
   /**
+   * How a client addresses a region to **time** it (`./probe-target`, the region
+   * picker). Present, `GET /regions` publishes a probe descriptor per region and a
+   * client can measure a real round trip to each; absent — a test harness, a
+   * deployment that has not configured one — the route answers exactly the capacity
+   * shape it always has, and a client with no target simply shows no ping.
+   */
+  readonly probeTargeter?: ProbeTargeter;
+  /**
    * Where the one line a placement writes goes (`room ABCD → <machine> (gru — your
    * region)`). Defaults to the process log; injected so a test can read the line
    * back instead of printing it, and so `route` stays a pure function of its
@@ -132,19 +149,13 @@ export interface AllocatorServerDeps {
   readonly log?: (line: string) => void;
 }
 
-/** A dev origin is any localhost/127.0.0.1 on any port, over plain http — the
- *  shape `vite dev` and a local preview serve the game from. */
-const LOCALHOST_ORIGIN = /^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?$/;
-
 /** The preflight answer's fixed part: the verbs and request headers the client
  *  routes accept. `content-type` is the only non-simple header a browser sends
  *  (on `POST /rooms`); the fleet routes carry `x-fleet-auth` but are server-to-
- *  server on the private network and never preflight, so it need not be listed. */
-const PREFLIGHT_HEADERS: Readonly<Record<string, string>> = {
-  'access-control-allow-methods': 'GET, POST, OPTIONS',
-  'access-control-allow-headers': 'content-type',
-  'access-control-max-age': '86400',
-};
+ *  server on the private network and never preflight, so it need not be listed.
+ *  The grant itself is `src/net/cors.ts`, shared with the match server so the two
+ *  processes cannot drift on who may call them. */
+const PREFLIGHT_HEADERS = preflightHeaders();
 
 /** A route's answer before it is written to the socket. */
 interface RouteResult {
@@ -173,7 +184,7 @@ export function createAllocatorServer(deps: AllocatorServerDeps): Server {
         // CORS is decided from the request's Origin and merged onto every
         // response — the empty preflight, an error, a 204 heartbeat ack, and the
         // room decision alike — so a browser sees the same grant whatever it asked.
-        const cors = corsHeaders(firstHeader(request.headers['origin']), deps.allowOrigins ?? []);
+        const cors = corsHeaders(firstHeaderValue(request.headers['origin']), deps.allowOrigins ?? []);
         if (result.body === undefined) {
           // No content-type on an empty body — but the CORS grant and any route
           // headers (the preflight verbs) still have to ride out.
@@ -220,9 +231,7 @@ function route(
     return method === 'GET' ? machinesRoute(deps, now) : methodNotAllowed();
   }
   if (pathname === '/regions') {
-    return method === 'GET'
-      ? { status: 200, body: { regions: deps.allocator.regions(now) } }
-      : methodNotAllowed();
+    return method === 'GET' ? regionsRoute(deps, now) : methodNotAllowed();
   }
   if (pathname === '/register') {
     return method === 'POST' ? registerRoute(deps, request, raw, now) : methodNotAllowed();
@@ -263,6 +272,37 @@ function health(deps: AllocatorServerDeps, now: number, startedAt: number): Rout
       rooms,
       reservations: deps.registry.reservations(now).length,
       uptimeSeconds: Math.round((now - startedAt) / 1000),
+    },
+  };
+}
+
+/**
+ * The fleet's regions with their live capacity — and, when the deployment can
+ * address one, **where to time it** (`./probe-target`, the region picker).
+ *
+ * The probe is additive in both directions. A client that predates it reads the
+ * capacity fields it always read and ignores the extra key; a deployment with no
+ * targeter (or a region this one cannot address) publishes the region anyway, with
+ * no target — the client then shows that region unmeasured rather than hiding it.
+ * A region is never dropped from this list for want of a way to ping it.
+ *
+ * Off Fly the target is a *Machine's* own address, so the region needs a live one:
+ * the first Machine the registry lists for it, which is enough because every
+ * Machine in a region answers for the same region.
+ */
+function regionsRoute(deps: AllocatorServerDeps, now: number): RouteResult {
+  const targeter = deps.probeTargeter;
+  const regions = deps.allocator.regions(now);
+  if (targeter === undefined) return { status: 200, body: { regions } };
+  const fleet = deps.registry.machines(now);
+  return {
+    status: 200,
+    body: {
+      regions: regions.map((r) => {
+        const machine = fleet.find((m) => m.region === r.region)?.machine;
+        const probe = targeter.probeFor(r.region, machine);
+        return probe === null ? r : { ...r, probe };
+      }),
     },
   };
 }
@@ -377,37 +417,11 @@ function fleetAuthFailure(
   raw: string,
 ): RouteResult | null {
   if (deps.secret === undefined) return null;
-  const signature = firstHeader(request.headers[FLEET_AUTH_HEADER]);
+  const signature = firstHeaderValue(request.headers[FLEET_AUTH_HEADER]);
   if (!verifyFleetRequest(raw, signature, deps.secret)) {
     return { status: 401, body: { error: 'unauthorized' } };
   }
   return null;
-}
-
-/** The CORS grant for one request's Origin, or `{}` when the origin is not
- *  allowed (the browser then blocks it). `Vary: Origin` keeps a shared cache from
- *  serving one origin's grant to another. */
-function corsHeaders(
-  origin: string | undefined,
-  allow: readonly string[],
-): Readonly<Record<string, string>> {
-  if (origin !== undefined && originAllowed(origin, allow)) {
-    return { 'access-control-allow-origin': origin, vary: 'Origin' };
-  }
-  return {};
-}
-
-/** Whether a browser Origin may call the client routes: any localhost dev origin,
- *  or one the deployment allow-listed (the GitHub Pages origin). */
-function originAllowed(origin: string, allow: readonly string[]): boolean {
-  if (LOCALHOST_ORIGIN.test(origin)) return true;
-  return allow.includes(origin);
-}
-
-/** The first value of a header Node may hand back as an array (it never does for
- *  `origin`; the guard is for the general shape). */
-function firstHeader(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
 }
 
 /**
@@ -663,6 +677,27 @@ function routerFromEnv(): Router {
   return new DirectRouter((machine) => template.replace('{machine}', machine));
 }
 
+/**
+ * …and the matching probe targeter (`./probe-target`): the address a *client* times
+ * a region against, chosen by the same deployment switch the Router is. Both read
+ * the same two variables, so a deployment configures one socket URL and gets both
+ * the dial and the probe out of it — there is no third variable to forget and no
+ * way to point them at different fleets.
+ *
+ * `MATCH_HEALTH_URL` overrides the derived address for the (so far hypothetical)
+ * deployment that serves health somewhere other than beside the socket.
+ */
+function probeTargeterFromEnv(): ProbeTargeter {
+  const env = process.env;
+  if ((env['ALLOCATOR_ROUTER'] ?? 'direct') === 'fly') {
+    const connectUrl = env['MATCH_CONNECT_URL'] ?? 'wss://planet-rush-gameserver.fly.dev/play';
+    const health = env['MATCH_HEALTH_URL'] ?? healthUrlFrom(connectUrl) ?? '';
+    return new FlyPreferRegionTargeter(health);
+  }
+  const template = env['MATCH_URL_TEMPLATE'] ?? 'ws://{machine}:8080/';
+  return new DirectProbeTargeter((machine) => template.replace('{machine}', machine));
+}
+
 /** Build the process's dependencies from the environment and start listening. */
 function main(): void {
   const env = process.env;
@@ -689,14 +724,12 @@ function main(): void {
   });
   // Browser origins the CORS layer permits, beyond localhost dev: the GitHub Pages
   // origin by default, overridable/extendable via ALLOW_ORIGINS (comma-separated).
-  const allowOrigins = (env['ALLOW_ORIGINS'] ?? 'https://imaginethegames.github.io')
-    .split(',')
-    .map((o) => o.trim())
-    .filter((o) => o.length > 0);
+  const allowOrigins = allowOriginsFromEnv(env['ALLOW_ORIGINS']);
   const server = createAllocatorServer({
     allocator,
     registry,
     router: routerFromEnv(),
+    probeTargeter: probeTargeterFromEnv(),
     now: Date.now,
     // The same secret that signs tickets authenticates the fleet write routes, so
     // enforcement is on whenever the allocator has a key (it always does in prod).

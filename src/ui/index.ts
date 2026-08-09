@@ -27,8 +27,8 @@
  * four role blurbs and the Vanguard preselected (§2.11), the host's per-seat bot
  * difficulty picks (§2.9), and the RUSH! countdown, in a layout that holds on a
  * phone in landscape and on a desktop — reached through the **entry screen**
- * (§4.2), whose three doors are PLAY SOLO (no server: §4.8 risk 6), CREATE ROOM
- * and JOIN ROOM, the last behind an on-screen keypad because the game is a
+ * (§4.2), whose three doors are SOLO (no server: §4.8 risk 6), HOST and
+ * JOIN, the last behind an on-screen keypad because the game is a
  * canvas with no text field to focus.
  */
 
@@ -301,8 +301,9 @@ export {
   resolveTeamRelation,
   fallbackName,
   NAMEPLATE_MAX_CHARS,
+  // The one label opacity there is: a name is lit whatever its ship is doing
+  // (a0-04 — the developer withdrew the combat fade, so there is no second level).
   NAMEPLATE_FULL_ALPHA,
-  NAMEPLATE_FADE_ALPHA,
 } from './nameplates';
 export type {
   DifficultyTable,
@@ -320,6 +321,9 @@ export {
   NAMEPLATE_ANCHOR,
   NAMEPLATE_SHIP_GAP,
   NAMEPLATE_STATION_GAP,
+  // The label's clearance above the health-bar cluster — rule 3's surviving half
+  // after a0-04 retired the combat fade, so it is exported to be pinned by a test.
+  nameplateClusterClearance,
 } from './nameplates-view';
 export type { DrawnNameplate } from './nameplates-view';
 
@@ -383,14 +387,23 @@ export {
   cycleSeatState,
   cycleSeatTeam,
   defaultDifficultyForEmptySeat,
+  // Where a lobby slot lands in the sim's DENSE roster (a0-11) — the two
+  // numberings stop agreeing the moment a seat is left open or closed.
+  denseSeatIndex,
   eraseRoomCode,
   hostControls,
   isJoinableRoomCode,
+  // "In the match" — a human or a bot, and nothing else. Every count on the
+  // screen is taken through it (GDD §2.1, amended 2026-08-07).
+  isParticipant,
   lobbyMatchConfig,
   lobbyModel,
   // The authored sides, in the two orders the two ends index by (m10 teams-wire):
   // per-SLOT for the server, DENSE for the world the client builds itself.
   lobbyRosterTeams,
+  // …and the host's per-seat OPEN / BOT / CLOSED authoring, in the SLOT order the
+  // server indexes it by (a0-11 — `LobbyChoiceMessage.seats`).
+  lobbyWireSeats,
   lobbyWireTeams,
   makeRoomCode,
   matchSizeOf,
@@ -404,6 +417,11 @@ export {
   selectShipClass,
   setPlayerName,
   startLobbyMatch,
+  // Why RUSH! is refused, in the words the screen shows (a0-11; GDD §2.1
+  // amended) — a refused button that says nothing is a dead control.
+  NEEDS_TWO,
+  NEEDS_TWO_SIDES,
+  startRefusal,
   // The one place a side's player-facing name lives — `FRIENDLY A` / `ENEMY B`,
   // the WORD relative to the viewer and the LETTER absolute — shared by the lobby
   // roster and the in-match nameplates so they can never disagree. `SIDE_COLORS`
@@ -411,6 +429,10 @@ export {
   SIDE_COLORS,
   SIDE_WORDS,
   sideRelation,
+  // The slots on one player's side, off the lobby's own `team` table — the roster
+  // the end-of-match summary reads to answer "did MY side take the claim?"
+  // (a0-09). The lobby's twin of `art/audio/scope` `deriveAlarmAllies`.
+  sideRosterOf,
   teamLabel,
   teamName,
   viewerTeamOf,
@@ -465,11 +487,11 @@ export { LobbyView, LOBBY_ID, LOBBY_ANCHOR } from './lobby-view';
 
 // --- The door into a room (GDD §2.1, §4.2, §4.8) ---------------------------
 //
-// The screen *before* the lobby: CAMPAIGN / PLAY SOLO / CREATE ROOM / JOIN ROOM,
-// and the on-screen keypad a room code is typed on (the game is a canvas — there
-// is no DOM input to focus, see `./lobby-entry`). CAMPAIGN is a teaser: it is lit
-// and pressable, and pressing it says `Coming Soon…` without going anywhere
-// (`chooseDoor` returns no intent for it — u9-01).
+// The screen *before* the lobby: CAMPAIGN / SOLO / HOST /
+// JOIN, and the on-screen keypad a room code is typed on (the game is a
+// canvas — there is no DOM input to focus, see `./lobby-entry`). CAMPAIGN is a
+// teaser: it is lit and pressable, and pressing it says `Coming Soon…` without
+// going anywhere (`chooseDoor` returns no intent for it — u9-01).
 //
 // **Wiring seam**, continuing the one above:
 //
@@ -585,7 +607,9 @@ export { LobbyEntryView, ENTRY_ID, ENTRY_ANCHOR } from './lobby-entry-view';
 //   //             refused/dropped → drain(flowFailed(flow, ENTRY_ERRORS.full))
 
 export {
+  FLOW_SCREENS,
   createFlow,
+  flowCloseHangar,
   flowCloseSettings,
   flowConnected,
   flowEliminated,
@@ -594,13 +618,17 @@ export {
   flowLobbySlots,
   flowMatchEnded,
   flowMatchStart,
+  flowOpenHangar,
   flowOpenSettings,
+  flowScreenHandler,
   flowTapEnd,
   flowTapEntry,
+  flowTapHangar,
   flowTapLobby,
   flowTapSettings,
   resetFlow,
   setFlowFireMode,
+  setFlowProfile,
   tickFlow,
   wireFireMode,
 } from './lobby-flow';
@@ -695,6 +723,10 @@ export {
   endOfMatchHitTest,
   endOfMatchLayout,
   endOfMatchModel,
+  // The summary's ONE allegiance question (a0-09): is that player on my side?
+  // Asked here rather than re-derived, so the headline, the line under it and the
+  // identity rule can never answer it three ways.
+  onYourSide,
 } from './end-of-match';
 export type {
   DeathCause,
@@ -811,6 +843,9 @@ export {
   mainMenuHitTest,
   mainMenuLayout,
   mainMenuModel,
+  mainMenuRoute,
+  mainMenuStep,
+  mainMenuIndexOf,
 } from './main-menu';
 export type {
   MainMenuButtonState,
@@ -913,6 +948,68 @@ export { CodexView, CODEX_ANCHOR } from './codex-view';
 // via codexBotHint / codexShipHint. It never hit-tests, so it can never eat a
 // lobby tap ("non-blocking").
 export { CodexHintView } from './codex-hint-view';
+
+// --- The HANGAR — the fourth main-menu door (a0-14) -------------------------
+//
+// Where a player looks at what they have and what they are working toward: their
+// ship drawn from the REAL generators, their level and progress toward the next
+// (read from the one profile, `src/progression/`, never recomputed here), and
+// the level→unlock list of cosmetics.
+//
+// It is NOT a store: no currency, no price, no purchase. And the boundary that
+// keeps it honest is in the contract rather than in the content — a cosmetic may
+// vary colour, livery, decals, trim and engine glow, and may NEVER vary outline,
+// proportions or class-identifying geometry, because a silhouette on the minimap
+// is information (style-guide §4, GDD §2.11).
+//
+//   const hangar = new HangarView(w, h, isTouch);
+//   ctx.root.addChild(hangar);
+//   // HANGAR pressed on the menu → hangar.visible = true; menuView.visible = false
+//   // on a state change: hangar.update(hangarModel({ profile, shipClass }))
+//   // on tap: const hit = hangar.hitTest(x, y)
+//   //   'back'     → hangar.visible = false; back to the menu
+//   //   'cosmetic' → equipCosmetic(profile, c); saveProfile(platform.storage, next)
+//
+// The list ships EMPTY, and the screen is built to be worth opening anyway —
+// `model.empty` carries the line to draw where the rows would be, because an
+// empty grid is indistinguishable from a broken one (LESSONS §20).
+export {
+  COSMETICS,
+  COSMETIC_INVARIANT,
+  COSMETIC_SLOTS,
+  COSMETIC_SLOT_SURFACE,
+  COSMETIC_VARIABLE,
+  HANGAR_BACK_LABEL,
+  HANGAR_EMPTY_LINE,
+  HANGAR_EYEBROW,
+  HANGAR_ID,
+  HANGAR_TITLE,
+  cosmeticStatus,
+  equipCosmetic,
+  equippedId,
+  hangarHitTest,
+  hangarLayout,
+  hangarModel,
+  hangarTargetKey,
+  isUnlocked,
+  sameHangarTarget,
+} from './hangar';
+export type {
+  Cosmetic,
+  CosmeticSlot,
+  CosmeticStatus,
+  HangarLayout,
+  HangarLayoutOptions,
+  HangarLevelView,
+  HangarModel,
+  HangarPointer,
+  HangarRowView,
+  HangarShipView,
+  HangarState,
+  HangarTarget,
+} from './hangar';
+
+export { HangarView, HANGAR_ANCHOR } from './hangar-view';
 
 // --- The map picker — pick the arena before a match (GDD §2.1; registry m8-01) --
 //

@@ -71,24 +71,65 @@ import { budgetTest } from './budgets';
  */
 const MAX_RATIO = 4;
 
-/** Median rAF delta over `frames` — the browser's own main-thread frame time. */
-async function medianFrameMs(page: Page, frames = 60): Promise<number> {
-  return page.evaluate(async (n) => {
-    const deltas: number[] = [];
-    let last = performance.now();
-    await new Promise<void>((resolve) => {
-      const tick = (): void => {
-        const now = performance.now();
-        deltas.push(now - last);
-        last = now;
-        if (deltas.length >= n) resolve();
-        else requestAnimationFrame(tick);
-      };
-      requestAnimationFrame(tick);
-    });
-    deltas.sort((a, b) => a - b);
-    return deltas[Math.floor(deltas.length / 2)] ?? 0;
-  }, frames);
+/**
+ * How long one sample may spend at the window, and the fewest frames it will
+ * accept from it.
+ *
+ * ── WHY THE SAMPLE IS BOUNDED BY TIME AND NOT BY FRAME COUNT (a0-00b) ──────
+ * This function used to take a flat 60 frames. That is a *fixed amount of work*
+ * only on a host where a frame costs about what a frame should cost, and this
+ * suite's gating host is not that host: the GitHub runner rasterises WebGL in
+ * software at ~1 fps (./sim-clock.ts), so "60 frames" quietly means **a minute
+ * of wall clock, per sample.** The title test takes two samples and the
+ * three-screen test takes four, and that arithmetic is the whole reason
+ * `:164` timed out at 150 s and `:227` came in at 5.5 min against a 5.5 min
+ * budget on PR #321's run — a spec measuring frame cost, priced in frames,
+ * paying the very cost it is measuring.
+ *
+ * Sampling a fixed WINDOW instead removes the term: the sample costs ~3 seconds
+ * wherever it runs, and what varies is how many frames fit in it — which is the
+ * thing being measured, so varying is correct. {@link SAMPLE_MIN_FRAMES} keeps a
+ * median honest on a host so slow that barely any frames arrive; it is also the
+ * only path that can outrun the window, and at the ~1 fps worst case it bounds
+ * one sample at ~9 s rather than ~60.
+ *
+ * The assertion is untouched: still the median rAF delta, still a ratio against
+ * a match sampled the same way in the same page (see the header). A regression
+ * of the kind this file guards was **14×**; nine samples resolve that with room
+ * to spare, and the ratio's own tolerance ({@link MAX_RATIO}) is unchanged.
+ */
+const SAMPLE_WINDOW_MS = 3000;
+const SAMPLE_MIN_FRAMES = 9;
+/** A ceiling for a host fast enough to make the window pointless — 60 frames is
+ *  a full second at 60 fps, and more samples than that buy no precision here. */
+const SAMPLE_MAX_FRAMES = 60;
+
+/**
+ * Median rAF delta — the browser's own main-thread frame time — over a fixed
+ * ~{@link SAMPLE_WINDOW_MS} window rather than a fixed frame count.
+ */
+async function medianFrameMs(page: Page): Promise<number> {
+  return page.evaluate(
+    async (cfg) => {
+      const deltas: number[] = [];
+      const started = performance.now();
+      let last = started;
+      await new Promise<void>((resolve) => {
+        const tick = (): void => {
+          const now = performance.now();
+          deltas.push(now - last);
+          last = now;
+          const enough = deltas.length >= cfg.minFrames && now - started >= cfg.windowMs;
+          if (enough || deltas.length >= cfg.maxFrames) resolve();
+          else requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+      deltas.sort((a, b) => a - b);
+      return deltas[Math.floor(deltas.length / 2)] ?? 0;
+    },
+    { windowMs: SAMPLE_WINDOW_MS, minFrames: SAMPLE_MIN_FRAMES, maxFrames: SAMPLE_MAX_FRAMES },
+  );
 }
 
 /** The frozen match's median frame time — the yardstick every screen is measured
@@ -166,7 +207,7 @@ test('the static title screen costs no more per frame than the live match', asyn
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'iphone', 'the phone profile is where fill rate bites');
   budgetTest({
-    work: 'boot to the menu → sample 60 frames → boot the frozen match → sample 60 frames → compare medians',
+    work: 'boot to the menu → sample a 3 s frame window → boot the frozen match → sample again → compare medians',
     measuredSeconds: 14,
   });
 
@@ -229,7 +270,7 @@ test('THE DOORS, THE LOBBY and THE CODEX cost no more per frame than the live ma
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'iphone', 'the phone profile is where fill rate bites');
   budgetTest({
-    work: 'boot the frozen match \u2192 sample 60 frames \u2192 boot the menu \u2192 press PLAY (the doors) \u2192 sample \u2192 press PLAY SOLO (the lobby) \u2192 sample \u2192 back \u2192 press CODEX \u2192 sample \u2192 compare all three medians against the match',
+    work: 'boot the frozen match \u2192 sample a 3 s frame window \u2192 boot the menu \u2192 press PLAY (the doors) \u2192 sample \u2192 press PLAY SOLO (the lobby) \u2192 sample \u2192 back \u2192 press CODEX \u2192 sample \u2192 compare all four medians',
     measuredSeconds: 32,
   });
 

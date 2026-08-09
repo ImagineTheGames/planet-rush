@@ -24,15 +24,25 @@ interface NameplateStage {
    *  returns the bot's slot, the name the table resolved, and its difficulty tier,
    *  or null. */
   stageBot(): { owner: number; name: string; difficulty: string | undefined } | null;
-  /** The labels the real layer drew last frame — owner, kind, text, suffix, colour, pos. */
-  plates(): Array<{ owner: number; kind: 'ship' | 'station'; text: string; suffix: string; color: number; x: number; y: number; local: boolean }>;
+  /** The labels the real layer drew last frame — owner, kind, text, suffix, colour,
+   *  the opacity it drew at (a0-04), and pos. */
+  plates(): Array<{ owner: number; kind: 'ship' | 'station'; text: string; suffix: string; color: number; alpha: number; x: number; y: number; local: boolean }>;
   /** The per-slot name table the match built (data-driven source of the labels). */
   names(): Array<string | undefined>;
   /** The per-slot difficulty table (mirror of `names`), source of the suffixes. */
   difficulties(): Array<string | undefined>;
 }
+/** The health-bar live-stage seam, borrowed here to put a ship in a REAL fight —
+ *  `damageEnemy` parks a live enemy beside the centred local ship and drops its
+ *  hull, so the bar layer must draw a bar over it. That is the state the label
+ *  used to fade under (a0-04). */
+interface HealthbarStage {
+  damageEnemy(fraction: number): { owner: number; fraction: number } | null;
+  bars(): Array<{ owner: number; fraction: number; x: number; y: number; local: boolean }>;
+}
 interface StageWindow {
   __nameplateStage?: NameplateStage;
+  __healthbarStage?: HealthbarStage;
   __planetRush?: {
     viewport: { width: number; height: number };
     placement(): Array<{ id: string; ok: boolean }>;
@@ -134,4 +144,74 @@ test('name labels render over a bot ship and its station in the real booted clie
   expect(entry!.ok, 'the nameplate layer sits inside its declared `full` anchor').toBe(true);
 
   expect(pageErrors, 'no page errors while staging the name labels').toEqual([]);
+});
+
+test('a ship being shot wears its name as brightly as a calm one (a0-04)', async ({ page }) => {
+  // The developer, on a live build: *"sometimes other ships names are dim and
+  // sometimes they are lit, they should always be lit."* The unit tests pin the
+  // model; this pins the pixels' own number — the alpha the REAL layer applied to
+  // a Text object on a real boot, over a ship the health-bar layer is drawing a
+  // bar for.
+  const pageErrors: string[] = [];
+  page.on('pageerror', (e) => pageErrors.push(String(e)));
+
+  await page.goto('/?debug=1&freeze=1', { waitUntil: 'load' });
+  await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
+  await page.waitForFunction(
+    () => typeof window.__nameplateStage?.stageBot === 'function' &&
+      typeof window.__healthbarStage?.damageEnemy === 'function',
+    undefined,
+    { timeout: 20_000 },
+  );
+
+  // Put an enemy in a fight: parked beside the centred local ship at 35% hull, so
+  // a bar MUST be up over it (damaged ⇒ a bar) — the exact clutter the retired
+  // fade keyed off.
+  const shot = await page.evaluate(() => window.__healthbarStage!.damageEnemy(0.35));
+  expect(shot, 'an enemy was available to stage').not.toBeNull();
+
+  // Wait for a frame where the bar layer has drawn that ship's bar AND the label
+  // layer has drawn its name, plus at least one label over an undamaged entity to
+  // compare against (the calm side of the pair).
+  const frame = await page
+    .waitForFunction(
+      (owner) => {
+        const plates = window.__nameplateStage!.plates();
+        const bars = window.__healthbarStage!.bars();
+        const shotPlate = plates.find((p) => p.owner === owner && p.kind === 'ship');
+        const shotBar = bars.find((b) => b.owner === owner && b.fraction < 1);
+        const calm = plates.filter((p) => !bars.some((b) => b.owner === p.owner));
+        return shotPlate && shotBar && calm.length > 0 ? { plates, bars } : null;
+      },
+      shot!.owner,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+
+  const plates = frame!.plates;
+  const bars = frame!.bars;
+  const shotPlate = plates.find((p) => p.owner === shot!.owner && p.kind === 'ship')!;
+  const calmPlates = plates.filter((p) => !bars.some((b) => b.owner === p.owner));
+
+  // One number across the frame: the shot ship's name, and every calm entity's.
+  for (const calm of calmPlates) {
+    expect(
+      shotPlate.alpha,
+      `the shot ship's name (${shotPlate.text}) is as bright as the calm ${calm.kind} label (${calm.text})`,
+    ).toBeCloseTo(calm.alpha, 5);
+  }
+  expect(new Set(plates.map((p) => p.alpha)).size, 'every drawn label shares one opacity').toBe(1);
+  expect(shotPlate.alpha, 'and that opacity is the full one').toBeCloseTo(0.92, 5);
+
+  // Rule 3's surviving half, on the real stage: the label is drawn ABOVE the bar
+  // it shares a ship with, so full brightness still cannot cover the bar. Both
+  // readbacks report a TOP edge in screen px (y grows downward), so the label's
+  // top being the smaller number is the whole claim — measured off two independent
+  // layers, not off one shared constant.
+  const shotBar = bars.find((b) => b.owner === shot!.owner)!;
+  expect(shotPlate.y, 'the lit label sits above the health bar it shares a ship with').toBeLessThan(
+    shotBar.y,
+  );
+
+  expect(pageErrors, 'no page errors while lighting a shot ship’s name').toEqual([]);
 });
