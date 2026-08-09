@@ -31,6 +31,8 @@ All eight Stage 2 tasks bar 2.8 (QA's). Three commits.
 - **`<evidence>` — the two frames.** `evidence/a0-10-defend-an-ally.ts` + `.json`.
 
 DoD: `npx tsc --noEmit` clean. `npm test -- --run` — **254 files, 4395 tests, 0 failed.**
+PR **#341**, `origin/main` is an ancestor of HEAD, CI **9 pass / 0 fail** (both
+"Typecheck, test, build" jobs and all six mobile-emulation shards).
 
 ## EVIDENCE (`evidence/a0-10-defend-an-ally.json`)
 
