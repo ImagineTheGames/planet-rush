@@ -140,6 +140,22 @@ A side label that is legible only by its hue is precisely the failure the
 amendment was ratified to prevent, and it fails on the platform the parity
 principle (§2.4) exists to protect.
 
+**Root cause, exactly.** `drawTeamChip` ends in `fitLabel(nodes.teamChipLabel, room)`,
+and `fitLabel` (`src/ui/lobby-view.ts:1265`) is a bare linear scale with **no floor**:
+
+```ts
+function fitLabel(label: Text, room: number): void {
+  label.scale.set(1);
+  const drawn = label.width;
+  if (drawn > room && room > 0) label.scale.set(room / drawn);
+}
+```
+
+So the word shrinks to whatever room is left, without limit. The chip's own
+comment budgets for *"the ~62px a landscape-phone row can spare"* — an assumption
+the **sixth** column broke. `SEAT_CONTROL_MIN_HEIGHT` guards the chip's height;
+nothing guards its width.
+
 **And the screen already knows the right answer.** `src/ui/lobby-view.ts:657`
 drops the hull sub-label **whole** rather than scaling it, with the reason stated
 in the code: *"a landscape phone's 233px row leaves ~40px of body, and `EXCAVATOR`

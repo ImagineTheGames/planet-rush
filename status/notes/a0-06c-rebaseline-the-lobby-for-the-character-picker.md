@@ -92,6 +92,13 @@ exists because a Teams match was played where it was *"impossible to know who is
 on your team."* A label legible only by hue is the exact failure the amendment
 was ratified to prevent, on the platform §2.4's parity principle protects.
 
+**Root cause:** `drawTeamChip` ends in `fitLabel(label, room)`, and `fitLabel`
+(`lobby-view.ts:1265`) is a bare linear scale with **no floor** —
+`label.scale.set(room / drawn)`. The word shrinks to whatever is left, without
+limit. The chip's comment budgets for *"the ~62px a landscape-phone row can
+spare"*; the sixth column broke that. `SEAT_CONTROL_MIN_HEIGHT` guards the chip's
+height, nothing guards its width.
+
 **The screen already knows the right answer.** `src/ui/lobby-view.ts:657` drops
 the hull sub-label **whole** rather than scaling it — *"`EXCAVATOR` fitted into
 40px is a 5px smudge, not a word."* The team chip does not follow that ladder; it
