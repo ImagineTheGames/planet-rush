@@ -1,0 +1,2776 @@
+{
+  "backdrop": {
+    "id": "backdrop",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "query": "debug=1&freeze=1",
+    "capturedAt": "2026-08-09T21:57:46.751Z",
+    "image": "images/a1-05-backdrop-frozen-desktop.png",
+    "servedSha": "7e175ac",
+    "pageErrors": []
+  },
+  "station-health": {
+    "id": "station-health",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "query": "debug=1&freeze=1",
+    "capturedAt": "2026-08-09T21:57:57.956Z",
+    "frames": [
+      {
+        "name": "damaged-near",
+        "geometry": {
+          "owner": 1,
+          "coreFraction": 0.35,
+          "surfaceDistance": 120,
+          "radius": 64,
+          "screen": {
+            "x": 456,
+            "y": 400
+          }
+        },
+        "image": "images/a1-05-station-health-damaged-near.png",
+        "crop": "images/a1-05-station-health-damaged-near-crop.png"
+      },
+      {
+        "name": "damaged-far",
+        "geometry": {
+          "owner": 1,
+          "coreFraction": 0.35,
+          "surfaceDistance": 480,
+          "radius": 64,
+          "screen": {
+            "x": 96,
+            "y": 400
+          }
+        },
+        "image": "images/a1-05-station-health-damaged-far.png",
+        "crop": "images/a1-05-station-health-damaged-far-crop.png"
+      },
+      {
+        "name": "healthy-near",
+        "geometry": {
+          "owner": 1,
+          "coreFraction": 1,
+          "surfaceDistance": 120,
+          "radius": 64,
+          "screen": {
+            "x": 456,
+            "y": 400
+          }
+        },
+        "image": "images/a1-05-station-health-healthy-near.png",
+        "crop": "images/a1-05-station-health-healthy-near-crop.png"
+      },
+      {
+        "name": "healthy-far",
+        "geometry": {
+          "owner": 1,
+          "coreFraction": 1,
+          "surfaceDistance": 480,
+          "radius": 64,
+          "screen": {
+            "x": 96,
+            "y": 400
+          }
+        },
+        "image": "images/a1-05-station-health-healthy-far.png",
+        "crop": "images/a1-05-station-health-healthy-far-crop.png"
+      }
+    ],
+    "servedSha": "7e175ac",
+    "pageErrors": []
+  },
+  "nameplates": {
+    "id": "nameplates",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "query": "debug=1&freeze=1",
+    "capturedAt": "2026-08-09T22:09:14.337Z",
+    "staged": {
+      "owner": 1,
+      "name": "Rusty",
+      "difficulty": "easy"
+    },
+    "platesQuiet": [
+      {
+        "owner": 1,
+        "kind": "ship",
+        "text": "Rusty",
+        "suffix": "(EASY)",
+        "teamLabel": "",
+        "teamColor": 5218443,
+        "color": 2282437,
+        "alpha": 0.92,
+        "x": 760,
+        "y": 238,
+        "local": false
+      },
+      {
+        "owner": 1,
+        "kind": "station",
+        "text": "Rusty",
+        "suffix": "(EASY)",
+        "teamLabel": "",
+        "teamColor": 5218443,
+        "color": 2282437,
+        "alpha": 0.92,
+        "x": 760,
+        "y": 454,
+        "local": false
+      }
+    ],
+    "imageQuiet": "images/a1-05-nameplates-quiet.png",
+    "combat": {
+      "dmg": {
+        "owner": 1,
+        "fraction": 0.45
+      },
+      "beams": {
+        "firingShip": 1,
+        "turret": {
+          "shooter": 1,
+          "origin": {
+            "x": 3084,
+            "y": 2164
+          },
+          "end": {
+            "x": 3084,
+            "y": 2074
+          },
+          "hit": {
+            "x": 3084,
+            "y": 2074
+          }
+        }
+      }
+    },
+    "platesCombat": [
+      {
+        "owner": 1,
+        "kind": "ship",
+        "text": "Rusty",
+        "suffix": "(EASY)",
+        "teamLabel": "",
+        "teamColor": 5218443,
+        "color": 2282437,
+        "alpha": 0.92,
+        "x": 760,
+        "y": 358,
+        "local": false
+      },
+      {
+        "owner": 1,
+        "kind": "station",
+        "text": "Rusty",
+        "suffix": "(EASY)",
+        "teamLabel": "",
+        "teamColor": 5218443,
+        "color": 2282437,
+        "alpha": 0.92,
+        "x": 760,
+        "y": 454,
+        "local": false
+      }
+    ],
+    "bars": [
+      {
+        "owner": 1,
+        "fraction": 0.45,
+        "x": 760,
+        "y": 375,
+        "local": false,
+        "hpText": "32/70"
+      },
+      {
+        "owner": 1,
+        "fraction": 1,
+        "x": 760,
+        "y": 449,
+        "local": false,
+        "hpText": "10/10"
+      }
+    ],
+    "imageCombat": "images/a1-05-nameplates-in-combat.png",
+    "cropCombat": "images/a1-05-nameplates-in-combat-crop.png",
+    "servedSha": "7e175ac",
+    "pageErrors": []
+  },
+  "build-wheel": {
+    "id": "build-wheel",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "query": "debug=1",
+    "capturedAt": "2026-08-09T21:58:30.996Z",
+    "openedRich": {
+      "open": true,
+      "banked": 9
+    },
+    "wedgesRich": [
+      {
+        "id": "turret",
+        "label": "TURRET",
+        "sub": "YOUR STATION",
+        "target": "YOUR STATION",
+        "caps": "0 / 4 BUILT",
+        "costLabel": "3",
+        "cost": 3,
+        "ready": true,
+        "costPaint": "ore"
+      },
+      {
+        "id": "shield",
+        "label": "SHIELD",
+        "sub": "YOUR STATION",
+        "target": "YOUR STATION",
+        "caps": "0 / 2 BUILT",
+        "costLabel": "5",
+        "cost": 5,
+        "ready": true,
+        "costPaint": "ore"
+      },
+      {
+        "id": "satellite",
+        "label": "RADAR",
+        "sub": "YOUR STATION",
+        "target": "YOUR STATION",
+        "caps": "0 / 1 BUILT",
+        "costLabel": "6",
+        "cost": 6,
+        "ready": true,
+        "costPaint": "ore"
+      },
+      {
+        "id": "repair",
+        "label": "REPAIR REACTOR",
+        "sub": "REACTOR FULL",
+        "target": "",
+        "caps": "",
+        "costLabel": "1",
+        "cost": 1,
+        "ready": false,
+        "costPaint": "spent"
+      },
+      {
+        "id": "upgrade",
+        "label": "UPGRADE SHIP",
+        "sub": "YOUR SHIP",
+        "target": "YOUR SHIP",
+        "caps": "",
+        "costLabel": "OPEN ▸",
+        "cost": null,
+        "ready": true,
+        "costPaint": "none"
+      }
+    ],
+    "imageRich": "images/a1-05-wheel-ore-9.png",
+    "setPoor": 2,
+    "wedgesPoor": [
+      {
+        "id": "turret",
+        "label": "TURRET",
+        "sub": "YOUR STATION",
+        "target": "YOUR STATION",
+        "caps": "0 / 4 BUILT",
+        "costLabel": "3",
+        "cost": 3,
+        "ready": false,
+        "costPaint": "refused"
+      },
+      {
+        "id": "shield",
+        "label": "SHIELD",
+        "sub": "YOUR STATION",
+        "target": "YOUR STATION",
+        "caps": "0 / 2 BUILT",
+        "costLabel": "5",
+        "cost": 5,
+        "ready": false,
+        "costPaint": "refused"
+      },
+      {
+        "id": "satellite",
+        "label": "RADAR",
+        "sub": "YOUR STATION",
+        "target": "YOUR STATION",
+        "caps": "0 / 1 BUILT",
+        "costLabel": "6",
+        "cost": 6,
+        "ready": false,
+        "costPaint": "refused"
+      },
+      {
+        "id": "repair",
+        "label": "REPAIR REACTOR",
+        "sub": "REACTOR FULL",
+        "target": "",
+        "caps": "",
+        "costLabel": "1",
+        "cost": 1,
+        "ready": false,
+        "costPaint": "spent"
+      },
+      {
+        "id": "upgrade",
+        "label": "UPGRADE SHIP",
+        "sub": "YOUR SHIP",
+        "target": "YOUR SHIP",
+        "caps": "",
+        "costLabel": "OPEN ▸",
+        "cost": null,
+        "ready": true,
+        "costPaint": "none"
+      }
+    ],
+    "imagePoor": "images/a1-05-wheel-ore-2.png",
+    "imageOreLabel": "images/a1-05-wheel-ore-label.png",
+    "servedSha": "7e175ac",
+    "pageErrors": []
+  },
+  "loot-tell": {
+    "id": "loot-tell",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "query": "debug=1",
+    "capturedAt": "2026-08-09T21:58:17.188Z",
+    "full": {
+      "staged": {
+        "cargo": 6,
+        "cargoCap": 6,
+        "banked": 3
+      }
+    },
+    "fullDrawn": {
+      "hold": {
+        "x": 640,
+        "y": 423,
+        "slots": 6,
+        "filled": 6,
+        "full": true
+      },
+      "total": 3,
+      "readout": {
+        "cargo": 6,
+        "banked": 3
+      },
+      "ship": null
+    },
+    "imageFull": "images/a1-05-loot-hold-full.png",
+    "cropFull": "images/a1-05-loot-hold-full-crop.png",
+    "freed": {
+      "hold": null,
+      "total": 8,
+      "readout": {
+        "cargo": 0,
+        "banked": 8.999999999999979
+      }
+    },
+    "imageFreed": "images/a1-05-loot-hold-freed.png",
+    "half": {
+      "hold": {
+        "x": 640,
+        "y": 423,
+        "slots": 6,
+        "filled": 3,
+        "full": false
+      },
+      "total": 8,
+      "readout": {
+        "cargo": 3,
+        "banked": 8.999999999999979
+      }
+    },
+    "imageHalf": "images/a1-05-loot-hold-half.png",
+    "cropHalf": "images/a1-05-loot-hold-half-crop.png",
+    "servedSha": "7e175ac",
+    "pageErrors": []
+  },
+  "wave-clock": {
+    "id": "wave-clock",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "query": "debug=1",
+    "capturedAt": "2026-08-09T21:58:39.278Z",
+    "imageEarly": "images/a1-05-wave-clock-early.png",
+    "imageLater": "images/a1-05-wave-clock-later.png",
+    "ticks": 2204,
+    "servedSha": "7e175ac",
+    "pageErrors": []
+  },
+  "ally-victory": {
+    "id": "ally-victory",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "query": "debug=1&sides=2",
+    "capturedAt": "2026-08-09T21:55:48.855Z",
+    "side": [
+      0,
+      2,
+      4,
+      6
+    ],
+    "staged": true,
+    "result": {
+      "kind": "victory",
+      "headline": "CLAIM HELD",
+      "subhead": "Your side took the claim — Player 7 held it."
+    },
+    "buttons": [
+      "rematch",
+      "menu"
+    ],
+    "image": "images/a1-05-end-ally-victory.png",
+    "servedSha": "7e175ac",
+    "pageErrors": []
+  },
+  "eliminated-then-ally-wins": {
+    "id": "eliminated-then-ally-wins",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "query": "debug=1&sides=2",
+    "capturedAt": "2026-08-09T21:55:54.578Z",
+    "side": [
+      0,
+      2,
+      4,
+      6
+    ],
+    "eliminated": true,
+    "defeatedResult": {
+      "kind": "eliminated",
+      "headline": "ELIMINATED",
+      "subhead": "8th of 8 — your reactor was destroyed."
+    },
+    "imageDefeated": "images/a1-05-end-eliminated-defeated.png",
+    "stagedAllyWin": true,
+    "result": {
+      "kind": "victory",
+      "headline": "CLAIM HELD",
+      "subhead": "Your side took the claim — Player 7 held it."
+    },
+    "image": "images/a1-05-end-eliminated-then-ally-wins.png",
+    "servedSha": "7e175ac",
+    "pageErrors": []
+  },
+  "summary-sequence": {
+    "id": "summary-sequence",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "query": "debug=1",
+    "capturedAt": "2026-08-09T21:56:03.201Z",
+    "careerBefore": {
+      "xp": 0,
+      "level": 1,
+      "matches": 0
+    },
+    "won": true,
+    "beats": [
+      {
+        "i": 0,
+        "seconds": 0,
+        "frame": {
+          "phase": "result",
+          "rows": [
+            {
+              "label": "ORE MINED",
+              "text": "0",
+              "xp": null
+            },
+            {
+              "label": "DAMAGE DEALT",
+              "text": "0 HP",
+              "xp": null
+            },
+            {
+              "label": "SHIPS DESTROYED",
+              "text": "0",
+              "xp": null
+            },
+            {
+              "label": "STATIONS DESTROYED",
+              "text": "—",
+              "xp": null
+            },
+            {
+              "label": "DISTANCE TRAVELLED",
+              "text": "0",
+              "xp": null
+            },
+            {
+              "label": "SHIPS USED",
+              "text": "0",
+              "xp": null
+            },
+            {
+              "label": "ORE USED",
+              "text": "0",
+              "xp": null
+            }
+          ],
+          "matchTime": "00:08",
+          "xp": "+0 XP",
+          "level": "LEVEL 1",
+          "barFrac": 0,
+          "leveledUp": false,
+          "buttonsLive": false,
+          "done": false
+        },
+        "image": "images/a1-05-summary-beat-0.png"
+      },
+      {
+        "i": 1,
+        "seconds": 1.2,
+        "frame": {
+          "phase": "rows",
+          "rows": [
+            {
+              "label": "ORE MINED",
+              "text": "0",
+              "xp": null
+            },
+            {
+              "label": "DAMAGE DEALT",
+              "text": "0 HP",
+              "xp": null
+            },
+            {
+              "label": "SHIPS DESTROYED",
+              "text": "0",
+              "xp": null
+            },
+            {
+              "label": "STATIONS DESTROYED",
+              "text": "—",
+              "xp": null
+            },
+            {
+              "label": "DISTANCE TRAVELLED",
+              "text": "0",
+              "xp": null
+            },
+            {
+              "label": "SHIPS USED",
+              "text": "0",
+              "xp": null
+            },
+            {
+              "label": "ORE USED",
+              "text": "0",
+              "xp": null
+            }
+          ],
+          "matchTime": "00:08",
+          "xp": "+0 XP",
+          "level": "LEVEL 1",
+          "barFrac": 0,
+          "leveledUp": false,
+          "buttonsLive": false,
+          "done": false
+        },
+        "image": "images/a1-05-summary-beat-1.png"
+      },
+      {
+        "i": 2,
+        "seconds": 3,
+        "frame": {
+          "phase": "total",
+          "rows": [
+            {
+              "label": "ORE MINED",
+              "text": "6",
+              "xp": "+6 XP"
+            },
+            {
+              "label": "DAMAGE DEALT",
+              "text": "0 HP",
+              "xp": "+0 XP"
+            },
+            {
+              "label": "SHIPS DESTROYED",
+              "text": "0",
+              "xp": "+0 XP"
+            },
+            {
+              "label": "STATIONS DESTROYED",
+              "text": "—",
+              "xp": "+0 XP"
+            },
+            {
+              "label": "DISTANCE TRAVELLED",
+              "text": "0",
+              "xp": null
+            },
+            {
+              "label": "SHIPS USED",
+              "text": "1",
+              "xp": null
+            },
+            {
+              "label": "ORE USED",
+              "text": "0",
+              "xp": null
+            }
+          ],
+          "matchTime": "00:08",
+          "xp": "+225 XP",
+          "level": "LEVEL 1",
+          "barFrac": 0,
+          "leveledUp": false,
+          "buttonsLive": false,
+          "done": false
+        },
+        "image": "images/a1-05-summary-beat-2.png"
+      },
+      {
+        "i": 3,
+        "seconds": 6,
+        "frame": {
+          "phase": "fill",
+          "rows": [
+            {
+              "label": "ORE MINED",
+              "text": "6",
+              "xp": "+6 XP"
+            },
+            {
+              "label": "DAMAGE DEALT",
+              "text": "0 HP",
+              "xp": "+0 XP"
+            },
+            {
+              "label": "SHIPS DESTROYED",
+              "text": "0",
+              "xp": "+0 XP"
+            },
+            {
+              "label": "STATIONS DESTROYED",
+              "text": "—",
+              "xp": "+0 XP"
+            },
+            {
+              "label": "DISTANCE TRAVELLED",
+              "text": "0",
+              "xp": null
+            },
+            {
+              "label": "SHIPS USED",
+              "text": "1",
+              "xp": null
+            },
+            {
+              "label": "ORE USED",
+              "text": "0",
+              "xp": null
+            }
+          ],
+          "matchTime": "00:08",
+          "xp": "+395 XP",
+          "level": "LEVEL 2",
+          "barFrac": 0.05863287128712843,
+          "leveledUp": true,
+          "buttonsLive": false,
+          "done": false
+        },
+        "image": "images/a1-05-summary-beat-3.png"
+      }
+    ],
+    "careerAfter": {
+      "xp": 395,
+      "level": 2,
+      "matches": 1
+    },
+    "finalFrame": {
+      "phase": "settle",
+      "rows": [
+        {
+          "label": "ORE MINED",
+          "text": "6",
+          "xp": "+6 XP"
+        },
+        {
+          "label": "DAMAGE DEALT",
+          "text": "0 HP",
+          "xp": "+0 XP"
+        },
+        {
+          "label": "SHIPS DESTROYED",
+          "text": "0",
+          "xp": "+0 XP"
+        },
+        {
+          "label": "STATIONS DESTROYED",
+          "text": "—",
+          "xp": "+0 XP"
+        },
+        {
+          "label": "DISTANCE TRAVELLED",
+          "text": "0",
+          "xp": null
+        },
+        {
+          "label": "SHIPS USED",
+          "text": "1",
+          "xp": null
+        },
+        {
+          "label": "ORE USED",
+          "text": "0",
+          "xp": null
+        }
+      ],
+      "matchTime": "00:08",
+      "xp": "+395 XP",
+      "level": "LEVEL 2",
+      "barFrac": 0.10451045104510451,
+      "leveledUp": true,
+      "buttonsLive": true,
+      "done": true
+    },
+    "imageSettled": "images/a1-05-summary-settled.png",
+    "storage": {
+      "planet-rush:profile": "{\"v\":1,\"xp\":395,\"level\":2,\"matches\":1}"
+    },
+    "servedSha": "7e175ac",
+    "pageErrors": []
+  },
+  "alarm-own-station": {
+    "id": "alarm-own-station",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "query": "debug=1",
+    "capturedAt": "2026-08-09T21:56:25.921Z",
+    "atBoot": {
+      "local": 0,
+      "localPlayer": 0,
+      "allies": [
+        0
+      ],
+      "active": false,
+      "engagements": 0,
+      "sounds": 0
+    },
+    "audioAtBoot": {
+      "contextState": "running",
+      "unlocked": false,
+      "running": false,
+      "master": 0.800000011920929,
+      "musicPlaying": true,
+      "musicPhase": "calm",
+      "sfxCount": 19,
+      "hushedCount": 0,
+      "sfxBusGain": 0.800000011920929,
+      "uiCues": {
+        "press": 0,
+        "confirm": 0,
+        "reject": 0,
+        "last": null
+      },
+      "lastGain": 0.17584847796305436,
+      "lastPan": -1,
+      "listener": {
+        "x": 1968,
+        "y": 1200,
+        "has": true
+      }
+    },
+    "rivalCoreBefore": 100,
+    "afterRivalHit": {
+      "local": 0,
+      "localPlayer": 0,
+      "allies": [
+        0
+      ],
+      "active": false,
+      "engagements": 0,
+      "sounds": 0
+    },
+    "rivalCoreAfter": 100,
+    "imageRivalHit": "images/a1-05-alarm-rival-station-hit.png",
+    "ownCoreBefore": 100,
+    "afterOwnHit": {
+      "local": 0,
+      "localPlayer": 0,
+      "allies": [
+        0
+      ],
+      "active": false,
+      "engagements": 0,
+      "sounds": 0
+    },
+    "ownCoreAfter": 0,
+    "image": "images/a1-05-alarm-own-station-hit.png",
+    "audioAfter": {
+      "contextState": "running",
+      "unlocked": false,
+      "running": false,
+      "master": 0.800000011920929,
+      "musicPlaying": true,
+      "musicPhase": "siege",
+      "sfxCount": 153,
+      "hushedCount": 303,
+      "sfxBusGain": 0.800000011920929,
+      "uiCues": {
+        "press": 0,
+        "confirm": 0,
+        "reject": 0,
+        "last": null
+      },
+      "lastGain": 0.6178361602275406,
+      "lastPan": -0.7127317979600695,
+      "listener": {
+        "x": 1968,
+        "y": 1200,
+        "has": true
+      }
+    },
+    "servedSha": "7e175ac",
+    "pageErrors": []
+  },
+  "sky-parallax": {
+    "id": "sky-parallax",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "query": "debug=1&freeze=1",
+    "capturedAt": "2026-08-09T21:57:50.458Z",
+    "frames": [
+      {
+        "i": 0,
+        "distance": 200,
+        "staged": {
+          "owner": 1,
+          "coreFraction": 1,
+          "surfaceDistance": 200,
+          "radius": 64,
+          "screen": {
+            "x": 482.940258945177,
+            "y": 1010.940258945177
+          }
+        },
+        "ship": {
+          "x": 2074.940258945177,
+          "y": 1810.940258945177
+        },
+        "image": "images/a1-05-sky-flight-0.png"
+      },
+      {
+        "i": 1,
+        "distance": 1044,
+        "staged": {
+          "owner": 1,
+          "coreFraction": 1,
+          "surfaceDistance": 1044,
+          "radius": 64,
+          "screen": {
+            "x": 376,
+            "y": 400
+          }
+        },
+        "ship": {
+          "x": 2918.940258945177,
+          "y": 1810.940258945177
+        },
+        "image": "images/a1-05-sky-flight-1.png"
+      },
+      {
+        "i": 2,
+        "distance": 1888,
+        "staged": {
+          "owner": 1,
+          "coreFraction": 1,
+          "surfaceDistance": 1888,
+          "radius": 64,
+          "screen": {
+            "x": -468,
+            "y": 400
+          }
+        },
+        "ship": {
+          "x": 3762.940258945177,
+          "y": 1810.940258945177
+        },
+        "image": "images/a1-05-sky-flight-2.png"
+      }
+    ],
+    "servedSha": "7e175ac",
+    "pageErrors": []
+  },
+  "wave-clock-lobby": {
+    "id": "wave-clock-lobby",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "query": "",
+    "capturedAt": "2026-08-09T22:00:25.051Z",
+    "lobby": {
+      "visible": true,
+      "online": false,
+      "room": "LOCAL",
+      "you": 0,
+      "isHost": true,
+      "humanCount": 1,
+      "slotCount": 8,
+      "size": 8,
+      "mode": "ffa",
+      "abundance": "scarce",
+      "screen": "roster",
+      "selectedClass": "vanguard",
+      "selectedMapId": "octagon",
+      "seatLabels": [
+        "TAKEN",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT"
+      ],
+      "seatCharacters": [
+        null,
+        "rusty",
+        "bolt",
+        "foreman",
+        "patch",
+        "sable",
+        "vulture",
+        "warden"
+      ],
+      "levelBadges": [
+        "LVL 1",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "hintTitle": null
+    },
+    "imageEarly": "images/a1-05-wave-clock-lobby-early.png",
+    "imageFull": "images/a1-05-wave-clock-lobby-full.png",
+    "servedSha": null,
+    "pageErrors": [
+      "Cannot read properties of null (reading 'clear')"
+    ]
+  },
+  "lobby-character": {
+    "id": "lobby-character",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "query": "",
+    "capturedAt": "2026-08-09T22:03:55.300Z",
+    "fresh": {
+      "visible": true,
+      "online": false,
+      "room": "LOCAL",
+      "you": 0,
+      "isHost": true,
+      "humanCount": 1,
+      "slotCount": 8,
+      "size": 8,
+      "mode": "ffa",
+      "abundance": "scarce",
+      "screen": "roster",
+      "selectedClass": "vanguard",
+      "selectedMapId": "octagon",
+      "seatLabels": [
+        "TAKEN",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT"
+      ],
+      "seatCharacters": [
+        null,
+        "rusty",
+        "bolt",
+        "foreman",
+        "patch",
+        "sable",
+        "vulture",
+        "warden"
+      ],
+      "levelBadges": [
+        "LVL 1",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "hintTitle": null
+    },
+    "imageSeated": "images/a1-05-lobby-roster-with-cast.png",
+    "characterCycle": {
+      "before": "rusty",
+      "after": "bolt"
+    },
+    "afterCycle": {
+      "visible": true,
+      "online": false,
+      "room": "LOCAL",
+      "you": 0,
+      "isHost": true,
+      "humanCount": 1,
+      "slotCount": 8,
+      "size": 8,
+      "mode": "ffa",
+      "abundance": "scarce",
+      "screen": "roster",
+      "selectedClass": "vanguard",
+      "selectedMapId": "octagon",
+      "seatLabels": [
+        "TAKEN",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT"
+      ],
+      "seatCharacters": [
+        null,
+        "bolt",
+        "bolt",
+        "foreman",
+        "patch",
+        "sable",
+        "vulture",
+        "warden"
+      ],
+      "levelBadges": [
+        "LVL 1",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "hintTitle": null
+    },
+    "imageCycled": "images/a1-05-lobby-character-cycled.png",
+    "rosterCrop": "images/a1-05-lobby-roster-crop.png",
+    "worldCast": [
+      null,
+      "bolt",
+      "bolt",
+      "foreman",
+      "patch",
+      "sable",
+      "vulture",
+      "warden"
+    ],
+    "imageMatch": "images/a1-05-lobby-cast-in-match.png",
+    "servedSha": "7e175ac",
+    "pageErrors": [
+      "Cannot read properties of null (reading 'clear')\nTypeError: Cannot read properties of null (reading 'clear')\n    at X._callContextMethod (https://imaginethegames.github.io/planet-rush/assets/index-De5ilkwi.js:242:2970)\n    at X.clear (https://imaginethegames.github.io/planet-rush/assets/index-De5ilkwi.js:242:5209)\n    at z7.update (https://imaginethegames.github.io/planet-rush/assets/index-De5ilkwi.js:249:16647)\n    at Q (https://imaginethegames.github.io/planet-rush/assets/index-De5ilkwi.js:249:228814)\n    at jn (https://imaginethegames.github.io/planet-rush/assets/index-De5ilkwi.js:249:230579)"
+    ]
+  },
+  "codex-by-tap-390": {
+    "id": "codex-by-tap-390",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "query": "",
+    "capturedAt": "2026-08-09T22:04:07.493Z",
+    "viewport": {
+      "inner": {
+        "w": 390,
+        "h": 844
+      },
+      "logical": {
+        "width": 844,
+        "height": 390
+      },
+      "isTouch": true
+    },
+    "beforeTap": {
+      "visible": true,
+      "online": false,
+      "room": "LOCAL",
+      "you": 0,
+      "isHost": true,
+      "humanCount": 1,
+      "slotCount": 8,
+      "size": 8,
+      "mode": "ffa",
+      "abundance": "scarce",
+      "screen": "roster",
+      "selectedClass": "vanguard",
+      "selectedMapId": "octagon",
+      "seatLabels": [
+        "TAKEN",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT"
+      ],
+      "seatCharacters": [
+        null,
+        "rusty",
+        "bolt",
+        "foreman",
+        "patch",
+        "sable",
+        "vulture",
+        "warden"
+      ],
+      "levelBadges": [
+        "LVL 1",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "hintTitle": null
+    },
+    "helpControls": [
+      {
+        "index": 0,
+        "logical": {
+          "x": 224.56,
+          "y": 117,
+          "width": 32.23999999999995,
+          "height": 52
+        },
+        "physicalCenter": {
+          "x": 247,
+          "y": 240.67999999999998
+        }
+      },
+      {
+        "index": 1,
+        "logical": {
+          "x": 224.56,
+          "y": 169,
+          "width": 32.23999999999995,
+          "height": 52
+        },
+        "physicalCenter": {
+          "x": 195,
+          "y": 240.67999999999998
+        }
+      },
+      {
+        "index": 2,
+        "logical": {
+          "x": 224.56,
+          "y": 221,
+          "width": 32.23999999999995,
+          "height": 52
+        },
+        "physicalCenter": {
+          "x": 143,
+          "y": 240.67999999999998
+        }
+      },
+      {
+        "index": 3,
+        "logical": {
+          "x": 224.56,
+          "y": 273,
+          "width": 32.23999999999995,
+          "height": 52
+        },
+        "physicalCenter": {
+          "x": 91,
+          "y": 240.67999999999998
+        }
+      },
+      {
+        "index": 4,
+        "logical": {
+          "x": 465.35999999999996,
+          "y": 117,
+          "width": 32.23999999999995,
+          "height": 52
+        },
+        "physicalCenter": {
+          "x": 247,
+          "y": 481.4799999999999
+        }
+      },
+      {
+        "index": 5,
+        "logical": {
+          "x": 465.35999999999996,
+          "y": 169,
+          "width": 32.23999999999995,
+          "height": 52
+        },
+        "physicalCenter": {
+          "x": 195,
+          "y": 481.4799999999999
+        }
+      },
+      {
+        "index": 6,
+        "logical": {
+          "x": 465.35999999999996,
+          "y": 221,
+          "width": 32.23999999999995,
+          "height": 52
+        },
+        "physicalCenter": {
+          "x": 143,
+          "y": 481.4799999999999
+        }
+      },
+      {
+        "index": 7,
+        "logical": {
+          "x": 465.35999999999996,
+          "y": 273,
+          "width": 32.23999999999995,
+          "height": 52
+        },
+        "physicalCenter": {
+          "x": 91,
+          "y": 481.4799999999999
+        }
+      }
+    ],
+    "imageBefore": "images/a1-05-codex-390-lobby.png",
+    "helpPoint": {
+      "x": 195,
+      "y": 240.67999999999998
+    },
+    "afterTap": {
+      "visible": true,
+      "online": false,
+      "room": "LOCAL",
+      "you": 0,
+      "isHost": true,
+      "humanCount": 1,
+      "slotCount": 8,
+      "size": 8,
+      "mode": "ffa",
+      "abundance": "scarce",
+      "screen": "roster",
+      "selectedClass": "vanguard",
+      "selectedMapId": "octagon",
+      "seatLabels": [
+        "TAKEN",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT"
+      ],
+      "seatCharacters": [
+        null,
+        "rusty",
+        "bolt",
+        "foreman",
+        "patch",
+        "sable",
+        "vulture",
+        "warden"
+      ],
+      "levelBadges": [
+        "LVL 1",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "hintTitle": "Rusty — the timid hoarder"
+    },
+    "image": "images/a1-05-codex-390-after-tap.png",
+    "servedSha": "7e175ac",
+    "pageErrors": [
+      "Cannot read properties of null (reading 'clear')\nTypeError: Cannot read properties of null (reading 'clear')\n    at X._callContextMethod (https://imaginethegames.github.io/planet-rush/assets/index-De5ilkwi.js:242:2970)\n    at X.clear (https://imaginethegames.github.io/planet-rush/assets/index-De5ilkwi.js:242:5209)\n    at z7.update (https://imaginethegames.github.io/planet-rush/assets/index-De5ilkwi.js:249:16647)\n    at Q (https://imaginethegames.github.io/planet-rush/assets/index-De5ilkwi.js:249:228814)\n    at jn (https://imaginethegames.github.io/planet-rush/assets/index-De5ilkwi.js:249:230579)"
+    ]
+  },
+  "room-starts-empty": {
+    "id": "room-starts-empty",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "query": "",
+    "capturedAt": "2026-08-09T22:01:14.234Z",
+    "fresh": {
+      "visible": true,
+      "online": true,
+      "room": "PLJ4",
+      "you": 0,
+      "isHost": true,
+      "humanCount": 1,
+      "slotCount": 8,
+      "size": 1,
+      "mode": "ffa",
+      "abundance": "scarce",
+      "screen": "roster",
+      "selectedClass": "vanguard",
+      "selectedMapId": "octagon",
+      "seatLabels": [
+        "TAKEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ],
+      "seatCharacters": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "levelBadges": [
+        "LVL 1",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "hintTitle": null
+    },
+    "image": "images/a1-05-room-starts-empty.png",
+    "rosterCrop": "images/a1-05-room-starts-empty-crop.png",
+    "roomLiveBeforeRush": true,
+    "beforeRush": {
+      "visible": true,
+      "online": true,
+      "room": "PLJ4",
+      "you": 0,
+      "isHost": true,
+      "humanCount": 1,
+      "slotCount": 8,
+      "size": 3,
+      "mode": "ffa",
+      "abundance": "scarce",
+      "screen": "roster",
+      "selectedClass": "vanguard",
+      "selectedMapId": "octagon",
+      "seatLabels": [
+        "TAKEN",
+        "BOT",
+        "OPEN",
+        "OPEN",
+        "BOT",
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ],
+      "seatCharacters": [
+        null,
+        "rusty",
+        null,
+        null,
+        "patch",
+        null,
+        null,
+        null
+      ],
+      "levelBadges": [
+        "LVL 1",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "hintTitle": null
+    },
+    "tell": {
+      "text": "NOBODY JOINED — PLAYING LOCALLY",
+      "buttons": 0
+    },
+    "imageRevert": "images/a1-05-all-bot-match-offline.png",
+    "roomLiveAfterRush": false,
+    "releasedRoom": "PLJ4",
+    "imageRunning": "images/a1-05-all-bot-match-running.png",
+    "servedSha": null,
+    "pageErrors": [
+      "Cannot read properties of null (reading 'clear')"
+    ]
+  },
+  "lobby-badge-and-hangar": {
+    "id": "lobby-badge-and-hangar",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "query": "debug=1",
+    "capturedAt": "2026-08-09T22:01:40.076Z",
+    "careerBefore": {
+      "xp": 0,
+      "level": 1,
+      "matches": 0
+    },
+    "careerAfter": {
+      "xp": 355,
+      "level": 2,
+      "matches": 1
+    },
+    "imageMenu": "images/a1-05-menu-after-a-win.png",
+    "hangar": {
+      "screen": "hangar",
+      "ship": "VANGUARD · Anvil",
+      "level": "LEVEL 2",
+      "empty": "No cosmetics yet — they unlock as you level up.",
+      "controls": [
+        "back"
+      ]
+    },
+    "imageHangar": "images/a1-05-hangar-empty-state.png",
+    "lobby": {
+      "visible": true,
+      "online": false,
+      "room": "LOCAL",
+      "you": 0,
+      "isHost": true,
+      "humanCount": 1,
+      "slotCount": 8,
+      "size": 8,
+      "mode": "ffa",
+      "abundance": "scarce",
+      "screen": "roster",
+      "selectedClass": "vanguard",
+      "selectedMapId": "octagon",
+      "seatLabels": [
+        "TAKEN",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT"
+      ],
+      "seatCharacters": [
+        null,
+        "rusty",
+        "bolt",
+        "foreman",
+        "patch",
+        "sable",
+        "vulture",
+        "warden"
+      ],
+      "levelBadges": [
+        "LVL 2",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "hintTitle": null
+    },
+    "badgeBounds": {
+      "x": 659.6999999999999,
+      "y": 175,
+      "width": 54,
+      "height": 63.125
+    },
+    "imageLobby": "images/a1-05-lobby-level-badge.png",
+    "imageBadgeCrop": "images/a1-05-lobby-level-badge-crop.png",
+    "servedSha": null,
+    "pageErrors": [
+      "Cannot read properties of null (reading 'clear')"
+    ]
+  },
+  "hold-flash": {
+    "id": "hold-flash",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "query": "debug=1",
+    "capturedAt": "2026-08-09T22:04:17.149Z",
+    "full": {
+      "hold": {
+        "x": 640,
+        "y": 423,
+        "slots": 6,
+        "filled": 6,
+        "full": true
+      },
+      "readout": {
+        "cargo": 6,
+        "banked": 3
+      }
+    },
+    "half": {
+      "hold": {
+        "x": 640,
+        "y": 423,
+        "slots": 6,
+        "filled": 3,
+        "full": false
+      },
+      "readout": {
+        "cargo": 3,
+        "banked": 3
+      }
+    },
+    "servedSha": "7e175ac",
+    "pageErrors": []
+  },
+  "alarm-online-nonzero-slot": {
+    "id": "alarm-online-nonzero-slot",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "capturedAt": "2026-08-09T22:07:41.323Z",
+    "hostLobby": {
+      "visible": true,
+      "online": true,
+      "room": "XBPW",
+      "you": 0,
+      "isHost": true,
+      "humanCount": 1,
+      "slotCount": 8,
+      "size": 1,
+      "mode": "ffa",
+      "abundance": "scarce",
+      "screen": "roster",
+      "selectedClass": "vanguard",
+      "selectedMapId": "octagon",
+      "seatLabels": [
+        "TAKEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ],
+      "seatCharacters": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "levelBadges": [
+        "LVL 1",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "hintTitle": null
+    },
+    "room": "XBPW",
+    "imageHostRoom": "images/a1-05-alarm-online-host-room.png",
+    "imageGuestKeypad": "images/a1-05-alarm-online-guest-keypad.png",
+    "guestLobby": {
+      "visible": true,
+      "online": true,
+      "room": "XBPW",
+      "you": 1,
+      "isHost": false,
+      "humanCount": 2,
+      "slotCount": 8,
+      "size": 2,
+      "mode": "ffa",
+      "abundance": "scarce",
+      "screen": "roster",
+      "selectedClass": "vanguard",
+      "selectedMapId": "octagon",
+      "seatLabels": [
+        "TAKEN",
+        "TAKEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ],
+      "seatCharacters": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "levelBadges": [
+        null,
+        "LVL 1",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "hintTitle": null
+    },
+    "imageGuestRoom": "images/a1-05-alarm-online-guest-room.png",
+    "hostLobbyWithGuest": {
+      "visible": true,
+      "online": true,
+      "room": "XBPW",
+      "you": 0,
+      "isHost": true,
+      "humanCount": 2,
+      "slotCount": 8,
+      "size": 2,
+      "mode": "ffa",
+      "abundance": "scarce",
+      "screen": "roster",
+      "selectedClass": "vanguard",
+      "selectedMapId": "octagon",
+      "seatLabels": [
+        "TAKEN",
+        "TAKEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ],
+      "seatCharacters": [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "levelBadges": [
+        "LVL 1",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "hintTitle": null
+    },
+    "guestSeatFromServer": 1,
+    "hostSeatFromServer": 0,
+    "guestAlarmInMatch": {
+      "local": 1,
+      "localPlayer": 1,
+      "allies": [
+        1
+      ],
+      "active": false,
+      "engagements": 0,
+      "sounds": 0
+    },
+    "hostAlarmInMatch": {
+      "local": 0,
+      "localPlayer": 0,
+      "allies": [
+        0
+      ],
+      "active": false,
+      "engagements": 0,
+      "sounds": 0
+    },
+    "imageGuestMatch": "images/a1-05-alarm-online-guest-match.png",
+    "imageHostMatch": "images/a1-05-alarm-online-host-match.png",
+    "servedShaHost": "7e175ac",
+    "servedShaGuest": "7e175ac",
+    "pageErrors": [
+      "host pageerror: Cannot read properties of null (reading 'clear')"
+    ],
+    "servedSha": "7e175ac"
+  },
+  "alarm-siege": {
+    "id": "alarm-siege",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "query": "debug=1",
+    "capturedAt": "2026-08-09T22:05:11.041Z",
+    "atBoot": {
+      "local": 0,
+      "localPlayer": 0,
+      "allies": [
+        0
+      ],
+      "active": false,
+      "engagements": 0,
+      "sounds": 0
+    },
+    "samples": [
+      {
+        "t": 1.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 3,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 4.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 6,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 7.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 9,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 10.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 12,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 13.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 15,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 16.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 18,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 19.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 21,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 22.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 24,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 25.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 27,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 28.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 30,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 31.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 33,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 34.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 36,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 37.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 39,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 40.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 42,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 43.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 45,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 46.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 48,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 49.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 51,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 52.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 54,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 55.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 57,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 58.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 60,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 61.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 63,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 64.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 66,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 67.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 69,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 70.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 72,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 73.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 75,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 76.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 78,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 79.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 81,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 82.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 84,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 85.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 87,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": false,
+          "engagements": 0,
+          "sounds": 0
+        },
+        "core": 100
+      },
+      {
+        "t": 88.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": true,
+          "engagements": 1,
+          "sounds": 1
+        },
+        "core": 100
+      },
+      {
+        "t": 90,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": true,
+          "engagements": 1,
+          "sounds": 1
+        },
+        "core": 100
+      },
+      {
+        "t": 91.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": true,
+          "engagements": 1,
+          "sounds": 1
+        },
+        "core": 100
+      },
+      {
+        "t": 93,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": true,
+          "engagements": 1,
+          "sounds": 1
+        },
+        "core": 100
+      },
+      {
+        "t": 94.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": true,
+          "engagements": 1,
+          "sounds": 1
+        },
+        "core": 100
+      },
+      {
+        "t": 96,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": true,
+          "engagements": 1,
+          "sounds": 1
+        },
+        "core": 100
+      },
+      {
+        "t": 97.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": true,
+          "engagements": 1,
+          "sounds": 1
+        },
+        "core": 100
+      },
+      {
+        "t": 99,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": true,
+          "engagements": 1,
+          "sounds": 1
+        },
+        "core": 100
+      },
+      {
+        "t": 100.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": true,
+          "engagements": 1,
+          "sounds": 1
+        },
+        "core": 100
+      },
+      {
+        "t": 102,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": true,
+          "engagements": 1,
+          "sounds": 1
+        },
+        "core": 100
+      },
+      {
+        "t": 103.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": true,
+          "engagements": 1,
+          "sounds": 1
+        },
+        "core": 100
+      },
+      {
+        "t": 105,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": true,
+          "engagements": 1,
+          "sounds": 1
+        },
+        "core": 100
+      },
+      {
+        "t": 106.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": true,
+          "engagements": 1,
+          "sounds": 1
+        },
+        "core": 100
+      },
+      {
+        "t": 108,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": true,
+          "engagements": 1,
+          "sounds": 1
+        },
+        "core": 100
+      },
+      {
+        "t": 109.5,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": true,
+          "engagements": 1,
+          "sounds": 1
+        },
+        "core": 100
+      },
+      {
+        "t": 111,
+        "read": {
+          "local": 0,
+          "localPlayer": 0,
+          "allies": [
+            0
+          ],
+          "active": true,
+          "engagements": 1,
+          "sounds": 1
+        },
+        "core": 100
+      }
+    ],
+    "whenActive": {
+      "local": 0,
+      "localPlayer": 0,
+      "allies": [
+        0
+      ],
+      "active": true,
+      "engagements": 1,
+      "sounds": 1
+    },
+    "image": "images/a1-05-alarm-under-attack.png",
+    "activeAt": 88.5,
+    "final": {
+      "local": 0,
+      "localPlayer": 0,
+      "allies": [
+        0
+      ],
+      "active": true,
+      "engagements": 1,
+      "sounds": 1
+    },
+    "imageFinal": "images/a1-05-alarm-siege-final.png",
+    "servedSha": "7e175ac",
+    "pageErrors": []
+  }
+}
