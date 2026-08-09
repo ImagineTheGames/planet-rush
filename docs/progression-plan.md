@@ -1,10 +1,26 @@
 # Meta-Progression — XP, Levels, Unlocks (Spike s4, amended a0-13)
 
 **Owner:** Architect · **GDD:** §2.1, §2.5, §2.8, §2.11, §4.2 (m9/online), §4.6 · **Status:**
-**RATIFIED and briefed.** Every question s4 left open was answered by the developer on
-2026-08-07; the answers are folded into the sections they change, each marked *(ratified
-2026-08-07)*. The brief chain is `docs/briefs/pr-*.md` (§7). Five NEW questions — raised by
-what the ratifications turned out to cost — are at the foot of this document.
+**RATIFIED, briefed, SHIPPED and re-baselined.** Every question s4 left open was answered by the
+developer on 2026-08-07; the answers are folded into the sections they change, each marked
+*(ratified 2026-08-07)*. The brief chain is `docs/briefs/pr-*.md` (§7) and is merged. **QA
+re-measured the whole economy against the shipped code in p1-08
+(`docs/progression-balance-p1-08.md`); the corrections that report raised against this document
+are folded in here, marked *(corrected a1-02, 2026-08-09)*.** SIX questions — five raised by
+what the ratifications turned out to cost, and Question F raised by the re-baseline — are at the
+foot of this document.
+
+> **Read this before quoting a number out of §1.** *(corrected a1-02, 2026-08-09)* Two things
+> about this document's tables were measured wrong by it and right by p1-08, and both are
+> corrections to published figures rather than wording:
+>
+> 1. **Every table in §1.2–§1.4 is a `standard`-abundance number, and the game ships `scarce`**
+>    (`DEFAULT_ABUNDANCE`). The label is now on every table; the measured cost of the confusion
+>    is at the head of §1.3a.
+> 2. **"Level 2 lands inside a single match" is a claim about the MEDIAN player**, and this
+>    document stated it as a claim about every player. A player knocked out first earns 68 XP
+>    and needs 4.4 matches. Restated everywhere it appears; the fix is a **row**, not a
+>    constant, and it is **Question F** — the developer's table, the developer's call.
 
 This spike **decides**, in the mold of `docs/netcode-spike.md` and
 `docs/variable-slots-plan.md`: measurements over intentions, every claim reproducible, and
@@ -33,11 +49,18 @@ a player in accrual events at today's shipped constants, and what that becomes i
 ```
 npx vite-node spikes/progression/measure-xp.ts            # s4: nine candidate events, three weight sets
 npx vite-node spikes/progression/measure-ratified-xp.ts   # a0-13: the RATIFIED weights, real bot cast, attributed
+npx vite-node harness/cli.ts pay --seeds 12               # p1-08: the SHIPPED observer and pricer, swept
+npx vitest run tests/harness/p1-08-pay.test.ts            # p1-08: the rig, and the abundance trap, pinned
 npx tsc --noEmit                                          # the shipped tree still type-checks
 ```
 
 The second run's full output is committed at `spikes/progression/measured-a0-13.txt`, so
-every number in §1.3a–§1.3c is checkable without a four-minute run.
+every number in §1.3a–§1.3c is checkable without a four-minute run. **The third is QA's
+re-measurement of the same economy against the shipped modules** — output at
+`spikes/progression/measured-p1-08.txt`, report at `docs/progression-balance-p1-08.md` — and
+where the two instruments disagree **the shipped one is right**: a0-13 reconstructed damage
+attribution from projectile geometry and published its own residual, while p1-08 reads
+`src/sim/combat-credit.ts`, the ledger pr-02 actually shipped.
 
 The measurement code is throwaway (`spikes/progression/`, excluded from `tsconfig.json`'s
 `include` and from the build). `measure-xp.ts` reuses the shipped QA harness
@@ -101,10 +124,17 @@ is used.
 
 5. **Level curve: `xpToNext(L) = base · L^exp`, `base=300` / `exp=1.6`, UNCHANGED**
    *(ratified 2026-08-07: "ok"; re-measured by a0-13 against the ratified weights and the
-   difficulty multiplier — §1.4)*. Re-measurement matters because the pay per match moved:
-   the curve still lands **level 2 inside a single match (0.8 matches)**, and level 10 stretches
-   from ~67 matches to ~101. No re-tune needed — but only if the participation rows are kept
-   (§1.3c), which is Question A at the foot of this document.
+   difficulty multiplier — §1.4; re-measured again against the shipped code by p1-08, which
+   recommends all three constants unchanged)*. Re-measurement matters because the pay per match
+   moved: the curve still lands **level 2 inside a single match for the MEDIAN player**
+   (0.8 matches at a0-13's cell; 0.6–1.0 in nineteen of p1-08's twenty cells), and level 10
+   stretches from ~67 matches to ~101 (p1-08 measures 76–135 across every cell, 96.6 at this
+   cell). No re-tune needed — but only if the participation rows are kept (§1.3c), which is
+   Question A at the foot of this document.
+   **What "median" excludes, and it is not a rounding detail** *(corrected a1-02)*: a player
+   knocked out first earns **68 XP** and needs **4.4 matches** to reach level 2. The hook holds
+   for the median seat and not for the worst one, the fix belongs in the participation floor
+   rather than in `base` (§1.4), and it is **Question F**.
 
 6. **Opponent strength scales the pay: DIFFICULTY yes, LEVEL no** *(a0-13, from the
    developer's 2026-08-07 ask)*. A kill is worth its weight **times what it cost to get**, and
@@ -178,8 +208,11 @@ carry both — a `by` on the kill alone would leave the 2× weight unpayable.
 
 ### 1.2 What a match actually pays — measured
 
-From `npx vite-node spikes/progression/measure-xp.ts`, seeds 1..24, N=8, octagon, shipped
-§2.8 constants. Per-player, per match (one row = one player's whole match):
+From `npx vite-node spikes/progression/measure-xp.ts`, seeds 1..24, N=8, octagon, **`standard`
+abundance** *(labelled a1-02 — the harness omits `abundance`, and omitting it keeps
+`createWorld`'s own `standard` default rather than the lobby's shipped `scarce`;
+`harness/match.ts:71-75,402`)*, shipped §2.8 constants. Per-player, per match (one row = one
+player's whole match):
 
 ```
                              gathered  deposit  struct   upgr  repair  waves  estKill  secs
@@ -203,14 +236,19 @@ Read the caveats with the numbers — they are the honest half:
   measurable proxy for "how much killing happened," not a per-player credit. An aggressive
   raider lobby sees ~37 ship-deaths per player-share; a passive miner lobby ~10. The real
   per-player number arrives only with the attribution hook (§1.1).
-- **N=8 is the stingy end.** Per-player ore density rises ~4× as N falls (the finite field is
-  split across fewer homes — s1 §1, `homeFieldOre(n)`), so a 3-player match pays *more*
-  gathered/deposited XP per head. Weights are tuned against the N=8 floor so no size feels
-  starved.
+- **N=8 is the stingy end** — ***half right, and the wrong half is the conclusion*** *(corrected
+  a1-02 from p1-08 §5)*. Per-player ore density rises ~4× as N falls (the finite field is split
+  across fewer homes — s1 §1, `homeFieldOre(n)`), so a 3-player match does pay *more*
+  gathered/deposited XP per head — measured, **ore per head +126%** from N=8 to N=3. But **total
+  XP FALLS 9%** (445 → 404), because at small N there is nobody to fight: damage collapses 82%
+  and ship kills 81%, and the two effects very nearly cancel. So **N=8 is not the floor** this
+  sentence tuned the weights against; the whole 3–8 band is 404–529 XP, and the smallest lobby
+  is the *leanest* one. The finding, and what it does to the character of the pay, is §1.3e.
 
 ### 1.3 XP per match under three weight sets
 
-Same run, three candidate weight sets (full weights in `spikes/progression/measure-xp.ts`).
+Same run, same cell — N=8, octagon, **`standard` abundance** (§1.2's label) — three candidate
+weight sets (full weights in `spikes/progression/measure-xp.ts`).
 Median player / winner-median / first-out-median, and the winner:loser spread:
 
 ```
@@ -243,6 +281,38 @@ the hook before it means anything. It is in the spike output for completeness.)
 
 ### 1.3a The RATIFIED weights, re-measured *(a0-13, 2026-08-07)*
 
+> **⚠ EVERY TABLE FROM HERE TO §1.4 IS A `standard`-ABUNDANCE NUMBER. THE GAME SHIPS `scarce`.**
+> *(corrected a1-02, 2026-08-09 — measured and flagged by p1-08 §2; this document published the
+> figures without the label, which is the correction, and QA declined to edit another agent's
+> file, which is why it took a second lane.)*
+>
+> `createWorld` keeps `standard` as its own default for backward compatibility
+> (`src/sim/state.ts:1033`); the lobby ships **`DEFAULT_ABUNDANCE = 'scarce'`**
+> (`src/sim/constants.ts:799`, `src/ui/lobby.ts:1046`, ratified p11 — *"by default more
+> scarce"*). `measure-ratified-xp.ts:448` calls `createWorld({ seed, players })` with **no
+> abundance**, so it measured `standard` — a real game, but not the one the lobby opens on.
+> `tests/harness/p1-08-pay.test.ts` now pins the trap (*"omitting it is NOT the shipped
+> default"*) so the next rig cannot fall into it silently.
+>
+> **What it cost, both columns measured on the same rig over the same twelve seeds** (median XP,
+> octagon, N=8; `spikes/progression/measured-p1-08.txt`, and the tables in p1-08 §4 — so the
+> difference between them is the abundance and nothing else):
+>
+> | lobby | `standard` — the abundance every table below is | `scarce` — what the game ships | Δ |
+> |---|---|---|---|
+> | EASY mirror | 327 | **296** | **−9.5%** |
+> | MEDIUM mirror | 521 | **509** | −2.3% |
+> | HARD mirror | 321 | **336** | +4.7% |
+> | **MIXED cast** — the cell this document's headline is taken on | 416 | **445** | **+7.0%** |
+>
+> **So the headline figure moves +7% and the widest lobby moves −9.5%, and no conclusion in
+> §1.3a–§1.4 turns on either.** The reason to correct it anyway is that a reader taking these
+> tables as the shipped economy was off by that much *with no way to know*: nothing on the page
+> said which economy it was. The direction is also the opposite of the obvious guess — the
+> leanest field pays the **most** XP, because at `scarce` the median player both fights more and
+> mines more (p1-08 §5). **Where a scarce number is known it is now printed beside the standard
+> one below; where it is not, the table says `standard` and means it.**
+
 The developer ratified four: **ore mined 1× · damage dealt 2× · ships destroyed 5× · stations
 destroyed 10×.** They are not a bolt-on to §1.3's three sets; they *replace* the combat half of
 them and pin the base unit (`ore = 1`) that all three sets already shared. So the pay was
@@ -251,10 +321,11 @@ re-measured from scratch rather than re-typed.
 **How, and what changed about the method.** `spikes/progression/measure-ratified-xp.ts` runs
 the **real shipped bot cast** — `createBots` + `runHeadlessMatch` from `src/bots` — in four
 lobbies (Easy mirror, Medium mirror, Hard mirror, and the shipped mixed fill order), N=8,
-octagon, seeds 1..12, all 48 matches ending inside the timeout. Two things forced the change
-from s4's harness strategies: strategies have **no difficulty tier**, so they cannot answer the
-developer's difficulty question at all; and s4's "kills" were a match-wide ship-death count ÷ N,
-which cannot be multiplied by a per-opponent tier.
+octagon, **`standard` abundance** (the box above), seeds 1..12, all 48 matches ending inside the
+timeout. Two things forced the change from s4's harness strategies: strategies have **no
+difficulty tier**, so they cannot answer the developer's difficulty question at all; and s4's
+"kills" were a match-wide ship-death count ÷ N, which cannot be multiplied by a per-opponent
+tier.
 
 **The shadow attributor, and why you may trust these numbers exactly as far as its residual.**
 `Projectile` already carries `owner` (`src/sim/state.ts:524` — a shot must never hit its own
@@ -281,13 +352,35 @@ and it is 64–90% of the whole residual. **That is not attributor error; it is 
 **What a match pays, per player, in the units the weights are written in:**
 
 ```
-PER-PLAYER ACCRUAL PER MATCH (median over all player-matches):
+PER-PLAYER ACCRUAL PER MATCH (median over all player-matches) — octagon, N=8, STANDARD abundance:
 lobby                                     ore    dmgHP    shipK    statK    spent     dist   deaths     secs
 EASY  mirror (Rusty/Bolt)                28.2      228      4.0      0.0     14.0    57705      4.0      850
 MEDIUM mirror (Foreman/Patch)            23.1     1443     21.0      0.0     17.0    62208     24.0      835
 HARD  mirror (Sable/Vulture/Warden)      12.8      689     11.0      0.0      8.0    33486     16.0      823
 MIXED cast (shipped fill order)          28.9      768     12.5      0.0     17.0    63430     16.5      835
 ```
+
+**The same four lobbies as the game actually seats them** *(added a1-02 — p1-08 §4, the shipped
+observer and the shipped credit ledger, same twelve seeds, `scarce`)*. Print this one when
+somebody asks what a match pays; print the one above only when comparing against a0-13:
+
+```
+PER-PLAYER ACCRUAL PER MATCH (median) — octagon, N=8, SCARCE (DEFAULT_ABUNDANCE):
+lobby                                     ore    dmgHP    shipK    statK   struct     upgr   repair    medXP
+EASY  mirror (Rusty/Bolt)                19.4      182      3.0      0.0      4.0      0.0      0.0      296
+MEDIUM mirror (Foreman/Patch)            20.9     1606     23.0      0.0      3.0      1.0      0.0      509
+HARD  mirror (Sable/Vulture/Warden)      16.7      756     14.0      0.0      2.0      1.0      1.0      336
+MIXED cast (shipped fill order)          26.5      871     13.0      0.0      3.0      1.0      0.0      445
+```
+
+**Two of this document's own caveats die on that second table, and one survives.** §1.2 warned
+that the harness *"under-builds and never repairs"* and that structure XP was **a floor, not a
+typical** — measured with the shipped trees, structures are **2–4 per player per match in every
+cell and 9–12% of all XP paid**, the third-largest row in the economy, so half that warning is
+retired (Trap 10 is amended to match). Repairs really are ~0–1 and ~1% of pay, so the other half
+stands. And the damage rows the shadow attributor reconstructed came in **1–6% low** against the
+ledger that shipped — exactly the direction its published residual predicted, and not enough to
+move a conclusion.
 
 Three things to read off it before any weight is applied. **Damage is measured in HP and lands
 in the hundreds-to-thousands** while a kill lands in the tens and a station kill in the units —
@@ -301,8 +394,10 @@ are the churniest cast in the game** — 24 own-deaths and 1443 HP dealt per pla
 
 A weight is not an economy until its unit is chosen, and this is the one number the developer's
 ask does not contain. Ore has an obvious unit (one ore). Damage does not: 1 HP occurs about a
-thousand times more often per match than a kill does. Measured, pooling all four lobbies, here
-is what each candidate unit does to the *composition* of one match's XP:
+thousand times more often per match than a kill does. Measured, pooling all four lobbies
+(`standard`), here is what each candidate unit does to the *composition* of one match's XP —
+**normalised over the ratified four only**, which is what makes the percentages below add to
+100% without the participation rows in them:
 
 | one unit of "damage dealt" = | ore % | damage % | ship kills % | station kills % | raw XP |
 |---|---|---|---|---|---|
@@ -319,11 +414,19 @@ their home. The weights say station ≫ ship ≫ damage ≫ ore; only a unit cho
 say it too.
 
 **Recommended: one unit of damage dealt = 25 HP** (`DAMAGE_HP_PER_UNIT = 25`, `TUNABLE`). It is
-the choice where all four rows are legible at once — combat (damage + kills) is 42% of pay, ore
-is 17%, and §1.3c's participation rows carry the rest — and where a full 50-HP hull melted pays
-4 XP-points against the 5 the kill itself pays, so finishing a ship is worth about as much as
-the work of getting it there. It is one constant, it is the tuning dial, and **Question B** puts
-it in front of the developer as a number they may simply overrule.
+the choice where all four rows are legible at once — combat (damage + kills) is 42% of the
+four-row pay, ore is 17%, and §1.3c's participation rows carry the rest — and where a full 50-HP
+hull melted pays 4 XP-points against the 5 the kill itself pays, so finishing a ship is worth
+about as much as the work of getting it there. It is one constant, it is the tuning dial, and
+**Question B** puts it in front of the developer as a number they may simply overrule.
+
+**Measured against the shipped pricer, it does exactly what it was chosen to do** *(added a1-02
+— p1-08 §6, mixed cast, `scarce`)*: under the full eleven rows, **damage is 19% of pay and ship
+kills are 19%** — one point apart, which is the equality 25 HP was picked to produce — ore is
+6%, and the seven participation rows take **55%** between them. The 17%-ore figure above is the
+four-row normalisation, not a contradiction of it. `DAMAGE_HP_PER_UNIT = 25` **ships and stays**:
+moving it to 50 halves damage's share and breaks the equality toward the kill; moving it to 10
+restores the problem it was chosen to avoid.
 
 ### 1.3b Opponent strength scales the pay *(a0-13)*
 
@@ -382,8 +485,9 @@ call it two days, no new dependency, no new storage — and it is **not built he
 developer wants level-scaling sooner it is their call: **Question D** puts the trade in front of
 them with these three points rather than a refusal.
 
-**What the multiplier actually moves, measured** (at `DAMAGE_HP_PER_UNIT = 25`, combat rows only,
-no participation rows):
+**What the multiplier actually moves, measured** (at `DAMAGE_HP_PER_UNIT = 25`, `standard`
+abundance, **combat rows only, no participation rows** — so these are *not* the XP/min the
+shipped economy pays; see §1.3c(3), corrected):
 
 ```
 multiplier: none (control)                  multiplier: 0.75 / 1.0 / 1.25 (recommended)
@@ -403,7 +507,7 @@ about ±20% and Easy's by ∓20%, and moves nothing else. It is a dial, not a de
 s4's finding #1 was that winner:first-out came in at **1.1–1.7×** — "XP is a *hook* that rewards
 showing up and playing the loop, so a player who loses their first eight matches still climbs."
 The ratified four delete every row that produced that property. Measured, at
-`DAMAGE_HP_PER_UNIT = 25` with the recommended multiplier:
+`DAMAGE_HP_PER_UNIT = 25` with the recommended multiplier, **`standard` abundance**:
 
 | lobby | spread, ratified four ONLY | spread, + s4's participation rows | median, four only | median, + rows |
 |---|---|---|---|---|
@@ -423,8 +527,17 @@ floor and lifts the typical match from 149 XP to **399 XP**.
 The developer ratified the *combat* weights and never ruled on the rest of the table, so keeping
 them is the reading this plan recommends — but it is their table. **Question A.**
 
+**Re-measured against the shipped pricer, and confirmed** *(a1-02, from p1-08 §6)*. Every
+four-only figure above reproduces **inside 7%** (59 / 260 / 167 / 171 against 58 / 243 / 162 /
+162; spreads 0.3× / 1.2× / 6.6× / 6.5×). In an Easy lobby the first player knocked out still
+earns more than three times what the winner does. **One published number does move, and it is the
+one an implementer would type:** this section's *"that would need either `base = 75`… or a global
+×4"* (§1.4) was computed off a 149-XP typical; measured off the shipped pricer at the shipped
+default lobby a four-only match pays **169 XP**, so the replacement value is **`base = 150`, not
+75** — and even at 150 an Easy lobby (four-only median 47) does not reach level 2 in a match.
+
 **(2) The station-kill weight pays almost nobody, because the Crush does the killing.** Measured
-over the same 48 matches — who actually took a station's core to zero:
+over the same 48 matches (`standard`) — who actually took a station's core to zero:
 
 | lobby | killed by a player | killed by the Crush | Crush share |
 |---|---|---|---|
@@ -441,12 +554,34 @@ the multiplier cannot help: ×0.75 of zero is zero. Three honest options — pay
 refuses to ring for core decay on exactly that reasoning), pay the last player who damaged that
 core inside a window, or replace the row with a "survived to the collapse" one. **Question C.**
 
+*(Re-measured across every lobby, map, N and abundance in p1-08's sweep: the median player
+destroys **zero** stations in **every single cell**, and the row is 0–2% of all XP paid. Whichever
+way Question C goes, the 10× row is the smallest thing in the economy.)*
+
 **(3) The XP farm is real, and it is not where it was expected.** Offline XP counts the same as
 online (ratified, §Q5) and Hard bots pay a premium, so "farm Hard bots alone" is the obvious
-worry. Measured, it is **wrong**: the fastest XP per minute in the game is a **Medium** bot lobby
-at **17 XP/min**, against Hard's 12 and Easy's 4. Medium bots fight constantly and die constantly
+worry. Measured, it is **wrong**: the fastest XP per minute in the game is a **Medium** bot lobby,
+against Hard and Easy. Medium bots fight constantly and die constantly
 (24 deaths per player per match) and so hand out damage and ship kills faster than Hard bots,
 who are cagier and end matches sooner. The multiplier narrows that gap; it does not close it.
+
+**The ordering survives; the numbers were the wrong economy's** *(corrected a1-02 from p1-08 §6
+Question E)*. This section originally read *"a **Medium** bot lobby at **17 XP/min**, against
+Hard's 12 and Easy's 4"* — those are §1.3b's **combat-rows-only** figures, an economy this
+document does not recommend. Under the economy that shipped (all eleven rows, `scarce`):
+
+| lobby | published here (combat rows only) | measured, shipped economy (`scarce`) | (`standard`) |
+|---|---|---|---|
+| EASY mirror | 4 | **20.9** | 23.1 |
+| MEDIUM mirror | **17** | **36.6** | 37.4 |
+| HARD mirror | 12 | 24.7 | 23.9 |
+| MIXED cast | 12 | 32.4 | 29.9 |
+
+Every rate roughly doubles-to-quintuples, and — the part that matters — **the gap collapses:
+fastest-to-slowest is 1.8×, not the 4.3× this section published.** Farming the best tier over the
+worst buys 75% more XP per minute, not 325% more. The finding is the same finding and it is much
+weaker than *"a Medium lobby is the farm"*; the recommendation (leave it alone) is unchanged, and
+is now made with more confidence rather than less.
 
 So the statement to put in front of the developer is not "Hard bots are the cheapest XP" but:
 **an uncontested solo bot lobby is the highest XP/minute in the game at every tier, and which
@@ -474,7 +609,54 @@ from m10 (GDD §2.8's discipline).
 | Match won | 200 flat | no | world delta — free |
 
 Rows 1–4 are the developer's, verbatim. Rows 5–11 are s4's, unchanged, and are **Question A**.
-Median match pay: **399 XP** (mean 459). No global scale factor is needed — see §1.4.
+Median match pay: **399 XP** (mean 459) — *a `standard` number, from a0-13's reconstruction*.
+**Re-measured against the shipped observer and pricer it is 416 at that same cell and 445 at the
+one the lobby actually opens on** (`scarce`), and **296–529 across every cell in p1-08's sweep**
+*(a1-02)*. The headline *"a typical match pays ~400 XP"* stands, and no global scale factor is
+needed — see §1.4.
+
+### 1.3e What the pay is a property of — the CAST, not the board *(added a1-02, from p1-08 §5)*
+
+a0-13 measured one cell (octagon, N=8, `standard`) four ways and called the lobby the variable.
+p1-08 swept the three axes this document never varied — 240 matches, all ended — and the result
+is worth stating as a rule rather than as four more tables, because it tells the next lane which
+knobs are worth measuring and which are noise:
+
+Each row holds everything but its own axis at the shipped default (mixed cast · octagon · N=8 ·
+`scarce`) and reports the median-XP band across that axis:
+
+| axis | swept | median XP | spread |
+|---|---|---|---|
+| **cast (lobby)** | Easy · Medium · Hard · mixed | **296 → 509** | **1.7×** |
+| lobby size N | 8 · 6 · 5 · 4 · 3 | 404 → 529 | 1.3× |
+| map | octagon · compass · oval · diamond | 423 → 470 | ±5% |
+| abundance | scarce · standard · rich | 401 → 445 | ±11% |
+
+**The cast is a wider effect than the map, the lobby size and the abundance put together.** So
+"what does a match pay?" is answered by *who is in it*, and a re-baseline that varies anything
+else first is measuring the wrong thing. It is also the standing warning of §1.3c(3) restated
+from the other end: the pay moves when the **Bot Engineer** moves a tree, not when a designer
+moves a board.
+
+**And the economy is flat across lobby size, for a reason that cancels itself.** The intuition —
+per-player ore density rises as N falls (`homeFieldOre(n)`), so a small match should pay more —
+is **half right and backwards on the conclusion** (§1.2, corrected):
+
+| N | ore/head | damage HP | ship kills | **med XP** | combat share of pay |
+|---|---|---|---|---|---|
+| 8 | 26.5 | 871 | 13.0 | **445** | 39% |
+| 6 | 34.5 | 1184 | 22.0 | **529** | 40% |
+| 5 | 39.0 | 908 | 16.0 | **518** | 29% |
+| 4 | 55.7 | 280 | 4.0 | **454** | 10% |
+| 3 | 59.9 | 159 | 2.5 | **404** | 6% |
+
+Ore per head climbs **+126%** from N=8 to N=3 — and XP **falls 9%**, because at small N there is
+almost nobody to fight: damage collapses 82% and ship kills 81%. The two effects very nearly
+cancel, so **a 3-player match does not pay more per head**; the whole band is 404–529 XP, a 1.3×
+spread. What *does* change is the **character** of the pay: at N=3 a match is 6% combat and a
+third ore-and-banking, at N=8 it is 39% combat. The curve is not broken at small N; it is barely
+disturbed by it — which is the answer to a question this document had left open by only ever
+measuring N=8.
 
 ### 1.4 The level curve — early-fast, pace on one dial
 
@@ -493,9 +675,10 @@ level   toNext   cumTotal   matches @600XP
  20     33352    260633      434.4
 ```
 
-**Level 2 lands inside a single match** (the hook — you level up your first game), levels
-3–5 across a handful, and the curve then stretches so level 20 is a long-tail goal
-(~430 matches). The two knobs do exactly what a designer wants: **`base` moves the whole
+**Level 2 lands inside a single match for the median player** *(corrected a1-02 — the qualifier
+is load-bearing and this document used to omit it; see the re-proof below)* — the hook, you level
+up your first game — levels 3–5 across a handful, and the curve then stretches so level 20 is a
+long-tail goal (~430 matches). The two knobs do exactly what a designer wants: **`base` moves the whole
 early game** (how fast level 2–5 arrive), **`exp` moves the tail's steepness** (how far
 apart the high levels sit). Because the curve is measured against real match pay, "how many
 matches to level 10?" is an answer, not a hope — and if the developer wants level 10 to feel
@@ -506,7 +689,7 @@ like a season's worth, that's `exp`; if they want it in a week, that's `base`.
 The developer accepted these two numbers, and the brief was right to insist they be re-proved
 rather than re-asserted: the numbers were fitted when a match paid **634 XP** (s4 weight set A),
 and the ratified weights changed what a match pays. Measured now, at `DAMAGE_HP_PER_UNIT = 25`
-with the tier multiplier:
+with the tier multiplier, **`standard` abundance** (§1.3a's box):
 
 | economy | median match pay | level 2 | level 5 | level 10 | level 20 |
 |---|---|---|---|---|---|
@@ -515,20 +698,60 @@ with the tier multiplier:
 | ratified four ONLY | 149 XP | 2.0 matches | 38.4 | 270 | 1754 |
 
 **The ratification survives, unchanged, and needs no scale factor** — on the recommended
-economy. "Level 2 in one match" is still true (0.8 of a match, so a *first* match levels you
-even if it goes badly); level 5 arrives across a fortnight of casual play instead of a week;
-level 10 stretches from ~67 matches to ~101, which is a long-tail goal getting longer, not a
-wall appearing.
+economy. "Level 2 in one match" is still true **of the median player** (0.8 of a match here;
+0.6–1.0 in nineteen of p1-08's twenty cells, the twentieth an Easy `scarce` lobby at 1.01);
+level 5 arrives across a fortnight of casual play instead of a week; level 10 stretches from ~67
+matches to ~101, which is a long-tail goal getting longer, not a wall appearing. p1-08 re-measured
+the tail against the shipped code and it holds: **level 10 at 76–135 matches** across every cell
+(96.6 at this one), level 20 at 493–880. **`XP_CURVE_BASE = 300`, `XP_CURVE_EXP = 1.6` and
+`DAMAGE_HP_PER_UNIT = 25` all stay where they are**, on QA's measurement as well as this one.
+
+#### The half of that sentence that is FALSE, and what it costs *(corrected a1-02, from p1-08 §7)*
+
+This document published the claim as *"level 2 lands inside a single match, **so a first match
+levels you even if it goes badly**."* The first half is measured and true. **The second half is
+false, and it is the half a designer would act on** — it promises a floor that no row in §1.3d
+pays. Measured on the shipped default lobby (mixed · octagon · N=8 · `scarce`), the same twelve
+matches:
+
+| seat | XP | matches to level 2 |
+|---|---|---|
+| winner | 1123 | 0.3 |
+| median seat | 445 | **0.7** ✅ the claim |
+| 25th percentile | 255 | 1.2 |
+| **first player knocked out** | **68** | **4.4** ❌ |
+| worst seat in the sample | 38 | 7.9 |
+
+**A new player's first match is not the median seat's match**, and the player this promise was
+written for — the one whose first game goes badly — is exactly the one it does not reach. The
+reason is structural rather than tuning: an eliminated player survives no further waves, clears
+**zero** placement rungs (`rungs = slots − placement`, so the first one out clears none *by
+construction*) and wins nothing, so three of the seven participation rows pay them zero.
+
+**The fix does not belong in the curve.** Dropping `base` far enough to level a 68-XP match
+(`base ≤ 68`) would put the median seat at level 2 in a sixth of a match and wreck the pacing the
+developer ratified. It belongs in the participation floor — and a new row in the developer's own
+weight table is theirs to add. Three options, priced by QA against the same twelve matches
+(`docs/progression-balance-p1-08.md` §7), are **Question F** at the foot of this document.
+**Until it is answered, this document states the claim as what it measurably is: level 2 lands
+inside a single match for the MEDIAN player.**
 
 **On the ratified four alone it does NOT survive:** level 2 takes two matches, so the hook — you
-level up your first game — is gone, and level 10 sits at 270 matches. That would need either
-`base = 75` (identical shape, quarter the numbers) or a global ×4 XP scale. Both were measured
-and both work; neither is needed if Question A goes the recommended way. **This is the concrete
-cost of dropping the participation rows, and it is why Question A is first.**
+level up your first game — is gone, and level 10 sits at 270 matches. That would need either a
+much smaller `base` (identical shape, a fraction of the numbers) or a global XP scale. Both were
+measured and both work; neither is needed if Question A goes the recommended way. *(The value
+this section originally published, `base = 75`, was computed off a 149-XP four-only typical.
+Measured off the shipped pricer a four-only match pays **169 XP** at the default lobby, so **the
+replacement is `base = 150`** — corrected a1-02 from p1-08 §6. Even at 150 an Easy lobby does not
+reach level 2 in a match.)* **This is the concrete cost of dropping the participation rows, and
+it is why Question A is first.**
 
-**A note for whoever tunes this next.** The pay above is a *bot* number. Real humans mine more
-and die less than Medium bots do, and QA re-baselines the whole table at m10 with the shipped
-trees and real play (§1.2's discipline). If the developer wants a target instead of a
+**A note for whoever tunes this next.** The pay above is a *bot* number, and it still is after
+the re-baseline: **there is no human in p1-08's 240-match sample and no way to get one from a
+harness.** Real humans mine more and die less than Medium bots do, so the pay a person earns is
+not this pay, and the right way to close that gap is telemetry off real play rather than a bigger
+harness run. What p1-08 *did* settle is that the instrument is honest and the constants are
+right; what it did not settle is the human half. If the developer wants a target instead of a
 measurement, the two dials are unchanged: `base` moves the early game, `exp` moves the tail.
 
 ### 1.5 Sizing the attribution hook *(a0-13 — promoted to Phase 1)*
@@ -1003,11 +1226,16 @@ Four new bank slots, voiced against the **amended** §4.7 tone contract. Require
 **Not** the existing `matchEnd`, `musicWin` or `musicLoss`: all forty slots are under `deny-all`
 (a0-01), and a satisfying sound from the denied bank is one the developer has already rejected.
 
-### Task PR-8 — re-baseline the economy (QA Agent) · *needs: PR-4, PR-5*
+### Task PR-8 — re-baseline the economy (QA Agent) · *needs: PR-4, PR-5* · **DONE**
 *Test first:* the pay table and the level curve are re-measured with the **shipped bot trees and
 real play**, not the spike's numbers, and the result is filed as a balance report against §1.4's
 table. §1.2's caveat applies to every number in §1.3a: the harness under-builds and under-repairs,
 and a bot economy is not a human one.
+**Landed 2026-08-09** — `docs/progression-balance-p1-08.md`, 240 matches, swept across cast × N ×
+map × abundance. Verdict: all three constants stay; §1.2's *structure* caveat is retired and its
+*repair* caveat stands; **two corrections to this document** (the missing abundance label, and the
+level-2 claim's missing "median") are folded in above by a1-02; the human half is still unmeasured
+and always will be from a harness.
 
 *(Phase 2, and NOT in this cut: the cosmetic unlock **list** (§4) — which needs content the
 developer has not written; the signed-profile join field (§2.2a) — which unblocks opponent-level
@@ -1195,9 +1423,17 @@ pr-03 ─┘
 pr-07 (a0-01) ────────► feeds pr-05
 ```
 
-**pr-01, pr-02 and pr-03 have no dependencies and can be claimed in parallel today.** pr-02 is
-the long pole: it is the only `src/sim/` change, and pr-04 and everything downstream of it wait
-on the credit ledger existing.
+**pr-01, pr-02 and pr-03 had no dependencies and were claimable in parallel.** pr-02 was the long
+pole: it is the only `src/sim/` change, and pr-04 and everything downstream of it waited on the
+credit ledger existing.
+
+**The whole chain has landed** *(recorded a1-02, 2026-08-09)* — `src/progression/{profile,curve,
+accrual,xp}.ts`, `src/ui/summary-sequence.ts` and `src/sim/combat-credit.ts` are shipped, and
+**pr-08 re-baselined the economy against them**: `harness/pay.ts`, `harness/cli.ts pay`,
+`tests/harness/p1-08-pay.test.ts` and the report at `docs/progression-balance-p1-08.md`. Its
+findings are folded into §1 above rather than left in a second document to drift; the corrections
+it raised **against this document** are marked *(corrected a1-02)* and listed at the top. What is
+left of Phase 1 is not a task — it is Question F.
 
 ---
 
@@ -1232,9 +1468,12 @@ on the credit ledger existing.
    world; write the profile at teardown. (§5)
 9. ~~**Every sidegrade node re-opens a balance sweep.**~~ — **RETIRED 2026-08-07** with Trap 7,
    and for the same reason: a livery does not move a win rate. (§3, §4)
-10. **Harness build/repair numbers are a floor, not a typical.** The QA probes under-build;
-    real bot trees and humans build more. Do not size structure/repair XP off the median-0
-    rows — re-baseline at m10 (PR-8). (§1.2)
+10. **Harness build/repair numbers are a floor, not a typical** — ***half retired 2026-08-09***.
+    The s4 probes under-build; real bot trees build **more**, and PR-8 measured how much:
+    **structures are 2–4 per player per match in every cell and 9–12% of all XP paid**, the
+    third-largest row in the economy, so the structure half of this warning is discharged and
+    §1.2's median-0 rows must not be quoted as a typical. **Repairs really are ~0–1 (≈1% of
+    pay)**, so the repair half stands. Humans are still unmeasured, in either row. (§1.2, §1.3a)
 11. **A weight is not an economy until its unit is chosen.** "Damage dealt 2×" at a literal
     1 HP makes damage 94% of all XP and the highest-weighted row, stations destroyed, 0%. Pick
     `DAMAGE_HP_PER_UNIT` deliberately; do not let it default to 1 by omission. (§1.3a)
@@ -1245,7 +1484,9 @@ on the credit ledger existing.
 13. **The four ratified weights have no participation floor.** On their own they make the first
     player knocked out out-earn the winner in an Easy lobby (0.3×). If Question A drops s4's
     non-combat rows, the level curve must be re-tuned in the same change — `base=300` stops
-    landing level 2 inside a first match. (§1.3c, §1.4)
+    landing level 2 inside a first match for anyone, and the measured replacement is
+    **`base = 150`**, not the 75 this document published before PR-8 re-priced it.
+    (§1.3c, §1.4)
 14. **XP is never shown in a match, and another player's level is never shown at all.** The
     ratified answer is *level yes, XP never, lobby only* (§Q2). That kills s4's persistent HUD
     XP bar outright, and it binds the summary screen: your own level and XP, nobody else's.
@@ -1263,6 +1504,20 @@ on the credit ledger existing.
 17. **Skipping the sequence must not change a single number.** The animation interpolates
     toward values fixed at teardown; a tween that produces a score is a score nobody can
     reproduce. And the input that skips must not also press a button. (§6.4 rules 1–2)
+18. **`createWorld` defaults to `standard` abundance; the LOBBY ships `scarce`** *(new
+    2026-08-09, a1-02 — the trap this document fell into)*. `createWorld({ seed, players })`
+    with no `abundance` measures a real game that nobody plays: the lobby opens on
+    `DEFAULT_ABUNDANCE = 'scarce'` (`constants.ts:799`). Every rig **names the abundance in
+    every cell**, and every table **prints which one it is** — the cost of the omission was up
+    to ±10% per lobby and, worse, unknowable from the page. `harness/match.ts` omits it too, on
+    purpose and documented, so an inherited default is not an excuse. Pinned by
+    `tests/harness/p1-08-pay.test.ts`. (§1.3a)
+19. **"Level 2 in one match" is a claim about the MEDIAN player, and only that** *(new
+    2026-08-09, a1-02)*. Measured on the shipped default lobby: median 445 XP (0.7 matches),
+    **first player knocked out 68 XP (4.4 matches)**. Anything that quotes the hook to a
+    *player* rather than to *the median* — an onboarding line, a store page, a tuning argument —
+    is quoting a number the economy does not pay them. The floor is a **row** question, open as
+    **Question F**; it is not a `base` question and it is not QA's to invent. (§1.4, Question F)
 
 ---
 
@@ -1298,8 +1553,12 @@ and so on.
    tier is **Medium**, not Hard, which is the opposite of what was expected.
 6. **Level curve → ACCEPTED.** *"ok."* `base=300` / `exp=1.6` kept, and **re-measured** against
    the ratified weights and the multiplier in **§1.4**: level 2 still lands inside one match
-   (0.8), level 10 moves from ~67 matches to ~101. It survives *on the recommended economy*; on
-   the ratified four alone it does not, which is Question A.
+   **for the median player** (0.8), level 10 moves from ~67 matches to ~101. It survives *on the
+   recommended economy*; on the ratified four alone it does not, which is Question A. **Re-proved
+   a third time against the shipped code by PR-8 and unchanged** — `XP_CURVE_BASE`,
+   `XP_CURVE_EXP` and `DAMAGE_HP_PER_UNIT` all stay — with one qualifier this document had been
+   omitting: the hook is the **median** seat's, and a player knocked out first needs 4.4 matches
+   (**Question F**, corrected a1-02).
 7. *(s4's Q6, kill/assist XP — deferred or now?)* **NOW.** Reversed by a0-13: the ratified
    weights put three of four rows on the hook, so deferring it ships a screen that pays only ore.
    **§1.5**, Task **PR-2**.
@@ -1311,7 +1570,7 @@ shape backend-portable).
 
 ---
 
-## QUESTIONS FOR THE DEVELOPER *(new, raised by what the ratifications cost)*
+## QUESTIONS FOR THE DEVELOPER *(A–E raised by what the ratifications cost; F by the re-baseline)*
 
 **A. Keep the participation rows, or is XP purely combat + ore?** *(the big one)*
 Your four weights are ratified and are not in question. What they do not say is whether the
@@ -1319,16 +1578,20 @@ Your four weights are ratified and are not in question. What they do not say is 
 waves survived, placement, match won — still pay anything. Measured, dropping them changes the
 character of the whole system: in an Easy bot lobby **the first player knocked out earns more
 XP than the winner (0.3×)**, because a turtle who wins by outlasting everyone deals little
-damage and kills nobody. It also drops a typical match from 399 XP to 149, which means `base=300`
-no longer lands level 2 inside a first match. *Recommendation:* **keep them** — they are what
-makes XP "a hook that rewards showing up," and they cost nothing to pay (they are all free world
-deltas). §1.3c(1), §1.4.
+damage and kills nobody. It also drops a typical match from ~400 XP to ~170, which means
+`base=300` no longer lands level 2 inside a first match for anyone. *Recommendation:* **keep
+them** — they are what makes XP "a hook that rewards showing up," and they cost nothing to pay
+(they are all free world deltas). **Re-measured against the shipped pricer, every number in this
+question reproduces inside 7% and the recommendation is confirmed unchanged** *(a1-02, from
+PR-8)*; if you drop the rows anyway, the measured replacement for `XP_CURVE_BASE` is **150**, not
+the 75 this document used to say. §1.3c(1), §1.4.
 
 **B. What is one unit of "damage dealt"?** Your `2×` needs a denominator, and it is the single
 number that decides what the whole economy feels like. At **1 HP** damage becomes 94% of all XP
 and your highest-weighted row — stations destroyed — becomes 0% of it. *Recommendation:*
-**one unit = 25 HP**, which lands combat at ~42% of pay, ore at 17%, and makes a full 50-HP hull
-melted worth about as much as the kill that ends it. §1.3a.
+**one unit = 25 HP**, which makes a full 50-HP hull melted worth about as much as the kill that
+ends it. It **shipped** at 25, and measured on the shipped pricer it does exactly that: damage is
+**19%** of pay and ship kills **19%**, one point apart *(a1-02, from PR-8)*. §1.3a.
 
 **C. A station the Crush killed — who gets the 10×?** Measured over 48 matches: **100% of station
 deaths in an Easy bot lobby and 98% in a Medium one were the collapse phase, not a player.**
@@ -1349,12 +1612,52 @@ it becomes PR-9. §1.3b.
 
 **E. The bot farm — fine, or worth capping?** Offline XP counts the same as online (your call,
 and the right one for a first-class offline game), so the cheapest XP in the game is a private
-lobby full of bots. Measured, the fastest is **a MEDIUM lobby at 17 XP/min** — not Hard (12), and
-not because of the multiplier, but because Medium bots fight and die constantly. Which tier pays
-best will move whenever the Bot Engineer touches the trees. *Recommendation:* **leave it alone**
+lobby full of bots. Measured, the fastest is **a MEDIUM lobby at 36.6 XP/min** — not Hard (24.7)
+and not Easy (20.9) — not because of the multiplier, but because Medium bots fight and die
+constantly. Which tier pays best will move whenever the Bot Engineer touches the trees.
+**The advantage is far smaller than this document first said** *(corrected a1-02: the published
+"17 vs 4, a 4.3× gap" was §1.3b's combat-rows-only economy, which this plan does not recommend;
+under the economy that shipped it is **1.8×** — farming the best tier over the worst buys 75%
+more XP per minute, not 325% more)*. *Recommendation:* **leave it alone**
 — for a cosmetic-only progression, a player grinding hats against bots is a player playing the
 game. Say the word and it becomes a daily cap or a small offline multiplier, but both are new
 systems to maintain and neither is free. §1.3c(3).
+
+**F. Does a player who is knocked out first earn a floor?** *(NEW 2026-08-09 — raised by QA's
+re-baseline, `docs/progression-balance-p1-08.md` §7/§9; folded in by a1-02, which is also where
+this document stopped over-claiming)*
+This plan promised that *"level 2 lands inside a single match, so a first match levels you even
+if it goes badly."* Measured on the lobby the game actually opens on, **only the first half is
+true**: the median seat earns 445 XP (0.7 matches to level 2) and **a player knocked out first
+earns 68 XP and needs 4.4 matches.** They survive no further waves, clear **zero** placement rungs
+(the first one out clears none *by construction*) and win nothing — so three of the seven
+participation rows pay them nothing, and the promise reaches everyone except the player it was
+written for. **This is a row in your weight table, so it is your call and not QA's or mine.**
+Three options, priced against the same twelve matches:
+
+| option | median | first out | **L2 @ first out** | winner:first-out spread |
+|---|---|---|---|---|
+| **accept it** — restate the claim as "for the median player" *(what this document now does)* | 445 | 68 | **4.4** | 16.6× |
+| a flat `MATCH PLAYED` row, **+100** | 545 | 168 | 1.8 | 7.3× |
+| **a flat `MATCH PLAYED` row, ≈230–250** — the one payment an eliminated player is guaranteed | ~675 | ~298 | **~1.0 — the promise, literally true** | **~4.5×** |
+| a flat `MATCH PLAYED` row, **+200** | 645 | 268 | 1.1 | 4.9× |
+| `XP_PER_WAVE` 15 → 40 — helps a little, and only a player who lived through a wave | 561 | 93 | 3.2 | 13.5× |
+| `XP_PER_PLACEMENT_RUNG` 20 → 40 — the intuitive dial, and the wrong one | 537 | **68** | **4.4** | **18.7×** |
+
+*(The +100 and +200 rows are priced directly; the ≈230–250 row interpolates them — a flat row
+adds the same number to every seat, so `first out = 68 + f` and the arithmetic is exact. Every row
+is the **same twelve matches re-priced**, never a second sweep taken on a different afternoon.)*
+
+Two things the table is worth reading twice for. **The intuitive dial cannot work:** doubling
+`XP_PER_PLACEMENT_RUNG` pays the first player out *exactly nothing* (they clear zero rungs) while
+paying the winner twice, and it moves the spread the **wrong** way, 16.6× → 18.7×. And **a flat
+row at +200 would collide with `XP_FOR_WIN = 200`**, which would say that showing up is worth what
+winning is — a design statement, not a tuning one, which is why the recommended value sits just
+above it at ~232 and why nobody has applied it for you. *Recommendation:* **accept it for now**
+— the claim is restated, no constant moves, and nothing ships wrong; **and if you want the promise
+kept, say "add the floor" and QA applies ≈230–250 and re-baselines.** The curve is *not* the place
+to fix this: a `base` small enough to level a 68-XP match would put the median seat at level 2 in
+a sixth of a match. §1.4, §1.3c(1).
 
 *(Secondary defaults, safe if unanswered: `DAMAGE_HP_PER_UNIT = 25`; tier multiplier
 0.75 / 1.0 / 1.25 with humans at 1.25; XP banked once at match-end; deposits weighted 2× gathered;
@@ -1366,7 +1669,8 @@ reverse — say the word and a row moves.)*
 ## GDD SECTION DRAFT (lands in the GDD when ratified — currency policy §2)
 
 > ### 2.12 Meta-progression: XP, levels, and the end-of-match summary *(Architect spike s4,
-> amended a0-13; `docs/progression-plan.md`)*
+> amended a0-13, corrected a1-02 against QA's re-baseline; `docs/progression-plan.md`,
+> `docs/progression-balance-p1-08.md`)*
 >
 > A player earns **XP** every match for playing the triangle — **ore mined (1×), damage dealt
 > (2×), ships destroyed (5×), stations destroyed (10×)** *(developer-ratified 2026-08-07)*, plus
@@ -1374,7 +1678,9 @@ reverse — say the word and a row moves.)*
 > survived, and how they placed. The three opponent-facing rows are **multiplied by the
 > opponent's difficulty** — Easy ×0.75, Medium ×1.0, Hard ×1.25, and a **human counts as Hard**,
 > because contesting a person is the point of the mode. A player levels up on an early-fast curve
-> (`xpToNext = base · L^exp`, both `TUNABLE`; level 2 lands inside a first match). A stat that
+> (`xpToNext = base · L^exp`, both `TUNABLE`; **level 2 lands inside a first match for the median
+> player** — a player knocked out first earns far less, and whether that seat gets a floor is
+> Question F). A stat that
 > cannot be credited to a real player is **not shown rather than estimated** — a reactor the
 > claim's collapse finished has no killer, and the summary says so.
 >
@@ -1398,6 +1704,9 @@ reverse — say the word and a row moves.)*
 > profile; there is no account, and **progression is never wiped**, which makes schema migration
 > the only repair path the profile will ever have.
 
-*End of spike s4, amended by a0-13 (2026-08-07). Every question s4 asked has been answered; the
-Phase 1 chain is §7 and is claimable today. The five questions above are what the answers cost —
-none of them blocks pr-01, pr-02 or pr-03.*
+*End of spike s4, amended by a0-13 (2026-08-07), corrected by a1-02 against QA's re-baseline
+(2026-08-09). Every question s4 asked has been answered; the Phase 1 chain is §7 and has shipped.
+Questions A–E are what the answers cost; **Question F is what the measurement cost** — the one
+promise this document made that the shipped economy does not keep for every seat. None of the six
+blocks anything that is built; F is the only one that would change a number, and it is a row in
+the developer's own table.*
