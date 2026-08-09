@@ -35,6 +35,12 @@
  *  - **rockChip (s4-01).** All three denied, with one note: *"almost there, but they
  *    should be lower in tone."* Re-offered a transposition down — same three
  *    characters, same envelopes, pitch and filter corners moved.
+ *  - **The four summary cues (p1-07).** New slots rather than a re-offer: the
+ *    end-of-match sequence (`docs/progression-plan.md` §6) needs four cues the
+ *    bank did not have, and it is explicitly **not** allowed to reach for
+ *    `matchEnd`, `musicWin` or `musicLoss` — those are three of the forty the
+ *    developer denied, so a satisfying sound taken from them is one that has
+ *    already been rejected. Board goes 40 slots → 44.
  *  - **All 40 slots (a0-01b).** The developer pressed **DENY ALL** on every slot on
  *    the board, and the board promises *"generate 3 new options"* on that press. This
  *    file is that generation: `a`, `b`, `c` are new everywhere, in the amended §4.7
@@ -86,6 +92,7 @@
  * | clock | structure under load — stone and metal giving way | pressure — a low body, mass moving | resonance — a narrow band, and a room |
  * | music | granular bed — particulate, no pitch centre | filtered analogue — a low body behind a corner | wide detuned space — unisons beating, metal in the smear |
  * | interface | a dry contact — grains, nothing rings | a damped pip — felt more than heard | a narrow band — one partial, machine-clean |
+ * | summary | a counter's contact — dry, granular, no pitch centre | pressure seating — a low body and a corner that moves | induction — a narrow band that rings once |
  *
  * Read down a column and the *axis* is the same on all forty slots — `a` is always
  * granular contact, `b` is always pressure and mass, `c` is always the one that
@@ -454,6 +461,14 @@ export const CANDIDATE_SLOT_ORDER: readonly string[] = [
   'respawnBeep',
   'respawnGo',
   'minimapPing',
+  // The end-of-match summary (p1-07) — four new slots, at the end of the board
+  // because they are new rather than re-offers, and a reviewer sweeping the
+  // forty they already denied should not have their order shuffled underneath
+  // them. Bank order, which is the order the sequence plays them in.
+  'xpTick',
+  'xpBarFill',
+  'levelUp',
+  'xpSettle',
 ];
 
 /** Every reviewable slot, keyed by id (each id is also its shipped {@link SoundName}). */
@@ -2354,6 +2369,220 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
           layers: [
             band('minimapPing_c.out', 1760, { gain: 0.95, decay: 0.11, q: 5.5, curve: 4.5, attack: 0.003, hold: 0.014, seed: 34170 }),
             band('minimapPing_c.back', 1175, { gain: 0.8, decay: 0.18, q: 6, curve: 4, attack: 0.004, hold: 0.014, at: 0.09, seed: 34171 }),
+          ],
+        },
+      },
+    ],
+  },
+  // === THE END-OF-MATCH SUMMARY (p1-07) =====================================
+  //
+  // Four **new** slots, for the choreographed end-of-match beat
+  // (`docs/progression-plan.md` §6.3/§6.5). Read that timeline before judging
+  // these by ear: they are heard in order, under a result that has already
+  // sounded, and three of them exist so the fourth lands.
+  //
+  // The family's three metaphors, on the same axis as every other family:
+  //
+  //   a  a **counter's contact** — granular, dry, no pitch centre to memorise
+  //   b  **pressure seating** — a low body with a corner travelling over it
+  //   c  **induction** — a narrow band that rings once, the only one with a tail
+  //
+  // Two constraints hold on the whole set and every offer in it honours them,
+  // because an approved candidate ships:
+  //
+  //  - **Under the result.** A station death is still the ache (GDD §4.7). Every
+  //    offer is quieter than `matchEnd`, and the level-up — the loudest thing
+  //    here by design — is quieter than it too.
+  //  - **Cancellable.** A player who skipped is telling you they do not want the
+  //    beat, so no offer has a tail that outlives the screen: the one-shots are
+  //    all under half a second, and all three `xpBarFill` offers are **loops**,
+  //    because a loop can be stopped and a one-shot in flight cannot.
+  //
+  // `matchEnd`, `musicWin` and `musicLoss` are not referenced by any of them,
+  // and `candidates.test.ts` asserts it rather than trusting the comment.
+  xpTick: {
+    // The `pressTick` problem, not the `matchEnd` one: ~40 of these inside five
+    // seconds, every match, forever. Held to `pressTick`'s bound in the tests —
+    // shorter and quieter — because that is the only slot in the bank with the
+    // same job. Nothing here rings: at forty repetitions a pitch centre becomes
+    // a melody, and a melody the player did not ask for is the fatigue.
+    label: "XP Tick",
+    context: "One step of the end-of-match count-up — dozens in five seconds, every match. If it is interesting, it is wrong.",
+    current: 'xpTick',
+    candidates: [
+      {
+        id: 'a',
+        character: "a counter contact, dry grit",
+        spec: {
+          name: 'xpTick_a_counterContact',
+          layers: [
+            grains('xpTick_a.contact', { freq: 1400, grain: 0.0018, gain: 0.42, hold: 0.002, decay: 0.014, curve: 6, from: 4800, to: 2400, q: 3, hp: 800, seed: 35000 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "a damped pip, felt not heard",
+        spec: {
+          name: 'xpTick_b_dampedPip',
+          layers: [
+            swept('xpTick_b.pip', { wave: 'triangle', freq: 740, from: 2000, to: 760, q: 3, gain: 0.17, attack: 0.0005, hold: 0.002, decay: 0.017, curve: 6, noiseMix: 0.24, hp: 300, seed: 35010 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "one narrow band, machine-clean",
+        spec: {
+          name: 'xpTick_c_narrowBand',
+          layers: [
+            band('xpTick_c.tone', 1760, { gain: 0.62, decay: 0.019, q: 7, curve: 7, hp: 900, seed: 35020 }),
+          ],
+        },
+      },
+    ],
+  },
+  xpBarFill: {
+    // A *filling* sound, not a repeated one — so all three are held loops with a
+    // start and a stop, and none of them sweeps inside its own body: a sweep in a
+    // loop restarts every lap and is heard as a pulse. The rise is ridden at the
+    // seam (`./engine` xpFill) against the bar's real progress, which is the
+    // only place that knows how long the fill is.
+    //
+    // All three sit low and mid on purpose. The level-up lands bright on top of
+    // this, and two bright things at once is the one mix the beat cannot make.
+    label: "XP Bar Fill",
+    context: "The bed under the level bar filling — starts and ends with the bar, and ducks under a level-up landing on it.",
+    current: 'xpBarFill',
+    candidates: [
+      {
+        id: 'a',
+        character: "particulate fill, poured in",
+        spec: {
+          name: 'xpBarFill_a_particulate',
+          loop: true,
+          crossfade: 0.25,
+          layers: [
+            grains('xpBarFill_a.pour', { freq: 120, grain: 0.0045, gain: 0.16, attack: 0, hold: 3, decay: 0, from: 760, q: 2.6, hp: 130, seed: 35100 }),
+            swept('xpBarFill_a.floor', { wave: 'sine', freq: 82.41, from: 260, q: 2, gain: 0.12, attack: 0, hold: 3, decay: 0, noiseMix: 0.05, seed: 35102 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "a low bed under pressure",
+        spec: {
+          name: 'xpBarFill_b_pressureBed',
+          loop: true,
+          crossfade: 0.25,
+          layers: [
+            swept('xpBarFill_b.body', { wave: 'triangle', freq: 110, from: 430, q: 2.4, gain: 0.15, attack: 0, hold: 3, decay: 0, noiseMix: 0.08, seed: 35110 }),
+            swept('xpBarFill_b.air', { wave: 'noise', freq: 88, from: 620, q: 2.2, gain: 0.07, attack: 0, hold: 3, decay: 0, hp: 150, seed: 35111 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "an induction hum, taking charge",
+        spec: {
+          name: 'xpBarFill_c_induction',
+          loop: true,
+          crossfade: 0.25,
+          layers: [
+            swept('xpBarFill_c.coil', { wave: 'noise', freq: 165, from: 700, q: 8, gain: 0.13, attack: 0, hold: 3, decay: 0, hp: 200, seed: 35120 }),
+            swept('xpBarFill_c.root', { wave: 'triangle', freq: 110, from: 500, q: 3, gain: 0.1, attack: 0, hold: 3, decay: 0, noiseMix: 0.06, seed: 35121 }),
+          ],
+        },
+      },
+    ],
+  },
+  levelUp: {
+    // **The one moment allowed to be a reward** — and the ceiling is the amended
+    // §4.7, not the old paragraph's fireworks. So all three read as *arrival*:
+    // something approaches, lands once, rings out. None of them is a rising
+    // phrase — that is the retired arcade idiom (§5.3) and it is also what
+    // `upgradeBought` already is.
+    //
+    // None uses a major third either. The interface does not congratulate
+    // (§4.7 register 2), and this cue can land on top of a DEFEAT headline.
+    label: "Level Up",
+    context: "The bar completed and the level ticked over — the one moment in the beat allowed to be a reward. Arrival, not fanfare.",
+    current: 'levelUp',
+    candidates: [
+      {
+        id: 'a',
+        character: "a dry arrival, contacts landing",
+        spec: {
+          name: 'levelUp_a_dryArrival',
+          layers: [
+            grains('levelUp_a.approach', { freq: 300, grain: 0.005, gain: 0.2, attack: 0.006, hold: 0.014, decay: 0.06, curve: 2.6, from: 800, to: 3600, q: 3.4, hp: 220, seed: 35200 }),
+            grains('levelUp_a.land', { freq: 900, grain: 0.0022, gain: 0.34, hold: 0.01, decay: 0.16, curve: 5, from: 5200, to: 1800, q: 3.6, hp: 500, at: 0.085, seed: 35201 }),
+            swept('levelUp_a.seat', { wave: 'triangle', freq: 110, from: 300, to: 180, q: 2, gain: 0.2, attack: 0.002, hold: 0.012, decay: 0.2, curve: 4, noiseMix: 0.1, at: 0.085, seed: 35203 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "pressure seating, weight arriving",
+        spec: {
+          name: 'levelUp_b_pressureSeating',
+          layers: [
+            swept('levelUp_b.charge', { wave: 'noise', freq: 260, from: 600, to: 2800, q: 4.5, gain: 0.16, attack: 0.008, hold: 0.014, decay: 0.06, curve: 2.4, hp: 180, seed: 35210 }),
+            swept('levelUp_b.seat', { wave: 'triangle', freq: 220, freqEnd: 208, from: 2400, to: 520, q: 3.4, gain: 0.36, attack: 0.002, hold: 0.016, decay: 0.3, curve: 4, punch: 0.5, noiseMix: 0.12, at: 0.085, seed: 35211 }),
+            swept('levelUp_b.sub', { wave: 'sine', freq: 82.41, from: 240, to: 120, q: 2, gain: 0.22, attack: 0.003, hold: 0.012, decay: 0.22, curve: 3.6, noiseMix: 0.05, at: 0.085, seed: 35212 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "a struck plate, one bare fifth",
+        spec: {
+          name: 'levelUp_c_struckPlate',
+          layers: [
+            swept('levelUp_c.approach', { wave: 'noise', freq: 320, from: 700, to: 3000, q: 5, gain: 0.13, attack: 0.006, hold: 0.012, decay: 0.06, curve: 2.6, hp: 200, seed: 35220 }),
+            ...plate('levelUp_c.root', 880, { gain: 0.3, decay: 0.32, ratios: [1, 2.41], q: 8, curve: 4, punch: 0.4, grain: 0.22, at: 0.085, seed: 35222 }),
+            ...plate('levelUp_c.fifth', 1318.51, { gain: 0.16, decay: 0.24, ratios: [1], q: 9, curve: 4.5, grain: 0.18, edge: 0, at: 0.085, seed: 35226 }),
+          ],
+        },
+      },
+    ],
+  },
+  xpSettle: {
+    // The full stop, and the smallest job in the set: *the screen has finished
+    // moving and your input means something again*. All three resolve DOWNWARD
+    // and none of them rings for long — a settle that ends higher than it began
+    // is a question, and a settle with a tail is still the screen talking.
+    label: "XP Settle",
+    context: "The end of the sequence — everything holds at its final value and the buttons take focus. Quiet: the full stop.",
+    current: 'xpSettle',
+    candidates: [
+      {
+        id: 'a',
+        character: "a dry stop, one contact",
+        spec: {
+          name: 'xpSettle_a_dryStop',
+          layers: [
+            grains('xpSettle_a.stop', { freq: 300, freqEnd: 240, grain: 0.004, gain: 0.2, hold: 0.008, decay: 0.09, curve: 5, from: 1100, to: 420, q: 2.6, hp: 150, seed: 35300 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        character: "a damped seat, closing",
+        spec: {
+          name: 'xpSettle_b_dampedSeat',
+          layers: [
+            swept('xpSettle_b.seat', { wave: 'triangle', freq: 220, freqEnd: 208, from: 900, to: 240, q: 2.6, gain: 0.18, attack: 0.004, hold: 0.02, decay: 0.2, curve: 5, noiseMix: 0.09, seed: 35310 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        character: "one low band, ringing out",
+        spec: {
+          name: 'xpSettle_c_lowBand',
+          layers: [
+            band('xpSettle_c.tone', 330, { gain: 0.5, decay: 0.2, q: 6, curve: 5, attack: 0.003, hold: 0.01, seed: 35320 }),
           ],
         },
       },

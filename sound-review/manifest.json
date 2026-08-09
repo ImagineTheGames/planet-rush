@@ -1042,6 +1042,110 @@
           "params": "src/art/audio/candidates.ts#minimapPing.c"
         }
       ]
+    },
+    {
+      "id": "xpTick",
+      "label": "XP Tick",
+      "context": "One step of the end-of-match count-up — dozens in five seconds, every match. If it is interesting, it is wrong.",
+      "current": "previews/xpTick/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/xpTick/a.wav",
+          "character": "a counter contact, dry grit",
+          "params": "src/art/audio/candidates.ts#xpTick.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/xpTick/b.wav",
+          "character": "a damped pip, felt not heard",
+          "params": "src/art/audio/candidates.ts#xpTick.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/xpTick/c.wav",
+          "character": "one narrow band, machine-clean",
+          "params": "src/art/audio/candidates.ts#xpTick.c"
+        }
+      ]
+    },
+    {
+      "id": "xpBarFill",
+      "label": "XP Bar Fill",
+      "context": "The bed under the level bar filling — starts and ends with the bar, and ducks under a level-up landing on it.",
+      "current": "previews/xpBarFill/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/xpBarFill/a.wav",
+          "character": "particulate fill, poured in",
+          "params": "src/art/audio/candidates.ts#xpBarFill.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/xpBarFill/b.wav",
+          "character": "a low bed under pressure",
+          "params": "src/art/audio/candidates.ts#xpBarFill.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/xpBarFill/c.wav",
+          "character": "an induction hum, taking charge",
+          "params": "src/art/audio/candidates.ts#xpBarFill.c"
+        }
+      ]
+    },
+    {
+      "id": "levelUp",
+      "label": "Level Up",
+      "context": "The bar completed and the level ticked over — the one moment in the beat allowed to be a reward. Arrival, not fanfare.",
+      "current": "previews/levelUp/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/levelUp/a.wav",
+          "character": "a dry arrival, contacts landing",
+          "params": "src/art/audio/candidates.ts#levelUp.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/levelUp/b.wav",
+          "character": "pressure seating, weight arriving",
+          "params": "src/art/audio/candidates.ts#levelUp.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/levelUp/c.wav",
+          "character": "a struck plate, one bare fifth",
+          "params": "src/art/audio/candidates.ts#levelUp.c"
+        }
+      ]
+    },
+    {
+      "id": "xpSettle",
+      "label": "XP Settle",
+      "context": "The end of the sequence — everything holds at its final value and the buttons take focus. Quiet: the full stop.",
+      "current": "previews/xpSettle/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/xpSettle/a.wav",
+          "character": "a dry stop, one contact",
+          "params": "src/art/audio/candidates.ts#xpSettle.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/xpSettle/b.wav",
+          "character": "a damped seat, closing",
+          "params": "src/art/audio/candidates.ts#xpSettle.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/xpSettle/c.wav",
+          "character": "one low band, ringing out",
+          "params": "src/art/audio/candidates.ts#xpSettle.c"
+        }
+      ]
     }
   ]
 }
