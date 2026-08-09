@@ -507,6 +507,20 @@ export class MatchRoom {
     return this.authoritative;
   }
 
+  /**
+   * The bot flying a seat, or null when a human has the controls (or the seat is
+   * empty, or the match has not started).
+   *
+   * Read-only in the sense that matters: the room owns every bot's lifetime, and
+   * hands this out so a test — and a debug overlay — can ask what a bot *knows*,
+   * starting with the seat it thinks it is in. Nothing on the wire
+   * is derived from it; `lobbyState` and `matchStart` already carry everything a
+   * client is told about who is in a seat.
+   */
+  botAt(player: PlayerId): Bot | null {
+    return this.slots[player]?.bot ?? null;
+  }
+
   /** Connected humans. A room with none and no grace left is garbage. */
   get humanCount(): number {
     return this.slots.filter((s) => s.socket !== null).length;
@@ -1029,6 +1043,16 @@ export class MatchRoom {
     );
     if (playing.length < MIN_MATCH_SIZE) return;
 
+    // **Renumber first, then seat.** A bot is built around the seat id it is
+    // told (`createBot`'s `BotSeat`), and it goes on perceiving through that id
+    // for the rest of the match (`src/bots/harness` `thinkOnce`) — so a bot
+    // seated at slot 5 and then compacted to slot 1 spent the match looking at a
+    // ship that does not exist, while its decisions were filed against the ship
+    // that does ({@link inputsFor} keys the row by `slot.player`). The cast is
+    // unaffected: compaction preserves slot order, so {@link castFor} spends the
+    // host's picks in exactly the order it did before (a0-06b).
+    this.compactRoster(playing);
+
     let botIndex = 0;
     for (const slot of playing) {
       if (slot.socket !== null) continue;
@@ -1038,8 +1062,6 @@ export class MatchRoom {
       slot.shipClass = PERSONALITIES[slot.personality as PersonalityId].shipClass;
       slot.ready = true;
     }
-
-    this.compactRoster(playing);
 
     this.authoritative = createWorld({
       seed: this.config.seed,
@@ -1478,9 +1500,11 @@ export class MatchRoom {
    * Drop the seats nobody is in and renumber the survivors `0..N-1` (a0-11).
    *
    * Called from {@link startMatch} and nowhere else, in the one instant when a
-   * seat's id can still be changed cheaply: after the bots are seated (so the
-   * roster is final) and before `createWorld` (so no ship, station or snapshot
-   * has ever been keyed by the old number).
+   * seat's id can still be changed cheaply: once the participants are known (so
+   * the roster is final) and before `createWorld` (so no ship, station or
+   * snapshot has ever been keyed by the old number). The bots are seated *after*
+   * this rather than before it, because a bot carries the seat id it was built
+   * with — see {@link startMatch}.
    *
    * Three things travel with the renumbering, and all three are bugs if they do
    * not:
