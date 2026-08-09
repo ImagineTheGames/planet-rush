@@ -835,14 +835,14 @@ export class LobbyView extends Container {
     chip: Rect,
     m: FrameMetrics,
   ): boolean {
-    const visible =
-      seat.levelBadge !== null && chip.width > 0 && chip.height > SEAT_CONTROL_MIN_HEIGHT;
+    const badge = seat.levelBadge;
+    const visible = badge !== null && chip.width > 0 && chip.height > SEAT_CONTROL_MIN_HEIGHT;
     nodes.levelLabel.visible = visible;
     if (!visible) return false;
 
     drawDeadOrLive(nodes.body, chip, false);
     const px = plateTypeSize(ROW_LABEL_PX, m);
-    nodes.levelLabel.text = seat.levelBadge as string;
+    nodes.levelLabel.text = badge;
     nodes.levelLabel.style.fontSize = px;
     nodes.levelLabel.style.letterSpacing = trackingPx(TRACKING.label, px);
     // One ramp step brighter than the tier chip's word: this row is yours, and
