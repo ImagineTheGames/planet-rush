@@ -58,8 +58,17 @@ you work; a future you reads it first. This is a working note, not evidence —
 - **Rejected a heading inside the §1.3a warning box** — a `###` inside a
   blockquote would land in the document's heading structure. Bold instead.
 
+- **`8b161ab`** — the whole correction, one commit, one file (plus this note).
+  **`d41e97a`** — merge of `origin/main` (`df78b15`, the ship-select lane), taken
+  rather than a rebase because the branch is already pushed and force-pushing any
+  ref is forbidden. **PR #353**, body names every published figure that moved and
+  by how much, as the brief's evidence line requires.
+
 ## NEXT
 
-- `npx tsc --noEmit` green. `npm test -- --run` running; then commit, push, PR.
+- `npx tsc --noEmit` green on the merged tree. `npm test -- --run` and CI running
+  on #353 — watch `Typecheck, test, build` and the six Playwright shards. A
+  docs-only diff should not touch them; if a shard is red it is the merged
+  ship-select lane, not this one, and the fix is a re-run rather than an edit here.
 - Nothing is blocked. The only open item this lane creates is **Question F**, and
   it is the developer's.
