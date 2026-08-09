@@ -32,6 +32,18 @@
  *     of the RESERVED colour (style-guide §2). A dimmed wedge loses its yellow
  *     rather than recolouring it, so yellow always means "this is ore."
  *
+ * ── AND THE COLOUR HALF OF THE DIRECTION (u11-01) ──────────────────────────
+ * u7-02 landed the wheel's STRUCTURE in Gantry/Bone and left its PALETTE behind:
+ * the hub's chevron still drew in plasma, `OPEN ▸` and the index diamond in a
+ * hand-picked chalk, and every wedge face and edge in raw `hullSteel`. A developer
+ * read the result as half-finished, and the diagnosis is one line — Gantry/Bone's
+ * premise is that **the menu spends no colour**, so the primary is the brightest
+ * thing rather than the bluest one. Every tone this file paints now comes from
+ * {@link WHEEL_CHROME} in {@link ./instrument} — the SAME in-match Bone vocabulary
+ * the HUD took in u7-07, not a parallel one — with exactly two exceptions, both
+ * ratified: the cost numerals and the hub's ore total (rule 2 above), and the
+ * threat red of a REJECTED press, which is danger rather than chrome.
+ *
  * Sizing is thumb-scale aware: {@link BuildWheelView.resize} scales the whole
  * wheel to the smaller viewport dimension so it stays reachable on a phone and
  * doesn't swallow a desktop screen.
@@ -76,7 +88,7 @@ import type { HubBack } from './wheel-nav';
 import { NEUTRAL_FEEDBACK } from './press-feedback';
 import type { ControlFeedback, PressFeedback, PressSurface } from './press-feedback';
 import { wheelRadius, WHEEL_MIN_RADIUS } from './hud-geometry';
-import { TEXT_MUTED } from './chrome';
+import { WHEEL_CHROME, WHEEL_FACE_ALPHA } from './instrument';
 import { FONT_BODY as FONT_NUMERAL, FONT_HEADING } from './typography';
 
 /** One Build-wheel wedge as the view drew it — the ?debug=1 live-stage seam's
@@ -161,13 +173,14 @@ export interface DrawnUpgradeWedge {
 // which is exactly the drift that module prevents — and it bit (a1-01): the shared
 // stack's fallback moved and this copy did not, so the wheel would have drawn its
 // ore total in a different face from the HUD's on the CI runner.
-
-/** Neutral light UI text. Chalk-white — never signal yellow (style-guide §2). */
-const TEXT_PRIMARY = 0xdce3ec;
-/** The refused/disabled dim — a wedge that can't be pressed, a cost you can't pay.
- *  A *state*, hull steel; distinct from the always-muted {@link TEXT_MUTED} the
- *  secondary labels (a wedge's target line, the hub ORE caption) wear. */
-const TEXT_DIM = PALETTE.hullSteel;
+//
+// The COLOURS took the same lesson in u11-01. They used to be spelled out here as
+// a local `TEXT_PRIMARY = 0xdce3ec` and a local `TEXT_DIM = hullSteel`, which is
+// how the wheel ended up a step bluer than the HUD it sits inside; they are now
+// {@link WHEEL_CHROME}, the same Bone ramp `./instrument` hands the rest of the
+// glass. `TEXT_MUTED` (./chrome) went the same way — it is 0x8b95a5, which is
+// `BONE.lo` with five more parts of blue in it, and five parts of blue is exactly
+// the size of the drift this brief exists to close.
 
 // ---------------------------------------------------------------------------
 // Geometry
@@ -187,6 +200,11 @@ const TEXT_DIM = PALETTE.hullSteel;
 function labelTopRadius(m: WheelProfile, outer: number): number {
   return outer - m.labelInset * outer;
 }
+
+/** The hub chevron's half-height as a fraction of its half-width — see
+ *  {@link BuildWheelView.drawHubBack}, which is also where the layout reads it
+ *  back, so the mark and the space reserved for it can never disagree. */
+const CHEVRON_ASPECT = 0.625;
 
 /** Ease the raw 0→1 pop progress so it settles rather than arriving linearly —
  *  a small overshoot-free ease-out reads as a wheel "snapping" into place. */
@@ -227,10 +245,12 @@ function wedgeReady(state: SegmentState | UpgradeWedgeState): boolean {
   return state === 'ready';
 }
 
-/** How opaque a wedge's body is. A refused wedge is *dark*, not hidden: the
- *  player still learns the wedge exists and what it costs. */
-function bodyAlpha(ready: boolean): number {
-  return ready ? 0.9 : 0.45;
+/** How much of {@link WHEEL_CHROME.face} a wedge's face carries. A refused wedge
+ *  is *dark*, not hidden: the player still learns the wedge exists and what it
+ *  costs. The two numbers, and why the wedge no longer outlines itself, are
+ *  {@link WHEEL_FACE_ALPHA}'s. */
+function faceAlpha(ready: boolean): number {
+  return ready ? WHEEL_FACE_ALPHA.ready : WHEEL_FACE_ALPHA.inert;
 }
 
 /** The colour a {@link CostPaint} resolves to (the paints themselves, and the
@@ -244,7 +264,10 @@ function costColor(paint: CostPaint): number {
     case 'spent':
       return MATERIAL_SHADES.tickSteel;
     case 'none':
-      return TEXT_PRIMARY;
+      // `OPEN ▸` — the one slot that signposts a screen instead of quoting a
+      // price. It spends no RESERVED colour, so under Bone it is simply the
+      // brightest metal on the wedge: the affordance reads by brightness.
+      return WHEEL_CHROME.nameReady;
   }
 }
 
@@ -375,9 +398,9 @@ export class BuildWheelView extends Container {
     // level; here, the top level, that CLOSES the wheel).
     this.buildHubOre = makeText('', FONT_NUMERAL, 26, PALETTE.signalYellow, 'bold');
     this.buildHubOre.anchor.set(0.5, 0.5);
-    this.buildHubLabel = makeText('ORE', FONT_NUMERAL, 11, TEXT_MUTED, 'bold');
+    this.buildHubLabel = makeText('ORE', FONT_NUMERAL, 11, WHEEL_CHROME.secondary, 'bold');
     this.buildHubLabel.anchor.set(0.5, 0);
-    this.buildHubBackLabel = makeText('', FONT_NUMERAL, 9, TEXT_MUTED, 'bold');
+    this.buildHubBackLabel = makeText('', FONT_NUMERAL, 9, WHEEL_CHROME.affordance, 'bold');
     this.buildHubBackLabel.anchor.set(0.5, 0);
     this.buildGroup.addChild(
       this.buildHubHit,
@@ -394,9 +417,9 @@ export class BuildWheelView extends Container {
     // lobby, so it names whose ship you are spending on.
     this.upgradeHubOre = makeText('', FONT_NUMERAL, 26, PALETTE.signalYellow, 'bold');
     this.upgradeHubOre.anchor.set(0.5, 0.5);
-    this.upgradeHubLabel = makeText('', FONT_NUMERAL, 10, TEXT_MUTED, 'bold');
+    this.upgradeHubLabel = makeText('', FONT_NUMERAL, 10, WHEEL_CHROME.secondary, 'bold');
     this.upgradeHubLabel.anchor.set(0.5, 0);
-    this.upgradeHubBackLabel = makeText('', FONT_NUMERAL, 9, TEXT_MUTED, 'bold');
+    this.upgradeHubBackLabel = makeText('', FONT_NUMERAL, 9, WHEEL_CHROME.affordance, 'bold');
     this.upgradeHubBackLabel.anchor.set(0.5, 0);
     this.upgradeGroup.addChild(
       this.upgradeHubHit,
@@ -663,8 +686,16 @@ export class BuildWheelView extends Container {
    * at the top of the hub. The whole hub disc is the tap target (registered
    * thumb-sized by the HUD), and ESC mirrors it on PC, so the word carries a `·
    * ESC` hint on desktop ("the legend shows it"). `null` (a closed wheel) hides
-   * both nodes. The chevron points UP — "go up a level" — and is plasma, the same
-   * accent the forward arrows use, so backward/forward read as one language.
+   * both nodes. The chevron points UP — "go up a level" — and is a **machined
+   * mark** ({@link WHEEL_CHROME.mark}), the same solid chalk the index diamond at
+   * twelve o'clock is cut from, so backward/forward read as one language.
+   *
+   * It used to be a 1.5px *stroked outline* in **plasma**, which is the single
+   * loudest thing this brief was called in to fix: it put the pre-Gantry accent
+   * at the centre of the wheel, brighter than the CLOSE word it belongs to, and
+   * on a phone (`c` ≈ 3.3px) a 1.5px outline of a 6px triangle is most of the
+   * triangle anyway. Filled and hueless it is crisper at both sizes and it costs
+   * the palette nothing.
    */
   private drawHubBack(
     chevron: Graphics,
@@ -697,18 +728,25 @@ export class BuildWheelView extends Container {
     // The up-chevron — "go up a level" — sits BETWEEN the rule and the word,
     // pointing back at the total above it, so the gesture and its label read as
     // one thing rather than as a word with a mark stranded under it.
+    //
+    // `CHEVRON_ASPECT` is the half-height, as a fraction of the half-width. It was
+    // 0.6 while the mark was a 1.5px OUTLINE, where a shallow triangle still reads
+    // as a chevron because the eye follows two strokes. Filled (u11-01) a 1.67:1
+    // triangle is a hill, not an arrowhead, so the apex is raised until the mark
+    // is closer to the index diamond it now shares a tone with — that diamond is
+    // 1:1, this is 1.25:1, and both read as "here" at a glance rather than as a
+    // shape that has to be decoded.
     chevron.visible = true;
     chevron.clear();
     const c = Math.max(3, m.detent * 0.55);
-    chevron
-      .poly([-c, c * 0.6, 0, -c * 0.6, c, c * 0.6])
-      .stroke({ width: 1.5, color: PALETTE.plasma, alpha: 0.95 });
+    const apex = c * CHEVRON_ASPECT;
+    chevron.poly([-c, apex, 0, -apex, c, apex]).fill({ color: WHEEL_CHROME.mark, alpha: 0.9 });
 
     // Now that every piece has been measured, centre the whole hub group on the
     // disc — the handoff's hub is a stack centred in its circle, and hanging it
     // off a guessed offset is what left it sitting on the bottom rim.
     const gap = Math.max(4, m.gapCost + 2);
-    const chevronH = c * 1.2;
+    const chevronH = c * CHEVRON_ASPECT * 2;
     const total = this.hubStackHeight + gap + chevronH + 2 + label.height;
     const top = -total / 2;
     if (this.hubOreNode) this.hubOreNode.y = top + this.hubOreCentre;
@@ -722,7 +760,7 @@ export class BuildWheelView extends Container {
       const w = m.hubRule * (1 - (0.8 * i) / steps);
       rule.moveTo(-w / 2, ruleY).lineTo(w / 2, ruleY).stroke({
         width: 1,
-        color: MATERIAL_SHADES.hairline,
+        color: WHEEL_CHROME.divider,
         alpha: 0.3,
       });
     }
@@ -822,11 +860,12 @@ export class BuildWheelView extends Container {
       .arc(0, 0, r, 0, Math.PI)
       .stroke({ width: m.ring, color: MATERIAL_SHADES.ruleDeep, alpha: 0.95 });
 
-    // 6. The index diamond at twelve o'clock — a machined mark, chalk-white.
+    // 6. The index diamond at twelve o'clock — a machined mark, and since u11-01
+    //    the SAME mark tone as the hub's chevron ({@link WHEEL_CHROME.mark}).
     const d = m.detent;
     rings
       .poly([0, -r - d / 2, d / 2, -r, 0, -r + d / 2, -d / 2, -r])
-      .fill({ color: TEXT_PRIMARY, alpha: 0.9 });
+      .fill({ color: WHEEL_CHROME.mark, alpha: 0.9 });
 
     // The hub disc, with the same lit-top / shadowed-bottom rim.
     rings.circle(0, 0, hub).fill({ color: PALETTE.vacuum, alpha: 0.95 });
@@ -840,7 +879,13 @@ export class BuildWheelView extends Container {
 
   /** The hairline spokes between wedges — the handoff's 1.2° conic dividers.
    *  Drawn once for the whole wheel rather than per wedge, so a wedge's own
-   *  press/confirm overlays never paint over a divider. */
+   *  press/confirm overlays never paint over a divider.
+   *
+   *  Since u11-01 these are the ONLY thing dividing one wedge from the next: a
+   *  wedge no longer strokes its own outline, because the ring it sits in is
+   *  already bounded on all four sides (the disc rim outside, the hub ring inside,
+   *  a spoke on each flank) and outlining it again is what made five wedges read
+   *  as five little plates. See {@link ../ui/instrument} `WHEEL_FACE_ALPHA`. */
   private drawSpokes(rings: Graphics, inner: number, outer: number, count: number, m: WheelProfile): void {
     if (count <= 1) return;
     const arc = (2 * Math.PI) / count;
@@ -853,7 +898,7 @@ export class BuildWheelView extends Container {
       rings
         .moveTo(cos * inner, sin * inner)
         .lineTo(cos * outer, sin * outer)
-        .stroke({ width: m.spoke, color: MATERIAL_SHADES.hairline, alpha: 0.45 });
+        .stroke({ width: m.spoke, color: WHEEL_CHROME.divider, alpha: 0.45 });
     }
   }
 
@@ -886,19 +931,23 @@ export class BuildWheelView extends Container {
         .arc(0, 0, inner, a1, a0, true)
         .closePath();
 
+    // The face, and ONLY the face — no outline of its own (u11-01). A ready
+    // wedge is a brighter lift over the glass than an inert one; that difference
+    // IS the state, because Bone spends brightness where the old chrome spent an
+    // outline weight and a hue.
     nodes.body.visible = true;
     nodes.body.clear();
-    trace()
-      .fill({ color: PALETTE.hullSteel, alpha: bodyAlpha(d.ready) * 0.16 })
-      .stroke({ width: 1, color: PALETTE.hullSteel, alpha: bodyAlpha(d.ready) * 0.5 });
+    trace().fill({ color: WHEEL_CHROME.face, alpha: faceAlpha(d.ready) });
 
-    // Press/confirm/reject overlays on the body, in palette-legal colours: a
-    // plasma glow on press, a plasma shimmer on a confirmed spend, a threat-red
-    // wash on a rejection (danger only — style-guide §2). Each is 0-alpha when
-    // idle, so an untouched wedge draws exactly as before.
+    // Press/confirm/reject overlays on the body. A press and a confirmed spend go
+    // BRIGHT rather than blue (u11-01 — they drew in plasma, the accent this whole
+    // brief is removing; Bone's answer to "this one, now" is luminance). The
+    // rejection keeps its threat red: that is DANGER, the other half of
+    // style-guide §2, and a refusal is a mechanic rather than chrome. Each is
+    // 0-alpha when idle, so an untouched wedge draws exactly as before.
     const energy = Math.max(fb.glow, fb.shimmer);
-    if (energy > 0) trace().fill({ color: PALETTE.plasma, alpha: energy * 0.2 });
-    if (fb.glow > 0) trace().stroke({ width: 2, color: PALETTE.plasma, alpha: fb.glow });
+    if (energy > 0) trace().fill({ color: WHEEL_CHROME.press, alpha: energy * 0.14 });
+    if (fb.glow > 0) trace().stroke({ width: 2, color: WHEEL_CHROME.press, alpha: fb.glow });
     if (fb.reject > 0) {
       trace().fill({ color: PALETTE.threatRed, alpha: fb.reject * 0.28 });
       trace().stroke({ width: 2, color: PALETTE.threatRed, alpha: fb.reject });
@@ -932,11 +981,11 @@ export class BuildWheelView extends Container {
       t.style.fill =
         line.slot === 'name'
           ? d.ready
-            ? TEXT_PRIMARY
-            : TEXT_DIM
+            ? WHEEL_CHROME.nameReady
+            : WHEEL_CHROME.nameInert
           : line.slot === 'cost'
             ? costColor(d.costPaint)
-            : TEXT_MUTED;
+            : WHEEL_CHROME.secondary;
       restyle(t, line.size, trackingPx(line.tracking, line.size));
       t.y = y;
       y += t.height + line.gap;
@@ -966,10 +1015,10 @@ export class BuildWheelView extends Container {
     // Sizes are set per frame from the resolved wheel profile ({@link restyle});
     // these are only the faces and the roles. The name is the one display face on
     // the wheel; everything else is Oxanium, per style-guide §7.
-    const label = makeText('', FONT_HEADING, 13, TEXT_PRIMARY);
-    const sub = makeText('', FONT_NUMERAL, 12, TEXT_MUTED, 'bold');
+    const label = makeText('', FONT_HEADING, 13, WHEEL_CHROME.nameReady);
+    const sub = makeText('', FONT_NUMERAL, 12, WHEEL_CHROME.secondary, 'bold');
     const cost = makeText('', FONT_NUMERAL, 20, PALETTE.signalYellow, 'bold');
-    const detail = makeText('', FONT_NUMERAL, 12, TEXT_MUTED, 'bold');
+    const detail = makeText('', FONT_NUMERAL, 12, WHEEL_CHROME.secondary, 'bold');
     for (const t of [label, sub, cost, detail]) {
       t.anchor.set(0.5, 0);
       t.style.align = 'center';
