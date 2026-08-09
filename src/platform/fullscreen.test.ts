@@ -20,6 +20,7 @@ function fakePlatform(over: Partial<Platform> = {}): Platform {
     storage: { get: () => null, set: () => {} },
     lockOrientation: () => Promise.resolve(),
     canLockOrientation: () => true,
+    prefersReducedMotion: () => false,
     ...over,
   };
 }
