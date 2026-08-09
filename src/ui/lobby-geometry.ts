@@ -430,7 +430,8 @@ export const SEAT_STRIPE = ROSTER.bar;
  * control is bounded three ways and takes whichever is smallest — its own width,
  * a share of a narrow row, and whatever is left once the body keeps
  * {@link SEAT_ROW_BODY_MIN}. The order across a row is therefore fixed at every
- * width: `bar | STATE | body | team chip | difficulty chip`.
+ * width: `bar | STATE | body | team chip | tier chip | ?` (a0-06 added the last
+ * one and made the tier chip read-only; neither moved anything ahead of them).
  *
  * ---------------------------------------------------------------------------
  * u7-03 — THE RE-SKIN, AND WHAT IT DID NOT MOVE
@@ -507,6 +508,72 @@ export const SEAT_CHIP_WIDTH = ROSTER.trailingWidth;
  *  body — and the row's centre, which the hit-test contract taps — stays clear. */
 export const SEAT_CHIP_MAX_FRACTION = 0.4;
 /**
+ * …and the narrowest the tier chip is allowed to become before the row gives up
+ * something else instead *(a0-06)*.
+ *
+ * It has a floor and no drop rung, unlike every other segment on this row: GDD
+ * §2.1 promises the tier is *shown* now, so a row that dropped it would be a row
+ * that stopped keeping a design rule rather than one that ran out of pixels. 40 is
+ * `HARD` and `EASY` at full size with the row's own padding; `MEDIUM`, the one
+ * word longer than the chip at this width, is auto-fitted down — the same ladder
+ * the side chip already keeps at ITS floor (`../ui/lobby-view` `drawTeamChip`:
+ * "below that the word is auto-fitted down, never up"). It is a value, not a
+ * control, so a shrunk word costs a read rather than a target.
+ */
+export const SEAT_CHIP_MIN = 40;
+
+/**
+ * Width of a roster row's trailing **`?` control** — the codex dossier for the
+ * character in that seat *(a0-06, 2026-08-07; developer: "there is a ? question
+ * mark icon that you can press to show a tooltip with the codex entry about that
+ * bot")*.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY IT IS A CONTROL AND NOT A HOVER
+ * ---------------------------------------------------------------------------
+ * The lobby has shown a codex hint on a bot row since c1 — on a desktop **hover**
+ * and a touch **long-press**. A hover is not an affordance: nothing on the row
+ * said it was there, and a hover-only feature is a desktop-only feature, which
+ * the ratified input-parity principle (GDD §2.4, `docs/input-parity.md`) does not
+ * allow. The `?` is the same content reached by a plain **tap**, on the one
+ * screen the game is landscape-locked on a phone for. The hover and long-press
+ * are kept: they are now shortcuts to a thing that is also advertised, which is
+ * the u5 lesson about the state control applied to the row's other half.
+ *
+ * ---------------------------------------------------------------------------
+ * WHAT IT COSTS, AND THE ORDER A NARROWING ROW GIVES THINGS UP IN
+ * ---------------------------------------------------------------------------
+ * It is the row's *fifth* segment (`bar | STATE | body | team | tier | ?`) and it
+ * is deliberately the narrowest: one glyph, no word, so 36 rather than the tier
+ * chip's 54. A fifth segment on a row that was already tight is a real cost, and
+ * the first cut of it was paid for by the wrong thing — the side chip fell off the
+ * notched landscape phone entirely, which is a ratified mechanic (m10, u3: the
+ * developer played a Teams match they could not read sides in). So the order is
+ * stated once, here, and {@link seatTrailing} is the only place it is applied:
+ *
+ *  1. **The `?` shrinks, then drops.** Its dossier is still reachable by a
+ *     long-press on the row, which shipped in c1 and is unchanged; the tier and
+ *     the side are reachable no other way. It goes first for that reason alone.
+ *  2. **The tier chip shrinks to {@link SEAT_CHIP_MIN}** and never drops — GDD
+ *     §2.1 promises the difficulty is shown.
+ *  3. **The side chip keeps {@link SEAT_TEAM_CHIP_MIN}**, below which it was
+ *     already dropped whole (u3), and the row **body keeps
+ *     {@link SEAT_ROW_BODY_MIN}** absolutely (u7-03). Neither is ever spent to
+ *     buy a `?`.
+ *
+ * Below {@link SEAT_HELP_MIN} the `?` is dropped whole rather than drawn as a
+ * clipped stub — the same rung {@link SEAT_STATE_MIN} and {@link SEAT_TEAM_CHIP_MIN}
+ * keep, and the reason the long-press fallback above is stated rather than assumed.
+ */
+export const SEAT_HELP_WIDTH = 36;
+/** …and the narrowest one that is still a thumbable glyph rather than a smudge.
+ *  24 is what lets the notched landscape phone — the tightest row QA's matrix
+ *  produces, ~205px — carry the `?` at all; the row is full-height, so the target
+ *  is 24 × the row's 48+, not 24 square. */
+export const SEAT_HELP_MIN = 24;
+/** …never more than this share of a narrow row. Small, because it is one glyph. */
+export const SEAT_HELP_MAX_FRACTION = 0.14;
+/**
  * Inset of a row's segments from the row's LEFT/RIGHT edges.
  *
  * **Zero on the vertical axis since u7-03**, which is why this is now only a
@@ -572,7 +639,12 @@ export const SEAT_TEAM_CHIP_MIN = 36;
  * asserting a blanket promise the narrow phone cannot keep.
  */
 export const SEAT_ROW_FULL_WIDTH =
-  (SEAT_STRIPE + SEAT_ROW_BODY_MIN + SEAT_TEAM_CHIP_WIDTH + SEAT_CHIP_WIDTH + 2 * SEAT_CHIP_PAD) /
+  (SEAT_STRIPE +
+    SEAT_ROW_BODY_MIN +
+    SEAT_TEAM_CHIP_WIDTH +
+    SEAT_CHIP_WIDTH +
+    SEAT_HELP_WIDTH +
+    3 * SEAT_CHIP_PAD) /
   (1 - SEAT_STATE_MAX_FRACTION);
 
 /**
@@ -791,15 +863,21 @@ export interface LobbyLayout {
    *  finds it *before* the row body and a 48px row is made of 48px controls.
    *  Aligned to `seats`; zero-extent on a row too narrow to carry a legible one. */
   readonly seatStates: readonly Rect[];
-  /** Each roster row's trailing DIFFICULTY chip — the bot-tier cycle, in BOTH
-   *  modes (n2). Nested inside its {@link seats} row on the right, so the hit-test
-   *  checks it *before* the row body. Aligned to `seats`. */
+  /** Each roster row's trailing DIFFICULTY chip. **Read-only since a0-06** — the
+   *  tier is the character's, shown beside the name rather than chosen (GDD §2.1
+   *  amended 2026-08-07), so this rect is a place to draw and no longer a target
+   *  the hit-test registers. Aligned to `seats`. */
   readonly seatChips: readonly Rect[];
   /** Each roster row's TEAM chip (TEAMS) — the side cycle, composed immediately
    *  left of the difficulty chip and kept clear of the row's body ({@link
    *  seatBodyEnd}). Aligned to `seats`; zero-extent below
    *  {@link SEAT_TEAM_CHIP_MIN}, which no row the roster splits into reaches. */
   readonly seatTeamChips: readonly Rect[];
+  /** Each roster row's trailing **`?` control** — the codex dossier for that seat's
+   *  character (a0-06). The far-right segment; zero-extent on a row too narrow to
+   *  carry a legible glyph, where the long-press shortcut still reaches the same
+   *  dossier. Aligned to `seats`. */
+  readonly seatHelp: readonly Rect[];
   /** The MODE toggle (FFA / TEAMS), top-left of the roster (variable-slots E). */
   readonly modeToggle: Rect;
   /** The ABUNDANCE toggle (SCARCE / STANDARD / RICH), top-right of the roster. */
@@ -837,19 +915,33 @@ export type LobbyTarget =
   /** BACK — leaves the lobby for the main menu (u2 menu-back), the exit every
    *  screen carries. The footer beam's left-hand plate since u7-03. */
   | { readonly kind: 'leave' }
-  /** The row body — cycles the seat's OPEN/BOT/CLOSED state (variable-slots E).
-   *  Since u5 the same cycle also has a control that SAYS so ({@link seatState});
-   *  the body is kept because a wide row is a generous target and taking it away
-   *  would be a second change nobody asked for. */
+  /**
+   * The row body — **the seat's CHARACTER cycle since a0-06**, and its
+   * OPEN/BOT/CLOSED cycle before that.
+   *
+   * The body is where the row draws the character's NAME, so the tap that lands
+   * on a name is the tap that changes it: the most direct mapping this row can
+   * have, and the "existing tap-to-cycle gesture" the brief asks the character to
+   * inherit (*"cycling seven names is the same gesture as cycling three tiers"*).
+   * The state cycle did not lose a control for it — it has kept its own drawn,
+   * labelled, leading one since u5, which is the discoverable one the developer
+   * asked for and the reason the body was free to be re-pointed.
+   *
+   * A **closed** row is the exception, and it is a rule rather than a special
+   * case: the body edits whatever the row is showing, and a closed row shows `OUT
+   * OF THE MATCH` and no character, so a tap there re-opens the seat. Nothing that
+   * worked on a shut door stopped working.
+   */
   | { readonly kind: 'seat'; readonly index: number }
   /** The row's LEADING STATE control — the same OPEN/BOT/CLOSED cycle as the row
    *  body, drawn and named (u5). A distinct target rather than a second `seat`
    *  rect so the flow, the seam and the tests can talk about the *control* rather
    *  than about the row that happens to contain it. */
   | { readonly kind: 'seatState'; readonly index: number }
-  /** The row's trailing DIFFICULTY chip — the bot-tier cycle, present in BOTH
-   *  modes (n2). The flow routes it to the difficulty cycle in either mode. */
-  | { readonly kind: 'seatChip'; readonly index: number }
+  /** The row's trailing **`?` control** — opens the codex dossier for that seat's
+   *  character (a0-06). A tap, on every device: the hover and the long-press that
+   *  reach the same hint are shortcuts, not the affordance (GDD §2.4 parity). */
+  | { readonly kind: 'seatHelp'; readonly index: number }
   /** The row's TEAM chip — the side cycle, TEAMS only (n2). Laid out in FFA too
    *  (geometry stays mode-blind), where a tap on it is a model no-op. */
   | { readonly kind: 'seatTeamChip'; readonly index: number }
@@ -1048,8 +1140,13 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
   };
   const seatColumns = placeSeats(seats, seatsBox, rosterRowHeight(metrics), gap);
   const seatStates = seats.map((rect) => stateRect(rect));
-  const seatChips = seats.map((rect) => chipRect(rect));
-  const seatTeamChips = seats.map((rect, i) => teamChipRect(rect, seatChips[i]!, seatStates[i]!));
+  // The three trailing segments are placed together, because they compete for one
+  // budget and placing them separately is how the side chip fell off the notched
+  // landscape phone (a0-06; {@link seatTrailing}).
+  const trailing = seats.map((rect, i) => seatTrailing(rect, seatStates[i]!));
+  const seatHelp = trailing.map((t) => t.help);
+  const seatChips = trailing.map((t) => t.tier);
+  const seatTeamChips = trailing.map((t) => t.team);
   const mapColumns = placeMaps(maps, mapBand);
 
   return {
@@ -1068,6 +1165,7 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     seatStates,
     seatChips,
     seatTeamChips,
+    seatHelp,
     modeToggle: controls.modeToggle,
     abundance: controls.abundance,
     classOptions,
@@ -1162,10 +1260,72 @@ function stateRect(seat: Rect): Rect {
  * hit-test contract taps a seat at its centre and must still land on the row body
  * ({@link lobbyHitTest} checks the chip first, so a tap *on* the chip wins).
  */
-function chipRect(seat: Rect): Rect {
-  if (seat.width <= 0 || seat.height <= 0) return { x: seat.x, y: seat.y, width: 0, height: 0 };
-  const width = Math.max(0, Math.min(SEAT_CHIP_WIDTH, seat.width * SEAT_CHIP_MAX_FRACTION - SEAT_CHIP_PAD));
-  return { x: seat.x + seat.width - width, y: seat.y, width, height: seat.height };
+/**
+ * The whole trailing group of one roster row, placed in one pass: the `?`, the
+ * tier chip, and the side chip, right to left *(a0-06)*.
+ *
+ * It is one function because they compete for one budget, and the first cut of
+ * the `?` proved what happens when three functions each hold their own opinion
+ * about how much room is left: the `?` took its 32px off the far right, the tier
+ * chip measured from *its* left edge, and the side chip — measured last, from what
+ * those two had already spent — fell to zero on the notched landscape phone. That
+ * is a ratified mechanic silently disappearing to buy a new affordance, which is
+ * the trade this file exists to make impossible.
+ *
+ * So the order of surrender is applied here and stated at {@link SEAT_HELP_WIDTH}:
+ * the `?` shrinks and then drops, the tier chip shrinks to {@link SEAT_CHIP_MIN}
+ * and never drops, and the side chip's {@link SEAT_TEAM_CHIP_MIN} and the body's
+ * {@link SEAT_ROW_BODY_MIN} are never spent at all.
+ */
+function seatTrailing(seat: Rect, state: Rect): { help: Rect; tier: Rect; team: Rect } {
+  const empty: Rect = { x: seat.x, y: seat.y, width: 0, height: 0 };
+  if (seat.width <= 0 || seat.height <= 0) return { help: empty, tier: empty, team: empty };
+
+  // Everything after the identity bar, the state control and the row body's own
+  // absolute minimum. This is the budget; nothing below may exceed it.
+  const room = seat.x + seat.width - seatBodyEnd(seat, state);
+
+  let tier = Math.max(0, Math.min(SEAT_CHIP_WIDTH, seat.width * SEAT_CHIP_MAX_FRACTION - SEAT_CHIP_PAD));
+  let help = Math.min(SEAT_HELP_WIDTH, seat.width * SEAT_HELP_MAX_FRACTION);
+  if (help < SEAT_HELP_MIN) help = 0;
+
+  /** What the side chip would be left with, given the two widths above. */
+  const sideRoom = (): number =>
+    room - tier - SEAT_CHIP_PAD - (help > 0 ? help + SEAT_CHIP_PAD : 0);
+
+  const tierWant = tier;
+  // 1. The `?` gives way first, shrinking toward its floor.
+  if (sideRoom() < SEAT_TEAM_CHIP_MIN && help > 0) {
+    help = Math.min(help, room - tier - 2 * SEAT_CHIP_PAD - SEAT_TEAM_CHIP_MIN);
+  }
+  // 2. Before the `?` is DROPPED, the tier chip shrinks toward its own floor to buy
+  //    it back — a control that is gone is worse than a value whose word is fitted
+  //    down, and the tier is a value.
+  if (help > 0 && help < SEAT_HELP_MIN) {
+    tier = Math.max(
+      SEAT_CHIP_MIN,
+      Math.min(tier, room - 2 * SEAT_CHIP_PAD - SEAT_HELP_MIN - SEAT_TEAM_CHIP_MIN),
+    );
+    help = Math.min(SEAT_HELP_WIDTH, room - tier - 2 * SEAT_CHIP_PAD - SEAT_TEAM_CHIP_MIN);
+  }
+  // 3. Only then is it dropped whole — and the tier takes its width back, because
+  //    the row it was shrunk for is no longer being drawn. A row this narrow is
+  //    below anything QA's matrix produces, and the dossier is the only one of the
+  //    three with a second way in (the long-press).
+  if (help < SEAT_HELP_MIN) {
+    help = 0;
+    tier = Math.max(SEAT_CHIP_MIN, Math.min(tierWant, room - SEAT_CHIP_PAD - SEAT_TEAM_CHIP_MIN));
+  }
+  tier = Math.max(0, Math.min(tier, room));
+
+  const helpRect: Rect =
+    help > 0
+      ? { x: seat.x + seat.width - help, y: seat.y, width: help, height: seat.height }
+      : empty;
+  const tierRight = help > 0 ? helpRect.x - SEAT_CHIP_PAD : seat.x + seat.width;
+  const tierRect: Rect =
+    tier > 0 ? { x: tierRight - tier, y: seat.y, width: tier, height: seat.height } : empty;
+  return { help: helpRect, tier: tierRect, team: teamChipRect(seat, tierRect, state) };
 }
 
 /**
@@ -1217,17 +1377,20 @@ export function lobbyHitTest(layout: LobbyLayout, x: number, y: number): LobbyTa
   if (hit(layout.abundance, x, y)) return { kind: 'abundance' };
   for (let i = 0; i < layout.seats.length; i++) {
     // A row's own controls win over its body: the LEADING state control names and
-    // cycles OPEN/BOT/CLOSED (u5), the trailing difficulty chip cycles the bot's
-    // tier (both modes), and the team chip to its left cycles the side (TEAMS); a
-    // tap anywhere else on the row cycles the seat state too. The three sit at the
-    // row's leading edge and strictly right of its centre respectively, so the
-    // BODY between them — what the hit-test contract taps — is never one of them.
+    // cycles OPEN/BOT/CLOSED (u5), the trailing `?` opens the seat's codex dossier
+    // (a0-06), and the team chip cycles the side (TEAMS); a tap anywhere else on
+    // the row cycles the seat's CHARACTER. All three sit at the row's leading edge
+    // and strictly right of its centre respectively, so the BODY between them —
+    // what the hit-test contract taps — is never one of them.
     const stateControl = layout.seatStates[i];
     if (stateControl && hit(stateControl, x, y)) return { kind: 'seatState', index: i };
+    const help = layout.seatHelp[i];
+    if (help && hit(help, x, y)) return { kind: 'seatHelp', index: i };
     const teamChip = layout.seatTeamChips[i];
     if (teamChip && hit(teamChip, x, y)) return { kind: 'seatTeamChip', index: i };
-    const chip = layout.seatChips[i];
-    if (chip && hit(chip, x, y)) return { kind: 'seatChip', index: i };
+    // The tier chip is NOT a target (a0-06): the difficulty is shown, not chosen,
+    // so a tap that lands on it falls through to the row body's character cycle
+    // rather than to a control that would have to refuse.
     const rect = layout.seats[i];
     if (rect && hit(rect, x, y)) return { kind: 'seat', index: i };
   }

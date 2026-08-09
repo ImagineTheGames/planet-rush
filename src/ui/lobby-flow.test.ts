@@ -267,8 +267,9 @@ describe('the room tells the server what it chose', () => {
   });
 
   it('sends the host’s difficulties in EMPTY-SEAT order, and only from the host', () => {
-    // In FFA the row's trailing chip cycles a bot's difficulty (variable-slots E).
-    const host = flowTapLobby(inLobby(0, 0), { kind: 'seatChip', index: 3 });
+    // The row BODY cycles the seat's CHARACTER (a0-06); the tier that rides the
+    // wire is read off it, so a character tap is what re-sends the list.
+    const host = flowTapLobby(inLobby(0, 0), { kind: 'seat', index: 3 });
     const message = sent(host)[0] as { botDifficulties?: readonly string[] };
     expect(message.botDifficulties).toHaveLength(7); // seven empty seats of eight
 
@@ -308,44 +309,49 @@ describe('the room tells the server what it chose', () => {
     const richer = flowTapLobby(inLobby(0, 0), { kind: 'abundance' });
     expect(richer.state.lobby?.abundance).toBe('standard');
 
-    // Seat state: the row body walks the seat one rung round the ring. Which rung
-    // it *starts* on is the flavour's business since a0-11 — an online room opens
-    // its seats OPEN and the solo lobby opens them on the bot cast — so what this
-    // asserts is the routing: a tap on the body reaches the cycle and it moves.
-    const before = inLobby(0, 0);
-    const botted = flowTapLobby(before, { kind: 'seat', index: 5 });
-    expect(botted.state.lobby?.seats[5]?.occupant).toBe(nextRung(before.lobby!.seats[5]!.occupant));
-
-    // …and so does the LEADING state control (u5) — the drawn, labelled button
-    // that finally says a slot can be closed. Two rects, ONE action: they walk the
-    // same ring in the same order, so the control can never become a second,
-    // subtly-different cycle bolted beside the first.
-    let viaBody = inLobby(0, 0);
+    // Seat state: the LEADING state control walks the ring OPEN → BOT → CLOSED.
+    // It is the only control that does since a0-06 — the row body moved to the
+    // character cycle, because that is where the row draws the name. Which rung a
+    // seat *starts* on is the flavour's business since a0-11 (an online room opens
+    // its seats OPEN, the solo lobby on the bot cast), so nothing below names one.
     let viaControl = inLobby(0, 0);
-    for (let i = 0; i < SEAT_STATE_CYCLE.length + 1; i++) {
-      viaBody = flowTapLobby(viaBody, { kind: 'seat', index: 5 }).state;
+    for (let i = 0; i < SEAT_STATE_CYCLE.length; i++) {
+      const before = viaControl.lobby?.seats[5]?.occupant;
       viaControl = flowTapLobby(viaControl, { kind: 'seatState', index: 5 }).state;
       expect(
         viaControl.lobby?.seats[5]?.occupant,
-        `tap ${i + 1}: the control and the body disagree`,
-      ).toBe(viaBody.lobby?.seats[5]?.occupant);
+        `tap ${i + 1}: the state control did not move`,
+      ).not.toBe(before);
     }
-    // Four taps = once round the three-rung ring plus one, so the seat is one
-    // rung past where it started — whichever rung that was.
-    expect(viaControl.lobby?.seats[5]?.occupant).toBe(nextRung(inLobby(0, 0).lobby!.seats[5]!.occupant));
+    // One full lap of the ring puts the seat back where it started — whichever
+    // rung that was, which is the part a0-11 made flavour-dependent.
+    expect(viaControl.lobby?.seats[5]?.occupant).toBe(inLobby(0, 0).lobby?.seats[5]?.occupant);
 
-    // The DIFFICULTY chip cycles the bot's tier in BOTH modes (n2) — the control
-    // the TEAMS lobby had lost when the side control took the only chip.
-    const tiered = flowTapLobby(teams.state, { kind: 'seatChip', index: 2 });
-    expect(tiered.state.lobby?.seats[2]?.difficulty).not.toBe(teams.state.lobby?.seats[2]?.difficulty);
-    // …and it changed the tier WITHOUT touching the side.
-    expect(tiered.state.lobby?.seats[2]?.team).toBe(teams.state.lobby?.seats[2]?.team);
+    // A CLOSED row's body still re-opens the seat — one rule, stated once: the body
+    // edits whatever the row is SHOWING, and a closed row shows no character.
+    // Walk to CLOSED rather than counting taps to it: which rung the seat starts
+    // on is the flavour's business since a0-11, so two taps from `inLobby` (the
+    // SOLO door, which opens on the bot cast) land on OPEN, not CLOSED.
+    let closed = inLobby(0, 0);
+    for (let i = 0; i < SEAT_STATE_CYCLE.length; i++) {
+      if (closed.lobby?.seats[5]?.occupant === 'closed') break;
+      closed = flowTapLobby(closed, { kind: 'seatState', index: 5 }).state;
+    }
+    expect(closed.lobby?.seats[5]?.occupant).toBe('closed');
+    expect(flowTapLobby(closed, { kind: 'seat', index: 5 }).state.lobby?.seats[5]?.occupant).toBe('open');
+
+    // The row BODY cycles the seat's CHARACTER in BOTH modes (a0-06) — one
+    // control per seat, so there is no tier left to disagree with the cast.
+    const recast = flowTapLobby(teams.state, { kind: 'seat', index: 2 });
+    expect(recast.state.lobby?.seats[2]?.character).not.toBe(teams.state.lobby?.seats[2]?.character);
+    // …and it changed the character WITHOUT touching the side.
+    expect(recast.state.lobby?.seats[2]?.team).toBe(teams.state.lobby?.seats[2]?.team);
 
     // The TEAM chip, composed alongside it, assigns the seat's side (TEAMS).
     const assigned = flowTapLobby(teams.state, { kind: 'seatTeamChip', index: 2 });
     expect(assigned.state.lobby?.seats[2]?.team).not.toBe(teams.state.lobby?.seats[2]?.team);
-    // …and it changed the side WITHOUT touching the tier.
-    expect(assigned.state.lobby?.seats[2]?.difficulty).toBe(teams.state.lobby?.seats[2]?.difficulty);
+    // …and it changed the side WITHOUT touching the character.
+    expect(assigned.state.lobby?.seats[2]?.character).toBe(teams.state.lobby?.seats[2]?.character);
   });
 
   it('refuses every variable-match control from a guest', () => {
@@ -355,7 +361,6 @@ describe('the room tells the server what it chose', () => {
       { kind: 'abundance' } as const,
       { kind: 'seat', index: 2 } as const,
       { kind: 'seatState', index: 2 } as const,
-      { kind: 'seatChip', index: 2 } as const,
       { kind: 'seatTeamChip', index: 2 } as const,
     ]) {
       const tapped = flowTapLobby(guest, target);
@@ -541,20 +546,27 @@ describe('the slot editor is reachable in EVERY mode AND both lobbies (guard the
         let state = inLobbyVia(flavour.door, 0, 0);
         if (mode !== 'ffa') state = flowTapLobby(state, { kind: 'mode' }).state;
         expect(state.lobby?.mode, `lobby is in ${mode}`).toBe(mode);
+        // Setup, not the thing under test (see {@link withBotAt}): since a0-11 the
+        // online room opens this seat OPEN and empty, and the two bot affordances
+        // below only MEAN anything on a bot seat. Without this the character tap
+        // is refused and the assertion compares a value to itself.
+        state = withBotAt(state, SEAT);
         const layout = lobbyLayout(GUARD_VIEWPORT);
 
-        // open/close + bot-assign: the row body reaches the OPEN→BOT→CLOSED cycle.
+        // The CHARACTER cycle: the row body reaches it (a0-06). This is the
+        // per-seat bot control now, and it is the one the developer asked for.
         const body = tapCentre(layout, layout.seats[SEAT]!);
         expect(body, `row body reachable in ${mode}`).toEqual({ kind: 'seat', index: SEAT });
         const cycled = flowTapLobby(state, body!);
-        expect(cycled.state.lobby?.seats[SEAT]?.occupant, `bot-assign reachable in ${mode}`).not.toBe(
-          state.lobby?.seats[SEAT]?.occupant,
+        expect(cycled.state.lobby?.seats[SEAT]?.character, `character cycle reachable in ${mode}`).not.toBe(
+          state.lobby?.seats[SEAT]?.character,
         );
 
-        // …and so does the LEADING STATE control (u5) — the one that SAYS so. It
-        // belongs in this guard for the reason the guard exists: an affordance
-        // that is laid out in one mode and not another, or in one lobby and not
-        // the other, is the class of miss this describe block was written for.
+        // open/close + bot-assign: the LEADING STATE control (u5) — the one that
+        // SAYS so. It belongs in this guard for the reason the guard exists: an
+        // affordance that is laid out in one mode and not another, or in one lobby
+        // and not the other, is the class of miss this describe block was written
+        // for.
         const stateControl = tapCentre(layout, layout.seatStates[SEAT]!);
         expect(stateControl, `state control reachable in ${mode}`).toEqual({
           kind: 'seatState',
@@ -563,24 +575,25 @@ describe('the slot editor is reachable in EVERY mode AND both lobbies (guard the
         const viaControl = flowTapLobby(state, stateControl!);
         expect(
           viaControl.state.lobby?.seats[SEAT]?.occupant,
-          `state control cycles the seat in ${mode}`,
-        ).toBe(cycled.state.lobby?.seats[SEAT]?.occupant);
+          `bot-assign reachable in ${mode}`,
+        ).not.toBe(state.lobby?.seats[SEAT]?.occupant);
 
-        // bot-difficulty: the difficulty chip reaches the tier cycle — IN EVERY MODE.
-        // This is the exact control the TEAMS lobby had lost.
-        const diff = tapCentre(layout, layout.seatChips[SEAT]!);
-        expect(diff, `difficulty chip reachable in ${mode}`).toEqual({ kind: 'seatChip', index: SEAT });
-        const onBot = withBotAt(state, SEAT);
-        const tiered = flowTapLobby(onBot, diff!);
-        expect(tiered.state.lobby?.seats[SEAT]?.difficulty, `bot-difficulty reachable in ${mode}`).not.toBe(
-          onBot.lobby?.seats[SEAT]?.difficulty,
-        );
-        // …and on an EMPTY seat there is no tier to cycle, so the chip is a no-op
-        // and costs the wire nothing (a0-11) — the flow stays perfectly still.
-        const empty = flowTapLobby(state, { kind: 'seatState', index: SEAT });
-        if (empty.state.lobby?.seats[SEAT]?.occupant === 'open') {
-          expect(flowTapLobby(empty.state, diff!).state).toBe(empty.state);
-        }
+        // The `?` control reaches the codex dossier — IN EVERY MODE (a0-06). It is
+        // a screen the wiring opens, so the model is deliberately unmoved by it;
+        // what this pins is that the control is laid out and hit-testable at all,
+        // which is the half a hover-only tooltip never had.
+        const help = tapCentre(layout, layout.seatHelp[SEAT]!);
+        expect(help, `codex ? reachable in ${mode}`).toEqual({ kind: 'seatHelp', index: SEAT });
+        expect(flowTapLobby(state, help!).state, `? changes no lobby state in ${mode}`).toBe(state);
+
+        // The tier chip keeps its rect and is NOT a target (a0-06): it is a value,
+        // not a control, so a tap there falls through to the row body rather than
+        // reaching a second setting that could disagree with the cast. This is the
+        // control a0-11 knew as `seatChip`; deleting it is the point of the brief.
+        expect(tapCentre(layout, layout.seatChips[SEAT]!), `tier chip is inert in ${mode}`).not.toEqual({
+          kind: 'seatChip',
+          index: SEAT,
+        });
       });
     }
 
@@ -608,13 +621,25 @@ describe('the slot editor is reachable in EVERY mode AND both lobbies (guard the
       expect(flowTapLobby(state, { kind: 'abundance' }).state.lobby?.abundance).not.toBe(
         state.lobby?.abundance,
       );
-      expect(flowTapLobby(state, { kind: 'seat', index: SEAT }).state.lobby?.seats[SEAT]?.occupant).toBe(
-        nextRung(state.lobby!.seats[SEAT]!.occupant),
+      // The row body is the CHARACTER cycle (a0-06); the seat-state cycle lives on
+      // the leading control it has had since u5.
+      expect(tapCentre(layout, layout.seatStates[SEAT]!)).toEqual({ kind: 'seatState', index: SEAT });
+      expect(tapCentre(layout, layout.seatHelp[SEAT]!)).toEqual({ kind: 'seatHelp', index: SEAT });
+      // On a BOT seat, because only a bot seat has a character to cycle (a0-11) —
+      // an online room's seats start OPEN, and the body would rightly refuse.
+      const onBot = withBotAt(state, SEAT);
+      expect(flowTapLobby(onBot, { kind: 'seat', index: SEAT }).state.lobby?.seats[SEAT]?.character).not.toBe(
+        onBot.lobby?.seats[SEAT]?.character,
       );
+      // The state control moves the seat one rung, from whichever rung this
+      // flavour started it on (a0-11) — the ring is the same in both.
+      expect(
+        flowTapLobby(state, { kind: 'seatState', index: SEAT }).state.lobby?.seats[SEAT]?.occupant,
+      ).toBe(nextRung(state.lobby!.seats[SEAT]!.occupant));
       // RUSH! needs a match to start: two participants (GDD §2.1, amended
       // 2026-08-07). Offline the cast is already there; in an empty room the host
       // seats one bot first, which is the developer's "up to player to fill it up".
-      expect(flowTapLobby(withBotAt(state, SEAT), { kind: 'rush' }).state.lobby?.phase).toBe('counting');
+      expect(flowTapLobby(onBot, { kind: 'rush' }).state.lobby?.phase).toBe('counting');
       expect(flowTapLobby(state, { kind: 'leave' }).state.screen).toBe('entry');
     });
   }
@@ -636,15 +661,23 @@ describe('the slot editor is reachable in EVERY mode AND both lobbies (guard the
     expect(ffaTapped.state, 'team-assign is excluded in FFA').toBe(ffa);
   });
 
-  it('composes the two controls — the difficulty and team chips are distinct targets', () => {
-    // The n2 regression in one line: in TEAMS a bot row carries BOTH chips at
-    // distinct hit targets, so the side control never replaces the tier control.
+  it('composes the row’s controls — side chip, `?` and body are distinct targets', () => {
+    // The n2 regression, restated for the a0-06 row: a bot row in TEAMS carries the
+    // side chip AND the codex `?` at distinct hit targets, and the body between
+    // them is a third — so no control on this row replaces another.
     const layout = lobbyLayout(GUARD_VIEWPORT);
-    const diff = tapCentre(layout, layout.seatChips[SEAT]!);
     const team = tapCentre(layout, layout.seatTeamChips[SEAT]!);
-    expect(diff).toEqual({ kind: 'seatChip', index: SEAT });
+    const help = tapCentre(layout, layout.seatHelp[SEAT]!);
+    const body = tapCentre(layout, layout.seats[SEAT]!);
     expect(team).toEqual({ kind: 'seatTeamChip', index: SEAT });
-    expect(diff).not.toEqual(team);
+    expect(help).toEqual({ kind: 'seatHelp', index: SEAT });
+    expect(body).toEqual({ kind: 'seat', index: SEAT });
+    expect(new Set([JSON.stringify(team), JSON.stringify(help), JSON.stringify(body)]).size).toBe(3);
+
+    // …and the TIER chip is deliberately NOT one of them: the difficulty is shown,
+    // not chosen, so a tap that lands on it falls through to the body's character
+    // cycle rather than to a control that would have to refuse.
+    expect(tapCentre(layout, layout.seatChips[SEAT]!)).toEqual({ kind: 'seat', index: SEAT });
   });
 });
 
@@ -752,7 +785,7 @@ describe('authority ends the lobby (rule 3)', () => {
 });
 
 describe('the whole front of a match, in one pass', () => {
-  it('goes door → room → hull → difficulty → RUSH! → world, in that order', () => {
+  it('goes door → room → hull → character → RUSH! → world, in that order', () => {
     const rng = mulberry32(11);
     const log: string[] = [];
     let state = createFlow();
@@ -771,6 +804,10 @@ describe('the whole front of a match, in one pass', () => {
     drain(flowConnected(state, 0));
     drain(flowLobbySlots(state, slots(8, [0, 1])));
     drain(flowTapLobby(state, { kind: 'class', index: CLASS_ORDER.indexOf(ShipClass.Interceptor) }));
+    // Seat 4 has to BE a bot before it can be cast (a0-11: a wire slot arrives
+    // OPEN, and the character cycle refuses a non-bot seat). Both taps are real
+    // host edits and both are broadcast, which is why two sends appear below.
+    drain(flowTapLobby(state, { kind: 'seatState', index: 4 }));
     drain(flowTapLobby(state, { kind: 'seat', index: 4 }));
     drain(flowTapLobby(state, { kind: 'rush' }));
     // Driven the way a frame loop drives it — until the count is spent, not for
@@ -784,7 +821,8 @@ describe('the whole front of a match, in one pass', () => {
       `open:${room}`,
       'send:lobbyChoice', // the pre-selected Vanguard, on open
       'send:lobbyChoice', // the Interceptor tile
-      'send:lobbyChoice', // seat 4's difficulty
+      'send:lobbyChoice', // seat 4 set to BOT (a0-11) — an open slot casts nobody
+      'send:lobbyChoice', // seat 4's character (a0-06) — the tier rides it
       'send:startMatch', // at zero, not on the press
     ]);
     expect(state.screen).toBe('match');

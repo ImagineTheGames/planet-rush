@@ -36,8 +36,8 @@ import type { Bot } from '../src/bots';
 import { MATCH_SLOTS, createBot, fillEmptySlots } from '../src/bots';
 import { perceive, DEFAULT_PERCEPTION } from '../src/bots';
 import type { Perception } from '../src/bots';
-import type { Inputs, PlayerInput, PlayerSpec, World } from '../src/sim';
-import { TICK_DT, createWorld, fieldOre, isOver, step } from '../src/sim';
+import type { Abundance, Inputs, PlayerInput, PlayerSpec, World } from '../src/sim';
+import { TICK_DT, createWorld, fieldOre, isOver, resolveEconomy, step } from '../src/sim';
 import { hashState } from './hash';
 import type { StrategyId } from './strategies';
 import { strategy } from './strategies';
@@ -67,6 +67,28 @@ export interface MatchSetup {
   readonly bounds?: { width: number; height: number };
   /** Asteroids per wave, overriding `WAVE.asteroidsPerWave`. */
   readonly asteroidCount?: number;
+  /**
+   * Ore scarcity this match runs at (p11 `abundance`). Omitted keeps
+   * `createWorld`'s legacy-safe `standard` baseline, so every pre-a0-17 sweep is
+   * byte-for-byte unchanged; a sweep that is *about* abundance names it.
+   */
+  readonly abundance?: Abundance;
+  /**
+   * Wave interval (seconds) forced onto the resolved economy after construction —
+   * the a0-17 measuring instrument, and the reason QA can price a candidate
+   * `respawnInterval` **without editing the constants table between runs**.
+   *
+   * `world.economy.waveInterval` is the single number the spawner, the collapse
+   * deadline, the HUD clock and bot perception all read (`waveIntervalOf`,
+   * a0-16), and wave 1 is placed at t=0 where the interval cannot matter — so
+   * replacing it here reproduces exactly the world a table with that
+   * `respawnInterval` would have built. It is applied inside {@link buildWorld},
+   * the one construction path a run and its replay share, so a recorded match
+   * still replays bit-for-bit.
+   *
+   * Measurement only: nothing in the shipped game sets it.
+   */
+  readonly waveIntervalOverride?: number;
 }
 
 /**
@@ -372,12 +394,25 @@ export function replay(recording: MatchRecording): { hash: string; world: World 
 /** Construct the world a setup describes. One code path for the run and for the
  *  replay, which is the point. */
 export function buildWorld(setup: MatchSetup): World {
-  return createWorld({
+  const world = createWorld({
     seed: setup.seed,
     players: playerSpecs(setup.lineup),
     ...(setup.bounds ? { bounds: setup.bounds } : {}),
     ...(setup.asteroidCount !== undefined ? { asteroidCount: setup.asteroidCount } : {}),
+    ...(setup.abundance !== undefined ? { abundance: setup.abundance } : {}),
   });
+  return applyWaveIntervalOverride(world, setup.waveIntervalOverride);
+}
+
+/** Force a candidate wave interval onto a freshly-built world (see
+ *  {@link MatchSetup.waveIntervalOverride}). A world with no resolved economy
+ *  gets the baseline one first, so the override is never silently dropped. */
+function applyWaveIntervalOverride(world: World, interval: number | undefined): World {
+  if (interval === undefined) return world;
+  if (!(interval > 0)) throw new Error(`buildWorld: waveIntervalOverride must be positive, got ${interval}`);
+  const base = world.economy ?? resolveEconomy();
+  world.economy = { ...base, waveInterval: interval };
+  return world;
 }
 
 /** The shared implementation behind {@link runMatch} and {@link recordMatch}. */

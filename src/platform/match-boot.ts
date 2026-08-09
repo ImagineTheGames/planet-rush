@@ -12,7 +12,9 @@
  * What it assembles (GDD §2.1, §2.9, §4.2):
  *
  *  - Eight slots, eight stations. This client flies one; the other seven are the
- *    cast (`src/bots`), each bringing its character's hull.
+ *    cast (`src/bots`), each bringing its character's hull — and since a0-06 the
+ *    cast is **the one the lobby picked** ({@link MatchBootConfig.cast}), not a
+ *    round-robin of the roster that ignored it.
  *  - A `LocalLoopback` holding the authoritative sim in this process — no
  *    server, no internet, and the same protocol the online match speaks.
  *  - One pulse per fixed tick: the bots file first, then the local client, whose
@@ -27,8 +29,8 @@ import type { Action, PlayerId, ShipClass } from '@shared/types';
 import { TICK_DT } from '../sim';
 import type { PlayerSpec, World } from '../sim';
 import { LocalLoopback, OFFLINE_ROOM, TransportSession } from '../net';
-import { MATCH_SLOTS, botLobby, createBots, fillEmptySlots, thinkOnce } from '../bots';
-import type { Bot } from '../bots';
+import { MATCH_SLOTS, ROSTER, botLobby, createBots, fillEmptySlots, thinkOnce } from '../bots';
+import type { Bot, PersonalityId } from '../bots';
 
 /** How to stand up the offline match. */
 export interface MatchBootConfig {
@@ -61,6 +63,27 @@ export interface MatchBootConfig {
    * absent table can never crash a boot, only leave a seat in FFA.
    */
   readonly teams?: readonly number[];
+  /**
+   * **The cast the lobby picked**, indexed by player id in the same dense order
+   * `teams` uses (`src/ui/lobby` `lobbyRosterCast`) — the seam this file was
+   * missing *(a0-06, 2026-08-07; GDD §2.1 amended)*.
+   *
+   * The lobby has resolved a character per seat since the day it shipped and
+   * showed it on the roster; it just never travelled. This config had no cast
+   * field at all, so the call below passed none, `fillEmptySlots` round-robined
+   * the whole mixed roster, and every offline match was Rusty, Bolt, Foreman,
+   * Patch, Sable, Vulture, Warden in seat order whatever the host had chosen —
+   * the developer's *"i chose HARD for all enemies but they were at other
+   * difficulties than i selected."* Selecting the character directly does not fix
+   * that mismatch on its own; **this line is what fixes it**, and picking the
+   * character is what makes a second, disagreeing control impossible afterwards.
+   *
+   * A slot the table does not name (a human seat, a short table, `?debug=1`, the
+   * harness) falls back to roster order, so every existing boot is unchanged.
+   * Repeats are honoured verbatim — two Wardens in, two Wardens out — because
+   * eight slots over seven characters, three of them Hard, cannot avoid one.
+   */
+  readonly cast?: readonly (PersonalityId | null | undefined)[];
   /** Fixed timestep. Defaults to the sim's canonical 60 Hz tick. */
   readonly dt?: number;
 }
@@ -91,7 +114,10 @@ export function bootOfflineMatch(config: MatchBootConfig): MatchBoot {
   const slots = config.slots ?? MATCH_SLOTS;
   const dt = config.dt ?? TICK_DT;
 
-  const seats = fillEmptySlots([config.localPlayer], slots);
+  // The lobby's cast reaches the seats here — the one line the whole a0-06 report
+  // turned on. `ROSTER` is passed explicitly because it is now the *fallback* for
+  // a slot the cast does not name, not the thing that decides the match.
+  const seats = fillEmptySlots([config.localPlayer], slots, ROSTER, undefined, config.cast);
   const bots = createBots(seats, { seed: config.seed });
   const roster: PlayerSpec[] = [
     { id: config.localPlayer, shipClass: config.shipClass },

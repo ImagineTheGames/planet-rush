@@ -77,6 +77,117 @@ expectation is otherwise, that is a rules change and needs saying out loud.
 
 ---
 
+## The lobby picks the CHARACTER. Difficulty is shown, not chosen.
+
+**Date:** 2026-08-07 · branch `agent/bots/a0-06-pick-the-character`
+**Ratified by:** Developer (Reinaldo)
+**Amends:** GDD §2.1 (folded in directly) and §2.9 (folded in directly). **This
+supersedes the earlier plan to carry a per-slot difficulty into the match.** No
+behaviour tree, tuning knob, personality weight, hull assignment, fog rule, Teams
+side assignment or seed-determinism property changes — this amendment is about
+*who you choose and what you are told about them*, not about how a bot plays.
+
+### The ratification, verbatim
+
+> "how about for bots we are able to select their personality instead of
+> EASY/MEDIUM/HARD and it shows the difficulty next to their personality (and
+> there is a ? question mark icon that you can press to show a tooltip with the
+> codex entry about that bot)..."
+
+Preceded by the two reports it answers:
+
+> "i chose HARD for all enemies but they were at other difficulties than i
+> selected"
+
+> "this bot personality thing makes no sense... its difficult to understand and
+> difficult to balance a team with it"
+
+### Why picking the character is not the same fix as carrying the tier through
+
+The two reports look like one bug and are not. The second is a *comprehension*
+complaint about a two-step control — set a tier, get a name you did not choose.
+The first is a *wiring* bug: `bootOfflineMatch` called `fillEmptySlots` with no
+cast at all, `MatchBootConfig` had no cast field, and the round-robin ran over the
+whole mixed roster — so whatever the lobby resolved was discarded and every
+offline match seated Rusty, Bolt, Foreman, Patch, Sable, Vulture, Warden in seat
+order regardless of the setting.
+
+Fixing only the wiring would have left the confusing control. Fixing only the
+control would have left the setting inert. **Selecting the character directly does
+neither: it deletes the possibility of a mismatch**, because there is no longer a
+second control that can disagree with the cast — the seat stores a character and
+the tier is read off it. The wiring is fixed too, and it had to be: the cast now
+travels lobby → `lobbyRosterCast` → `MatchBootConfig.cast` → `fillEmptySlots` →
+`createBots`.
+
+### The one decision that was surfaced rather than made quietly
+
+There are **8 slots and 7 characters**, and only **3 are Hard**. So a full house
+needs at least one repeat, and the developer's own stated goal — a balanced 4v4 —
+needs *four* Hard bots, which is more Hard characters than exist.
+
+**Duplicates are allowed**, because forbidding them makes the developer's use case
+impossible. A repeat is told apart by **numbering the name** — `Warden 1`,
+`Warden 2` — and only when the character actually repeats, so every lobby anyone
+has played so far reads exactly as it did. The numeral was chosen over a livery
+variant and over doing nothing: a livery variant would be a new asset for a case
+the field already distinguishes (the slot's identity colour and its `P1`…`P8`
+decal), and doing nothing leaves two rows on the roster the host cannot tell
+apart while they are checking their own work. **A new character was not invented
+to dodge the arithmetic** — the cast is GDD §2.9 and not the Bot Engineer's to
+extend.
+
+The name table this exposed was already keyed by **slot** rather than by
+character (`main.ts` `rebuildNameTable`, `src/ui/lobby` `playerNameTable`), so no
+re-keying was needed — only the numbering.
+
+### The row
+
+`bar | STATE | body | team chip | tier chip | ?`
+
+- **The body cycles the character.** The row draws the name in its body, so the
+  tap that lands on a name is the tap that changes it. The seat-state cycle lost
+  nothing: it has had its own drawn, labelled, leading control since u5, which is
+  the discoverable one the developer asked for. A **closed** row still re-opens on
+  a body tap — one rule, stated once: *the body edits whatever the row is
+  showing*, and a closed row shows no character.
+- **The tier chip is read-only**, in the same rect the difficulty cycle used to
+  occupy, drawn on the `inert` surface rather than the raised `secondary` plate,
+  and not registered with the hit test at all. This screen already keeps *a
+  dead-looking button beats a lying one*; a value that is not a button has to look
+  like one even less.
+- **The `?` is a tap, on every device.** The dossier itself is not new — the lobby
+  has shown a codex hint on a bot row since c1, on a desktop hover and a touch
+  long-press, with nothing on the row saying so. A hover is not an affordance, and
+  a hover-only feature is a desktop-only feature, which the ratified input-parity
+  principle (GDD §2.4) does not allow. Dismissal is a tap anywhere else — the same
+  grammar the minimap overlay keeps — and the hover and long-press survive as
+  shortcuts.
+- **The hull already earns its place** and keeps it: the row's second line names
+  it (`EXCAVATOR`), dropped whole on a row too short for two lines, and the `?`
+  dossier badges it too. GDD §2.11's *"a silhouette on the minimap is
+  information"* is unaffected — the hull still follows the character.
+
+### What deliberately did NOT change
+
+`DIFFICULTY_TUNING`, the Easy/Medium/Hard trees, the characters' `weights`, the
+hull assignments (§2.11), fog honesty, Teams side assignment, and determinism from
+the seed. `DIFFICULTY_LABELS` is unchanged and still spells the three tiers; it is
+now the vocabulary of a read-out rather than of a control.
+
+### Known remaining gap — ONLINE carries the tier, not the name
+
+The ratified wire (`src/net/transport.ts` `LobbyChoiceMessage`) has a
+`botDifficulties` row and no character row, and `server/room.ts` casts from the
+tier with its own `castFor`. So an **online** room seats the right *tiers* and may
+seat different *names* within them; the **offline** game — the flavour both
+reports were filed against — carries the full cast and is exact. Closing that gap
+is a Netcode seam (a `botPersonalities` row beside `botDifficulties`, mirrored in
+`wire.ts` and `room.ts`) and is deliberately not taken here: `src/net/` and
+`server/` are not the Bot Engineer's to change unilaterally.
+
+---
+
 ## The under-attack alarm SOUNDS ONCE, and only for YOUR station
 
 **Date:** 2026-08-07 · branch `agent/sound/s9-alarm-once-and-ownership`

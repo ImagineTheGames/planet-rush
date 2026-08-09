@@ -38,6 +38,18 @@ import { mirrorLineup, recordMatch, replay, roundRobinLineup, runMatch, seedRang
 import type { MatchResult } from './match';
 import { profileSuite } from './perf';
 import { SIM_BUDGET_60_MS, SIM_BUDGET_30_MS } from './perf';
+import {
+  contestsPass,
+  maxIntervalHoldingAnchor,
+  maxIntervalInsideRail,
+  railVerdict,
+  readCandidate,
+  readContests,
+  schedule,
+  shippedSpread,
+} from './abundance';
+import type { Candidate, CandidateReading } from './abundance';
+import { WAVE_COUNT, WAVE_INTERVAL_S } from '../src/sim';
 import { STRATEGY_IDS } from './strategies';
 import type { StrategyId } from './strategies';
 import {
@@ -394,11 +406,136 @@ function soak(matchCount: number, rotations: number): number {
 }
 
 // ---------------------------------------------------------------------------
+// abundance — pricing a candidate SCARCE↔RICH spread (a0-17)
+// ---------------------------------------------------------------------------
+
+/**
+ * Price one or more candidate wave intervals per abundance level and print the
+ * numbers the scarcity report quotes, plus the rail verdicts.
+ *
+ *   vite-node harness/cli.ts abundance                       # the shipped table
+ *   vite-node harness/cli.ts abundance --scarce 180,240 --rich 90,75
+ *
+ * A candidate is `level@interval`; omitting `--<level>` prices whatever the
+ * shipped table resolves to for that level, so a bare run is "re-measure what is
+ * committed". Seeds are fixed and printed, so a run is reproducible from the
+ * output alone.
+ */
+function abundance(
+  scarce: readonly number[],
+  rich: readonly number[],
+  standard: readonly number[],
+  seedCount: number,
+  contestsOnly = false,
+): number {
+  const seeds = seedRange(seedCount);
+  log(`# abundance — candidate wave-interval spread (a0-17)`);
+  log('');
+  log(`seeds: ${seeds.join(',')}   probe mirrors: miner + turtle (8 seats, vanguard)   roster: the real trees`);
+  log('');
+  const shipped = shippedSpread();
+  log(
+    `shipped table: SCARCE ${shipped.scarce.toFixed(1)} s · STANDARD ${shipped.standard.toFixed(1)} s · ` +
+      `RICH ${shipped.rich.toFixed(1)} s — spread ${shipped.spread.toFixed(1)} s`,
+  );
+  log(
+    `rails: deadline holds its anchor up to ${maxIntervalHoldingAnchor().toFixed(1)} s/wave; ` +
+      `worst-case ending stays inside 15:00 up to ${maxIntervalInsideRail().toFixed(1)} s/wave`,
+  );
+  log('');
+
+  const candidates: Candidate[] = [
+    ...scarce.map((interval) => ({ level: 'scarce' as const, interval })),
+    ...(scarce.length ? [] : [{ level: 'scarce' as const }]),
+    ...standard.map((interval) => ({ level: 'standard' as const, interval })),
+    ...(standard.length ? [] : [{ level: 'standard' as const }]),
+    ...rich.map((interval) => ({ level: 'rich' as const, interval })),
+    ...(rich.length ? [] : [{ level: 'rich' as const }]),
+  ];
+
+  let allPass = true;
+  const readings: CandidateReading[] = [];
+  if (contestsOnly) return abundanceContests(candidates, seeds);
+  log('| level | s/wave | ×base | schedule | miner ore/min | miner med | turtle med | turtle max | roster med | roster max | waves | rails |');
+  log('|---|---|---|---|---|---|---|---|---|---|---|---|');
+  for (const c of candidates) {
+    const r = readCandidate(c, seeds, seeds);
+    readings.push(r);
+    const v = railVerdict(r);
+    const pass = v.terminates && v.insideLengthRail && v.allWavesLanded;
+    allPass = allPass && pass;
+    const flags = [
+      v.terminates ? '' : 'TIMEOUT',
+      v.insideLengthRail ? '' : 'LONG',
+      v.allWavesLanded ? '' : 'WAVE-LOST',
+      v.anchorHeld ? '' : 'anchor-moved',
+    ].filter(Boolean);
+    log(
+      `| ${r.level} | ${r.interval.toFixed(1)} | ${r.multiplier.toFixed(3)} | ${schedule(r.interval).join(' · ')} | ` +
+        `${r.miner.orePerMinute.toFixed(1)} | ${mmss(r.miner.medianSeconds)} | ${mmss(r.turtle.medianSeconds)} | ` +
+        `${mmss(r.turtle.maxSeconds)} | ${mmss(r.roster.median)} | ${mmss(r.roster.max)} | ` +
+        `${r.minWavesSpawned}/${WAVE_COUNT} | ${flags.length ? flags.join(' ') : 'PASS'} |`,
+    );
+  }
+
+  log('');
+  log('| level | s/wave | last wave | collapse deadline | worst-case end | mined (miner) | field left (turtle) |');
+  log('|---|---|---|---|---|---|---|');
+  for (const r of readings) {
+    log(
+      `| ${r.level} | ${r.interval.toFixed(1)} | ${mmss(r.lastWave)} | ${mmss(r.deadline)} | ${mmss(r.worstCase)} | ` +
+        `${r.miner.minedTotal.toFixed(0)} | ${r.turtle.fieldLeft.toFixed(0)} |`,
+    );
+  }
+
+  log('');
+  const contestsOk = abundanceContests(candidates, seeds) === 0;
+  allPass = allPass && contestsOk;
+
+  log('');
+  log(allPass ? '  ALL RAILS GREEN' : '  RAIL BROKEN — see the flags above');
+  return allPass ? 0 : 1;
+}
+
+/** The two 55% contests at each candidate, contestant by contestant — the shape
+ *  that shows whether a win-rate hole is *caused* by abundance or merely present
+ *  at every level (a0-17: the excavator is the latter). */
+function abundanceContests(candidates: readonly Candidate[], seeds: readonly number[]): number {
+  let pass = true;
+  for (const c of candidates) {
+    const con = readContests(c, seeds);
+    const ok = contestsPass(con);
+    pass = pass && ok;
+    log(
+      `  ${con.level} @ ${con.interval.toFixed(1)} s — ${ok ? 'PASS' : 'FAIL'} ` +
+        `(${con.ended}/${con.matches} decided; fair share: character ${(100 / HARD_POOL.length).toFixed(1)}%, hull ${(100 / CLASSES.length).toFixed(1)}%)`,
+    );
+    const row = (label: string, rs: readonly { name: string; rate: number }[]): void =>
+      log(`      ${label}: ${rs.map((r) => `${r.name} ${(r.rate * 100).toFixed(1)}%`).join(' · ')}`);
+    row('character', con.byCharacter);
+    row('hull     ', con.byClass);
+  }
+  return pass ? 0 : 1;
+}
+
+/** `1.2,1.6` or `180,240` → seconds. A value ≤ 4 is read as a `respawnInterval`
+ *  multiplier, anything larger as a literal interval in seconds — the two ways a
+ *  reader thinks about this table, and no interval below 4 s is meaningful. */
+function intervals(arg: string | undefined): number[] {
+  if (!arg) return [];
+  return arg
+    .split(',')
+    .map((s) => Number(s.trim()))
+    .filter((n) => Number.isFinite(n) && n > 0)
+    .map((n) => (n <= 4 ? n * WAVE_INTERVAL_S : n));
+}
+
+// ---------------------------------------------------------------------------
 // Entry
 // ---------------------------------------------------------------------------
 
 function usage(): number {
-  log('usage: vite-node harness/cli.ts <smoke|balance|perf|determinism|soak> [args]');
+  log('usage: vite-node harness/cli.ts <smoke|balance|perf|determinism|soak|abundance> [args]');
   return 2;
 }
 
@@ -422,6 +559,20 @@ function main(argv: readonly string[]): number {
       const rotFlag = rest.indexOf('--rotations');
       const rotations = rotFlag >= 0 ? Number(rest[rotFlag + 1] ?? 4) : 4;
       return soak(matches, rotations);
+    }
+    case 'abundance': {
+      const flagValue = (name: string): string | undefined => {
+        const i = rest.indexOf(name);
+        return i >= 0 ? rest[i + 1] : undefined;
+      };
+      const seedsFlag = flagValue('--seeds');
+      return abundance(
+        intervals(flagValue('--scarce')),
+        intervals(flagValue('--rich')),
+        intervals(flagValue('--standard')),
+        seedsFlag ? Number(seedsFlag) : 8,
+        rest.includes('--contests'),
+      );
     }
     default:
       return usage();
