@@ -35,6 +35,7 @@ import {
   haulHome,
   fightBlockade,
   homeErrand,
+  joinAssault,
   lastStandDefend,
   mine,
   nearestThreat,
@@ -50,6 +51,7 @@ import {
   wantsHomeErrand,
   wantsRetreat,
   wantsAllyDefence,
+  wantsJoinAssault,
   wantsToHaul,
 } from './behaviors';
 import { WEAPON_RANGE, NEUTRAL } from './steering';
@@ -192,6 +194,23 @@ export const easyTree: Node = selector('easy', [
     (ctx) => wantsHomeErrand(ctx, EASY_REPAIR_AT, easyDefence(ctx)),
     (ctx) => homeErrand(ctx),
   ),
+
+  // **Join a teammate's attack** (`docs/team-bots-plan.md` Stage 4; the
+  // developer, 2026-08-07: *"…and equally should try to attack when team mates
+  // go on offensive"*). Below `defend`, `defend-ally`, `haul` and `fix-base`, so
+  // an over-defender still patches its own ring before it goes raiding — and
+  // **above `potshot`**, because a called objective is a better use of a shot
+  // than whatever happens to be in front of it.
+  //
+  // An Easy bot joins *badly*, and that is the design rather than a concession:
+  // it misses a third of the calls, hears the rest 1.2 s late, and its teammate's
+  // calls fall off the channel between sends (`./ally` `ASSAULT_JOIN_QUIET`).
+  // Cooperation is a difficulty dial expressed through the existing latency and
+  // miss model — there is no separate "be bad at teamwork" knob (plan §4.5).
+  //
+  // Easy never *opens* a raid, note: this tree has no station attack to announce
+  // one from. It only ever answers a better bot's.
+  when('join-assault', (ctx) => wantsJoinAssault(ctx), (ctx) => joinAssault(ctx)),
 
   // "attacks rarely": only a character with a real attack weight, and only at
   // something already in front of it.

@@ -37,6 +37,7 @@ import {
   homeErrand,
   hunt,
   fightBlockade,
+  joinAssault,
   lastStandDefend,
   mine,
   nearestThreat,
@@ -52,6 +53,7 @@ import {
   wantsHomeErrand,
   wantsRetreat,
   wantsAllyDefence,
+  wantsJoinAssault,
   wantsToHaul,
 } from './behaviors';
 import { NEUTRAL } from './steering';
@@ -238,6 +240,16 @@ export const mediumTree: Node = selector('medium', [
       !ctx.self.cargoFull,
     (ctx) => roam(ctx),
   ),
+
+  // **Join a teammate's attack** (`docs/team-bots-plan.md` Stage 4; the
+  // developer, 2026-08-07: *"…and equally should try to attack when team mates
+  // go on offensive"*). Below `defend` and `defend-ally` so **my home outranks
+  // your raid**, below `haul` so a full hold is banked first (GDD §2.7), and
+  // above `attack` because joining decides *which* fight, not whether to fight.
+  // Squarely in character for the tier that already "gangs up on the current
+  // leader" — this is that instinct with a teammate's call behind it instead of
+  // a scoreboard guess. Cannot fire in FFA (plan §2.5).
+  when('join-assault', (ctx) => wantsJoinAssault(ctx), (ctx) => joinAssault(ctx)),
 
   // "gangs up on the current leader".
   when(

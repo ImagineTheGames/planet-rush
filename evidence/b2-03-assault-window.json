@@ -1,0 +1,220 @@
+{
+  "what": "b2-03 — how long a raid on an enemy home lasts, and what a join budget costs",
+  "measuredAt": "HEAD before the join branch exists — this is the game as it ships today",
+  "fixture": {
+    "mapId": "octagon",
+    "abundance": "scarce",
+    "note": "abundance and mapId are named, never defaulted: createWorld falls back to `standard`/`octagon` while the lobby ships DEFAULT_ABUNDANCE",
+    "seeds": [
+      11,
+      23,
+      37,
+      41,
+      59,
+      67,
+      73,
+      89,
+      97,
+      101,
+      113,
+      127
+    ],
+    "lineups": [
+      "2v2 (4 slots)",
+      "4v4 (8 slots)"
+    ],
+    "maxSeconds": 800,
+    "alarmWindow": 2
+  },
+  "part1_howLongARaidLasts": {
+    "byMergeGap": {
+      "mergeGap_2s": {
+        "allRaids": {
+          "n": 610,
+          "mean": 3.9,
+          "p50": 2.6,
+          "p75": 4.5,
+          "p90": 7.7,
+          "p95": 10.3,
+          "max": 25.8
+        },
+        "raidsThatKilledTheCore": {
+          "n": 29,
+          "mean": 10.3,
+          "p50": 10,
+          "p75": 13.7,
+          "p90": 19.7,
+          "p95": 22.9,
+          "max": 25.8
+        },
+        "raidsThatPeteredOut": {
+          "n": 581,
+          "mean": 3.6,
+          "p50": 2.6,
+          "p75": 4.2,
+          "p90": 6.6,
+          "p95": 8.6,
+          "max": 18.6
+        },
+        "killRate": "4.8%"
+      },
+      "mergeGap_3s": {
+        "allRaids": {
+          "n": 598,
+          "mean": 4,
+          "p50": 2.7,
+          "p75": 4.6,
+          "p90": 7.9,
+          "p95": 10.9,
+          "max": 25.8
+        },
+        "raidsThatKilledTheCore": {
+          "n": 29,
+          "mean": 10.7,
+          "p50": 10,
+          "p75": 13.9,
+          "p90": 22.9,
+          "p95": 23.1,
+          "max": 25.8
+        },
+        "raidsThatPeteredOut": {
+          "n": 569,
+          "mean": 3.7,
+          "p50": 2.6,
+          "p75": 4.2,
+          "p90": 6.8,
+          "p95": 8.9,
+          "max": 25.6
+        },
+        "killRate": "4.8%"
+      },
+      "mergeGap_5s": {
+        "allRaids": {
+          "n": 578,
+          "mean": 4.3,
+          "p50": 2.7,
+          "p75": 4.8,
+          "p90": 8.8,
+          "p95": 12.6,
+          "max": 38.6
+        },
+        "raidsThatKilledTheCore": {
+          "n": 29,
+          "mean": 12,
+          "p50": 10.3,
+          "p75": 15.2,
+          "p90": 22.9,
+          "p95": 23.1,
+          "max": 38.6
+        },
+        "raidsThatPeteredOut": {
+          "n": 549,
+          "mean": 3.9,
+          "p50": 2.6,
+          "p75": 4.3,
+          "p90": 7.6,
+          "p95": 10.6,
+          "max": 25.6
+        },
+        "killRate": "5.0%"
+      }
+    },
+    "byLineup_atNominalGap": {
+      "2v2": {
+        "allRaids": {
+          "n": 86,
+          "mean": 3,
+          "p50": 2.6,
+          "p75": 3.3,
+          "p90": 4.8,
+          "p95": 5.6,
+          "max": 8.8
+        },
+        "raidsThatKilledTheCore": {
+          "n": 0,
+          "mean": 0,
+          "p50": 0,
+          "p75": 0,
+          "p90": 0,
+          "p95": 0,
+          "max": 0
+        }
+      },
+      "4v4": {
+        "allRaids": {
+          "n": 524,
+          "mean": 4.1,
+          "p50": 2.7,
+          "p75": 4.7,
+          "p90": 8,
+          "p95": 10.9,
+          "max": 25.8
+        },
+        "raidsThatKilledTheCore": {
+          "n": 29,
+          "mean": 10.3,
+          "p50": 10,
+          "p75": 13.7,
+          "p90": 19.7,
+          "p95": 22.9,
+          "max": 25.8
+        }
+      }
+    }
+  },
+  "part3_howFarAJoinerFlies": {
+    "method": "every raid-second (an enemy home taking fire with a raider from that side already on its doorstep) weighted by the nearest teammate NOT already there — the §1.5 shape, asked about enemy homes instead of ally ones",
+    "raidSecondsSampled": 1481,
+    "cruiseSpeed": "119 units/s measured over travelling ships (BASE_SPEED is 260 top, class- and drag-scaled)",
+    "distance": {
+      "n": 1481,
+      "mean": 823.7,
+      "p50": 801.6,
+      "p75": 1019.8,
+      "p90": 1245.4,
+      "p95": 1375.1,
+      "max": 1936.8
+    },
+    "coverageByReach": {
+      "600u": "26% of raid-seconds, ~5.1 s to fly",
+      "900u": "62% of raid-seconds, ~7.6 s to fly",
+      "1200u": "88% of raid-seconds, ~10.1 s to fly",
+      "1500u": "98% of raid-seconds, ~12.7 s to fly",
+      "1800u": "100% of raid-seconds, ~15.2 s to fly",
+      "2400u": "100% of raid-seconds, ~20.3 s to fly"
+    }
+  },
+  "part2_budgetByTraceReplay": {
+    "method": "per-tick readings recorded once from real matches, then the pure latch replayed at each (max, cooldown) pair — no constant edited between runs",
+    "quietSeconds": 4,
+    "readings": 574564,
+    "caveat": "an upper bound: the trace offers a candidate whenever ANY enemy home is taking fire, with no push call and no range gate, so the shipped branch commits strictly less often",
+    "grid": {
+      "max_20_cooldown_15": "1.0% of ticks committed (analytic ceiling 57%)",
+      "max_20_cooldown_20": "0.8% of ticks committed (analytic ceiling 50%)",
+      "max_20_cooldown_25": "0.7% of ticks committed (analytic ceiling 44%)",
+      "max_20_cooldown_30": "0.7% of ticks committed (analytic ceiling 40%)",
+      "max_20_cooldown_45": "0.5% of ticks committed (analytic ceiling 31%)",
+      "max_25_cooldown_15": "1.0% of ticks committed (analytic ceiling 63%)",
+      "max_25_cooldown_20": "0.8% of ticks committed (analytic ceiling 56%)",
+      "max_25_cooldown_25": "0.7% of ticks committed (analytic ceiling 50%)",
+      "max_25_cooldown_30": "0.7% of ticks committed (analytic ceiling 45%)",
+      "max_25_cooldown_45": "0.5% of ticks committed (analytic ceiling 36%)",
+      "max_30_cooldown_15": "1.0% of ticks committed (analytic ceiling 67%)",
+      "max_30_cooldown_20": "0.8% of ticks committed (analytic ceiling 60%)",
+      "max_30_cooldown_25": "0.7% of ticks committed (analytic ceiling 55%)",
+      "max_30_cooldown_30": "0.7% of ticks committed (analytic ceiling 50%)",
+      "max_30_cooldown_45": "0.5% of ticks committed (analytic ceiling 40%)",
+      "max_35_cooldown_15": "1.0% of ticks committed (analytic ceiling 70%)",
+      "max_35_cooldown_20": "0.8% of ticks committed (analytic ceiling 64%)",
+      "max_35_cooldown_25": "0.7% of ticks committed (analytic ceiling 58%)",
+      "max_35_cooldown_30": "0.7% of ticks committed (analytic ceiling 54%)",
+      "max_35_cooldown_45": "0.5% of ticks committed (analytic ceiling 44%)",
+      "max_45_cooldown_15": "1.0% of ticks committed (analytic ceiling 75%)",
+      "max_45_cooldown_20": "0.8% of ticks committed (analytic ceiling 69%)",
+      "max_45_cooldown_25": "0.7% of ticks committed (analytic ceiling 64%)",
+      "max_45_cooldown_30": "0.7% of ticks committed (analytic ceiling 60%)",
+      "max_45_cooldown_45": "0.5% of ticks committed (analytic ceiling 50%)"
+    }
+  }
+}

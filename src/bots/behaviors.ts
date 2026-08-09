@@ -33,6 +33,10 @@ import {
   ALLY_RESPONSE_MAX,
   ALLY_RESPONSE_QUIET,
   ALLY_RESPONSE_RANGE,
+  ASSAULT_JOIN_COOLDOWN,
+  ASSAULT_JOIN_MAX,
+  ASSAULT_JOIN_QUIET,
+  ASSAULT_JOIN_RANGE,
   allyResponseCommit,
   allyResponseTarget,
   releaseAllyResponse,
@@ -60,7 +64,14 @@ import {
 } from './steering';
 import { commit, committed, release } from './commitment';
 import { corneredCommit, corneredCommitted, corneredHeld, resetCornered } from './cornered';
-import { homeIntruder, intruderNear, isTargetable, isWounded, retreatThreshold } from './targeting';
+import {
+  homeIntruder,
+  intruderNear,
+  isTargetable,
+  isWounded,
+  retreatThreshold,
+  scoreStation,
+} from './targeting';
 import type { TargetScore } from './targeting';
 import { STUCK_DECISIONS } from './tree';
 import type { BotCtx } from './tree';
@@ -736,6 +747,27 @@ export function callHelp(ctx: BotCtx): boolean {
 }
 
 /**
+ * *"I am going in on that home, there."* The sender's own committed intent, which
+ * is a fact about itself and therefore always legal (`./radio` §2.2), over a
+ * position it read off a `PerceivedStation` — public at any range.
+ *
+ * **Homes only.** "Going on the offensive" is a raid on a core, which is also the
+ * only offence worth converging on: GDD §2.6's "two beats one" is a statement
+ * about sieges. Broadcasting every potshot at a passing ship would be the plan's
+ * Stage 4 focus fire, which is a different mechanism (a score bonus, not a
+ * commitment) and is deliberately not in this brief. A ship target is silent.
+ *
+ * Called from the *body* of an attack rather than from its test, so a bot only
+ * announces a raid it is actually prosecuting this tick — and cooldown-gated by
+ * {@link callOut}, so pressing a siege for thirty seconds is a handful of calls
+ * and not six hundred.
+ */
+export function callPush(ctx: BotCtx, target: TargetScore): boolean {
+  if (target.kind !== 'station') return false;
+  return callOut(ctx, 'push', target.id, target.pos);
+}
+
+/**
  * How far *this character* will break off to answer a teammate, leaned by
  * `homebody` around the plan's measured {@link ALLY_RESPONSE_RANGE}.
  *
@@ -961,6 +993,236 @@ export function defendAlly(ctx: BotCtx): readonly Action[] | null {
 }
 
 // ---------------------------------------------------------------------------
+// Joining an ally's ATTACK (GDD §2.6, §2.9; `docs/team-bots-plan.md` Stage 4 —
+// the developer, 2026-08-07: "…and equally should try to attack when team mates
+// go on offensive")
+// ---------------------------------------------------------------------------
+
+/**
+ * How far *this character* will fly to join a teammate's raid, leaned by
+ * `opportunism` around the measured {@link ASSAULT_JOIN_RANGE}.
+ *
+ * **The plan already named this dial for this job** (§4.5): *"`opportunism` —
+ * Sable (0.9) and Vulture (0.8) honour focus-fire calls (a called target is a
+ * punishable target); Rusty (0.1) does not."* So this is a reuse, not a new knob
+ * — and pointedly **not** `homebody`, which is the *defensive* range multiplier
+ * one section up. A territorial character should answer an alarm from further
+ * and fly out for a raid from nearer; sharing one dial between the two would make
+ * those the same sentence.
+ *
+ * The multiplier is `0.55 + opportunism`, so the cast mean lands at 0.99 — within
+ * 1% of the measured recommendation, meaning the character spread costs the team
+ * nothing on average. The spread reads as the plan describes it: Sable 1740 and
+ * Vulture 1620 cross the map for a called target, Warden 1260 goes if it is on
+ * the way, and Rusty 780 and Patch 900 stay home. TUNABLE
+ */
+export function assaultJoinRange(ctx: BotCtx): number {
+  return ASSAULT_JOIN_RANGE * (0.55 + ctx.weights.opportunism);
+}
+
+/** A teammate's raid, and where it is. */
+export interface AllyAssault {
+  /** The **objective**: the slot whose home is being hit. This is what the latch
+   *  commits to, because "that home is gone" is what ends a raid. */
+  readonly on: PlayerId;
+  /** The teammate who said so — for a debug overlay, and for tests. */
+  readonly by: PlayerId;
+  /** Where the fight is: the enemy home's position, as the caller reported it. */
+  readonly pos: Vec2;
+  /** How far this bot is from that point, now. */
+  readonly distance: number;
+}
+
+/**
+ * Is that home still standing, as far as this bot can legitimately tell?
+ *
+ * `PerceivedStation.alive` is public at any range — a wreck is visible from
+ * further away than its numbers are, "smoke carries" (GDD §2.2) — so this is the
+ * one thing about an enemy core a bot may read without scouting. Its HP is not,
+ * and is not read anywhere here.
+ *
+ * A station that is not in the view at all reads as **not standing**, which ends
+ * a commitment rather than holding one open. That is the safe direction: the
+ * alternative is a bot posted forever at an objective it cannot confirm.
+ */
+function enemyHomeStanding(ctx: BotCtx, owner: PlayerId): boolean {
+  for (const station of ctx.view.stations) {
+    if (station.owner === owner) return station.alive;
+  }
+  return false;
+}
+
+/**
+ * Is somebody on my side going in on slot `id`'s home? **At any range** —
+ * deliberately, and for the identical reason {@link allyDistress} is: a bot most
+ * of the way to a fight has flown out of the range it started in, and re-testing
+ * distance mid-flight would release the commitment exactly when it is closest to
+ * paying off. Range gates *starting* a run ({@link nearestAllyAssault}), never
+ * continuing one.
+ *
+ * **One legitimate source, and no second one.** Unlike the defensive branch there
+ * is no Layer A here: the klaxon rings for a home *on your own side*, and nothing
+ * on anybody's HUD announces that a teammate has opened a raid. So the only
+ * signal is a `push` call this bot actually heard, still fresh on its
+ * hearsay-discounted clock. A bot may act on a callout; it may never act on what
+ * it could not perceive, and with no call it perceives nothing.
+ *
+ * The **freshest** call about the target, not the first: `receive` returns them in
+ * ascending delivery order, so the last match is the newest thing said, and a
+ * newer report of the same objective should not sit unread behind an older one.
+ */
+export function allyAssaultOn(ctx: BotCtx, id: PlayerId): AllyAssault | null {
+  // Never against my own side, whatever a malformed record claims — the same
+  // refusal `allyDistress` makes in the other direction.
+  if (id === ctx.self.id || isAlly(ctx, id)) return null;
+  if (!enemyHomeStanding(ctx, id)) return null;
+  let latest: Callout | null = null;
+  for (const call of allyCalls(ctx)) {
+    if (call.kind !== 'push' || call.about !== id) continue;
+    latest = call;
+  }
+  if (!latest) return null;
+  return { on: id, by: latest.from, pos: latest.pos, distance: dist(ctx.self.pos, latest.pos) };
+}
+
+/**
+ * The raid this bot would break off for — nearest first, inside
+ * {@link assaultJoinRange}.
+ *
+ * The scan is over `ctx.view.stations`, which is built in `world.stations` order
+ * (`./perception`), and ties keep the earlier entry, so two equidistant raids
+ * resolve the same way on every engine (GDD §4.8).
+ */
+export function nearestAllyAssault(ctx: BotCtx): AllyAssault | null {
+  const reach = assaultJoinRange(ctx);
+  let best: AllyAssault | null = null;
+  for (const station of ctx.view.stations) {
+    const raid = allyAssaultOn(ctx, station.owner);
+    if (!raid || raid.distance > reach) continue;
+    if (best === null || raid.distance < best.distance) best = raid;
+  }
+  return best;
+}
+
+/**
+ * **Does this bot want to join a teammate's attack right now?**
+ *
+ * The offensive twin of {@link wantsAllyDefence}, and the differences are the
+ * whole design. What is the *same*: the latch, the selfish-first gates, and the
+ * fold-exactly-once-per-decision contract. What is different, in the order it
+ * matters:
+ *
+ *  1. **There is no happy ending on arrival.** `defend-ally` completes on
+ *     "arrived, and nothing to fight"; a raid that arrives to plenty to fight has
+ *     *succeeded*. So the `arrived` slot carries **"the objective is gone"** —
+ *     the target's home is dead — and everything else leans on the ceiling and
+ *     the cooldown, which is why those are measured rather than inherited
+ *     (`./ally`, `evidence/b2-03-assault-window.ts`).
+ *  2. **Collapse does not switch it off**, where it does switch `defend-ally`
+ *     off. That asymmetry is one argument, not two: in collapse nothing can be
+ *     repaired and the endgame is a damage race (GDD §2.3), so a player who
+ *     spends it *guarding* cannot win — but a player who spends it *on a rival's
+ *     core* is doing the only thing that still scores. Defence stops mattering
+ *     there; offence starts mattering more.
+ *  3. **No `wantsToHaul` gate.** The branch sits below `haul` in all three trees,
+ *     so a bot with a hold worth banking never reaches this test at all. The
+ *     defensive branch needs the explicit gate because it sits *above* `haul`;
+ *     here the ladder does it, and a condition that can never fire would be a
+ *     worse guarantee than the tree order, not a better one.
+ *
+ * **The ladder is unchanged, and this is where that is enforced.** The branch is
+ * below `last-stand`, `cornered-fight`, `retreat`, this bot's own `defend`, and
+ * `defend-ally`: **my home outranks yours, and my home outranks your raid.**
+ * `ownHomeThreatened` is the same expression the trees' own `defend` test uses,
+ * so the two can never disagree — and it is a *transient* hold rather than a
+ * release, because the raid may still be running when the emergency here passes
+ * and {@link ASSAULT_JOIN_MAX} already bounds how long that hold can last.
+ */
+export function wantsJoinAssault(ctx: BotCtx): boolean {
+  const brain = ctx.brain;
+  const latch = brain.allyAssault;
+  const now = ctx.view.time;
+
+  // FFA, structurally: a side of one has no teammates to raid with and no radio
+  // to hear one on, so this cannot fire and draws nothing (plan §2.5).
+  if (ctx.view.allies.length === 0) return false;
+  if (!ctx.self.alive) {
+    releaseAllyResponse(latch);
+    return false;
+  }
+  if (ownHomeThreatened(ctx) || committed(brain.fleeing) || corneredCommitted(brain.cornered, now)) {
+    return false;
+  }
+
+  const answering = allyResponseTarget(latch);
+  const held = answering >= 0 ? allyAssaultOn(ctx, answering) : null;
+  const candidate = answering >= 0 ? null : nearestAllyAssault(ctx);
+  // The objective died: the raid worked. This is the only completion this latch
+  // has, and it outranks a live call for the same reason arrival does over there
+  // — completion breaks a commitment rather than renewing it.
+  const objectiveGone = answering >= 0 && !enemyHomeStanding(ctx, answering);
+
+  const target = allyResponseCommit(
+    latch,
+    now,
+    candidate ? candidate.on : -1,
+    held !== null,
+    objectiveGone,
+    ASSAULT_JOIN_QUIET,
+    ASSAULT_JOIN_MAX,
+    ASSAULT_JOIN_COOLDOWN,
+  );
+  if (target < 0) return false;
+  // Remember where the fight is while it is still being talked about. A home does
+  // not move, but the channel goes quiet between a teammate's calls — at Easy for
+  // half of a continuous raid (`./ally` `ASSAULT_JOIN_QUIET`) — and a joiner that
+  // re-derived its destination every decision would lose it mid-flight.
+  const seen = held ?? candidate;
+  if (seen) {
+    latch.at.x = seen.pos.x;
+    latch.at.y = seen.pos.y;
+  }
+  return true;
+}
+
+/**
+ * Go, and press the same siege the teammate is pressing.
+ *
+ * Two cases, in this order, and the order is the tactic:
+ *
+ *  1. **Something is defending the objective** — meet it. A raid that ignores the
+ *     defender to plink the core takes turret fire and ship fire while doing the
+ *     slowest damage on the board. This is {@link intruderNear} at the *enemy's*
+ *     doorstep, which is the identical predicate at the identical radius the
+ *     defensive branch uses at a friendly one (`./targeting`, plan Trap 9).
+ *  2. **Otherwise the home itself** — through the ordinary attack verbs, so a
+ *     joiner strips the turrets first exactly like a bot that picked the target
+ *     for itself (GDD §2.6's patient siege). A raider is a raider; the only thing
+ *     that changed is who chose the doorstep.
+ *
+ * Reusing {@link attack} also means the joiner **re-broadcasts the push** on its
+ * own cooldown, so a raid two bots have joined keeps talking even if the bot that
+ * opened it dies. That falls out of the reuse rather than being wired, which is
+ * the point of doing it this way round.
+ */
+export function joinAssault(ctx: BotCtx): readonly Action[] | null {
+  const latch = ctx.brain.allyAssault;
+  const objective = allyResponseTarget(latch);
+  if (objective < 0) return null;
+
+  const defender = intruderNear(ctx, latch.at);
+  if (defender) return engage(ctx, defender.pos, 16, WEAPON_RANGE * 0.6, defender.vel, defender.id);
+
+  for (const station of ctx.view.stations) {
+    if (station.owner !== objective || !station.alive) continue;
+    const target = scoreStation(ctx, station);
+    const suppress = suppressTurrets(ctx, target);
+    return suppress ?? attack(ctx, target);
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Attack (GDD §2.6, §2.9)
 // ---------------------------------------------------------------------------
 
@@ -1007,6 +1269,11 @@ export function attack(ctx: BotCtx, target: TargetScore): readonly Action[] {
   if (target.kind === 'ship') {
     return engage(ctx, target.pos, target.radius, WEAPON_RANGE * 0.6, target.vel, target.id);
   }
+  // Going in on a home: say so, so a teammate in range can come too (the
+  // developer, 2026-08-07 — *"equally should try to attack when team mates go on
+  // offensive"*). Cooldown-gated, silent on ship targets, and a no-op with no RNG
+  // draw in FFA, where there is nobody to tell (`callPush`).
+  callPush(ctx, target);
   return engage(ctx, target.pos, target.radius, SIEGE_STANDOFF);
 }
 
@@ -1019,6 +1286,11 @@ export function attack(ctx: BotCtx, target: TargetScore): readonly Action[] {
 export function suppressTurrets(ctx: BotCtx, target: TargetScore): readonly Action[] | null {
   const memo = ctx.memory.station(target.id);
   if (!memo || memo.turrets === null || memo.turrets <= 0) return null;
+  // Stripping the guns off a home is the opening move of a raid, not a separate
+  // activity, so it announces on the same terms `attack` does. Below the guard
+  // above, so a bot that turned out to have no turrets to shoot at says nothing
+  // here and says it from `attack` instead — one call either way, never two.
+  callPush(ctx, target);
   // Turrets ring the station; the nearest arc of that ring is the first barrel.
   const out = toward(memo.pos, ctx.self.pos);
   const mount = STATION.radius + TURRET.mountOffset;

@@ -40,6 +40,15 @@
  * this file supplies the memory of having decided. The state lives on the
  * {@link import('./tree').Brain}, beside the sim rather than inside it, so it can
  * never desync a determinism replay (GDD §4.8).
+ *
+ * **That domain-freedom is now load-bearing rather than tidy.** b2-03 ships the
+ * offensive half of the same developer ask — *"equally should try to attack when
+ * team mates go on offensive"* — and it is a **second instance of this latch**
+ * with its own four durations (`ASSAULT_JOIN_*` below), not a second mechanism.
+ * Two `AllyResponse`s live on the `Brain`, folded by the same `allyResponseCommit`
+ * from two different branches. Anything added here must stay true of both, which
+ * in practice means: no view, no ranges, and no assumption about what `arrived`
+ * means — the two callers pass it very different questions.
  */
 
 import type { PlayerId, Vec2 } from '@shared/types';
@@ -103,6 +112,116 @@ export const ALLY_RESPONSE_MAX = 45;
 export const ALLY_RESPONSE_COOLDOWN = 30;
 
 // ---------------------------------------------------------------------------
+// Joining an ally's ATTACK (MEASURED — `evidence/b2-03-assault-window.ts`)
+// ---------------------------------------------------------------------------
+//
+// The developer, 2026-08-07: *"…and equally should try to attack when team mates
+// go on offensive."* The offensive half of the same ask, and a **second instance
+// of the latch above** rather than a second mechanism — which is the whole reason
+// this file carries no domain knowledge.
+//
+// **What does not transfer, and why these are four fresh numbers.** The defensive
+// response ends on *"arrived, and there is nothing to fight"*. An assault that
+// arrives to plenty to fight has **succeeded**, so that clause is gone: the join
+// latch's only completion is *the objective died*, and everything else leans on
+// the ceiling and the cooldown. Inheriting 45/30 would be inheriting numbers
+// measured against a different question — and the measurement says they are the
+// wrong numbers by a wide margin. `evidence/b2-03-assault-window.ts`, 12 seeds ×
+// {2v2, 4v4} at the shipped `scarce` abundance on `octagon`, cutting every
+// station's own `underAttack` tell into raids:
+//
+//   | raid                    |  n  | p50  | p75  | p90  | max  |
+//   |-------------------------|-----|------|------|------|------|
+//   | all                     | 610 | 2.6s | 4.5s | 7.7s |25.8s |
+//   | ended in a dead core    |  29 |10.0s |13.7s |19.7s |25.8s |
+//   | petered out             | 581 | 2.6s | 4.2s | 6.6s |18.6s |
+//
+// **A raid is a short event.** 45 seconds is nearly double the longest raid ever
+// observed; a ceiling there would never once bind, which makes it not a ceiling.
+
+/**
+ * How far a bot will fly to join a teammate's raid, before the character's
+ * `opportunism` leans it (`./behaviors` `assaultJoinRange`).
+ *
+ * **Measured on the raid distribution, not borrowed from the siege one.** Plan
+ * §1.5 weighted every *ally-siege* second by how far the teammate was, and 1200
+ * fell out of it; that is a different distribution from "how far is the enemy
+ * home my teammate is hitting". Re-run against enemy homes — every raid-second
+ * weighted by the nearest teammate not already in the fight — 1200 covers **88%**
+ * and 1500 covers **98%**, at ~10.1 s and ~12.7 s of flight at the cast's
+ * measured 119 units/s cruise.
+ *
+ * That it lands on the same number as {@link ALLY_RESPONSE_RANGE} is a result,
+ * not a reuse: the two were measured separately and agree. TUNABLE
+ */
+export const ASSAULT_JOIN_RANGE = 1200;
+
+/**
+ * The reach on the shelf: 98% of raid-seconds for a ~25% longer trip. Recorded as
+ * a named constant so a re-tune is one edit and the A/B has something to point
+ * at, exactly like {@link ALLY_RESPONSE_RANGE_WIDE}. Unused by shipped
+ * behaviour. TUNABLE
+ */
+export const ASSAULT_JOIN_RANGE_WIDE = 1500;
+
+/**
+ * Seconds a raid must read **quiet** before the join ends.
+ *
+ * **This one is derived from the channel, not from the klaxon**, and that is the
+ * second thing that does not transfer. {@link ALLY_RESPONSE_QUIET} only has to
+ * clear `Perception.alarmWindow` (2 s) because the ally alarm is a live boolean.
+ * A raid has no klaxon at all: the only signal is a `push` call, so "quiet" means
+ * *my teammate has not said anything about it lately*, and the gap between one
+ * teammate's calls is `DifficultyTuning.callCooldown` — **6 s at Easy**.
+ *
+ * Worse, at Easy a call's readable life is `memorySeconds / HEARSAY_STALENESS` =
+ * 3 s while the gap between calls is 6 s, so during a perfectly *continuous* Easy
+ * raid the channel is silent half the time. A quiet window under 6 s would
+ * release the commitment between two calls of an assault that never stopped.
+ * Eight clears the widest cooldown with margin and still sits far under the
+ * ceiling. TUNABLE
+ */
+export const ASSAULT_JOIN_QUIET = 8;
+
+/**
+ * Hard ceiling on one join, in seconds — **the number the brief said to measure,
+ * and the measurement moved it from 45 to 25.**
+ *
+ * A join has to buy the trip *and* the fight. The trip is ~10.1 s at the p88
+ * reach (1245 units at 119 units/s), and 14.6 s at the widest character's
+ * (Sable, 1740). The fight, from the table above, is p50 10.0 s and p75 13.7 s
+ * for the raids that actually killed a core — and those are *solo* raids, so a
+ * joined one should close faster ("two beats one", GDD §2.6).
+ *
+ * 25 = the typical trip plus a p75 winning raid (10.1 + 13.7 ≈ 24), and it still
+ * covers the widest trip plus a p50 winning raid (14.6 + 10.0 ≈ 25). Below that
+ * a joiner arrives and is recalled before it can matter; far above it the ceiling
+ * stops being reachable at all. TUNABLE
+ */
+export const ASSAULT_JOIN_MAX = 25;
+
+/**
+ * Seconds before a bot will join again, measured from the end of its last join.
+ *
+ * **The budget question is different here too.** For the defensive latch it is
+ * "one besieged ally must not consume a teammate's whole match", against an
+ * attacker who never leaves. There is no offensive equivalent — the measurement
+ * found no long raids to be consumed by (p90 7.7 s), and a trace replay of the
+ * pure latch across a (max × cooldown) grid put the committed share at ~1% of
+ * ticks at *every* pair, so the ceiling/cooldown pair is not what bounds the
+ * cost. What actually needs bounding is **ping-pong**: raids are so short and so
+ * frequent that a bot could chase a fresh call every few seconds and never mine.
+ *
+ * So the cooldown is sized against the *trip*, not the siege: 25 s is one full
+ * round trip at the measured reach (~10 s each way) plus a working margin, so a
+ * bot that answered a call gets its own errand back before it can be pulled out
+ * again. The analytic worst case, 25/(25+25) = **50%**, is deliberately tighter
+ * than the defensive latch's 60%: your side's core is the win condition and
+ * someone else's is not. TUNABLE
+ */
+export const ASSAULT_JOIN_COOLDOWN = 25;
+
+// ---------------------------------------------------------------------------
 // The latch
 // ---------------------------------------------------------------------------
 
@@ -117,9 +236,15 @@ export const ALLY_RESPONSE_COOLDOWN = 30;
  * {@link startedAt} is the ceiling, and {@link readyAt} is the budget.
  */
 export interface AllyResponse {
-  /** The ally being answered, or `-1` when not answering. */
+  /**
+   * **The subject of the commitment**, or `-1` when there is none. Which slot
+   * that is depends on the instance, and the two are deliberately different:
+   * for the defensive latch it is the *ally being answered*, and for the assault
+   * latch it is the *objective* — the enemy whose home the side is going in on,
+   * because "that home is gone" is what ends a raid, not "that teammate is fine".
+   */
   target: PlayerId;
-  /** Sim time the target's distress last read live; `-1` when uncommitted. */
+  /** Sim time the commitment's subject last read live; `-1` when uncommitted. */
   lastLive: number;
   /** Sim time this response began; `-1` when uncommitted. */
   startedAt: number;
