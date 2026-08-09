@@ -72,11 +72,25 @@ both keys (the brief's evidence line).
 
 ## NEXT
 
-- Nothing outstanding. **PR #342 open, all four DoD gates PASS**, CI fully green
-  (Typecheck/test/build + all 6 mobile Playwright shards). Suite re-taken on the
-  merge actually proposed (main moved to #341 mid-session): 254 files / 4402
-  tests / 0 failures. Awaiting review + merge.
+- Nothing outstanding. **PR #342 open, all four DoD gates PASS.** Awaiting
+  review + merge.
+- **Session 2026-08-09b: main moved twice under this branch, both merged.**
+  The rest of the P1 chain landed while #342 sat open:
+  - `#344` **p1-03 level curve** — added `src/progression/curve.test.ts` (15
+    tests) and evidence. It did **not** touch `curve.ts`, so the `xpToReach`
+    that this module's read-side reconciliation calls is semantically
+    unchanged; the fixture corrections under DECISIONS still hold. Both
+    progression suites green together (15 + 25 = 40).
+  - `#343` **p1-02 attribution hook** — entirely `src/sim/` (`combat-credit.ts`,
+    the write-only credit ledger + `by: PlayerId` on the damage path). No
+    overlap with `src/progression/`. This is the upstream half of the same
+    chain, not a competing profile write.
+  Neither merge conflicted. Gates re-taken on the merge actually proposed each
+  time — the branch is only ever fast-forwarded onto main, never rebased.
 - For whoever takes **pr-06**: backup rotation (see the clobber above) wants the
   `remove(key)` that brief adds.
 - For whoever takes **pr-04** (accrual, the single write site): `saveProfile`
-  now returns `false` instead of writing garbage — check it.
+  now returns `false` instead of writing garbage — check it. Note the chain is
+  now joined at both ends — p1-02 emits `world.credit`, pr-04 consumes it and
+  writes through this module's guard. `DAMAGE_HP_PER_UNIT` is pr-04's constant;
+  p1-02's ledger stores raw HP.
