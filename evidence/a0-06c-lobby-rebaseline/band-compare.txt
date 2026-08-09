@@ -1,0 +1,148 @@
+band-compare.txt — a0-06c, generated 2026-08-09T07:29:16Z
+HEAD 22bf4e7   (= origin/main, which contains PR #319)
+
+############################################################################
+# PART 1 — IS THE LANDED BASELINE STALE?  committed baseline vs a FRESH
+#          FORCED WRITE on today's tree.  Expect: the build-sha stamp only.
+############################################################################
+
+--- desktop-lobby-desktop-linux.png
+  vs /tmp/a0-06c/fresh/desktop-lobby-desktop-linux.png
+size 1280x800, per-channel threshold 8/255
+
+differing px: 176 (ratio 0.0002)
+bands that differ:
+  y  782– 789 (  8 rows)  x    8–  45  max   26 px/row
+
+--- desktop-lobby-teams-desktop-linux.png
+  vs /tmp/a0-06c/fresh/desktop-lobby-teams-desktop-linux.png
+size 1280x800, per-channel threshold 8/255
+
+differing px: 190 (ratio 0.0002)
+bands that differ:
+  y  782– 789 (  8 rows)  x    8–  50  max   28 px/row
+
+--- phone-landscape-lobby-iphone-linux.png
+  vs /tmp/a0-06c/fresh/phone-landscape-lobby-iphone-linux.png
+size 844x390, per-channel threshold 8/255
+
+differing px: 145 (ratio 0.0004)
+bands that differ:
+  y  371– 378 (  8 rows)  x    9–  49  max   22 px/row
+
+--- phone-landscape-lobby-teams-iphone-linux.png
+  vs /tmp/a0-06c/fresh/phone-landscape-lobby-teams-iphone-linux.png
+size 844x390, per-channel threshold 8/255
+
+differing px: 145 (ratio 0.0004)
+bands that differ:
+  y  371– 378 (  8 rows)  x    9–  49  max   22 px/row
+
+--- phone-portrait-lobby-iphone-linux.png
+  vs /tmp/a0-06c/fresh/phone-portrait-lobby-iphone-linux.png
+size 390x844, per-channel threshold 8/255
+
+differing px: 145 (ratio 0.0004)
+bands that differ:
+  y    9–  11 (  3 rows)  x   11–  18  max    8 px/row
+  y   14–  17 (  4 rows)  x   11–  18  max    6 px/row
+  y   20–  23 (  4 rows)  x   11–  18  max    8 px/row
+  y   25–  28 (  4 rows)  x   11–  18  max    8 px/row
+  y   30–  34 (  5 rows)  x   11–  18  max    6 px/row
+  y   36–  39 (  4 rows)  x   11–  18  max    6 px/row
+  y   42–  44 (  3 rows)  x   11–  18  max    7 px/row
+  y   47–  49 (  3 rows)  x   15–  17  max    2 px/row
+
+############################################################################
+# PART 2 — WHAT a0-06 ITSELF MOVED.  main WITHOUT the picker (2d3f29b, a
+#          forced write in a throwaway worktree) vs the landed baseline.
+############################################################################
+
+--- desktop-lobby-desktop-linux.png
+  vs /tmp/a0-06c/committed/desktop-lobby-desktop-linux.png
+size 1280x800, per-channel threshold 8/255
+
+differing px: 19539 (ratio 0.0191)
+bands that differ:
+  y  238– 679 (442 rows)  x  152– 746  max  124 px/row
+  y  782– 789 (  8 rows)  x    8–  45  max   24 px/row
+
+--- desktop-lobby-teams-desktop-linux.png
+  vs /tmp/a0-06c/committed/desktop-lobby-teams-desktop-linux.png
+size 1280x800, per-channel threshold 8/255
+
+differing px: 54653 (ratio 0.0534)
+bands that differ:
+  y  175– 679 (505 rows)  x  152– 746  max  198 px/row
+  y  782– 789 (  8 rows)  x    8–  50  max   25 px/row
+
+--- phone-landscape-lobby-iphone-linux.png
+  vs /tmp/a0-06c/committed/phone-landscape-lobby-iphone-linux.png
+size 844x390, per-channel threshold 8/255
+
+differing px: 12446 (ratio 0.0378)
+bands that differ:
+  y  117– 324 (208 rows)  x  104– 492  max  160 px/row
+  y  371– 378 (  8 rows)  x    9–  49  max   21 px/row
+
+--- phone-landscape-lobby-teams-iphone-linux.png
+  vs /tmp/a0-06c/committed/phone-landscape-lobby-teams-iphone-linux.png
+size 844x390, per-channel threshold 8/255
+
+differing px: 18109 (ratio 0.0550)
+bands that differ:
+  y  117– 324 (208 rows)  x  137– 492  max  164 px/row
+  y  371– 378 (  8 rows)  x    9–  49  max   21 px/row
+
+--- phone-portrait-lobby-iphone-linux.png
+  vs /tmp/a0-06c/committed/phone-portrait-lobby-iphone-linux.png
+size 390x844, per-channel threshold 8/255
+
+differing px: 12446 (ratio 0.0378)
+bands that differ:
+  y    9–  11 (  3 rows)  x   11–  18  max    8 px/row
+  y   14–  17 (  4 rows)  x   11–  18  max    8 px/row
+  y   20–  22 (  3 rows)  x   11–  16  max    6 px/row
+  y   25–  28 (  4 rows)  x   11–  18  max    8 px/row
+  y   30–  33 (  4 rows)  x   11–  17  max    6 px/row
+  y   42–  45 (  4 rows)  x   11–  18  max    7 px/row
+  y   47–  49 (  3 rows)  x   15–  17  max    2 px/row
+  y  104– 110 (  7 rows)  x   80– 153  max   35 px/row
+  y  112– 251 (140 rows)  x   65– 220  max  156 px/row
+  y  344– 400 ( 57 rows)  x   80– 206  max   48 px/row
+  y  403– 409 (  7 rows)  x   66– 271  max  200 px/row
+  y  411– 470 ( 60 rows)  x   65– 272  max  208 px/row
+  y  472– 492 ( 21 rows)  x   87– 250  max   29 px/row
+
+############################################################################
+# PART 3 — THE DRIFT THE OLD BASELINE WAS HIDING.  the baseline CI compared
+#          against (a0-07, 7ffc837) vs main's OWN render without a0-06.
+#          Neither side of this pair contains the character picker.
+############################################################################
+
+--- desktop-lobby-desktop-linux.png
+  vs /tmp/a0-06c/mainonly/desktop-lobby-desktop-linux.png
+size 1280x800, per-channel threshold 8/255
+
+differing px: 22214 (ratio 0.0217)
+bands that differ:
+  y  265– 274 ( 10 rows)  x   64– 102  max   34 px/row
+  y  328– 337 ( 10 rows)  x   64– 102  max   33 px/row
+  y  391– 400 ( 10 rows)  x   64– 102  max   33 px/row
+  y  454– 463 ( 10 rows)  x   64– 102  max   34 px/row
+  y  517– 526 ( 10 rows)  x   64– 102  max   33 px/row
+  y  572– 679 (108 rows)  x   64–1227  max  395 px/row
+  y  782– 789 (  8 rows)  x    8–  45  max   24 px/row
+
+--- phone-landscape-lobby-iphone-linux.png
+  vs /tmp/a0-06c/mainonly/phone-landscape-lobby-iphone-linux.png
+size 844x390, per-channel threshold 8/255
+
+differing px: 11416 (ratio 0.0347)
+bands that differ:
+  y  139– 146 (  8 rows)  x  274– 308  max   30 px/row
+  y  191– 198 (  8 rows)  x   33– 308  max   60 px/row
+  y  243– 250 (  8 rows)  x   33– 308  max   60 px/row
+  y  257– 324 ( 68 rows)  x   33– 811  max  271 px/row
+  y  340– 341 (  2 rows)  x  567– 589  max   23 px/row
+  y  371– 378 (  8 rows)  x    9–  45  max   19 px/row
