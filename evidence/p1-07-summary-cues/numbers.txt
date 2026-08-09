@@ -1,0 +1,101 @@
+p1-07 — the four end-of-match summary cues. Evidence, generated out of the modules.
+       npx vite-node evidence/p1-07-summary-cues/numbers.ts
+
+=== 1. THE REVIEW BOARD — four new slots, three candidates each ===
+
+  XP Tick  (xpTick)
+    One step of the end-of-match count-up — dozens in five seconds, every match. If it is interesting, it is wrong.
+    current  previews/xpTick/current.wav
+    a        previews/xpTick/a.wav              a counter contact, dry grit
+    b        previews/xpTick/b.wav              a damped pip, felt not heard
+    c        previews/xpTick/c.wav              one narrow band, machine-clean
+
+  XP Bar Fill  (xpBarFill)
+    The bed under the level bar filling — starts and ends with the bar, and ducks under a level-up landing on it.
+    current  previews/xpBarFill/current.wav
+    a        previews/xpBarFill/a.wav           particulate fill, poured in
+    b        previews/xpBarFill/b.wav           a low bed under pressure
+    c        previews/xpBarFill/c.wav           an induction hum, taking charge
+
+  Level Up  (levelUp)
+    The bar completed and the level ticked over — the one moment in the beat allowed to be a reward. Arrival, not fanfare.
+    current  previews/levelUp/current.wav
+    a        previews/levelUp/a.wav             a dry arrival, contacts landing
+    b        previews/levelUp/b.wav             pressure seating, weight arriving
+    c        previews/levelUp/c.wav             a struck plate, one bare fifth
+
+  XP Settle  (xpSettle)
+    The end of the sequence — everything holds at its final value and the buttons take focus. Quiet: the full stop.
+    current  previews/xpSettle/current.wav
+    a        previews/xpSettle/a.wav            a dry stop, one contact
+    b        previews/xpSettle/b.wav            a damped seat, closing
+    c        previews/xpSettle/c.wav            one low band, ringing out
+
+  board size: 44 slots (40 denied + 4 new), 132 candidates
+
+=== 2. THE TONE AUDIT — the four, beside the bank ===
+
+  The `retro tells` column is the audit's own (square/saw, duty sweep, arpeggio,
+  repeat, an audible wobble, a chirp). Empty is the whole claim: each new cue is
+  inside the amended §4.7 envelope on the same measurement the other forty are.
+
+  sound           v waves                     sec  peak     rms  centroid     zcr  retro tells
+  xpTick          1 noise                    0.02  0.09  0.0101   5682 Hz  0.1549  —
+  xpBarFill       3 triangle×2 noise         2.75  0.20  0.0630    753 Hz  0.0192  —
+  levelUp         5 noise×2 triangle×3       0.43  0.39  0.0462   2472 Hz  0.0471  —
+  xpSettle        2 noise triangle           0.22  0.10  0.0251    464 Hz  0.0103  —
+  ------------------------------------------------------------------------------------------------
+  pressTick       4 noise sine×3             0.05  0.12  0.0267   5270 Hz  0.0759  —
+  matchEnd        3 triangle×3               1.24  0.43  0.0967   1464 Hz  0.0328  —
+  musicWin        5 triangle×5               1.28  0.33  0.0605   1984 Hz  0.0175  —
+  musicLoss       4 triangle×2 sine×2        1.27  0.31  0.0739    252 Hz  0.0067  —
+  stationDeath    3 sine noise triangle      1.32  0.90  0.1824   1566 Hz  0.0064  chirp down ×6.18, chirp down ×4.00
+
+  census — 44 sounds, 146 voices
+    square      0  (0.0%)
+    saw         2  (1.4%)
+    triangle   46  (31.5%)
+    sine       56  (38.4%)
+    noise      42  (28.8%)
+    the two saws are alarm.low / alarm.high — the sanctioned klaxon (§2.2), unchanged.
+
+=== 3. THE TWO SET-LEVEL CONSTRAINTS (plan §6.5) ===
+
+  UNDER THE RESULT — RMS as played (the bed at its seam ceiling, ×0.5)
+    matchEnd     0.0967   the result this beat plays under
+    stationDeath 0.1824   the ache, untouched
+    xpTick       0.0101   ×0.10 of the result
+    xpBarFill    0.0315   ×0.33 of the result
+    levelUp      0.0462   ×0.48 of the result
+    xpSettle     0.0251   ×0.26 of the result
+
+  CANCELLABLE — nothing outlives the screen
+    xpTick       0.020 s one-shot
+    xpBarFill    LOOP — started and stopped with the bar (engine.xpFill / stopXpFill)
+    levelUp      0.430 s one-shot
+    xpSettle     0.224 s one-shot
+
+=== 4. THE COUNT-UP TICK UNDER REPETITION ===
+
+  one tick     0.0199 s  peak 0.0855  rms 0.01011
+  pressTick    0.0520 s  peak 0.1214  rms 0.02674   (the bound)
+  quietest in the bank: xpTick, xpSettle, pressTick
+
+  forty ticks, each pitched by the rise the seam applies:
+     8/s   peak 0.0855   rms 0.00358   does not stack — each tick is gone before the next arrives
+    20/s   peak 0.0855   rms 0.00563   does not stack — each tick is gone before the next arrives
+    40/s   peak 0.0855   rms 0.00788   does not stack — each tick is gone before the next arrives
+
+  the rise: 0.35 semitones per tick, capped at 12 — ×1.2746 playback rate at the top,
+  4.2 semitones end to end, and it stops there however long the count runs.
+
+=== 5. NOT THE DENIED STINGS (plan §6.5) ===
+
+  34 voices across the four shipped cues and their twelve candidates,
+  checked against the 44 voices of matchEnd / musicWin / musicLoss
+  and their offers: 0 re-used.
+
+  Longest voice in the set vs the ache it must never outlast:
+    levelUp      0.346 s
+    stationDeath 1.320 s   (the longest tail in the bank, held)
+

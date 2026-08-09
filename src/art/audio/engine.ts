@@ -52,7 +52,16 @@ import type { PlayerId } from '@shared/types';
 import { DeathMoment } from '../vfx/death-moment';
 import { TELL, type TellKind, type TellQueue } from '../tells';
 import { UnderAttackAlarm, type AlarmOptions } from './alarm';
-import { SOUND, TELL_SOUND, CUE_SOUND, CUE_UI, type SoundName, type AudioCue } from './bank';
+import {
+  SOUND,
+  TELL_SOUND,
+  CUE_SOUND,
+  CUE_UI,
+  XP_TICK_SEMITONES,
+  XP_TICK_STEPS_MAX,
+  type SoundName,
+  type AudioCue,
+} from './bank';
 import { UiCuePlayer, type UiCuePlayerOptions } from './ui-cues';
 import { SustainedVoice } from './weapons';
 import type { AudioContextLike } from './context';
@@ -115,6 +124,38 @@ const SFX_DUCK = 0.7;
  */
 export const ALARM_DUCK_S = 0.85;
 
+/**
+ * The end-of-match bar's bed (`./bank` {@link SOUND.xpBarFill}, plan §6.3 beat 3),
+ * as the four numbers that make a still loop read as *filling*.
+ *
+ * The body does not rise on its own — a sweep inside a loop restarts every lap
+ * and pulses — so the rise is here, ridden against the bar's own progress: the
+ * level comes up from {@link XP_FILL_FLOOR} of its peak, and the rate climbs by
+ * {@link XP_FILL_RISE} (a major third at the top, which is *opening* rather than
+ * *transposing*). A bar that is nearly empty still sounds, because plan §6.3's
+ * "almost no XP at all" case says the beat always plays for its full length,
+ * however small the delta.
+ */
+export const XP_FILL_GAIN = 0.5;
+export const XP_FILL_FLOOR = 0.55;
+export const XP_FILL_RISE = 0.26;
+/** Ramp seconds for a progress step, and for the fade the bar's end gets. */
+const XP_FILL_RIDE_S = 0.08;
+export const XP_FILL_RELEASE_S = 0.12;
+
+/**
+ * How far the bed steps aside for a level-up landing on top of it, and for how
+ * long — plan §6.5: *"must duck cleanly under a `levelUp` landing on top of it."*
+ *
+ * Ducked rather than stopped, because beat 4 is a pause in the fill and not the
+ * end of it: the bar resumes with whatever XP is left, and a bed that cut out and
+ * restarted would announce the seam. The recovery is the same shape the alarm's
+ * duck uses (`./engine` syncAlarm) — counted down in {@link AudioEngine.update},
+ * so it works headless.
+ */
+export const XP_FILL_DUCK = 0.4;
+export const XP_FILL_DUCK_S = 0.45;
+
 /** Options for {@link AudioEngine}. */
 export interface AudioEngineOptions {
   /**
@@ -173,6 +214,12 @@ export class AudioEngine {
   private wantsMusic: boolean;
 
   private ambientLoop: LoopHandle | null = null;
+  /** The end-of-match bar's bed while it is filling (p1-07), or `null`. */
+  private xpFillLoop: LoopHandle | null = null;
+  /** The bar's progress the bed is currently riding, 0..1. */
+  private xpFillAt = 0;
+  /** Seconds left of the level-up duck on the bed. Counted down in {@link update}. */
+  private xpDuckLeft = 0;
   /**
    * The engagement number the last sting was raised for (`UnderAttackAlarm.count`).
    * The alarm is a one-shot per engagement, so this — not `alarm.active` — is what
@@ -478,6 +525,7 @@ export class AudioEngine {
    * upstream of the duck.
    *
    * @param index Slot index for a stepped cue (`join`): one semitone per seat.
+   *   For `xpTick` it is the tick's ordinal, which is what the count-up rides up.
    */
   cue(kind: AudioCue, index = 0): void {
     const graph = this.graph;
@@ -493,7 +541,55 @@ export class AudioEngine {
       if (this.uiCues.play(glass, index)) this.played++;
       return;
     }
-    if (graph.play(CUE_SOUND[kind], 1, graph.jitter(0.04))) this.played++;
+    // The bar's bed steps aside for the landing rather than stopping under it:
+    // beat 4 is a pause in the fill, not the end of it (plan §6.3).
+    if (kind === 'levelUp' && this.xpFillLoop?.alive) {
+      this.xpDuckLeft = XP_FILL_DUCK_S;
+      this.rideXpFill(0.04);
+    }
+    if (graph.play(CUE_SOUND[kind], 1, this.cueRate(kind, index))) this.played++;
+  }
+
+  /**
+   * The bed under the level bar (`./bank` {@link SOUND.xpBarFill}), rode against
+   * the bar's own progress — plan §6.3 beat 3, the beat the developer described.
+   *
+   * Call it every frame the bar is moving with `progress` 0..1; the first call
+   * starts the loop and the rest ride it. It never *computes* anything about the
+   * fill: the sequence owns the number, this owns the sound, which is §6.4 rule 2
+   * applied one layer down.
+   *
+   * Nothing starts under the three-second hush (GDD §4.7) — a home dying outranks
+   * a bar filling, and the next frame after the quiet lifts starts it cleanly.
+   */
+  xpFill(progress: number): void {
+    const graph = this.graph;
+    if (!graph) return;
+    this.xpFillAt = Number.isFinite(progress) ? Math.max(0, Math.min(1, progress)) : 0;
+    if (this.death.gain <= HUSHED) return;
+    if (!this.xpFillLoop?.alive) {
+      this.xpFillLoop = graph.startLoop(SOUND.xpBarFill, 0, 'sfx');
+    }
+    this.rideXpFill(XP_FILL_RIDE_S);
+  }
+
+  /**
+   * End the bar's bed — the settle, or a skip.
+   *
+   * A short fade rather than a cut, and a short one rather than a graceful one:
+   * a player who skipped the sequence is telling you they do not want the beat
+   * (plan §6.5), so the bed has to be *gone*, not tapering behind the buttons.
+   */
+  stopXpFill(fade = XP_FILL_RELEASE_S): void {
+    this.xpFillLoop?.stop(fade);
+    this.xpFillLoop = null;
+    this.xpFillAt = 0;
+    this.xpDuckLeft = 0;
+  }
+
+  /** True while the bar's bed is sounding. The sequence's eye, and a test's. */
+  get xpFilling(): boolean {
+    return this.xpFillLoop?.alive === true;
   }
 
   /** Advance the alarm, the held voice, the soundtrack, and the hush. */
@@ -509,6 +605,14 @@ export class AudioEngine {
     this.musicScore.update(step);
     if (this.started) this.music?.update(step, this.death.gain);
 
+    if (this.xpDuckLeft > 0) {
+      this.xpDuckLeft -= step;
+      if (this.xpDuckLeft <= 0) {
+        this.xpDuckLeft = 0;
+        this.rideXpFill(XP_FILL_DUCK_S * 0.5); // back up under the level-up's tail
+      }
+    }
+
     this.graph?.setDuck(this.death.gain);
     this.syncAlarm(step);
   }
@@ -519,6 +623,7 @@ export class AudioEngine {
     this.music?.stop();
     this.ambientLoop?.stop(0.2);
     this.ambientLoop = null;
+    this.stopXpFill(0.05);
     this.alarmDuckLeft = 0;
     this.uiCues?.dispose();
     this.graph?.dispose();
@@ -537,6 +642,9 @@ export class AudioEngine {
     this.thruster?.stop();
     this.musicScore.reset();
     this.music?.stop();
+    // A rematch starts from the lobby, not from last match's summary screen: a
+    // bed still filling under it would be the previous match's bar, held open.
+    this.stopXpFill(0.05);
     this.lastSpatial = HERE;
     // Forget last match's side and phase; the presenter re-pushes them on the
     // first frame of the new one, and until then the alarm is the local player's.
@@ -545,6 +653,33 @@ export class AudioEngine {
   }
 
   // -------------------------------------------------------------------------
+
+  /**
+   * The playback rate a device cue sounds at.
+   *
+   * Everything gets the mix's deterministic pitch jitter, which is what keeps a
+   * repeated sound from reading as a sample being retriggered — everything except
+   * the count-up tick, which gets a **rise** instead (`./bank`
+   * {@link XP_TICK_SEMITONES}). The two cannot be combined: jitter around a
+   * climbing pitch is heard as the climb wobbling, and the plan asks for
+   * *"pitched up slightly as the count rises"*, which is a line, not a cloud.
+   */
+  private cueRate(kind: AudioCue, index: number): number {
+    const graph = this.graph;
+    if (kind !== 'xpTick') return graph ? graph.jitter(0.04) : 1;
+    const step = Math.min(Math.max(0, Math.floor(index)), XP_TICK_STEPS_MAX);
+    return Math.pow(2, (step * XP_TICK_SEMITONES) / 12);
+  }
+
+  /** Push the bar's progress (and the level-up duck) onto the bed's live handle. */
+  private rideXpFill(seconds: number): void {
+    const loop = this.xpFillLoop;
+    if (!loop?.alive) return;
+    const duck = this.xpDuckLeft > 0 ? XP_FILL_DUCK : 1;
+    const open = XP_FILL_FLOOR + (1 - XP_FILL_FLOOR) * this.xpFillAt;
+    loop.setGain(XP_FILL_GAIN * open * duck, seconds);
+    loop.setRate(1 + XP_FILL_RISE * this.xpFillAt, seconds);
+  }
 
   /**
    * The one-shot half of the routing: a kind, its sound, and how loud.

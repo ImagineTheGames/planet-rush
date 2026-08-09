@@ -80,3 +80,32 @@ than an opinion.
 **None of the five** — but this brief is **gated on a0-01 landing its re-voice**, because these
 four cues must sit in the same room as the other forty. If a0-01 is still open, write the specs
 and the tests and hold the voicing.
+
+---
+
+## Lane annotations *(added by `agent/sound/p1-07-summary-cues`, 2026-08-09)*
+
+Per the chain rule — *the plan is the contract; where the plan and the brief disagree, the plan
+wins, say so in the PR and fix the brief*. **Nothing in this brief contradicts
+`docs/progression-plan.md` §6.5**; the two were read line by line and the brief is a faithful
+expansion of the plan's table. Three notes, none of them a contradiction:
+
+1. **The gate is met.** a0-01's re-voice landed as **PR #314** (`s8-01: bank re-voice round 2`,
+   MERGED). `synth.ts` on `main` carries `decayCurve` / `resonance` / `lowPassEnd` / `bandPass`
+   and `bank.ts` documents round 2 as shipped, so this lane voiced rather than holding.
+2. **Test 2 names the wrong file for the *assertion*, and the right one for the *number*.**
+   `spikes/tone-audit/measure-bank-tone.ts` is a measurement spike owned by the Architect: it
+   prints a table and asserts nothing, and a test may not depend on a throwaway spike (that file
+   says so itself, and `audio.test.ts` repeats the rule where it copies the spike's arithmetic).
+   *"Asserted the same way a0-01 asserts the rest of the bank"* therefore resolves to
+   **`src/art/audio/audio.test.ts`**, which is where a0-01's own tone contract lives — so that is
+   where the four cues are held to the envelope. The spike's table is the **evidence**, generated
+   into `evidence/p1-07-summary-cues.ts` → `.txt` so the numbers reproduce without touching
+   another agent's file.
+3. **`xpBarFill` ships as a LOOP, with a seam.** The brief and the plan both require it to start
+   and end with the bar and to be cancellable. The bar's length is not knowable when it starts
+   (plan §6.3 caps each subsequent fill at 0.5 s) and a one-shot in flight cannot be stopped by
+   this mix graph, so a sustained one-shot would fail the skip constraint by construction. It is
+   therefore a looping spec plus `AudioEngine.xpFill(progress)` / `stopXpFill()` — which is also
+   how *"a sustained, rising bed"* gets its rise, since a filter sweep inside a loop restarts
+   every lap and is heard as a pulse.

@@ -30,6 +30,8 @@ import {
   SUSTAINED_TELLS,
   soundSpec,
   TELL_SOUND,
+  XP_TICK_SEMITONES,
+  XP_TICK_STEPS_MAX,
   type AudioCue,
   type SoundName,
 } from './bank';
@@ -45,7 +47,15 @@ import {
   type GainNodeLike,
   type StereoPannerNodeLike,
 } from './context';
-import { ALARM_DUCK_S, AudioEngine, EARSHOT_FAR, EARSHOT_NEAR } from './engine';
+import {
+  ALARM_DUCK_S,
+  AudioEngine,
+  EARSHOT_FAR,
+  EARSHOT_NEAR,
+  XP_FILL_DUCK,
+  XP_FILL_DUCK_S,
+  XP_FILL_GAIN,
+} from './engine';
 import { AudioGraph, MIX_DEFAULTS, renderSound } from './graph';
 import {
   cutoffFor,
@@ -837,6 +847,182 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
       bandShare(chip, 500, DEFAULT_SAMPLE_RATE / 2),
       'the mining voice has fallen below what a phone speaker can emit',
     ).toBeGreaterThan(0.4);
+  });
+
+  // -------------------------------------------------------------------------
+  // The end-of-match summary set (p1-07) — `docs/progression-plan.md` §6.5
+  // -------------------------------------------------------------------------
+  //
+  // Four cues for a screen the player sees after **every match, forever**, so
+  // they are held to the set-level constraints the plan states rather than only
+  // to the bank-wide ones above. The bank-wide contracts already walk these four
+  // — they are in `SOUND_NAMES` — and these add what is true of this set alone.
+
+  /** The four, in the order the sequence plays them (plan §6.3 beats 1–5). */
+  const SUMMARY: readonly SoundName[] = [SOUND.xpTick, SOUND.xpBarFill, SOUND.levelUp, SOUND.xpSettle];
+  /** The three slots the plan forbids this beat to reach for — all under deny-all. */
+  const DENIED_STINGS: readonly SoundName[] = [SOUND.matchEnd, SOUND.musicWin, SOUND.musicLoss];
+
+  it('puts each summary cue inside the amended tone envelope (GDD §4.7, p1-07)', () => {
+    // The same clauses `docs/audio-revoice-spec.md` §5 states and the two tests
+    // above assert bank-wide, restated pointed at the four so a failure names the
+    // cue rather than the bank. Cheap, and the reason it is worth the duplication
+    // is a0-01's own finding: these four were written *after* the contract, and a
+    // new slot is exactly where a retired idiom walks back in unnoticed.
+    for (const name of SUMMARY) {
+      const spec = soundSpec(name);
+      const voices = isLayered(spec) ? spec.layers.map((l) => l.spec) : [spec as VoiceSpec];
+      expect(voices.length, `${name} has no voices`).toBeGreaterThan(0);
+      for (const v of voices) {
+        const where = `${name}/${v.name}`;
+        // §5.1 — the oscillators. There is no sanctioned exception here: the one
+        // in the bank is the klaxon, and none of these is a mechanic's alarm.
+        expect(v.wave, `${where} is an arcade oscillator`).not.toBe('square');
+        expect(v.wave, `${where} is an arcade oscillator`).not.toBe('saw');
+        // §5.3 — the arcade idioms, retired outright.
+        expect(v.arpMul, `${where} arpeggios`).toBeUndefined();
+        expect(v.arpTime, `${where} arpeggios`).toBeUndefined();
+        expect(v.dutySweep, `${where} sweeps its duty`).toBeUndefined();
+        expect(v.repeat, `${where} trills`).toBeUndefined();
+        // §5.4 — no wobble, and no chirp, inside a short voice.
+        if (voiceDuration(v) < 0.25) {
+          expect(v.vibratoDepth ?? 0, `${where} wobbles`).toBe(0);
+          if (v.freqEnd !== undefined && v.freqEnd !== v.freq) {
+            const glide = Math.max(v.freq, v.freqEnd) / Math.max(1, Math.min(v.freq, v.freqEnd));
+            expect(glide, `${where} chirps ×${glide.toFixed(2)}`).toBeLessThanOrEqual(1.2);
+          }
+        }
+        // a0-01's round-2 finding, which is the sharper one: a stack of
+        // unfiltered tones with a linear decay is a glockenspiel whatever the
+        // oscillator. Every voice here carries material, and every decay is a
+        // tail rather than a volume knob turning down.
+        const material =
+          v.wave === 'noise' || (v.noiseMix ?? 0) > 0 || v.lowPass !== undefined || v.highPass !== undefined;
+        expect(material, `${where} is a bare tone generator`).toBe(true);
+        if (v.decay > 0) expect(v.decayCurve ?? 0, `${where} fades in a straight line`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('keeps the count-up tick inside the `pressTick` bound, not the `matchEnd` one', () => {
+    // The plan is explicit that this is the `pressTick` problem: *"heard dozens
+    // of times in five seconds… it must survive being heard every match
+    // forever."* `pressTick` is the only other slot in the bank with that job, so
+    // it is the bound — shorter, quieter, and quieter still in RMS.
+    const tick = renderSound(soundSpec(SOUND.xpTick));
+    const press = renderSound(soundSpec(SOUND.pressTick));
+    expect(tick.length, 'the count-up tick is longer than a press tick').toBeLessThanOrEqual(press.length);
+    expect(peak(tick), 'the count-up tick peaks over a press tick').toBeLessThanOrEqual(peak(press));
+    expect(rms(tick), 'the count-up tick is louder than a press tick').toBeLessThan(rms(press));
+    // It is in fact the quietest thing in the bank, which is the design: at forty
+    // repetitions the failure mode is fatigue, and the fix is subtraction.
+    for (const name of SOUND_NAMES) {
+      if (name === SOUND.xpTick) continue;
+      expect(rms(tick), `${name} is quieter than the count-up tick`).toBeLessThan(rms(renderSound(soundSpec(name))));
+    }
+  });
+
+  it('survives repetition: forty ticks in five seconds do not accumulate or clip', () => {
+    // The assertion the slot exists for. Forty ticks, each pitched by the rise
+    // the seam applies (`./engine` cueRate), stacked at three rates spanning
+    // "dozens in five seconds" up to a rate no count-up will ever ask for — and
+    // the sum must stay inside the same headroom the mix assumes of one sound.
+    const tick = renderSound(soundSpec(SOUND.xpTick));
+    const stack = (perSecond: number): Float32Array => {
+      const gap = Math.round(DEFAULT_SAMPLE_RATE / perSecond);
+      const out = new Float32Array(gap * 40 + tick.length * 2);
+      for (let k = 0; k < 40; k++) {
+        // The same rate the engine plays tick k at: resampled by reading faster.
+        const rate = Math.pow(2, (Math.min(k, XP_TICK_STEPS_MAX) * XP_TICK_SEMITONES) / 12);
+        const len = Math.floor(tick.length / rate);
+        for (let i = 0; i < len; i++) {
+          out[k * gap + i] = (out[k * gap + i] ?? 0) + (tick[Math.floor(i * rate)] ?? 0);
+        }
+      }
+      return out;
+    };
+    const alone = peak(tick);
+    for (const perSecond of [8, 20, 40]) {
+      const buf = stack(perSecond);
+      expect(peak(buf), `forty ticks at ${perSecond}/s clip`).toBeLessThanOrEqual(0.95);
+      // Not merely under the ceiling — they do not stack **at all**: each tick is
+      // gone before the next arrives, so the burst peaks at one tick's level.
+      // That is what "does not accumulate into a buzz" means as a number.
+      expect(peak(buf), `forty ticks at ${perSecond}/s accumulate`).toBeLessThanOrEqual(alone * 1.02);
+    }
+  });
+
+  it('mixes the whole summary set UNDER the result that already sounded', () => {
+    // Plan §6.5's first set-level constraint: *"they mix under whatever the
+    // result already sounded — a station death is still the ache."* Stated as
+    // levels, which is the only place the constraint can actually live.
+    //
+    // **As played, not as rendered.** A one-shot cue sounds at gain 1 (`./engine`
+    // cue), where the bar's bed is a held voice whose ceiling is a mix parameter
+    // ({@link XP_FILL_GAIN}) — so comparing its raw body against a one-shot would
+    // be comparing a buffer to a sound. The ceiling is used rather than the ride's
+    // current value, because the constraint has to hold at the loudest the bed can
+    // ever get.
+    const level = (name: SoundName) =>
+      rms(renderSound(soundSpec(name))) * (name === SOUND.xpBarFill ? XP_FILL_GAIN : 1);
+    const result = level(SOUND.matchEnd);
+    for (const name of SUMMARY) {
+      expect(level(name), `${name} is louder than the result it plays under`).toBeLessThan(result);
+      expect(level(name), `${name} is louder than a home dying`).toBeLessThan(level(SOUND.stationDeath));
+    }
+    // The level-up is the one moment allowed to be a reward, so it is the
+    // loudest of the four — and still under the result.
+    for (const name of SUMMARY) {
+      if (name === SOUND.levelUp) continue;
+      expect(level(SOUND.levelUp), `${name} is louder than the level-up`).toBeGreaterThan(level(name));
+    }
+  });
+
+  it('is cancellable: nothing in the set can outlive the screen', () => {
+    // Plan §6.5's second set-level constraint. pr-05 owns the cancel; this owns
+    // being cancellable — which for a one-shot means being SHORT (the mix has no
+    // handle on one in flight), and for the sustained cue means being a LOOP,
+    // which is the only thing in this graph that can be told to stop.
+    for (const name of SUMMARY) {
+      const spec = soundSpec(name);
+      if (loops(spec)) {
+        expect(name, 'the only sustained cue in the set is the bar bed').toBe(SOUND.xpBarFill);
+        continue;
+      }
+      const seconds = renderSound(spec).length / DEFAULT_SAMPLE_RATE;
+      expect(seconds, `${name} has a tail that outlives a skip`).toBeLessThanOrEqual(0.5);
+    }
+    expect(loops(soundSpec(SOUND.xpBarFill)), 'the bar bed cannot be stopped').toBe(true);
+  });
+
+  it('reaches for none of the three denied stings (plan §6.5)', () => {
+    // *"A satisfying sound drawn from the denied bank is a satisfying sound the
+    // developer has already rejected."* All forty slots are under deny-all
+    // (a0-01) and three of them are the obvious ones to reach for here, so this
+    // asserts the set is new material rather than a re-route: no shared voice, no
+    // shared name, and — the one that would actually ship the mistake — no cue in
+    // the vocabulary pointing at them.
+    const denied = new Set<string>(DENIED_STINGS);
+    const deniedVoices = new Set<string>();
+    for (const name of DENIED_STINGS) {
+      const spec = soundSpec(name);
+      for (const v of isLayered(spec) ? spec.layers.map((l) => l.spec) : [spec as VoiceSpec]) {
+        deniedVoices.add(JSON.stringify(v));
+      }
+    }
+    for (const name of SUMMARY) {
+      expect(denied.has(name), `${name} IS one of the denied stings`).toBe(false);
+      const spec = soundSpec(name);
+      for (const v of isLayered(spec) ? spec.layers.map((l) => l.spec) : [spec as VoiceSpec]) {
+        expect(deniedVoices.has(JSON.stringify(v)), `${name}/${v.name} is a denied voice, re-used`).toBe(false);
+        for (const sting of DENIED_STINGS) {
+          expect(v.name, `${v.name} is named after ${sting}`).not.toContain(sting);
+        }
+      }
+    }
+    for (const cue of ['xpTick', 'levelUp', 'xpSettle'] as const) {
+      expect(denied.has(CUE_SOUND[cue]), `the ${cue} cue plays a denied sting`).toBe(false);
+    }
   });
 
   it('keeps every pair of tells a player must not confuse apart (s7-01 §8)', () => {
@@ -1952,6 +2138,136 @@ describe('the device cues (`./engine` cue — the p4-03 seams)', () => {
   it('runs silent with no context — a UI cue on the server or the harness is a no-op', () => {
     const engine = new AudioEngine({ local: 0 });
     expect(() => engine.cue('press')).not.toThrow();
+    expect(engine.playCount).toBe(0);
+  });
+});
+
+describe('the end-of-match summary cues (p1-07 — the seam pr-05 plays)', () => {
+  const engineOn = () => {
+    const ctx = new FakeAudioContext();
+    const engine = new AudioEngine({ context: ctx, local: 0 });
+    engine.start();
+    return { ctx, engine };
+  };
+
+  it('sounds the three summary cues into their own new bank slots', () => {
+    // The one that would be a real defect: a summary cue quietly wired to a
+    // DENIED slot. `CUE_SOUND` is the map pr-05 plays through, so it is the map
+    // that has to be checked, not the bank entries beside it.
+    const map: readonly (readonly [AudioCue, SoundName])[] = [
+      ['xpTick', SOUND.xpTick],
+      ['levelUp', SOUND.levelUp],
+      ['xpSettle', SOUND.xpSettle],
+    ];
+    for (const [cue, sound] of map) {
+      const { engine } = engineOn();
+      expect(CUE_SOUND[cue], `${cue} is not wired to its own slot`).toBe(sound);
+      engine.cue(cue);
+      expect(engine.playCount, `${cue} made no sound`).toBe(1);
+    }
+  });
+
+  it('rides the count-up tick UP, and stops climbing rather than going shrill', () => {
+    // *"Pitched up slightly as the count rises"* (plan §6.5) is playback rate at
+    // this seam, not forty specs — so this is where it is asserted. The cap is
+    // the half that matters: a count-up has no fixed length, and an uncapped
+    // rise ends somewhere different, and eventually somewhere shrill, on a long
+    // match.
+    const { ctx, engine } = engineOn();
+    const rates: number[] = [];
+    for (const i of [0, 1, 2, 5, XP_TICK_STEPS_MAX, XP_TICK_STEPS_MAX + 40]) {
+      const before = ctx.sources.length;
+      engine.cue('xpTick', i);
+      // A tick may be refused by the repeat gap; advance past it so each lands.
+      ctx.advance(MIX_DEFAULTS.repeatGap * 2);
+      const source = ctx.sources[before];
+      expect(source, `tick ${i} started no source`).toBeDefined();
+      rates.push(source!.playbackRate.value);
+    }
+    expect(rates[0]).toBeCloseTo(1, 6); // the first tick is the pitch it was voiced at
+    for (let i = 1; i < 4; i++) expect(rates[i]!).toBeGreaterThan(rates[i - 1]!);
+    // The climb is *slight*: four semitones end to end, and it stops there.
+    expect(rates[4]).toBeCloseTo(Math.pow(2, (XP_TICK_STEPS_MAX * XP_TICK_SEMITONES) / 12), 6);
+    expect(rates[5]).toBe(rates[4]);
+    expect(rates[4]!).toBeLessThan(Math.pow(2, 5 / 12)); // under a fourth, always
+  });
+
+  it('starts the bar bed on the first frame of the fill and rides it open', () => {
+    const { ctx, engine } = engineOn();
+    expect(engine.xpFilling).toBe(false);
+    engine.xpFill(0);
+    expect(engine.xpFilling).toBe(true);
+    const started = ctx.sources.filter((s) => s.loop).length;
+
+    const loopGain = ctx.gains[ctx.gains.length - 1]!;
+    const opening = loopGain.gain.events.at(-1)!.value;
+    engine.xpFill(1);
+    expect(engine.xpFilling).toBe(true);
+    // Riding it is not restarting it: one loop source for the whole fill.
+    expect(ctx.sources.filter((s) => s.loop).length).toBe(started);
+    expect(loopGain.gain.events.at(-1)!.value).toBeGreaterThan(opening);
+    // Every level change is ramped, never set — a jump on a held voice clicks.
+    expect(loopGain.gain.events.every((e) => e.kind !== 'set' || e.value === 0)).toBe(true);
+  });
+
+  it('ducks the bed under a level-up landing on it, and lets it back up', () => {
+    // Plan §6.5: *"must duck cleanly under a `levelUp` landing on top of it."*
+    // Ducked and not stopped, because beat 4 is a pause in the fill and not the
+    // end of it — the bar resumes with whatever XP is left.
+    const { ctx, engine } = engineOn();
+    engine.xpFill(0.5);
+    const loopGain = ctx.gains[ctx.gains.length - 1]!;
+    const level = () => loopGain.gain.events.at(-1)!.value;
+    const open = level();
+
+    engine.cue('levelUp');
+    const ducked = level();
+    expect(ducked).toBeLessThan(open);
+    expect(ducked / open).toBeCloseTo(XP_FILL_DUCK, 6);
+    expect(engine.xpFilling, 'the bed stopped instead of stepping aside').toBe(true);
+
+    run(engine, ctx, XP_FILL_DUCK_S + 0.2);
+    expect(level()).toBeCloseTo(open, 6);
+  });
+
+  it('stops the bed on a skip rather than leaving it under the buttons', () => {
+    const { ctx, engine } = engineOn();
+    engine.xpFill(0.4);
+    const source = ctx.sources.filter((s) => s.loop).at(-1)!;
+    engine.stopXpFill();
+    expect(engine.xpFilling).toBe(false);
+    run(engine, ctx, 0.5);
+    expect(source.stops, 'the bar bed outlived the screen').toBeGreaterThan(0);
+    // And a rematch cannot inherit last match's bar.
+    engine.xpFill(0.4);
+    engine.reset();
+    expect(engine.xpFilling).toBe(false);
+  });
+
+  it('never starts the bed inside the three-second hush (GDD §4.7)', () => {
+    const { ctx, engine } = engineOn();
+    const death = new TellQueue(4);
+    death.push(TELL.stationDeath, 0, 0, 0, 1, 1);
+    engine.consume(death);
+    run(engine, ctx, 0.3);
+    expect(engine.death.gain).toBe(0);
+
+    engine.xpFill(0.5);
+    expect(engine.xpFilling, 'a bar filled through the quiet').toBe(false);
+    // And it recovers on its own once the ache has had its beat.
+    run(engine, ctx, HUSH_S + 0.5);
+    engine.xpFill(0.6);
+    expect(engine.xpFilling).toBe(true);
+  });
+
+  it('runs silent with no context — the summary on the server or the harness', () => {
+    const engine = new AudioEngine({ local: 0 });
+    expect(() => {
+      engine.cue('xpTick', 3);
+      engine.xpFill(0.5);
+      engine.stopXpFill();
+    }).not.toThrow();
+    expect(engine.xpFilling).toBe(false);
     expect(engine.playCount).toBe(0);
   });
 });

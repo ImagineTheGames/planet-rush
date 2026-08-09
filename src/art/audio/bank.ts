@@ -253,6 +253,48 @@ export const SOUND = {
   /** The minimap toggle. A rising sonar blip — locate, not alarm. The *ping*
    * mechanic was cut (§2.4); the name is a fossil (s7-01 §11 Q7). */
   minimapPing: 'minimapPing',
+
+  // --- The end-of-match summary (p1-07) — the XP beat, under the result -----
+  //
+  // Four cues for the choreographed end-of-match sequence
+  // (`docs/progression-plan.md` §6.3/§6.5), and **not** the stings already in the
+  // bank: `matchEnd`, `musicWin` and `musicLoss` are three of the forty slots the
+  // developer pressed DENY ALL on (a0-01), so a satisfying sound drawn from them
+  // is a satisfying sound that has already been rejected. They are new voices.
+  //
+  // Two constraints hold across the set rather than on any one of them:
+  //
+  //  - **They mix UNDER whatever the result already sounded.** A station death is
+  //    still the ache (GDD §4.7); the XP beat plays beneath it, never over it.
+  //    `audio.test.ts` states that as a number — every one of the four is quieter
+  //    in RMS than `matchEnd`, and far quieter than `stationDeath`.
+  //  - **Everything is cancellable.** A player who skipped the sequence is telling
+  //    you they do not want the beat, so nothing here may outlive the screen: the
+  //    three one-shots are all under 0.5 s, and the one sustained cue is a LOOP
+  //    (`xpBarFill`) rather than a long one-shot, because a loop can be stopped
+  //    and a one-shot in flight cannot. pr-05 owns the cancel; this owns being
+  //    cancellable.
+
+  /**
+   * The count-up tick (beat 1–2). Heard dozens of times in five seconds, every
+   * match, forever — so this is the `pressTick` problem, not the `matchEnd` one:
+   * tiny, dry, and with nothing in it that can ring. If it is interesting, it is
+   * wrong. It pitches *up* slightly as the count rises; that ride is playback
+   * rate at the seam ({@link XP_TICK_SEMITONES}), not forty specs.
+   */
+  xpTick: 'xpTick',
+  /**
+   * The bed under the bar filling (beat 3) — a *filling* sound, not a repeated
+   * one. A held loop, started and stopped with the bar (`./engine` xpFill).
+   */
+  xpBarFill: 'xpBarFill',
+  /**
+   * The level-up (beat 4) — **the one moment allowed to be a reward.** Short,
+   * bright, decisive, and an *arrival* rather than a fanfare.
+   */
+  levelUp: 'levelUp',
+  /** The settle (beat 5). The full stop: quiet, and the screen is yours again. */
+  xpSettle: 'xpSettle',
 } as const;
 
 /** One of the {@link SOUND} names. */
@@ -2093,6 +2135,303 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
       },
     ],
   },
+
+  // --- The end-of-match summary (p1-07) -----------------------------------
+  //
+  // The developer asked the end-of-match sequence for *"a satisfying sound"*
+  // (`docs/progression-plan.md` §6). These four are that ask, answered as a beat
+  // rather than as one sting: three of them exist so the fourth lands.
+  //
+  // None of them is built out of {@link strike}. That is deliberate and it is the
+  // one structural decision in this group: the Gantry/Bone material is the sound
+  // of a *confirmation* — a pick, a purchase, a refusal, a chunk banked — and
+  // hearing it again here would make a level-up sound like a wheel press with
+  // more notes on it. These are made of swept resonance and band-passed material
+  // instead: the same instrument the rest of round 2 is built from
+  // (`../synth` — `decayCurve`, `resonance`, `lowPassEnd`, `bandPass`), spent on
+  // a different gesture.
+
+  /**
+   * **The count-up tick** (beat 1–2), and the whole design is a subtraction.
+   *
+   * It fires up to ~40 times inside five seconds, on a screen the player sees
+   * after every single match forever. The failure mode is not "boring", it is
+   * **fatigue**: anything with a pitch centre becomes a melody at forty
+   * repetitions, and anything with a tail becomes a buzz. So this is one narrow
+   * band of noise, ~20 ms, band-passed so it is made of material rather than of a
+   * tone, with a curve of 8 — *"a click with a whisper after it"* (`../synth`) —
+   * so it is comfortably gone before the next one arrives at 8/s.
+   *
+   * At 0.0101 RMS it is the **quietest sound in the bank** — `xpSettle` is next,
+   * and `pressTick` after that — and `audio.test.ts` holds it to `pressTick`'s
+   * bound rather than `matchEnd`'s: shorter, quieter, and forty of them stacked
+   * at any plausible rate must not climb into the mix.
+   *
+   * The *"pitched up slightly as the count rises"* the plan asks for is playback
+   * rate at the seam ({@link XP_TICK_SEMITONES}, `./engine` cue), not a voice per
+   * step: a rise written as data is one buffer and a number, where forty specs
+   * would be forty renders of the same 20 ms of noise.
+   */
+  [SOUND.xpTick]: {
+    name: 'xpTick',
+    wave: 'noise',
+    attack: 0.0004,
+    hold: 0.0015,
+    decay: 0.018,
+    decayCurve: 8, // a click with a whisper after it — nothing left to accumulate
+    freq: 1320,
+    lowPass: 1320,
+    resonance: 4, // narrow enough to read as a contact, not wide enough to hiss
+    bandPass: true,
+    highPass: 700, // no low end at all: forty of these must not thicken the mix
+    gain: 0.6,
+    seed: 0x7c10,
+  },
+
+  /**
+   * **The bed under the bar filling** (beat 3): *a filling sound, not a repeated
+   * one*.
+   *
+   * A **loop**, and that is the load-bearing choice. The fill runs for a tunable
+   * beat and is capped shorter on each subsequent level-up (plan §6.3), so its
+   * length is not knowable when it starts; and a player who skips must have it
+   * *stop*, which a one-shot in flight cannot do. A loop can be started with the
+   * bar and faded out with it, which is exactly what the cue is specified to be.
+   *
+   * So the *rising* is not inside the body — a sweep inside a loop restarts every
+   * lap and reads as a pulse, which is the one artefact `../synth` seamless
+   * exists to kill. The body is a still, grained bed, and `./engine` xpFill rides
+   * its rate and level with the bar's own progress. A bed that opens as the bar
+   * fills is a machine taking on charge; a bed that repeats is a metronome.
+   *
+   * It is low and mid, deliberately: {@link SOUND.levelUp} lands bright, on top
+   * of it, and the two must not fight. The seam ducks this under that landing.
+   */
+  [SOUND.xpBarFill]: {
+    name: 'xpBarFill',
+    loop: true,
+    crossfade: 0.25,
+    layers: [
+      {
+        // The body. A2 — an octave over the ambient bed's A1, so the summary
+        // screen is in the same room as the match it just ended.
+        spec: {
+          name: 'xpBarFill.bed',
+          wave: 'triangle',
+          attack: 0,
+          hold: 3,
+          decay: 0,
+          freq: 110,
+          noiseMix: 0.07,
+          lowPass: 460,
+          resonance: 2.2,
+          gain: 0.13,
+          seed: 0x7c20,
+        },
+      },
+      {
+        // The fifth over it, thinner. Two intervals and no third: the bed states
+        // no mood of its own, because a defeat is still a defeat underneath it.
+        spec: {
+          name: 'xpBarFill.fifth',
+          wave: 'triangle',
+          attack: 0,
+          hold: 3,
+          decay: 0,
+          freq: 165,
+          noiseMix: 0.06,
+          lowPass: 720,
+          resonance: 2.6,
+          gain: 0.065,
+          seed: 0x7c21,
+        },
+      },
+      {
+        // The air that makes it a *filling* rather than a chord being held: a
+        // narrow band of moving noise, the sound of something being poured in.
+        spec: {
+          name: 'xpBarFill.air',
+          wave: 'noise',
+          attack: 0,
+          hold: 3,
+          decay: 0,
+          freq: 96,
+          lowPass: 880,
+          resonance: 2.8,
+          highPass: 190,
+          gain: 0.075,
+          seed: 0x7c22,
+        },
+      },
+    ],
+  },
+
+  /**
+   * **The level-up** (beat 4) — the one moment in this set allowed to be a
+   * reward, and the sound the developer's *"satisfying sound"* actually names.
+   *
+   * The amended §4.7 is the ceiling, not the old paragraph's fireworks, so the
+   * shape is **arrival**: something approaches, lands once, and rings out. Not a
+   * rising phrase — a rising arpeggio is the retired idiom (§5.3), and three
+   * notes climbing is what {@link SOUND.upgradeBought} already is.
+   *
+   *  - **The approach** is a *filter* opening, not a pitch chirp. §5.4 separates
+   *    the two by name: a corner travelling up over a fixed pitch is a machine
+   *    taking on energy, where a pitch sliding up in 90 ms is a cartoon.
+   *  - **The landing** is a band-passed contact — two hard things touching —
+   *    struck at the same instant as the note, so the pair reads as one event.
+   *  - **The note** is a bare fifth, A5 over E6, struck together rather than in
+   *    sequence. No third, so it is neither triumphant nor sad: the interface
+   *    voice does not congratulate (§4.7 register 2), and a level-up landing on
+   *    a defeat must not argue with the headline above it.
+   *  - **The seat** under it is what stops five bright layers reading as a chime.
+   *
+   * ~0.44 s end to end. Short enough to cancel, long enough to be the moment.
+   */
+  [SOUND.levelUp]: {
+    name: 'levelUp',
+    layers: [
+      {
+        spec: {
+          name: 'levelUp.approach',
+          wave: 'noise',
+          attack: 0.006,
+          hold: 0.012,
+          decay: 0.07,
+          decayCurve: 2.6,
+          freq: 300,
+          lowPass: 700,
+          lowPassEnd: 3400, // energy arriving — the corner travels, the pitch does not
+          resonance: 5,
+          highPass: 200,
+          gain: 0.15,
+          seed: 0x7c30,
+        },
+      },
+      {
+        spec: {
+          name: 'levelUp.contact',
+          wave: 'noise',
+          attack: 0.0004,
+          hold: 0.002,
+          decay: 0.055,
+          decayCurve: 7,
+          punch: 0.6,
+          freq: 2200,
+          lowPass: 2200,
+          resonance: 5,
+          bandPass: true,
+          gain: 0.34,
+          seed: 0x7c31,
+        },
+        at: 0.085,
+      },
+      {
+        spec: {
+          name: 'levelUp.note',
+          wave: 'triangle',
+          attack: 0.0015,
+          hold: 0.004,
+          decay: 0.34,
+          decayCurve: 4,
+          freq: 880,
+          noiseMix: 0.08,
+          lowPass: 2800,
+          lowPassEnd: 950, // the body closing as it rings out, rather than fading
+          resonance: 3.2,
+          gain: 0.3,
+          seed: 0x7c32,
+        },
+        at: 0.085,
+      },
+      {
+        spec: {
+          name: 'levelUp.fifth',
+          wave: 'triangle',
+          attack: 0.0015,
+          hold: 0.004,
+          decay: 0.26,
+          decayCurve: 4.5,
+          freq: 1318.51,
+          noiseMix: 0.09,
+          lowPass: 3200,
+          lowPassEnd: 1300,
+          resonance: 3.4,
+          gain: 0.17,
+          seed: 0x7c33,
+        },
+        at: 0.085,
+      },
+      {
+        spec: {
+          name: 'levelUp.seat',
+          wave: 'triangle',
+          attack: 0.002,
+          hold: 0.01,
+          decay: 0.2,
+          decayCurve: 4.2,
+          freq: 110,
+          noiseMix: 0.06,
+          lowPass: 320,
+          resonance: 2,
+          gain: 0.2,
+          seed: 0x7c34,
+        },
+        at: 0.085,
+      },
+    ],
+  },
+
+  /**
+   * **The settle** (beat 5). The full stop.
+   *
+   * Its whole job is to say *the screen has finished moving and your input means
+   * something again*, which is a smaller job than any other cue here — so it is
+   * the second-quietest sound in the bank, behind only the tick that leads to it,
+   * and under `pressTick`. A machine coming to rest: a soft contact, and a low
+   * body behind a corner that closes.
+   *
+   * It resolves **downward**, an octave under the level-up's note, because a
+   * settle that ends higher than it started is a question rather than a stop.
+   */
+  [SOUND.xpSettle]: {
+    name: 'xpSettle',
+    layers: [
+      {
+        spec: {
+          name: 'xpSettle.contact',
+          wave: 'noise',
+          attack: 0.0006,
+          hold: 0.002,
+          decay: 0.03,
+          decayCurve: 7,
+          freq: 520,
+          lowPass: 520,
+          resonance: 3.5,
+          bandPass: true,
+          gain: 0.13,
+          seed: 0x7c40,
+        },
+      },
+      {
+        spec: {
+          name: 'xpSettle.rest',
+          wave: 'triangle',
+          attack: 0.004,
+          hold: 0.02,
+          decay: 0.2,
+          decayCurve: 5,
+          freq: 220,
+          noiseMix: 0.08,
+          lowPass: 900,
+          lowPassEnd: 260, // coming to rest: the corner closes and stays closed
+          resonance: 2.6,
+          gain: 0.16,
+          seed: 0x7c41,
+        },
+      },
+    ],
+  },
 };
 
 /** The spec for a named sound. */
@@ -2184,6 +2523,19 @@ export const SUSTAINED_TELLS: readonly TellKind[] = [TELL.thrust];
  *  - `join`   — a seat filled, stepping up by slot index.
  *  - `rush`   — RUSH!, the countdown starting.
  *
+ * Three more are the **end-of-match summary's** beats (p1-07, plan §6.3), raised
+ * by the sequence rather than by a finger — the count-up tick, the level-up, and
+ * the settle that hands the screen back:
+ *
+ *  - `xpTick`   — one number ticking up. `index` is the tick's ordinal, and the
+ *    cue pitches up with it ({@link XP_TICK_SEMITONES}).
+ *  - `levelUp`  — the bar completed and the level readout moved.
+ *  - `xpSettle` — everything has landed; the buttons are live.
+ *
+ * The fourth summary cue, {@link SOUND.xpBarFill}, is deliberately **not** here:
+ * it is a held loop with a start and a stop, and a cue is a moment. It has its
+ * own seam, {@link AudioEngine.xpFill} / {@link AudioEngine.stopXpFill}.
+ *
  * Played through {@link AudioEngine.cue}: full level, no earshot falloff (they are
  * non-diegetic UI, not a thing at a place in the world), but still under the
  * three-second hush like everything else (GDD §4.7).
@@ -2201,7 +2553,26 @@ export type AudioCue =
   | 'back'
   | 'accept'
   | 'join'
-  | 'rush';
+  | 'rush'
+  | 'xpTick'
+  | 'levelUp'
+  | 'xpSettle';
+
+/**
+ * How far the count-up tick climbs per tick, in semitones, and where the climb
+ * stops (plan §6.5: *"pitched up slightly as the count rises"*).
+ *
+ * **Slightly** is the whole specification, and the ceiling is why this is two
+ * numbers rather than one. A count-up is not a fixed length — a big match ticks
+ * for longer than a small one — so an uncapped rise would end somewhere
+ * different every match and, on a long one, somewhere shrill. Twelve steps of a
+ * third of a semitone is a four-semitone climb, arriving at the top a third of
+ * the way through a typical count and staying there: audible as *rising*, and
+ * never audible as a melody.
+ */
+export const XP_TICK_SEMITONES = 0.35;
+/** Ticks after which {@link XP_TICK_SEMITONES} stops climbing. */
+export const XP_TICK_STEPS_MAX = 12;
 
 /**
  * The bank sound each device cue falls back to.
@@ -2226,6 +2597,9 @@ export const CUE_SOUND: Readonly<Record<AudioCue, SoundName>> = {
   accept: SOUND.purchaseConfirm,
   join: SOUND.pressTick,
   rush: SOUND.purchaseConfirm,
+  xpTick: SOUND.xpTick,
+  levelUp: SOUND.levelUp,
+  xpSettle: SOUND.xpSettle,
 };
 
 /**
@@ -2244,6 +2618,12 @@ export const CUE_SOUND: Readonly<Record<AudioCue, SoundName>> = {
  * `deposit`, `respawnBeep`, `respawnGo` and `ping` are absent on purpose: they are
  * world/clock tells wearing a cue's clothes, not the UI's struck glass, and the
  * handoff's set does not cover them.
+ *
+ * The three summary cues are absent for a sharper reason. The Gantry/Bone set is
+ * the sound of *the interface answering a finger* — and the end-of-match sequence
+ * is the one screen where the player is not touching anything: it plays itself,
+ * and the first touch **skips** it. Routing `xpTick` to `pick` would tell a
+ * player their taps were registering while the screen counted itself up.
  */
 export const CUE_UI: Readonly<Partial<Record<AudioCue, UiCueName>>> = {
   press: 'pick',
