@@ -39,6 +39,48 @@ describe('xpToNext', () => {
   });
 });
 
+describe("§1.4's published table", () => {
+  // The plan's table, transcribed from `docs/progression-plan.md` §1.4 and kept
+  // in its own shape: the row labelled level L carries the cost of the step that
+  // ARRIVES at L — `xpToNext(L - 1)` — and `cumTotal` is `xpToReach(L)`. Pinning
+  // it as literals is the difference between a test and a restatement: asserting
+  // `xpToNext(L) === Math.round(300 * L ** 1.6)` (above) re-derives the formula
+  // and would stay green through a change to either dial, and until this block
+  // existed nothing anywhere pinned a cumulative total at all — `xpToReach` was
+  // only ever checked against itself. pr-05's bar reads these cumulative
+  // numbers, and QA re-tunes `base`/`exp` from m10; when they do, the doc should
+  // go red here rather than quietly re-deriving around them.
+  const TABLE = [
+    // level, toNext (= xpToNext(level - 1)), cumTotal (= xpToReach(level)), matches @600XP
+    [2, 300, 300, 0.5],
+    [3, 909, 1209, 2.0],
+    [4, 1740, 2949, 4.9],
+    [5, 2757, 5706, 9.5],
+    [6, 3940, 9646, 16.1],
+    [8, 6750, 21670, 36.1],
+    [10, 10090, 40117, 66.9],
+    [15, 20461, 120594, 201.0],
+    [20, 33352, 260633, 434.4],
+  ] as const;
+
+  it('reproduces every published row, character for character', () => {
+    for (const [level, toNext, cumTotal] of TABLE) {
+      expect(xpToNext(level - 1)).toBe(toNext);
+      expect(xpToReach(level)).toBe(cumTotal);
+    }
+  });
+
+  it("holds §1.4's matches-to-level claims at the 600 XP sample rate", () => {
+    // The fourth column is what makes the two dials a design decision rather
+    // than arithmetic — "level 10 at ~67 matches" is the sentence the developer
+    // ratified. One decimal, the precision the doc prints.
+    for (const [level, , cumTotal, matches] of TABLE) {
+      expect(Number((cumTotal / 600).toFixed(1))).toBe(matches);
+      expect(levelForXp(cumTotal)).toBe(level);
+    }
+  });
+});
+
 describe('levelForXp', () => {
   it('is level 1 at 0 XP, and never returns 0 or a negative', () => {
     expect(levelForXp(0)).toBe(1);
