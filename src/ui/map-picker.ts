@@ -209,7 +209,20 @@ export const MAP_CARD_MAX_WIDTH = 240;
 /** A card shorter than this cannot fit a preview over a name over a blurb; the
  *  view drops the blurb below it rather than clipping (m8-02 thumb rule). */
 export const MAP_CARD_MIN_HEIGHT = 84;
-export const MAP_CARD_MAX_HEIGHT = 150;
+/**
+ * …and the ceiling.
+ *
+ * **190 since u10-01, up from 150.** The 150 was chosen while this row lived in a
+ * reserved strip on the PLAY flow, where a taller card would have eaten the menu.
+ * The row has a screen of its own now ({@link ./map-select}), and at 150 a desktop
+ * card was 190 wide — narrow enough that the longest registry blurb ("The
+ * Crescents", four wrapped lines) ran out of the bottom of its own card while its
+ * five neighbours fitted in three. A square-ish card holds every blurb the registry
+ * has and reads as a board rather than as a banner; the view still drops an
+ * overrunning blurb whole rather than clipping it, which is the guard that found
+ * this.
+ */
+export const MAP_CARD_MAX_HEIGHT = 190;
 
 /** How the four cards are arranged in the band. */
 export type MapCardShape = 'row' | 'grid';

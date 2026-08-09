@@ -358,12 +358,20 @@ export const PICK_LABEL_HEIGHT = 18;
  * The tallest a summary card grows.
  *
  * The four-tile block was capped at {@link CLASS_TILE_MAX} because four of them
- * shared a column. One does not, and a card allowed to take a whole desktop column
- * would read as a banner rather than as the current pick — the same argument
- * {@link LOBBY_MAP_CARD_MAX_WIDTH} makes about width. 160 is `CLASS_TILE_MAX` plus
- * the room the blurb wraps into once it is not competing with three siblings.
+ * shared a column. One does not — but "not competing" is not the same as "take the
+ * column": a card allowed to fill a desktop's right column reads as a banner rather
+ * than as the current pick, and the first cut of this (160) drew the hull card's
+ * name, stats and two-line blurb across its top two-thirds with a hand's width of
+ * empty plate under them.
+ *
+ * 124 is what the CONTENT wants, measured off `classTileContent`'s own ladder: the
+ * 3px pad, the 14px name line, the 12px hull line, the 13px stat row with its air,
+ * a two-line blurb, and the pad again. Above that a card gains dead metal, not
+ * information. The leftover column height becomes AIR between the two blocks —
+ * which is what the Gantry material wants anyway — rather than being spent
+ * stretching either of them.
  */
-export const PICK_CARD_MAX_HEIGHT = 160;
+export const PICK_CARD_MAX_HEIGHT = 124;
 
 /**
  * Below this block width the two cards stop sitting side by side and stack.

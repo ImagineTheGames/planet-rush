@@ -265,12 +265,20 @@ const HINT_HEIGHT = 22;
  * The tile height ceiling on THIS screen.
  *
  * `CLASS_TILE_MAX` (108) is the lobby's number and it was chosen while four tiles
- * shared a column with a roster and an arena row. Here they have the band, so the
- * cap only has to stop two rows of tiles from becoming two banners on a 4K
- * desktop — which 200 does, while still letting a 470px desktop band draw the role
- * blurb GDD §2.11 gives each hull at a size worth reading.
+ * shared a column with a roster and an arena row. Here they have the band — but
+ * "not competing" is not "take the band": a tile is name, hull, one stat row and a
+ * blurb, and the first cut of this (200) drew all of that across the top third of
+ * each tile with a hand's width of empty plate under it on a desktop.
+ *
+ * 120 is what `classTileContent`'s ladder actually wants at its widest: the 3px
+ * pad, the 14px name, the 12px hull, the 13px stat row with its air either side,
+ * and a wrapped blurb. Above it a tile gains dead metal, not information — the
+ * leftover band height becomes air around the 2×2, which is what the Gantry
+ * material wants anyway. It is still comfortably above `CLASS_TILE_MAX`, which is
+ * the point: the tile is bigger here than it was in the lobby column, just not
+ * unboundedly.
  */
-export const SHIP_TILE_MAX = 200;
+export const SHIP_TILE_MAX = 120;
 
 /**
  * Lay the screen out for a viewport.
@@ -323,6 +331,13 @@ export function shipSelectLayout(
     'grid',
     SHIP_TILE_MAX,
   );
+  // …and CENTRED in what is left of the band. `placeClassTiles` caps rather than
+  // stretches (which is what makes "nothing escapes the band" true by
+  // construction), so a tall desktop band leaves slack — and slack left at the
+  // bottom hangs the whole 2×2 off the header beam with a third of the screen empty
+  // under it. The same slack, split, reads as air around a block. It is only ever a
+  // downward shift of rects that already fit, so nothing can escape the band by it.
+  centreTiles(tiles, tilesY, tilesHeight);
 
   return {
     content: frame.content,
@@ -337,6 +352,17 @@ export function shipSelectLayout(
     isTouch,
     metrics,
   };
+}
+
+/** Slide a placed block of tiles down by half the slack it left in `height`,
+ *  in place. A no-op when the tiles filled the band, which is every phone. */
+function centreTiles(tiles: Rect[], top: number, height: number): void {
+  if (tiles.length === 0) return;
+  let bottom = top;
+  for (const tile of tiles) bottom = Math.max(bottom, tile.y + tile.height);
+  const slack = Math.max(0, height - (bottom - top));
+  if (slack <= 0) return;
+  for (let i = 0; i < tiles.length; i++) tiles[i] = { ...tiles[i]!, y: tiles[i]!.y + slack / 2 };
 }
 
 /**
