@@ -98,3 +98,90 @@ describe('prefersReducedMotion', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// storage.remove — pr-06, and it is for MIGRATION, not for a reset
+// ---------------------------------------------------------------------------
+
+/**
+ * A `localStorage` stand-in for one assertion, and take it away after — the same
+ * shape {@link withWindow} keeps, for the same reason: the runner is node and
+ * there is no browser storage here unless a test makes one.
+ *
+ * `throws` makes every call reject the way private mode and a full quota do, so
+ * the "never throws into game code" rule (this seam's header) is tested rather
+ * than assumed.
+ */
+function withLocalStorage(
+  seed: Record<string, string> | 'throws',
+  run: (read: () => Record<string, string>) => void,
+): void {
+  const globals = globalThis as { localStorage?: unknown };
+  const had = 'localStorage' in globals;
+  const before = globals.localStorage;
+  const map = new Map<string, string>(seed === 'throws' ? [] : Object.entries(seed));
+  const boom = (): never => {
+    throw new Error('storage disabled');
+  };
+  globals.localStorage =
+    seed === 'throws'
+      ? { getItem: boom, setItem: boom, removeItem: boom }
+      : {
+          getItem: (key: string) => map.get(key) ?? null,
+          setItem: (key: string, value: string) => void map.set(key, value),
+          removeItem: (key: string) => void map.delete(key),
+        };
+  try {
+    run(() => Object.fromEntries(map));
+  } finally {
+    if (had) globals.localStorage = before;
+    else delete globals.localStorage;
+  }
+}
+
+/**
+ * `storage.remove` (brief `docs/briefs/pr-06-lobby-level-badge.md`; plan §2.1).
+ *
+ * **It exists for migration, and there is no reset button in this chain.**
+ * Progression is never wiped (plan §Q4, the developer's *"no."*), so the seam
+ * gains this method for the one job `set` cannot do: a migration that must
+ * **retire** a key, and the `planet-rush:profile.bak` blob pr-01 preserves,
+ * which wants clearing once a profile has been recovered from it. No UI reaches
+ * it and none may be added.
+ */
+describe('storage.remove — the migration tool, not a reset (plan §2.1, §Q4)', () => {
+  it('deletes a key, and leaves every other key alone', () => {
+    withLocalStorage({ 'planet-rush:profile': '{}', 'planet-rush:fireMode': 'hold' }, (read) => {
+      const storage = createBrowserPlatform().storage;
+      expect(storage.get('planet-rush:profile')).toBe('{}');
+      storage.remove('planet-rush:profile');
+      expect(storage.get('planet-rush:profile')).toBeNull();
+      expect(read()).toEqual({ 'planet-rush:fireMode': 'hold' });
+    });
+  });
+
+  it('is a NO-OP on a key that is not there — removing nothing removes nothing', () => {
+    withLocalStorage({ 'planet-rush:fireMode': 'hold' }, (read) => {
+      const storage = createBrowserPlatform().storage;
+      expect(() => storage.remove('planet-rush:profile.bak')).not.toThrow();
+      expect(storage.get('planet-rush:profile.bak')).toBeNull();
+      expect(read()).toEqual({ 'planet-rush:fireMode': 'hold' });
+    });
+  });
+
+  it('a removed key can be written again — remove is not a tombstone', () => {
+    withLocalStorage({ 'planet-rush:profile.bak': 'salvage me' }, () => {
+      const storage = createBrowserPlatform().storage;
+      storage.remove('planet-rush:profile.bak');
+      storage.set('planet-rush:profile.bak', 'again');
+      expect(storage.get('planet-rush:profile.bak')).toBe('again');
+    });
+  });
+
+  it('degrades to a no-op where storage throws — private mode never reaches game code', () => {
+    withLocalStorage('throws', () => {
+      const storage = createBrowserPlatform().storage;
+      expect(() => storage.remove('planet-rush:profile')).not.toThrow();
+    });
+  });
+});

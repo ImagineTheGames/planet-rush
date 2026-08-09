@@ -187,6 +187,49 @@ export const CHARACTER_CYCLE: readonly PersonalityId[] = ROSTER;
 export const SEAT_HELP_GLYPH = '?';
 
 // ---------------------------------------------------------------------------
+// The level badge (pr-06) — LEVEL yes, XP never, LOBBY only
+// ---------------------------------------------------------------------------
+
+/**
+ * The word on the local player's level badge. **`LVL`, not `LEVEL`** — the chip
+ * it rides in is the row's trailing 54px (`./lobby-geometry` `SEAT_CHIP_WIDTH`),
+ * and `LEVEL 7` would be auto-fitted down to a smudge on the
+ * landscape phone this screen is locked to, whereas `LVL 7` sits at full type
+ * size at every width in QA's matrix. The industrial voice
+ * (`docs/copy-sweep-industrial-voice.md`) reads the models, which is why this
+ * string lives here rather than in a draw call.
+ *
+ * It lives beside the roster's other words for the same reason `DIFFICULTY_LABELS`
+ * does, and it is deliberately a *prefix*, not a format string: there is exactly
+ * one number that may follow it, and it is a level.
+ */
+export const LEVEL_BADGE_PREFIX = 'LVL';
+
+/**
+ * A career level as the badge prints it — `LVL 7`.
+ *
+ * ---------------------------------------------------------------------------
+ * THE RULING THIS FUNCTION IS HALF OF
+ * ---------------------------------------------------------------------------
+ * The developer, 2026-08-07, verbatim: *"we can show the LEVEL but not XP (and
+ * show it only in the lobby)."* Three rules, and this function keeps the first
+ * two: it formats a **level**, and it has no way to print an XP total — there is
+ * no XP parameter, no second line and no tooltip. The third rule ("lobby only")
+ * is kept by {@link seatView}, which puts the badge on exactly one row and by
+ * `src/ui/level-badge.test.ts`, which asserts its absence everywhere else.
+ *
+ * **A junk level folds to 1**, the `readMapId` discipline every persisted value
+ * on this screen already keeps (plan §2.1). The profile reader refuses a
+ * malformed level before it gets here, so this is the second line of defence —
+ * but it is the cheap one, and the failure it prevents (`LVL undefined` on the
+ * roster) is the one a player reads as a broken game rather than as a new career.
+ */
+export function levelBadgeLabel(level: number): string {
+  const safe = Number.isFinite(level) ? Math.max(1, Math.floor(level)) : 1;
+  return `${LEVEL_BADGE_PREFIX} ${safe}`;
+}
+
+// ---------------------------------------------------------------------------
 // Variable matches (docs/variable-slots-plan.md, Milestone E) — the lobby as a
 // control surface: a MODE toggle, per-seat OPEN/BOT/CLOSED, TEAM assignment, and
 // the ratified ABUNDANCE row. All four ride the one `MatchConfig` seam
@@ -841,6 +884,28 @@ export interface LobbyState {
    * {@link lobbyMatchConfig} seam as the mode and the slots.
    */
   readonly abundance: Abundance;
+  /**
+   * **The LOCAL player's career level** — the one number this screen is allowed
+   * to show about a career, and the only place in the whole game it may appear
+   * (pr-06; plan §Q2, ratified 2026-08-07: *"we can show the LEVEL but not XP
+   * (and show it only in the lobby)"*).
+   *
+   * Read from `src/progression/profile.ts` `loadProfile` by the boot that opens
+   * the lobby and handed in here, exactly like {@link name} and {@link mapId}:
+   * this model imports no storage and no profile, so it stays pure and testable
+   * and the sim can never reach a career through it (GDD §4.8).
+   *
+   * **It is the local player's and nobody else's.** There is no per-seat level on
+   * {@link LobbySeat} and no level on the wire — a remote human's level is a
+   * number their own client authored (plan §2.2: m9 has no accounts), so it is
+   * not read, not requested and not rendered. Never below 1; a fresh career is
+   * level 1 (`freshProfile`).
+   *
+   * **And never XP.** The raw total is private to its owner *always* — the badge
+   * carries a level, never an XP figure, which is why this field is a level and
+   * there is no sibling beside it.
+   */
+  readonly level: number;
   /** Seconds left on the RUSH countdown; 0 outside `counting`. */
   readonly countdown: number;
   /**
@@ -885,6 +950,14 @@ export interface LobbyOptions {
   /** The arena. Default the registry default (`octagon`, "The Ring"); a stale or
    *  hand-edited value is folded down to it ({@link normalizeMapId}). */
   readonly mapId?: string;
+  /**
+   * Your career level, from `loadProfile` (pr-06). Default **1** — a fresh
+   * career, and the same value `freshProfile()` holds, so a lobby opened with no
+   * profile at all draws `LVL 1` rather than a hole. Folded to a whole number ≥ 1
+   * on the way in ({@link levelBadgeLabel}'s discipline), so a hand-edited store
+   * can never put a fraction or a negative on the roster.
+   */
+  readonly level?: number;
   /** Joinable over the wire? Default true (online). The offline solo-vs-bots
    *  boot passes false, which hides the room code and the OPEN seat markers. */
   readonly online?: boolean;
@@ -971,9 +1044,21 @@ export function createLobby(options: LobbyOptions): LobbyState {
     mapId,
     mode: options.mode ?? 'ffa',
     abundance: options.abundance ?? DEFAULT_ABUNDANCE,
+    // A fresh career is level 1 (`freshProfile`), which is also what an absent
+    // option means — so the badge is never blank on a first boot.
+    level: normalizeLevel(options.level),
     countdown: 0,
     online,
   });
+}
+
+/** Fold a career level into range: absent, junk or below 1 is a fresh career
+ *  (level 1), and a fraction is floored. The profile reader already refuses a
+ *  malformed level (`progression/profile.ts` `asLevel`); this is the seam's own
+ *  guard, so a lobby built by a test or a future caller cannot carry one either. */
+function normalizeLevel(level: number | undefined): number {
+  if (level === undefined || !Number.isFinite(level)) return 1;
+  return Math.max(1, Math.floor(level));
 }
 
 /** Fold a requested match size into range: absent means every physical slot open
@@ -1765,6 +1850,32 @@ export interface LobbySeatView {
    * (`src/net/ping` `seatPing`, which owns both rules).
    */
   readonly ping: PingReadout | null;
+  /**
+   * **`LVL 7` on YOUR row, and `null` on every other one** (pr-06; plan §Q2,
+   * ratified 2026-08-07: *"we can show the LEVEL but not XP (and show it only in
+   * the lobby)"*).
+   *
+   * The badge is the whole of the developer's ruling in one field, and the
+   * `null` is the more load-bearing half:
+   *
+   *  - **A bot has no career** — there is no profile behind a personality, and
+   *    inventing a level for one would be printing a number nothing produced.
+   *  - **A remote human's level is a claim, not a fact.** m9 has no accounts
+   *    (plan §2.2), so a level arriving from another client is a number that
+   *    client authored; it is not read, not requested and not rendered, and there
+   *    is no field on the wire carrying one (`../net/transport` `LobbySlot`).
+   *  - **An OPEN or CLOSED seat has nobody in it** to have a career at all.
+   *
+   * Because the badge lives on this screen and this screen is **gone before
+   * RUSH!**, a level can never be read as live information about an opponent —
+   * which is precisely the fog GDD §2.2 exists to keep. The absence is asserted
+   * in `./level-badge.test.ts` rather than left implicit, because an absence
+   * nobody tests for is an absence that comes back.
+   *
+   * It is a **level**, formatted, and never an XP total: raw XP is private to its
+   * owner always, including from its owner's own lobby row.
+   */
+  readonly levelBadge: string | null;
 }
 
 /** A side's active headcount, for the always-visible TEAMS tally (ratified:
@@ -1943,6 +2054,16 @@ function seatView(
     // an empty or shut seat has no connection to time. Stated as "anything that is
     // not a human in a chair" so the three cases cannot drift apart.
     ping: seatPing({ isBot: seat.occupant !== 'human', rtt: seat.rtt }),
+    // The level badge, on the ONE row that has a career behind it: the seat the
+    // local player is actually sitting in. Stated as "a human, and it is you" so
+    // the three ways it could leak are closed by one condition — a bot has no
+    // profile, a remote human's level is a number their client authored (plan
+    // §2.2), and an empty or shut seat has nobody in it. It reads off
+    // `state.you` rather than a slot captured when the lobby was built, so the
+    // badge follows you when the server seats you somewhere else
+    // ({@link seatLocalPlayer}) instead of staying behind on a stranger's row.
+    levelBadge:
+      seat.occupant === 'human' && seat.player === state.you ? levelBadgeLabel(state.level) : null,
     // Shown, not chosen (a0-06): the row's tier chip is read off the character
     // the host picked, so the row cannot advertise a tier the cast disagrees with.
     ...(isBot ? { botDifficulty: PERSONALITIES[seat.character].difficulty as BotDifficulty } : {}),

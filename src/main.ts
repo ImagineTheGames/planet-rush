@@ -5886,6 +5886,24 @@ function readMapId(platform: ReturnType<typeof createBrowserPlatform>): string {
 }
 
 /**
+ * The local player's career LEVEL, for the lobby seat badge (pr-06; plan §Q2,
+ * ratified 2026-08-07: *"we can show the LEVEL but not XP (and show it only in
+ * the lobby)"*).
+ *
+ * Read **here, when the lobby opens**, and not once at boot: the summary screen
+ * banks XP at the end of every match (`bankMatch`), so a player who rematches or
+ * walks back to the roster has a level the front door's read is already stale
+ * about. One `loadProfile` per lobby costs one `localStorage` read.
+ *
+ * The level goes in and **nothing else does** — no XP, no match count. The lobby
+ * model has one field for one number ({@link LobbyState.level}) and no room to
+ * carry a total that is private to its owner.
+ */
+function readCareerLevel(platform: ReturnType<typeof createBrowserPlatform>): number {
+  return loadProfile(platform.storage).level;
+}
+
+/**
  * `?sides=N` (debug only) — the side table a `?debug=1` boot builds its world
  * with, or `null` for the ordinary free-for-all.
  *
@@ -8085,6 +8103,28 @@ interface LobbySeam {
    * a row for real and reads what the row now says.
    */
   seatCharacters: readonly (string | null)[];
+  /**
+   * **The level badge on each roster row** — `LVL 7` on the local player's seat
+   * and `null` on all seven others (pr-06; plan §Q2, ratified 2026-08-07: *"we
+   * can show the LEVEL but not XP (and show it only in the lobby)"*).
+   *
+   * Read-only, and it reports the *drawn* words rather than the profile, so a
+   * suite can assert the ruling on a real boot: exactly one row carries a badge,
+   * it is this client's, and no row anywhere carries an XP total. It is the
+   * lobby-side half of an absence that is otherwise invisible to a full-frame
+   * baseline — a 54px chip is well under a golden's diff tolerance, which is why
+   * this seam exists at all rather than the pixels being trusted to speak.
+   */
+  levelBadges: readonly (string | null)[];
+  /**
+   * …and where the local player's badge was DRAWN, in PHYSICAL (un-rotated,
+   * CSS-px) space, or null when no row carries one.
+   *
+   * The same shape {@link seatStates}'s `physicalBounds` reports and for the same
+   * reason: a seam that only reported a word would have said the badge was fine
+   * on the day it was never drawn. A screenshot region is the second witness.
+   */
+  levelBadgeBounds: Rect | null;
   /** Each roster row's physical centre, so a live-stage run can tap the row BODY
    *  the way a player does and watch the character change. */
   seatControls: readonly { index: number; physicalCenter: { x: number; y: number } }[];
@@ -8204,6 +8244,10 @@ function openLobby(
     shipClass: readShipClass(platform),
     name: readPlayerName(platform),
     mapId: readMapId(platform),
+    // Your career level, for the badge on your own seat row — the ONE place in
+    // the game a level is shown (pr-06; plan §Q2). Nobody else's is read, and no
+    // XP total travels with it.
+    level: readCareerLevel(platform),
     // The whole match shape the host last set (variable-slots Milestone E): the
     // mode, the abundance, and the size (trailing seats pre-closed) — folded to
     // legal values on read, so a stale key can never open an illegal lobby.
@@ -8254,6 +8298,8 @@ function openLobby(
     counting: false,
     localShipClass: null,
     seatCharacters: [],
+    levelBadges: [],
+    levelBadgeBounds: null,
     seatControls: [],
     seatHelpControls: [],
     worldCast: null,
@@ -8313,6 +8359,27 @@ function openLobby(
     // to change or explain it (a0-06). Read off the same `state` the view drew, so
     // the seam cannot report a character the screen is not showing.
     seam.seatCharacters = state.seats.map((s) => s.personality);
+    // The level badge as the roster DREW it (pr-06) — `LVL 7` on your own row and
+    // null on every other, read off the same model the view drew from, plus the
+    // physical box your chip occupies so a suite can photograph it rather than
+    // guess where it is. Both corners through the landscape-lock rotation and
+    // re-normalised, exactly as `seatStates` does it: under the lock the corners
+    // swap sides, and a box built from one of them is backwards on a phone.
+    seam.levelBadges = model.seats.map((s) => s.levelBadge);
+    const badgeRow = model.seats.findIndex((s) => s.levelBadge !== null);
+    const badgeChip = badgeRow >= 0 ? layout.seatChips[badgeRow] : undefined;
+    if (badgeChip && badgeChip.width > 0) {
+      const a = ctx.toPhysical(badgeChip.x, badgeChip.y);
+      const b = ctx.toPhysical(badgeChip.x + badgeChip.width, badgeChip.y + badgeChip.height);
+      seam.levelBadgeBounds = {
+        x: Math.min(a.x, b.x),
+        y: Math.min(a.y, b.y),
+        width: Math.abs(b.x - a.x),
+        height: Math.abs(b.y - a.y),
+      };
+    } else {
+      seam.levelBadgeBounds = null;
+    }
     seam.seatControls = layout.seats.map((r, i) => {
       // The row BODY's midpoint — after the leading state control, before the
       // leftmost trailing chip. That is the strip the name is drawn in, and the
