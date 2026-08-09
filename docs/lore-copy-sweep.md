@@ -1,5 +1,29 @@
 # Lore copy sweep — "planets" → mining facilities
 
+## 0. RATIFIED EXCEPTION — THE FOUR ENTRY DOORS ARE PLAIN, AND NOT YOURS (2026-08-07)
+
+Before executing anything below, or any other copy pass: **the four buttons on the
+entry screen are outside every voice and fiction sweep.** They are `CAMPAIGN`,
+`SOLO`, `HOST`, `JOIN`, and so are the plain hints under them. The developer,
+2026-08-07, reading the screen the industrial-voice sweep had produced:
+
+> *"you took this too far, its too complicated, you can switch it back to how it
+> was CAMPAIGN, SOLO, HOST, JOIN... its way too complex for new players to
+> understand"*
+
+This list never contained those four strings — the doors were re-worded by
+`docs/copy-sweep-industrial-voice.md` §3.2, which is where the exception is
+recorded in full, and where a voice pass must read it. It is repeated here because
+this document is the other list a copy agent opens, and the entry screen is the one
+screen a player meets before they have played anything: it says what the button
+does and nothing else.
+
+Delivered by **a0-15** (UI). Enforced by `src/ui/lobby-entry.test.ts` (the four
+words, pinned with the quote) and `src/ui/voice-door-labels.test.ts` (no refusal
+may name a door that is not on the screen). Everything else below is unaffected.
+
+---
+
 **Status:** delivered spike (branch `agent/architect/l1-station-lore`). This is the
 execution list the **UI Engineer** runs in a follow-up: every *player-facing* string
 that says "planet" or leans on the old fiction, with its replacement. The fiction
