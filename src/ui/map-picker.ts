@@ -158,14 +158,39 @@ export function mapPickerModel(selectedId: string): MapPickerModel {
   const selected = normalizeMapId(selectedId);
   return {
     selectedId: selected,
-    cards: MAPS.map((map) => ({
-      id: map.id,
-      name: map.name,
-      blurb: map.blurb,
-      veteran: map.id === VETERAN_MAP_ID,
-      selected: map.id === selected,
-      preview: mapPreview(map),
-    })),
+    cards: MAPS.map((map) => cardFor(map, selected)),
+  };
+}
+
+/**
+ * **One card, for one map** — the lobby's single arena card since u10-01, where
+ * the four-card row moved to its own screen and the lobby kept only the pick.
+ *
+ * It is the same {@link MapCardModel} {@link mapPickerModel} builds, from the same
+ * registry entry, through the same {@link mapPreview}: the lobby's summary card and
+ * the MAP SELECT card the player pressed to choose it are the *same picture*, which
+ * is the whole reason this is a shared constructor rather than a second one written
+ * for the lobby. An unknown id folds to the default ({@link normalizeMapId}), so a
+ * stale stored key can never leave the card blank.
+ *
+ * `selected` is always true here: a card built for the current pick is the current
+ * pick. The lobby draws it raised for that reason and the view needs no second flag.
+ */
+export function mapCardModel(id: string): MapCardModel {
+  const selected = normalizeMapId(id);
+  return cardFor(getMap(selected), selected);
+}
+
+/** One registry entry as a card, lit when it is the selection. The single place a
+ *  `MapCardModel` is authored, so the row and the lone card cannot drift. */
+function cardFor(map: MapDef, selectedId: string): MapCardModel {
+  return {
+    id: map.id,
+    name: map.name,
+    blurb: map.blurb,
+    veteran: map.id === VETERAN_MAP_ID,
+    selected: map.id === selectedId,
+    preview: mapPreview(map),
   };
 }
 
@@ -184,7 +209,20 @@ export const MAP_CARD_MAX_WIDTH = 240;
 /** A card shorter than this cannot fit a preview over a name over a blurb; the
  *  view drops the blurb below it rather than clipping (m8-02 thumb rule). */
 export const MAP_CARD_MIN_HEIGHT = 84;
-export const MAP_CARD_MAX_HEIGHT = 150;
+/**
+ * …and the ceiling.
+ *
+ * **190 since u10-01, up from 150.** The 150 was chosen while this row lived in a
+ * reserved strip on the PLAY flow, where a taller card would have eaten the menu.
+ * The row has a screen of its own now ({@link ./map-select}), and at 150 a desktop
+ * card was 190 wide — narrow enough that the longest registry blurb ("The
+ * Crescents", four wrapped lines) ran out of the bottom of its own card while its
+ * five neighbours fitted in three. A square-ish card holds every blurb the registry
+ * has and reads as a board rather than as a banner; the view still drops an
+ * overrunning blurb whole rather than clipping it, which is the guard that found
+ * this.
+ */
+export const MAP_CARD_MAX_HEIGHT = 190;
 
 /** How the four cards are arranged in the band. */
 export type MapCardShape = 'row' | 'grid';
@@ -202,11 +240,11 @@ export interface MapPickerLayout {
 
 /**
  * Lay `count` cards out inside `band`, choosing the arrangement that keeps each
- * card wide enough to read its blurb (m8-02): one row of four where the band is
- * wide enough (desktop, phone-landscape), a 2×2 grid where it is not (a narrow
- * portrait window). Cards are **capped**, never stretched, and the block is
- * centred — so nothing escapes the band by construction, the same discipline
- * every geometry file here keeps.
+ * card wide enough to read its blurb (m8-02): the whole registry in one row where
+ * the band is wide enough (desktop), then **three columns** (a landscape phone),
+ * then two (a narrow portrait window). Cards are **capped**, never stretched, and
+ * the block is centred — so nothing escapes the band by construction, the same
+ * discipline every geometry file here keeps.
  *
  * `isTouch` is a *scale* input, not a layout one: the cards are already large
  * enough to be thumb targets on every device (a card is ≥ {@link MAP_CARD_MIN_HEIGHT}
@@ -219,9 +257,23 @@ export function mapPickerLayout(band: Rect, count = MAPS.length, _isTouch = fals
     return { band, cards: [], columns: 0, shape: 'row' };
   }
 
-  const rowWidth = (band.width - (n - 1) * MAP_CARD_GAP) / n;
-  const shape: MapCardShape = rowWidth >= MAP_CARD_MIN_WIDTH ? 'row' : 'grid';
-  const columns = shape === 'row' ? n : Math.min(2, n);
+  // The widest arrangement whose cards still read: the whole registry across, then
+  // three columns, then two.
+  //
+  // **Three is new (u10-01), and it closes a note this file left for its own
+  // owner.** a0-12 took the registry to six maps, found that a 780×150
+  // phone-landscape strip folded straight from a row to 2×3 with 43px cards, and
+  // wrote down the three ways out — *"drop MAP_CARD_MIN_WIDTH to ~122, give the
+  // band more height, or let the grid run 3 columns instead of 2"* — while noting
+  // that nothing a player saw was broken, because the shipped lobby row had its own
+  // looser geometry. u10-01 deleted that row: this function is the shipped path now,
+  // so the note had to be answered rather than carried. Three columns is the answer
+  // that costs nothing — the same 780px band gives 253px cards, 70px tall, over
+  // both floors, where the fold to two gave 43.
+  const columns = [n, 3, 2].find(
+    (c) => c <= n && (band.width - (c - 1) * MAP_CARD_GAP) / c >= MAP_CARD_MIN_WIDTH,
+  ) ?? Math.min(2, n);
+  const shape: MapCardShape = columns === n ? 'row' : 'grid';
   const rows = Math.ceil(n / columns);
 
   const cardWidth = clamp((band.width - (columns - 1) * MAP_CARD_GAP) / columns, 0, MAP_CARD_MAX_WIDTH);

@@ -90,9 +90,9 @@ import {
 } from './lobby-entry';
 import type { EntryIntent, EntryState } from './lobby-entry';
 import {
-  CLASS_ORDER,
   applyLobbySlots,
   botDifficulties,
+  closeLobbyScreen,
   lobbyWireSeats,
   lobbyWireTeams,
   createLobby,
@@ -100,6 +100,8 @@ import {
   cycleSeatCharacter,
   cycleSeatState,
   cycleSeatTeam,
+  openMapSelect,
+  openShipSelect,
   pressRush,
   seatLocalPlayer,
   selectMap,
@@ -110,6 +112,9 @@ import {
   toggleMode,
 } from './lobby';
 import type { LobbyState } from './lobby';
+import { shipClassAt } from './ship-select';
+import type { ShipSelectTarget } from './ship-select';
+import type { MapSelectTarget } from './map-select';
 import { mapIdAt } from './map-picker';
 import { equipCosmetic, COSMETICS } from './hangar';
 import type { Cosmetic, HangarTarget } from './hangar';
@@ -364,6 +369,20 @@ function withLobby(state: FlowState, lobby: LobbyState): FlowResult {
   return { state: next, effects: [choiceFor(next, lobby)] };
 }
 
+/**
+ * Fold a new lobby in **without telling the server** — the u10-01 screen moves.
+ *
+ * Which of the room's three screens a player is standing on is not match config:
+ * it is not on the wire, it is not in {@link LobbyState}'s handoff to the sim, and
+ * a `lobbyChoice` sent for it would be a message about nothing, broadcast to every
+ * client in the room, every time somebody looked at the hulls. So opening and
+ * closing a picker costs the wire exactly zero — which is the same accounting
+ * {@link withLobby} does for a refused tap, arrived at from the other direction.
+ */
+function still(state: FlowState, lobby: LobbyState): FlowResult {
+  return state.lobby === lobby ? rest(state) : rest({ ...state, lobby });
+}
+
 // ---------------------------------------------------------------------------
 // The door
 // ---------------------------------------------------------------------------
@@ -514,10 +533,19 @@ export function flowTapLobby(state: FlowState, target: LobbyTarget): FlowResult 
   const lobby = state.lobby;
   if (state.screen !== 'lobby' || !lobby) return rest(state);
   switch (target.kind) {
-    case 'class': {
-      const shipClass: ShipClass | undefined = CLASS_ORDER[target.index];
-      return shipClass === undefined ? rest(state) : withLobby(state, selectShipClass(lobby, shipClass));
-    }
+    case 'shipCard':
+      // **Opens SHIP SELECT** (u10-01). The lobby's one hull card is not a pick —
+      // there is nothing to choose between on a screen showing one hull — so the
+      // only thing a press on it can mean is "show me the four". Nothing here
+      // reaches the wire: which screen a player is standing on is not match config,
+      // so `withLobby`'s `lobbyChoice` would be a message about nothing.
+      return still(state, openShipSelect(lobby));
+    case 'mapCard':
+      // **Opens MAP SELECT** — for a guest too. The arena is the host's and stays
+      // the host's; what is refused is the *pick*, on the screen this opens, and a
+      // card that would not even open would read as broken while withholding
+      // information the player is owed (`./lobby` `openMapSelect`).
+      return still(state, openMapSelect(lobby));
     case 'seat': {
       // **The row BODY cycles the seat's CHARACTER** (a0-06). The body is where the
       // row draws the name, so the tap that lands on a name is the tap that changes
@@ -561,12 +589,6 @@ export function flowTapLobby(state: FlowState, target: LobbyTarget): FlowResult 
     case 'abundance':
       // SCARCE → STANDARD → RICH (ratified p11). Locked with the hull at RUSH!.
       return withLobby(state, cycleAbundance(lobby));
-    case 'map':
-      // The arena picker moved into the lobby (p2). Folded in like the hull; a
-      // refusal (locked after RUSH!) returns the identical lobby, so `withLobby`
-      // sends nothing. The arena is not yet in the wire protocol, so an online
-      // room ignores the re-sent choice — offline is where the pick has teeth.
-      return withLobby(state, selectMap(lobby, mapIdAt(target.index)));
     case 'rush': {
       // No message yet — the countdown has to run first (rule 2). A guest's
       // press is refused by `pressRush`, which returns the identical lobby, and
@@ -592,6 +614,58 @@ export function flowTapLobby(state: FlowState, target: LobbyTarget): FlowResult 
       return lobby.online ? { state: next, effects: [{ kind: 'close-transport' }] } : rest(next);
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// The two screens the lobby's cards open (u10-01)
+// ---------------------------------------------------------------------------
+
+/**
+ * Tap SHIP SELECT — a target from {@link ./ship-select} `shipSelectHitTest`,
+ * mapped back through {@link CLASS_ORDER} so the tile the finger landed on is the
+ * hull the model records.
+ *
+ * BACK returns to the roster with the pick untouched; a tile picks and returns
+ * ({@link pickShipClass}). The `lobbyChoice` is emitted **only when the hull
+ * actually moved**, which is why the pick is taken in two steps here rather than
+ * through `pickShipClass` alone: pressing the card you are already flying is a
+ * player agreeing with themselves, and it owes the room nothing.
+ *
+ * A no-op unless SHIP SELECT is really the screen up — a stray tap arriving a
+ * frame after BACK must not re-pick a hull on the roster behind it.
+ */
+export function flowTapShipSelect(state: FlowState, target: ShipSelectTarget): FlowResult {
+  const lobby = state.lobby;
+  if (state.screen !== 'lobby' || !lobby || lobby.screen !== 'ship-select') return rest(state);
+  if (target.kind === 'back') return still(state, closeLobbyScreen(lobby));
+  const shipClass: ShipClass | undefined = shipClassAt(target.index);
+  if (shipClass === undefined) return rest(state);
+  const picked = selectShipClass(lobby, shipClass);
+  // The hull moved ⇒ the room is owed a choice; either way the screen closes.
+  return picked === lobby
+    ? still(state, closeLobbyScreen(lobby))
+    : withLobby(state, closeLobbyScreen(picked));
+}
+
+/**
+ * Tap MAP SELECT — a target from {@link ./map-select} `mapSelectHitTest`, mapped
+ * back through the picker's own {@link mapIdAt} so the card drawn and the arena
+ * recorded cannot drift.
+ *
+ * **A guest's tap on a card returns them to the roster having changed nothing.**
+ * `selectMap` refuses them (the arena is the host's), the screen closes anyway,
+ * and — because the lobby came back identical — the wire hears nothing at all.
+ * That is the whole read-only behaviour, and it is three lines rather than a mode
+ * flag because the refusal already lives in one place.
+ */
+export function flowTapMapSelect(state: FlowState, target: MapSelectTarget): FlowResult {
+  const lobby = state.lobby;
+  if (state.screen !== 'lobby' || !lobby || lobby.screen !== 'map-select') return rest(state);
+  if (target.kind === 'back') return still(state, closeLobbyScreen(lobby));
+  const picked = selectMap(lobby, mapIdAt(target.index));
+  return picked === lobby
+    ? still(state, closeLobbyScreen(lobby))
+    : withLobby(state, closeLobbyScreen(picked));
 }
 
 /**

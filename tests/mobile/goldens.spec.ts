@@ -1200,6 +1200,16 @@ interface LobbyGoldenSeam {
   readonly mode: string;
   readonly seatStates: readonly { readonly label: string }[];
   readonly modeControl: { readonly physicalCenter: { readonly x: number; readonly y: number } };
+  /** Which of the room's three screens is up (u10-01) — the readback the two
+   *  picker baselines below wait on before they shoot. */
+  readonly screen: string;
+  /** The lobby's ONE ship card and ONE arena card, and the physical point a real
+   *  press has to land on to open each picker. */
+  readonly shipCardControl: { readonly physicalCenter: { readonly x: number; readonly y: number } };
+  readonly mapCardControl: { readonly physicalCenter: { readonly x: number; readonly y: number } };
+  /** The picker screens' own controls — empty unless their screen is the one up. */
+  readonly classControls: readonly { readonly index: number }[];
+  readonly mapCards: readonly { readonly width: number; readonly height: number }[];
 }
 
 /**
@@ -1278,6 +1288,118 @@ async function rotateToLandscape(page: Page): Promise<void> {
   const vp = page.viewportSize();
   if (vp) await page.setViewportSize({ width: vp.height, height: vp.width });
 }
+
+// ---------------------------------------------------------------------------
+// The two screens the lobby's cards open (u10-01)
+// ---------------------------------------------------------------------------
+//
+// The developer reported this by LOOKING at the lobby — *"we should only show 1
+// ship and 1 map in lobby because it's too cluttered now"* — and will judge it the
+// same way. So the pair of new screens gets baselines on both form factors, and
+// they are reached by **pressing the card**, not by calling a seam: a baseline of a
+// screen reached by a press proves it is also reachable.
+//
+// They are also the only images in this file of a screen that did not exist last
+// week, which is worth stating: the five lobby baselines below are RE-baselined
+// (one card each where there were four hull tiles and six arena cards), and these
+// four are new. Both halves of that were eyeballed before they were committed.
+
+/** Press the lobby's ship card the way a player does, and wait for SHIP SELECT to
+ *  report itself up with its four tiles laid out. */
+async function openShipSelect(page: Page): Promise<void> {
+  await openPicker(page, 'ship');
+}
+
+/** …and the arena card, for MAP SELECT. */
+async function openMapSelect(page: Page): Promise<void> {
+  await openPicker(page, 'map');
+}
+
+async function openPicker(page: Page, which: 'ship' | 'map'): Promise<void> {
+  const point = await page.evaluate((w) => {
+    const l = (window as unknown as { __lobby?: LobbyGoldenSeam }).__lobby;
+    if (!l) return null;
+    const c = w === 'ship' ? l.shipCardControl : l.mapCardControl;
+    return { x: c.physicalCenter.x, y: c.physicalCenter.y };
+  }, which);
+  expect(point, `the lobby reports where the ${which} card is drawn`).not.toBeNull();
+  await page.mouse.click(point!.x, point!.y);
+  await page.waitForFunction(
+    (w) => {
+      const l = (window as unknown as { __lobby?: LobbyGoldenSeam }).__lobby;
+      if (!l) return false;
+      // The screen is up AND has laid its own controls out — a screen that reported
+      // itself open with nothing on it is the empty-room failure LESSONS §20 names.
+      return w === 'ship'
+        ? l.screen === 'ship-select' && l.classControls.length === 4
+        : l.screen === 'map-select' && l.mapCards.length === 6;
+    },
+    which,
+    { timeout: 20_000 },
+  );
+  await page.mouse.move(1, 1);
+  await settleFrames(page);
+}
+
+test('golden: desktop SHIP SELECT — four hulls, pips AND numbers', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot → PLAY → PLAY SOLO → press the ship card → SHIP SELECT settle → one full-frame golden comparison',
+    measuredSeconds: 14,
+  });
+
+  await openLobby(page);
+  await openShipSelect(page);
+  await expect(page).toHaveScreenshot('desktop-ship-select.png', MENU_GOLDEN);
+});
+
+test('golden: desktop MAP SELECT — the six arenas and the VETERAN tag', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot → PLAY → PLAY SOLO → press the arena card → MAP SELECT settle → one full-frame golden comparison',
+    measuredSeconds: 14,
+  });
+
+  await openLobby(page);
+  await openMapSelect(page);
+  await expect(page).toHaveScreenshot('desktop-map-select.png', MENU_GOLDEN);
+});
+
+test('golden: landscape phone SHIP SELECT — the comparison, at thumb scale', async ({
+  page,
+}, testInfo) => {
+  // The phone is the reason the brief exists. In the lobby column these four tiles
+  // were a 172×66 box that dropped GDD §2.11's role blurb on every handset in QA's
+  // matrix; this is the image that says whether the screen bought that back.
+  test.skip(testInfo.project.name !== 'iphone', 'one landscape phone baseline only (iphone)');
+  budgetTest({
+    work: 'rotate to landscape → boot → lobby → press the ship card → SHIP SELECT settle → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 18,
+  });
+
+  await rotateToLandscape(page);
+  await openLobby(page);
+  await openShipSelect(page);
+  await expect(page).toHaveScreenshot('phone-landscape-ship-select.png', MENU_GOLDEN);
+});
+
+test('golden: landscape phone MAP SELECT — six arenas, over the thumb floor', async ({
+  page,
+}, testInfo) => {
+  // The arena row has been squeezed for three briefs (p2 → u7-03 → a0-12, which
+  // had to compress its gutter to two pixels to hold six cards). This is the first
+  // image of it with a band of its own.
+  test.skip(testInfo.project.name !== 'iphone', 'one landscape phone baseline only (iphone)');
+  budgetTest({
+    work: 'rotate to landscape → boot → lobby → press the arena card → MAP SELECT settle → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 18,
+  });
+
+  await rotateToLandscape(page);
+  await openLobby(page);
+  await openMapSelect(page);
+  await expect(page).toHaveScreenshot('phone-landscape-map-select.png', MENU_GOLDEN);
+});
 
 test('golden: desktop lobby + ship select — Gantry/Bone', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');

@@ -36,7 +36,7 @@
  */
 
 import type { Rect, Viewport } from '@platform/layout-registry';
-import { beamContentInset, frameMetrics, plateHeight } from '../art/materials';
+import { TOUCH_MIN, beamContentInset, frameMetrics, plateHeight } from '../art/materials';
 import type { BeamKind, FrameMetrics, PlateRole, PlateScale } from '../art/materials';
 import type { Insets } from './menu-geometry';
 
@@ -167,6 +167,50 @@ export function beamPlate(
       ? strip.x + offset
       : strip.x + strip.width - w - offset;
   return { x, y: strip.y + (strip.height - h) / 2, width: w, height: h };
+}
+
+/**
+ * A footer plate that keeps the **thumb floor even where the beam cannot hold
+ * one** — and the band's share of the bill.
+ *
+ * The lobby worked this out first for RUSH! and did it inline (`./lobby-geometry`):
+ * a 390-wide phone in PORTRAIT resolves a 28px footer beam, so a plate centred in
+ * it would be a 28px control, and RUSH! is the one thing on that screen a player
+ * has to be able to press. It takes {@link TOUCH_MIN} regardless, grows **upward**
+ * out of the beam, and the band gives up exactly the overflow — which is air
+ * between the band and the beam by construction.
+ *
+ * u10-01's two picker screens have the same one-control-you-must-press shape (BACK
+ * is the only way off either), so the arithmetic lives here rather than being
+ * copied a third time. The returned `overflow` is what the caller must subtract
+ * from its band, and it is zero on every viewport whose beam is already tall
+ * enough — which is every desktop and every phone in landscape.
+ *
+ * `align` picks the end of the beam: `leading` for a BACK plate, `trailing` for an
+ * action (the settings screen's DONE, the lobby's RUSH!).
+ */
+export function beamActionPlate(
+  frame: GantryFrame,
+  m: FrameMetrics,
+  width: number,
+  align: BeamAlign = 'leading',
+): { readonly rect: Rect; readonly overflow: number } {
+  const strip = beamContent(frame.footer, m, 'footer');
+  const height = Math.max(
+    0,
+    Math.min(
+      Math.max(TOUCH_MIN, plateHeight('compact', m)),
+      frame.footer.height + m.gutter + frame.band.height,
+    ),
+  );
+  const overflow = Math.max(0, height - (frame.footer.height + m.gutter));
+  const bottom = frame.footer.y + frame.footer.height;
+  // Centred in the beam where it fits; bottom-aligned and growing up where it does
+  // not — never past the safe-area edge below it.
+  const y = Math.min(strip.y + (strip.height - height) / 2, bottom - height);
+  const w = Math.max(0, Math.min(width, strip.width));
+  const x = align === 'leading' ? strip.x : strip.x + strip.width - w;
+  return { rect: { x, y, width: w, height }, overflow };
 }
 
 // ---------------------------------------------------------------------------
