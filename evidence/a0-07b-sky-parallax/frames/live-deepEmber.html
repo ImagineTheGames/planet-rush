@@ -1,0 +1,68 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+  body { margin: 0; padding: 28px 24px 34px; background: #14181d; color: #b9c2cc;
+         font-family: 'Oxanium', ui-monospace, monospace; }
+  h1 { font-size: 19px; margin: 0 0 4px; color: #4DC3FF; font-weight: 600; }
+  .lede { font-size: 12.5px; margin: 0 0 22px; max-width: 2560px; line-height: 1.55; color: #8b96a3; }
+  .lede b { color: #b9c2cc; }
+  h2 { font-size: 14px; margin: 20px 0 8px; color: #e7edf3; font-weight: 600; }
+  h2 .sub { color: #7E8894; font-weight: 400; font-size: 12px; }
+  .strip { display: flex; gap: 14px; }
+  figure { margin: 0; }
+  figure img { display: block; width: 844px; height: 390px; border: 1px solid #2b333c; }
+  figcaption { font-size: 11px; line-height: 1.5; padding-top: 6px; color: #8b96a3; }
+  figcaption b { color: #cfd7e0; font-weight: 600; }
+  h3 { font-size: 11.5px; margin: 14px 0 6px; color: #7E8894; font-weight: 400; }
+  .crop { overflow: hidden; border: 1px solid #39424c; }
+  .crop img { border: 0; }
+</style></head><body>
+    <h1>Deep Ember — one straight flight, the real build, before and after (a0-07b)</h1>
+    <p class="lede">
+      a sparse one, on <b>line</b>, landscape phone 844×390 at dpr 3, <b>?debug=1</b> with the sim running:
+      the ship is flown in a straight line on a held key (east, whichever side of
+      this board has room) and a frame is taken at the start, 300 u along and 600 u along. Everything in the world moves a full 1 px per unit flown; the far star field moves
+      0.10 of that. The question is only what the sky does between the three frames — and whether it
+      stays with the stars or with the ship.
+    </p>
+    <section>
+  <h2>BEFORE — origin/main, parallax 0.05 <span class="sub">the build the developer reported</span></h2>
+  <div class="strip"><figure><img src="2-live-deepEmber-before-1.png"/><figcaption>
+        <b>start</b> — ship at world x = 683 u (0 u flown)
+      </figcaption></figure><figure><img src="2-live-deepEmber-before-2.png"/><figcaption>
+        <b>middle</b> — ship at world x = 1155 u (472 u flown)
+      </figcaption></figure><figure><img src="2-live-deepEmber-before-3.png"/><figcaption>
+        <b>end</b> — ship at world x = 1447 u (765 u flown)
+      </figcaption></figure></div>
+  <h3>the same three frames, 2x on the open band between the HUD bars (x 300-720, y 85-200) — the sky is a whisper by design, so it needs the zoom</h3>
+  <div class="strip"><figure><div class="crop" style="width:924.0000000000001px;height:253.00000000000003px">
+  <img src="2-live-deepEmber-before-1.png" style="width:1856.8000000000002px;height:858.0000000000001px;
+       margin-left:-660px;margin-top:-187.00000000000003px"/>
+</div><figcaption>start</figcaption></figure><figure><div class="crop" style="width:924.0000000000001px;height:253.00000000000003px">
+  <img src="2-live-deepEmber-before-2.png" style="width:1856.8000000000002px;height:858.0000000000001px;
+       margin-left:-660px;margin-top:-187.00000000000003px"/>
+</div><figcaption>middle</figcaption></figure><figure><div class="crop" style="width:924.0000000000001px;height:253.00000000000003px">
+  <img src="2-live-deepEmber-before-3.png" style="width:1856.8000000000002px;height:858.0000000000001px;
+       margin-left:-660px;margin-top:-187.00000000000003px"/>
+</div><figcaption>end</figcaption></figure></div>
+</section>
+    <section>
+  <h2>AFTER — this branch, parallax 0.085 <span class="sub">the sky travels with the far star field</span></h2>
+  <div class="strip"><figure><img src="2-live-deepEmber-after-1.png"/><figcaption>
+        <b>start</b> — ship at world x = 683 u (0 u flown)
+      </figcaption></figure><figure><img src="2-live-deepEmber-after-2.png"/><figcaption>
+        <b>middle</b> — ship at world x = 1156 u (473 u flown)
+      </figcaption></figure><figure><img src="2-live-deepEmber-after-3.png"/><figcaption>
+        <b>end</b> — ship at world x = 1436 u (754 u flown)
+      </figcaption></figure></div>
+  <h3>the same three frames, 2x on the open band between the HUD bars (x 300-720, y 85-200) — the sky is a whisper by design, so it needs the zoom</h3>
+  <div class="strip"><figure><div class="crop" style="width:924.0000000000001px;height:253.00000000000003px">
+  <img src="2-live-deepEmber-after-1.png" style="width:1856.8000000000002px;height:858.0000000000001px;
+       margin-left:-660px;margin-top:-187.00000000000003px"/>
+</div><figcaption>start</figcaption></figure><figure><div class="crop" style="width:924.0000000000001px;height:253.00000000000003px">
+  <img src="2-live-deepEmber-after-2.png" style="width:1856.8000000000002px;height:858.0000000000001px;
+       margin-left:-660px;margin-top:-187.00000000000003px"/>
+</div><figcaption>middle</figcaption></figure><figure><div class="crop" style="width:924.0000000000001px;height:253.00000000000003px">
+  <img src="2-live-deepEmber-after-3.png" style="width:1856.8000000000002px;height:858.0000000000001px;
+       margin-left:-660px;margin-top:-187.00000000000003px"/>
+</div><figcaption>end</figcaption></figure></div>
+</section>
+  </body></html>
