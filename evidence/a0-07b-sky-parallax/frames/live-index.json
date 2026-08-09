@@ -1,0 +1,84 @@
+{
+  "after": "http://localhost:4272",
+  "before": "http://localhost:4273",
+  "cases": [
+    {
+      "sky": "plasmaReef",
+      "map": "oval",
+      "before": [
+        {
+          "name": "2-live-plasmaReef-before-1.png",
+          "worldX": 2820,
+          "flown": 0
+        },
+        {
+          "name": "2-live-plasmaReef-before-2.png",
+          "worldX": 2362,
+          "flown": 458
+        },
+        {
+          "name": "2-live-plasmaReef-before-3.png",
+          "worldX": 2093,
+          "flown": 727
+        }
+      ],
+      "after": [
+        {
+          "name": "2-live-plasmaReef-after-1.png",
+          "worldX": 2820,
+          "flown": 0
+        },
+        {
+          "name": "2-live-plasmaReef-after-2.png",
+          "worldX": 2384,
+          "flown": 436
+        },
+        {
+          "name": "2-live-plasmaReef-after-3.png",
+          "worldX": 2067,
+          "flown": 753
+        }
+      ],
+      "composite": "3-live-plasmaReef-before-vs-after.png"
+    },
+    {
+      "sky": "deepEmber",
+      "map": "line",
+      "before": [
+        {
+          "name": "2-live-deepEmber-before-1.png",
+          "worldX": 683,
+          "flown": 0
+        },
+        {
+          "name": "2-live-deepEmber-before-2.png",
+          "worldX": 1155,
+          "flown": 472
+        },
+        {
+          "name": "2-live-deepEmber-before-3.png",
+          "worldX": 1447,
+          "flown": 765
+        }
+      ],
+      "after": [
+        {
+          "name": "2-live-deepEmber-after-1.png",
+          "worldX": 683,
+          "flown": 0
+        },
+        {
+          "name": "2-live-deepEmber-after-2.png",
+          "worldX": 1156,
+          "flown": 473
+        },
+        {
+          "name": "2-live-deepEmber-after-3.png",
+          "worldX": 1436,
+          "flown": 754
+        }
+      ],
+      "composite": "3-live-deepEmber-before-vs-after.png"
+    }
+  ]
+}
