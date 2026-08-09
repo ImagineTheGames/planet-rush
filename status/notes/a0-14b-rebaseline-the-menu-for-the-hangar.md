@@ -170,9 +170,42 @@ lock the portrait frame is the landscape frame rotated 90°, so the two frames
 differ by a transpose and necessarily share a pixel count (844×390 = 390×844).
 Verify before "fixing" it.
 
+### THE BRIEF NAMED TWO GOLDENS. THERE ARE THREE.
+
+The single most important thing on this page. `194c2d5`.
+
+`desktop-title-desktop-linux.png` (`goldens.spec.ts:648`, 1280×800) draws the
+same main menu and therefore moves for the same reason. Nothing on this branch
+had ever touched it. It is **20.04%** different against a 1% tolerance — not a
+marginal case, not a flake.
+
+Why nobody saw it: the brief was scoped from a failure list containing only
+`[iphone]` failures. And the reason that list was incomplete is §4 above — the
+mobile gate had **never run** on this branch. The instant the two phone frames
+were pushed and the `pull_request` run fired for the first time, shard **4/6**
+came back red on exactly this test, all three attempts.
+
+So the two failures compounded: a gate that never ran produced a partial failure
+list, and a brief scoped from that partial list looked complete. `fail == 0` and
+`SKIPPED` are indistinguishable in `gh pr checks`.
+
+**The rule to carry forward:** when a change touches a screen, derive the
+goldens to re-shoot from *which frames draw that screen* — `grep` the spec for
+the ones that reach it — never from which ones happened to be red. Here that is
+three: `desktop-title`, `phone-landscape-title`, `phone-portrait-title`. The
+other menu goldens (settings, doors, codex, lobby) navigate away from the main
+menu and correctly did not move; that was checked, not assumed.
+
+It got the full discipline anyway: desktop SETTINGS as pixel-for-pixel control,
+the HANGAR-removed control reproducing the committed baseline exactly, eyes on
+the frame, two bands (stack rows 229–570, sha stamp rows 782–789), no third.
+
 ## NEXT
 
-1. Push, then confirm a **`pull_request`**-event run exists for the new head sha
-   and that `Mobile emulation (Playwright)` is **SUCCESS — not SKIPPED**. That,
-   not the fail-count, is the DoD's real question (see §4 above).
-2. Per-snapshot justification into #333's body.
+1. **Waiting on CI run `31295127781`** (`pull_request`, head `194c2d5`) — the
+   first run that carries all three re-baselined frames. Needs
+   `Mobile emulation (Playwright)` = **SUCCESS**, and specifically shard 4/6,
+   which is the one that was red.
+2. If a shard is red on something else, read it before assuming flake: shards
+   1/2/3/5/6 were already green on the two-golden tree, so a new failure there
+   would be real.
