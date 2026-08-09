@@ -15,6 +15,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
+  MIGRATABLE_VERSIONS,
   PROFILE_BACKUP_KEY,
   PROFILE_KEY,
   PROFILE_VERSION,
@@ -26,6 +27,7 @@ import {
   type Profile,
   type ProfileStorage,
 } from './profile';
+import { levelForXp, xpToReach } from './curve';
 
 /** The seam, in memory. Structurally `platform.storage` and nothing more. */
 function memoryStorage(seed: Record<string, string> = {}): ProfileStorage & { readonly map: Map<string, string> } {
@@ -40,7 +42,13 @@ function memoryStorage(seed: Record<string, string> = {}): ProfileStorage & { re
 describe('round trip', () => {
   it('saves and loads back equal to itself', () => {
     const store = memoryStorage();
-    const profile: Profile = { v: 1, xp: 4211, level: 5, matches: 12 };
+    // A CONSISTENT pair: `level` is a cache of `xp`, so a fixture that pairs
+    // 4211 XP with level 5 is not a profile this game can produce — the reader
+    // rebuilds the cache and the round trip would fail on the fixture's own
+    // arithmetic rather than on anything the module did wrong.
+    const xp = xpToReach(5);
+    const profile: Profile = { v: 1, xp, level: 5, matches: 12 };
+    expect(levelForXp(xp)).toBe(5);
     saveProfile(store, profile);
     expect(loadProfile(store)).toEqual(profile);
   });
@@ -185,13 +193,39 @@ describe('nothing is destroyed silently', () => {
 
 describe('the migration seam', () => {
   it('exists, is called for a known older version, and its result is used', () => {
+    const xp = xpToReach(3);
     const store = memoryStorage({
-      [PROFILE_KEY]: JSON.stringify({ v: 0, xp: 1200, level: 3, matches: 5 }),
+      [PROFILE_KEY]: JSON.stringify({ v: 0, xp, level: 3, matches: 5 }),
     });
     // Not a fold: the numbers survive the version bump.
-    expect(loadProfile(store)).toEqual({ v: 1, xp: 1200, level: 3, matches: 5 });
+    expect(loadProfile(store)).toEqual({ v: 1, xp, level: 3, matches: 5 });
     // …and nothing was backed up, because nothing was lost.
     expect(store.map.has(PROFILE_BACKUP_KEY)).toBe(false);
+  });
+
+  it('has no gaps in the ladder — a rung for every version below the current one', () => {
+    // The guard on the whole seam. Bumping PROFILE_VERSION to 2 without adding a
+    // `1` rung makes this red, instead of shipping a build where every v:0 and
+    // v:1 profile in the world folds to a fresh career on first boot.
+    for (let v = 0; v < PROFILE_VERSION; v++) {
+      expect(MIGRATABLE_VERSIONS, `no migration rung for v:${v}`).toContain(v);
+    }
+    // And every rung is a rung, not a leap: none claims a version at or above
+    // the current one, which is what makes the walk single-stepped.
+    for (const v of MIGRATABLE_VERSIONS) expect(v).toBeLessThan(PROFILE_VERSION);
+  });
+
+  it('walks EVERY rung, so the oldest profile still arrives — not just the newest', () => {
+    // Today the ladder is one rung, so this is the same as the case above. It
+    // stops being the same the day v:2 ships, and that is the day it matters:
+    // the oldest blobs are the ones with the longest careers in them.
+    const oldest = Math.min(...MIGRATABLE_VERSIONS);
+    const xp = xpToReach(4);
+    const migrated = migrate({ v: oldest, xp, level: 4, matches: 9 });
+    expect(migrated).not.toBeNull();
+    expect(migrated?.v).toBe(PROFILE_VERSION);
+    expect(migrated?.xp).toBe(xp);
+    expect(migrated?.matches).toBe(9);
   });
 
   it('routes only KNOWN older versions — current and newer are not migrations', () => {
@@ -209,9 +243,88 @@ describe('the migration seam', () => {
   });
 });
 
+describe('the write is guarded by the reader', () => {
+  /** The invariant: `saveProfile` never writes a blob `loadProfile` would reject.
+   *  Stated once, checked against every adversarial profile below. */
+  function neverWritesUnreadable(profile: Profile): void {
+    const store = memoryStorage();
+    const good: Profile = { v: 1, xp: xpToReach(3), level: 3, matches: 7 };
+    saveProfile(store, good);
+
+    const written = saveProfile(store, profile);
+    const onDisk = store.map.get(PROFILE_KEY) as string;
+    if (written) {
+      // If it claimed to write, the reader must accept what it wrote.
+      expect(validateProfile(JSON.parse(onDisk)), JSON.stringify(profile)).not.toBeNull();
+    } else {
+      // If it refused, the career that was already there is untouched.
+      expect(JSON.parse(onDisk), JSON.stringify(profile)).toEqual(good);
+    }
+  }
+
+  it('refuses a non-finite xp rather than writing JSON `null` over a career', () => {
+    // The failure this guard exists for. `JSON.stringify({xp: NaN})` is
+    // `{"xp":null}` — no throw, no warning — and the loss only surfaces on the
+    // NEXT boot, when the reader folds a blob it cannot accept. pr-04 is the
+    // single write site and it computes `xp += gain`; one non-finite `gain` is
+    // all it takes.
+    const store = memoryStorage();
+    const good: Profile = { v: 1, xp: xpToReach(6), level: 6, matches: 20 };
+    saveProfile(store, good);
+
+    const broken = { ...good, xp: Number.NaN } as Profile;
+    expect(saveProfile(store, broken)).toBe(false);
+
+    // Nothing was written, so the career reads back whole — not folded, and not
+    // merely recoverable from the backup key.
+    expect(loadProfile(store)).toEqual(good);
+    expect(store.map.has(PROFILE_BACKUP_KEY)).toBe(false);
+  });
+
+  it('holds the invariant across every shape an accrual bug can produce', () => {
+    const adversarial: Profile[] = [
+      { v: 1, xp: Number.NaN, level: 3, matches: 7 },
+      { v: 1, xp: Number.POSITIVE_INFINITY, level: 3, matches: 7 },
+      { v: 1, xp: -1, level: 3, matches: 7 },
+      { v: 1, xp: 100, level: Number.NaN, matches: 7 },
+      { v: 1, xp: 100, level: 3, matches: Number.NaN },
+      { v: 1, xp: 100, level: 3, matches: -2 },
+      { v: 2 as 1, xp: 100, level: 3, matches: 7 },
+      { v: 1, xp: 100.5, level: 3, matches: 7.5 },
+      { v: 1, xp: 0, level: 1, matches: 0 },
+    ];
+    for (const profile of adversarial) neverWritesUnreadable(profile);
+  });
+
+  it('writes a good profile and says so', () => {
+    const store = memoryStorage();
+    expect(saveProfile(store, freshProfile())).toBe(true);
+    expect(store.map.has(PROFILE_KEY)).toBe(true);
+  });
+});
+
 describe('validateProfile', () => {
   it('never returns a level below 1', () => {
     expect(validateProfile({ v: 1, xp: 0, level: 0, matches: 0 })?.level).toBe(1);
+  });
+
+  it('rebuilds a level that disagrees with xp — the cache never outranks its source', () => {
+    // No reset ships, so a level written wrong once is wrong forever unless the
+    // reader repairs it. Both directions: a level too high (a tampered or
+    // buggy write) and one left behind (a curve QA re-tuned under a stored
+    // profile) come back to what the xp actually buys.
+    const xp = xpToReach(4);
+    expect(validateProfile({ v: 1, xp, level: 99, matches: 3 })?.level).toBe(4);
+    expect(validateProfile({ v: 1, xp, level: 1, matches: 3 })?.level).toBe(4);
+    expect(validateProfile({ v: 1, xp, level: 4, matches: 3 })?.level).toBe(4);
+  });
+
+  it('folds a MALFORMED level rather than repairing it — the blob is not trusted', () => {
+    // The line between the two: a well-formed cache that drifted is repaired; a
+    // blob whose fields are the wrong types is not a payload to mine a career
+    // out of, and folds (and is backed up) like any other corrupt one.
+    expect(validateProfile({ v: 1, xp: 100, level: null, matches: 2 })).toBeNull();
+    expect(validateProfile({ v: 1, xp: 100, level: '4', matches: 2 })).toBeNull();
   });
 
   it('floors a non-integer count rather than refusing it', () => {
