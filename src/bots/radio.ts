@@ -55,10 +55,10 @@ import type { PlayerId, Rng, Vec2 } from '@shared/types';
 // ---------------------------------------------------------------------------
 
 /**
- * What a bot may say. **Three kinds: two about trouble, one about intent.** The
- * plan's full vocabulary also has `sighting` and `claim` (§2.2); they belong to
- * Stages 3–4 and are deliberately still not here, because a channel with nothing
- * to carry is a channel nobody can test.
+ * What a bot may say. **Four kinds: two about trouble, two about intent.** The
+ * plan's full vocabulary also has `sighting` (§2.2); it belongs to a stage that
+ * needs it and is deliberately still not here, because a channel with nothing to
+ * carry is a channel nobody can test.
  *
  *  - `help`  — *"I am in trouble, here."* A fact about the sender's own ship, so
  *    it is legal at any range and under any fog: you always know where you are.
@@ -75,18 +75,41 @@ import type { PlayerId, Rng, Vec2 } from '@shared/types';
  *    when your teammate opens a raid. Legal because it is the sender's own
  *    committed intent — a fact about yourself, the same licence `help` has — over
  *    a position it read off a `PerceivedStation`, which is public at any range.
+ *  - `claim` — *"I am working that rock."* Stage 3, and the plan's own word
+ *    (§2.2: *"the sender's own committed intent — `Brain.mineSite` … intent is a
+ *    fact about yourself"*). The **only** kind that needs {@link Callout.key},
+ *    which is why the key exists: a mining site is identified by an asteroid id,
+ *    and a position alone would make the receiver match rocks by proximity, which
+ *    is a guess where an id is a fact.
  *
- * `push` is deliberately **not** the plan's `claim`. `claim` is specified as
- * "intent tag + a target key" and is spent by Stage 3 on mining sites
- * (`Brain.tabu`) and Stage 4 on focus fire; spending it here would force its tag
- * field in a stage early, or make Stage 3 rename it. A raid needs nothing
- * `Callout` does not already carry.
+ * `push` is deliberately **not** `claim`, and b2-03 kept them apart rather than
+ * overloading one: a raid is a *commitment with a latch* and a rock is a *soft
+ * exclusion that expires*, they end for different reasons, and `push` needed no
+ * key. Now that `claim` is here the two sit side by side and neither had to bend.
  *
  * Never sendable, at any tier: an unscouted core's HP, anyone's held or banked
  * ore, upgrade tiers, an asteroid's true `ore` — anything read off `World`. The
- * enforcement is that {@link Callout} has nowhere to put them.
+ * enforcement is that {@link Callout} has nowhere to put them. **Note what
+ * `claim` therefore is and is not:** it carries an asteroid *id* and *position*,
+ * both of which the sender read off a `PerceivedAsteroid` in its own view
+ * (`./perception` — a rock is in the view only inside `visualRange`), and it
+ * carries no `ore`, no `crackStage`, and no promise that the rock is worth
+ * anything. A receiver learns *"my teammate is going there"*, never *"there is
+ * ore there"* — the second would be a sighting laundered through an intent.
  */
-export type CalloutKind = 'help' | 'siege' | 'push';
+export type CalloutKind = 'help' | 'siege' | 'push' | 'claim';
+
+/**
+ * {@link Callout.key} for a call that is about a slot and nothing else — every
+ * kind but `claim`.
+ *
+ * The stored record always carries a key and a draft need not: a `help` has no
+ * target key to omit-or-not, so {@link send} normalises the absence here rather
+ * than propagating an `undefined` into a value type that lives on a preallocated
+ * ring. It also means the three kinds that predate Stage 3 build exactly the
+ * drafts they always did.
+ */
+export const NO_KEY = -1;
 
 /**
  * One thing a teammate said. Small, flat, and carrying **only** a position, a
@@ -107,11 +130,20 @@ export interface Callout {
   /** The slot the call is *about* — the caller for `help`, the besieged home's
    *  owner for `siege`, and for `push` the **target**: whoever owns the home the
    *  sender is going in on. It is the one field where `push` differs in kind from
-   *  the other two, which are always about the sender's own side. */
+   *  the other two, which are always about the sender's own side. For `claim` it
+   *  is the caller again: a claim is a statement about what *I* am doing. */
   readonly about: PlayerId;
-  /** Where the trouble is: the caller's own position, the besieged home's, or —
-   *  for `push` — the enemy home being raided. */
+  /** Where the trouble is: the caller's own position, the besieged home's, the
+   *  enemy home being raided — or, for `claim`, the rock. */
   readonly pos: Vec2;
+  /**
+   * The **target key** this call is about, or {@link NO_KEY}. Only `claim` uses
+   * it, and it is an asteroid id: `Brain.tabu` is keyed by asteroid id, so a
+   * receiver that had only a position would have to match rocks by proximity —
+   * a guess where the id is a fact, and one that would silently pick the wrong
+   * rock in a tight field.
+   */
+  readonly key: number;
   /** The sender's `view.time` when it perceived this. Never the receipt time. */
   readonly seenAt: number;
   /** `seenAt + callLatency`. Not readable before this, ever (see rule 1). */
@@ -212,6 +244,9 @@ export interface CalloutDraft {
   readonly from: PlayerId;
   readonly about: PlayerId;
   readonly pos: Vec2;
+  /** The target key. Omitted by every kind but `claim`, and normalised to
+   *  {@link NO_KEY} on the stored record (see {@link Callout.key}). */
+  readonly key?: number;
   /** The sender's `view.time` when it perceived this (see {@link Callout}). */
   readonly seenAt: number;
 }
@@ -254,6 +289,7 @@ export function send(
     from: draft.from,
     about: draft.about,
     pos: { x: draft.pos.x, y: draft.pos.y },
+    key: draft.key ?? NO_KEY,
     seenAt: draft.seenAt,
     readableAt: draft.seenAt + latency,
     seq: radio.seq++,

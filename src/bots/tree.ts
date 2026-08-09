@@ -138,6 +138,22 @@ export interface Brain {
    */
   mineSite: number;
   /**
+   * Sim time this bot committed to {@link mineSite} — *when I called it*, and the
+   * only thing that settles a dead heat between two teammates who chose the same
+   * rock (`./targeting` `foldAllyClaims`, Stage 3).
+   *
+   * A `claim` carries the sender's own commit time as its `seenAt`, so comparing
+   * the two answers "who was on this first?" without a negotiation and without a
+   * slot-order bias. **Strictly earlier wins**: on an exact tie — two bots
+   * deciding on the same tick, which is common — *neither* defers and both keep
+   * the rock, which is precisely today's behaviour and therefore never worse. The
+   * alternative, both deferring, is the ping-pong where two teammates leave a good
+   * rock together and go and contest the next one together.
+   *
+   * `-1` when the bot is not mining. Written by `./behaviors`'s `mine`.
+   */
+  mineSiteAt: number;
+  /**
    * **Contested-site memory** (p11 field report point 2): asteroid id → the sim
    * time its mining cool-down lifts. A site whose *approach* triggered a retreat
    * is booked here, and `bestRock` excludes it while the cool-down is live
@@ -232,6 +248,7 @@ export function createBrain(personality: Personality, rng: Rng, radio: TeamRadio
     fleeing: newLatch(),
     cornered: newCorneredLatch(),
     mineSite: -1,
+    mineSiteAt: -1,
     tabu: new Map(),
     endowment: -1,
     radio,

@@ -44,6 +44,7 @@ import { STATION, SPAWN_PROTECTION_S, TURRET, WEAPON_RANGE } from '../sim';
 import type { PerceivedAsteroid, PerceivedStation, PerceivedShip } from './perception';
 import { estimateOre } from './perception';
 import type { DifficultyTuning, PersonalityWeights } from './personalities';
+import { receive } from './radio';
 import { dist } from './steering';
 import type { BotCtx } from './tree';
 
@@ -296,6 +297,207 @@ function pruneTabu(ctx: BotCtx): void {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Dividing the field (`docs/team-bots-plan.md` Stage 3)
+// ---------------------------------------------------------------------------
+//
+// The spike measured allies **434 units apart in a 2v2**, against the enemy
+// pairs' 1042, with 79.3% of the match inside one visual range of each other
+// (plan §1.6). *"They are not covering a board; they are flying formation by
+// accident."* Two allies mining the same rocks is two economies doing one
+// economy's work, and `bestRock` had no notion of who else was going anywhere.
+//
+// Stage 3 is two mechanisms, and they answer two different halves of the same
+// problem. The first needs no channel at all, which is exactly right: most
+// contention is *visible* contention, so most of it is solvable without a word.
+// The second is for the contention that is not visible.
+
+/**
+ * How near a teammate has to be to a rock before it counts as *theirs*: **one
+ * visual range**, and therefore not a constant at all —
+ * `view.perception.visualRange`.
+ *
+ * This is the one number in the mechanism that did not need choosing, and the
+ * sweep is what established that. Priced end to end over two disjoint 8-seed
+ * sets at 450 / 720 / 1000 (`evidence/b3-01-dividing-the-field.json`), 720 was
+ * the reach that raised ore on both — and 720 *is* `visualRange`
+ * (`./perception` `HUMAN_VISUAL_RANGE`), which is also the only reach the
+ * mechanism can honestly have: an ally further away than that is not in
+ * `view.ships` at all, so a wider radius is unreachable and a narrower one
+ * throws away sightings the bot legitimately has.
+ *
+ * So the term reads exactly as plan §2.1's candidate (b) states it — *"he is
+ * closer to that rock than I am, so I take the other one"* — over precisely the
+ * board this bot can see, with no free parameter for how far it looks. Kept as a
+ * named function rather than inlined because *"the reach is the sight"* is the
+ * argument, and it should be greppable.
+ */
+function allyCrowdRadius(ctx: BotCtx): number {
+  return ctx.view.perception.visualRange;
+}
+
+/**
+ * How hard a rock a teammate is parked on divides down for me. At 4 a rock with
+ * an ally sitting on it is worth a fifth of the same rock in open space — enough
+ * that the next field over wins the pick, and never enough to make the rock
+ * unpickable.
+ *
+ * **A multiplier, never a veto** (plan §4.3's named risk): if the only rock in
+ * view is the one my teammate is on, I still mine it, because two miners on one
+ * rock beats one miner and one bot flying in circles. The same discipline
+ * {@link pathClearance} already keeps, in the same shape and with the same
+ * "worst single ally sets it" rule so three teammates are not three penalties.
+ *
+ * **Measured, over two disjoint 8-seed sets against the same matches with the
+ * branch absent** (`evidence/b3-01-dividing-the-field.json`). Against a baseline
+ * of 12.5% / 12.0% of allied pair-ticks committed to the *same* rock, the grid
+ * at `(reach, penalty, claim-hold)`:
+ *
+ *   | arm        | same rock 2v2 | ore/side 2v2 | ore/side/min 2v2 | same rock 4v4 |
+ *   |------------|---------------|--------------|------------------|---------------|
+ *   | branch off |  12.5 / 12.0  | 108.4 /116.1 |   7.86 / 8.35    |  15.2 / 13.4  |
+ *   | 450, 2, 10 |   9.9 /  8.6  | 116.1 /113.5 |   8.27 / 8.15    |   9.4 /  8.3  |
+ *   | 450, 4, 10 |   7.7 /  7.1  | 114.8 /116.2 |   8.38 / 8.33    |   7.3 /  9.0  |
+ *   | 720, 2, 20 |   7.5 /  7.2  | 116.1 /112.4 |   8.31 / 8.13    |   6.7 /  7.4  |
+ *   | **720,4,10** | **8.0 / 8.4** | **118.1/118.8** | **8.41 / 8.61** | **8.3 / 7.5** |
+ *
+ * Every arm divides the field; the second seed set is what picks between them.
+ * **720/4 is the only arm that raises both ore per side and ore per side-minute
+ * on *both* seed sets** — the others each win one set and lose the other, which
+ * is the signature of a number fitted to eight seeds rather than measured. That
+ * is also why the sweep was run twice on disjoint seeds instead of once on
+ * sixteen: a held-out set can falsify an over-fit, a bigger single set cannot.
+ * TUNABLE
+ */
+export const ALLY_CROWD_PENALTY = 4;
+
+/**
+ * How much of the discount *this character* applies, leaned by `greed` — the
+ * plan's own dial for this question (§4.5: *"a greedy bot defers a rock claim
+ * less readily"*), reused rather than replaced by a new knob.
+ *
+ * `1.5 - greed`, so Vulture (0.9) applies 0.6× of it and defers barely at all
+ * while timid Rusty (0.3) applies 1.2×. The cast mean is 0.94, so the constants
+ * above are very nearly what the cast as a whole plays at and the character
+ * spread costs the team almost nothing on average — the same property
+ * `allyResponseRange` was tuned for.
+ */
+function crowdLean(weights: PersonalityWeights): number {
+  return 1.5 - weights.greed;
+}
+
+/**
+ * **Mechanism 1 — observable-state division, no radio.** How crowded the run to
+ * a rock is, in (0, 1]: 1 for a rock no teammate is nearer to, shrinking toward
+ * `1 / (1 + ALLY_CROWD_PENALTY)` as a teammate closes on it.
+ *
+ * This is candidate (b) from plan §2.1 — *"he is closer to that rock than I am,
+ * so I take the other one"* — and the `d >= rock.distance` gate is the whole
+ * reason it cannot over-divide. Deference is **strictly ordered by distance**:
+ * the nearer bot never defers to the further one, so the plan's named failure
+ * ("two allies each politely deferring until neither mines the good rock") is
+ * not merely unlikely, it is unreachable. An exact tie defers neither, which
+ * is the safe direction to be wrong in.
+ *
+ * O(ships in view) and allocation-free, because `bestRock` runs this for every
+ * rock on every decision for every bot (plan §4.3's cost note).
+ *
+ * **FFA gets exactly 1.0, structurally.** Every ship in an FFA view is hostile
+ * (teams-of-one), so the loop finds no candidate, `worst` stays 0, and the
+ * result is `1 / (1 + 0)` = 1 exactly — and an IEEE multiply by 1.0 is the
+ * identity, so an FFA bot's rock scores are the same bits they were before this
+ * function existed (`ffa-parity.test.ts`'s pinned hashes).
+ */
+function allyCrowding(ctx: BotCtx, rock: PerceivedAsteroid): number {
+  const reach = allyCrowdRadius(ctx);
+  let worst = 0;
+  for (const ship of ctx.view.ships) {
+    // A teammate, alive, and actually able to be working: a wreck or an
+    // eliminated slot is not competing for anything.
+    if (isFoe(ship) || !ship.alive || ship.eliminated) continue;
+    const d = dist(ship.pos, rock.pos);
+    // Not near it, or not nearer to it than I am — no claim on it either way.
+    if (d >= reach || d >= rock.distance) continue;
+    const near = 1 - d / reach;
+    if (near > worst) worst = near;
+  }
+  if (worst === 0) return 1;
+  return 1 / (1 + ALLY_CROWD_PENALTY * crowdLean(ctx.weights) * worst);
+}
+
+/**
+ * How long an ally's `claim` keeps a rock on this bot's tabu list, measured from
+ * the moment the claim was **made** rather than heard.
+ *
+ * Anchoring to `seenAt` is what makes the fold **idempotent**: the same call
+ * re-folded on the next decision writes the same number, so there is no
+ * "have I already handled this one?" state to keep and no way for a claim to
+ * renew itself by being re-read. It also means a claim ages exactly like the
+ * news it is — a late-delivered claim is already half spent when it lands.
+ *
+ * Sized against a mining errand and against the channel: a claim stays readable
+ * for `memorySeconds / HEARSAY_STALENESS` (Easy 3 s, Hard 10 s), so a value in
+ * that band means an exclusion expires at about the same time the news does
+ * instead of long after the teammate has moved on. TUNABLE
+ */
+export const CLAIM_TABU_SECONDS = 10;
+
+/**
+ * **Mechanism 2 — `claim` callouts (plan §4.3.2).** Fold every fresh ally claim
+ * this bot can hear into its own {@link Brain.tabu}, so a rock a teammate said
+ * it was working is excluded exactly the way a rock this bot broke off from is.
+ *
+ * **The tier dial is the channel, and no new knob was invented for it.** The
+ * plan's §4.5 row — *"honours an ally's rock claim: Easy often ignores it,
+ * Medium usually, Hard always"* — falls straight out of the dials Stage 2 already
+ * shipped: an Easy bot misses 35% of calls outright (`callMissChance`), hears
+ * what it does hear 1.2 s late, and the claim expires on its 6 s `memorySeconds`
+ * at a hearsay discount, so it honours a claim for about three seconds if at all;
+ * a Hard bot misses 5%, hears in 0.25 s, and honours for ten. That is the same
+ * mechanism-not-a-knob discipline as `aimLatency`, and it is why there is no
+ * `claimHonour` probability here (which would also have needed a per-claim RNG
+ * draw, and therefore dedup state to stop it re-rolling every decision).
+ *
+ * **It only ever widens.** A claim that would *shorten* an entry this bot put
+ * there itself is ignored: a site this bot broke off from under fire (p11) is a
+ * decision of its own about its own safety, and a teammate's intent is not
+ * grounds to revisit it early.
+ *
+ * `greed` leans the duration for the same reason it leans the discount above —
+ * a greedy character defers less readily.
+ */
+function foldAllyClaims(ctx: BotCtx): void {
+  const radio = ctx.brain.radio;
+  if (!radio) return;
+  const calls = receive(radio, ctx.self.id, ctx.view.time, ctx.tuning.memorySeconds);
+  if (calls.length === 0) return;
+  const hold = CLAIM_TABU_SECONDS * crowdLean(ctx.weights);
+  for (const call of calls) {
+    if (call.kind !== 'claim' || call.key < 0) continue;
+    // A claim about a slot that is not on this bot's side is ignored rather than
+    // trusted — the same refusal `allyDistress` makes, for the same reason: no
+    // branch should act on a malformed record it never sends.
+    if (call.about === ctx.self.id || !isAllySlot(ctx, call.about)) continue;
+    // A dead heat over the rock I am already on, settled by who called it first
+    // (`Brain.mineSiteAt`). Strictly earlier wins, so an exact tie defers
+    // neither and two teammates who chose the same rock on the same tick simply
+    // both keep it — today's behaviour — rather than both leaving it together
+    // and contesting the next one together.
+    if (call.key === ctx.brain.mineSite && call.seenAt >= ctx.brain.mineSiteAt) continue;
+    const until = call.seenAt + hold;
+    const existing = ctx.brain.tabu.get(call.key);
+    if (existing === undefined || until > existing) ctx.brain.tabu.set(call.key, until);
+  }
+}
+
+/** Is this slot on my side? A roster read, not a sighting (`./perception`). */
+function isAllySlot(ctx: BotCtx, id: PlayerId): boolean {
+  for (const ally of ctx.view.allies) {
+    if (ally.id === id) return true;
+  }
+  return false;
+}
+
 /**
  * The rock worth mining: estimated payout against the trip to reach it
  * (GDD §5.5 — "let a player judge a payout before committing weapon time"),
@@ -314,8 +516,18 @@ function pruneTabu(ctx: BotCtx): void {
  * through to roam, which carries it somewhere new to look — deliberately not a
  * fall-back that re-includes the cooled sites, because flying back at them is
  * the exact loop the tabu exists to break.
+ *
+ * **And, since Stage 3, discounted by how crowded the rock is with teammates**
+ * ({@link allyCrowding}) with an ally's spoken {@link CLAIM_TABU_SECONDS claim}
+ * folded into the same tabu list. Both are inert in FFA — there are no allies to
+ * be near and no channel to hear — so this function's FFA answer is unchanged to
+ * the bit.
  */
 export function bestRock(ctx: BotCtx): PerceivedAsteroid | null {
+  // Order matters: a claim heard this decision must be on the list before the
+  // list is read, and the prune must run after the fold so a claim that landed
+  // already expired never lingers a decision longer than its own clock.
+  foldAllyClaims(ctx);
   pruneTabu(ctx);
   const tabu = ctx.brain.tabu;
   let best: PerceivedAsteroid | null = null;
@@ -323,7 +535,7 @@ export function bestRock(ctx: BotCtx): PerceivedAsteroid | null {
   for (const rock of ctx.view.asteroids) {
     if (tabu.has(rock.id)) continue;
     const payout = estimateOre(rock) / (1 + rock.distance / 150);
-    const score = payout * pathClearance(ctx, rock.pos);
+    const score = payout * pathClearance(ctx, rock.pos) * allyCrowding(ctx, rock);
     if (score > bestScore || (best !== null && score === bestScore && rock.id < best.id)) {
       bestScore = score;
       best = rock;
