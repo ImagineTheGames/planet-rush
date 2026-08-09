@@ -181,6 +181,106 @@ export const SCRIM_COLOR = PALETTE.vacuum;
 export const INSTRUMENT_TRACK = MATERIAL_SHADES.rulePlate;
 
 // ---------------------------------------------------------------------------
+// 3b. The wheel's chrome — the same ramp, by the role a wheel has (u11-01)
+// ---------------------------------------------------------------------------
+//
+// The Build & Upgrade wheel is the biggest instrument on the glass, and it is the
+// last one still spending the pre-Gantry accent: its hub chevron drew in **plasma
+// `#4DC3FF`**, its `OPEN ▸` signpost and its index diamond in a hand-picked
+// chalk `#DCE3EC`, and its wedge faces and edges in raw `hullSteel`. A developer
+// read the result as half-finished — *"the build wheel is halfway there it didn't
+// fully implement the color theme correctly"* — and they were reading it right:
+// the direction's whole premise is that **the menu spends no colour**, so a hue
+// on a wheel's chrome is not a small deviation from it, it is the opposite of it.
+//
+// These live HERE rather than in `build-wheel-view.ts` for the reason the brief
+// gives: there must not be a parallel answer. `INSTRUMENT_KEY` and friends above
+// are the in-match vocabulary; the wheel takes the SAME ramp, named by the role a
+// wheel has and nothing more. Pinned in `./instrument.test.ts`, which recomputes
+// each one against `BONE` / `MATERIAL_SHADES` so a hand-edited hex cannot get in.
+//
+// What is NOT here, deliberately: the cost numerals and the hub's ore total. They
+// are the one carved-out use of a RESERVED colour (style-guide §2.1 — signal
+// yellow when payable, threat red when not), they are decided in `./wheel-stack`,
+// and they are the only colour the wheel is allowed to spend. Everything below is
+// material and brightness.
+
+export const WHEEL_CHROME = {
+  /**
+   * The wedge you can act on, and the signpost that opens a screen: the brightest
+   * metal on the wheel. Bone's own constraint is that the primary reads by
+   * BRIGHTNESS rather than by hue, which is exactly what a radial menu needs —
+   * every wedge is the same shape and the same size, so brightness is the only
+   * channel left that is not already spoken for.
+   */
+  nameReady: BONE.hi,
+  /**
+   * A wedge that is refused, capped or inert. `tickSteel`, the same step the
+   * wheel already paints a *spent* cost numeral in (`costPaint: 'spent'`), so
+   * "there is nothing to do here" is one tone across the whole wheel rather than
+   * one for a word and another for a number.
+   */
+  nameInert: MATERIAL_SHADES.tickSteel,
+  /**
+   * The lines a wedge is READ from rather than acted on — what it spends on, the
+   * count over its cap, the hub's `ORE` caption. Bone's low step: the same
+   * luminance the wheel already muted these to, sourced from the ramp instead of
+   * from a bluer hand-picked grey.
+   */
+  secondary: BONE.lo,
+  /** The hub's BACK word (`CLOSE · ESC`). A step above {@link secondary}, because
+   *  it is the one thing in the hub you can press. */
+  affordance: BONE.mid,
+  /**
+   * A machined mark: the index diamond at twelve o'clock, and the hub's up-chevron.
+   * One vocabulary for both — they are the same object (a small solid mark that
+   * says "here"), and until u11-01 the diamond was chalk and the chevron was a
+   * stroked plasma outline, which is two answers to one question.
+   */
+  mark: BONE.hi,
+  /**
+   * The face of a wedge — a *whisper*, not a plate. The wheel's own rule is that
+   * the world reads through the disc, so a wedge's brightness is a lift over the
+   * glass rather than a surface on top of it; `BONE.fill` is the ratified "lit end
+   * of a primary face", and {@link WHEEL_FACE_ALPHA} is what keeps it a lift.
+   */
+  face: BONE.fill,
+  /**
+   * The hairline that divides one wedge from the next. Unchanged in value from
+   * what shipped — it was already a Gantry tone — and named here so the wheel's
+   * chrome is readable in one place.
+   */
+  divider: MATERIAL_SHADES.hairline,
+  /**
+   * A press, and a confirmed spend. Bone again: a pressed wedge goes BRIGHT, it
+   * does not go blue. (A *rejected* press stays threat red — that is danger, the
+   * other half of style-guide §2, and it is a mechanic rather than chrome.)
+   */
+  press: BONE.hi,
+} as const;
+
+/**
+ * How much of {@link WHEEL_CHROME.face} a wedge's face carries, by state.
+ *
+ * Stated as its own number because it is the number that decides whether the
+ * wheel is instruments on glass or a stack of plates. Over the disc
+ * (`faceShade` at 0.88 over the fight) a ready face lands about eighteen levels
+ * above the glass and an inert one about six — a 3× separation a player reads at
+ * a glance, from a fill that is still 66% transparent at its strongest.
+ *
+ * The wedge draws NO outline of its own since u11-01. The ring it sits in is
+ * already bounded — the disc rim outside it, the hub ring inside it, a hairline
+ * spoke on each side — so an outline per wedge repeats three edges that exist and
+ * turns five wedges into five little plates. That is precisely the "1px hairlines
+ * on black, which reads as a wireframe rather than a product" the Gantry handoff
+ * diagnoses, arriving on the one screen that cannot answer it with a surface.
+ */
+export const WHEEL_FACE_ALPHA = {
+  ready: 0.34,
+  inert: 0.12,
+} as const;
+
+// ---------------------------------------------------------------------------
 // 4. The scrim — the cast shadow, with its geometry taken away
 // ---------------------------------------------------------------------------
 

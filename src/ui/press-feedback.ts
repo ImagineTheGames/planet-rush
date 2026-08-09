@@ -37,10 +37,13 @@
  * no "I pressed the button" flag: the feedback fires because the core actually
  * healed, so a press that the sim quietly refuses can never fake a confirmation.
  *
- * Colours obey the frozen palette (style-guide §1–§2): the glow and confirm pulse
- * are **plasma** (energy), the reject flash is **threat red** (danger only), the
- * repair shimmer is **patina** (the repair tint), and a floating cost stays
- * **signal yellow** — it *is* ore, the one thing yellow is allowed to mean.
+ * Colours obey the frozen palette (style-guide §1–§2): the reject flash is
+ * **threat red** (danger only), the repair shimmer is **patina** (the repair
+ * tint), and a floating cost stays **signal yellow** — it *is* ore, the one thing
+ * yellow is allowed to mean. The glow and the confirm pulse on a WHEEL WEDGE were
+ * plasma too until u11-01; under the ratified Gantry/Bone direction a pressed
+ * control goes **bright**, not blue, so they take `WHEEL_CHROME.press` — the
+ * amounts are still this file's, only the tone is the view's (`build-wheel-view`).
  */
 
 import { REPAIR_ENTRY_ORE, WHEEL_ORDER } from './build-wheel';
@@ -304,13 +307,14 @@ export function detectConfirmations(prev: WheelSnapshot, next: WheelSnapshot): C
 export interface ControlFeedback {
   /** Scale multiplier (press-down and confirm-pulse combined). */
   readonly scale: number;
-  /** Glow-ring alpha from a press (plasma). */
+  /** Glow-ring alpha from a press. Bone on a wheel wedge since u11-01. */
   readonly glow: number;
   /** Horizontal shake offset from a rejection, CSS px. */
   readonly shakeX: number;
   /** Threat-red reject-flash alpha. */
   readonly reject: number;
-  /** Confirm/repair shimmer alpha (plasma on a wedge, patina on the core). */
+  /** Confirm/repair shimmer alpha (Bone on a wedge since u11-01, patina on the
+   *  core — the core's tint is the repair mechanic's, not the wheel's chrome). */
   readonly shimmer: number;
 }
 
