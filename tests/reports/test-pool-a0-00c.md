@@ -77,6 +77,9 @@ identical in every arm, capped and uncapped:
 and it is stronger than a wall-time number: the cap changes how many workers run
 the suite and demonstrably not which specs run.
 
+The DoD run on the pushed tree: `npm test -- --run` → **rc=0, 244 files, 4132
+tests, 672 s**, taken with the other two lanes live (load 12–27 across the run).
+
 ## 4. The measurements
 
 ### 4.1 The opportunistic pair — discarded

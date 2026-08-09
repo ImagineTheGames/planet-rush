@@ -24,19 +24,39 @@ Branch: `agent/qa/a0-00c-cap-test-pool`. Working note, not evidence.
 - Merged `origin/main` into the branch (the DoD's ancestor check was failing:
   the branch was cut before a0-16 landed). Clean merge, no conflicts.
 
-- `harness/pool-contention-bench.sh` — the measurement rig (2026-08-09). Supplies
-  the competing load itself (one spin loop per worker the other two lanes would
-  spawn) so a before/after pair is taken against the same box, not against two
-  different afternoons. See DECISIONS for why the opportunistic measurement had
-  to be thrown away.
+- `harness/pool-contention-bench.sh` (`942ea57`) — the fixed-competing-load rig.
+  It turned out to measure the wrong thing (see DECISIONS); kept and documented
+  as such so nobody builds it a second time.
+- `harness/pool-lane-aggregate.sh` (`25cbc85`) — the rig that matches the claim.
+  Three concurrent `vitest --run`, disjoint `--shard` thirds, timed to the LAST
+  lane home. Total CPU work pinned at one suite in both arms.
+- `tests/harness/pool-size.test.ts` fix (`94607a8`) — the real-box invariant test
+  asserted `workers <= hostParallelism()` unconditionally, which the "before" arm
+  would have reddened on its way to measuring itself. The ceiling belongs to the
+  derivation, not to an explicit override.
+- `tests/reports/test-pool-a0-00c.md` (`ab818a3`) — the report. Ten arms, three
+  rigs. Leads with the finding, which is not the one the brief expected.
 
-## NOT BUILT YET
+## THE FINDING (read before touching the number)
 
-- `tests/reports/test-pool-a0-00c.md` — the before/after numbers. A session
-  before last listed it under BUILT; it was never written. Controlled runs are
-  executing now (2026-08-09).
-- Nothing pushed yet. `origin/agent/qa/a0-00c-cap-test-pool` does not exist;
-  `5eb4163` + the merge `86af420` are local only. Push + PR outstanding.
+Two things came out opposite to the brief, both evidenced in the report:
+
+1. **vitest was never reading the host's 16.** `os.availableParallelism()` is
+   cgroup-aware (libuv reads the quota) and vitest 2.1.8 prefers it: 6 on this
+   box against `os.cpus()`'s 8. The oversubscription was 3× (three lanes each
+   claiming the container's whole budget), not 8×. **Playwright** is the runner
+   genuinely blind to the quota — `os.cpus()/2` = 4, at ~2 cores per dpr-3 page,
+   so 3 lanes = 24 cores of demand on 6. If an 85-minute lane recurs, look there.
+2. **The cap costs throughput and buys gate stability.** Three real lanes
+   sharding one suite finish FASTER uncapped — 248 s vs 320 s, and 131 s vs
+   252 s, with the capped arm holding the quieter box in rep 1. What capping buys
+   is 1 red arm in 5 instead of 3 in 5, including a 60 fps gate (`perf.test.ts`
+   p95 4.33 ms vs 4.17 ms) that failed only uncapped, from contention.
+
+Shipped at 2/lane as briefed — it is the ask, and it is where the 60 fps gates
+hold. Report §5 puts the trade to the Director explicitly. Raising it is one
+value (`LANES`, or `VITEST_MAX_WORKERS` per run); do not quietly re-tune it
+without that call.
 
 ## DECISIONS
 
@@ -95,6 +115,21 @@ Branch: `agent/qa/a0-00c-cap-test-pool`. Working note, not evidence.
   `vite.config.ts` explicitly), so `tsc --noEmit` does not typecheck it. I did
   not edit `tsconfig.json` — not my file. Proposed to the Platform Engineer in
   the PR as a one-word follow-up.
+- **For the Platform Engineer, flagged in the PR, not edited:** three Playwright
+  configs leave `workers` unset and so inherit the quota-blind
+  `os.cpus().length / 2` — `tests/live-stage/playwright.config.ts`,
+  `tests/live-stage/playwright.live-stage.config.ts`, and
+  `tests/live/playwright.live.config.ts`. `npm run test:live-stage` is a real
+  package script, so these are lane-runnable, not one-offs. One line each:
+  `workers: browserWorkerCap()`. (The other three live-stage configs and
+  `tests/live-stage-online/` already set `workers: 1` — checked, not assumed; an
+  earlier draft of the report claimed the whole directory was capped and was
+  wrong.)
 - Known and unrelated: `tests/net/capacity/capacity-regression.test.ts` is
-  load-flaky (asserts a 33 ms wall-clock tick budget on a shared box). Expect it
-  red in a contended run; it is not a signal about this change.
+  load-flaky (asserts a 33 ms wall-clock tick budget on a shared box). It went
+  red in 4 of the 10 measurement arms, in BOTH capped and uncapped ones — it is a
+  symptom of a shared box throughout, never a signal about this change.
+- Open question for the Director, report §5: whether sweep throughput outranks
+  gate stability. If it does, the cap should be raised, and the better fix is to
+  make the wall-clock gates measure CPU time rather than wall time — a separate
+  brief, and a bigger one.
