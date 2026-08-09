@@ -26,8 +26,18 @@ Three commits, all on the branch.
   DECISIONS; each is recorded at length in the file it lives in.
 - **`164832a` — `src/bots/field-division.test.ts` (20 cases) + the rig.**
 
+- **`4e9892c` — merge of `origin/main`.** Brought in a1-03's CI/Docker/tsconfig
+  work only; touched no file under `src/bots/` and no `src/shared/` contract, so
+  nothing above was re-decided. Kept the branch fast-forwardable.
+
 DoD at `164832a`: `npx tsc --noEmit` clean; `npm test -- --run` — **269 files,
 4712 tests, 0 failed.**
+
+**Re-verified at `4e9892c` (2026-08-09), all four gates green:** `tsc --noEmit`
+clean; `npm test -- --run` — **269 files, 4712 tests, 0 failed**; `origin/main`
+is an ancestor of HEAD; **PR [#356](https://github.com/ImagineTheGames/planet-rush/pull/356)
+open with 0 failing checks** (9 pass, 8 skipped deploy jobs). The merge changed
+neither the test count nor any measured figure below.
 
 ## THE MEASUREMENT (the brief's actual ask)
 
