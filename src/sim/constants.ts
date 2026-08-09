@@ -827,20 +827,42 @@ export interface AbundanceMultipliers {
  * (all multipliers 1). RICH is the generous end for a lobby that wants a faster,
  * looser match. All `TUNABLE` (GDD §2.8).
  *
- * SCARCE's `respawnInterval` was kept modest (1.1) because a larger stretch used
- * to drift the HUD wave clock and bot perception, which read the schedule through
- * `waveTime`'s baseline default. That is fixed (a0-16): both now read
- * {@link waveIntervalOf}, so the countdown on screen and the bot's expectation
- * follow whatever this table says. The multipliers here are unchanged by that
- * wiring — widening the SCARCE↔RICH spread is a0-17's balance change, and it is
- * now free to make it. Alongside the interval, SCARCE's "real wait, not a refill"
- * is carried by the lean waves (`totalOre`): you mine a thin wave out fast, then
- * wait the interval with an empty field.
+ * **The interval spread, widened (a0-17, 2026-08-07.)** The developer: *"we need
+ * bigger intervals 25 seconds between rich and 15 to scarce is not a big change,
+ * it should be a much BIGGER time difference."* p11 had kept SCARCE at 1.1 and
+ * RICH at 0.85 because a larger stretch drifted the HUD wave clock and bot
+ * perception, which read the schedule through `waveTime`'s baseline default; a0-16
+ * fixed that (both now read {@link waveIntervalOf}), so the interval was free to
+ * move. It is now **1.2 / 1 / 0.75** — a wave every **3:00 · 2:30 · 1:52.5**, a
+ * spread of **67.5 s** against the old 37.5.
+ *
+ * That is not the 150 s the brief proposed, and the reason is arithmetic rather
+ * than caution (measured in `tests/reports/abundance-spread-a0-17.md`). Collapse
+ * cannot open until the last wave has landed (`enterCollapseIfDue` gates on
+ * `allWavesSpawned`), and the match ends 100–160 s later — so **the wave interval
+ * and the match length are the same dial**: an ending lands near `4 × interval +
+ * tail`. The 10–15 min target (GDD §1) is a 300-second-wide window, spread across
+ * the `WAVE_COUNT - 1` = 4 gaps between waves, which caps the whole SCARCE↔RICH
+ * interval spread at **~75 s**. The shipped table now uses 67.5 of that 75 — 90%
+ * of what the length rail admits, against p11's 50%. Going wider does not break
+ * the mechanic (all five waves still land at every level), it makes SCARCE matches
+ * *longer*: measured, 240 s/wave runs 18:24 median. That is a design trade for the
+ * developer, filed in the report, not a number to clamp quietly.
+ *
+ * The bounds each end sits against, both measured: SCARCE is capped by the turtle
+ * mirror (forced collapse + `CORE_HP / COLLAPSE_CORE_DECAY` of entropy = 14:10 at
+ * 1.2, and the deadline stays on its pre-p11 anchor because
+ * {@link COLLAPSE_GRACE_FLOOR_S} moved to 30); RICH is floored by the all-miner
+ * mirror, which mines a fully-delivered field out early — 10:10 at 0.75, and 9:42
+ * at 0.7, i.e. under the 10-minute floor. Alongside the interval, SCARCE's "real
+ * wait, not a refill" is still carried by the lean waves (`totalOre`, untouched by
+ * a0-17): you mine a thin wave out fast, then wait the interval with an empty
+ * field.
  */
 export const ABUNDANCE: Readonly<Record<Abundance, AbundanceMultipliers>> = {
-  scarce: { totalOre: 0.55, density: 0.75, respawnInterval: 1.1 },
+  scarce: { totalOre: 0.55, density: 0.75, respawnInterval: 1.2 },
   standard: { totalOre: 1, density: 1, respawnInterval: 1 },
-  rich: { totalOre: 1.6, density: 1.25, respawnInterval: 0.85 },
+  rich: { totalOre: 1.6, density: 1.25, respawnInterval: 0.75 },
 } as const;
 
 /** The multiplier set for a level, defaulting an unknown/absent level to the
@@ -918,9 +940,22 @@ export function homeFieldOreFor(fieldYield: number, playerCount: number): number
  * to it, in which case this floor of grace is kept after that last wave. Below the
  * baseline `COLLAPSE_GRACE_S`, so it only binds at respawn intervals longer than
  * the shipped SCARCE level. Lives here (a leaf constant) so a test that mocks the
- * constants table can override it alongside `COLLAPSE_GRACE_S`. TUNABLE
+ * constants table can override it alongside `COLLAPSE_GRACE_S`.
+ *
+ * **60 → 30 (a0-17.)** This floor is what decides how far SCARCE's interval can
+ * stretch before the collapse deadline leaves its pre-p11 anchor: the deadline
+ * stays anchored while `waveTime(WAVE_COUNT, interval) + floor ≤ 750`, so a
+ * 60-second floor capped SCARCE at 172.5 s/wave and a 30-second one caps it at
+ * 180 — the round 3:00 the widened table ships (see {@link ABUNDANCE}). What is
+ * given up is exactly 30 seconds of *guaranteed* post-final-wave mining, and it is
+ * cheap because of when the floor binds at all: only in a match where the field is
+ * still un-mined when the deadline arrives, i.e. one where nobody has been mining
+ * for twelve minutes. Whenever players *do* clear the field, collapse opens on
+ * exhaustion and this number is never read. Measured at 30: the turtle mirror
+ * still resolves at 14:10 at every level, 8/8, and all five waves still land.
+ * TUNABLE
  */
-export const COLLAPSE_GRACE_FLOOR_S: Tunable<number> = 60;
+export const COLLAPSE_GRACE_FLOOR_S: Tunable<number> = 30;
 
 /** Respawn time — free; time is the cost (GDD §2.7, §2.8), seconds. TUNABLE */
 export const RESPAWN_S: Tunable<number> = 5;
