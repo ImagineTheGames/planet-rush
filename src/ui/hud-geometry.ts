@@ -22,6 +22,9 @@
 
 import type { Rect } from '@platform/layout-registry';
 import type { HomeArrow } from './alarm';
+import { hudMetrics, hudSpace } from './instrument';
+import { collapsedRect } from './minimap';
+import type { MinimapInsets } from './minimap';
 
 // ---------------------------------------------------------------------------
 // The Build & Upgrade wheel (GDD §2.5)
@@ -179,8 +182,26 @@ export const HP_BAR_WIDTH = 140;
 export const HP_BAR_HEIGHT = 10;
 /** Thin shield overbar above it — shields stand in front of the core (GDD §2.5). */
 export const SHIELD_BAR_HEIGHT = 4;
-/** The bar's top edge within the element, below the `HOME` label, CSS px. */
-export const HP_BAR_TOP = 16;
+/** Air between the shield overbar and the core bar it stands in front of, CSS px. */
+export const SHIELD_BAR_GAP = 2;
+/**
+ * The row above the bar that carries `HOME` and the `100/100` core value, CSS px:
+ * one line of {@link ./hud} `TYPE.coreValue` ink (≈10 px at the 11 px floor) plus
+ * four pixels of air under its baseline.
+ *
+ * That air is the point. The element is a stack of three things in a corner, and
+ * the one that gets squeezed is the number: with the bar's top hard-coded at 16
+ * the shield overbar landed **one pixel under the value's baseline**, so a station
+ * with a generator standing drew a plasma line flush against the underside of
+ * `100/100` and the numerals read as struck through. It is on `main`'s own frozen
+ * baseline and in this brief's `before-*` evidence — a pre-existing defect this
+ * pass found by shooting the corner at 5× rather than by reading the diff.
+ */
+export const HP_VALUE_ROW = 14;
+/** The bar's top edge within the element, under the value row and the shield
+ *  overbar that stands above it. Derived, never typed twice — the collision above
+ *  is what a hand-picked number bought. */
+export const HP_BAR_TOP = HP_VALUE_ROW + SHIELD_BAR_HEIGHT + SHIELD_BAR_GAP;
 
 /**
  * The own-station HP element's drawn footprint: the right-aligned `HOME` label
@@ -219,21 +240,150 @@ export function stationHpBounds(viewportWidth: number, labelWidth = 0): Rect {
 // The onboarding prompt (GDD §2.10)
 // ---------------------------------------------------------------------------
 
-/** Horizontal padding inside the prompt panel — text box edge to panel edge on
- *  each side is half of this. */
+/** Horizontal padding inside the prompt panel at the 1280×720 reference — text
+ *  box edge to panel edge on each side is half of this. Use {@link promptPad},
+ *  which scales it with the HUD frame like every other Gantry metric. */
 export const PROMPT_PAD_X = 40;
-/** Vertical padding inside the prompt panel, CSS px. */
+/** Vertical padding inside the prompt panel at the reference, CSS px. */
 export const PROMPT_PAD_Y = 22;
-/** The panel's 1px outline (style-guide §1 plasma). It is part of the drawn
- *  footprint — `getBounds()` reports it — so the wrap budget has to pay for it. */
-export const PROMPT_STROKE = 1;
-/** The prompt's vertical centre, as a fraction of viewport height. Below the
- *  ship (which the follow camera holds at the centre) and above the controls
- *  strip, so it never covers the thing it is telling the player to look at. */
-export const PROMPT_CENTER_Y = 0.72;
+
+/**
+ * The prompt's padding at a given viewport — the reference numbers above run
+ * through the HUD frame scale ({@link ./instrument} `hudSpace`).
+ *
+ * This is not tidiness: it is load-bearing on the wheel clearance. At 844×390 the
+ * prompt's type scales to 12px and its line box to ~16px, so an UNSCALED 22px of
+ * vertical padding would be more than the type it surrounds and would push a
+ * one-line prompt 10px back up into the build wheel's bottom wedges — the exact
+ * collision {@link promptBand} exists to end.
+ */
+export function promptPad(viewportWidth: number, viewportHeight: number): { x: number; y: number } {
+  const m = hudMetrics(viewportWidth, viewportHeight);
+  return { x: hudSpace(PROMPT_PAD_X, m), y: hudSpace(PROMPT_PAD_Y, m) };
+}
+/** The prompt's own edge. Since u7-07 the prompt wears a scrim rather than a
+ *  stroked panel ({@link ./instrument} — no plates over gameplay), so nothing is
+ *  drawn outside its rect any more and this term is zero. It is kept, named, and
+ *  still subtracted from the wrap budget because it is the term that made the
+ *  `full` + {@link HUD_PAD} claim true in the first place: if the prompt ever
+ *  grows an edge again, the budget already pays for it. */
+export const PROMPT_STROKE = 0;
 /** Wrap floor, so a comically narrow viewport still wraps rather than clamping
  *  to zero. */
 export const PROMPT_MIN_TEXT_WIDTH = 80;
+
+/**
+ * The band at the bottom of the screen the desktop controls strip owns, CSS px.
+ *
+ * Mirrors the strip's own drawing constants in {@link ./hud} (`STRIP_ROW` 18 +
+ * `STRIP_PAD` 12) plus a hairline of air, so the prompt clears the bindings
+ * legend rather than landing on it. **Desktop only** — GDD §2.2/§2.4 make the
+ * strip desktop-only, and on touch the visible controls replace it, which is why
+ * {@link promptBand} takes `isTouch` rather than reserving this everywhere.
+ */
+export const PROMPT_STRIP_RESERVE = 34;
+
+/**
+ * The width each side of a TOUCH screen the thumb controls own, CSS px.
+ *
+ * Mirrors `@platform/touch-visuals`' own placement — `EDGE_MARGIN` (28) +
+ * `2 · R_STICK` (128) — which is the widest of the three things that can sit in a
+ * bottom corner there: the left thrust stick's zone, and on the right either the
+ * Manual aim zone (the same 128 px) or the narrower Auto-aim FIRE button (84 px).
+ * Taking the widest means the prompt clears the thumb columns in **both** fire
+ * modes without this file having to know which one is set — the same
+ * mirror-a-platform-constant discipline {@link ./minimap} `MINIMAP_FIRE_COLUMN`
+ * uses, and the same reason: the affordance geometry is platform's to own.
+ */
+export const PROMPT_THUMB_COLUMN = 156;
+
+/** Air between the build wheel's bottom edge and the top of the prompt band. */
+export const PROMPT_WHEEL_GAP = 6;
+
+/** Air between the prompt and the minimap's collapsed corner square. */
+export const PROMPT_MINIMAP_GAP = 8;
+
+/**
+ * The clear band the onboarding prompt lives in — **the answer to the collision
+ * this brief was written around**, and the reason it is a function of the
+ * viewport rather than the constant it replaces.
+ *
+ * ## What it replaces, and why the constant could not survive
+ *
+ * The prompt used to be centred on `PROMPT_CENTER_Y = 0.72` of the viewport
+ * height: a single fraction, shared by every prompt on every screen. On a desktop
+ * that lands in clear air. On a landscape phone it does not, and the numbers say
+ * why — at 844×390:
+ *
+ *  - the build wheel is `clamp(min(844,390) × 0.36, 120, 230)` = **140 px** in
+ *    radius, centred, so it spans **y 54.6 → 335.4** — 72% of the screen's height;
+ *  - `0.72 × 390` = 280.8, so the prompt's band sat at **y 259 → 302**, entirely
+ *    inside the wheel. The SPEND prompt fires *while the wheel is open* by design
+ *    (GDD §2.10), so this is not an edge case: it is the prompt's normal state,
+ *    and it covered the REPAIR REACTOR and RADAR wedges outright.
+ *
+ * There is **no clear horizontal band left on that screen**: the wave clock takes
+ * y 16 → 70 at the top, the wheel takes 54.6 → 335.4, and the thumb controls take
+ * the bottom corners from y 234 down. So the prompt cannot be *moved out* of the
+ * wheel by picking a better fraction — that option does not exist at 390 px of
+ * height, and pretending otherwise would have meant stealing from the wave clock
+ * above or FIRE below, which the brief forbids.
+ *
+ * ## What it does instead
+ *
+ * Two changes, and they only work together:
+ *
+ * 1. **The prompt is bottom-anchored in the band under the wheel** rather than
+ *    centred on a fraction of the screen. At 844×390 the band is y 341.4 → 374 —
+ *    54.6 px of real estate that the fraction never reached — and a prompt at the
+ *    HUD's own type scale is 33 px tall there, so it fits, clear of the wedges,
+ *    clear of the strip's reserve, and clear of the thumb columns.
+ * 2. **The prompt wraps to this band's width, not the screen's.** The band stops
+ *    short of the thumb columns and of the minimap's collapsed square, so a long
+ *    prompt breaks to a second line instead of running under a control. That is
+ *    the trade, stated: a phone gets a taller prompt rather than a wider one.
+ *
+ * When even the band cannot hold the panel (a four-line prompt on a 320 px
+ * screen), the panel keeps its bottom edge and grows up into the wheel — and
+ * that overlap is now *readable*, because the prompt lost its opaque panel in the
+ * same change ({@link ./instrument} `SCRIM.prompt`) and the wedge reads through
+ * it. Degrading into transparency is the whole point of the material rule.
+ */
+export function promptBand(
+  viewportWidth: number,
+  viewportHeight: number,
+  isTouch: boolean,
+  insets: MinimapInsets = {},
+): Rect {
+  const left = HUD_PAD + Math.max(0, insets.left ?? 0);
+  const right = viewportWidth - HUD_PAD - Math.max(0, insets.right ?? 0);
+  const bottomInset = Math.max(0, insets.bottom ?? 0);
+
+  // Vertical: under the wheel, above the strip (desktop) / the bottom margin.
+  const wheel = wheelBounds(viewportWidth, viewportHeight);
+  const bottom =
+    viewportHeight - HUD_PAD - bottomInset - (isTouch ? 0 : PROMPT_STRIP_RESERVE);
+  const top = Math.min(bottom, wheel.y + wheel.height + PROMPT_WHEEL_GAP);
+
+  // Horizontal: centred, and no wider than twice its distance to the nearest
+  // thing already living in that band — a thumb column, or the minimap's corner.
+  const centerX = viewportWidth / 2;
+  const map = collapsedRect({ width: viewportWidth, height: viewportHeight }, isTouch, insets);
+  const thumb = isTouch ? PROMPT_THUMB_COLUMN : 0;
+  const leftLimit = left + thumb;
+  const rightLimit = Math.min(right - thumb, map.width > 0 ? map.x - PROMPT_MINIMAP_GAP : right);
+  const half = Math.max(
+    (PROMPT_MIN_TEXT_WIDTH + promptPad(viewportWidth, viewportHeight).x) / 2,
+    Math.min(centerX - leftLimit, rightLimit - centerX),
+  );
+
+  return {
+    x: centerX - half,
+    y: top,
+    width: half * 2,
+    height: Math.max(0, bottom - top),
+  };
+}
 
 /**
  * The width the prompt's text box wraps at, CSS px.
@@ -242,42 +392,56 @@ export const PROMPT_MIN_TEXT_WIDTH = 80;
  * is a sentence, and a sentence is intrinsically wider than any third-width band
  * in the anchor vocabulary — "Hold the FIRE button on the asteroid — your shots
  * chip the rock" is ~440 px on one line, wider than a 390 px portrait phone. So the
- * prompt does not get a band; it gets the screen, and the contract it signs is
- * that it *never leaves* it (`full` + {@link HUD_PAD}, see `Hud.describeLayout`).
+ * prompt does not get an anchor band; it gets the screen, and the contract it
+ * signs is that it *never leaves* it (`full` + {@link HUD_PAD}, see
+ * `Hud.describeLayout`).
  *
- * Wrapping here is what makes that contract true rather than hopeful: the panel
- * is `textWidth + PROMPT_PAD_X + PROMPT_STROKE`, so wrapping at
- * `W − 2·HUD_PAD − PROMPT_PAD_X − PROMPT_STROKE` makes the *stroked* panel land
- * exactly on the HUD margin in the worst case and inside it in every other. The
- * stroke is subtracted deliberately: leave it out and a prompt whose text hits
- * the wrap ceiling registers 1 px wider than its own anchor zone.
+ * Wrapping here is what makes that contract true rather than hopeful — and since
+ * u7-07 it makes a second promise true as well: the box is
+ * {@link promptBand}'s width rather than the viewport's, so a wrapped prompt also
+ * cannot run under a thumb stick or the minimap. `promptWidth = textWidth +
+ * PROMPT_PAD_X + PROMPT_STROKE`, so wrapping at
+ * `band − PROMPT_PAD_X − PROMPT_STROKE` lands the panel exactly on the band's
+ * edge in the worst case and inside it in every other.
  */
-export function promptWrapWidth(viewportWidth: number): number {
-  return Math.max(
-    PROMPT_MIN_TEXT_WIDTH,
-    viewportWidth - 2 * HUD_PAD - PROMPT_PAD_X - PROMPT_STROKE,
-  );
+export function promptWrapWidth(
+  viewportWidth: number,
+  viewportHeight: number,
+  isTouch: boolean,
+  insets: MinimapInsets = {},
+): number {
+  const band = promptBand(viewportWidth, viewportHeight, isTouch, insets);
+  const pad = promptPad(viewportWidth, viewportHeight);
+  return Math.max(PROMPT_MIN_TEXT_WIDTH, band.width - pad.x - PROMPT_STROKE);
 }
 
 /**
  * The onboarding prompt's drawn footprint: a panel sized to its (already
- * wrapped) text box, centred horizontally and on {@link PROMPT_CENTER_Y}.
+ * wrapped) text box, centred horizontally and hung from the bottom of
+ * {@link promptBand}.
  *
  * `textWidth`/`textHeight` are the measured metrics of the wrapped text — the
  * registry records what was actually drawn, so the caller passes real numbers
  * rather than the ceiling. Feed {@link promptWrapWidth} to get the worst case.
+ * The `y` is clamped to the HUD margin, so an over-tall prompt on a tiny screen
+ * grows upward into the wheel (readable through the scrim) rather than off the
+ * top edge, which would break the `full` + `HUD_PAD` claim.
  */
 export function promptBounds(
   viewportWidth: number,
   viewportHeight: number,
   textWidth: number,
   textHeight: number,
+  isTouch = false,
+  insets: MinimapInsets = {},
 ): Rect {
-  const width = textWidth + PROMPT_PAD_X + PROMPT_STROKE;
-  const height = textHeight + PROMPT_PAD_Y + PROMPT_STROKE;
+  const band = promptBand(viewportWidth, viewportHeight, isTouch, insets);
+  const pad = promptPad(viewportWidth, viewportHeight);
+  const width = Math.min(textWidth + pad.x + PROMPT_STROKE, band.width);
+  const height = textHeight + pad.y + PROMPT_STROKE;
   return {
     x: viewportWidth / 2 - width / 2,
-    y: viewportHeight * PROMPT_CENTER_Y - height / 2,
+    y: Math.max(HUD_PAD, band.y + band.height - height),
     width,
     height,
   };
@@ -287,14 +451,24 @@ export function promptBounds(
 // The respawn countdown overlay ("RESPAWNING 3…", field request v0.2.2)
 // ---------------------------------------------------------------------------
 
-/** Horizontal padding inside the countdown panel, CSS px (text box edge to panel
- *  edge on each side is half of this). */
+/** Horizontal padding inside the countdown panel at the 1280×720 reference, CSS
+ *  px (text box edge to panel edge on each side is half of this). Use
+ *  {@link respawnPad}, which scales it with the HUD frame. */
 export const RESPAWN_PAD_X = 36;
-/** Vertical padding inside the countdown panel, CSS px. */
+/** Vertical padding inside the countdown panel at the reference, CSS px. */
 export const RESPAWN_PAD_Y = 18;
-/** The panel's 1px outline — part of the drawn footprint (`getBounds()` reports
- *  it), so the wrap budget has to pay for it, exactly like the prompt's. */
-export const RESPAWN_STROKE = 1;
+
+/** The countdown's padding at a given viewport — the same frame scale the prompt
+ *  takes ({@link promptPad}), so the two overlays are one family on a phone. */
+export function respawnPad(viewportWidth: number, viewportHeight: number): { x: number; y: number } {
+  const m = hudMetrics(viewportWidth, viewportHeight);
+  return { x: hudSpace(RESPAWN_PAD_X, m), y: hudSpace(RESPAWN_PAD_Y, m) };
+}
+/** The countdown's own edge. Zero since u7-07, for the same reason the prompt's
+ *  is ({@link PROMPT_STROKE}): the overlay wears a scrim rather than a stroked
+ *  panel. Kept and still subtracted from the wrap budget, so the `full` +
+ *  {@link HUD_PAD} claim survives the day an edge comes back. */
+export const RESPAWN_STROKE = 0;
 /** The countdown's vertical centre, as a fraction of viewport height. Dead centre
  *  — where the ship exploded and the camera stays (field request), and clear
  *  because a dead ship draws nothing under it. */
@@ -312,10 +486,10 @@ export const RESPAWN_MIN_TEXT_WIDTH = 80;
  * `W − 2·HUD_PAD − RESPAWN_PAD_X − RESPAWN_STROKE` makes the *stroked* panel land
  * exactly on that margin in the worst case and inside it otherwise.
  */
-export function respawnWrapWidth(viewportWidth: number): number {
+export function respawnWrapWidth(viewportWidth: number, viewportHeight = viewportWidth): number {
   return Math.max(
     RESPAWN_MIN_TEXT_WIDTH,
-    viewportWidth - 2 * HUD_PAD - RESPAWN_PAD_X - RESPAWN_STROKE,
+    viewportWidth - 2 * HUD_PAD - respawnPad(viewportWidth, viewportHeight).x - RESPAWN_STROKE,
   );
 }
 
@@ -333,8 +507,9 @@ export function respawnBounds(
   textWidth: number,
   textHeight: number,
 ): Rect {
-  const width = textWidth + RESPAWN_PAD_X + RESPAWN_STROKE;
-  const height = textHeight + RESPAWN_PAD_Y + RESPAWN_STROKE;
+  const pad = respawnPad(viewportWidth, viewportHeight);
+  const width = textWidth + pad.x + RESPAWN_STROKE;
+  const height = textHeight + pad.y + RESPAWN_STROKE;
   return {
     x: viewportWidth / 2 - width / 2,
     y: viewportHeight * RESPAWN_CENTER_Y - height / 2,

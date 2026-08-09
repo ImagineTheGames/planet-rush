@@ -95,8 +95,22 @@ import { Minimap } from './minimap';
 import type { MinimapFrame, MinimapInsets } from './minimap';
 import { MinimapView } from './minimap-view';
 import type { DrawnMinimap } from './minimap-view';
-import { PANEL_FILL, PANEL_FILL_ALPHA, PANEL_RULE, PANEL_RULE_ALPHA, TEXT_MUTED, RADIUS } from './chrome';
+import { TEXT_MUTED } from './chrome';
 import { FONT_BODY as FONT_NUMERAL, FONT_HEADING } from './typography';
+import {
+  drawEdgeRule,
+  drawScrim,
+  drawTick,
+  hudMetrics,
+  hudSpace,
+  hudTracking,
+  hudType,
+  INSTRUMENT_KEY,
+  INSTRUMENT_RADIUS,
+  INSTRUMENT_RULE,
+  SCRIM,
+} from './instrument';
+import type { HudMetrics } from './instrument';
 import {
   ARROW_SIZE,
   arrowPoly,
@@ -106,14 +120,13 @@ import {
   HP_BAR_WIDTH,
   HP_BAR_HEIGHT,
   HP_BAR_TOP,
+  SHIELD_BAR_GAP,
   SHIELD_BAR_HEIGHT,
-  PROMPT_PAD_X,
-  PROMPT_PAD_Y,
+  promptPad,
   PROMPT_STROKE,
-  PROMPT_CENTER_Y,
+  promptBounds,
   promptWrapWidth,
-  RESPAWN_PAD_X,
-  RESPAWN_PAD_Y,
+  respawnPad,
   RESPAWN_STROKE,
   RESPAWN_CENTER_Y,
   respawnWrapWidth,
@@ -149,6 +162,44 @@ const STRIP_ROW = 18;
 const STRIP_PAD = 12;
 /** Gap between the top-left ORE label and the banked number below it, CSS px. */
 const TOTAL_LABEL_H = 14;
+
+// --- Gantry/Bone reference type sizes (u7-07) -------------------------------
+//
+// The sizes the HUD is drawn at on the 1280×720 reference, run through
+// {@link hudType} so a phone gets the same layout a quarter smaller rather than
+// the same pixels in a smaller frame. Named here rather than spelled inline so
+// the whole HUD's type scale is one block a reader can check against
+// style-guide §7's 12px legibility floor.
+const TYPE = {
+  /** `ORE` / `HOME` / an eyebrow above a readout. */
+  eyebrow: 11,
+  /** The banked ore total — the loudest number on the screen. */
+  bank: 22,
+  /** `WAVE 1/5 · Outer Drift`. */
+  waveName: 15,
+  /** `NEXT 2:28` / `COLLAPSE`. */
+  waveNext: 14,
+  /** `MATCH 0:02`. */
+  waveMatch: 13,
+  /** `100/100` beside the HOME bar. */
+  coreValue: 11,
+  /** A controls-strip binding (`WASD`) and its action (`Thrust`). */
+  stripKey: 13,
+  stripLabel: 12,
+  /** An onboarding prompt. */
+  prompt: 16,
+  /** `RESPAWNING 3…`. */
+  respawn: 24,
+  /** A floating ore cost travelling to the bank. */
+  costFloat: 18,
+} as const;
+
+/** How much of a readout's height its scrim reaches past, so the darkness starts
+ *  before the type does rather than at its cap-height. */
+const SCRIM_BLEED = 8;
+
+/** The accent tick's height beside a prompt, as a fraction of the panel. */
+const PROMPT_TICK_FRACTION = 0.55;
 
 
 // ---------------------------------------------------------------------------
@@ -418,14 +469,25 @@ export class Hud extends Container {
   /** Onboarding state machine — each prompt fires once (GDD §2.10). */
   private readonly onboarding = new Onboarding();
 
+  /** The Gantry/Bone frame for this viewport ({@link ./instrument}). Recomputed
+   *  on every resize; every type size and every gap on the HUD reads it. */
+  private metrics: HudMetrics = hudMetrics(1280, 720);
+
   // --- Ore — the banked total the Build wheel spends (top-left) -------------
   //     Field rule: top-left shows the BANK only; held ore moved under the ship
   //     (see `oreHold` below), so the two ore numbers can never be confused. The
   //     label above it reads `ORE` since a0-03; the rule is about the NUMBER, and
   //     the number did not move.
   private readonly oreGroup = new Container();
+  /** The instrument chrome under the readout — a scrim hanging from the top edge
+   *  and the Bone rule that closes the cluster off. Never a plate: the world
+   *  reads through both (./instrument). */
+  private readonly oreChrome = new Graphics();
   private readonly totalLabel: Text;
   private readonly bankedText: Text;
+  /** What the ore chrome was last drawn for, so it redraws on a change rather
+   *  than every frame (a banked total moves seconds apart, not frames apart). */
+  private oreChromeKey = '';
   /** The banked total the top-left last drew — read back by the ?debug=1
    *  live-stage seam to prove the total rises as the under-ship hold drains. */
   private lastBankedTotal = 0;
@@ -438,23 +500,30 @@ export class Hud extends Container {
 
   // --- Wave clock (top-center) --------------------------------------------
   private readonly waveGroup = new Container();
+  private readonly waveChrome = new Graphics();
   private readonly waveName: Text;
   private readonly waveNext: Text;
   private readonly waveMatch: Text;
+  private waveChromeKey = '';
 
   // --- Controls strip (bottom, desktop only) ------------------------------
   private readonly stripGroup = new Container();
+  private readonly stripChrome = new Graphics();
   private readonly stripLabels: Text[] = [];
   private stripSignature = ''; // rebuild only when device/mode/visibility change
   /** The strip rows resolved for this frame — captured for the ?debug=1 live-stage
    *  seam so a test can assert the contextual Build legend on the real client. */
   private lastStripRows: readonly StripRow[] = [];
 
-  // --- Onboarding prompt (lower-center) -----------------------------------
+  // --- Onboarding prompt (bottom band, under the wheel) -------------------
   private readonly promptGroup = new Container();
-  private readonly promptPanel = new Graphics();
+  /** The scrim + accent tick that replaced the stroked panel (u7-07). */
+  private readonly promptScrim = new Graphics();
   private readonly promptAccent = new Graphics();
   private readonly promptText: Text;
+  /** The panel geometry the prompt drew last, so the scrim redraws on a change
+   *  rather than every frame a prompt is up. */
+  private promptScrimKey = '';
 
   // --- Respawn countdown ("RESPAWNING 3…", field request v0.2.2) ----------
   //     A centred overlay in the player's colour while the local ship is dead and
@@ -462,8 +531,9 @@ export class Hud extends Container {
   //     shown for a final death (the DEFEATED flow owns that). Decisions live in
   //     ./respawn-countdown; this file just draws the verdict.
   private readonly respawnGroup = new Container();
-  private readonly respawnPanel = new Graphics();
+  private readonly respawnScrim = new Graphics();
   private readonly respawnText: Text;
+  private respawnScrimKey = '';
   /** The countdown model the overlay drew last frame — read back by the ?debug=1
    *  live-stage seam to prove the number decrements on sim ticks and clears at
    *  respawn. */
@@ -471,6 +541,7 @@ export class Hud extends Container {
 
   // --- Own station HP (top-right, player colour — GDD §2.2) ----------------
   private readonly stationGroup = new Container();
+  private readonly stationChrome = new Graphics();
   private readonly stationLabel: Text;
   /** Numeric core HP beside the bar — a "75/100" readout (developer request,
    *  p5-08). Sim-driven off the same coreHp/maxCoreHp the bar fills from, so the
@@ -599,7 +670,8 @@ export class Hud extends Container {
     // spend chimes, all from the same state that drives the visual tell.
     this.pressFeedback = new PressFeedback(sfx);
 
-    // Ore (top-left): a dim `ORE` heading over the banked number in ore yellow.
+    // Ore (top-left): a dim `ORE` eyebrow over the banked number in ore yellow.
+    // The chrome behind it is a scrim and a rule — never a plate (./instrument).
     //
     // `ORE`, ratified 2026-08-07 (a0-03) — the developer, on a screenshot of this
     // readout: "should not say total, it should say ORE". It has been `TOTAL`
@@ -614,37 +686,42 @@ export class Hud extends Container {
     // with 5 banked reads 5 here and 8 there. Both numbers are correct and neither
     // changed; only this label did. Flagged for the developer in a0-03's PR rather
     // than resolved unilaterally — renaming the HUB is their call, not this file's.
-    this.totalLabel = this.makeText('ORE', FONT_HEADING, 11, TEXT_MUTED);
+    //
+    // The size is `TYPE.eyebrow`, which IS 11 — a0-03's literal, renamed by this
+    // branch's type scale, not re-sized by it. The `'eyebrow'` tier adds the
+    // Gantry tracking; the word and its size are main's.
+    this.totalLabel = this.makeText('ORE', FONT_HEADING, TYPE.eyebrow, TEXT_MUTED, 'normal', 'eyebrow');
     this.totalLabel.y = 0;
-    this.bankedText = this.makeText('', FONT_NUMERAL, 22, PALETTE.signalYellow, 'bold');
+    this.bankedText = this.makeText('', FONT_NUMERAL, TYPE.bank, PALETTE.signalYellow, 'bold', 'name');
     this.bankedText.y = TOTAL_LABEL_H;
-    this.oreGroup.addChild(this.totalLabel, this.bankedText);
+    this.oreGroup.addChild(this.oreChrome, this.totalLabel, this.bankedText);
     this.oreGroup.x = PAD;
     this.oreGroup.y = PAD;
 
-    // Wave clock: three stacked, centre-anchored lines.
-    this.waveName = this.makeText('', FONT_HEADING, 15, TEXT_PRIMARY);
-    this.waveNext = this.makeText('', FONT_NUMERAL, 14, PALETTE.plasma);
-    this.waveMatch = this.makeText('', FONT_NUMERAL, 13, TEXT_MUTED);
+    // Wave clock: three stacked, centre-anchored lines. All three take the `name`
+    // tier — the wave is a proper noun and the two clocks are VALUES, which is
+    // exactly what that tier is for. `eyebrow` was tried and rejected on
+    // `MATCH 0:02`: at .26em a clock reads as a tag rather than as a time, and the
+    // tier is chosen by the job the text does, not by how small it is.
+    this.waveName = this.makeText('', FONT_HEADING, TYPE.waveName, TEXT_PRIMARY, 'normal', 'name');
+    this.waveNext = this.makeText('', FONT_NUMERAL, TYPE.waveNext, INSTRUMENT_KEY, 'bold', 'name');
+    this.waveMatch = this.makeText('', FONT_NUMERAL, TYPE.waveMatch, TEXT_MUTED, 'normal', 'name');
     for (const t of [this.waveName, this.waveNext, this.waveMatch]) t.anchor.set(0.5, 0);
-    this.waveName.y = 0;
-    this.waveNext.y = 20;
-    this.waveMatch.y = 38;
-    this.waveGroup.addChild(this.waveName, this.waveNext, this.waveMatch);
+    this.waveGroup.addChild(this.waveChrome, this.waveName, this.waveNext, this.waveMatch);
 
-    // Onboarding prompt: accent bar + panel + centre-anchored text, hidden until
+    // Onboarding prompt: accent tick + scrim + centre-anchored text, hidden until
     // a prompt is active.
-    this.promptText = this.makeText('', FONT_HEADING, 16, TEXT_PRIMARY);
+    this.promptText = this.makeText('', FONT_HEADING, TYPE.prompt, TEXT_PRIMARY, 'normal', 'label');
     this.promptText.anchor.set(0.5, 0.5);
-    this.promptGroup.addChild(this.promptPanel, this.promptAccent, this.promptText);
+    this.promptGroup.addChild(this.promptScrim, this.promptAccent, this.promptText);
     this.promptGroup.visible = false;
 
-    // Respawn countdown: a prominent centre-anchored line over a dim backing
-    // panel, hidden until the local ship is dead with a respawn pending. The fill
-    // is set per frame to the player's colour (field request v0.2.2).
-    this.respawnText = this.makeText('', FONT_HEADING, 24, TEXT_PRIMARY, 'bold');
+    // Respawn countdown: a prominent centre-anchored line over a scrim, hidden
+    // until the local ship is dead with a respawn pending. The fill is set per
+    // frame to the player's colour (field request v0.2.2).
+    this.respawnText = this.makeText('', FONT_HEADING, TYPE.respawn, TEXT_PRIMARY, 'bold', 'label');
     this.respawnText.anchor.set(0.5, 0.5);
-    this.respawnGroup.addChild(this.respawnPanel, this.respawnText);
+    this.respawnGroup.addChild(this.respawnScrim, this.respawnText);
     this.respawnGroup.visible = false;
 
     // Own station HP: a right-anchored label above a bar in the player's colour,
@@ -652,14 +729,18 @@ export class Hud extends Container {
     // opposite HOME and above the left end of the bar — a numeral, so Oxanium
     // (style-guide §5.6). It rides within the bar's own x-span, so it never widens
     // the top-right footprint the layout registry records (see hud-geometry.ts).
-    this.stationLabel = this.makeText('HOME', FONT_HEADING, 11, TEXT_MUTED);
+    this.stationLabel = this.makeText('HOME', FONT_HEADING, TYPE.eyebrow, TEXT_MUTED, 'normal', 'eyebrow');
     this.stationLabel.anchor.set(1, 0);
-    this.coreLabel = this.makeText('', FONT_NUMERAL, 11, TEXT_PRIMARY);
+    this.coreLabel = this.makeText('', FONT_NUMERAL, TYPE.coreValue, TEXT_PRIMARY, 'normal', 'name');
     this.coreLabel.anchor.set(0, 0);
     this.coreLabel.x = -HP_BAR_WIDTH;
     this.coreLabel.y = 1;
-    this.stationGroup.addChild(this.stationBar, this.stationLabel, this.coreLabel);
+    this.stationGroup.addChild(this.stationChrome, this.stationBar, this.stationLabel, this.coreLabel);
     this.stationGroup.visible = false;
+
+    // The strip's own chrome draws behind its labels, inside the strip group, so
+    // the rule + scrim are part of what `controls-strip` registers.
+    this.stripGroup.addChild(this.stripChrome);
 
     // Alarm: a threat-red frame around the whole screen plus the arrow home.
     // Both are drawn only while the alarm is sounding — threat red is never a
@@ -720,23 +801,73 @@ export class Hud extends Container {
   }
 
   private layout(): void {
+    // The Gantry frame first: every size and gap below is derived from it, so a
+    // phone gets the same layout a quarter smaller rather than desktop pixels
+    // rattling around in a short viewport (./instrument `hudMetrics`).
+    this.metrics = hudMetrics(this.screenWidth, this.screenHeight);
+    this.applyTypeScale();
+
     this.waveGroup.x = this.screenWidth / 2;
     this.waveGroup.y = PAD;
     this.stationGroup.x = this.screenWidth - PAD;
     this.stationGroup.y = PAD;
     this.stripGroup.y = this.screenHeight - STRIP_ROW - STRIP_PAD;
     this.promptGroup.x = this.screenWidth / 2;
-    // Below the ship (the follow camera holds it at the centre) and above the
-    // controls strip, so the prompt never covers the thing it is pointing at.
-    // The fraction lives in hud-geometry.ts with the rest of the prompt's
-    // geometry, so `describeLayout`'s registered rect is computed from the same
-    // number this draws with.
-    this.promptGroup.y = this.screenHeight * PROMPT_CENTER_Y;
+    // The prompt's y is no longer a fraction of the screen: it hangs from the
+    // bottom of the clear band under the build wheel, and that band depends on
+    // the panel's own measured height — so it is set in `updateOnboarding`, from
+    // the same `promptBounds` the registry is handed. See hud-geometry.ts
+    // `promptBand` for the measurements that retired `PROMPT_CENTER_Y`.
     // Respawn countdown: dead centre — the ship exploded here and the camera
     // stays on it (field request v0.2.2).
     this.respawnGroup.x = this.screenWidth / 2;
     this.respawnGroup.y = this.screenHeight * RESPAWN_CENTER_Y;
     this.wheel.resize(this.screenWidth, this.screenHeight);
+
+    // Chrome that depends only on the viewport can be drawn once, here.
+    this.drawStationChrome();
+    // …and chrome that also depends on live text redraws itself on change.
+    this.oreChromeKey = '';
+    this.waveChromeKey = '';
+    this.promptScrimKey = '';
+    this.respawnScrimKey = '';
+    this.stripSignature = '';
+  }
+
+  /**
+   * Re-derive every type size and its tracking for the current frame metrics.
+   *
+   * Two things happen here that did not happen before u7-07. Sizes **scale** with
+   * the viewport (floored at 11px — `hudType`), so the HUD is the same layout on
+   * a phone rather than the same pixels; and every letter-spacing comes from the
+   * one ratified tracking scale (`TRACKING`, via `hudTracking`) instead of the
+   * flat `letterSpacing: 0.5` this file used to hand every single Text — which
+   * was precisely the drift the handoff diagnosed, still living on the one screen
+   * a player spends the whole match looking at.
+   */
+  private applyTypeScale(): void {
+    const m = this.metrics;
+    const set = (t: Text, referencePx: number, tier: 'eyebrow' | 'label' | 'name'): void => {
+      const px = hudType(referencePx, m);
+      t.style.fontSize = px;
+      t.style.letterSpacing = hudTracking(tier, px);
+    };
+    set(this.totalLabel, TYPE.eyebrow, 'eyebrow');
+    set(this.bankedText, TYPE.bank, 'name');
+    set(this.waveName, TYPE.waveName, 'name');
+    set(this.waveNext, TYPE.waveNext, 'name');
+    set(this.waveMatch, TYPE.waveMatch, 'name');
+    set(this.stationLabel, TYPE.eyebrow, 'eyebrow');
+    set(this.coreLabel, TYPE.coreValue, 'name');
+    set(this.promptText, TYPE.prompt, 'label');
+    set(this.respawnText, TYPE.respawn, 'label');
+
+    // The ore cluster's two lines and the clock's three re-stack at the scaled
+    // sizes, so the leading follows the type instead of being pinned to desktop.
+    this.bankedText.y = hudSpace(TOTAL_LABEL_H, m);
+    this.waveName.y = 0;
+    this.waveNext.y = hudSpace(20, m);
+    this.waveMatch.y = hudSpace(38, m);
   }
 
   /** Draw one frame. Pull the pure models, then update the Pixi children. */
@@ -762,6 +893,80 @@ export class Hud extends Container {
     this.updateOnboarding(frame, wheelOpen, underAttack);
   }
 
+  // --- Instrument chrome: scrims and rules, never plates (u7-07) -----------
+  //
+  // Each readout carries its own darkness and its own closing edge, and nothing
+  // else. Between the clusters the glass is clear, which is what makes this
+  // "instruments on glass" rather than a header beam with holes in it
+  // (./instrument).
+  //
+  // **Every scrim is drawn inside its own element's rect** — never bled out to the
+  // screen edge. That is not a stylistic preference: an element's registered
+  // footprint is what it DRAWS (`describeLayout` reads `getBounds()`), so a scrim
+  // reaching past the HUD margin would push `ore-hud` and `station-hp` out of
+  // their declared anchors, which QA's layout contract catches on a real device
+  // and did — `tests/mobile/layout.spec.ts` failed on exactly that with the first
+  // version of this code. The corner scrims therefore fade at ALL FOUR edges
+  // rather than hanging from the screen edge: a soft blot under the readout,
+  // clear of the margin, invisible at its own boundary.
+
+  /** The top-left ore cluster's chrome, in the group's own space (origin at the
+   *  cluster's top-left, i.e. the HUD margin). Redrawn when the number changes
+   *  width, not per frame. */
+  private drawOreChrome(): void {
+    const m = this.metrics;
+    const width = Math.max(this.totalLabel.width, this.bankedText.width) + hudSpace(18, m);
+    const ruleY = this.bankedText.y + this.bankedText.height + hudSpace(4, m);
+    const g = this.oreChrome;
+    g.clear();
+    drawScrim(g, 0, 0, width, ruleY + hudSpace(SCRIM_BLEED, m), 'center', SCRIM.corner);
+    drawEdgeRule(g, 0, ruleY, width, 1, INSTRUMENT_RULE);
+  }
+
+  /** The top-centre wave clock's chrome. Centre-anchored like the clock itself. */
+  private drawWaveChrome(): void {
+    const m = this.metrics;
+    const width =
+      Math.max(this.waveName.width, this.waveNext.width, this.waveMatch.width) + hudSpace(24, m);
+    const ruleY = this.waveMatch.y + this.waveMatch.height + hudSpace(4, m);
+    const g = this.waveChrome;
+    g.clear();
+    drawScrim(g, -width / 2, 0, width, ruleY + hudSpace(SCRIM_BLEED, m), 'center', SCRIM.corner);
+    drawEdgeRule(g, -width / 2, ruleY, width, 1, INSTRUMENT_RULE);
+  }
+
+  /** The top-right HOME cluster's chrome. Right-anchored: the group's origin is
+   *  the readout's right edge, so the cluster runs leftward from 0. */
+  private drawStationChrome(): void {
+    const m = this.metrics;
+    const width = HP_BAR_WIDTH + hudSpace(18, m);
+    const ruleY = HP_BAR_TOP + HP_BAR_HEIGHT + hudSpace(4, m);
+    const g = this.stationChrome;
+    g.clear();
+    drawScrim(g, -width, 0, width, ruleY + hudSpace(SCRIM_BLEED, m), 'center', SCRIM.corner);
+    drawEdgeRule(g, -width, ruleY, width, 1, INSTRUMENT_RULE);
+  }
+
+  /**
+   * The desktop controls strip's chrome: the footer beam's Bone rule — the only
+   * part of a beam that can live on glass — over a scrim hanging from the bottom
+   * edge, which is the one place a scrim MAY hang from a screen edge, because
+   * `bottom-strip` is the one anchor whose zone reaches it (full width,
+   * y ∈ [H−48, H], margin 0). Drawn in the strip group's own space, so it is part
+   * of what `controls-strip` registers rather than a sibling smuggled out of the
+   * measurement.
+   */
+  private drawStripChrome(width: number): void {
+    const m = this.metrics;
+    const top = -hudSpace(10, m);
+    const height = STRIP_ROW + STRIP_PAD - top;
+    const g = this.stripChrome;
+    g.clear();
+    if (width <= 0) return;
+    drawScrim(g, 0, top, this.screenWidth, height, 'bottom', SCRIM.strip);
+    drawEdgeRule(g, STRIP_PAD, top, Math.min(width, this.screenWidth - 2 * STRIP_PAD), 1, INSTRUMENT_RULE);
+  }
+
   // --- Ore: the BANK (top-left) and the HOLD (under the ship) --------------
 
   /** Draw the two ore readouts from the one sim-driven model (field rule): the
@@ -774,6 +979,11 @@ export class Hud extends Container {
     // Top-left ORE: just the safe banked number the Build wheel spends.
     this.bankedText.text = `${model.banked}`;
     this.lastBankedTotal = model.banked;
+    const oreKey = `${model.banked}`;
+    if (oreKey !== this.oreChromeKey) {
+      this.drawOreChrome();
+      this.oreChromeKey = oreKey;
+    }
 
     // Under-ship HOLD: the pips for what you're carrying, floated below the local
     // ship (screen centre under the follow camera). Shown while carrying OR
@@ -823,9 +1033,20 @@ export class Hud extends Container {
       this.waveNext.text = clock.isFinalWave
         ? 'FINAL WAVE'
         : `NEXT ${formatClock(clock.countdownToNext ?? 0)}`;
-      this.waveNext.style.fill = PALETTE.plasma;
+      // Bone, not plasma (u7-07). The countdown is the loudest line on the clock,
+      // so under this direction it is the BRIGHTEST metal rather than a coloured
+      // one — which puts plasma back to meaning energy on the same screen (the
+      // shield overbar six inches to the right of it). Threat red above still
+      // outranks it, because COLLAPSE is a danger state and that is what red is.
+      this.waveNext.style.fill = INSTRUMENT_KEY;
     }
     this.waveMatch.text = `MATCH ${formatClock(clock.matchTime)}`;
+
+    const waveKey = `${this.waveName.text}|${this.waveNext.text}|${this.waveMatch.text.length}`;
+    if (waveKey !== this.waveChromeKey) {
+      this.drawWaveChrome();
+      this.waveChromeKey = waveKey;
+    }
   }
 
   // --- Controls strip (desktop only) --------------------------------------
@@ -833,7 +1054,10 @@ export class Hud extends Container {
   private updateControlsStrip(frame: HudFrame): void {
     const show = showControlsStrip(frame.isTouch);
     this.stripGroup.visible = show;
-    if (!show) return;
+    if (!show) {
+      this.stripChrome.clear();
+      return;
+    }
 
     // The Build & Upgrade row is contextual on docking (field report v0.2.2): its
     // live key shows only at your own station, matching the touch BUILD button.
@@ -854,31 +1078,45 @@ export class Hud extends Container {
     for (const t of this.stripLabels) t.destroy();
     this.stripLabels.length = 0;
 
-    // Lay out "KEY action" pairs left→right along the bottom. Keys in plasma,
-    // actions in grey — NOT yellow (style-guide §2 overrides GDD §2.4 prose;
-    // see ./controls-strip for the reconciliation). A dimmed row (an affordance
-    // you can't use here — e.g. Build away from your station) drops its key
-    // entirely, so the legend never prints a dead one, and draws at reduced alpha.
+    // Lay out "KEY action" pairs left→right along the bottom.
+    //
+    // The key is now the BRIGHTEST metal on the row (Bone `INSTRUMENT_KEY`) and
+    // the action stays muted — the handoff's whole accent mechanism, applied to
+    // the one HUD element that is literally a legend. It used to draw in plasma,
+    // which was itself a correction of GDD §2.4's "keys in signal yellow"
+    // (style-guide §2 forbids yellow as chrome); Bone retires the workaround
+    // rather than swapping one borrowed hue for another, and hands plasma back to
+    // the shield overbar and the radar ring, where it means energy. A dimmed row
+    // (an affordance you can't use here — e.g. Build away from your station) drops
+    // its key entirely, so the legend never prints a dead one, and draws faint.
     const DIM_ALPHA = 0.5;
+    const m = this.metrics;
+    const keyGap = hudSpace(6, m);
+    const rowGap = hudSpace(18, m);
     let x = STRIP_PAD;
     for (const row of rows) {
       if (row.binding !== null) {
-        const key = this.makeText(row.binding, FONT_NUMERAL, 13, PALETTE.plasma, 'bold');
+        const key = this.makeText(row.binding, FONT_NUMERAL, TYPE.stripKey, INSTRUMENT_KEY, 'bold', 'name');
         key.x = x;
         key.alpha = row.dimmed ? DIM_ALPHA : 1;
         this.stripGroup.addChild(key);
         this.stripLabels.push(key);
-        x += key.width + 6;
+        x += key.width + keyGap;
       }
 
-      const label = this.makeText(row.label, FONT_HEADING, 12, TEXT_MUTED);
+      const label = this.makeText(row.label, FONT_HEADING, TYPE.stripLabel, TEXT_MUTED, 'normal', 'label');
       label.x = x;
       label.y = 1;
       label.alpha = row.dimmed ? DIM_ALPHA : 1;
       this.stripGroup.addChild(label);
       this.stripLabels.push(label);
-      x += label.width + 18;
+      x += label.width + rowGap;
     }
+
+    // The strip's own chrome spans exactly what it laid out — the footer beam's
+    // Bone rule over a scrim, drawn to the strip's real width rather than the
+    // screen's, so an empty strip draws no furniture.
+    this.drawStripChrome(x - rowGap);
   }
 
   // --- Own station HP (top-right, GDD §2.2) ---------------------------------
@@ -911,12 +1149,18 @@ export class Hud extends Container {
     const fill = model.critical && flash ? model.criticalColor : model.color;
 
     const y = HP_BAR_TOP;
+    const r = INSTRUMENT_RADIUS; // a surface is square (./instrument)
     this.stationBar.clear();
-    // Track: the full width, so the missing part is visible as absence.
+    // Track: the full width, so the missing part is visible as absence. Square
+    // corners since u7-07 — the handoff's own rule, that a raised plate is
+    // chamfered and a surface is not, and nothing on the glass is raised. The
+    // outline stays the OWNER'S colour: identity is the one thing on this bar
+    // that Bone does not get to take, because style-guide §3 puts player colour
+    // on the HP bar by name.
     this.stationBar
-      .roundRect(-HP_BAR_WIDTH, y, HP_BAR_WIDTH, HP_BAR_HEIGHT, 2)
+      .roundRect(-HP_BAR_WIDTH, y, HP_BAR_WIDTH, HP_BAR_HEIGHT, r)
       .fill({ color: PALETTE.hullSteel, alpha: 0.22 })
-      .roundRect(-HP_BAR_WIDTH, y, HP_BAR_WIDTH, HP_BAR_HEIGHT, 2)
+      .roundRect(-HP_BAR_WIDTH, y, HP_BAR_WIDTH, HP_BAR_HEIGHT, r)
       .stroke({ width: 1, color: model.color, alpha: 0.55 });
     if (model.coreFraction > 0) {
       // A standing core keeps at least a sliver of fill — a living thing never
@@ -924,14 +1168,14 @@ export class Hud extends Container {
       // which the `coreFraction > 0` gate already excludes). The true fraction
       // still drives `destroyed`/`critical` in the model.
       const w = HP_BAR_WIDTH * Math.max(HEALTHBAR_MIN_FILL, model.coreFraction);
-      this.stationBar.roundRect(-w, y, w, HP_BAR_HEIGHT, 2).fill({ color: fill, alpha: 0.95 });
+      this.stationBar.roundRect(-w, y, w, HP_BAR_HEIGHT, r).fill({ color: fill, alpha: 0.95 });
     }
     // Shield overbar: plasma, and only while a generator stands (GDD §2.5). A
     // standing shield pool keeps its sliver too, by the same living-never-empty rule.
     if (model.hasShield && model.shieldFraction > 0) {
       const sw = HP_BAR_WIDTH * Math.max(HEALTHBAR_MIN_FILL, model.shieldFraction);
       this.stationBar
-        .roundRect(-sw, y - SHIELD_BAR_HEIGHT - 2, sw, SHIELD_BAR_HEIGHT, 1)
+        .roundRect(-sw, y - SHIELD_BAR_HEIGHT - SHIELD_BAR_GAP, sw, SHIELD_BAR_HEIGHT, r)
         .fill({ color: PALETTE.plasma, alpha: 0.85 });
     }
 
@@ -942,7 +1186,7 @@ export class Hud extends Container {
     const shimmer = this.pressFeedback.coreShimmer(this.frameTime);
     if (shimmer > 0 && model.coreFraction > 0) {
       const w = HP_BAR_WIDTH * Math.max(HEALTHBAR_MIN_FILL, model.coreFraction);
-      this.stationBar.roundRect(-w, y, w, HP_BAR_HEIGHT, 2).fill({ color: PALETTE.patina, alpha: shimmer * 0.6 });
+      this.stationBar.roundRect(-w, y, w, HP_BAR_HEIGHT, r).fill({ color: PALETTE.patina, alpha: shimmer * 0.6 });
     }
 
     this.stationLabel.text = model.destroyed ? 'HOME LOST' : 'HOME';
@@ -988,20 +1232,24 @@ export class Hud extends Container {
     this.respawnText.text = model.text;
     this.respawnText.style.fill = model.color; // the player's own colour (§5.2)
     this.respawnText.style.wordWrap = true;
-    this.respawnText.style.wordWrapWidth = respawnWrapWidth(this.screenWidth);
+    this.respawnText.style.wordWrapWidth = respawnWrapWidth(this.screenWidth, this.screenHeight);
     this.respawnText.style.align = 'center';
 
-    // A dim backing panel sized to the text, so the countdown reads over the
-    // death scene; a thin outline in the player's colour ties it to the number.
-    const w = this.respawnText.width + RESPAWN_PAD_X;
-    const h = this.respawnText.height + RESPAWN_PAD_Y;
-    this.respawnPanel.clear();
-    // The unified panel skin (./chrome), outlined in the player's own colour —
-    // the countdown's identity — rather than the neutral rule.
-    this.respawnPanel
-      .roundRect(-w / 2, -h / 2, w, h, RADIUS.panel)
-      .fill({ color: PANEL_FILL, alpha: PANEL_FILL_ALPHA })
-      .stroke({ width: RESPAWN_STROKE, color: model.color, alpha: 0.6 });
+    // A scrim sized to the text, so the countdown reads over the death scene, and
+    // a rule in the player's own colour under it — the countdown's identity —
+    // rather than a stroked panel around it. This is the one scrim on the HUD
+    // allowed to run heavy (`SCRIM.overlay`): the local ship has just exploded,
+    // so there is nothing under the centre of the screen to read through.
+    const pad = respawnPad(this.screenWidth, this.screenHeight);
+    const w = this.respawnText.width + pad.x;
+    const h = this.respawnText.height + pad.y;
+    const key = `${Math.round(w)}x${Math.round(h)}:${model.color}`;
+    if (key !== this.respawnScrimKey) {
+      this.respawnScrim.clear();
+      drawScrim(this.respawnScrim, -w / 2, -h / 2, w, h, 'center', SCRIM.overlay);
+      drawEdgeRule(this.respawnScrim, -w / 2, h / 2 - RESPAWN_STROKE - 1, w, 1, model.color, 0.8);
+      this.respawnScrimKey = key;
+    }
 
     this.respawnGroup.visible = true;
   }
@@ -1549,7 +1797,7 @@ export class Hud extends Container {
   private floatSlot(index: number): Text {
     const existing = this.floatTexts[index];
     if (existing) return existing;
-    const text = this.makeText('', FONT_NUMERAL, 18, PALETTE.signalYellow, 'bold');
+    const text = this.makeText('', FONT_NUMERAL, TYPE.costFloat, PALETTE.signalYellow, 'bold', 'name');
     text.anchor.set(0.5, 0.5);
     this.floatsGroup.addChild(text);
     this.floatTexts[index] = text;
@@ -1579,31 +1827,60 @@ export class Hud extends Container {
     // button on the asteroid — your shots chip the rock" is ~440 px on one line, which
     // is wider than a 390 px portrait screen; a prompt the player can't read is a
     // prompt that didn't fire (GDD §2.10, style-guide §9 "reads at a glance").
+    //
+    // Since u7-07 the wrap is the CLEAR BAND's width, not the screen's, so a long
+    // prompt breaks to a second line rather than running under a thumb stick or
+    // the minimap's corner square — see hud-geometry.ts `promptBand` for the
+    // measurements, and for why the band replaced a single `PROMPT_CENTER_Y`.
+    const isTouch = frame.isTouch;
+    const insets = this.minimapInsets;
     this.promptText.style.wordWrap = true;
-    this.promptText.style.wordWrapWidth = promptWrapWidth(this.screenWidth);
+    this.promptText.style.wordWrapWidth = promptWrapWidth(
+      this.screenWidth,
+      this.screenHeight,
+      isTouch,
+      insets,
+    );
     this.promptText.style.align = 'center';
 
-    // Size the panel to the text, centre-anchored on the group origin. The
-    // stroke is centred on the path by Pixi, so it adds PROMPT_STROKE to the
-    // drawn footprint — the same term promptWrapWidth() already subtracted, and
-    // the same rect promptBounds() reports to the registry.
-    const w = this.promptText.width + PROMPT_PAD_X;
-    const h = this.promptText.height + PROMPT_PAD_Y;
-    this.promptPanel.clear();
-    // The unified panel skin: the void-material fill + a neutral hairline rule
-    // (./chrome), the same chrome every menu and the wheel now wear. The prompt's
-    // identity is carried by its plasma accent bar below, not by a coloured panel
-    // outline — exactly how the ui-mockup draws it.
-    this.promptPanel
-      .roundRect(-w / 2, -h / 2, w, h, RADIUS.panel)
-      .fill({ color: PANEL_FILL, alpha: PANEL_FILL_ALPHA })
-      .stroke({ width: PROMPT_STROKE, color: PANEL_RULE, alpha: PANEL_RULE_ALPHA });
-    // Plasma accent bar on the left — the weapon is plasma (style-guide §1).
-    this.promptAccent.clear();
-    this.promptAccent.rect(-w / 2, -h / 2, 4, h).fill({ color: PALETTE.plasma });
-    // The accent is drawn on the panel's left edge and is narrower than it, so
-    // the group's footprint stays exactly the stroked panel — what promptBounds
-    // reports and what `full` + PAD is asserted against.
+    // Hang the panel from the bottom of that band, off the SAME geometry the
+    // registry is handed, so the drawn rect and the registered rect are one
+    // computation rather than two that have to agree.
+    const bounds = promptBounds(
+      this.screenWidth,
+      this.screenHeight,
+      this.promptText.width,
+      this.promptText.height,
+      isTouch,
+      insets,
+    );
+    this.promptGroup.x = this.screenWidth / 2;
+    this.promptGroup.y = bounds.y + bounds.height / 2;
+
+    const pad = promptPad(this.screenWidth, this.screenHeight);
+    const w = this.promptText.width + pad.x + PROMPT_STROKE;
+    const h = this.promptText.height + pad.y + PROMPT_STROKE;
+    const key = `${Math.round(w)}x${Math.round(h)}`;
+    if (key !== this.promptScrimKey) {
+      // A scrim, not a panel. The prompt sits in the same band as the build
+      // wheel's bottom wedges on a landscape phone — there is no clear air left
+      // at 390 px of height — so the thing behind it has to survive it. At
+      // `SCRIM.prompt` it does: the wedge reads through, where the old
+      // nearly-opaque `PANEL_FILL` covered REPAIR REACTOR and RADAR outright.
+      this.promptScrim.clear();
+      drawScrim(this.promptScrim, -w / 2, -h / 2, w, h, 'center', SCRIM.prompt);
+
+      // The accent: the plate's own 3px tick, which is the one piece of the
+      // Gantry plate that costs the world no pixels. It replaces a 4px plasma
+      // bar — plasma is a material colour that means energy, and a prompt is not
+      // energy; Bone says "this line is the live one" with brightness instead.
+      this.promptAccent.clear();
+      drawTick(this.promptAccent, -w / 2, 0, h * PROMPT_TICK_FRACTION);
+      this.promptScrimKey = key;
+    }
+    // Both are drawn inside the panel rect, so the group's footprint stays
+    // exactly that rect — what promptBounds reports and what `full` + PAD is
+    // asserted against.
 
     this.promptGroup.visible = true;
   }
@@ -1803,16 +2080,28 @@ export class Hud extends Container {
 
   // --- Helpers -------------------------------------------------------------
 
+  /**
+   * One piece of HUD text, at the ratified tracking for the job it does.
+   *
+   * `tier` is not decoration: `letterSpacing` used to be a flat `0.5` px on every
+   * Text in this file, which is one of the six drifted values the Gantry handoff
+   * set out to retire. It is now `TRACKING.eyebrow` / `.label` / `.name`, chosen
+   * by what the text IS (a tag above a readout / a control's word / a proper noun
+   * or a value) and scaled with the size, so a resize carries its tracking with
+   * it ({@link ./instrument} `hudTracking`).
+   */
   private makeText(
     text: string,
     fontFamily: string,
     fontSize: number,
     fill: number,
     fontWeight: TextStyleFontWeight = 'normal',
+    tier: 'eyebrow' | 'label' | 'name' = 'label',
   ): Text {
+    const size = hudType(fontSize, this.metrics);
     return new Text({
       text,
-      style: { fontFamily, fontSize, fill, fontWeight, letterSpacing: 0.5 },
+      style: { fontFamily, fontSize: size, fill, fontWeight, letterSpacing: hudTracking(tier, size) },
     });
   }
 }

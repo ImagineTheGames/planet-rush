@@ -26,6 +26,7 @@
 import { Container, Graphics } from 'pixi.js';
 import { PALETTE } from '@render/index';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
+import { INSTRUMENT_RADIUS } from './instrument';
 import { ORE_HOLD_PIP, ORE_HOLD_PIP_GAP, oreHoldBounds, oreHoldRowWidth } from './ore-hold';
 import type { OreHold } from './ore-hold';
 
@@ -102,7 +103,10 @@ export class OreHoldView extends Container {
     let x = b.x;
     for (let i = 0; i < hold.slots; i++) {
       const filled = i < hold.filled;
-      this.pips.roundRect(x, b.y, ORE_HOLD_PIP, ORE_HOLD_PIP, 2);
+      // Square: a pip is a surface, and nothing on the glass is a raised plate
+      // (./instrument `INSTRUMENT_RADIUS`). A square cargo slot also reads as a
+      // SLOT rather than as a bead, which is what it is.
+      this.pips.roundRect(x, b.y, ORE_HOLD_PIP, ORE_HOLD_PIP, INSTRUMENT_RADIUS);
       if (filled) {
         // Filled ore pip: signal yellow, dimming on the flash's off-beat when full.
         this.pips.fill({ color: PALETTE.signalYellow, alpha: hold.full && !flashOn ? FULL_FLASH_DIM : 1 });

@@ -123,6 +123,87 @@ test('golden: landscape phone frozen scene', async ({ page }, testInfo) => {
 });
 
 // ---------------------------------------------------------------------------
+// The HUD's own chrome bands, CLIPPED (u7-07)
+// ---------------------------------------------------------------------------
+//
+// These exist because of a number measured while re-baselining this brief: the
+// Gantry/Bone pass over the whole in-match HUD — every readout's type, tracking,
+// scrim, rule and corner radius — moved between **0.93% and 1.41%** of the pixels
+// in the full-frame baselines above. `GOLDEN.maxDiffPixelRatio` is 1%. So a
+// complete re-skin of the screen a player spends the entire match on sat on the
+// knife-edge of the one gate that is supposed to catch it, and the FFA landscape
+// baseline would have passed unchanged.
+//
+// That tolerance is right for what it is for. A full frame is mostly world — a
+// starfield, an asteroid belt, four station rings — and every one of those pixels
+// pays into the antialiasing budget while telling you nothing about the HUD. The
+// fix is not a tighter ratio (which would flake on font AA); it is to point the
+// gate at the thing being gated. Clipping to the band the instruments actually
+// occupy keeps the same 1% ratio over a ninth of the area, which is a ninth of
+// the absolute budget — and every pixel in it is HUD.
+//
+// Two bands, because they fail differently: the TOP carries the ore TOTAL, the
+// wave clock and HOME (three separate scrims and three rules), and the BOTTOM
+// carries the desktop controls strip, whose rule and key colour are the loudest
+// single change in this brief. The phone gets the top band only — it has no strip
+// (GDD §2.2/§2.4, touch replaces it), which is itself worth a baseline.
+
+/** The top band, in CSS px: the three corner readouts and their rules. Deep
+ *  enough to include the wave clock's third line and the rule under it. */
+const HUD_TOP_BAND = 96;
+/** The bottom band: the controls strip, its Bone rule and its scrim. */
+const HUD_FOOTER_BAND = 64;
+
+test('golden: desktop HUD chrome band — the corner instruments', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot of the frozen scene → font settle → one clipped golden comparison of the top HUD band',
+    measuredSeconds: 5,
+  });
+
+  await bootFrozen(page);
+  await expect(page).toHaveScreenshot('desktop-hud-top.png', {
+    ...GOLDEN,
+    clip: { x: 0, y: 0, width: 1280, height: HUD_TOP_BAND },
+  });
+});
+
+test('golden: desktop HUD footer band — the controls strip', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot of the frozen scene → font settle → one clipped golden comparison of the strip band',
+    measuredSeconds: 5,
+  });
+
+  await bootFrozen(page);
+  await expect(page).toHaveScreenshot('desktop-hud-footer.png', {
+    ...GOLDEN,
+    clip: { x: 0, y: 800 - HUD_FOOTER_BAND, width: 1280, height: HUD_FOOTER_BAND },
+  });
+});
+
+test('golden: landscape phone HUD chrome band — the same instruments a quarter smaller', async ({
+  page,
+}, testInfo) => {
+  // The HUD's type and spacing scale on a phone (`./instrument` `hudMetrics`), so
+  // this band is not the desktop one shrunk by the screenshot — it is a different
+  // layout, and the only baseline that can fail when that scale changes.
+  test.skip(testInfo.project.name !== 'iphone', 'one landscape phone baseline only (iphone)');
+  budgetTest({
+    work: 'rotate to landscape → boot the frozen scene → font settle → one clipped golden comparison at dpr 3',
+    measuredSeconds: 8,
+  });
+
+  const vp = page.viewportSize();
+  if (vp) await page.setViewportSize({ width: vp.height, height: vp.width }); // portrait → landscape
+  await bootFrozen(page);
+  await expect(page).toHaveScreenshot('phone-landscape-hud-top.png', {
+    ...GOLDEN,
+    clip: { x: 0, y: 0, width: 844, height: HUD_TOP_BAND },
+  });
+});
+
+// ---------------------------------------------------------------------------
 // The side labels, in a TEAMS scene (u3 — ratified 2026-08-05)
 // ---------------------------------------------------------------------------
 //
