@@ -46,6 +46,8 @@ import {
   SCRIM_COLOR,
   SCRIM_CORE,
   TICK_WIDTH,
+  WHEEL_CHROME,
+  WHEEL_FACE_ALPHA,
 } from './instrument';
 
 // ---------------------------------------------------------------------------
@@ -321,6 +323,89 @@ describe('the ratified vocabulary, carried across intact', () => {
     for (const tone of [INSTRUMENT_RULE, INSTRUMENT_TICK, INSTRUMENT_KEY, INSTRUMENT_MID, INSTRUMENT_TRACK]) {
       expect(reserved).not.toContain(tone);
     }
+  });
+
+  // -------------------------------------------------------------------------
+  // The wheel's chrome (u11-01) — the half of the direction u7-02 left behind
+  // -------------------------------------------------------------------------
+
+  describe('WHEEL_CHROME — the build wheel spends no colour on its chrome', () => {
+    it('is drawn entirely from the Bone ramp — no seventh hue, and no hand-picked hex', () => {
+      // The defect this brief closes, stated as constants: the hub chevron was
+      // `PALETTE.plasma`, `OPEN ▸` and the index diamond were a local
+      // `0xdce3ec`, and the wedge faces were raw `hullSteel`. Every one of them
+      // is now a declared step that `../art/materials.test.ts` recomputes from
+      // its recipe on hull steel, so the wheel cannot drift off the ramp again
+      // without that test going red first.
+      expect(WHEEL_CHROME.nameReady).toBe(BONE.hi);
+      expect(WHEEL_CHROME.nameInert).toBe(MATERIAL_SHADES.tickSteel);
+      expect(WHEEL_CHROME.secondary).toBe(BONE.lo);
+      expect(WHEEL_CHROME.affordance).toBe(BONE.mid);
+      expect(WHEEL_CHROME.mark).toBe(BONE.hi);
+      expect(WHEEL_CHROME.face).toBe(BONE.fill);
+      expect(WHEEL_CHROME.divider).toBe(MATERIAL_SHADES.hairline);
+      expect(WHEEL_CHROME.press).toBe(BONE.hi);
+    });
+
+    it('spends none of the three colours a match has jobs for', () => {
+      // Plasma is the one that actually happened, and it is the one with the most
+      // to lose: it means ENERGY on this very screen (the shield overbar stands in
+      // front of a reactor in it). Yellow and red are the RESERVED pair — the
+      // wheel spends them on cost numerals and on a rejected press, neither of
+      // which is chrome, and neither of which is in this object.
+      const spoken = [PALETTE.plasma, PALETTE.signalYellow, PALETTE.threatRed, PALETTE.patina];
+      for (const [role, tone] of Object.entries(WHEEL_CHROME)) {
+        expect(spoken, `${role} spends a colour that already has a job`).not.toContain(tone);
+      }
+    });
+
+    it('every tone is a cool neutral — brightness is the only channel it uses', () => {
+      // Bone is a value ramp on hull steel, so no channel may run warmer than the
+      // blue one; the same oracle `../art/materials.test.ts` runs over the plate
+      // vocabulary and `lobby.test.ts` runs over the stat pips.
+      for (const [role, tone] of Object.entries(WHEEL_CHROME)) {
+        const r = (tone >> 16) & 0xff;
+        const g = (tone >> 8) & 0xff;
+        const b = tone & 0xff;
+        expect(b >= g && g >= r, `${role} is not a cool neutral`).toBe(true);
+        // …and nowhere near the accent it replaces. Plasma leads blue over red by
+        // 178; the whole Bone ramp leads by at most 22. `wheel-chrome.spec.ts`
+        // reads the SAME 60-level gap off real pixels on the booted client.
+        expect(b - r, `${role} leans blue like the accent it replaced`).toBeLessThan(60);
+      }
+    });
+
+    it('ranks the wheel by brightness, because that is all Bone has to rank with', () => {
+      // The hierarchy, in one assertion: what you act on is brightest, the word
+      // under the mark is next, what you only read is below that, and what is
+      // refused is dimmest. Get this backwards and the wheel still contains no
+      // hue and still reads as noise.
+      const luma = (c: number): number =>
+        0.2126 * ((c >> 16) & 0xff) + 0.7152 * ((c >> 8) & 0xff) + 0.0722 * (c & 0xff);
+      expect(luma(WHEEL_CHROME.nameReady)).toBeGreaterThan(luma(WHEEL_CHROME.affordance));
+      expect(luma(WHEEL_CHROME.affordance)).toBeGreaterThan(luma(WHEEL_CHROME.secondary));
+      expect(luma(WHEEL_CHROME.secondary)).toBeGreaterThan(luma(WHEEL_CHROME.nameInert));
+      expect(luma(WHEEL_CHROME.nameInert)).toBeGreaterThan(luma(WHEEL_CHROME.face));
+      // The mark and the primary word are deliberately the SAME step: the index
+      // diamond and the hub chevron are one object drawn twice, and a wedge you
+      // can press is the same order of "act on this" as the mark that says where.
+      expect(WHEEL_CHROME.mark).toBe(WHEEL_CHROME.nameReady);
+    });
+
+    it('a wedge face stays a lift over the glass, never a plate on top of it', () => {
+      // The rule the whole wheel is built on — no plates over gameplay, the world
+      // reads through. A face that reached for opacity to carry its state would
+      // buy the state and lose the game behind it, so the separation has to come
+      // out of a fill that is still mostly transparent at its strongest.
+      expect(WHEEL_FACE_ALPHA.ready).toBeLessThan(0.4);
+      expect(WHEEL_FACE_ALPHA.inert).toBeLessThan(WHEEL_FACE_ALPHA.ready);
+      // …and the two states have to be far enough apart to READ as two states.
+      // Threefold, measured the way an eye measures it: as the lift each one puts
+      // over the disc it is drawn on, not as a ratio of raw alphas.
+      const disc = 19; // faceShade at 0.88 over the fight, per-channel, ≈ level 19
+      const lift = (a: number): number => a * (((BONE.fill >> 16) & 0xff) - disc);
+      expect(lift(WHEEL_FACE_ALPHA.ready)).toBeGreaterThan(lift(WHEEL_FACE_ALPHA.inert) * 2.5);
+    });
   });
 
   it('the tick is the plate\'s own 3px bar, drawn centred on its row', () => {
