@@ -144,8 +144,16 @@ selfish-first ladder (asserted at all three tiers).
 
 <!-- what remains, in order, and anything blocking -->
 
-Nothing outstanding in the role split. Push, PR, re-check the `origin/main`
-ancestor gate immediately before claiming the DoD.
+Nothing outstanding in the role split. Pushed; **PR #360 open**.
+
+Resume note (this session): the branch was already complete and pushed, but
+`origin/main` had moved (a1-04, PR #359 — docker-context walk). Merged it in at
+`8f4a376`; clean, touched only `tests/server/docker-context.test.ts` and a
+status note, nothing under `src/bots/`. Re-ran both gates on the merge:
+`npx tsc --noEmit` clean, `npm test -- --run` **270 files / 4740 tests passed**.
+Ancestor gate re-checked green *after* the push. If a future session finds the
+ancestor gate red again, it is main moving underneath, not the work rotting —
+merge, re-run both gates, push, re-check in that order.
 
 Handover:
 
