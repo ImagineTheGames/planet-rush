@@ -921,3 +921,86 @@ frames.
 The lobby frame is the developer's case in one picture: seven rows reading
 `Warden 1 / Warden 2 / Sable 1 / Vulture 1 / Warden 3 / Sable 2 / Vulture 2`,
 the hull under each name, a read-only `HARD` chip, a `?`.
+
+#### `05c00a1` — the suite did not "run slowly on this box." It never finished.
+
+**This is the most important thing on this branch and it invalidates a claim
+sessions 10–12 left standing.** `src/ui/lobby.test.ts` **hung**, so `npm test`
+printed 618 lines of green and then sat forever. I killed a run at 23 minutes
+believing it was starved; that was wrong about the cause but right that something
+was broken. Two abandoned runs from *earlier sessions of this lane* were still
+spinning at **1h04m and 1h54m**. They are the same hang.
+
+The cause is **session ten's own documented trap, in the file session ten
+resolved**: since a0-11 an online `lobby()` opens with seven OPEN chairs and no
+bots, and `cycleSeatCharacter` **refuses a non-bot seat**. So
+
+    while (state.seats[slot]!.character !== 'warden') state = cycleSeatCharacter(...)
+
+is a no-op repeated forever. Session ten found this class, fixed four tests, and
+missed three. **Session eleven then committed the resolution having run `tsc` and
+not the suite** — the note records "tsc clean on the unstaged tree" as the
+evidence the merge was finished, and `tsc` cannot see a loop that never exits.
+Sessions 12 and this one inherited it.
+
+Three tests were wrong, all wanting bots and asking for an online room:
+'lets the host seat the same character twice' (the hang), 'shows the tier of the
+character actually seated' (would have asserted one unchanged row seven times),
+and 're-indexes around a CLOSED seat' (counted two taps to CLOSED; a solo seat
+starts on `bot`, so two taps overshoot to `open` — the same rung-counting trap
+`e94db05` fixed next door).
+
+**Why it hung instead of failing, which is the transferable part:** every cycler
+in that file is a *silent no-op* on a seat it refuses. A loop pointed at the wrong
+fixture therefore spins rather than asserting. All eight unbounded `while`s are
+now `cycleCharacterTo` / `cycleStateTo` / `cycleTeamTo`, bounded by one lap and
+throwing with the seat and its occupant named. **Verified the bound fires** by
+restoring the bad fixture: "seat 1 never reached 'warden' — occupant 'open'
+refuses the tap", in seconds. A wrong fixture should cost one red test, not the
+suite.
+
+##### Two lessons, and neither is "merge more carefully"
+
+1. **`tsc` is not a substitute for the suite when a merge changes what a fixture
+   MEANS.** Session ten wrote that lesson down ("a green test is not evidence")
+   and session eleven then accepted a green `tsc` as evidence of the same merge.
+   If you resolve a merge, run the suite before you believe it.
+2. **A hung suite is indistinguishable from a slow one**, and this box is
+   genuinely slow, which is what let it survive. The tell is the *log*, not the
+   process: output stops at a fixed line count and never advances. **Diff the test
+   files that reported against `git ls-files '*.test.ts'`** — the one that never
+   printed is the one that hung. That took a minute and would have taken a minute
+   in any of the last three sessions. (`evidence/*.live.test.ts` are excluded by
+   config and always absent; ignore those six.)
+
+**Do not pipe the run through `tail`.** Redirect to a file. Both traps in this
+note are really the same trap: I could not see the output, so I diagnosed from
+process stats and got it wrong twice — first "it's contention", then "it's hung"
+on a run that was fine. The log answers it in one read.
+
+#### DoD on the merged tree, with the hang fixed
+
+- `npx tsc --noEmit` — clean.
+- `npm test -- --run` — **4116 passed, 1 failed of 4117**, 243 files, 510 s. This
+  is the **first complete unit run on this branch since the a0-11 merge**; the
+  three sessions that reported green were reporting a run that never finished.
+  (The count jumped 4032 → 4117 because 100 tests in `lobby.test.ts` had not been
+  executing at all.)
+- The one failure is `capacity-regression` ("the loop stays inside the tick budget
+  at 12 rooms", 42.76 ms vs a 33 ms budget). Sessions 2/4/5/6/7/8 called it a
+  wall-clock benchmark that only trips under lane contention. **This time it is
+  measured rather than asserted, and by a better method than re-running it:** the
+  box was at **load 31 on 8 cores**, and `git diff --name-only origin/main...HEAD`
+  shows this branch changes **no file that test exercises** — its imports are
+  `src/net/snapshot`, `src/net/wire`, `server/match-server` and its own helpers,
+  every one byte-identical to main here. A benchmark over unchanged code cannot
+  have been broken by this branch. Re-running it in "isolation" was the weaker
+  check and gave 34.03 ms at load 31, which measures the box, not the branch.
+- `PREVIEW_PORT=4198 npm run test:live-stage -- lobby-cast.spec.ts` — **3 passed**
+  (cast round trip 30.2 s, `?` by click 8.3 s, `?` by tap at 390 px 45.1 s).
+- GDD.md differs from `origin/main`; `merge-base --is-ancestor` OK at `525440c`.
+
+**The proof, re-measured not re-asserted:** `lobby-cast-readback.txt` regenerated
+**byte-identical** — slots 1–7 `warden warden sable vulture warden sable vulture`
+in the lobby and the same seven in the match, `identical: true`. It is absent from
+`ad30e9d`'s diff and that absence IS the result.
