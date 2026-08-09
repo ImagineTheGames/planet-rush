@@ -84,6 +84,7 @@ import {
   LOBBY_TITLE,
   MODE_LABELS,
   RUSH_LABEL,
+  SEAT_HELP_GLYPH,
   SIDE_COLORS,
   STAT_PIP_COLORS,
 } from './lobby';
@@ -187,8 +188,11 @@ interface SeatNodes {
    *  gone with the handoff's decluttered row: the bar and the P-number carry
    *  identity, and §3 rule 3's hue-independent channel is the decal. */
   readonly detail: Text;
-  /** EASY/MEDIUM/HARD, centred on the trailing difficulty chip. */
+  /** EASY/MEDIUM/HARD, centred on the trailing tier chip. **Read-only since
+   *  a0-06** — the character's own tier, shown rather than chosen. */
   readonly chipLabel: Text;
+  /** `?` — the trailing control that opens this seat's codex dossier (a0-06). */
+  readonly helpLabel: Text;
   /** The side, in the viewer's words — `FRIENDLY A` / `ENEMY B` — centred on the
    *  team chip and auto-fitted to it (u3). */
   readonly teamChipLabel: Text;
@@ -347,8 +351,9 @@ export class LobbyView extends Container {
       const stateControl = this.layout.seatStates[i];
       const chip = this.layout.seatChips[i];
       const teamChip = this.layout.seatTeamChips[i];
-      if (!seat || !rect || !stateControl || !chip || !teamChip) continue;
-      this.drawSeat(this.seatSlot(i), seat, rect, stateControl, chip, teamChip, model, metrics);
+      const help = this.layout.seatHelp[i];
+      if (!seat || !rect || !stateControl || !chip || !teamChip || !help) continue;
+      this.drawSeat(this.seatSlot(i), seat, rect, stateControl, chip, teamChip, help, model, metrics);
     }
     for (let i = 0; i < this.layout.classOptions.length; i++) {
       const option = model.classOptions[i];
@@ -538,9 +543,17 @@ export class LobbyView extends Container {
    * is also what buys the row its height on a phone (`./lobby-geometry`).
    *
    * Left to right: `bar | STATE control | P-number | name and hull | team chip |
-   * difficulty chip`. The state control leads, because it is the control that
+   * tier chip | ?`. The state control leads, because it is the control that
    * decides what the slot *is* — and because it was the only one on this row that
    * had nothing drawn for it at all before u5.
+   *
+   * **a0-06 changed what two of those segments MEAN, and added one.** The row's
+   * body is the character cycle now (the tap that lands on a name changes the
+   * name); the tier chip states the character's difficulty and is no longer a
+   * control at all — it draws on the `inert` surface every dead thing on this
+   * screen draws on, so it reads as the information GDD §2.1 promises rather than
+   * as a second control that could disagree with the cast; and the `?` at the far
+   * right opens that character's codex dossier on a plain tap.
    */
   private drawSeat(
     nodes: SeatNodes,
@@ -549,6 +562,7 @@ export class LobbyView extends Container {
     stateRect: Rect,
     chipRect: Rect,
     teamChipRect: Rect,
+    helpRect: Rect,
     model: LobbyModel,
     m: FrameMetrics,
   ): void {
@@ -603,6 +617,7 @@ export class LobbyView extends Container {
     // bot seat in TEAMS therefore carries both at once; neither replaces the
     // other.
     const teams = model.mode === 'teams';
+    const helpShown = this.drawHelpControl(nodes, seat, helpRect, m);
     const tierShown = this.drawDifficultyChip(nodes, seat, chipRect, m);
     const teamShown = this.drawTeamChip(nodes, seat, teamChipRect, teams, closed, m);
 
@@ -610,7 +625,13 @@ export class LobbyView extends Container {
     // was really drawn, or the right edge when the row carries none. The name and
     // the hull measure against it, so a 233px landscape row's name is fitted into
     // its own body rather than drawn under the side chip.
-    const chipsLeft = teamShown ? teamChipRect.x : tierShown ? chipRect.x : rect.x + rect.width;
+    const chipsLeft = teamShown
+      ? teamChipRect.x
+      : tierShown
+        ? chipRect.x
+        : helpShown
+          ? helpRect.x
+          : rect.x + rect.width;
 
     const textX = nodes.decal.x + nodes.decal.width + pad;
     const textRoom = Math.max(0, chipsLeft - pad - textX);
@@ -724,13 +745,21 @@ export class LobbyView extends Container {
   }
 
   /**
-   * The trailing DIFFICULTY chip — the bot-tier cycle (EASY/MEDIUM/HARD), drawn on
-   * every BOT seat in BOTH modes (n2): the one slot-editor control every mode
-   * shares, so a bot's tier is editable in TEAMS exactly as in FFA. A human or
-   * closed seat has no tier, so the chip is hidden — which is also the handoff's
-   * *"difficulty and OPEN collapsed into one trailing slot"*: one slot at the end
-   * of the row, carrying the one trailing thing this seat has. Returns whether it
-   * was drawn.
+   * The trailing TIER chip — `EASY` / `MEDIUM` / `HARD`, drawn on every BOT seat in
+   * both modes. Returns whether it was drawn.
+   *
+   * **It is a read-out, not a control** *(a0-06, GDD §2.1 amended 2026-08-07: the
+   * host picks the character and its difficulty is shown)*. That is the entire
+   * change here and it is deliberately visible in the material rather than only in
+   * the hit test: the chip draws on the `inert` surface — the same one a guest's
+   * mode toggle and a dead state control wear — instead of the raised, bright-
+   * hairlined `secondary` plate it used to. This screen already keeps the rule
+   * that *a dead-looking button beats a lying one* ({@link drawSeatState} point 3);
+   * a value that is not a button at all has to look like one even less.
+   *
+   * The tier itself comes off the character (`./lobby` `seatDifficulty`), so this
+   * chip cannot print a difficulty the seated bot will not fly — the developer's
+   * *"i chose HARD … they were at other difficulties"* has no representation left.
    */
   private drawDifficultyChip(
     nodes: SeatNodes,
@@ -742,14 +771,54 @@ export class LobbyView extends Container {
     nodes.chipLabel.visible = visible;
     if (!visible) return false;
 
-    drawPlate(nodes.body, chip.x, chip.y, chip.width, chip.height, 'secondary', 'chip');
+    drawDeadOrLive(nodes.body, chip, false);
     const px = plateTypeSize(ROW_LABEL_PX, m);
     nodes.chipLabel.text = DIFFICULTY_LABELS[seat.botDifficulty ?? 'medium'];
     nodes.chipLabel.style.fontSize = px;
     nodes.chipLabel.style.letterSpacing = trackingPx(TRACKING.label, px);
+    nodes.chipLabel.style.fill = MATERIAL_SHADES.boneLo;
     fitLabel(nodes.chipLabel, chip.width - 2 * STATE_LABEL_PAD);
     nodes.chipLabel.x = chip.x + chip.width / 2;
     nodes.chipLabel.y = chip.y + chip.height / 2;
+    return true;
+  }
+
+  /**
+   * The trailing **`?` control** — a plain tap opens this seat's character's codex
+   * dossier *(a0-06; the developer asked for "a ? question mark icon that you can
+   * press to show a tooltip with the codex entry about that bot")*. Bot rows only:
+   * a human seat and a closed one have no character to write a dossier about.
+   * Returns whether it was drawn.
+   *
+   * It reads as pressable — the `secondary` chip plate the state control wears —
+   * because unlike the tier chip beside it, it **is** a control, and on every
+   * device: the hover and the long-press that reach the same hint are shortcuts to
+   * an affordance that is now advertised, not the affordance itself. A hover-only
+   * tooltip is a desktop-only feature and the parity principle (GDD §2.4) does not
+   * have a cell for one.
+   *
+   * The glyph is a bare `?` and takes no hue: yellow means ore and red means damage
+   * (style-guide §2), and a help affordance is neither.
+   */
+  private drawHelpControl(
+    nodes: SeatNodes,
+    seat: LobbySeatView,
+    rect: Rect,
+    m: FrameMetrics,
+  ): boolean {
+    const visible = seat.isBot && rect.width > 0 && rect.height > SEAT_CONTROL_MIN_HEIGHT;
+    nodes.helpLabel.visible = visible;
+    if (!visible) return false;
+
+    drawPlate(nodes.body, rect.x, rect.y, rect.width, rect.height, 'secondary', 'chip');
+    const px = plateTypeSize(ROW_LABEL_PX, m);
+    nodes.helpLabel.text = SEAT_HELP_GLYPH;
+    nodes.helpLabel.style.fontSize = px;
+    nodes.helpLabel.style.letterSpacing = 0;
+    nodes.helpLabel.style.fill = MATERIAL_SHADES.bone;
+    fitLabel(nodes.helpLabel, rect.width - 2);
+    nodes.helpLabel.x = rect.x + rect.width / 2;
+    nodes.helpLabel.y = rect.y + rect.height / 2;
     return true;
   }
 
@@ -838,13 +907,25 @@ export class LobbyView extends Container {
     chipLabel.anchor.set(0.5, 0.5);
     const teamChipLabel = makeText('', FONT_HEADING, ROW_LABEL_PX, MATERIAL_SHADES.bone);
     teamChipLabel.anchor.set(0.5, 0.5);
+    const helpLabel = makeText('', FONT_HEADING, ROW_LABEL_PX, MATERIAL_SHADES.bone);
+    helpLabel.anchor.set(0.5, 0.5);
     // Numerals face, like every other number on this screen; the colour is set
     // per-frame from the grade.
     const ping = makeText('', FONT_BODY, DETAIL_PX, PING_GRADE_COLORS.good);
     ping.anchor.set(0, 0.5);
 
-    this.addChild(body, stateLabel, decal, name, detail, chipLabel, teamChipLabel, ping);
-    const nodes: SeatNodes = { body, stateLabel, decal, name, detail, chipLabel, teamChipLabel, ping };
+    this.addChild(body, stateLabel, decal, name, detail, chipLabel, teamChipLabel, helpLabel, ping);
+    const nodes: SeatNodes = {
+      body,
+      stateLabel,
+      decal,
+      name,
+      detail,
+      chipLabel,
+      teamChipLabel,
+      helpLabel,
+      ping,
+    };
     this.seatNodes[index] = nodes;
     return nodes;
   }
@@ -1194,6 +1275,7 @@ function hideRow(nodes: SeatNodes): void {
   nodes.detail.visible = false;
   nodes.chipLabel.visible = false;
   nodes.teamChipLabel.visible = false;
+  nodes.helpLabel.visible = false;
   nodes.ping.visible = false;
 }
 
