@@ -1,0 +1,61 @@
+{
+  "panelPx": 840,
+  "bodyRadiusPx": 128,
+  "sameZoom": {
+    "bare": {
+      "spanPx": 299,
+      "from": 270,
+      "to": 569
+    },
+    "built-4": {
+      "spanPx": 299,
+      "from": 270,
+      "to": 569
+    },
+    "shot-2": {
+      "spanPx": 299,
+      "from": 270,
+      "to": 569
+    },
+    "shot-0": {
+      "spanPx": 299,
+      "from": 270,
+      "to": 569
+    }
+  },
+  "refactorMovesNothing": {
+    "bare": {
+      "size": "840x912",
+      "differingPixels": 0
+    },
+    "built-4": {
+      "size": "840x912",
+      "differingPixels": 0
+    },
+    "shot-2": {
+      "size": "840x912",
+      "differingPixels": 0
+    },
+    "shot-0": {
+      "size": "840x912",
+      "differingPixels": 0
+    }
+  },
+  "emptyRingVsFreshSpawn": {
+    "differingPixels": 0
+  },
+  "builtDifferenceIsOutboard": {
+    "built-4": {
+      "differingPixels": 5768,
+      "minPx": 155,
+      "maxPx": 204,
+      "entirelyOutboardOfHull": true
+    },
+    "shot-2": {
+      "differingPixels": 2898,
+      "minPx": 156,
+      "maxPx": 204,
+      "entirelyOutboardOfHull": true
+    }
+  }
+}

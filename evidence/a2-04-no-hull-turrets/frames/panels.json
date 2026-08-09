@@ -1,0 +1,22 @@
+[
+  {
+    "id": "panel-bare",
+    "turrets": 0,
+    "caption": "0 built — a fresh station · sim says 0"
+  },
+  {
+    "id": "panel-built-4",
+    "turrets": 4,
+    "caption": "4 built — the ring full · sim says 4"
+  },
+  {
+    "id": "panel-shot-2",
+    "turrets": 2,
+    "caption": "2 shot down — the count drops · sim says 2"
+  },
+  {
+    "id": "panel-shot-0",
+    "turrets": 0,
+    "caption": "the ring shot empty · sim says 0"
+  }
+]
