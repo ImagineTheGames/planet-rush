@@ -17,6 +17,29 @@ Nothing else. No workflow change, no `skipLibCheck`, no `any`, no deleted test.
 Server behaviour, the `scale count 1` pin, the `::` bind and the token presence
 check are all untouched.
 
+- **THE EVIDENCE EXISTS: run [31331151684] is green.** `Deploy server (Fly.io)`,
+  `workflow_dispatch` on this branch, 2026-08-09 19:15 UTC — **the first green
+  run since 2026-08-07**, and all 13 steps passed:
+
+  ```
+  Deploy allocator (control plane first)   RUN npx tsc --noEmit -p allocator/tsconfig.json  →  ✓ 14 modules
+  Deploy gameserver fleet                  RUN npx tsc --noEmit -p server/tsconfig.json     →  ✓ 58 modules
+  Health checks   allocator  {"status":"ok","machines":3,...}   healthy
+                  gameserver {"status":"ok","region":"iad",...} healthy
+  ```
+
+  Note **`Deploy gameserver fleet` ran and passed** — the step that had not
+  executed at all since 2026-08-07. That is the second fix proving itself in CI,
+  not just in the simulated context. Module counts (14 / 58) match the local
+  reproduction exactly. Fleet is live: iad x2 + gru x1.
+
+  Dispatched rather than waited-for-merge because the workflow's `on:` has
+  `workflow_dispatch`, and the branch's diff vs `main` is **build config only**
+  (`git diff origin/main...HEAD` touches two tsconfigs, one Dockerfile line, this
+  note — zero runtime source). So the image this run built and shipped is
+  byte-for-byte what merging produces; the evidence is not weakened by arriving
+  before the merge. It also un-stalls production two days early.
+
 ## DECISIONS
 
 **The diagnosis is shape 1 — the allocator should not be typechecking `*.test.ts`
@@ -102,12 +125,20 @@ caught by a deploy. Named in the PR body for its owner.
 
 ## NEXT
 
-- Push, open the PR, watch `Deploy server (Fly.io)` on merge — one green run is
-  the whole evidence, and it will be the first since 2026-08-07.
-- **Expect the first green run to do a lot at once**: the gameserver fleet has not
-  been deployed for two days, so the merge rolls two days of `server/`, `src/net/`
-  and `src/shared/` changes onto the fleet in one go, and the `scale count` and
-  health-check steps run for the first time since then. Worth a pair of eyes on
-  the run, not just its exit code.
+Work is complete. Both fixes are committed and pushed, PR #355 is open, and the
+DoD's one green `Deploy server (Fly.io)` run exists (31331151684).
+
+- Awaiting review/merge on #355. On merge the workflow fires again on `main`;
+  it should be a no-op roll of the same image this run already shipped.
+- The "expect the first green run to do a lot at once" worry **has already
+  happened and was clean** — that dispatched run rolled two days of `server/`,
+  `src/net/` and `src/shared/` change onto the fleet in one go, and the
+  `scale count` and health-check steps all passed. No pair of eyes needed on
+  the merge run beyond its exit code.
+- Open for the Director, not blocking: whether `Deploy server (Fly.io)` joins the
+  notifier's watch list (recommendation and the smallest-honest-signal proposal
+  are in the PR body).
+- Open for the Netcode Engineer, not blocking: widening
+  `tests/server/docker-context.test.ts` to walk `src/` too.
 
 No blockers.
