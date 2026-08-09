@@ -6,7 +6,7 @@
  * dropped the player "right in the match", so the menu was never reached.
  *
  * **PLAY opens the doors, and it is the only way in** (ratified: one play flow).
- * PLAY leads to {@link ./lobby-entry} — SOLO CONTRACT / OPEN A CLAIM / JOIN A CLAIM — and
+ * PLAY leads to {@link ./lobby-entry} — SOLO / HOST / JOIN — and
  * all three of those lead to the *same* lobby ({@link ./lobby}), offline or
  * online. Nothing on this screen builds a match world; SETTINGS opens the Day-7
  * settings screen ({@link ./settings}). The wiring lives in `src/main.ts`; this
@@ -36,7 +36,7 @@ import type { NavScreen } from './menu-nav';
 /**
  * What a tap on the main menu resolves to.
  *
- * `play` opens **the doors** — SOLO CONTRACT / OPEN A CLAIM / JOIN A CLAIM
+ * `play` opens **the doors** — SOLO / HOST / JOIN
  * ({@link ./lobby-entry}) — and nothing else. It does not build a match and it no
  * longer has an offline lobby of its own: the developer ratified ONE way in
  * ("PLAY → goes to the same online menu, which already has offline play … right

@@ -33,7 +33,7 @@
  * ONE DOOR, ONE LOBBY (ratified — the unified play flow)
  * ---------------------------------------------------------------------------
  * There is exactly one entry point and exactly one lobby. The main menu's PLAY
- * opens {@link ./lobby-entry} — SOLO CONTRACT / OPEN A CLAIM / JOIN A CLAIM — and all
+ * opens {@link ./lobby-entry} — SOLO / HOST / JOIN — and all
  * three of those doors resolve into the same {@link ./lobby} through the same
  * {@link flowConnected}. The single difference between "the solo lobby" and "the
  * online lobby" is the `online` flag the door already decided, which the lobby
@@ -466,7 +466,7 @@ export function flowConnected(
   const host = options.host ?? (state.entry.screen === 'join' ? 0 : you);
   // ONE lobby component, both modes (ratified): the same `createLobby` opens the
   // solo room and the online one, and the ONLY thing that differs is the flag the
-  // door already resolved — `online: false` for SOLO CONTRACT (no room code, the empty
+  // door already resolved — `online: false` for SOLO (no room code, the empty
   // seats are the bot cast), `true` for CREATE / JOIN (code up, seats claimable).
   // Every other affordance — hulls, map, mode, abundance, slot states, difficulty,
   // teams, RUSH — is the same model function in both, which is the property the

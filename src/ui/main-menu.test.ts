@@ -77,8 +77,8 @@ describe('the model', () => {
   });
 
   it('offers ONE way into a match — no second front door beside PLAY', () => {
-    // The ratified single play flow: PLAY opens the doors screen (PLAY SOLO /
-    // CREATE ROOM / JOIN ROOM), which already carries offline play, so the separate
+    // The ratified single play flow: PLAY opens the doors screen (SOLO /
+    // HOST / JOIN), which already carries offline play, so the separate
     // ONLINE button — and the offline-lobby shortcut PLAY used to be — are gone.
     // Asserted as an absence, because a redundant door is exactly the kind of thing
     // that gets quietly re-added.

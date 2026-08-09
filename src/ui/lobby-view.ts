@@ -480,7 +480,7 @@ export class LobbyView extends Container {
     // The host sees the shape of the match they are about to start — the head
     // count in FFA, and the always-visible per-side tally in TEAMS (ratified:
     // counts shown, never blocking a split).
-    // "Claim holder", not "host": the guest came through JOIN A CLAIM, so the
+    // "Claim holder", not "host": the guest came through JOIN, so the
     // claim is the noun already on screen, and "host" is the network's word for
     // it (GDD §4.7 worked examples). Measured at 11px against the content box
     // before it shipped — see tests/mobile/voice-copy-fit.spec.ts.

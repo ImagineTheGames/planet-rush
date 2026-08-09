@@ -75,6 +75,7 @@ import {
   shieldPool,
   stockTiers,
   teamOf,
+  waveIntervalOf,
   waveTime,
 } from '../sim';
 import type { Asteroid, Bounds, MatchPhase, MiningStation, Ship, UpgradeTiers, World } from '../sim';
@@ -717,12 +718,20 @@ function selfView(
   };
 }
 
-/** Seconds until the next wave, or null once the last one has landed. Public
- *  information: it is printed on the HUD (GDD §2.2). */
+/**
+ * Seconds until the next wave, or null once the last one has landed. Public
+ * information: it is printed on the HUD (GDD §2.2).
+ *
+ * Read on the match's OWN interval (`waveIntervalOf`, the accessor the spawner
+ * reads), never `waveTime`'s baseline default — that default is what made a bot
+ * in a default SCARCE match expect the wave 15 s early and commit to the centre
+ * to find nothing there (a0-16). A world with no resolved economy falls back to
+ * the baseline inside `waveIntervalOf`, so a hand-built bot fixture is unchanged.
+ */
 function nextWaveIn(world: World): number | null {
   const next = world.match.wavesSpawned + 1;
   if (next > WAVE_COUNT) return null;
-  return Math.max(0, waveTime(next) - world.time);
+  return Math.max(0, waveTime(next, waveIntervalOf(world)) - world.time);
 }
 
 // ---------------------------------------------------------------------------
