@@ -483,6 +483,21 @@ export interface MatchStartSlot {
    * it rides RUSH!, never the snapshot (spike §S2, Trap 7).
    */
   team?: number;
+  /**
+   * **Which character is flying this seat**, or absent on a human's (a0-06b).
+   *
+   * The roster that ends the lobby carried the hull and the side and said nothing
+   * at all about who was in the ship — so an online client had no way to name the
+   * cast the room built, and named the one its *own* lobby had guessed at instead.
+   * For the host those agreed by luck; for a joiner, whose lobby never authored a
+   * cast, they did not. Offline the pick travels in-process
+   * (`MatchBootConfig.cast`), so only the online path was ever blind.
+   *
+   * Static match config, like the hull and the side beside it: it rides RUSH!
+   * once, never the 30 Hz snapshot (spike §S2, Trap 7). Optional — a pre-a0-06b
+   * server omits it and a client keeps naming bots the way it did before.
+   */
+  personality?: PersonalityId;
 }
 
 /**

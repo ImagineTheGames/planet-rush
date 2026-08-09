@@ -1528,7 +1528,15 @@ export class MatchRoom {
       // recipient, which is why it rides `matchStart` and not the broadcast
       // roster beside it.
       you: slot.player,
-      slots: this.slots.map((s) => ({ player: s.player, shipClass: s.shipClass, team: s.team })),
+      // …and WHO is in each seat (a0-06b): the hull and the side alone cannot name
+      // a bot, and three Hard characters share one tier, so a client that guessed
+      // from either would sometimes name the wrong one. Absent on a human's seat.
+      slots: this.slots.map((s) => ({
+        player: s.player,
+        shipClass: s.shipClass,
+        team: s.team,
+        ...(s.personality ? { personality: s.personality } : {}),
+      })),
       ...(this.config.bounds ? { bounds: { ...this.config.bounds } } : {}),
       ...(this.config.asteroidCount !== undefined
         ? { asteroidCount: this.config.asteroidCount }
