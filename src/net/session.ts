@@ -39,6 +39,7 @@ import { RemoteInterpolator } from './interpolation';
 import type { InterpolatedShip, InterpolatedShot } from './interpolation';
 import { PresentationLayer } from './presentation';
 import { decodeSnapshot } from './snapshot';
+import type { PersonalityId } from '../bots';
 import type {
   BotDifficulty,
   ConnectionState,
@@ -275,12 +276,19 @@ export class TransportSession implements MatchSession {
   }
 
   /** Send the lobby choice: hull, fire mode, and — honoured only from the room
-   *  creator — the bots' difficulties, the match MODE and the per-seat TEAM
-   *  assignment (GDD §2.1, §2.11, §4.2; m10 teams-wire). */
+   *  creator — the bots' CAST and their difficulties, the match MODE and the
+   *  per-seat TEAM assignment (GDD §2.1, §2.11, §4.2; m10 teams-wire, a0-06b). */
   chooseInLobby(options: {
     shipClass: ShipClass;
     fireMode?: FireMode;
     botDifficulties?: readonly BotDifficulty[];
+    /**
+     * The characters those tiers belong to, same order and same length (a0-06b).
+     * The authoritative half of the pair: where this names a seat's character the
+     * room seats *that* character and derives the tier from it, so the two can
+     * never disagree about a seat (`./transport` `LobbyChoiceMessage`).
+     */
+    botPersonalities?: readonly PersonalityId[];
     mode?: MatchMode;
     teams?: readonly number[];
     /** The host's per-seat OPEN / BOT / CLOSED authoring, by slot (a0-11). */
@@ -291,6 +299,7 @@ export class TransportSession implements MatchSession {
       shipClass: options.shipClass,
       fireMode: options.fireMode ?? 'manual',
       ...(options.botDifficulties ? { botDifficulties: options.botDifficulties } : {}),
+      ...(options.botPersonalities ? { botPersonalities: options.botPersonalities } : {}),
       ...(options.mode ? { mode: options.mode } : {}),
       ...(options.teams ? { teams: options.teams } : {}),
       ...(options.seats ? { seats: options.seats } : {}),
@@ -868,6 +877,9 @@ export interface OnlineSessionConfig {
   readonly fireMode?: FireMode;
   /** Bot difficulties, honoured only if this client created the room. */
   readonly botDifficulties?: readonly BotDifficulty[];
+  /** The characters behind those tiers (a0-06b) — the row the room actually casts
+   *  from. Honoured only if this client created the room, like the tiers. */
+  readonly botPersonalities?: readonly PersonalityId[];
   /** Ambient overrides for the transport — injected in tests (see
    *  `./websocket-transport`); production passes none and gets the browser's. */
   readonly transport?: Omit<WebSocketTransportConfig, 'url' | 'room'>;
@@ -889,12 +901,14 @@ function readOptionalString(transport: unknown, key: string): string | null {
 
 /** An online session, with the two lobby gestures a room needs. */
 export interface OnlineSession extends MatchSession {
-  /** Re-send the lobby choice (hull, fire mode, bot difficulties, and — from the
-   *  host — the match mode and the per-seat team assignment). */
+  /** Re-send the lobby choice (hull, fire mode, the bots' cast and difficulties,
+   *  and — from the host — the match mode and the per-seat team assignment). */
   chooseInLobby(options: {
     shipClass: ShipClass;
     fireMode?: FireMode;
     botDifficulties?: readonly BotDifficulty[];
+    /** The characters behind those tiers, same order (a0-06b). */
+    botPersonalities?: readonly PersonalityId[];
     mode?: MatchMode;
     teams?: readonly number[];
     /** The host's per-seat OPEN / BOT / CLOSED authoring, by slot (a0-11). */
@@ -960,6 +974,7 @@ export function createOnlineSession(config: OnlineSessionConfig): OnlineSession 
       shipClass: config.shipClass,
       ...(config.fireMode !== undefined ? { fireMode: config.fireMode } : {}),
       ...(config.botDifficulties ? { botDifficulties: config.botDifficulties } : {}),
+      ...(config.botPersonalities ? { botPersonalities: config.botPersonalities } : {}),
     });
   };
 

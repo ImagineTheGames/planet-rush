@@ -408,6 +408,27 @@ export class MatchRoom {
   private creator: PlayerId | null = null;
   private botDifficulties: readonly BotDifficulty[] = [];
   /**
+   * **The cast the host picked**, one entry per BOT seat in the order
+   * {@link castFor} spends them — the same order and length as
+   * {@link botDifficulties} (a0-06b; `src/net/transport`
+   * `LobbyChoiceMessage.botPersonalities`).
+   *
+   * The room used to hold only the tier, and re-derive *a* character of that tier
+   * at RUSH!. There are three Hard characters and one Hard tier, so "the host
+   * picked Sable" and "this room seats a Hard bot" are different facts, and the
+   * second one was all that survived the hop: pick Sable, get Vulture. That is the
+   * class of bug GDD §2.1 *amended 2026-08-07* deleted from the lobby — "the host
+   * picks the character and its difficulty is **shown**, not chosen" — and it
+   * outlived the amendment on the wire.
+   *
+   * **This row wins where it speaks.** {@link castFor} reads it first, and only
+   * falls back to the tier for a seat it does not name (an older client, a shorter
+   * array). The tier the room then publishes is the seated character's own
+   * (`seatBot`), so the two tables cannot contradict each other about a seat —
+   * one of them is not consulted.
+   */
+  private botPersonalities: readonly PersonalityId[] = [];
+  /**
    * What the host set each seat to — OPEN / BOT / CLOSED, indexed by slot
    * (a0-11; `src/net/transport` `LobbyChoiceMessage.seats`, GDD §2.1 *amended
    * 2026-08-07*).
@@ -537,6 +558,11 @@ export class MatchRoom {
         player: slot.player,
         isBot: slot.bot !== null,
         ...(slot.difficulty ? { botDifficulty: slot.difficulty } : {}),
+        // …and WHICH character that tier belongs to (a0-06b). Published beside the
+        // tier, never instead of it: the chip stays what it was, and a roster that
+        // wants the name no longer has to guess it from a tier three characters
+        // share. Absent on a seat with no bot flying it, exactly like the tier.
+        ...(slot.personality ? { botPersonality: slot.personality } : {}),
         shipClass: slot.shipClass,
         team: slot.team,
         ready: slot.ready,
@@ -750,6 +776,13 @@ export class MatchRoom {
         // Only the room creator picks the bots' difficulties (GDD §4.2)…
         if (player === this.creator && message.botDifficulties) {
           this.botDifficulties = message.botDifficulties;
+        }
+        // …and only the creator picks the CHARACTERS behind them (a0-06b). Kept
+        // beside the tiers rather than folded into them because they are not the
+        // same fact: the tier is what the roster shows, the character is what the
+        // room seats, and it is the second one this message exists to carry.
+        if (player === this.creator && message.botPersonalities) {
+          this.botPersonalities = message.botPersonalities;
         }
         // …and only the creator shapes the match: the MODE and the per-seat SIDE
         // (m10 teams-wire). A joiner's copy of either is their own screen's local
@@ -1327,12 +1360,33 @@ export class MatchRoom {
   }
 
   /**
-   * The character that fills the nth empty lobby seat. The creator's difficulty
-   * list is honored slot by slot (GDD §2.1: "before the match, the host picks
-   * each bot's difficulty"); anything it does not name falls back to roster
-   * order, so a lobby that says nothing still gets the full cast.
+   * The character that fills the nth bot seat — **the host's pick, when they made
+   * one** (GDD §2.1 *amended 2026-08-07*: "the host picks the character and its
+   * difficulty is shown, not chosen").
+   *
+   * Three answers, in this order, and the order is the whole rule:
+   *
+   *  1. **The character the host named** (`botPersonalities[index]`, a0-06b). The
+   *     tier is then *derived* from it in {@link seatBot}, never consulted here —
+   *     which is what makes "the two rows disagree" unrepresentable rather than
+   *     merely unlikely. A repeat is a repeat: two Wardens named is two Wardens
+   *     seated, because this indexes rather than de-duplicates.
+   *  2. **A character of the tier they named** (`botDifficulties[index]`) — the
+   *     behaviour every client had before a0-06b, kept verbatim for the ones that
+   *     still speak only tiers. It seats the right *tier* and may seat a different
+   *     *name* within it; that is the known limit of what an old client can say,
+   *     and it is a legal cast rather than a wrong one.
+   *  3. **Roster order**, so a lobby that says nothing at all still gets the full
+   *     seven-character cast it has always got.
+   *
+   * A short array falls through per index, not wholesale: naming three characters
+   * and seating five bots resolves the first three by name and the last two by
+   * whatever step 2 or 3 has to offer.
    */
   private castFor(index: number): PersonalityId {
+    const chosen = this.botPersonalities[index];
+    if (chosen) return chosen;
+
     const wanted = this.botDifficulties[index];
     if (wanted) {
       const tier = rosterAt(wanted as Difficulty);
@@ -1474,7 +1528,15 @@ export class MatchRoom {
       // recipient, which is why it rides `matchStart` and not the broadcast
       // roster beside it.
       you: slot.player,
-      slots: this.slots.map((s) => ({ player: s.player, shipClass: s.shipClass, team: s.team })),
+      // …and WHO is in each seat (a0-06b): the hull and the side alone cannot name
+      // a bot, and three Hard characters share one tier, so a client that guessed
+      // from either would sometimes name the wrong one. Absent on a human's seat.
+      slots: this.slots.map((s) => ({
+        player: s.player,
+        shipClass: s.shipClass,
+        team: s.team,
+        ...(s.personality ? { personality: s.personality } : {}),
+      })),
       ...(this.config.bounds ? { bounds: { ...this.config.bounds } } : {}),
       ...(this.config.asteroidCount !== undefined
         ? { asteroidCount: this.config.asteroidCount }
