@@ -18,7 +18,7 @@
  * ladder and why the role blurb (GDD §2.11's own sentence about each hull) was
  * the first thing dropped on every phone in QA's matrix.
  *
- * Given the screen, the same tile is 592×200 on a desktop and 389×121 on a
+ * Given the screen, the same tile is 593×120 on a desktop and 395×116 on a
  * landscape phone: the six stats lay out as **one table-like row** on both, the
  * blurb is drawn rather than dropped, and the comparison the pips exist for
  * finally happens at a size a player can make it at. Nothing about the tile's

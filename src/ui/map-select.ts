@@ -20,10 +20,11 @@
  *
  * So the cards are laid out here by {@link ./map-picker} `mapPickerLayout` — the
  * layout written for exactly this job, before the row was ever a lobby column —
- * in a band the width of the whole screen. Six cards come out 190×150 on a
- * desktop and 240×77 in a 2×3 on a landscape phone: over the thumb floor in both
+ * in a band the width of the whole screen. Six cards come out 190×190 on a
+ * desktop and 240×114 in a 3×2 on a landscape phone: over the thumb floor in both
  * dimensions with room to spare, which is the first time that has been true since
- * a0-12.
+ * a0-12 — and the three-column rung is itself a u10-01 change, answering the note
+ * a0-12 left for this file's owner (`./map-picker`, `mapPickerLayout`).
  *
  * **The registry is untouched, and that is a hard boundary.** Four… six maps, The
  * Ring the default, and the resource-fairness invariant are `src/sim/maps`'s and
