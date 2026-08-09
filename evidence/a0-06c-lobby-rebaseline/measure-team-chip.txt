@@ -1,0 +1,37 @@
+measure-team-chip.txt — a0-06c, generated 2026-08-09T07:29:29Z
+
+The P3 roster row's side chip (FRIENDLY A), measured as chip ink — the
+saturated blue/red pixels — inside one fixed window per form factor.
+BEFORE = main without the picker (2d3f29b).  AFTER = the landed baseline.
+
+===== 390 px LANDSCAPE, TEAMS — window x 125-219, y 221-272 =====
+
+-- BEFORE
+  window x 125–219, y 221–272
+  chip ink: 115 px
+  bounding box: x 137–192 (56 px wide), y 238–255 (18 px tall)
+  ink rows: 13 of 52
+  per-row ink: 238:26 239:13 240:14 241:19 242:12 243:13 249:2 250:2 251:2 252:2 253:5 254:3 255:2
+
+-- AFTER
+  window x 125–219, y 221–272
+  chip ink: 33 px
+  bounding box: x 137–155 (19 px wide), y 243–250 (8 px tall)
+  ink rows: 6 of 52
+  per-row ink: 243:12 244:11 245:6 248:1 249:2 250:1
+
+===== DESKTOP 1280x800, TEAMS — window x 555-714, y 305-359 (CONTROL) =====
+
+-- BEFORE
+  window x 555–714, y 305–359
+  chip ink: 239 px
+  bounding box: x 616–686 (71 px wide), y 321–344 (24 px tall)
+  ink rows: 18 of 55
+  per-row ink: 321:34 322:19 323:20 324:22 325:32 326:18 327:18 328:21 329:25 336:2 337:3 338:3 339:2 340:4 341:6 342:3 343:4 344:3
+
+-- AFTER
+  window x 555–714, y 305–359
+  chip ink: 239 px
+  bounding box: x 578–648 (71 px wide), y 321–344 (24 px tall)
+  ink rows: 18 of 55
+  per-row ink: 321:34 322:19 323:20 324:22 325:32 326:18 327:18 328:21 329:25 336:2 337:3 338:3 339:2 340:4 341:6 342:3 343:4 344:3
