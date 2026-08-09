@@ -57,6 +57,18 @@ field nobody fills.**
 ship, so an online client named its own lobby's guess. Rides RUSH! once, never
 the snapshot.
 
+**`8febcba` — `evidence/a0-06b-online-cast/README.md`**, saying what the readback
+proves and why the cast is all-HARD (a mixed-tier cast makes a readback that looks
+fine under the old code too).
+
+**`99ee324` — the two `tests/net/` journeys declare their budgets.**
+`tests/net/budget-contract.test.ts` caught this in the FULL suite run and not in
+a targeted one: every test in that directory that lets time pass must pass
+`netBudget({work, measuredSeconds})` as `it()`'s third argument, or it rides
+vitest's flat 5 s default. **A targeted `vitest run <file>` will never tell you
+this** — the contract test lives in a different file. Run the whole suite before
+believing a new `tests/net/` file is green.
+
 **`b5aa33d` — `docs/netcode-cast-wire.md`**, and `docs/design-amendments.md`'s
 "Known remaining gap" struck through with what closed it.
 
