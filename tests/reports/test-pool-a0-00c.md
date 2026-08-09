@@ -77,8 +77,17 @@ identical in every arm, capped and uncapped:
 and it is stronger than a wall-time number: the cap changes how many workers run
 the suite and demonstrably not which specs run.
 
-The DoD run on the pushed tree: `npm test -- --run` → **rc=0, 244 files, 4132
-tests, 672 s**, taken with the other two lanes live (load 12–27 across the run).
+Two DoD runs, both with the other two lanes live:
+
+| tree | `npm test -- --run` |
+| --- | --- |
+| the measured commit (all ten arms above) | rc=0, 244 files, **4132** tests, 672 s |
+| after merging `origin/main` — the pushed tree | rc=0, 244 files, **4136** tests, 775 s |
+
+The four extra tests are a0-15's, which landed on `main` while these
+measurements were running. Every arm in this report was taken on the one commit,
+before that merge, so the ten arms compare against each other and not against
+`main` moving underneath them.
 
 ## 4. The measurements
 
