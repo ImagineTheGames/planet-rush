@@ -121,10 +121,39 @@ both image builds.
 - *Touching the Dockerfiles' COPY sets.* Nothing is missing; `harness/` has no
   business in a runtime image (a1-03), and the brief says these must not change.
 
+## The deploy stayed green
+
+PR **#359**. `Deploy server (Fly.io)` run **[31335087164]**, `workflow_dispatch`
+on this branch, 2026-08-09 20:48 UTC — **success**, 2m36s, every step:
+
+```
+Deploy allocator (control plane first)  RUN npx tsc --noEmit -p allocator/tsconfig.json  →  ✓ 14 modules
+Deploy gameserver fleet                 RUN npx tsc --noEmit -p server/tsconfig.json     →  ✓ 58 modules
+Health checks  allocator  {"status":"ok","machines":3,...}                 healthy
+               gameserver {"status":"ok","region":"iad","capacity":6,...}  healthy
+```
+
+Module counts 14 / 58 — identical to a1-03's. That is the "what must not change"
+half of the brief, checked rather than asserted: both images build exactly the
+program they built before. Dispatched rather than waited-for-merge, on a1-03's
+reasoning: the branch diff vs `main` is one test file and this note, zero runtime
+source, so the image this run shipped is byte-for-byte what merging produces.
+
+The `Deploy server (Fly.io)` history now reads
+
+```
+31335087164  success  workflow_dispatch  a1-04
+31331244297  success  push               main
+31331151684  success  workflow_dispatch  a1-03
+31329770205  failure  push               main   <- the last of six
+```
+
+Also merged `origin/main` (PR #358, wheel chrome) into the branch and re-ran:
+`npx tsc --noEmit` green, the widened test 6/6 green against the newly-arrived
+`src/ui/` files.
+
 ## NEXT
 
-- Deploy evidence: one green `Deploy server (Fly.io)` run on this branch —
-  see the PR body for the run id.
 - Open, not blocking, and not mine to decide: `Deploy server (Fly.io)` still has
   no watcher (a1-03 raised it; the call is the Director's). This lane shortens
   the window in which that matters for one class of break, it does not close it.
