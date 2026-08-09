@@ -657,7 +657,7 @@ export const SEPARATOR_WIDTH = 1;
 // which and why, because they were load-bearing before:
 //
 //  - `DOOR_HEIGHT` / `DOOR_HEIGHT_TOUCH` (56 / 64) — a door is a PLATE now, so
-//    its height is `plateHeight(scale, metrics)`: a hero plate for PLAY SOLO and
+//    its height is `plateHeight(scale, metrics)`: a hero plate for SOLO and
 //    a standard plate for the other three. The thumb floor is enforced once, for
 //    every screen, by `frameMetrics.plateScale`.
 //  - `DOOR_HINT_HEIGHT` (18) — the hint is no longer a line of text floating
@@ -1551,7 +1551,7 @@ function placeDoors(out: Rect[], band: Rect, m: FrameMetrics): DoorShape {
  * how tall it is. Mirrors `./lobby-entry` `doorPlate`, which owns the *role* half
  * of the same decision; the two are asserted consistent in the tests.
  *
- * PLAY SOLO is the hero, and it is the only one: it is the door that always works
+ * SOLO is the hero, and it is the only one: it is the door that always works
  * with no server (GDD §4.8 risk 6), so it is the screen's headline action, and
  * under Bone the headline action is the biggest and brightest plate — and there is
  * exactly one ({@link ./gantry} `singlePrimary`).

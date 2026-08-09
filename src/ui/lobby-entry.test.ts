@@ -48,7 +48,7 @@ import {
   submitJoin,
   typeEntryCode,
 } from './lobby-entry';
-import type { EntryState } from './lobby-entry';
+import type { EntryDoor, EntryState } from './lobby-entry';
 import { TOUCH_MIN } from '../art/materials';
 import { singlePrimary } from './gantry';
 import {
@@ -77,16 +77,16 @@ function typed(code: string): EntryState {
 describe('the doors (GDD §2.1, §4.2 — how a match is entered)', () => {
   it('offers CAMPAIGN first, above the solo door (u9-01 — "it goes ontop of Solo")', () => {
     // The ratified thing here is the ORDER — CAMPAIGN sits above SOLO in every
-    // shape this screen has. The labels are asserted alongside it; l2-02 re-worded
-    // the solo door to `SOLO CONTRACT`, which moves the word without moving the
-    // order u9-01 asked for.
+    // shape this screen has. The labels are asserted alongside it: l2-02 re-worded
+    // the solo door into the industrial voice and a0-15 put the plain word back,
+    // and neither of those moved the order u9-01 asked for.
     expect(DOOR_ORDER[0]).toBe('campaign');
     expect(DOOR_ORDER[1]).toBe('solo');
     expect(DOOR_OPTIONS[0]?.label).toBe('CAMPAIGN');
-    expect(DOOR_OPTIONS[1]?.label).toBe('SOLO CONTRACT');
+    expect(DOOR_OPTIONS[1]?.label).toBe('SOLO');
   });
 
-  it('offers PLAY SOLO WITHOUT a server, and as the only door that needs none (GDD §4.8 risk 6)', () => {
+  it('offers SOLO WITHOUT a server, and as the only door that needs none (GDD §4.8 risk 6)', () => {
     const solo = DOOR_OPTIONS.find((d) => d.door === 'solo');
     expect(solo?.needsNetwork).toBe(false);
     expect(solo?.comingSoon).toBe(false);
@@ -94,6 +94,34 @@ describe('the doors (GDD §2.1, §4.2 — how a match is entered)', () => {
     // it is the ONLY other door that does not — and it is not a way into a match.
     expect(DOOR_OPTIONS.filter((d) => !d.needsNetwork && !d.comingSoon)).toHaveLength(1);
     expect(DOOR_OPTIONS.filter((d) => d.needsNetwork)).toHaveLength(2);
+  });
+
+  it('says the four plain words the developer ratified (a0-15)', () => {
+    // Developer, 2026-08-07, reading the entry screen after the voice sweep:
+    // "you took this too far, its too complicated, you can switch it back to how
+    // it was CAMPAIGN, SOLO, HOST, JOIN... its way too complex for new players to
+    // understand". These four are therefore NOT the voice's to take — the
+    // exception is written down in `docs/copy-sweep-industrial-voice.md` §0 and
+    // `docs/lore-copy-sweep.md` §0, and pinned here so a sweep that skips the
+    // docs still trips over it.
+    expect(DOOR_OPTIONS.map((d) => d.label)).toEqual(['CAMPAIGN', 'SOLO', 'HOST', 'JOIN']);
+    // One word each, and it is the word the button does. A door label that grew a
+    // second word is the shape of the change that was reverted.
+    for (const option of DOOR_OPTIONS) {
+      expect(option.label.split(' '), `${option.door} label`).toHaveLength(1);
+    }
+  });
+
+  it('explains the room code on the two doors that need it, and nowhere else', () => {
+    // A first-time player can guess what SOLO does. They cannot guess that HOST
+    // hands out a code and JOIN takes one — that is the one mechanic this screen
+    // genuinely has to teach, so both online hints have to carry it (a0-15).
+    const hint = (door: EntryDoor): string => DOOR_OPTIONS.find((d) => d.door === door)!.hint;
+    expect(hint('create')).toMatch(/code/i);
+    expect(hint('join')).toMatch(/code/i);
+    // …and SOLO keeps the offline promise (GDD §4.8 risk 6) in words a player can
+    // act on, rather than in the register's word for it.
+    expect(hint('solo')).toMatch(/no internet needed/i);
   });
 
   it('names all four doors exactly once, in DOOR_ORDER', () => {
@@ -402,7 +430,7 @@ describe('the frame model', () => {
   });
 
   it('leaves the screen exactly as it was when nobody is narrating', () => {
-    // PLAY SOLO opens no socket, so it has no story and keeps the plain word; a
+    // SOLO opens no socket, so it has no story and keeps the plain word; a
     // mistyped code is still the screen's own error, not the netcode's.
     const solo = entryModel(chooseDoor(createEntry(), 'create', rng()).state, null);
     expect(solo.prompt).toContain('CONNECTING');
@@ -547,7 +575,7 @@ describe('four doors are still four buttons (u9-01)', () => {
   });
 
   for (const { name, vp, touch } of PROFILES) {
-    it(`keeps CAMPAIGN directly above PLAY SOLO — ${name}`, () => {
+    it(`keeps CAMPAIGN directly above SOLO — ${name}`, () => {
       // The developer's words are literal: the campaign door goes ON TOP of solo.
       // In the stack that is the reading order; in the two-column shape the doors
       // fill column-major *precisely so this stays true* — same column, next row.
@@ -618,7 +646,7 @@ describe('four doors are still four buttons (u9-01)', () => {
 // ---------------------------------------------------------------------------
 
 describe('the doors in Gantry/Bone (u7-04)', () => {
-  it('draws exactly ONE bright plate, and it is PLAY SOLO', () => {
+  it('draws exactly ONE bright plate, and it is SOLO', () => {
     // Bone spends no colour: the primary action is simply the brightest and
     // biggest plate, which is only a signal while there is exactly one of them.
     const model = entryModel(createEntry());
@@ -645,7 +673,7 @@ describe('the doors in Gantry/Bone (u7-04)', () => {
     expect(campaign?.scale).toBe(create?.scale);
   });
 
-  it('gives PLAY SOLO the tallest plate on the screen at every profile', () => {
+  it('gives SOLO the tallest plate on the screen at every profile', () => {
     // Size is half of what marks the primary (brightness is the other half, and
     // there is no third half, because Bone spends no hue). The stack compresses
     // proportionally, so the ratio has to survive the phone as well as the desk.

@@ -4,10 +4,20 @@
  * The screen *before* {@link ./lobby}: the three ways a match is entered
  * (GDD §2.1, §4.2), and the on-screen pad a room code is typed on.
  *
- *   CAMPAIGN       not built yet. It answers `Coming Soon…` and goes nowhere.
- *   SOLO CONTRACT  no server, no code to read out — bots fill all eight seats.
- *   OPEN A CLAIM   a fresh code, generated here and shown for the room to read.
- *   JOIN A CLAIM   type the code somebody else is holding up.
+ *   CAMPAIGN  not built yet. It answers `Coming Soon…` and goes nowhere.
+ *   SOLO      no server, no code to read out — bots fill all eight seats.
+ *   HOST      a fresh code, generated here and shown for the room to read.
+ *   JOIN      type the code somebody else is holding up.
+ *
+ * Those four words are **plain by ratification** and are not the voice's to take
+ * (a0-15, 2026-08-07). The developer, reading the sweep's labels on the entry
+ * screen: *"you took this too far, its too complicated, you can switch it back to
+ * how it was CAMPAIGN, SOLO, HOST, JOIN... its way too complex for new players to
+ * understand"*. The front door is the one screen a player meets before they know
+ * anything, so it says what the button does and nothing else — the exception is
+ * recorded in `docs/copy-sweep-industrial-voice.md` §0 and
+ * `docs/lore-copy-sweep.md` §0 so the next voice pass reads it before touching
+ * these strings. The in-match copy the sweep wrote is untouched.
  *
  * **This is the one and only front door** (ratified: one play flow). The main
  * menu's PLAY opens *this* screen — there is no second entry point that skips it —
@@ -146,39 +156,40 @@ export const DOOR_OPTIONS: readonly EntryDoorOption[] = [
   },
   {
     door: 'solo',
-    label: 'SOLO CONTRACT',
-    // `Offline.`, not `No connection needed.` — 57 chars against the door's 420px
-    // at 11px, 376px drawn, 10% headroom (tests/mobile/voice-copy-fit.spec.ts).
+    label: 'SOLO',
+    // The hint says what happens when you press it, in the order it happens:
+    // you play, the opponents are bots, and it works with no connection. The
+    // offline fact is the one this line may never lose (GDD §4.8 risk 6), so it
+    // is stated as the plainest available sentence rather than in the register's
+    // word for it ("Offline.") — a player who has to infer that "offline" means
+    // "this one still works on the school wifi" has been told nothing.
     //
-    // The sweep is what broke this one. The pre-sweep line was 60 chars and fit
-    // at 6% headroom; rewriting it into the voice took it to 70 and 462px, and
-    // it was the only label in the game that overflowed. GDD §4.7: "Length is
-    // part of clarity… a longer in-register word that ellipsizes has traded
-    // information for flavour." Nothing here truncates — `drawDoor` centres and
-    // lets it spill — so the overflow was silent and the copy is what gives.
-    //
-    // `offline` is not a shortening invented to fit. It is the register's own
-    // word for this state (§4.7 vocabulary: "held / lost / offline / refused"
-    // instead of "victory, defeat, error, oops"), and it is already what this
-    // codebase calls this door — `voice-door-labels.test.ts` requires every
-    // "still works" refusal to name THE OFFLINE DOOR by its current label. So
-    // the third sentence now uses the same word the other two screens use for
-    // it, and the fact survives intact: no network is needed to take this door.
-    hint: 'Work the claim alone. Bots hold the other seats. Offline.',
+    // 49 chars. GDD §4.7: "Length is part of clarity… Measure before you ship
+    // it", and this exact hint is the one label in the game that has actually
+    // overflowed — the sweep's 70-char version drew 462px into a 420px door and
+    // nothing truncates (`drawDoor` centres and lets it spill), so the overflow
+    // was silent. The budget is 63 characters at 11px (420 / 6.601 px-per-char,
+    // Liberation Mono at 0.6em); tests/mobile/voice-copy-fit.spec.ts measures it
+    // in the booted page and prints the headroom.
+    hint: 'Play on your own against bots. No internet needed.',
     needsNetwork: false,
     comingSoon: false,
   },
   {
     door: 'create',
-    label: 'OPEN A CLAIM',
-    hint: 'Open the claim and read the code out. They join you.',
+    // HOST and JOIN are the two halves of one mechanic, so their hints are
+    // written as a pair: this one MAKES the code, that one TYPES it. The code is
+    // the single thing on this screen a first-time player cannot guess at, which
+    // is why both lines spend their words on it and on nothing else.
+    label: 'HOST',
+    hint: 'Start a new game and get a code for friends to join.',
     needsNetwork: true,
     comingSoon: false,
   },
   {
     door: 'join',
-    label: 'JOIN A CLAIM',
-    hint: 'Type the code somebody is holding up.',
+    label: 'JOIN',
+    hint: 'Type in a friend’s code to join their game.',
     needsNetwork: true,
     comingSoon: false,
   },
@@ -287,11 +298,14 @@ export const ENTRY_ERRORS = {
    *  Duplicated verbatim in `./online-copy` `ONLINE_COPY.notFound` — the two must
    *  agree, and `lobby-entry.test.ts` pins that they do. */
   unknown: 'No claim with that code. Check it and try again.',
-  /** Eight seats, all taken (`./lobby` LOBBY_SLOTS). */
-  full: 'That claim is full. Ask for a rematch, or take a solo contract.',
+  /** Eight seats, all taken (`./lobby` LOBBY_SLOTS). Names the door it sends the
+   *  player to, because that door is on the screen this line is drawn over —
+   *  "take a solo contract" was the sweep's way of saying it, and it named the
+   *  old label in lower case (a0-15). */
+  full: 'That claim is full. Ask for a rematch, or press SOLO.',
   /** No server, or no internet. Names the door that still works — so it moves
    *  whenever {@link DOOR_OPTIONS} does (`voice-door-labels.test.ts`). */
-  offline: 'Cannot reach the server. SOLO CONTRACT still works.',
+  offline: 'Cannot reach the server. SOLO still works.',
 } as const;
 
 /** A fresh entry screen: the home doors, nothing typed, nothing wrong. */
@@ -432,7 +446,7 @@ export function entryConnected(): EntryState {
  * The three failures the M3 brief keeps apart get three different sentences
  * calling for three different actions (never one "connection failed"): the fleet
  * is full (retry later), no room has that code (fix the code), or the servers
- * cannot be reached (retry, and SOLO CONTRACT still works). The mapping itself lives
+ * cannot be reached (retry, and SOLO still works). The mapping itself lives
  * in {@link ./online-copy} so this door and the in-match connection overlay say
  * the same words for the same reason.
  */
@@ -449,8 +463,8 @@ export interface EntryDoorView extends EntryDoorOption {
   /** Dead while an attempt is in flight. */
   readonly enabled: boolean;
   /**
-   * Whether this is the screen's ONE headline action (u7-04). PLAY SOLO, and only
-   * PLAY SOLO: it is the door that always works with no server (GDD §4.8 risk 6).
+   * Whether this is the screen's ONE headline action (u7-04). SOLO, and only
+   * SOLO: it is the door that always works with no server (GDD §4.8 risk 6).
    * Under Gantry/Bone that is not a colour — the primary is simply the biggest and
    * brightest plate, and it *must never share a screen with a second bright plate*
    * ({@link ./gantry} `singlePrimary`).
@@ -477,7 +491,7 @@ export interface EntryDoorView extends EntryDoorOption {
  * row, an unselected ship. A teaser drawn as a surface would read as unpressable,
  * which is the greyed-out door that brief exists to prevent, wearing a bevel.
  *
- * So CAMPAIGN takes exactly the same material as CREATE ROOM and JOIN ROOM:
+ * So CAMPAIGN takes exactly the same material as HOST and JOIN:
  * `secondary`, full contrast, raised off the screen with a bezel and a cast
  * shadow, and pressable — because pressing it is how the screen answers.
  */
@@ -612,7 +626,7 @@ export const ENTRY_STATUS = {
  * last step *is* the failure, said exactly (`REFUSED: bad-ticket — machine
  * mismatch`), and two sentences about one refusal is the duplicate surface this
  * whole change exists to delete. With no narration the screen behaves exactly as it
- * always has, which is what SOLO CONTRACT and a mistyped room code still want.
+ * always has, which is what SOLO and a mistyped room code still want.
  */
 export function entryModel(
   state: EntryState,
