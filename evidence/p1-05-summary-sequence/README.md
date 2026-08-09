@@ -14,10 +14,10 @@ sequences would not be evidence of a timeline.
 | # | file | beat | what the client reported that frame |
 |---|---|---|---|
 | 1 | `1-beat0-result-alone.png` | 0 @ 0.6 s | `phase: result` — CLAIM HELD, the rule, the line, and **nothing else on the screen**. The ache gets its beat (GDD §4.7). |
-| 2 | `2-beat1-mid-count.png` | 1 @ 2.2 s | `phase: rows` — five rows landed, `DISTANCE TRAVELLED` **mid-count at 1 361** on its way to 1 488, `SHIPS USED` still fading in, no XP total, no bar. |
+| 2 | `2-beat1-mid-count.png` | 1 @ 2.2 s | `phase: rows` — five rows landed, `DISTANCE TRAVELLED` **mid-count at 1 340** on its way to 1 465, `SHIPS USED` still fading in, no XP total, no bar. |
 | 3 | `3-beat3-bar-mid-fill.png` | 3 @ 4.3 s | `phase: fill` — bar at **0.827** under `LEVEL 1`, readout live: **`+248 XP · 52 TO NEXT`**. |
 | 4 | `4-beat5-settle.png` | 5 @ 30 s | `phase: settle`, `done`, `buttonsLive` — `LEVEL 2`, bar 0.061, `+355 XP · 854 TO NEXT`. |
-| 5 | `5-reduced-motion.png` | — | The same staging under a real `prefers-reduced-motion: reduce` media emulation: the **same final numbers on the first frame**, `leveledUp: true` — the level-up is marked, not dropped. |
+| 5 | `5-reduced-motion.png` | — @ **0.6 s** | The same staging under a real `prefers-reduced-motion: reduce` media emulation, photographed at **the same 0.6 s as frame 1**: where a full-motion client is still holding the result alone, this one already shows every final number — `LEVEL 2`, bar 0.061, `leveledUp: true`. The level-up is marked, not dropped. |
 
 `frames.json` is the model behind each photograph, as the client reported it.
 

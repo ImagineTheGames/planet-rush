@@ -2293,10 +2293,20 @@ async function boot(): Promise<void> {
     return summaryPinned ?? (nowMs - summaryStartMs) / 1000;
   }
 
-  /** How the sequence is being read: skipped, reduced, or neither. Freeze pins it
-   *  to the end state for the same reason a golden exists. */
+  /**
+   * How the sequence is being read: skipped, reduced, or neither.
+   *
+   * **A staged boot rests at the end state.** `?freeze=1` pins the whole frame by
+   * definition, and `?debug=1` is the boot every golden and live-stage spec runs:
+   * a screenshot harness captures two frames and compares them, so a screen that
+   * is mid-count between the two is a gate that fails on its own animation rather
+   * than on a regression. A run that wants the beats asks for them by name
+   * (`__endScreenStage.summarySeek`), which is what this lane's own evidence does
+   * — and a seek overrides the rest, so the beats are still reachable.
+   */
   function summaryOptions(): { skipped: boolean; reducedMotion: boolean } {
-    return { skipped: summarySkipped || flags.freeze, reducedMotion: summaryReduced };
+    const staged = (flags.debug || flags.freeze) && summaryPinned === null;
+    return { skipped: summarySkipped || staged, reducedMotion: summaryReduced };
   }
 
   /**

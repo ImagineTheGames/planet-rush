@@ -78,7 +78,7 @@
         },
         {
           "label": "DISTANCE TRAVELLED",
-          "text": "1 361",
+          "text": "1 340",
           "xp": null
         },
         {
@@ -129,7 +129,7 @@
         },
         {
           "label": "DISTANCE TRAVELLED",
-          "text": "1 488",
+          "text": "1 465",
           "xp": null
         },
         {
@@ -180,7 +180,7 @@
         },
         {
           "label": "DISTANCE TRAVELLED",
-          "text": "1 488",
+          "text": "1 465",
           "xp": null
         },
         {
@@ -212,7 +212,7 @@
   },
   {
     "frame": "5-reduced-motion",
-    "at": "first frame",
+    "at": "0.6s",
     "model": {
       "phase": "settle",
       "rows": [
@@ -238,7 +238,7 @@
         },
         {
           "label": "DISTANCE TRAVELLED",
-          "text": "1 488",
+          "text": "1 468",
           "xp": null
         },
         {

@@ -146,13 +146,15 @@ try {
   await page.close();
 
   // --- …and the same sequence with the OS asking for less motion --------------
+  //
+  // Photographed at the SAME 0.6 s as frame 1, which is what makes it evidence
+  // rather than a second picture of the settle: at 0.6 s a full-motion client is
+  // still holding the result alone (frame 1), and this one is already showing
+  // every final number with the level-up marked.
   const reduced = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: 3 });
   await reduced.emulateMedia({ reducedMotion: 'reduce' }); // the real media query, not a flag
   await stageWin(reduced, base);
-  await settle(reduced);
-  const reducedModel = await reduced.evaluate(() => window.__endScreenStage.summary());
-  await reduced.screenshot({ path: join(HERE, '5-reduced-motion.png') });
-  log.push({ frame: '5-reduced-motion', at: 'first frame', model: reducedModel });
+  await shot(reduced, '5-reduced-motion', 0.6, log);
   const reducedCareer = await reduced.evaluate(() => window.__endScreenStage.career());
   log.push({ career: reducedCareer });
   await reduced.close();
