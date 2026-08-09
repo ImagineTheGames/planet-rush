@@ -48,7 +48,14 @@ COPY server ./server
 COPY allocator ./allocator
 
 # Typecheck before bundling: a server that does not compile must not build.
-RUN npx tsc --noEmit
+#
+# Uses the server's own tsconfig (server/tsconfig.json), not the bare root
+# config. The root config's `include` names `tests/` and `harness/`, which this
+# stage does not copy — tsc skips missing include entries without complaint, so
+# the program quietly became "src/ + server/", tests and all, and started failing
+# on `src/**/*.test.ts` files importing `harness/` that the server never runs
+# (a1-03). server/tsconfig.json states the program instead of inferring it.
+RUN npx tsc --noEmit -p server/tsconfig.json
 RUN npx vite build --config server/vite.server.config.ts
 
 # --- runtime ----------------------------------------------------------------

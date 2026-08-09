@@ -11,6 +11,20 @@
   //
   // The repo-wide `npx tsc --noEmit` (root config) still checks the allocator too
   // — the allocator's tests import its modules, pulling them into that program.
+  //
+  // TESTS ARE EXCLUDED, and that is load-bearing (a1-03). `include: ["../src"]`
+  // swept in every `src/**/*.test.ts`, and those tests import `harness/` — a
+  // top-level dir the build stage does not COPY and should not: it is the
+  // determinism/soak/bench tooling, not allocator runtime code. So the image
+  // typechecked files whose imports the image cannot resolve, and every
+  // `Deploy server (Fly.io)` run failed at `docker build` from 2026-08-07 to
+  // 2026-08-09 while `npx tsc --noEmit` stayed green on every lane and on main
+  // (LESSONS §12: typecheck-in-image catches what typecheck-on-host cannot).
+  //
+  // The allocator never runs a test, so this program has no business compiling
+  // one. The tests themselves stay fully checked by the repo-wide `npx tsc
+  // --noEmit` in CI, where `harness/` exists. If you widen `include` here,
+  // widen the Dockerfile's COPY set to match — or the deploy goes red again.
   "extends": "../tsconfig.json",
   "compilerOptions": {
     // baseUrl relative to this file (the repo root) so the aliases resolve the
@@ -22,5 +36,6 @@
       "@render/*": ["src/render/*"]
     }
   },
-  "include": ["../src", "../allocator"]
+  "include": ["../src", "../allocator"],
+  "exclude": ["../src/**/*.test.ts", "../allocator/**/*.test.ts"]
 }
