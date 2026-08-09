@@ -29,6 +29,7 @@ import {
 } from './constants';
 import { getMap } from './maps';
 import { scatterDerelictLoot } from './match';
+import { makeCombatCredit, type CombatCredit } from './combat-credit';
 import { liveOre, makeLedger, type OreLedger } from './ore-ledger';
 import { shipCargoCap, shipMaxHull, stockTiers, type UpgradeTiers } from './upgrades';
 import { spawnHomeFields, spawnWave } from './waves';
@@ -709,6 +710,19 @@ export interface World {
    */
   ledger?: OreLedger;
   /**
+   * Match-wide combat attribution (`./combat-credit`) — who dealt what damage and
+   * who landed which killing blow, indexed by player slot. The information three
+   * of the four ratified XP weights are paid from
+   * (`docs/progression-plan.md` §1.1, §1.5).
+   *
+   * Optional, write-only, and outside the determinism fingerprint, for exactly
+   * the reasons {@link ledger} is: `createWorld` always attaches one, foreign
+   * worlds omit it, and every function in `./combat-credit` no-ops when it is
+   * absent. Nothing in `step` may ever read it — a world with a credit ledger and
+   * a world without one step identically (GDD §4.8).
+   */
+  credit?: CombatCredit;
+  /**
    * Per-player sensory memory — the "remembered once seen" static geography of the
    * minimap fog (RATIFIED feature f1; see {@link SensoryMemory}). Optional so the
    * hand-built worlds other lanes construct keep satisfying the interface;
@@ -1040,6 +1054,10 @@ export function createWorld(config: WorldConfig): World {
     economy,
     match: initialMatch(),
     ledger: makeLedger(),
+    // Combat attribution, one row per seat (`./combat-credit`). Sized from the
+    // lobby, not from the ships, because the slot outlives the hull: a shot in
+    // flight when its owner dies still credits that owner's seat.
+    credit: makeCombatCredit(config.players.length),
     // Per-player minimap fog memory (feature f1): one slot per live player, all
     // masks 0 (nothing scouted yet). `step`'s sensory pass fills them from tick 1,
     // starting with each player's own station (always in its own coverage).

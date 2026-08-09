@@ -255,7 +255,11 @@ function resolveHit(world: World, hash: SpatialHash, p: Projectile): boolean {
     if (!ship.alive || !canDamage(world, p.owner, ship.id) || ship.spawnProtect > 0) continue;
     const rr = ship.radius + p.radius;
     if (dist2(p.pos, ship.pos) > rr * rr) continue;
-    damageShip(world, ship, p.damage);
+    // `p.owner` is the attribution the credit ledger needs, and it is already
+    // here — it must be, to have asked `canDamage` above. For a turret shot it is
+    // the *station owner*, so a turret's kill belongs to the player who bought
+    // the deterrent (progression-plan §1.5 trap 3). Nothing is inferred.
+    damageShip(world, ship, p.damage, p.owner);
     if (p.kind === 'ship') forfeitProtection(world, p.owner);
     return true;
   }
@@ -281,7 +285,7 @@ function resolveHit(world: World, hash: SpatialHash, p: Projectile): boolean {
       if (turret.hp <= 0) continue;
       const rr = turret.radius + p.radius;
       if (dist2(p.pos, turret.pos) > rr * rr) continue;
-      damageTurret(turret, p.damage);
+      damageTurret(turret, p.damage, p.owner, world);
       forfeitProtection(world, p.owner);
       return true;
     }
@@ -294,7 +298,7 @@ function resolveHit(world: World, hash: SpatialHash, p: Projectile): boolean {
         if (sat.hp <= 0) continue;
         const rr = sat.radius + p.radius;
         if (dist2(p.pos, sat.pos) > rr * rr) continue;
-        damageSatellite(sat, p.damage);
+        damageSatellite(sat, p.damage, p.owner, world);
         forfeitProtection(world, p.owner);
         return true;
       }
@@ -309,7 +313,7 @@ function resolveHit(world: World, hash: SpatialHash, p: Projectile): boolean {
     // Shields and cores take the core rate, not the hull rate (GDD §2.8): the
     // projectile carries its ship-damage, scaled down here the way the weapon's
     // core DPS was scaled from its ship DPS.
-    damageStation(world, station, p.damage * PROJECTILE_CORE_FACTOR);
+    damageStation(world, station, p.damage * PROJECTILE_CORE_FACTOR, p.owner);
     forfeitProtection(world, p.owner);
     return true;
   }

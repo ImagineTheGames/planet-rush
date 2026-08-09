@@ -13,6 +13,8 @@
  * it belongs to (`buildings.ts`).
  */
 
+import type { PlayerId } from '@shared/types';
+import { creditDamage, creditKill } from './combat-credit';
 import { CHUNK, DEATH_ORE_DROP_FRACTION, RESPAWN_S, clampToMargin } from './constants';
 import { ledgerAdd } from './ore-ledger';
 import type { Ship, World } from './state';
@@ -21,11 +23,23 @@ import type { Ship, World } from './state';
  * Apply `amount` HP of damage to a ship, respecting spawn protection
  * (GDD §2.1), and kill it if that takes it to zero. Returns true if the hit
  * landed — callers use that to decide whether a projectile is spent.
+ *
+ * `by` is the attacker's **slot**, when the hit has one: `projectiles.ts` passes
+ * `p.owner`, which is the shooter for a ship weapon shot and the *station owner*
+ * for a turret shot (§1.5 trap 3 — a player who bought the deterrent gets what it
+ * kills). It is optional because some hits genuinely have no attacker, and it is
+ * never inferred: an omitted `by` credits nobody, which is the honest answer, not
+ * a gap (`./combat-credit`). Nothing about the damage rule reads it — spawn
+ * protection, the half-hold drop and the respawn clock are identical with and
+ * without it.
  */
-export function damageShip(world: World, target: Ship, amount: number): boolean {
+export function damageShip(world: World, target: Ship, amount: number, by?: PlayerId): boolean {
   if (!target.alive || target.spawnProtect > 0 || amount <= 0) return false;
+  // Credit the HP that actually landed, never the overkill: a 9999-damage
+  // finisher into a 30 HP hull dealt 30 (`./combat-credit`).
+  creditDamage(world, by, target.id, 'dealtToShips', Math.min(amount, target.hull));
   target.hull -= amount;
-  if (target.hull <= 0) killShip(world, target);
+  if (target.hull <= 0) killShip(world, target, by);
   return true;
 }
 
@@ -33,8 +47,15 @@ export function damageShip(world: World, target: Ship, amount: number): boolean 
  * Destroy a ship: drop half its held ore as debris and start the respawn clock
  * (GDD §2.3, §2.7). Banked ore is untouched — the cost of dying is time and
  * position, never the bank.
+ *
+ * `by` credits the killing blow to one slot, never split (§1.5 trap 5). The slot
+ * is the accounting key rather than the hull, so a shot that outlives its owner's
+ * ship still pays that owner — including a player already eliminated from the
+ * match (trap 4). A death with no attacker (elimination collateral, a test call,
+ * the `?debug=1` write seam) credits nobody.
  */
-export function killShip(world: World, ship: Ship): void {
+export function killShip(world: World, ship: Ship, by?: PlayerId): void {
+  creditKill(world, by, ship.id, 'shipKills');
   ship.alive = false;
   ship.hull = 0;
   ship.respawnTimer = RESPAWN_S;
