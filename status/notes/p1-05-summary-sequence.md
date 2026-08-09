@@ -81,6 +81,10 @@ the five decisions the brief left open are annotated in it under *AS BUILT*.
   the re-baselined `desktop-end-of-match`; the `phone-portrait-eliminated` shot
   did not move. The end-of-match golden was re-run twice more and held.
 - Evidence reproduces: `npm run build && node evidence/…/capture.mjs`.
+- **CI on [#347](https://github.com/ImagineTheGames/planet-rush/pull/347): 0 in the
+  `fail` bucket.** *Typecheck, test, build* green, and **all six Playwright mobile
+  shards green** — which is the re-baselined golden holding on the software-GL
+  runner, not just in this container. The rest skip by their own triggers.
 
 ## NEXT
 
