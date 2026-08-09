@@ -2416,7 +2416,7 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'xpTick_a_counterContact',
           layers: [
-            grains('xpTick_a.contact', { freq: 1400, grain: 0.0018, gain: 0.42, hold: 0.002, decay: 0.014, curve: 6, from: 4800, to: 2400, q: 3, hp: 800, seed: 35000 }),
+            grains('xpTick_a.contact', { freq: 1400, grain: 0.0018, gain: 0.105, hold: 0.002, decay: 0.014, curve: 6, from: 4800, to: 2400, q: 3, hp: 800, seed: 35000 }),
           ],
         },
       },
