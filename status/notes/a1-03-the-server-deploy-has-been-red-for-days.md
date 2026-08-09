@@ -40,6 +40,24 @@ check are all untouched.
   byte-for-byte what merging produces; the evidence is not weakened by arriving
   before the merge. It also un-stalls production two days early.
 
+- **And then the real trigger proved it too: run [31331244297] is green.**
+  PR #355 merged at 19:17 UTC and the merge commit `489d361` fired
+  `Deploy server (Fly.io)` the ordinary way — `event: push`, `branch: main`, no
+  dispatch — and all 13 steps passed. This is the stronger of the two: the
+  failure streak is broken on the exact path that had been red six times, not
+  only on a hand-run one. The run history now reads
+
+  ```
+  31331244297  success  push              main    489d361   <- the streak is broken
+  31331151684  success  workflow_dispatch a1-03   0d426ec
+  31329770205  failure  push              main    1da82b2   <- the last of six
+  ```
+
+  Verified the fixes by reading `origin/main` directly rather than by diffing a
+  merged branch (the diff-vs-main check dies on merge): main carries the
+  allocator `exclude`, the new `server/tsconfig.json` include/exclude, and
+  `RUN npx tsc --noEmit -p server/tsconfig.json` in `server/Dockerfile`.
+
 ## DECISIONS
 
 **The diagnosis is shape 1 — the allocator should not be typechecking `*.test.ts`
@@ -125,16 +143,18 @@ caught by a deploy. Named in the PR body for its owner.
 
 ## NEXT
 
-Work is complete. Both fixes are committed and pushed, PR #355 is open, and the
-DoD's one green `Deploy server (Fly.io)` run exists (31331151684).
+**Work is complete.** Both fixes are in `main` (PR #355, merged). The DoD's green
+`Deploy server (Fly.io)` run exists twice over — dispatched (31331151684) and on
+the real `push`-to-`main` trigger (31331244297). Fleet live, both health
+endpoints answering.
 
-- Awaiting review/merge on #355. On merge the workflow fires again on `main`;
-  it should be a no-op roll of the same image this run already shipped.
-- The "expect the first green run to do a lot at once" worry **has already
-  happened and was clean** — that dispatched run rolled two days of `server/`,
-  `src/net/` and `src/shared/` change onto the fleet in one go, and the
-  `scale count` and health-check steps all passed. No pair of eyes needed on
-  the merge run beyond its exit code.
+- PR #357 carries this note update only (no code); #355 merged while the deploy
+  run proving it was still in flight, so main's copy of this note stopped at
+  "watch the run on merge".
+- The "expect the first green run to do a lot at once" worry **happened twice and
+  was clean both times** — two days of `server/`, `src/net/` and `src/shared/`
+  change rolled onto the fleet, `scale count` and health checks all passed.
+  Nothing to watch beyond exit codes from here.
 - Open for the Director, not blocking: whether `Deploy server (Fly.io)` joins the
   notifier's watch list (recommendation and the smallest-honest-signal proposal
   are in the PR body).
