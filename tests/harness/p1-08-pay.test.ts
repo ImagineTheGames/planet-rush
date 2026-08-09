@@ -44,10 +44,13 @@ import {
   XP_ROW_KEYS,
   baseForLevel2In,
   buildPayWorld,
+  floorCandidate,
   matchesToLevel,
   medianPlayerMatch,
   payStats,
+  percentile,
   playerMatches,
+  rowCount,
   runPayMatch,
   seeds,
   summaryCost,
@@ -274,6 +277,48 @@ describe('p1-08 — the report’s arithmetic', () => {
     const stats = payStats([{ ...run, ok: true, failure: null }]);
     const total = XP_ROW_KEYS.reduce((sum, k) => sum + stats.composition[k], 0);
     expect(total).toBeCloseTo(1, 9);
+  });
+
+  it('a percentile reports a value some seat actually earned', () => {
+    // Nearest-rank, no interpolation: "the p25 player earned 255" has to be a
+    // sentence about a player, because the report writes it as one.
+    const xs = [10, 20, 30, 40];
+    expect(percentile(xs, 0)).toBe(10);
+    expect(percentile(xs, 0.25)).toBe(10);
+    expect(percentile(xs, 0.5)).toBe(20);
+    expect(percentile(xs, 1)).toBe(40);
+    expect(percentile([], 0.5)).toBe(0);
+  });
+
+  it('a candidate floor is priced against the SAME matches, and the control is the shipped pay', () => {
+    // `harness/abundance.ts`'s discipline, applied to XP: two candidates are
+    // comparable because they are the same twelve matches re-priced, never a
+    // second sweep taken on a different afternoon.
+    const run = { ...runPayMatch(setup({ seed: 9 }), { maxSeconds: PROBE_SECONDS }), ok: true, failure: null };
+    const control = floorCandidate([run], 'control', () => 0);
+    const stats = payStats([run]);
+    expect(control.medianXp).toBe(stats.medianXp);
+    expect(control.firstOutXp).toBe(stats.firstOutXp);
+    expect(control.p25Xp).toBe(stats.p25Xp);
+
+    const flat = floorCandidate([run], 'flat +100', () => 100);
+    expect(flat.medianXp).toBe(control.medianXp + 100);
+    expect(flat.firstOutL2).toBeLessThanOrEqual(control.firstOutL2);
+
+    // The row-count reader is what a re-weighted candidate is built from.
+    const p = medianPlayerMatch([run])!;
+    expect(rowCount(p, 'waves')).toBe(p.accrual.wavesSurvived);
+    expect(rowCount(p, 'oreMined')).toBe(p.accrual.oreMined);
+  });
+
+  it('doubling the placement rung cannot pay the first player out — by construction', () => {
+    // The finding that made the report recommend a flat row instead: `rungs =
+    // slots − placement`, so the first out clears zero of them and a bigger rung
+    // pays them nothing while paying the winner twice.
+    const run = { ...runPayMatch(setup({ seed: 9 }), { maxSeconds: PROBE_SECONDS }), ok: true, failure: null };
+    const firstOut = playerMatches([run]).filter((p) => p.firstOut);
+    expect(firstOut.length).toBeGreaterThan(0);
+    for (const p of firstOut) expect(rowCount(p, 'placement')).toBe(0);
   });
 
   it('the summary sequence cost is read off pr-05, and grows with the level-ups', () => {
