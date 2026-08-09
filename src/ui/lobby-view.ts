@@ -82,29 +82,27 @@ import {
   DIFFICULTY_LABELS,
   LOBBY_EYEBROW,
   LOBBY_TITLE,
+  MAP_PICK_GUEST_LABEL,
+  MAP_PICK_LABEL,
   MODE_LABELS,
   RUSH_LABEL,
   SEAT_HELP_GLYPH,
+  SHIP_PICK_LABEL,
   SIDE_COLORS,
-  STAT_PIP_COLORS,
 } from './lobby';
-import type { LobbyModel, LobbySeatView, ShipClassOption } from './lobby';
+import type { LobbyModel, LobbySeatView } from './lobby';
 import {
   SEAT_CONTROL_MIN_HEIGHT,
   SEAT_STRIPE,
-  STAT_COUNT,
-  STAT_PIP_BAR,
-  STAT_ROW_TEXT,
-  classStatCell,
-  classTileContent,
   lobbyHitTest,
   lobbyLayout,
 } from './lobby-geometry';
-import type { ClassTileContent, Insets, LobbyLayout, LobbyTarget } from './lobby-geometry';
+import type { Insets, LobbyLayout, LobbyTarget } from './lobby-geometry';
 import { FONT_BODY, FONT_HEADING } from './typography';
 import { MapPickerView } from './map-picker-view';
-import { mapPickerModel } from './map-picker';
 import type { MapPickerLayout } from './map-picker';
+import { createClassTileNodes, drawClassTile } from './class-tile-view';
+import type { ClassTileNodes } from './class-tile-view';
 import { ScreenCache } from './screen-cache';
 // One grade→colour table for both surfaces that show a ping, so the roster row
 // and the in-match stamp can never disagree about what "amber" means — and the
@@ -136,15 +134,6 @@ const TOGGLE_PX = 13;
 /** The footer beam's two plates and the hint between them. */
 const ACTION_PX = 20;
 const HINT_PX = 12;
-/** A hull tile: its class name, its hull nickname, its blurb, its stat cells. */
-const TILE_NAME_PX = 14;
-const TILE_HULL_PX = 10;
-const TILE_BLURB_PX = 11;
-const STAT_PX = 9;
-/** …and the floor it keeps. Deliberately below {@link TYPE_MIN}: see the note in
- *  {@link LobbyView.drawClassStats}. */
-const STAT_MIN_PX = 8;
-
 /** Air between a player's name and their ping — `reivi · 245ms`. */
 const PING_GAP = 8;
 
@@ -157,13 +146,10 @@ const TEAM_CHIP_LABEL_PAD = 6;
  *  screen and it should reach full size on every row the layout really produces. */
 const STATE_LABEL_PAD = 4;
 
-/** Air between two pips of a stat bar (u4). */
-const STAT_PIP_GAP = 1;
-/** A pip bar never spans more than this, so a stat on a 469px-wide desktop tile
- *  reads as a bar under its own figure rather than a rule across the tile. Set
- *  to the widest figure the six cells produce (`SPD 130%` measures 34px at
- *  Oxanium 9), so the bar tracks the text it belongs to. */
-const STAT_PIP_BAR_MAX_WIDTH = 36;
+/** Inset a summary card's eyebrow keeps from its strip's leading edge (u10-01).
+ *  The word is left-aligned rather than centred, because it labels the card under
+ *  it and a label hangs off the block's edge, not off its middle. */
+const PICK_LABEL_PAD = 6;
 
 /** The lobby's layout-registry id and declared anchor: it owns the screen. */
 export const LOBBY_ID = 'lobby';
@@ -205,18 +191,6 @@ interface SeatNodes {
   readonly levelLabel: Text;
 }
 
-interface ClassNodes {
-  readonly body: Graphics;
-  readonly name: Text;
-  readonly hull: Text;
-  readonly blurb: Text;
-  /** Every pip of every stat on this tile, in one Graphics — 30 tiny rects
-   *  redrawn together, so a tile costs one extra draw call rather than six. */
-  readonly pips: Graphics;
-  /** `SPD 130%` — one per stat, in the model's own stat order (u4). */
-  readonly stats: Text[];
-}
-
 // ---------------------------------------------------------------------------
 // The view
 // ---------------------------------------------------------------------------
@@ -234,12 +208,21 @@ export class LobbyView extends Container {
   private readonly roomLabel: Text;
   private readonly roomCode: Text;
   private readonly seatNodes: SeatNodes[] = [];
-  private readonly classNodes: ClassNodes[] = [];
-  /** The arena row (p2 field rule): the four map cards, drawn by the SHARED map
-   *  view, so the registry previews, the VETERAN tag and the selection all come
-   *  for free — no ship stats, no yellow, exactly the frozen contract the
-   *  standalone picker kept. Fed the lobby's own card rects each frame. */
+  /** **The ONE hull card** (u10-01) — the pick, drawn by the shared tile renderer
+   *  SHIP SELECT draws its four with, so the summary and the screen it was chosen
+   *  on are the same tile at two sizes. */
+  private readonly shipCard: ClassTileNodes;
+  /** **The ONE arena card**, drawn by the SHARED map view so the registry preview,
+   *  the VETERAN tag and the selection all come for free — no ship stats, no
+   *  yellow, exactly the frozen contract the standalone picker kept. Fed a
+   *  one-card layout built from the lobby's own rect. */
   private readonly mapPicker = new MapPickerView();
+  /** The two eyebrows that make the cards read as controls rather than labels:
+   *  `SHIP · CHANGE` over one, `MAP · CHANGE` (or `MAP · CLAIM HOLDER'S`) over the
+   *  other. Drawn on the `plates` canvas below them. */
+  private readonly pickPlates = new Graphics();
+  private readonly shipEyebrow: Text;
+  private readonly mapEyebrow: Text;
   /** The MODE toggle (FFA / TEAMS) and the ABUNDANCE toggle (SCARCE / STANDARD /
    *  RICH) — the two match-config controls at the top of the roster (Milestone E). */
   private readonly toggles = new Graphics();
@@ -286,8 +269,17 @@ export class LobbyView extends Container {
     this.abundanceText = makeText('', FONT_HEADING, TOGGLE_PX, MATERIAL_SHADES.bone);
     this.abundanceText.anchor.set(0.5, 0.5);
 
+    this.shipEyebrow = makeText('', FONT_BODY, EYEBROW_PX, MATERIAL_SHADES.boneLo);
+    this.shipEyebrow.anchor.set(0, 0.5);
+    this.mapEyebrow = makeText('', FONT_BODY, EYEBROW_PX, MATERIAL_SHADES.boneLo);
+    this.mapEyebrow.anchor.set(0, 0.5);
+
     this.addChild(this.backdrop, this.beams, this.heading, this.roomLabel, this.roomCode);
-    this.addChild(this.mapPicker);
+    // The two summary blocks, in draw order: the eyebrow strip's plate, the arena
+    // card (its own container), then the hull card's children, then the two words.
+    this.addChild(this.pickPlates, this.mapPicker);
+    this.shipCard = createClassTileNodes(this);
+    this.addChild(this.shipEyebrow, this.mapEyebrow);
     this.addChild(this.toggles, this.modeText, this.abundanceText);
     this.addChild(this.actions, this.backText, this.rushText, this.rushHint);
     this.visible = false;
@@ -315,9 +307,18 @@ export class LobbyView extends Container {
     return [{ id: LOBBY_ID, anchor: LOBBY_ANCHOR, bounds: { ...this.layout.content } }];
   }
 
-  /** Draw one frame. A `started` lobby draws nothing: the match owns the screen. */
+  /**
+   * Draw one frame.
+   *
+   * Two states draw nothing at all, and they are different kinds of nothing: a
+   * `started` lobby has handed the screen to the **match**, and a lobby on
+   * `ship-select` / `map-select` has handed it to one of its own **pickers**
+   * (u10-01). Both are "somebody else owns the display", so both are one boolean
+   * here rather than a caller remembering to hide this view — a screen you can
+   * forget to hide is a screen that gets drawn under another one.
+   */
   update(model: LobbyModel): void {
-    const visible = model.phase !== 'started';
+    const visible = model.phase !== 'started' && model.screen === 'roster';
     if (visible !== this.visible) this.cache.invalidate();
     this.visible = visible;
     if (!visible) return;
@@ -359,13 +360,7 @@ export class LobbyView extends Container {
       if (!seat || !rect || !stateControl || !chip || !teamChip || !help) continue;
       this.drawSeat(this.seatSlot(i), seat, rect, stateControl, chip, teamChip, help, model, metrics);
     }
-    for (let i = 0; i < this.layout.classOptions.length; i++) {
-      const option = model.classOptions[i];
-      const rect = this.layout.classOptions[i];
-      if (!option || !rect) continue;
-      this.drawClassTile(this.classSlot(i), option, rect, model, metrics);
-    }
-    this.drawMaps(model);
+    this.drawPicks(model, metrics);
     this.drawActions(model, metrics);
     // Everything above is now on the display list; rasterise it once so the
     // frames between state changes cost one blit rather than ~1700 translucent
@@ -510,29 +505,119 @@ export class LobbyView extends Container {
   }
 
   /**
-   * The arena row. The rects are the lobby's own ({@link LobbyLayout.maps}); the
-   * drawing is the shared {@link MapPickerView}'s, fed a {@link MapPickerLayout}
-   * built from those rects and the model for the currently-selected arena — so
-   * the card previews, names and VETERAN tag are pixel-for-pixel what the picker
-   * draws, with none of it duplicated here.
+   * **The two summary cards** — one hull, one arena — and the two eyebrows that
+   * make them read as controls (u10-01).
    *
-   * The whole row dims for a client that cannot change it — a JOINER in an online
-   * room, or any lobby past RUSH! — the same honest tell the MODE and ORE chips
-   * carry ({@link drawControls}), and the same rule the model enforces
-   * (`./lobby` `selectMap` is the host's). A guest still *reads* which arena the
-   * room is flying; it just doesn't read as theirs to press.
+   * ---------------------------------------------------------------------------
+   * WHAT THIS REPLACED, AND WHAT IT KEPT
+   * ---------------------------------------------------------------------------
+   * Four hull tiles and six arena cards, on the screen the developer photographed
+   * and called *"too cluttered"*. They are on their own screens now
+   * ({@link ./ship-select-view}, {@link ./map-select-view}); what is left here is
+   * the **pick**, twice, and each is a control that opens the screen it was picked
+   * on.
+   *
+   * Neither card is redrawn from scratch for the lobby. The hull is the shared
+   * tile renderer's ({@link ./class-tile-view}) — same ladder, same pips, same
+   * figures, on a card that is now *wider* than any of the four it replaced — and
+   * the arena is the shared {@link MapPickerView}'s, fed a one-card layout. That is
+   * the whole reason both renderers moved out of this file: two screens drawing the
+   * same card must not be two drawings of it.
+   *
+   * ---------------------------------------------------------------------------
+   * THE EYEBROW IS THE AFFORDANCE
+   * ---------------------------------------------------------------------------
+   * *"Each reads as a control that opens something — not as a dead label."* A card
+   * on its own cannot say that: this screen has drawn selected cards as raised
+   * plates since u7-03, and a raised plate showing your own pick reads as a
+   * *state*, not as a door. So each card carries a word over it that names what it
+   * is and what pressing it does — `SHIP · CHANGE`, `MAP · CHANGE` — and the strip
+   * is inside the hit target, because a caption that says CHANGE and is not itself
+   * pressable is a control smaller than it looks.
+   *
+   * The arena's word is also where the **host rule** is told: a guest reads
+   * `MAP · CLAIM HOLDER'S` and the card drops to the `inert` surface, so the
+   * control looks unavailable rather than looking live and then refusing — the same
+   * rule {@link drawSeatState} keeps, and the rule the brief names.
    */
-  private drawMaps(model: LobbyModel): void {
+  private drawPicks(model: LobbyModel, m: FrameMetrics): void {
+    const { shipPick, shipLabel, shipCard, mapPick, mapLabel, mapCard } = this.layout;
+    this.pickPlates.clear();
+
+    // --- The hull card ------------------------------------------------------
+    // A hull is every client's own choice, so this card is live for everyone until
+    // RUSH! locks it (GDD §2.11) — `classLocked` is the only thing that dims it.
+    const shipLive = !model.classLocked;
+    drawClassTile(this.shipCard, model.shipCard, shipCard, {
+      selected: true,
+      dim: !shipLive,
+      // Always the RAISED plate: this card IS the pick, so there is no unselected
+      // sibling for `inert` to distinguish it from. Never `primary` — RUSH! is this
+      // screen's one bright plate (`./gantry` `singlePrimary`).
+      role: 'secondary',
+      metrics: m,
+    });
+    this.drawPickEyebrow(this.shipEyebrow, shipLabel, shipPick, SHIP_PICK_LABEL, shipLive, m);
+
+    // --- The arena card -----------------------------------------------------
+    // One card, through the shared picker view. `columns: 1` and `shape: 'row'`
+    // rather than a special "single" mode: one card in a row of one is what this
+    // is, and the picker draws it identically either way.
     const mapLayout: MapPickerLayout = {
-      band: this.layout.mapBand,
-      cards: this.layout.maps,
-      columns: this.layout.mapColumns,
-      shape: this.layout.mapColumns >= this.layout.maps.length ? 'row' : 'grid',
+      band: mapCard,
+      cards: [mapCard],
+      columns: 1,
+      shape: 'row',
     };
     this.mapPicker.setLayout(mapLayout);
     this.mapPicker.visible = true;
-    this.mapPicker.alpha = model.hostControls && !model.classLocked ? 1 : 0.55;
-    this.mapPicker.update(mapPickerModel(model.mapId));
+    // The card dims for a client who cannot change it — a JOINER in an online room,
+    // or any lobby past RUSH!. It still READS: the board you are about to fly is
+    // information, and only the pressing is the host's.
+    const mapLive = model.canPickMap && !model.classLocked;
+    this.mapPicker.alpha = mapLive ? 1 : 0.55;
+    this.mapPicker.update({ selectedId: model.mapCard.id, cards: [model.mapCard] });
+    this.drawPickEyebrow(
+      this.mapEyebrow,
+      mapLabel,
+      mapPick,
+      mapLive ? MAP_PICK_LABEL : MAP_PICK_GUEST_LABEL,
+      mapLive,
+      m,
+    );
+  }
+
+  /**
+   * One summary block's eyebrow: a hairline strip carrying the word, drawn on the
+   * `inert` surface so it reads as part of the block rather than as a second plate
+   * standing off it.
+   *
+   * Dropped **whole** where the layout gave it no height (`./lobby-geometry`
+   * `splitPick` — the strip is what goes when a block cannot afford both it and a
+   * thumb-sized card), never clipped. The block is still the hit target either way,
+   * so losing the word costs the control nothing but its caption.
+   */
+  private drawPickEyebrow(
+    label: Text,
+    strip: Rect,
+    block: Rect,
+    text: string,
+    live: boolean,
+    m: FrameMetrics,
+  ): void {
+    const visible = strip.width > 0 && strip.height > 0;
+    label.visible = visible;
+    if (!visible) return;
+    drawPlate(this.pickPlates, strip.x, strip.y, strip.width, strip.height, 'inert', 'chip', 'rest', false);
+    const px = typeSize(EYEBROW_PX, m);
+    label.text = text;
+    label.style.fontSize = px;
+    label.style.letterSpacing = trackingPx(TRACKING.eyebrow, px);
+    label.style.fill = live ? MATERIAL_SHADES.bone : MATERIAL_SHADES.boneLo;
+    label.alpha = live ? 1 : 0.75;
+    label.x = block.x + PICK_LABEL_PAD;
+    label.y = strip.y + strip.height / 2;
+    fitLabel(label, Math.max(0, strip.width - 2 * PICK_LABEL_PAD));
   }
 
   // --- Seat rows -----------------------------------------------------------
@@ -1064,193 +1149,6 @@ export class LobbyView extends Container {
     label.y = rect.y + rect.height / 2;
   }
 
-  // --- Hull tiles (ship select) --------------------------------------------
-
-  /**
-   * One hull tile: a name, a hull, **six stats as pips and numbers**, and a role
-   * blurb — in that priority order, laid out by `classTileContent` so a short
-   * tile drops a whole block rather than clipping one (u4, ratified 2026-08-05:
-   * *"both pips and numbers"*).
-   *
-   * Every figure here is `line.text` and every bar is `line.pips`, both derived
-   * from the one `line.value` the model read off the sim's `SHIP_STATS`. This
-   * method computes neither, which is how "four pips beside a number that means
-   * three" is made unreachable rather than merely unlikely.
-   *
-   * **Selection is a raised plate, not a hue.** The picked hull is `secondary`
-   * (the material every actionable control on this screen wears) and the other
-   * three are `inert` — which is the handoff's own example of that role, *"a
-   * settings row, an unselected ship"*. It is deliberately NOT `primary`: RUSH!
-   * is this screen's one bright plate, and a second would destroy the only
-   * mechanism Bone has for saying "this is the action".
-   */
-  private drawClassTile(
-    nodes: ClassNodes,
-    option: ShipClassOption,
-    rect: Rect,
-    model: LobbyModel,
-    m: FrameMetrics,
-  ): void {
-    const selected = option.shipClass === model.shipClass;
-    const dim = model.classLocked && !selected;
-    const content = classTileContent(rect);
-
-    nodes.body.clear();
-    if (rect.width <= 0 || rect.height <= 0) {
-      nodes.name.visible = false;
-      nodes.hull.visible = false;
-      nodes.blurb.visible = false;
-      nodes.pips.visible = false;
-      for (const cell of nodes.stats) cell.visible = false;
-      return;
-    }
-    // No accent tick: a tile's content is a GRID that starts at its own 3px
-    // padding, and the tick would land in the middle of the stat cells.
-    drawPlate(
-      nodes.body,
-      rect.x,
-      rect.y,
-      rect.width,
-      rect.height,
-      selected ? 'secondary' : 'inert',
-      'compact',
-      'rest',
-      false,
-    );
-
-    const alpha = dim ? 0.45 : 1;
-    const namePx = plateTypeSize(TILE_NAME_PX, m);
-    nodes.name.visible = true;
-    nodes.name.text = option.name;
-    nodes.name.style.fontSize = namePx;
-    nodes.name.style.letterSpacing = trackingPx(DISPLAY_TRACKING.heading, namePx);
-    nodes.name.style.fill = selected ? BONE.hi : MATERIAL_SHADES.bone;
-    nodes.name.alpha = alpha;
-    nodes.name.x = content.name.x;
-    nodes.name.y = content.name.y;
-
-    // The hull nickname (Quadfin…). Flavour the codex also carries, so it is the
-    // block that gives way *before* the stats on the tightest tile.
-    const hullPx = plateTypeSize(TILE_HULL_PX, m);
-    nodes.hull.text = option.hull;
-    nodes.hull.style.fontSize = hullPx;
-    nodes.hull.style.letterSpacing = trackingPx(TRACKING.label, hullPx);
-    nodes.hull.alpha = alpha;
-    nodes.hull.x = content.hull.x;
-    nodes.hull.y = content.hull.y;
-    nodes.hull.visible = content.showHull;
-
-    this.drawClassStats(nodes, option, content, selected, alpha, m);
-
-    // The role blurb (GDD §2.11). Hidden on a tile too short to hold it rather
-    // than clipped — a half-sentence reads worse than none.
-    const blurbPx = plateTypeSize(TILE_BLURB_PX, m);
-    nodes.blurb.text = option.blurb;
-    nodes.blurb.style.fontSize = blurbPx;
-    nodes.blurb.alpha = alpha;
-    nodes.blurb.style.wordWrapWidth = Math.max(20, content.blurb.width);
-    nodes.blurb.x = content.blurb.x;
-    nodes.blurb.y = content.blurb.y;
-    // The layout reserves the blurb's band; how many WRAPPED lines the sentence
-    // actually takes at this width is a measurement only Pixi can make, so the
-    // final say is here — an overrunning blurb is dropped whole rather than run
-    // out of the bottom of its own tile.
-    nodes.blurb.visible = content.showBlurb && nodes.blurb.height <= content.blurb.height;
-  }
-
-  /**
-   * The stat grid on one tile: per stat, its figure on a text line with its pip
-   * bar directly beneath, in the model's own stat order (GDD §2.11's table).
-   *
-   * The two channels are deliberately redundant — the bar answers *"which of
-   * these four is the fast one?"* across the four tiles at a glance, the figure
-   * answers *"by how much"* — and both are read off the same `ShipStatLine`, so
-   * they cannot drift apart here.
-   */
-  private drawClassStats(
-    nodes: ClassNodes,
-    option: ShipClassOption,
-    content: ClassTileContent,
-    selected: boolean,
-    alpha: number,
-    m: FrameMetrics,
-  ): void {
-    nodes.pips.clear();
-    nodes.pips.alpha = alpha;
-    nodes.pips.visible = content.showStats;
-    // NOT `plateTypeSize`: that floors type at TYPE_MIN (11px), which is the right
-    // floor for a control's word and the wrong one for a six-cell grid — an 11px
-    // figure overflows the 10px text line `classStatCell` reserves and the pip bar
-    // is drawn straight through it. The grid has its own floor, and 8px is the
-    // size this block has been legible at since u4.
-    const px = Math.max(STAT_MIN_PX, Math.round(STAT_PX * m.plateScale));
-
-    for (let i = 0; i < nodes.stats.length; i++) {
-      const cell = nodes.stats[i]!;
-      const line = option.stats[i];
-      if (!line || !content.showStats) {
-        cell.visible = false;
-        continue;
-      }
-      const box = classStatCell(content, i);
-      cell.visible = true;
-      cell.text = `${line.label} ${line.text}`;
-      cell.style.fontSize = px;
-      cell.style.fill = selected ? MATERIAL_SHADES.bone : MATERIAL_SHADES.boneLo;
-      cell.alpha = alpha;
-      cell.x = box.x;
-      cell.y = box.y;
-
-      // The bar under the figure. Filled pips are the brightest metal on the
-      // picked hull and one ramp step down on the others; the unfilled remainder
-      // is the shaded end of the same ramp. No hue is spent on a stat readout —
-      // the same treatment the settings screen's volume pips take.
-      const barWidth = Math.min(box.width, STAT_PIP_BAR_MAX_WIDTH);
-      const pipWidth = Math.max(
-        1,
-        (barWidth - (line.pipMax - 1) * STAT_PIP_GAP) / Math.max(1, line.pipMax),
-      );
-      const barY = box.y + STAT_ROW_TEXT;
-      for (let p = 0; p < line.pipMax; p++) {
-        const filled = p < line.pips;
-        nodes.pips
-          .rect(box.x + p * (pipWidth + STAT_PIP_GAP), barY, pipWidth, STAT_PIP_BAR)
-          .fill({
-            color: filled
-              ? selected
-                ? STAT_PIP_COLORS.selected
-                : STAT_PIP_COLORS.filled
-              : STAT_PIP_COLORS.empty,
-            alpha: 1,
-          });
-      }
-    }
-  }
-
-  private classSlot(index: number): ClassNodes {
-    const existing = this.classNodes[index];
-    if (existing) return existing;
-
-    const body = new Graphics();
-    const name = makeText('', FONT_HEADING, TILE_NAME_PX, MATERIAL_SHADES.bone);
-    const hull = makeText('', FONT_BODY, TILE_HULL_PX, MATERIAL_SHADES.boneLo);
-    const blurb = makeText('', FONT_BODY, TILE_BLURB_PX, MATERIAL_SHADES.boneLo);
-    blurb.style.wordWrap = true;
-    const pips = new Graphics();
-    // One label+figure per stat. `letterSpacing: 0` (rather than the row's usual
-    // tracking) is what buys `SPD 130%` its room in a 46px cell on a phone.
-    const stats: Text[] = [];
-    for (let i = 0; i < STAT_COUNT; i++) {
-      const cell = makeText('', FONT_BODY, STAT_PX, MATERIAL_SHADES.boneLo);
-      cell.style.letterSpacing = 0;
-      stats.push(cell);
-    }
-
-    this.addChild(body, name, hull, blurb, pips, ...stats);
-    const nodes: ClassNodes = { body, name, hull, blurb, pips, stats };
-    this.classNodes[index] = nodes;
-    return nodes;
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1264,10 +1162,11 @@ export class LobbyView extends Container {
  * surface. Chips are excluded by construction (`countPrimaries` takes plates).
  */
 export function lobbyPlateRoles(model: LobbyModel): PlateRole[] {
-  const roles: PlateRole[] = ['primary', 'secondary'];
-  for (const option of model.classOptions) {
-    roles.push(option.shipClass === model.shipClass ? 'secondary' : 'inert');
-  }
+  // RUSH!, BACK — then the two summary cards (u10-01): the hull card is always the
+  // pick, so it is always the raised `secondary` plate, and the arena card is drawn
+  // by the picker with the same role for the same reason. Neither may be `primary`,
+  // which is the property this list exists to let a test assert.
+  const roles: PlateRole[] = ['primary', 'secondary', 'secondary', 'secondary'];
   for (let i = 0; i < model.seats.length; i++) roles.push('inert');
   return roles;
 }

@@ -51,6 +51,11 @@
  *     number is still its cost (GDD §2.5), and "stats are allowed on
  *     ship-select" does not leak into it.
  *
+ *     *(u10-01, 2026-08-07: the four hull tiles moved to a **screen** of their own
+ *     ({@link LobbyScreen}) and the roster kept one card — the pick. The rule is
+ *     unchanged and so is the card: pips AND numbers, off the sim's own table.
+ *     What moved is where the four are compared, not whether stats are shown.)*
+ *
  * ---------------------------------------------------------------------------
  * WHAT THE EMPTY SEATS SHOW
  * ---------------------------------------------------------------------------
@@ -112,7 +117,8 @@ import type { Abundance, ShipStats } from '../sim/constants';
 import { DEFAULT_ABUNDANCE, SHIP_STATS } from '../sim/constants';
 import { playerColor } from './station-hp';
 import { CLASS_NAMES } from './upgrade-wheel';
-import { normalizeMapId } from './map-picker';
+import { mapCardModel, normalizeMapId } from './map-picker';
+import type { MapCardModel } from './map-picker';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -150,6 +156,30 @@ export const LOBBY_EYEBROW = 'CLAIM';
 /** Seconds the RUSH countdown runs for. Long enough to put a thumb back on the
  *  stick, short enough that nobody reads it twice. TUNABLE */
 export const RUSH_COUNTDOWN_SECONDS = 5;
+
+/**
+ * The words over the lobby's two summary cards (u10-01) — the eyebrow that turns
+ * each card from a label into a **control that opens something**.
+ *
+ * `NOUN · VERB`, and both halves are load-bearing. The noun says which of the two
+ * picks this card is; the verb says that pressing it does something, which a card
+ * showing your own selection cannot say on its own (this screen has drawn selected
+ * cards as raised plates since u7-03, so a raised card reads as a *state*).
+ *
+ * **`CHANGE`, not `TAP TO CHANGE`.** The lobby runs on a desktop with a mouse, on a
+ * phone with a thumb, and under the keyboard/gamepad menu nav — so a word naming
+ * one of those three gestures is wrong on the other two, and GDD §2.4's parity
+ * principle has no cell for a device-specific instruction. It is also the shorter
+ * word, and the strip it rides is 54px on the narrowest phone.
+ *
+ * The guest form is the arena's host rule in words: the same `CLAIM HOLDER` noun
+ * the footer's `WAITING FOR THE CLAIM HOLDER` already uses (GDD §4.7 worked
+ * examples — "claim holder", not "host"), so the roster teaches one word for the
+ * person who owns the room rather than two.
+ */
+export const SHIP_PICK_LABEL = 'SHIP · CHANGE';
+export const MAP_PICK_LABEL = 'MAP · CHANGE';
+export const MAP_PICK_GUEST_LABEL = "MAP · CLAIM HOLDER'S";
 
 /** The words a difficulty is shown as. The tier is named in full on the row —
  *  and since a0-06 it is **shown, not chosen** (GDD §2.1 amended 2026-08-07): the
@@ -844,6 +874,51 @@ export interface LobbySeat {
 /** Lobby phases. The view draws nothing once the match owns the screen. */
 export type LobbyPhase = 'gathering' | 'counting' | 'started';
 
+// ---------------------------------------------------------------------------
+// The three screens this room is looked at through (u10-01)
+// ---------------------------------------------------------------------------
+
+/**
+ * Which of the lobby's three screens has the display.
+ *
+ * ---------------------------------------------------------------------------
+ * THE REPORT, AND WHY IT IS A SCREEN SPLIT RATHER THAN A TIDY-UP
+ * ---------------------------------------------------------------------------
+ * The developer, 2026-08-07, with a screenshot of the live lobby: *"in the lobby
+ * page select ship and select map need to open different pages, we should only
+ * show 1 ship and 1 map in lobby because it's too cluttered now"*.
+ *
+ * CREW MUSTER was carrying eight roster rows, **four hull tiles of six stats
+ * each** and **four arena cards** on one 390px-wide screen. The Gantry re-skin
+ * (u7-03) made that visible rather than causing it. So the two four-card blocks
+ * become two screens of their own, and the roster keeps one card of each — the
+ * *pick*, as a control that opens the screen it was picked on.
+ *
+ *  - `roster`      — CREW MUSTER: the eight seats, the MODE / YIELD strip, one
+ *                    ship card, one arena card, RUSH!.
+ *  - `ship-select` — the four hulls with their full stats, pips AND numbers
+ *                    (u4, ratified 2026-08-05; GDD §2.5 / §2.11 amended). This is
+ *                    where the comparison happens, so it finally has the room to
+ *                    do it properly.
+ *  - `map-select`  — the four arenas with their registry previews, names and the
+ *                    VETERAN tag.
+ *
+ * It lives on the lobby STATE rather than in the wiring for the reason every
+ * other decision on this screen does: the brief's whole test list — pressing a
+ * card opens its screen, picking returns with the card updated, BACK returns
+ * without changing the pick, a guest cannot author the arena — is then a headless
+ * unit test rather than a browser run. `main.ts` only draws what this says.
+ *
+ * **It is not match config.** Nothing here rides the wire, nothing here reaches
+ * `MatchConfig`, and RUSH! resolves the same choices from whichever screen the
+ * player happens to be standing on ({@link lobbyMatchConfig} does not read it).
+ */
+export type LobbyScreen = 'roster' | 'ship-select' | 'map-select';
+
+/** Every lobby screen, in a stable order — the audit list the nav-graph contract
+ *  (`./menu-nav`) is checked against. */
+export const LOBBY_SCREENS: readonly LobbyScreen[] = ['roster', 'ship-select', 'map-select'];
+
 /** The whole lobby, as one immutable value. Every function below takes one and
  *  returns a new one, so a reducer, a test and a replay all see the same shape. */
 export interface LobbyState {
@@ -854,6 +929,13 @@ export interface LobbyState {
    *  pick the bot difficulties and press RUSH!, and are otherwise a client. */
   readonly host: PlayerId;
   readonly phase: LobbyPhase;
+  /**
+   * Which of the room's three screens is up (u10-01) — the roster, SHIP SELECT or
+   * MAP SELECT. Purely where the player is *standing*: it is not sent, not stored
+   * and not read by anything that builds a world, and a lobby resolved at RUSH!
+   * yields the identical {@link MatchConfig} from any of the three.
+   */
+  readonly screen: LobbyScreen;
   readonly seats: readonly LobbySeat[];
   /** Your hull pick. Mirrored onto your seat; locked once counting starts. */
   readonly shipClass: ShipClass;
@@ -1038,6 +1120,9 @@ export function createLobby(options: LobbyOptions): LobbyState {
     you,
     host,
     phase: 'gathering',
+    // A room opens on its roster, always — the two picker screens are somewhere
+    // you go, never somewhere you land (u10-01).
+    screen: 'roster',
     seats,
     shipClass,
     name,
@@ -1181,6 +1266,98 @@ export function selectShipClass(state: LobbyState, shipClass: ShipClass): LobbyS
       seat.player === state.you ? { ...seat, shipClass } : seat,
     ),
   };
+}
+
+// ---------------------------------------------------------------------------
+// The two screens the lobby's cards open (u10-01)
+// ---------------------------------------------------------------------------
+
+/**
+ * Open SHIP SELECT — a press on the lobby's one ship card.
+ *
+ * **Nobody is refused.** A hull is every client's own choice (there is no host
+ * rule on it, and never was), and even a lobby past RUSH! — where the choice is
+ * locked, GDD §2.11 — may be *read*: a player who cannot change their hull can
+ * still want to see what the four are. {@link classLocked} is what refuses the
+ * pick; this only moves the screen, and the screen draws the refusal
+ * ({@link LobbyModel.classLocked}).
+ *
+ * Still on the roster? Then nothing moves and the identical state comes back, the
+ * stillness rule every function in this file keeps.
+ */
+export function openShipSelect(state: LobbyState): LobbyState {
+  return state.screen === 'ship-select' ? state : { ...state, screen: 'ship-select' };
+}
+
+/**
+ * Open MAP SELECT — a press on the lobby's one arena card.
+ *
+ * **A guest may open it, and reads it.** The arena is the host's
+ * ({@link selectMap}, {@link hostControls}) and that does not change here; what
+ * this screen refuses is *authoring*, not *looking*. A card that would not open at
+ * all is a control that reads as broken — the same failure the lobby's own dead-vs-
+ * lying-button rule exists to prevent (`./lobby-view` `drawSeatState` point 3) —
+ * so the screen opens, states whose choice it is ({@link LobbyModel.canPickMap}),
+ * and draws its four cards unpressable. A guest who taps one lands on
+ * {@link selectMap}'s existing refusal and the screen does not move under them.
+ *
+ * The board a player is about to fly is information they are owed, which is the
+ * same argument that put the map on the lobby in the first place (p2 field rule).
+ */
+export function openMapSelect(state: LobbyState): LobbyState {
+  return state.screen === 'map-select' ? state : { ...state, screen: 'map-select' };
+}
+
+/**
+ * BACK from either screen — return to the roster **with the pick exactly as it
+ * was**.
+ *
+ * That is the whole contract of this function and it is kept by having nothing
+ * else in it: it writes `screen` and touches no hull, no arena and no seat. A
+ * "cancel" that restored some remembered value would need a second copy of the
+ * pick to restore *from*, and that second copy is precisely what could disagree
+ * with the first. There is nothing to cancel because a pick is applied when it is
+ * made ({@link pickShipClass}, {@link pickMap}) — the same immediate-apply grammar
+ * the settings screen keeps ("there is no cancel").
+ */
+export function closeLobbyScreen(state: LobbyState): LobbyState {
+  return state.screen === 'roster' ? state : { ...state, screen: 'roster' };
+}
+
+/**
+ * Pick a hull **on the SHIP SELECT screen** — the pick, and the return, as one
+ * move (u10-01: *"picking returns to the lobby with the choice reflected in the
+ * single card"*).
+ *
+ * Two things happen and they are deliberately separable: {@link selectShipClass}
+ * decides the hull and keeps every refusal it has ever kept (a locked lobby is
+ * still a locked lobby), and {@link closeLobbyScreen} returns to the roster. The
+ * screen returns **even when the hull did not change** — pressing the card you are
+ * already flying is a player saying "yes, this one", and stranding them on the
+ * picker for agreeing with themselves would be a trap.
+ *
+ * Callers that owe the wire a message should compare against
+ * {@link selectShipClass}'s own result rather than this one: a re-pick of the
+ * current hull moves the screen and nothing the server cares about, and a
+ * `lobbyChoice` re-sent for it would be bytes spent on nothing.
+ */
+export function pickShipClass(state: LobbyState, shipClass: ShipClass): LobbyState {
+  return closeLobbyScreen(selectShipClass(state, shipClass));
+}
+
+/**
+ * Pick an arena on the MAP SELECT screen — the twin of {@link pickShipClass}, and
+ * the same two moves.
+ *
+ * **A guest returns to the roster too, having changed nothing.** {@link selectMap}
+ * refuses them (the arena is the host's), and the screen still closes: a control
+ * that swallowed the press and left the player on a screen they cannot use is
+ * worse than one that plainly hands them back. What they are owed instead is
+ * knowing it was never theirs *before* they pressed, which is
+ * {@link LobbyModel.canPickMap}'s job on the card itself.
+ */
+export function pickMap(state: LobbyState, mapId: string): LobbyState {
+  return closeLobbyScreen(selectMap(state, mapId));
 }
 
 /**
@@ -1889,9 +2066,33 @@ export interface LobbyTeamCount {
 /** The lobby for one frame. */
 export interface LobbyModel {
   readonly phase: LobbyPhase;
+  /** Which of the room's three screens is up (u10-01). The roster draws when this
+   *  is `roster`; the two pickers are their own views (`./ship-select-view`,
+   *  `./map-select-view`) and draw from their own models. */
+  readonly screen: LobbyScreen;
   readonly room: RoomCode;
   readonly seats: readonly LobbySeatView[];
-  readonly classOptions: readonly ShipClassOption[];
+  /**
+   * **The one hull card the roster draws** — the hull this client has chosen, and
+   * no other (u10-01, the developer: *"we should only show 1 ship and 1 map in
+   * lobby"*). The other three moved to SHIP SELECT, where there is room to compare
+   * them.
+   *
+   * It is a whole {@link ShipClassOption}, stats and all, because the ratified u4
+   * rule is unchanged: ship stats appear here, **as pips AND numbers**. What
+   * changed is how many hulls' worth of them share the screen. One card in the
+   * column four used to fight over has more room for the grid than any of the four
+   * ever did.
+   */
+  readonly shipCard: ShipClassOption;
+  /** …and **the one arena card**: the map this room is flying, drawn by the same
+   *  {@link ./map-picker} constructor MAP SELECT draws its four with, so the
+   *  summary and the screen it was picked on are literally the same picture. */
+  readonly mapCard: MapCardModel;
+  /** Whether the arena is THIS client's to change — the host, before RUSH!
+   *  ({@link hostControls}). The card draws dead rather than live-then-refusing
+   *  when it is false, which is the rule the whole screen keeps. */
+  readonly canPickMap: boolean;
   /** Your hull — the tile drawn as selected. */
   readonly shipClass: ShipClass;
   /** Your name (field request v0.2.1) — shown on your roster row and over your
@@ -1949,9 +2150,16 @@ export function lobbyModel(state: LobbyState): LobbyModel {
   const botCount = active.filter((s) => s.isBot).length;
   return {
     phase: state.phase,
+    screen: state.screen,
     room: state.room,
     seats,
-    classOptions: CLASS_OPTIONS,
+    // ONE card each (u10-01). The hull is resolved through `CLASS_OPTIONS` rather
+    // than rebuilt, so the card on the roster and the tile on SHIP SELECT are the
+    // same object; a hull id outside the four folds to the default rather than
+    // leaving the roster with a hole where a card should be.
+    shipCard: shipCardFor(state.shipClass),
+    mapCard: mapCardModel(state.mapId),
+    canPickMap: hostControls(state),
     shipClass: state.shipClass,
     name: state.name,
     mapId: state.mapId,
@@ -1973,6 +2181,23 @@ export function lobbyModel(state: LobbyState): LobbyModel {
     botCount,
     online: state.online,
   };
+}
+
+/**
+ * The {@link ShipClassOption} for a hull — the lobby's one card, and SHIP SELECT's
+ * four, read out of the one ratified table ({@link CLASS_OPTIONS}).
+ *
+ * A hull the table does not hold folds to {@link DEFAULT_SHIP_CLASS}'s card rather
+ * than to `undefined`: the roster has exactly one ship card since u10-01, so "no
+ * card" is a hole in the screen where the pick should be, and a Vanguard card is a
+ * truthful answer for a state that can only arise from a corrupt store.
+ */
+export function shipCardFor(shipClass: ShipClass): ShipClassOption {
+  return (
+    CLASS_OPTIONS.find((option) => option.shipClass === shipClass) ??
+    CLASS_OPTIONS.find((option) => option.shipClass === DEFAULT_SHIP_CLASS) ??
+    CLASS_OPTIONS[0]!
+  );
 }
 
 /** The active seats grouped into per-side headcounts, sorted by team number —

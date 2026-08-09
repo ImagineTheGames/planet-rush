@@ -158,14 +158,39 @@ export function mapPickerModel(selectedId: string): MapPickerModel {
   const selected = normalizeMapId(selectedId);
   return {
     selectedId: selected,
-    cards: MAPS.map((map) => ({
-      id: map.id,
-      name: map.name,
-      blurb: map.blurb,
-      veteran: map.id === VETERAN_MAP_ID,
-      selected: map.id === selected,
-      preview: mapPreview(map),
-    })),
+    cards: MAPS.map((map) => cardFor(map, selected)),
+  };
+}
+
+/**
+ * **One card, for one map** — the lobby's single arena card since u10-01, where
+ * the four-card row moved to its own screen and the lobby kept only the pick.
+ *
+ * It is the same {@link MapCardModel} {@link mapPickerModel} builds, from the same
+ * registry entry, through the same {@link mapPreview}: the lobby's summary card and
+ * the MAP SELECT card the player pressed to choose it are the *same picture*, which
+ * is the whole reason this is a shared constructor rather than a second one written
+ * for the lobby. An unknown id folds to the default ({@link normalizeMapId}), so a
+ * stale stored key can never leave the card blank.
+ *
+ * `selected` is always true here: a card built for the current pick is the current
+ * pick. The lobby draws it raised for that reason and the view needs no second flag.
+ */
+export function mapCardModel(id: string): MapCardModel {
+  const selected = normalizeMapId(id);
+  return cardFor(getMap(selected), selected);
+}
+
+/** One registry entry as a card, lit when it is the selection. The single place a
+ *  `MapCardModel` is authored, so the row and the lone card cannot drift. */
+function cardFor(map: MapDef, selectedId: string): MapCardModel {
+  return {
+    id: map.id,
+    name: map.name,
+    blurb: map.blurb,
+    veteran: map.id === VETERAN_MAP_ID,
+    selected: map.id === selectedId,
+    preview: mapPreview(map),
   };
 }
 

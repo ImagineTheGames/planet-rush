@@ -420,6 +420,21 @@ export {
   seatLocalPlayer,
   selectMap,
   selectShipClass,
+  // The room's THREE screens (u10-01, the developer: *"select ship and select map
+  // need to open different pages … only show 1 ship and 1 map in lobby"*). The
+  // roster keeps one card of each — the pick — and each card opens a page. BACK
+  // returns with the pick exactly as it was, because a pick is applied when it is
+  // made and there is nothing to cancel.
+  LOBBY_SCREENS,
+  MAP_PICK_GUEST_LABEL,
+  MAP_PICK_LABEL,
+  SHIP_PICK_LABEL,
+  closeLobbyScreen,
+  openMapSelect,
+  openShipSelect,
+  pickMap,
+  pickShipClass,
+  shipCardFor,
   setPlayerName,
   startLobbyMatch,
   // Why RUSH! is refused, in the words the screen shows (a0-11; GDD §2.1
@@ -450,6 +465,7 @@ export type {
   LobbyOptions,
   SideRelation,
   LobbyPhase,
+  LobbyScreen,
   LobbySeat,
   LobbySeatView,
   LobbyState,
@@ -476,6 +492,14 @@ export {
   // between a desktop number and a touch number.
   RUSH_WIDTH_MAX,
   TWO_COLUMN_MIN_WIDTH,
+  // The lobby's two summary blocks (u10-01) — one hull card, one arena card, each
+  // an eyebrow over a card and the whole block a hit target.
+  PICK_CARD_MAX_HEIGHT,
+  PICK_CARD_MIN_WIDTH,
+  PICK_LABEL_HEIGHT,
+  // …and the tile placement the SHIP SELECT screen borrows, so the four hulls are
+  // arranged by the same function (and the same floors) that arranged them here.
+  placeClassTiles,
   lobbyHitTest,
   lobbyLayout,
 } from './lobby-geometry';
@@ -489,6 +513,87 @@ export type {
 } from './lobby-geometry';
 
 export { LobbyView, LOBBY_ID, LOBBY_ANCHOR } from './lobby-view';
+
+// --- The two screens the lobby's cards open (u10-01) ------------------------
+//
+// The developer, 2026-08-07, over a screenshot of the live lobby: *"in the lobby
+// page select ship and select map need to open different pages, we should only
+// show 1 ship and 1 map in lobby because it's too cluttered now"*. CREW MUSTER
+// was carrying eight roster rows, four hull tiles of six stats each and six arena
+// cards on one 390px screen; these are where the four and the six went.
+//
+// Both are ordinary members of this directory's three-piece set — a pure model
+// with its layout co-located, and a thin view that draws it — and both reuse the
+// renderer the lobby already had rather than growing a second one: the hull tile
+// is `./class-tile-view` (shared with the lobby's one card, so the u4 "figure and
+// pips are two renderings of one value" rule has one home), and the arena card is
+// the picker's own `MapPickerView`.
+export {
+  SHIP_SELECT_BACK_LABEL,
+  SHIP_SELECT_EYEBROW,
+  SHIP_SELECT_HINT,
+  SHIP_SELECT_ID,
+  SHIP_SELECT_LOCKED_HINT,
+  SHIP_SELECT_TITLE,
+  SHIP_TILE_MAX,
+  sameShipTarget,
+  shipClassAt,
+  shipSelectHitTest,
+  shipSelectLayout,
+  shipSelectModel,
+  shipSelectPlateRoles,
+  shipSelectTargetKey,
+} from './ship-select';
+export type {
+  ShipSelectLayout,
+  ShipSelectLayoutOptions,
+  ShipSelectModel,
+  ShipSelectPointer,
+  ShipSelectState,
+  ShipSelectTarget,
+  ShipSelectTileView,
+} from './ship-select';
+export { ShipSelectView, SHIP_SELECT_ANCHOR } from './ship-select-view';
+
+export {
+  MAP_SELECT_BACK_LABEL,
+  MAP_SELECT_EYEBROW,
+  MAP_SELECT_GUEST_HINT,
+  MAP_SELECT_HINT,
+  MAP_SELECT_ID,
+  MAP_SELECT_TITLE,
+  mapIdAtCard,
+  mapSelectHitTest,
+  mapSelectLayout,
+  mapSelectModel,
+  mapSelectPlateRoles,
+  mapSelectTargetKey,
+  sameMapTarget,
+} from './map-select';
+export type {
+  MapSelectLayout,
+  MapSelectLayoutOptions,
+  MapSelectModel,
+  MapSelectPointer,
+  MapSelectState,
+  MapSelectTarget,
+} from './map-select';
+export { MapSelectView, MAP_SELECT_ANCHOR } from './map-select-view';
+
+// The hull tile, drawn — shared by the lobby's one summary card and SHIP SELECT's
+// four (u10-01). One renderer, because two screens drawing the same six figures
+// and five-pip bars must not be two drawings of them.
+export {
+  createClassTileNodes,
+  drawClassTile,
+  hideClassTile,
+  STAT_MIN_PX,
+  STAT_PX,
+  TILE_BLURB_PX,
+  TILE_HULL_PX,
+  TILE_NAME_PX,
+} from './class-tile-view';
+export type { ClassTileNodes, ClassTilePaint } from './class-tile-view';
 
 // --- The door into a room (GDD §2.1, §4.2, §4.8) ---------------------------
 //
@@ -630,6 +735,11 @@ export {
   flowTapEntry,
   flowTapHangar,
   flowTapLobby,
+  // …and the two screens a lobby card opens (u10-01). Separate handlers rather
+  // than more `LobbyTarget` cases, because each screen owns the display while it
+  // is up and hit-tests its own geometry.
+  flowTapMapSelect,
+  flowTapShipSelect,
   flowTapSettings,
   resetFlow,
   setFlowFireMode,
@@ -1066,6 +1176,10 @@ export {
   MAP_CARD_MIN_HEIGHT,
   MAP_CARD_MAX_HEIGHT,
   mapPickerModel,
+  // One card for one map (u10-01) — the lobby's single arena card, built by the
+  // same constructor the six-card row is, so the summary and the screen it was
+  // picked on are the same picture.
+  mapCardModel,
   mapPickerLayout,
   mapPickerHitTest,
   mapPreview,

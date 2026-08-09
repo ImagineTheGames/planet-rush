@@ -224,6 +224,20 @@ import {
   lobbyLayout,
   tickLobby,
   pressRush,
+  // The two screens the lobby's summary cards open (u10-01) — one hull card and
+  // one arena card on the roster, four hulls and six arenas on pages of their own
+  // (the developer: "select ship and select map need to open different pages").
+  // The screen a player is standing on is `LobbyState.screen`, so the three moves
+  // below are the whole of the navigation.
+  ShipSelectView,
+  MapSelectView,
+  shipSelectModel,
+  shipSelectLayout,
+  mapSelectModel,
+  mapSelectLayout,
+  openShipSelect,
+  openMapSelect,
+  closeLobbyScreen,
   // The wire half of the ONE lobby (ratified: CREATE ROOM opens the same lobby,
   // online): a `lobbyState` broadcast folds in through `applyLobbySlots` so joiners
   // appear in their seats live, `startLobbyMatch` is authority ending the lobby, and
@@ -295,6 +309,9 @@ import type {
   SummaryFrame,
   SummarySequence,
   LobbyState,
+  LobbyScreen,
+  ShipSelectTarget,
+  MapSelectTarget,
   PauseScreen,
   PauseButton,
   UiCue,
@@ -8149,9 +8166,35 @@ interface LobbySeam {
    *  or null when none is up — readback proof the lobby reuse (GDD §2.10 point 2)
    *  fires on hover / long-press. */
   hintTitle: string | null;
-  /** The hull tiles' physical centres, so a live-stage run can hover one and watch
-   *  the codex hull description appear. */
-  classControls: readonly { index: number; physicalCenter: { x: number; y: number } }[];
+  /**
+   * **Which of the room's three screens is up** (u10-01): `roster`, `ship-select`
+   * or `map-select`. Everything below that reports a picker's controls is empty
+   * unless its screen is the one showing, which is the same "invisible ⇒
+   * untappable" rule the layouts keep — a seam that reported rects for a screen
+   * nobody can see would be a seam a test could pass against a blank display.
+   */
+  screen: LobbyScreen;
+  /**
+   * The lobby's **one ship card** and **one arena card**, as drawn — the rect and
+   * the physical point a real press must land on to open each picker.
+   *
+   * They are the whole of the developer's report on the readback side: a test that
+   * counts these counts *one* of each, where it used to count four and six.
+   */
+  shipCardControl: { logical: Rect; physicalCenter: { x: number; y: number } };
+  mapCardControl: { logical: Rect; physicalCenter: { x: number; y: number } };
+  /** The four hull tiles on SHIP SELECT, once it is open — their rects and the
+   *  physical points a press lands on. Empty on every other screen. */
+  classControls: readonly {
+    index: number;
+    logical: Rect;
+    physicalCenter: { x: number; y: number };
+  }[];
+  /** Open SHIP SELECT / MAP SELECT the way the card does, and BACK out of either
+   *  — the drive methods a live-stage run walks the new navigation with. */
+  openShipSelect(): void;
+  openMapSelect(): void;
+  closeScreen(): void;
   /** Select the hull tile at `index` in {@link classOrder} — a tap on a tile. */
   selectClass(index: number): void;
   /** Press RUSH! — starts the countdown that boots the match. */
@@ -8169,8 +8212,11 @@ interface LobbySeam {
   veteranMapId: string;
   /** Card order, so a test maps a card index to a map id the way the view does. */
   mapOrder: readonly string[];
-  /** The arena card rects (logical, landscape space) — thumb-size assertion targets. */
+  /** The arena card rects on MAP SELECT, once it is open (logical, landscape
+   *  space) — thumb-size assertion targets. Empty on every other screen. */
   mapCards: readonly Rect[];
+  /** …and the physical points a real press on each has to land on. */
+  mapCardControls: readonly { index: number; physicalCenter: { x: number; y: number } }[];
   /** Each map's registry station positions, from the SAME bundled registry the sim
    *  builds from — the expected board a booted match must match (p2). */
   expectedStations: Readonly<Record<string, readonly { x: number; y: number }[]>>;
@@ -8267,10 +8313,16 @@ function openLobby(
 
   const size0 = ctx.logicalSize();
   const view = new LobbyView(size0.w, size0.h, isTouch);
+  // The two screens the lobby's summary cards open (u10-01). They are siblings of
+  // the roster rather than overlays *over* it: each owns the whole display while it
+  // is up, so exactly one of the three is visible at any moment and the other two
+  // cost a boolean per frame.
+  const shipSelectView = new ShipSelectView(size0.w, size0.h, isTouch);
+  const mapSelectView = new MapSelectView(size0.w, size0.h, isTouch);
   // The codex tooltip (GDD §2.10 point 2) — a passive overlay above the roster,
   // shown on hover / long-press of a hull tile or a bot seat, dismissed on any tap.
   const hintView = new CodexHintView();
-  ctx.root.addChild(view, hintView);
+  ctx.root.addChild(view, shipSelectView, mapSelectView, hintView);
 
   const seam: LobbySeam = {
     visible: true,
@@ -8304,7 +8356,13 @@ function openLobby(
     seatHelpControls: [],
     worldCast: null,
     hintTitle: null,
+    screen: state.screen,
+    shipCardControl: { logical: { x: 0, y: 0, width: 0, height: 0 }, physicalCenter: { x: 0, y: 0 } },
+    mapCardControl: { logical: { x: 0, y: 0, width: 0, height: 0 }, physicalCenter: { x: 0, y: 0 } },
     classControls: [],
+    openShipSelect: (): void => goToScreen(openShipSelect(state)),
+    openMapSelect: (): void => goToScreen(openMapSelect(state)),
+    closeScreen: (): void => goToScreen(closeLobbyScreen(state)),
     selectClass: (index: number): void => selectClassAt(index),
     rush: (): void => rush(),
     leave: (): void => leaveToMenu(),
@@ -8317,6 +8375,7 @@ function openLobby(
     veteranMapId: VETERAN_MAP_ID,
     mapOrder: MAP_ORDER,
     mapCards: [],
+    mapCardControls: [],
     expectedStations: Object.fromEntries(MAP_ORDER.map((id) => [id, registryStations(id)])),
     worldMapId: null,
     worldStations: null,
@@ -8332,13 +8391,28 @@ function openLobby(
     resolveRush = resolve;
   });
 
-  /** Redraw the lobby from current state and refresh the seam's layout facts. */
+  /**
+   * Redraw the lobby from current state and refresh the seam's layout facts.
+   *
+   * **Exactly one of the three screens is up** (u10-01). The roster hides itself
+   * when a picker is open rather than being drawn under it, because a picker owns
+   * the display: it is a page, not an overlay, which is the whole of what the
+   * developer asked for. `LobbyView.update` already hides itself once the match has
+   * the screen, so the two conditions are folded into one visibility per frame.
+   */
   function render(): void {
     const model = lobbyModel(state);
     view.update(model);
+    shipSelectView.setVisible(model.screen === 'ship-select' && model.phase !== 'started');
+    shipSelectView.update(shipSelectModel({ shipClass: model.shipClass, locked: model.classLocked }));
+    mapSelectView.setVisible(model.screen === 'map-select' && model.phase !== 'started');
+    mapSelectView.update(
+      mapSelectModel({ mapId: model.mapId, canPick: model.canPickMap && !model.classLocked }),
+    );
     const { w, h } = ctx.logicalSize();
     const layout = lobbyLayout({ width: w, height: h }, { isTouch });
-    seam.visible = view.visible;
+    seam.screen = model.screen;
+    seam.visible = view.visible || shipSelectView.visible || mapSelectView.visible;
     seam.slotCount = layout.seats.length;
     seam.online = model.online;
     seam.room = model.room;
@@ -8350,7 +8424,36 @@ function openLobby(
     seam.size = model.size;
     seam.selectedClass = state.shipClass;
     seam.selectedMapId = state.mapId;
-    seam.mapCards = layout.maps.map((r) => ({ ...r }));
+    // The lobby's TWO summary cards — one hull, one arena (u10-01). Reported as
+    // the whole pressable BLOCK (eyebrow plus card), which is what the hit test
+    // registers, so a suite pressing the reported point presses what a player does.
+    seam.shipCardControl = controlOf(layout.shipPick);
+    seam.mapCardControl = controlOf(layout.mapPick);
+    // …and the picker screens' own controls, empty unless their screen is up. A
+    // seam that reported rects for a screen nobody can see would let a test pass
+    // against a blank display, which is the same "invisible ⇒ untappable" rule the
+    // layouts keep, stated on the readback side.
+    if (model.screen === 'ship-select') {
+      const ship = shipSelectLayout({ width: w, height: h }, { isTouch });
+      seam.classControls = ship.tiles.map((r, i) => ({
+        index: i,
+        logical: { ...r },
+        physicalCenter: ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2),
+      }));
+    } else {
+      seam.classControls = [];
+    }
+    if (model.screen === 'map-select') {
+      const maps = mapSelectLayout({ width: w, height: h }, { isTouch });
+      seam.mapCards = maps.picker.cards.map((r) => ({ ...r }));
+      seam.mapCardControls = maps.picker.cards.map((r, i) => ({
+        index: i,
+        physicalCenter: ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2),
+      }));
+    } else {
+      seam.mapCards = [];
+      seam.mapCardControls = [];
+    }
     seam.logicalViewport = { width: w, height: h };
     seam.content = { ...layout.content };
     seam.seatHeight = layout.seats[0]?.height ?? 0;
@@ -8446,12 +8549,36 @@ function openLobby(
       physicalCenter: ctx.toPhysical(mode.x + mode.width / 2, mode.y + mode.height / 2),
     };
     seam.counting = model.countdown.active;
-    // The hull tiles' physical centres — the codex hull-description hover targets.
-    seam.classControls = layout.classOptions.map((r, i) => ({
-      index: i,
-      physicalCenter: ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2),
-    }));
     soundSeatArrivals(model);
+  }
+
+  /** One control, as the seam reports every control: the rect it was drawn at and
+   *  the physical point a real press has to land on, through the landscape-lock
+   *  rotation. */
+  function controlOf(rect: Rect): { logical: Rect; physicalCenter: { x: number; y: number } } {
+    return {
+      logical: { ...rect },
+      physicalCenter: ctx.toPhysical(rect.x + rect.width / 2, rect.y + rect.height / 2),
+    };
+  }
+
+  /**
+   * Move between the room's three screens (u10-01) — the one path all of BACK, the
+   * two cards and the two drive methods go through.
+   *
+   * A refusal comes back as the identical state (`./ui/lobby` keeps that discipline
+   * everywhere), so the cue is decided by identity exactly as the slot editor's
+   * cycles are: a screen that moved is a press, one that did not is a refusal. It
+   * costs the wire nothing on either branch — which screen a player is looking at is
+   * not match config and never rides a `lobbyChoice`.
+   */
+  function goToScreen(next: LobbyState): void {
+    if (resolved) return;
+    if (next === state) return;
+    ctx.cue(next.screen === 'roster' ? 'back' : 'press');
+    state = next;
+    hideHint(); // a tooltip anchored to the screen we just left
+    render();
   }
 
   /**
@@ -8505,16 +8632,27 @@ function openLobby(
     x: number,
     y: number,
   ): { hint: NonNullable<ReturnType<typeof codexShipHint>>; ax: number; ay: number } | null {
+    const { w, h } = ctx.logicalSize();
+    // **SHIP SELECT is where the hull dossiers live now** (u10-01). They were on the
+    // lobby's four tiles; the four tiles are here, so the hover and the long-press
+    // that reach GDD §2.10 point 2's reuse came with them rather than being dropped
+    // on the floor of a screen that no longer has the tiles.
+    if (state.screen === 'ship-select') {
+      const hit = shipSelectView.hitTest(x, y);
+      if (!hit || hit.kind !== 'hull') return null;
+      const rect = shipSelectLayout({ width: w, height: h }, { isTouch }).tiles[hit.index];
+      return hullHint(CLASS_ORDER[hit.index], rect);
+    }
+    // MAP SELECT has no dossiers: the codex writes about hulls and characters, and
+    // a card's own blurb is already the arena's description.
+    if (state.screen === 'map-select') return null;
     const hit = view.hitTest(x, y);
     if (!hit) return null;
-    const { w, h } = ctx.logicalSize();
     const layout = lobbyLayout({ width: w, height: h }, { isTouch });
-    if (hit.kind === 'class') {
-      const cls = CLASS_ORDER[hit.index];
-      const rect = layout.classOptions[hit.index];
-      const hint = cls ? codexShipHint(CODEX_DATA, cls) : null;
-      if (!hint || !rect) return null;
-      return { hint, ax: rect.x + rect.width / 2, ay: rect.y };
+    if (hit.kind === 'shipCard') {
+      // The roster's one card keeps its dossier too — it is a hull tile, so it
+      // explains itself exactly as the four on the picker screen do.
+      return hullHint(state.shipClass, layout.shipCard);
     }
     // A bot row — from its body, its trailing `?`, or any other segment of it. All
     // of them are "the pointer is over this seat", which is what a hover means.
@@ -8522,6 +8660,17 @@ function openLobby(
       return seatHint(hit.index, layout);
     }
     return null;
+  }
+
+  /** The codex hull description for one tile, anchored above it — null where there
+   *  is no hull or no rect (GDD §2.10 point 2's reuse, `codexShipHint`). */
+  function hullHint(
+    cls: ShipClass | undefined,
+    rect: Rect | undefined,
+  ): { hint: NonNullable<ReturnType<typeof codexShipHint>>; ax: number; ay: number } | null {
+    const hint = cls === undefined ? null : codexShipHint(CODEX_DATA, cls);
+    if (!hint || !rect || rect.width <= 0) return null;
+    return { hint, ax: rect.x + rect.width / 2, ay: rect.y };
   }
 
   /** The codex dossier for one roster row, anchored above it — null on a row with
@@ -8633,34 +8782,50 @@ function openLobby(
     });
   }
 
-  /** Pick the hull tile at `index` (a tap on a tile). Refused after RUSH!, where
-   *  {@link selectShipClass} returns the same state and the choice is locked. The
-   *  room is told at once, so the roster everyone reads shows the real hull. */
+  /**
+   * Pick the hull tile at `index` **on SHIP SELECT**, and come back to the roster
+   * with it showing on the one ship card (u10-01).
+   *
+   * Refused after RUSH!, where {@link selectShipClass} returns the same state and
+   * the choice is locked (GDD §2.11). The two moves are deliberately taken
+   * separately: the *screen* closes either way — pressing the hull you are already
+   * flying is a player saying "yes, this one", and stranding them on the picker for
+   * agreeing with themselves would be a trap — while the *room* is told only when
+   * the hull really moved, so a re-pick costs the wire nothing.
+   */
   function selectClassAt(index: number): void {
     if (resolved) return;
     const shipClass = CLASS_ORDER[index];
     if (shipClass === undefined) return;
-    const next = selectShipClass(state, shipClass);
-    if (next === state) return; // a refused / repeated pick costs the wire nothing
-    state = next;
-    // The selection stepped one tile: a detent, the same notch the wheel makes.
-    ctx.cue('detent');
-    sendChoice();
+    const picked = selectShipClass(state, shipClass);
+    const moved = picked !== state;
+    state = closeLobbyScreen(picked);
+    // The selection stepped one tile: a detent, the same notch the wheel makes. A
+    // re-pick of the current hull is not a step, so it sounds like the return it is.
+    ctx.cue(moved ? 'detent' : 'back');
+    if (moved) sendChoice();
     render();
   }
 
-  /** Pick the arena card at `index` (a tap on a card). Persists the choice at once,
-   *  so a reload finds it preselected and `boot()` reads it at RUSH! (p2). Refused
-   *  after RUSH! and from a JOINER — one arena per room, and it is the host's
-   *  ({@link selectMap}), so a guest's tap returns the identical state and nothing
-   *  is stored. */
+  /**
+   * Pick the arena card at `index` on MAP SELECT, and come back. Persists the
+   * choice at once, so a reload finds it preselected and `boot()` reads it at RUSH!
+   * (p2).
+   *
+   * Refused after RUSH! and **from a JOINER** — one arena per room, and it is the
+   * host's ({@link selectMap}) — in which case the identical state comes back,
+   * nothing is stored, and the screen still closes: a control that swallowed the
+   * press and left a guest standing on a screen they cannot use would be worse than
+   * one that plainly hands them back. What they are owed instead is knowing it was
+   * never theirs *before* they pressed, which the screen's own hint says.
+   */
   function selectMapAt(index: number): void {
     if (resolved) return;
-    const next = selectMap(state, mapIdAt(index));
-    if (next === state) return;
-    state = next;
-    ctx.cue('detent');
-    platform.storage.set(MAP_STORAGE_KEY, state.mapId);
+    const picked = selectMap(state, mapIdAt(index));
+    const moved = picked !== state;
+    state = closeLobbyScreen(picked);
+    ctx.cue(moved ? 'detent' : 'back');
+    if (moved) platform.storage.set(MAP_STORAGE_KEY, state.mapId);
     render();
   }
 
@@ -8835,11 +9000,18 @@ function openLobby(
 
   function act(hit: NonNullable<ReturnType<typeof view.hitTest>>): void {
     switch (hit.kind) {
-      case 'class':
-        selectClassAt(hit.index);
+      case 'shipCard':
+        // **Opens SHIP SELECT** (u10-01). The lobby's one hull card is not a pick —
+        // there is nothing to choose between on a card showing one hull — so the
+        // only thing a press on it can mean is "show me the four".
+        goToScreen(openShipSelect(state));
         break;
-      case 'map':
-        selectMapAt(hit.index);
+      case 'mapCard':
+        // **Opens MAP SELECT** — for a guest too. The arena stays the host's; what
+        // is refused is the pick, on the screen this opens, and a card that would
+        // not even open would read as broken while withholding the board the player
+        // is about to fly (`./ui/lobby` `openMapSelect`).
+        goToScreen(openMapSelect(state));
         break;
       case 'seat': {
         // **The row BODY cycles the seat's CHARACTER** (a0-06) — the tap that lands
@@ -8994,8 +9166,36 @@ function openLobby(
     press = null;
     if (p?.timer) clearTimeout(p.timer);
     if (!p || p.hold || p.moved) return; // a dossier long-press or a drag, not a tap
+    // Whichever of the room's three screens is up owns the tap (u10-01). Each view
+    // hit-tests the geometry IT drew, so a press can only ever reach a control that
+    // is on screen — the same "tested against what was drawn" rule the roster keeps,
+    // extended to a screen that is now one of three.
+    if (state.screen === 'ship-select') {
+      const hit = shipSelectView.hitTest(p.x, p.y);
+      if (hit) actShipSelect(hit);
+      return;
+    }
+    if (state.screen === 'map-select') {
+      const hit = mapSelectView.hitTest(p.x, p.y);
+      if (hit) actMapSelect(hit);
+      return;
+    }
     const hit = view.hitTest(p.x, p.y);
     if (hit) act(hit);
+  }
+
+  /** A tap on SHIP SELECT: BACK returns with the pick untouched, a tile picks and
+   *  returns ({@link selectClassAt}). */
+  function actShipSelect(hit: ShipSelectTarget): void {
+    if (hit.kind === 'back') goToScreen(closeLobbyScreen(state));
+    else selectClassAt(hit.index);
+  }
+
+  /** A tap on MAP SELECT: the same two, through {@link selectMapAt} — which is
+   *  where a guest's press is refused and still hands them back. */
+  function actMapSelect(hit: MapSelectTarget): void {
+    if (hit.kind === 'back') goToScreen(closeLobbyScreen(state));
+    else selectMapAt(hit.index);
   }
 
   function onPointerLeave(): void {
@@ -9018,14 +9218,22 @@ function openLobby(
   }
 
   function onKeyDown(e: KeyboardEvent): void {
-    // Escape leaves the lobby for the main menu (u2 menu-back) — the pointer twin
-    // of the BACK button, the exit every screen answers Escape with.
+    // Escape is BACK, and BACK is **one step**, never a shortcut out of the
+    // building (u10-01). On a picker it returns to the roster with the pick exactly
+    // as it was; on the roster it leaves for the main menu (u2 menu-back). An
+    // Escape that skipped the roster would make the two picker screens the only
+    // places in the shell where the exit key does two things at once, and would
+    // silently drop a player out of a room they had only opened a card in.
     if (e.code === 'Escape') {
-      leaveToMenu();
+      if (state.screen === 'roster') leaveToMenu();
+      else goToScreen(closeLobbyScreen(state));
       return;
     }
     // Enter or Space is RUSH! — a keyboard player never reaches for the mouse to
-    // start, the same courtesy the main menu gives PLAY.
+    // start, the same courtesy the main menu gives PLAY. Not from a picker: RUSH!
+    // is not drawn there, and a key that starts a match off a screen with no start
+    // button on it is exactly the trap the nav graph exists to forbid.
+    if (state.screen !== 'roster') return;
     if (e.code === 'Enter' || e.code === 'Space') rush();
   }
 
@@ -9033,6 +9241,11 @@ function openLobby(
     ctx.recomputeTransform();
     const { w, h } = ctx.logicalSize();
     view.resize(w, h, isTouch);
+    // All three screens re-lay-out, not only the one that is up: a rotation while
+    // SHIP SELECT is open must not leave the roster behind it holding the old
+    // viewport's rects for the frame after BACK.
+    shipSelectView.resize(w, h, isTouch);
+    mapSelectView.resize(w, h, isTouch);
     hideHint(); // a stale tooltip is anchored to the old layout — drop it on a flip
     render();
   }
@@ -9048,8 +9261,10 @@ function openLobby(
     window.removeEventListener('resize', relayout);
     window.removeEventListener('orientationchange', relayout);
     window.visualViewport?.removeEventListener('resize', relayout);
-    ctx.root.removeChild(view, hintView);
+    ctx.root.removeChild(view, shipSelectView, mapSelectView, hintView);
     view.destroy({ children: true });
+    shipSelectView.destroy({ children: true });
+    mapSelectView.destroy({ children: true });
     hintView.destroy({ children: true });
   }
 
