@@ -104,9 +104,34 @@ untestable. Extracting the seam and testing that is the house pattern — cf.
   (`src/sim/`, `src/net/`, `src/bots/`); it hosts the UI shells, and the defect
   is in one of them. Flagged in the PR.
 
+## Session 2 — resume, re-verify, ship
+
+The fix above was committed and pushed but never opened as a PR, and the notes
+file in `/status/notes/` was still the blank template. Both fixed here.
+
+- **Merged `origin/main`** (`7e175ac` → `fc567ab`, 4 commits, clean — no
+  conflicts). PR **#361** has landed, so
+  `evidence/a1-05-live-round/readback.json` is now on main and the branch
+  carries it. The stack is no longer second-hand.
+- **Re-verified the diagnosis from the evidence, not from these notes.**
+  `readback.json` `pageErrors`: six captures carry the message, two
+  (`lobby-character`, `codex-by-tap-390`) carry the full five-frame stack
+  quoted in the commit. Confirmed at source that the chain is real —
+  `measureFleet` (`src/main.ts:6889`) awaits `surveyRegions` and then calls
+  `render()` **unconditionally**; its `if (screen !== 'online') return;` guards
+  only the notice write, not the draw. `src/ui/lobby-entry-view.ts:234` is
+  `this.backdrop.clear()`, the first draw after the screen-cache early-out.
+- **Proved the test fails without the fix.** Neutered `dispose()` to a no-op and
+  ran the file: **4 of 6 tests fail**, including `is inert once the latch is
+  disposed`, which then throws the live `TypeError` for real. Restored; tree
+  clean.
+- **Both gates green on the merged tree**: `npx tsc --noEmit` clean;
+  `npm test -- --run` → **271 files, 4746 tests, all passing** (~582s).
+
 ## NEXT
 
-- Nothing blocking. DoD gates run green locally (`tsc --noEmit`, `npm test --run`).
+- Nothing blocking. PR opened; DoD is the PR's checks.
 - Not done, deliberately: no live-stage re-capture. Proving zero uncaught
   exceptions on a real clean boot is QA's round to run, and the race needs a
-  human-speed walk that their scripted one cannot produce.
+  human-speed walk that their scripted one cannot produce. The headless test is
+  what this lane can honestly attest to.
