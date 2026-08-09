@@ -1343,6 +1343,145 @@ burning CPU. **Same lesson as trap #2 in a new costume: when a cheap indicator
 disagrees with reality, check the processes or the log, and do not let a bad
 probe convince you a healthy run is stuck.**
 
+### Session 2026-08-09 (fourth) — the branch was RED on a gate no session had ever looked at
+
+Inherited the branch **fully pushed** (`git log origin/<branch>..HEAD` empty —
+checked FIRST, session 5's lesson), no merge in progress, `origin/main`
+(`fdf460e`) already an ancestor, 45 dirty paths. **Read `git status` before
+restoring** (session 9's rule — the fortieth line has been a real change before);
+all 45 were `tests/live-stage/*-evidence.png` and nothing else, so `git checkout
+-- tests/live-stage/` (never `git clean`). No feature work was outstanding and
+none was invented.
+
+**Then I looked at something thirteen sessions had not: the PR's checks.**
+
+#### The finding
+
+PR #319 read `MERGEABLE` but `mergeStateStatus: UNSTABLE`. **"Mobile emulation
+(Playwright)" had been FAILING on this branch for many commits.** Five lobby
+goldens are in that suite and this brief rewrote the lobby row; nobody noticed
+because **the mobile suite is not in this brief's DoD.** Every session ran
+`tsc` + `vitest` + live-stage, got green on all three, and wrote "green" in this
+note. All of those runs were honest and none of them covered this.
+
+**The transferable lesson, and it is not "run more tests":** the DoD is a floor,
+not a ceiling. `gh pr checks <n>` is one call and it is the only thing that tells
+you what the *repo* thinks of your branch, as opposed to what your four commands
+think. A note that says green thirteen times is not evidence that CI is green.
+Sessions 3, 5 and 12 each wrote "PR #319 MERGEABLE" — **`mergeable` is about
+CONFLICTS, not about CHECKS.** Read `mergeStateStatus` too; `UNSTABLE` means the
+merge is clean and a check is red.
+
+#### What was actually broken, which was less than it looked and more interesting
+
+Four goldens failed at **ratio 0.02** against a `maxDiffPixelRatio` of **0.01**.
+That much is this brief's: the row grew a `?` and the tier chip moved to the
+inert surface. Reproduced locally on an isolated port — **the same four fail and
+`desktop-lobby` passes, exactly matching CI**, which also proves this box renders
+like the runner and therefore that locally-shot baselines are valid here.
+
+**But the committed baselines were STALE, and not by this brief's hand.** Reading
+the frames instead of the ratios: main's baseline draws `OPEN` in the state
+column and **four** arena cards; this branch draws `BOT` and **six**. Neither of
+those is mine — a0-11 renamed OPEN→BOT and a0-12 took the arena row 4→6, and the
+baselines date from a0-07 (`78dc317`), before both.
+
+I spent an hour proving that properly rather than assuming, and the method is the
+part worth keeping:
+
+- `origin/main` in a throwaway worktree (isolated port 4196, `node_modules`
+  symlinked) **passes** the golden.
+- `--update-snapshots` there rewrites **nothing** — which looks like proof that
+  main's render matches the baseline, and is not.
+- **Delete the baseline and force a fresh write, and main's true render comes
+  back with `BOT` and six arenas** — identical in those respects to this branch.
+
+**So `--update-snapshots` is a liar for this purpose: Playwright leaves a
+snapshot alone when it passes WITHIN TOLERANCE.** A stale baseline plus a
+sub-1% drift is invisible to every command that sounds like it would reveal it.
+The only probe that answers the question is `rm` the file and let it be written.
+
+The whole story: a0-11's and a0-12's drift sat under the 1% budget, so main
+stayed green with baselines that no longer depicted main. This brief's ~2% is
+simply what tipped an already-drifted frame over the line.
+
+#### `08754f2` — re-baselined all five, including the one that passed
+
+Four were failing. `desktop-lobby` was **not**, and I re-shot it anyway: it lacks
+the `?` column outright and survives on tolerance luck, so it is a baseline that
+does not depict the UI it guards. Leaving it would load exactly the trap that
+just cost this session an hour — **a stale baseline makes the next innocent
+change look guilty.** Playwright will not rewrite a passing snapshot, so this one
+needs the `rm`-and-rerun path.
+
+All five shot on an isolated port against a verified bundle, **all five looked at**
+(not just diffed), and re-run clean afterwards: 5 passed. The two tightest
+profiles are the ones worth having looked at — the 390 px landscape phone and the
+portrait-held lock both keep **all** trailing segments, `BOT | name | side | tier
+| ?`, so `seatTrailing`'s order of surrender still holds at the notch.
+
+**Stated plainly in the commit and here: the new frames also carry a0-11's and
+a0-12's un-baselined changes.** That is unavoidable when re-shooting a frame three
+briefs have moved, and it must not be read as this branch's doing.
+
+`tests/mobile/` is QA's. Re-baselining goldens your own change moves is the
+established practice here rather than a boundary crossing — **`78dc317` is this
+same role doing this same thing and it is on main.** The alternative was shipping
+a red gate.
+
+#### Then main moved to `ab427ad` (a0-14 the hangar, PR #333) mid-session
+
+Killed the running live-stage sweep rather than letting it finish — session 7's
+rule, and the reason is that `merge-base --is-ancestor` is evaluated on the
+*final* tree, so a green result on a stale one proves nothing the DoD wants.
+**Merge before you measure; the measurement is the perishable thing.**
+
+Merged **clean, no conflicts** (`a745e47`), pushed immediately (sessions 5 and 7
+each lost an hour to a finished merge that never left the box). Verified rather
+than trusted, since a0-14 touches two of my files:
+
+- `src/ui/lobby-flow.ts` — a0-14 adds a `hangar` screen to `FlowScreen` and a
+  `flowScreenHandler` audit. **Purely additive**; my seat-character cycling is
+  elsewhere in the file.
+- `src/main.ts` — the hangar's wiring, in different functions from the cast seam.
+- **It re-baselined only the three TITLE goldens, so it did not collide with the
+  five lobby ones I had just committed.**
+- a0-14 adds a **fourth front door**. `lobby-cast.spec.ts` selects doors by
+  **kind**, not by label or position, so a new door passes straight through —
+  the same property that survived a0-15's door rename.
+
+**This is the thirteenth merge in a row to leave the cast seam untouched.**
+
+#### DoD on the merged tree (`a745e47`), every gate re-run after the merge
+
+- `npx tsc --noEmit` — clean, run **before** pushing the merge.
+- `npm test -- --run` — **4247 passed, 0 failed**, 248 files. A **complete** run,
+  verified session 13's way rather than assumed: `src/ui/lobby.test.ts` reported
+  its **100 tests** (session 13's hang stays fixed), `lobby-geometry` 126,
+  `lobby-flow` 67, `cast-seam` 8, `match-boot` 16. `capacity-regression`
+  **passed** (62.8 s). Redirected to a file, never piped (trap #2).
+- `PREVIEW_PORT=4194 npm run test:live-stage -- lobby-cast.spec.ts` — **3 passed**
+  (2.0 m): cast round trip 27.9 s, `?` by click on PC 6.2 s, `?` by tap at 390 px
+  landscape 28.9 s.
+- **The gate no previous session ran:** `PREVIEW_PORT=4194 npx playwright test
+  tests/mobile/goldens.spec.ts -g "lobby"` — **5 passed** on the merged tree, with
+  no further baseline churn (a0-14 did not move the lobby).
+- GDD.md differs from `origin/main`; `merge-base --is-ancestor` OK at `ab427ad`.
+  Markers verified by grep, not assumed — §2.1 line 56 carries a0-11's *"an `open`
+  slot is EMPTY"* and a0-06's *"the host picks each bot's CHARACTER"* side by side,
+  §2.1 line 62 the full amendment, §2.9 line 235 *"characters, not difficulty
+  labels"*.
+
+**The proof, re-measured not re-asserted:** `lobby-cast-readback.txt` regenerated
+**byte-identical** on top of the a0-14 merge — slot 0 `null`, slots 1–7 `warden
+warden sable vulture warden sable vulture` in the lobby and the *same seven* in
+the match, `identical: true`. It is absent from `2ecac4b`'s diff and **that
+absence IS the result.** a0-14 added a whole screen and a fourth door, and the
+cast seam did not notice.
+
+`2ecac4b` re-shot the four frames (badge now reads `a745e47`) and was pushed
+immediately after committing.
+
 ## NEXT (restated at the end so it is the last word, not buried mid-file)
 
 - **ONLINE still carries the tier, not the name** — unchanged, and still the only
@@ -1360,7 +1499,18 @@ probe convince you a healthy run is stuck.**
 - **Keep BOTH copies of this note in step** — `/status/notes/…` (the shared 9p
   mount the harness briefs you from) and `status/notes/…` (the repo copy the DoD
   sees). They drifted three sessions apart once; `diff -q` them before you finish.
+- **CHECK `gh pr checks 319` EVERY SESSION — it is not in the DoD and it was red
+  for thirteen of them.** The four DoD commands do not cover CI's mobile-emulation
+  job, which owns five lobby goldens that this brief's row rewrite moves. Also read
+  `mergeStateStatus`, not just `mergeable`: `mergeable` is about CONFLICTS, so a
+  branch can read MERGEABLE and UNSTABLE at the same time, and this one did.
+- **If a lobby golden fails, do not reach for `--update-snapshots` to find out
+  why.** It leaves a snapshot alone when it passes within the 1% tolerance, so it
+  cannot distinguish "matches" from "drifted but under budget". `rm` the baseline
+  and let it be written, then look at the frame. That is how the a0-11 / a0-12
+  drift hiding under main's green was found.
 - **No feature work outstanding. Do not invent any.** If you inherit this branch
   green, the useful things to do are: check `git log origin/<branch>..HEAD` first,
-  read `git status` before restoring it, merge main if it has moved (**merge before
-  you measure**), and re-run the gates — **redirected to a file, never piped**.
+  read `git status` before restoring it, check `gh pr checks`, merge main if it has
+  moved (**merge before you measure**), and re-run the gates — **redirected to a
+  file, never piped**.
