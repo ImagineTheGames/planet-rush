@@ -5,6 +5,32 @@
 
 ---
 
+## STATUS — LANDED 2026-08-07, amended by p1-03 (2026-08-09)
+
+`src/progression/curve.ts` and its 13 tests shipped as commit `ae5fa52` inside **PR #333**
+(`agent/ui/a0-14-hangar`) — that lane needed the curve for the hangar's level block, found
+this brief unclaimed, and implemented it verbatim. Read `status/notes/a0-14-the-hangar.md`
+before touching the module; **pr-04 and pr-05 consume it, they do not re-derive it.**
+
+Lane p1-03 re-audited the shipped module against the five tests below, found four already
+covered, and closed the fifth: §1.4's *published table* was nowhere in the repo — the shipped
+test asserted `xpToNext(L) === Math.round(300 * L ** 1.6)`, which restates the formula, and
+no cumulative total was pinned at all. `src/progression/curve.test.ts` now locks all nine
+published rows (`toNext`, `cumTotal`, matches @600 XP) as literals, so a dial change turns
+the doc red instead of silently re-deriving. Generated table:
+`evidence/p1-03-level-curve.txt`.
+
+**One correction, where this brief disagreed with the plan — the plan wins.** The signature
+block below writes `300 as Tunable<number>`, but `Tunable<T>` is declared in
+`src/sim/constants.ts:24`; importing it would break this brief's own trap (*"if this file
+imports anything from `src/sim/`… it is the wrong file"*) **and** fail this brief's own DoD
+grep. Plan §1.4 asks only for *"(both `TUNABLE`)"* — the comment convention used across
+`src/main.ts`, `src/bots/ally.ts` and `src/art/`. The shipped plain `const` + `TUNABLE`
+doc-comment is the correct reading; the annotations below are left as written for the
+record, not as an instruction.
+
+---
+
 ## The ask
 
 The smallest brief in the chain, and deliberately separate from everything else so that the one
