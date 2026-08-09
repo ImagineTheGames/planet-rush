@@ -94,23 +94,48 @@ Each applied locally, run, reverted. 29 green before and after.
 is caught by a pinned count, not by a classifier. That is the honest limit, and
 it is the same limit a2-04 hit.
 
+### The evidence (`229ed98`)
+
+Re-shot, not reinvented — `frames.ts` and `capture-frames.mjs` unchanged, vite on
+the private port 5199. Added `measure-frames.mjs` -> `frames-measured.json`,
+because a picture of a station with no guns on it is only evidence if someone
+measures it. The number that matters: **bare vs shot-0 = 0 differing pixels**,
+and bare vs built-4 differs only between radius 155 and 204 px against a body
+radius of 128 — the whole difference is outboard of the hull.
+
+**Trap for a future me:** the beacon-span zoom probe inherited from a2-04 is
+WRONG on this hull and I corrected it rather than copying it. It took the
+leftmost-to-rightmost roster-coloured pixel, and on the Cutterhead the turrets
+carry roster colour too, so it read the guns (299/367/333/299). Band-limit to
+r < 152 px (ring 140-148, turret art starts 155) -> 299 px on all four.
+
+### Goldens: nothing moved, and it is said out loud
+
+Ran the mobile goldens on a scratch config on port **4191** with
+`reuseExistingServer: false` — NOT the shipped 4173 config, because three lanes
+share this box and a run there can serve a neighbour's bundle. Deleted the
+scratch config afterwards (`git status` clean, no foreign evidence PNGs dirtied).
+
+**35 passed, 70 skipped, 0 failed. Nothing re-baselined; nothing needed to be.**
+All five scene goldens #312 re-baselined pass against #312's own baselines. The
+four UPGRADE WHEEL goldens a2-04 flagged as pre-existing now pass — fixed on main
+in the meantime.
+
 ## NEXT
 
 - [x] merge, resolved the Cutterhead's way
 - [x] exclusion re-pointed
 - [x] tests re-aimed + mutation-proved
-- [ ] re-shoot the evidence frames on the Cutterhead (4 built standing / ring
-      shot empty). #313's set has these for the OLD hull — re-shoot, do not
-      reinvent. `evidence/a2-04-no-hull-turrets/frames.ts` + `capture-frames.mjs`
-      already drive the shipped Renderer against the shipped sim; the captions
-      read back off `data-turrets`, so they stay honest.
-- [ ] goldens: the sprite output is byte-identical to main's, so nothing should
-      move. #312 already re-baselined five. **Say so explicitly** rather than
-      leaving it unsaid — the brief asks for that in as many words.
-- [ ] DoD, PR body rewrite, and state that the hold can come off.
+- [x] evidence re-shot on the Cutterhead and measured
+- [x] goldens confirmed, nothing moved, said explicitly
+- [ ] push, rewrite the PR body, state that the hold can come off
 
-### Known and NOT mine (carried from a2-04, re-verify before repeating)
+**`main` moves fast.** It advanced twice while I worked (#333, then #338 a0-17).
+Re-check `git merge-base --is-ancestor origin/main HEAD` immediately before
+claiming the DoD — it flipped to FAIL on me once. The second merge (a0-17, sim
+constants) was conflict-free and touches no art.
 
-`tests/net/capacity/capacity-regression.test.ts` is load-flaky on this shared
-box, and four UPGRADE WHEEL goldens were failing on `origin/main`'s own tip.
-Report by name, never adopt, never re-baseline from this lane.
+### Known and NOT mine
+
+`tests/net/capacity/capacity-regression.test.ts` is load-flaky on this shared box
+(it passed this time — a green is not a fix). Report by name, never adopt.

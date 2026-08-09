@@ -132,19 +132,27 @@ it — which is exactly why they are worth shooting.
 
 ## The suite results this branch was measured against
 
-**Mobile goldens, in the container:** 31 passed, 4 failed. The four are all
-**UPGRADE WHEEL** — and they fail *identically with the working tree reset to
-`origin/main` content*, so they are pre-existing and belong to whoever owns
-`src/ui/`. Every golden the station silhouette shows in passes unchanged:
+Re-run 2026-08-09 (a2-06), after the merge, on a private preview port so a
+neighbouring lane's bundle could not be what got tested.
+
+**Mobile goldens, in the container: 35 passed, 70 skipped, 0 failed.**
+**Nothing was re-baselined, and nothing needed to be.** #312 re-baselined five
+goldens when the Cutterhead landed; this branch moves no pixel further, so all
+five pass against #312's own baselines:
 
 ```
-✓ golden: desktop frozen scene
-✓ golden: landscape phone frozen scene
-✓ golden: desktop frozen TEAMS scene — FRIENDLY A / ENEMY B
-✓ golden: landscape phone frozen TEAMS scene — FRIENDLY A / ENEMY B
-✓ golden: PORTRAIT-HELD phone frozen TEAMS scene — the labels survive the lock
+✓ [desktop] golden: desktop frozen scene
+✓ [iphone]  golden: landscape phone frozen scene
+✓ [desktop] golden: desktop frozen TEAMS scene — FRIENDLY A / ENEMY B
+✓ [iphone]  golden: landscape phone frozen TEAMS scene — FRIENDLY A / ENEMY B
+✓ [iphone]  golden: PORTRAIT-HELD phone frozen TEAMS scene — the labels survive the lock
 ```
 
-**Unit suite:** 3836 passed, 1 failed —
-`tests/net/capacity/capacity-regression.test.ts`, also confirmed failing on
-`origin/main` content, also not this branch's.
+The four **UPGRADE WHEEL** goldens a2-04 reported as pre-existing failures now
+pass too — they were fixed on `main` in the meantime. Reported then, not adopted
+then, and gone now.
+
+**Unit suite: 247 files, 4242 passed, 0 failed.** `npx tsc --noEmit` clean. Note
+that `tests/net/capacity/capacity-regression.test.ts` — load-flaky on this shared
+box and red during a2-04's run — passed here. It is still the same wall-clock
+test on the same shared box; a green is not a fix.
