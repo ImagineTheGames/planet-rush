@@ -1033,6 +1033,89 @@ wrong one. Ratified through main, not this brief's to litigate.
   of this brief's own boundary: a0-16 changed how a bot *plays*, and who the
   lobby *seats* did not move.
 
+### Session 2026-08-09 — this note has been lying to its own successors
+
+Inherited the branch **fully pushed** (`git log origin/<branch>..HEAD` empty —
+checked FIRST, before believing anything else; sessions 5 and 7 each lost an hour
+to skipping it), `origin/main` at `aaf2733` already an ancestor, PR **#319** OPEN
+and MERGEABLE at exactly `f1a71d9`. 43 evidence PNGs dirty; **read `git status`
+before restoring it** (session 9's rule — the fortieth line has been a real change
+before), confirmed all 43 were `tests/live-stage/*-evidence.png` and nothing else,
+restored with `git checkout -- tests/live-stage/`. **No feature work was
+outstanding and none was invented.**
+
+#### The finding, and it is about this file rather than the code
+
+**There are TWO copies of this note and they had diverged by three sessions.**
+
+- `/status/notes/…md` — `/status` is a **9p host mount (`X:\`), shared across every
+  lane**. This is the copy the harness reads to brief a new session.
+- `status/notes/…md` **inside the repo** — tracked, committed, what the DoD's
+  `git ls-files` sees.
+
+Sessions 10–13 wrote only the repo copy. The shared copy was frozen at session 9,
+**679 lines against the repo's 1053**, so this session opened with a briefing that
+predated the single most important discovery on the branch: that `npm test` did
+not "run slowly on this box," it **hung** on `src/ui/lobby.test.ts`, and three
+sessions reported green on a run that never finished (`05c00a1`). I was one step
+from re-diagnosing a fixed hang from scratch.
+
+Synced forward (the repo copy is strictly newer and a superset, so this is a
+copy, not a merge). **Both copies are now 1053 lines and byte-identical.**
+
+**The rule, and it is cheap:** this brief says keep `/status/notes/<brief>.md`
+current, and the DoD reads the repo. They are different files on different
+filesystems. **Write both, every session, and `diff -q` them before you finish.**
+A note that only a `git show` can reach cannot brief the session that needs it.
+
+#### The smaller mistake, worth one line
+
+Watching the suite, I wrote `until grep -q … ; do :; done` — an unthrottled
+busy-wait that **pinned a core against the very run it was watching**. Trap #2 in
+this note says don't pipe the output; the matching rule for the *waiting* is `sleep
+5` inside the loop. Also note `pkill -f "until grep -q"` returned 144 because the
+pattern matched the shell running it; the run survived, but check the thing is
+still alive afterwards rather than assuming (I did: 35 → 166 log lines).
+
+#### DoD, all four gates re-run on `f1a71d9`
+
+- `npx tsc --noEmit` — clean.
+- `npm test -- --run` — **4128 passed, 0 failed**, 244 files, 233 s. A **complete**
+  run, verified session 13's way rather than assumed: `src/ui/lobby.test.ts`
+  reported its **100 tests**, `cast-seam.test.ts` 8, `match-boot.test.ts` 16.
+  `capacity-regression` **passed** (63 s) at load ~3 — consistent with every
+  session since 2: it is a wall-clock benchmark over code this branch does not
+  touch. Do not chase it.
+- `npm run test:live-stage` — **full sweep**, `PREVIEW_PORT=4194`: **74 passed, 28
+  failed, 3 skipped** in 12.2 m. **All three `lobby-cast` cases pass** (cast round
+  trip 1.1 m, `?` by click on PC 15.7 s, `?` by tap at 390 px landscape 1.1 m),
+  and `lobby-cast` appears in the failure block **zero** times. Sessions 2 and 4
+  measured `origin/main` in isolated worktrees at **30 failed / 66 passed**; this
+  run is *better* than that baseline on both axes.
+- GDD.md differs from `origin/main`; `merge-base --is-ancestor` OK at `aaf2733`.
+  Markers verified by grep, not assumed — §2.1 line 56 (*"the host picks each
+  bot's CHARACTER"*, beside a0-11's *"an `open` slot is EMPTY"*), §2.1 lines 62/64
+  carry the full amendment, §2.9 line 235 *"characters, not difficulty labels"*.
+
+**One failing file was NOT on the standing not-mine list** — `minimap.spec.ts`
+(4 lines / 2 cases), which sessions 2–13 never saw fail. Checked instead of
+explained away, because "it's contention" is the answer that stops you looking:
+re-ran it alone at load 7 and it was **7 passed**. Contention, at load 19.5 with
+other lanes building. The other twelve files are the familiar set — `connect-trace`,
+`upgrade-wheel`, `unified-play-flow`, `map-picker`, `fullscreen`, `codex-lobby`,
+`ore-conservation`, `tap-markers`, `tap-commander`, `repair-core`, `lobby-flow`,
+`audio-alive`.
+
+**The proof, re-measured not re-asserted:** the sweep regenerated
+`lobby-cast-readback.txt` **byte-identical** — slot 0 `null` (the human), slots
+1–7 `warden warden sable vulture warden sable vulture` in the lobby and the *same
+seven* in the match, `identical: true`. It does not appear in `git status` after
+the run and **that absence IS the result.** That file is the evidence; the PNGs
+are the picture of it. No frames were re-shot this session: `f1a71d9` already shot
+them on this exact tree, `origin/main` has not moved since, and a frame can never
+carry the hash of the commit containing it — re-shooting an unchanged bundle would
+add churn and prove nothing.
+
 ## NEXT
 
 - **ONLINE still carries the tier, not the name** (unchanged, and still the only
@@ -1047,6 +1130,9 @@ wrong one. Ratified through main, not this brief's to litigate.
   `tests/live-stage/playwright.config.ts` (`a1bc039`, Platform's) and the root
   `playwright.config.ts` (`7701b62`, QA's). Either owner can drop their own; both
   default to 4173 unchanged.
+- **Keep BOTH copies of this note in step** — `/status/notes/…` (the shared 9p
+  mount the harness briefs you from) and `status/notes/…` (the repo copy the DoD
+  sees). They drifted three sessions apart once; `diff -q` them before you finish.
 - **No feature work outstanding. Do not invent any.** If you inherit this branch
   green, the useful things to do are: check `git log origin/<branch>..HEAD`
   first, merge main if it has moved, and re-run the gates — **with the run
