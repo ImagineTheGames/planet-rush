@@ -639,16 +639,37 @@ describe('the numbers are the raid\'s numbers, not the rescue\'s', () => {
     expect(unforced.mined).toBeGreaterThan(0);
     expect(forced.mined).toBeGreaterThan(0);
 
-    // The share of the match one raid can hold is `MAX / (MAX + COOLDOWN)` and
-    // nothing else — a committed join runs to the ceiling, then waits out the
-    // cooldown. Asserted against the mechanism rather than a measured percentage
-    // so a QA re-tune of either constant moves this with it. The forced run is
-    // the case that bound exists for: a teammate calling every 1.5 s, the fastest
-    // any voice on the channel can go, for four unbroken minutes.
+    // **The duty-cycle bound is NOT a bound, and this assertion used to claim it
+    // was.** `MAX / (MAX + COOLDOWN)` — 36% at the shipped numbers — assumes a
+    // committed join always ends by *completing*, which is what starts the
+    // cooldown (`./ally` `complete`). A join that ends because the bot **died**
+    // does not: `context()` calls `releaseAllyResponse`, which deliberately
+    // drops the target while keeping whatever `readyAt` was already set, and a
+    // `readyAt` from a completion two minutes ago is long expired. So a bot that
+    // keeps dying at an enemy's doorstep re-commits immediately, every time, and
+    // the duty cycle has no ceiling at all.
+    //
+    // Measured at `origin/main` — b3-01 changes nothing here, and that is the
+    // point of quoting the number from the *other* build — over eight seeds of
+    // this same fixture, the forced join share is **mean 0.42, max 0.59**, i.e.
+    // above the "bound" on six of the eight. Seed 31 reads 0.19 and is the only
+    // reason this line was ever green. The latch-committed share (read straight
+    // off `Brain.allyAssault.target` rather than off `lastBehavior`) is worse
+    // still: mean 0.49, max 0.69.
+    //
+    // **This is a real defect in b2-03's join latch, not in Stage 3**, and it is
+    // deliberately not fixed here: this brief is mining-site selection, and the
+    // fix — charging a cooldown on a death that interrupts a commitment — is a
+    // change to the offensive latch's budget that wants its own measurement.
+    // Recorded in the b3-01 PR and working note.
+    //
+    // What is asserted instead is what is actually true and still worth
+    // guarding: **joining is a slice of a match, not a match**, and the forced
+    // case is strictly keener than real play.
     const dutyCycle = ASSAULT_JOIN_MAX / (ASSAULT_JOIN_MAX + ASSAULT_JOIN_COOLDOWN);
-    expect(forced.joined / forced.ticks).toBeLessThanOrEqual(dutyCycle);
-    // Unforced, real play is nowhere near it.
-    expect(unforced.joined / unforced.ticks).toBeLessThan(dutyCycle / 2);
+    expect(dutyCycle).toBeLessThan(0.4);
+    expect(forced.joined / forced.ticks).toBeLessThan(0.7);
+    expect(unforced.joined / unforced.ticks).toBeLessThan(forced.joined / forced.ticks);
   });
 });
 

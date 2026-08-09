@@ -1,0 +1,30 @@
+spikes/team-bots/measure-team-gaps.ts — s5-01
+seeds 1,2,3,4,5,6,7,8 · shadow sample every 30 ticks · cap 1200s
+
+  FFA 4 (control) done (8 matches)
+  TEAMS 2v2 done (8 matches)
+  FFA 8 (control) done (8 matches)
+  TEAMS 4v4 done (8 matches)
+
+lineup              len s  ended  hunt=ally  leader=ally  target=ally  intrudr=ally  ally same rock  foe same rock  siege blind  orphan s
+-----------------------------------------------------------------------------------------------------------------------------------------
+FFA 4 (control)       845    8/8       0.0%         0.0%         0.0%          0.0%             n/a           5.8%          n/a         0
+TEAMS 2v2             839    8/8       0.0%         0.0%         0.0%          0.0%            5.6%           5.6%         0.0%         7
+FFA 8 (control)       835    8/8       0.0%         0.0%         0.0%          0.0%             n/a           5.0%          n/a         0
+TEAMS 4v4             807    8/8       0.0%         0.0%         0.0%          0.0%            7.2%           4.4%         0.0%       382
+
+Raw counts (for the doc's footnotes):
+  FFA 4 (control)  ctxSamples=52343 hunt=0/52343 leader=0/52343 target=0/35538 intruder=0/1579 allyPairs=0/0 foePairs=132127/2289123 siege=0/0s orphanTeam=0s orphanBot=0s
+  TEAMS 2v2        ctxSamples=51449 hunt=0/51449 leader=0/51449 target=0/30155 intruder=0/2297 allyPairs=41909/742313 foePairs=82366/1480243 siege=0/252s orphanTeam=60s orphanBot=60s
+  FFA 8 (control)  ctxSamples=68638 hunt=0/68638 leader=0/68638 target=0/63930 intruder=0/16015 allyPairs=0/0 foePairs=236881/4715056 siege=0/0s orphanTeam=0s orphanBot=0s
+  TEAMS 4v4        ctxSamples=86012 hunt=0/86012 leader=0/86012 target=0/71719 intruder=0/9395 allyPairs=238789/3312043 foePairs=186283/4231914 siege=0/3030s orphanTeam=3059s orphanBot=4524s
+
+Stage 2 — how far the teammate was while an ally home burned (siege-seconds):
+  TEAMS 2v2        ≤sensor(undefined)=0.0%  ≤visual(720)=23.8%  ≤1200=67.8%  ≤1800=8.2%  ≤2400=0.3%  >2400=0.0%
+  TEAMS 4v4        ≤sensor(undefined)=0.0%  ≤visual(720)=45.7%  ≤1200=32.3%  ≤1800=21.4%  ≤2400=0.6%  >2400=0.0%
+
+Stage 3 — how much board two live ships share (pair-ticks):
+  FFA 4 (control)  mean apart ally=  n/a foe=  876   within one visual range: ally=n/a foe=34.8%
+  TEAMS 2v2        mean apart ally=  726 foe=  784   within one visual range: ally=50.0% foe=40.1%
+  FFA 8 (control)  mean apart ally=  n/a foe=  880   within one visual range: ally=n/a foe=38.5%
+  TEAMS 4v4        mean apart ally=  745 foe=  795   within one visual range: ally=51.7% foe=45.3%

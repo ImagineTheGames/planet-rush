@@ -42,7 +42,7 @@ import {
   releaseAllyResponse,
 } from './ally';
 import type { Callout, CalloutKind } from './radio';
-import { receive, send } from './radio';
+import { NO_KEY, receive, send } from './radio';
 import {
   ARRIVE_RADIUS,
   aimAndFire,
@@ -630,8 +630,14 @@ export function wantsToHaul(ctx: BotCtx): boolean {
 export function mine(ctx: BotCtx, rock: { id: number; pos: Vec2; radius: number } | null): readonly Action[] | null {
   if (!rock || ctx.self.cargoFull) {
     ctx.brain.mineSite = -1;
+    ctx.brain.mineSiteAt = -1;
     return null;
   }
+  // Say which rock, on the way in — but only when it is a *new* rock, which is
+  // read off `mineSite` before the line below overwrites it (Stage 3, and the
+  // reason the call is one per errand rather than one per decision).
+  if (ctx.brain.mineSite !== rock.id) ctx.brain.mineSiteAt = ctx.view.time;
+  callClaim(ctx, rock);
   // Book the site this decision commits to (p11). Read on the tick a retreat
   // breaks off this approach ({@link wantsRetreat}) and by the oscillation soak.
   ctx.brain.mineSite = rock.id;
@@ -712,7 +718,13 @@ export function allyCalls(ctx: BotCtx): readonly Callout[] {
  * draw** when the radio is `null`: that is what keeps an FFA match byte-identical
  * to the one that shipped before the radio existed (plan §2.5, Task 1.6's hash).
  */
-export function callOut(ctx: BotCtx, kind: CalloutKind, about: PlayerId, pos: Vec2): boolean {
+export function callOut(
+  ctx: BotCtx,
+  kind: CalloutKind,
+  about: PlayerId,
+  pos: Vec2,
+  key: number = NO_KEY,
+): boolean {
   const brain = ctx.brain;
   if (!brain.radio) return false;
   const now = ctx.view.time;
@@ -720,7 +732,7 @@ export function callOut(ctx: BotCtx, kind: CalloutKind, about: PlayerId, pos: Ve
   brain.lastCallAt = now;
   send(
     brain.radio,
-    { kind, from: ctx.self.id, about, pos, seenAt: now },
+    { kind, from: ctx.self.id, about, pos, key, seenAt: now },
     ctx.tuning.callLatency,
     ctx.tuning.callMissChance,
     ctx.rng,
@@ -765,6 +777,28 @@ export function callHelp(ctx: BotCtx): boolean {
 export function callPush(ctx: BotCtx, target: TargetScore): boolean {
   if (target.kind !== 'station') return false;
   return callOut(ctx, 'push', target.id, target.pos);
+}
+
+/**
+ * *"I am working that rock."* The sender's own committed intent — `Brain.mineSite`
+ * — which is a fact about itself and therefore legal at any tier
+ * (`docs/team-bots-plan.md` §2.2), over an id and a position it read off a
+ * `PerceivedAsteroid` in its own view.
+ *
+ * **Only on a change of site**, and that is the whole traffic bound. A bot works
+ * one rock for a whole errand, so a claim is one call per errand rather than one
+ * per decision — which matters because `Brain.lastCallAt` is a **single voice
+ * shared across kinds**: a claim spent every decision would sit on the mouth a
+ * teammate needs for `help`. Mining is also the lowest thing on the ladder that
+ * speaks at all, so a bot claiming a rock is by construction a bot with no
+ * emergency to report this decision.
+ *
+ * It carries no `ore` and no `crackStage` — a receiver learns *"my teammate is
+ * going there"*, never *"there is ore there"* (`./radio`'s `claim` row).
+ */
+export function callClaim(ctx: BotCtx, rock: { id: number; pos: Vec2 }): boolean {
+  if (ctx.brain.mineSite === rock.id) return false;
+  return callOut(ctx, 'claim', ctx.self.id, rock.pos, rock.id);
 }
 
 /**
