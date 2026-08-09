@@ -34,9 +34,11 @@ import {
   MAP_NEBULA,
   NEBULAE,
   NEBULA_IDS,
+  SKY_PARALLAX,
   STAR_LAYERS,
   UNASSIGNED_NEBULAE,
   VOID_SEED,
+  coverSpan,
   groundSprite,
   nebulaForMap,
   nebulaSprite,
@@ -214,7 +216,9 @@ describe('the sky cost/brightness table', () => {
       // happens once per (map, viewport, VFX tier) and never per frame.
       const REPS = 40;
       const t0 = performance.now();
-      for (let i = 0; i < REPS; i++) nebulaSprite(id, VOID_SEED, 2177, 1200, 1, 844, 390);
+      for (let i = 0; i < REPS; i++) {
+        nebulaSprite(id, VOID_SEED, coverSpan(SKY_PARALLAX, 844, 3200), coverSpan(SKY_PARALLAX, 390, 2000), 1, 844, 390);
+      }
       const buildMs = (performance.now() - t0) / REPS;
       return [
         spec.name.padEnd(13),
@@ -624,8 +628,12 @@ describe('the perf budget (GDD §4.3 risk 5)', () => {
     // over the viewport-sized window at the centre of a wide arena's field, every
     // sky that is not NONE has to actually be there.
     const SCREEN = { w: 844, h: 390 } as const;
-    const FIELD_W = 2177; // coverSpan(0.05, 844, 3200) — a wide arena on a phone
-    const FIELD_H = 1200;
+    // The real field a wide arena builds on a phone, taken from the renderer's own
+    // sizing rather than typed in — it moved when a0-07b raised the sky's parallax
+    // (2177 → 2371 across), and a hard-coded number would have silently kept
+    // testing the old build's field.
+    const FIELD_W = coverSpan(SKY_PARALLAX, SCREEN.w, 3200);
+    const FIELD_H = coverSpan(SKY_PARALLAX, SCREEN.h, 2000);
     for (const id of NEBULA_IDS) {
       if (id === 'none') continue;
       const shapes = nebulaSprite(id, VOID_SEED, FIELD_W, FIELD_H, 1, SCREEN.w, SCREEN.h).shapes;
@@ -709,5 +717,145 @@ describe('the review tile is the whole stack, in composite order', () => {
     const peakAlpha = Math.max(...shapes.map((s) => s.fill?.alpha ?? 0));
     expect(peakAlpha).toBeGreaterThan(0.7);
     expect(shapes.every((s) => s.fill?.color === GROUND_COLOR)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 8. The sky has to MOVE (a0-07b) — the developer's live-play report, measured
+// ---------------------------------------------------------------------------
+
+/**
+ * *"the parallax effect is kind of broken, those bloom as moving with the ship
+ * on the front layer, they are supposed to be attached to stars…"*
+ *
+ * Nothing was screen-locked; the sky drifted at 0.05, **half** the farthest star
+ * layer's 0.10, and a discrete clot that falls that far behind the field it is
+ * drawn among reads as a foreground overlay riding the ship. These are the
+ * numbers that make "attached to the stars" checkable rather than a matter of
+ * taste, and they are stated as *relations to the star layers* on purpose — the
+ * eye has no absolute ruler for backdrop speed, only the other layers.
+ *
+ * The camera is 1:1 with world units (render/index.ts offsets `worldRoot` by the
+ * camera offset and never scales), so a parallax factor is literally *screen px
+ * per world unit flown*.
+ */
+describe('the sky travels with the stars, not with the ship (a0-07b)', () => {
+  /** The farthest star layer — the reference every claim below is against. */
+  const FAR = STAR_LAYERS[0]!;
+  /** The landscape phone the game is locked to (GDD §4.6), and its short side. */
+  const SCREEN = { w: 844, h: 390 } as const;
+  /** What the sky drifted in the build the developer reported. */
+  const REPORTED = 0.05;
+  /** The skies that sit behind the field (everything but the dust lane). */
+  const DISTANT = NEBULA_IDS.filter((id) => !NEBULAE[id].occludes);
+
+  it('the far star layer really is the farthest star layer', () => {
+    // Everything below is phrased against STAR_LAYERS[0]; if the layer order ever
+    // changes, these assertions must be re-read rather than silently re-pointed.
+    expect(FAR.key).toBe('deep');
+    expect([...STAR_LAYERS].sort((a, b) => a.parallax - b.parallax)[0]!.key).toBe('deep');
+  });
+
+  it('every distant sky sits strictly behind the farthest stars — the depth order holds', () => {
+    for (const id of DISTANT) {
+      expect(NEBULAE[id].parallax, `${NEBULAE[id].name} vs the deep star layer`).toBeLessThan(FAR.parallax);
+    }
+    // …and the one sky that is dust in FRONT of the field is between the two star
+    // layers it lives between: it eats the deep layer and is eaten by the mid one.
+    const mid = STAR_LAYERS.find((l) => l.key === 'mid')!;
+    expect(NEBULAE.coalsack.parallax).toBeGreaterThan(FAR.parallax);
+    expect(NEBULAE.coalsack.parallax).toBeLessThan(mid.parallax);
+  });
+
+  it('travels WITH the far field: it keeps at least 80% of the deep layer’s drift', () => {
+    // This is the fix, in one ratio. At 0.05 the sky kept 50% of the deep layer's
+    // drift — it visibly fell behind the stars, so the eye refused to group it
+    // with them and grouped it with the glass instead. The floor is set at 80%
+    // so nobody can walk the number back a little at a time.
+    for (const id of DISTANT) {
+      const ratio = NEBULAE[id].parallax / FAR.parallax;
+      expect(ratio, `${NEBULAE[id].name} keeps this much of the deep layer’s drift`).toBeGreaterThanOrEqual(0.8);
+      expect(ratio, `${NEBULAE[id].name} must still be slower than the stars`).toBeLessThan(1);
+    }
+    expect(REPORTED / FAR.parallax).toBeCloseTo(0.5, 2); // what was reported, for the record
+  });
+
+  it('lags the stars by ≤ 20 px per screen-width flown, where it used to lag by 42', () => {
+    // The quantity the eye actually judges: how far the sky slips behind the star
+    // field over a flight the player can hold in one glance — one screen-width.
+    const lag = (f: number): number => (FAR.parallax - f) * SCREEN.w;
+    expect(lag(REPORTED)).toBeCloseTo(42.2, 1); // the reported build: half a field behind
+    for (const id of DISTANT) {
+      expect(lag(NEBULAE[id].parallax), `${NEBULAE[id].name} slips this far behind the stars`).toBeLessThanOrEqual(20);
+    }
+    // Its own drift over that same flight, which is the other half of the read:
+    // 72 px of travel where the reported build had 42.
+    expect(SKY_PARALLAX * SCREEN.w).toBeGreaterThan(REPORTED * SCREEN.w * 1.6);
+  });
+
+  it('still separates from the stars over a whole arena crossing — distant, not welded on', () => {
+    // The other side of the same trade. If the sky matched the deep layer exactly
+    // it would be AT the stars' depth, and "further than the farthest stars" would
+    // be a coincidence rather than something the frame shows. Over a full crossing
+    // the far field must slide measurably past it.
+    for (const bound of [2400, 3200]) {
+      const separation = (FAR.parallax - SKY_PARALLAX) * bound;
+      expect(separation, `${bound} u crossing`).toBeGreaterThan(30);
+    }
+  });
+
+  it('the field still covers the screen at the faster parallax, at every camera offset', () => {
+    // A faster layer has further to travel, so it needs more field. coverSpan is
+    // what buys that; this is the assertion that it actually bought enough — the
+    // failure mode being a band of bare Floor sliding in from the edge of a phone
+    // at the far end of a wide arena.
+    for (const [f, view, bound] of [
+      [SKY_PARALLAX, SCREEN.w, 3200],
+      [SKY_PARALLAX, SCREEN.h, 2000],
+      [NEBULAE.coalsack.parallax, SCREEN.w, 3200],
+      ...STAR_LAYERS.map((l) => [l.parallax, SCREEN.w, 3200] as const),
+    ] as readonly (readonly [number, number, number])[]) {
+      const span = coverSpan(f, view, bound);
+      for (let i = 0; i <= 40; i++) {
+        // The camera offset the renderer computes: view/2 − target, target over the arena.
+        const off = view / 2 - (i / 40) * bound;
+        const center = view / 2 + off * f; // VoidBackdrop.update
+        expect(center - span / 2, `f=${f} at target ${(i / 40) * bound}`).toBeLessThanOrEqual(0);
+        expect(center + span / 2, `f=${f} at target ${(i / 40) * bound}`).toBeGreaterThanOrEqual(view);
+      }
+    }
+  });
+
+  it('costs build-time geometry and NOT per-frame fill — the claim the PR makes', () => {
+    // Raising the parallax grows the field, and per-screen authoring turns a bigger
+    // field into more elements. That is a one-off cost at configure(); the number
+    // the GPU pays every frame is per-screen coverage, and it must not move at all.
+    const before = {
+      w: coverSpan(REPORTED, SCREEN.w, 3200),
+      h: coverSpan(REPORTED, SCREEN.h, 2000),
+    };
+    const after = {
+      w: coverSpan(SKY_PARALLAX, SCREEN.w, 3200),
+      h: coverSpan(SKY_PARALLAX, SCREEN.h, 2000),
+    };
+    const areaGrowth = (after.w * after.h) / (before.w * before.h);
+    expect(areaGrowth).toBeGreaterThan(1.1);
+    expect(areaGrowth, 'the field grows by about a fifth, once, at build time').toBeLessThan(1.3);
+
+    for (const id of NEBULA_IDS) {
+      if (id === 'none') continue;
+      const was = nebulaSprite(id, VOID_SEED, before.w, before.h, 1, SCREEN.w, SCREEN.h).shapes.length;
+      const now = nebulaSprite(id, VOID_SEED, after.w, after.h, 1, SCREEN.w, SCREEN.h).shapes.length;
+      // Elements track field area…
+      expect(now / was, `${NEBULAE[id].name}: ${was} → ${now} shapes`).toBeGreaterThan(1.05);
+      expect(now / was, `${NEBULAE[id].name}: ${was} → ${now} shapes`).toBeLessThan(1.35);
+      // …so elements PER SCREENFUL, which is what fill-rate is, do not.
+      const perScreenWas = was / ((before.w * before.h) / (SCREEN.w * SCREEN.h));
+      const perScreenNow = now / ((after.w * after.h) / (SCREEN.w * SCREEN.h));
+      expect(
+        Math.abs(perScreenNow - perScreenWas) / perScreenWas,
+        `${NEBULAE[id].name} per-screen element count`,
+      ).toBeLessThan(0.1);
+    }
   });
 });

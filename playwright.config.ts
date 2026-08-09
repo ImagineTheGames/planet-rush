@@ -23,6 +23,7 @@ import { readdirSync } from 'node:fs';
 import { defineConfig, type PlaywrightTestConfig } from '@playwright/test';
 import { DEVICE_MATRIX } from './tests/mobile/shot-budget';
 import { filesForShard, planShards, spreadSeconds } from './tests/mobile/shard-plan';
+import { browserWorkerCap } from './harness/pool-size';
 
 /**
  * ── THE PORT IS OVERRIDABLE, AND THAT IS A CORRECTNESS FIX (a0-06, proposed) ──
@@ -191,8 +192,22 @@ export default defineConfig({
   // DO NOT raise this to "use the runner properly" — the runner is not idle,
   // it is blocked, and a second worker makes both pages slower than one.
   //
-  // Locally, `undefined` keeps Playwright's default: a dev box has the cores.
-  workers: process.env.CI ? 1 : undefined,
+  // Locally this used to be a bare `undefined` — "a dev box has the cores" —
+  // and on a dev box it still resolves to exactly that. What it missed is that
+  // the studio lanes are not a dev box: Playwright's default is
+  // `os.cpus().length / 2`, and inside a container `os.cpus()` reports the
+  // HOST's cores, not the cgroup quota. Three lanes on a 6-core container each
+  // read the 16-core host and each opened ~8 pages — the same mis-sized-runner
+  // bug a0-00c fixed for vitest, on the runner whose own evidence (above) is
+  // that TWO pages on four cores is the single largest source of red in this
+  // suite's history.
+  //
+  // `browserWorkerCap()` returns `undefined` when there is no cgroup quota, so
+  // a laptop and a GitHub runner are bit-for-bit unaffected; under the studio's
+  // quota it is 6 cores ÷ 3 lanes ÷ 2 cores-per-page = **1**, which is the
+  // number CI arrived at independently by measurement. See harness/pool-size.ts.
+  // `--workers=N` on the command line still overrides it for a one-off.
+  workers: process.env.CI ? 1 : browserWorkerCap(),
 
   // ── Reporters, and the one that made a golden failure inspectable (q8-01) ──
   //
