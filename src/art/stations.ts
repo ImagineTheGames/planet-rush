@@ -55,6 +55,12 @@
  *  - **Hulls never take player colour** (§3). The roster colour touches the lug
  *    keyways, the apron blocks and the barge marker — trim marks, never the steel
  *    — and the beacon ring does the ownership work at any zoom.
+ *  - **The hull carries no turrets** (a2-04) — see {@link STATION_HULL_EXCLUSIONS}.
+ *    The eight anchor lugs are the *seats*; the gun that bolts to one is bought,
+ *    capped and destructible (GDD §2.5, §2.6), so it belongs to the buildings
+ *    layer ({@link turretSprite}, `./buildings`) and never to this file. The lug
+ *    is structure and the keyway is the roster colour; only a gun was ever
+ *    unwelcome.
  *
  * **Four variants**, still "arrangement, not colour": the deck furniture rotates
  * as one set, the claim rim and the cut face are seeded blobs, the hoppers carry
@@ -386,6 +392,66 @@ export function cutterheadLayout(variant: number): CutterheadLayout {
 // The body
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// What the hull deliberately does NOT draw (a2-04)
+// ---------------------------------------------------------------------------
+
+/**
+ * One entry per ratified removal. Adding to this list is a design decision.
+ *
+ * **`turret`** — the developer, 2026-08-07: *"an ammendment to the new mining
+ * station, we dont need the turrets on it, those will be built externally as it
+ * already is...."* The concept board this generator amplifies
+ * (`docs/art-direction/facility-concepts-r2.html`) drew four turrets into every
+ * facility body and called that part "never the problem." It is a problem, and
+ * mechanically rather than aesthetically: a turret is **bought** at the Build &
+ * Upgrade wheel for 3 ore over ~10 s, **capped** at 4 a station, and
+ * **individually destructible** (GDD §2.5, §2.6). Draw four into the hull and
+ * all three break where the player looks:
+ *
+ *  1. a station with 4 built turrets renders 8;
+ *  2. a fresh spawn with 0 built still reads as a fortress;
+ *  3. the re-arm tell ("when a turret is shot down the count drops and the wedge
+ *     lights again," §2.5) dies — the count says none, the picture says one.
+ *
+ * (3) is the general rule pointed at art: **a display whose empty state is
+ * indistinguishable from its full state will lie to you.** The hull draws the
+ * *mounting ground* — the eight anchor lugs and their keyways, which is exactly
+ * what {@link cutterheadHullParts}' `anchor-lugs` part is. The gun that stands on
+ * one is {@link turretSprite} (`./buildings`), placed by the renderer's turret
+ * layer at whatever count the sim says is standing.
+ *
+ * This is a **named** exclusion rather than a silent absence on purpose. Removing
+ * BANK from the build wheel once silently removed the radar-satellite wedge and
+ * no test noticed for three releases. `compliance.test.ts` asserts this list from
+ * both directions: the hull emits nothing on it, **and** everything not on it is
+ * still reachable — the second assertion being the one that matters, because a
+ * test that only proved the hull bare would stay green if turrets were deleted
+ * from the game entirely.
+ */
+export const STATION_HULL_EXCLUSIONS = ['turret'] as const;
+
+/** A feature the station hull is forbidden to emit. */
+export type StationHullExclusion = (typeof STATION_HULL_EXCLUSIONS)[number];
+
+/**
+ * One named group of shapes in the station hull.
+ *
+ * The manifest exists so {@link STATION_HULL_EXCLUSIONS} has something to be
+ * checked *against*. An exclusion asserted over an anonymous shape list can only
+ * ever be checked by reading the source; asserted over named parts it is a test.
+ * {@link cutterheadShapes} is this list flattened and **nothing appended**, so the
+ * manifest cannot fall behind what the hull actually draws — `compliance.test.ts`
+ * asserts the shape counts match, which is what makes it exhaustive rather than a
+ * comment that happens to be typed in code.
+ */
+export interface StationHullPart {
+  /** Lower-case feature name. Checked against {@link STATION_HULL_EXCLUSIONS}. */
+  readonly part: string;
+  /** The shapes this part contributes, in draw order. */
+  readonly shapes: readonly Shape[];
+}
+
 /** How a cutterhead is drawn: which layout, whose colours, and dead or working. */
 export interface CutterheadOptions {
   readonly variant: number;
@@ -396,23 +462,42 @@ export interface CutterheadOptions {
 }
 
 /**
- * The whole facility body, back to front, in unit space. Exported because the
- * derelict (./wrecks) is this same drawing under {@link DEAD} plus its own
- * damage mask — one geometry, two palettes, which is how the board itself does it.
+ * The whole facility body, back to front, in unit space, **part by part**.
+ *
+ * The parts are the same sections the drawing was always authored in — the claim,
+ * the deck plate, the cutter ring, the anchor lugs, the throat and so on. Naming
+ * them changes no geometry and no draw order; it gives
+ * {@link STATION_HULL_EXCLUSIONS} something to be checked against, and gives a
+ * reader a table of contents for a 300-line drawing. `part(...)` opens a new
+ * group and every `shapes.push` after it lands in that group, so a mark cannot
+ * end up unnamed by being added in the wrong place — it lands in whichever part
+ * it is written under.
+ *
+ * Exported because the derelict (./wrecks) is this same drawing under {@link DEAD}
+ * plus its own damage mask — one geometry, two palettes, which is how the board
+ * itself does it.
  */
-export function cutterheadShapes(options: CutterheadOptions): Shape[] {
+export function cutterheadHullParts(options: CutterheadOptions): readonly StationHullPart[] {
   const dead = options.dead === true;
   const P = dead ? DEAD : LIVE;
   const L = cutterheadLayout(options.variant);
   const phase = L.spec.deckPhase;
   const own = dead ? undefined : playerColor(options.playerId ?? 0);
-  const shapes: Shape[] = [];
+
+  const parts: { part: string; shapes: Shape[] }[] = [];
+  let shapes: Shape[] = [];
+  /** Open a named part. Everything pushed until the next call belongs to it. */
+  const part = (name: string): void => {
+    shapes = [];
+    parts.push({ part: name, shapes });
+  };
 
   const mat = (color: number, alpha = 1): Paint => fill(color, 'material', alpha);
   const line = (color: number, w: number, alpha = 1): Paint => stroke(color, u(w), 'material', alpha);
   const ore = (color: number, alpha = 1): Paint => fill(color, 'ore', alpha);
   const oreLine = (color: number, w: number, alpha = 1): Paint => stroke(color, u(w), 'ore', alpha);
 
+  part('claim');
   // --- The claim: the rock this machine is clamped to ------------------------
   // Drawn in the rock family, not the board's lighter hex — see the file header —
   // and inked at `LINE.rock` like every other rock in the game (a3-01, Lever A),
@@ -423,6 +508,7 @@ export function cutterheadShapes(options: CutterheadOptions): Shape[] {
   shapes.push(poly(polarPoly(L.rim.map(([r, d]) => [r * 0.9, d + 3] as const)), mat(P.rockDark, 0.55)));
   for (const f of L.facets) shapes.push(poly(polarPoly(f), mat(P.lit, 0.22)));
 
+  part('deck-plate');
   // --- Deck plate ------------------------------------------------------------
   shapes.push(circle(0, 0, u(52), mat(P.plate)));
   shapes.push(circle(0, 0, u(52), line(P.ink, LINE.sprite)));
@@ -433,6 +519,7 @@ export function cutterheadShapes(options: CutterheadOptions): Shape[] {
   shapes.push(polyline(arcB(50, -164, -16, 22), line(P.lit, 2.6, 0.8)));
   shapes.push(polyline(arcB(50, 16, 164, 22), line(P.ink, 2.8, 0.75)));
 
+  part('cutter-ring');
   // --- Cutter ring and its sixteen tooth pips --------------------------------
   shapes.push(polyline(arcB(55, 0, 360, 56), line(P.steel, 6.5)));
   for (let i = 0; i < 16; i++) {
@@ -440,6 +527,10 @@ export function cutterheadShapes(options: CutterheadOptions): Shape[] {
     shapes.push(circle(u(x), u(y), u(1.5), mat(P.ink, 0.9)));
   }
 
+  // The lug is the SEAT a turret bolts to, and the seat is structure — it stays
+  // whether or not anything is standing on it. `anchor-lugs`, never `turrets`:
+  // see STATION_HULL_EXCLUSIONS. The name is load-bearing, not decorative.
+  part('anchor-lugs');
   // --- Eight anchor lugs: what clamps the head to the claim -------------------
   // Two are snapped off a derelict — a rig that has come loose from its claim.
   const lugGone = dead ? [2, 5] : [];
@@ -462,6 +553,7 @@ export function cutterheadShapes(options: CutterheadOptions): Shape[] {
     }
   }
 
+  part('throat');
   // --- The throat: a hole, with a working face at the bottom of it ------------
   shapes.push(circle(0, 0, u(30), mat(P.ink)));
   shapes.push(circle(0, 0, u(26.5), mat(P.well)));
@@ -472,12 +564,14 @@ export function cutterheadShapes(options: CutterheadOptions): Shape[] {
   shapes.push(polyline(arcB(28.2, -166, -14, 20), line(PALETTE.vacuum, 2.8, 0.85)));
 
   if (dead) {
+    part('core-out');
     // The core is out and the throat is dark. Dark steel where signal yellow
     // used to be is the single strongest thing this palette can say.
     shapes.push(circle(0, 0, u(21), mat(P.well)));
     shapes.push(circle(0, 0, u(9), mat(PALETTE.vacuum)));
     shapes.push(circle(0, 0, u(9), line(P.deep, 1.6)));
   } else {
+    part('cut-face');
     // The cut face, its seams, and the core at the bottom of the bore.
     shapes.push(poly(polarPoly(L.face), mat(P.rock)));
     shapes.push(poly(polarPoly(L.face.map(([r, d]) => [r * 0.78, d - 4] as const)), mat(P.lit, 0.2)));
@@ -489,6 +583,7 @@ export function cutterheadShapes(options: CutterheadOptions): Shape[] {
       shapes.push(polyline(seg, oreLine(P.oreDim, 0.9, 0.9)));
     }
     shapes.push(circle(0, 0, u(25.4), line(P.ink, 2)));
+    part('core');
     // The core: the win condition, and the reason yellow is allowed here (§2).
     // Radii unchanged from the shipped sprite — 0.34 / 0.22 / 0.11 R.
     shapes.push(
@@ -496,6 +591,7 @@ export function cutterheadShapes(options: CutterheadOptions): Shape[] {
       circle(0, 0, 0.22, fill(PALETTE.signalYellow, 'core')),
       circle(0, 0, 0.11, fill(DERIVED.coreHot, 'core')),
     );
+    part('kerf');
     // The kerf: the bright arc where it is cutting RIGHT NOW, and the ore it is
     // throwing. This is the mark that makes the object a machine at work.
     shapes.push(polyline(arcB(24, L.spec.kerfFrom, L.spec.kerfFrom + 108, 16), oreLine(P.oreDim, 4, 0.95)));
@@ -505,6 +601,7 @@ export function cutterheadShapes(options: CutterheadOptions): Shape[] {
     }
   }
 
+  part('bore-housing');
   // --- The bore housing and the sixteen inward teeth --------------------------
   shapes.push(polyline(arcB(34, 0, 360, 40), line(P.deep, 9)));
   shapes.push(polyline(arcB(38, -160, -20, 20), line(P.lit, 2, 0.55)));
@@ -523,6 +620,7 @@ export function cutterheadShapes(options: CutterheadOptions): Shape[] {
   }
   shapes.push(polyline(arcB(38.6, 0, 360, 44), line(P.ink, 1.8, 0.8)));
 
+  part('ore-circuit');
   // --- The ore circuit: the deck truss that carries what the head wins ---------
   // Four arcs with gaps where the furniture sits, exactly as the board runs them.
   const TRUSS: readonly (readonly [number, number])[] = [[8, 40], [48, 132], [138, 222], [228, 312]];
@@ -535,12 +633,14 @@ export function cutterheadShapes(options: CutterheadOptions): Shape[] {
     }
   }
 
+  part('deck-ore');
   // --- Ore, visibly, on the circuit -------------------------------------------
   for (const m of L.deckOre) {
     const [x, y] = pol(m.r, m.deg + phase);
     shapes.push(circle(u(x), u(y), u(m.size), ore(P.ore, dead ? 0.8 : 0.95)));
   }
 
+  part('chute');
   // --- The throat chute: the path from the hole to the circuit -----------------
   shapes.push(
     polyline([...pol(34.7, 8.2 + phase).map(u), ...pol(47.6, 24.8 + phase).map(u)], line(P.steel, 1.8)),
@@ -588,6 +688,7 @@ export function cutterheadShapes(options: CutterheadOptions): Shape[] {
     }
   };
 
+  part('hoppers');
   stubAt(45 + phase);
   hopper(45, L.spec.hoppers[0], 25, 13);
   stubAt(140 + phase);
@@ -596,6 +697,7 @@ export function cutterheadShapes(options: CutterheadOptions): Shape[] {
 
   // The smelter: molten ore in the slot. Out on a derelict.
   {
+    part('smelter');
     const deg = 225 + phase;
     const [cx, cy] = pol(46, deg);
     const rot = deg - 90;
@@ -615,6 +717,7 @@ export function cutterheadShapes(options: CutterheadOptions): Shape[] {
   // edge is one of the five things signal yellow is allowed to be (§2), so it
   // carries role `danger` and the audit proves it.
   {
+    part('apron-and-barge');
     const deg = -42 + phase;
     const [cx, cy] = pol(47, deg);
     const rot = deg - 90;
@@ -652,6 +755,7 @@ export function cutterheadShapes(options: CutterheadOptions): Shape[] {
 
   // The radiator comb: heat rejected, hung outboard where nothing else is.
   {
+    part('radiator');
     const base = -110 + phase;
     shapes.push(polyline(spoke(43, 52, base), line(P.plate, 4)));
     for (let i = 0; i < 7; i++) {
@@ -663,6 +767,7 @@ export function cutterheadShapes(options: CutterheadOptions): Shape[] {
 
   // The spoil boom: the arm that leaves the circle, and the waste it throws.
   {
+    part('spoil-boom');
     const base = 100 + phase;
     const plate = polarPoly([[52, base - 12], [52, base + 12], [64, base + 10], [64, base - 8]]);
     shapes.push(poly(plate, mat(P.plate)), poly(plate, line(P.ink, 1.6)));
@@ -693,6 +798,7 @@ export function cutterheadShapes(options: CutterheadOptions): Shape[] {
     }
   }
 
+  part('corrosion');
   // --- Corrosion -------------------------------------------------------------
   for (const m of L.patina) {
     const [x, y] = pol(m.r, m.deg + phase);
@@ -700,6 +806,7 @@ export function cutterheadShapes(options: CutterheadOptions): Shape[] {
   }
 
   if (dead) {
+    part('ore-spill');
     // The split hopper's spill: the only bright yellow left on a wreck, and the
     // reason anyone comes here at all (GDD §2.7).
     const spill = 140 + phase;
@@ -710,7 +817,19 @@ export function cutterheadShapes(options: CutterheadOptions): Shape[] {
     }
   }
 
-  return shapes;
+  return parts;
+}
+
+/**
+ * The whole facility body as one flat shape list — {@link cutterheadHullParts},
+ * flattened, and **nothing appended afterwards**. Every shape the hull draws
+ * therefore belongs to a named part, which is the property
+ * {@link STATION_HULL_EXCLUSIONS}' test leans on: `compliance.test.ts` asserts
+ * this list's length equals the manifest's, so an unnamed — and therefore
+ * unexcludable — mark cannot exist.
+ */
+export function cutterheadShapes(options: CutterheadOptions): Shape[] {
+  return cutterheadHullParts(options).flatMap((p) => [...p.shapes]);
 }
 
 // ---------------------------------------------------------------------------
@@ -728,6 +847,17 @@ export function stationSprite(variant: number, playerId = 0): SpriteDef {
   const v = stationVariantFor(variant);
   const p = ((Math.trunc(playerId) % 8) + 8) % 8;
   return sprite(`station/v${v}/p${p}`, STATION_ART_EXTENT, cutterheadShapes({ variant: v, playerId: p }));
+}
+
+/**
+ * The parts behind {@link stationSprite}, under the same variant/owner
+ * normalisation — so the manifest the exclusion test reads is the manifest the
+ * shipped sprite is built from, not a second drawing that could drift from it.
+ */
+export function stationHullParts(variant: number, playerId = 0): readonly StationHullPart[] {
+  const v = stationVariantFor(variant);
+  const p = ((Math.trunc(playerId) % 8) + 8) % 8;
+  return cutterheadHullParts({ variant: v, playerId: p });
 }
 
 /**

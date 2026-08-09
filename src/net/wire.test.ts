@@ -14,6 +14,7 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ShipClass, UpgradeTrack } from '@shared/types';
+import { ROSTER } from '../bots';
 import { playtestLog, resetPlaytestLog } from './playtest-log';
 import { decodeSnapshot, encodeSnapshot } from './snapshot';
 import type { ProjSnap, ShipSnap } from './snapshot';
@@ -159,6 +160,80 @@ describe('client → server', () => {
       room: 'QK7P',
       reclaim: 7,
     });
+  });
+
+  // --- The cast (a0-06b) ---------------------------------------------------
+
+  it('round-trips the host CAST, repeats and all', () => {
+    // Eight seats, seven characters, three of them Hard: a 4v4 of all-Hard bots
+    // needs a repeat, so the wire must carry `['warden','warden']` as two entries
+    // rather than a set (GDD §2.9; a0-06).
+    const message: ClientMessage = {
+      type: 'lobbyChoice',
+      shipClass: ShipClass.Interceptor,
+      fireMode: 'manual',
+      botDifficulties: ['hard', 'hard', 'easy'],
+      botPersonalities: ['warden', 'warden', 'rusty'],
+    };
+    expect(parseClientMessage(encodeClientMessage(message))).toEqual(message);
+  });
+
+  it('admits exactly the roster, and nothing off the prototype chain', () => {
+    // a0-06 shipped this guard once as `chosen in PERSONALITIES` — an object
+    // literal, so `in` walked the prototype and `constructor` passed a check meant
+    // to admit seven strings. Seating one yields a bot whose personality row is a
+    // *function*. On the client that was unreachable; on the wire the sender is
+    // whoever holds the socket, so it is the front door.
+    for (const id of ROSTER) {
+      expect(
+        parseClientMessage(
+          JSON.stringify({ type: 'lobbyChoice', shipClass: 'hauler', fireMode: 'manual', botPersonalities: [id] }),
+        ),
+      ).toMatchObject({ botPersonalities: [id] });
+    }
+    for (const bogus of ['constructor', 'toString', '__proto__', 'valueOf', 'hasOwnProperty', 'Warden', '']) {
+      expect(
+        parseClientMessage(
+          JSON.stringify({
+            type: 'lobbyChoice',
+            shipClass: 'hauler',
+            fireMode: 'manual',
+            botPersonalities: [bogus],
+          }),
+        ),
+      ).toEqual({ type: 'lobbyChoice', shipClass: ShipClass.Hauler, fireMode: 'manual' });
+    }
+  });
+
+  it('drops a malformed cast whole, and it costs the sender nothing but the cast', () => {
+    // Rejected whole rather than per-entry, for the reason the seat roster is:
+    // dropping one unreadable entry shifts every seat after it by one, and hands
+    // seat 5's character to seat 2. And dropped rather than REFUSED, so a bad cast
+    // never costs its sender the hull pick riding the same message.
+    const bad = [
+      ['warden', 42],
+      ['warden', null],
+      Array.from({ length: 9 }, () => 'warden'), // more entries than there are seats
+      'warden',
+      { 0: 'warden' },
+    ];
+    for (const botPersonalities of bad) {
+      const parsed = parseClientMessage(
+        JSON.stringify({
+          type: 'lobbyChoice',
+          shipClass: 'excavator',
+          fireMode: 'auto',
+          botDifficulties: ['hard'],
+          botPersonalities,
+        }),
+      );
+      expect(parsed).toEqual({
+        type: 'lobbyChoice',
+        shipClass: ShipClass.Excavator,
+        fireMode: 'auto',
+        botDifficulties: ['hard'],
+      });
+    }
   });
 });
 

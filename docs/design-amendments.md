@@ -175,16 +175,30 @@ hull assignments (§2.11), fog honesty, Teams side assignment, and determinism f
 the seed. `DIFFICULTY_LABELS` is unchanged and still spells the three tiers; it is
 now the vocabulary of a read-out rather than of a control.
 
-### Known remaining gap — ONLINE carries the tier, not the name
+### ~~Known remaining gap — ONLINE carries the tier, not the name~~ — CLOSED by a0-06b
 
-The ratified wire (`src/net/transport.ts` `LobbyChoiceMessage`) has a
-`botDifficulties` row and no character row, and `server/room.ts` casts from the
-tier with its own `castFor`. So an **online** room seats the right *tiers* and may
-seat different *names* within them; the **offline** game — the flavour both
-reports were filed against — carries the full cast and is exact. Closing that gap
-is a Netcode seam (a `botPersonalities` row beside `botDifficulties`, mirrored in
-`wire.ts` and `room.ts`) and is deliberately not taken here: `src/net/` and
-`server/` are not the Bot Engineer's to change unilaterally.
+*Recorded as open by a0-06; closed 2026-08-09 on
+`agent/netcode/a0-06b-wire-botPersonalities`. Left in place rather than deleted,
+because the gap is the reason the seam exists and the note is how it was found.*
+
+The ratified wire (`src/net/transport.ts` `LobbyChoiceMessage`) had a
+`botDifficulties` row and no character row, and `server/room.ts` cast from the
+tier with its own `castFor`. So an **online** room seated the right *tiers* and
+could seat different *names* within them — three characters share the Hard tier —
+while the **offline** game, the flavour both reports were filed against, carried
+the full cast and was exact.
+
+**a0-06b carries the character.** `LobbyChoiceMessage.botPersonalities` rides
+beside `botDifficulties`, one entry per bot seat in the same order; `castFor`
+reads the character first and *derives* the tier from it, so the two rows cannot
+disagree about a seat — one of them is not consulted. `botDifficulties` stays,
+because the tier is still shown and a client that sends only tiers still gets the
+tier-derived cast it always got. `matchStart.slots[].personality` carries the
+result back, so a client can name the cast authority built rather than its own
+guess at it. Duplicates travel: two Wardens in, two Wardens out.
+
+Rationale, alternatives rejected, and the hostile-input rules are in
+`docs/netcode-cast-wire.md`.
 
 ---
 
