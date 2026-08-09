@@ -39,9 +39,9 @@ import {
   COLLAPSE_GRACE_FLOOR_S,
   COLLAPSE_GRACE_S,
   WAVE_COUNT,
-  WAVE_INTERVAL_S,
   WRECK,
   clampToMargin,
+  waveIntervalOf,
   waveTime,
 } from './constants';
 import { killShip } from './damage';
@@ -83,7 +83,7 @@ export function isWreck(station: MiningStation): boolean {
  * deadline is unchanged.
  */
 export function collapseDeadline(world?: World): number {
-  const interval = world?.economy?.waveInterval ?? WAVE_INTERVAL_S;
+  const interval = waveIntervalOf(world);
   // The pre-p11 anchor — the baseline deadline (750 s at shipped constants); a
   // longer SCARCE interval must not push the ending past it.
   const anchored = waveTime(WAVE_COUNT) + COLLAPSE_GRACE_S;

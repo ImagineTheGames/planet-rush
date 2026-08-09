@@ -277,6 +277,14 @@ export interface HudFrame {
    *  no repair, no new ore. Greys out REPAIR CORE on the wheel and puts
    *  COLLAPSE on the wave clock. Default false. */
   readonly collapsed?: boolean;
+  /** Seconds between asteroid waves in THIS match — the sim's
+   *  `waveIntervalOf(world)`, an abundance multiple of the baseline and the exact
+   *  number the spawner schedules against. The wave clock counts down on it, so a
+   *  SCARCE match's longer wait is what the player sees (a0-16: before this the
+   *  countdown ran on the baseline and reached zero 15 s before the rocks landed
+   *  in every default match). Default: the baseline cadence, for a feed that has
+   *  no world to ask. */
+  readonly waveInterval?: number;
   /** Seconds left on the own station's repair COOLDOWN — the sim's
    *  `station.repairGate`, read each frame. While `> 0` the sim refuses every
    *  repair order `'cooling-down'`, so REPAIR REACTOR draws disabled-gray with a
@@ -800,7 +808,10 @@ export class Hud extends Container {
   // --- Wave clock ----------------------------------------------------------
 
   private updateWaveClock(frame: HudFrame): void {
-    const clock = computeWaveClock(frame.time, frame.collapsed ?? false);
+    // The match's own wave interval, not the baseline (a0-16). Passed straight
+    // through: an absent field falls to `computeWaveClock`'s own fallback, so the
+    // baseline is named in one place rather than re-derived here.
+    const clock = computeWaveClock(frame.time, frame.collapsed ?? false, frame.waveInterval);
     this.waveName.text = `WAVE ${clock.wave}/${clock.waveCount} · ${clock.name}`;
     // COLLAPSE outranks FINAL WAVE: the field is spent, repair is off and
     // shields no longer regenerate (GDD §2.3). It is threat red because it is

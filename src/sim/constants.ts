@@ -678,17 +678,38 @@ export function homeFieldOre(playerCount: number): number {
  * it — the same schedule the HUD's wave clock counts down to, so the clock and
  * the spawner can never drift.
  *
- * `interval` defaults to the baseline `WAVE_INTERVAL_S`, which is what the
- * cross-lane callers that predate abundance (`src/ui/wave-clock.ts`,
- * `src/bots/perception.ts`) pass — so their schedule is unchanged. The sim's own
- * spawner and collapse deadline pass the *per-world* interval
- * (`world.economy.waveInterval`, an abundance multiple of the baseline), so a
- * SCARCE match's waves are genuinely further apart. Where the two differ the HUD
- * clock reads the baseline cadence until it is taught to read `world.economy`
- * (the n1 wiring follow-up, alongside the lobby control) — see `ABUNDANCE`.
+ * `interval` defaults to the baseline `WAVE_INTERVAL_S`, but **no caller that a
+ * player or a bot depends on may take that default** (a0-16): the spawner, the
+ * collapse deadline, the HUD wave clock and bot perception all pass the
+ * *per-world* interval from {@link waveIntervalOf}, so every one of them reads
+ * the same number and a SCARCE match's longer wait is felt on the clock exactly
+ * as it is in the field. The default survives only for a bare arithmetic caller
+ * that has no world to hand (the baseline collapse anchor below).
  */
 export function waveTime(n: number, interval: number = WAVE_INTERVAL_S): number {
   return (n - 1) * interval;
+}
+
+/**
+ * The wave interval this world actually runs on, seconds — the ONE read of
+ * `world.economy.waveInterval`, so the spawner, the collapse deadline, the HUD
+ * countdown (`src/ui/wave-clock.ts`) and bot perception (`src/bots/perception.ts`)
+ * can never disagree about when the next wave lands. Before a0-16 the last two
+ * took `waveTime`'s baseline default and a default (SCARCE) match counted down
+ * 150 s to a wave that arrived at 165 s.
+ *
+ * The read is defensive because `world.economy` is genuinely optional on the
+ * `World` type: net snapshots, bot fixtures and `@platform/freeze` hand-build
+ * worlds without one, exactly as they do without `world.ledger`. Those resolve to
+ * the baseline — the pre-p11 schedule, unchanged — rather than throwing.
+ *
+ * Typed structurally (not `World`) so a caller outside the sim can pass a frame's
+ * worth of world without importing the whole state tree.
+ */
+export function waveIntervalOf(
+  world?: { readonly economy?: { readonly waveInterval: number } } | null,
+): number {
+  return world?.economy?.waveInterval ?? WAVE_INTERVAL_S;
 }
 
 /**
@@ -806,13 +827,15 @@ export interface AbundanceMultipliers {
  * (all multipliers 1). RICH is the generous end for a lobby that wants a faster,
  * looser match. All `TUNABLE` (GDD §2.8).
  *
- * SCARCE's `respawnInterval` is kept modest (1.1) on purpose: a longer wait is
- * genuinely felt, but the wave-schedule *timing* is read by the HUD wave clock
- * (`src/ui`) and bot perception (`src/bots`) through the baseline `waveTime`
- * until the n1 wiring teaches them `world.economy` — so a large stretch would
- * drift the clock. Most of SCARCE's "real wait, not a refill" is carried by the
- * lean waves (`totalOre`): you mine a thin wave out fast, then wait the interval
- * with an empty field.
+ * SCARCE's `respawnInterval` was kept modest (1.1) because a larger stretch used
+ * to drift the HUD wave clock and bot perception, which read the schedule through
+ * `waveTime`'s baseline default. That is fixed (a0-16): both now read
+ * {@link waveIntervalOf}, so the countdown on screen and the bot's expectation
+ * follow whatever this table says. The multipliers here are unchanged by that
+ * wiring — widening the SCARCE↔RICH spread is a0-17's balance change, and it is
+ * now free to make it. Alongside the interval, SCARCE's "real wait, not a refill"
+ * is carried by the lean waves (`totalOre`): you mine a thin wave out fast, then
+ * wait the interval with an empty field.
  */
 export const ABUNDANCE: Readonly<Record<Abundance, AbundanceMultipliers>> = {
   scarce: { totalOre: 0.55, density: 0.75, respawnInterval: 1.1 },
