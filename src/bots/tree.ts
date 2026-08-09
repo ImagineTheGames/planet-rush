@@ -192,6 +192,18 @@ export interface Brain {
    */
   readonly allyResponse: AllyResponse;
   /**
+   * The **join-the-assault** commitment (`./ally`): which enemy home this bot
+   * broke off to help hit, when that raid was last heard of, and when it may
+   * join another. The offensive twin of {@link allyResponse} — the same latch
+   * type folded by the same function, with its own measured durations, because
+   * a raid and a rescue end for completely different reasons.
+   *
+   * Two latches rather than one because a bot can be *between* commitments on one
+   * axis while committed on the other, and folding them together would make the
+   * cooldown for answering an alarm also the cooldown for joining a push.
+   */
+  readonly allyAssault: AllyResponse;
+  /**
    * Sim time this bot last spoke on the channel — the `callCooldown` clock
    * (`./behaviors` `callOut`). `-1` until it has said anything.
    *
@@ -224,6 +236,7 @@ export function createBrain(personality: Personality, rng: Rng, radio: TeamRadio
     endowment: -1,
     radio,
     allyResponse: newAllyResponse(),
+    allyAssault: newAllyResponse(),
     lastCallAt: -1,
   };
 }
@@ -288,6 +301,12 @@ export function context(view: BotView, brain: Brain): BotCtx {
     // is ringing (`./ally`, plan Task 2.7's trap). The *cooldown* survives, on
     // purpose — see `releaseAllyResponse`.
     releaseAllyResponse(brain.allyResponse);
+    // The same argument, and it bites harder on the offensive latch: a bot that
+    // died at an enemy's doorstep is exactly the bot most likely to still be
+    // committed to that doorstep, and respawning at the far end of the map with
+    // the raid long over is how a "join" becomes a lone suicide run. Cooldown
+    // survives here too — dying on a raid does not earn a free second one.
+    releaseAllyResponse(brain.allyAssault);
   }
   // Book the endowment once, on the first decision. A bot seated at the opening
   // (`tick 0`) earns its `STARTING_ORE` grant and owes nothing; a bot that takes

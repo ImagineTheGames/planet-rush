@@ -44,6 +44,7 @@ import {
   homeErrand,
   hunt,
   fightBlockade,
+  joinAssault,
   lastStandDefend,
   mine,
   nearestThreat,
@@ -61,6 +62,7 @@ import {
   wantsHomeErrand,
   wantsRetreat,
   wantsAllyDefence,
+  wantsJoinAssault,
   wantsToHaul,
 } from './behaviors';
 import { NEUTRAL } from './steering';
@@ -266,6 +268,24 @@ export const hardTree: Node = selector('hard', [
     (ctx) => ctx.weights.scavenge >= SCAVENGE_COMMIT,
     (ctx) => scavenge(ctx),
   ),
+
+  // **Join a teammate's attack** (`docs/team-bots-plan.md` Stage 4; the
+  // developer, 2026-08-07: *"…and equally should try to attack when team mates
+  // go on offensive"*). The offensive half of the ask `defend-ally` answers
+  // defensively, and its position in this list is the design just as much:
+  //
+  //  - Below `defend` and `defend-ally`, so **my home outranks your raid** and
+  //    the selfish-first ladder is exactly what it was.
+  //  - Below `spend` and `haul`, because flying into a siege with a hold worth
+  //    banking hands half of it to whoever kills you (GDD §2.7). `defend-ally`
+  //    needs an explicit cargo gate for this; sitting under `haul` is the same
+  //    guarantee made structurally.
+  //  - **Above `attack`**, because that is the whole point: a bot that would have
+  //    picked its own fight goes to the one its teammate already opened, which is
+  //    "two beats one" (GDD §2.6) chosen deliberately instead of by coincidence.
+  //
+  // In FFA it cannot fire: no allies, no radio, no `push` to hear (plan §2.5).
+  when('join-assault', (ctx) => wantsJoinAssault(ctx), (ctx) => joinAssault(ctx)),
 
   // The paragraph, executed: score every visible ship and home by threat,
   // proximity and opportunity, take the best one if it clears the floor, and

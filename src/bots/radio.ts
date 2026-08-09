@@ -55,10 +55,10 @@ import type { PlayerId, Rng, Vec2 } from '@shared/types';
 // ---------------------------------------------------------------------------
 
 /**
- * What a bot may say. **Stage 2 ships the minimum form: two kinds, both about
- * trouble.** The plan's full vocabulary also has `sighting` and `claim`
- * (§2.2); they belong to Stages 3–4 and are deliberately not here, because a
- * channel with nothing to carry is a channel nobody can test.
+ * What a bot may say. **Three kinds: two about trouble, one about intent.** The
+ * plan's full vocabulary also has `sighting` and `claim` (§2.2); they belong to
+ * Stages 3–4 and are deliberately still not here, because a channel with nothing
+ * to carry is a channel nobody can test.
  *
  *  - `help`  — *"I am in trouble, here."* A fact about the sender's own ship, so
  *    it is legal at any range and under any fog: you always know where you are.
@@ -68,12 +68,25 @@ import type { PlayerId, Rng, Vec2 } from '@shared/types';
  *    sender's own {@link import('./perception').OwnStationView.underAttack}, or
  *    from an ally home it actually scouted (`PerceivedStation.underAttack`, which
  *    is `null` off-screen and therefore unsendable).
+ *  - `push`  — *"I am going in on that home, there."* The developer, 2026-08-07:
+ *    *"…and equally should try to attack when team mates go on offensive"*. The
+ *    offensive half of the same ask `help`/`siege` answer defensively, and the
+ *    **only** source for it: there is no Layer A here, because no klaxon rings
+ *    when your teammate opens a raid. Legal because it is the sender's own
+ *    committed intent — a fact about yourself, the same licence `help` has — over
+ *    a position it read off a `PerceivedStation`, which is public at any range.
+ *
+ * `push` is deliberately **not** the plan's `claim`. `claim` is specified as
+ * "intent tag + a target key" and is spent by Stage 3 on mining sites
+ * (`Brain.tabu`) and Stage 4 on focus fire; spending it here would force its tag
+ * field in a stage early, or make Stage 3 rename it. A raid needs nothing
+ * `Callout` does not already carry.
  *
  * Never sendable, at any tier: an unscouted core's HP, anyone's held or banked
  * ore, upgrade tiers, an asteroid's true `ore` — anything read off `World`. The
  * enforcement is that {@link Callout} has nowhere to put them.
  */
-export type CalloutKind = 'help' | 'siege';
+export type CalloutKind = 'help' | 'siege' | 'push';
 
 /**
  * One thing a teammate said. Small, flat, and carrying **only** a position, a
@@ -92,9 +105,12 @@ export interface Callout {
   /** The slot that spoke. */
   readonly from: PlayerId;
   /** The slot the call is *about* — the caller for `help`, the besieged home's
-   *  owner for `siege`. Equal to {@link from} in every Stage 2 send. */
+   *  owner for `siege`, and for `push` the **target**: whoever owns the home the
+   *  sender is going in on. It is the one field where `push` differs in kind from
+   *  the other two, which are always about the sender's own side. */
   readonly about: PlayerId;
-  /** Where the trouble is: the caller's own position, or the besieged home's. */
+  /** Where the trouble is: the caller's own position, the besieged home's, or —
+   *  for `push` — the enemy home being raided. */
   readonly pos: Vec2;
   /** The sender's `view.time` when it perceived this. Never the receipt time. */
   readonly seenAt: number;

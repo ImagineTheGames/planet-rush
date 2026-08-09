@@ -40,6 +40,15 @@
  * this file supplies the memory of having decided. The state lives on the
  * {@link import('./tree').Brain}, beside the sim rather than inside it, so it can
  * never desync a determinism replay (GDD §4.8).
+ *
+ * **That domain-freedom is now load-bearing rather than tidy.** b2-03 ships the
+ * offensive half of the same developer ask — *"equally should try to attack when
+ * team mates go on offensive"* — and it is a **second instance of this latch**
+ * with its own four durations (`ASSAULT_JOIN_*` below), not a second mechanism.
+ * Two `AllyResponse`s live on the `Brain`, folded by the same `allyResponseCommit`
+ * from two different branches. Anything added here must stay true of both, which
+ * in practice means: no view, no ranges, and no assumption about what `arrived`
+ * means — the two callers pass it very different questions.
  */
 
 import type { PlayerId, Vec2 } from '@shared/types';
@@ -103,6 +112,168 @@ export const ALLY_RESPONSE_MAX = 45;
 export const ALLY_RESPONSE_COOLDOWN = 30;
 
 // ---------------------------------------------------------------------------
+// Joining an ally's ATTACK (MEASURED — `evidence/b2-03-assault-window.ts`)
+// ---------------------------------------------------------------------------
+//
+// The developer, 2026-08-07: *"…and equally should try to attack when team mates
+// go on offensive."* The offensive half of the same ask, and a **second instance
+// of the latch above** rather than a second mechanism — which is the whole reason
+// this file carries no domain knowledge.
+//
+// **What does not transfer, and why these are four fresh numbers.** The defensive
+// response ends on *"arrived, and there is nothing to fight"*. An assault that
+// arrives to plenty to fight has **succeeded**, so that clause is gone: the join
+// latch's only completion is *the objective died*, and everything else leans on
+// the ceiling and the cooldown. Inheriting 45/30 would be inheriting numbers
+// measured against a different question — and the measurement says they are the
+// wrong numbers by a wide margin. `evidence/b2-03-assault-window.ts`, 12 seeds ×
+// {2v2, 4v4} at the shipped `scarce` abundance on `octagon`, cutting every
+// station's own `underAttack` tell into raids:
+//
+//   | raid                    |  n  | p50  | p75  | p90  | max  |
+//   |-------------------------|-----|------|------|------|------|
+//   | all                     | 610 | 2.6s | 4.5s | 7.7s |25.8s |
+//   | ended in a dead core    |  29 |10.0s |13.7s |19.7s |25.8s |
+//   | petered out             | 581 | 2.6s | 4.2s | 6.6s |18.6s |
+//
+// **A raid is a short event.** 45 seconds is nearly double the longest raid ever
+// observed; a ceiling there would never once bind, which makes it not a ceiling.
+
+/**
+ * How far a bot will fly to join a teammate's raid, before the character's
+ * `opportunism` leans it (`./behaviors` `assaultJoinRange`).
+ *
+ * **Measured on the raid distribution, not borrowed from the siege one.** Plan
+ * §1.5 weighted every *ally-siege* second by how far the teammate was, and 1200
+ * fell out of it; that is a different distribution from "how far is the enemy
+ * home my teammate is hitting". Re-run against enemy homes — every raid-second
+ * weighted by the nearest teammate not already in the fight — the coverage curve
+ * is 900u → 62%, 1000u → 71%, 1200u → 88%, 1500u → 98%, at roughly 7.6 / 8.4 /
+ * 10.1 / 12.7 seconds of flight at the cast's measured 119 units/s cruise.
+ *
+ * **And then the coverage curve lost the argument to the cost curve**, which is
+ * the whole reason this constant is not 1200. Coverage is not the objective;
+ * {@link ALLY_RESPONSE_RANGE} says it out loud for the defensive case — *"response
+ * range is a **cost** as well as a reach"* — and for a raid the payoff on the
+ * other side of that cost is lower, because someone else's core is not the win
+ * condition and your own side's is. Run end to end over 8 seeds × 3 casts against
+ * the same matches with the branch absent, in mined ore per match:
+ *
+ *   | reach | Sable-led | mixed | Rusty-led | joining |
+ *   |-------|-----------|-------|-----------|---------|
+ *   | base  |     13.5  | 24.9  |     32.5  |    —    |
+ *   | 1200  |  8.9 (66%)|19.6 (79%)|28.5 (88%)| 12–17% |
+ *   | 1000  | 11.0 (81%)|21.7 (87%)|29.9 (92%)|  9–11% |
+ *   |  800  | 11.9 (88%)|20.1 (81%)|30.1 (93%)|   5–6% |
+ *   |  600  | 12.7 (94%)|25.7(103%)|30.3 (93%)|   1–2% |
+ *
+ * 1200 costs the keenest cast a **third of its economy**, which is the bot that
+ * never mines this budget exists to prevent. 600 buys it back by switching the
+ * feature off — 1–2% of the match is not a behaviour anyone would see. 1000 is
+ * the knee: ~87% of the control's ore on a mixed cast, comparable to the 86% the
+ * defensive branch settled for, with the branch genuinely firing.
+ *
+ * So the offensive reach ends up **strictly tighter than the defensive one**, and
+ * that is the design saying the same thing the ladder says one level up: my home
+ * outranks yours, and my home outranks your raid. TUNABLE
+ */
+export const ASSAULT_JOIN_RANGE = 1000;
+
+/**
+ * The reach on the shelf: 88% of raid-seconds instead of 71%, at a third of the
+ * joiner's economy. Recorded as a named constant so a re-tune is one edit and the
+ * A/B has something to point at, exactly like {@link ALLY_RESPONSE_RANGE_WIDE} —
+ * and so the number the coverage curve *would* have picked is written down next
+ * to the reason it did not win. Unused by shipped behaviour. TUNABLE
+ */
+export const ASSAULT_JOIN_RANGE_WIDE = 1200;
+
+/**
+ * Seconds a raid must read **quiet** before the join ends.
+ *
+ * **This one is derived from the channel, not from the klaxon**, and that is the
+ * second thing that does not transfer. {@link ALLY_RESPONSE_QUIET} only has to
+ * clear `Perception.alarmWindow` (2 s) because the ally alarm is a live boolean.
+ * A raid has no klaxon at all: the only signal is a `push` call, so "quiet" means
+ * *nobody has said anything about it lately* — and how long that lasts during a
+ * raid which never stopped is a property of the channel's own dials.
+ *
+ * A teammate prosecuting a siege re-sends every `DifficultyTuning.callCooldown`,
+ * and each call stays readable for `memorySeconds / HEARSAY_STALENESS` seconds
+ * (`./radio` `receive`). So the silence inside a *continuous* raid is
+ * `callCooldown - readableLife`:
+ *
+ *   | tier   | callCooldown | readable life | silent for |
+ *   |--------|--------------|---------------|------------|
+ *   | Easy   |        6 s   |         3 s   |      3 s   |
+ *   | Medium |        3 s   |         6 s   |     never  |
+ *   | Hard   |      1.5 s   |        10 s   |     never  |
+ *
+ * **Easy is the only tier that ever goes quiet mid-raid**, and it does so for
+ * 3 s. Eight covers that with a wide margin — wide on purpose, because one voice
+ * is one channel: a raider that takes a hit spends its next slot on `help`
+ * instead of `push` (`Brain.lastCallAt` is shared across kinds), which stretches
+ * an Easy gap toward 9 s. Past that the raid has genuinely paused and letting go
+ * is the right answer, not a bug. TUNABLE
+ */
+export const ASSAULT_JOIN_QUIET = 8;
+
+/**
+ * Hard ceiling on one join, in seconds — **the number the brief said to measure,
+ * and the measurement moved it from 45 to 25.**
+ *
+ * A join has to buy the trip *and* the fight. The trip is ~8.4 s at the shipped
+ * {@link ASSAULT_JOIN_RANGE}, and 12.2 s at the widest character's reach (Sable,
+ * 1450). The fight, from the table above, is p50 10.0 s and p75 13.7 s for the
+ * raids that actually killed a core — and those are *solo* raids, so a joined one
+ * should close faster ("two beats one", GDD §2.6).
+ *
+ * 25 = the typical trip plus a p75 winning raid (8.4 + 13.7 ≈ 22), and it still
+ * covers the widest trip plus a p50 winning raid (12.2 + 10.0 ≈ 22), with margin
+ * for a joiner that has to fight its way in. Below that a joiner arrives and is
+ * recalled before it can matter; far above it the ceiling stops being reachable
+ * at all. TUNABLE
+ */
+export const ASSAULT_JOIN_MAX = 25;
+
+/**
+ * Seconds before a bot will join again, measured from the end of its last join.
+ *
+ * **The budget question is different here too.** For the defensive latch it is
+ * "one besieged ally must not consume a teammate's whole match", against an
+ * attacker who never leaves. There is no offensive equivalent: the measurement
+ * found no long raids to be consumed by (p90 7.7 s). What needs bounding instead
+ * is **ping-pong** — raids are so short and so frequent that a bot could chase a
+ * fresh call every few seconds and never mine.
+ *
+ * **It is the duty-cycle dial, and only that.** A committed join runs to at most
+ * {@link ASSAULT_JOIN_MAX}, so under a raid that is *always* being called the
+ * share of a match this branch can hold is `MAX / (MAX + COOLDOWN)`. At 45 that
+ * is **36%**, against the defensive latch's 60% — deliberately tighter, because
+ * your side's core is the win condition and someone else's is not.
+ *
+ * Swept end to end (8 seeds × 3 casts, against the same matches with the branch
+ * absent), 45 is where the two curves stop disagreeing: the realistic cost is
+ * flat from 25 to 60 seconds — 87%, 91%, 90% of the control's ore on a mixed cast
+ * — while the pathological case, a teammate broadcasting a call every 1.5 s for
+ * four unbroken minutes, tightens from 44% of the match spent joining to 38%.
+ * Past 45 neither curve moves. So the larger value is close to free on play
+ * anyone will see and strictly better on the case the budget exists for.
+ *
+ * **A caution for whoever re-tunes this.** The cooldown is a *weak* lever on
+ * ordinary play, and the trace-replay estimate that suggested it was the whole
+ * budget was wrong in a way worth naming. The replay proxied "is there a raid to
+ * join" with "is an enemy home taking fire", which flickers on the 2 s alarm
+ * window; the real reading is "is a `push` call still readable", which at Hard
+ * persists ten seconds past the last word spoken. So the replay predicted ~1% of
+ * ticks committed and the shipped branch actually spends 8–11% — it was a
+ * **lower** bound, not the upper bound it was labelled.
+ * {@link ASSAULT_JOIN_RANGE} is the lever that priced this feature; measure
+ * there first. TUNABLE
+ */
+export const ASSAULT_JOIN_COOLDOWN = 45;
+
+// ---------------------------------------------------------------------------
 // The latch
 // ---------------------------------------------------------------------------
 
@@ -117,9 +288,15 @@ export const ALLY_RESPONSE_COOLDOWN = 30;
  * {@link startedAt} is the ceiling, and {@link readyAt} is the budget.
  */
 export interface AllyResponse {
-  /** The ally being answered, or `-1` when not answering. */
+  /**
+   * **The subject of the commitment**, or `-1` when there is none. Which slot
+   * that is depends on the instance, and the two are deliberately different:
+   * for the defensive latch it is the *ally being answered*, and for the assault
+   * latch it is the *objective* — the enemy whose home the side is going in on,
+   * because "that home is gone" is what ends a raid, not "that teammate is fine".
+   */
   target: PlayerId;
-  /** Sim time the target's distress last read live; `-1` when uncommitted. */
+  /** Sim time the commitment's subject last read live; `-1` when uncommitted. */
   lastLive: number;
   /** Sim time this response began; `-1` when uncommitted. */
   startedAt: number;
