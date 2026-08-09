@@ -99,6 +99,24 @@ check. The config stays untracked (its own header says NOT FOR COMMIT).
 
 ## NEXT
 
-- Full mobile suite result → PR body; then open the PR.
+**Session 1 closed the whole DoD. PR [#335](https://github.com/ImagineTheGames/planet-rush/pull/335), branch at `7c7134f`.**
+
+- Full mobile suite on the isolated port: **123 passed / 90 skipped / 0 failed**
+  (20.2m) — the same shape r6-01 recorded, and no golden other than the two doors
+  baselines moved.
+- `origin/main` moved mid-session (a0-16, wave clock ↔ economy, merged as
+  `aaf2733`). Merged in at `7c7134f` — **clean, zero conflicts**; it touches
+  `hud.ts` / `wave-clock.ts` / `sim/`, none of them a doors file. Re-verified on
+  the merged tree: `tsc` clean, `npm test -- --run` **4113 passed / 243 files**,
+  the doors + frozen goldens green. Ancestry line satisfied.
+- All five DoD lines pass locally. CI on #335 was still running when this was
+  written — if it reds, check the shard log before assuming it is this branch:
+  r6-01 logged `tests/net/capacity/capacity-regression.test.ts` as a wall-clock
+  perf assertion with no headroom on shared hardware, and it belongs to whoever
+  owns `server/`. This branch's whole diff is `src/ui/`, `tests/mobile/`, `docs/`,
+  goldens and evidence PNGs.
+- The PR body carries the five copy items flagged-not-fixed for the developer
+  (the CAMPAIGN hint is the loudest) and the `GDD.md` §4.7 rows 478–479, which
+  still ratify the retired labels and want a Director amendment.
 - `dist-a0-14/` is untracked junk from another brief, present before this session
   started. Leave it. Never `git clean` here.
