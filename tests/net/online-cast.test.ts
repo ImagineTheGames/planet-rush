@@ -51,6 +51,7 @@ import {
 } from '../../src/ui/lobby';
 import type { LobbyState } from '../../src/ui/lobby';
 import type { MatchStartSlot } from '../../src/net/transport';
+import { netBudget } from './budgets';
 import { nodeWebSocket, startMatchServer, until } from './node-websocket';
 
 const EVIDENCE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../evidence/a0-06b-online-cast');
@@ -282,7 +283,10 @@ describe('an online room seats the characters the host picked (a0-06b)', () => {
     expect(readback.preA0_06bWouldHaveSeated).not.toEqual(wanted);
     mkdirSync(EVIDENCE_DIR, { recursive: true });
     writeFileSync(`${EVIDENCE_DIR}/readback.json`, `${JSON.stringify(readback, null, 2)}\n`);
-  });
+  }, netBudget({
+    work: 'boot an 8-seat server → host CREATE ROOM → seven seats to BOT → a named all-Hard cast tapped onto each → RUSH! → assert the seated cast and the matchStart roster by NAME → write the readback',
+    measuredSeconds: 0.2,
+  }));
 
   it('seats two Wardens when the host picked two Wardens, over a real socket', async () => {
     const harness = await startMatchServer({ seed: 99, slots: 8, asteroidCount: 10 });
@@ -333,5 +337,8 @@ describe('an online room seats the characters the host picked (a0-06b)', () => {
     expect(rosterCast(host.matchRoster()!)).toEqual(['warden', 'warden']);
     // Two SEATS holding it — a collapse would have left one bot and a short world.
     expect(room.world?.ships).toHaveLength(3); // the host plus two Wardens
-  });
+  }, netBudget({
+    work: 'boot a server → host CREATE ROOM → two seats to BOT → both tapped onto Warden → RUSH! → assert two Wardens in two distinct seats, in the room and in the matchStart roster',
+    measuredSeconds: 0.15,
+  }));
 });
