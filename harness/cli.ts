@@ -421,7 +421,13 @@ function soak(matchCount: number, rotations: number): number {
  * committed". Seeds are fixed and printed, so a run is reproducible from the
  * output alone.
  */
-function abundance(scarce: readonly number[], rich: readonly number[], standard: readonly number[], seedCount: number): number {
+function abundance(
+  scarce: readonly number[],
+  rich: readonly number[],
+  standard: readonly number[],
+  seedCount: number,
+  contestsOnly = false,
+): number {
   const seeds = seedRange(seedCount);
   log(`# abundance — candidate wave-interval spread (a0-17)`);
   log('');
@@ -447,10 +453,11 @@ function abundance(scarce: readonly number[], rich: readonly number[], standard:
     ...(rich.length ? [] : [{ level: 'rich' as const }]),
   ];
 
-  log('| level | s/wave | ×base | schedule | miner ore/min | miner med | turtle med | turtle max | roster med | roster max | waves | rails |');
-  log('|---|---|---|---|---|---|---|---|---|---|---|---|');
   let allPass = true;
   const readings: CandidateReading[] = [];
+  if (contestsOnly) return abundanceContests(candidates, seeds);
+  log('| level | s/wave | ×base | schedule | miner ore/min | miner med | turtle med | turtle max | roster med | roster max | waves | rails |');
+  log('|---|---|---|---|---|---|---|---|---|---|---|---|');
   for (const c of candidates) {
     const r = readCandidate(c, seeds, seeds);
     readings.push(r);
@@ -482,20 +489,33 @@ function abundance(scarce: readonly number[], rich: readonly number[], standard:
   }
 
   log('');
-  for (const c of candidates) {
-    const con = readContests(c, seeds);
-    const worst = [...con.byCharacter, ...con.byClass].sort((a, b) => b.rate - a.rate)[0];
-    const pass = contestsPass(con);
-    allPass = allPass && pass;
-    log(
-      `  ${con.level} @ ${con.interval.toFixed(1)} s — win-rate ceiling ${pass ? 'PASS' : 'FAIL'} ` +
-        `(top ${worst?.name ?? 'n/a'} ${((worst?.rate ?? 0) * 100).toFixed(1)}%, ${con.ended}/${con.matches} decided)`,
-    );
-  }
+  const contestsOk = abundanceContests(candidates, seeds) === 0;
+  allPass = allPass && contestsOk;
 
   log('');
   log(allPass ? '  ALL RAILS GREEN' : '  RAIL BROKEN — see the flags above');
   return allPass ? 0 : 1;
+}
+
+/** The two 55% contests at each candidate, contestant by contestant — the shape
+ *  that shows whether a win-rate hole is *caused* by abundance or merely present
+ *  at every level (a0-17: the excavator is the latter). */
+function abundanceContests(candidates: readonly Candidate[], seeds: readonly number[]): number {
+  let pass = true;
+  for (const c of candidates) {
+    const con = readContests(c, seeds);
+    const ok = contestsPass(con);
+    pass = pass && ok;
+    log(
+      `  ${con.level} @ ${con.interval.toFixed(1)} s — ${ok ? 'PASS' : 'FAIL'} ` +
+        `(${con.ended}/${con.matches} decided; fair share: character ${(100 / HARD_POOL.length).toFixed(1)}%, hull ${(100 / CLASSES.length).toFixed(1)}%)`,
+    );
+    const row = (label: string, rs: readonly { name: string; rate: number }[]): void =>
+      log(`      ${label}: ${rs.map((r) => `${r.name} ${(r.rate * 100).toFixed(1)}%`).join(' · ')}`);
+    row('character', con.byCharacter);
+    row('hull     ', con.byClass);
+  }
+  return pass ? 0 : 1;
 }
 
 /** `1.2,1.6` or `180,240` → seconds. A value ≤ 4 is read as a `respawnInterval`
@@ -551,6 +571,7 @@ function main(argv: readonly string[]): number {
         intervals(flagValue('--rich')),
         intervals(flagValue('--standard')),
         seedsFlag ? Number(seedsFlag) : 8,
+        rest.includes('--contests'),
       );
     }
     default:

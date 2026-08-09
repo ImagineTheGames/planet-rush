@@ -187,7 +187,7 @@ When a station's reactor is destroyed, its owner is eliminated and gets an immed
 
 **And the law earned its keep (amended 2026-08-08, a0-08).** The report came a fourth time — "sometimes picked up ore from dead ships dont count" — and this time the ledger answered it: **conservation held, exactly, through every reproduction**, so the fourth report was *not* a leak and no rule needed changing. It was a legibility failure, fixed as one (§2.3). That is the ledger working as intended: it does not only catch black holes, it also proves when there isn't one, and tells you to go look at what the player could see instead.
 
-### 2.8 Baseline constants (opening hypotheses, owned by QA thereafter) *(amended 2026-07-27 — weapon/repair/turret-tier rows; see `docs/design-amendments.md`)*
+### 2.8 Baseline constants (opening hypotheses, owned by QA thereafter) *(amended 2026-07-27 — weapon/repair/turret-tier rows; see `docs/design-amendments.md`; amended 2026-08-07 — the ore-abundance table, a0-17)*
 
 These are starting values, not commitments — they exist so the Gameplay Engineer types design numbers at M1 instead of inventing them, and so QA has a hypothesis to falsify. All are flagged `TUNABLE`.
 
@@ -213,6 +213,20 @@ These are starting values, not commitments — they exist so the Gameplay Engine
 | Ship sensor (minimap) | A ship's own local fog-of-war coverage disc (§2.6 radar) | 520 |
 | Station sensor (minimap) | A station's short local coverage disc | 300 |
 | Satellite sensor (minimap) | A live radar satellite's large coverage disc | 900 |
+
+**Ore abundance — the per-match yield knob** *(ratified p11; **amended 2026-08-07, a0-17** — the interval spread widened).* `YIELD` in the lobby (§4.5) is `scarce | standard | rich`, a named multiplier set over three economy numbers, resolved once when the world is built and carried on the match rather than in a global — so one claim can run lean while another runs generous. **SCARCE is the shipped default** ("by default more scarce so combat and resource management is deeper" — developer, p11).
+
+> *"we need bigger intervals 25 seconds between rich and 15 to scarce is not a big change, it should be a much BIGGER time difference"* — developer, 2026-08-07
+
+| | Total ore | Rock count | Wave interval | A wave every | Waves land at |
+|---|---|---|---|---|---|
+| **SCARCE** *(default)* | ×0.55 | ×0.75 | **×1.2** | **3:00** | 0:00 · 3:00 · 6:00 · 9:00 · 12:00 |
+| STANDARD | ×1 | ×1 | ×1 | 2:30 | 0:00 · 2:30 · 5:00 · 7:30 · 10:00 |
+| **RICH** | ×1.6 | ×1.25 | **×0.75** | **1:52** | 0:00 · 1:53 · 3:45 · 5:38 · 7:30 |
+
+The spread between the lean and the generous wait is now **67.5 s**, against the 37.5 s the developer called "not a big change" — and it is 90% of the entire spread the match-length target can hold. **That ceiling is the thing to understand before anyone asks for more.** Collapse cannot open until the last wave has landed (§2.3 — the phase waits on the fifth wave, so a wave is never skipped), and a match ends 100–160 s after collapse opens. An ending therefore lands near `4 × interval + tail`: **the wave interval and the match length are the same dial.** A 10–15 minute target (§1) is a 300-second window, divided across the four gaps between five waves, which is where the ~75 s comes from. Widening past it does not break the closing ring — every level still receives all five waves — it makes SCARCE matches *longer*: measured, a 4-minute wave interval runs 18:24. **Buying a bigger felt difference means buying a longer SCARCE match, and that is a design call, not a tuning one.**
+
+Each end sits against a different measured bound, and neither is arbitrary. **SCARCE** is capped by the passive match: forced collapse plus entropy resolves a full turtle field at 14:10 at ×1.2, with the collapse deadline still on its pre-p11 anchor. **RICH** is floored by the opposite failure — a field delivered this fast is mined out early, so an all-mining lobby finishes at 10:11 at ×0.75 and would drop *under* the ten-minute floor at ×0.7. What each level costs in ore is unchanged by this amendment: `Total ore` and `Rock count` are p11's ratified numbers, so a0-17 moved the economy's **rhythm**, not its **richness**. Fairness is untouched at every level by construction — a multiplier scales the pattern uniformly and never re-rolls it per station, so all `N` home fields stay exactly equal (§2.3). Numbers: `tests/reports/abundance-spread-a0-17.md`, `docs/p11-ore-scarcity.md`.
 
 ### 2.9 AI opponents (in-game) *(amended 2026-07-27 — projectile lead, team allegiance, slot model; see `docs/design-amendments.md`)*
 
