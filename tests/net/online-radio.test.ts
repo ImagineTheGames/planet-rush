@@ -53,6 +53,7 @@ import { MatchServer } from '../../server/match-server';
 import type { ServerSocket } from '../../server/match-server';
 import type { MatchRoom } from '../../server/room';
 import { hashState } from '../../harness/hash';
+import { netBudget } from './budgets';
 
 const EVIDENCE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../evidence/b2-02-radio-seam');
 
@@ -264,7 +265,10 @@ describe('an online Teams match carries a bot’s callout to its ally (b2-02)', 
     };
     mkdirSync(EVIDENCE_DIR, { recursive: true });
     writeFileSync(`${EVIDENCE_DIR}/readback.json`, `${JSON.stringify(readback, null, 2)}\n`);
-  });
+  }, netBudget({
+    work: 'stand a four-seat room up through the wire → RUSH! → wound a Warden under an enemy → tick the room until it calls for help, its ally hears it and answers → write the readback',
+    measuredSeconds: 0.02,
+  }));
 
   it('changes nothing in a served FFA match — the same seed, hashed', () => {
     // Teams-of-one: seat 0 is the host, and seats 1..3 each fight for themselves.
@@ -287,5 +291,8 @@ describe('an online Teams match carries a bot’s callout to its ally (b2-02)', 
     }
 
     expect(hashState(world), 'the served FFA match is the one that shipped').toBe(FFA_GOLDEN);
-  });
+  }, netBudget({
+    work: 'stand the same room up in FFA → RUSH! → 60 sim seconds of a four-station free-for-all through the room’s own update loop → hash the world',
+    measuredSeconds: 0.21,
+  }));
 });
