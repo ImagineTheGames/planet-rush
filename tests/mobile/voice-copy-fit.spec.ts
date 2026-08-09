@@ -8,11 +8,17 @@
  *   > traded information for flavour, which this rule forbids. Measure before
  *   > you ship it.
  *
- * l2-02 made eight labels longer — `PLAY SOLO` (9) → `SOLO CONTRACT` (13),
- * `ORE ·` → `YIELD ·`, `VICTORY` (7) → `CLAIM HELD` (10), `WAITING FOR THE HOST`
- * (20) → `WAITING FOR THE CLAIM HOLDER` (28) — and this project has shipped text
- * that fit on desktop and overflowed on a phone. So the measurement is a test,
- * not a screenshot somebody once looked at.
+ * l2-02 made eight labels longer — `ORE ·` → `YIELD ·`, `VICTORY` (7) →
+ * `CLAIM HELD` (10), `WAITING FOR THE HOST` (20) → `WAITING FOR THE CLAIM
+ * HOLDER` (28), and the four entry doors into phrases — and this project has
+ * shipped text that fit on desktop and overflowed on a phone. So the measurement
+ * is a test, not a screenshot somebody once looked at.
+ *
+ * a0-15 sent the entry doors back to plain words (`SOLO` / `HOST` / `JOIN`) on
+ * the developer's ratification, which only ever makes them fit more easily — but
+ * "shorter, so it must fit" is the assumption this file exists to refuse, and the
+ * hints under them are NEW copy at the tightest measurement in the sweep. Both
+ * halves are measured below, and the headroom is printed on pass.
  *
  * ── WHY THIS CAN'T BE A UNIT TEST ──────────────────────────────────────────
  * Text width is a font fact, and the fonts are the browser's. `makeText` hands a
@@ -98,10 +104,14 @@ interface FitCase {
  *         not 358.
  */
 const CASES: readonly FitCase[] = [
-  // --- The three doors (lobby-entry.ts DOOR_OPTIONS, drawn at 16px heading) ---
-  { where: 'DOOR_OPTIONS.solo', text: 'SOLO CONTRACT', font: FONT_HEADING, size: 16, box: 420 },
-  { where: 'DOOR_OPTIONS.create', text: 'OPEN A CLAIM', font: FONT_HEADING, size: 16, box: 420 },
-  { where: 'DOOR_OPTIONS.join', text: 'JOIN A CLAIM', font: FONT_HEADING, size: 16, box: 420 },
+  // --- The four doors (lobby-entry.ts DOOR_OPTIONS, drawn at 16px heading) ----
+  // Plain by ratification (a0-15) and the shortest labels on the screen — kept
+  // measured anyway, because CAMPAIGN is now the long one and a future door word
+  // arrives here first.
+  { where: 'DOOR_OPTIONS.campaign', text: 'CAMPAIGN', font: FONT_HEADING, size: 16, box: 420 },
+  { where: 'DOOR_OPTIONS.solo', text: 'SOLO', font: FONT_HEADING, size: 16, box: 420 },
+  { where: 'DOOR_OPTIONS.create', text: 'HOST', font: FONT_HEADING, size: 16, box: 420 },
+  { where: 'DOOR_OPTIONS.join', text: 'JOIN', font: FONT_HEADING, size: 16, box: 420 },
 
   // --- The lobby toggle chips (lobby-view.ts drawControls, 12px heading) ------
   // Every value of each toggle, because the chip is sized for the longest one and
@@ -141,24 +151,45 @@ const CASES: readonly FitCase[] = [
   // The longest of the four, which is the one that decides the set.
   {
     where: 'ENTRY_ERRORS.full',
-    text: 'That claim is full. Ask for a rematch, or take a solo contract.',
+    text: 'That claim is full. Ask for a rematch, or press SOLO.',
     font: FONT_BODY,
     size: 12,
     box: 812,
   },
-  // The longest of the FOUR hints (u9-01 added CAMPAIGN; this said "three"),
-  // bounded by the DOOR (420) rather than by the content box: the hint is centred
-  // under its button and reads as part of it, so the button's width is the honest
-  // container even though nothing clips at it.
+  // ALL FOUR hints, bounded by the DOOR (420) rather than by the content box: a
+  // hint is centred under its button and reads as part of it, so the button's
+  // width is the honest container even though nothing clips at it.
   //
-  // Still the tightest case in the sweep, and the one that actually overflowed:
-  // at 70 chars it drew 462px into a 420px door. Shortened to 57 (r6-01), it
-  // draws 376px — 10% headroom, in line with its siblings (CAMPAIGN 337px,
-  // OPEN A CLAIM 343px). The budget is 63 characters at 11px: Liberation Mono
-  // is 0.6em, so 420 / 6.601 = 63.6. Watch this one if a longer hint is proposed.
+  // This is the tightest group in the sweep and the only copy in the game that
+  // has actually overflowed: the sweep's solo hint drew 462px into a 420px door
+  // at 70 chars, silently, because `drawDoor` centres and lets text spill. The
+  // budget is 63 characters at 11px — Liberation Mono is 0.6em, so
+  // 420 / 6.601 = 63.6. a0-15 rewrote three of the four in plain words and they
+  // are all well inside it; measured rather than assumed, which is the point.
+  {
+    where: 'DOOR_OPTIONS.campaign hint',
+    text: 'A run of linked contracts, one claim after another.',
+    font: FONT_BODY,
+    size: 11,
+    box: 420,
+  },
   {
     where: 'DOOR_OPTIONS.solo hint',
-    text: 'Work the claim alone. Bots hold the other seats. Offline.',
+    text: 'Play on your own against bots. No internet needed.',
+    font: FONT_BODY,
+    size: 11,
+    box: 420,
+  },
+  {
+    where: 'DOOR_OPTIONS.create hint',
+    text: 'Start a new game and get a code for friends to join.',
+    font: FONT_BODY,
+    size: 11,
+    box: 420,
+  },
+  {
+    where: 'DOOR_OPTIONS.join hint',
+    text: 'Type in a friend’s code to join their game.',
     font: FONT_BODY,
     size: 11,
     box: 420,
@@ -197,7 +228,7 @@ async function bootMenu(page: Page): Promise<void> {
 
 test('every voiced label fits the fixed-width chrome it is drawn in', async ({ page }, testInfo) => {
   budgetTest({
-    work: 'boot the menu → font settle → measure 14 voiced labels against their boxes',
+    work: 'boot the menu → font settle → measure 18 voiced labels against their boxes',
     measuredSeconds: 6,
   });
 
@@ -265,7 +296,7 @@ test('screenshots the voiced screens for review', async ({ page }, testInfo) => 
   await page.waitForTimeout(300);
   await page.screenshot({ path: `evidence/voice-${tag}-2-doors.png` });
 
-  // JOIN A CLAIM → the code pad, where ENTER THE CLAIM CODE is drawn.
+  // JOIN → the code pad, where ENTER THE CLAIM CODE is drawn.
   const join = await page.evaluate(() => {
     const d = (
       window as unknown as {

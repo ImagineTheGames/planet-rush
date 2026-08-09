@@ -23,7 +23,7 @@
  *   • `not-found` (404)   — no room has that code. The connection is fine; the
  *     *code* is wrong, so the fix is to check it and re-type — not to retry.
  *   • `network`           — `fetch` never reached the allocator: offline, DNS,
- *     TLS. Says nothing about any room — check the connection and retry, and PLAY
+ *     TLS. Says nothing about any room — check the connection and retry, and
  *     SOLO still works in the meantime (the offline promise, §4.8 risk 6).
  *   • `bad-response`      — a 2xx (or other) the client could not read. The
  *     server answered but not sanely; retrying is the only sensible move.
@@ -89,7 +89,7 @@ const ONLINE_ERROR_COPY: Readonly<Record<ResolveFailure, OnlineErrorCopy>> = {
   },
   network: {
     reason: 'network',
-    message: 'Can’t reach the servers. Check your connection — SOLO CONTRACT still works.',
+    message: 'Can’t reach the servers. Check your connection — SOLO still works.',
     action: 'retry',
   },
   'bad-response': {
@@ -130,7 +130,7 @@ const RECONNECT_ENDED_COPY: Readonly<Record<StopReason, ReconnectEndedCopy>> = {
   'room-gone': {
     reason: 'room-gone',
     headline: 'MATCH ENDED',
-    detail: 'Lost the server. SOLO CONTRACT still works offline.',
+    detail: 'Lost the server. SOLO still works offline.',
   },
   'grace-elapsed': {
     reason: 'grace-elapsed',
