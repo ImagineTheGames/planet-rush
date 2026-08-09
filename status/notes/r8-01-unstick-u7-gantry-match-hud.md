@@ -88,13 +88,45 @@ resolves `state=OPEN number=298`, counts **3** failing checks (`Mobile
 emulation` and its shards 1/6 and 4/6) and **exits non-zero**. LESSONS §22
 satisfied by demonstration, not assertion.
 
+**The behavioural proofs, re-run by name and confirmed RUN, not skipped.**
+`build-wheel-gantry.spec.ts:371` (capped-wedge refusal) ✓ iphone, pixel, desktop.
+`build-flow.spec.ts:266` (u7-02 BACK cycle) ✓ iphone, pixel — desktop skips it by
+design, it is a touch flow. Grepped the log for both by name rather than trusting
+the summary count, because "88 passed" is also what a run that skipped them says.
+
+**Reverted, not committed: `evidence/voice-*.png`.** `voice-copy-fit.spec.ts`
+rewrites nine evidence PNGs as a side effect of any run. They belong to the voice
+work, not to this brief; committing them would have been an edit outside
+ownership dressed as test output.
+
+## OUTCOME — #298 MERGED
+
+CI on the pushed branch went **fully green, all six shards**, including 1/6 and
+4/6 which were the two red ones. #298 then merged as `7c7794c`.
+
+**One more check after the merge, and it mattered.** `a2-04` (the Cutterhead —
+the station loses its hull turrets) landed in the same window. That is a station
+silhouette change and could have invalidated six freshly-re-shot in-match
+baselines. Re-ran the full golden suite on the merged tree carrying both:
+**38 passed / 0 failed**. The baselines survive it.
+
+Final DoD, all four lines, run verbatim on `6ab4064`:
+
+| Line | Result |
+|---|---|
+| `npx tsc --noEmit` | exit 0 |
+| `npm test -- --run` | **252 files / 4347 tests passed** |
+| `origin/main` ancestor of HEAD | exit 0 |
+| PR gate | `state=MERGED` → exit 0 |
+
+**Note for whoever runs this DoD next.** Line 3 failed twice during
+verification, both times purely because `main` moved *between* the fetch and the
+check — not because anything regressed. Re-merge and re-run; it is a treadmill,
+not a fault. Line 4 short-circuits on `MERGED` now, so it no longer exercises the
+`gh pr checks` branch — that branch was hand-tested while #298 was still open and
+**did** fail (3 failing checks, non-zero exit), which is the LESSONS §22
+demonstration.
+
 ## NEXT
 
-1. Non-golden mobile specs running now — must include the two the brief names by
-   hand: the **capped-wedge refusal** (`build-wheel-gantry.spec.ts:371`) and the
-   **u7-02 BACK cycle** (`build-flow.spec.ts:266`). Genuinely green, not merely
-   un-timed-out.
-2. Push, then rewrite #298's body: hunk-by-hunk hud.ts rationale + the
-   snapshot-provenance split (main's / re-shot / deliberately untouched).
-3. DoD line 4 only goes green when CI's Mobile gate does. Shards 1/6 and 4/6 are
-   the ones to watch — they are where the re-shot goldens live.
+Nothing outstanding. The branch is merged and equals `origin/main`.
