@@ -1,0 +1,65 @@
+{
+  "brief": "a0-06b",
+  "what": "an online room seats the characters the host picked, not just their tiers",
+  "seed": 4242,
+  "lobbyCast": [
+    "warden",
+    "warden",
+    "sable",
+    "vulture",
+    "warden",
+    "sable",
+    "vulture"
+  ],
+  "seatedCast": [
+    "warden",
+    "warden",
+    "sable",
+    "vulture",
+    "warden",
+    "sable",
+    "vulture"
+  ],
+  "matchStartCast": [
+    "warden",
+    "warden",
+    "sable",
+    "vulture",
+    "warden",
+    "sable",
+    "vulture"
+  ],
+  "tiers": [
+    "hard",
+    "hard",
+    "hard",
+    "hard",
+    "hard",
+    "hard",
+    "hard"
+  ],
+  "hulls": [
+    "excavator",
+    "excavator",
+    "interceptor",
+    "vanguard",
+    "excavator",
+    "interceptor",
+    "vanguard"
+  ],
+  "seatsPerCharacter": {
+    "warden": 3,
+    "sable": 2,
+    "vulture": 2
+  },
+  "identical": true,
+  "preA0_06bWouldHaveSeated": [
+    "sable",
+    "vulture",
+    "warden",
+    "sable",
+    "vulture",
+    "warden",
+    "sable"
+  ]
+}
