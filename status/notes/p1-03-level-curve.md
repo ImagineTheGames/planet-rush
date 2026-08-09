@@ -68,9 +68,19 @@ merged, tested module for no gain. What was left undone is audited below.
 - Full `npm test -- --run` green.
 - Generated table matches §1.4 character for character, all nine published rows.
 
+### Re-verified 2026-08-09 on resume, against the merged tree
+
+- `npx tsc --noEmit` clean; `npm test -- --run` **254 files / 4397 tests passed**.
+- `src/progression/curve.test.ts` 15 tests green (13 shipped + the 2 table-lock
+  assertions this lane added).
+- Brief's own two greps: `git ls-files src/progression/curve.ts` hits;
+  `grep -rEn "from '(\.\./)+(sim|platform|render)" src/progression/curve.ts` → 0.
+- PR **#344 MERGED** as `44677c3`; all CI buckets pass or skip, zero fail.
+  `origin/main` now contains this branch's HEAD.
+
 ## NEXT
 
-- Nothing outstanding once the PR is open and CI is green.
+- **Nothing outstanding — this lane is done and merged.** Do not re-open it.
 - For the rest of the chain: pr-04 (accrual) writes `xp`/`matches`; pr-05
   (summary bar) must read `levelProgress` and must not re-derive the curve. If
   Question A lands *no* (drop the participation rows), `XP_CURVE_BASE` re-tunes
