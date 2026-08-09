@@ -1137,3 +1137,103 @@ add churn and prove nothing.
   green, the useful things to do are: check `git log origin/<branch>..HEAD`
   first, merge main if it has moved, and re-run the gates — **with the run
   redirected to a file, never piped**, so you can see a hang if one returns.
+
+### Session 2026-08-09 (second) — a0-15 rebuilt the front door my spec walks through
+
+Inherited the branch **fully pushed** (`git log origin/<branch>..HEAD` empty —
+checked FIRST, before believing anything else; sessions 5 and 7 each lost an hour
+to skipping it), no merge in progress, PR **#319** OPEN and MERGEABLE. 40 dirty
+paths; **read `git status` before restoring** (session 9's rule — the fortieth
+line has been a real change before), confirmed all 40 were
+`tests/live-stage/*-evidence.png` and nothing else, restored with `git checkout
+-- tests/live-stage/`. **No feature work was outstanding and none was invented.**
+Both copies of this note were already in sync at 1139 lines.
+
+**`origin/main` had moved to `d057f2e`** — a0-15 plain-entry-doors, PR #335.
+Merged first, before measuring anything (session 7's rule), and it mattered here
+because a0-15 touches **`src/ui/lobby.ts`, `lobby-geometry.ts`, `lobby-view.ts`
+and `lobby-flow.ts`** — four of the files this brief rewrote most — *and* rebuilt
+the screen the live-stage spec walks to reach the lobby.
+
+**It auto-merged clean, and this time "verify the clean merge" paid a different
+dividend than usual: all four shared-file changes turned out to be pure PROSE.**
+a0-15 renamed the doors (SOLO CONTRACT / OPEN A CLAIM / JOIN A CLAIM → CAMPAIGN ·
+SOLO · HOST · JOIN) and its diff against my four files is nothing but the old
+labels being updated *inside doc comments* — `lobby.ts` 2 lines, `lobby-view.ts`
+2, `lobby-flow.ts` 4, `lobby-geometry.ts` 4, and not one of them is code. Checked
+the diff hunk by hunk rather than trusting the absence of a conflict, which is the
+standing rule for a file both sides edited.
+
+**The real risk was in the SPEC, not the merge, and it is worth writing down.**
+a0-15 changed the door labels *and added a fourth door* (`EntryDoor` is now
+`'campaign' | 'solo' | 'create' | 'join'`). `lobby-cast.spec.ts` walks PLAY →
+doors → SOLO on the real client, so a spec that had located that door **by its
+label** would have broken on a rename that changed no behaviour at all. It does
+not: it selects by control **kind** (`doorControls.find(x => x.kind === 'solo')`,
+line 108), so the rename and the new door both passed straight through.
+Verified `kind: 'solo'` still exists in `lobby-entry.ts:158` **before** running
+anything, rather than discovering it from a red spec. **Select front-door
+controls by kind; a label is copy and copy is somebody else's to change.**
+
+**This is the eleventh merge in a row to leave the cast seam untouched** — and
+a0-15 is the one that came closest, since it edited four of my files and the
+screen in front of my test, and still moved nothing but words.
+
+#### DoD on the merged tree
+
+- `npx tsc --noEmit` — clean (run **before** pushing the merge, which is the point
+  of running it).
+- `npm test -- --run` — **4132 passed, 0 failed**, 244 files, 250 s. A **complete**
+  run, verified session 13's way rather than assumed: `src/ui/lobby.test.ts`
+  reported its **100 tests** (the hang session 13 found stays fixed),
+  `cast-seam.test.ts` 8, `match-boot.test.ts` 16. `capacity-regression`
+  **passed** (63 s). Redirected to a file, never piped.
+- `npm run test:live-stage` — **full sweep**, `PREVIEW_PORT=4194`: **74 passed, 28
+  failed, 3 skipped** in 14.2 m. **All three `lobby-cast` cases pass** (cast round
+  trip 1.1 m, `?` by click on PC 14.6 s, `?` by tap at 390 px landscape 1.3 m).
+  `lobby-cast` appears in the failure block **zero** times and no `lobby-cast`
+  directory exists under `test-results/`, which is where Playwright puts failures.
+  Sessions 2 and 4 measured `origin/main` in isolated worktrees at **30 failed /
+  66 passed**; this run is better than that baseline on both axes.
+- GDD.md differs from `origin/main`; `merge-base --is-ancestor` OK at `d057f2e`.
+  Markers verified by grep, not assumed — §2.1 line 56 carries a0-11's *"an `open`
+  slot is EMPTY"* and a0-06's *"the host picks each bot's CHARACTER"* side by
+  side, §2.1 lines 62/64 the full amendment, §2.9 line 235 *"characters, not
+  difficulty labels"*.
+
+The 28 fall in 13 spec files. Twelve are the familiar standing not-mine set
+(`connect-trace` ×4, `upgrade-wheel` ×3, `unified-play-flow` ×3, `map-picker` ×3,
+`fullscreen` ×3, `codex-lobby` ×3, `ore-conservation` ×2, and one each of
+`tap-markers`, `tap-commander`, `repair-core`, `lobby-flow`, `audio-alive`).
+The thirteenth, **`minimap.spec.ts` (2 cases), is not on the original list** —
+session 13 saw it once too. **Checked instead of explained away**, because "it's
+contention" is the answer that stops you looking: re-ran it alone and it was
+**7 passed**. The sweep ran at load ~18 with other lanes building; it started at
+load 1.8.
+
+**The proof, re-measured not re-asserted:** the sweep regenerated
+`lobby-cast-readback.txt` **byte-identical** — slot 0 `null` (the human), slots
+1–7 `warden warden sable vulture warden sable vulture` in the lobby and the *same
+seven* in the match, `identical: true`. It is absent from `42fdb22`'s diff and
+**that absence IS the result.** That file is the evidence; the PNGs picture it.
+
+`42fdb22` re-shot the four frames (the committed set was from `f1a71d9`, older
+than this merge, and the badge stamps the hash into every frame — they now read
+`79180c2`). Pushed immediately after committing. The lobby frame is the
+developer's case in one picture: seven rows reading `Warden 1 / Warden 2 / Sable 1
+/ Vulture 1 / Warden 3 / Sable 2 / Vulture 2`, the hull under each name, a
+read-only `HARD` chip, a `?`. The codex frame is the better picture of the
+*principle* — the dossier open over a **mixed-tier** cast (`EASY` / `MEDIUM` /
+`HARD` down the column), so the chip is visibly derived from whoever is in the
+seat and cannot disagree with it. The match frame catches no rival nameplate this
+run; `f517ef7` caught one and `2f3acf4` did not. **It is luck either way** — which
+is exactly why the spec writes all seven names to the readback instead of hoping
+a plate drifts into shot. Do not treat either outcome as a regression.
+
+#### One small thing, since the note keeps a record of its own mistakes
+
+The tail-restore worked cleanly this time by staging the four frames FIRST and
+then running `git checkout -- tests/live-stage/` over the rest — `git add` the
+ones you are keeping, then restore the directory, and the staged four survive.
+That is a cleaner shape than restoring 38 paths by name and it is the same one
+line either way.
