@@ -43,9 +43,10 @@ import {
   ROSTER,
   createBot,
   rosterAt,
+  teamRadio,
   thinkOnce,
 } from '../src/bots';
-import type { PersonalityId } from '../src/bots';
+import type { PersonalityId, TeamRadio } from '../src/bots';
 import { InputQueue } from '../src/net/input-queue';
 import type { InputStats } from '../src/net/input-queue';
 import { encodeWorldSnapshot } from '../src/net/snapshot';
@@ -446,6 +447,16 @@ export class MatchRoom {
    * cannot conjure a bot nobody asked for.
    */
   private seatStates: LobbySeatState[];
+  /**
+   * One team callout channel per side, keyed by `Slot.team` — the shared half of
+   * bot state, and the only piece of it this room owns rather than `createBot`
+   * ({@link wireRadios}, b2-02).
+   *
+   * A side of one holds `null` here rather than nothing, which is what makes FFA
+   * a *stated* answer instead of an absent one: the entry says "this side has a
+   * channel, and it is silence."
+   */
+  private readonly radios = new Map<number, TeamRadio | null>();
   /** Wall clock of the last update, so elapsed real time becomes whole ticks. */
   private lastUpdateMs = -1;
   /** Fractional tick time carried between updates — dropping it would make the
@@ -505,6 +516,20 @@ export class MatchRoom {
   /** The authoritative world, or null before the match starts. */
   get world(): World | null {
     return this.authoritative;
+  }
+
+  /**
+   * The bot flying a seat, or null when a human has the controls (or the seat is
+   * empty, or the match has not started).
+   *
+   * Read-only in the sense that matters: the room owns every bot's lifetime, and
+   * hands this out so a test — and a debug overlay — can ask what a bot *knows*,
+   * including the side channel it is on ({@link wireRadios}). Nothing on the wire
+   * is derived from it; `lobbyState` and `matchStart` already carry everything a
+   * client is told about who is in a seat.
+   */
+  botAt(player: PlayerId): Bot | null {
+    return this.slots[player]?.bot ?? null;
   }
 
   /** Connected humans. A room with none and no grace left is garbage. */
@@ -663,6 +688,10 @@ export class MatchRoom {
     slot.bot = null;
     slot.personality = null;
     slot.difficulty = null;
+    // …and leaves the side's channel with them: a member nobody is flying would
+    // cost every remaining ally a miss roll per call, for a seat that can no
+    // longer hear one ({@link wireRadios}).
+    this.wireRadios();
     slot.ready = true;
     slot.fog = new FogTracker(slot.player);
     // New hands, and possibly a new input counter: a client that rebuilt its
@@ -745,6 +774,9 @@ export class MatchRoom {
     }
 
     this.seatBot(slot, this.substituteFor(slot.player));
+    // The side just gained a voice: a stand-in that could not hear its allies
+    // would be the b2-02 silence again, one seat at a time ({@link wireRadios}).
+    this.wireRadios();
     slot.graceUntil = graceUntil;
     // An abandoned seat's token dies with the window: a reclaim would be answered
     // `reclaim-expired`, which is exactly what it is.
@@ -1029,6 +1061,16 @@ export class MatchRoom {
     );
     if (playing.length < MIN_MATCH_SIZE) return;
 
+    // **Renumber first, then seat.** A bot is built around the seat id it is
+    // told (`createBot`'s `BotSeat`), and it goes on perceiving through that id
+    // for the rest of the match (`src/bots/harness` `thinkOnce`) — so a bot
+    // seated at slot 5 and then compacted to slot 1 spent the match looking at a
+    // ship that does not exist, while its decisions were filed against the ship
+    // that does ({@link inputsFor} keys the row by `slot.player`). The cast is
+    // unaffected: compaction preserves slot order, so {@link castFor} spends the
+    // host's picks in exactly the order it did before (a0-06b).
+    this.compactRoster(playing);
+
     let botIndex = 0;
     for (const slot of playing) {
       if (slot.socket !== null) continue;
@@ -1038,8 +1080,9 @@ export class MatchRoom {
       slot.shipClass = PERSONALITIES[slot.personality as PersonalityId].shipClass;
       slot.ready = true;
     }
-
-    this.compactRoster(playing);
+    // …and now that every seat is final — its id, its side, and who is flying it
+    // — open the sides' channels (`wireRadios`, b2-02).
+    this.wireRadios();
 
     this.authoritative = createWorld({
       seed: this.config.seed,
@@ -1360,6 +1403,99 @@ export class MatchRoom {
   }
 
   /**
+   * **Open one callout channel per side, and hand it to that side's bots**
+   * (`src/bots/radio`; `docs/team-bots-plan.md` §2, Stage 2 — b2-02).
+   *
+   * THE SEAM THIS CLOSES
+   * ---------------------------------------------------------------------------
+   * The offline path seats a whole lineup at once, so `createBots`
+   * (`src/bots/harness`) can see the sides and build their rings. This room seats
+   * bots **one at a time** — at RUSH!, and again whenever a pilot drops — so every
+   * bot got `createBot`'s quiet default, `radio: null`, and an online Teams match
+   * ran with Layer B silent: allies never heard each other's `help` or `siege`,
+   * and the same two bots fought differently depending on whether a server had
+   * dealt their seats. `src/bots/harness` names this seam and says whose it is:
+   * *"wiring a shared channel through the server's slot table is netcode's file,
+   * not this one."* This is that file.
+   *
+   * WHAT IS ON THE CHANNEL — BOT SEATS, AND ONLY BOT SEATS
+   * ---------------------------------------------------------------------------
+   * Membership mirrors `createBots` exactly: the seats on this side that a **bot
+   * is flying**. That is not a shortcut, it is the parity rule. {@link
+   * import('../src/bots/radio').send} draws one number from the sender's seeded
+   * stream **per member**, and that stream is shared with the bot's aim and its
+   * escape headings — so putting a human's seat on the roster would cost every
+   * ally an extra draw and shift every later decision it makes. A 1-human/3-bot
+   * side would then fight differently online than the identical lineup does
+   * offline, which is precisely the difference this brief exists to remove.
+   *
+   * A human's seat therefore contributes nothing here, and loses nothing by it:
+   * Layer A — the ally klaxon and the HUD — is what a human plays on, and it is
+   * derived from the world rather than from this ring.
+   *
+   * FFA DEGRADES STRUCTURALLY, WITH NO MODE CHECK
+   * ---------------------------------------------------------------------------
+   * In FFA a side *is* a seat (`Slot.team === Slot.player`, and `compactRoster`
+   * re-derives it), so every side has exactly one member and `teamRadio` answers
+   * `null` for a roster of one. Nothing below asks {@link matchMode} anything:
+   * `send` on `null` is a no-op that draws no random number, `receive` on `null`
+   * is the shared empty array, and an FFA match is byte-identical to the one that
+   * ran before this method existed (plan §2.5).
+   *
+   * WHY IT IS RE-RUN, AND WHAT SURVIVES
+   * ---------------------------------------------------------------------------
+   * A side's bot roster is not fixed for the match: a dropped pilot's seat gains
+   * one ({@link vacate}) and a reclaimed seat loses one ({@link reclaim}), and a
+   * substitute that could not hear its allies would be the same silence again on
+   * a smaller scale. `TeamRadio.members` is fixed at construction, so a side whose
+   * roster moved gets a **new** ring — and the calls already in the old one are
+   * carried across it, because the side did not stop existing merely because one
+   * of its pilots did. `seq` travels with them, so the total order `receive`
+   * sorts by is continuous across the change. A side whose membership did not
+   * move keeps the very ring it had, which is every tick but a handful.
+   *
+   * The ring stays **outside `World`**, exactly as it is offline: the determinism
+   * replay hashes the world and replays recorded inputs (GDD §4.8), and a channel
+   * in there could desync it — and it would be on the 494-byte wire budget, which
+   * is not ours (plan Trap 5). Nothing here is encoded, broadcast, or predicted.
+   */
+  private wireRadios(): void {
+    // Who is on each side, in ascending seat order (`this.slots` is kept in seat
+    // order, and `teamRadio` sorts anyway — the order is part of the determinism
+    // contract, so it is stated in both places rather than assumed in either).
+    const sides = new Map<number, PlayerId[]>();
+    for (const slot of this.slots) {
+      if (!slot.bot) continue;
+      const members = sides.get(slot.team);
+      if (members) members.push(slot.player);
+      else sides.set(slot.team, [slot.player]);
+    }
+
+    for (const [side, members] of sides) {
+      const standing = this.radios.get(side);
+      if (standing !== undefined && sameMembers(standing, members)) continue;
+      const opened = teamRadio(members);
+      // Carry the chatter across a re-open (above). Bounded by construction: the
+      // old ring holds at most `RADIO_CAPACITY` calls, so this copies at most that.
+      if (opened && standing) {
+        for (const call of standing.calls) opened.calls.push(call);
+        opened.at = standing.at;
+        opened.seq = standing.seq;
+      }
+      this.radios.set(side, opened);
+    }
+    // A side with no bots left on it has no channel to keep open.
+    for (const side of [...this.radios.keys()]) {
+      if (!sides.has(side)) this.radios.delete(side);
+    }
+
+    for (const slot of this.slots) {
+      if (!slot.bot) continue;
+      slot.bot.brain.radio = this.radios.get(slot.team) ?? null;
+    }
+  }
+
+  /**
    * The character that fills the nth bot seat — **the host's pick, when they made
    * one** (GDD §2.1 *amended 2026-08-07*: "the host picks the character and its
    * difficulty is shown, not chosen").
@@ -1478,9 +1614,11 @@ export class MatchRoom {
    * Drop the seats nobody is in and renumber the survivors `0..N-1` (a0-11).
    *
    * Called from {@link startMatch} and nowhere else, in the one instant when a
-   * seat's id can still be changed cheaply: after the bots are seated (so the
-   * roster is final) and before `createWorld` (so no ship, station or snapshot
-   * has ever been keyed by the old number).
+   * seat's id can still be changed cheaply: once the participants are known (so
+   * the roster is final) and before `createWorld` (so no ship, station or
+   * snapshot has ever been keyed by the old number). The bots are seated *after*
+   * this rather than before it, because a bot carries the seat id it was built
+   * with — see {@link startMatch}.
    *
    * Three things travel with the renumbering, and all three are bugs if they do
    * not:
@@ -1773,4 +1911,20 @@ function sameWallet(a: PlayerEconomy, b: PlayerEconomy): boolean {
   const tracks = Object.keys(b.tiers);
   if (Object.keys(a.tiers).length !== tracks.length) return false;
   return tracks.every((track) => a.tiers[track] === b.tiers[track]);
+}
+
+/**
+ * Is this side's standing channel already the channel these members need
+ * ({@link MatchRoom.wireRadios})? — the test for "nothing changed", which is the
+ * answer on every tick but the handful where a seat changes hands.
+ *
+ * `null` is a real answer and not a missing one: it is the channel a side of one
+ * gets, so a side that is still a side of one is still up to date. Both lists are
+ * in ascending seat order (`teamRadio` sorts, and the caller walks the slots in
+ * order), so this compares elementwise rather than as sets.
+ */
+function sameMembers(standing: TeamRadio | null, members: readonly PlayerId[]): boolean {
+  if (!standing) return members.length < 2;
+  if (standing.members.length !== members.length) return false;
+  return standing.members.every((id, i) => id === members[i]);
 }
