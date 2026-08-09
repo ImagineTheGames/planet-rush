@@ -72,8 +72,14 @@ both keys (the brief's evidence line).
 
 ## NEXT
 
-- Nothing outstanding. **PR #342 open, all four DoD gates PASS.** Awaiting
-  review + merge.
+- **DONE. PR #342 is MERGED** (`be3c5dd` on main). All four DoD gates PASS on
+  the merged state, re-taken 2026-08-09c: `tsc --noEmit` clean; suite 255 files
+  / 4423 tests / 0 failures; `origin/main` an ancestor of HEAD; PR state MERGED.
+- One housekeeping step that session: the ancestor gate had gone red for a
+  purely mechanical reason — main was exactly one commit ahead, and that commit
+  *was* #342's own merge. Fast-forwarded the branch onto `be3c5dd` and pushed
+  (ff-only, no rebase). `git diff origin/main...HEAD` was already empty before
+  the merge: every deliverable was in main. Nothing was rebuilt.
 - **Session 2026-08-09b: main moved twice under this branch, both merged.**
   The rest of the P1 chain landed while #342 sat open:
   - `#344` **p1-03 level curve** — added `src/progression/curve.test.ts` (15
