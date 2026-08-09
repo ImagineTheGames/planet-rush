@@ -36,6 +36,29 @@ export interface Platform {
   storage: {
     get(key: string): string | null;
     set(key: string, value: string): void;
+    /**
+     * Retire a key. **For MIGRATION, and there is no reset button in this game**
+     * (pr-06; `docs/progression-plan.md` §2.1, §Q4).
+     *
+     * The seam was `get`/`set` and nothing else, and the thing that used to want
+     * a third method — a "reset my progress" button — is **cancelled**: the
+     * developer ruled that progression is never wiped (*"no."*, 2026-08-07).
+     * That ruling is exactly what makes this method necessary rather than
+     * unnecessary. With no reset path, **schema migration is the only repair
+     * tool the profile will ever have**, and a migration that must *replace* a
+     * blob can do it with `set` while one that must *retire a key* cannot. The
+     * concrete case is pr-01's `planet-rush:profile.bak`: a blob preserved out of
+     * harm's way is meant to be cleared once it has been recovered, and until now
+     * the only way to "clear" it was to write an empty string over it, which is
+     * a key that still exists holding a value no reader can classify.
+     *
+     * **Removing an absent key is a no-op**, like `localStorage.removeItem` — a
+     * caller that does not know whether a key is there is the normal caller.
+     *
+     * No UI reaches this, and none may be added: a control that clears a career
+     * is precisely the thing §Q4 refused.
+     */
+    remove(key: string): void;
   };
   /** Lock orientation where supported (landscape; cuttable per §4.9). */
   lockOrientation(orientation: 'landscape' | 'portrait'): Promise<void>;
@@ -140,6 +163,13 @@ export function createBrowserPlatform(): Platform {
           localStorage.setItem(key, value);
         } catch {
           /* quota / private mode — settings just don't persist this session */
+        }
+      },
+      remove(key: string): void {
+        try {
+          localStorage.removeItem(key);
+        } catch {
+          /* private mode / disabled storage — the key was never ours to hold */
         }
       },
     },

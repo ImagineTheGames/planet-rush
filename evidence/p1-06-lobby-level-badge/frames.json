@@ -1,0 +1,89 @@
+{
+  "viewport": {
+    "width": 844,
+    "height": 390
+  },
+  "frames": [
+    {
+      "frame": "1-lobby-roster.png",
+      "what": "the lobby roster: LVL 7 on your own row, and on no other",
+      "you": 0,
+      "badges": [
+        "LVL 7",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "badged": 1
+    },
+    {
+      "frame": "3-your-row-crop.png",
+      "what": "the badged row at the size it is drawn — LVL 7 in the trailing chip",
+      "clip": {
+        "x": 0,
+        "y": 113,
+        "width": 322,
+        "height": 60
+      }
+    },
+    {
+      "frame": "4-a-bot-row-crop.png",
+      "what": "a BOT row at the same crop: the same chip carries a tier, never a level",
+      "botRow": 1,
+      "clip": {
+        "x": 0,
+        "y": 269,
+        "width": 322,
+        "height": 60
+      }
+    },
+    {
+      "frame": "5-lobby-at-level-2.png",
+      "what": "the same roster at a level-2 career — the number moves with the profile",
+      "badges": [
+        "LVL 2",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "frame": "2-in-match-nameplates.png",
+      "what": "the SAME seat in the match: the nameplate carries no level, and the lobby is gone",
+      "lobbyBadgesBeforeRush": [
+        "LVL 7",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      "lobbyVisibleAfterRush": false,
+      "lobbyBadgesAfterRush": [
+        "LVL 7",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ]
+    },
+    {
+      "frame": "6-frozen-scene-no-levels.png",
+      "what": "the frozen debug world: every nameplate on screen, not a level or an XP figure among them",
+      "profileSeededAt": 7
+    }
+  ]
+}

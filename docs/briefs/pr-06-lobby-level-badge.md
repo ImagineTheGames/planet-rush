@@ -92,3 +92,105 @@ carrying none. The pair is the ruling, shown.
 ## Open questions this brief is exposed to
 
 **None.** §Q2 is ratified and unusually specific.
+
+---
+
+## AS BUILT *(p1-06, branch `agent/ui/p1-06-lobby-level-badge`)*
+
+The brief was implemented as written except where it and
+`docs/progression-plan.md` disagreed. **The plan wins** (the chain says so), so
+the one disagreement is corrected here rather than shipped.
+
+### 1. THE CORRECTION — "not even your own" is too strong, and the plan says so
+
+**The brief, above:** *"no other surface in the game renders a level or any XP …
+raw XP is private to its owner, always — the badge shows a level, never an XP
+total, not even your own."*
+
+Read literally, that forbids two things the developer ratified **in the same
+pass** and that were merged before this lane started:
+
+- **The end-of-match summary** counts up your own XP and fills your own level bar
+  — plan §6.3 beats 2–4, from the developer's own words: *"the progress bar
+  filling up to show you current level, whats left till next level as it fills
+  up"*. Shipped by pr-05 (#347).
+- **The hangar** shows a `LEVEL n` block and an XP figure on the front door
+  (a0-14, `src/ui/hangar.ts`).
+
+The brief concedes the point itself, two paragraphs later, by scoping its own
+test to *"`end-of-match.ts`'s **opponent-facing paths**"* rather than to the whole
+file. So the sentence is the loose one, not the rule.
+
+**Built to the plan's reading**, which §Q2 and the GDD §2.12 draft both state:
+**a level badge sits on a lobby seat row and nowhere else — never on an in-match
+nameplate, never in the HUD, never on the end screen for anyone but yourself —
+and nobody else's level is shown anywhere, ever.** Your own career on your own
+screen is the owner reading their own record; an opponent's is what §2.2 fogs.
+`src/ui/level-badge.test.ts`'s header states this in as many words, so the next
+lane inherits the reasoning rather than re-deriving it.
+
+Asserting the literal sentence was rejected: it would have failed on `main` the
+day it was written, against two ratified screens.
+
+### 2. The five tests, as built — `src/ui/level-badge.test.ts` (17 tests)
+
+1. **The badge renders.** A profile at level 7 (XP written through
+   `saveProfile`, level read back through `loadProfile`) puts **`LVL 7`** on the
+   local seat's row. The copy is `LVL`, not `LEVEL`: the chip is
+   `ROSTER.trailingWidth` = 54 px and floors at 40, where `MEDIUM` already
+   auto-fits down — `LEVEL 7` is longer. Plus: the badge follows the local seat
+   through `seatLocalPlayer` (online, the seat is the server's), exactly one row
+   is badged at every match size, and no lobby string matches `/\bxp\b/i`.
+2. **A fresh profile reads level 1**, and so does a lobby opened with no level at
+   all — never blank, never `undefined`, never `NaN`. A junk level folds to 1 at
+   both the seam and the formatter.
+3. **Bots and remote seats show no badge.** Bot rows, an OPEN row, a CLOSED row —
+   and a **wire-seated** remote human, folded in through a real `lobbyState`
+   broadcast, with the broadcast's own slots asserted to carry no level field
+   (`../net/transport` `LobbySlot` has none and must not grow one).
+4. **THE ABSENCE**, with the ruling quoted in the test names: a source scan for
+   any printable string matching `/\b(lvl|level|xp)\b/i` over `nameplates.ts`,
+   `nameplates-view.ts`, `hud.ts` and `chrome.ts` (comments stripped — those
+   files discuss levels at length and must be allowed to), plus behavioural
+   passes over `nameplateModel` (ship + station, TEAMS, tier suffix, own-ship
+   label — every channel a level could ride in on) and over `endOfMatchModel`'s
+   four outcomes, checking values **and keys**.
+5. **`remove` deletes a key** and is a no-op on a key that is not there — plus a
+   removed key can be written again, and a throwing store (private mode, quota)
+   degrades to a no-op rather than throwing into game code.
+
+### 3. The DoD's fourth line, tightened as the brief invited
+
+The smoke grep `grep -rniE '\blevel\b|\bxp\b' src/ui/nameplates.ts | grep -viE
+'levelling|//|\*'` **passes unchanged** — it was not noisy against the shipped
+file, so nothing needed tightening. It is still the weaker instrument, for the
+reason the brief gives: it reads one file and cannot tell a comment from a label
+in the general case. Test 4 is the guarantee.
+
+### 4. Where the badge sits, and what it did not cost
+
+In the roster row's **trailing tier chip** — the rect a bot row spends on
+`EASY`/`MEDIUM`/`HARD`. The two can never both want it, so the badge takes a rect
+that was already laid out and already empty on your row: **no new segment** in
+`lobby-geometry.ts` `seatTrailing`, nothing else on the row narrows, and the
+order of surrender a narrowing row keeps is untouched. It draws on the `inert`
+surface (it is a value, not a control) and the hit test is unchanged —
+`lobbyHitTest` already declines to name the tier rect, so a tap there still falls
+through to the row body.
+
+### 5. A finding about the goldens, not a footnote
+
+**All five lobby baselines passed unchanged against the build that added the
+badge.** They shoot the whole frame at `maxDiffPixelRatio: 0.01`, which on a
+dpr-3 phone is ~29 600 pixels of slack; a ~54 × 48 px chip is an order of
+magnitude under it. Both halves were fixed: the five baselines were re-generated,
+and **two new region goldens** shoot the chip's own bounds (desktop and the
+landscape phone, where the trailing chips are narrowest), reading the region off
+`__lobby.levelBadgeBounds` — the client's own report of where it drew, never a
+rect the spec computed. The seam gained `levelBadges` and `levelBadgeBounds`,
+pure read-back.
+
+### 6. Not built, deliberately
+
+No reset button — `remove` exists for migration and nothing calls it yet (§Q4).
+No unlock content (§4 designs none). No level on the wire.

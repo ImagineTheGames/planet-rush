@@ -199,6 +199,10 @@ interface SeatNodes {
   /** `· 245ms` — this player's round trip, beside their name, colour-graded
    *  (ratified developer). Human rows only; a bot has no ping (`src/net/ping`). */
   readonly ping: Text;
+  /** `LVL 7` — **your own row only**, in the trailing chip a bot row spends on
+   *  its tier (pr-06; plan §Q2). Null on every other seat, which is the half of
+   *  the ruling that needed a test (`./level-badge.test.ts`). */
+  readonly levelLabel: Text;
 }
 
 interface ClassNodes {
@@ -619,6 +623,11 @@ export class LobbyView extends Container {
     const teams = model.mode === 'teams';
     const helpShown = this.drawHelpControl(nodes, seat, helpRect, m);
     const tierShown = this.drawDifficultyChip(nodes, seat, chipRect, m);
+    // Your level rides in the SAME chip a bot row spends on its tier (pr-06),
+    // and the two can never both want it: the tier chip is bot-only and the badge
+    // is your-own-seat-only. One rect, one exclusive occupant, no new geometry
+    // and nothing else on the row moves.
+    const badgeShown = this.drawLevelBadge(nodes, seat, chipRect, m);
     const teamShown = this.drawTeamChip(nodes, seat, teamChipRect, teams, closed, m);
 
     // Where the row's trailing furniture actually begins — the leftmost chip that
@@ -627,7 +636,7 @@ export class LobbyView extends Container {
     // its own body rather than drawn under the side chip.
     const chipsLeft = teamShown
       ? teamChipRect.x
-      : tierShown
+      : tierShown || badgeShown
         ? chipRect.x
         : helpShown
           ? helpRect.x
@@ -784,6 +793,70 @@ export class LobbyView extends Container {
   }
 
   /**
+   * The **level badge** — `LVL 7` on the local player's row, and on no other row
+   * on this screen, and on no other screen in the game. Returns whether it was
+   * drawn.
+   *
+   * ---------------------------------------------------------------------------
+   * THE RULING, AND WHY IT IS SATISFIED BY A `null` RATHER THAN BY CARE
+   * ---------------------------------------------------------------------------
+   * The developer, 2026-08-07: *"we can show the LEVEL but not XP (and show it
+   * only in the lobby)."* This method draws whatever `seat.levelBadge` holds and
+   * decides nothing: the model has already resolved the badge to `null` on a bot
+   * (no profile), on a remote human (their level is a number their client
+   * authored — plan §2.2, there are no accounts), and on an OPEN or CLOSED seat
+   * (nobody is in it). There is deliberately no `isYou` test here — one condition,
+   * in one place, tested in `./level-badge.test.ts` as an absence.
+   *
+   * ---------------------------------------------------------------------------
+   * WHERE IT SITS, AND WHY THAT COSTS NOTHING
+   * ---------------------------------------------------------------------------
+   * In the row's trailing **tier chip** rect — the one a bot row spends on
+   * `EASY`/`MEDIUM`/`HARD`. The two are mutually exclusive by construction (the
+   * tier chip is bot-only; the badge is your-seat-only), so the badge takes a rect
+   * that was already laid out and already empty on your row: no new segment in
+   * `./lobby-geometry` `seatTrailing`, nothing else on the row narrows, and the
+   * order of surrender a narrowing row keeps (`SEAT_HELP_WIDTH`) is untouched.
+   *
+   * It is drawn on the `inert` surface, like the tier chip beside it and for the
+   * same reason: **it is a value, not a control.** The hit test does not name it
+   * (`./lobby-geometry` `lobbyHitTest` — the tier rect is not a target), so a tap
+   * that lands on it falls through to the row body exactly as it did before, where
+   * the character cycle refuses on a human seat. A dead-looking button beats a
+   * lying one, and a thing that is not a button at all has to look like one even
+   * less.
+   *
+   * No hue: a career is not ore and not danger (style-guide §2), so the badge is
+   * the same Bone ramp every other read-out on this screen wears.
+   */
+  private drawLevelBadge(
+    nodes: SeatNodes,
+    seat: LobbySeatView,
+    chip: Rect,
+    m: FrameMetrics,
+  ): boolean {
+    const badge = seat.levelBadge;
+    const visible = badge !== null && chip.width > 0 && chip.height > SEAT_CONTROL_MIN_HEIGHT;
+    nodes.levelLabel.visible = visible;
+    if (!visible) return false;
+
+    drawDeadOrLive(nodes.body, chip, false);
+    const px = plateTypeSize(ROW_LABEL_PX, m);
+    nodes.levelLabel.text = badge;
+    nodes.levelLabel.style.fontSize = px;
+    nodes.levelLabel.style.letterSpacing = trackingPx(TRACKING.label, px);
+    // One ramp step brighter than the tier chip's word: this row is yours, and
+    // the badge is the only thing on the roster that is about *you* rather than
+    // about the seat. Still no hue — the brightness does the work, exactly as
+    // your row's hairline does (see {@link drawSeat}).
+    nodes.levelLabel.style.fill = MATERIAL_SHADES.bone;
+    fitLabel(nodes.levelLabel, chip.width - 2 * STATE_LABEL_PAD);
+    nodes.levelLabel.x = chip.x + chip.width / 2;
+    nodes.levelLabel.y = chip.y + chip.height / 2;
+    return true;
+  }
+
+  /**
    * The trailing **`?` control** — a plain tap opens this seat's character's codex
    * dossier *(a0-06; the developer asked for "a ? question mark icon that you can
    * press to show a tooltip with the codex entry about that bot")*. Bot rows only:
@@ -909,12 +982,26 @@ export class LobbyView extends Container {
     teamChipLabel.anchor.set(0.5, 0.5);
     const helpLabel = makeText('', FONT_HEADING, ROW_LABEL_PX, MATERIAL_SHADES.bone);
     helpLabel.anchor.set(0.5, 0.5);
+    // `LVL 7` — your own row's badge, in the chip a bot row spends on its tier.
+    const levelLabel = makeText('', FONT_HEADING, ROW_LABEL_PX, MATERIAL_SHADES.bone);
+    levelLabel.anchor.set(0.5, 0.5);
     // Numerals face, like every other number on this screen; the colour is set
     // per-frame from the grade.
     const ping = makeText('', FONT_BODY, DETAIL_PX, PING_GRADE_COLORS.good);
     ping.anchor.set(0, 0.5);
 
-    this.addChild(body, stateLabel, decal, name, detail, chipLabel, teamChipLabel, helpLabel, ping);
+    this.addChild(
+      body,
+      stateLabel,
+      decal,
+      name,
+      detail,
+      chipLabel,
+      teamChipLabel,
+      helpLabel,
+      ping,
+      levelLabel,
+    );
     const nodes: SeatNodes = {
       body,
       stateLabel,
@@ -925,6 +1012,7 @@ export class LobbyView extends Container {
       teamChipLabel,
       helpLabel,
       ping,
+      levelLabel,
     };
     this.seatNodes[index] = nodes;
     return nodes;
@@ -1277,6 +1365,7 @@ function hideRow(nodes: SeatNodes): void {
   nodes.teamChipLabel.visible = false;
   nodes.helpLabel.visible = false;
   nodes.ping.visible = false;
+  nodes.levelLabel.visible = false;
 }
 
 function touchOpts(isTouch: boolean, insets?: Insets): { isTouch: boolean; insets?: Insets } {

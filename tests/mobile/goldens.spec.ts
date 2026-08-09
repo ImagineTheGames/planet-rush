@@ -1348,3 +1348,110 @@ test('golden: PORTRAIT-HELD phone lobby — the roster survives the lock', async
   await openLobby(page);
   await expect(page).toHaveScreenshot('phone-portrait-lobby.png', MENU_GOLDEN);
 });
+
+// ---------------------------------------------------------------------------
+// The level badge (pr-06) — and why a full-frame baseline could not see it
+// ---------------------------------------------------------------------------
+//
+// The developer, 2026-08-07: *"we can show the LEVEL but not XP (and show it
+// only in the lobby)."* The badge that answers it is a ~54 × 48 px chip on the
+// local player's roster row.
+//
+// The five lobby baselines above shoot the WHOLE frame at `maxDiffPixelRatio:
+// 0.01`. On a dpr-3 phone that is ~29 600 pixels of slack, and the badge occupies
+// an order of magnitude fewer — so all five passed, unchanged, against the very
+// build that added it. That is not the tolerance being wrong (it is there for
+// font and GPU antialiasing, and this file's header explains why it must stay
+// small but non-zero); it is a full-frame diff being the wrong instrument for a
+// chip this size.
+//
+// So this shoots the chip's own bounds, where the badge IS most of the frame and
+// 1% is antialiasing slack again rather than a blind spot. The region comes from
+// the client's own report of where it drew the badge (`__lobby.levelBadgeBounds`,
+// physical CSS px through the landscape-lock rotation) — the same discipline as
+// every other press point in this file: never a rect this spec computed.
+//
+// It cannot be a whole-lobby baseline for the same reason it cannot be a
+// nameplate one: what is asserted here is that the badge is DRAWN, and the far
+// more important claim — that it is drawn NOWHERE ELSE — is a unit test with the
+// developer's sentence quoted in it (`src/ui/level-badge.test.ts`), because an
+// absence has no pixels to photograph.
+
+/** The badge's own bounds as the client reports having drawn them, or null. */
+async function levelBadgeRegion(
+  page: Page,
+): Promise<{ x: number; y: number; width: number; height: number } | null> {
+  return page.evaluate(() => {
+    const l = (
+      window as unknown as {
+        __lobby?: {
+          levelBadgeBounds: { x: number; y: number; width: number; height: number } | null;
+        };
+      }
+    ).__lobby;
+    return l?.levelBadgeBounds ?? null;
+  });
+}
+
+/** The words the roster actually drew in each seat's badge slot — one per seat,
+ *  `null` on every row that is not the local player's. */
+async function levelBadgeWords(page: Page): Promise<readonly (string | null)[]> {
+  return page.evaluate(() => {
+    const l = (window as unknown as { __lobby?: { levelBadges: readonly (string | null)[] } })
+      .__lobby;
+    return l?.levelBadges ?? [];
+  });
+}
+
+test('golden: desktop lobby — the level badge on YOUR row, and no other', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot → PLAY → PLAY SOLO → lobby settle → read the badge bounds back → one region golden comparison',
+    measuredSeconds: 6,
+  });
+
+  await openLobby(page);
+
+  // The ruling, read off the running client before a single pixel is compared:
+  // exactly one row carries a badge, it is this client's seat, and it is a LEVEL.
+  const words = await levelBadgeWords(page);
+  expect(words.length, 'the lobby reports a badge slot for every seat').toBe(8);
+  expect(words.filter((w) => w !== null), 'exactly one row carries a level badge').toHaveLength(1);
+  for (const word of words) expect(word ?? '').not.toMatch(/\bxp\b/i);
+
+  const region = await levelBadgeRegion(page);
+  expect(region, 'the lobby reports where it drew the badge').not.toBeNull();
+  await expect(page).toHaveScreenshot('desktop-lobby-level-badge.png', {
+    ...MENU_GOLDEN,
+    clip: region!,
+  });
+});
+
+test('golden: landscape phone lobby — the level badge under a thumb', async ({
+  page,
+}, testInfo) => {
+  // The phone is the tight case: the trailing chips are narrowest here
+  // (`src/ui/lobby-geometry` — the row's order of surrender), so this is where a
+  // badge would be fitted down to a smudge or dropped whole if the copy ever grew.
+  test.skip(testInfo.project.name !== 'iphone', 'one landscape phone baseline only (iphone)');
+  budgetTest({
+    work: 'rotate to landscape → boot → PLAY → PLAY SOLO → lobby settle → read the badge bounds back → one region golden comparison at dpr 3',
+    measuredSeconds: 16,
+  });
+
+  await rotateToLandscape(page);
+  await openLobby(page);
+
+  const words = await levelBadgeWords(page);
+  expect(words.filter((w) => w !== null), 'exactly one row carries a level badge').toHaveLength(1);
+  for (const word of words) expect(word ?? '').not.toMatch(/\bxp\b/i);
+
+  const region = await levelBadgeRegion(page);
+  expect(region, 'the lobby reports where it drew the badge').not.toBeNull();
+  await expect(page).toHaveScreenshot('phone-landscape-lobby-level-badge.png', {
+    ...MENU_GOLDEN,
+    clip: region!,
+  });
+});
