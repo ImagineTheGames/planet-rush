@@ -71,10 +71,12 @@ the five decisions the brief left open are annotated in it under *AS BUILT*.
 
 ## VERIFIED
 
-- `npx tsc --noEmit` — clean.
-- `npm test -- --run` — **259 files, 4521 tests, all passing** (496 s), taken at
-  `8f407ca`; `d2a64ed` after it touches only the audio wiring in `src/main.ts`,
-  which no unit test covers, and typechecks clean.
+- `npx tsc --noEmit` — clean, re-taken on the tip.
+- `npm test -- --run` — **259 files, 4521 tests, all passing**, re-taken on the tip
+  `639dcf8` (499 s; the same counts as the first run at `8f407ca`).
+- **The skip's other half, on the booted client:** `evidence/…/skip-consumes-the-
+  first-tap.mjs` — tap one skips and builds no world (`matchId` 1 → 1, `done`
+  true), tap two rematches (`matchId` 2, screen `none`). PASS.
 - Golden suite (`tests/mobile/goldens.spec.ts`, both projects): **38 passed**, on
   the re-baselined `desktop-end-of-match`; the `phone-portrait-eliminated` shot
   did not move. The end-of-match golden was re-run twice more and held.
