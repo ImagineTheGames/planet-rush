@@ -37,6 +37,13 @@ import type { Action, PlayerId, ShipClass } from '@shared/types';
 // (`MatchConfig`), because the lobby, the wire and the world must all spell the
 // two modes identically or "TEAMS" means something different at each hop.
 import type { MatchMode } from '../sim/match-config';
+// Type-only, same reason again: the ore-abundance level is the sim's own union
+// (`./constants` `Abundance`), because the lobby's YIELD row, this wire and
+// `createWorld` must all spell `scarce | standard | rich` identically — a
+// hand-copied union here would be a place for the economy to drift, and an
+// abundance that does not survive the hop is a match built at a yield the lobby
+// never promised (n5-01).
+import type { Abundance } from '../sim/constants';
 // Type-only, and for the same reason as the mode above: the cast the host picks
 // is `src/bots`' own union (GDD §2.9), because the lobby, the wire and the room
 // must spell "warden" identically or the character does not survive the hop —
@@ -214,6 +221,26 @@ export interface LobbyChoiceMessage {
    * only which seats share a value matters, never the value itself.
    */
   teams?: readonly number[];
+  /**
+   * The ore ABUNDANCE the host's lobby is on — the YIELD row, `scarce | standard
+   * | rich` (GDD §2.8, ratified p11; the interval spread widened by a0-17).
+   *
+   * The same seam {@link mode} rides, for the same reason and with the same
+   * failure when it is missing: the lobby has shown a `YIELD · SCARCE` chip since
+   * p11 and nothing carried the level to the room, so **every online match was
+   * built at `standard`** — the value `resolveEconomy` falls back to when nobody
+   * says otherwise. Measured on a live fly.io gameserver at `7e175ac`: the chip
+   * read SCARCE and the wave clock read a 150 s interval where SCARCE is 180
+   * (n5-01).
+   *
+   * Static match config, settled *before* the sim exists: it rides this
+   * low-frequency lobby message, never the 30 Hz snapshot (spike §S2, Trap 7).
+   * Honored from the room creator only, like every field above — a joiner cannot
+   * re-price the room's economy. Absent from a pre-n5-01 client (and from a
+   * joiner), which reads as "no opinion" and leaves the room on the ratified
+   * SCARCE default it opened with (`server/room.ts`, `DEFAULT_ABUNDANCE`).
+   */
+  abundance?: Abundance;
 }
 
 /** The room creator starts the match (fills empty slots with bots server-side). */
@@ -468,6 +495,26 @@ export interface MatchStartMessage {
   bounds?: { width: number; height: number };
   /** Asteroids per wave, when the room overrode the sim default. */
   asteroidCount?: number;
+  /**
+   * **The ore abundance the room RUSHed with** — the level authority built its own
+   * world at (`createWorld`'s `abundance`, `src/sim/constants` `resolveEconomy`).
+   *
+   * This message is the client's world constructor call, and abundance is one of
+   * its arguments: it decides the field's total ore, its rock counts, and the wait
+   * between waves. A client that guessed it would predict a different economy from
+   * the one the server is spawning — a predicted 180 s wave against an
+   * authoritative 150 s one is worse than the honest 150, because the wave clock,
+   * the bots' `waveTime` and the collapse deadline would all read a metronome the
+   * rocks do not keep.
+   *
+   * So it is TOLD, not guessed, on exactly the terms the seed and the roster are.
+   * Optional, and an absent value must be threaded to `createWorld` as absent
+   * rather than defaulted here: a pre-n5-01 server built its world with no
+   * abundance at all (the `standard` baseline), so a client that helpfully
+   * substituted the product's SCARCE default would desynchronise itself against
+   * precisely the servers this field exists to agree with (n5-01).
+   */
+  abundance?: Abundance;
 }
 
 /** One seat at RUSH!, as the world was built from it. */

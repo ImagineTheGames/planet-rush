@@ -57,6 +57,7 @@ import type { Action, ActionType, BuildItem, Vec2 } from '@shared/types';
 import { ShipClass, UpgradeTrack } from '@shared/types';
 import { playtestLog } from './playtest-log';
 import type { MatchMode } from '../sim/match-config';
+import type { Abundance } from '../sim/constants';
 // The one RUNTIME import this parser takes from outside `src/net`, and it is
 // deliberate: the set of characters the wire admits is the cast itself (GDD §2.9),
 // read from `ROSTER` rather than re-typed as a seven-word union here. A hand-copied
@@ -213,6 +214,11 @@ export function parseClientMessage(frame: WireFrame): ClientMessage | null {
       // …and the per-seat OPEN / BOT / CLOSED authoring (a0-11), on the same
       // dropped-not-refused terms as the two above.
       const seats = parseSeatStates(raw['seats']);
+      // …and the ore ABUNDANCE the host's YIELD row is on (n5-01), on those same
+      // terms: an unknown level is dropped, never coerced, so a stale or hostile
+      // string leaves the room on the abundance it already had — always a legal
+      // economy — instead of costing the sender their hull pick.
+      const abundance = parseAbundance(raw['abundance']);
       return {
         type: 'lobbyChoice',
         shipClass,
@@ -222,6 +228,7 @@ export function parseClientMessage(frame: WireFrame): ClientMessage | null {
         ...(mode ? { mode } : {}),
         ...(teams ? { teams } : {}),
         ...(seats ? { seats } : {}),
+        ...(abundance ? { abundance } : {}),
       };
     }
     case 'startMatch':
@@ -388,6 +395,20 @@ function parseFireMode(value: unknown): FireMode | null {
  *  absent/unknown — the server then keeps the mode the room was allocated with. */
 function parseMatchMode(value: unknown): MatchMode | null {
   return value === 'ffa' || value === 'teams' ? value : null;
+}
+
+/**
+ * The ore abundance a host's `lobbyChoice` claims (n5-01, GDD §2.8), or null for
+ * absent/unknown — the room then keeps the level it already has.
+ *
+ * The three ratified words and nothing else. Spelled out here rather than checked
+ * against `ABUNDANCE`'s keys because this file is the server's front door and its
+ * rule is that no field is trusted: an allow-list of three literals cannot admit a
+ * fourth level by accident, and if a fourth is ever ratified the table and this
+ * line move together or the wire visibly refuses it.
+ */
+function parseAbundance(value: unknown): Abundance | null {
+  return value === 'scarce' || value === 'standard' || value === 'rich' ? value : null;
 }
 
 /**

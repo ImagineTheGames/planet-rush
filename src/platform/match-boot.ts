@@ -31,7 +31,7 @@
 
 import type { Action, PlayerId, ShipClass } from '@shared/types';
 import { TICK_DT } from '../sim';
-import type { PlayerSpec, World } from '../sim';
+import type { Abundance, PlayerSpec, World } from '../sim';
 import { LocalLoopback, OFFLINE_ROOM, TransportSession } from '../net';
 import { MATCH_SLOTS, ROSTER, botLobby, createBots, fillEmptySlots, thinkOnce } from '../bots';
 import type { Bot, PersonalityId } from '../bots';
@@ -100,6 +100,33 @@ export interface MatchBootConfig {
    * eight slots over seven characters, three of them Hard, cannot avoid one.
    */
   readonly cast?: readonly (PersonalityId | null | undefined)[];
+  /**
+   * **The ore abundance the lobby RUSHed with** — the YIELD row, `scarce |
+   * standard | rich` (GDD §2.8, ratified p11; the interval spread widened by
+   * a0-17). *(n5-01, 2026-08-09.)*
+   *
+   * The last of the lobby's picks that never travelled. The YIELD row has been on
+   * screen since p11 and `LobbyChoice` has carried the level to this call site
+   * since Milestone E; this config had no field to put it in, so it stopped here
+   * and the world was built with no abundance at all — which `resolveEconomy`
+   * reads as the pre-p11 `standard` baseline. Measured on the live build at
+   * `7e175ac`: the lobby chip read `YIELD · SCARCE` and the wave clock read a
+   * 150 s interval, where SCARCE is 180.
+   *
+   * It rides `WorldConfig` from here, so `LocalLoopback` spreads it straight into
+   * `createWorld` and `world.economy` is the one the lobby promised — the field's
+   * total ore, its rock counts and its wave metronome together, not just the
+   * clock (`src/sim/constants` `resolveEconomy`).
+   *
+   * **Optional, and absent means absent.** A boot that names no level (the QA
+   * harness, `?debug=1`, every existing test) passes none to `createWorld` and is
+   * byte-for-byte the world it built before — the same discipline `createWorld`
+   * keeps for exactly these callers (`src/sim/state.ts`, `resolveEconomy`'s
+   * `standard` default). The ratified SCARCE default is the *lobby's*
+   * (`DEFAULT_ABUNDANCE`, `matchAbundance`), and it is applied where a player is
+   * actually promised something.
+   */
+  readonly abundance?: Abundance;
   /** Fixed timestep. Defaults to the sim's canonical 60 Hz tick. */
   readonly dt?: number;
 }
@@ -161,6 +188,12 @@ export function bootOfflineMatch(config: MatchBootConfig): MatchBoot {
       // through `LocalLoopback.startMatch` → `createWorld`, which builds the layout
       // (or falls back to the default for an unknown id).
       ...(config.mapId !== undefined ? { mapId: config.mapId } : {}),
+      // The ore abundance the lobby RUSHed with (n5-01). Same one-line thread as
+      // the arena above and the same seam: `LocalLoopback.startMatch` spreads this
+      // whole config into `createWorld`, so a level named here is the economy the
+      // offline world is built at — and a boot that names none builds exactly the
+      // world it built before.
+      ...(config.abundance !== undefined ? { abundance: config.abundance } : {}),
     },
     localPlayer: config.localPlayer,
     dt,

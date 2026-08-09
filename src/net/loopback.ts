@@ -71,8 +71,11 @@ export const OFFLINE_ROOM: RoomCode = 'LOCAL';
 
 /** How to stand up an offline match. */
 export interface LoopbackConfig {
-  /** The match to create at `startMatch`: seed, slots, bounds (GDD §2.1). Ship
-   *  classes may still be changed by `lobbyChoice` before the match starts. */
+  /** The match to create at `startMatch`: seed, slots, bounds, and the ore
+   *  ABUNDANCE the lobby RUSHed with (GDD §2.1, §2.8) — the whole config is
+   *  spread into `createWorld`, so a level set here is the economy the offline
+   *  world is actually built at (n5-01). Ship classes may still be changed by
+   *  `lobbyChoice` before the match starts. */
   readonly match: WorldConfig;
   /** Which slot this client is flying. Default 0. */
   readonly localPlayer?: PlayerId;
@@ -270,6 +273,14 @@ export class LocalLoopback implements Transport, LocalAuthority {
       ...(this.config.match.bounds ? { bounds: { ...this.config.match.bounds } } : {}),
       ...(this.config.match.asteroidCount !== undefined
         ? { asteroidCount: this.config.match.asteroidCount }
+        : {}),
+      // The ore abundance this world was built at (n5-01) — carried for the same
+      // reason as the two overrides above: offline nobody reads it back, but the
+      // protocol is the protocol with the wire removed, so a `matchStart` that
+      // named a different economy from the world beside it would be the one place
+      // the two transports could disagree about what RUSH! means.
+      ...(this.config.match.abundance !== undefined
+        ? { abundance: this.config.match.abundance }
         : {}),
     });
     this.broadcastSnapshot();
