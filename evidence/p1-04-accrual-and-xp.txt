@@ -1,0 +1,56 @@
+=== p1-04 — ONE REAL MATCH, OBSERVED (accrual.ts) AND PRICED (xp.ts) ===
+shipped bot cast · N=8 · default map · read off pr-02 `world.credit`, nothing reconstructed
+
+MATCH: MIXED cast (shipped fill order) · seed 1 · 828.8s · ended=true
+
+slot  bot               tier     ore  banked    used   dmgHP   shipK   statK    dist   ships  struct    upgr     rep    wave   place      XP
+  0   rusty             easy    38.8    31.8    24.0     799      11       0   58580       6       7       0     1.0       5       5     431
+  1   bolt              easy    12.1     8.1     9.0     490       4       0   60631      23       3       0     0.0       5       6     236
+  2   foreman         medium    46.0    28.6    29.0    1721      34       0   81410      24       4       4     0.0       5       2     740
+  3   patch           medium    40.5    23.9    27.0    1446      31       0   60329      29       5       3     3.0       5       4     687
+  4   sable             hard    41.5    10.8    14.0    1768      27       0   86322      46       3       1     1.0       5       3     594
+  5   vulture           hard    24.0     7.5    12.0     458       7       0   36415      14       3       1     1.0       3       7     251
+  6   warden            hard    80.9    49.1    56.0    2441      38       5   94428      21       6       7     0.0       5       1    1262
+  7   rusty             easy     9.6     9.3     9.0     197       2       0   10079       4       3       0     0.0       1       8     112
+
+XP ROWS — slot 6 (warden, hard), placed 1/8:
+  ORE MINED                 80.9     81 XP
+  DAMAGE DEALT            2441.4    203 XP   × opponent tier
+  SHIPS DESTROYED           38.0    205 XP   × opponent tier
+  STATIONS DESTROYED         5.0     48 XP   × opponent tier
+  ORE BANKED                49.1     98 XP
+  DEFENCES BUILT             6.0     72 XP
+  UPGRADES BOUGHT            7.0    140 XP
+  REACTOR PATCHED            0.0      0 XP
+  WAVES SURVIVED             5.0     75 XP
+  PLACEMENT                  7.0    140 XP
+  MATCH WON                  1.0    200 XP
+  TOTAL                            1262 XP
+  (rows sum to total: true)
+
+=== BESIDE `spikes/progression/measured-a0-13.txt` (per-player medians) ===
+this run: seeds 1,2,3,4 (4 matches per lobby) · spike: seeds 1..12 (12 each)
+
+lobby                               src          ore    dmgHP    shipK    statK     used     dist    ships     secs    medXP
+EASY  mirror (Rusty/Bolt)           p1-04       30.4    275.1      5.5      0.0     16.0  60166.9      4.5    850.0    357.0
+                                    a0-13       28.2    228.0      4.0      0.0     14.0  57705.0      4.0    850.0     58.0
+MEDIUM mirror (Foreman/Patch)       p1-04       22.4   1478.3     21.5      0.0     17.0  62592.1     25.5    832.7    493.5
+                                    a0-13       23.1   1443.0     21.0      0.0     17.0  62208.0     24.0    835.0    243.0
+HARD  mirror (Sable/Vulture/Warden) p1-04       17.2    864.1     16.0      1.0      7.5  41964.4     18.0    397.5    365.5
+                                    a0-13       12.8    689.0     11.0      0.0      8.0  33486.0     16.0    823.0    162.0
+MIXED cast (shipped fill order)     p1-04       28.8    882.1     14.5      0.0     14.5  61819.3     19.0    772.3    397.5
+                                    a0-13       28.9    768.0     12.5      0.0     17.0  63430.0     16.5    835.0    162.0
+
+Reading the two rows: `ore`, `used`, `dist`, `ships` and `secs` are the same free world
+deltas the spike measured and should agree closely. `dmgHP`/`shipK`/`statK` are the ledger
+now and a reconstruction then, over 4 seeds against 12 — the same neighbourhood, not the same
+digits. `medXP` differs by construction: the spike priced the ratified four ONLY, and this
+prices the whole §1.3d table, participation rows included (plan Question A's recommendation).
+
+The number to check the whole economy against is §1.3d's own prediction for the recommended
+table: **median 399 XP, mean 459** per player-match. The MIXED cast — the shipped fill order,
+and the closest thing here to a real lobby — pays a median the shipped modules produce without
+a scale factor anywhere in them. §1.4 hangs off that number: level 2 inside 0.8 of a match,
+level 10 at ~101. It survives.
+
+done.
