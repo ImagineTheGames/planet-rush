@@ -109,12 +109,15 @@ check. The config stays untracked (its own header says NOT FOR COMMIT).
   `hud.ts` / `wave-clock.ts` / `sim/`, none of them a doors file. Re-verified on
   the merged tree: `tsc` clean, `npm test -- --run` **4113 passed / 243 files**,
   the doors + frozen goldens green. Ancestry line satisfied.
-- All five DoD lines pass locally. CI on #335 was still running when this was
-  written — if it reds, check the shard log before assuming it is this branch:
+- All five DoD lines pass locally, **and CI on #335 is GREEN** — `Typecheck, test,
+  build` pass, all six `Mobile emulation (Playwright)` shards pass, so the two
+  re-baselined goldens hold on the runner's fonts as well as the container's.
+  `mergeable: MERGEABLE`, `mergeStateStatus: CLEAN`. Nothing outstanding.
+  (If a later re-run reds, check the shard log before assuming it is this branch:
   r6-01 logged `tests/net/capacity/capacity-regression.test.ts` as a wall-clock
   perf assertion with no headroom on shared hardware, and it belongs to whoever
   owns `server/`. This branch's whole diff is `src/ui/`, `tests/mobile/`, `docs/`,
-  goldens and evidence PNGs.
+  goldens and evidence PNGs.)
 - The PR body carries the five copy items flagged-not-fixed for the developer
   (the CAMPAIGN hint is the loudest) and the `GDD.md` §4.7 rows 478–479, which
   still ratify the retired labels and want a Director amendment.
