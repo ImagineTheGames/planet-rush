@@ -52,6 +52,7 @@ import {
   turretTierSpec,
 } from './constants';
 import { areEnemies } from './allegiance';
+import { creditDamage } from './combat-credit';
 import { destroyCore, isCollapsed } from './match';
 import { ledgerAdd } from './ore-ledger';
 import { fireTurretProjectile, leadAim } from './projectiles';
@@ -715,11 +716,21 @@ export function updateSatellites(world: World, dt: number): void {
  * the array at zero HP until {@link sweepDeadSatellites} runs at end of step, so
  * two shots landing on it in one tick index a stable array — the same discipline
  * as {@link damageTurret}. Returns true if the hit landed.
+ *
+ * `by` and `world` are the attribution pair — see {@link damageTurret} for why
+ * the world arrives last and optional here.
  */
-export function damageSatellite(sat: RadarSatellite, amount: number): boolean {
+export function damageSatellite(
+  sat: RadarSatellite,
+  amount: number,
+  by?: PlayerId,
+  world?: World,
+): boolean {
   if (amount <= 0 || sat.hp <= 0) return false;
+  const dealt = Math.min(amount, sat.hp);
   sat.hp -= amount;
   if (sat.hp < 0) sat.hp = 0;
+  if (world) creditDamage(world, by, sat.owner, 'dealtToStations', dealt);
   return true;
 }
 
@@ -766,23 +777,41 @@ export function shieldPool(station: MiningStation): number {
  * cannot keep repairing under fire, they have to drive the attacker off first.
  * The discrete heal already applied is never undone — there is no channel to
  * interrupt. Returns true if the hit landed.
+ *
+ * `by` is the attacker's slot when the hit has one (`projectiles.ts` passes
+ * `p.owner`); it is write-only attribution and changes nothing about the routing
+ * above. Collapse decay passes none — the Crush has no attacker, and a core it
+ * finished is credited to nobody (`./combat-credit`).
  */
-export function damageStation(world: World, station: MiningStation, amount: number): boolean {
+export function damageStation(
+  world: World,
+  station: MiningStation,
+  amount: number,
+  by?: PlayerId,
+): boolean {
   if (!station.alive || station.spawnProtect > 0 || amount <= 0) return false;
 
   let left = amount;
+  let dealt = 0;
   for (const shield of station.shields) {
     if (left <= 0) break;
     if (shield.hp <= 0) continue;
     const absorbed = Math.min(shield.hp, left);
     shield.hp -= absorbed;
     left -= absorbed;
+    dealt += absorbed;
   }
-  if (left > 0) station.coreHp -= left;
+  if (left > 0) {
+    // Only the HP the core actually had is credited — overkill on a finisher is
+    // not damage dealt (`./combat-credit`).
+    dealt += Math.min(left, station.coreHp);
+    station.coreHp -= left;
+  }
 
   station.sinceDamage = 0;
 
-  if (station.coreHp <= 0) destroyCore(world, station);
+  creditDamage(world, by, station.owner, 'dealtToStations', dealt);
+  if (station.coreHp <= 0) destroyCore(world, station, by);
   return true;
 }
 
@@ -792,11 +821,23 @@ export function damageStation(world: World, station: MiningStation, amount: numb
  * ships can be shooting the same station in one tick, and removing an entry
  * mid-tick would shift the indices the other ship's shot already resolved.
  * Same discipline as asteroids, which are also filtered only at end of step.
+ *
+ * **Why `world` arrives last, and optional.** Unlike the other three damage entry
+ * points, this one never took a world — a turret is damaged through the body
+ * alone. The credit ledger lives on the world, so recording the hit needs one;
+ * putting it *first*, where it belongs stylistically, would break every existing
+ * caller, including ones in lanes this agent does not own. So it is a trailing
+ * optional, and omitting it simply skips the accounting — the same no-op
+ * discipline `ledgerAdd` uses for a world with no ore ledger. Damage to a turret
+ * is credited to `dealtToStations`: it is the station's property, and the 2×
+ * weight is on damage dealt, not on which body absorbed it.
  */
-export function damageTurret(turret: Turret, amount: number): boolean {
+export function damageTurret(turret: Turret, amount: number, by?: PlayerId, world?: World): boolean {
   if (amount <= 0 || turret.hp <= 0) return false;
+  const dealt = Math.min(amount, turret.hp);
   turret.hp -= amount;
   if (turret.hp < 0) turret.hp = 0;
+  if (world) creditDamage(world, by, turret.owner, 'dealtToStations', dealt);
   return true;
 }
 

@@ -44,6 +44,7 @@ import {
   waveIntervalOf,
   waveTime,
 } from './constants';
+import { creditKill } from './combat-credit';
 import { killShip } from './damage';
 import { ledgerAdd } from './ore-ledger';
 import type { MiningStation, World } from './state';
@@ -110,8 +111,16 @@ export function collapseDeadline(world?: World): number {
  *
  * Turrets are zeroed rather than spliced — `sweepDeadTurrets` removes them at
  * end of step, so indices stay stable for every shot already resolved this tick.
+ *
+ * `by` is the slot that landed the killing blow, when there was one, and it is
+ * carried straight through to {@link eliminate} — the single non-idempotent point
+ * on this path, so a core cannot pay its 10× twice even if two shots reach it in
+ * the same tick. Collapse decay calls this with no `by` at all: the Crush has no
+ * attacker, and measurement says that is the *common* case, not a corner one
+ * (§1.5 — 100% of station deaths in an Easy lobby). Nobody is credited then, by
+ * design (`./combat-credit`).
  */
-export function destroyCore(world: World, station: MiningStation): void {
+export function destroyCore(world: World, station: MiningStation, by?: PlayerId): void {
   station.coreHp = 0;
   station.alive = false;
   station.repairing = false;
@@ -125,22 +134,33 @@ export function destroyCore(world: World, station: MiningStation): void {
   for (const p of world.projectiles) {
     if (p.active && p.owner === station.owner) p.active = false;
   }
-  eliminate(world, station);
+  eliminate(world, station, by);
 }
 
 /**
  * Record the death in the elimination order and pay out the wreck. The push onto
  * `match.eliminated` *is* the last-to-die order, so it happens here, in
  * resolution order, rather than being reconstructed later from timestamps.
+ *
+ * The `eliminated` guard below makes this the once-per-death point, which is why
+ * the station kill is credited HERE rather than in `destroyCore` (which is
+ * deliberately idempotent).
  */
-function eliminate(world: World, station: MiningStation): void {
+function eliminate(world: World, station: MiningStation, by?: PlayerId): void {
   if (world.match.eliminated.includes(station.owner)) return;
+  creditKill(world, by, station.owner, 'stationKills');
   world.match.eliminated.push(station.owner);
   station.deathTime = world.time;
 
   // The owner is out (GDD §2.7): their ship dies where it stands — shedding
   // half its hold like any death — and it never respawns. The Rematch button is
   // the UI's answer to this flag.
+  //
+  // Deliberately NOT credited as a ship kill, even when a player took the core:
+  // a "ship destroyed" is a killing blow landed on a hull, and this hull was not
+  // shot — it went down with the seat. The 10× station kill already pays for
+  // ending the player, and crediting the 5× too would pay one act twice
+  // (`./combat-credit`, and the honesty rule in §1.5). Hence no `by` here.
   const ship = shipOwnedBy(world, station.owner);
   let banked = 0;
   if (ship) {

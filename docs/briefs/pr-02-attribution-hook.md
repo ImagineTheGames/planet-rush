@@ -114,3 +114,22 @@ nothing about allegiance.
 **Question C** (a station the Crush killed — who gets the 10×?) changes only what pr-05 *shows*.
 Whatever the answer, this brief's job is unchanged: record the truth, credit nobody when there
 is nobody. **Ship it now.**
+
+---
+
+## Amendments made while building it *(p1-02, 2026-08-09)*
+
+Two places where the brief as written could not be followed literally. Both are recorded in
+`status/notes/p1-02-attribution-hook.md` with the reasoning.
+
+1. **The credit gate is `areEnemies`, not `canDamage`.** Trap 4 above and plan §1.5 trap 2 both
+   say an ally must never be credited — but `canDamage` *opens up to allies* the day
+   `FRIENDLY_FIRE` is ratified ON, so a shot that lands on a teammate would also pay. Plan trap
+   5's wording ("the last **enemy** to land damage") settles it. With friendly fire OFF (the
+   ratified default) the two predicates agree exactly on every damaging call, so nothing about
+   today's behaviour differs, and the predicate still comes from `allegiance.ts` — it is not
+   re-derived.
+2. **`damageTurret`/`damageSatellite` take a trailing optional `world` after `by`.** They are
+   the only two damage entry points that never took a `World`, and the ledger lives on it.
+   Putting `world` first would break existing callers in lanes the Gameplay Engineer does not
+   own. Omitting it skips the accounting — `ledgerAdd`'s no-op discipline.
