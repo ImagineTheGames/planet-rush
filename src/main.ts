@@ -8183,7 +8183,7 @@ function openLobby(
 
   /**
    * Tell the room what this client chose — the hull, the fire mode, and (from the
-   * creator only) the per-seat bot difficulties in the empty-seat order
+   * creator only) the per-seat bot CAST and its difficulties, in the bot-seat order
    * `server/room.ts` reads them in. Offline there is nobody to tell, so this is a
    * no-op and the whole solo path costs the wire nothing.
    *
@@ -8198,7 +8198,26 @@ function openLobby(
     room.session.chooseInLobby({
       shipClass: state.shipClass,
       fireMode: wireFireMode(readFireMode(platform, isTouch)),
-      ...(host ? { botDifficulties: botDifficulties(state) } : {}),
+      ...(host
+        ? {
+            botDifficulties: botDifficulties(state),
+            // **The characters those tiers belong to** (a0-06b) — the row the room
+            // actually casts from, and the half that was missing entirely. The
+            // wire used to carry the tier alone, so an online room seated the
+            // right *tier* and any of the characters inside it: pick Sable, get
+            // Vulture. Offline never had that gap.
+            //
+            // Same filter as `botDifficulties`, and that is load-bearing rather
+            // than tidy: `seat.personality` is the seat's character gated by the
+            // same `isBotSeat` the tier list filters on, so the two rows are the
+            // same length in the same order by construction, and neither can slide
+            // against the other — or the seam would hand seat 5's character to
+            // seat 2, which is the very off-by-one both rows are indexed to avoid.
+            botPersonalities: state.seats
+              .map((s) => s.personality)
+              .filter((p): p is PersonalityId => p !== null),
+          }
+        : {}),
       // The match SHAPE, from the host only (m10 teams-wire): the MODE and the
       // per-seat SIDE, indexed by slot. Sent on every lobby change like the hulls
       // and the difficulties, so the room's advertised mode and every seat's
@@ -8440,9 +8459,10 @@ function openLobby(
         } else {
           state = stepped(state, cycleSeatCharacter(state, hit.index));
         }
-        // Online the room is told in empty-seat order: the wire carries the tier the
-        // chosen character flies at (`botDifficulties`), which is as much of the
-        // pick as the ratified protocol has a field for.
+        // Online the room is told in bot-seat order, and since a0-06b it is told
+        // the CHARACTER (`botPersonalities`) and not merely the tier it flies at:
+        // the room seats the name that was picked here, so this tap moves the
+        // online match exactly as far as it moves the offline one.
         sendChoice();
         render();
         break;
