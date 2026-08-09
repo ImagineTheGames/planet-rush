@@ -22,8 +22,9 @@ than holding the voicing.
 | `782cb44` | `bank.ts`: the four slots — `xpTick`, `xpBarFill`, `levelUp`, `xpSettle` — plus the seam (3 new `AudioCue`s, `XP_TICK_SEMITONES`, `AudioEngine.xpFill` / `stopXpFill`) |
 | `c1fb32b` | `candidates.ts`: 4 slots × 3 offers, `CANDIDATE_SLOT_ORDER`, re-rendered previews + manifest (board 40 → 44) |
 | `86e0df4` | `audio.test.ts` + `candidates.test.ts`: the envelope, the `pressTick` bound, repetition, under-the-result, cancellable, not-the-denied-three, and the seam |
-| `d5afa4b` | `evidence/p1-07-summary-cues.ts` → `.txt` — the board, the tone-audit rows, the numbers |
-| (this) | the brief annotated; these notes |
+| `d5afa4b` | `evidence/p1-07-summary-cues/numbers.ts` → `.txt` — the tone-audit rows, the numbers |
+| `f4c19b5` | the brief annotated; these notes |
+| `a8a1e87` | `evidence/p1-07-summary-cues/build-board.mjs` → `board.html` + two PNGs — the four slots as the review page prints them |
 
 ## DECISIONS
 
@@ -89,8 +90,15 @@ it. A contract that cannot fail on the defect is the a0-01 lesson.
 Re-running `sound-review/render.ts` rewrote `previews/alarm/current.wav`: it was
 1.4 MB of **16-second tiled LOOP**, which is what the alarm was before s9-01 made
 it a once-per-engagement sting. The board was offering the developer a klaxon the
-game no longer plays. It is now the 0.61 s one-shot the bank holds. Flagged in the
-PR body, not buried.
+game no longer plays. It is now the 0.61 s one-shot the bank holds.
+
+**a0-01b found this first and left it on purpose** —
+`evidence/a0-01b-candidates-round2/README.md`: *"It is reverted in every commit
+here because the brief fences `current.wav` off by name. It should be
+regenerated, and that is a Director call, not this brief's."* This brief carries
+no such fence and its test 1 requires re-rendering the previews, so leaving it
+would mean actively reverting a fossil back in. Kept, and flagged in the PR body
+with that quote, so the Director can revert one file if they disagree.
 
 ### The brief, annotated (the plan wins, but nothing disagreed).
 
