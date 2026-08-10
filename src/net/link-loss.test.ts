@@ -130,14 +130,18 @@ describe('detection: the backgrounded tab (the developer’s case)', () => {
 });
 
 describe('detection: the socket saying so', () => {
-  it('a transport that is already redialling is not asked to be pressed', () => {
+  it('a transport that is already redialling still offers the player the button', () => {
     const watch = watching();
     watch.transportState('reconnecting', 2_000);
     const status = watch.poll(2_000);
     expect(status.phase).toBe('redialing');
     expect(status.cause).toBe('socket');
-    // Nothing for the player to press but ABANDON: the client is already dialling.
-    expect(linkNotice(status).actions.map((a) => a.kind)).toEqual(['abandon']);
+    // This assertion used to read the other way — "nothing for the player to press
+    // but ABANDON: the client is already dialling" — and that reading is what put a
+    // one-button card in front of the developer for the whole grace window (n8-01).
+    // The client dialling on a backoff nobody can see is not an answer to a player
+    // who wants to try NOW, and `./websocket-transport` `redial` cancels that wait.
+    expect(linkNotice(status).actions.map((a) => a.kind)).toEqual(['reconnect', 'abandon']);
   });
 
   it('a closed transport is terminal and carries its reason', () => {
@@ -280,6 +284,107 @@ describe('the words on screen', () => {
     expect(notice.actions[0]?.label).toBe('RECONNECT · 40s');
     expect(notice.actions[0]?.primary).toBe(true);
     expect(notice.failed).toBe(false);
+  });
+
+  /**
+   * n8-01: *"the ask was two buttons; the build draws one"*.
+   *
+   * The RECONNECTING… card is not a corner case — measured on the served build it is
+   * what the player looks at for essentially the whole grace window, because a fresh
+   * loss spends its automatic redial in the same poll that detected it and the
+   * transport then retries on a backoff that never reports failure. So the button
+   * that is missing here is the button that is missing, full stop.
+   */
+  describe('RECONNECT during the grace window', () => {
+    /** The card the developer actually met: 4 s of silence, auto-redial spent. */
+    function reconnectingCard(): ReturnType<typeof linkNotice> {
+      const watch = watching(1_000, 60_000);
+      watch.poll(5_000); // silence detected
+      expect(watch.takeAutoRedial(5_000)).toBe(true);
+      watch.beginRedial(5_000); // …and spent, by the client, on its own
+      const status = watch.poll(5_000);
+      expect(status.phase).toBe('redialing');
+      return linkNotice(status);
+    }
+
+    it('is drawn on the card the player is actually looking at', () => {
+      const notice = reconnectingCard();
+      expect(notice.actions.map((a) => a.kind)).toEqual(['reconnect', 'abandon']);
+      expect(notice.actions[0]?.label).toContain('RECONNECT');
+      // The seconds ride the button here too: they are the decision.
+      expect(notice.actions[0]?.label).toContain(notice.grace);
+      expect(notice.actions[0]?.primary).toBe(true);
+    });
+
+    it('leaves the verified title and detail exactly as a1-13 read them', () => {
+      // The words are not this brief's to change — only the buttons under them.
+      const notice = reconnectingCard();
+      expect(notice.title).toBe('RECONNECTING…');
+      expect(notice.detail).toBe('no server data for 4s — reclaiming your seat, 56s of grace left.');
+    });
+
+    it('is NOT offered once the seat is gone — there is nothing to reconnect to', () => {
+      const watch = watching(1_000, 10_000);
+      watch.poll(5_000);
+      const notice = linkNotice(watch.poll(12_000));
+      expect(notice.title).toContain('SEAT EXPIRED');
+      expect(notice.actions.map((a) => a.kind)).toEqual(['menu']);
+    });
+
+    it('is still a real attempt while the automatic dial is in flight', () => {
+      // The press must not be a label on a timer: it counts as its own attempt, and
+      // the card says so in the same breath.
+      const watch = watching(1_000, 60_000);
+      watch.poll(5_000);
+      watch.beginRedial(5_000); // the automatic one
+      watch.beginRedial(5_100, true); // …and the player presses anyway
+      const status = watch.poll(5_100);
+      expect(status.attempts).toBe(2);
+      expect(status.manualRedial).toBe('dialing');
+      expect(linkNotice(status).detail).toContain('You pressed RECONNECT — attempt 2 went out.');
+    });
+
+    it('says so when the press cannot get out, instead of doing nothing visible', () => {
+      // The transport has no dial to give (a dead room, a spent window, a transport
+      // with no redial gesture). Silence here is the failure a1-13 would catch.
+      const watch = watching(1_000, 60_000);
+      watch.poll(5_000);
+      watch.beginRedial(5_000);
+      watch.redialFailed(5_100, true);
+      const status = watch.poll(5_100);
+      expect(status.manualRedial).toBe('failed');
+      expect(linkNotice(status).detail).toContain('could not go out');
+    });
+
+    it('reports a failed press even from the card that is not dialling', () => {
+      // `redialFailed` used to return early whenever the phase was already `'lost'`,
+      // so a press on the CONNECTION LOST card changed nothing anywhere.
+      const watch = watching(1_000, 60_000);
+      watch.poll(5_000);
+      expect(watch.status.phase).toBe('lost');
+      watch.redialFailed(5_100, true);
+      expect(watch.status.manualRedial).toBe('failed');
+      expect(linkNotice(watch.status).detail).toContain('could not go out');
+    });
+
+    it('forgets the press when the link comes back, and again on the next loss', () => {
+      const watch = watching(1_000, 60_000);
+      watch.poll(5_000);
+      watch.redialFailed(5_000, true);
+      expect(watch.status.manualRedial).toBe('failed');
+
+      watch.frame(5_200); // a frame — any frame — is proof of life
+      expect(watch.poll(5_200).manualRedial).toBe('none');
+      expect(watch.poll(9_000).manualRedial).toBe('none'); // and gone again, fresh
+    });
+
+    it('the client’s own automatic dial is never reported as the player’s press', () => {
+      const watch = watching(1_000, 60_000);
+      watch.poll(5_000);
+      watch.beginRedial(5_000); // automatic: no `manual` flag
+      expect(watch.poll(5_000).manualRedial).toBe('none');
+      expect(linkNotice(watch.status).detail).not.toContain('You pressed');
+    });
   });
 
   it('spells each detected cause differently — that is the whole point', () => {

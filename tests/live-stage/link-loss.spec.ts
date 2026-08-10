@@ -29,6 +29,15 @@
  * clicks are real clicks on real buttons. If the install is ever dropped again, this
  * goes red on the same commit.
  *
+ * **n8-01.** It did not go red when half the ask went missing, and that is worth
+ * writing down. The developer asked for *"reconnect / abandon buttons"*; the file
+ * asserted that at least one of the two ids was on the page, and passed for a card
+ * that drew ABANDON MATCH alone — which is what a1-13 then photographed for 112
+ * seconds. An assertion that accepts either of two things cannot notice one of them
+ * disappearing. Both are named individually now, and RECONNECT is pressed rather
+ * than merely counted: a drawn button and a working button are different claims, and
+ * the round before this one shipped the first while reporting the second.
+ *
  * Skipped, not failed, without a fleet: the default live-stage config boots an
  * offline bundle where CREATE can only ever reach "can't reach the servers".
  *
@@ -213,13 +222,34 @@ test.describe('the link dies and the player is told', () => {
       // frozen match, with the cause and the seconds on it.
       await match.guest.screenshot({ path: 'tests/live-stage/link-loss-lost-evidence.png' });
 
-      // And there is a way out — a button, not just a sentence. Which buttons
-      // depends on the card: the client spends its one automatic redial the instant
-      // it detects a loss, so what a player usually meets is RECONNECTING… with
-      // ABANDON MATCH under it, and RECONNECT is drawn on the card where nothing is
-      // dialling (`src/net/link-loss` `linkNotice`). ABANDON is on both.
-      expect(await match.guest.locator(`${RECONNECT}, ${ABANDON}`).count()).toBeGreaterThan(0);
+      // **BOTH buttons the developer asked for**, on the card the grace window
+      // actually shows (n8-01).
+      //
+      // This assertion used to be `count() > 0` over either id, with a comment
+      // explaining that RECONNECT belongs on some other card — and it passed, every
+      // run, on a card that offered ABANDON MATCH alone. That is what a1-13 then
+      // photographed for 112 seconds: a client spends its one automatic redial in the
+      // same poll that detects the loss, so RECONNECTING… IS the grace window, and a
+      // button drawn only on the card before it is a button nobody ever sees. A test
+      // that accepts either of two buttons cannot notice one of them going missing,
+      // which is precisely what it failed to notice.
+      await expect(match.guest.locator(TITLE)).toContainText('RECONNECTING…');
+      await expect(match.guest.locator(RECONNECT)).toBeVisible();
       await expect(match.guest.locator(ABANDON)).toBeVisible();
+      await match.guest.screenshot({ path: 'tests/live-stage/link-loss-reconnect-evidence.png' });
+
+      // …and RECONNECT is a real attempt, not a label on the timer already running.
+      // The edge is still gagged, so nothing can recover on its own and nothing else
+      // in the client can move the attempt counter: the one automatic dial was spent
+      // at detection and `beginRedial` has exactly two callers, that one and this
+      // button (`src/net/link-loss`). A counter that moves is a dial that went out.
+      await press(match.guest, RECONNECT, async () => {
+        await expect(match.guest.locator(TITLE)).toContainText(/ATTEMPT \d/, { timeout: 5_000 });
+      });
+      // VERBOSITY, for the press itself: the card answers the button, not just the
+      // connection. A press that says nothing is the failure mode this brief names.
+      await expect(match.guest.locator(DETAIL)).toContainText('You pressed RECONNECT');
+      await match.guest.screenshot({ path: 'tests/live-stage/link-loss-reconnect-pressed-evidence.png' });
 
       // The wire, proven by a sentence only `session.leave()` can produce: the
       // watchdog's `'left'` ending (`src/net/link-loss` `endingTitle`). A drawn
@@ -238,6 +268,35 @@ test.describe('the link dies and the player is told', () => {
         });
       });
       await expect(match.guest.locator(ROOT)).toBeHidden();
+    } finally {
+      await gag(false).catch(() => {});
+      await match.close();
+    }
+  });
+
+  test('RECONNECT puts the player back in the match when the server is reachable', async ({ browser }) => {
+    const match = await twoPlayerMatch(browser);
+    try {
+      await gag(true);
+      await expect(match.guest.locator(ROOT)).toBeVisible({ timeout: 30_000 });
+      await expect(match.guest.locator(RECONNECT)).toBeVisible();
+
+      // The network returns, and the player does not wait to find out. The client
+      // would get home on its own eventually — it is sleeping out an exponential
+      // backoff it never shows anybody — and the button is what turns that
+      // "eventually" into a press: `redial` cancels the pending retry and dials in
+      // the same tick, because a human saying "try now" should not have to sit out a
+      // delay they cannot see (`src/net/websocket-transport`).
+      await gag(false);
+      await press(match.guest, RECONNECT, async () => {
+        await expect(match.guest.locator(ROOT)).toBeHidden({ timeout: 20_000 });
+      });
+
+      // Back in the match it never left, flying the seat the grace rule held for it
+      // (GDD §4.2 — same ship, same upgrades). "Does something real" means this.
+      expect(await match.guest.evaluate(() => window.__mainMenu?.matchStarted)).toBe(true);
+      expect(await match.guest.evaluate(() => window.__mainMenu?.localShipPos)).not.toBeNull();
+      await match.guest.screenshot({ path: 'tests/live-stage/link-loss-reconnected-evidence.png' });
     } finally {
       await gag(false).catch(() => {});
       await match.close();

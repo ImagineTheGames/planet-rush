@@ -67,8 +67,15 @@ export interface WatchedSession {
   linkHidden(): void;
   /** The page came back — a stale last frame at this instant IS the diagnosis. */
   linkShown(now?: number): LinkStatus;
-  /** RECONNECT: dial again now and reclaim the seat (GDD §4.2). */
-  reconnect(now?: number): boolean;
+  /**
+   * RECONNECT: dial again now and reclaim the seat (GDD §4.2).
+   *
+   * `manual` marks the dial as the player's own press rather than the client's
+   * automatic attempt, which is what lets the overlay answer *that press* — including
+   * when it fails (`./link-loss` `ManualRedial`). Optional, so a session written
+   * before n8-01 still satisfies this interface structurally.
+   */
+  reconnect(now?: number, manual?: boolean): boolean;
   /** ABANDON MATCH: a stated leave, so the seat is freed rather than held. */
   leave(reason?: string): void;
 }
@@ -147,8 +154,14 @@ export function attachLinkLoss(config: LinkLossAttachConfig): LinkLossHandle {
     // a silently-killed socket fires no `onclose` to start one (`./websocket-transport`
     // `redial`). The seat, the ship, the cargo and the upgrades come back with it
     // (GDD §4.2; proven end to end in `tests/net/reconnect-resume.test.ts`).
+    //
+    // A REAL attempt, every press, including while the automatic one is mid-flight
+    // (n8-01 §2): `redial` cancels the pending backoff and dials in the same tick, so
+    // the player gets the immediate try they asked for instead of a label on a timer.
+    // `true` says this dial was a human's, so a press that cannot get out says so on
+    // the card rather than doing nothing anyone can see (n8-01 §3).
     onReconnect: () => {
-      session.reconnect();
+      session.reconnect(undefined, true);
       poll();
     },
     // ABANDON MATCH — say so on the wire, then hang up. The difference between this
