@@ -70,6 +70,23 @@ export interface EdgeMachine {
 
 /** The edge, as a test drives it. */
 export interface FlyEdge {
+  /**
+   * **Go silent without hanging up** (`?gag=1` on the control route) — the shape of
+   * the developer's zombie match, reproduced at the one place that can reproduce it.
+   *
+   * Only the SERVER→CLIENT direction stops: the edge stops reading from each
+   * Machine, so not one further frame reaches a browser, while every socket stays
+   * open at both ends and the client's own input keeps flowing. That is exactly the
+   * lie `src/net/link-loss` exists to catch — `WebSocket.readyState` still reads
+   * `OPEN`, no `onclose` ever runs, and the only evidence of death is the silence
+   * itself. Nothing is dropped (the stream is *paused*, so TCP holds it), so
+   * ungagging resumes a connection that is still valid rather than one with a hole
+   * in it, and the client recovers exactly as it would when a real network returns.
+   *
+   * Applies to connections spliced later too, so a redial into a still-dead network
+   * stays dead until the test says otherwise.
+   */
+  gag(on: boolean): void;
   /** The shared hostname clients dial — the allocator's `connectUrl`. */
   readonly url: string;
   /** `http://…/_edge/land` — the out-of-process twin of {@link FlyEdge.landOn}. */
@@ -130,6 +147,11 @@ export async function startFlyEdge(
   let wrongOnly = false;
   let cursor = 0;
   let replays = 0;
+  /** True while the fleet is gagged ({@link FlyEdge.gag}). */
+  let gagged = false;
+  /** Every Machine-side stream currently spliced to a client, so a gag can stop
+   *  reading from all of them at once — and a new splice can join a gag already on. */
+  const upstreams = new Set<Socket>();
 
   const firstHop = (upgradeUrl: string): EdgeMachine => {
     if (wrongOnly && options.hostOf) {
@@ -143,6 +165,16 @@ export async function startFlyEdge(
       return pinned;
     }
     return machines[cursor++ % machines.length]!;
+  };
+
+  /** Stop (or restart) delivery from every Machine. A paused stream keeps its data
+   *  in the kernel rather than dropping it, so this is reversible mid-connection. */
+  const setGag = (on: boolean): void => {
+    gagged = on;
+    for (const upstream of upstreams) {
+      if (on) upstream.pause();
+      else upstream.resume();
+    }
   };
 
   /** Every socket this edge is holding open, so `stop()` can actually stop: an
@@ -162,9 +194,13 @@ export async function startFlyEdge(
       if (url.searchParams.get('reset') === '1') replays = 0;
       const wrong = url.searchParams.get('wrong');
       if (wrong !== null) wrongOnly = wrong !== '0';
+      // `?gag=1|0` — the silent death, and its undo, from outside this process
+      // (the live-stage run's browser cannot reach `gag()` any other way).
+      const gag = url.searchParams.get('gag');
+      if (gag !== null) setGag(gag !== '0');
       options.onControl?.(url.searchParams);
       response.writeHead(200, { 'content-type': 'application/json' });
-      response.end(JSON.stringify({ forced, wrongOnly, replays, machines: [...byId.keys()] }));
+      response.end(JSON.stringify({ forced, wrongOnly, replays, gagged, machines: [...byId.keys()] }));
       return;
     }
     response.writeHead(200, { 'content-type': 'text/plain' });
@@ -230,6 +266,12 @@ export async function startFlyEdge(
         upstream.pipe(client);
         client.pipe(upstream);
         client.resume();
+        // The 101 itself is already through (it was written above, before the
+        // splice), so a gagged connection still OPENS — which is the point: the
+        // socket is healthy in every way a client can observe, and delivers nothing.
+        upstreams.add(upstream);
+        upstream.on('close', () => upstreams.delete(upstream));
+        if (gagged) upstream.pause();
       });
 
       upstream.on('error', () => client.destroy());
@@ -256,6 +298,7 @@ export async function startFlyEdge(
     landWrong: (on): void => {
       wrongOnly = on;
     },
+    gag: setGag,
     get replays(): number {
       return replays;
     },

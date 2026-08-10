@@ -126,6 +126,14 @@ get kicked out and presented reconnect / abandon buttons, and verbosity of what
 happened."* `installLinkLossView` is never called — not by production, not by a
 spec, not by the barrel it is exported through.
 **Should be called by:** the client's session boot. *(Owner: Netcode.)*
+**FIXED 2026-08-10 by n6-01** — installed on the match's boot through
+`src/net/link-loss-attach.ts`, which also folds `visibilitychange` in (nothing in
+`src/` listened for it) and polls the watchdog each rendered frame, so the freeze in
+`session.sendInput` engages too. `installLinkLossView`, `showLinkLoss` and
+`resetLinkLossView` left the allowlist; `hideLinkLoss` and `linkLossView` stay as
+surface. Proved by `tests/live-stage/link-loss.spec.ts`, which boots the shipped
+bundle, kills a real socket silently and clicks the real buttons — a unit test
+cannot prove a wire, which is how this shipped.
 
 **`src/art/atlas.ts` — 11 of its 12 value exports, and a performance claim.**
 The translation layer from sim state to pooled textures, whose stated job is

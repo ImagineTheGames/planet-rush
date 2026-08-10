@@ -14,6 +14,7 @@
     "test:live-stage": "playwright test --config tests/live-stage/playwright.config.ts",
     "test:pin": "node tests/net/live-pin.probe.mjs --local 6",
     "test:connect-evidence": "playwright test --config tests/live-stage/playwright.connect-trace.config.ts",
+    "test:link-loss-evidence": "playwright test --config tests/live-stage/playwright.link-loss.config.ts",
     "typecheck": "tsc --noEmit",
     "dark-matter": "node tools/dark-matter-scan.mjs",
     "dark-matter:check": "node tools/dark-matter-scan.mjs --check"
