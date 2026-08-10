@@ -20,6 +20,7 @@ import {
   PANEL_ROWS_TOP,
 } from './wheel-input';
 import { WHEEL_ORDER, segmentAtDirection } from '../ui';
+import { wheelMetrics } from '../art/materials';
 
 const WHEEL = { centerX: 200, centerY: 150, radius: 100, segments: WHEEL_ORDER.length };
 const PANEL = { centerX: 200, centerY: 150, width: 300, height: 212, rowHeight: 30, rows: 4 };
@@ -79,6 +80,45 @@ describe('hitWheel', () => {
       kind: 'segment',
       index: 0,
     });
+  });
+
+  it('reads the drawn hub\'s rim as hub, not as a purchase (u13-01)', () => {
+    // The band this brief exists for. The hub is DRAWN to `wheelMetrics().hub`
+    // of the radius — 0.319 at the desktop reference, 0.32 at the phone's — and
+    // the hit-test used to stop at a hand-written 0.300, so the outermost ~4.5 px
+    // of the painted hub disc bought a wedge. A thumb is bigger than that band,
+    // and the wedge it bought was a real purchase off the player's ore.
+    for (const fraction of [0.305, 0.315]) {
+      const r = WHEEL.radius * fraction;
+      // More than one axis: the annulus is a ring, not a point at twelve o'clock.
+      expect(hitWheel(200, 150 - r, WHEEL).kind, `up at ${fraction}r`).toBe('hub');
+      expect(hitWheel(200 + r, 150, WHEEL).kind, `right at ${fraction}r`).toBe('hub');
+      expect(hitWheel(200, 150 + r, WHEEL).kind, `down at ${fraction}r`).toBe('hub');
+      expect(hitWheel(200 - r, 150, WHEEL).kind, `left at ${fraction}r`).toBe('hub');
+    }
+  });
+
+  it('puts the boundary exactly where the wheel is drawn (u13-01)', () => {
+    // From both sides of the drawn hub's rim, at the test wheel's radius.
+    expect(hitWheel(200, 150 - WHEEL.radius * 0.318, WHEEL).kind).toBe('hub');
+    expect(hitWheel(200, 150 - WHEEL.radius * 0.321, WHEEL).kind).toBe('segment');
+  });
+
+  it('takes its dead zone from the profile the wheel is DRAWN from (u13-01)', () => {
+    // The point of the fix: not "0.319 written down twice" but one number, read
+    // from `src/art/materials`' wheel profile — the same table
+    // `src/ui/build-wheel-view.ts` sizes its hub disc from. The fraction is not
+    // constant across devices (0.32 on a phone, 0.319 on the desktop reference,
+    // interpolated between), so a copied constant would be wrong at one end even
+    // on the day it was copied.
+    for (const radius of [80, 140, 188, 235, 400]) {
+      const layout = { ...WHEEL, radius };
+      const drawn = radius * wheelMetrics(radius).hub;
+      expect(hitWheel(200, 150 - (drawn - 0.5), layout).kind, `inside at r=${radius}`).toBe('hub');
+      expect(hitWheel(200, 150 - (drawn + 0.5), layout).kind, `outside at r=${radius}`).toBe(
+        'segment',
+      );
+    }
   });
 
   it('lands a press on the ring on the segment drawn there', () => {
