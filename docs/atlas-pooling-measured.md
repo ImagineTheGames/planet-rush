@@ -112,6 +112,14 @@ Empty-stage floor: **3.00 ms**. `layer ms` is the median with that floor removed
 | `shots:graphics` | 300 | 300 | 300 | 1.0 | 14.70 | **11.70** |
 | `shots:sprites` | 300 | 300 | 4 | 1.0 | 6.50 | **3.50** |
 
+*Read the two `+cull` rows for the mechanism, not for a number to quote.* Their
+`drawn: 3` is the rig's own geometry — the scenario layers sit at the stage
+origin, so the "viewport" is the arena's top-left corner rather than a camera
+centred on a ship. What they establish is that skipping an entity costs nothing
+and removes its draw call. **The game's actual visible fractions are in §4.1**,
+measured separately and exactly: 75 rocks of 200 on desktop, 6 of 200 on a
+landscape phone.
+
 ### 3.1 Pooling pays
 
 The rock layer is **6.7× cheaper** pooled and submits **111× fewer draw calls**.
@@ -197,8 +205,14 @@ with the camera on ship 0:
 
 A landscape phone submits **660 bodies to show 11**. That ratio is arithmetic on
 the arena and the viewport — it holds on every device, and it is the *mobile*
-gate, which GDD §4.3 makes the tighter of the two. The `+cull` rows in §3 show
-what skipping them costs: nothing (3.80 ms, ~1 draw call).
+gate, which GDD §4.3 makes the tighter of the two.
+
+What that is worth is a scaling, not a single figure, and it is worth stating as
+one rather than borrowing §3's `drawn: 3` row. The rock layer costs 26.1 ms for
+200; culling to the 75 a desktop window contains leaves roughly 9.8 ms of it, and
+to the 6 a phone contains, under 1 ms. The `+cull` rows confirm the floor those
+approach — 3.80 ms total, ~1 draw call — but the number to plan against is the
+proportion, and on the phone the proportion is 3%.
 
 Culling changes no pixel by construction — an entity outside the viewport
 contributes none — so unlike the pooling it is not blocked by the goldens. It is
