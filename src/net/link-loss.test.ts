@@ -341,7 +341,7 @@ describe('the words on screen', () => {
       const status = watch.poll(5_100);
       expect(status.attempts).toBe(2);
       expect(status.manualRedial).toBe('dialing');
-      expect(linkNotice(status).detail).toContain('You pressed RECONNECT — attempt 2 went out just now.');
+      expect(linkNotice(status).detail).toContain('You pressed RECONNECT — attempt 2 went out.');
     });
 
     it('says so when the press cannot get out, instead of doing nothing visible', () => {

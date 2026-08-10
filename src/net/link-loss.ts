@@ -648,8 +648,10 @@ export function manualRedialPhrase(manual: ManualRedial, attempts: number): stri
   switch (manual) {
     case 'dialing':
       // Names the attempt number so a second press is visibly a second press, rather
-      // than the same sentence appearing to sit there unchanged.
-      return ` You pressed RECONNECT — attempt ${attempts} went out just now.`;
+      // than the same sentence appearing to sit there unchanged. No "just now": this
+      // card is redrawn once a second for up to a minute, and a sentence that is true
+      // when it is written and false thirty seconds later is not verbosity.
+      return ` You pressed RECONNECT — attempt ${attempts} went out.`;
     case 'failed':
       // No dial could even be started: the socket is gone and there is nothing on the
       // other end to dial at. Says the press was heard, and says it did not land.
