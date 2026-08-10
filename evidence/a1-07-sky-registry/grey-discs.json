@@ -1,0 +1,353 @@
+{
+  "frame": "octagon-D-ground-only.png",
+  "what": "every void layer but void-ground hidden — no sky, no stars, no bloom",
+  "band": {
+    "x0": 40,
+    "x1": 2500,
+    "y0": 250,
+    "y1": 1520
+  },
+  "bloomHaloCssPxAcross": 18.9,
+  "count": 16,
+  "asteroidCount": 10,
+  "otherObjects": [
+    {
+      "kind": "station body / halo ring",
+      "w": 512,
+      "h": 512,
+      "meanRgb": [
+        5,
+        9,
+        19
+      ]
+    },
+    {
+      "kind": "arena wall band",
+      "w": 10,
+      "h": 635,
+      "meanRgb": [
+        7,
+        8,
+        11
+      ]
+    },
+    {
+      "kind": "arena wall band",
+      "w": 4,
+      "h": 635,
+      "meanRgb": [
+        63,
+        69,
+        76
+      ]
+    },
+    {
+      "kind": "station part (inside the halo ring)",
+      "w": 214,
+      "h": 199.5,
+      "meanRgb": [
+        54,
+        62,
+        72
+      ]
+    },
+    {
+      "kind": "station part (inside the halo ring)",
+      "w": 47.5,
+      "h": 45.5,
+      "meanRgb": [
+        91,
+        110,
+        111
+      ]
+    },
+    {
+      "kind": "arena wall band",
+      "w": 1,
+      "h": 635,
+      "meanRgb": [
+        36,
+        39,
+        44
+      ]
+    }
+  ],
+  "medianEquivDiameterCssPx": 62.7,
+  "largestEquivDiameterCssPx": 74.2,
+  "smallestEquivDiameterCssPx": 16.8,
+  "blobs": [
+    {
+      "kind": "station body / halo ring",
+      "elongation": 1,
+      "x": 1120,
+      "y": 388,
+      "w": 1024,
+      "h": 1024,
+      "areaDevicePx": 36732,
+      "widthCssPx": 512,
+      "heightCssPx": 512,
+      "equivDiameterCssPx": 108.1,
+      "meanRgb": [
+        5,
+        9,
+        19
+      ]
+    },
+    {
+      "kind": "arena wall band",
+      "elongation": 63.5,
+      "x": 2262,
+      "y": 250,
+      "w": 20,
+      "h": 1270,
+      "areaDevicePx": 25400,
+      "widthCssPx": 10,
+      "heightCssPx": 635,
+      "equivDiameterCssPx": 89.9,
+      "meanRgb": [
+        7,
+        8,
+        11
+      ]
+    },
+    {
+      "kind": "asteroid",
+      "elongation": 1,
+      "x": 603,
+      "y": 618,
+      "w": 154,
+      "h": 158,
+      "areaDevicePx": 17297,
+      "widthCssPx": 77,
+      "heightCssPx": 79,
+      "equivDiameterCssPx": 74.2,
+      "meanRgb": [
+        64,
+        70,
+        78
+      ]
+    },
+    {
+      "kind": "asteroid",
+      "elongation": 1.3,
+      "x": 524,
+      "y": 1203,
+      "w": 141,
+      "h": 181,
+      "areaDevicePx": 16958,
+      "widthCssPx": 70.5,
+      "heightCssPx": 90.5,
+      "equivDiameterCssPx": 73.5,
+      "meanRgb": [
+        56,
+        62,
+        69
+      ]
+    },
+    {
+      "kind": "asteroid",
+      "elongation": 1.1,
+      "x": 353,
+      "y": 1027,
+      "w": 144,
+      "h": 130,
+      "areaDevicePx": 13518,
+      "widthCssPx": 72,
+      "heightCssPx": 65,
+      "equivDiameterCssPx": 65.6,
+      "meanRgb": [
+        63,
+        68,
+        77
+      ]
+    },
+    {
+      "kind": "asteroid",
+      "elongation": 1.1,
+      "x": 345,
+      "y": 599,
+      "w": 130,
+      "h": 143,
+      "areaDevicePx": 12689,
+      "widthCssPx": 65,
+      "heightCssPx": 71.5,
+      "equivDiameterCssPx": 63.6,
+      "meanRgb": [
+        59,
+        65,
+        73
+      ]
+    },
+    {
+      "kind": "asteroid",
+      "elongation": 1.4,
+      "x": 40,
+      "y": 302,
+      "w": 112,
+      "h": 158,
+      "areaDevicePx": 12334,
+      "widthCssPx": 56,
+      "heightCssPx": 79,
+      "equivDiameterCssPx": 62.7,
+      "meanRgb": [
+        63,
+        68,
+        77
+      ]
+    },
+    {
+      "kind": "asteroid",
+      "elongation": 1.1,
+      "x": 60,
+      "y": 1338,
+      "w": 138,
+      "h": 130,
+      "areaDevicePx": 11656,
+      "widthCssPx": 69,
+      "heightCssPx": 65,
+      "equivDiameterCssPx": 60.9,
+      "meanRgb": [
+        59,
+        65,
+        72
+      ]
+    },
+    {
+      "kind": "arena wall band",
+      "elongation": 158.8,
+      "x": 2300,
+      "y": 250,
+      "w": 8,
+      "h": 1270,
+      "areaDevicePx": 10160,
+      "widthCssPx": 4,
+      "heightCssPx": 635,
+      "equivDiameterCssPx": 56.9,
+      "meanRgb": [
+        63,
+        69,
+        76
+      ]
+    },
+    {
+      "kind": "station part (inside the halo ring)",
+      "elongation": 1.1,
+      "x": 1407,
+      "y": 703,
+      "w": 428,
+      "h": 399,
+      "areaDevicePx": 9255,
+      "widthCssPx": 214,
+      "heightCssPx": 199.5,
+      "equivDiameterCssPx": 54.3,
+      "meanRgb": [
+        54,
+        62,
+        72
+      ]
+    },
+    {
+      "kind": "asteroid",
+      "elongation": 1.3,
+      "x": 552,
+      "y": 490,
+      "w": 105,
+      "h": 84,
+      "areaDevicePx": 6107,
+      "widthCssPx": 52.5,
+      "heightCssPx": 42,
+      "equivDiameterCssPx": 44.1,
+      "meanRgb": [
+        64,
+        70,
+        78
+      ]
+    },
+    {
+      "kind": "asteroid",
+      "elongation": 1.1,
+      "x": 600,
+      "y": 1071,
+      "w": 109,
+      "h": 102,
+      "areaDevicePx": 5248,
+      "widthCssPx": 54.5,
+      "heightCssPx": 51,
+      "equivDiameterCssPx": 40.9,
+      "meanRgb": [
+        56,
+        61,
+        69
+      ]
+    },
+    {
+      "kind": "station part (inside the halo ring)",
+      "elongation": 1,
+      "x": 1589,
+      "y": 852,
+      "w": 95,
+      "h": 91,
+      "areaDevicePx": 2860,
+      "widthCssPx": 47.5,
+      "heightCssPx": 45.5,
+      "equivDiameterCssPx": 30.2,
+      "meanRgb": [
+        91,
+        110,
+        111
+      ]
+    },
+    {
+      "kind": "arena wall band",
+      "elongation": 635,
+      "x": 2291,
+      "y": 250,
+      "w": 2,
+      "h": 1270,
+      "areaDevicePx": 2540,
+      "widthCssPx": 1,
+      "heightCssPx": 635,
+      "equivDiameterCssPx": 28.4,
+      "meanRgb": [
+        36,
+        39,
+        44
+      ]
+    },
+    {
+      "kind": "asteroid",
+      "elongation": 5.1,
+      "x": 234,
+      "y": 250,
+      "w": 138,
+      "h": 27,
+      "areaDevicePx": 2369,
+      "widthCssPx": 69,
+      "heightCssPx": 13.5,
+      "equivDiameterCssPx": 27.5,
+      "meanRgb": [
+        53,
+        59,
+        65
+      ]
+    },
+    {
+      "kind": "asteroid",
+      "elongation": 2.1,
+      "x": 528,
+      "y": 497,
+      "w": 32,
+      "h": 66,
+      "areaDevicePx": 886,
+      "widthCssPx": 16,
+      "heightCssPx": 33,
+      "equivDiameterCssPx": 16.8,
+      "meanRgb": [
+        51,
+        57,
+        64
+      ]
+    }
+  ],
+  "medianVsBloomHalo": 3.3
+}

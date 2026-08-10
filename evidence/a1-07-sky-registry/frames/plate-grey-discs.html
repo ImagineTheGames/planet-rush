@@ -1,0 +1,75 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+  body { margin:0; padding:26px 24px 30px; background:#14181d; color:#b9c2cc;
+         font-family:'Oxanium',ui-monospace,monospace; width:1520px; }
+  h1 { font-size:20px; margin:0 0 4px; color:#4DC3FF; font-weight:600; }
+  .lede { font-size:12.5px; margin:4px 0 14px; line-height:1.6; color:#8b96a3; }
+  .lede b { color:#cfd7e0; } code { color:#e0c07a; }
+  .row { display:flex; gap:12px; align-items:flex-start; }
+  figure { margin:0; } figure img { display:block; width:740px; border:1px solid #2b333c; }
+  figcaption { font-size:11px; line-height:1.45; padding-top:5px; color:#8b96a3; width:740px; }
+  figcaption b { color:#cfd7e0; }
+  table { border-collapse:collapse; font-size:11.5px; }
+  td,th { border:1px solid #2b333c; padding:3px 9px; text-align:left; }
+  th { color:#7E8894; font-weight:400; } td.n { color:#e7edf3; }
+  .sw { display:inline-block; width:10px; height:10px; border:1px solid #39424c; vertical-align:-1px; margin-right:5px; }
+  .note { font-size:11.5px; color:#7E8894; line-height:1.55; margin-top:10px; }
+</style></head><body>
+  <h1>The Octagon — what the soft grey discs actually are</h1>
+  <p class="lede">
+    Served bundle <b>dd1d3f5</b>, the DEFAULT arena. <code>MAP_NEBULA.octagon</code> is <b>none</b> and the live
+    stage agrees: there is no <code>void-nebula-*</code> layer on the stage at all, and hiding that prefix changes
+    <b>zero</b> pixels. Both frames below have every void layer but <code>void-ground</code> hidden — <b>no sky, not
+    one star, not one bloom halo.</b> Everything still visible is a world object.
+  </p>
+  <div class="row">
+    <figure><img src="octagon-discs-marked.png"/><figcaption>
+      <b>16 neutral-grey objects</b> found by flood fill over everything brighter than Floor and
+      neutral in hue (so the station's blue rings, the ore's yellow and the HUD text are already excluded).
+      <b style="color:#ff5a64">Red — the 10 asteroids</b>: compact rock polygons with a lighter
+      silhouette rim, opaque, standing in front of whatever star would have been behind them.
+      <b style="color:#5a82be">Blue — the 6 that are NOT rocks</b> and are named rather than
+      quietly counted in: station body / halo ring (512×512 px); arena wall band (10×635 px); arena wall band (4×635 px); station part (inside the halo ring) (214×199.5 px); station part (inside the halo ring) (47.5×45.5 px); arena wall band (1×635 px).
+    </figcaption></figure>
+    <div>
+      <table>
+        <tr><th>#</th><th>bbox, CSS px</th><th>equiv. diameter</th><th>vs a bloom halo</th><th>mean ink</th></tr>
+        <tr><td>1</td><td class="n">77 × 79</td><td class="n">74.2</td>
+       <td class="n">3.9×</td>
+       <td><span class="sw" style="background:rgb(64,70,78)"></span> rgb(64, 70, 78)</td></tr><tr><td>2</td><td class="n">70.5 × 90.5</td><td class="n">73.5</td>
+       <td class="n">3.9×</td>
+       <td><span class="sw" style="background:rgb(56,62,69)"></span> rgb(56, 62, 69)</td></tr><tr><td>3</td><td class="n">72 × 65</td><td class="n">65.6</td>
+       <td class="n">3.5×</td>
+       <td><span class="sw" style="background:rgb(63,68,77)"></span> rgb(63, 68, 77)</td></tr><tr><td>4</td><td class="n">65 × 71.5</td><td class="n">63.6</td>
+       <td class="n">3.4×</td>
+       <td><span class="sw" style="background:rgb(59,65,73)"></span> rgb(59, 65, 73)</td></tr><tr><td>5</td><td class="n">56 × 79</td><td class="n">62.7</td>
+       <td class="n">3.3×</td>
+       <td><span class="sw" style="background:rgb(63,68,77)"></span> rgb(63, 68, 77)</td></tr><tr><td>6</td><td class="n">69 × 65</td><td class="n">60.9</td>
+       <td class="n">3.2×</td>
+       <td><span class="sw" style="background:rgb(59,65,72)"></span> rgb(59, 65, 72)</td></tr><tr><td>7</td><td class="n">52.5 × 42</td><td class="n">44.1</td>
+       <td class="n">2.3×</td>
+       <td><span class="sw" style="background:rgb(64,70,78)"></span> rgb(64, 70, 78)</td></tr><tr><td>8</td><td class="n">54.5 × 51</td><td class="n">40.9</td>
+       <td class="n">2.2×</td>
+       <td><span class="sw" style="background:rgb(56,61,69)"></span> rgb(56, 61, 69)</td></tr><tr><td>9</td><td class="n">69 × 13.5</td><td class="n">27.5</td>
+       <td class="n">1.5×</td>
+       <td><span class="sw" style="background:rgb(53,59,65)"></span> rgb(53, 59, 65)</td></tr><tr><td>10</td><td class="n">16 × 33</td><td class="n">16.8</td>
+       <td class="n">0.9×</td>
+       <td><span class="sw" style="background:rgb(51,57,64)"></span> rgb(51, 57, 64)</td></tr>
+      </table>
+      <p class="note">
+        The largest star in the field is the <code>near</code> layer at <code>maxR 2.2</code>, and its outer bloom halo
+        is <code>4.3×</code> that — <b>18.9 px across at ~6% alpha</b>
+        (<code>BLOOM.intensity[1] = 0.065</code>). The median object here is
+        <b>62.7 px</b> across — <b>3.3× the halo</b> — and opaque
+        rather than a 6% wash. The ruling-out in the brief holds, and this is what is left.
+      </p>
+    </div>
+  </div>
+  <p class="note">
+    <b>Read this as a lead, not a verdict on the developer's screenshot.</b> What is attested is what is in THIS
+    frame: on the default arena, with no sky drawn and every star layer off, the empty field still contains
+    10 soft-edged neutral-grey discs several times the size of the largest bloom, and they are the
+    rocks. That matches the report's shape — including "the stars that are supposed to be there are underneath",
+    which is exactly true of an opaque rock. It is not proof that this is what they were looking at; nobody has
+    matched their frame to a map, a build or a moment.
+  </p>
+</body></html>
