@@ -601,9 +601,14 @@ export class Renderer {
     units: number;
   } {
     const extent = this.extentOf(key, make);
-    const size = Math.max(8, Math.round(2 * extent * pxPerUnit));
+    // Deliberately NOT rounded. `size` is only ever a cache key and a divisor
+    // (`SpriteTextureCache` rasterises at `size / (2 · extent)` px per unit), and
+    // rounding it would put a fraction of a percent between the pooled scale and
+    // the `radius / ART_SCALE` the vectors used — small, but a drift with no
+    // reason to exist. The FRAME is what has to be whole pixels, and it is.
+    const size = 2 * extent * pxPerUnit;
     this.baker.frameFor(size);
-    return { texture: bake(size), units: (2 * extent) / size };
+    return { texture: bake(size), units: 1 / pxPerUnit };
   }
 
   /** Point the camera at a new visible viewport (resize / orientationchange /

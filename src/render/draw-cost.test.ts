@@ -21,15 +21,25 @@
  * moves the frozen-scene goldens, and that brief's own guard rail forbids it.
  * So the numbers are pinned here instead, where CI reads them.
  *
+ * **(1) IS FIXED — a1-11 wired the pooling, with the golden constraint lifted.**
+ * Rocks, turrets and shots are pooled `Sprite`s over shared textures now, so the
+ * *draw calls* those layers cost collapsed (see the doc's revised table and
+ * `./pooling.test.ts`, which asserts the sharing on the shipped renderer). What
+ * this file measures is **display objects, not draw calls**, and that number is
+ * unchanged and still worth pinning: the renderer still walks every entity in
+ * the arena every frame, and (2) — that almost none of them are on screen — is
+ * exactly as true as it was. That is what a1-10 §6A is for and it has not landed.
+ *
  * **If you are here because this test failed: good.** It means the shape of the
  * frame changed. Do not loosen the assertion — re-run
  * `node spikes/atlas-pooling/run.mjs`, update `docs/atlas-pooling-measured.md`
  * with the new numbers, and update the constants below to match what you
  * measured. The test exists to make that re-measurement unskippable.
  *
- * Headless: the renderer builds Graphics geometry with no WebGL, which is a
- * property worth naming here because the pooled path would cost it (baking a
- * texture needs a live `generateTexture`) — that is part of the bill in the doc.
+ * Headless, still: a1-10 flagged that baking needs a live `generateTexture` and
+ * that paying for it with a second, Graphics-shaped fallback path would be worse
+ * than not pooling. a1-11 did not pay it — the baker is injected, and with none
+ * the renderer draws the same sprites over blank textures of the right size.
  */
 import { describe, it, expect } from 'vitest';
 import { Container } from 'pixi.js';
@@ -62,7 +72,9 @@ function layer(stage: Container, label: string): Container {
 }
 
 /** Display objects the renderer left visible in the entity layers — i.e. what it
- *  hands the GPU. Pooled-but-hidden children do not count; they cost nothing. */
+ *  walks and transforms. Since a1-11 the dense ones batch, so this is no longer a
+ *  draw-call count; it is still the per-frame CPU walk, and it is still the whole
+ *  arena. Pooled-but-hidden children do not count; they cost nothing. */
 function submitted(stage: Container): number {
   let n = 0;
   for (const label of ENTITY_LAYERS) {
@@ -100,7 +112,7 @@ function onScreen(world: World, viewport: Viewport): number {
 }
 
 describe('draw cost on the GDD §4.3 stress scene (a1-10 characterisation)', () => {
-  it('submits one display object per entity — nothing is pooled into a shared draw', () => {
+  it('walks one display object per entity, on-screen or not', () => {
     const world = stressWorld();
     const entities =
       world.asteroids.length +
@@ -112,7 +124,7 @@ describe('draw cost on the GDD §4.3 stress scene (a1-10 characterisation)', () 
     expect(entities).toBeGreaterThanOrEqual(STRESS_SCENE.asteroids);
     expect(
       submitted(drawOnce(world, DESKTOP)),
-      'the renderer draws one Graphics per entity; if this changed, re-measure (see the file header)',
+      'the renderer walks one display object per entity; if this changed, re-measure (see the file header)',
     ).toBe(entities);
   });
 
