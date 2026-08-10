@@ -3,7 +3,7 @@
 **a1-09 · Platform Engineer · 2026-08-10 · every number below is reproducible
 with `npm run dark-matter` on this branch**
 
-`abundanceOf`/`matchAbundance` (`src/sim/match-config.ts`) is three lines,
+`matchAbundance` (`src/sim/match-config.ts`) is three lines,
 correct, and tested. Its entire job is applying the ratified SCARCE default. It
 had zero non-test callers: production read `config.abundance` raw, which
 resolved to `standard`, so every match ever played ran a 150 s wave schedule

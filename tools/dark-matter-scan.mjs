@@ -718,7 +718,12 @@ function runCheck(rows, opts, diag) {
     return !row || !row.dark;
   });
 
-  const lines = [];
+  // The gate is the one output nobody reads by choice — it is read when it goes
+  // red — so the two "this scan may be wrong" warnings have to travel with it.
+  // An unclassified production tree makes the gate fail on exports that tree
+  // calls on every request (`allocator/`, exactly), and the warning is the only
+  // thing that says so at the moment someone is staring at the failure.
+  const lines = [...warnings(diag)];
   if (stale.length) {
     lines.push('');
     lines.push(`NOTE: ${stale.length} allowlist entr${stale.length === 1 ? 'y is' : 'ies are'} no longer dark — production now calls them.`);
