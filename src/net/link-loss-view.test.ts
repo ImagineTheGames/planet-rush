@@ -216,5 +216,19 @@ describe('LinkLossView', () => {
     watch.frame(T0 + 8_500);
     view.update(watch.poll(T0 + 8_500));
     expect(view.visible).toBe(false);
+    expect(dom.root.hidden).toBe(true);
+  });
+
+  it('and the `hidden` it sets can actually beat its own stylesheet', () => {
+    // A fake DOM has no CSS, so `hidden` "works" here whatever the sheet says — and
+    // in a browser it did not: the scrim's own `#pr-link-loss{display:flex}` outranks
+    // the UA's `[hidden]{display:none}` on specificity, so `hide()` left a
+    // full-viewport `pointer-events:auto` card standing over a recovered match
+    // (n6-01, caught by `tests/live-stage/link-loss.spec.ts` — the first run that
+    // ever installed this overlay in a real page). The rule is asserted here so it
+    // cannot be tidied away by someone who has only ever seen the fake DOM.
+    expect(renderLinkLossHtml(linkNotice(lostStatus()))).toContain(
+      `#${LINK_LOSS_ROOT_ID}[hidden]{display:none;}`,
+    );
   });
 });

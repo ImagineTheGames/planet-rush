@@ -55,6 +55,9 @@ export default defineConfig({
     baseURL: PREVIEW_URL,
     browserName: chromium,
     viewport: { width: 1280, height: 800 },
+    // A click that never lands is a failed test, never a hung suite — and this
+    // overlay is a surface where "the button did nothing" is the whole risk.
+    actionTimeout: 20_000,
     trace: 'retain-on-failure',
   },
 

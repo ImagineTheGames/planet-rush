@@ -103,6 +103,15 @@ function linkLossCss(accent: string): string {
     `font-family:${FONT_BODY};-webkit-text-size-adjust:100%;` +
     `padding:calc(1rem + env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom));` +
     `box-sizing:border-box;}` +
+    // …and {@link LinkLossView.hide} has to be able to undo all of that. The `hidden`
+    // attribute is only the UA rule `[hidden]{display:none}`, which the `display:flex`
+    // above outranks on specificity alone — so without this line `hide()` sets a flag
+    // and nothing else happens: the scrim keeps its 100 % of the viewport, keeps
+    // `pointer-events:auto`, and keeps a stale RECONNECTING… card over a match the
+    // player has just been let back into. Found the first time this overlay was
+    // installed for real (n6-01) and invisible to every fake-DOM test, which has no
+    // stylesheet to lose the fight in.
+    `#${LINK_LOSS_ROOT_ID}[hidden]{display:none;}` +
     `#${LINK_LOSS_ROOT_ID} .pr-ll-card{width:min(34rem,94vw);box-sizing:border-box;` +
     `background:${CSS_VACUUM};border:1px solid ${accent};border-radius:6px;` +
     `padding:1.1rem 1.2rem;text-align:center;box-shadow:0 8px 32px #000000aa;` +

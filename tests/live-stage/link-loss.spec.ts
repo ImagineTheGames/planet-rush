@@ -140,10 +140,34 @@ async function twoPlayerMatch(browser: Browser): Promise<{ host: Page; guest: Pa
   };
 }
 
-/** Stop (or restart) delivery from every Machine — the silent death, and its undo. */
-async function gag(page: Page, on: boolean): Promise<void> {
-  const response = await page.request.get(`${EDGE_CONTROL}?gag=${on ? '1' : '0'}`);
-  expect(response.ok(), 'the edge control route did not answer').toBe(true);
+/** Stop (or restart) delivery from every Machine — the silent death, and its undo.
+ *  Over plain `fetch` rather than a page's request context, so teardown can put the
+ *  fleet back even when the browser it was driving is already gone. */
+async function gag(on: boolean): Promise<void> {
+  const response = await fetch(`${EDGE_CONTROL}?gag=${on ? '1' : '0'}`);
+  expect(response.ok, 'the edge control route did not answer').toBe(true);
+}
+
+/**
+ * Press a button the way a player does: a real mouse click at the point it is
+ * actually drawn, then wait for the screen to answer.
+ *
+ * Not `locator.click()`, and the reason is the overlay's own design: the grace
+ * countdown rides the RECONNECT button, so the card is re-written once a second
+ * (`src/net/link-loss-view` — "one DOM write per second") and every button element
+ * is replaced with it. Playwright's actionability check wants one element to stay
+ * attached for the whole of its sequence, and under a live match's frame load it
+ * loses that race about as often as it wins it. A player's click does not care
+ * which element object is under the pixel — so neither does this, and the retry
+ * covers the one-in-a-thousand press that lands mid-rewrite.
+ */
+async function press(page: Page, selector: string, answered: () => Promise<void>): Promise<void> {
+  await expect(async () => {
+    const box = await page.locator(selector).boundingBox();
+    expect(box, `${selector} is not on screen`).not.toBeNull();
+    await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2);
+    await answered();
+  }).toPass({ timeout: 45_000 });
 }
 
 test.describe('the link dies and the player is told', () => {
@@ -157,7 +181,7 @@ test.describe('the link dies and the player is told', () => {
       await expect(match.guest.locator(ROOT)).toBeHidden();
 
       // The socket dies the way a backgrounded tab's does: silently.
-      await gag(match.guest, true);
+      await gag(true);
 
       // …and the client says so, on its own, with no event to go on. The wait is
       // real time: `SILENCE_FLOOR_MS` is 2.5 s and this run has no clock to move.
@@ -179,6 +203,9 @@ test.describe('the link dies and the player is told', () => {
         .innerText()}`;
       expect(said).toContain('no server data for');
       expect(said).toMatch(/\d+s/);
+      // What the developer asked to see, as a picture: the kick-out over their own
+      // frozen match, with the cause and the seconds on it.
+      await match.guest.screenshot({ path: 'tests/live-stage/link-loss-lost-evidence.png' });
 
       // And there is a way out — a button, not just a sentence. Which buttons
       // depends on the card: the client spends its one automatic redial the instant
@@ -187,23 +214,26 @@ test.describe('the link dies and the player is told', () => {
       // dialling (`src/net/link-loss` `linkNotice`). ABANDON is on both.
       expect(await match.guest.locator(`${RECONNECT}, ${ABANDON}`).count()).toBeGreaterThan(0);
       await expect(match.guest.locator(ABANDON)).toBeVisible();
-      await match.guest.locator(ABANDON).click();
 
       // The wire, proven by a sentence only `session.leave()` can produce: the
       // watchdog's `'left'` ending (`src/net/link-loss` `endingTitle`). A drawn
-      // button that did nothing would still be sitting on the previous card.
-      await expect(match.guest.locator(TITLE)).toContainText('MATCH ABANDONED', { timeout: 15_000 });
+      // button that did nothing would leave the previous card standing.
+      await press(match.guest, ABANDON, async () => {
+        await expect(match.guest.locator(TITLE)).toContainText('MATCH ABANDONED', { timeout: 3_000 });
+      });
       await expect(match.guest.locator(MENU)).toBeVisible();
+      await match.guest.screenshot({ path: 'tests/live-stage/link-loss-abandoned-evidence.png' });
 
       // BACK TO MENU is the second half of "get me out of here": it lands on the
       // real main menu, which only a clean boot shows.
-      await match.guest.locator(MENU).click();
-      await match.guest.waitForFunction(() => window.__mainMenu?.matchStarted === false, undefined, {
-        timeout: 60_000,
+      await press(match.guest, MENU, async () => {
+        await match.guest.waitForFunction(() => window.__mainMenu?.matchStarted === false, undefined, {
+          timeout: 20_000,
+        });
       });
       await expect(match.guest.locator(ROOT)).toBeHidden();
     } finally {
-      await gag(match.host, false).catch(() => {});
+      await gag(false).catch(() => {});
       await match.close();
     }
   });
@@ -211,21 +241,22 @@ test.describe('the link dies and the player is told', () => {
   test('the overlay comes down by itself when the link comes back', async ({ browser }) => {
     const match = await twoPlayerMatch(browser);
     try {
-      await gag(match.guest, true);
+      await gag(true);
       await expect(match.guest.locator(ROOT)).toBeVisible({ timeout: 30_000 });
 
       // The network returns. Nothing is pressed: the client had already spent its
       // one automatic reclaim attempt (GDD §4.2 — the seat, the ship, the cargo and
       // the upgrades are still ours inside the grace window), and a frame arriving
       // is what takes the overlay down.
-      await gag(match.guest, false);
+      await gag(false);
       await expect(match.guest.locator(ROOT)).toBeHidden({ timeout: 60_000 });
+      await match.guest.screenshot({ path: 'tests/live-stage/link-loss-recovered-evidence.png' });
 
       // Still in the match it never left, and the world is being drawn again.
       expect(await match.guest.evaluate(() => window.__mainMenu?.matchStarted)).toBe(true);
       expect(await match.guest.evaluate(() => window.__mainMenu?.localShipPos)).not.toBeNull();
     } finally {
-      await gag(match.host, false).catch(() => {});
+      await gag(false).catch(() => {});
       await match.close();
     }
   });
