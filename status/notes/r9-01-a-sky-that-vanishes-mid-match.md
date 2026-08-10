@@ -30,6 +30,25 @@ Branch: `agent/art/r9-01-sky-survives-the-reducer`
 Gates at that commit: `npx tsc --noEmit` clean; `npm test -- --run`
 **273 files / 4769 tests passed**.
 
+- **`6bba177` evidence(r9-01): the sky held for 45 s on the arena that lost it.**
+  `evidence/r9-01-sky-survives-reducer/` — probe, figure script, README,
+  `measurements.json`; six plates in `evidence/images/r9-01-*`, each attested
+  one by one in `evidence/manifest.json`.
+
+  | build | arena | t+1s | t+45s | dropped | reduce-VFX engaged |
+  |---|---|---|---|---|---|
+  | `dd1d3f5` | **oval** | `plasmaReef` | **— gone** | **t+6.1 s** | t+6.1 s |
+  | `dd1d3f5` | line (control) | `deepEmber` | `deepEmber` | never | t+6.7 s |
+  | `7a90b22` | **oval** | `plasmaReef` | **`plasmaReef`** | **never, 45/45 polls** | t+18 s |
+  | `7a90b22` | line (control) | `deepEmber` | `deepEmber` | never | t+18.9 s |
+
+  The reducer's own state is read off the live page with **no debug seam added**:
+  `drawAtmosphere` rebuilds the owned station's halo as rings alone when
+  `reduceVfx` is on, and `atmosphereHaloSprite` is 53 shapes full against 13
+  reduced, so the live `atmosphere-*` Graphics' instruction count *is* the tier.
+  That is what makes the after-run mean anything — before the fix, "the reef is
+  gone" was itself the proof the reducer had engaged.
+
 ## DECISIONS
 
 **Picked options 1 + 2 from the brief, as one rule with two halves.** Neither is
@@ -98,9 +117,28 @@ void "sheds its nebula … Rebuild happens lazily in draw". That is now stale �
 neither sheds nor rebuilds on the tier. `src/render/` is not art's file, so the
 correction is raised in the PR body for its owner rather than made here.
 
+**One consequence worth naming rather than discovering.** With the pin, the
+*auto* path can only thin the **next** sky, never the current one — and the tier
+is not knowable at frame 1 (the reducer is a 3-second measurement, not a device
+probe), so a first-boot match on a slow device keeps its full sky and pays for it.
+The paths that do reach a thin sky are: the manual reduce-VFX setting on before a
+match's sky is built, and any new sky committed while the tier is engaged. That is
+the trade the brief's option 2 asks for, stated plainly. If the Director wants a
+slow device to *boot* thin, the lever is a persisted tier in platform's hands, not
+the backdrop's.
+
+Two seams named for their owners rather than reached into:
+
+- `src/render/index.ts:409-410` — the comment about the void "shedding its
+  nebula" is now stale.
+- Within one page session `Renderer` is constructed once (`main.ts:1174`) and
+  `backdrop.destroy()` is never called, so a **rematch on the same map** keeps the
+  pin from the previous match. A missed saving, not an artefact; `destroy()` at
+  match start would release it if Render wants that.
+
 ## NEXT
 
-- [x] Live evidence: 40 s scene-graph poll on a served build, Oval + Line
+- [x] Live evidence: 45 s scene-graph poll on a served build, Oval + Line
       control, sky must survive. Shape borrowed from a1-07's `probe-throttle.mjs`
       (which lives on `agent/qa-manager/a1-07-sky-registry`, unmerged).
 - [x] Push branch, open PR, DoD gates.
