@@ -1,0 +1,250 @@
+{
+  "amp": 14,
+  "served": {
+    "sha": "dd1d3f5",
+    "time": "2026-08-10T02:31:26.389Z"
+  },
+  "maps": [
+    {
+      "id": "octagon",
+      "name": "The Octagon",
+      "registry": "none",
+      "rendered": "none",
+      "match": true,
+      "drawOrder": [
+        "void-ground",
+        "void-stars-deep",
+        "void-stars-mid",
+        "void-stars-near"
+      ],
+      "liveNebula": null,
+      "frozenNebula": null,
+      "blendMode": null,
+      "skyAlone": {
+        "pixels": 5184000,
+        "touchedPct": 0,
+        "over2Pct": 0,
+        "peakChannelDelta": 0,
+        "peakLumaDelta": 0,
+        "meanInkWhereTouched": null
+      },
+      "starsAlone": {
+        "pixels": 5184000,
+        "touchedPct": 0.2,
+        "over2Pct": 0.1,
+        "peakChannelDelta": 229,
+        "peakLumaDelta": 228.1,
+        "meanInkWhereTouched": {
+          "r": 25.78,
+          "g": 26.41,
+          "b": 26.85
+        }
+      }
+    },
+    {
+      "id": "compass",
+      "name": "The Compass",
+      "registry": "coalsack",
+      "rendered": "coalsack",
+      "match": true,
+      "drawOrder": [
+        "void-ground",
+        "void-stars-deep",
+        "void-stars-mid",
+        "void-stars-near",
+        "void-nebula-coalsack"
+      ],
+      "liveNebula": "coalsack",
+      "frozenNebula": "coalsack",
+      "blendMode": "inherit",
+      "skyAlone": {
+        "pixels": 5184000,
+        "touchedPct": 0.1,
+        "over2Pct": 0.1,
+        "peakChannelDelta": 226,
+        "peakLumaDelta": 225.1,
+        "meanInkWhereTouched": {
+          "r": 17.82,
+          "g": 18.4,
+          "b": 18.86
+        }
+      },
+      "starsAlone": {
+        "pixels": 5184000,
+        "touchedPct": 0.1,
+        "over2Pct": 0.1,
+        "peakChannelDelta": 162,
+        "peakLumaDelta": 161.9,
+        "meanInkWhereTouched": {
+          "r": 16.89,
+          "g": 17.33,
+          "b": 17.65
+        }
+      }
+    },
+    {
+      "id": "oval",
+      "name": "The Oval",
+      "registry": "plasmaReef",
+      "rendered": "plasmaReef",
+      "match": true,
+      "drawOrder": [
+        "void-ground",
+        "void-nebula-plasmaReef",
+        "void-stars-deep",
+        "void-stars-mid",
+        "void-stars-near"
+      ],
+      "liveNebula": null,
+      "frozenNebula": "plasmaReef",
+      "blendMode": "add",
+      "skyAlone": {
+        "pixels": 5184000,
+        "touchedPct": 30.1,
+        "over2Pct": 10.7,
+        "peakChannelDelta": 21,
+        "peakLumaDelta": 15,
+        "meanInkWhereTouched": {
+          "r": 0.52,
+          "g": 1.61,
+          "b": 2.76
+        }
+      },
+      "starsAlone": {
+        "pixels": 5184000,
+        "touchedPct": 0.2,
+        "over2Pct": 0.1,
+        "peakChannelDelta": 240,
+        "peakLumaDelta": 239.1,
+        "meanInkWhereTouched": {
+          "r": 26.89,
+          "g": 27.62,
+          "b": 28.01
+        }
+      }
+    },
+    {
+      "id": "diamond",
+      "name": "Double Diamond",
+      "registry": "patinaDrift",
+      "rendered": "patinaDrift",
+      "match": true,
+      "drawOrder": [
+        "void-ground",
+        "void-nebula-patinaDrift",
+        "void-stars-deep",
+        "void-stars-mid",
+        "void-stars-near"
+      ],
+      "liveNebula": "patinaDrift",
+      "frozenNebula": "patinaDrift",
+      "blendMode": "inherit",
+      "skyAlone": {
+        "pixels": 5184000,
+        "touchedPct": 25.9,
+        "over2Pct": 11.9,
+        "peakChannelDelta": 16,
+        "peakLumaDelta": 14.2,
+        "meanInkWhereTouched": {
+          "r": 1.66,
+          "g": 2.7,
+          "b": 2.48
+        }
+      },
+      "starsAlone": {
+        "pixels": 5184000,
+        "touchedPct": 0.2,
+        "over2Pct": 0.2,
+        "peakChannelDelta": 240,
+        "peakLumaDelta": 239.1,
+        "meanInkWhereTouched": {
+          "r": 24.87,
+          "g": 25.57,
+          "b": 26.09
+        }
+      }
+    },
+    {
+      "id": "line",
+      "name": "The Line",
+      "registry": "deepEmber",
+      "rendered": "deepEmber",
+      "match": true,
+      "drawOrder": [
+        "void-ground",
+        "void-nebula-deepEmber",
+        "void-stars-deep",
+        "void-stars-mid",
+        "void-stars-near"
+      ],
+      "liveNebula": "deepEmber",
+      "frozenNebula": "deepEmber",
+      "blendMode": "inherit",
+      "skyAlone": {
+        "pixels": 5184000,
+        "touchedPct": 41.1,
+        "over2Pct": 26.3,
+        "peakChannelDelta": 16,
+        "peakLumaDelta": 7.3,
+        "meanInkWhereTouched": {
+          "r": 4.41,
+          "g": 1.13,
+          "b": 1.04
+        }
+      },
+      "starsAlone": {
+        "pixels": 5184000,
+        "touchedPct": 0.2,
+        "over2Pct": 0.1,
+        "peakChannelDelta": 238,
+        "peakLumaDelta": 237.8,
+        "meanInkWhereTouched": {
+          "r": 27.47,
+          "g": 28.5,
+          "b": 29.03
+        }
+      }
+    },
+    {
+      "id": "crescents",
+      "name": "The Crescents",
+      "registry": "ironVeil",
+      "rendered": "ironVeil",
+      "match": true,
+      "drawOrder": [
+        "void-ground",
+        "void-nebula-ironVeil",
+        "void-stars-deep",
+        "void-stars-mid",
+        "void-stars-near"
+      ],
+      "liveNebula": "ironVeil",
+      "frozenNebula": "ironVeil",
+      "blendMode": "inherit",
+      "skyAlone": {
+        "pixels": 5184000,
+        "touchedPct": 34.5,
+        "over2Pct": 31.9,
+        "peakChannelDelta": 20,
+        "peakLumaDelta": 12.3,
+        "meanInkWhereTouched": {
+          "r": 6.26,
+          "g": 4.34,
+          "b": 4.34
+        }
+      },
+      "starsAlone": {
+        "pixels": 5184000,
+        "touchedPct": 0.2,
+        "over2Pct": 0.1,
+        "peakChannelDelta": 240,
+        "peakLumaDelta": 239.1,
+        "meanInkWhereTouched": {
+          "r": 27.23,
+          "g": 28.02,
+          "b": 28.34
+        }
+      }
+    }
+  ]
+}

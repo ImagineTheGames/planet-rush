@@ -1,0 +1,63 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+  body { margin:0; padding:26px 24px 30px; background:#14181d; color:#b9c2cc;
+         font-family:'Oxanium',ui-monospace,monospace; width:1520px; }
+  h1 { font-size:20px; margin:0 0 4px; color:#4DC3FF; font-weight:600; }
+  .lede { font-size:12.5px; margin:4px 0 16px; line-height:1.6; color:#8b96a3; }
+  .lede b { color:#cfd7e0; } code { color:#e0c07a; }
+  .case { margin-bottom:16px; }
+  .case h2 { font-size:14px; margin:0 0 5px; color:#e7edf3; font-weight:600; }
+  .case h2 .sub { color:#7E8894; font-weight:400; font-size:12px; }
+  .trace { display:flex; gap:2px; margin:4px 0 6px; }
+  .trace i { width:34px; height:26px; border-radius:2px; display:block; }
+  .on { background:#1f7a4a; } .off { background:#8a2028; }
+  .axis { font-size:10.5px; color:#68727e; margin-bottom:10px; }
+  .row { display:flex; gap:12px; }
+  figure { margin:0; } figure img { display:block; width:740px; border:1px solid #2b333c; }
+  figcaption { font-size:11px; padding-top:5px; color:#8b96a3; width:740px; line-height:1.45; }
+  figcaption b { color:#cfd7e0; }
+  .key { font-size:11.5px; color:#7E8894; margin:2px 0 14px; }
+  .key i { display:inline-block; width:10px; height:10px; border-radius:2px; vertical-align:-1px; margin:0 4px 0 10px; }
+  .note { font-size:11.5px; color:#7E8894; line-height:1.55; margin-top:12px; }
+  .note b { color:#cfd7e0; }
+</style></head><body>
+  <h1>The Oval is the one arena that can end up with no sky at all — by design, and nobody had watched it happen</h1>
+  <p class="lede">
+    Served bundle <b>dd1d3f5</b>. Reading the sky twice on The Oval gave two different answers:
+    <code>?debug=1&amp;freeze=1</code> had <code>void-nebula-plasmaReef</code> on the stage, and a LIVE
+    <code>?debug=1</code> boot of the same bundle had <b>no nebula layer at all</b>. Every other arena answered the
+    same both ways. This is why: <code>Void.build()</code> computes
+    <code>density = reduced ? nebula.reducedDensity : 1</code> and then
+    <code>drawSky = id !== 'none' &amp;&amp; density &gt; 0</code>, and <b>plasmaReef is the only sky whose
+    <code>reducedDensity</code> is 0</b> — coalsack 1, deepEmber 1, ironVeil 0.5, patinaDrift 0.45. When
+    <code>VfxAutoQuality</code> engages, the reef is the one sky that goes to nothing. Freeze never throttles
+    (<code>flags.freeze ? false : vfxQuality.sample(...)</code>), which is why the frozen frame still has it.
+  </p>
+  <p class="key">Each cell is one second of one arena's live boot:
+    <i class="on"></i> a <code>void-nebula-*</code> layer is on the stage &nbsp;
+    <i class="off"></i> it is not.</p>
+  <div class="case">
+    <h2>oval → plasmaReef <span class="sub">— <code>reducedDensity 0</code>, the subject</span></h2>
+    <div class="trace"><i class="on" title="t+1.8s  fps 3.2  plasmaReef"></i><i class="on" title="t+3.8s  fps 2.7  plasmaReef"></i><i class="on" title="t+5.9s  fps 2.4  plasmaReef"></i><i class="off" title="t+8.3s  fps 2.1  no nebula layer"></i><i class="off" title="t+9.9s  fps 2  no nebula layer"></i><i class="off" title="t+11.5s  fps 2  no nebula layer"></i><i class="off" title="t+13.1s  fps 1.9  no nebula layer"></i><i class="off" title="t+14.6s  fps 1.9  no nebula layer"></i><i class="off" title="t+15.7s  fps 1.9  no nebula layer"></i><i class="off" title="t+17.2s  fps 1.9  no nebula layer"></i><i class="off" title="t+18.7s  fps 1.9  no nebula layer"></i><i class="off" title="t+20.3s  fps 2  no nebula layer"></i><i class="off" title="t+21.8s  fps 2  no nebula layer"></i><i class="off" title="t+23.4s  fps 2  no nebula layer"></i><i class="off" title="t+25s  fps 2.2  no nebula layer"></i><i class="off" title="t+26.5s  fps 2.2  no nebula layer"></i><i class="off" title="t+28.1s  fps 2.1  no nebula layer"></i><i class="off" title="t+29.6s  fps 2.1  no nebula layer"></i><i class="off" title="t+31.1s  fps 2  no nebula layer"></i><i class="off" title="t+32.6s  fps 2  no nebula layer"></i><i class="off" title="t+34.3s  fps 2  no nebula layer"></i><i class="off" title="t+35.9s  fps 2.2  no nebula layer"></i><i class="off" title="t+37.4s  fps 2.2  no nebula layer"></i><i class="off" title="t+38.9s  fps 2.1  no nebula layer"></i><i class="off" title="t+40.5s  fps 2.1  no nebula layer"></i><i class="off" title="t+42s  fps 2  no nebula layer"></i><i class="off" title="t+43.5s  fps 2  no nebula layer"></i><i class="off" title="t+45.1s  fps 2  no nebula layer"></i><i class="off" title="t+47s  fps 1.9  no nebula layer"></i><i class="off" title="t+48.5s  fps 1.9  no nebula layer"></i><i class="off" title="t+50s  fps 1.9  no nebula layer"></i><i class="off" title="t+51.6s  fps 1.9  no nebula layer"></i><i class="off" title="t+53.1s  fps 1.9  no nebula layer"></i><i class="off" title="t+54.7s  fps 1.9  no nebula layer"></i><i class="off" title="t+56.2s  fps 1.9  no nebula layer"></i><i class="off" title="t+57.7s  fps 1.9  no nebula layer"></i><i class="off" title="t+59.3s  fps 2  no nebula layer"></i><i class="off" title="t+60.8s  fps 1.9  no nebula layer"></i><i class="off" title="t+62.4s  fps 1.9  no nebula layer"></i><i class="off" title="t+63.9s  fps 1.9  no nebula layer"></i></div>
+    <div class="axis">t+1s ────────────────────────────────────────── t+40s
+      &nbsp;&nbsp;·&nbsp;&nbsp; fps 3.2 → 1.9 (median 2)
+      &nbsp;&nbsp;·&nbsp;&nbsp; sky plasmaReef → —, <b style="color:#ff6b74">dropped at t+8.3s</b></div>
+  </div><div class="case">
+    <h2>line → deepEmber <span class="sub">— <code>reducedDensity 1</code>, the control: same box, same load, same 40 s, a sky that must survive</span></h2>
+    <div class="trace"><i class="on" title="t+2.5s  fps 3  deepEmber"></i><i class="on" title="t+4.5s  fps 2.6  deepEmber"></i><i class="on" title="t+6.6s  fps 2.3  deepEmber"></i><i class="on" title="t+8.8s  fps 2.1  deepEmber"></i><i class="on" title="t+10.4s  fps 2.1  deepEmber"></i><i class="on" title="t+12s  fps 2  deepEmber"></i><i class="on" title="t+13.6s  fps 2  deepEmber"></i><i class="on" title="t+14.6s  fps 2  deepEmber"></i><i class="on" title="t+16.2s  fps 2  deepEmber"></i><i class="on" title="t+17.7s  fps 2  deepEmber"></i><i class="on" title="t+19.2s  fps 2  deepEmber"></i><i class="on" title="t+20.7s  fps 2  deepEmber"></i><i class="on" title="t+22.3s  fps 2  deepEmber"></i><i class="on" title="t+23.9s  fps 1.9  deepEmber"></i><i class="on" title="t+25.5s  fps 1.9  deepEmber"></i><i class="on" title="t+27s  fps 1.9  deepEmber"></i><i class="on" title="t+28.6s  fps 1.9  deepEmber"></i><i class="on" title="t+30.1s  fps 2  deepEmber"></i><i class="on" title="t+31.6s  fps 2  deepEmber"></i><i class="on" title="t+33.1s  fps 2  deepEmber"></i><i class="on" title="t+34.8s  fps 1.9  deepEmber"></i><i class="on" title="t+36.4s  fps 1.9  deepEmber"></i><i class="on" title="t+37.9s  fps 1.9  deepEmber"></i><i class="on" title="t+39.4s  fps 1.9  deepEmber"></i><i class="on" title="t+41s  fps 1.9  deepEmber"></i><i class="on" title="t+42.5s  fps 2  deepEmber"></i><i class="on" title="t+44.1s  fps 2  deepEmber"></i><i class="on" title="t+45.6s  fps 1.9  deepEmber"></i><i class="on" title="t+47.5s  fps 2  deepEmber"></i><i class="on" title="t+49s  fps 2  deepEmber"></i><i class="on" title="t+50.5s  fps 2  deepEmber"></i><i class="on" title="t+52.1s  fps 2  deepEmber"></i><i class="on" title="t+53.6s  fps 2  deepEmber"></i><i class="on" title="t+55.2s  fps 2  deepEmber"></i><i class="on" title="t+56.7s  fps 2  deepEmber"></i><i class="on" title="t+58.2s  fps 2  deepEmber"></i><i class="on" title="t+59.8s  fps 2  deepEmber"></i><i class="on" title="t+61.3s  fps 1.9  deepEmber"></i><i class="on" title="t+62.9s  fps 2  deepEmber"></i><i class="on" title="t+64.4s  fps 1.9  deepEmber"></i></div>
+    <div class="axis">t+1s ────────────────────────────────────────── t+40s
+      &nbsp;&nbsp;·&nbsp;&nbsp; fps 3 → 1.9 (median 2)
+      &nbsp;&nbsp;·&nbsp;&nbsp; sky deepEmber → deepEmber, held for the whole run</div>
+  </div>
+  <div class="row">
+    <figure><img src="throttle-oval-after-40s.png"/><figcaption><b>oval after 40 s</b> — no nebula layer on the stage</figcaption></figure><figure><img src="throttle-line-after-40s.png"/><figcaption><b>line after 40 s</b> — deepEmber still on the stage</figcaption></figure>
+  </div>
+  <p class="note">
+    <b>What this is and is not.</b> It is not a bug and not a registry fault: <code>MAP_NEBULA.oval</code> says
+    plasmaReef and the build loads plasmaReef. It is a consequence of the registry that the registry does not
+    state — <b>on a throttled client The Oval flies under a bare star field</b>, and it is the only arena of the
+    six for which that is true. The threshold is <code>DEFAULT_VFX_QUALITY</code>: smoothed fps at or under 30,
+    held 3 s. <b>This box is nowhere near a real device</b> — software WebGL running two contexts at once,
+    median 2 fps — so what is demonstrated here is the MECHANISM and which sky it takes,
+    not that any particular phone crosses that line. A device that never drops below 30 fps never sees this.
+  </p>
+</body></html>
