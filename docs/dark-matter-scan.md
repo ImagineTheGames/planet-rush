@@ -1,6 +1,7 @@
 # Dark matter — exports production never calls
 
-**a1-09 · Platform Engineer · 2026-08-10 · scanned at `4c1b200`**
+**a1-09 · Platform Engineer · 2026-08-10 · every number below is reproducible
+with `npm run dark-matter` on this branch**
 
 `abundanceOf`/`matchAbundance` (`src/sim/match-config.ts`) is three lines,
 correct, and tested. Its entire job is applying the ratified SCARCE default. It
@@ -41,7 +42,7 @@ and each of them changes the answer:
 
 A reference from inside the declaring module is counted separately (`self-used`):
 that code *runs*, and only the `export` is wider than the use. Ranking it with
-the real findings buries them — 1221 of the 1533 raw candidates are this.
+the real findings buries them — 1221 of the 1528 raw candidates are this.
 
 ## 2. The acceptance test — it finds the bug we already know about
 
@@ -65,15 +66,15 @@ say about the case it was built for.
 
 ## 3. The numbers
 
-2770 exports under `src/`. 1533 have zero production references. Split by what
+2769 exports under `src/`. 1528 have zero production references. Split by what
 the zero means:
 
 | Hint | All | Values | In the gate |
 |---|---:|---:|---|
 | `self-used` — its own module calls it; only the `export` is wide | 1221 | 826 | no |
-| `test-only` — specs call it, production does not ← **the `matchAbundance` shape** | 156 | 156 | yes |
+| `test-only` — specs call it, production does not ← **the `matchAbundance` shape** | 157 | 156 | yes |
 | `orphan-module` — declared in a file no entry point reaches | 105 | 80 | yes |
-| `unreferenced` — nothing anywhere names it | 34 | 34 | yes |
+| `unreferenced` — nothing anywhere names it | 37 | 34 | yes |
 | `reexported-unused` — a barrel forwards it; nobody takes it | 8 | 8 | yes |
 | **triaged below** | | **278** | |
 
@@ -91,22 +92,23 @@ says so.
 
 ### 4.1 DARK — should be called, and is not (verified)
 
-**`src/ui/lobby-flow.ts` — 20 exports, 288 spec references, one caller.**
-The front-of-match state machine. Its own header says why it exists:
+**`src/ui/lobby-flow.ts` — 25 of its 26 value exports, 222 spec references, one
+caller.** The front-of-match state machine. Its own header says why it exists:
 
 > *"A comment is not a seam. M2 shipped a HUD whose every element was merged,
 > tested and unwired, and the milestone was retracted for it… So the order lives
 > here, in code, asserted headless — and Platform's job in `main.ts` shrinks
 > from transcribing a comment to draining an effect list."*
 
-`src/main.ts` calls exactly one function from it (`wireFireMode`) and names
+The one thing `src/main.ts` calls from it is `wireFireMode`. It names
 `./ui/lobby-flow` **nine times in prose** — "rule 1", "rule 2", "rule 3", "the
 same targets `flowTapSettings`", "exactly as `flowConnected` does". The module
 written to stop a state machine living in a comment is being consumed as a
 comment. `flowTapLobby` has 50 spec references and no callers.
 **Should be called by:** `src/main.ts`. *(Owner: UI + Platform.)*
 
-**`src/art/vfx/` + `src/art/presenter.ts` — 37 exports, an unreachable island.**
+**`src/art/vfx/` + `src/art/presenter.ts` — 50 dark value exports, an unreachable
+island.**
 `emitters.ts`, `kinds.ts`, `layer.ts`, `particles.ts`, `field.ts` and the
 `ArtPresenter` that wires them are reachable from no entry point. GDD §3.6 does
 not ask for "some effects", it names them, and `emitters.ts` implements all 25:
@@ -117,14 +119,15 @@ and names it `audioObserver` — so the tell stream is sounded and not drawn.
 `src/render/index.ts` draws no particles.
 **Should be called by:** `src/main.ts` / `src/render/index.ts`. *(Owner: Art.)*
 
-**`src/net/link-loss-view.ts` — 5 exports, zero references of any kind.**
+**`src/net/link-loss-view.ts` — 11 of its 12 value exports, and the entry point
+has zero references of any kind.**
 The CONNECTION LOST overlay, from the developer's zombie-match report: *"I should
 get kicked out and presented reconnect / abandon buttons, and verbosity of what
 happened."* `installLinkLossView` is never called — not by production, not by a
 spec, not by the barrel it is exported through.
 **Should be called by:** the client's session boot. *(Owner: Netcode.)*
 
-**`src/art/atlas.ts` — 11 of 12 exports, and a performance claim.**
+**`src/art/atlas.ts` — 11 of its 12 value exports, and a performance claim.**
 The translation layer from sim state to pooled textures, whose stated job is
 that "a field of 200 rocks shares a couple of dozen textures (GDD §4.3: zero
 per-frame allocation on the hot paths)". `src/render/index.ts` imports exactly
@@ -160,7 +163,7 @@ verified against the production path: a headless model with specs, and a
 `src/main.ts` that does the work itself. Listed so the owner can confirm or
 dismiss each; **not** asserted here.
 
-| Module | Dark values | Note |
+| Module | Gate-relevant dark values | Note |
 |---|---:|---|
 | `src/ui/lobby-geometry.ts` | 4 (of 74 exports, 61 dark counting `self-used`) | the lobby's rects |
 | `src/ui/hud-geometry.ts` | 8 | "every rect the day-2 elements occupy" — the M2 retraction's own subject |

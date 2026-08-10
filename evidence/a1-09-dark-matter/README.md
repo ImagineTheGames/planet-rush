@@ -69,7 +69,7 @@ so it stays true without anyone re-running this by hand.
 their use counts, and the module rollup. This is the input
 `docs/dark-matter-scan.md` triages and `tools/dark-matter-allowlist.json`
 records a verdict for, one line each. It is the trimmed view: the full
-2770-export dump is 1.6 MB and reproducible with `npm run dark-matter -- --json`,
+2769-export dump is 1.6 MB and reproducible with `npm run dark-matter -- --json`,
 so it is not committed.
 
 `modules-head.txt` is the `--modules` rollup: the 17 modules under `src/` that no
