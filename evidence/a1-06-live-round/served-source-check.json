@@ -1,0 +1,85 @@
+{
+  "base": "https://imaginethegames.github.io/planet-rush/",
+  "checkedAt": "2026-08-10T01:09:27.075Z",
+  "comparedAgainstSha": "e567af0",
+  "versionJson": {
+    "sha": "e567af0",
+    "time": "2026-08-10T00:53:24.250Z"
+  },
+  "servedBundle": "index-C-UgMqNF.js",
+  "sourcesInMap": 380,
+  "results": [
+    {
+      "file": "src/ui/shell-lifetime.ts",
+      "inMap": true,
+      "identical": true,
+      "servedChars": 3584,
+      "localChars": 3584
+    },
+    {
+      "file": "src/platform/match-boot.ts",
+      "inMap": true,
+      "identical": true,
+      "servedChars": 12142,
+      "localChars": 12142
+    },
+    {
+      "file": "src/net/session.ts",
+      "inMap": true,
+      "identical": true,
+      "servedChars": 50081,
+      "localChars": 50081
+    },
+    {
+      "file": "src/net/wire.ts",
+      "inMap": true,
+      "identical": true,
+      "servedChars": 31468,
+      "localChars": 31468
+    },
+    {
+      "file": "src/net/loopback.ts",
+      "inMap": true,
+      "identical": true,
+      "servedChars": 15709,
+      "localChars": 15709
+    },
+    {
+      "file": "src/main.ts",
+      "inMap": true,
+      "identical": true,
+      "servedChars": 464785,
+      "localChars": 464785
+    },
+    {
+      "file": "src/sim/match.ts",
+      "inMap": true,
+      "identical": true,
+      "servedChars": 17027,
+      "localChars": 17027
+    },
+    {
+      "file": "src/sim/constants.ts",
+      "inMap": true,
+      "identical": true,
+      "servedChars": 88439,
+      "localChars": 88439
+    }
+  ],
+  "erased": [
+    {
+      "file": "src/net/transport.ts",
+      "why": "types only — erased at compile time",
+      "inMap": false,
+      "expected": "absent"
+    },
+    {
+      "file": "src/ui/index.ts",
+      "why": "re-export barrel — flattened by rollup",
+      "inMap": false,
+      "expected": "absent"
+    }
+  ],
+  "allIdentical": true,
+  "note": "Bundle FILENAME is not a gate: vite injects an ISO build time into __BUILD_INFO__, so the content hash moves on every build. The sourcemap sourcesContent is the gate."
+}

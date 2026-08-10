@@ -1,0 +1,311 @@
+{
+  "match-length": {
+    "id": "match-length",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "capturedAt": "2026-08-10T01:21:05.922Z",
+    "lobby": {
+      "visible": true,
+      "online": false,
+      "room": "LOCAL",
+      "you": 0,
+      "isHost": true,
+      "humanCount": 1,
+      "slotCount": 8,
+      "mode": "ffa",
+      "abundance": "scarce",
+      "screen": "roster",
+      "selectedMapId": "octagon",
+      "seatLabels": [
+        "TAKEN",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT"
+      ]
+    },
+    "startedAt": "2026-08-10T01:21:24.319Z",
+    "samples": [
+      {
+        "elapsed": 15,
+        "inkPct": 4.149,
+        "phase": "alive"
+      },
+      {
+        "elapsed": 32.7,
+        "inkPct": 4.217,
+        "phase": "alive"
+      },
+      {
+        "elapsed": 50.5,
+        "inkPct": 4.209,
+        "phase": "alive"
+      },
+      {
+        "elapsed": 68.1,
+        "inkPct": 4.252,
+        "phase": "alive"
+      },
+      {
+        "elapsed": 89,
+        "inkPct": 4.151,
+        "phase": "alive"
+      },
+      {
+        "elapsed": 107.8,
+        "inkPct": 4.162,
+        "phase": "alive"
+      },
+      {
+        "elapsed": 125.7,
+        "inkPct": 4.154,
+        "phase": "alive"
+      },
+      {
+        "elapsed": 142.4,
+        "inkPct": 4.235,
+        "phase": "alive"
+      },
+      {
+        "elapsed": 160.2,
+        "inkPct": 4.217,
+        "phase": "alive"
+      },
+      {
+        "elapsed": 177.5,
+        "inkPct": 4.198,
+        "phase": "alive"
+      },
+      {
+        "elapsed": 195,
+        "inkPct": 4.208,
+        "phase": "alive"
+      },
+      {
+        "elapsed": 213.2,
+        "inkPct": 4.06,
+        "phase": "alive"
+      },
+      {
+        "elapsed": 233.2,
+        "inkPct": 4.003,
+        "phase": "alive"
+      },
+      {
+        "elapsed": 252.1,
+        "inkPct": 4.021,
+        "phase": "alive"
+      },
+      {
+        "elapsed": 270.2,
+        "inkPct": 3.928,
+        "phase": "alive"
+      },
+      {
+        "elapsed": 288.1,
+        "inkPct": 4.018,
+        "phase": "alive"
+      },
+      {
+        "elapsed": 305.9,
+        "inkPct": 3.937,
+        "phase": "alive"
+      },
+      {
+        "elapsed": 323.8,
+        "inkPct": 3.978,
+        "phase": "alive"
+      },
+      {
+        "elapsed": 341.7,
+        "inkPct": 3.891,
+        "phase": "alive"
+      },
+      {
+        "elapsed": 359.6,
+        "inkPct": 4.094,
+        "phase": "alive"
+      },
+      {
+        "elapsed": 380.1,
+        "inkPct": 0,
+        "phase": "alive"
+      },
+      {
+        "elapsed": 413.5,
+        "inkPct": 4.05,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 431.4,
+        "inkPct": 4.099,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 449.6,
+        "inkPct": 5.385,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 470.1,
+        "inkPct": 4.7,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 488.3,
+        "inkPct": 4.944,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 506.3,
+        "inkPct": 4.274,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 524.5,
+        "inkPct": 4.175,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 543.4,
+        "inkPct": 4.159,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 560.1,
+        "inkPct": 4.13,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 576.9,
+        "inkPct": 4.176,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 593.6,
+        "inkPct": 4.241,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 611.7,
+        "inkPct": 4.269,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 628.4,
+        "inkPct": 4.22,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 645.2,
+        "inkPct": 4.216,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 661.9,
+        "inkPct": 4.246,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 679.9,
+        "inkPct": 4.217,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 696.7,
+        "inkPct": 4.269,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 713.4,
+        "inkPct": 4.285,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 730.1,
+        "inkPct": 4.288,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 748.2,
+        "inkPct": 4.248,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 764.9,
+        "inkPct": 4.369,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 781.5,
+        "inkPct": 4.326,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 798.3,
+        "inkPct": 4.284,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 816.2,
+        "inkPct": 4.353,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 832.9,
+        "inkPct": 4.592,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 849.6,
+        "inkPct": 4.203,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 866.3,
+        "inkPct": 4.247,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 884.4,
+        "inkPct": 4.27,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 901.2,
+        "inkPct": 4.228,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 917.8,
+        "inkPct": 4.248,
+        "phase": "spectating"
+      },
+      {
+        "elapsed": 934.4,
+        "inkPct": 0,
+        "phase": "spectating"
+      }
+    ],
+    "eliminatedAtS": 380.1,
+    "imageEliminated": "images/a1-06-match-length-eliminated.png",
+    "spectateClick": {
+      "at": 380.1,
+      "inkAfter": 4.453,
+      "worked": true
+    },
+    "imageSpectating": "images/a1-06-match-length-spectating.png",
+    "endedAtS": 934.4,
+    "lastLiveClockS": 917.8,
+    "ended": true,
+    "imageEnd": "images/a1-06-match-length-end-screen.png",
+    "imageEndSettled": "images/a1-06-match-length-end-settled.png",
+    "wallClockS": 946.5,
+    "servedSha": "e567af0",
+    "pageErrors": [],
+    "ok": true,
+    "tookS": 965.8
+  }
+}

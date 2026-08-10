@@ -1,0 +1,406 @@
+{
+  "wave-clock-offline": {
+    "id": "wave-clock-offline",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "capturedAt": "2026-08-10T01:09:47.574Z",
+    "lobby": {
+      "visible": true,
+      "online": false,
+      "room": "LOCAL",
+      "you": 0,
+      "isHost": true,
+      "humanCount": 1,
+      "slotCount": 8,
+      "mode": "ffa",
+      "abundance": "scarce",
+      "screen": "roster",
+      "selectedMapId": "octagon",
+      "seatLabels": [
+        "TAKEN",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT"
+      ]
+    },
+    "imageLobby": "images/a1-06-wave-clock-lobby.png",
+    "readings": [
+      {
+        "targetS": 4,
+        "actualS": 6.05,
+        "image": "images/a1-06-wave-clock-offline-004s.png"
+      },
+      {
+        "targetS": 20,
+        "actualS": 21.96,
+        "image": "images/a1-06-wave-clock-offline-020s.png"
+      },
+      {
+        "targetS": 45,
+        "actualS": 46.95,
+        "image": "images/a1-06-wave-clock-offline-045s.png"
+      }
+    ],
+    "imageFull": "images/a1-06-wave-clock-offline-full.png",
+    "servedSha": "e567af0",
+    "pageErrors": [],
+    "ok": true,
+    "tookS": 73.4
+  },
+  "wave-clock-online": {
+    "id": "wave-clock-online",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "capturedAt": "2026-08-10T01:11:55.180Z",
+    "hostLobby": {
+      "visible": true,
+      "online": true,
+      "room": "B7GW",
+      "you": 0,
+      "isHost": true,
+      "humanCount": 1,
+      "slotCount": 8,
+      "mode": "ffa",
+      "abundance": "scarce",
+      "screen": "roster",
+      "selectedMapId": "octagon",
+      "seatLabels": [
+        "TAKEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ]
+    },
+    "room": "B7GW",
+    "guestLobby": {
+      "visible": true,
+      "online": true,
+      "room": "B7GW",
+      "you": 1,
+      "isHost": false,
+      "humanCount": 2,
+      "slotCount": 8,
+      "mode": "ffa",
+      "abundance": "scarce",
+      "screen": "roster",
+      "selectedMapId": "octagon",
+      "seatLabels": [
+        "TAKEN",
+        "TAKEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ]
+    },
+    "hostLobbyWithGuest": {
+      "visible": true,
+      "online": true,
+      "room": "B7GW",
+      "you": 0,
+      "isHost": true,
+      "humanCount": 2,
+      "slotCount": 8,
+      "mode": "ffa",
+      "abundance": "scarce",
+      "screen": "roster",
+      "selectedMapId": "octagon",
+      "seatLabels": [
+        "TAKEN",
+        "TAKEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ]
+    },
+    "imageHostLobby": "images/a1-06-wave-clock-online-host-lobby.png",
+    "imageGuestLobby": "images/a1-06-wave-clock-online-guest-lobby.png",
+    "readings": [
+      {
+        "targetS": 6,
+        "actualS": 13.63,
+        "guestImage": "images/a1-06-wave-clock-online-guest-006s.png",
+        "hostImage": "images/a1-06-wave-clock-online-host-006s.png"
+      },
+      {
+        "targetS": 30,
+        "actualS": 37.01,
+        "guestImage": "images/a1-06-wave-clock-online-guest-030s.png",
+        "hostImage": "images/a1-06-wave-clock-online-host-030s.png"
+      },
+      {
+        "targetS": 145,
+        "actualS": 152.27,
+        "guestImage": "images/a1-06-wave-clock-online-guest-145s.png",
+        "hostImage": "images/a1-06-wave-clock-online-host-145s.png"
+      },
+      {
+        "targetS": 155,
+        "actualS": 162.65,
+        "guestImage": "images/a1-06-wave-clock-online-guest-155s.png",
+        "hostImage": "images/a1-06-wave-clock-online-host-155s.png"
+      },
+      {
+        "targetS": 175,
+        "actualS": 182.21,
+        "guestImage": "images/a1-06-wave-clock-online-guest-175s.png",
+        "hostImage": "images/a1-06-wave-clock-online-host-175s.png"
+      },
+      {
+        "targetS": 185,
+        "actualS": 193.36,
+        "guestImage": "images/a1-06-wave-clock-online-guest-185s.png",
+        "hostImage": "images/a1-06-wave-clock-online-host-185s.png"
+      },
+      {
+        "targetS": 200,
+        "actualS": 205.48,
+        "guestImage": "images/a1-06-wave-clock-online-guest-200s.png",
+        "hostImage": "images/a1-06-wave-clock-online-host-200s.png"
+      }
+    ],
+    "imageGuestFull": "images/a1-06-wave-clock-online-guest-full.png",
+    "imageHostFull": "images/a1-06-wave-clock-online-host-full.png",
+    "servedShaHost": "e567af0",
+    "servedShaGuest": "e567af0",
+    "pageErrors": [],
+    "ok": true,
+    "tookS": 367.9
+  },
+  "clean-boot-errors": {
+    "id": "clean-boot-errors",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "capturedAt": "2026-08-10T01:23:54.788Z",
+    "sessions": [
+      {
+        "id": "desktop-doors",
+        "depth": "doors",
+        "errors": [],
+        "afterMenu": 0,
+        "afterDoors": 0,
+        "image": "images/a1-06-clean-boot-desktop-doors.png",
+        "servedSha": "e567af0",
+        "total": 0
+      },
+      {
+        "id": "desktop-lobby",
+        "depth": "lobby",
+        "errors": [],
+        "afterMenu": 0,
+        "afterDoors": 0,
+        "abundance": "scarce",
+        "afterLobby": 0,
+        "image": "images/a1-06-clean-boot-desktop-lobby.png",
+        "servedSha": "e567af0",
+        "total": 0
+      },
+      {
+        "id": "desktop-match",
+        "depth": "match",
+        "errors": [],
+        "afterMenu": 0,
+        "afterDoors": 0,
+        "abundance": "scarce",
+        "afterLobby": 0,
+        "afterMatch": 0,
+        "image": "images/a1-06-clean-boot-desktop-match.png",
+        "servedSha": "e567af0",
+        "total": 0
+      },
+      {
+        "id": "phone-doors",
+        "depth": "doors",
+        "errors": [],
+        "afterMenu": 0,
+        "afterDoors": 0,
+        "image": "images/a1-06-clean-boot-phone-doors.png",
+        "servedSha": "e567af0",
+        "total": 0
+      },
+      {
+        "id": "phone-lobby",
+        "depth": "lobby",
+        "errors": [],
+        "afterMenu": 0,
+        "afterDoors": 0,
+        "abundance": "scarce",
+        "afterLobby": 0,
+        "image": "images/a1-06-clean-boot-phone-lobby.png",
+        "servedSha": "e567af0",
+        "total": 0
+      },
+      {
+        "id": "phone-match",
+        "depth": "match",
+        "errors": [],
+        "afterMenu": 0,
+        "afterDoors": 0,
+        "abundance": "scarce",
+        "afterLobby": 0,
+        "afterMatch": 0,
+        "image": "images/a1-06-clean-boot-phone-match.png",
+        "servedSha": "e567af0",
+        "total": 0
+      }
+    ],
+    "totalErrors": 0,
+    "control": {
+      "errorsBeforeInjection": 0,
+      "errorsAfterInjection": 1,
+      "caught": true,
+      "captured": [
+        "Cannot read properties of null (reading 'clear')"
+      ]
+    },
+    "ok": true,
+    "tookS": 137.4
+  },
+  "wave-arrival-offline": {
+    "id": "wave-arrival-offline",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "capturedAt": "2026-08-10T01:26:26.206Z",
+    "lobby": {
+      "visible": true,
+      "online": false,
+      "room": "LOCAL",
+      "you": 0,
+      "isHost": true,
+      "humanCount": 1,
+      "slotCount": 8,
+      "mode": "ffa",
+      "abundance": "scarce",
+      "screen": "roster",
+      "selectedMapId": "octagon",
+      "seatLabels": [
+        "TAKEN",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT"
+      ]
+    },
+    "readings": [
+      {
+        "targetS": 145,
+        "actualS": 146.86,
+        "image": "images/a1-06-wave-arrival-offline-145s.png"
+      },
+      {
+        "targetS": 155,
+        "actualS": 156.91,
+        "image": "images/a1-06-wave-arrival-offline-155s.png"
+      },
+      {
+        "targetS": 175,
+        "actualS": 176.98,
+        "image": "images/a1-06-wave-arrival-offline-175s.png"
+      },
+      {
+        "targetS": 185,
+        "actualS": 187.07,
+        "image": "images/a1-06-wave-arrival-offline-185s.png"
+      },
+      {
+        "targetS": 200,
+        "actualS": 201.26,
+        "image": "images/a1-06-wave-arrival-offline-200s.png"
+      }
+    ],
+    "imageFull": "images/a1-06-wave-arrival-offline-full.png",
+    "servedSha": "e567af0",
+    "pageErrors": [],
+    "ok": true,
+    "tookS": 224.6
+  },
+  "wave-arrival-online-field": {
+    "id": "wave-arrival-online-field",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "capturedAt": "2026-08-10T01:39:19.506Z",
+    "room": "B38B",
+    "guestLobby": {
+      "visible": true,
+      "online": true,
+      "room": "B38B",
+      "you": 1,
+      "isHost": false,
+      "humanCount": 2,
+      "slotCount": 8,
+      "mode": "ffa",
+      "abundance": "scarce",
+      "screen": "roster",
+      "selectedMapId": "octagon",
+      "seatLabels": [
+        "TAKEN",
+        "TAKEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ]
+    },
+    "frames": [
+      {
+        "targetS": 140,
+        "actualS": 147.24,
+        "rockInkPct": 3.3812,
+        "full": "images/a1-06-wave-arrival-field-guest-140s.png",
+        "clock": "images/a1-06-wave-arrival-field-clock-140s.png"
+      },
+      {
+        "targetS": 165,
+        "actualS": 172.59,
+        "rockInkPct": 3.3812,
+        "full": "images/a1-06-wave-arrival-field-guest-165s.png",
+        "clock": "images/a1-06-wave-arrival-field-clock-165s.png"
+      },
+      {
+        "targetS": 178,
+        "actualS": 185.08,
+        "rockInkPct": 4.0804,
+        "full": "images/a1-06-wave-arrival-field-guest-178s.png",
+        "clock": "images/a1-06-wave-arrival-field-clock-178s.png"
+      },
+      {
+        "targetS": 192,
+        "actualS": 199.36,
+        "rockInkPct": 4.0804,
+        "full": "images/a1-06-wave-arrival-field-guest-192s.png",
+        "clock": "images/a1-06-wave-arrival-field-clock-192s.png"
+      },
+      {
+        "targetS": 205,
+        "actualS": 212.3,
+        "rockInkPct": 4.0804,
+        "full": "images/a1-06-wave-arrival-field-guest-205s.png",
+        "clock": "images/a1-06-wave-arrival-field-clock-205s.png"
+      },
+      {
+        "targetS": 225,
+        "actualS": 232.15,
+        "rockInkPct": 4.0804,
+        "full": "images/a1-06-wave-arrival-field-guest-225s.png",
+        "clock": "images/a1-06-wave-arrival-field-clock-225s.png"
+      }
+    ],
+    "servedSha": "e567af0",
+    "pageErrors": [],
+    "ok": true,
+    "tookS": 283.9
+  }
+}
