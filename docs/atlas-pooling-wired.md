@@ -256,7 +256,16 @@ than edits to it:
 
 ## 6. Recommendations
 
-1. **Cull off-screen entities** — a1-10 §6A, unchanged and now the top item by a
+1. ~~**Cull off-screen entities**~~ — **DONE (a1-12,
+   [`viewport-cull-measured.md`](./viewport-cull-measured.md)).** On the same rig
+   and box, re-measuring this document's own baseline as the control: draw calls
+   32.1 → 10.9 on the desktop window and 32.1 → **9.0** on the landscape phone,
+   entities submitted 660 → 173 and 660 → **11**, median frame 53.2 → 38.0 ms and
+   36.3 → **20.7 ms**. The 6-of-200 below is exactly what it now submits. Still
+   not under budget on the desktop profile, and still on a box with no GPU.
+   Original text, unchanged, for the record:
+
+   **Cull off-screen entities** — a1-10 §6A, unchanged and now the top item by a
    wider margin. Platform-only, provably pixel-free, and it is the lever that
    attacks the mobile gate: 6 visible rocks of 200 on a landscape phone.
 2. **Pool the remaining entity layers** — ships, stations, shields, chunks. The
