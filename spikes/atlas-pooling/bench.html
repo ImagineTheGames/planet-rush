@@ -1,0 +1,41 @@
+<!doctype html>
+<!--
+  spikes/atlas-pooling/bench.html — the a1-10 A/B rig's page shell.
+
+  Served by the Vite DEV server (`npx vite`), never by the production build:
+  `vite.config.ts` has a single implicit `index.html` entry and this file adds
+  no second one, so nothing here can reach the shipped bundle. It exists so the
+  benchmark can run against real WebGL in a real browser, which is the only
+  place the question "does texture pooling buy a frame?" has an answer.
+
+  Driven headlessly by `run.mjs`; open it by hand for a look (the result JSON
+  is printed into the page as well as handed back on `window.__atlasBench`).
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>a1-10 — atlas pooling A/B</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #0d1015;
+        color: #dce3ec;
+        font: 12px/1.5 ui-monospace, monospace;
+      }
+      #out {
+        position: fixed;
+        inset: auto 0 0 0;
+        max-height: 45vh;
+        overflow: auto;
+        padding: 8px 12px;
+        background: #0d1015e0;
+        white-space: pre;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="out">running…</div>
+    <script type="module" src="./bench.ts"></script>
+  </body>
+</html>
