@@ -414,8 +414,12 @@ import {
   openAudioContext,
   type AudioCue,
 } from './art/audio';
-import { TellQueue, TELL_CAPACITY } from './art/tells';
+import { TELL_NAMES, TellQueue, TELL_CAPACITY, type TellKind } from './art/tells';
 import { WorldObserver } from './art/vfx/observer';
+import { VfxField } from './art/vfx/field';
+import { VfxLayer } from './art/vfx/layer';
+import { stageVfxShowcase } from './art/vfx/showcase';
+import { SpriteTextureCache } from './art/textures';
 
 // The slot this client flies. Offline (and for the room CREATOR online, who is
 // always seated first) this is 0; a JOINER online is seated by the server at the
@@ -544,6 +548,23 @@ function logHost(url: string): string {
 const SESSION_LOG_POLL_MS = 250;
 
 const MATCH_SEED = 1;
+
+/**
+ * Particle density while the "reduce VFX" floor is engaged (GDD §4.3, risk 5).
+ *
+ * Half, not zero, and that is the whole point: r9-01 ruled that the reducer must
+ * shed weight by THINNING, never by making something vanish mid-match, after the
+ * same signal deleted a sky. Every emitter keeps at least one particle at any
+ * density above zero (`art/vfx/emitters.ts` `budget`), so the tell survives the
+ * throttle even on the worst frame the device has — a phone in trouble loses
+ * sparks, never a mechanic (GDD §3.6).
+ */
+const REDUCED_VFX_DENSITY = 0.5;
+
+/** The world origin, for reading the live camera offset back out of the renderer
+ *  (`projectToScreen`). A module constant so the read costs no allocation. */
+const WORLD_ORIGIN: Vec2 = { x: 0, y: 0 };
+
 /** Index of UPGRADE SHIP: the one segment that opens a screen instead of
  *  spending (GDD §2.5). Read from the wheel's own order so it cannot drift. */
 const UPGRADE_SEGMENT = WHEEL_ORDER.indexOf('upgrade');
@@ -1214,6 +1235,42 @@ async function boot(): Promise<void> {
   const vfxQuality = new VfxAutoQuality();
   let lastRenderMs = performance.now();
 
+  // --- The VISIBLE half of the tell stream (a2-07; GDD §3.6) ─────────────────
+  //     `src/art/vfx/` implements the whole specified effect set by name, is unit-
+  //     tested green, and was constructed by NOTHING on this boot path: this file
+  //     imported the throttle that thins the particles and the observer that
+  //     derives the tells, used the observer five times — every one of them audio
+  //     — and drew not one spark. An explosion made its noise and left no mark.
+  //     That is the dark-matter failure of LESSONS §1 at its largest, and the
+  //     three lines below (plus four in the render loop) are the whole of it.
+  //
+  //     The seam is deliberately the AUDIO one, not a second one: `audioObserver`
+  //     already diffs the world into `audioTells` every frame, and the field is
+  //     documented to read that same queue non-destructively (`vfx/field.ts`,
+  //     `audio/engine.ts` — "the same queue, untouched"). So the visual consumer
+  //     is ADDED alongside the audible one rather than plumbed in parallel: one
+  //     diff pass per frame, one vocabulary, and a mechanic that is heard and not
+  //     seen becomes impossible by construction rather than by promise.
+  //
+  //     The texture cache is this client's FIRST (a1-09 found `art/atlas.ts`'s
+  //     pooling uncalled — do not assume the pooling you expect is running). It
+  //     bakes eleven particle textures once, in the layer's constructor, and is
+  //     touched no further: per frame the layer only writes transforms and tints.
+  const vfxTextures = new SpriteTextureCache(app.renderer, Math.min(window.devicePixelRatio || 1, 2));
+  const vfxField = new VfxField({ seed: matchSeed });
+  const vfxLayer = new VfxLayer(vfxTextures);
+  //     Above the world the renderer just added to `gameRoot`, below the HUD that
+  //     is added after us — an explosion draws over the ship it came off, and
+  //     under the readouts. It is a WORLD-space layer parked in screen space: the
+  //     renderer's camera transform is read back through its own public
+  //     `projectToScreen` seam each frame (below), so nothing in `src/render/`
+  //     — the Platform Engineer's file — has to change to carry it.
+  gameRoot.addChild(vfxLayer);
+  /** Reused scratch for that camera read-back — zero per-frame allocation. */
+  const vfxOriginScratch: Vec2 = { x: 0, y: 0 };
+  /** Whether the frozen review sheet has been staged this boot (`?freeze=1`). */
+  let vfxShowcased = false;
+
   // --- Debug instrument (debug-hook.ts): only when ?debug=1. Exposes the read-
   //     only window.__planetRush the QA suite asserts centring against. Inert
   //     (and skipped in the render loop) otherwise.
@@ -1314,6 +1371,7 @@ async function boot(): Promise<void> {
     installMinimapStage();
     installStationHealthStage();
     installAudioStage();
+    installVfxStage();
   }
 
   // The pause seam is installed on BOTH boots, unlike the debug stages above, and
@@ -2144,7 +2202,14 @@ async function boot(): Promise<void> {
       // ways to flip it). `sample` is evaluated first so the frame-time tracker
       // keeps running even while the manual floor is on. Freeze keeps full VFX so
       // the golden frame is byte-deterministic.
-      renderer.setReduceVfx(flags.freeze ? false : vfxQuality.sample(frameSeconds) || matchSettings.reduceVfx);
+      const reduceVfx = flags.freeze ? false : vfxQuality.sample(frameSeconds) || matchSettings.reduceVfx;
+      renderer.setReduceVfx(reduceVfx);
+      // The particle field rides the SAME signal, and degrades the way r9-01 ruled
+      // the sky must: by THINNING, never by vanishing mid-match. `quality` scales
+      // every burst's particle budget and removes no effect — each emitter keeps
+      // at least one particle (`vfx/emitters.ts` `budget`), so a phone dropping
+      // frames loses sparks and never loses a mechanic's tell (GDD §4.3, §3.6).
+      vfxField.quality = reduceVfx ? REDUCED_VFX_DENSITY : 1;
 
       // `mapId` picks the backdrop's sky (a0-07): a map's nebula is part of its
       // identity, like its layout, and `World` does not carry the id it was built
@@ -2171,6 +2236,41 @@ async function boot(): Promise<void> {
       audio.setAlarmScope(alarmAllies(), world.match.phase === 'collapse');
       audio.consume(audioTells);
       audio.update(frameSeconds);
+      // VFX (src/art/vfx): DRAW this frame the same moments the mix just sounded,
+      // off the very same queue — the visible half of the mandate the audible half
+      // has been riding alone since the set was written (a2-07; GDD §3.6). The
+      // field reads the queue non-destructively and by contract, so this is a
+      // second consumer rather than a change to the first: nothing above this line
+      // moved, and the two halves cannot drift because there is only one stream.
+      //
+      // Frozen (`?freeze=1`) is the one exception, and it is a determinism rule,
+      // not a shortcut: a pinned world produces no deltas, so the observer emits
+      // nothing and the review sheet would show an empty layer — and particles
+      // animate off `dt`, so a field that kept updating between boot and capture
+      // would make the goldens flicker. Instead the showcase is staged ONCE at a
+      // fixed timestep (`vfx/showcase.ts`) and then left alone: the same pool,
+      // drawn identically, on every boot and every machine.
+      if (flags.freeze) {
+        if (!vfxShowcased) {
+          const anchor = world.ships.find((s) => s.id === cameraTarget);
+          if (anchor) {
+            stageVfxShowcase(vfxField, audioTells, anchor.pos, LOCAL_PLAYER);
+            vfxShowcased = true;
+          }
+        }
+      } else {
+        vfxField.consume(audioTells);
+        vfxField.update(frameSeconds);
+      }
+      // The layer holds world-space particles but hangs in screen space beside the
+      // renderer's own world root, so it is offset by the camera the renderer just
+      // wrote — read back through its public `projectToScreen` seam rather than
+      // recomputed, so the particles can never disagree with the ships they came
+      // off. Two writes, no allocation.
+      renderer.projectToScreen(WORLD_ORIGIN, vfxOriginScratch);
+      vfxLayer.x = vfxOriginScratch.x;
+      vfxLayer.y = vfxOriginScratch.y;
+      vfxLayer.draw(vfxField.pool);
       // Phones lock and tabs get backgrounded mid-match; the context comes back
       // suspended and the rest of the game is silent unless something re-arms the
       // unlock. Cheap, and a no-op while the context is running (risk 7).
@@ -2642,6 +2742,10 @@ async function boot(): Promise<void> {
     // ended on (the observer's first post-reset frame primes and emits nothing).
     audioObserver.reset();
     audio.reset();
+    // …and the picture with it: the new arena opens on an empty field rather than
+    // wearing the last one's embers (a2-07).
+    vfxField.reset();
+    vfxShowcased = false;
     // A rematch may re-team the board, so last match's alarm roster is a stale
     // claim about who is on your side — the next frame re-derives it (s9-01).
     alarmSide = null;
@@ -5145,6 +5249,100 @@ async function boot(): Promise<void> {
     };
     try {
       Object.defineProperty(window, '__audioStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
+  /**
+   * Install `window.__vfxStage` — the effects are DRAWN, proven on a real boot.
+   *
+   * The exact twin of `__audioStage`, for the exact same class of defect and for
+   * one more reason besides. `src/art/vfx/` shipped the whole GDD §3.6 set,
+   * green under a thorough unit suite, and this file — the one the shipped client
+   * actually boots — constructed none of it for six milestones. Every one of
+   * those tests passed the whole time. They could not have failed: a unit test
+   * asks whether an emitter emits, and the thing that was broken was whether
+   * anybody ever called it. Only booting the real bundle and reading the live
+   * layer back can answer that, which is why the answer lives here.
+   *
+   * The extra reason is `drawn`. "Which of the twenty-five effects are wired?"
+   * was, until this seam, a question you could only answer by grepping and
+   * hoping — and the whole subsystem is proof of how that goes. The field now
+   * tallies what it actually put in the pool, per tell kind, so the question has
+   * a measured answer with the honest zeroes included: `waveArrive` draws nothing
+   * by design (the wave clock is the HUD's tell), and a firing tick the spark
+   * throttle swallowed did not draw either.
+   *
+   * Pure read-back — no mutators, nothing driven. Every effect in it got there
+   * because the sim did something; this seam cannot fake the wiring it exists to
+   * prove. Behind ?debug=1.
+   */
+  function installVfxStage(): void {
+    const stage = {
+      read(): {
+        /** True once the layer is in the live scene graph — the wire itself. A
+         *  layer that exists but hangs off nothing draws exactly as much as one
+         *  that was never constructed, which is the bug this milestone fixes. */
+        attached: boolean;
+        /** Live particles in the field's pool this frame. */
+        particles: number;
+        /** Pooled sprites the draw layer holds (its high-water mark). Sprites are
+         *  reused, never rebuilt, so this settles and then stops climbing. */
+        sprites: number;
+        /** Effect density the throttle has the field at, 0..1. Below 1 the bursts
+         *  are thinned; it never reaches 0, because an effect must not vanish. */
+        quality: number;
+        /** True while the auto-reducer (or the settings floor) is engaged. */
+        reduced: boolean;
+        /** Tells the field has DRAWN since the last match reset, all kinds. */
+        drawnTotal: number;
+        /** Per-kind draw counts, keyed by tell name (`art/tells` TELL_NAMES) —
+         *  the "which of the 25 are wired" readout. */
+        drawn: Record<string, number>;
+        /** Who owned each kind's LAST drawn tell, −1 for nobody. On a running
+         *  match eight ships are mining and dying, so this is what attributes a
+         *  burst to the seat a test just staged rather than to the board. */
+        drawnBy: Record<string, number>;
+        /** True while the frozen review sheet is what is on screen, so a test can
+         *  tell a staged golden apart from a live match (`vfx/showcase.ts`). */
+        frozen: boolean;
+      } {
+        const drawn: Record<string, number> = {};
+        const drawnBy: Record<string, number> = {};
+        for (let kind = 0; kind < TELL_NAMES.length; kind++) {
+          const name = TELL_NAMES[kind];
+          if (!name) continue;
+          drawn[name] = vfxField.drawn(kind as TellKind);
+          drawnBy[name] = vfxField.drawnBy(kind as TellKind);
+        }
+        return {
+          attached: vfxLayer.parent !== null,
+          particles: vfxField.count,
+          sprites: vfxLayer.spriteCount,
+          quality: vfxField.quality,
+          reduced: vfxField.quality < 1,
+          drawnTotal: vfxField.drawnTotal,
+          drawn,
+          drawnBy,
+          frozen: vfxShowcased,
+        };
+      },
+      /** How many times one named tell has been drawn — the same number as
+       *  `read().drawn[name]`, for a `waitForFunction` that should not serialise
+       *  the whole table on every poll. */
+      drawnOf(name: string): number {
+        const kind = TELL_NAMES.indexOf(name);
+        return kind < 0 ? -1 : vfxField.drawn(kind as TellKind);
+      },
+    };
+    try {
+      Object.defineProperty(window, '__vfxStage', {
         value: stage,
         writable: false,
         configurable: false,
