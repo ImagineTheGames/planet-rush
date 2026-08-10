@@ -831,13 +831,20 @@ export class Renderer {
       const station = world.stations[i]!;
       this.drawAtmosphere(i, station, viewerId, viewer, world.time);
 
-      // The body and the overlay are drawn as one object each, always together,
-      // so they share one visibility test — taken against the widest thing the
-      // pair can draw (`stationReach`), never against the core radius alone.
-      const stationOnScreen = touchesBox(this.visible, station.pos.x, station.pos.y, this.stationReach(station));
-      this.stationBody(i, station, stationOnScreen);
+      // The body and the overlay each get the test at the position IT is drawn
+      // at, taken against the widest thing a station can draw (`stationReach`)
+      // rather than against the core radius alone. Two tests rather than one
+      // because the two do not always agree about where the station is — see
+      // {@link stationBody}, and `docs/viewport-cull-measured.md` §6.
+      this.stationBody(i, station);
 
       const overlay = this.overlayFor(i);
+      const stationOnScreen = touchesBox(
+        this.visible,
+        station.pos.x,
+        station.pos.y,
+        this.stationReach(station),
+      );
       overlay.visible = stationOnScreen;
       if (stationOnScreen) {
         overlay.clear();
@@ -1038,20 +1045,36 @@ export class Renderer {
     g.alpha = lo + (hi - lo) * breath;
   }
 
-  /** A station's static body, drawn once — and again the one time it becomes a
-   *  wreck (GDD §2.7: the wreck stays on the map for the rest of the match).
-   *  `onScreen` only hides it: a station off the window keeps whatever geometry
-   *  it had, so scrolling back to it costs a `visible` flag and not a redraw. */
-  private stationBody(index: number, station: MiningStation, onScreen: boolean): void {
+  /**
+   * A station's static body, drawn once — and again the one time it becomes a
+   * wreck (GDD §2.7: the wreck stays on the map for the rest of the match).
+   *
+   * The cull only ever flips `visible` here; the geometry is built on exactly the
+   * frames a1-11 built it on, and the body is never destroyed, so scrolling back
+   * to a home costs a flag and not a redraw. That is worth stating because the
+   * body is the one thing in this layer drawn ONCE per match: hiding it saves a
+   * submission and nothing else, and delaying its creation would save nothing at
+   * all.
+   *
+   * **And the test is taken at the position the BODY is drawn at, read off the
+   * display object — not at `station.pos`.** The two are the same number in every
+   * match, because stations do not move. They are not the same number if one ever
+   * does: this method writes the transform only on the frame it (re)builds the
+   * geometry, so a station that moved afterwards leaves its body behind while its
+   * overlay, which is repositioned every frame, follows. a1-12 found that latent
+   * bug through the `?debug=1` nameplate seam, which teleports a rival's home
+   * beside the local ship — see `docs/viewport-cull-measured.md` §6, where it is
+   * reported rather than fixed (fixing it moves two frozen goldens, which is a
+   * re-baseline this brief has no mandate for). Culling on the drawn position
+   * means the cull cannot make that bug worse by hiding a body that is, wrongly
+   * or not, on screen.
+   */
+  private stationBody(index: number, station: MiningStation): void {
     let g = this.stationGfx[index];
     const dead = !station.alive;
-    if (!onScreen) {
-      if (g) g.visible = false;
-      return;
-    }
     if (g && this.stationDrawnDead[index] === dead) {
-      g.visible = true;
       g.alpha = station.spawnProtect > 0 ? 0.75 : 1;
+      g.visible = touchesBox(this.visible, g.x, g.y, this.stationReach(station));
       return;
     }
     if (!g) {
@@ -1060,7 +1083,6 @@ export class Renderer {
       this.stationGfx[index] = g;
       this.stationLayer.addChild(g);
     }
-    g.visible = true;
     this.stationDrawnDead[index] = dead;
 
     const r = station.radius;

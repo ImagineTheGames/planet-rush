@@ -62,15 +62,37 @@ const headed = process.argv.includes('--headed');
 const jsonAt = process.argv[process.argv.indexOf('--json') + 1];
 const wantJson = process.argv.includes('--json') && jsonAt && !jsonAt.startsWith('--');
 
-/** Start `vite` detached enough that we can always kill it again. */
+/**
+ * Start `vite` in its own **process group**, so we can always kill it again.
+ *
+ * `detached: true` is the whole point and it is not decoration. `npx` spawns a
+ * shell which spawns node-vite, so killing the pid we hold kills the wrapper and
+ * orphans the server: a1-12 found one from an *earlier session* still holding
+ * the port, and found the current run hanging after its own numbers were printed
+ * because the orphan had inherited stdout and nothing downstream ever saw EOF.
+ * A group kill (`-pid`) takes the shell and the server together.
+ */
 function startVite() {
   const proc = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], {
     stdio: ['ignore', 'inherit', 'inherit'],
+    detached: true,
   });
   proc.on('exit', (code) => {
     proc.exitedWith = code;
   });
   return proc;
+}
+
+/** SIGKILL the whole server group. Falls back to the single pid if the group is
+ *  already gone, and never throws — this runs in a `finally`. */
+function killVite(proc) {
+  for (const target of [-proc.pid, proc.pid]) {
+    try {
+      process.kill(target, 'SIGKILL');
+    } catch {
+      /* already dead */
+    }
+  }
 }
 
 /** Give a failing vite a moment to report itself before we try to load a page.
@@ -211,8 +233,9 @@ try {
   console.error(err);
   exitCode = 1;
 } finally {
-  // SIGKILL, not SIGTERM: a vite still holding --strictPort 5183 makes the next
-  // run fail to start, and this rig has already lost capture runs to exactly that.
-  vite.kill('SIGKILL');
+  // SIGKILL the GROUP, not SIGTERM the wrapper: a survivor holding the port
+  // makes the next run fail to start — and, worse, makes THIS run hang after it
+  // has already printed, because it inherited stdout. Both have happened here.
+  killVite(vite);
 }
 process.exit(exitCode);
