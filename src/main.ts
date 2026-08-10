@@ -339,6 +339,9 @@ import {
   createOnlineSession,
   allocatorTransport,
   attachSessionLog,
+  // The CONNECTION LOST overlay, wired to the live session (n6-01): the developer's
+  // zombie match, finally told to the player who is in it.
+  attachLinkLoss,
   // A room with no other humans in it plays locally, and says so (a0-11).
   ROOM_COST_NOTE,
   localSeat,
@@ -1135,6 +1138,37 @@ async function boot(): Promise<void> {
       if (message.type === 'matchStart' && session.world) world = session.world;
     });
   }
+
+  // ── THE CONNECTION LOST OVERLAY (n6-01; the developer's zombie-match report) ──
+  //
+  // *"I should get kicked out and presented reconnect / abandon buttons, and
+  // verbosity of what happened."*
+  //
+  // The whole thing was built for that report — the watchdog (`src/net/link-loss`),
+  // the overlay (`src/net/link-loss-view`), the freeze in `sendInput`, RECONNECT and
+  // ABANDON on the session, and a test over the real stack
+  // (`tests/net/disconnect-honesty.test.ts`) — and then **nothing in this file ever
+  // called any of it**. `installLinkLossView` appeared exactly once in `src/`: its own
+  // definition. So the client kept flying a world no server was behind, silently, for
+  // the whole life of the feature; the fix was merged and never installed (a1-09).
+  //
+  // Here, not at the front door: this is where the match is, and it is the one screen
+  // where silence means something. A lobby is legitimately quiet — the room broadcasts
+  // a roster only when a seat or a ping actually moves — so watching it would throw
+  // CONNECTION LOST over a healthy room (`src/net/link-loss-attach`). Online only; a
+  // `LocalLoopback` cannot drop.
+  const linkLoss = onlineSession
+    ? attachLinkLoss({
+        session: onlineSession,
+        dom: document,
+        // The developer's own case is a tab that went away: nothing in this client
+        // listened for `visibilitychange` at all before this line.
+        page: document,
+        // BACK TO MENU on the terminal card, and it is EXIT TO MENU's own mechanism —
+        // the seat is gone, so the way out is the way out (see `exitToMenu`).
+        onMenu: () => exitToMenu(),
+      })
+    : null;
 
   // The match world now exists — flip the menu's test seam so a clean-boot
   // live-stage run can prove it did NOT exist a moment ago, while the menu was up
@@ -2224,6 +2258,14 @@ async function boot(): Promise<void> {
       // touch corner button. Runs every rendered frame, including while the sim is
       // frozen above — so the overlay stays live over a stopped world.
       syncPause();
+      // Is the connection still there? (n6-01, GDD §4.2.) Sampled on the RENDER
+      // frame and not on the sim step, because a lost link is detected by nothing
+      // happening: the sim step is exactly what stops (`src/net/session` sendInput
+      // freezes the moment a loss is detected), and a watchdog hung on it would go
+      // to sleep with the world it was supposed to be watching. Costs one clock read
+      // and a string compare on a live connection, and draws nothing at all
+      // (`src/net/link-loss-attach`). Null offline — a `LocalLoopback` cannot drop.
+      linkLoss?.poll();
       // Refresh the layout registry from what was just drawn (debug only).
       if (registry) refreshLayout(registry);
       // Feed the QA centring instrument, if armed (?debug=1) — no work otherwise.

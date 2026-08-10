@@ -82,6 +82,13 @@
  * of the match — where before every measured millisecond went only to an
  * instrument.
  *
+ * `./link-loss-attach` is what makes that overlay a *behaviour* rather than a
+ * module: the session, the page's visibility and the two buttons, joined in one
+ * place and installed by the match's own boot. Its own file for the same reason
+ * `./playtest-log-attach` is — and for one more, on the record: for the whole life
+ * of the feature nothing anywhere called `installLinkLossView`, so every line above
+ * about a player being told was true of the code and false of the game (n6-01).
+ *
  * `./region-probe` is that same instinct one screen earlier: the fleet's regions,
  * each with a round trip this client **measured** before a room is placed, so the
  * automatic (edge-inferred) region becomes a choice a player can see the cost of —
@@ -112,6 +119,7 @@ export * from './connect-trace';
 export * from './connect-trace-view';
 export * from './link-loss';
 export * from './link-loss-view';
+export * from './link-loss-attach';
 // A room with no other humans in it plays locally, and says so (a0-11).
 export * from './local-revert';
 export * from './local-revert-view';
