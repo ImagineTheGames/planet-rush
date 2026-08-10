@@ -659,7 +659,14 @@ async function measureShippedRenderer(app: Application, world: World, reduceVfx 
   const stage = new Container();
   app.stage.removeChildren();
   app.stage.addChild(stage);
-  const renderer = new Renderer(stage, { width: VIEW.width, height: VIEW.height, originX: 0, originY: 0 });
+  // The baker `main.ts` injects (a1-11). Without it the renderer draws the same
+  // scene graph over blank textures — correct for a headless unit test, and a
+  // measurement of nothing at all. `resolution: 1` is this rig's dpr.
+  const renderer = new Renderer(
+    stage,
+    { width: VIEW.width, height: VIEW.height, originX: 0, originY: 0 },
+    { baker: app.renderer, resolution: 1 },
+  );
   // The auto-reducer's own switch, thrown by hand. Running the baseline both
   // ways answers the question the brief cares about more than the A/B: when
   // `VfxAutoQuality` engages, how much frame does it actually buy back?

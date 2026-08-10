@@ -228,6 +228,7 @@ export interface EntityTextureBaker {
     frame?: Rectangle;
     resolution?: number;
     antialias?: boolean;
+    textureSourceOptions?: { autoGenerateMipmaps?: boolean };
   }): Texture;
 }
 
@@ -292,6 +293,17 @@ class CenteredBaker implements TextureBaker {
       frame: new Rectangle(-this.half, -this.half, size, size),
       resolution,
       antialias: options.antialias ?? true,
+      // Mipmaps, and they are load-bearing rather than polish. Every look is
+      // baked at the density the vectors were *authored* to be stroked at, which
+      // is well above the density they are *drawn* at — a turret is 114 texture
+      // px shown across 24 (`TURRET_ART_SCALE` 48 against `TURRET.radius` 12).
+      // Baking lower is not the fix: `drawSprite` floors a stroke at half a pixel,
+      // so a low-density bake would draw the thin trim THICKER than the vectors
+      // do, which is the appearance change this brief exists to avoid. Minifying
+      // 4× with no mip chain is the other one — the trim would crawl as the
+      // barrel turns. Pixi warns off mipmapped render textures because they are
+      // usually re-rendered every frame; these are baked once each, ever.
+      textureSourceOptions: { autoGenerateMipmaps: true },
     });
   }
 }
