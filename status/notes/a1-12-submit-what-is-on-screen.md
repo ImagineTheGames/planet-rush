@@ -27,14 +27,32 @@ DECISIONS for why the branch is stacked on it anyway.
    off-screen/straddling pair, layer by layer, and a guard that enumerates the
    art generators against the extents the cull pads by), and the four render
    suites that were about pooling or fog rather than about the window.
-2. `05f0d9d` — `tests/sim-render-parity.test.ts` (Platform's, permanent) asks
+2. `02a1430` — `tests/sim-render-parity.test.ts` (Platform's, permanent) asks
    its question through a window that contains the arena.
-3. `85d3a1e` — **CROSS-OWNER, flagged**: two viewport literals in
+3. `2236d6c` — **CROSS-OWNER, flagged**: two viewport literals in
    `tests/combat-visibility.test.ts` (Gameplay's). Its siege fixture parks its
    two shooters ~2800 units apart, so no 800×600 window ever held both.
-4. `<pending>` — the rig: a landscape-phone profile for the whole-frame
-   baseline, a `drawn` (submitted-entities) column, and two hardenings the run
-   below cost me (free port, rig marker).
+4. `a01d0db` — the rig: a landscape-phone profile for the whole-frame baseline,
+   a `drawn` (submitted-entities) column, and the hardenings the runs below cost
+   me (ephemeral port, settle-and-check, rig marker, group kill).
+5. `961ee73` — **the golden alarm's answer**: the station body is culled where it
+   is DRAWN, not where the sim says it is, and its creation timing is left exactly
+   as a1-11 had it. See the section below; all 44 goldens pass unchanged.
+6. `b74d027` — `docs/viewport-cull-measured.md` + `evidence/a1-12-viewport-cull/`.
+
+**tsc clean. 4838 tests green across 279 files. All 44 goldens green, UNCHANGED.**
+
+**Measured** (a1-10's rig, this box, back to back, `docs/viewport-cull-measured.md`):
+
+| | draw calls | submitted | median frame |
+|---|---|---|---|
+| desktop 1280×800 | 32.1 → **10.9** | 660 → **173** | 53.2 → **38.0 ms** |
+| phone 844×390 | 32.1 → **9.0** | 660 → **11** | 36.3 → **20.7 ms** |
+
+Rocks on the phone: 200 → **6**, which is a1-10 §4.1's own number. The phone
+profile no longer trips `VfxAutoQuality`. The desktop scene is still NOT under
+budget (~26 fps on a box with no GPU) — say that plainly, and rest the conclusion
+on the draw-call and submitted columns, never on the milliseconds.
 
 ## DECISIONS
 <!-- why you chose an approach, what you rejected, and the trap you hit -->
@@ -77,13 +95,16 @@ shot 1.48 (the top DAMAGE rung's halo), ship 1.16, shield 1.15, rock exactly 1.
 on screen crosses the window. Culling on the origin drops it; culling on the
 segment's own bounding box keeps it, and is conservative in the safe direction.
 
-**Stations get three tests, not one.** The body+overlay pair shares one, taken
-against `stationReach` — the widest of the Cutterhead art (1.95× the core), the
+**Stations get four tests, not one**, each taken where that object is drawn. The
+reach is `stationReach` — the widest of the Cutterhead art (1.95× the core), the
 construction arc, and the outermost shield bubble (90 units in its own right,
-bigger than the station it stands on). The halo gets its own, at
-`ATMOSPHERE_HALO_RADIUS` (four station radii): on a phone the air fills the
-window while the station it rings is still off the left edge. Each turret gets
-its own, because a gun slides around its station's rim (`Turret.orbitAngle`).
+bigger than the station it stands on). The **overlay** is tested at
+`station.pos`, where it is repositioned every frame. The **body** is tested at
+its OWN `g.x/g.y` (see the golden section — they are not always the same point).
+The **halo** gets its own at `ATMOSPHERE_HALO_RADIUS` (four station radii): on a
+phone the air fills the window while the station it rings is still off the left
+edge. Each **turret** gets its own, because a gun slides around its station's rim
+(`Turret.orbitAngle`).
 
 **Rejected: a screen-space pad for the URL bar.** The visual viewport can grow
 (URL bar hides) before `relayout` fires, which would reveal a band the cull had
@@ -104,6 +125,45 @@ a0-05 amendment killed a 180-unit `SENSOR_RANGE` gate that blanked the ring of a
 rival you could see perfectly well. An off-screen station draws nothing at all —
 body, beacon, ring — so no read is lost. `cull.test.ts` pins the amendment where
 it bites: a rival at 250 units, plainly on screen, still rings.
+
+### THE GOLDENS FIRED, AND THEY WERE RIGHT — read this before touching them
+
+Two phone TEAMS goldens moved by ~9250 px (3%), identically across three retries.
+**They were not moved by a cull dropping something visible. The opposite.**
+
+Isolation, in the order that made it defensible (a1-11's method):
+
+1. `git worktree add /tmp/pre-cull <a1-11 tip>` + symlink `node_modules`, then
+   `CI=1 PREVIEW_PORT=<free> npx playwright test … -g TEAMS`. **a1-11 reproduces
+   its committed baselines exactly.** That makes the delta mine and nothing else's.
+2. Dump both scene graphs off a REAL boot at the golden's own profile *with the
+   golden's own staging* (`window.__nameplateStage.stageBot()` — it is what boots
+   the TEAMS scene, and it TELEPORTS a rival's home beside the local ship). A
+   throwaway `window.__stationDump` in `main.ts`, reverted after.
+
+```
+a1-11   station-1 body at (336, 1200)    overlay-1 at (2088, 1340)
+a1-12   station-1 body at (2088, 1340)   overlay-1 at (2088, 1340)
+```
+
+**`stationBody` writes its transform only on the frame it (re)builds the
+geometry — once per match. A station that moves afterwards leaves its body
+behind.** The baselines had baked a station drawn as a bare damage ring with no
+body under it. My first cut delayed the body's creation until it was on screen,
+so it got built *after* the teleport, at the right place — and the picture
+improved, which is still a golden moving.
+
+Not fixed here: fixing it moves those two frozen goldens for real and re-cutting
+frozen scenes is not this brief's mandate. Scoped around instead (`961ee73`) —
+the body is built on exactly the frames a1-11 built it on (it is drawn once per
+match, so delaying it saved nothing at all), and its cull test reads `g.x/g.y`
+off the display object, so the cull cannot hide a body that is on screen whether
+or not it is in the right place. **All 44 goldens green, unchanged.** Reported in
+`docs/viewport-cull-measured.md` §6 with the fix and the two images named.
+
+*Do not "fix" this by re-cutting. If you are told to fix the bug, it is two
+assignments in `stationBody` plus a re-cut of `phone-landscape-frozen-teams` and
+`phone-portrait-frozen-teams`, and it is a change of its own.*
 
 ### THE TRAP THIS BRIEF HIT, AND IT PRINTED A PLAUSIBLE LIE
 
@@ -127,16 +187,28 @@ Kill leftovers with `pkill -f 'vite --port'` if one is ever seen again.
 ## NEXT
 <!-- what remains, in order, and anything blocking -->
 
-1. Bench post-cull (desktop + landscape phone), in flight.
-2. Bench pre-cull on the SAME rig from a worktree at a1-11's tip
-   (`/tmp/pre-cull`, `bench.ts`/`run.mjs` copied in so the instrument is
-   identical and only the renderer differs). Serialised, never concurrent — two
-   SwiftShader captures at once corrupt both.
-3. `docs/viewport-cull-measured.md` + raw captures under
-   `evidence/a1-12-viewport-cull/`.
-4. Goldens: run `tests/mobile/goldens.spec.ts` UNCHANGED with `CI=1`. They must
-   not move. If one does, something visible was culled — that is the bug, not a
-   re-baseline.
-5. tsc, full suite, push, PR.
+Everything the brief asked for is committed. Remaining: push and PR, then the
+DoD's PR-checks-green line.
+
+**Done:** the cull + its tests (`4531317`), the two test-window scopings
+(`02a1430`, `2236d6c` cross-owner), the rig's phone profile and hardenings
+(`a01d0db`), the golden investigation and its scoping fix (`961ee73`), the doc +
+evidence (`b74d027`). tsc clean; 4838 tests green; 44/44 goldens green and
+unchanged.
+
+**The headline to defend in review, and do not soften it:** 32.1 → 10.9 draw
+calls on the desktop window and 32.1 → 9.0 on the landscape phone; 660 → 173 and
+660 → **11** entities submitted; and the §4.3 scene is **still not under budget**
+on the desktop profile (~26 fps on a box with no GPU). Rest it on the draw-call
+and submitted columns. The milliseconds do not travel off this box.
+
+**Two things for whoever comes next**, both in the doc rather than in a commit:
+
+- **Art:** `VfxLayer.draw(pool, visible?: CullBox)` — the particle layer is the
+  one entity layer this brief did not cull, because widening Art's ratified seam
+  unilaterally is not mine to do. `Renderer.visibleWorld` already exposes the box.
+- **Real hardware.** `PERF_GATE=1 tests/perf/playwright.perf.config.ts`. This box
+  has no GPU and cannot answer the 60 fps question — a1-10 said so, a1-11 said
+  so, and it is still true.
 
 Nothing is blocked.
