@@ -84,13 +84,43 @@ So a1-12's headline **"120 → 0 chunks on the phone" is a figure from
 arena as synthetic load. That is the right number for a bench and it is not a
 population the shipped game produces; it should not be read as a gameplay loss.
 
-`mine-chunks.mjs` therefore tests the chunks the only way they exist — by flying
-the ship into a rock and holding the mine button, on both builds, with input and
-sampling issued against a **pinned clock** (`page.clock`) so both get identical
-inputs at identical sim times. Verified rather than assumed: the HUD's own MATCH
-clock advances exactly 5 s per `runFor(5000)`. Per-sample agreement is re-checked
-against ship positions (ships move; rocks do not, so rocks are useless as a live
-fingerprint). Result in `mine-chunks.json`.
+`mine-chunks.mjs` therefore tests the chunks the only way they exist — by playing
+a match on both builds and sampling 14 times over 44 s.
+
+**The cross-build comparison cannot be made exact, and that limit is the result.**
+`page.clock` fixes when time *appears* to advance; it does not fix how many sim
+steps each build takes inside a `runFor`. The two builds' own HUD MATCH clocks
+drift up to a second apart (pre `0:23 / 0:26 / 0:29` against served `0:22 / 0:25
+/ 0:28`). So chunks are matched with a **position tolerance**, on the subset of
+samples where both builds print the same match second, and the tolerance's
+sensitivity is published rather than hidden:
+
+| | |
+|---|---|
+| samples where both MATCH clocks agree | 9 of 14 |
+| on-screen chunk instances drawn by pre-cull | **2** |
+| of those, drawn by the served build too | **2** (offsets 6.9 px, 20.1 px) |
+| missing | **0** |
+| off-screen chunks drawn by pre-cull | 9 |
+| of those, drawn by the served build anyway | **0** — the cull's whole job |
+
+At a 20 px tolerance one of the two pairs falls out; at 30 px and above both
+hold (`chunk-verdict.json`, `sensitivitySweep`).
+
+**Two on-screen instances is not a clearance, and this round does not call it
+one.** Nothing here suggests the chunk cull drops anything a player can see, and
+the off-screen half is clean and unambiguous — but the manifest files the chunk
+item as **inconclusive**. Settling it properly needs a seam reporting the sim's
+tick, so two live builds can be compared at identical ticks rather than within a
+second of each other. That is a `src/` change and this is a read-only round.
+
+Two dead ends are recorded in the instrument rather than quietly dropped, because
+both produced a confident wrong answer first: a pooled display object that has
+never been drawn has bounds `(0,0,0,0)`, which trivially "touches" a viewport
+anchored at the origin (the tell was every chunk reporting a distance-to-ship of
+755 px — exactly the half-diagonal of 1280×800); and the first run aimed at a
+target read off the *frozen* census while playing a *live* match, so it shot at
+empty space for 44 s with the tutorial hint still on screen.
 
 ## Files
 
@@ -102,6 +132,8 @@ fingerprint). Result in `mine-chunks.json`.
 | `capture-plates.mjs` → `plates.json` | whole-frame plates, amplified diff + connected-component analysis, straddlers outlined |
 | `boundary-zoom.mjs` | the tightest boundary cases at 6× nearest neighbour |
 | `mine-chunks.mjs` → `mine-chunks.json` | the ore chunks, on a played match |
+| `analyze-chunks.mjs` → `chunk-verdict.json` | the chunk verdict: clock-agreement filter, tolerance match, sensitivity sweep |
+| `chunk-zoom.mjs` | the drawn ore chunk at 8×, both builds |
 | `frames/` | the raw frames every plate is cut from |
 
 Reproduce: build `111db86` into a worktree (`git worktree add /tmp/pre-cull
@@ -114,6 +146,8 @@ node evidence/a1-15-cull-visible-rocks/compare-census.mjs
 node evidence/a1-15-cull-visible-rocks/capture-plates.mjs
 node evidence/a1-15-cull-visible-rocks/boundary-zoom.mjs
 node evidence/a1-15-cull-visible-rocks/mine-chunks.mjs
+node evidence/a1-15-cull-visible-rocks/analyze-chunks.mjs
+node evidence/a1-15-cull-visible-rocks/chunk-zoom.mjs
 ```
 
 ## What this round does NOT claim
