@@ -1,0 +1,108 @@
+{
+  "base": "https://imaginethegames.github.io/planet-rush/",
+  "checkedAt": "2026-08-10T14:12:21.291Z",
+  "claimedSha": "ecc1496",
+  "versionJson": {
+    "sha": "ecc1496",
+    "time": "2026-08-10T13:51:52.947Z"
+  },
+  "bundle": "index-ChQ2ff7F.js",
+  "sourcesInMap": 389,
+  "results": [
+    {
+      "file": "src/main.ts",
+      "inMap": true,
+      "identical": true,
+      "servedBytes": 481167,
+      "repoBytes": 481167
+    },
+    {
+      "file": "src/art/vfx/layer.ts",
+      "inMap": true,
+      "identical": true,
+      "servedBytes": 4881,
+      "repoBytes": 4881
+    },
+    {
+      "file": "src/art/vfx/field.ts",
+      "inMap": true,
+      "identical": true,
+      "servedBytes": 10819,
+      "repoBytes": 10819
+    },
+    {
+      "file": "src/art/vfx/emitters.ts",
+      "inMap": true,
+      "identical": true,
+      "servedBytes": 27298,
+      "repoBytes": 27298
+    },
+    {
+      "file": "src/art/vfx/observer.ts",
+      "inMap": true,
+      "identical": true,
+      "servedBytes": 31872,
+      "repoBytes": 31872
+    },
+    {
+      "file": "src/art/vfx/showcase.ts",
+      "inMap": true,
+      "identical": true,
+      "servedBytes": 5123,
+      "repoBytes": 5123
+    },
+    {
+      "file": "src/net/link-loss.ts",
+      "inMap": true,
+      "identical": true,
+      "servedBytes": 28383,
+      "repoBytes": 28383
+    },
+    {
+      "file": "src/net/link-loss-view.ts",
+      "inMap": true,
+      "identical": true,
+      "servedBytes": 11580,
+      "repoBytes": 11580
+    },
+    {
+      "file": "src/net/link-loss-attach.ts",
+      "inMap": true,
+      "identical": true,
+      "servedBytes": 8368,
+      "repoBytes": 8368
+    },
+    {
+      "file": "src/platform/wheel-input.ts",
+      "inMap": true,
+      "identical": true,
+      "servedBytes": 13744,
+      "repoBytes": 13744
+    },
+    {
+      "file": "src/render/index.ts",
+      "inMap": true,
+      "identical": true,
+      "servedBytes": 68853,
+      "repoBytes": 68853
+    },
+    {
+      "file": "src/render/cull.ts",
+      "inMap": true,
+      "identical": true,
+      "servedBytes": 8000,
+      "repoBytes": 8000
+    }
+  ],
+  "erased": [
+    {
+      "file": "src/art/vfx/index.ts",
+      "why": "re-export barrel — flattened by rollup"
+    },
+    {
+      "file": "src/net/index.ts",
+      "why": "re-export barrel — flattened by rollup"
+    }
+  ],
+  "verdict": "SERVED BUILD IS THE CLAIMED TREE"
+}

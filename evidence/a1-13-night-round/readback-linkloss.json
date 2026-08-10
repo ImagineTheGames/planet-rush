@@ -1,0 +1,1552 @@
+{
+  "base": "https://imaginethegames.github.io/planet-rush/",
+  "capturedAt": "2026-08-10T14:57:46.769Z",
+  "view": {
+    "width": 1280,
+    "height": 800
+  },
+  "runs": {
+    "linkloss-reconnect": {
+      "name": "linkloss-reconnect",
+      "errors": [
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiN1hZRCIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3MzM4ODU5M30.6mJtoOnhBtiXr2wrSpvYbms6ZCqXfs9-u_mg-FultjQ' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiN1hZRCIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3MzM4ODU5M30.6mJtoOnhBtiXr2wrSpvYbms6ZCqXfs9-u_mg-FultjQ' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiN1hZRCIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3MzM4ODU5M30.6mJtoOnhBtiXr2wrSpvYbms6ZCqXfs9-u_mg-FultjQ' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiN1hZRCIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3MzM4ODU5M30.6mJtoOnhBtiXr2wrSpvYbms6ZCqXfs9-u_mg-FultjQ' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiN1hZRCIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3MzM4ODU5M30.6mJtoOnhBtiXr2wrSpvYbms6ZCqXfs9-u_mg-FultjQ' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiN1hZRCIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3MzM4ODU5M30.6mJtoOnhBtiXr2wrSpvYbms6ZCqXfs9-u_mg-FultjQ' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiN1hZRCIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3MzM4ODU5M30.6mJtoOnhBtiXr2wrSpvYbms6ZCqXfs9-u_mg-FultjQ' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiN1hZRCIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3MzM4ODU5M30.6mJtoOnhBtiXr2wrSpvYbms6ZCqXfs9-u_mg-FultjQ' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiN1hZRCIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3MzM4ODU5M30.6mJtoOnhBtiXr2wrSpvYbms6ZCqXfs9-u_mg-FultjQ' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiN1hZRCIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3MzM4ODU5M30.6mJtoOnhBtiXr2wrSpvYbms6ZCqXfs9-u_mg-FultjQ' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiN1hZRCIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3MzM4ODU5M30.6mJtoOnhBtiXr2wrSpvYbms6ZCqXfs9-u_mg-FultjQ' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiN1hZRCIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3MzM4ODU5M30.6mJtoOnhBtiXr2wrSpvYbms6ZCqXfs9-u_mg-FultjQ' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiN1hZRCIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3MzM4ODU5M30.6mJtoOnhBtiXr2wrSpvYbms6ZCqXfs9-u_mg-FultjQ' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiN1hZRCIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3MzM4ODU5M30.6mJtoOnhBtiXr2wrSpvYbms6ZCqXfs9-u_mg-FultjQ' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiN1hZRCIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3MzM4ODU5M30.6mJtoOnhBtiXr2wrSpvYbms6ZCqXfs9-u_mg-FultjQ' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        }
+      ],
+      "room": "7XYD",
+      "hostLobby": {
+        "online": true,
+        "room": "7XYD",
+        "humanCount": 2,
+        "seats": [
+          "TAKEN",
+          "TAKEN",
+          "OPEN",
+          "OPEN",
+          "OPEN",
+          "OPEN",
+          "OPEN",
+          "OPEN"
+        ]
+      },
+      "guestLobby": {
+        "online": true,
+        "room": "7XYD",
+        "humanCount": 2,
+        "isHost": false
+      },
+      "hostBadge": {
+        "text": "ffc414e · 0800d5b6 (iad)",
+        "server": {
+          "machine": "0800d5b6d62328",
+          "region": "iad"
+        },
+        "rttMs": null
+      },
+      "guestBadge": {
+        "text": "ffc414e · 0800d5b6 (iad)",
+        "server": {
+          "machine": "0800d5b6d62328",
+          "region": "iad"
+        },
+        "rttMs": null
+      },
+      "lobbyImage": "images/a1-13-linkloss-reconnect-1-lobby-guest.png",
+      "matchStartedAt": 1786373365930,
+      "beforeCut": {
+        "present": false
+      },
+      "beforeCutImage": "images/a1-13-linkloss-reconnect-2-healthy-guest.png",
+      "preLink": {
+        "before": {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 182,
+          "sent": 281,
+          "sinceLastRecvMs": 14,
+          "readyState": 1,
+          "close": null,
+          "ageMs": 13284
+        },
+        "after": {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 308,
+          "sent": 534,
+          "sinceLastRecvMs": 12,
+          "readyState": 1,
+          "close": null,
+          "ageMs": 17285
+        },
+        "framesIn4s": 126
+      },
+      "lostTimeline": [
+        {
+          "atMs": 11,
+          "ws": {
+            "url": "wss://planet-rush-gameserver.fly.dev/play",
+            "received": 308,
+            "sent": 534,
+            "sinceLastRecvMs": 14,
+            "readyState": 1,
+            "close": null,
+            "ageMs": 17287
+          },
+          "overlay": false
+        },
+        {
+          "atMs": 1014,
+          "ws": {
+            "url": "wss://planet-rush-gameserver.fly.dev/play",
+            "received": 308,
+            "sent": 596,
+            "sinceLastRecvMs": 1025,
+            "readyState": 1,
+            "close": null,
+            "ageMs": 18298
+          },
+          "overlay": false
+        },
+        {
+          "atMs": 2017,
+          "ws": {
+            "url": "wss://planet-rush-gameserver.fly.dev/play",
+            "received": 308,
+            "sent": 659,
+            "sinceLastRecvMs": 2028,
+            "readyState": 1,
+            "close": null,
+            "ageMs": 19301
+          },
+          "overlay": false
+        },
+        {
+          "atMs": 3024,
+          "ws": {
+            "url": "wss://planet-rush-gameserver.fly.dev/play",
+            "received": 0,
+            "sent": 0,
+            "sinceLastRecvMs": null,
+            "readyState": 3,
+            "close": {
+              "at": 1786373377172,
+              "code": 1006,
+              "reason": "",
+              "wasClean": false
+            },
+            "ageMs": 310
+          },
+          "overlay": true
+        }
+      ],
+      "lostNoticedAfterMs": 3024,
+      "lostOverlay": {
+        "present": true,
+        "covers": {
+          "w": 1280,
+          "h": 800
+        },
+        "title": "RECONNECTING…",
+        "detail": "no server data for 3s — reclaiming your seat, 57s of grace left.",
+        "buttons": [
+          {
+            "id": "pr-link-loss-abandon",
+            "label": "ABANDON MATCH",
+            "disabled": false,
+            "w": 177,
+            "h": 44
+          }
+        ]
+      },
+      "lostImage": "images/a1-13-linkloss-reconnect-lost.png",
+      "failure": "page.waitForSelector: Timeout 90000ms exceeded.\nCall log:\n  - waiting for locator('#pr-link-loss-reconnect') to be visible\n",
+      "failureImage": "images/a1-13-linkloss-reconnect-failure.png"
+    },
+    "linkloss-abandon": {
+      "name": "linkloss-abandon",
+      "errors": [
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiUkNSVCIsIm1hY2hpbmUiOiI2ODM2MjkzYjUxNjFkOCIsImV4cGlyZXNBdCI6MTc4NjM3MzI5MTMzMn0.godKzTksZ9pHCA2GzmT-UwYQkQAD-x4r0c4m36aTGeQ' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiUkNSVCIsIm1hY2hpbmUiOiI2ODM2MjkzYjUxNjFkOCIsImV4cGlyZXNBdCI6MTc4NjM3MzI5MTMzMn0.godKzTksZ9pHCA2GzmT-UwYQkQAD-x4r0c4m36aTGeQ' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiUkNSVCIsIm1hY2hpbmUiOiI2ODM2MjkzYjUxNjFkOCIsImV4cGlyZXNBdCI6MTc4NjM3MzI5MTMzMn0.godKzTksZ9pHCA2GzmT-UwYQkQAD-x4r0c4m36aTGeQ' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiUkNSVCIsIm1hY2hpbmUiOiI2ODM2MjkzYjUxNjFkOCIsImV4cGlyZXNBdCI6MTc4NjM3MzI5MTMzMn0.godKzTksZ9pHCA2GzmT-UwYQkQAD-x4r0c4m36aTGeQ' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        }
+      ],
+      "room": "RCRT",
+      "hostLobby": {
+        "online": true,
+        "room": "RCRT",
+        "humanCount": 2,
+        "seats": [
+          "TAKEN",
+          "TAKEN",
+          "OPEN",
+          "OPEN",
+          "OPEN",
+          "OPEN",
+          "OPEN",
+          "OPEN"
+        ]
+      },
+      "guestLobby": {
+        "online": true,
+        "room": "RCRT",
+        "humanCount": 2,
+        "isHost": false
+      },
+      "hostBadge": {
+        "text": "ffc414e · 6836293b (iad)",
+        "server": {
+          "machine": "6836293b5161d8",
+          "region": "iad"
+        },
+        "rttMs": null
+      },
+      "guestBadge": {
+        "text": "ffc414e · 6836293b (iad)",
+        "server": {
+          "machine": "6836293b5161d8",
+          "region": "iad"
+        },
+        "rttMs": null
+      },
+      "lobbyImage": "images/a1-13-linkloss-abandon-1-lobby-guest.png",
+      "matchStartedAt": 1786373268546,
+      "beforeCut": {
+        "present": false
+      },
+      "beforeCutImage": "images/a1-13-linkloss-abandon-2-healthy-guest.png",
+      "preLink": {
+        "before": {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 182,
+          "sent": 282,
+          "sinceLastRecvMs": 2,
+          "readyState": 1,
+          "close": null,
+          "ageMs": 13111
+        },
+        "after": {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 309,
+          "sent": 530,
+          "sinceLastRecvMs": 11,
+          "readyState": 1,
+          "close": null,
+          "ageMs": 17113
+        },
+        "framesIn4s": 127
+      },
+      "lostTimeline": [
+        {
+          "atMs": 13,
+          "ws": {
+            "url": "wss://planet-rush-gameserver.fly.dev/play",
+            "received": 309,
+            "sent": 530,
+            "sinceLastRecvMs": 12,
+            "readyState": 1,
+            "close": null,
+            "ageMs": 17114
+          },
+          "overlay": false
+        },
+        {
+          "atMs": 1018,
+          "ws": {
+            "url": "wss://planet-rush-gameserver.fly.dev/play",
+            "received": 309,
+            "sent": 593,
+            "sinceLastRecvMs": 1025,
+            "readyState": 1,
+            "close": null,
+            "ageMs": 18127
+          },
+          "overlay": false
+        },
+        {
+          "atMs": 2020,
+          "ws": {
+            "url": "wss://planet-rush-gameserver.fly.dev/play",
+            "received": 309,
+            "sent": 650,
+            "sinceLastRecvMs": 2030,
+            "readyState": 1,
+            "close": null,
+            "ageMs": 19132
+          },
+          "overlay": false
+        },
+        {
+          "atMs": 3029,
+          "ws": {
+            "url": "wss://planet-rush-gameserver.fly.dev/play",
+            "received": 0,
+            "sent": 0,
+            "sinceLastRecvMs": null,
+            "readyState": 3,
+            "close": {
+              "at": 1786373279590,
+              "code": 1006,
+              "reason": "",
+              "wasClean": false
+            },
+            "ageMs": 487
+          },
+          "overlay": true
+        }
+      ],
+      "lostNoticedAfterMs": 3029,
+      "lostOverlay": {
+        "present": true,
+        "covers": {
+          "w": 1280,
+          "h": 800
+        },
+        "title": "RECONNECTING…",
+        "detail": "no server data for 3s — reclaiming your seat, 57s of grace left.",
+        "buttons": [
+          {
+            "id": "pr-link-loss-abandon",
+            "label": "ABANDON MATCH",
+            "disabled": false,
+            "w": 177,
+            "h": 44
+          }
+        ]
+      },
+      "lostImage": "images/a1-13-linkloss-abandon-lost.png",
+      "afterAbandon": {
+        "present": true,
+        "covers": {
+          "w": 1280,
+          "h": 800
+        },
+        "title": "MATCH ABANDONED — your seat is a bot’s now",
+        "detail": "You left the match. The seat is freed and the match went on without you.",
+        "buttons": [
+          {
+            "id": "pr-link-loss-menu",
+            "label": "BACK TO MENU",
+            "disabled": false,
+            "w": 160,
+            "h": 44
+          }
+        ]
+      },
+      "afterAbandonImage": "images/a1-13-linkloss-abandon-4-after-abandon.png",
+      "afterMenu": {
+        "present": false
+      },
+      "afterMenuState": {
+        "mainMenuVisible": true,
+        "onlineMenuVisible": false,
+        "matchStarted": false
+      },
+      "afterMenuImage": "images/a1-13-linkloss-abandon-5-after-back-to-menu.png"
+    },
+    "linkloss-silent": {
+      "name": "linkloss-silent",
+      "errors": [],
+      "room": "5XDE",
+      "hostLobby": {
+        "online": true,
+        "room": "5XDE",
+        "humanCount": 2,
+        "seats": [
+          "TAKEN",
+          "TAKEN",
+          "OPEN",
+          "OPEN",
+          "OPEN",
+          "OPEN",
+          "OPEN",
+          "OPEN"
+        ]
+      },
+      "guestLobby": {
+        "online": true,
+        "room": "5XDE",
+        "humanCount": 2,
+        "isHost": false
+      },
+      "hostBadge": {
+        "text": "ffc414e · 0800d5b6 (iad)",
+        "server": {
+          "machine": "0800d5b6d62328",
+          "region": "iad"
+        },
+        "rttMs": null
+      },
+      "guestBadge": {
+        "text": "ffc414e · 0800d5b6 (iad)",
+        "server": {
+          "machine": "0800d5b6d62328",
+          "region": "iad"
+        },
+        "rttMs": null
+      },
+      "lobbyImage": "images/a1-13-linkloss-silent-1-lobby-guest.png",
+      "matchStartedAt": 1786373560419,
+      "beforeCut": {
+        "present": false
+      },
+      "beforeCutImage": "images/a1-13-linkloss-silent-2-healthy-guest.png",
+      "preLink": {
+        "before": {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 183,
+          "sent": 291,
+          "sinceLastRecvMs": 19,
+          "readyState": 1,
+          "close": null,
+          "ageMs": 13173
+        },
+        "after": {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 310,
+          "sent": 535,
+          "sinceLastRecvMs": 23,
+          "readyState": 1,
+          "close": null,
+          "ageMs": 17174
+        },
+        "framesIn4s": 127
+      },
+      "lostTimeline": [
+        {
+          "atMs": 15,
+          "ws": {
+            "url": "wss://planet-rush-gameserver.fly.dev/play",
+            "received": 310,
+            "sent": 535,
+            "sinceLastRecvMs": 26,
+            "readyState": 1,
+            "close": null,
+            "ageMs": 17177
+          },
+          "overlay": false
+        },
+        {
+          "atMs": 1018,
+          "ws": {
+            "url": "wss://planet-rush-gameserver.fly.dev/play",
+            "received": 343,
+            "sent": 599,
+            "sinceLastRecvMs": 3,
+            "readyState": 1,
+            "close": null,
+            "ageMs": 18191
+          },
+          "overlay": false
+        },
+        {
+          "atMs": 2021,
+          "ws": {
+            "url": "wss://planet-rush-gameserver.fly.dev/play",
+            "received": 375,
+            "sent": 659,
+            "sinceLastRecvMs": 2,
+            "readyState": 1,
+            "close": null,
+            "ageMs": 19194
+          },
+          "overlay": false
+        },
+        {
+          "atMs": 3026,
+          "ws": {
+            "url": "wss://planet-rush-gameserver.fly.dev/play",
+            "received": 36,
+            "sent": 2,
+            "sinceLastRecvMs": 3,
+            "readyState": 1,
+            "close": null,
+            "ageMs": 465
+          },
+          "overlay": true
+        }
+      ],
+      "lostNoticedAfterMs": 3026,
+      "lostOverlay": {
+        "present": true,
+        "covers": {
+          "w": 1280,
+          "h": 800
+        },
+        "title": "RECONNECTING…",
+        "detail": "no server data for 3s — reclaiming your seat, 57s of grace left.",
+        "buttons": [
+          {
+            "id": "pr-link-loss-abandon",
+            "label": "ABANDON MATCH",
+            "disabled": false,
+            "w": 177,
+            "h": 44
+          }
+        ]
+      },
+      "lostImage": "images/a1-13-linkloss-silent-lost.png",
+      "failure": "page.waitForSelector: Timeout 60000ms exceeded.\nCall log:\n  - waiting for locator('#pr-link-loss-reconnect') to be visible\n",
+      "failureImage": "images/a1-13-linkloss-silent-failure.png"
+    },
+    "linkloss-grace": {
+      "name": "linkloss-grace",
+      "errors": [
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiV1dKMyIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3Mzc1MTU3MX0.0_J-bTxjDXwikxXEvAtvGvvbZmjNz8FHkIseC-Xfdz8' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiV1dKMyIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3Mzc1MTU3MX0.0_J-bTxjDXwikxXEvAtvGvvbZmjNz8FHkIseC-Xfdz8' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiV1dKMyIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3Mzc1MTU3MX0.0_J-bTxjDXwikxXEvAtvGvvbZmjNz8FHkIseC-Xfdz8' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiV1dKMyIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3Mzc1MTU3MX0.0_J-bTxjDXwikxXEvAtvGvvbZmjNz8FHkIseC-Xfdz8' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiV1dKMyIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3Mzc1MTU3MX0.0_J-bTxjDXwikxXEvAtvGvvbZmjNz8FHkIseC-Xfdz8' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiV1dKMyIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3Mzc1MTU3MX0.0_J-bTxjDXwikxXEvAtvGvvbZmjNz8FHkIseC-Xfdz8' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiV1dKMyIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3Mzc1MTU3MX0.0_J-bTxjDXwikxXEvAtvGvvbZmjNz8FHkIseC-Xfdz8' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiV1dKMyIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3Mzc1MTU3MX0.0_J-bTxjDXwikxXEvAtvGvvbZmjNz8FHkIseC-Xfdz8' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiV1dKMyIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3Mzc1MTU3MX0.0_J-bTxjDXwikxXEvAtvGvvbZmjNz8FHkIseC-Xfdz8' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiV1dKMyIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3Mzc1MTU3MX0.0_J-bTxjDXwikxXEvAtvGvvbZmjNz8FHkIseC-Xfdz8' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiV1dKMyIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3Mzc1MTU3MX0.0_J-bTxjDXwikxXEvAtvGvvbZmjNz8FHkIseC-Xfdz8' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiV1dKMyIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3Mzc1MTU3MX0.0_J-bTxjDXwikxXEvAtvGvvbZmjNz8FHkIseC-Xfdz8' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiV1dKMyIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3Mzc1MTU3MX0.0_J-bTxjDXwikxXEvAtvGvvbZmjNz8FHkIseC-Xfdz8' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiV1dKMyIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3Mzc1MTU3MX0.0_J-bTxjDXwikxXEvAtvGvvbZmjNz8FHkIseC-Xfdz8' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "WebSocket connection to 'wss://planet-rush-gameserver.fly.dev/play?ticket=eyJyb29tIjoiV1dKMyIsIm1hY2hpbmUiOiIwODAwZDViNmQ2MjMyOCIsImV4cGlyZXNBdCI6MTc4NjM3Mzc1MTU3MX0.0_J-bTxjDXwikxXEvAtvGvvbZmjNz8FHkIseC-Xfdz8' failed: Error in connection establishment: net::ERR_INTERNET_DISCONNECTED"
+        },
+        {
+          "who": "guest",
+          "kind": "console.error",
+          "message": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+        }
+      ],
+      "room": "WWJ3",
+      "hostLobby": {
+        "online": true,
+        "room": "WWJ3",
+        "humanCount": 2,
+        "seats": [
+          "TAKEN",
+          "TAKEN",
+          "OPEN",
+          "OPEN",
+          "OPEN",
+          "OPEN",
+          "OPEN",
+          "OPEN"
+        ]
+      },
+      "guestLobby": {
+        "online": true,
+        "room": "WWJ3",
+        "humanCount": 2,
+        "isHost": false
+      },
+      "hostBadge": {
+        "text": "ffc414e · 0800d5b6 (iad)",
+        "server": {
+          "machine": "0800d5b6d62328",
+          "region": "iad"
+        },
+        "rttMs": null
+      },
+      "guestBadge": {
+        "text": "ffc414e · 0800d5b6 (iad)",
+        "server": {
+          "machine": "0800d5b6d62328",
+          "region": "iad"
+        },
+        "rttMs": null
+      },
+      "lobbyImage": "images/a1-13-linkloss-grace-1-lobby-guest.png",
+      "matchStartedAt": 1786373728904,
+      "beforeCut": {
+        "present": false
+      },
+      "beforeCutImage": "images/a1-13-linkloss-grace-2-healthy-guest.png",
+      "preLink": {
+        "before": {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 183,
+          "sent": 287,
+          "sinceLastRecvMs": 18,
+          "readyState": 1,
+          "close": null,
+          "ageMs": 13274
+        },
+        "after": {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 310,
+          "sent": 538,
+          "sinceLastRecvMs": 37,
+          "readyState": 1,
+          "close": null,
+          "ageMs": 17283
+        },
+        "framesIn4s": 127
+      },
+      "cards": [
+        {
+          "atMs": 1,
+          "title": null,
+          "detail": null,
+          "buttons": []
+        },
+        {
+          "atMs": 2004,
+          "title": null,
+          "detail": null,
+          "buttons": []
+        },
+        {
+          "atMs": 4005,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 4s — reclaiming your seat, 56s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ],
+          "image": "images/a1-13-linkloss-grace-t004005.png"
+        },
+        {
+          "atMs": 7885,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 8s — reclaiming your seat, 52s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 9887,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 10s — reclaiming your seat, 50s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 11894,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 12s — reclaiming your seat, 48s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 13900,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 14s — reclaiming your seat, 46s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 15902,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 16s — reclaiming your seat, 44s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 17907,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 18s — reclaiming your seat, 42s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 19909,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 20s — reclaiming your seat, 40s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 21920,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 22s — reclaiming your seat, 38s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 23924,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 24s — reclaiming your seat, 36s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 25928,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 26s — reclaiming your seat, 34s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 27929,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 28s — reclaiming your seat, 32s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 29931,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 30s — reclaiming your seat, 30s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 31956,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 32s — reclaiming your seat, 28s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 33957,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 34s — reclaiming your seat, 26s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 35962,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 36s — reclaiming your seat, 24s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 37967,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 38s — reclaiming your seat, 22s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 39968,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 40s — reclaiming your seat, 20s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 41982,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 42s — reclaiming your seat, 18s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 43989,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 44s — reclaiming your seat, 16s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 45994,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 46s — reclaiming your seat, 14s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 47995,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 48s — reclaiming your seat, 12s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 49997,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 50s — reclaiming your seat, 10s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 51998,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 52s — reclaiming your seat, 8s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 54000,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 54s — reclaiming your seat, 6s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 56002,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 56s — reclaiming your seat, 4s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 58003,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 58s — reclaiming your seat, 2s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 60004,
+          "title": "RECONNECTING…",
+          "detail": "no server data for 60s — reclaiming your seat, 0s of grace left.",
+          "buttons": [
+            "ABANDON MATCH (177x44)"
+          ]
+        },
+        {
+          "atMs": 62005,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ],
+          "image": "images/a1-13-linkloss-grace-t062005.png"
+        },
+        {
+          "atMs": 65860,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ]
+        },
+        {
+          "atMs": 67862,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ]
+        },
+        {
+          "atMs": 69863,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ]
+        },
+        {
+          "atMs": 71864,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ]
+        },
+        {
+          "atMs": 73870,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ]
+        },
+        {
+          "atMs": 75872,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ]
+        },
+        {
+          "atMs": 77874,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ]
+        },
+        {
+          "atMs": 79876,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ]
+        },
+        {
+          "atMs": 81877,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ]
+        },
+        {
+          "atMs": 83878,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ]
+        },
+        {
+          "atMs": 85879,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ]
+        },
+        {
+          "atMs": 87882,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ]
+        },
+        {
+          "atMs": 89884,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ]
+        },
+        {
+          "atMs": 91885,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ]
+        },
+        {
+          "atMs": 93888,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ]
+        },
+        {
+          "atMs": 95891,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ]
+        },
+        {
+          "atMs": 97893,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ]
+        },
+        {
+          "atMs": 99894,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ]
+        },
+        {
+          "atMs": 101895,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ]
+        },
+        {
+          "atMs": 103899,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ]
+        },
+        {
+          "atMs": 105903,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ]
+        },
+        {
+          "atMs": 107906,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ]
+        },
+        {
+          "atMs": 109911,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ]
+        },
+        {
+          "atMs": 111913,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+          "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+          "buttons": [
+            "BACK TO MENU (160x44)"
+          ]
+        }
+      ],
+      "titlesSeen": [
+        null,
+        "RECONNECTING…",
+        "SEAT EXPIRED — a bot flew your ship, match went on"
+      ],
+      "buttonsEverOffered": [
+        "ABANDON MATCH",
+        "BACK TO MENU"
+      ],
+      "reconnectEverOffered": false,
+      "finalCard": {
+        "atMs": 111913,
+        "title": "SEAT EXPIRED — a bot flew your ship, match went on",
+        "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+        "buttons": [
+          "BACK TO MENU (160x44)"
+        ]
+      }
+    },
+    "linkloss-recovery": {
+      "name": "linkloss-recovery",
+      "errors": [],
+      "room": "EDCR",
+      "hostLobby": {
+        "online": true,
+        "room": "EDCR",
+        "humanCount": 2,
+        "seats": [
+          "TAKEN",
+          "TAKEN",
+          "OPEN",
+          "OPEN",
+          "OPEN",
+          "OPEN",
+          "OPEN",
+          "OPEN"
+        ]
+      },
+      "guestLobby": {
+        "online": true,
+        "room": "EDCR",
+        "humanCount": 2,
+        "isHost": false
+      },
+      "hostBadge": {
+        "text": "ffc414e · 6836293b (iad)",
+        "server": {
+          "machine": "6836293b5161d8",
+          "region": "iad"
+        },
+        "rttMs": null
+      },
+      "guestBadge": {
+        "text": "ffc414e · 6836293b (iad)",
+        "server": {
+          "machine": "6836293b5161d8",
+          "region": "iad"
+        },
+        "rttMs": null
+      },
+      "lobbyImage": "images/a1-13-linkloss-recovery-1-lobby-guest.png",
+      "matchStartedAt": 1786373881319,
+      "beforeCut": {
+        "present": false
+      },
+      "beforeCutImage": "images/a1-13-linkloss-recovery-2-healthy-guest.png",
+      "preLink": {
+        "before": {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 183,
+          "sent": 278,
+          "sinceLastRecvMs": 7,
+          "readyState": 1,
+          "close": null,
+          "ageMs": 13423
+        },
+        "after": {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 311,
+          "sent": 528,
+          "sinceLastRecvMs": 6,
+          "readyState": 1,
+          "close": null,
+          "ageMs": 17425
+        },
+        "framesIn4s": 128
+      },
+      "lostTimeline": [
+        {
+          "atMs": 10,
+          "ws": {
+            "url": "wss://planet-rush-gameserver.fly.dev/play",
+            "received": 311,
+            "sent": 528,
+            "sinceLastRecvMs": 7,
+            "readyState": 1,
+            "close": null,
+            "ageMs": 17426
+          },
+          "overlay": false
+        },
+        {
+          "atMs": 1011,
+          "ws": {
+            "url": "wss://planet-rush-gameserver.fly.dev/play",
+            "received": 342,
+            "sent": 592,
+            "sinceLastRecvMs": 14,
+            "readyState": 1,
+            "close": null,
+            "ageMs": 18435
+          },
+          "overlay": false
+        },
+        {
+          "atMs": 2026,
+          "ws": {
+            "url": "wss://planet-rush-gameserver.fly.dev/play",
+            "received": 374,
+            "sent": 651,
+            "sinceLastRecvMs": 24,
+            "readyState": 1,
+            "close": null,
+            "ageMs": 19438
+          },
+          "overlay": false
+        },
+        {
+          "atMs": 3033,
+          "ws": {
+            "url": "wss://planet-rush-gameserver.fly.dev/play",
+            "received": 34,
+            "sent": 2,
+            "sinceLastRecvMs": 7,
+            "readyState": 1,
+            "close": null,
+            "ageMs": 414
+          },
+          "overlay": true
+        }
+      ],
+      "lostNoticedAfterMs": 3033,
+      "lostOverlay": {
+        "present": true,
+        "covers": {
+          "w": 1280,
+          "h": 800
+        },
+        "title": "RECONNECTING…",
+        "detail": "no server data for 3s — reclaiming your seat, 57s of grace left.",
+        "buttons": [
+          {
+            "id": "pr-link-loss-abandon",
+            "label": "ABANDON MATCH",
+            "disabled": false,
+            "w": 177,
+            "h": 44
+          }
+        ]
+      },
+      "lostImage": "images/a1-13-linkloss-recovery-lost.png",
+      "beforeRestore": {
+        "present": true,
+        "covers": {
+          "w": 1280,
+          "h": 800
+        },
+        "title": "RECONNECTING…",
+        "detail": "no server data for 11s — reclaiming your seat, 49s of grace left.",
+        "buttons": [
+          {
+            "id": "pr-link-loss-abandon",
+            "label": "ABANDON MATCH",
+            "disabled": false,
+            "w": 177,
+            "h": 44
+          }
+        ]
+      },
+      "beforeRestoreImage": "images/a1-13-linkloss-recovery-3-up.png",
+      "clearedAfterMs": null,
+      "afterRestore": {
+        "present": true,
+        "covers": {
+          "w": 0,
+          "h": 0
+        },
+        "title": "RECONNECTING…",
+        "detail": "no server data for 13s — reclaiming your seat, 47s of grace left.",
+        "buttons": [
+          {
+            "id": "pr-link-loss-abandon",
+            "label": "ABANDON MATCH",
+            "disabled": false,
+            "w": 0,
+            "h": 0
+          }
+        ]
+      },
+      "afterRestoreImage": "images/a1-13-linkloss-recovery-4-after-restore.png",
+      "afterRestoreLink": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 1654,
+          "sent": 2581,
+          "sinceLastRecvMs": 18,
+          "readyState": 1,
+          "close": null,
+          "ageMs": 51885
+        }
+      ],
+      "resumed": {
+        "matchStarted": true,
+        "shipPos": {
+          "x": 475.125,
+          "y": 1211.25
+        }
+      }
+    }
+  },
+  "priorCapturedAt": "2026-08-10T14:55:15.870Z"
+}
