@@ -32,12 +32,22 @@ import type { ControlState } from './actions';
 // Geometry (mirrors src/ui/build-wheel-view.ts, which does not export it)
 // ---------------------------------------------------------------------------
 
-/** Hub radius as a fraction of the outer ring — the dead centre of the wheel,
- *  where the live ore total is printed. A press here selects nothing. */
-export const HUB_FRACTION = 0.22;
-/** Inner edge of the segment ring, as a fraction of the outer ring. Between the
- *  hub and here is the gap the hub's stroke lives in; a press there is a miss,
- *  not a purchase. */
+/**
+ * Inner edge of the segment ring, as a fraction of the outer ring. Everything
+ * inside it — the hub disc where the live ore total is printed, and the gap
+ * around it — is a miss, not a purchase.
+ *
+ * There used to be a second constant here, `HUB_FRACTION = 0.22`, for the hub
+ * disc alone. `tools/dark-matter-scan.mjs` found it with zero references of any
+ * kind, including from this module's own spec, and triage (a1-09) found it was
+ * worse than unused: it mirrored a `src/ui/build-wheel-view.ts` geometry that no
+ * longer exists. That file now draws "a 150 px hub inside a 470 px disc, so
+ * there is one number rather than two" — 0.319. A stale mirror of a number the
+ * other side has already merged away is the drift this module's spec exists to
+ * catch, so it is gone rather than corrected: input hit-tests, it does not draw,
+ * and the only radius it needs is the one below. `hitWheel`'s spec pins the hub
+ * as a miss by behaviour, which is what the deleted constant was documenting.
+ */
 export const INNER_FRACTION = 0.3;
 
 /** Where the panel's first row starts, measured down from the panel's top edge —
