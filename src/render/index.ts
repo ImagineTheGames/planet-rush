@@ -36,6 +36,23 @@
  *    size, so a headless suite asserts the same scene graph players get and only
  *    the pixels are absent — which is the one thing it never asserted anyway.
  *
+ * **And nothing off screen is submitted at all (a1-12).** Pooling made each body
+ * cheap; it did not stop the layer from handing the GPU every body in the arena
+ * whether or not the player could see it. a1-10 §4.1 measured the gap exactly —
+ * a 1280×800 desktop window contains 75 of the 200 rocks, a 844×390 landscape
+ * phone contains **6** — and a1-11 named it the top remaining lever once the
+ * pooling had landed. Every entity layer now tests its bodies against the world
+ * rectangle the camera is actually showing (`./cull`) and hides the rest.
+ *
+ * The rule is **visibility, never existence**: a body is skipped only when it
+ * cannot contribute a pixel, so the test is against its *drawn* extent (its
+ * collision radius times the widest look its layer wears, `RENDER_EXTENT`) and
+ * an entity straddling the edge still draws. Slots are indexed by the entity's
+ * own identity rather than by a running count of survivors, so a rock leaving
+ * the screen does not renumber the field behind it and every pool's look-key
+ * guard keeps holding. Because it changes only what is *submitted*, the frozen
+ * goldens must not move by a pixel — and they are what says it did not.
+ *
  * Placeholder shapes stand in until art lands (GDD §2.4 day-1: "placeholder
  * triangle ok"): a steel triangle ship with a player-colour cockpit, grey rocks
  * that darken as they crack, signal-yellow ore chunks, plasma muzzle flashes, and
@@ -61,7 +78,14 @@ import { inAtmosphere, turretHomeAngle, turretOrbitPos } from '../sim/buildings'
 import { areEnemies } from '../sim/allegiance';
 import { stationHealthVisible } from '../sim/sensing';
 import type { Asteroid, OreChunk, MiningStation, Projectile, Ship, World } from '../sim/state';
-import { atmosphereHaloSprite, beaconRingSprite, stationSprite, stationVariantFor } from '../art/stations';
+import {
+  ATMOSPHERE_HALO_RADIUS,
+  STATION_ART_EXTENT,
+  atmosphereHaloSprite,
+  beaconRingSprite,
+  stationSprite,
+  stationVariantFor,
+} from '../art/stations';
 import { stationWreckSprite } from '../art/wrecks';
 import { asteroidArt, asteroidTexture } from '../art/atlas';
 import { shipSprite } from '../art/ships';
@@ -70,6 +94,16 @@ import { shotSprite, type ShotFamily } from '../art/vfx/shots';
 import type { SpriteDef } from '../art/shapes';
 import { SpriteTextureCache, drawSprite, spriteGraphics, type TextureBaker } from '../art/textures';
 import { ARENA_WALL_BANDS, VoidBackdrop } from '../art/backdrop';
+import {
+  CULL_SLOP,
+  RENDER_EXTENT,
+  cullBox,
+  reachOf,
+  segmentTouchesBox,
+  touchesBox,
+  writeVisibleWorld,
+  type CullBox,
+} from './cull';
 
 // ---------------------------------------------------------------------------
 // Palette (frozen — style-guide.md §1 / §3.1). Hex as PixiJS numbers.
@@ -162,6 +196,13 @@ class GraphicsPool {
     return g;
   }
 
+  /** Hide the i-th pooled graphic — the culled entity's slot. Never creates one:
+   *  a body that has been off screen since boot costs no display object at all. */
+  hide(i: number): void {
+    const g = this.items[i];
+    if (g) g.visible = false;
+  }
+
   /** Hide every pooled graphic from `count` onward (reused, not destroyed). */
   hideFrom(count: number): void {
     for (let i = count; i < this.items.length; i++) {
@@ -198,6 +239,13 @@ class SpritePool {
     }
     s.visible = true;
     return s;
+  }
+
+  /** Hide the i-th pooled sprite — the culled entity's slot. Never creates one:
+   *  a body that has been off screen since boot costs no display object at all. */
+  hide(i: number): void {
+    const s = this.items[i];
+    if (s) s.visible = false;
   }
 
   /** Hide every pooled sprite from `count` onward (reused, not destroyed). */
@@ -340,6 +388,15 @@ function makeUnitChunk(): Graphics {
 // Impact flare radius (world units) at the muzzle flash's hit point. Punchy but small
 // so it reads as a torch bite, not an explosion (style-guide §8 "bright, punchy").
 const IMPACT_RADIUS = 7;
+
+/** Radius outside the station body the construction arc is stroked at (GDD §2.5).
+ *  Named because the cull has to know how far a station's furniture reaches and
+ *  the two must not drift apart — `drawConstruction` strokes at exactly this. */
+const CONSTRUCTION_RING_INSET = 12;
+
+/** Radial step between the gauge rings of stacked shield bubbles, so a pair reads
+ *  as two (`drawShieldBubble`). Named for the same reason as the inset above. */
+const SHIELD_GAUGE_STEP = 6;
 
 // The atmosphere halo's breath (radians/sec). Keyed to sim time, not the wall
 // clock, so the frozen golden stays deterministic (goldens.spec.ts). ~4.5s
@@ -521,6 +578,11 @@ export class Renderer {
   private viewport: Viewport;
   /** Reused scratch so centerCamera allocates nothing per frame (GDD §4.3). */
   private readonly offsetScratch: Vec2 = { x: 0, y: 0 };
+  /** The slice of the world on screen this frame, in world units — rewritten by
+   *  {@link centerCamera} from the offset it just applied, and read by every
+   *  entity layer to decide what to submit (a1-12, `./cull`). One box, reused:
+   *  the cull allocates nothing per frame either. */
+  private readonly visible: CullBox = cullBox();
 
   constructor(stage: Container, viewport: Viewport, options: RendererOptions = {}) {
     this.viewport = viewport;
@@ -678,6 +740,18 @@ export class Renderer {
     writeCameraOffset(this.offsetScratch, TARGET_SCRATCH, this.viewport);
     this.worldRoot.x = this.offsetScratch.x;
     this.worldRoot.y = this.offsetScratch.y;
+    // ...and, from that same offset, the world rectangle the player can see. The
+    // cull is a function of where the world ACTUALLY got drawn, so it can never
+    // drift from the camera the way a separately-derived rectangle would.
+    writeVisibleWorld(this.visible, this.offsetScratch, this.viewport);
+  }
+
+  /** The world rectangle on screen after the last {@link draw} — the one notion
+   *  of "on screen" this layer has. Exposed read-only for the debug seam and for
+   *  the cull's own tests; the renderer mutates it in place each frame, so a
+   *  caller that needs to keep it must copy it. */
+  get visibleWorld(): Readonly<CullBox> {
+    return this.visible;
   }
 
   /**
@@ -743,31 +817,56 @@ export class Renderer {
    */
   private drawStations(world: World, viewerId: PlayerId): void {
     const viewer = world.ships.find((s) => s.id === viewerId);
-    let turrets = 0;
-    let scaffolds = 0;
+
+    // Turret and scaffold slots are (station × mount slot), NOT a running count
+    // of what survived the cull — a gun that leaves the screen must not renumber
+    // the guns behind it and miss every `owner:tier:state` key at once. The mount
+    // slot is the sim's own reservation (`Turret.slot`, unique per station while
+    // the turret lives), so the mapping is stable for as long as the gun is. Start
+    // every slot hidden and light up the ones that draw.
+    this.turretPool.hideFrom(0);
+    this.scaffoldPool.hideFrom(0);
 
     for (let i = 0; i < world.stations.length; i++) {
       const station = world.stations[i]!;
       this.drawAtmosphere(i, station, viewerId, viewer, world.time);
-      this.stationBody(i, station);
+
+      // The body and the overlay are drawn as one object each, always together,
+      // so they share one visibility test — taken against the widest thing the
+      // pair can draw (`stationReach`), never against the core radius alone.
+      const stationOnScreen = touchesBox(this.visible, station.pos.x, station.pos.y, this.stationReach(station));
+      this.stationBody(i, station, stationOnScreen);
 
       const overlay = this.overlayFor(i);
-      overlay.clear();
-      overlay.x = station.pos.x;
-      overlay.y = station.pos.y;
+      overlay.visible = stationOnScreen;
+      if (stationOnScreen) {
+        overlay.clear();
+        overlay.x = station.pos.x;
+        overlay.y = station.pos.y;
 
-      if (station.alive) {
-        this.drawShieldBubble(overlay, station);
-        this.drawConstruction(overlay, station);
-        // Health is not fog (GDD §2.2, amended): every station, every range. The
-        // sim owns the rule so there is one place to change it, and exactly one
-        // answer for the renderer, the bots and the server.
-        if (stationHealthVisible(viewerId, station)) this.drawDamageRing(overlay, station);
+        if (station.alive) {
+          this.drawShieldBubble(overlay, station);
+          this.drawConstruction(overlay, station);
+          // Health is not fog (GDD §2.2, amended): every station, every range. The
+          // sim owns the rule so there is one place to change it, and exactly one
+          // answer for the renderer, the bots and the server. "Every range" is a
+          // statement about fog, not about the window — an overlay outside the
+          // window shows nothing to anybody, and the ring is back the instant it
+          // scrolls in.
+          if (stationHealthVisible(viewerId, station)) this.drawDamageRing(overlay, station);
+        }
       }
 
       for (const turret of station.turrets) {
         if (turret.hp <= 0) continue; // killed this tick, swept at end of step
-        const s = this.turretPool.at(turrets);
+        // Tested on its own rather than inherited from the station: a gun rides
+        // its station's rim and slides around it (`Turret.orbitAngle`), so the
+        // half of a ring that faces the window can be on screen while the half
+        // behind it is not.
+        if (!touchesBox(this.visible, turret.pos.x, turret.pos.y, reachOf(turret.radius, RENDER_EXTENT.turret)))
+          continue;
+        const slot = i * TURRET.capPerStation + turret.slot;
+        const s = this.turretPool.at(slot);
         // The barrel state is the threat telegraph (style-guide §5.5): a fired
         // muzzle this tick is `firing`; a committed target is `tracking`; else
         // the barrel is cold. The tier picks the ratified pool silhouette.
@@ -779,7 +878,7 @@ export class Renderer {
         // tier × state is 8 × 3 × 3 at the design cap, and a1-10 measured 24 of
         // them carrying all 32 turrets on the §4.3 scene.
         const key = `turret:${turret.owner}:${tier}:${state}`;
-        if (this.turretKeys[turrets] !== key) {
+        if (this.turretKeys[slot] !== key) {
           const look = this.lookUnits(
             key,
             TURRET_ART_SCALE,
@@ -788,19 +887,18 @@ export class Renderer {
               this.textures.getBy(`${key}:${size}`, () => turretSprite({ playerId: turret.owner, state, tier }), size),
           );
           s.texture = look.texture;
-          this.turretUnits[turrets] = look.units;
-          this.turretKeys[turrets] = key;
+          this.turretUnits[slot] = look.units;
+          this.turretKeys[slot] = key;
         }
         s.x = turret.pos.x;
         s.y = turret.pos.y;
         s.rotation = turret.angle;
         // The texture is TURRET_ART_SCALE px per art unit; divide it back out to
         // land the turret at its collision radius in world units.
-        s.scale.set(this.turretUnits[turrets]! * turret.radius);
+        s.scale.set(this.turretUnits[slot]! * turret.radius);
         // Damaged turrets fade toward the vacuum rather than recolouring —
         // threat red is reserved for damage *events*, not for standing objects.
         s.alpha = 0.45 + 0.55 * clamp01(turret.hp / turret.maxHp);
-        turrets++;
       }
 
       // A turret build-in-progress reads as a scaffold on its reserved mount, so
@@ -808,27 +906,55 @@ export class Renderer {
       for (const job of station.builds) {
         if (job.kind !== 'turret') continue; // a shield builds centred — arc only
         const pos = turretOrbitPos(station, turretHomeAngle(station, job.slot));
-        const s = this.scaffoldPool.at(scaffolds);
+        if (!touchesBox(this.visible, pos.x, pos.y, reachOf(TURRET.radius, RENDER_EXTENT.turret))) continue;
+        const slot = i * TURRET.capPerStation + job.slot;
+        const s = this.scaffoldPool.at(slot);
         const key = `scaffold:${station.owner}`;
-        if (this.scaffoldKeys[scaffolds] !== key) {
+        if (this.scaffoldKeys[slot] !== key) {
           const make = (): SpriteDef => turretSprite({ playerId: station.owner, state: 'building' });
           const look = this.lookUnits(key, TURRET_ART_SCALE, make, (size) =>
             this.textures.getBy(`${key}:${size}`, make, size),
           );
           s.texture = look.texture;
-          this.scaffoldUnits[scaffolds] = look.units;
-          this.scaffoldKeys[scaffolds] = key;
+          this.scaffoldUnits[slot] = look.units;
+          this.scaffoldKeys[slot] = key;
         }
         s.x = pos.x;
         s.y = pos.y;
         s.rotation = turretHomeAngle(station, job.slot);
-        s.scale.set(this.scaffoldUnits[scaffolds]! * TURRET.radius);
-        scaffolds++;
+        s.scale.set(this.scaffoldUnits[slot]! * TURRET.radius);
       }
     }
+  }
 
-    this.turretPool.hideFrom(turrets);
-    this.scaffoldPool.hideFrom(scaffolds);
+  /**
+   * How far a station's own furniture reaches from its centre, in world units —
+   * the pad the body/overlay pair is culled on.
+   *
+   * A station is the one entity in this layer whose *drawn* size is nothing like
+   * its collision radius: the Cutterhead body art is authored at
+   * `STATION_ART_EXTENT` (1.95× the core), the construction arc is stroked
+   * outside that, and a shield bubble is 90 world units in its own right —
+   * bigger than the station it stands on, and stacked pairs step out further
+   * still. So this takes the widest of them rather than any single one, which is
+   * what stops a besieged station's bubble from popping in at the screen edge
+   * while its core is still off it.
+   */
+  private stationReach(station: MiningStation): number {
+    // The body art, and the construction arc just outside it. The damage ring
+    // (radius + 5, stroked 4) sits inside the arc, so the arc bounds both.
+    let reach = station.radius * STATION_ART_EXTENT;
+    const rings = station.radius + CONSTRUCTION_RING_INSET;
+    if (rings > reach) reach = rings;
+    for (let i = 0; i < station.shields.length; i++) {
+      const shield = station.shields[i]!;
+      if (shield.hp <= 1e-9) continue; // drained: `drawShieldBubble` skips it
+      const bubble = shield.radius * RENDER_EXTENT.shield;
+      const gauge = shield.radius + i * SHIELD_GAUGE_STEP + 1; // stroked 2, half outside
+      const outer = bubble > gauge ? bubble : gauge;
+      if (outer > reach) reach = outer;
+    }
+    return reach * CULL_SLOP;
   }
 
   /**
@@ -875,9 +1001,16 @@ export class Renderer {
     viewer: Ship | undefined,
     time: number,
   ): void {
+    // Own, and on screen. The halo is the widest thing this layer draws — it
+    // reaches `DEPOSIT_RANGE` (four station radii, 256 world units), so it gets
+    // its own cull test rather than the station's: on a landscape phone the air
+    // fills the window while the station it rings is still off the left edge.
     const own = station.alive && station.owner === viewerId;
     let g = this.stationHalo[index];
-    if (!own) {
+    if (
+      !own ||
+      !touchesBox(this.visible, station.pos.x, station.pos.y, reachOf(station.radius, ATMOSPHERE_HALO_RADIUS))
+    ) {
       if (g) g.visible = false;
       return;
     }
@@ -906,11 +1039,18 @@ export class Renderer {
   }
 
   /** A station's static body, drawn once — and again the one time it becomes a
-   *  wreck (GDD §2.7: the wreck stays on the map for the rest of the match). */
-  private stationBody(index: number, station: MiningStation): void {
+   *  wreck (GDD §2.7: the wreck stays on the map for the rest of the match).
+   *  `onScreen` only hides it: a station off the window keeps whatever geometry
+   *  it had, so scrolling back to it costs a `visible` flag and not a redraw. */
+  private stationBody(index: number, station: MiningStation, onScreen: boolean): void {
     let g = this.stationGfx[index];
     const dead = !station.alive;
+    if (!onScreen) {
+      if (g) g.visible = false;
+      return;
+    }
     if (g && this.stationDrawnDead[index] === dead) {
+      g.visible = true;
       g.alpha = station.spawnProtect > 0 ? 0.75 : 1;
       return;
     }
@@ -920,6 +1060,7 @@ export class Renderer {
       this.stationGfx[index] = g;
       this.stationLayer.addChild(g);
     }
+    g.visible = true;
     this.stationDrawnDead[index] = dead;
 
     const r = station.radius;
@@ -1021,7 +1162,7 @@ export class Renderer {
         shield.radius,
       );
       const lost = clamp01(1 - shield.hp / shield.maxHp);
-      this.drawDamageFill(g, shield.radius + i * 6, station.owner, lost, 2, 0.7);
+      this.drawDamageFill(g, shield.radius + i * SHIELD_GAUGE_STEP, station.owner, lost, 2, 0.7);
     }
   }
 
@@ -1032,7 +1173,7 @@ export class Renderer {
     if (station.builds.length === 0) return;
     const job = station.builds[0]!;
     const done = job.total > 0 ? clamp01(1 - job.remaining / job.total) : 1;
-    const r = station.radius + 12;
+    const r = station.radius + CONSTRUCTION_RING_INSET;
     g.circle(0, 0, r).stroke({ width: 2, color: PALETTE.hullSteel, alpha: 0.25 });
     if (done <= 0) return;
     // `moveTo` the arc start so `arc` never spokes back to the current point.
@@ -1072,32 +1213,42 @@ export class Renderer {
    *
    * `src/art/atlas.ts` has no entry for a shot (its art lives under
    * `src/art/vfx/`), so the key is written here, in the atlas's own idiom.
+   *
+   * **Culled, and slot-indexed by the sim's own projectile pool (a1-12).** A shot
+   * in flight toward the edge of the screen is *visible* and must draw, so the
+   * test is against the glow's drawn radius, not the shot's centre. The slot is
+   * the projectile's index in `world.projectiles` — which is itself a stable
+   * recycled pool (`sim/projectiles.ts` `takeProjectile`) — rather than a running
+   * count of live shots, so culling one shot does not renumber the rest and blow
+   * every `${family}:${tier}` key guard in a firefight.
    */
   private drawShots(world: World, viewer: PlayerId): void {
-    let live = 0;
-    for (const p of world.projectiles) {
-      if (!p.active) continue;
+    for (let i = 0; i < world.projectiles.length; i++) {
+      const p = world.projectiles[i]!;
+      if (!p.active || !touchesBox(this.visible, p.pos.x, p.pos.y, reachOf(p.radius, RENDER_EXTENT.shot))) {
+        this.shotPool.hide(i);
+        continue;
+      }
       const family: ShotFamily = areEnemies(world, viewer, p.owner) ? 'enemy' : 'own';
       const tier = shotTier(world, p);
       const key = `shot:${family}:${tier}`;
-      const s = this.shotPool.at(live);
-      if (this.shotKeys[live] !== key) {
+      const s = this.shotPool.at(i);
+      if (this.shotKeys[i] !== key) {
         const make = (): SpriteDef => shotSprite(family, tier);
         const look = this.lookUnits(key, SHOT_ART_SCALE, make, (size) =>
           this.textures.getBy(`${key}:${size}`, make, size),
         );
         s.texture = look.texture;
-        this.shotUnits[live] = look.units;
-        this.shotKeys[live] = key;
+        this.shotUnits[i] = look.units;
+        this.shotKeys[i] = key;
       }
       s.x = p.pos.x;
       s.y = p.pos.y;
       // The texture is SHOT_ART_SCALE px per art unit; divide it back out so unit
       // radius 1 lands at the shot's collision radius (the glow overhangs it).
-      s.scale.set(this.shotUnits[live]! * p.radius);
-      live++;
+      s.scale.set(this.shotUnits[i]! * p.radius);
     }
-    this.shotPool.hideFrom(live);
+    this.shotPool.hideFrom(world.projectiles.length);
   }
 
   /**
@@ -1109,10 +1260,22 @@ export class Renderer {
    * actually moves; `atlas.asteroidTexture` — whose header has carried the claim
    * "a field of 200 rocks shares a couple of dozen textures" since M1, with
    * nothing calling it — is what supplies the texture.
+   *
+   * **And the field is culled to the viewport first (a1-12).** This is the layer
+   * the cull exists for: 200 rocks, of which a desktop window contains 75 and a
+   * landscape phone 6. A rock is skipped only when its whole drawn silhouette is
+   * outside the visible rectangle, so one straddling the edge still draws — and
+   * the slot index stays the rock's own index in the field, never a count of
+   * survivors, so a rock leaving the screen cannot renumber the ones behind it
+   * and make every look key miss at once.
    */
   private drawAsteroids(asteroids: readonly Asteroid[]): void {
     for (let i = 0; i < asteroids.length; i++) {
       const a = asteroids[i]!;
+      if (!touchesBox(this.visible, a.pos.x, a.pos.y, reachOf(a.radius, RENDER_EXTENT.rock))) {
+        this.asteroidPool.hide(i);
+        continue;
+      }
       const s = this.asteroidPool.at(i);
       const art = asteroidArt(a);
       if (this.asteroidKeys[i] !== art.key) {
@@ -1132,9 +1295,17 @@ export class Renderer {
     this.asteroidPool.hideFrom(asteroids.length);
   }
 
+  /** The ore field (GDD §2.3) — 120 drifting chunks on the §4.3 scene, culled on
+   *  the same rule and by the same index-stable slot as the rocks. A chunk is a
+   *  unit circle scaled by its collision radius, so its art reaches exactly its
+   *  radius and the pad is the slop alone. */
   private drawChunks(chunks: readonly OreChunk[]): void {
     for (let i = 0; i < chunks.length; i++) {
       const c = chunks[i]!;
+      if (!touchesBox(this.visible, c.pos.x, c.pos.y, reachOf(c.radius, RENDER_EXTENT.chunk))) {
+        this.chunkPool.hide(i);
+        continue;
+      }
       const g = this.chunkPool.at(i);
       g.x = c.pos.x;
       g.y = c.pos.y;
@@ -1151,7 +1322,11 @@ export class Renderer {
         this.shipGfx[ship.id] = g;
         this.shipLayer.addChild(g);
       }
-      if (!ship.alive) {
+      // Dead, or nowhere near the window. The camera target is centred by
+      // construction, so the local ship is always on screen and only rivals are
+      // ever culled here — which is also the fog rule this layer already stated
+      // for enemy hulls ("drawn only on screen", header).
+      if (!ship.alive || !touchesBox(this.visible, ship.pos.x, ship.pos.y, reachOf(ship.radius, RENDER_EXTENT.ship))) {
         g.visible = false;
         continue;
       }
@@ -1171,15 +1346,26 @@ export class Renderer {
     // A flash that hits ends at its impact point and gets a plasma glow there; a
     // clean miss runs full range with no glow (GDD §4.1). Glows are pooled
     // separately since only some flashes strike — index them independently.
+    //
+    // Culled as a SEGMENT (a1-12), not as a point: a flash fired from off screen
+    // at something on screen crosses the window and must be drawn, so the test is
+    // the stroke's own span against the viewport. Skipping one also skips the
+    // `clear()` + `stroke()` that would rebuild its geometry, which is the whole
+    // cost of this layer — a muzzle is the one thing here still drawn per frame.
     let glows = 0;
     for (let i = 0; i < muzzles.length; i++) {
       const m = muzzles[i]!;
+      const halfStroke = ((m.width ?? 3) / 2) * CULL_SLOP;
+      if (!segmentTouchesBox(this.visible, m.from.x, m.from.y, m.to.x, m.to.y, halfStroke)) {
+        this.muzzlePool.hide(i);
+        continue;
+      }
       const g = this.muzzlePool.at(i);
       g.clear();
       g.moveTo(m.from.x, m.from.y).lineTo(m.to.x, m.to.y).stroke({ width: m.width ?? 3, color: m.color, cap: 'round' });
       // The flash line always draws (it is the turret-fire tell); the impact
       // glow is decoration, so it is the first thing reduce-VFX sheds (§4.3).
-      if (m.hit && !this.reduceVfx) {
+      if (m.hit && !this.reduceVfx && touchesBox(this.visible, m.hit.x, m.hit.y, IMPACT_RADIUS * CULL_SLOP)) {
         const glow = this.impactPool.at(glows++);
         glow.x = m.hit.x;
         glow.y = m.hit.y;

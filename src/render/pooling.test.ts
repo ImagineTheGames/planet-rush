@@ -27,7 +27,19 @@ import { asteroidArt } from '../art/atlas';
 import { Renderer, type EntityTextureBaker } from './index';
 import type { Viewport } from '@platform/camera';
 
-const VIEW: Viewport = { width: 1280, height: 800, originX: 0, originY: 0 };
+/**
+ * A window big enough to contain the whole 2400×2400 arena, so nothing is culled.
+ *
+ * Since a1-12 the renderer submits only what is on screen, and every assertion
+ * below is about the **pooling** — how many textures a 200-rock field costs, that
+ * a steady frame bakes nothing, that a pooled sprite carries the transform its
+ * `Graphics` carried. Shooting them through a real 1280×800 window would ask
+ * those questions of the 75 rocks that happen to be visible, which is a weaker
+ * version of each one and would make the texture budget move whenever the field
+ * seeding did. The cull has its own suite (`./cull.test.ts`) and its own numbers
+ * (`./draw-cost.test.ts`); this file deliberately takes it out of the picture.
+ */
+const VIEW: Viewport = { width: 6000, height: 6000, originX: 0, originY: 0 };
 
 /** A baker that records every bake and returns a blank texture of the requested
  *  frame — the production `generateTexture` contract, minus the raster. */

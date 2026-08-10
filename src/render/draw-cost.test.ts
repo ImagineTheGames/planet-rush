@@ -1,40 +1,44 @@
 /**
- * Draw-cost characterisation (a1-10, `docs/atlas-pooling-measured.md`).
+ * Draw-cost characterisation (a1-10 → a1-11 → a1-12).
  * OWNER: Platform Engineer.
  *
  * This suite asserts what the renderer costs **today**, on purpose, because the
- * cost is now a measured number attached to a deferred decision — and a deferred
- * decision written only in a document is how `src/art/atlas.ts` came to carry a
- * pooling claim for a whole milestone with nothing calling it (a1-09).
+ * cost is a measured number attached to a decision — and a decision written only
+ * in a document is how `src/art/atlas.ts` came to carry a pooling claim for a
+ * whole milestone with nothing calling it (a1-09).
  *
- * The measurement (see the doc for the box and the method) found two things:
+ * a1-10 measured two things on the GDD §4.3 stress scene and fixed neither:
  *
- *  1. The renderer submits **one display object per entity**. On the GDD §4.3
- *     stress scene that is ~263 draw calls a frame, and putting the same looks
- *     through `SpriteTextureCache` instead collapses the 200-rock layer from 200
- *     draw calls to 1.8 and its cost from 26.1 ms to 3.9 ms.
- *  2. Almost none of those entities are **on screen**. The arena is 2400×2400
+ *  1. The renderer submitted **one display object per entity**, ~263 draw calls
+ *     a frame, because every body drew its own `Graphics`.
+ *  2. Almost none of those entities were **on screen**. The arena is 2400×2400
  *     (or 3200×2000); a desktop window sees a 1280×800 slice of it and a
- *     landscape phone sees 844×390. Nothing in this layer culls.
+ *     landscape phone sees 844×390. Nothing in this layer culled.
  *
- * Neither was fixed under a1-10: the pooled path rasterises vector art, which
- * moves the frozen-scene goldens, and that brief's own guard rail forbids it.
- * So the numbers are pinned here instead, where CI reads them.
+ * **(1) is fixed — a1-11 wired the pooling** (`./pooling.test.ts`,
+ * `docs/atlas-pooling-wired.md`): 263 draw calls → 32.1, median frame 96.9 ms →
+ * 53.1 ms, and still not under budget.
  *
- * **(1) IS FIXED — a1-11 wired the pooling, with the golden constraint lifted.**
- * Rocks, turrets and shots are pooled `Sprite`s over shared textures now, so the
- * *draw calls* those layers cost collapsed (see the doc's revised table and
- * `./pooling.test.ts`, which asserts the sharing on the shipped renderer). What
- * this file measures is **display objects, not draw calls**, and that number is
- * unchanged and still worth pinning: the renderer still walks every entity in
- * the arena every frame, and (2) — that almost none of them are on screen — is
- * exactly as true as it was. That is what a1-10 §6A is for and it has not landed.
+ * **(2) is fixed — a1-12 culls to the viewport** (`./cull.ts`,
+ * `./cull.test.ts`, `docs/viewport-cull-measured.md`). What this file pins is the
+ * *shape* that produced: the entity layers now submit what the window contains
+ * and not the arena, and the phone — the tighter gate — submits a small fraction
+ * of what the desktop does off the very same field.
+ *
+ * The two bounds below are a **sandwich**, deliberately, rather than a
+ * re-implementation of `./cull.ts` in test code (which would assert only that
+ * the file equals itself):
+ *
+ *   - the lower bound is every body whose own collision radius touches the
+ *     window — nothing genuinely visible may be missing;
+ *   - the upper bound inflates each radius by the widest art extent any of these
+ *     layers wears, so nothing beyond the reach of its own art may be present.
  *
  * **If you are here because this test failed: good.** It means the shape of the
  * frame changed. Do not loosen the assertion — re-run
- * `node spikes/atlas-pooling/run.mjs`, update `docs/atlas-pooling-measured.md`
- * with the new numbers, and update the constants below to match what you
- * measured. The test exists to make that re-measurement unskippable.
+ * `node spikes/atlas-pooling/run.mjs`, update the measurement docs with the new
+ * numbers, and update the constants below to match what you measured. The test
+ * exists to make that re-measurement unskippable.
  *
  * Headless, still: a1-10 flagged that baking needs a live `generateTexture` and
  * that paying for it with a second, Graphics-shaped fallback path would be worse
@@ -46,6 +50,7 @@ import { Container } from 'pixi.js';
 import { stressWorld, STRESS_SCENE } from '../../harness/perf';
 import type { World } from '../sim';
 import { Renderer } from './index';
+import { CULL_SLOP, RENDER_EXTENT } from './cull';
 import type { Viewport } from '@platform/camera';
 
 /** The desktop gate's window (GDD §4.3, and `tests/perf/playwright.perf.config.ts`). */
@@ -57,6 +62,11 @@ const PHONE: Viewport = { width: 844, height: 390, originX: 0, originY: 0 };
  *  scene. The backdrop and the boundary are a fixed handful and are excluded so
  *  the ratio below is about entities, not chrome. */
 const ENTITY_LAYERS = ['asteroids', 'chunks', 'ships', 'turrets', 'shots'] as const;
+
+/** The widest art any of those layers wears, times the bake slop — the upper
+ *  bound on how far past its collision radius a body in them can reach. It is
+ *  the turret, whose extent deliberately tracks its muzzle telegraph. */
+const WIDEST_REACH = Math.max(...Object.values(RENDER_EXTENT)) * CULL_SLOP;
 
 function drawOnce(world: World, viewport: Viewport): Container {
   const stage = new Container();
@@ -72,9 +82,10 @@ function layer(stage: Container, label: string): Container {
 }
 
 /** Display objects the renderer left visible in the entity layers — i.e. what it
- *  walks and transforms. Since a1-11 the dense ones batch, so this is no longer a
- *  draw-call count; it is still the per-frame CPU walk, and it is still the whole
- *  arena. Pooled-but-hidden children do not count; they cost nothing. */
+ *  hands the GPU. Since a1-11 the dense ones batch, so this is no longer a
+ *  draw-call count; it is the per-frame walk and the batch geometry, and since
+ *  a1-12 it is the window rather than the arena. Pooled-but-hidden children do
+ *  not count; they cost nothing. */
 function submitted(stage: Container): number {
   let n = 0;
   for (const label of ENTITY_LAYERS) {
@@ -84,11 +95,12 @@ function submitted(stage: Container): number {
 }
 
 /**
- * Entities whose drawn extent intersects the visible viewport this frame —
- * inflated by each body's own radius, so anything straddling an edge counts as
- * on screen. This is the number a culling pass would submit.
+ * Entities whose extent intersects the visible viewport this frame, each body
+ * inflated by `pad` times its own collision radius. `pad = 1` is the minimum
+ * that can possibly show a pixel; a larger `pad` is the generous reading that
+ * accounts for art overhanging the collider.
  */
-function onScreen(world: World, viewport: Viewport): number {
+function onScreen(world: World, viewport: Viewport, pad: number): number {
   // The camera puts the target ship at the visible centre, so the visible world
   // rectangle is that centre plus/minus half the viewport (camera.ts; the camera
   // is translate-only, no zoom, so world units are CSS px).
@@ -98,7 +110,7 @@ function onScreen(world: World, viewport: Viewport): number {
   const top = target.pos.y - viewport.height / 2;
   const bottom = target.pos.y + viewport.height / 2;
   const hit = (x: number, y: number, r: number): boolean =>
-    x + r >= left && x - r <= right && y + r >= top && y - r <= bottom;
+    x + r * pad >= left && x - r * pad <= right && y + r * pad >= top && y - r * pad <= bottom;
 
   let n = 0;
   for (const a of world.asteroids) if (hit(a.pos.x, a.pos.y, a.radius)) n++;
@@ -111,45 +123,67 @@ function onScreen(world: World, viewport: Viewport): number {
   return n;
 }
 
-describe('draw cost on the GDD §4.3 stress scene (a1-10 characterisation)', () => {
-  it('walks one display object per entity, on-screen or not', () => {
-    const world = stressWorld();
-    const entities =
-      world.asteroids.length +
-      world.chunks.length +
-      world.ships.filter((s) => s.alive).length +
-      world.stations.reduce((n, s) => n + s.turrets.filter((t) => t.hp > 0).length, 0) +
-      world.projectiles.filter((p) => p.active).length;
+/** Every entity in the arena, on screen or not — what the layer used to walk. */
+function entityCount(world: World): number {
+  return (
+    world.asteroids.length +
+    world.chunks.length +
+    world.ships.filter((s) => s.alive).length +
+    world.stations.reduce((n, s) => n + s.turrets.filter((t) => t.hp > 0).length, 0) +
+    world.projectiles.filter((p) => p.active).length
+  );
+}
 
-    expect(entities).toBeGreaterThanOrEqual(STRESS_SCENE.asteroids);
-    expect(
-      submitted(drawOnce(world, DESKTOP)),
-      'the renderer walks one display object per entity; if this changed, re-measure (see the file header)',
-    ).toBe(entities);
+describe('draw cost on the GDD §4.3 stress scene', () => {
+  it('submits the window, not the arena', () => {
+    const world = stressWorld();
+    expect(entityCount(world)).toBeGreaterThanOrEqual(STRESS_SCENE.asteroids);
+
+    const drawn = submitted(drawOnce(world, DESKTOP));
+
+    // The sandwich. Below the floor something visible went missing — that is the
+    // bug this whole change is most likely to introduce, and it is a bug even if
+    // it makes the numbers look better. Above the ceiling the cull is not culling.
+    expect(drawn, 'a body touching the window must be submitted').toBeGreaterThanOrEqual(
+      onScreen(world, DESKTOP, 1),
+    );
+    expect(drawn, 'a body beyond the reach of its own art must not be').toBeLessThanOrEqual(
+      onScreen(world, DESKTOP, WIDEST_REACH),
+    );
+
+    // …and the whole point: it is a fraction of the field, not the field.
+    expect(drawn).toBeLessThan(entityCount(world) / 2);
   });
 
-  it('draws the whole arena every frame, most of it off screen', () => {
+  it('is best on the phone, which is the tighter gate', () => {
     const world = stressWorld();
-    const stage = drawOnce(world, DESKTOP);
-    const drawn = submitted(stage);
-    const visible = onScreen(world, DESKTOP);
+    const phone = submitted(drawOnce(world, PHONE));
+    const desktop = submitted(drawOnce(world, DESKTOP));
 
-    // The measured fact, pinned: the renderer submits several times what the
-    // window contains. The bound is deliberately loose — this test is here to
-    // notice a culling pass landing, not to police the field's exact seeding.
-    expect(visible).toBeLessThan(drawn);
-    expect(
-      drawn / visible,
-      'off-screen submissions per on-screen one; a culling pass would drive this to ~1',
-    ).toBeGreaterThan(2);
-  });
-
-  it('is worse on the phone, which is the tighter gate', () => {
-    const world = stressWorld();
     // A landscape phone sees 844×390 of the same arena — under a third of the
-    // desktop window's area — so the same field costs the same submissions for
-    // far fewer visible bodies. The mobile gate (GDD §4.3) is the binding one.
-    expect(onScreen(world, PHONE)).toBeLessThan(onScreen(world, DESKTOP));
-    expect(submitted(drawOnce(world, PHONE))).toBe(submitted(drawOnce(world, DESKTOP)));
+    // desktop window's area. Before a1-12 these two numbers were EQUAL, and that
+    // equality was the finding: the same field cost the same submissions however
+    // little of it the device could show. The mobile gate (GDD §4.3) is the
+    // binding one, and it is where the cull pays most.
+    expect(phone).toBeLessThan(desktop);
+    expect(phone, 'a body touching the phone window must be submitted').toBeGreaterThanOrEqual(
+      onScreen(world, PHONE, 1),
+    );
+    expect(phone, 'a body beyond the reach of its own art must not be').toBeLessThanOrEqual(
+      onScreen(world, PHONE, WIDEST_REACH),
+    );
+  });
+
+  it('keeps the pooled slots it is not using — hidden, not destroyed', () => {
+    const world = stressWorld();
+    const stage = drawOnce(world, PHONE);
+
+    // The cull hides; it does not tear the pool down and rebuild it when the
+    // camera pans back (GDD §4.3, zero per-frame allocation). Rocks the phone
+    // could not show still occupy no draw and no bake — but the ones it showed
+    // once keep their slot.
+    const rocks = layer(stage, 'asteroids');
+    expect(rocks.children.length).toBeGreaterThan(0);
+    expect(rocks.children.filter((c) => c.visible).length).toBeLessThan(world.asteroids.length);
   });
 });
