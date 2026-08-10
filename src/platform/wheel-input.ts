@@ -23,32 +23,53 @@
  * at twelve o'clock, the rest clockwise — and `wheel-input.test.ts` pins it
  * against `src/ui`'s `segmentAtDirection` across a full sweep, so the two cannot
  * drift apart without a red test.
+ *
+ * The *radial* half of that geometry is not mirrored at all any more: since
+ * u13-01 the hub's radius is read from `src/art/materials`' wheel profile — the
+ * table `src/ui/build-wheel-view.ts` draws the hub disc from — so what the player
+ * presses and what the player sees are one number rather than two that have to
+ * be kept in step (see {@link hubRadius}). The drawn wheel is the truth; this
+ * follows it.
  */
 
 import type { BuildItem, UpgradeTrack } from '@shared/types';
+import { wheelMetrics } from '../art/materials';
 import type { ControlState } from './actions';
 
 // ---------------------------------------------------------------------------
-// Geometry (mirrors src/ui/build-wheel-view.ts, which does not export it)
+// Geometry — READ from the profile the wheel is drawn from, never copied
 // ---------------------------------------------------------------------------
 
 /**
- * Inner edge of the segment ring, as a fraction of the outer ring. Everything
- * inside it — the hub disc where the live ore total is printed, and the gap
- * around it — is a miss, not a purchase.
+ * Inner edge of the segment ring in CSS px: the hub disc where the live ore
+ * total is printed. Everything inside it is a miss, not a purchase — and since
+ * u13-01 "inside it" means *exactly* what the player can see, because this reads
+ * the same `wheelMetrics().hub` that `src/ui/build-wheel-view.ts` sizes the
+ * painted disc from (`const inner = r * m.hub`).
  *
- * There used to be a second constant here, `HUB_FRACTION = 0.22`, for the hub
- * disc alone. `tools/dark-matter-scan.mjs` found it with zero references of any
- * kind, including from this module's own spec, and triage (a1-09) found it was
- * worse than unused: it mirrored a `src/ui/build-wheel-view.ts` geometry that no
- * longer exists. That file now draws "a 150 px hub inside a 470 px disc, so
- * there is one number rather than two" — 0.319. A stale mirror of a number the
- * other side has already merged away is the drift this module's spec exists to
- * catch, so it is gone rather than corrected: input hit-tests, it does not draw,
- * and the only radius it needs is the one below. `hitWheel`'s spec pins the hub
- * as a miss by behaviour, which is what the deleted constant was documenting.
+ * **Why this is an import and not a number.** It used to be `INNER_FRACTION =
+ * 0.3`, written here by hand, while the wheel was painted to 0.319 — "a 150 px
+ * hub inside a 470 px disc". The ~4.5 px annulus between the two looked like hub
+ * and hit-tested as a wedge, so a thumb landing on the ore total bought a turret
+ * (u13-01). The tempting fix — change 0.3 to 0.319 — is the bug again: a1-09 had
+ * just deleted `HUB_FRACTION = 0.22` from this module for being exactly that, "a
+ * stale mirror of a number the other side has already merged away". Two numbers
+ * that must agree, kept in step by hand, is the whole failure mode; one number,
+ * read, is the fix.
+ *
+ * It is also not a constant to copy. `wheelMetrics` interpolates the hub between
+ * the phone profile (0.32) and the desktop one (0.319), so the fraction depends
+ * on the radius the wheel was actually drawn at, and any single hand-written
+ * value is wrong at one end on the day it is written.
+ *
+ * `src/art/materials` is a leaf — a table of numbers over `./palette` and
+ * `./tokens`, with no DOM, no PixiJS, no `src/sim` and, crucially, no
+ * `@platform`, so this edge is not the cycle importing `src/ui` would be. The
+ * module header's rule is unchanged: input hit-tests, it does not draw.
  */
-export const INNER_FRACTION = 0.3;
+export function hubRadius(radius: number): number {
+  return radius * wheelMetrics(radius).hub;
+}
 
 /** Where the panel's first row starts, measured down from the panel's top edge —
  *  `PANEL_CHROME_HEIGHT`'s title + header block as `build-wheel-view` lays it
@@ -117,7 +138,7 @@ export function hitWheel(x: number, y: number, layout: WheelLayout): WheelHit {
   const dy = y - layout.centerY;
   const d2 = dx * dx + dy * dy;
   if (d2 > layout.radius * layout.radius) return { kind: 'outside' };
-  const inner = layout.radius * INNER_FRACTION;
+  const inner = hubRadius(layout.radius);
   if (d2 < inner * inner) return { kind: 'hub' };
   const index = segmentIndexAt(dx, dy, layout.segments, inner);
   return index === null ? { kind: 'hub' } : { kind: 'segment', index };

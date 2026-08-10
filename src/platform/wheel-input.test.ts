@@ -16,10 +16,11 @@ import {
   hitPanel,
   hitWheel,
   segmentIndexAt,
-  INNER_FRACTION,
+  hubRadius,
   PANEL_ROWS_TOP,
 } from './wheel-input';
 import { WHEEL_ORDER, segmentAtDirection } from '../ui';
+import { wheelMetrics } from '../art/materials';
 
 const WHEEL = { centerX: 200, centerY: 150, radius: 100, segments: WHEEL_ORDER.length };
 const PANEL = { centerX: 200, centerY: 150, width: 300, height: 212, rowHeight: 30, rows: 4 };
@@ -55,7 +56,7 @@ describe('hitWheel', () => {
 
   it('reads the hub as a miss, never as a purchase', () => {
     expect(hitWheel(200, 150, WHEEL).kind).toBe('hub');
-    const justInside = WHEEL.radius * INNER_FRACTION - 1;
+    const justInside = hubRadius(WHEEL.radius) - 1;
     expect(hitWheel(200, 150 - justInside, WHEEL).kind).toBe('hub');
   });
 
@@ -66,8 +67,8 @@ describe('hitWheel', () => {
     // one number. This is the guard against it coming back: the behaviour the
     // constant was describing is asserted here, at every radius it covered, so
     // re-introducing a separate hub radius has to survive these presses rather
-    // than merely compile. The wheel's dead centre is `INNER_FRACTION` and only
-    // `INNER_FRACTION`.
+    // than merely compile. The wheel's dead centre is the hub the wheel is drawn
+    // with, and only that.
     for (const fraction of [0, 0.1, 0.22, 0.29]) {
       const r = WHEEL.radius * fraction;
       expect(hitWheel(200, 150 - r, WHEEL).kind, `at ${fraction}r`).toBe('hub');
@@ -75,10 +76,60 @@ describe('hitWheel', () => {
     }
     // …and the first ring radius outside it still buys, so the guard above is
     // pinning a boundary rather than a wheel that refuses every press.
-    expect(hitWheel(200, 150 - WHEEL.radius * 0.31, WHEEL)).toEqual({
+    //
+    // MOVED, DELIBERATELY (u13-01): this line read `0.31` until the hit boundary
+    // was moved onto the drawn one. 0.31r was never "the first radius outside the
+    // hub" — it sat *inside* the disputed 0.300–0.319 band, i.e. inside the
+    // painted hub, and it asserted `segment` because that is what the code did,
+    // not because that is what the wheel showed. It is the bug this guard was
+    // written beside rather than a second guard, so it moves out to 0.33r, which
+    // is on the ring under every profile; 0.31r's new answer — `hub` — is pinned
+    // by name in the u13-01 cases below, so nothing that this line used to cover
+    // is now uncovered.
+    expect(hitWheel(200, 150 - WHEEL.radius * 0.33, WHEEL)).toEqual({
       kind: 'segment',
       index: 0,
     });
+    expect(hitWheel(200, 150 - WHEEL.radius * 0.31, WHEEL).kind).toBe('hub');
+  });
+
+  it('reads the drawn hub\'s rim as hub, not as a purchase (u13-01)', () => {
+    // The band this brief exists for. The hub is DRAWN to `wheelMetrics().hub`
+    // of the radius — 0.319 at the desktop reference, 0.32 at the phone's — and
+    // the hit-test used to stop at a hand-written 0.300, so the outermost ~4.5 px
+    // of the painted hub disc bought a wedge. A thumb is bigger than that band,
+    // and the wedge it bought was a real purchase off the player's ore.
+    for (const fraction of [0.305, 0.315]) {
+      const r = WHEEL.radius * fraction;
+      // More than one axis: the annulus is a ring, not a point at twelve o'clock.
+      expect(hitWheel(200, 150 - r, WHEEL).kind, `up at ${fraction}r`).toBe('hub');
+      expect(hitWheel(200 + r, 150, WHEEL).kind, `right at ${fraction}r`).toBe('hub');
+      expect(hitWheel(200, 150 + r, WHEEL).kind, `down at ${fraction}r`).toBe('hub');
+      expect(hitWheel(200 - r, 150, WHEEL).kind, `left at ${fraction}r`).toBe('hub');
+    }
+  });
+
+  it('puts the boundary exactly where the wheel is drawn (u13-01)', () => {
+    // From both sides of the drawn hub's rim, at the test wheel's radius.
+    expect(hitWheel(200, 150 - WHEEL.radius * 0.318, WHEEL).kind).toBe('hub');
+    expect(hitWheel(200, 150 - WHEEL.radius * 0.321, WHEEL).kind).toBe('segment');
+  });
+
+  it('takes its dead zone from the profile the wheel is DRAWN from (u13-01)', () => {
+    // The point of the fix: not "0.319 written down twice" but one number, read
+    // from `src/art/materials`' wheel profile — the same table
+    // `src/ui/build-wheel-view.ts` sizes its hub disc from. The fraction is not
+    // constant across devices (0.32 on a phone, 0.319 on the desktop reference,
+    // interpolated between), so a copied constant would be wrong at one end even
+    // on the day it was copied.
+    for (const radius of [80, 140, 188, 235, 400]) {
+      const layout = { ...WHEEL, radius };
+      const drawn = radius * wheelMetrics(radius).hub;
+      expect(hitWheel(200, 150 - (drawn - 0.5), layout).kind, `inside at r=${radius}`).toBe('hub');
+      expect(hitWheel(200, 150 - (drawn + 0.5), layout).kind, `outside at r=${radius}`).toBe(
+        'segment',
+      );
+    }
   });
 
   it('lands a press on the ring on the segment drawn there', () => {
