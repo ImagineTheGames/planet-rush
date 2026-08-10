@@ -3,6 +3,10 @@
 **a1-09 · Platform Engineer · 2026-08-10 · every number below is reproducible
 with `npm run dark-matter` on this branch**
 
+**Corrected by a1-14 (2026-08-10): §4.3 recommended deleting a live module.
+[§4.0](#40-correction--a-dead-row-that-was-not-dead-a1-14-2026-08-10) is the
+correction and the post-mortem — the scan was right, the triage was not.**
+
 `matchAbundance` (`src/sim/match-config.ts`) is three lines,
 correct, and tested. Its entire job is applying the ratified SCARCE default. It
 had zero non-test callers: production read `config.abundance` raw, which
@@ -26,6 +30,7 @@ npm run dark-matter              # the candidate list, grouped by verdict hint
 npm run dark-matter -- --modules # per-module rollup + the modules nothing boots
 npm run dark-matter -- --json    # machine-readable
 npm run dark-matter:check        # the CI gate: exit 1 on a NEW dark export
+npm run dark-matter:audit        # hold this file's verdicts to the numbers (§4.0)
 ```
 
 For every `export` declared under `src/`, it counts references from production
@@ -84,11 +89,131 @@ interface exported for one caller to spell a parameter is not a wiring failure.
 ## 4. Triage
 
 Every one of the 278 carries its verdict in `tools/dark-matter-allowlist.json`,
-one line each. The sections below are the reasoning. **§4.1 is verified** — I
+one line each. The sections below are the reasoning. **§4.0 is a correction to
+§4.3 and supersedes it where they disagree.** **§4.1 is verified** — I
 read the production path for each and it either does the work itself or does not
 do it at all. **§4.2 is the same shape but confirmed only by the scan**, and is
 flagged for its owner rather than asserted. **§4.4 is triaged by pattern**, and
 says so.
+
+### 4.0 CORRECTION — a DEAD row that was not dead (a1-14, 2026-08-10)
+
+**Read this before §4.3.** One row in the DEAD table recommended deleting a live
+feature. `n7-01` caught it while doing the deleting, and left the module alone
+rather than editing this file. The row as it shipped:
+
+> | `src/net/connect-trace-view.ts` (2) | its own header says it "is no longer a panel of its own" |
+
+**What that module actually is.** It puts **RETRY and DOWNLOAD LOG under the
+title of a connecting screen that just failed** — the developer's ask, *"with
+RETRY and the log right there"*. It is DOM rather than PixiJS on purpose: the
+moments it exists for are a socket that never opened and a join the server
+refused, when the renderer may not be drawing at all. It is installed at boot and
+driven from `src/main.ts`'s connect state machine, through the `src/net` barrel:
+
+| Site (at `ecc1496`) | Call |
+|---|---|
+| `src/main.ts:365-367` | imports `hideConnectTrace`, `installConnectTraceView`, `showConnectTrace` from `./net` |
+| `src/main.ts:6804` | `installConnectTraceView({…})` — the boot install |
+| `src/main.ts:6831`, `:6864` | `showConnectTrace(…)` — per trace step, and on the re-render timer |
+| `src/main.ts:6911` | `hideConnectTrace()` — in `endConnectTrace` |
+
+Its `TraceDom` / `TraceElement` types are imported by `src/net/link-loss-view.ts`,
+`src/net/local-revert-view.ts` and `src/net/link-loss-attach.ts` — the module
+`n6-01` wired into the match's boot path. Deleting this file takes the CONNECTION
+LOST overlay down with it. *(`n7-01` read the call sites at `:6790`, `:6817`,
+`:6850` and `:6897`; `a1-11` has moved `main.ts` under them since. The line
+numbers rot — the scan's `prodSites`, below, do not.)*
+
+**The scan was right. The triage was wrong.** This is the important half, so it
+is worth being exact about. Re-run at `ecc1496`, the scan's own numbers for that
+file are:
+
+```
+src/net/connect-trace-view.ts  — 14 exports, 5 live, 2 dark, 7 self-used
+    installConnectTraceView   prod:1  → live      (src/main.ts)
+    showConnectTrace          prod:2  → live      (src/main.ts)
+    hideConnectTrace          prod:1  → live      (src/main.ts)
+    TraceDom                  prod:3  → live      (link-loss-view, link-loss-attach, local-revert-view)
+    TraceElement              prod:3  → live      (link-loss-view, local-revert-view)
+    connectTraceView          prod:0 test:0 self:0  → dark, unreferenced
+    resetConnectTraceView     prod:0 test:0 self:0  → dark, unreferenced
+```
+
+The reachability walk did not miss the module: it resolved five of its exports to
+production call sites and named them. **There is no bug in
+`tools/dark-matter-scan.mjs` here, and so no other row can share one.** The two
+exports it did flag — an accessor and a teardown seam with zero references of any
+kind, not even from the module's own spec — are genuinely dark, and `n7-01`
+deleted exactly those two.
+
+What went wrong is one step later, in this document. The triage:
+
+1. **Wrote the verdict from the header instead of from the numbers.** The header
+   sentence is *true* — that panel is gone, folded into the connecting screen's
+   title line by `connectTitleLine`. It describes a **panel that became two
+   buttons**, not a module that died. A file's prose says what it used to be;
+   only the call sites say whether it still runs, and they were in the same
+   report, one column over.
+2. **Filed two symbol findings as one module row.** Every other DEAD row is
+   honestly scoped — the spike row names three files that are dead entire, the
+   `vec.ts` row names four members of a live file. This row put a bare module
+   path under a heading reading *"safe to delete"*, and a reader deletes what the
+   row names. The `(2)` was doing all the load-bearing work and none of the
+   reading.
+
+A human misreading a header is not fixable in code, and pretending otherwise
+would be the second wrong claim in this section. What *is* fixable is the shape
+that misreading leaves behind — a DEAD verdict written next to symbols in a file
+whose other exports the same scan calls live. `npm run dark-matter:audit`
+(`--audit`) now looks for it. It reports and never fails; it is a prompt to
+re-read a row, not a gate:
+
+```
+VERDICTS TO RE-READ: 2 modules carry a DEAD verdict and still have exports production calls.
+      The verdict may still be right about the symbols it names — but it is
+      not right about the file, and a reader will take it for the file.
+
+      src/net/connect-trace-view.ts  — 2 marked DEAD, 5 live
+        LIVE  TraceElement (prod:3 — src/net/link-loss-view.ts, src/net/local-revert-view.ts)
+        LIVE  TraceDom (prod:3 — src/net/link-loss-view.ts, src/net/link-loss-attach.ts, src/net/local-revert-view.ts)
+        LIVE  installConnectTraceView (prod:1 — src/main.ts)
+        LIVE  showConnectTrace (prod:2 — src/main.ts)
+        LIVE  hideConnectTrace (prod:1 — src/main.ts)
+
+      src/sim/vec.ts  — 4 marked DEAD, 3 live
+        LIVE  dist2 (prod:19 — src/sim/projectiles.ts)
+        LIVE  normalize (prod:6 — src/sim/projectiles.ts, src/sim/step.ts)
+        LIVE  turnToward (prod:2 — src/sim/buildings.ts)
+```
+
+Note that it flags `vec.ts` too, and `vec.ts`'s row is **correct** — see the
+re-check below. That is the honest limit of what a tool can do here: the two rows
+are indistinguishable to it, and differ only in how they were written down. It
+narrows "re-read the section" to "re-read these two rows", which is the whole of
+the help available.
+
+**Every DEAD row re-checked, then.** The section had one wrong row, so its method
+is suspect until each is checked the way `n7-01` checked that one — against the
+call sites, not against the prose:
+
+| Row | Re-checked at `ecc1496` | Verdict |
+|---|---|---|
+| `src/net/spike/{bench,sim-standin,snapshot}.ts` (13 gated) | all 20 exports of the three files: `prod:0`, and no entry point reaches them | **stands.** Correctly scoped: the files *are* dead entire. `n7-01` deleted them |
+| `src/sim/vec.ts` — `vec`, `len2`, `dist`, `dot` (4) | all four `prod:0 test:0 self:0`, `unreferenced`. `dist2` (prod:19), `normalize` (prod:6), `turnToward` (prod:2) are live | **stands**, with one correction below |
+| ~~`src/net/connect-trace-view.ts` (2)~~ | above | **withdrawn.** The module is live; the two symbols were dark and are gone |
+
+The `vec.ts` correction is small and is the same error in miniature: the row's
+aside said "(`len`, `dist2` are live)". `dist2` is live. **`len` is not** — it has
+`prod:0 test:0 self:1` and is `self-used`, called only by `normalize` inside
+`vec.ts`. The code runs; nothing outside the module calls it, so the `export` is
+wider than the use. Worth saying because `vec.ts`'s own header makes the claim
+that fooled §4.3 the first time — *"`len`/`dist` exist for geometry that
+genuinely needs a magnitude"* — and this time the numbers were believed over the
+prose, which is why that row is right.
+
+The row is corrected in place below rather than deleted, so the next reader knows
+it was checked and what it looked like when it looked dead.
 
 ### 4.1 DARK — should be called, and is not (verified)
 
@@ -185,11 +310,16 @@ in two comments and calls it zero times. That is the family in one line.
 
 ### 4.3 DEAD — safe to delete, by its owner
 
+**This table shipped with a wrong row, withdrawn in §4.0 — read that first.** It
+named a whole module, under this heading, for a file that is installed at boot
+and called three times from `src/main.ts`. What is left below has been re-checked
+against call sites rather than headers (§4.0), and each row now says how much it
+claims: a file, or named members of a live file.
+
 | Module / symbol | Why |
 |---|---|
-| `src/net/spike/{bench,sim-standin,snapshot}.ts` (15) | the day-0 netcode spike, superseded by `src/net/snapshot.ts`; unreachable |
-| `src/sim/vec.ts` — `vec`, `len2`, `dist`, `dot` (4) | unused members of the vector helpers (`len`, `dist2` are live) |
-| `src/net/connect-trace-view.ts` (2) | its own header says it "is no longer a panel of its own" |
+| **the whole file** — `src/net/spike/{bench,sim-standin,snapshot}.ts` (13 gated, 20 exports) | the day-0 netcode spike, superseded by `src/net/snapshot.ts`. Every export `prod:0`, no entry point reaches any of the three. Deleted by `n7-01` |
+| **these members only** — `src/sim/vec.ts` — `vec`, `len2`, `dist`, `dot` (4) | four unreferenced members of a **live** module: `dist2`, `normalize` and `turnToward` are called from production, and `len` runs inside `normalize`. Delete the four; the file stays |
 | ~~`src/platform/wheel-input.ts#HUB_FRACTION`~~ | **deleted in this branch** — see below |
 
 **One deletion, and only one.** `HUB_FRACTION = 0.22` had zero references of any
@@ -206,7 +336,9 @@ buy. Watched it fail first — setting `INNER_FRACTION` to 0.22 turns it red wit
 
 The rest are other agents' files. The scan found them; deleting them is theirs
 to do, and a dark-matter scan that turns into a deletion spree is a worse
-outcome than the dark matter.
+outcome than the dark matter. §4.0 is why that is not just caution: the one row
+here that named a whole file was wrong about it, and the owner who came to do the
+deleting is the one who noticed.
 
 **Observation, not a finding:** the hit-test's dead zone is `INNER_FRACTION`
 0.300 of the drawn radius while the hub is *drawn* at 0.319, so presses in that
@@ -271,6 +403,12 @@ reports. A check that is right a third of the time and costs one line to answer
 is worth keeping; the cost of being wrong the other two-thirds is a line of
 JSON, and the cost of not having it is `matchAbundance`, five times.
 
+**`--audit` is deliberately not in CI.** It has two hits today, both answered in
+§4.0, and it would print them on every run for as long as `vec.ts` keeps four
+dead members in a live file — a red-that-means-nothing is how the gate next to it
+would get disabled too. It is run by hand when this document is edited, or when a
+DEAD row is about to be acted on.
+
 Two things keep it from becoming noise nobody reads:
 
 - **It ignores `self-used`.** 826 value exports are called by their own module.
@@ -297,3 +435,10 @@ Stated so the report is read at the right strength:
   with a computed specifier reads as an orphan.
 - **It says nothing about whether a called thing is *correctly* called.** It
   finds "nobody calls this", which is one bug shape, not all of them.
+- **It cannot check the triage, which is the half a human writes.** §4.0 is the
+  demonstration: the scan resolved five live call sites in a module this document
+  then recommended deleting. `--audit` catches the one shape that mistake leaves
+  in the allowlist — a DEAD verdict beside symbols in a file with live exports —
+  and nothing catches a wrong DARK or a wrong SURFACE. §4.4's own warning ("the
+  section most likely to be wrong") should now be read at full strength: the one
+  section that *was* checked one row at a time still shipped a wrong row.
