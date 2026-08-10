@@ -89,19 +89,45 @@ a readiness poll using node's `fetch`, which refused a vite that was serving 200
 to curl; it navigates with the browser now, and SIGKILLs vite so a survivor on
 `--strictPort 5183` cannot break the next run.
 
+**Two traps for a resume, found in the session after the work landed:**
+
+- **The note lives in TWO places and they are not the same directory.** The brief
+  names `/status/notes/…` (absolute, 82 files, the cross-agent scratch area); the
+  committed copy is `<repo>/status/notes/…` (56 files). The session that did the
+  work updated only the repo copy, so the next session opened on the *empty
+  template* at the brief's own path and nearly re-did finished work. Write BOTH.
+  Trust the branch over any note that disagrees with it.
+- **`src/net/playtest-log.test.ts` is flaky and it is not ours.** See below.
+
 ## NEXT
 <!-- what remains, in order, and anything blocking -->
 
 Work is complete against the brief. **PR #372** is open and the branch is pushed.
 
 DoD status:
-- `npx tsc --noEmit` — **clean**.
+- `npx tsc --noEmit` — **clean** (re-verified this session).
 - `npm test -- --run` — **276 files / 4798 tests passed**, 474 s.
 - doc present on the remote branch — verified with the DoD's own
   `git cat-file -e FETCH_HEAD:docs/atlas-pooling-measured.md`.
-- PR checks — running; nothing failing. The mobile-emulation shards carry the
-  goldens, which is the real proof that "what renders" did not change, since this
-  branch touches no render behaviour at all.
+- PR checks — see the flake note below; re-run cleared it.
+
+**The one thing that went red, and why it is not this branch.** The `push`-event
+CI run on tip `f514637` failed `Typecheck, test, build` on
+`src/net/playtest-log.test.ts:336` — `expected 1 to be +0`. Proof it is a flake
+and not ours, in order of strength:
+
+1. **The `pull_request` run on the *same SHA* passed that same job.** Same code,
+   same commit, both outcomes. That is dispositive on its own.
+2. The tip commit's entire diff is one markdown note file.
+3. This branch touches no `src/net/` file (`git diff --name-only main...HEAD`).
+4. The mechanism is a real clock race in *their* file: the pre-boot fallback log
+   stamps `at` off the wall clock **before** `installPlaytestLog` swaps in the
+   fake clock, so `at` is 0 only if module-load→`recordNote` stays inside one
+   millisecond. It reads 1 when the boundary is crossed.
+
+Handled by re-running the failed job — **not** by editing `src/net/`, which is
+another agent's file. The flake is worth reporting to whoever owns m10
+(`bed5a54`, `829d280`) but fixing it is out of scope here.
 
 Nothing is blocked.
 
