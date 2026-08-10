@@ -1,0 +1,416 @@
+{
+  "label": "before-111db86",
+  "base": "http://127.0.0.1:4932",
+  "served": {
+    "sha": "111db86",
+    "time": "2026-08-10T16:01:45.886Z"
+  },
+  "viewport": {
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "deviceScaleFactor": 2
+  },
+  "maps": [
+    {
+      "id": "octagon",
+      "sky": "none",
+      "frames": {
+        "A-frozen": "octagon-A-frozen.png",
+        "no-deep": "octagon-no-deep.png",
+        "no-mid": "octagon-no-mid.png",
+        "no-near": "octagon-no-near.png",
+        "no-stars": "octagon-no-stars.png",
+        "A-frozen-again": "octagon-A-frozen-again.png"
+      },
+      "isolates": {
+        "deep": {
+          "plate": "octagon-iso-deep.png",
+          "amplify": 14,
+          "pixels": 5184000,
+          "touchedPct": 0.07,
+          "peakDelta": 57.9,
+          "meanInk": 0.0081,
+          "softPixels": 2096,
+          "corePixels": 1282,
+          "softToCore": 1.63,
+          "blobs": 117,
+          "blobMaxArea": 196,
+          "blobsOver100": 10
+        },
+        "mid": {
+          "plate": "octagon-iso-mid.png",
+          "amplify": 14,
+          "pixels": 5184000,
+          "touchedPct": 0.06,
+          "peakDelta": 119.5,
+          "meanInk": 0.0177,
+          "softPixels": 1463,
+          "corePixels": 1627,
+          "softToCore": 0.9,
+          "blobs": 63,
+          "blobMaxArea": 355,
+          "blobsOver100": 9
+        },
+        "near": {
+          "plate": "octagon-iso-near.png",
+          "amplify": 14,
+          "pixels": 5184000,
+          "touchedPct": 0.02,
+          "peakDelta": 228.1,
+          "meanInk": 0.015,
+          "softPixels": 72,
+          "corePixels": 921,
+          "softToCore": 0.08,
+          "blobs": 12,
+          "blobMaxArea": 464,
+          "blobsOver100": 1
+        },
+        "allStars": {
+          "plate": "octagon-iso-allStars.png",
+          "amplify": 14,
+          "pixels": 5184000,
+          "touchedPct": 0.16,
+          "peakDelta": 228.1,
+          "meanInk": 0.0408,
+          "softPixels": 3631,
+          "corePixels": 3830,
+          "softToCore": 0.95,
+          "blobs": 192,
+          "blobMaxArea": 464,
+          "blobsOver100": 20
+        }
+      },
+      "readback": {
+        "layers": [
+          {
+            "label": "void-stars-deep",
+            "visible": true,
+            "alpha": 1,
+            "fills": 1121,
+            "strokes": 0,
+            "stars": 795,
+            "bloomed": 163,
+            "bloomRatio": 0.205,
+            "groupSizes": {
+              "1": 632,
+              "3": 163
+            },
+            "maxHaloRadius": 4.08,
+            "maxCoreRadius": 0.95,
+            "haloAlphaMin": 0.0169,
+            "haloAlphaMax": 0.0608,
+            "haloAlphaDistinct": [
+              0.0169,
+              0.0195,
+              0.0247,
+              0.0416,
+              0.048,
+              0.0608
+            ]
+          },
+          {
+            "label": "void-stars-mid",
+            "visible": true,
+            "alpha": 1,
+            "fills": 779,
+            "strokes": 46,
+            "stars": 575,
+            "bloomed": 102,
+            "bloomRatio": 0.1774,
+            "groupSizes": {
+              "1": 473,
+              "3": 102
+            },
+            "maxHaloRadius": 5.78,
+            "maxCoreRadius": 1.35,
+            "haloAlphaMin": 0.0273,
+            "haloAlphaMax": 0.112,
+            "haloAlphaDistinct": [
+              0.0273,
+              0.0358,
+              0.0455,
+              0.0672,
+              0.088,
+              0.112
+            ]
+          },
+          {
+            "label": "void-stars-near",
+            "visible": true,
+            "alpha": 1,
+            "fills": 362,
+            "strokes": 112,
+            "stars": 254,
+            "bloomed": 54,
+            "bloomRatio": 0.2126,
+            "groupSizes": {
+              "1": 200,
+              "3": 54
+            },
+            "maxHaloRadius": 9.24,
+            "maxCoreRadius": 2.19,
+            "haloAlphaMin": 0.0416,
+            "haloAlphaMax": 0.1472,
+            "haloAlphaDistinct": [
+              0.0416,
+              0.0572,
+              0.0598,
+              0.1024,
+              0.1408,
+              0.1472
+            ]
+          }
+        ],
+        "order": [
+          "void-ground",
+          "void-stars-deep",
+          "void-stars-mid",
+          "void-stars-near"
+        ],
+        "build": "111db86",
+        "prKeys": [
+          "shipScreen",
+          "shipWorld",
+          "viewport",
+          "fps",
+          "build",
+          "ticks",
+          "input",
+          "muzzles",
+          "stageCombat",
+          "damageShip",
+          "damageCore",
+          "coreHp",
+          "layout",
+          "resolveAnchor",
+          "placement",
+          "frozen",
+          "freezeTick",
+          "worldHash"
+        ],
+        "frozen": true,
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        },
+        "reduceVfx": null
+      },
+      "nullControl": {
+        "plate": "octagon-iso-null.png",
+        "amplify": 14,
+        "pixels": 5184000,
+        "touchedPct": 0,
+        "peakDelta": 0,
+        "meanInk": 0,
+        "softPixels": 0,
+        "corePixels": 0,
+        "softToCore": null,
+        "blobs": 0,
+        "blobMaxArea": 0,
+        "blobsOver100": 0
+      }
+    },
+    {
+      "id": "line",
+      "sky": "deepEmber",
+      "frames": {
+        "A-frozen": "line-A-frozen.png",
+        "no-deep": "line-no-deep.png",
+        "no-mid": "line-no-mid.png",
+        "no-near": "line-no-near.png",
+        "no-stars": "line-no-stars.png",
+        "A-frozen-again": "line-A-frozen-again.png"
+      },
+      "isolates": {
+        "deep": {
+          "plate": "line-iso-deep.png",
+          "amplify": 14,
+          "pixels": 5184000,
+          "touchedPct": 0.08,
+          "peakDelta": 57.9,
+          "meanInk": 0.0086,
+          "softPixels": 2553,
+          "corePixels": 1327,
+          "softToCore": 1.92,
+          "blobs": 117,
+          "blobMaxArea": 193,
+          "blobsOver100": 13
+        },
+        "mid": {
+          "plate": "line-iso-mid.png",
+          "amplify": 14,
+          "pixels": 5184000,
+          "touchedPct": 0.05,
+          "peakDelta": 119.5,
+          "meanInk": 0.0158,
+          "softPixels": 1104,
+          "corePixels": 1447,
+          "softToCore": 0.76,
+          "blobs": 54,
+          "blobMaxArea": 312,
+          "blobsOver100": 8
+        },
+        "near": {
+          "plate": "line-iso-near.png",
+          "amplify": 14,
+          "pixels": 5184000,
+          "touchedPct": 0.03,
+          "peakDelta": 237.8,
+          "meanInk": 0.0212,
+          "softPixels": 47,
+          "corePixels": 1250,
+          "softToCore": 0.04,
+          "blobs": 18,
+          "blobMaxArea": 464,
+          "blobsOver100": 2
+        },
+        "allStars": {
+          "plate": "line-iso-allStars.png",
+          "amplify": 14,
+          "pixels": 5184000,
+          "touchedPct": 0.16,
+          "peakDelta": 237.8,
+          "meanInk": 0.0457,
+          "softPixels": 3704,
+          "corePixels": 4024,
+          "softToCore": 0.92,
+          "blobs": 189,
+          "blobMaxArea": 464,
+          "blobsOver100": 23
+        }
+      },
+      "readback": {
+        "layers": [
+          {
+            "label": "void-stars-deep",
+            "visible": true,
+            "alpha": 1,
+            "fills": 1131,
+            "strokes": 0,
+            "stars": 803,
+            "bloomed": 164,
+            "bloomRatio": 0.2042,
+            "groupSizes": {
+              "1": 639,
+              "3": 164
+            },
+            "maxHaloRadius": 4.08,
+            "maxCoreRadius": 0.95,
+            "haloAlphaMin": 0.0169,
+            "haloAlphaMax": 0.0608,
+            "haloAlphaDistinct": [
+              0.0169,
+              0.0195,
+              0.0247,
+              0.0416,
+              0.048,
+              0.0608
+            ]
+          },
+          {
+            "label": "void-stars-mid",
+            "visible": true,
+            "alpha": 1,
+            "fills": 800,
+            "strokes": 50,
+            "stars": 590,
+            "bloomed": 105,
+            "bloomRatio": 0.178,
+            "groupSizes": {
+              "1": 485,
+              "3": 105
+            },
+            "maxHaloRadius": 5.78,
+            "maxCoreRadius": 1.35,
+            "haloAlphaMin": 0.0273,
+            "haloAlphaMax": 0.112,
+            "haloAlphaDistinct": [
+              0.0273,
+              0.0358,
+              0.0455,
+              0.0672,
+              0.088,
+              0.112
+            ]
+          },
+          {
+            "label": "void-stars-near",
+            "visible": true,
+            "alpha": 1,
+            "fills": 382,
+            "strokes": 114,
+            "stars": 266,
+            "bloomed": 58,
+            "bloomRatio": 0.218,
+            "groupSizes": {
+              "1": 208,
+              "3": 58
+            },
+            "maxHaloRadius": 9.24,
+            "maxCoreRadius": 2.19,
+            "haloAlphaMin": 0.0416,
+            "haloAlphaMax": 0.1472,
+            "haloAlphaDistinct": [
+              0.0416,
+              0.0572,
+              0.0598,
+              0.1024,
+              0.1408,
+              0.1472
+            ]
+          }
+        ],
+        "order": [
+          "void-ground",
+          "void-nebula-deepEmber",
+          "void-stars-deep",
+          "void-stars-mid",
+          "void-stars-near"
+        ],
+        "build": "111db86",
+        "prKeys": [
+          "shipScreen",
+          "shipWorld",
+          "viewport",
+          "fps",
+          "build",
+          "ticks",
+          "input",
+          "muzzles",
+          "stageCombat",
+          "damageShip",
+          "damageCore",
+          "coreHp",
+          "layout",
+          "resolveAnchor",
+          "placement",
+          "frozen",
+          "freezeTick",
+          "worldHash"
+        ],
+        "frozen": true,
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        },
+        "reduceVfx": null
+      },
+      "nullControl": {
+        "plate": "line-iso-null.png",
+        "amplify": 14,
+        "pixels": 5184000,
+        "touchedPct": 0,
+        "peakDelta": 0,
+        "meanInk": 0,
+        "softPixels": 0,
+        "corePixels": 0,
+        "softToCore": null,
+        "blobs": 0,
+        "blobMaxArea": 0,
+        "blobsOver100": 0
+      }
+    }
+  ]
+}

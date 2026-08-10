@@ -1,0 +1,81 @@
+{
+  "guard": "src/art/backdrop-bloom.test.ts",
+  "cleanTreePasses": true,
+  "mutations": [
+    {
+      "id": "suspect-1-alpha-quantised",
+      "why": "Suspect 1: \"if pooled textures bake at a different scale, or QUANTISE ALPHA, a 6% wash is exactly what disappears first while the 1px star core survives.\" Modelled at the source: round each halo alpha to one decimal, which floors every deep-layer halo (0.0169) to zero and trips the existing `if (a <= 0) continue`.",
+      "from": "      const a = round(ink.alpha * BLOOM.intensity[b]!);",
+      "to": "      const a = Math.round(ink.alpha * BLOOM.intensity[b]! * 10) / 10;",
+      "applied": true,
+      "failed": true,
+      "summary": "Tests  7 failed | 1 passed (8)",
+      "failingTests": [
+        "the bloom reaches the frame, not just the sprite definition > submits a halo for BLOOM.scatter of the stars in every layer 18ms",
+        "the bloom reaches the frame, not just the sprite definition > submits each halo at the ratified radius and the ratified alpha 12ms",
+        "nothing downstream may take the bloom back off the stage > keeps every star layer drawing when the reducer engages mid-match 8ms",
+        "nothing downstream may take the bloom back off the stage > blooms on a device that boots ALREADY throttled 2ms",
+        "nothing downstream may take the bloom back off the stage > keeps the bloom through a resize while throttled 7ms",
+        "nothing downstream may take the bloom back off the stage > blooms on a phone as well as a desktop 1ms",
+        "nothing downstream may take the bloom back off the stage > blooms on every arena, including the five that carry a sky 2ms"
+      ]
+    },
+    {
+      "id": "suspect-1b-bloom-dropped-entirely",
+      "why": "The developer's report taken at its word: the halos are not submitted at all.",
+      "from": "    if (rng.next() < BLOOM.scatter) {",
+      "to": "    if (false && rng.next() < BLOOM.scatter) {",
+      "applied": true,
+      "failed": true,
+      "summary": "Tests  6 failed | 2 passed (8)",
+      "failingTests": [
+        "the bloom reaches the frame, not just the sprite definition > submits a halo for BLOOM.scatter of the stars in every layer 17ms",
+        "nothing downstream may take the bloom back off the stage > keeps every star layer drawing when the reducer engages mid-match 6ms",
+        "nothing downstream may take the bloom back off the stage > blooms on a device that boots ALREADY throttled 4ms",
+        "nothing downstream may take the bloom back off the stage > keeps the bloom through a resize while throttled 5ms",
+        "nothing downstream may take the bloom back off the stage > blooms on a phone as well as a desktop 2ms",
+        "nothing downstream may take the bloom back off the stage > blooms on every arena, including the five that carry a sky 3ms"
+      ]
+    },
+    {
+      "id": "suspect-2-cull-reaches-the-backdrop",
+      "why": "Suspect 2: \"the cull reaching a backdrop layer it should never touch.\" Modelled as the cheapest way that would ever be written — the star layer built, then left not visible.",
+      "from": "      this.view.addChild(g);\n      this.layers.push({ gfx: g, parallax: spec.parallax });",
+      "to": "      g.visible = false;\n      this.view.addChild(g);\n      this.layers.push({ gfx: g, parallax: spec.parallax });",
+      "applied": true,
+      "failed": true,
+      "summary": "Tests  3 failed | 5 passed (8)",
+      "failingTests": [
+        "nothing downstream may take the bloom back off the stage > keeps every star layer drawing when the reducer engages mid-match 14ms",
+        "nothing downstream may take the bloom back off the stage > blooms on a device that boots ALREADY throttled 2ms",
+        "nothing downstream may take the bloom back off the stage > keeps the bloom through a resize while throttled 6ms"
+      ]
+    },
+    {
+      "id": "suspect-3-reducer-sheds-the-stars",
+      "why": "Suspect 3: reduced-VFX shedding more than it claims. `setReduceVfx` promises the stars \"near-free once baked, stay\"; this is the one-line edit that would make that comment a lie.",
+      "from": "    for (const spec of STAR_LAYERS) {",
+      "to": "    for (const spec of STAR_LAYERS) {\n      if (this.reduced && spec.key !== 'deep') continue;",
+      "applied": true,
+      "failed": true,
+      "summary": "Tests  2 failed | 6 passed (8)",
+      "failingTests": [
+        "nothing downstream may take the bloom back off the stage > blooms on a device that boots ALREADY throttled 15ms",
+        "nothing downstream may take the bloom back off the stage > keeps the bloom through a resize while throttled 4ms"
+      ]
+    },
+    {
+      "id": "bonus-halo-painted-over-the-star",
+      "why": "Not a suspect, and the easiest of the lot to do by accident: draw the halo AFTER the star instead of before. The bloom is still submitted, still at the ratified alpha, and the field looks wrong because a 16% disc now washes over every star it belongs to.",
+      "from": "    shapes.push(circle(x, y, r, fill(ink.color, 'material', ink.alpha)));",
+      "to": "    shapes.unshift(circle(x, y, r, fill(ink.color, 'material', ink.alpha)));",
+      "applied": true,
+      "failed": true,
+      "summary": "Tests  2 failed | 6 passed (8)",
+      "failingTests": [
+        "the bloom reaches the frame, not just the sprite definition > submits each halo at the ratified radius and the ratified alpha 19ms",
+        "the bloom reaches the frame, not just the sprite definition > draws the halo BEHIND the star, so the point sits on its own glow 5ms"
+      ]
+    }
+  ]
+}

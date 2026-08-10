@@ -1,0 +1,1619 @@
+{
+  "label": "live-after-ebdae99",
+  "base": "http://127.0.0.1:4931",
+  "served": {
+    "sha": "ebdae99",
+    "time": "2026-08-10T16:01:05.441Z"
+  },
+  "devices": [
+    {
+      "device": "desktop-1440x900-dpr2",
+      "samples": [
+        {
+          "order": [
+            "void-ground",
+            "void-stars-deep",
+            "void-stars-mid",
+            "void-stars-near"
+          ],
+          "voidVisible": true,
+          "voidAlpha": 1,
+          "layers": [
+            {
+              "label": "void-stars-deep",
+              "visible": true,
+              "alpha": 1,
+              "renderable": true,
+              "worldVisible": true,
+              "fills": 1121,
+              "stars": 795,
+              "bloomed": 163,
+              "bloomRatio": 0.205
+            },
+            {
+              "label": "void-stars-mid",
+              "visible": true,
+              "alpha": 1,
+              "renderable": true,
+              "worldVisible": true,
+              "fills": 779,
+              "stars": 575,
+              "bloomed": 102,
+              "bloomRatio": 0.1774
+            },
+            {
+              "label": "void-stars-near",
+              "visible": true,
+              "alpha": 1,
+              "renderable": true,
+              "worldVisible": true,
+              "fills": 362,
+              "stars": 254,
+              "bloomed": 54,
+              "bloomRatio": 0.2126
+            }
+          ],
+          "build": "ebdae99",
+          "pr": {
+            "shipScreen": {
+              "x": 720,
+              "y": 450
+            },
+            "shipWorld": {
+              "x": 1968,
+              "y": 1200
+            },
+            "viewport": {
+              "w": 1440,
+              "h": 900,
+              "width": 1440,
+              "height": 900
+            },
+            "fps": 3.658858125274133,
+            "build": {
+              "sha": "ebdae99",
+              "time": "2026-08-10T16:01:05.441Z",
+              "dirty": false
+            },
+            "ticks": 167,
+            "input": {
+              "frame": 167,
+              "types": [
+                "thrust",
+                "aim",
+                "fire",
+                "build"
+              ],
+              "fire": false,
+              "build": false,
+              "aim": true,
+              "thrust": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            "muzzles": [],
+            "stageCombat": {
+              "firingShip": 1,
+              "turret": {
+                "shooter": 1,
+                "origin": {
+                  "x": 1810.940258945177,
+                  "y": 1734.940258945177
+                },
+                "end": {
+                  "x": 1810.940258945177,
+                  "y": 1644.940258945177
+                },
+                "hit": {
+                  "x": 1810.940258945177,
+                  "y": 1644.940258945177
+                }
+              }
+            },
+            "damageShip": {
+              "op": "damageShip"
+            },
+            "damageCore": {
+              "op": "damageCore"
+            },
+            "coreHp": null,
+            "layout": [
+              {
+                "id": "ship-local",
+                "anchor": {
+                  "region": "center",
+                  "margin": 0
+                },
+                "bounds": {
+                  "x": 704,
+                  "y": 434,
+                  "width": 32,
+                  "height": 32
+                }
+              },
+              {
+                "id": "build-badge",
+                "anchor": {
+                  "region": "bottom-left",
+                  "margin": 8
+                },
+                "bounds": {
+                  "x": 8,
+                  "y": 853,
+                  "width": 38,
+                  "height": 13
+                }
+              },
+              {
+                "id": "ore-hud",
+                "anchor": {
+                  "region": "top-left",
+                  "margin": 16
+                },
+                "bounds": {
+                  "x": 16,
+                  "y": 16,
+                  "width": 47.5569140625,
+                  "height": 50
+                }
+              },
+              {
+                "id": "banked-total",
+                "anchor": {
+                  "region": "top-left",
+                  "margin": 16
+                },
+                "bounds": {
+                  "x": 16,
+                  "y": 30,
+                  "width": 13.2021484375,
+                  "height": 24
+                }
+              },
+              {
+                "id": "controls-strip",
+                "anchor": {
+                  "region": "bottom-strip",
+                  "margin": 0
+                },
+                "bounds": {
+                  "x": 0,
+                  "y": 860,
+                  "width": 1440,
+                  "height": 40
+                }
+              },
+              {
+                "id": "station-hp",
+                "anchor": {
+                  "region": "top-right",
+                  "margin": 16
+                },
+                "bounds": {
+                  "x": 1266,
+                  "y": 16,
+                  "width": 158.5,
+                  "height": 42
+                }
+              },
+              {
+                "id": "nameplates",
+                "anchor": {
+                  "region": "full",
+                  "margin": 0
+                },
+                "bounds": {
+                  "x": 237.19175567953948,
+                  "y": 22.9968240697267,
+                  "width": 590.8100021329606,
+                  "height": 712.9224307733593
+                }
+              },
+              {
+                "id": "minimap",
+                "anchor": {
+                  "region": "bottom-right",
+                  "margin": 12
+                },
+                "bounds": {
+                  "x": 1280,
+                  "y": 700,
+                  "width": 148,
+                  "height": 148
+                }
+              },
+              {
+                "id": "healthbars",
+                "anchor": {
+                  "region": "full",
+                  "margin": 0
+                },
+                "bounds": {
+                  "x": 247.79527130453948,
+                  "y": 35.9968240697267,
+                  "width": 161.76072006782204,
+                  "height": 709.9224307733593
+                }
+              }
+            ],
+            "resolveAnchor": "<threw: Cannot read properties of undefined (reading 'margin')>",
+            "placement": [
+              {
+                "id": "ship-local",
+                "ok": true
+              },
+              {
+                "id": "build-badge",
+                "ok": true
+              },
+              {
+                "id": "ore-hud",
+                "ok": true
+              },
+              {
+                "id": "banked-total",
+                "ok": true
+              },
+              {
+                "id": "controls-strip",
+                "ok": true
+              },
+              {
+                "id": "station-hp",
+                "ok": true
+              },
+              {
+                "id": "nameplates",
+                "ok": true
+              },
+              {
+                "id": "minimap",
+                "ok": true
+              },
+              {
+                "id": "healthbars",
+                "ok": true
+              }
+            ],
+            "frozen": false,
+            "freezeTick": null,
+            "worldHash": null
+          },
+          "atSeconds": 2
+        },
+        {
+          "order": [
+            "void-ground",
+            "void-stars-deep",
+            "void-stars-mid",
+            "void-stars-near"
+          ],
+          "voidVisible": true,
+          "voidAlpha": 1,
+          "layers": [
+            {
+              "label": "void-stars-deep",
+              "visible": true,
+              "alpha": 1,
+              "renderable": true,
+              "worldVisible": true,
+              "fills": 1121,
+              "stars": 795,
+              "bloomed": 163,
+              "bloomRatio": 0.205
+            },
+            {
+              "label": "void-stars-mid",
+              "visible": true,
+              "alpha": 1,
+              "renderable": true,
+              "worldVisible": true,
+              "fills": 779,
+              "stars": 575,
+              "bloomed": 102,
+              "bloomRatio": 0.1774
+            },
+            {
+              "label": "void-stars-near",
+              "visible": true,
+              "alpha": 1,
+              "renderable": true,
+              "worldVisible": true,
+              "fills": 362,
+              "stars": 254,
+              "bloomed": 54,
+              "bloomRatio": 0.2126
+            }
+          ],
+          "build": "ebdae99",
+          "pr": {
+            "shipScreen": {
+              "x": 720,
+              "y": 450
+            },
+            "shipWorld": {
+              "x": 1968,
+              "y": 1200
+            },
+            "viewport": {
+              "w": 1440,
+              "h": 900,
+              "width": 1440,
+              "height": 900
+            },
+            "fps": 4.377540403704377,
+            "build": {
+              "sha": "ebdae99",
+              "time": "2026-08-10T16:01:05.441Z",
+              "dirty": false
+            },
+            "ticks": 658,
+            "input": {
+              "frame": 658,
+              "types": [
+                "thrust",
+                "aim",
+                "fire",
+                "build"
+              ],
+              "fire": false,
+              "build": false,
+              "aim": true,
+              "thrust": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            "muzzles": [],
+            "stageCombat": {
+              "firingShip": 1,
+              "turret": {
+                "shooter": 1,
+                "origin": {
+                  "x": 1810.940258945177,
+                  "y": 1734.940258945177
+                },
+                "end": {
+                  "x": 1810.940258945177,
+                  "y": 1644.940258945177
+                },
+                "hit": {
+                  "x": 1810.940258945177,
+                  "y": 1644.940258945177
+                }
+              }
+            },
+            "damageShip": {
+              "op": "damageShip"
+            },
+            "damageCore": {
+              "op": "damageCore"
+            },
+            "coreHp": null,
+            "layout": [
+              {
+                "id": "ship-local",
+                "anchor": {
+                  "region": "center",
+                  "margin": 0
+                },
+                "bounds": {
+                  "x": 704,
+                  "y": 434,
+                  "width": 32,
+                  "height": 32
+                }
+              },
+              {
+                "id": "build-badge",
+                "anchor": {
+                  "region": "bottom-left",
+                  "margin": 8
+                },
+                "bounds": {
+                  "x": 8,
+                  "y": 853,
+                  "width": 38,
+                  "height": 13
+                }
+              },
+              {
+                "id": "ore-hud",
+                "anchor": {
+                  "region": "top-left",
+                  "margin": 16
+                },
+                "bounds": {
+                  "x": 16,
+                  "y": 16,
+                  "width": 47.5569140625,
+                  "height": 50
+                }
+              },
+              {
+                "id": "banked-total",
+                "anchor": {
+                  "region": "top-left",
+                  "margin": 16
+                },
+                "bounds": {
+                  "x": 16,
+                  "y": 30,
+                  "width": 13.2021484375,
+                  "height": 24
+                }
+              },
+              {
+                "id": "controls-strip",
+                "anchor": {
+                  "region": "bottom-strip",
+                  "margin": 0
+                },
+                "bounds": {
+                  "x": 0,
+                  "y": 860,
+                  "width": 1440,
+                  "height": 40
+                }
+              },
+              {
+                "id": "station-hp",
+                "anchor": {
+                  "region": "top-right",
+                  "margin": 16
+                },
+                "bounds": {
+                  "x": 1266,
+                  "y": 16,
+                  "width": 158.5,
+                  "height": 42
+                }
+              },
+              {
+                "id": "nameplates",
+                "anchor": {
+                  "region": "full",
+                  "margin": 0
+                },
+                "bounds": {
+                  "x": 77.84912791742931,
+                  "y": 129.64712221559068,
+                  "width": 750.1526298950707,
+                  "height": 610.686391990872
+                }
+              },
+              {
+                "id": "minimap",
+                "anchor": {
+                  "region": "bottom-right",
+                  "margin": 12
+                },
+                "bounds": {
+                  "x": 1280,
+                  "y": 700,
+                  "width": 148,
+                  "height": 148
+                }
+              },
+              {
+                "id": "healthbars",
+                "anchor": {
+                  "region": "full",
+                  "margin": 0
+                },
+                "bounds": {
+                  "x": 88.45264354242931,
+                  "y": 142.64712221559068,
+                  "width": 314.3502334751871,
+                  "height": 607.686391990872
+                }
+              }
+            ],
+            "resolveAnchor": "<threw: Cannot read properties of undefined (reading 'margin')>",
+            "placement": [
+              {
+                "id": "ship-local",
+                "ok": true
+              },
+              {
+                "id": "build-badge",
+                "ok": true
+              },
+              {
+                "id": "ore-hud",
+                "ok": true
+              },
+              {
+                "id": "banked-total",
+                "ok": true
+              },
+              {
+                "id": "controls-strip",
+                "ok": true
+              },
+              {
+                "id": "station-hp",
+                "ok": true
+              },
+              {
+                "id": "nameplates",
+                "ok": true
+              },
+              {
+                "id": "minimap",
+                "ok": true
+              },
+              {
+                "id": "healthbars",
+                "ok": true
+              }
+            ],
+            "frozen": false,
+            "freezeTick": null,
+            "worldHash": null
+          },
+          "atSeconds": 12
+        },
+        {
+          "order": [
+            "void-ground",
+            "void-stars-deep",
+            "void-stars-mid",
+            "void-stars-near"
+          ],
+          "voidVisible": true,
+          "voidAlpha": 1,
+          "layers": [
+            {
+              "label": "void-stars-deep",
+              "visible": true,
+              "alpha": 1,
+              "renderable": true,
+              "worldVisible": true,
+              "fills": 1121,
+              "stars": 795,
+              "bloomed": 163,
+              "bloomRatio": 0.205
+            },
+            {
+              "label": "void-stars-mid",
+              "visible": true,
+              "alpha": 1,
+              "renderable": true,
+              "worldVisible": true,
+              "fills": 779,
+              "stars": 575,
+              "bloomed": 102,
+              "bloomRatio": 0.1774
+            },
+            {
+              "label": "void-stars-near",
+              "visible": true,
+              "alpha": 1,
+              "renderable": true,
+              "worldVisible": true,
+              "fills": 362,
+              "stars": 254,
+              "bloomed": 54,
+              "bloomRatio": 0.2126
+            }
+          ],
+          "build": "ebdae99",
+          "pr": {
+            "shipScreen": {
+              "x": 720,
+              "y": 450
+            },
+            "shipWorld": {
+              "x": 1968,
+              "y": 1200
+            },
+            "viewport": {
+              "w": 1440,
+              "h": 900,
+              "width": 1440,
+              "height": 900
+            },
+            "fps": 4.9114468932042445,
+            "build": {
+              "sha": "ebdae99",
+              "time": "2026-08-10T16:01:05.441Z",
+              "dirty": false
+            },
+            "ticks": 1737,
+            "input": {
+              "frame": 1737,
+              "types": [
+                "thrust",
+                "aim",
+                "fire",
+                "build"
+              ],
+              "fire": false,
+              "build": false,
+              "aim": true,
+              "thrust": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            "muzzles": [],
+            "stageCombat": {
+              "firingShip": 1,
+              "turret": {
+                "shooter": 1,
+                "origin": {
+                  "x": 1810.940258945177,
+                  "y": 1734.940258945177
+                },
+                "end": {
+                  "x": 1810.940258945177,
+                  "y": 1644.940258945177
+                },
+                "hit": {
+                  "x": 1810.940258945177,
+                  "y": 1644.940258945177
+                }
+              }
+            },
+            "damageShip": {
+              "op": "damageShip"
+            },
+            "damageCore": {
+              "op": "damageCore"
+            },
+            "coreHp": null,
+            "layout": [
+              {
+                "id": "ship-local",
+                "anchor": {
+                  "region": "center",
+                  "margin": 0
+                },
+                "bounds": {
+                  "x": 704,
+                  "y": 434,
+                  "width": 32,
+                  "height": 32
+                }
+              },
+              {
+                "id": "build-badge",
+                "anchor": {
+                  "region": "bottom-left",
+                  "margin": 8
+                },
+                "bounds": {
+                  "x": 8,
+                  "y": 853,
+                  "width": 38,
+                  "height": 13
+                }
+              },
+              {
+                "id": "ore-hud",
+                "anchor": {
+                  "region": "top-left",
+                  "margin": 16
+                },
+                "bounds": {
+                  "x": 16,
+                  "y": 16,
+                  "width": 47.5569140625,
+                  "height": 50
+                }
+              },
+              {
+                "id": "banked-total",
+                "anchor": {
+                  "region": "top-left",
+                  "margin": 16
+                },
+                "bounds": {
+                  "x": 16,
+                  "y": 30,
+                  "width": 13.2021484375,
+                  "height": 24
+                }
+              },
+              {
+                "id": "controls-strip",
+                "anchor": {
+                  "region": "bottom-strip",
+                  "margin": 0
+                },
+                "bounds": {
+                  "x": 0,
+                  "y": 860,
+                  "width": 1440,
+                  "height": 40
+                }
+              },
+              {
+                "id": "station-hp",
+                "anchor": {
+                  "region": "top-right",
+                  "margin": 16
+                },
+                "bounds": {
+                  "x": 1266,
+                  "y": 16,
+                  "width": 158.5,
+                  "height": 42
+                }
+              },
+              {
+                "id": "nameplates",
+                "anchor": {
+                  "region": "full",
+                  "margin": 0
+                },
+                "bounds": {
+                  "x": 65.15105871371466,
+                  "y": 16.445788288951007,
+                  "width": 762.8506990987854,
+                  "height": 864.7680735434851
+                }
+              },
+              {
+                "id": "minimap",
+                "anchor": {
+                  "region": "bottom-right",
+                  "margin": 12
+                },
+                "bounds": {
+                  "x": 1280,
+                  "y": 700,
+                  "width": 148,
+                  "height": 148
+                }
+              },
+              {
+                "id": "healthbars",
+                "anchor": {
+                  "region": "full",
+                  "margin": 0
+                },
+                "bounds": {
+                  "x": 79.95516027621466,
+                  "y": 29.445788288951007,
+                  "width": 159.6192825448505,
+                  "height": 861.7680735434851
+                }
+              }
+            ],
+            "resolveAnchor": "<threw: Cannot read properties of undefined (reading 'margin')>",
+            "placement": [
+              {
+                "id": "ship-local",
+                "ok": true
+              },
+              {
+                "id": "build-badge",
+                "ok": true
+              },
+              {
+                "id": "ore-hud",
+                "ok": true
+              },
+              {
+                "id": "banked-total",
+                "ok": true
+              },
+              {
+                "id": "controls-strip",
+                "ok": true
+              },
+              {
+                "id": "station-hp",
+                "ok": true
+              },
+              {
+                "id": "nameplates",
+                "ok": true
+              },
+              {
+                "id": "minimap",
+                "ok": true
+              },
+              {
+                "id": "healthbars",
+                "ok": true
+              }
+            ],
+            "frozen": false,
+            "freezeTick": null,
+            "worldHash": null
+          },
+          "atSeconds": 30
+        }
+      ],
+      "frames": {
+        "t2s": "desktop-1440x900-dpr2-t2s.png",
+        "t12s": "desktop-1440x900-dpr2-t12s.png",
+        "t30s": "desktop-1440x900-dpr2-t30s.png"
+      },
+      "starFieldStable": true
+    },
+    {
+      "device": "phone-844x390-dpr3",
+      "samples": [
+        {
+          "order": [
+            "void-ground",
+            "void-stars-deep",
+            "void-stars-mid",
+            "void-stars-near"
+          ],
+          "voidVisible": true,
+          "voidAlpha": 1,
+          "layers": [
+            {
+              "label": "void-stars-deep",
+              "visible": true,
+              "alpha": 1,
+              "renderable": true,
+              "worldVisible": true,
+              "fills": 388,
+              "stars": 278,
+              "bloomed": 55,
+              "bloomRatio": 0.1978
+            },
+            {
+              "label": "void-stars-mid",
+              "visible": true,
+              "alpha": 1,
+              "renderable": true,
+              "worldVisible": true,
+              "fills": 359,
+              "stars": 273,
+              "bloomed": 43,
+              "bloomRatio": 0.1575
+            },
+            {
+              "label": "void-stars-near",
+              "visible": true,
+              "alpha": 1,
+              "renderable": true,
+              "worldVisible": true,
+              "fills": 213,
+              "stars": 155,
+              "bloomed": 29,
+              "bloomRatio": 0.1871
+            }
+          ],
+          "build": "ebdae99",
+          "pr": {
+            "shipScreen": {
+              "x": 422,
+              "y": 195
+            },
+            "shipWorld": {
+              "x": 1968,
+              "y": 1200
+            },
+            "viewport": {
+              "w": 844,
+              "h": 390,
+              "width": 844,
+              "height": 390
+            },
+            "fps": 4.595868594570201,
+            "build": {
+              "sha": "ebdae99",
+              "time": "2026-08-10T16:01:05.441Z",
+              "dirty": false
+            },
+            "ticks": 139,
+            "input": {
+              "frame": 139,
+              "types": [
+                "thrust",
+                "aim",
+                "fire",
+                "build"
+              ],
+              "fire": false,
+              "build": false,
+              "aim": true,
+              "thrust": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            "muzzles": [],
+            "stageCombat": {
+              "firingShip": 1,
+              "turret": {
+                "shooter": 1,
+                "origin": {
+                  "x": 1810.940258945177,
+                  "y": 1734.940258945177
+                },
+                "end": {
+                  "x": 1810.940258945177,
+                  "y": 1644.940258945177
+                },
+                "hit": {
+                  "x": 1810.940258945177,
+                  "y": 1644.940258945177
+                }
+              }
+            },
+            "damageShip": {
+              "op": "damageShip"
+            },
+            "damageCore": {
+              "op": "damageCore"
+            },
+            "coreHp": null,
+            "layout": [
+              {
+                "id": "ship-local",
+                "anchor": {
+                  "region": "center",
+                  "margin": 0
+                },
+                "bounds": {
+                  "x": 406,
+                  "y": 179,
+                  "width": 32,
+                  "height": 32
+                }
+              },
+              {
+                "id": "build-badge",
+                "anchor": {
+                  "region": "bottom-left",
+                  "margin": 8
+                },
+                "bounds": {
+                  "x": 8,
+                  "y": 343,
+                  "width": 38,
+                  "height": 13
+                }
+              },
+              {
+                "id": "ore-hud",
+                "anchor": {
+                  "region": "top-left",
+                  "margin": 16
+                },
+                "bounds": {
+                  "x": 16,
+                  "y": 16,
+                  "width": 43.5569140625,
+                  "height": 39
+                }
+              },
+              {
+                "id": "banked-total",
+                "anchor": {
+                  "region": "top-left",
+                  "margin": 16
+                },
+                "bounds": {
+                  "x": 16,
+                  "y": 27,
+                  "width": 10.20166015625,
+                  "height": 19
+                }
+              },
+              {
+                "id": "controls-strip",
+                "anchor": {
+                  "region": "bottom-strip",
+                  "margin": 0
+                },
+                "bounds": {
+                  "x": 0,
+                  "y": 352,
+                  "width": 844,
+                  "height": 38
+                }
+              },
+              {
+                "id": "station-hp",
+                "anchor": {
+                  "region": "top-right",
+                  "margin": 16
+                },
+                "bounds": {
+                  "x": 674,
+                  "y": 16,
+                  "width": 154.5,
+                  "height": 39
+                }
+              },
+              {
+                "id": "nameplates",
+                "anchor": {
+                  "region": "full",
+                  "margin": 0
+                },
+                "bounds": {
+                  "x": 505.9982421875,
+                  "y": 110,
+                  "width": 24.003515625000034,
+                  "height": 13
+                }
+              },
+              {
+                "id": "minimap",
+                "anchor": {
+                  "region": "bottom-right",
+                  "margin": 12
+                },
+                "bounds": {
+                  "x": 754,
+                  "y": 260,
+                  "width": 78,
+                  "height": 78
+                }
+              }
+            ],
+            "resolveAnchor": "<threw: Cannot read properties of undefined (reading 'margin')>",
+            "placement": [
+              {
+                "id": "ship-local",
+                "ok": true
+              },
+              {
+                "id": "build-badge",
+                "ok": true
+              },
+              {
+                "id": "ore-hud",
+                "ok": true
+              },
+              {
+                "id": "banked-total",
+                "ok": true
+              },
+              {
+                "id": "controls-strip",
+                "ok": true
+              },
+              {
+                "id": "station-hp",
+                "ok": true
+              },
+              {
+                "id": "nameplates",
+                "ok": true
+              },
+              {
+                "id": "minimap",
+                "ok": true
+              }
+            ],
+            "frozen": false,
+            "freezeTick": null,
+            "worldHash": null
+          },
+          "atSeconds": 2
+        },
+        {
+          "order": [
+            "void-ground",
+            "void-stars-deep",
+            "void-stars-mid",
+            "void-stars-near"
+          ],
+          "voidVisible": true,
+          "voidAlpha": 1,
+          "layers": [
+            {
+              "label": "void-stars-deep",
+              "visible": true,
+              "alpha": 1,
+              "renderable": true,
+              "worldVisible": true,
+              "fills": 388,
+              "stars": 278,
+              "bloomed": 55,
+              "bloomRatio": 0.1978
+            },
+            {
+              "label": "void-stars-mid",
+              "visible": true,
+              "alpha": 1,
+              "renderable": true,
+              "worldVisible": true,
+              "fills": 359,
+              "stars": 273,
+              "bloomed": 43,
+              "bloomRatio": 0.1575
+            },
+            {
+              "label": "void-stars-near",
+              "visible": true,
+              "alpha": 1,
+              "renderable": true,
+              "worldVisible": true,
+              "fills": 213,
+              "stars": 155,
+              "bloomed": 29,
+              "bloomRatio": 0.1871
+            }
+          ],
+          "build": "ebdae99",
+          "pr": {
+            "shipScreen": {
+              "x": 422,
+              "y": 195
+            },
+            "shipWorld": {
+              "x": 1968,
+              "y": 1200
+            },
+            "viewport": {
+              "w": 844,
+              "h": 390,
+              "width": 844,
+              "height": 390
+            },
+            "fps": 5.834858573679586,
+            "build": {
+              "sha": "ebdae99",
+              "time": "2026-08-10T16:01:05.441Z",
+              "dirty": false
+            },
+            "ticks": 662,
+            "input": {
+              "frame": 662,
+              "types": [
+                "thrust",
+                "aim",
+                "fire",
+                "build"
+              ],
+              "fire": false,
+              "build": false,
+              "aim": true,
+              "thrust": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            "muzzles": [],
+            "stageCombat": {
+              "firingShip": 1,
+              "turret": {
+                "shooter": 1,
+                "origin": {
+                  "x": 1810.940258945177,
+                  "y": 1734.940258945177
+                },
+                "end": {
+                  "x": 1810.940258945177,
+                  "y": 1644.940258945177
+                },
+                "hit": {
+                  "x": 1810.940258945177,
+                  "y": 1644.940258945177
+                }
+              }
+            },
+            "damageShip": {
+              "op": "damageShip"
+            },
+            "damageCore": {
+              "op": "damageCore"
+            },
+            "coreHp": null,
+            "layout": [
+              {
+                "id": "ship-local",
+                "anchor": {
+                  "region": "center",
+                  "margin": 0
+                },
+                "bounds": {
+                  "x": 406,
+                  "y": 179,
+                  "width": 32,
+                  "height": 32
+                }
+              },
+              {
+                "id": "build-badge",
+                "anchor": {
+                  "region": "bottom-left",
+                  "margin": 8
+                },
+                "bounds": {
+                  "x": 8,
+                  "y": 343,
+                  "width": 38,
+                  "height": 13
+                }
+              },
+              {
+                "id": "ore-hud",
+                "anchor": {
+                  "region": "top-left",
+                  "margin": 16
+                },
+                "bounds": {
+                  "x": 16,
+                  "y": 16,
+                  "width": 43.5569140625,
+                  "height": 39
+                }
+              },
+              {
+                "id": "banked-total",
+                "anchor": {
+                  "region": "top-left",
+                  "margin": 16
+                },
+                "bounds": {
+                  "x": 16,
+                  "y": 27,
+                  "width": 10.20166015625,
+                  "height": 19
+                }
+              },
+              {
+                "id": "controls-strip",
+                "anchor": {
+                  "region": "bottom-strip",
+                  "margin": 0
+                },
+                "bounds": {
+                  "x": 0,
+                  "y": 352,
+                  "width": 844,
+                  "height": 38
+                }
+              },
+              {
+                "id": "station-hp",
+                "anchor": {
+                  "region": "top-right",
+                  "margin": 16
+                },
+                "bounds": {
+                  "x": 674,
+                  "y": 16,
+                  "width": 154.5,
+                  "height": 39
+                }
+              },
+              {
+                "id": "nameplates",
+                "anchor": {
+                  "region": "full",
+                  "margin": 0
+                },
+                "bounds": {
+                  "x": 505.9982421875,
+                  "y": 110,
+                  "width": 24.003515625000034,
+                  "height": 13
+                }
+              },
+              {
+                "id": "minimap",
+                "anchor": {
+                  "region": "bottom-right",
+                  "margin": 12
+                },
+                "bounds": {
+                  "x": 754,
+                  "y": 260,
+                  "width": 78,
+                  "height": 78
+                }
+              }
+            ],
+            "resolveAnchor": "<threw: Cannot read properties of undefined (reading 'margin')>",
+            "placement": [
+              {
+                "id": "ship-local",
+                "ok": true
+              },
+              {
+                "id": "build-badge",
+                "ok": true
+              },
+              {
+                "id": "ore-hud",
+                "ok": true
+              },
+              {
+                "id": "banked-total",
+                "ok": true
+              },
+              {
+                "id": "controls-strip",
+                "ok": true
+              },
+              {
+                "id": "station-hp",
+                "ok": true
+              },
+              {
+                "id": "nameplates",
+                "ok": true
+              },
+              {
+                "id": "minimap",
+                "ok": true
+              }
+            ],
+            "frozen": false,
+            "freezeTick": null,
+            "worldHash": null
+          },
+          "atSeconds": 12
+        },
+        {
+          "order": [
+            "void-ground",
+            "void-stars-deep",
+            "void-stars-mid",
+            "void-stars-near"
+          ],
+          "voidVisible": true,
+          "voidAlpha": 1,
+          "layers": [
+            {
+              "label": "void-stars-deep",
+              "visible": true,
+              "alpha": 1,
+              "renderable": true,
+              "worldVisible": true,
+              "fills": 388,
+              "stars": 278,
+              "bloomed": 55,
+              "bloomRatio": 0.1978
+            },
+            {
+              "label": "void-stars-mid",
+              "visible": true,
+              "alpha": 1,
+              "renderable": true,
+              "worldVisible": true,
+              "fills": 359,
+              "stars": 273,
+              "bloomed": 43,
+              "bloomRatio": 0.1575
+            },
+            {
+              "label": "void-stars-near",
+              "visible": true,
+              "alpha": 1,
+              "renderable": true,
+              "worldVisible": true,
+              "fills": 213,
+              "stars": 155,
+              "bloomed": 29,
+              "bloomRatio": 0.1871
+            }
+          ],
+          "build": "ebdae99",
+          "pr": {
+            "shipScreen": {
+              "x": 422,
+              "y": 195
+            },
+            "shipWorld": {
+              "x": 1968,
+              "y": 1200
+            },
+            "viewport": {
+              "w": 844,
+              "h": 390,
+              "width": 844,
+              "height": 390
+            },
+            "fps": 5.249335206429077,
+            "build": {
+              "sha": "ebdae99",
+              "time": "2026-08-10T16:01:05.441Z",
+              "dirty": false
+            },
+            "ticks": 1737,
+            "input": {
+              "frame": 1737,
+              "types": [
+                "thrust",
+                "aim",
+                "fire",
+                "build"
+              ],
+              "fire": false,
+              "build": false,
+              "aim": true,
+              "thrust": {
+                "x": 0,
+                "y": 0
+              }
+            },
+            "muzzles": [],
+            "stageCombat": {
+              "firingShip": 1,
+              "turret": {
+                "shooter": 1,
+                "origin": {
+                  "x": 1810.940258945177,
+                  "y": 1734.940258945177
+                },
+                "end": {
+                  "x": 1810.940258945177,
+                  "y": 1644.940258945177
+                },
+                "hit": {
+                  "x": 1810.940258945177,
+                  "y": 1644.940258945177
+                }
+              }
+            },
+            "damageShip": {
+              "op": "damageShip"
+            },
+            "damageCore": {
+              "op": "damageCore"
+            },
+            "coreHp": null,
+            "layout": [
+              {
+                "id": "ship-local",
+                "anchor": {
+                  "region": "center",
+                  "margin": 0
+                },
+                "bounds": {
+                  "x": 406,
+                  "y": 179,
+                  "width": 32,
+                  "height": 32
+                }
+              },
+              {
+                "id": "build-badge",
+                "anchor": {
+                  "region": "bottom-left",
+                  "margin": 8
+                },
+                "bounds": {
+                  "x": 8,
+                  "y": 343,
+                  "width": 38,
+                  "height": 13
+                }
+              },
+              {
+                "id": "ore-hud",
+                "anchor": {
+                  "region": "top-left",
+                  "margin": 16
+                },
+                "bounds": {
+                  "x": 16,
+                  "y": 16,
+                  "width": 43.5569140625,
+                  "height": 39
+                }
+              },
+              {
+                "id": "banked-total",
+                "anchor": {
+                  "region": "top-left",
+                  "margin": 16
+                },
+                "bounds": {
+                  "x": 16,
+                  "y": 27,
+                  "width": 10.20166015625,
+                  "height": 19
+                }
+              },
+              {
+                "id": "controls-strip",
+                "anchor": {
+                  "region": "bottom-strip",
+                  "margin": 0
+                },
+                "bounds": {
+                  "x": 0,
+                  "y": 352,
+                  "width": 844,
+                  "height": 38
+                }
+              },
+              {
+                "id": "station-hp",
+                "anchor": {
+                  "region": "top-right",
+                  "margin": 16
+                },
+                "bounds": {
+                  "x": 674,
+                  "y": 16,
+                  "width": 154.5,
+                  "height": 39
+                }
+              },
+              {
+                "id": "nameplates",
+                "anchor": {
+                  "region": "full",
+                  "margin": 0
+                },
+                "bounds": {
+                  "x": 505.9982421875,
+                  "y": 110,
+                  "width": 24.003515625000034,
+                  "height": 13
+                }
+              },
+              {
+                "id": "minimap",
+                "anchor": {
+                  "region": "bottom-right",
+                  "margin": 12
+                },
+                "bounds": {
+                  "x": 754,
+                  "y": 260,
+                  "width": 78,
+                  "height": 78
+                }
+              }
+            ],
+            "resolveAnchor": "<threw: Cannot read properties of undefined (reading 'margin')>",
+            "placement": [
+              {
+                "id": "ship-local",
+                "ok": true
+              },
+              {
+                "id": "build-badge",
+                "ok": true
+              },
+              {
+                "id": "ore-hud",
+                "ok": true
+              },
+              {
+                "id": "banked-total",
+                "ok": true
+              },
+              {
+                "id": "controls-strip",
+                "ok": true
+              },
+              {
+                "id": "station-hp",
+                "ok": true
+              },
+              {
+                "id": "nameplates",
+                "ok": true
+              },
+              {
+                "id": "minimap",
+                "ok": true
+              }
+            ],
+            "frozen": false,
+            "freezeTick": null,
+            "worldHash": null
+          },
+          "atSeconds": 30
+        }
+      ],
+      "frames": {
+        "t2s": "phone-844x390-dpr3-t2s.png",
+        "t12s": "phone-844x390-dpr3-t12s.png",
+        "t30s": "phone-844x390-dpr3-t30s.png"
+      },
+      "starFieldStable": true
+    }
+  ]
+}

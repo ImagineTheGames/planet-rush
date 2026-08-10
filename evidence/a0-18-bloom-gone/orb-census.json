@@ -1,0 +1,280 @@
+{
+  "before-111db86": {
+    "octagon": {
+      "rows": [
+        {
+          "layer": "near",
+          "starsOnScreen": 12,
+          "bloomedOnScreen": 2,
+          "plainOnScreen": 10,
+          "perceptibleOrbs": 2,
+          "orbWidthCssMedian": 12.5,
+          "orbWidthCssMax": 12.5,
+          "biggestOrbRings": [
+            4,
+            7,
+            11,
+            14,
+            23,
+            31,
+            39,
+            47,
+            138,
+            228
+          ]
+        },
+        {
+          "layer": "mid",
+          "starsOnScreen": 62,
+          "bloomedOnScreen": 11,
+          "plainOnScreen": 51,
+          "perceptibleOrbs": 11,
+          "orbWidthCssMedian": 7,
+          "orbWidthCssMax": 10.5,
+          "biggestOrbRings": [
+            2,
+            3,
+            5,
+            6,
+            10,
+            14,
+            18,
+            22,
+            47,
+            95,
+            119
+          ]
+        },
+        {
+          "layer": "deep",
+          "starsOnScreen": 118,
+          "bloomedOnScreen": 21,
+          "plainOnScreen": 97,
+          "perceptibleOrbs": 7,
+          "orbWidthCssMedian": 6,
+          "orbWidthCssMax": 8.5,
+          "biggestOrbRings": [
+            1,
+            2,
+            4,
+            5,
+            6,
+            7,
+            40
+          ]
+        }
+      ],
+      "totalStars": 192,
+      "totalBloomed": 34,
+      "perceptible": 20
+    },
+    "line": {
+      "rows": [
+        {
+          "layer": "near",
+          "starsOnScreen": 18,
+          "bloomedOnScreen": 5,
+          "plainOnScreen": 13,
+          "perceptibleOrbs": 5,
+          "orbWidthCssMedian": 10.5,
+          "orbWidthCssMax": 12,
+          "biggestOrbRings": [
+            4,
+            7,
+            11,
+            14,
+            23,
+            31,
+            39,
+            47,
+            93,
+            138,
+            183,
+            228
+          ]
+        },
+        {
+          "layer": "mid",
+          "starsOnScreen": 55,
+          "bloomedOnScreen": 11,
+          "plainOnScreen": 44,
+          "perceptibleOrbs": 11,
+          "orbWidthCssMedian": 7.5,
+          "orbWidthCssMax": 10,
+          "biggestOrbRings": [
+            2,
+            3,
+            5,
+            6,
+            10,
+            13,
+            16,
+            19,
+            39,
+            99
+          ]
+        },
+        {
+          "layer": "deep",
+          "starsOnScreen": 118,
+          "bloomedOnScreen": 25,
+          "plainOnScreen": 93,
+          "perceptibleOrbs": 11,
+          "orbWidthCssMedian": 6.5,
+          "orbWidthCssMax": 8.5,
+          "biggestOrbRings": [
+            1,
+            2,
+            5,
+            6,
+            7,
+            15,
+            39
+          ]
+        }
+      ],
+      "totalStars": 191,
+      "totalBloomed": 41,
+      "perceptible": 27
+    }
+  },
+  "after-ebdae99": {
+    "octagon": {
+      "rows": [
+        {
+          "layer": "near",
+          "starsOnScreen": 12,
+          "bloomedOnScreen": 2,
+          "plainOnScreen": 10,
+          "perceptibleOrbs": 2,
+          "orbWidthCssMedian": 12.5,
+          "orbWidthCssMax": 12.5,
+          "biggestOrbRings": [
+            4,
+            7,
+            11,
+            14,
+            23,
+            31,
+            39,
+            47,
+            138,
+            228
+          ]
+        },
+        {
+          "layer": "mid",
+          "starsOnScreen": 64,
+          "bloomedOnScreen": 11,
+          "plainOnScreen": 53,
+          "perceptibleOrbs": 11,
+          "orbWidthCssMedian": 7,
+          "orbWidthCssMax": 10.5,
+          "biggestOrbRings": [
+            2,
+            3,
+            5,
+            6,
+            10,
+            14,
+            18,
+            22,
+            47,
+            95,
+            119
+          ]
+        },
+        {
+          "layer": "deep",
+          "starsOnScreen": 118,
+          "bloomedOnScreen": 21,
+          "plainOnScreen": 97,
+          "perceptibleOrbs": 7,
+          "orbWidthCssMedian": 6,
+          "orbWidthCssMax": 8.5,
+          "biggestOrbRings": [
+            1,
+            2,
+            4,
+            5,
+            6,
+            7,
+            40
+          ]
+        }
+      ],
+      "totalStars": 194,
+      "totalBloomed": 34,
+      "perceptible": 20
+    },
+    "line": {
+      "rows": [
+        {
+          "layer": "near",
+          "starsOnScreen": 18,
+          "bloomedOnScreen": 5,
+          "plainOnScreen": 13,
+          "perceptibleOrbs": 5,
+          "orbWidthCssMedian": 10.5,
+          "orbWidthCssMax": 12,
+          "biggestOrbRings": [
+            4,
+            7,
+            11,
+            14,
+            23,
+            31,
+            39,
+            47,
+            93,
+            138,
+            183,
+            228
+          ]
+        },
+        {
+          "layer": "mid",
+          "starsOnScreen": 56,
+          "bloomedOnScreen": 11,
+          "plainOnScreen": 45,
+          "perceptibleOrbs": 11,
+          "orbWidthCssMedian": 7.5,
+          "orbWidthCssMax": 10,
+          "biggestOrbRings": [
+            2,
+            3,
+            5,
+            6,
+            10,
+            13,
+            16,
+            19,
+            39,
+            99
+          ]
+        },
+        {
+          "layer": "deep",
+          "starsOnScreen": 118,
+          "bloomedOnScreen": 25,
+          "plainOnScreen": 93,
+          "perceptibleOrbs": 11,
+          "orbWidthCssMedian": 6.5,
+          "orbWidthCssMax": 8.5,
+          "biggestOrbRings": [
+            1,
+            2,
+            5,
+            6,
+            7,
+            15,
+            39
+          ]
+        }
+      ],
+      "totalStars": 192,
+      "totalBloomed": 41,
+      "perceptible": 27
+    }
+  }
+}
