@@ -4,22 +4,12 @@
  * Tiny pure helpers over the shared `Vec2` plain-data type. Determinism policy
  * (GDD §4.1, §4.8): we own every float operation, so operation order is fixed
  * and there are no square roots on the hot collision path — narrow phase uses
- * squared distances (`dx² + dy² < (r1+r2)²`). `len`/`dist` exist for geometry
- * that genuinely needs a magnitude (drag, normalization); the broad/narrow
- * phase never calls them.
+ * squared distances (`dist2`, i.e. `dx² + dy² < (r1+r2)²`). `len` exists for
+ * geometry that genuinely needs a magnitude (it backs `normalize`); the
+ * broad/narrow phase never calls it.
  */
 
 import type { Vec2 } from '@shared/types';
-
-/** A fresh vector. */
-export function vec(x: number, y: number): Vec2 {
-  return { x, y };
-}
-
-/** Squared length — no sqrt. Preferred for comparisons. */
-export function len2(v: Vec2): number {
-  return v.x * v.x + v.y * v.y;
-}
 
 /** Length. Uses sqrt — only where a true magnitude is required. */
 export function len(v: Vec2): number {
@@ -33,11 +23,6 @@ export function dist2(a: Vec2, b: Vec2): number {
   return dx * dx + dy * dy;
 }
 
-/** Distance between two points. Uses sqrt. */
-export function dist(a: Vec2, b: Vec2): number {
-  return Math.sqrt(dist2(a, b));
-}
-
 /**
  * Unit vector in the same direction, or `fallback` when `v` is (near) zero.
  * The fallback keeps direction math total: an idle stick or a chunk sitting on
@@ -47,11 +32,6 @@ export function normalize(v: Vec2, fallback: Vec2 = { x: 1, y: 0 }): Vec2 {
   const l = len(v);
   if (l < 1e-9) return { x: fallback.x, y: fallback.y };
   return { x: v.x / l, y: v.y / l };
-}
-
-/** Dot product. */
-export function dot(a: Vec2, b: Vec2): number {
-  return a.x * b.x + a.y * b.y;
 }
 
 /**
