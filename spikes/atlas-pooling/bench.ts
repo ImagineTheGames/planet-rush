@@ -243,9 +243,28 @@ function onScreen(x: number, y: number, radius: number): boolean {
   );
 }
 
+/**
+ * Pixi decides batchability per `GraphicsContext`, and in its default `'auto'`
+ * mode the rule is one line of `GraphicsContextSystem`:
+ *
+ *     gpuContext.isBatchable = gpuContext.geometryData.vertices.length < 400
+ *
+ * A rock's silhouette, veins and cracks clear 400 comfortably, so every rock
+ * falls out of the batcher and takes a draw call of its own. Forcing
+ * `batchMode: 'batch'` puts the same triangles back in the batch buffer — same
+ * geometry, same vertices, different submission path — which is the one option
+ * on the table that cannot change a pixel by construction. Whether it is *fast*
+ * is a different question (a forced batch re-uploads its vertices every frame
+ * instead of drawing a static geometry), and that is what the scenario is for.
+ */
+function forceBatch(g: Graphics): Graphics {
+  g.context.batchMode = 'batch';
+  return g;
+}
+
 // --- A: one Graphics per rock, own context (what ships today) --------------
 
-function rocksAsGraphics(world: World, cull = false): Scenario {
+function rocksAsGraphics(world: World, cull = false, batch = false): Scenario {
   const layer = new Container();
   const gfx: Graphics[] = [];
   const keys: string[] = [];
@@ -256,7 +275,7 @@ function rocksAsGraphics(world: World, cull = false): Scenario {
   }
   let visible = 0;
   return {
-    name: cull ? 'rocks:graphics+cull' : 'rocks:graphics',
+    name: batch ? 'rocks:graphics+batch' : cull ? 'rocks:graphics+cull' : 'rocks:graphics',
     layer,
     pooled: () => gfx.length, // one context each — that IS the finding
     drawn: () => visible,
@@ -276,6 +295,9 @@ function rocksAsGraphics(world: World, cull = false): Scenario {
         if (keys[i] !== art.key) {
           g.clear();
           drawSprite(g, art.build(), ROCK_ART_SCALE);
+          // `clear()` replaces the context, so the batch flag is re-applied on
+          // every rebuild rather than once at construction.
+          if (batch) forceBatch(g);
           keys[i] = art.key;
         }
         g.x = p.x;
@@ -633,11 +655,15 @@ function nextFrame(): Promise<void> {
 /** The whole-frame baseline: the SHIPPED `Renderer`, drawing the SHIPPED scene.
  *  Not an A/B — it is the answer to "what does a busy frame cost today, and does
  *  `VfxAutoQuality` engage on it?", which the brief says outranks the A/B. */
-async function measureShippedRenderer(app: Application, world: World): Promise<Result> {
+async function measureShippedRenderer(app: Application, world: World, reduceVfx = false): Promise<Result> {
   const stage = new Container();
   app.stage.removeChildren();
   app.stage.addChild(stage);
   const renderer = new Renderer(stage, { width: VIEW.width, height: VIEW.height, originX: 0, originY: 0 });
+  // The auto-reducer's own switch, thrown by hand. Running the baseline both
+  // ways answers the question the brief cares about more than the A/B: when
+  // `VfxAutoQuality` engages, how much frame does it actually buy back?
+  renderer.setReduceVfx(reduceVfx);
   const view: RenderView = { cameraTarget: 0, muzzles: [] };
 
   for (let i = 0; i < WARMUP; i++) {
@@ -663,7 +689,7 @@ async function measureShippedRenderer(app: Application, world: World): Promise<R
   app.stage.removeChildren();
   stage.destroy({ children: true });
   return {
-    name: 'shipped:whole-frame',
+    name: reduceVfx ? 'shipped:whole-frame+reduceVfx' : 'shipped:whole-frame',
     entities: (() => {
       const n =
         world.asteroids.length +
@@ -705,8 +731,9 @@ async function main(): Promise<void> {
   const world = stressWorld();
   const stage = new Container();
 
-  // The baseline first, on its own world, before any A/B scene exists.
-  const baseline = await measureShippedRenderer(app, stressWorld());
+  // The baselines first, on their own worlds, before any A/B scene exists.
+  const baseline = await measureShippedRenderer(app, stressWorld(), false);
+  const baselineReduced = await measureShippedRenderer(app, stressWorld(), true);
 
   app.stage.removeChildren();
   app.stage.addChild(stage);
@@ -726,6 +753,9 @@ async function main(): Promise<void> {
     // the pooling win is really a "we draw the whole arena every frame" win.
     rocksAsGraphics(world, true),
     rocksAsSprites(world, new SpriteTextureCache(app.renderer as never, 1), true),
+    // Same vectors, forced into the batcher. The only candidate on the table
+    // that cannot move a pixel, so it is worth a column whatever it costs.
+    rocksAsGraphics(world, false, true),
     turretsAsGraphics(world),
     turretsAsSprites(world, new SpriteTextureCache(app.renderer as never, 1)),
     shotsAsGraphics(world),
@@ -773,6 +803,7 @@ async function main(): Promise<void> {
     frames: FRAMES,
     rounds: ROUNDS,
     baseline,
+    baselineReduced,
     results: merged,
     allRounds: rounds,
   };

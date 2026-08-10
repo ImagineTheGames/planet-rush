@@ -24,45 +24,44 @@ import { writeFileSync } from 'node:fs';
 import { chromium } from '@playwright/test';
 
 const PORT = 5183; // not 5173: leave the developer's own `npm run dev` alone
-// 127.0.0.1, not `localhost`: node's `fetch` prefers the AAAA record and vite
-// binds v4 only, so the readiness poll would time out against a server that is
-// up and answering (it did — 90 s of it).
-const URL = `http://127.0.0.1:${PORT}/spikes/atlas-pooling/bench.html`;
+const URL = `http://localhost:${PORT}/spikes/atlas-pooling/bench.html`;
 const headed = process.argv.includes('--headed');
 const jsonAt = process.argv[process.argv.indexOf('--json') + 1];
 const wantJson = process.argv.includes('--json') && jsonAt && !jsonAt.startsWith('--');
 
-/**
- * Start `vite` and resolve once it actually serves the bench page.
- *
- * Readiness is polled with a real request rather than sniffed out of vite's
- * banner: with stdout piped instead of a TTY the banner's timing and wording are
- * not something to hang a 60-second timeout on, and "the URL answers 200" is the
- * condition we actually need anyway.
- */
-async function startVite() {
+/** Start `vite` detached enough that we can always kill it again. */
+function startVite() {
   const proc = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], {
     stdio: ['ignore', 'inherit', 'inherit'],
   });
-  let dead = null;
   proc.on('exit', (code) => {
-    dead = code;
+    proc.exitedWith = code;
   });
+  return proc;
+}
 
-  const deadline = Date.now() + 90_000;
-  for (;;) {
-    if (dead !== null) throw new Error(`vite exited with ${dead}`);
-    if (Date.now() > deadline) {
-      proc.kill('SIGTERM');
-      throw new Error(`vite did not serve ${URL} within 90s`);
-    }
+/**
+ * Navigate, retrying until the dev server answers.
+ *
+ * Readiness is polled with **the browser**, not with node's `fetch` and not by
+ * sniffing vite's banner. Both of those were tried and both lie here: `fetch`
+ * resolves `localhost` differently from Chromium and spent 90 s refusing a
+ * server that was up and serving 200 to curl, and the banner prints before the
+ * socket is reliably accepting. The only client whose opinion matters is the one
+ * that has to load the page.
+ */
+async function gotoWhenReady(page, proc) {
+  const deadline = Date.now() + 120_000;
+  for (let attempt = 1; ; attempt++) {
+    if (proc.exitedWith != null) throw new Error(`vite exited with ${proc.exitedWith}`);
+    if (Date.now() > deadline) throw new Error(`vite never served ${URL}`);
     try {
-      const res = await fetch(URL);
-      if (res.ok) return proc;
-    } catch {
-      // Not listening yet.
+      await page.goto(URL, { waitUntil: 'load', timeout: 15_000 });
+      return;
+    } catch (err) {
+      if (attempt % 5 === 0) console.log(`  …waiting for ${URL} (${String(err).split('\n')[0]})`);
+      await new Promise((r) => setTimeout(r, 1000));
     }
-    await new Promise((r) => setTimeout(r, 500));
   }
 }
 
@@ -81,13 +80,23 @@ function table(payload) {
   lines.push(`sampling   : ${payload.frames} frames × ${payload.rounds} rounds (round 1 discarded)`);
   lines.push('');
 
-  const b = payload.baseline;
   lines.push('-- baseline: the SHIPPED renderer on the GDD §4.3 stress scene --');
-  lines.push(
-    `  ${b.entities} entities · median ${num(b.stats.median)} ms (${num(b.stats.fps, 1)} fps) · ` +
-      `p95 ${num(b.stats.p95)} · ${num(b.drawCallsPerFrame, 1)} draw calls/frame · ` +
-      `VfxAutoQuality would engage: ${b.vfxWouldEngage ? 'YES' : 'no'}`,
-  );
+  for (const b of [payload.baseline, payload.baselineReduced].filter(Boolean)) {
+    lines.push(
+      `  ${pad(b.name, 30)} ${b.entities} entities · median ${num(b.stats.median)} ms ` +
+        `(${num(b.stats.fps, 1)} fps) · p95 ${num(b.stats.p95)} · ` +
+        `${num(b.drawCallsPerFrame, 1)} draw calls/frame · ` +
+        `VfxAutoQuality would engage: ${b.vfxWouldEngage ? 'YES' : 'no'}`,
+    );
+  }
+  if (payload.baseline && payload.baselineReduced) {
+    const bought = payload.baseline.stats.median - payload.baselineReduced.stats.median;
+    const pctOf = (bought / payload.baseline.stats.median) * 100;
+    lines.push(
+      `  → engaging reduce-VFX buys back ${num(bought)} ms of ${num(payload.baseline.stats.median)} ms ` +
+        `(${num(pctOf, 1)}% of the frame)`,
+    );
+  }
   lines.push('');
 
   // Every scenario pays the same clear+present at 1280×800, so quoting raw
@@ -110,7 +119,7 @@ function table(payload) {
   return lines.join('\n');
 }
 
-const vite = await startVite();
+const vite = startVite();
 let exitCode = 0;
 try {
   const browser = await chromium.launch({
@@ -131,8 +140,8 @@ try {
   });
   page.on('pageerror', (e) => console.error('[page error]', e.message));
 
-  await page.goto(URL, { waitUntil: 'load' });
-  await page.waitForFunction(() => window.__atlasBench !== undefined, undefined, { timeout: 300_000 });
+  await gotoWhenReady(page, vite);
+  await page.waitForFunction(() => window.__atlasBench !== undefined, undefined, { timeout: 900_000 });
   const payload = await page.evaluate(() => window.__atlasBench);
   await browser.close();
 
@@ -150,6 +159,8 @@ try {
   console.error(err);
   exitCode = 1;
 } finally {
-  vite.kill('SIGTERM');
+  // SIGKILL, not SIGTERM: a vite still holding --strictPort 5183 makes the next
+  // run fail to start, and this rig has already lost capture runs to exactly that.
+  vite.kill('SIGKILL');
 }
 process.exit(exitCode);
