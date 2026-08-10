@@ -1,0 +1,26 @@
+{
+  "octagon": {
+    "pixels": 5184000,
+    "touchedPct": 1.1238,
+    "changedInVoid": 68,
+    "changedInWorld": 56143,
+    "changedInBackground": 2046,
+    "peakDeltaVoid": 12.9,
+    "peakDeltaWorld": 65.1,
+    "peakDeltaBackground": 3,
+    "starMaskPixels": 8059,
+    "worldMaskPixels": 724923
+  },
+  "line": {
+    "pixels": 5184000,
+    "touchedPct": 0.5411,
+    "changedInVoid": 79,
+    "changedInWorld": 27248,
+    "changedInBackground": 723,
+    "peakDeltaVoid": 9.8,
+    "peakDeltaWorld": 54.2,
+    "peakDeltaBackground": 3.1,
+    "starMaskPixels": 8361,
+    "worldMaskPixels": 1152111
+  }
+}
