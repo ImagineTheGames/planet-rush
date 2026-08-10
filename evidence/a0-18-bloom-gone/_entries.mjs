@@ -94,9 +94,19 @@ const entries = [
         'away. Suspect 2, the cull reaching a backdrop layer — all three void-stars-* layers are on the stage, ' +
         'visible, renderable, at alpha 1, on both arenas and both viewports. Suspect 3, reduced-VFX shedding more ' +
         'than it claims — THE FROZEN PROBE CANNOT TEST THIS AT ALL, because ?freeze=1 pins reduceVfx to false in ' +
-        'src/main.ts, so a separate live probe held the sim for 30 s at 4-5 fps (the reducer engaged far past its ' +
-        'trigger) and the star field is unchanged from t+2 s to t+30 s on desktop and on a phone. The comment in ' +
-        'Renderer.setReduceVfx that says the stars stay is accurate.',
+        'src/main.ts, so a separate live probe held the sim for 30 s at 4.6-5.8 fps and the star field is unchanged ' +
+        'from t+2 s to t+30 s on desktop and on a phone. The comment in Renderer.setReduceVfx that says the stars ' +
+        'stay is accurate.',
+      '',
+      'THE ONE LIMIT IN THAT THIRD SUSPECT, STATED RATHER THAN GLOSSED. The reducer\'s state was NOT read back — it ' +
+        'was INFERRED FROM THE FRAME RATE. window.__planetRush exposes shipScreen, shipWorld, viewport, fps, build, ' +
+        'ticks, input, muzzles, stageCombat, damageShip, damageCore, coreHp, layout, resolveAnchor, placement, ' +
+        'frozen, freezeTick and worldHash, and NO VFX-TIER HANDLE AT ALL, so the probe has no way to ask. What it can ' +
+        'say is that the run held 4.6-5.8 fps for 30 s while VfxAutoQuality engages on three sustained seconds under ' +
+        '30 fps (r9-01): six times under the floor for ten times the trigger window. That is a strong inference and ' +
+        'not a measurement, which is why the unit guard shipped in this round drives setReduceVfx(true) directly ' +
+        'rather than resting on it. A reduceVfx read-back on the debug handle would turn this into a measurement; it ' +
+        'lives in src/main.ts and is filed rather than added here.',
       '',
       'WHAT DID CHANGE THE LOOK, stated because the brief asked for it if the bloom turned out to be present. The ' +
         '56,143 world pixels are a1-11 re-baking the entity looks as mipmapped sprites, concentrated on silhouette ' +

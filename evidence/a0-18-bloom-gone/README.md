@@ -37,7 +37,22 @@ nearest one to the star is 20.2 device px away.
 |---|---|---|---|
 | 1 | **pooling (a1-11)** bakes at a different scale or quantises alpha, so a 6% wash dies while the 1 px core survives | **cleared** | the star layers are not baked at all — `VoidBackdrop.configure` plays them into `Graphics` with `drawSprite(…, 1)` and never touches `SpriteTextureCache`. Read off the *running* build, the halo alphas arrive as 0.0169–0.1472, i.e. `BLOOM.intensity` applied and not rounded away |
 | 2 | **the cull (a1-12)** reaching a backdrop layer it should never touch | **cleared** | all three `void-stars-*` layers are on the stage, `visible`, `renderable`, `alpha` 1, on both arenas and both viewports; the backdrop is a sibling of `worldRoot`, and the cull only ever writes `visible` on entity layers |
-| 3 | **reduced-VFX** shedding more than it claims | **cleared, and on the path that can actually show it** | `?freeze=1` pins `reduceVfx` to false (`src/main.ts`), so the frozen probe cannot test this at all. `probe-live.mjs` runs the sim for 30 s at **4–5 fps** — the reducer is engaged well past its trigger — and the star field is unchanged from t+2 s to t+30 s, desktop and phone. The comment in `Renderer.setReduceVfx` is not a lie |
+| 3 | **reduced-VFX** shedding more than it claims | **cleared, and on the path that can actually show it** | `?freeze=1` pins `reduceVfx` to false (`src/main.ts`), so the frozen probe cannot test this at all. `probe-live.mjs` runs the sim for 30 s at **4–5 fps** and the star field is unchanged from t+2 s to t+30 s, desktop and phone. The comment in `Renderer.setReduceVfx` is not a lie |
+
+**One limit of that third row, stated rather than glossed.** The reducer's state was
+**not read back — it was inferred from the frame rate.** `window.__planetRush`
+exposes `shipScreen, shipWorld, viewport, fps, build, ticks, input, muzzles,
+stageCombat, damageShip, damageCore, coreHp, layout, resolveAnchor, placement,
+frozen, freezeTick, worldHash` and **no VFX-tier handle at all**, so the probe has
+no way to ask. What it can say is that the run held **4.6–5.8 fps for 30 s**, and
+`VfxAutoQuality` engages on a sustained drop below the fps floor — three seconds
+under 30 fps, per r9-01. A run six times under the floor for ten times the trigger
+window all but certainly had the reducer on, and the star field did not move
+across it; but "all but certainly" is the honest strength of this row, and the
+`backdrop-bloom.test.ts` tests that drive `setReduceVfx(true)` directly are what
+close it properly. **A `reduceVfx` read-back on the debug handle would make this
+row a measurement instead of an inference** — worth filing, and it is `src/main.ts`,
+so not this round's to add.
 
 The brief said to say so if the bloom turned out to be present and something else
 had changed the look. **Something else did change the look, and it is the rocks.**
