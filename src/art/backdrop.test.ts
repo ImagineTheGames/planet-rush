@@ -35,6 +35,7 @@ import {
   NEBULAE,
   NEBULA_IDS,
   SKY_PARALLAX,
+  SKY_REDUCED_FLOOR,
   STAR_LAYERS,
   UNASSIGNED_NEBULAE,
   VOID_SEED,
@@ -43,6 +44,7 @@ import {
   nebulaForMap,
   nebulaSprite,
   nebulaTileSprite,
+  reducedSkyDensity,
   starFieldSprite,
   type MapId,
   type NebulaId,
@@ -149,9 +151,12 @@ function luma(rgb: readonly [number, number, number]): number {
 }
 
 /** The brightest pixel a sky composites to over Floor, and the field mean. */
-function skyBrightness(id: NebulaId): { peak: [number, number, number]; peakLuma: number; meanLuma: number } {
+function skyBrightness(
+  id: NebulaId,
+  density = 1,
+): { peak: [number, number, number]; peakLuma: number; meanLuma: number } {
   const spec = NEBULAE[id];
-  const shapes = nebulaSprite(id, VOID_SEED, FIELD.w, FIELD.h).shapes;
+  const shapes = nebulaSprite(id, VOID_SEED, FIELD.w, FIELD.h, density).shapes;
   const COLS = 200;
   const ROWS = 120;
   let peak: [number, number, number] = unpack(GROUND_COLOR);
@@ -230,7 +235,10 @@ describe('the sky cost/brightness table', () => {
         `mean Y′ ${String(b.meanLuma).padStart(5)}`,
         `tax ${`${(tax * 100).toFixed(1)}%`.padStart(5)}`,
         `ΔE ring ${dE(PALETTE.plasma)} / red ${dE(PALETTE.threatRed)} / ore ${dE(PALETTE.signalYellow)}`,
-        `reduced ${spec.reducedDensity}`,
+        // What the auto-reducer leaves, and what that saves — both, since r9-01:
+        // a declared shed that nobody measured is how a whole sky came to be
+        // deleted "because a fraction of it saves a fraction of nothing".
+        `reduced ${spec.reducedDensity} → od ${id === 'none' ? '0.000' : overdrawOf(id, reducedSkyDensity(spec)).toFixed(3)}`,
         spec.additive ? 'ADDITIVE' : spec.occludes ? 'occludes' : '',
       ].join(' | ');
     });
@@ -655,14 +663,63 @@ describe('the perf budget (GDD §4.3 risk 5)', () => {
     for (const id of NEBULA_IDS) {
       const spec = NEBULAE[id];
       const full = nebulaSprite(id, VOID_SEED, FIELD.w, FIELD.h, 1).shapes.length;
-      if (spec.reducedDensity === 0) {
-        // Dropped entirely — the renderer skips the layer, so nothing is built.
-        expect(spec.id === 'none' || spec.additive, `${spec.name} drops under reduce`).toBe(true);
+      if (id === 'none') {
+        // The one sky that is no geometry at any tier. It declares 0 and means
+        // it; the renderer skips this layer on the id, never on the density.
+        expect(full, 'None builds nothing').toBe(0);
         continue;
       }
       const reduced = nebulaSprite(id, VOID_SEED, FIELD.w, FIELD.h, spec.reducedDensity).shapes.length;
       expect(reduced, spec.name).toBeLessThanOrEqual(full);
       if (spec.reducedDensity < 1) expect(reduced, spec.name).toBeLessThan(full);
+    }
+  });
+
+  /**
+   * **r9-01 — the shed has a floor, and the table has to sit on it.** The Oval's
+   * sky left the stage 8.3 s into a live match because Plasma Reef declared
+   * `reducedDensity: 0` and `0` meant *delete the layer*. The behaviour is fixed
+   * in the renderer (`backdrop-reducer.test.ts` holds that half); this is the
+   * half that keeps the *table* from re-authoring the cliff — a sky with geometry
+   * may never declare itself away, and what a throttled device is left with has
+   * to still be a sky.
+   */
+  it('no sky with geometry can be declared out of existence', () => {
+    for (const id of NEBULA_IDS) {
+      const spec = NEBULAE[id];
+      if (id === 'none') continue;
+      expect(spec.reducedDensity, `${spec.name} declares at or above the floor`).toBeGreaterThanOrEqual(
+        SKY_REDUCED_FLOOR,
+      );
+      // The backstop, independently: whatever the table says, the density the
+      // renderer builds with is positive and leaves real geometry behind.
+      const d = reducedSkyDensity(spec);
+      expect(d, spec.name).toBeGreaterThanOrEqual(SKY_REDUCED_FLOOR);
+      expect(nebulaSprite(id, VOID_SEED, FIELD.w, FIELD.h, d).shapes.length, spec.name).toBeGreaterThan(0);
+    }
+    // And the clamp genuinely clamps, on a spec the table is not allowed to hold.
+    expect(reducedSkyDensity({ ...NEBULAE.plasmaReef, reducedDensity: 0 })).toBe(SKY_REDUCED_FLOOR);
+  });
+
+  it('a thinned sky is a cheaper sky and never a brighter one', () => {
+    for (const id of NEBULA_IDS) {
+      const spec = NEBULAE[id];
+      if (id === 'none' || spec.reducedDensity >= 1) continue;
+      const d = reducedSkyDensity(spec);
+      // Cheaper: the whole reason the tier exists. Reported, not just asserted —
+      // "a fraction of it saves a fraction of nothing" was the claim that made
+      // the reef droppable, and it was never measured.
+      const full = overdrawOf(id);
+      const thin = overdrawOf(id, d);
+      // eslint-disable-next-line no-console
+      console.log(
+        `  ${spec.name.padEnd(13)} reduced ${d}: overdraw ${full.toFixed(3)} -> ${thin.toFixed(3)} ` +
+          `(${((1 - thin / full) * 100).toFixed(0)}% of this sky's fill, gone)`,
+      );
+      expect(thin, `${spec.name} costs less thinned`).toBeLessThan(full);
+      // Never brighter: fewer elements can only remove light, and on the additive
+      // sky that is the one direction that could have surprised us.
+      expect(skyBrightness(id, d).peakLuma, `${spec.name} peak`).toBeLessThanOrEqual(spec.peakLuma * 1.001);
     }
   });
 

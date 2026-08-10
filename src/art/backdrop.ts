@@ -1,6 +1,32 @@
 /**
  * src/art/backdrop.ts — the void, v3: the darker space. OWNER: Art Agent.
  *
+ * **r9-01 — a sky may thin, and it may never leave.** Nothing about what any sky
+ * *is* changed here either; what changed is what the auto-reducer is allowed to
+ * do to one. Measured on the served build `dd1d3f5`, two live boots side by side
+ * for 40 s: The Oval booted **with** `void-nebula-plasmaReef` on the stage, held
+ * it for three polls, and at **t+8.3 s the layer was gone** — while Line, the
+ * control on the same box under the same load, kept `void-nebula-deepEmber` for
+ * the full 40 s. The reef was the only coloured sky declaring
+ * {@link NebulaSpec.reducedDensity} `0`, and `0` meant *delete the layer*, so a
+ * whole sky popped out of the frame in one frame on a machine that was merely
+ * warm. Two rules now stand between the reducer and that:
+ *
+ *  1. **A floor** — {@link SKY_REDUCED_FLOOR}. A throttled sky is a *thinner*
+ *     sky, never an absent one; the reducer may take at most three quarters of
+ *     one. Plasma Reef declares `0.45` on measured grounds (see it), and layer
+ *     *presence* is no longer a function of the VFX tier at all.
+ *  2. **The tier is read once, at build** — {@link VoidBackdrop.configure} pins
+ *     the density the first time a sky goes on the stage and holds it until the
+ *     sky itself changes. A device that boots throttled gets the thin sky for the
+ *     whole match; a device that throttles at t+8 s keeps the sky it started
+ *     with. Either way the transition never happens in front of the player.
+ *
+ * That second rule is Coalsack's own argument, generalised: *"shedding it
+ * mid-match would make a wall of stars appear at once"* is a hazard about
+ * **mid-match**, not about dust, and it was already written on this file before
+ * the reef went missing.
+ *
  * **a0-07b — how the sky MOVES.** One number changed since the ratification
  * below, and nothing about what the sky *is*: the distant skies drift at
  * {@link SKY_PARALLAX} `0.085` instead of `0.05`, so they travel with the far
@@ -76,7 +102,7 @@
  * sheets, 22 blobs) are what a *phone* sees, and {@link NebulaSpec.overdraw} is
  * a genuine per-frame constant a test can pin on any map. Each sky declares its
  * own {@link NebulaSpec.reducedDensity}: what `VfxAutoQuality` leaves of it when
- * the auto-reducer throttles a device — 0 drops the layer.
+ * the auto-reducer throttles a device — never nothing (r9-01).
  *
  * Sizing to the *field* instead was the first build's mistake and it is worth
  * remembering: on a wide arena the parallax field is ~2.2 screens across, so
@@ -284,6 +310,38 @@ export const BLOOM = {
 export type NebulaId = 'none' | 'coalsack' | 'ironVeil' | 'patinaDrift' | 'plasmaReef' | 'deepEmber';
 
 /**
+ * **The floor under a shed sky (r9-01).** The auto-reducer may take at most
+ * three quarters of a sky's elements; what is left is thin, and it is still
+ * there. Stated as a rule rather than a taste, because the failure it prevents
+ * is categorical: a layer that goes to zero *disappears*, and every value above
+ * zero merely *thins*. There is no continuum across that boundary, which is why
+ * `0` was never a tuning choice one notch below `0.1` — it was a different
+ * behaviour wearing a number's clothes.
+ *
+ * A quarter is where the arithmetic stops meaning anything on a phone: Patina
+ * Drift, the sky with the most parts, is 22 wisps per screenful and 0.25 of it is
+ * five — below that a sky rounds toward one or two elements and is a shape, not
+ * a field. If a sky is ever genuinely too expensive to keep at a quarter, the
+ * honest fix is a cheaper sky on that map, not a vanishing one.
+ *
+ * This is a **backstop, not the mechanism**: every sky with geometry declares a
+ * {@link NebulaSpec.reducedDensity} at or above it on its own measured merits,
+ * and `backdrop.test.ts` asserts that, so the clamp should never bite. It exists
+ * so that a future `0` — the exact edit that cost The Oval its sky — cannot
+ * quietly reintroduce the cliff.
+ */
+export const SKY_REDUCED_FLOOR = 0.25;
+
+/**
+ * The density a sky is built at on a throttled device: its declared
+ * {@link NebulaSpec.reducedDensity}, never below {@link SKY_REDUCED_FLOOR}.
+ * Always > 0 — a sky's *presence* is not a function of the VFX tier.
+ */
+export function reducedSkyDensity(spec: NebulaSpec): number {
+  return Math.max(spec.reducedDensity, SKY_REDUCED_FLOOR);
+}
+
+/**
  * One sky: what it looks like, where it sits in the stack, what it costs, and
  * what the auto-reducer leaves of it. A spec rather than six ad-hoc functions,
  * because the perf story has to be statable per sky (brief) and a table is the
@@ -339,11 +397,20 @@ export interface NebulaSpec {
   readonly peakLuma: number;
   /**
    * What `VfxAutoQuality` leaves of this sky on a throttled device (GDD §4.3
-   * risk 5): a multiplier on element count, where **0 drops the layer**. The
-   * cheap skies keep their whole selves — dropping an occluding dust lane would
-   * make a wall of stars appear mid-match, which is a worse artefact than the
-   * cost it saves. The additive one goes, because additive overdraw *is* the
-   * cost.
+   * risk 5): a multiplier on element count, floored at {@link SKY_REDUCED_FLOOR}
+   * so it can **never mean "no layer"** (r9-01). The cheap skies keep their whole
+   * selves — thinning an occluding dust lane would make a wall of stars appear,
+   * which is a worse artefact than the cost it saves. The additive one thins
+   * hardest, because additive overdraw *is* the cost, and it thins to a sky
+   * rather than to nothing.
+   *
+   * It is read **once per sky, at build** ({@link VoidBackdrop.configure}), never
+   * re-read while that sky is on the stage — so this number describes the sky a
+   * throttled device *boots* into, not something that happens to a player who is
+   * already looking at it.
+   *
+   * `none` declares 0 and means it: it has no geometry either way, and the
+   * renderer skips the layer on the id, not on this number.
    */
   readonly reducedDensity: number;
   /**
@@ -514,6 +581,9 @@ const NONE: NebulaSpec = {
   additive: false,
   overdraw: 0,
   peakLuma: 1.9,
+  // The one honest 0 in the table: there is no geometry to thin, and the
+  // renderer skips this layer on the id rather than on the density, so it is
+  // never a sky that leaves — it is a sky that was never there.
   reducedDensity: 0,
   build: () => [],
 };
@@ -707,9 +777,23 @@ const PLASMA_REEF: NebulaSpec = {
   additive: true,
   overdraw: 1.121,
   peakLuma: 17.4,
-  // Dropped. Additive overdraw is the entire cost of this sky, so a fraction of
-  // it saves a fraction of nothing; the map keeps its Floor and its stars.
-  reducedDensity: 0,
+  // **Thinned to a third of its parts, not dropped (r9-01).** The old value was
+  // 0 — "a fraction of it saves a fraction of nothing" — and that claim was
+  // never measured. It is wrong, and the shape of the cost says why: the reef's
+  // fill is not in its clots (r ≈ 0.045–0.095 of a screen half-height) but in
+  // the three broad base washes under them (r ≈ 0.5–0.8). Shedding at 0.45 takes
+  // the washes 3 → 1 and the clots 9 → 4, and on the canonical 1600×900 screenful
+  // that is measured overdraw **1.121 → 0.463: 59% of this sky's fill, gone.**
+  // The throttled reef then costs less than Coalsack (0.691) or Deep Ember
+  // (0.746) — every coloured sky but Iron Veil — while still being a reef.
+  //
+  // 0.45 rather than lower because below it the saving stops arriving — the last
+  // base wash is the floor of the cost. 0.30 measures 0.443 and 0.15 measures
+  // 0.414: a further 2% and 4% of the full reef's fill, for clots 4 → 3 → 1. The
+  // floor itself (0.25 → 0.427) would buy 3% more frame and cost half the clots.
+  // Nor higher: 0.5 rounds the second base wash back in and jumps to 0.701,
+  // keeping only 37%.
+  reducedDensity: 0.45,
   build(seed, width, height, density, screenW, screenH) {
     const rng = mulberry32((seed ^ 0x51a5_9aee) >>> 0);
     const out: Shape[] = [];
@@ -873,8 +957,9 @@ export type MapId = 'octagon' | 'compass' | 'oval' | 'diamond' | 'line' | 'cresc
  *    every roster below eight it is the board with the fewest entities on it,
  *    and it is a wide arena whose stations sit spread around a rim with an empty
  *    middle. It is the one board with fill-rate to spare — and under
- *    `VfxAutoQuality` the reef is the sky that drops, so a throttled phone stops
- *    paying for it entirely.
+ *    `VfxAutoQuality` the reef is the sky that thins hardest, so a throttled
+ *    phone pays 41% of it (r9-01: it used to pay none of it, by making the sky
+ *    leave the frame mid-match).
  *  - **`crescents` → Iron Veil.** (a0-12, claiming one of the two skies this
  *    registry held open.) The Crescents is the busiest *frame* in the set: two
  *    arcs of four face each other across one small bowl, every home is the same
@@ -1117,10 +1202,13 @@ export function coverSpan(f: number, view: number, bound: number): number {
 
 /**
  * The void backdrop: build once with {@link configure} (idempotent — it rebuilds
- * only when the arena bounds, the viewport, the map or the VFX tier change),
- * then call {@link update} every frame with the camera offset the renderer
- * already computed. Add {@link view} to the scene graph *behind* the world
- * container.
+ * only when the arena bounds, the viewport or the map change), then call
+ * {@link update} every frame with the camera offset the renderer already
+ * computed. Add {@link view} to the scene graph *behind* the world container.
+ *
+ * The VFX tier is deliberately **not** on that list of rebuild triggers (r9-01).
+ * It is read once per sky, when the sky is built, and pinned from then on —
+ * see {@link skyDensity}.
  */
 export class VoidBackdrop {
   /** The screen-space root — add behind the world container. */
@@ -1129,33 +1217,60 @@ export class VoidBackdrop {
   private layers: Layer[] = [];
   private reduced = false;
   private nebula: NebulaSpec = NEBULAE[MAP_NEBULA.octagon];
+  /**
+   * **The pin (r9-01).** The density the sky on the stage was built at, decided
+   * the first time this sky is built and then held for as long as it is the
+   * sky — so the auto-reducer engaging (or releasing) at t+8 s changes nothing a
+   * player is looking at. `null` = no sky committed yet, so the next
+   * {@link configure} reads the tier.
+   */
+  private pinnedDensity: number | null = null;
   /** The config the current geometry was built for, so a no-op frame rebuilds
    *  nothing (GDD §4.3). `-1` = never built. */
   private builtW = -1;
   private builtH = -1;
   private builtBoundsW = -1;
   private builtBoundsH = -1;
-  private builtReduced = false;
+  private builtDensity = -1;
   private builtNebula: NebulaId | '' = '';
 
   constructor(private readonly seed: number = VOID_SEED) {
     this.view.label = 'void-backdrop';
   }
 
-  /** Thin the sky on a throttled device (GDD §4.3 risk 5). Each sky declares
-   *  what survives — {@link NebulaSpec.reducedDensity}, 0 to drop it — because
-   *  "the nebula" is no longer one thing with one cost. The stars, near-free
-   *  once baked, and the ground, which is one opaque quad, always stay.
-   *  Rebuilds only on a real change. */
+  /**
+   * Thin the *next* sky on a throttled device (GDD §4.3 risk 5). Each sky
+   * declares what survives — {@link NebulaSpec.reducedDensity} — because "the
+   * nebula" is no longer one thing with one cost. The stars, near-free once
+   * baked, and the ground, which is one opaque quad, always stay.
+   *
+   * **This never touches the sky already on the stage** (r9-01). It records the
+   * tier; {@link configure} reads it only when it has no sky committed, so this
+   * call cannot rebuild, cannot re-scatter and cannot remove a layer a player is
+   * looking at. It is free to be called every frame, in either direction, which
+   * is exactly what the renderer does.
+   *
+   * The consequence, stated rather than discovered: a device that drops below
+   * the fps floor *mid-match* buys back nothing from the backdrop — it buys it
+   * from the impact glows, the spawn shimmer and the station halo, which are all
+   * per-frame decisions and can flip mid-match without an artefact. The backdrop
+   * pays on the next map instead. That is the trade, and it is the right way
+   * round: a rebake of every layer's geometry at the moment frames are already
+   * bad is a hitch on top of a stall, and it was buying the frame it interrupted.
+   */
   setReduceVfx(on: boolean): void {
     this.reduced = on;
   }
 
   /** Point the backdrop at a map, which is what chooses its sky
    *  ({@link MAP_NEBULA}). Cheap and idempotent; the rebuild happens lazily in
-   *  {@link configure}. An unknown id falls back to the default map's sky. */
+   *  {@link configure}. An unknown id falls back to the default map's sky. A
+   *  *different* sky releases the density pin — the new one is entitled to read
+   *  the current VFX tier, since nobody is looking at it yet (r9-01). */
   setMap(mapId: string | undefined): void {
-    this.nebula = nebulaForMap(mapId);
+    const next = nebulaForMap(mapId);
+    if (next.id !== this.nebula.id) this.pinnedDensity = null;
+    this.nebula = next;
   }
 
   /** The sky currently built (or about to be) — the renderer's read-back, and
@@ -1165,18 +1280,35 @@ export class VoidBackdrop {
   }
 
   /**
+   * The density this sky is (or will be) built at: 1 at full VFX, and
+   * {@link reducedSkyDensity} if the tier was throttled when the sky was
+   * committed. Always > 0 — the read-back for "the sky thinned" as against the
+   * defect this replaced, "the sky left" (r9-01).
+   */
+  get skyDensity(): number {
+    return this.pinnedDensity ?? (this.reduced ? reducedSkyDensity(this.nebula) : 1);
+  }
+
+  /**
    * Build (or rebuild) the field to cover a `viewW`×`viewH` viewport over a
    * `boundsW`×`boundsH` arena. Cheap no-op when nothing changed — safe to call
    * every frame. Geometry is played into static `Graphics` here and only moved
    * thereafter.
    */
   configure(boundsW: number, boundsH: number, viewW: number, viewH: number): void {
+    // **Commit the tier here, once (r9-01.)** The sky's density is decided the
+    // first time this sky is built and pinned; from then on the rebuild key
+    // carries the pinned number rather than the live `reduced` flag, so the
+    // reducer flipping mid-match is not a rebuild trigger at all. A resize that
+    // *does* rebuild (a mobile URL-bar reflow, a rotate) re-bakes the same sky at
+    // the same density rather than taking the chance to shed it.
+    const density = (this.pinnedDensity ??= this.reduced ? reducedSkyDensity(this.nebula) : 1);
     if (
       this.builtW === viewW &&
       this.builtH === viewH &&
       this.builtBoundsW === boundsW &&
       this.builtBoundsH === boundsH &&
-      this.builtReduced === this.reduced &&
+      this.builtDensity === density &&
       this.builtNebula === this.nebula.id &&
       this.layers.length > 0
     ) {
@@ -1186,7 +1318,7 @@ export class VoidBackdrop {
     this.builtH = viewH;
     this.builtBoundsW = boundsW;
     this.builtBoundsH = boundsH;
-    this.builtReduced = this.reduced;
+    this.builtDensity = density;
     this.builtNebula = this.nebula.id;
 
     // Discard any prior build.
@@ -1202,8 +1334,10 @@ export class VoidBackdrop {
     this.view.addChild(ground);
     this.layers.push({ gfx: ground, parallax: 0 });
 
-    const density = this.reduced ? this.nebula.reducedDensity : 1;
-    const drawSky = this.nebula.id !== 'none' && density > 0;
+    // A sky is drawn because the map has one, full stop. The VFX tier decides how
+    // MUCH of it, never whether — `none` is the only sky that is no layer, and it
+    // is no layer at every tier (r9-01).
+    const drawSky = this.nebula.id !== 'none';
     const sky = (): void => {
       if (!drawSky) return;
       const nw = coverSpan(this.nebula.parallax, viewW, boundsW);
@@ -1245,10 +1379,14 @@ export class VoidBackdrop {
     }
   }
 
-  /** Release every layer's geometry (context loss / teardown). */
+  /** Release every layer's geometry (context loss / teardown). The density pin
+   *  goes with them: nothing is on the stage, so the next build is entitled to
+   *  read the tier afresh (r9-01). */
   destroy(): void {
     for (const l of this.layers) l.gfx.destroy();
     this.layers = [];
     this.view.removeChildren();
+    this.pinnedDensity = null;
+    this.builtDensity = -1;
   }
 }

@@ -1738,5 +1738,65 @@
     "buildSha": "dd1d3f5",
     "attestation": "THE REPORT THIS ROUND WAS CALLED FOR: 'it doesnt look right, perhaps the stars that are supposed to be there are underneath?', from live play, on soft grey discs in an otherwise empty field. The registry half is closed by `a1-07-octagon-sky-none`: on octagon, the DEFAULT arena, there is no `void-nebula-*` layer on the stage and hiding that prefix changes zero pixels. So the discs are not the sky. THIS ASKS WHAT THEY ARE, off the frame. The frame used has EVERY void layer but `void-ground` hidden — no sky, not one star, NOT ONE BLOOM HALO — so anything still standing in the empty field is a world object. A flood fill over everything brighter than Floor and neutral in hue (which already excludes the station's blue rings, the ore's yellow and the HUD text) finds 16 objects. SIX OF THEM ARE NAMED RATHER THAN QUIETLY COUNTED IN: one station body / halo ring (512x512 px), two station parts sitting inside that ring, and three arena wall bands (the 1-10 px x 635 px slivers that are ARENA_WALL_BANDS, the edge of the world). THE OTHER TEN ARE ROCKS: compact (elongation 1.0-2.1), neutral mid-grey (mean ink clustered rgb(51-64, 57-70, 64-78) — the rock family), with the lighter silhouette rim that makes them read as soft-edged at page scale. Their equivalent diameters run 16.8 to 74.2 CSS px, median 62.7. THE COMPARISON THE BRIEF ALREADY SET UP: the largest star is the `near` layer at `maxR 2.2` and its outer bloom halo is 4.3x that — 18.9 px across at ~6% alpha (`BLOOM.intensity[1] = 0.065`). The median disc here is 3.3x that halo AND OPAQUE rather than a 6% wash. The ruling-out in the brief holds, and this is what is left standing. It also fits the report's own wording: 'the stars that are supposed to be there are underneath' is exactly true of an opaque rock. VERDICT — INCONCLUSIVE, and deliberately so. What is proven is what is in THIS frame: on the default arena, with no sky and every star layer off, the empty field still contains ten soft-edged neutral-grey discs several times the size of the largest bloom, and they are the asteroids. What is NOT proven is that this is what the developer was looking at — nobody has matched their frame to a map, a build or a moment, and they may have been on one of the five arenas that does carry a sky. This is a lead for the Director to take back to them, not a closed answer.",
     "verdict": "inconclusive"
+  },
+  {
+    "id": "r9-01-oval-sky-gone-before",
+    "title": "The Oval — the sky is gone 45 s in (before, dd1d3f5)",
+    "area": "backdrop",
+    "image": "images/r9-01-before-oval-t45s.png",
+    "capturedAt": "2026-08-10T03:35:00Z",
+    "buildSha": "dd1d3f5",
+    "attestation": "The Oval on the pre-fix bundle, 45 s into a live ?debug=1 boot with the CPU throttled 8× from t+3 s. The frame is Floor and the star-field and nothing else: there is no cyan anywhere in it. The blue owner beacon rings, the yellow-cored station, two grey asteroids left of centre and the Warden/Rusty nameplates are all present, so this is a live playing frame, not a blank one. Wave clock reads 'WAVE 1/5 · Outer Drift / NEXT 2:01 / MATCH 0:30'. Build stamp 'dd1d3f5' bottom-left. The scene-graph poll behind this frame recorded void-nebula-plasmaReef present at t+1 s and t+2 s and absent from t+6.1 s onward, for the remaining 39 s. This is the defect: a whole sky left the frame in one frame.",
+    "verdict": "verified"
+  },
+  {
+    "id": "r9-01-oval-sky-survives-after",
+    "title": "The Oval — the sky is still there 45 s in (after, 7a90b22)",
+    "area": "backdrop",
+    "image": "images/r9-01-after-oval-t45s.png",
+    "capturedAt": "2026-08-10T03:36:00Z",
+    "buildSha": "7a90b22",
+    "attestation": "The same arena, same seed, same throttle, on the r9-01 bundle: 45 s in, Plasma Reef's soft cyan clots are visible across the frame — a cluster low-left of the station, a broad wash down the left third, more knots mid-right and lower-centre. Everything else matches the before frame: same wave ('WAVE 1/5 · Outer Drift'), match clock 0:31 against 0:30, the same two asteroids in the same places, the same blue beacon rings. Build stamp '7a90b22' bottom-left. The poll behind this frame recorded void-nebula-plasmaReef present in all 45 samples, while the station atmosphere halo dropped from 53 instructions to 13 at t+18 s — i.e. the reduce-VFX tier DID engage and the sky stayed anyway.",
+    "verdict": "verified"
+  },
+  {
+    "id": "r9-01-line-control-before",
+    "title": "Line — the control sky, before (dd1d3f5)",
+    "area": "backdrop",
+    "image": "images/r9-01-before-line-t45s.png",
+    "capturedAt": "2026-08-10T03:35:00Z",
+    "buildSha": "dd1d3f5",
+    "attestation": "The Line on the pre-fix bundle, run in parallel with the Oval case on the same box under the same 8× CPU throttle. Deep Ember is plainly present at 45 s: warm dark-red bodies at the left edge, lower-centre and down the right third, exactly the 'felt at the edges' read. Three stations (teal, blue-owned centre, green), four asteroid clusters right, minimap bottom-right. Build stamp 'dd1d3f5'. The poll recorded void-nebula-deepEmber in all 45 samples with reduce-VFX engaged at t+6.7 s. This is the control: on the same box, at the same time, under the same throttle, a sky with reducedDensity 1 did not leave — so the Oval's loss was not the box, the bundle or the harness.",
+    "verdict": "verified"
+  },
+  {
+    "id": "r9-01-line-control-after",
+    "title": "Line — the control sky, after (7a90b22)",
+    "area": "backdrop",
+    "image": "images/r9-01-after-line-t45s.png",
+    "capturedAt": "2026-08-10T03:37:00Z",
+    "buildSha": "7a90b22",
+    "attestation": "The Line on the r9-01 bundle, same conditions. Indistinguishable from the before frame: the same Deep Ember bodies in the same places at the same value, the same three stations, the same asteroids, match clock 0:33 against 0:32. Build stamp '7a90b22'. void-nebula-deepEmber in all 45 samples. This is the no-change control for the FIX: a sky that already survived the reducer is untouched by it, which is what the brief required of Coalsack's and Deep Ember's reducedDensity 1.",
+    "verdict": "verified"
+  },
+  {
+    "id": "r9-01-plasma-reef-full",
+    "title": "Plasma Reef at full density — the reference",
+    "area": "backdrop",
+    "image": "images/r9-01-plasma-reef-full.png",
+    "capturedAt": "2026-08-10T03:41:00Z",
+    "buildSha": "7a90b22",
+    "attestation": "Plasma Reef composited over Floor with the three star layers, authored for an 844×390 phone screen over The Oval's 3200×2000 field, rendered at 2× with true per-channel additive accumulation (the same maths backdrop.test.ts measures peak luma with). 1336 reef shapes. Knots of faint cyan are spread across the whole frame — upper-left, upper-right, a dense group left of centre, more lower-centre and right — sitting on three broad, barely-there base washes. Nothing in it approaches the ink outline's value; the brightest clots read as light, not as an object. This is the reference the reduced tier is judged against.",
+    "verdict": "verified"
+  },
+  {
+    "id": "r9-01-plasma-reef-reduced",
+    "title": "Plasma Reef thinned to 0.45 — a sky, not an absence",
+    "area": "backdrop",
+    "image": "images/r9-01-plasma-reef-reduced.png",
+    "capturedAt": "2026-08-10T03:41:00Z",
+    "buildSha": "7a90b22",
+    "attestation": "The same sky at reducedDensity 0.45 — what a device that BUILDS its sky while already throttled gets. 608 shapes against 1336, one base wash against three, four clots against nine, and measured overdraw 0.463 against 1.121. It is unmistakably still Plasma Reef: two clusters of cyan knots down the left-of-centre column, one upper-right, one lower-centre, all at the same size, hue and alpha as the full sky — thinner, not dimmer and not different. The clot POSITIONS differ from the full plate because element count seeds the layout; that is exactly why the density is pinned at build and never changed mid-match, so a player never sees the two.",
+    "verdict": "verified"
   }
 ]
