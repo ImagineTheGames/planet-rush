@@ -257,6 +257,13 @@ interface ShieldMemo {
   hp: number;
   maxHp: number;
   radius: number;
+  /** The station's position. Kept for the same reason `TurretMemo.owner` is: the
+   *  `shieldDown` tell is emitted from the memo, after the station loop has
+   *  ended, so there is no station left to ask where the bubble was. */
+  x: number;
+  y: number;
+  /** The station owner's slot — a collapsed shield rings the alarm (GDD §2.2). */
+  owner: number;
   seen: number;
 }
 
@@ -595,8 +602,47 @@ export class WorldObserver {
       this.observeBuilds(station, out, silent);
     }
 
+    // ── The three memo maps are WORLD-wide, so all three are pruned HERE ──────
+    // `observeBuilds` has always said why ("pruning it per station would drop the
+    // other seven stations' jobs and re-announce them on the next frame"), and
+    // the turret and shield sweeps used to do exactly that, one function below
+    // the sentence warning against it. Every frame, station 0's pass deleted the
+    // other seven stations' turrets — announcing a `turretDown` for each — and
+    // then their own passes found them missing and announced a `buildComplete`.
+    //
+    // Measured on a real twenty-second match (a2-07): **1176 turret deaths and
+    // 1183 build completions**, roughly one of each per turret per frame, none
+    // of which happened. Silent for as long as nothing drew them; the moment the
+    // VFX layer was wired it became every station flashing twice a frame. The
+    // audio half has been sounding them the whole time, and `turretDown` is one
+    // of the three damage kinds that ring the under-attack alarm (GDD §2.2).
+    this.sweepTurrets(out, silent);
+    this.sweepShields(out, silent);
     this.forget(this.stations);
     this.forget(this.builds);
+  }
+
+  /** Turrets that were not seen this frame: picked off (GDD §2.6), or lost with
+   *  the station they were mounted on. Runs once per frame, after every station. */
+  private sweepTurrets(out: TellQueue, silent: boolean): void {
+    for (const [id, memo] of this.turrets) {
+      if (memo.seen === this.frame) continue;
+      // "A patient attacker can pick off turrets from the edge of their range"
+      // (GDD §2.6) — a deterrent dying is a tell the owner should hear, so it
+      // carries the owner: this is one of the three damage kinds that ring the
+      // under-attack alarm (GDD §2.2, "core, shield, or turrets").
+      if (!silent) out.push(TELL.turretDown, memo.x, memo.y, memo.angle, 1, memo.owner);
+      this.turrets.delete(id);
+    }
+  }
+
+  /** Shields that were not seen this frame: pressure beat regeneration (§2.6). */
+  private sweepShields(out: TellQueue, silent: boolean): void {
+    for (const [id, memo] of this.shields) {
+      if (memo.seen === this.frame) continue;
+      if (!silent) out.push(TELL.shieldDown, memo.x, memo.y, 0, clamp01(memo.radius / 64), memo.owner);
+      this.shields.delete(id);
+    }
   }
 
   private observeTurrets(station: StationView, out: TellQueue, silent: boolean): void {
@@ -631,23 +677,21 @@ export class WorldObserver {
       memo.radius = turret.radius;
       memo.owner = station.owner;
     }
-
-    for (const [id, memo] of this.turrets) {
-      if (memo.seen === this.frame) continue;
-      // "A patient attacker can pick off turrets from the edge of their range"
-      // (GDD §2.6) — a deterrent dying is a tell the owner should hear, so it
-      // carries the owner: this is one of the three damage kinds that ring the
-      // under-attack alarm (GDD §2.2, "core, shield, or turrets").
-      if (!silent) out.push(TELL.turretDown, memo.x, memo.y, memo.angle, 1, memo.owner);
-      this.turrets.delete(id);
-    }
   }
 
   private observeShields(station: StationView, out: TellQueue, silent: boolean): void {
     for (const shield of station.shields) {
       let memo = this.shields.get(shield.id);
       if (!memo) {
-        memo = { hp: shield.hp, maxHp: shield.maxHp, radius: shield.radius, seen: this.frame };
+        memo = {
+          hp: shield.hp,
+          maxHp: shield.maxHp,
+          radius: shield.radius,
+          x: station.pos.x,
+          y: station.pos.y,
+          owner: station.owner,
+          seen: this.frame,
+        };
         this.shields.set(shield.id, memo);
         if (!silent) {
           out.push(TELL.buildComplete, station.pos.x, station.pos.y, station.angle, 0.5, station.owner);
@@ -661,15 +705,9 @@ export class WorldObserver {
       memo.hp = shield.hp;
       memo.maxHp = shield.maxHp;
       memo.radius = shield.radius;
-    }
-
-    for (const [id, memo] of this.shields) {
-      if (memo.seen === this.frame) continue;
-      // Pressure beat regeneration (GDD §2.6): the bubble is gone.
-      if (!silent) {
-        out.push(TELL.shieldDown, station.pos.x, station.pos.y, 0, clamp01(memo.radius / 64), station.owner);
-      }
-      this.shields.delete(id);
+      memo.x = station.pos.x;
+      memo.y = station.pos.y;
+      memo.owner = station.owner;
     }
   }
 

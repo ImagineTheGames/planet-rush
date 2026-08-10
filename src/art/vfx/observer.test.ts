@@ -374,6 +374,68 @@ describe('WorldObserver — deriving the moments', () => {
     }
   });
 
+  it('keeps one station\'s TURRETS from killing another\'s, every frame, forever', () => {
+    // The same bug as the one above, in the function directly below the comment
+    // warning about it — and it shipped. The turret memo map is world-wide but
+    // was swept inside the PER-STATION pass, so station 0's turn deleted every
+    // other station's turrets (announcing a `turretDown` each), and their own
+    // turns found them missing and announced a `buildComplete`. Measured on a
+    // real twenty-second match before the fix: 1176 turret deaths and 1183
+    // completions, none of which happened.
+    //
+    // It survived because it is invisible at N=1: a single-station fixture, which
+    // is what every other turret test here uses, cannot express it. And because
+    // nothing DREW the tells, so the only witness was a mix quietly sounding a
+    // turret dying sixty times a second.
+    const gun = (id: number, x: number) => ({ id, pos: { x, y: 500 }, radius: 8, angle: 0, cooldown: 0, hp: 30 });
+    const a = station({ id: 0, owner: 0, turrets: [gun(5, 520)] });
+    const b = station({ id: 1, owner: 1, pos: { x: 800, y: 800 }, turrets: [gun(6, 820)] });
+    const observer = new WorldObserver();
+    const tells = new TellQueue();
+    const both = world({ stations: [a, b] }) as unknown as WorldView;
+
+    observer.observe(both, 0, tells);
+    for (let i = 0; i < 5; i++) {
+      tells.clear();
+      observer.observe(both, 1 / 60, tells);
+      expect(tells.has(TELL.turretDown)).toBe(false);
+      expect(tells.has(TELL.buildComplete)).toBe(false);
+    }
+
+    // …and a turret that really is picked off still reports, from the memo, with
+    // its owner intact — the sweep moved, the tell did not.
+    tells.clear();
+    observer.observe(world({ stations: [a, station({ id: 1, owner: 1, pos: { x: 800, y: 800 } })] }) as unknown as WorldView, 1 / 60, tells);
+    expect(tells.count(TELL.turretDown)).toBe(1);
+    expect(tells.player[tells.indexOf(TELL.turretDown)]).toBe(1);
+    expect(tells.x[tells.indexOf(TELL.turretDown)]).toBeCloseTo(820, 5);
+  });
+
+  it('keeps one station\'s SHIELDS from collapsing another\'s, every frame, forever', () => {
+    const bubble = (id: number) => ({ id, hp: 40, maxHp: 40, radius: 80 });
+    const a = station({ id: 0, owner: 0, shields: [bubble(3)] });
+    const b = station({ id: 1, owner: 1, pos: { x: 800, y: 800 }, shields: [bubble(4)] });
+    const observer = new WorldObserver();
+    const tells = new TellQueue();
+    const both = world({ stations: [a, b] }) as unknown as WorldView;
+
+    observer.observe(both, 0, tells);
+    for (let i = 0; i < 5; i++) {
+      tells.clear();
+      observer.observe(both, 1 / 60, tells);
+      expect(tells.has(TELL.shieldDown)).toBe(false);
+      expect(tells.has(TELL.buildComplete)).toBe(false);
+    }
+
+    // A bubble that really pops still reports at ITS OWN station, not at
+    // whichever one the loop happened to be holding when the sweep ran.
+    tells.clear();
+    observer.observe(world({ stations: [a, station({ id: 1, owner: 1, pos: { x: 800, y: 800 } })] }) as unknown as WorldView, 1 / 60, tells);
+    expect(tells.count(TELL.shieldDown)).toBe(1);
+    expect(tells.player[tells.indexOf(TELL.shieldDown)]).toBe(1);
+    expect(tells.x[tells.indexOf(TELL.shieldDown)]).toBeCloseTo(800, 5);
+  });
+
   it('shimmers a shield on damage and collapses it when the bubble goes', () => {
     const withShield = (hp: number) => station({ shields: [{ id: 3, hp, maxHp: 40, radius: 80 }] });
     const hit = diff(world({ stations: [withShield(40)] }), world({ stations: [withShield(28)] }));
