@@ -28,7 +28,7 @@
 
 import { mulberry32, type Rng } from '@shared/types';
 import { playerColor } from '../palette';
-import { TELL, type TellQueue } from '../tells';
+import { TELL, TELL_COUNT, type TellKind, type TellQueue } from '../tells';
 import { DeathMoment } from './death-moment';
 import {
   asteroidBurst,
@@ -106,6 +106,8 @@ export class VfxField {
   private time = 0;
   /** Next time each slot's firing may burst again (see {@link HIT_BURST_INTERVAL}). */
   private readonly hitNext = new Float32Array(SLOTS);
+  /** Tells this field has actually DRAWN, per kind — see {@link drawn}. */
+  private readonly tally = new Int32Array(TELL_COUNT);
 
   constructor(options: VfxFieldOptions = {}) {
     this.pool = new ParticlePool(options.capacity ?? PARTICLE_CAPACITY);
@@ -129,8 +131,15 @@ export class VfxField {
       const angle = tells.angle[i]!;
       const mag = tells.magnitude[i]!;
       const player = tells.player[i]!;
+      const kind = tells.kindAt(i);
+      // The tally's definition of "drawn" is *particles reached the pool*, read
+      // off the pool's own two counters rather than asserted by each case: a
+      // burst either grew the pool or stole from it (`./particles` emit). So a
+      // firing tick the throttle swallowed, and the audio-only wave tell, count
+      // as what they are — not drawn — instead of as a route that fired.
+      const before = pool.count + pool.stolen;
 
-      switch (tells.kindAt(i)) {
+      switch (kind) {
         case TELL.mineHit:
           if (this.hitReady(player)) weaponImpact(pool, rng, x, y, angle, mag, playerColor(player), false, q);
           break;
@@ -215,6 +224,8 @@ export class VfxField {
         case TELL.waveArrive:
           break;
       }
+
+      if (pool.count + pool.stolen !== before) this.tally[kind]!++;
     }
   }
 
@@ -233,11 +244,34 @@ export class VfxField {
     this.rng = mulberry32(this.seed);
     this.time = 0;
     this.hitNext.fill(0);
+    this.tally.fill(0);
   }
 
   /** Live particles. */
   get count(): number {
     return this.pool.count;
+  }
+
+  /**
+   * How many tells of `kind` this field has drawn since the last {@link reset}.
+   *
+   * The reason this counter exists is a2-07: `src/art/vfx/` implemented the whole
+   * GDD §3.6 set, was unit-tested green, and was constructed by nothing on the
+   * boot path — so an explosion made its noise and left no mark for six
+   * milestones. "Is this route wired?" had no answer anyone could *read*, only an
+   * answer someone could grep for and get wrong. Now the live client can be asked,
+   * per kind, and the honest answer includes the two zeroes: `waveArrive` draws
+   * nothing by design, and a firing tick the throttle swallowed did not draw.
+   */
+  drawn(kind: TellKind): number {
+    return this.tally[kind] ?? 0;
+  }
+
+  /** Tells drawn since the last {@link reset}, all kinds — "is anything alive?" */
+  get drawnTotal(): number {
+    let n = 0;
+    for (let i = 0; i < this.tally.length; i++) n += this.tally[i]!;
+    return n;
   }
 
   /** Whether this slot's firing may throw sparks again yet. */

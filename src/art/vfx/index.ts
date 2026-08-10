@@ -11,6 +11,7 @@
  * | `emitters.ts` | the named effects: impacts, cracks, shimmer, flashes, … |
  * | `field.ts` | the routing table, and the owner of the death moment |
  * | `layer.ts` | the only file here that imports PixiJS |
+ * | `showcase.ts` | the frozen review sheet: a fixed moment, deterministically |
  *
  * `death-moment.ts` sits beside them holding the tone contract's three seconds
  * of quiet (GDD §4.7), because it belongs to neither the picture nor the sound —
@@ -24,3 +25,4 @@ export * from './death-moment';
 export * from './observer';
 export * from './field';
 export * from './layer';
+export * from './showcase';
