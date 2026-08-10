@@ -1,0 +1,1351 @@
+{
+  "base": "https://imaginethegames.github.io/planet-rush/",
+  "capturedAt": "2026-08-10T14:42:12.832Z",
+  "errors": [],
+  "samples": [
+    {
+      "atMs": 0,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 1439,
+          "readyState": 2,
+          "close": null,
+          "error": false,
+          "ageMs": 7692
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 1004,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 2443,
+          "readyState": 2,
+          "close": null,
+          "error": false,
+          "ageMs": 8696
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 2007,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 3448,
+          "readyState": 2,
+          "close": null,
+          "error": false,
+          "ageMs": 9701
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 3013,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 4451,
+          "readyState": 2,
+          "close": null,
+          "error": false,
+          "ageMs": 10704
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 4015,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 5453,
+          "readyState": 2,
+          "close": null,
+          "error": false,
+          "ageMs": 11706
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 5016,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 6454,
+          "readyState": 2,
+          "close": null,
+          "error": false,
+          "ageMs": 12707
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 6019,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 7457,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 13710
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 7021,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 8459,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 14712
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 8023,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 9461,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 15714
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 9025,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 10462,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 16715
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 10025,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 11463,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 17716
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 11027,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 12465,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 18718
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 12031,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 13476,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 19729
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 13040,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 14477,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 20730
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 14047,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 15485,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 21738
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 15049,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 16487,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 22740
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 16053,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 17494,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 23747
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 17058,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 18495,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 24748
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 18060,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 19498,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 25751
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 19061,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 20499,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 26752
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 20060,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 21500,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 27753
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 21070,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 22508,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 28761
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 22071,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 23509,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 29762
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 23073,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 24513,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 30766
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 24078,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 25516,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 31769
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 25080,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 26518,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 32771
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 26084,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 27522,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 33775
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 27098,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 28536,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 34789
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 28102,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 29540,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 35793
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 29106,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 30544,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 36797
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 30110,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 31548,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 37801
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 31113,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 32551,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 38804
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 32115,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 33555,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 39808
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 33118,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 34560,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 40813
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 34124,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 35561,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 41814
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 35125,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 36562,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 42815
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 36127,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 37566,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 43819
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 37130,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 38569,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 44822
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 38137,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 39579,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 45832
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 39143,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 40581,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 46834
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 40146,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 41583,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 47836
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 41149,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 42587,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 48840
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 42150,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 43588,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 49841
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 43153,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 44591,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 50844
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 44154,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 45592,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 51845
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 45155,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 46593,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 52846
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 46160,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 47598,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 53851
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 47162,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 48600,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 54853
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 48164,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 49602,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 55855
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 49164,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 50604,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 56857
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 50168,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 51606,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 57859
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 51170,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 52608,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 58861
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 52172,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 53609,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 59862
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 53174,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 54614,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 60867
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 54182,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 55620,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 61873
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 55185,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 56630,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 62883
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 56193,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 57631,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 63884
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 57196,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 58634,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 64887
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 58199,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 59637,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 65890
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    },
+    {
+      "atMs": 59202,
+      "sockets": [
+        {
+          "url": "wss://planet-rush-gameserver.fly.dev/play",
+          "received": 7,
+          "sent": 4,
+          "sinceLastRecvMs": 60640,
+          "readyState": 3,
+          "close": {
+            "at": 1786372946842,
+            "code": 1006,
+            "reason": "",
+            "wasClean": false
+          },
+          "error": false,
+          "ageMs": 66893
+        }
+      ],
+      "matchStarted": true,
+      "overlay": false
+    }
+  ],
+  "lobby": {
+    "online": true,
+    "room": "9ZEH",
+    "isHost": true,
+    "humanCount": 1
+  },
+  "inLobby": {
+    "sockets": [
+      {
+        "url": "wss://planet-rush-gameserver.fly.dev/play",
+        "received": 4,
+        "sent": 3,
+        "sinceLastRecvMs": 1494,
+        "readyState": 1,
+        "close": null,
+        "error": false,
+        "ageMs": 1821
+      }
+    ],
+    "matchStarted": false,
+    "overlay": false
+  },
+  "seats": [
+    "TAKEN",
+    "BOT",
+    "OPEN",
+    "OPEN",
+    "OPEN",
+    "OPEN",
+    "OPEN",
+    "OPEN"
+  ],
+  "rushedAt": 1786372941542,
+  "final": {
+    "sockets": [
+      {
+        "url": "wss://planet-rush-gameserver.fly.dev/play",
+        "received": 7,
+        "sent": 4,
+        "sinceLastRecvMs": 61642,
+        "readyState": 3,
+        "close": {
+          "at": 1786372946842,
+          "code": 1006,
+          "reason": "",
+          "wasClean": false
+        },
+        "error": false,
+        "ageMs": 67895
+      }
+    ],
+    "matchStarted": true,
+    "overlay": false
+  }
+}
