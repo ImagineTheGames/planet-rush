@@ -828,12 +828,17 @@ function runAudit(rows, opts, diag) {
   // (2) A verdict written about a symbol that is gone, or that production now calls.
   const gone = allow.filter(([id]) => !byId.has(id)).map(([id]) => id);
   const revived = allow.filter(([id]) => byId.get(id) && !byId.get(id).dark).map(([id]) => id);
-  for (const [label, ids] of [
-    ['no longer exist', gone],
-    ['are no longer dark — production calls them now', revived],
+  for (const [one, many, ids] of [
+    ['names a symbol that no longer exists', 'name symbols that no longer exist', gone],
+    [
+      'is no longer dark — production calls it now',
+      'are no longer dark — production calls them now',
+      revived,
+    ],
   ]) {
     if (!ids.length) continue;
-    lines.push(`NOTE: ${ids.length} allowlist entr${ids.length === 1 ? 'y' : 'ies'} ${label}.`);
+    const single = ids.length === 1;
+    lines.push(`NOTE: ${ids.length} allowlist entr${single ? 'y' : 'ies'} ${single ? one : many}.`);
     for (const id of ids) lines.push(`      ${id}`);
     lines.push('');
   }
