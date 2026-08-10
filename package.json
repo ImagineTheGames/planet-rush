@@ -17,7 +17,8 @@
     "test:link-loss-evidence": "playwright test --config tests/live-stage/playwright.link-loss.config.ts",
     "typecheck": "tsc --noEmit",
     "dark-matter": "node tools/dark-matter-scan.mjs",
-    "dark-matter:check": "node tools/dark-matter-scan.mjs --check"
+    "dark-matter:check": "node tools/dark-matter-scan.mjs --check",
+    "dark-matter:audit": "node tools/dark-matter-scan.mjs --audit"
   },
   "dependencies": {
     "pixi.js": "8.6.6"

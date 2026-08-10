@@ -58,12 +58,17 @@
  * `docs/dark-matter-scan.md` is for. The scan finds candidates; a human says
  * which are DARK, which are SURFACE, and which are DEAD.
  *
+ * That last sentence is also where this can go wrong in the other direction: the
+ * human can be wrong about a candidate the scan got right. `--audit` (a1-14)
+ * holds the written verdicts to the numbers they were written next to.
+ *
  * ── Usage ────────────────────────────────────────────────────────────────
  *
  *   npm run dark-matter                  # the candidate list, grouped by file
  *   npm run dark-matter -- --json        # machine-readable, for diffing
  *   npm run dark-matter -- --modules     # the per-module rollup + unreachable files
  *   npm run dark-matter -- --check       # CI gate: fail on a NEW dark export
+ *   npm run dark-matter -- --audit       # hold the allowlist's verdicts to the numbers
  *   npm run dark-matter -- --all         # every export with its use counts
  *   npm run dark-matter -- --write-allowlist   # re-baseline the gate
  *   node tools/dark-matter-scan.mjs --project ../old/tsconfig.json
@@ -132,6 +137,7 @@ function parseArgs(argv) {
     json: false,
     all: false,
     check: false,
+    audit: false,
     modules: false,
     writeAllowlist: false,
     project: resolve(REPO_ROOT, 'tsconfig.json'),
@@ -145,6 +151,7 @@ function parseArgs(argv) {
     if (a === '--json') opts.json = true;
     else if (a === '--all') opts.all = true;
     else if (a === '--check') opts.check = true;
+    else if (a === '--audit') opts.audit = true;
     else if (a === '--modules') opts.modules = true;
     else if (a === '--write-allowlist') opts.writeAllowlist = true;
     else if (a === '--no-types') opts.types = false;
@@ -174,6 +181,8 @@ Usage: node tools/dark-matter-scan.mjs [options]
   --all                list every export, not just the zero-production ones
   --modules            per-module rollup, and the modules no entry point reaches
   --check              exit 1 if a candidate is missing from the allowlist
+  --audit              hold the allowlist's written verdicts to the scan's
+                       numbers (a1-14). Reports, never fails.
   --write-allowlist    rewrite the allowlist from today's candidates (re-baseline)
   --no-types           skip type-only exports (interfaces, type aliases)
   --entry PATH         boot-path entry point, repeatable
@@ -755,6 +764,95 @@ function runCheck(rows, opts, diag) {
   return 0;
 }
 
+// ── The verdict audit ─────────────────────────────────────────────────────
+//
+// `--audit` checks the allowlist's *prose* against the scan's numbers. It exists
+// because of a1-14: §4.3 of the report recommended deleting
+// `src/net/connect-trace-view.ts`, which puts RETRY and DOWNLOAD LOG on a failed
+// join and is called from `src/main.ts` three times. The scan had that right —
+// it flagged two of the module's fourteen exports and called the other five
+// live. The *triage* generalised two symbol findings into a module verdict,
+// justified by the module's header rather than by the numbers next to it.
+//
+// A tool cannot stop a human misreading a header. It can notice when a DEAD
+// verdict has been written next to symbols in a module whose other exports the
+// same scan calls live, which is the shape that misreading leaves behind. So
+// this reports and never fails: it is a prompt to re-read a row, not a gate.
+
+/** The verdict word a triage line opens with — `DEAD — …` → `DEAD`. */
+function verdictWordOf(reason) {
+  const word = String(reason).trim().split(/[\s—:-]/, 1)[0];
+  return /^[A-Z]{3,}$/.test(word) ? word : null;
+}
+
+function runAudit(rows, opts, diag) {
+  if (!existsSync(opts.allowlist)) {
+    process.stderr.write(`dark-matter-scan: --audit needs an allowlist at ${opts.allowlist}\n`);
+    return 2;
+  }
+  const allow = Object.entries(JSON.parse(readFileSync(opts.allowlist, 'utf8')).allow ?? {});
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const lines = [...warnings(diag), ''];
+
+  // (1) A DEAD verdict sitting in a module the scan still finds live exports in.
+  const deadModules = new Map();
+  for (const [id, reason] of allow) {
+    if (verdictWordOf(reason) !== 'DEAD') continue;
+    const file = id.split('#')[0];
+    if (!deadModules.has(file)) deadModules.set(file, []);
+    deadModules.get(file).push(id);
+  }
+  const mixed = [];
+  for (const [file, ids] of deadModules) {
+    const live = rows.filter((r) => r.file === file && !r.dark);
+    if (live.length) mixed.push({ file, ids, live });
+  }
+  if (mixed.length) {
+    const one = mixed.length === 1;
+    lines.push(
+      `VERDICTS TO RE-READ: ${mixed.length} module${one ? '' : 's'} ${one ? 'carries' : 'carry'} a DEAD verdict and still ${one ? 'has' : 'have'} exports production calls.`,
+    );
+    lines.push('      The verdict may still be right about the symbols it names — but it is');
+    lines.push('      not right about the file, and a reader will take it for the file.');
+    for (const { file, ids, live } of mixed) {
+      lines.push('');
+      lines.push(`      ${file}  — ${ids.length} marked DEAD, ${live.length} live`);
+      for (const r of live) {
+        const sites = [...new Set(r.prodSites)].join(', ');
+        lines.push(`        LIVE  ${r.name} (prod:${r.uses.prod}${sites ? ` — ${sites}` : ''})`);
+      }
+    }
+    lines.push('');
+  }
+
+  // (2) A verdict written about a symbol that is gone, or that production now calls.
+  const gone = allow.filter(([id]) => !byId.has(id)).map(([id]) => id);
+  const revived = allow.filter(([id]) => byId.get(id) && !byId.get(id).dark).map(([id]) => id);
+  for (const [one, many, ids] of [
+    ['names a symbol that no longer exists', 'name symbols that no longer exist', gone],
+    [
+      'is no longer dark — production calls it now',
+      'are no longer dark — production calls them now',
+      revived,
+    ],
+  ]) {
+    if (!ids.length) continue;
+    const single = ids.length === 1;
+    lines.push(`NOTE: ${ids.length} allowlist entr${single ? 'y' : 'ies'} ${single ? one : many}.`);
+    for (const id of ids) lines.push(`      ${id}`);
+    lines.push('');
+  }
+
+  const clean = !mixed.length && !gone.length && !revived.length;
+  lines.push(
+    clean
+      ? `dark-matter-scan: ${allow.length} allowlist verdicts agree with the scan.`
+      : `dark-matter-scan: ${allow.length} allowlist verdicts audited — see above. (Reporting only; exit 0.)`,
+  );
+  process.stdout.write(lines.join('\n') + '\n');
+  return 0;
+}
+
 // ── main ──────────────────────────────────────────────────────────────────
 
 const opts = parseArgs(process.argv.slice(2));
@@ -766,6 +864,8 @@ if (opts.writeAllowlist) {
   process.exit(writeAllowlist(rows, opts));
 } else if (opts.check) {
   process.exit(runCheck(rows, opts, diag));
+} else if (opts.audit) {
+  process.exit(runAudit(rows, opts, diag));
 } else if (opts.json) {
   process.stdout.write(
     JSON.stringify(

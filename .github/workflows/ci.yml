@@ -61,6 +61,12 @@ jobs:
       # deliberate seam, an invariant a spec pins, or public surface — add it to
       # the allowlist WITH A REASON and record the verdict in the report. The
       # allowlist entry is the claim; `npm run dark-matter` shows the evidence.
+      #
+      # The companion check `npm run dark-matter:audit` is deliberately NOT a
+      # step here (a1-14). It audits the REASONS in the allowlist against the
+      # scan's numbers, has standing hits that are already answered in
+      # docs/dark-matter-scan.md §4.0, and would print them on every run. Run it
+      # by hand when editing that report or before acting on a DEAD verdict.
       - name: Dark matter (no new uncalled exports)
         run: npm run dark-matter:check
 
