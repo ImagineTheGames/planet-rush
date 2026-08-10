@@ -1,0 +1,89 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+  body { margin:0; padding:26px 24px 30px; background:#14181d; color:#b9c2cc;
+         font-family:'Oxanium',ui-monospace,monospace; width:1520px; }
+  h1 { font-size:20px; margin:0 0 3px; color:#4DC3FF; font-weight:600; }
+  h2 { font-size:14px; margin:20px 0 8px; color:#e7edf3; font-weight:600; }
+  h2 .sub { color:#7E8894; font-weight:400; font-size:12px; }
+  .lede { font-size:12.5px; margin:4px 0 14px; line-height:1.6; color:#8b96a3; }
+  .lede b { color:#cfd7e0; } code { color:#e0c07a; }
+  .row { display:flex; gap:12px; }
+  figure { margin:0; }
+  figure img { display:block; border:1px solid #2b333c; }
+  .z img { width:487px; }
+  .f img { width:487px; }
+  figcaption { font-size:11px; line-height:1.45; padding-top:5px; color:#8b96a3; width:487px; }
+  figcaption b { color:#cfd7e0; }
+  table { border-collapse:collapse; font-size:11.5px; margin-top:10px; width:100%; }
+  td,th { border:1px solid #2b333c; padding:4px 9px; text-align:left; }
+  th { color:#7E8894; font-weight:400; }
+  td.n { color:#e7edf3; } td.hit { color:#57d98a; }
+  .note { font-size:11.5px; color:#7E8894; line-height:1.55; margin-top:8px; }
+</style></head><body>
+  <h1>The Compass — Coalsack, the sky you see by what is missing</h1>
+  <p class="lede">
+    Served bundle <b>dd1d3f5</b>. The live stage carries
+    <code>void-nebula-coalsack</code> and carries it <b>last</b> — draw order
+    <code>void-ground › void-stars-deep › void-stars-mid › void-stars-near › void-nebula-coalsack</code>,
+    i.e. in FRONT of all three star layers, which is what <code>occludes: true</code> is for.
+    Coalsack is the ground colour, so it adds no light: over the whole frozen frame its own paint
+    changed <b>0.1%</b> of pixels, mean ink r17.8 g18.4 b18.9 — neutral grey, the colour of the stars it
+    covered rather than any ink of its own.
+  </p>
+
+  <h2>The patch where the star field stops <span class="sub">— 400×250 device px at (835, 475), 3×; the window is the one holding the MOST covered stars, chosen by the measurement, not by hand</span></h2>
+  <div class="row z">
+    <figure><img src="compass-zoom-with-dust.png"/><figcaption><b>A — the dust drawing</b> (frozen, ×3 exposure so the void is legible). Empty.</figcaption></figure>
+    <figure><img src="compass-zoom-no-dust.png"/><figcaption><b>B — <code>void-nebula-coalsack</code> hidden</b>, same exposure. The stars come back.</figcaption></figure>
+    <figure><img src="compass-zoom-difference.png"/><figcaption><b>|A − B| × 14 — every star the lane was standing in front of.</b> 2,409 pixels of star are covered across the whole frame.</figcaption></figure>
+  </div>
+
+  <h2>In motion <span class="sub">— one straight live flight west, three camera positions; below each frame, the star points the profile is computed from</span></h2>
+  <div class="row f">
+    <figure><img src="compass-flight-1.png"/><figcaption><b>frame 1</b> — ship world x 1752 (0 u flown)</figcaption></figure><figure><img src="compass-flight-2.png"/><figcaption><b>frame 2</b> — ship world x 1279 (473 u flown)</figcaption></figure><figure><img src="compass-flight-3.png"/><figcaption><b>frame 3</b> — ship world x 934 (818 u flown)</figcaption></figure>
+  </div>
+  <div class="row f">
+    <figure><img src="star-map-compass-1.png"/><figcaption>the extracted star points, frame 1</figcaption></figure><figure><img src="star-map-compass-2.png"/><figcaption>the extracted star points, frame 2</figcaption></figure><figure><img src="star-map-compass-3.png"/><figcaption>the extracted star points, frame 3</figcaption></figure>
+  </div>
+  <table>
+    <tr><th>frames</th><th>camera travelled</th><th>best re-alignment</th><th>as % of camera travel</th>
+        <th>r at screen-locked (0 px)</th><th>r at deep stars, parallax 0.10</th><th>r at Coalsack's own 0.14</th></tr>
+    <tr>
+  <td>1 → 2</td>
+  <td class="n">473 u = 946 px</td>
+  <td class="n">95 px</td>
+  <td class="n">10.0%</td>
+  <td>0.51347</td>
+  <td class="hit">95 px → <b>0.61149</b></td>
+  <td>132 px → 0.54092</td>
+</tr><tr>
+  <td>1 → 3</td>
+  <td class="n">818 u = 1636 px</td>
+  <td class="n">33 px</td>
+  <td class="n">2.0%</td>
+  <td>0.62055</td>
+  <td class="hit">164 px → <b>0.56559</b></td>
+  <td>229 px → 0.53481</td>
+</tr><tr>
+  <td>2 → 3</td>
+  <td class="n">345 u = 690 px</td>
+  <td class="n">68 px</td>
+  <td class="n">9.9%</td>
+  <td>0.43093</td>
+  <td class="hit">69 px → <b>0.60311</b></td>
+  <td>97 px → 0.47386</td>
+</tr>
+  </table>
+  <p class="note">
+    <b>What this settles and what it does not.</b> The field is not stuck to the glass: on both short
+    baselines the profile re-aligns at 10.0% and 9.9% of the camera's travel — the deep star layer's
+    <code>parallax 0.1</code> to within a pixel — and scores materially worse at 0 px (0.51 vs 0.61, 0.43 vs 0.60).
+    It does NOT resolve Coalsack's own 0.14 from the 0.10 of the stars it eats: those predictions are 4% of
+    travel apart (37 px and 28 px here) and a few hundred star pixels will not separate them; 0.14 scores
+    below 0.10 on every pair, which is the expected answer for a profile made of STARS.
+    The long pair (1→3) is the method failing honestly rather than being dropped: it peaks at 33 px and
+    scores best of all at 0 px. Two reasons, both real — the star field is not rigid (deep 0.10, mid 0.26,
+    near 0.50 separate by hundreds of px over 1636 px of travel), and frame 1 alone contains the home
+    station's dashed range rings, thin and dim enough to survive the point detector as fixed structure near
+    frame centre. Pair 2→3 is the clean one, and it is the one that lands on 0.10.
+  </p>
+</body></html>

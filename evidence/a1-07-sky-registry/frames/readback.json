@@ -1,0 +1,1309 @@
+{
+  "base": "http://127.0.0.1:4287",
+  "served": {
+    "sha": "dd1d3f5",
+    "time": "2026-08-10T02:31:26.389Z"
+  },
+  "capturedAt": "2026-08-10T02:34:36.803Z",
+  "maps": [
+    {
+      "id": "octagon",
+      "name": "The Octagon",
+      "expect": "none",
+      "note": "DEFAULT_MAP_ID — a fresh install lands here",
+      "live": {
+        "path": "stage/game-root/void-backdrop",
+        "children": [
+          {
+            "index": 0,
+            "label": "void-ground",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 720,
+            "y": 450,
+            "localBounds": {
+              "w": 1442,
+              "h": 902
+            }
+          },
+          {
+            "index": 1,
+            "label": "void-stars-deep",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 595,
+            "y": 375,
+            "localBounds": {
+              "w": 3577,
+              "h": 2418
+            }
+          },
+          {
+            "index": 2,
+            "label": "void-stars-mid",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 396,
+            "y": 255,
+            "localBounds": {
+              "w": 4115,
+              "h": 3031
+            }
+          },
+          {
+            "index": 3,
+            "label": "void-stars-near",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 96,
+            "y": 75,
+            "localBounds": {
+              "w": 4870,
+              "h": 3958
+            }
+          }
+        ],
+        "nebulaLabels": [],
+        "starLabels": [
+          "void-stars-deep",
+          "void-stars-mid",
+          "void-stars-near"
+        ],
+        "build": {
+          "sha": "dd1d3f5",
+          "time": "2026-08-10T02:31:26.389Z",
+          "dirty": false
+        },
+        "ticks": 599,
+        "shipWorld": {
+          "x": 1968,
+          "y": 1200
+        },
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        }
+      },
+      "frozen": {
+        "path": "stage/game-root/void-backdrop",
+        "children": [
+          {
+            "index": 0,
+            "label": "void-ground",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 720,
+            "y": 450,
+            "localBounds": {
+              "w": 1442,
+              "h": 902
+            }
+          },
+          {
+            "index": 1,
+            "label": "void-stars-deep",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 595,
+            "y": 375,
+            "localBounds": {
+              "w": 3577,
+              "h": 2418
+            }
+          },
+          {
+            "index": 2,
+            "label": "void-stars-mid",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 396,
+            "y": 255,
+            "localBounds": {
+              "w": 4115,
+              "h": 3031
+            }
+          },
+          {
+            "index": 3,
+            "label": "void-stars-near",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 96,
+            "y": 75,
+            "localBounds": {
+              "w": 4870,
+              "h": 3958
+            }
+          }
+        ],
+        "nebulaLabels": [],
+        "starLabels": [
+          "void-stars-deep",
+          "void-stars-mid",
+          "void-stars-near"
+        ],
+        "build": {
+          "sha": "dd1d3f5",
+          "time": "2026-08-10T02:31:26.389Z",
+          "dirty": false
+        },
+        "ticks": 0,
+        "shipWorld": {
+          "x": 1968,
+          "y": 1200
+        },
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        }
+      },
+      "frames": {
+        "live": "octagon-live.png",
+        "A-frozen": "octagon-A-frozen.png",
+        "B-no-nebula": "octagon-B-no-nebula.png",
+        "C-no-stars": "octagon-C-no-stars.png",
+        "D-ground-only": "octagon-D-ground-only.png"
+      },
+      "hidden": {
+        "nebula": {
+          "touched": []
+        },
+        "stars": {
+          "touched": [
+            "void-stars-deep",
+            "void-stars-mid",
+            "void-stars-near"
+          ]
+        },
+        "all": {
+          "touched": [
+            "void-stars-deep",
+            "void-stars-mid",
+            "void-stars-near"
+          ]
+        }
+      },
+      "actual": "none",
+      "match": true
+    },
+    {
+      "id": "compass",
+      "name": "The Compass",
+      "expect": "coalsack",
+      "note": "the one sky drawn IN FRONT of the stars",
+      "live": {
+        "path": "stage/game-root/void-backdrop",
+        "children": [
+          {
+            "index": 0,
+            "label": "void-ground",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 720,
+            "y": 450,
+            "localBounds": {
+              "w": 1442,
+              "h": 902
+            }
+          },
+          {
+            "index": 1,
+            "label": "void-stars-deep",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 617,
+            "y": 375,
+            "localBounds": {
+              "w": 3577,
+              "h": 2418
+            }
+          },
+          {
+            "index": 2,
+            "label": "void-stars-mid",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 452,
+            "y": 255,
+            "localBounds": {
+              "w": 4115,
+              "h": 3031
+            }
+          },
+          {
+            "index": 3,
+            "label": "void-stars-near",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 204,
+            "y": 75,
+            "localBounds": {
+              "w": 4870,
+              "h": 3958
+            }
+          },
+          {
+            "index": 4,
+            "label": "void-nebula-coalsack",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 576,
+            "y": 345,
+            "localBounds": {
+              "w": 4655,
+              "h": 1256
+            }
+          }
+        ],
+        "nebulaLabels": [
+          "void-nebula-coalsack"
+        ],
+        "starLabels": [
+          "void-stars-deep",
+          "void-stars-mid",
+          "void-stars-near"
+        ],
+        "build": {
+          "sha": "dd1d3f5",
+          "time": "2026-08-10T02:31:26.389Z",
+          "dirty": false
+        },
+        "ticks": 646,
+        "shipWorld": {
+          "x": 1751.7098115668775,
+          "y": 1200
+        },
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        }
+      },
+      "frozen": {
+        "path": "stage/game-root/void-backdrop",
+        "children": [
+          {
+            "index": 0,
+            "label": "void-ground",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 720,
+            "y": 450,
+            "localBounds": {
+              "w": 1442,
+              "h": 902
+            }
+          },
+          {
+            "index": 1,
+            "label": "void-stars-deep",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 617,
+            "y": 375,
+            "localBounds": {
+              "w": 3577,
+              "h": 2418
+            }
+          },
+          {
+            "index": 2,
+            "label": "void-stars-mid",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 452,
+            "y": 255,
+            "localBounds": {
+              "w": 4115,
+              "h": 3031
+            }
+          },
+          {
+            "index": 3,
+            "label": "void-stars-near",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 204,
+            "y": 75,
+            "localBounds": {
+              "w": 4870,
+              "h": 3958
+            }
+          },
+          {
+            "index": 4,
+            "label": "void-nebula-coalsack",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 576,
+            "y": 345,
+            "localBounds": {
+              "w": 4655,
+              "h": 1256
+            }
+          }
+        ],
+        "nebulaLabels": [
+          "void-nebula-coalsack"
+        ],
+        "starLabels": [
+          "void-stars-deep",
+          "void-stars-mid",
+          "void-stars-near"
+        ],
+        "build": {
+          "sha": "dd1d3f5",
+          "time": "2026-08-10T02:31:26.389Z",
+          "dirty": false
+        },
+        "ticks": 0,
+        "shipWorld": {
+          "x": 1751.7098115668775,
+          "y": 1200
+        },
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        }
+      },
+      "frames": {
+        "live": "compass-live.png",
+        "A-frozen": "compass-A-frozen.png",
+        "B-no-nebula": "compass-B-no-nebula.png",
+        "C-no-stars": "compass-C-no-stars.png",
+        "D-ground-only": "compass-D-ground-only.png"
+      },
+      "hidden": {
+        "nebula": {
+          "touched": [
+            "void-nebula-coalsack"
+          ]
+        },
+        "stars": {
+          "touched": [
+            "void-stars-deep",
+            "void-stars-mid",
+            "void-stars-near"
+          ]
+        },
+        "all": {
+          "touched": [
+            "void-stars-deep",
+            "void-stars-mid",
+            "void-stars-near",
+            "void-nebula-coalsack"
+          ]
+        }
+      },
+      "actual": "coalsack",
+      "match": true
+    },
+    {
+      "id": "oval",
+      "name": "The Oval",
+      "expect": "plasmaReef",
+      "note": "",
+      "live": {
+        "path": "stage/game-root/void-backdrop",
+        "children": [
+          {
+            "index": 0,
+            "label": "void-ground",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 720,
+            "y": 450,
+            "localBounds": {
+              "w": 1442,
+              "h": 902
+            }
+          },
+          {
+            "index": 1,
+            "label": "void-stars-deep",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 510,
+            "y": 395,
+            "localBounds": {
+              "w": 3737,
+              "h": 2338
+            }
+          },
+          {
+            "index": 2,
+            "label": "void-stars-mid",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 174,
+            "y": 307,
+            "localBounds": {
+              "w": 4530,
+              "h": 2823
+            }
+          },
+          {
+            "index": 3,
+            "label": "void-stars-near",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": -330,
+            "y": 175,
+            "localBounds": {
+              "w": 5661,
+              "h": 3561
+            }
+          }
+        ],
+        "nebulaLabels": [],
+        "starLabels": [
+          "void-stars-deep",
+          "void-stars-mid",
+          "void-stars-near"
+        ],
+        "build": {
+          "sha": "dd1d3f5",
+          "time": "2026-08-10T02:31:26.389Z",
+          "dirty": false
+        },
+        "ticks": 601,
+        "shipWorld": {
+          "x": 2820,
+          "y": 1000.0000000000024
+        },
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        }
+      },
+      "frozen": {
+        "path": "stage/game-root/void-backdrop",
+        "children": [
+          {
+            "index": 0,
+            "label": "void-ground",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 720,
+            "y": 450,
+            "localBounds": {
+              "w": 1442,
+              "h": 902
+            }
+          },
+          {
+            "index": 1,
+            "label": "void-nebula-plasmaReef",
+            "visible": true,
+            "blendMode": "add",
+            "alpha": 1,
+            "x": 542,
+            "y": 403,
+            "localBounds": {
+              "w": 3117,
+              "h": 2036
+            }
+          },
+          {
+            "index": 2,
+            "label": "void-stars-deep",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 510,
+            "y": 395,
+            "localBounds": {
+              "w": 3737,
+              "h": 2338
+            }
+          },
+          {
+            "index": 3,
+            "label": "void-stars-mid",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 174,
+            "y": 307,
+            "localBounds": {
+              "w": 4530,
+              "h": 2823
+            }
+          },
+          {
+            "index": 4,
+            "label": "void-stars-near",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": -330,
+            "y": 175,
+            "localBounds": {
+              "w": 5661,
+              "h": 3561
+            }
+          }
+        ],
+        "nebulaLabels": [
+          "void-nebula-plasmaReef"
+        ],
+        "starLabels": [
+          "void-stars-deep",
+          "void-stars-mid",
+          "void-stars-near"
+        ],
+        "build": {
+          "sha": "dd1d3f5",
+          "time": "2026-08-10T02:31:26.389Z",
+          "dirty": false
+        },
+        "ticks": 0,
+        "shipWorld": {
+          "x": 2820,
+          "y": 1000.0000000000024
+        },
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        }
+      },
+      "frames": {
+        "live": "oval-live.png",
+        "A-frozen": "oval-A-frozen.png",
+        "B-no-nebula": "oval-B-no-nebula.png",
+        "C-no-stars": "oval-C-no-stars.png",
+        "D-ground-only": "oval-D-ground-only.png"
+      },
+      "hidden": {
+        "nebula": {
+          "touched": [
+            "void-nebula-plasmaReef"
+          ]
+        },
+        "stars": {
+          "touched": [
+            "void-stars-deep",
+            "void-stars-mid",
+            "void-stars-near"
+          ]
+        },
+        "all": {
+          "touched": [
+            "void-nebula-plasmaReef",
+            "void-stars-deep",
+            "void-stars-mid",
+            "void-stars-near"
+          ]
+        }
+      },
+      "actual": "plasmaReef",
+      "match": true
+    },
+    {
+      "id": "diamond",
+      "name": "Double Diamond",
+      "expect": "patinaDrift",
+      "note": "",
+      "live": {
+        "path": "stage/game-root/void-backdrop",
+        "children": [
+          {
+            "index": 0,
+            "label": "void-ground",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 720,
+            "y": 450,
+            "localBounds": {
+              "w": 1442,
+              "h": 902
+            }
+          },
+          {
+            "index": 1,
+            "label": "void-nebula-patinaDrift",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 645,
+            "y": 456,
+            "localBounds": {
+              "w": 3690,
+              "h": 2221
+            }
+          },
+          {
+            "index": 2,
+            "label": "void-stars-deep",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 632,
+            "y": 457,
+            "localBounds": {
+              "w": 3737,
+              "h": 2338
+            }
+          },
+          {
+            "index": 3,
+            "label": "void-stars-mid",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 491,
+            "y": 468,
+            "localBounds": {
+              "w": 4530,
+              "h": 2823
+            }
+          },
+          {
+            "index": 4,
+            "label": "void-stars-near",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 280,
+            "y": 485,
+            "localBounds": {
+              "w": 5661,
+              "h": 3561
+            }
+          }
+        ],
+        "nebulaLabels": [
+          "void-nebula-patinaDrift"
+        ],
+        "starLabels": [
+          "void-stars-deep",
+          "void-stars-mid",
+          "void-stars-near"
+        ],
+        "build": {
+          "sha": "dd1d3f5",
+          "time": "2026-08-10T02:31:26.389Z",
+          "dirty": false
+        },
+        "ticks": 706,
+        "shipWorld": {
+          "x": 1600,
+          "y": 380
+        },
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        }
+      },
+      "frozen": {
+        "path": "stage/game-root/void-backdrop",
+        "children": [
+          {
+            "index": 0,
+            "label": "void-ground",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 720,
+            "y": 450,
+            "localBounds": {
+              "w": 1442,
+              "h": 902
+            }
+          },
+          {
+            "index": 1,
+            "label": "void-nebula-patinaDrift",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 645,
+            "y": 456,
+            "localBounds": {
+              "w": 3720,
+              "h": 2350
+            }
+          },
+          {
+            "index": 2,
+            "label": "void-stars-deep",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 632,
+            "y": 457,
+            "localBounds": {
+              "w": 3737,
+              "h": 2338
+            }
+          },
+          {
+            "index": 3,
+            "label": "void-stars-mid",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 491,
+            "y": 468,
+            "localBounds": {
+              "w": 4530,
+              "h": 2823
+            }
+          },
+          {
+            "index": 4,
+            "label": "void-stars-near",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 280,
+            "y": 485,
+            "localBounds": {
+              "w": 5661,
+              "h": 3561
+            }
+          }
+        ],
+        "nebulaLabels": [
+          "void-nebula-patinaDrift"
+        ],
+        "starLabels": [
+          "void-stars-deep",
+          "void-stars-mid",
+          "void-stars-near"
+        ],
+        "build": {
+          "sha": "dd1d3f5",
+          "time": "2026-08-10T02:31:26.389Z",
+          "dirty": false
+        },
+        "ticks": 0,
+        "shipWorld": {
+          "x": 1600,
+          "y": 380
+        },
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        }
+      },
+      "frames": {
+        "live": "diamond-live.png",
+        "A-frozen": "diamond-A-frozen.png",
+        "B-no-nebula": "diamond-B-no-nebula.png",
+        "C-no-stars": "diamond-C-no-stars.png",
+        "D-ground-only": "diamond-D-ground-only.png"
+      },
+      "hidden": {
+        "nebula": {
+          "touched": [
+            "void-nebula-patinaDrift"
+          ]
+        },
+        "stars": {
+          "touched": [
+            "void-stars-deep",
+            "void-stars-mid",
+            "void-stars-near"
+          ]
+        },
+        "all": {
+          "touched": [
+            "void-nebula-patinaDrift",
+            "void-stars-deep",
+            "void-stars-mid",
+            "void-stars-near"
+          ]
+        }
+      },
+      "actual": "patinaDrift",
+      "match": true
+    },
+    {
+      "id": "line",
+      "name": "The Line",
+      "expect": "deepEmber",
+      "note": "",
+      "live": {
+        "path": "stage/game-root/void-backdrop",
+        "children": [
+          {
+            "index": 0,
+            "label": "void-ground",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 720,
+            "y": 450,
+            "localBounds": {
+              "w": 1442,
+              "h": 902
+            }
+          },
+          {
+            "index": 1,
+            "label": "void-nebula-deepEmber",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 723,
+            "y": 387,
+            "localBounds": {
+              "w": 3961,
+              "h": 2702
+            }
+          },
+          {
+            "index": 2,
+            "label": "void-stars-deep",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 724,
+            "y": 376,
+            "localBounds": {
+              "w": 3737,
+              "h": 2338
+            }
+          },
+          {
+            "index": 3,
+            "label": "void-stars-mid",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 730,
+            "y": 259,
+            "localBounds": {
+              "w": 4530,
+              "h": 2823
+            }
+          },
+          {
+            "index": 4,
+            "label": "void-stars-near",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 739,
+            "y": 82,
+            "localBounds": {
+              "w": 5661,
+              "h": 3561
+            }
+          }
+        ],
+        "nebulaLabels": [
+          "void-nebula-deepEmber"
+        ],
+        "starLabels": [
+          "void-stars-deep",
+          "void-stars-mid",
+          "void-stars-near"
+        ],
+        "build": {
+          "sha": "dd1d3f5",
+          "time": "2026-08-10T02:31:26.389Z",
+          "dirty": false
+        },
+        "ticks": 691,
+        "shipWorld": {
+          "x": 682.68,
+          "y": 1186.16
+        },
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        }
+      },
+      "frozen": {
+        "path": "stage/game-root/void-backdrop",
+        "children": [
+          {
+            "index": 0,
+            "label": "void-ground",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 720,
+            "y": 450,
+            "localBounds": {
+              "w": 1442,
+              "h": 902
+            }
+          },
+          {
+            "index": 1,
+            "label": "void-nebula-deepEmber",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 723,
+            "y": 387,
+            "localBounds": {
+              "w": 3961,
+              "h": 2702
+            }
+          },
+          {
+            "index": 2,
+            "label": "void-stars-deep",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 724,
+            "y": 376,
+            "localBounds": {
+              "w": 3737,
+              "h": 2338
+            }
+          },
+          {
+            "index": 3,
+            "label": "void-stars-mid",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 730,
+            "y": 259,
+            "localBounds": {
+              "w": 4530,
+              "h": 2823
+            }
+          },
+          {
+            "index": 4,
+            "label": "void-stars-near",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 739,
+            "y": 82,
+            "localBounds": {
+              "w": 5661,
+              "h": 3561
+            }
+          }
+        ],
+        "nebulaLabels": [
+          "void-nebula-deepEmber"
+        ],
+        "starLabels": [
+          "void-stars-deep",
+          "void-stars-mid",
+          "void-stars-near"
+        ],
+        "build": {
+          "sha": "dd1d3f5",
+          "time": "2026-08-10T02:31:26.389Z",
+          "dirty": false
+        },
+        "ticks": 0,
+        "shipWorld": {
+          "x": 682.68,
+          "y": 1186.16
+        },
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        }
+      },
+      "frames": {
+        "live": "line-live.png",
+        "A-frozen": "line-A-frozen.png",
+        "B-no-nebula": "line-B-no-nebula.png",
+        "C-no-stars": "line-C-no-stars.png",
+        "D-ground-only": "line-D-ground-only.png"
+      },
+      "hidden": {
+        "nebula": {
+          "touched": [
+            "void-nebula-deepEmber"
+          ]
+        },
+        "stars": {
+          "touched": [
+            "void-stars-deep",
+            "void-stars-mid",
+            "void-stars-near"
+          ]
+        },
+        "all": {
+          "touched": [
+            "void-nebula-deepEmber",
+            "void-stars-deep",
+            "void-stars-mid",
+            "void-stars-near"
+          ]
+        }
+      },
+      "actual": "deepEmber",
+      "match": true
+    },
+    {
+      "id": "crescents",
+      "name": "The Crescents",
+      "expect": "ironVeil",
+      "note": "",
+      "live": {
+        "path": "stage/game-root/void-backdrop",
+        "children": [
+          {
+            "index": 0,
+            "label": "void-ground",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 720,
+            "y": 450,
+            "localBounds": {
+              "w": 1442,
+              "h": 902
+            }
+          },
+          {
+            "index": 1,
+            "label": "void-nebula-ironVeil",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 746,
+            "y": 367,
+            "localBounds": {
+              "w": 4146,
+              "h": 1981
+            }
+          },
+          {
+            "index": 2,
+            "label": "void-stars-deep",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 751,
+            "y": 352,
+            "localBounds": {
+              "w": 3577,
+              "h": 2418
+            }
+          },
+          {
+            "index": 3,
+            "label": "void-stars-mid",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 800,
+            "y": 196,
+            "localBounds": {
+              "w": 4115,
+              "h": 3031
+            }
+          },
+          {
+            "index": 4,
+            "label": "void-stars-near",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 874,
+            "y": -38,
+            "localBounds": {
+              "w": 4870,
+              "h": 3958
+            }
+          }
+        ],
+        "nebulaLabels": [
+          "void-nebula-ironVeil"
+        ],
+        "starLabels": [
+          "void-stars-deep",
+          "void-stars-mid",
+          "void-stars-near"
+        ],
+        "build": {
+          "sha": "dd1d3f5",
+          "time": "2026-08-10T02:31:26.389Z",
+          "dirty": false
+        },
+        "ticks": 675,
+        "shipWorld": {
+          "x": 411.76540933057845,
+          "y": 1426.0226317699394
+        },
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        }
+      },
+      "frozen": {
+        "path": "stage/game-root/void-backdrop",
+        "children": [
+          {
+            "index": 0,
+            "label": "void-ground",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 720,
+            "y": 450,
+            "localBounds": {
+              "w": 1442,
+              "h": 902
+            }
+          },
+          {
+            "index": 1,
+            "label": "void-nebula-ironVeil",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 746,
+            "y": 367,
+            "localBounds": {
+              "w": 4288,
+              "h": 1962
+            }
+          },
+          {
+            "index": 2,
+            "label": "void-stars-deep",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 751,
+            "y": 352,
+            "localBounds": {
+              "w": 3577,
+              "h": 2418
+            }
+          },
+          {
+            "index": 3,
+            "label": "void-stars-mid",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 800,
+            "y": 196,
+            "localBounds": {
+              "w": 4115,
+              "h": 3031
+            }
+          },
+          {
+            "index": 4,
+            "label": "void-stars-near",
+            "visible": true,
+            "blendMode": "inherit",
+            "alpha": 1,
+            "x": 874,
+            "y": -38,
+            "localBounds": {
+              "w": 4870,
+              "h": 3958
+            }
+          }
+        ],
+        "nebulaLabels": [
+          "void-nebula-ironVeil"
+        ],
+        "starLabels": [
+          "void-stars-deep",
+          "void-stars-mid",
+          "void-stars-near"
+        ],
+        "build": {
+          "sha": "dd1d3f5",
+          "time": "2026-08-10T02:31:26.389Z",
+          "dirty": false
+        },
+        "ticks": 0,
+        "shipWorld": {
+          "x": 411.76540933057845,
+          "y": 1426.0226317699394
+        },
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        }
+      },
+      "frames": {
+        "live": "crescents-live.png",
+        "A-frozen": "crescents-A-frozen.png",
+        "B-no-nebula": "crescents-B-no-nebula.png",
+        "C-no-stars": "crescents-C-no-stars.png",
+        "D-ground-only": "crescents-D-ground-only.png"
+      },
+      "hidden": {
+        "nebula": {
+          "touched": [
+            "void-nebula-ironVeil"
+          ]
+        },
+        "stars": {
+          "touched": [
+            "void-stars-deep",
+            "void-stars-mid",
+            "void-stars-near"
+          ]
+        },
+        "all": {
+          "touched": [
+            "void-nebula-ironVeil",
+            "void-stars-deep",
+            "void-stars-mid",
+            "void-stars-near"
+          ]
+        }
+      },
+      "actual": "ironVeil",
+      "match": true
+    }
+  ],
+  "compassFlight": {
+    "dir": "west",
+    "x0": 1752,
+    "frames": [
+      {
+        "file": "compass-flight-1.png",
+        "worldX": 1752,
+        "flown": 0
+      },
+      {
+        "file": "compass-flight-2.png",
+        "worldX": 1279,
+        "flown": 473
+      },
+      {
+        "file": "compass-flight-3.png",
+        "worldX": 934,
+        "flown": 818
+      }
+    ]
+  }
+}

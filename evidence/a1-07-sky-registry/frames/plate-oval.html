@@ -1,0 +1,51 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+  body { margin:0; padding:26px 24px 30px; background:#14181d; color:#b9c2cc;
+         font-family:'Oxanium',ui-monospace,monospace; width:1520px; }
+  h1 { font-size:20px; margin:0 0 3px; color:#4DC3FF; font-weight:600; }
+  h1 .v { font-size:13px; padding:2px 8px; border-radius:3px; margin-left:10px; vertical-align:2px; }
+  .ok { background:#123a26; color:#57d98a; } .bad { background:#3d1418; color:#ff6b74; }
+  .lede { font-size:12.5px; margin:4px 0 16px; line-height:1.6; color:#8b96a3; max-width:1460px; }
+  .lede b { color:#cfd7e0; } code { color:#e0c07a; }
+  .row { display:flex; gap:12px; margin-bottom:6px; }
+  figure { margin:0; }
+  figure img { display:block; width:492px; border:1px solid #2b333c; }
+  figcaption { font-size:11px; line-height:1.45; padding-top:5px; color:#8b96a3; width:492px; }
+  figcaption b { color:#cfd7e0; }
+  table { border-collapse:collapse; font-size:11.5px; margin-top:12px; }
+  td,th { border:1px solid #2b333c; padding:3px 9px; text-align:left; }
+  th { color:#7E8894; font-weight:400; }
+  td.n { color:#e7edf3; }
+</style></head><body>
+  <h1>The Oval — the sky the running build actually loaded
+    <span class="v ok">REGISTRY MATCHES</span></h1>
+  <p class="lede">
+    Served bundle <b>dd1d3f5</b>, desktop 1440×900 at dpr 2, map pinned through
+    <code>localStorage['planet-rush:mapId'] = 'oval'</code>. <code>MAP_NEBULA.oval</code> says
+    <b>plasmaReef</b>; the live stage answers <b>plasmaReef</b>. The layer names below are read off the
+    running Pixi scene graph, not off the source: <code>Void.build()</code> writes
+    <code>void-nebula-&lt;id&gt;</code> from the same <code>nebula.id</code> the sprite is drawn from.
+    Draw order, back to front: <code>void-ground › void-nebula-plasmaReef › void-stars-deep › void-stars-mid › void-stars-near</code>.
+  </p>
+  <div class="row">
+    <figure><img src="oval-A-frozen.png"/><figcaption><b>A — <code>?debug=1&amp;freeze=1</code>, the seeded pinned world.</b> Everything drawing.</figcaption></figure>
+    <figure><img src="oval-B-no-nebula.png"/><figcaption><b>B — the same frame, <code>void-nebula-plasmaReef</code> hidden.</b> One layer's visibility, nothing else.</figcaption></figure>
+    <figure><img src="oval-sky-isolated.png"/><figcaption>
+      <b>|A − B| × 14 — the sky's own pixels, and nothing else's.</b>
+      Touches 30.1% of the frame; peak Δluma 15 of 255 before amplification.
+    </figcaption></figure>
+  </div>
+  <div class="row">
+    <figure><img src="oval-D-ground-only.png"/><figcaption><b>D — every void layer but <code>void-ground</code> hidden.</b> Floor and the world: what is left when neither sky nor star draws.</figcaption></figure>
+    <figure><img src="oval-stars-isolated.png"/><figcaption><b>|A − C| × 14 — the three star layers alone</b>, for scale: 0.2% of the frame, peak Δluma 239.1.</figcaption></figure>
+    <figure><table>
+      <tr><th>registry <code>MAP_NEBULA.oval</code></th><td class="n">plasmaReef</td></tr>
+      <tr><th>rendered (frozen, full VFX)</th><td class="n">plasmaReef</td></tr>
+      <tr><th>rendered (live <code>?debug=1</code>)</th><td class="n">none — no void-nebula-* layer</td></tr>
+      <tr><th>blend mode</th><td class="n">add</td></tr>
+      <tr><th>sky alone — frame touched</th><td class="n">30.1%</td></tr>
+      <tr><th>sky alone — peak Δluma</th><td class="n">15 / 255</td></tr>
+      <tr><th>sky alone — mean ink (r,g,b)</th><td class="n">0.52, 1.61, 2.76</td></tr>
+      <tr><th>stars alone — frame touched</th><td class="n">0.2%</td></tr>
+    </table></figure>
+  </div>
+</body></html>
