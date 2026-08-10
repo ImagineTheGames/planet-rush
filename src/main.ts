@@ -284,6 +284,9 @@ import {
   // Whether the bottom edge carries the controls strip — the one piece of screen
   // furniture the build badge has to make room for (see `buildBadge.lift`).
   showControlsStrip,
+  // A screen shell's "am I still up?" latch. Both shells below own one, and both
+  // read it at the top of their `render()` (u12-01).
+  createShellLifetime,
 } from './ui';
 import type {
   HudFrame,
@@ -6340,6 +6343,12 @@ function openMainMenu(
   // read that string, and renaming a wire-visible id buys nothing.
   let screen: 'menu' | 'settings' | 'codex' | 'online' | 'hangar' = 'menu';
   let played = false;
+  // Is this shell still on screen? `teardown()` destroys every view it owns, but
+  // the work already in flight when that happens — the allocator fleet probe most
+  // of all — keeps a live reference to `render()` and cannot be cancelled. The
+  // latch is how those callers find out, and `render()` is where they ask
+  // (u12-01; see `./ui/shell-lifetime`).
+  const life = createShellLifetime();
   // The career, read once when the front door opens (a0-14). The hangar shows
   // it and the equip write persists it through the same module; nothing else on
   // this screen touches it, and the sim never sees it at all (GDD §4.8).
@@ -6723,6 +6732,11 @@ function openMainMenu(
   }
 
   function render(): void {
+    // The doors were torn down while somebody was still holding this function.
+    // `entryView` and its siblings are destroyed Graphics by now — `backdrop.clear()`
+    // on the first line of `LobbyEntryView.update` is the throw QA caught on six of
+    // six clean boots. A shell that is gone draws nothing (u12-01).
+    if (!life.alive) return;
     menuView.visible = screen === 'menu';
     settingsView.visible = screen === 'settings';
     codexView.visible = screen === 'codex';
@@ -7430,7 +7444,9 @@ function openMainMenu(
     seam.visible = false;
     // The doors are gone with the rest of the menu, and `render()` will never run
     // again to say so — mark it here, or the seam would report a screen that is not
-    // on screen for the rest of the session.
+    // on screen for the rest of the session. (That "never runs again" was an
+    // ASSUMPTION until u12-01, and a false one: the fleet probe called it one last
+    // time, into destroyed Graphics. `teardown()` now enforces it.)
     onlineSeam.visible = false;
     resolvePlay({ kind: 'offline' });
   }
@@ -7849,6 +7865,10 @@ function openMainMenu(
   }
 
   function teardown(): void {
+    // FIRST, before a single `destroy()`: the listeners below cover everything the
+    // browser calls, but not the work already in flight that calls US. Flipping the
+    // latch here is what makes the lines after it safe (u12-01).
+    life.dispose();
     app.canvas.removeEventListener('pointerdown', onPointerDown);
     app.canvas.removeEventListener('pointermove', onPointerMove);
     app.canvas.removeEventListener('pointerup', onPointerUp);
@@ -8329,6 +8349,12 @@ function openLobby(
     online: room !== undefined,
   });
   let resolved = false;
+  // The same latch the menu shell carries, for the same reason (u12-01). `resolved`
+  // above is about the MATCH — it stops a second RUSH! — and says nothing about
+  // whether this screen still exists. Two things here outlive `teardown()` and reach
+  // the views: the room's `observe` handler (`src/net/session` hands back no
+  // unsubscribe, so it cannot be detached) and the long-press dossier timer.
+  const life = createShellLifetime();
 
   const size0 = ctx.logicalSize();
   const view = new LobbyView(size0.w, size0.h, isTouch);
@@ -8420,6 +8446,10 @@ function openLobby(
    * the screen, so the two conditions are folded into one visibility per frame.
    */
   function render(): void {
+    // A `lobbyState` that crossed on the wire with the match starting, or a hold
+    // timer that fired into the handoff, arrives here after `view` is destroyed
+    // Graphics. Same rule as the doors: a torn-down shell draws nothing (u12-01).
+    if (!life.alive) return;
     const model = lobbyModel(state);
     view.update(model);
     // Each picker's model is built ONLY while its screen is up. `render()` runs
@@ -8743,7 +8773,12 @@ function openLobby(
     showHint(resolved);
   }
 
+  // The dossier is the one thing on this screen that reaches a view without going
+  // through `render()`, so it carries the latch itself. The timer that opens it is
+  // cleared by `teardown()` as well — belt and braces, because a hold that lands in
+  // the same frame as the handoff is exactly the race u12-01 is about.
   function showHint(resolved: { hint: NonNullable<ReturnType<typeof codexShipHint>>; ax: number; ay: number }): void {
+    if (!life.alive) return;
     const { w, h } = ctx.logicalSize();
     hintView.show(resolved.hint, resolved.ax, resolved.ay, w, h);
     seam.hintTitle = resolved.hint.title;
@@ -8751,6 +8786,7 @@ function openLobby(
 
   function hideHint(): void {
     pinnedHintSeat = null;
+    if (!life.alive) return;
     hintView.hide();
     seam.hintTitle = null;
   }
@@ -9304,6 +9340,10 @@ function openLobby(
   }
 
   function teardown(): void {
+    // FIRST, as in the menu shell: the room's `observe` handler cannot be detached,
+    // so the latch is the only thing that can tell it this screen is gone (u12-01).
+    life.dispose();
+    if (press?.timer !== null && press?.timer !== undefined) clearTimeout(press.timer);
     app.ticker.remove(onTick);
     app.canvas.removeEventListener('pointerdown', onPointerDown);
     app.canvas.removeEventListener('pointermove', onPointerMove);
