@@ -1,0 +1,878 @@
+{
+  "base": "https://imaginethegames.github.io/planet-rush/",
+  "capturedAt": "2026-08-10T14:21:31.335Z",
+  "view": {
+    "width": 1280,
+    "height": 800
+  },
+  "crop": {
+    "w": 600,
+    "h": 440
+  },
+  "errors": [],
+  "build": {
+    "sha": "ecc1496",
+    "time": "2026-08-10T13:51:52.947Z",
+    "dirty": false
+  },
+  "atBoot": {
+    "attached": true,
+    "particles": 54,
+    "sprites": 54,
+    "quality": 1,
+    "reduced": false,
+    "drawnTotal": 21,
+    "drawn": {
+      "mineHit": 0,
+      "weaponHit": 0,
+      "rockCrack": 0,
+      "rockBurst": 0,
+      "oreCollect": 0,
+      "holdFull": 0,
+      "turretFire": 0,
+      "shotImpact": 0,
+      "shieldHit": 0,
+      "shieldDown": 0,
+      "coreHit": 0,
+      "shipExplode": 0,
+      "shipSpawn": 0,
+      "spawnPulse": 0,
+      "thrust": 14,
+      "buildPlaced": 7,
+      "buildComplete": 0,
+      "repairTick": 0,
+      "bankOre": 0,
+      "upgradeBought": 0,
+      "waveArrive": 0,
+      "collapseBegin": 0,
+      "stationDeath": 0,
+      "matchEnd": 0,
+      "turretDown": 0
+    },
+    "drawnBy": {
+      "mineHit": -1,
+      "weaponHit": -1,
+      "rockCrack": -1,
+      "rockBurst": -1,
+      "oreCollect": -1,
+      "holdFull": -1,
+      "turretFire": -1,
+      "shotImpact": -1,
+      "shieldHit": -1,
+      "shieldDown": -1,
+      "coreHit": -1,
+      "shipExplode": -1,
+      "shipSpawn": -1,
+      "spawnPulse": -1,
+      "thrust": 7,
+      "buildPlaced": 7,
+      "buildComplete": -1,
+      "repairTick": -1,
+      "bankOre": -1,
+      "upgradeBought": -1,
+      "waveArrive": -1,
+      "collapseBegin": -1,
+      "stationDeath": -1,
+      "matchEnd": -1,
+      "turretDown": -1
+    },
+    "frozen": false
+  },
+  "canvas": {
+    "w": 1280,
+    "h": 800,
+    "cssW": 1280,
+    "cssH": 800
+  },
+  "afterIdle": {
+    "attached": true,
+    "particles": 6,
+    "sprites": 145,
+    "quality": 1,
+    "reduced": false,
+    "drawnTotal": 882,
+    "drawn": {
+      "mineHit": 0,
+      "weaponHit": 0,
+      "rockCrack": 6,
+      "rockBurst": 0,
+      "oreCollect": 15,
+      "holdFull": 5,
+      "turretFire": 0,
+      "shotImpact": 88,
+      "shieldHit": 0,
+      "shieldDown": 0,
+      "coreHit": 0,
+      "shipExplode": 0,
+      "shipSpawn": 0,
+      "spawnPulse": 152,
+      "thrust": 546,
+      "buildPlaced": 7,
+      "buildComplete": 7,
+      "repairTick": 0,
+      "bankOre": 56,
+      "upgradeBought": 0,
+      "waveArrive": 0,
+      "collapseBegin": 0,
+      "stationDeath": 0,
+      "matchEnd": 0,
+      "turretDown": 0
+    },
+    "drawnBy": {
+      "mineHit": -1,
+      "weaponHit": -1,
+      "rockCrack": -1,
+      "rockBurst": -1,
+      "oreCollect": 4,
+      "holdFull": 4,
+      "turretFire": -1,
+      "shotImpact": -1,
+      "shieldHit": -1,
+      "shieldDown": -1,
+      "coreHit": -1,
+      "shipExplode": -1,
+      "shipSpawn": -1,
+      "spawnPulse": 7,
+      "thrust": 7,
+      "buildPlaced": 7,
+      "buildComplete": 7,
+      "repairTick": -1,
+      "bankOre": 3,
+      "upgradeBought": -1,
+      "waveArrive": -1,
+      "collapseBegin": -1,
+      "stationDeath": -1,
+      "matchEnd": -1,
+      "turretDown": -1
+    },
+    "frozen": false
+  },
+  "explode": {
+    "staged": true,
+    "stagedAt": 1786371704406,
+    "trigger": {
+      "t": 1786371704542,
+      "seq": 4,
+      "particles": 35,
+      "sprites": 145,
+      "shipExplode": 1,
+      "shipExplodeBy": 0,
+      "oreCollect": 15,
+      "oreCollectBy": 4,
+      "from": 0
+    },
+    "sheet": "images/a1-13-vfx-explode-sheet.png",
+    "triggerIndex": 4,
+    "singles": [
+      {
+        "rel": -2,
+        "image": "images/a1-13-vfx-explode-m2.png",
+        "zoom": "images/a1-13-vfx-explode-m2-2x.png",
+        "relMs": -315,
+        "particles": 8,
+        "shipExplode": 0,
+        "shipExplodeBy": -1
+      },
+      {
+        "rel": -1,
+        "image": "images/a1-13-vfx-explode-m1.png",
+        "zoom": "images/a1-13-vfx-explode-m1-2x.png",
+        "relMs": -261,
+        "particles": 13,
+        "shipExplode": 0,
+        "shipExplodeBy": -1
+      },
+      {
+        "rel": 0,
+        "image": "images/a1-13-vfx-explode-p0.png",
+        "zoom": "images/a1-13-vfx-explode-p0-2x.png",
+        "relMs": 0,
+        "particles": 35,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "rel": 1,
+        "image": "images/a1-13-vfx-explode-p1.png",
+        "zoom": "images/a1-13-vfx-explode-p1-2x.png",
+        "relMs": 100,
+        "particles": 38,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "rel": 2,
+        "image": "images/a1-13-vfx-explode-p2.png",
+        "zoom": "images/a1-13-vfx-explode-p2-2x.png",
+        "relMs": 203,
+        "particles": 38,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "rel": 3,
+        "image": "images/a1-13-vfx-explode-p3.png",
+        "zoom": "images/a1-13-vfx-explode-p3-2x.png",
+        "relMs": 260,
+        "particles": 32,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "rel": 4,
+        "image": "images/a1-13-vfx-explode-p4.png",
+        "zoom": "images/a1-13-vfx-explode-p4-2x.png",
+        "relMs": 483,
+        "particles": 17,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "rel": 5,
+        "image": "images/a1-13-vfx-explode-p5.png",
+        "zoom": "images/a1-13-vfx-explode-p5-2x.png",
+        "relMs": 508,
+        "particles": 15,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      }
+    ],
+    "peak": {
+      "image": "images/a1-13-vfx-explode-p1.png",
+      "index": 5,
+      "t": 1786371704642,
+      "seq": 5,
+      "particles": 38,
+      "sprites": 145,
+      "shipExplode": 1,
+      "shipExplodeBy": 0,
+      "oreCollect": 15,
+      "oreCollectBy": 4,
+      "relMs": 236
+    },
+    "frames": [
+      {
+        "seq": 0,
+        "relMs": -306,
+        "particles": 0,
+        "shipExplode": 0,
+        "shipExplodeBy": -1
+      },
+      {
+        "seq": 1,
+        "relMs": -246,
+        "particles": 2,
+        "shipExplode": 0,
+        "shipExplodeBy": -1
+      },
+      {
+        "seq": 2,
+        "relMs": -179,
+        "particles": 8,
+        "shipExplode": 0,
+        "shipExplodeBy": -1
+      },
+      {
+        "seq": 3,
+        "relMs": -125,
+        "particles": 13,
+        "shipExplode": 0,
+        "shipExplodeBy": -1
+      },
+      {
+        "seq": 4,
+        "relMs": 136,
+        "particles": 35,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 5,
+        "relMs": 236,
+        "particles": 38,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 6,
+        "relMs": 339,
+        "particles": 38,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 7,
+        "relMs": 396,
+        "particles": 32,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 8,
+        "relMs": 619,
+        "particles": 17,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 9,
+        "relMs": 644,
+        "particles": 15,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 10,
+        "relMs": 694,
+        "particles": 20,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 11,
+        "relMs": 803,
+        "particles": 19,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 12,
+        "relMs": 863,
+        "particles": 21,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 13,
+        "relMs": 871,
+        "particles": 21,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 14,
+        "relMs": 883,
+        "particles": 24,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 15,
+        "relMs": 923,
+        "particles": 25,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 16,
+        "relMs": 946,
+        "particles": 30,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 17,
+        "relMs": 995,
+        "particles": 35,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 18,
+        "relMs": 1022,
+        "particles": 36,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 19,
+        "relMs": 1127,
+        "particles": 29,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 20,
+        "relMs": 1159,
+        "particles": 28,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 21,
+        "relMs": 1252,
+        "particles": 12,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 22,
+        "relMs": 1328,
+        "particles": 10,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 23,
+        "relMs": 1383,
+        "particles": 11,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 24,
+        "relMs": 1447,
+        "particles": 15,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 25,
+        "relMs": 1523,
+        "particles": 13,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 26,
+        "relMs": 1576,
+        "particles": 17,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 27,
+        "relMs": 1671,
+        "particles": 18,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 28,
+        "relMs": 1721,
+        "particles": 16,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 29,
+        "relMs": 1770,
+        "particles": 17,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      },
+      {
+        "seq": 30,
+        "relMs": 1839,
+        "particles": 12,
+        "shipExplode": 1,
+        "shipExplodeBy": 0
+      }
+    ]
+  },
+  "ore": {
+    "staged": {
+      "cargo": 6,
+      "cargoCap": 6,
+      "banked": 3
+    },
+    "stagedAt": 1786371712852,
+    "trigger": {
+      "t": 1786371712913,
+      "seq": 6,
+      "particles": 18,
+      "sprites": 147,
+      "shipExplode": 3,
+      "shipExplodeBy": 5,
+      "oreCollect": 20,
+      "oreCollectBy": 0,
+      "from": 19
+    },
+    "sheet": "images/a1-13-vfx-ore-sheet.png",
+    "triggerIndex": 6,
+    "singles": [
+      {
+        "rel": -2,
+        "image": "images/a1-13-vfx-ore-m2.png",
+        "zoom": "images/a1-13-vfx-ore-m2-2x.png",
+        "relMs": -266,
+        "particles": 30,
+        "oreCollect": 18,
+        "oreCollectBy": 7
+      },
+      {
+        "rel": -1,
+        "image": "images/a1-13-vfx-ore-m1.png",
+        "zoom": "images/a1-13-vfx-ore-m1-2x.png",
+        "relMs": -117,
+        "particles": 28,
+        "oreCollect": 19,
+        "oreCollectBy": 1
+      },
+      {
+        "rel": 0,
+        "image": "images/a1-13-vfx-ore-p0.png",
+        "zoom": "images/a1-13-vfx-ore-p0-2x.png",
+        "relMs": 0,
+        "particles": 18,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "rel": 1,
+        "image": "images/a1-13-vfx-ore-p1.png",
+        "zoom": "images/a1-13-vfx-ore-p1-2x.png",
+        "relMs": 123,
+        "particles": 34,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "rel": 2,
+        "image": "images/a1-13-vfx-ore-p2.png",
+        "zoom": "images/a1-13-vfx-ore-p2-2x.png",
+        "relMs": 221,
+        "particles": 36,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "rel": 3,
+        "image": "images/a1-13-vfx-ore-p3.png",
+        "zoom": "images/a1-13-vfx-ore-p3-2x.png",
+        "relMs": 328,
+        "particles": 27,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "rel": 4,
+        "image": "images/a1-13-vfx-ore-p4.png",
+        "zoom": "images/a1-13-vfx-ore-p4-2x.png",
+        "relMs": 615,
+        "particles": 9,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "rel": 5,
+        "image": "images/a1-13-vfx-ore-p5.png",
+        "zoom": "images/a1-13-vfx-ore-p5-2x.png",
+        "relMs": 668,
+        "particles": 15,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      }
+    ],
+    "peak": {
+      "image": "images/a1-13-vfx-ore-p2.png",
+      "index": 8,
+      "t": 1786371713134,
+      "seq": 8,
+      "particles": 36,
+      "sprites": 147,
+      "shipExplode": 3,
+      "shipExplodeBy": 5,
+      "oreCollect": 20,
+      "oreCollectBy": 0,
+      "relMs": 282
+    },
+    "frames": [
+      {
+        "seq": 0,
+        "relMs": -477,
+        "particles": 18,
+        "oreCollect": 18,
+        "oreCollectBy": 7
+      },
+      {
+        "seq": 1,
+        "relMs": -421,
+        "particles": 21,
+        "oreCollect": 18,
+        "oreCollectBy": 7
+      },
+      {
+        "seq": 2,
+        "relMs": -375,
+        "particles": 20,
+        "oreCollect": 18,
+        "oreCollectBy": 7
+      },
+      {
+        "seq": 3,
+        "relMs": -313,
+        "particles": 22,
+        "oreCollect": 18,
+        "oreCollectBy": 7
+      },
+      {
+        "seq": 4,
+        "relMs": -205,
+        "particles": 30,
+        "oreCollect": 18,
+        "oreCollectBy": 7
+      },
+      {
+        "seq": 5,
+        "relMs": -56,
+        "particles": 28,
+        "oreCollect": 19,
+        "oreCollectBy": 1
+      },
+      {
+        "seq": 6,
+        "relMs": 61,
+        "particles": 18,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 7,
+        "relMs": 184,
+        "particles": 34,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 8,
+        "relMs": 282,
+        "particles": 36,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 9,
+        "relMs": 389,
+        "particles": 27,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 10,
+        "relMs": 676,
+        "particles": 9,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 11,
+        "relMs": 729,
+        "particles": 15,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 12,
+        "relMs": 792,
+        "particles": 17,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 13,
+        "relMs": 842,
+        "particles": 22,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 14,
+        "relMs": 908,
+        "particles": 27,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 15,
+        "relMs": 922,
+        "particles": 32,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 16,
+        "relMs": 937,
+        "particles": 40,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 17,
+        "relMs": 974,
+        "particles": 43,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 18,
+        "relMs": 1015,
+        "particles": 43,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 19,
+        "relMs": 1025,
+        "particles": 43,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 20,
+        "relMs": 1088,
+        "particles": 44,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 21,
+        "relMs": 1135,
+        "particles": 43,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 22,
+        "relMs": 1141,
+        "particles": 42,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 23,
+        "relMs": 1244,
+        "particles": 33,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 24,
+        "relMs": 1289,
+        "particles": 28,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 25,
+        "relMs": 1339,
+        "particles": 22,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 26,
+        "relMs": 1425,
+        "particles": 15,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 27,
+        "relMs": 1482,
+        "particles": 14,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 28,
+        "relMs": 1521,
+        "particles": 15,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 29,
+        "relMs": 1581,
+        "particles": 17,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 30,
+        "relMs": 1650,
+        "particles": 28,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 31,
+        "relMs": 1701,
+        "particles": 28,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      },
+      {
+        "seq": 32,
+        "relMs": 1747,
+        "particles": 27,
+        "oreCollect": 20,
+        "oreCollectBy": 0
+      }
+    ]
+  },
+  "final": {
+    "attached": true,
+    "particles": 27,
+    "sprites": 165,
+    "quality": 1,
+    "reduced": false,
+    "drawnTotal": 1672,
+    "drawn": {
+      "mineHit": 0,
+      "weaponHit": 0,
+      "rockCrack": 7,
+      "rockBurst": 0,
+      "oreCollect": 21,
+      "holdFull": 7,
+      "turretFire": 13,
+      "shotImpact": 169,
+      "shieldHit": 0,
+      "shieldDown": 0,
+      "coreHit": 3,
+      "shipExplode": 4,
+      "shipSpawn": 3,
+      "spawnPulse": 186,
+      "thrust": 1094,
+      "buildPlaced": 8,
+      "buildComplete": 8,
+      "repairTick": 0,
+      "bankOre": 149,
+      "upgradeBought": 0,
+      "waveArrive": 0,
+      "collapseBegin": 0,
+      "stationDeath": 0,
+      "matchEnd": 0,
+      "turretDown": 0
+    },
+    "drawnBy": {
+      "mineHit": -1,
+      "weaponHit": -1,
+      "rockCrack": -1,
+      "rockBurst": -1,
+      "oreCollect": 7,
+      "holdFull": 0,
+      "turretFire": 4,
+      "shotImpact": -1,
+      "shieldHit": -1,
+      "shieldDown": -1,
+      "coreHit": 1,
+      "shipExplode": 4,
+      "shipSpawn": 5,
+      "spawnPulse": 0,
+      "thrust": 5,
+      "buildPlaced": 4,
+      "buildComplete": 4,
+      "repairTick": -1,
+      "bankOre": 7,
+      "upgradeBought": -1,
+      "waveArrive": -1,
+      "collapseBegin": -1,
+      "stationDeath": -1,
+      "matchEnd": -1,
+      "turretDown": -1
+    },
+    "frozen": false
+  },
+  "localPlayer": 0
+}
