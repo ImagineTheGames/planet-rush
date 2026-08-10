@@ -59,6 +59,28 @@ describe('hitWheel', () => {
     expect(hitWheel(200, 150 - justInside, WHEEL).kind).toBe('hub');
   });
 
+  it('keeps the whole drawn hub disc a miss, with ONE radius doing it', () => {
+    // a1-09 deleted `HUB_FRACTION = 0.22`, a second hub radius this module
+    // carried and nothing ever read — a stale mirror of a `build-wheel-view.ts`
+    // geometry that has since collapsed the hub and the ring's inner edge into
+    // one number. This is the guard against it coming back: the behaviour the
+    // constant was describing is asserted here, at every radius it covered, so
+    // re-introducing a separate hub radius has to survive these presses rather
+    // than merely compile. The wheel's dead centre is `INNER_FRACTION` and only
+    // `INNER_FRACTION`.
+    for (const fraction of [0, 0.1, 0.22, 0.29]) {
+      const r = WHEEL.radius * fraction;
+      expect(hitWheel(200, 150 - r, WHEEL).kind, `at ${fraction}r`).toBe('hub');
+      expect(hitWheel(200 + r, 150, WHEEL).kind, `at ${fraction}r`).toBe('hub');
+    }
+    // …and the first ring radius outside it still buys, so the guard above is
+    // pinning a boundary rather than a wheel that refuses every press.
+    expect(hitWheel(200, 150 - WHEEL.radius * 0.31, WHEEL)).toEqual({
+      kind: 'segment',
+      index: 0,
+    });
+  });
+
   it('lands a press on the ring on the segment drawn there', () => {
     const r = WHEEL.radius * 0.7;
     const hit = hitWheel(200, 150 - r, WHEEL);
