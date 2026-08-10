@@ -21,6 +21,21 @@ function world() {
   return createWorld({ seed: 1, players: [{ id: 0, shipClass: ShipClass.Vanguard }] });
 }
 
+/**
+ * Flash geometry, placed relative to the camera target's own ship.
+ *
+ * The camera centres the target (camera.ts) and, since a1-12, the renderer
+ * submits only what that window contains — so a flash at a fixed world point
+ * asserts nothing about the muzzle layer until you know where the ship is. These
+ * offsets are the same shapes the cases used before (a 50-unit strike, a 260-unit
+ * full-range miss); anchoring them to the ship is what makes them a flash the
+ * player is actually looking at, which is the only kind there is.
+ */
+function nearShip(w: ReturnType<typeof world>, dx: number, dy: number): { x: number; y: number } {
+  const ship = w.ships[0]!;
+  return { x: ship.pos.x + dx, y: ship.pos.y + dy };
+}
+
 function impactLayer(stage: Container): Container {
   const layer = stage.getChildByLabel('impacts', true);
   if (!layer) throw new Error('impacts layer missing');
@@ -41,10 +56,11 @@ describe('muzzle-flash impact glow (§2.6 clamp)', () => {
   it('draws a pooled plasma glow at the hit point when the flash strikes', () => {
     const stage = new Container();
     const r = new Renderer(stage, { width: 800, height: 600, originX: 0, originY: 0 });
-    const hit = { x: 950, y: 900 };
-    const muzzle: MuzzleView = { from: { x: 900, y: 900 }, to: hit, color: 0x4dc3ff, hit };
+    const w = world();
+    const hit = nearShip(w, 50, 0);
+    const muzzle: MuzzleView = { from: nearShip(w, 0, 0), to: hit, color: 0x4dc3ff, hit };
 
-    r.draw(world(), { cameraTarget: 0, muzzles: [muzzle] });
+    r.draw(w, { cameraTarget: 0, muzzles: [muzzle] });
 
     const glows = visibleChildren(impactLayer(stage));
     expect(glows).toHaveLength(1);
@@ -58,14 +74,15 @@ describe('muzzle-flash impact glow (§2.6 clamp)', () => {
   it('draws no glow on a clean miss (hit === null, full-range flash)', () => {
     const stage = new Container();
     const r = new Renderer(stage, { width: 800, height: 600, originX: 0, originY: 0 });
+    const w = world();
     const muzzle: MuzzleView = {
-      from: { x: 900, y: 900 },
-      to: { x: 1160, y: 900 }, // full range, nothing struck
+      from: nearShip(w, 0, 0),
+      to: nearShip(w, 260, 0), // full range, nothing struck
       color: 0x4dc3ff,
       hit: null,
     };
 
-    r.draw(world(), { cameraTarget: 0, muzzles: [muzzle] });
+    r.draw(w, { cameraTarget: 0, muzzles: [muzzle] });
 
     expect(visibleChildren(impactLayer(stage))).toHaveLength(0);
     // The flash line still draws to its full-range endpoint.
@@ -75,17 +92,18 @@ describe('muzzle-flash impact glow (§2.6 clamp)', () => {
   it('hides the glow again once the flash stops hitting (pool reuse)', () => {
     const stage = new Container();
     const r = new Renderer(stage, { width: 800, height: 600, originX: 0, originY: 0 });
-    const hit = { x: 950, y: 900 };
+    const w = world();
+    const hit = nearShip(w, 50, 0);
 
-    r.draw(world(), {
+    r.draw(w, {
       cameraTarget: 0,
-      muzzles: [{ from: { x: 900, y: 900 }, to: hit, color: 0x4dc3ff, hit }],
+      muzzles: [{ from: nearShip(w, 0, 0), to: hit, color: 0x4dc3ff, hit }],
     });
     expect(visibleChildren(impactLayer(stage))).toHaveLength(1);
 
     // Next frame: nothing firing → no flashes, no glows, but the pooled
     // Graphics is retained (hidden, not destroyed).
-    r.draw(world(), { cameraTarget: 0, muzzles: [] });
+    r.draw(w, { cameraTarget: 0, muzzles: [] });
     const layer = impactLayer(stage);
     expect(visibleChildren(layer)).toHaveLength(0);
     expect(layer.children.length).toBeGreaterThanOrEqual(1); // kept for reuse
@@ -94,15 +112,17 @@ describe('muzzle-flash impact glow (§2.6 clamp)', () => {
   it('glows only for the flashes that hit when several fire at once', () => {
     const stage = new Container();
     const r = new Renderer(stage, { width: 800, height: 600, originX: 0, originY: 0 });
-    const hitA = { x: 950, y: 900 };
-    const hitC = { x: 900, y: 950 };
+    const w = world();
+    const from = nearShip(w, 0, 0);
+    const hitA = nearShip(w, 50, 0);
+    const hitC = nearShip(w, 0, 50);
     const muzzles: MuzzleView[] = [
-      { from: { x: 900, y: 900 }, to: hitA, color: 0x4dc3ff, hit: hitA },
-      { from: { x: 900, y: 900 }, to: { x: 1160, y: 900 }, color: 0x4dc3ff, hit: null },
-      { from: { x: 900, y: 900 }, to: hitC, color: 0x4dc3ff, hit: hitC },
+      { from, to: hitA, color: 0x4dc3ff, hit: hitA },
+      { from, to: nearShip(w, 260, 0), color: 0x4dc3ff, hit: null },
+      { from, to: hitC, color: 0x4dc3ff, hit: hitC },
     ];
 
-    r.draw(world(), { cameraTarget: 0, muzzles });
+    r.draw(w, { cameraTarget: 0, muzzles });
 
     const glows = visibleChildren(impactLayer(stage));
     expect(glows).toHaveLength(2);

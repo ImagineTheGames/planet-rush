@@ -21,23 +21,85 @@
  */
 import { spawn } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { chromium } from '@playwright/test';
 
-const PORT = 5183; // not 5173: leave the developer's own `npm run dev` alone
+/**
+ * A port nothing else is holding.
+ *
+ * It used to be a hard-coded 5183 with `--strictPort`, and a1-12 lost a capture
+ * to exactly that: a **stale vite from an earlier session** still held the port,
+ * the new one exited with "Port 5183 is already in use", and the run navigated
+ * to the survivor and measured ITS module graph — printing a1-11's baselines
+ * over a1-12's code, plausibly and silently. That is the same class of failure
+ * the goldens' `reuseExistingServer` note is about, and the instrument has to be
+ * immune to it rather than the operator vigilant about it.
+ *
+ * Two defences, because the port is only half of it: bind an ephemeral port here
+ * so a survivor cannot collide with us at all, and refuse to report a payload
+ * that did not come from THIS rig (see `RIG_MARKER` below).
+ */
+async function freePort() {
+  if (process.env.BENCH_PORT) return Number(process.env.BENCH_PORT);
+  return new Promise((resolve, reject) => {
+    const probe = createServer();
+    probe.on('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const { port } = probe.address();
+      probe.close(() => resolve(port));
+    });
+  });
+}
+
+const PORT = await freePort(); // never 5173: leave the developer's own `npm run dev` alone
 const URL = `http://localhost:${PORT}/spikes/atlas-pooling/bench.html`;
+
+/** A field only this revision of `bench.ts` emits. A payload without it came
+ *  from some other build of the rig, and reporting it as this run's numbers is
+ *  worse than reporting nothing. */
+const RIG_MARKER = 'baselines';
 const headed = process.argv.includes('--headed');
 const jsonAt = process.argv[process.argv.indexOf('--json') + 1];
 const wantJson = process.argv.includes('--json') && jsonAt && !jsonAt.startsWith('--');
 
-/** Start `vite` detached enough that we can always kill it again. */
+/**
+ * Start `vite` in its own **process group**, so we can always kill it again.
+ *
+ * `detached: true` is the whole point and it is not decoration. `npx` spawns a
+ * shell which spawns node-vite, so killing the pid we hold kills the wrapper and
+ * orphans the server: a1-12 found one from an *earlier session* still holding
+ * the port, and found the current run hanging after its own numbers were printed
+ * because the orphan had inherited stdout and nothing downstream ever saw EOF.
+ * A group kill (`-pid`) takes the shell and the server together.
+ */
 function startVite() {
   const proc = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], {
     stdio: ['ignore', 'inherit', 'inherit'],
+    detached: true,
   });
   proc.on('exit', (code) => {
     proc.exitedWith = code;
   });
   return proc;
+}
+
+/** SIGKILL the whole server group. Falls back to the single pid if the group is
+ *  already gone, and never throws — this runs in a `finally`. */
+function killVite(proc) {
+  for (const target of [-proc.pid, proc.pid]) {
+    try {
+      process.kill(target, 'SIGKILL');
+    } catch {
+      /* already dead */
+    }
+  }
+}
+
+/** Give a failing vite a moment to report itself before we try to load a page.
+ *  Without this the first `goto` can win the race against the `exit` event and
+ *  we happily measure whatever else is answering on that port. */
+function settle(ms) {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 /**
@@ -81,9 +143,12 @@ function table(payload) {
   lines.push('');
 
   lines.push('-- baseline: the SHIPPED renderer on the GDD §4.3 stress scene --');
-  for (const b of [payload.baseline, payload.baselineReduced].filter(Boolean)) {
+  // `baselines` is a1-12's array (every screen × VFX tier); the two named keys
+  // are a1-10's desktop pair, kept so older captures still print.
+  const shipped = payload.baselines ?? [payload.baseline, payload.baselineReduced].filter(Boolean);
+  for (const b of shipped) {
     lines.push(
-      `  ${pad(b.name, 30)} ${b.entities} entities · median ${num(b.stats.median)} ms ` +
+      `  ${pad(b.name, 38)} ${b.entities} entities, ${b.drawn} submitted · median ${num(b.stats.median)} ms ` +
         `(${num(b.stats.fps, 1)} fps) · p95 ${num(b.stats.p95)} · ` +
         `${num(b.drawCallsPerFrame, 1)} draw calls/frame · ` +
         `VfxAutoQuality would engage: ${b.vfxWouldEngage ? 'YES' : 'no'}`,
@@ -140,6 +205,9 @@ try {
   });
   page.on('pageerror', (e) => console.error('[page error]', e.message));
 
+  console.log(`bench → ${URL}`);
+  await settle(1500);
+  if (vite.exitedWith != null) throw new Error(`vite exited with ${vite.exitedWith} before the page loaded`);
   await gotoWhenReady(page, vite);
   await page.waitForFunction(() => window.__atlasBench !== undefined, undefined, { timeout: 900_000 });
   const payload = await page.evaluate(() => window.__atlasBench);
@@ -147,6 +215,12 @@ try {
 
   if (payload.error) {
     console.error('bench failed in page:', payload.error);
+    exitCode = 1;
+  } else if (!(RIG_MARKER in payload)) {
+    console.error(
+      `the page returned a payload with no '${RIG_MARKER}' — it is not this revision of the rig.\n` +
+        'Something else served bench.html (a stale dev server, a neighbouring lane). Refusing to report it.',
+    );
     exitCode = 1;
   } else {
     console.log('\n' + table(payload) + '\n');
@@ -159,8 +233,9 @@ try {
   console.error(err);
   exitCode = 1;
 } finally {
-  // SIGKILL, not SIGTERM: a vite still holding --strictPort 5183 makes the next
-  // run fail to start, and this rig has already lost capture runs to exactly that.
-  vite.kill('SIGKILL');
+  // SIGKILL the GROUP, not SIGTERM the wrapper: a survivor holding the port
+  // makes the next run fail to start — and, worse, makes THIS run hang after it
+  // has already printed, because it inherited stdout. Both have happened here.
+  killVite(vite);
 }
 process.exit(exitCode);

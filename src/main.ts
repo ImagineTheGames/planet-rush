@@ -1225,8 +1225,22 @@ async function boot(): Promise<void> {
   //     with everything else under the landscape lock. The camera centres on the
   //     LOGICAL viewport (landscape), URL-bar / notch / fullscreen aware on the
   //     un-rotated path — see camera.ts and readViewport().
+  //
+  //     The `baker` is what turns the entity layers pooled (a1-11). `src/render/`
+  //     draws rocks, turrets and shots as `Sprite`s over a handful of textures
+  //     baked once per distinct look, and it is the live `app.renderer` that bakes
+  //     them; with no baker it draws the same scene graph over blank textures,
+  //     which is what lets the render suites stay headless without CI and the
+  //     player seeing two different draw paths. a1-10 measured the layer this
+  //     replaces at 26.1 ms and 200 draw calls for 200 rocks
+  //     (`docs/atlas-pooling-measured.md`). The resolution cap is the VFX cache's,
+  //     for the same reason: a dpr-3 phone would otherwise bake nine times the
+  //     texels it can show.
   let viewport: Viewport = readViewport();
-  const renderer = new Renderer(gameRoot, viewport);
+  const renderer = new Renderer(gameRoot, viewport, {
+    baker: app.renderer,
+    resolution: Math.min(window.devicePixelRatio || 1, 2),
+  });
 
   // --- Auto VFX-reduction (vfx-quality.ts): watches real frame times and engages
   //     the "reduce VFX" setting on a sustained drop below the fps floor (GDD

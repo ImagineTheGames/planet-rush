@@ -69,6 +69,40 @@ import { Renderer, type RenderView } from '../../src/render';
  *  so this rig and QA's frame-time gate are talking about the same screen. */
 const VIEW = { width: 1280, height: 800 } as const;
 
+/**
+ * The two screens the whole-frame baseline is measured on (a1-12).
+ *
+ * a1-10 ran the baseline on the desktop window alone, which is the *looser* of
+ * the two gates and the one where the arena-vs-window gap is smallest. The
+ * landscape phone is where §4.1 measured 6 visible rocks out of 200 and where
+ * GDD §4.3's binding gate lives, so it gets its own capture: same rig, same box,
+ * same scene, back to back. Both come from `tests/perf/playwright.perf.config.ts`
+ * so the rig and QA's frame-time gate are talking about the same screens.
+ */
+const PROFILES = [
+  { name: 'desktop', width: 1280, height: 800 },
+  { name: 'phone-landscape', width: 844, height: 390 },
+] as const;
+
+type Profile = (typeof PROFILES)[number];
+
+/** The entity layers the cull acts on — what `drawn` counts below. Matches
+ *  `src/render/draw-cost.test.ts`, deliberately: the headless test and the real
+ *  browser must be counting the same thing. */
+const ENTITY_LAYERS = ['asteroids', 'chunks', 'ships', 'turrets', 'shots'] as const;
+
+/** Display objects the shipped renderer left visible in those layers — i.e. what
+ *  it handed the GPU this frame. Since a1-12 that is the window, not the arena. */
+function submittedEntities(stage: Container): number {
+  let n = 0;
+  for (const label of ENTITY_LAYERS) {
+    const layer = stage.getChildByLabel(label, true) as Container | null;
+    if (!layer) continue;
+    for (const child of layer.children) if (child.visible) n++;
+  }
+  return n;
+}
+
 /** Frames timed per scenario, per round. ~2 s of a 60 fps budget each. */
 const FRAMES = 180;
 /** Frames rendered untimed first: shader compiles, first texture uploads, JIT. */
@@ -654,12 +688,30 @@ function nextFrame(): Promise<void> {
 
 /** The whole-frame baseline: the SHIPPED `Renderer`, drawing the SHIPPED scene.
  *  Not an A/B — it is the answer to "what does a busy frame cost today, and does
- *  `VfxAutoQuality` engage on it?", which the brief says outranks the A/B. */
-async function measureShippedRenderer(app: Application, world: World, reduceVfx = false): Promise<Result> {
+ *  `VfxAutoQuality` engage on it?", which the brief says outranks the A/B.
+ *
+ *  Run once per {@link PROFILES} entry. The canvas is resized to the profile as
+ *  well as the camera viewport, so a phone capture pays a phone's fill cost and
+ *  not a desktop's — quoting a 844×390 viewport over a 1280×800 render target
+ *  would charge the phone for pixels it does not have. */
+async function measureShippedRenderer(
+  app: Application,
+  world: World,
+  profile: Profile,
+  reduceVfx = false,
+): Promise<Result> {
   const stage = new Container();
   app.stage.removeChildren();
   app.stage.addChild(stage);
-  const renderer = new Renderer(stage, { width: VIEW.width, height: VIEW.height, originX: 0, originY: 0 });
+  app.renderer.resize(profile.width, profile.height);
+  // The baker `main.ts` injects (a1-11). Without it the renderer draws the same
+  // scene graph over blank textures — correct for a headless unit test, and a
+  // measurement of nothing at all. `resolution: 1` is this rig's dpr.
+  const renderer = new Renderer(
+    stage,
+    { width: profile.width, height: profile.height, originX: 0, originY: 0 },
+    { baker: app.renderer, resolution: 1 },
+  );
   // The auto-reducer's own switch, thrown by hand. Running the baseline both
   // ways answers the question the brief cares about more than the A/B: when
   // `VfxAutoQuality` engages, how much frame does it actually buy back?
@@ -686,10 +738,16 @@ async function measureShippedRenderer(app: Application, world: World, reduceVfx 
     last = now;
   }
 
+  // Counted BEFORE the teardown, off the last frame drawn: what the shipped
+  // renderer actually left visible for the GPU on this screen. Pre-a1-12 this is
+  // the whole arena by construction; post-a1-12 it is the window.
+  const drawn = submittedEntities(stage);
+
   app.stage.removeChildren();
   stage.destroy({ children: true });
+  app.renderer.resize(VIEW.width, VIEW.height);
   return {
-    name: reduceVfx ? 'shipped:whole-frame+reduceVfx' : 'shipped:whole-frame',
+    name: `shipped:whole-frame@${profile.name}${reduceVfx ? '+reduceVfx' : ''}`,
     entities: (() => {
       const n =
         world.asteroids.length +
@@ -700,7 +758,7 @@ async function measureShippedRenderer(app: Application, world: World, reduceVfx 
         world.projectiles.filter((p) => p.active).length;
       return n;
     })(),
-    drawn: 0,
+    drawn,
     pooled: 0,
     drawCallsPerFrame: (drawCalls - callsAtStart) / FRAMES,
     stats: stats(deltas),
@@ -731,9 +789,18 @@ async function main(): Promise<void> {
   const world = stressWorld();
   const stage = new Container();
 
-  // The baselines first, on their own worlds, before any A/B scene exists.
-  const baseline = await measureShippedRenderer(app, stressWorld(), false);
-  const baselineReduced = await measureShippedRenderer(app, stressWorld(), true);
+  // The baselines first, on their own worlds, before any A/B scene exists. Both
+  // screens, both VFX tiers — four captures, interleaved with nothing, so the
+  // desktop and the phone are read off the same warm box minutes apart at most.
+  const baselines: Result[] = [];
+  for (const profile of PROFILES) {
+    baselines.push(await measureShippedRenderer(app, stressWorld(), profile, false));
+    baselines.push(await measureShippedRenderer(app, stressWorld(), profile, true));
+  }
+  // `baseline` / `baselineReduced` stay the desktop pair under their old names, so
+  // a1-10's and a1-11's captures and this one are still column-comparable.
+  const baseline = baselines[0]!;
+  const baselineReduced = baselines[1]!;
 
   app.stage.removeChildren();
   app.stage.addChild(stage);
@@ -802,8 +869,10 @@ async function main(): Promise<void> {
     scene: STRESS_SCENE,
     frames: FRAMES,
     rounds: ROUNDS,
+    profiles: PROFILES,
     baseline,
     baselineReduced,
+    baselines,
     results: merged,
     allRounds: rounds,
   };

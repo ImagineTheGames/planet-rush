@@ -24,6 +24,20 @@ import type { World } from '../sim';
 
 const VIEW = { width: 800, height: 600, originX: 0, originY: 0 };
 
+/**
+ * A window big enough to contain the whole arena, so nothing is culled.
+ *
+ * Since a1-12 the renderer submits only what is on screen, which makes "is this
+ * drawn?" two questions instead of one: *is the rule right* (fog, ownership,
+ * wreck persistence) and *is it in the window*. The cases below are about the
+ * first, so they are shot through a window where the second is never in play —
+ * `./cull.test.ts` owns the second and nothing else asserts it here.
+ *
+ * The default arena is 2400×2400 (`sim/maps.ts`), and the camera centres the
+ * target ship, so 6000 clears it from any spawn.
+ */
+const ARENA_VIEW = { width: 6000, height: 6000, originX: 0, originY: 0 };
+
 function arena(slots = 8): World {
   return createWorld({
     seed: 7,
@@ -54,7 +68,7 @@ function instructionCount(stage: Container, label: string): number {
 describe('stations are on screen at all (the M2 integration gap)', () => {
   it('draws a body for every slot in an eight-station ring', () => {
     const stage = new Container();
-    const r = new Renderer(stage, VIEW);
+    const r = new Renderer(stage, ARENA_VIEW);
     const world = arena();
 
     r.draw(world, { cameraTarget: 0, muzzles: [] });
@@ -79,7 +93,7 @@ describe('stations are on screen at all (the M2 integration gap)', () => {
 
   it('puts each body at its station\'s world position', () => {
     const stage = new Container();
-    const r = new Renderer(stage, VIEW);
+    const r = new Renderer(stage, ARENA_VIEW);
     const world = arena();
 
     r.draw(world, { cameraTarget: 0, muzzles: [] });
@@ -98,7 +112,7 @@ describe('station health is always visible (GDD §2.2, amended 2026-08-07)', () 
 
   it('shows a wounded rival from across the map — the frame that was lying', () => {
     const stage = new Container();
-    const r = new Renderer(stage, VIEW);
+    const r = new Renderer(stage, ARENA_VIEW);
     const world = arena();
     const rival = world.stations[4]!;
     rival.spawnProtect = 0;
@@ -116,7 +130,7 @@ describe('station health is always visible (GDD §2.2, amended 2026-08-07)', () 
 
   it('reads the same near and far — same ring, same fill', () => {
     const stage = new Container();
-    const r = new Renderer(stage, VIEW);
+    const r = new Renderer(stage, ARENA_VIEW);
     const world = arena();
     const rival = world.stations[4]!;
     const healthy = world.stations[2]!;
@@ -145,7 +159,7 @@ describe('station health is always visible (GDD §2.2, amended 2026-08-07)', () 
 
   it('always shows your own home, at any distance', () => {
     const stage = new Container();
-    const r = new Renderer(stage, VIEW);
+    const r = new Renderer(stage, ARENA_VIEW);
     const world = arena();
     const home = world.stations[0]!;
     home.spawnProtect = 0;
@@ -251,7 +265,7 @@ describe('construction is visible (GDD §2.5)', () => {
 describe('a wreck stays on the map (GDD §2.7)', () => {
   it('redraws the body once the core is gone, and keeps drawing it', () => {
     const stage = new Container();
-    const r = new Renderer(stage, VIEW);
+    const r = new Renderer(stage, ARENA_VIEW);
     const world = arena();
     const doomed = world.stations[2]!;
 

@@ -37,7 +37,25 @@ import { Renderer } from '@render/index';
 import { CHUNK, PROJECTILE, SHIELD, TURRET, createWorld, turretMountPos } from '../src/sim';
 import type { OreChunk, Projectile, Shield, Turret, World } from '../src/sim';
 
-const VIEW = { width: 1200, height: 900, originX: 0, originY: 0 };
+/**
+ * A window big enough to contain the whole arena, so nothing is culled.
+ *
+ * This suite asks a question about **entity types**: does every collidable family
+ * the world can spawn get a visible display object of about the right size? Since
+ * a1-12 the renderer submits only what the camera is showing (`src/render/cull.ts`),
+ * so a 1200×900 window would answer that question only for the families that
+ * happen to have a member near ship 0 — a ring of eight stations 2400 units
+ * across does not — and a genuinely undrawn collider family would hide behind
+ * "well, it was off screen".
+ *
+ * The bug this file is permanent for is unaffected by the cull, and it is worth
+ * saying why rather than only asserting it: the camera centres the local ship, so
+ * anything that ship can *collide* with is within one ship radius of the centre of
+ * the window and therefore drawn. "You can hit what you cannot see" needs the two
+ * to be reachable at once; the cull only ever hides what is further away than the
+ * player can touch. The cull's own visibility pairs live in `src/render/cull.test.ts`.
+ */
+const VIEW = { width: 6000, height: 6000, originX: 0, originY: 0 };
 
 /**
  * A world holding **one of every collidable entity type** (GDD §4.1 — every

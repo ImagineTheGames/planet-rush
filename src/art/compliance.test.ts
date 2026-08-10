@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { Container, Graphics } from 'pixi.js';
+import { Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { ShipClass } from '@shared/types';
 import { PALETTE as RENDER_PALETTE, PLAYER_COLORS as RENDER_ROSTER, Renderer } from '@render/index';
 import {
@@ -225,7 +225,28 @@ function buildOut(world: World, done: () => boolean): void {
 function turretsOnScreen(stage: Container): number {
   const layer = stage.getChildByLabel('turrets', true) as Container | null;
   if (!layer) throw new Error('turrets layer missing');
-  return layer.children.filter((c) => c.visible && (c as Graphics).context?.instructions.length > 0).length;
+  return layer.children.filter((c) => c.visible && isPainting(c)).length;
+}
+
+/**
+ * Whether a pooled child of a render layer is actually PAINTING this frame.
+ *
+ * ── Touched by a1-11 (Platform), and deliberately narrowly ───────────────────
+ * This used to read `(c as Graphics).context?.instructions.length > 0`, which
+ * asked *"is this a Graphics with geometry?"* when what the tests below need to
+ * know is *"is the gun on screen?"*. The turret layer became pooled `Sprite`s
+ * over shared textures when a1-11 wired GDD §4.3's "instanced sprites" (200
+ * rocks: 200 draw calls → 1.8), and the old predicate silently counted zero
+ * turrets for a stage full of them. The assertions themselves — four built means
+ * four drawn, the hull never grows its own guns — are unchanged, and so is what
+ * they would catch. Only the "what kind of display object" question is dropped,
+ * because the render layer's answer to it is not this file's contract.
+ */
+function isPainting(node: Container): boolean {
+  const context = (node as Graphics).context;
+  if (context) return context.instructions.length > 0;
+  const texture = (node as Sprite).texture;
+  return texture !== undefined && texture !== Texture.EMPTY;
 }
 
 /** Draw instructions in one station's hull graphic — the silhouette, as a number. */

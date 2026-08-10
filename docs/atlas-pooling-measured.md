@@ -1,5 +1,13 @@
 # The atlas pooling, measured — a1-10
 
+> **⚑ WIRED. This document is now the BEFORE column.** a1-11 lifted the golden
+> constraint §5 turns on and wired the pooling on the three layers measured here.
+> Every number below still stands as a reading — it was taken on the same rig and
+> the same box and it reproduces — but the shipped renderer is no longer the
+> `graphics` path it describes. **`docs/atlas-pooling-wired.md` is the after.**
+> Read this one for the method, the two dead pixel-free alternatives, and the
+> reducer finding; read that one for what the frame costs now.
+
 **Question.** `src/art/atlas.ts` carries a performance claim in its header: *"a
 field of 200 rocks shares a couple of dozen textures (GDD §4.3: zero per-frame
 allocation on the hot paths)"*. a1-09 found the file dark — **11 of its 12 value

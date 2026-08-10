@@ -1,0 +1,810 @@
+{
+  "gpu": "Google Inc. (Google) / ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/131.0.6778.33 Safari/537.36",
+  "view": {
+    "width": 1280,
+    "height": 800
+  },
+  "scene": {
+    "ships": 8,
+    "turrets": 32,
+    "shields": 16,
+    "asteroids": 200,
+    "projectiles": 300,
+    "chunks": 120
+  },
+  "frames": 180,
+  "rounds": 3,
+  "baseline": {
+    "name": "shipped:whole-frame",
+    "entities": 668,
+    "drawn": 0,
+    "pooled": 0,
+    "drawCallsPerFrame": 32.06111111111111,
+    "stats": {
+      "frames": 180,
+      "mean": 53.666666666666664,
+      "median": 53.099999994039536,
+      "p95": 59.19999999552965,
+      "p99": 65.89999999850988,
+      "max": 66.10000000149012,
+      "fps": 18.83239171586158
+    },
+    "vfxWouldEngage": true
+  },
+  "baselineReduced": {
+    "name": "shipped:whole-frame+reduceVfx",
+    "entities": 668,
+    "drawn": 0,
+    "pooled": 0,
+    "drawCallsPerFrame": 33.06111111111111,
+    "stats": {
+      "frames": 180,
+      "mean": 50.85888888889717,
+      "median": 50.19999999552965,
+      "p95": 55.79999999701977,
+      "p99": 60.20000000298023,
+      "max": 61,
+      "fps": 19.92031872687352
+    },
+    "vfxWouldEngage": true
+  },
+  "results": [
+    {
+      "name": "floor:empty",
+      "entities": 0,
+      "drawn": 0,
+      "pooled": 0,
+      "drawCallsPerFrame": 0,
+      "stats": {
+        "frames": 180,
+        "mean": 2.9961111110945544,
+        "median": 3.0999999940395355,
+        "p95": 3.3000000044703484,
+        "p99": 4.299999997019768,
+        "max": 4.300000004470348,
+        "fps": 333.3333333333333
+      },
+      "vfxWouldEngage": false
+    },
+    {
+      "name": "rocks:graphics",
+      "entities": 200,
+      "drawn": 200,
+      "pooled": 200,
+      "drawCallsPerFrame": 200,
+      "stats": {
+        "frames": 180,
+        "mean": 28.75666666664183,
+        "median": 29.200000002980232,
+        "p95": 30.399999998509884,
+        "p99": 33.29999999701977,
+        "max": 33.899999998509884,
+        "fps": 34.84320558034011
+      },
+      "vfxWouldEngage": false
+    },
+    {
+      "name": "rocks:sprites",
+      "entities": 200,
+      "drawn": 200,
+      "pooled": 46,
+      "drawCallsPerFrame": 1.7555555555555555,
+      "stats": {
+        "frames": 180,
+        "mean": 6.771111111135946,
+        "median": 7.100000001490116,
+        "p95": 7.700000002980232,
+        "p99": 8.5,
+        "max": 9.200000002980232,
+        "fps": 149.2537314428681
+      },
+      "vfxWouldEngage": false
+    },
+    {
+      "name": "rocks:contexts",
+      "entities": 200,
+      "drawn": 200,
+      "pooled": 60,
+      "drawCallsPerFrame": 200,
+      "stats": {
+        "frames": 180,
+        "mean": 29.53722222223878,
+        "median": 30,
+        "p95": 31.700000002980232,
+        "p99": 34.70000000298023,
+        "max": 34.80000000447035,
+        "fps": 34.12969283623599
+      },
+      "vfxWouldEngage": false
+    },
+    {
+      "name": "rocks:graphics+cull",
+      "entities": 200,
+      "drawn": 3,
+      "pooled": 200,
+      "drawCallsPerFrame": 2.5722222222222224,
+      "stats": {
+        "frames": 180,
+        "mean": 6.872777777744664,
+        "median": 7,
+        "p95": 7.5,
+        "p99": 7.899999998509884,
+        "max": 8.199999995529652,
+        "fps": 147.05882343273467
+      },
+      "vfxWouldEngage": false
+    },
+    {
+      "name": "rocks:sprites+cull",
+      "entities": 200,
+      "drawn": 3,
+      "pooled": 6,
+      "drawCallsPerFrame": 1.0222222222222221,
+      "stats": {
+        "frames": 180,
+        "mean": 6.748888888872332,
+        "median": 6.600000001490116,
+        "p95": 7.5,
+        "p99": 11.100000001490116,
+        "max": 24.799999997019768,
+        "fps": 153.84615384615384
+      },
+      "vfxWouldEngage": false
+    },
+    {
+      "name": "rocks:graphics+batch",
+      "entities": 200,
+      "drawn": 200,
+      "pooled": 200,
+      "drawCallsPerFrame": 200,
+      "stats": {
+        "frames": 180,
+        "mean": 28.08111111111939,
+        "median": 29.200000002980232,
+        "p95": 30.299999997019768,
+        "p99": 32.100000001490116,
+        "max": 34.399999998509884,
+        "fps": 35.84229390872434
+      },
+      "vfxWouldEngage": false
+    },
+    {
+      "name": "turrets:graphics",
+      "entities": 32,
+      "drawn": 32,
+      "pooled": 32,
+      "drawCallsPerFrame": 32,
+      "stats": {
+        "frames": 180,
+        "mean": 11.636666666674945,
+        "median": 11.5,
+        "p95": 13.699999995529652,
+        "p99": 15,
+        "max": 17.799999997019768,
+        "fps": 87.71929825708
+      },
+      "vfxWouldEngage": false
+    },
+    {
+      "name": "turrets:sprites",
+      "entities": 32,
+      "drawn": 32,
+      "pooled": 24,
+      "drawCallsPerFrame": 1.0333333333333334,
+      "stats": {
+        "frames": 180,
+        "mean": 6.8450000000082785,
+        "median": 6.799999997019768,
+        "p95": 7.700000002980232,
+        "p99": 9,
+        "max": 9.900000005960464,
+        "fps": 149.25373127689392
+      },
+      "vfxWouldEngage": false
+    },
+    {
+      "name": "shots:graphics",
+      "entities": 300,
+      "drawn": 300,
+      "pooled": 300,
+      "drawCallsPerFrame": 1,
+      "stats": {
+        "frames": 180,
+        "mean": 14.580555555555556,
+        "median": 14.600000001490116,
+        "p95": 16,
+        "p99": 17,
+        "max": 17.400000005960464,
+        "fps": 68.96551724137932
+      },
+      "vfxWouldEngage": false
+    },
+    {
+      "name": "shots:sprites",
+      "entities": 300,
+      "drawn": 300,
+      "pooled": 4,
+      "drawCallsPerFrame": 1,
+      "stats": {
+        "frames": 180,
+        "mean": 6.537777777802613,
+        "median": 6.5,
+        "p95": 7.199999995529652,
+        "p99": 7.4000000059604645,
+        "max": 7.600000001490116,
+        "fps": 153.84615384615384
+      },
+      "vfxWouldEngage": false
+    }
+  ],
+  "allRounds": [
+    [
+      {
+        "name": "floor:empty",
+        "entities": 0,
+        "drawn": 0,
+        "pooled": 0,
+        "drawCallsPerFrame": 0,
+        "stats": {
+          "frames": 180,
+          "mean": 3.0227777777446643,
+          "median": 3,
+          "p95": 3.399999998509884,
+          "p99": 4.200000002980232,
+          "max": 4.800000004470348,
+          "fps": 333.3333333333333
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "rocks:graphics",
+        "entities": 200,
+        "drawn": 200,
+        "pooled": 200,
+        "drawCallsPerFrame": 200,
+        "stats": {
+          "frames": 180,
+          "mean": 31.121111111094553,
+          "median": 30.899999998509884,
+          "p95": 33.600000001490116,
+          "p99": 36.899999998509884,
+          "max": 37.79999999701977,
+          "fps": 32.36245954848621
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "rocks:sprites",
+        "entities": 200,
+        "drawn": 200,
+        "pooled": 69,
+        "drawCallsPerFrame": 2.611111111111111,
+        "stats": {
+          "frames": 180,
+          "mean": 7.18111111111939,
+          "median": 7,
+          "p95": 8.5,
+          "p99": 9.399999998509884,
+          "max": 9.5,
+          "fps": 142.85714285714286
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "rocks:contexts",
+        "entities": 200,
+        "drawn": 200,
+        "pooled": 58,
+        "drawCallsPerFrame": 200,
+        "stats": {
+          "frames": 180,
+          "mean": 29.425,
+          "median": 28.600000001490116,
+          "p95": 34.099999994039536,
+          "p99": 41.899999998509884,
+          "max": 43,
+          "fps": 34.96503496321322
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "rocks:graphics+cull",
+        "entities": 200,
+        "drawn": 3,
+        "pooled": 200,
+        "drawCallsPerFrame": 2.5722222222222224,
+        "stats": {
+          "frames": 180,
+          "mean": 7.012222222238779,
+          "median": 6.9000000059604645,
+          "p95": 7.700000002980232,
+          "p99": 9.600000001490116,
+          "max": 10.200000002980232,
+          "fps": 144.92753610669052
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "rocks:sprites+cull",
+        "entities": 200,
+        "drawn": 3,
+        "pooled": 7,
+        "drawCallsPerFrame": 1.0222222222222221,
+        "stats": {
+          "frames": 180,
+          "mean": 6.719444444444444,
+          "median": 6.600000001490116,
+          "p95": 7.5999999940395355,
+          "p99": 9.5,
+          "max": 11.399999998509884,
+          "fps": 151.51515148094316
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "rocks:graphics+batch",
+        "entities": 200,
+        "drawn": 200,
+        "pooled": 200,
+        "drawCallsPerFrame": 200,
+        "stats": {
+          "frames": 180,
+          "mean": 30.475,
+          "median": 30.399999998509884,
+          "p95": 33.19999999552965,
+          "p99": 35,
+          "max": 35.600000001490116,
+          "fps": 32.894736843717666
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "turrets:graphics",
+        "entities": 32,
+        "drawn": 32,
+        "pooled": 32,
+        "drawCallsPerFrame": 32,
+        "stats": {
+          "frames": 180,
+          "mean": 11.505555555555556,
+          "median": 11.399999998509884,
+          "p95": 13.199999995529652,
+          "p99": 13.700000002980232,
+          "max": 14,
+          "fps": 87.71929825708
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "turrets:sprites",
+        "entities": 32,
+        "drawn": 32,
+        "pooled": 24,
+        "drawCallsPerFrame": 1.0333333333333334,
+        "stats": {
+          "frames": 180,
+          "mean": 6.7455555555307205,
+          "median": 6.600000001490116,
+          "p95": 7.5999999940395355,
+          "p99": 8.799999997019768,
+          "max": 9,
+          "fps": 151.51515148094316
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "shots:graphics",
+        "entities": 300,
+        "drawn": 300,
+        "pooled": 300,
+        "drawCallsPerFrame": 1,
+        "stats": {
+          "frames": 180,
+          "mean": 14.474444444436166,
+          "median": 14.399999998509884,
+          "p95": 15.900000005960464,
+          "p99": 19.399999998509884,
+          "max": 20,
+          "fps": 69.44444445163057
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "shots:sprites",
+        "entities": 300,
+        "drawn": 300,
+        "pooled": 4,
+        "drawCallsPerFrame": 1,
+        "stats": {
+          "frames": 180,
+          "mean": 6.546666666658388,
+          "median": 6.5,
+          "p95": 7.199999995529652,
+          "p99": 7.700000002980232,
+          "max": 7.9000000059604645,
+          "fps": 153.84615384615384
+        },
+        "vfxWouldEngage": false
+      }
+    ],
+    [
+      {
+        "name": "floor:empty",
+        "entities": 0,
+        "drawn": 0,
+        "pooled": 0,
+        "drawCallsPerFrame": 0,
+        "stats": {
+          "frames": 180,
+          "mean": 2.9961111110945544,
+          "median": 3,
+          "p95": 3.3000000044703484,
+          "p99": 4.299999997019768,
+          "max": 4.300000004470348,
+          "fps": 333.3333333333333
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "rocks:graphics",
+        "entities": 200,
+        "drawn": 200,
+        "pooled": 200,
+        "drawCallsPerFrame": 200,
+        "stats": {
+          "frames": 180,
+          "mean": 28.75666666664183,
+          "median": 28.69999999552965,
+          "p95": 30.399999998509884,
+          "p99": 33.29999999701977,
+          "max": 33.899999998509884,
+          "fps": 34.84320558034011
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "rocks:sprites",
+        "entities": 200,
+        "drawn": 200,
+        "pooled": 65,
+        "drawCallsPerFrame": 2.9444444444444446,
+        "stats": {
+          "frames": 180,
+          "mean": 7.192222222189108,
+          "median": 7.100000001490116,
+          "p95": 8.100000001490116,
+          "p99": 9.399999998509884,
+          "max": 11.199999995529652,
+          "fps": 140.8450703929753
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "rocks:contexts",
+        "entities": 200,
+        "drawn": 200,
+        "pooled": 66,
+        "drawCallsPerFrame": 200,
+        "stats": {
+          "frames": 180,
+          "mean": 30.302222222213945,
+          "median": 30,
+          "p95": 32.5,
+          "p99": 36,
+          "max": 36.5,
+          "fps": 33.333333333333336
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "rocks:graphics+cull",
+        "entities": 200,
+        "drawn": 3,
+        "pooled": 200,
+        "drawCallsPerFrame": 2.5722222222222224,
+        "stats": {
+          "frames": 180,
+          "mean": 7.174444444436166,
+          "median": 7,
+          "p95": 7.899999998509884,
+          "p99": 8.799999997019768,
+          "max": 22.899999998509884,
+          "fps": 142.85714285714286
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "rocks:sprites+cull",
+        "entities": 200,
+        "drawn": 3,
+        "pooled": 7,
+        "drawCallsPerFrame": 1.0222222222222221,
+        "stats": {
+          "frames": 180,
+          "mean": 6.688888888888889,
+          "median": 6.600000001490116,
+          "p95": 7.4000000059604645,
+          "p99": 8.5,
+          "max": 9,
+          "fps": 151.51515148094316
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "rocks:graphics+batch",
+        "entities": 200,
+        "drawn": 200,
+        "pooled": 200,
+        "drawCallsPerFrame": 200,
+        "stats": {
+          "frames": 180,
+          "mean": 29.350555555563833,
+          "median": 29.200000002980232,
+          "p95": 32.19999999552965,
+          "p99": 36.399999998509884,
+          "max": 40,
+          "fps": 34.24657533897045
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "turrets:graphics",
+        "entities": 32,
+        "drawn": 32,
+        "pooled": 32,
+        "drawCallsPerFrame": 32,
+        "stats": {
+          "frames": 180,
+          "mean": 11.71722222218911,
+          "median": 11.5,
+          "p95": 13.899999998509884,
+          "p99": 15,
+          "max": 15.399999998509884,
+          "fps": 86.95652173913044
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "turrets:sprites",
+        "entities": 32,
+        "drawn": 32,
+        "pooled": 24,
+        "drawCallsPerFrame": 1.0333333333333334,
+        "stats": {
+          "frames": 180,
+          "mean": 6.8450000000082785,
+          "median": 6.700000002980232,
+          "p95": 7.700000002980232,
+          "p99": 9,
+          "max": 9.900000005960464,
+          "fps": 149.25373127689392
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "shots:graphics",
+        "entities": 300,
+        "drawn": 300,
+        "pooled": 300,
+        "drawCallsPerFrame": 1,
+        "stats": {
+          "frames": 180,
+          "mean": 14.580555555555556,
+          "median": 14.5,
+          "p95": 16,
+          "p99": 17,
+          "max": 17.400000005960464,
+          "fps": 68.96551724137932
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "shots:sprites",
+        "entities": 300,
+        "drawn": 300,
+        "pooled": 4,
+        "drawCallsPerFrame": 1,
+        "stats": {
+          "frames": 180,
+          "mean": 6.537777777802613,
+          "median": 6.5,
+          "p95": 7.199999995529652,
+          "p99": 7.4000000059604645,
+          "max": 7.600000001490116,
+          "fps": 153.84615384615384
+        },
+        "vfxWouldEngage": false
+      }
+    ],
+    [
+      {
+        "name": "floor:empty",
+        "entities": 0,
+        "drawn": 0,
+        "pooled": 0,
+        "drawCallsPerFrame": 0,
+        "stats": {
+          "frames": 180,
+          "mean": 3.1066666666832234,
+          "median": 3.0999999940395355,
+          "p95": 3.5,
+          "p99": 4.199999995529652,
+          "max": 4.5,
+          "fps": 322.58064578152596
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "rocks:graphics",
+        "entities": 200,
+        "drawn": 200,
+        "pooled": 200,
+        "drawCallsPerFrame": 200,
+        "stats": {
+          "frames": 180,
+          "mean": 29.35777777781089,
+          "median": 29.200000002980232,
+          "p95": 32.5,
+          "p99": 37,
+          "max": 42.600000001490116,
+          "fps": 34.24657533897045
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "rocks:sprites",
+        "entities": 200,
+        "drawn": 200,
+        "pooled": 46,
+        "drawCallsPerFrame": 1.7555555555555555,
+        "stats": {
+          "frames": 180,
+          "mean": 6.771111111135946,
+          "median": 6.699999995529652,
+          "p95": 7.700000002980232,
+          "p99": 8.5,
+          "max": 9.200000002980232,
+          "fps": 149.2537314428681
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "rocks:contexts",
+        "entities": 200,
+        "drawn": 200,
+        "pooled": 60,
+        "drawCallsPerFrame": 200,
+        "stats": {
+          "frames": 180,
+          "mean": 29.53722222223878,
+          "median": 29.299999997019768,
+          "p95": 31.700000002980232,
+          "p99": 34.70000000298023,
+          "max": 34.80000000447035,
+          "fps": 34.12969283623599
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "rocks:graphics+cull",
+        "entities": 200,
+        "drawn": 3,
+        "pooled": 200,
+        "drawCallsPerFrame": 2.5722222222222224,
+        "stats": {
+          "frames": 180,
+          "mean": 6.872777777744664,
+          "median": 6.800000004470348,
+          "p95": 7.5,
+          "p99": 7.899999998509884,
+          "max": 8.199999995529652,
+          "fps": 147.05882343273467
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "rocks:sprites+cull",
+        "entities": 200,
+        "drawn": 3,
+        "pooled": 6,
+        "drawCallsPerFrame": 1.0222222222222221,
+        "stats": {
+          "frames": 180,
+          "mean": 6.748888888872332,
+          "median": 6.5,
+          "p95": 7.5,
+          "p99": 11.100000001490116,
+          "max": 24.799999997019768,
+          "fps": 153.84615384615384
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "rocks:graphics+batch",
+        "entities": 200,
+        "drawn": 200,
+        "pooled": 200,
+        "drawCallsPerFrame": 200,
+        "stats": {
+          "frames": 180,
+          "mean": 28.08111111111939,
+          "median": 27.899999998509884,
+          "p95": 30.299999997019768,
+          "p99": 32.100000001490116,
+          "max": 34.399999998509884,
+          "fps": 35.84229390872434
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "turrets:graphics",
+        "entities": 32,
+        "drawn": 32,
+        "pooled": 32,
+        "drawCallsPerFrame": 32,
+        "stats": {
+          "frames": 180,
+          "mean": 11.636666666674945,
+          "median": 11.399999998509884,
+          "p95": 13.699999995529652,
+          "p99": 15,
+          "max": 17.799999997019768,
+          "fps": 87.71929825708
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "turrets:sprites",
+        "entities": 32,
+        "drawn": 32,
+        "pooled": 24,
+        "drawCallsPerFrame": 1.0333333333333334,
+        "stats": {
+          "frames": 180,
+          "mean": 6.872222222222222,
+          "median": 6.799999997019768,
+          "p95": 7.600000001490116,
+          "p99": 8.600000001490116,
+          "max": 8.699999995529652,
+          "fps": 147.05882359386317
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "shots:graphics",
+        "entities": 300,
+        "drawn": 300,
+        "pooled": 300,
+        "drawCallsPerFrame": 1,
+        "stats": {
+          "frames": 180,
+          "mean": 14.600555555563833,
+          "median": 14.600000001490116,
+          "p95": 16.099999994039536,
+          "p99": 16.700000002980232,
+          "max": 17.299999997019768,
+          "fps": 68.4931506779409
+        },
+        "vfxWouldEngage": false
+      },
+      {
+        "name": "shots:sprites",
+        "entities": 300,
+        "drawn": 300,
+        "pooled": 4,
+        "drawCallsPerFrame": 1,
+        "stats": {
+          "frames": 180,
+          "mean": 6.561666666674945,
+          "median": 6.5,
+          "p95": 7.300000004470348,
+          "p99": 7.700000002980232,
+          "max": 8,
+          "fps": 153.84615384615384
+        },
+        "vfxWouldEngage": false
+      }
+    ]
+  ]
+}
