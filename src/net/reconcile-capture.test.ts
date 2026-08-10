@@ -1,9 +1,9 @@
 /**
- * src/net/spike/reconcile-capture.test.ts — a real reconciliation-feel capture at
+ * src/net/reconcile-capture.test.ts — a real reconciliation-feel capture at
  * the developer's condition (M10 reconcile-feel brief; GDD §4.2).
  *
  * The brief asks for a real telemetry capture pasted into the PR, and this is the
- * tool that mints it — the same discipline as the day-0 spike (`./spike.bench.test.ts`):
+ * tool that mints it — the same discipline the day-0 spike bench used:
  * it drives a full client↔authority round trip over an artificially delayed wire
  * at the developer's ~150 ms + jitter, feeds every send and every reconcile
  * through the production {@link NetTelemetry}, and LOGS the per-second capture. The
@@ -13,20 +13,26 @@
  * stays green on any runner.
  *
  * Reproduce / regenerate the capture in docs/netcode-spike.md:
- *   `npx vitest run src/net/spike/reconcile-capture.test.ts`
+ *   `npx vitest run src/net/reconcile-capture.test.ts`
+ *
+ * **It lived in `src/net/spike/` and no longer does (n7-01).** It never imported
+ * a line of the spike — every module below is the shipping one — so when the
+ * day-0 spike was deleted as dead this came up one directory rather than going
+ * with it. A spec of live code filed under a dead folder is how live coverage
+ * gets deleted by association.
  */
 
 import { describe, expect, it } from 'vitest';
 import { ShipClass } from '@shared/types';
 import type { Action, PlayerId } from '@shared/types';
-import { TICK_DT, createWorld, step } from '../../sim';
-import type { World, WorldConfig } from '../../sim';
-import { InputQueue } from '../input-queue';
-import { PredictedMatch, SNAP_THRESHOLD } from '../prediction';
-import { NetTelemetry } from '../telemetry';
-import { decodeSnapshot, encodeWorldSnapshot } from '../snapshot';
-import type { DecodedSnapshot } from '../snapshot';
-import type { InputMessage } from '../transport';
+import { TICK_DT, createWorld, step } from '../sim';
+import type { World, WorldConfig } from '../sim';
+import { InputQueue } from './input-queue';
+import { PredictedMatch, SNAP_THRESHOLD } from './prediction';
+import { NetTelemetry } from './telemetry';
+import { decodeSnapshot, encodeWorldSnapshot } from './snapshot';
+import type { DecodedSnapshot } from './snapshot';
+import type { InputMessage } from './transport';
 
 const LOCAL: PlayerId = 0;
 const MATCH: WorldConfig = {

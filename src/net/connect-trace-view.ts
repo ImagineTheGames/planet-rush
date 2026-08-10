@@ -251,6 +251,14 @@ export class ConnectTraceView {
 // ---------------------------------------------------------------------------
 // The shared surface — what the game's screens actually call
 // ---------------------------------------------------------------------------
+//
+// Three functions, and all three are called: `src/main.ts` installs this at
+// boot (`installConnectTraceView`) and drives it from the connect state machine
+// (`showConnectTrace`, `hideConnectTrace`). It used to export two more — a
+// `connectTraceView()` accessor and a `resetConnectTraceView()` teardown seam —
+// which had zero references of any kind, not even from this module's own spec,
+// and n7-01 removed them. That is the whole of what the dark-matter scan found
+// here; the file itself is live and the header above says what it does.
 
 let shared: ConnectTraceView | null = null;
 
@@ -263,11 +271,6 @@ export function installConnectTraceView(config: ConnectTraceViewConfig): Connect
   return shared;
 }
 
-/** The installed surface, or null. */
-export function connectTraceView(): ConnectTraceView | null {
-  return shared;
-}
-
 /** Show the trace. Safe where nothing was installed (it does nothing), so a
  *  caller needs no null check. */
 export function showConnectTrace(trace: ConnectTrace, now: number): void {
@@ -277,10 +280,4 @@ export function showConnectTrace(trace: ConnectTrace, now: number): void {
 /** Withdraw the affordances. */
 export function hideConnectTrace(): void {
   shared?.hide();
-}
-
-/** Drop the shared surface (tests, teardown). */
-export function resetConnectTraceView(): void {
-  shared?.destroy();
-  shared = null;
 }

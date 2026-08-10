@@ -38,7 +38,6 @@ import {
   POS_SCALE,
   WORST_CASE_BYTES,
 } from './snapshot';
-import { WORST_CASE_BYTES as SPIKE_WORST_CASE } from './spike/snapshot';
 
 function world() {
   return createWorld({
@@ -55,10 +54,15 @@ function world() {
 describe('snapshot wire layout', () => {
   it('still costs exactly what the spike measured', () => {
     expect(WORST_CASE_BYTES).toBe(HEADER_BYTES + MAX_SHIPS * SHIP_BYTES + MAX_PROJECTILES * PROJECTILE_BYTES);
-    // The number docs/netcode-spike.md bills bandwidth against (494 B after the
-    // v0.3 laser funeral dropped the ship `aim` field, was 510 B).
+    // 494 B IS the day-0 spike's measurement, and this line is now the only thing
+    // holding the live encoder to it. Until n7-01 this file also imported the
+    // spike's own `WORST_CASE_BYTES` and asserted the two agreed; the spike was
+    // deleted as dead code, so the literal carries that guard alone. It is a
+    // measured number, not a magic one — docs/netcode-spike.md §1 bills every
+    // bandwidth figure against it (494 after the v0.3 laser funeral dropped the
+    // ship `aim` field; 510 as first measured). Changing it changes that
+    // document's arithmetic, which is the point of pinning it here.
     expect(WORST_CASE_BYTES).toBe(494);
-    expect(WORST_CASE_BYTES).toBe(SPIKE_WORST_CASE);
   });
 
   it('stays far under the ~2 KB the GDD assumed (risk 4)', () => {
