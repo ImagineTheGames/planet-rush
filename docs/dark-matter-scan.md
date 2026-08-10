@@ -111,7 +111,7 @@ moments it exists for are a socket that never opened and a join the server
 refused, when the renderer may not be drawing at all. It is installed at boot and
 driven from `src/main.ts`'s connect state machine, through the `src/net` barrel:
 
-| Site (at `ecc1496`) | Call |
+| Site (at `ecc1496`, and unchanged at `ffc414e`) | Call |
 |---|---|
 | `src/main.ts:365-367` | imports `hideConnectTrace`, `installConnectTraceView`, `showConnectTrace` from `./net` |
 | `src/main.ts:6804` | `installConnectTraceView({…})` — the boot install |
@@ -126,8 +126,8 @@ LOST overlay down with it. *(`n7-01` read the call sites at `:6790`, `:6817`,
 numbers rot — the scan's `prodSites`, below, do not.)*
 
 **The scan was right. The triage was wrong.** This is the important half, so it
-is worth being exact about. Re-run at `ecc1496`, the scan's own numbers for that
-file are:
+is worth being exact about. Re-run at `ecc1496` — the tree the row was written
+against, before `n7-01` landed — the scan's own numbers for that file were:
 
 ```
 src/net/connect-trace-view.ts  — 14 exports, 5 live, 2 dark, 7 self-used
@@ -142,10 +142,17 @@ src/net/connect-trace-view.ts  — 14 exports, 5 live, 2 dark, 7 self-used
 
 The reachability walk did not miss the module: it resolved five of its exports to
 production call sites and named them. **There is no bug in
-`tools/dark-matter-scan.mjs` here, and so no other row can share one.** The two
-exports it did flag — an accessor and a teardown seam with zero references of any
-kind, not even from the module's own spec — are genuinely dark, and `n7-01`
-deleted exactly those two.
+`tools/dark-matter-scan.mjs` here, so there is none for another row to share.**
+Checked rather than assumed — a sweep of all 241 allowlist entries against that
+same run found none the scan now calls live and none naming a symbol that no
+longer exists.
+
+The two exports it did flag — a `connectTraceView()` accessor and a
+`resetConnectTraceView()` teardown seam, zero references of any kind, not even
+from the module's own spec — were genuinely dark, and they are exactly the two
+`n7-01` deleted (PR #375). At `ffc414e` the file is 12 exports, 5 live, 7
+`self-used`, and **nothing in it is dark**. Its allowlist lines went with the
+symbols; the module has no verdict left to be wrong about.
 
 What went wrong is one step later, in this document. The triage:
 
@@ -167,7 +174,8 @@ would be the second wrong claim in this section. What *is* fixable is the shape
 that misreading leaves behind — a DEAD verdict written next to symbols in a file
 whose other exports the same scan calls live. `npm run dark-matter:audit`
 (`--audit`) now looks for it. It reports and never fails; it is a prompt to
-re-read a row, not a gate:
+re-read a row, not a gate. Run in the `ecc1496` tree — this branch's tool, that
+tree's allowlist, before `n7-01`'s deletions — it names the row:
 
 ```
 VERDICTS TO RE-READ: 2 modules carry a DEAD verdict and still have exports production calls.
@@ -187,11 +195,11 @@ VERDICTS TO RE-READ: 2 modules carry a DEAD verdict and still have exports produ
         LIVE  turnToward (prod:2 — src/sim/buildings.ts)
 ```
 
-Note that it flags `vec.ts` too, and `vec.ts`'s row is **correct** — see the
-re-check below. That is the honest limit of what a tool can do here: the two rows
-are indistinguishable to it, and differ only in how they were written down. It
-narrows "re-read the section" to "re-read these two rows", which is the whole of
-the help available.
+At `ffc414e` — `n7-01`'s deletions landed — only the `vec.ts` block remains, and
+that row is **correct**; see the re-check below. Which is the honest limit of
+what a tool can do here: the two rows were indistinguishable to it, and differed
+only in how a human wrote them down. It narrows "re-read the section" to "re-read
+these rows", and that is the whole of the help available.
 
 **Every DEAD row re-checked, then.** The section had one wrong row, so its method
 is suspect until each is checked the way `n7-01` checked that one — against the
@@ -199,8 +207,8 @@ call sites, not against the prose:
 
 | Row | Re-checked at `ecc1496` | Verdict |
 |---|---|---|
-| `src/net/spike/{bench,sim-standin,snapshot}.ts` (13 gated) | all 20 exports of the three files: `prod:0`, and no entry point reaches them | **stands.** Correctly scoped: the files *are* dead entire. `n7-01` deleted them |
-| `src/sim/vec.ts` — `vec`, `len2`, `dist`, `dot` (4) | all four `prod:0 test:0 self:0`, `unreferenced`. `dist2` (prod:19), `normalize` (prod:6), `turnToward` (prod:2) are live | **stands**, with one correction below |
+| `src/net/spike/{bench,sim-standin,snapshot}.ts` (13 gated) | all 20 exports of the three files `prod:0`, and no entry point reaches any of them | **stands.** Correctly scoped: the files *are* dead entire. Deleted by `n7-01` |
+| `src/sim/vec.ts` — `vec`, `len2`, `dist`, `dot` (4) | all four `prod:0 test:0 self:0`, `unreferenced`. `dist2` (prod:19), `normalize` (prod:6) and `turnToward` (prod:2) are live | **stands**, with one correction below |
 | ~~`src/net/connect-trace-view.ts` (2)~~ | above | **withdrawn.** The module is live; the two symbols were dark and are gone |
 
 The `vec.ts` correction is small and is the same error in miniature: the row's
@@ -316,11 +324,11 @@ and called three times from `src/main.ts`. What is left below has been re-checke
 against call sites rather than headers (§4.0), and each row now says how much it
 claims: a file, or named members of a live file.
 
-| Module / symbol | Why |
-|---|---|
-| **the whole file** — `src/net/spike/{bench,sim-standin,snapshot}.ts` (13 gated, 20 exports) | the day-0 netcode spike, superseded by `src/net/snapshot.ts`. Every export `prod:0`, no entry point reaches any of the three. Deleted by `n7-01` |
-| **these members only** — `src/sim/vec.ts` — `vec`, `len2`, `dist`, `dot` (4) | four unreferenced members of a **live** module: `dist2`, `normalize` and `turnToward` are called from production, and `len` runs inside `normalize`. Delete the four; the file stays |
-| ~~`src/platform/wheel-input.ts#HUB_FRACTION`~~ | **deleted in this branch** — see below |
+| Scope | Module / symbol | Why |
+|---|---|---|
+| ~~the whole file~~ | ~~`src/net/spike/{bench,sim-standin,snapshot}.ts` (13 gated, 20 exports)~~ | the day-0 netcode spike, superseded by `src/net/snapshot.ts`. Every export `prod:0`, no entry point reached any of the three. **Deleted by `n7-01`, PR #375** |
+| **these members only** | `src/sim/vec.ts` — `vec`, `len2`, `dist`, `dot` (4) | four unreferenced members of a **live** module: `dist2`, `normalize` and `turnToward` are called from production, and `len` runs inside `normalize`. Delete the four; the file stays. *(Owner: Gameplay.)* |
+| ~~one symbol~~ | ~~`src/platform/wheel-input.ts#HUB_FRACTION`~~ | **deleted in this branch** — see below |
 
 **One deletion, and only one.** `HUB_FRACTION = 0.22` had zero references of any
 kind, including from its own spec, and triage found it was worse than unused: it
@@ -335,10 +343,11 @@ buy. Watched it fail first — setting `INNER_FRACTION` to 0.22 turns it red wit
 `at 0.22r: expected 'segment' to be 'hub'`.
 
 The rest are other agents' files. The scan found them; deleting them is theirs
-to do, and a dark-matter scan that turns into a deletion spree is a worse
-outcome than the dark matter. §4.0 is why that is not just caution: the one row
-here that named a whole file was wrong about it, and the owner who came to do the
-deleting is the one who noticed.
+to do, and a dark-matter scan that turns into a deletion spree is a worse outcome
+than the dark matter. §4.0 is why that is not merely good manners: the one row
+here that named a whole file was wrong about the file, and the owner who came to
+do the deleting is the one who caught it. As of `ffc414e` the only row left
+un-acted-on is `vec.ts`'s four members, and it is Gameplay's to take.
 
 **Observation, not a finding:** the hit-test's dead zone is `INNER_FRACTION`
 0.300 of the drawn radius while the hub is *drawn* at 0.319, so presses in that

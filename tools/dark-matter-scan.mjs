@@ -808,8 +808,9 @@ function runAudit(rows, opts, diag) {
     if (live.length) mixed.push({ file, ids, live });
   }
   if (mixed.length) {
+    const one = mixed.length === 1;
     lines.push(
-      `VERDICTS TO RE-READ: ${mixed.length} module${mixed.length === 1 ? '' : 's'} carry a DEAD verdict and still have exports production calls.`,
+      `VERDICTS TO RE-READ: ${mixed.length} module${one ? '' : 's'} ${one ? 'carries' : 'carry'} a DEAD verdict and still ${one ? 'has' : 'have'} exports production calls.`,
     );
     lines.push('      The verdict may still be right about the symbols it names — but it is');
     lines.push('      not right about the file, and a reader will take it for the file.');
