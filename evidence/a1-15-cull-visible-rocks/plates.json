@@ -1,0 +1,34 @@
+{
+  "phone-landscape-844x390": {
+    "differing": 5324,
+    "totalPx": 329160,
+    "peak": 79,
+    "hotBlobs": 108,
+    "largestHotBlobPx2": 13,
+    "straddlers": 3,
+    "verdict": {
+      "visibleTrue": 6,
+      "straddling": 3,
+      "drawn": 6,
+      "missing": 0,
+      "overdraw": 0,
+      "missingDetail": []
+    }
+  },
+  "desktop-1280x800": {
+    "differing": 16385,
+    "totalPx": 1024000,
+    "peak": 79,
+    "hotBlobs": 245,
+    "largestHotBlobPx2": 13,
+    "straddlers": 6,
+    "verdict": {
+      "visibleTrue": 21,
+      "straddling": 6,
+      "drawn": 23,
+      "missing": 0,
+      "overdraw": 2,
+      "missingDetail": []
+    }
+  }
+}
