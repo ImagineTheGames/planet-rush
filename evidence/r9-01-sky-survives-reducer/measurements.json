@@ -1,0 +1,2574 @@
+{
+  "seconds": 45,
+  "throttleAtSeconds": 3,
+  "cpuThrottlingRate": 8,
+  "builds": [
+    {
+      "id": "before",
+      "label": "dd1d3f5 \u2014 the code as it stood",
+      "port": "4288",
+      "served": {
+        "sha": "dd1d3f5",
+        "time": "2026-08-10T03:31:08.361Z"
+      },
+      "cases": [
+        {
+          "id": "oval",
+          "sky": "plasmaReef",
+          "role": "subject",
+          "frame": "../images/r9-01-before-oval-t45s.png",
+          "skyAtStart": "plasmaReef",
+          "skyAtEnd": null,
+          "skyPresentEverySample": false,
+          "droppedAtSeconds": 6.1,
+          "reduceVfxEngagedAtSeconds": 6.1,
+          "reduceVfxEngagedAtEnd": true,
+          "fpsFirst": 1.9,
+          "fpsLast": 1.5,
+          "fpsMedianAfterThrottle": 1.5,
+          "samples": [
+            {
+              "fps": 1.9,
+              "ticks": 18,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 53,
+              "t": 1.8
+            },
+            {
+              "fps": 1.8,
+              "ticks": 48,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 53,
+              "t": 3.2
+            },
+            {
+              "fps": 1.6,
+              "ticks": 108,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 6.1
+            },
+            {
+              "fps": 1.6,
+              "ticks": 153,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 8
+            },
+            {
+              "fps": 1.6,
+              "ticks": 183,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 9.3
+            },
+            {
+              "fps": 1.6,
+              "ticks": 213,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 10.6
+            },
+            {
+              "fps": 1.6,
+              "ticks": 243,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 11.9
+            },
+            {
+              "fps": 1.6,
+              "ticks": 273,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 13.2
+            },
+            {
+              "fps": 1.6,
+              "ticks": 303,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 14.5
+            },
+            {
+              "fps": 1.6,
+              "ticks": 348,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 16.4
+            },
+            {
+              "fps": 1.6,
+              "ticks": 378,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 17.8
+            },
+            {
+              "fps": 1.5,
+              "ticks": 423,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 19.8
+            },
+            {
+              "fps": 1.5,
+              "ticks": 453,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 21
+            },
+            {
+              "fps": 1.5,
+              "ticks": 498,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 23
+            },
+            {
+              "fps": 1.6,
+              "ticks": 543,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 24.9
+            },
+            {
+              "fps": 1.5,
+              "ticks": 588,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 26.8
+            },
+            {
+              "fps": 1.5,
+              "ticks": 618,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 28.2
+            },
+            {
+              "fps": 1.5,
+              "ticks": 648,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 29.5
+            },
+            {
+              "fps": 1.5,
+              "ticks": 693,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 31.4
+            },
+            {
+              "fps": 1.5,
+              "ticks": 723,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 32.7
+            },
+            {
+              "fps": 1.5,
+              "ticks": 768,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 34.6
+            },
+            {
+              "fps": 1.5,
+              "ticks": 813,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 36.6
+            },
+            {
+              "fps": 1.6,
+              "ticks": 858,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 38.5
+            },
+            {
+              "fps": 1.6,
+              "ticks": 888,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 39.8
+            },
+            {
+              "fps": 1.5,
+              "ticks": 933,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 41.8
+            },
+            {
+              "fps": 1.5,
+              "ticks": 963,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 43.1
+            },
+            {
+              "fps": 1.5,
+              "ticks": 993,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 44.4
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1038,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 46.4
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1068,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 47.7
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1098,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 49
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1143,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 51
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1188,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 52.9
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1218,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 54.2
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1248,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 55.5
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1278,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 56.8
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1323,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 58.7
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1368,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 60.7
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1413,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 62.7
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1458,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 64.6
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1503,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 66.6
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1548,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 68.5
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1578,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 69.9
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1623,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 71.9
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1653,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 73.3
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1683,
+              "nebula": null,
+              "layers": [
+                "void-ground",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 74.7
+            }
+          ]
+        },
+        {
+          "id": "line",
+          "sky": "deepEmber",
+          "role": "control",
+          "frame": "../images/r9-01-before-line-t45s.png",
+          "skyAtStart": "deepEmber",
+          "skyAtEnd": "deepEmber",
+          "skyPresentEverySample": true,
+          "droppedAtSeconds": null,
+          "reduceVfxEngagedAtSeconds": 6.7,
+          "reduceVfxEngagedAtEnd": true,
+          "fpsFirst": 1.9,
+          "fpsLast": 1.5,
+          "fpsMedianAfterThrottle": 1.5,
+          "samples": [
+            {
+              "fps": 1.9,
+              "ticks": 19,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 53,
+              "t": 1.8
+            },
+            {
+              "fps": 1.8,
+              "ticks": 64,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 53,
+              "t": 3.9
+            },
+            {
+              "fps": 1.7,
+              "ticks": 124,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 6.7
+            },
+            {
+              "fps": 1.6,
+              "ticks": 154,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 8
+            },
+            {
+              "fps": 1.6,
+              "ticks": 184,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 9.3
+            },
+            {
+              "fps": 1.6,
+              "ticks": 214,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 10.6
+            },
+            {
+              "fps": 1.6,
+              "ticks": 244,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 11.9
+            },
+            {
+              "fps": 1.6,
+              "ticks": 274,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 13.2
+            },
+            {
+              "fps": 1.6,
+              "ticks": 319,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 15.1
+            },
+            {
+              "fps": 1.6,
+              "ticks": 349,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 16.4
+            },
+            {
+              "fps": 1.6,
+              "ticks": 394,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 18.4
+            },
+            {
+              "fps": 1.5,
+              "ticks": 424,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 19.8
+            },
+            {
+              "fps": 1.5,
+              "ticks": 469,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 21.7
+            },
+            {
+              "fps": 1.5,
+              "ticks": 514,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 23.6
+            },
+            {
+              "fps": 1.6,
+              "ticks": 559,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 25.5
+            },
+            {
+              "fps": 1.5,
+              "ticks": 589,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 26.8
+            },
+            {
+              "fps": 1.5,
+              "ticks": 619,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 28.2
+            },
+            {
+              "fps": 1.5,
+              "ticks": 664,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 30.1
+            },
+            {
+              "fps": 1.5,
+              "ticks": 694,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 31.4
+            },
+            {
+              "fps": 1.5,
+              "ticks": 739,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 33.4
+            },
+            {
+              "fps": 1.5,
+              "ticks": 784,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 35.3
+            },
+            {
+              "fps": 1.5,
+              "ticks": 829,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 37.2
+            },
+            {
+              "fps": 1.6,
+              "ticks": 859,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 38.5
+            },
+            {
+              "fps": 1.5,
+              "ticks": 904,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 40.5
+            },
+            {
+              "fps": 1.5,
+              "ticks": 934,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 41.9
+            },
+            {
+              "fps": 1.5,
+              "ticks": 964,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 43.2
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1009,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 45.1
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1039,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 46.4
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1069,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 47.7
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1114,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 49.7
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1159,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 51.6
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1189,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 52.9
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1219,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 54.3
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1249,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 55.5
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1294,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 57.5
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1339,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 59.4
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1384,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 61.3
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1429,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 63.3
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1474,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 65.3
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1519,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 67.2
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1549,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 68.5
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1594,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 70.6
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1624,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 72
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1654,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 73.3
+            },
+            {
+              "fps": 1.5,
+              "ticks": 1699,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 75.3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "after",
+      "label": "r9-01 \u2014 the sky may thin, never leave",
+      "port": "4287",
+      "served": {
+        "sha": "7a90b22",
+        "time": "2026-08-10T03:29:18.432Z"
+      },
+      "cases": [
+        {
+          "id": "oval",
+          "sky": "plasmaReef",
+          "role": "subject",
+          "frame": "../images/r9-01-after-oval-t45s.png",
+          "skyAtStart": "plasmaReef",
+          "skyAtEnd": "plasmaReef",
+          "skyPresentEverySample": true,
+          "droppedAtSeconds": null,
+          "reduceVfxEngagedAtSeconds": 18,
+          "reduceVfxEngagedAtEnd": true,
+          "fpsFirst": 3.7,
+          "fpsLast": 1.2,
+          "fpsMedianAfterThrottle": 1.2,
+          "samples": [
+            {
+              "fps": 3.7,
+              "ticks": 15,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 53,
+              "t": 1.7
+            },
+            {
+              "fps": 3.1,
+              "ticks": 60,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 53,
+              "t": 3.8
+            },
+            {
+              "fps": 2.5,
+              "ticks": 120,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 53,
+              "t": 6.7
+            },
+            {
+              "fps": 2.1,
+              "ticks": 165,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 53,
+              "t": 9.3
+            },
+            {
+              "fps": 2,
+              "ticks": 195,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 53,
+              "t": 11
+            },
+            {
+              "fps": 1.7,
+              "ticks": 240,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 53,
+              "t": 13.6
+            },
+            {
+              "fps": 1.6,
+              "ticks": 285,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 53,
+              "t": 16.3
+            },
+            {
+              "fps": 1.5,
+              "ticks": 315,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 18
+            },
+            {
+              "fps": 1.4,
+              "ticks": 360,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 20.5
+            },
+            {
+              "fps": 1.3,
+              "ticks": 405,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 23.1
+            },
+            {
+              "fps": 1.3,
+              "ticks": 450,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 25.6
+            },
+            {
+              "fps": 1.3,
+              "ticks": 480,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 27.3
+            },
+            {
+              "fps": 1.3,
+              "ticks": 510,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 28.9
+            },
+            {
+              "fps": 1.3,
+              "ticks": 555,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 31.4
+            },
+            {
+              "fps": 1.2,
+              "ticks": 600,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 34
+            },
+            {
+              "fps": 1.2,
+              "ticks": 630,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 35.6
+            },
+            {
+              "fps": 1.2,
+              "ticks": 660,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 37.3
+            },
+            {
+              "fps": 1.2,
+              "ticks": 690,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 39
+            },
+            {
+              "fps": 1.2,
+              "ticks": 735,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 41.6
+            },
+            {
+              "fps": 1.2,
+              "ticks": 780,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 44
+            },
+            {
+              "fps": 1.2,
+              "ticks": 810,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 45.6
+            },
+            {
+              "fps": 1.2,
+              "ticks": 855,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 48.1
+            },
+            {
+              "fps": 1.2,
+              "ticks": 900,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 50.6
+            },
+            {
+              "fps": 1.2,
+              "ticks": 945,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 53.1
+            },
+            {
+              "fps": 1.2,
+              "ticks": 975,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 54.8
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1020,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 57.3
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1050,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 59
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1095,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 61.5
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1125,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 63.3
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1170,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 66.1
+            },
+            {
+              "fps": 1.1,
+              "ticks": 1215,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 68.7
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1260,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 71.2
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1305,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 73.7
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1335,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 75.3
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1380,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 77.8
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1410,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 79.5
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1440,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 81.2
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1485,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 83.6
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1515,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 85.3
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1560,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 87.8
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1590,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 89.4
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1620,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 91.1
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1665,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 93.6
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1710,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 96.1
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1740,
+              "nebula": "plasmaReef",
+              "layers": [
+                "void-ground",
+                "void-nebula-plasmaReef",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 97.8
+            }
+          ]
+        },
+        {
+          "id": "line",
+          "sky": "deepEmber",
+          "role": "control",
+          "frame": "../images/r9-01-after-line-t45s.png",
+          "skyAtStart": "deepEmber",
+          "skyAtEnd": "deepEmber",
+          "skyPresentEverySample": true,
+          "droppedAtSeconds": null,
+          "reduceVfxEngagedAtSeconds": 18.9,
+          "reduceVfxEngagedAtEnd": true,
+          "fpsFirst": 3.7,
+          "fpsLast": 1.2,
+          "fpsMedianAfterThrottle": 1.2,
+          "samples": [
+            {
+              "fps": 3.7,
+              "ticks": 30,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 53,
+              "t": 2.4
+            },
+            {
+              "fps": 3.1,
+              "ticks": 75,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 53,
+              "t": 4.5
+            },
+            {
+              "fps": 2.5,
+              "ticks": 135,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 53,
+              "t": 7.5
+            },
+            {
+              "fps": 2.2,
+              "ticks": 165,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 53,
+              "t": 9.3
+            },
+            {
+              "fps": 1.9,
+              "ticks": 210,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 53,
+              "t": 12
+            },
+            {
+              "fps": 1.7,
+              "ticks": 255,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 53,
+              "t": 14.5
+            },
+            {
+              "fps": 1.6,
+              "ticks": 285,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 53,
+              "t": 16.3
+            },
+            {
+              "fps": 1.5,
+              "ticks": 330,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 18.9
+            },
+            {
+              "fps": 1.4,
+              "ticks": 375,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 21.4
+            },
+            {
+              "fps": 1.4,
+              "ticks": 420,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 23.9
+            },
+            {
+              "fps": 1.3,
+              "ticks": 450,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 25.6
+            },
+            {
+              "fps": 1.3,
+              "ticks": 480,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 27.3
+            },
+            {
+              "fps": 1.3,
+              "ticks": 525,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 29.8
+            },
+            {
+              "fps": 1.3,
+              "ticks": 570,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 32.3
+            },
+            {
+              "fps": 1.2,
+              "ticks": 600,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 34
+            },
+            {
+              "fps": 1.2,
+              "ticks": 630,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 35.7
+            },
+            {
+              "fps": 1.2,
+              "ticks": 660,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 37.3
+            },
+            {
+              "fps": 1.2,
+              "ticks": 705,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 39.9
+            },
+            {
+              "fps": 1.2,
+              "ticks": 750,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 42.4
+            },
+            {
+              "fps": 1.2,
+              "ticks": 780,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 44
+            },
+            {
+              "fps": 1.2,
+              "ticks": 825,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 46.5
+            },
+            {
+              "fps": 1.2,
+              "ticks": 870,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 48.9
+            },
+            {
+              "fps": 1.2,
+              "ticks": 915,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 51.4
+            },
+            {
+              "fps": 1.2,
+              "ticks": 945,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 53.1
+            },
+            {
+              "fps": 1.2,
+              "ticks": 990,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 55.6
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1020,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 57.3
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1065,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 59.8
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1095,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 61.5
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1140,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 64.2
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1185,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 67
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1230,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 69.5
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1275,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 72
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1305,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 73.7
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1350,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 76.1
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1380,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 77.8
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1410,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 79.5
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1455,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 82
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1485,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 83.7
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1530,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 86.1
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1560,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 87.8
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1590,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 89.4
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1635,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 91.9
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1680,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 94.4
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1710,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 96.1
+            },
+            {
+              "fps": 1.2,
+              "ticks": 1755,
+              "nebula": "deepEmber",
+              "layers": [
+                "void-ground",
+                "void-nebula-deepEmber",
+                "void-stars-deep",
+                "void-stars-mid",
+                "void-stars-near"
+              ],
+              "halo": 13,
+              "t": 98.6
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

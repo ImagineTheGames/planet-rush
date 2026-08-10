@@ -1658,5 +1658,65 @@
     "buildSha": "e567af0",
     "attestation": "The risk the fix introduces, and nobody had ever played a 180 s SCARCE match to its end. PLAY -> PLAY SOLO under 'YIELD · SCARCE' (seam: abundance 'scarce') -> RUSH!, then the HUD clock strip polled every 15 s for the whole match on served e567af0. THE WAVES RAN ON THE NEW METRONOME ALL THE WAY DOWN, each crop's own arithmetic checkable: MATCH 1:01 / NEXT 2:00 = 181; MATCH 5:04 'WAVE 2/5 · Far Belt' / NEXT 0:57 = 361; MATCH 7:09 'WAVE 3/5 · Mid Field' / NEXT 1:52 = 541; MATCH 9:25 'WAVE 4/5 · Inner Ring' / NEXT 2:36 = 721; MATCH 11:42 / NEXT 0:19 = 721 again, i.e. the fifth and last wave due at 12:01 = 4 x 180. THE COLLAPSE HELD THE RAIL: by MATCH 12:50 the strip reads 'WAVE 5/5 · Claim Fall' with the middle line replaced by 'COLLAPSE' in threat red, and it did not read COLLAPSE at MATCH 11:42 — so the deadline fired between them, which is where `collapseDeadline`'s re-anchoring puts it (750 s = 12:30: the 180 s interval pushes the last wave out to 720 s but the deadline is anchored, not dragged). The match then resolved: the last frame with a live clock is MATCH 12:50, and 68 s of wall clock later the strip is blank and the result screen is up. So the match ended between MATCH 12:50 and roughly 13:58 — INSIDE the ratified 10–15 minute rail, with a minute or so to spare. THE RESULT SCREEN, looked at: 'CLAIM LOST' over 'Player 8 took the claim.', 'MATCH TIME · 05:12', a stat column of all zeroes (ORE MINED 0, DAMAGE DEALT 0 HP, SHIPS DESTROYED 0, DISTANCE TRAVELLED 0, SHIPS USED 2), '+50 XP', 'LEVEL 1', REMATCH and BACK TO MENU, badge e567af0. TWO THINGS THAT WOULD OTHERWISE BE MISREAD. FIRST, 'MATCH TIME · 05:12' is NOT the match's length — it is this client's own time in it. The ship was never piloted, so it was ELIMINATED ('7th of 8 — your reactor was destroyed') at a poll 20 s after the crop reading MATCH 5:04, and 5:12 sits inside that window; the camera then took SPECTATE and watched the remaining eight minutes. An earlier run of this shot stopped at the elimination and would have filed 'SCARCE matches run SHORT of the rail', which was flatly wrong. SECOND, the WALL clock for this run was 946 s, longer than the sim's ~830: the headless client accumulated about 96 s of lag while other captures in this round were running beside it, and once they finished the clock tracked real time exactly (four consecutive 68 s wall intervals each advanced MATCH by 68 s, from 8:17 to 12:50). The in-sim MATCH clock is the number the rail is about and the number reported here. SCOPE, honestly: this is ONE match, solo/offline, with an unpiloted local ship and seven bots. It shows the schedule and the collapse deadline behaving on a real 180 s world; it does not characterise a lobby of eight humans.",
     "verdict": "verified"
+  },
+  {
+    "id": "r9-01-oval-sky-gone-before",
+    "title": "The Oval — the sky is gone 45 s in (before, dd1d3f5)",
+    "area": "backdrop",
+    "image": "images/r9-01-before-oval-t45s.png",
+    "capturedAt": "2026-08-10T03:35:00Z",
+    "buildSha": "dd1d3f5",
+    "attestation": "The Oval on the pre-fix bundle, 45 s into a live ?debug=1 boot with the CPU throttled 8× from t+3 s. The frame is Floor and the star-field and nothing else: there is no cyan anywhere in it. The blue owner beacon rings, the yellow-cored station, two grey asteroids left of centre and the Warden/Rusty nameplates are all present, so this is a live playing frame, not a blank one. Wave clock reads 'WAVE 1/5 · Outer Drift / NEXT 2:01 / MATCH 0:30'. Build stamp 'dd1d3f5' bottom-left. The scene-graph poll behind this frame recorded void-nebula-plasmaReef present at t+1 s and t+2 s and absent from t+6.1 s onward, for the remaining 39 s. This is the defect: a whole sky left the frame in one frame.",
+    "verdict": "verified"
+  },
+  {
+    "id": "r9-01-oval-sky-survives-after",
+    "title": "The Oval — the sky is still there 45 s in (after, 7a90b22)",
+    "area": "backdrop",
+    "image": "images/r9-01-after-oval-t45s.png",
+    "capturedAt": "2026-08-10T03:36:00Z",
+    "buildSha": "7a90b22",
+    "attestation": "The same arena, same seed, same throttle, on the r9-01 bundle: 45 s in, Plasma Reef's soft cyan clots are visible across the frame — a cluster low-left of the station, a broad wash down the left third, more knots mid-right and lower-centre. Everything else matches the before frame: same wave ('WAVE 1/5 · Outer Drift'), match clock 0:31 against 0:30, the same two asteroids in the same places, the same blue beacon rings. Build stamp '7a90b22' bottom-left. The poll behind this frame recorded void-nebula-plasmaReef present in all 45 samples, while the station atmosphere halo dropped from 53 instructions to 13 at t+18 s — i.e. the reduce-VFX tier DID engage and the sky stayed anyway.",
+    "verdict": "verified"
+  },
+  {
+    "id": "r9-01-line-control-before",
+    "title": "Line — the control sky, before (dd1d3f5)",
+    "area": "backdrop",
+    "image": "images/r9-01-before-line-t45s.png",
+    "capturedAt": "2026-08-10T03:35:00Z",
+    "buildSha": "dd1d3f5",
+    "attestation": "The Line on the pre-fix bundle, run in parallel with the Oval case on the same box under the same 8× CPU throttle. Deep Ember is plainly present at 45 s: warm dark-red bodies at the left edge, lower-centre and down the right third, exactly the 'felt at the edges' read. Three stations (teal, blue-owned centre, green), four asteroid clusters right, minimap bottom-right. Build stamp 'dd1d3f5'. The poll recorded void-nebula-deepEmber in all 45 samples with reduce-VFX engaged at t+6.7 s. This is the control: on the same box, at the same time, under the same throttle, a sky with reducedDensity 1 did not leave — so the Oval's loss was not the box, the bundle or the harness.",
+    "verdict": "verified"
+  },
+  {
+    "id": "r9-01-line-control-after",
+    "title": "Line — the control sky, after (7a90b22)",
+    "area": "backdrop",
+    "image": "images/r9-01-after-line-t45s.png",
+    "capturedAt": "2026-08-10T03:37:00Z",
+    "buildSha": "7a90b22",
+    "attestation": "The Line on the r9-01 bundle, same conditions. Indistinguishable from the before frame: the same Deep Ember bodies in the same places at the same value, the same three stations, the same asteroids, match clock 0:33 against 0:32. Build stamp '7a90b22'. void-nebula-deepEmber in all 45 samples. This is the no-change control for the FIX: a sky that already survived the reducer is untouched by it, which is what the brief required of Coalsack's and Deep Ember's reducedDensity 1.",
+    "verdict": "verified"
+  },
+  {
+    "id": "r9-01-plasma-reef-full",
+    "title": "Plasma Reef at full density — the reference",
+    "area": "backdrop",
+    "image": "images/r9-01-plasma-reef-full.png",
+    "capturedAt": "2026-08-10T03:41:00Z",
+    "buildSha": "7a90b22",
+    "attestation": "Plasma Reef composited over Floor with the three star layers, authored for an 844×390 phone screen over The Oval's 3200×2000 field, rendered at 2× with true per-channel additive accumulation (the same maths backdrop.test.ts measures peak luma with). 1336 reef shapes. Knots of faint cyan are spread across the whole frame — upper-left, upper-right, a dense group left of centre, more lower-centre and right — sitting on three broad, barely-there base washes. Nothing in it approaches the ink outline's value; the brightest clots read as light, not as an object. This is the reference the reduced tier is judged against.",
+    "verdict": "verified"
+  },
+  {
+    "id": "r9-01-plasma-reef-reduced",
+    "title": "Plasma Reef thinned to 0.45 — a sky, not an absence",
+    "area": "backdrop",
+    "image": "images/r9-01-plasma-reef-reduced.png",
+    "capturedAt": "2026-08-10T03:41:00Z",
+    "buildSha": "7a90b22",
+    "attestation": "The same sky at reducedDensity 0.45 — what a device that BUILDS its sky while already throttled gets. 608 shapes against 1336, one base wash against three, four clots against nine, and measured overdraw 0.463 against 1.121. It is unmistakably still Plasma Reef: two clusters of cyan knots down the left-of-centre column, one upper-right, one lower-centre, all at the same size, hue and alpha as the full sky — thinner, not dimmer and not different. The clot POSITIONS differ from the full plate because element count seeds the layout; that is exactly why the density is pinned at build and never changed mid-match, so a player never sees the two.",
+    "verdict": "verified"
   }
 ]
