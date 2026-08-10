@@ -203,6 +203,7 @@ const OFFLINE_LINK: LinkStatus = {
   silentMs: 0,
   graceRemainingMs: 0,
   attempts: 0,
+  manualRedial: 'none',
   ending: null,
 };
 
@@ -477,14 +478,20 @@ export class TransportSession implements MatchSession {
    * actually started; false when there was nothing to dial for — a dead room or a
    * spent window, which the transport then closes with, so the overlay stops asking
    * and says what happened instead.
+   *
+   * `manual` is true when a human pressed the button rather than the client spending
+   * its one automatic attempt. It changes nothing about the dial and everything about
+   * what the overlay is then able to say: the outcome of *that press* is recorded on
+   * the watch, so a press that could not get out is reported instead of vanishing
+   * (`./link-loss` `ManualRedial`, n8-01).
    */
-  reconnect(now: number = this.clock()): boolean {
+  reconnect(now: number = this.clock(), manual = false): boolean {
     const watch = this.watch;
     if (!watch) return false;
     const redial = (this.transport as { redial?: () => boolean }).redial;
     const started = typeof redial === 'function' ? redial.call(this.transport) : false;
-    if (started) watch.beginRedial(now);
-    else watch.redialFailed(now);
+    if (started) watch.beginRedial(now, manual);
+    else watch.redialFailed(now, manual);
     return started;
   }
 
@@ -946,8 +953,9 @@ export interface OnlineSession extends MatchSession {
   /** The page came back; a stale last frame at this instant is a lost connection. */
   linkShown(now?: number): LinkStatus;
   /** RECONNECT: dial now and reclaim the seat. False when there is nothing to
-   *  reclaim (dead room, spent window). */
-  reconnect(now?: number): boolean;
+   *  reclaim (dead room, spent window). `manual` marks a human's press, so the
+   *  overlay can report what *that* press did (`./link-loss` `ManualRedial`). */
+  reconnect(now?: number, manual?: boolean): boolean;
   /** ABANDON MATCH: a stated leave, so the seat is freed rather than held. */
   leave(reason?: string): void;
 }

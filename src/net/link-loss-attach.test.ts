@@ -73,6 +73,21 @@ function fakeDom(): FakeDom {
     root: body,
     createElement(): TraceElement {
       const el = fakeElement();
+      // Writing `innerHTML` replaces every element under it in a real DOM — new
+      // objects, no listeners carried over — and the fake has to do the same or it
+      // stops modelling the thing under test. Without this the cache below hands the
+      // view the *same* button object on every re-render, the view binds a second
+      // handler to it (`./link-loss-view` `render`: "one listener per live element,
+      // never a stale handler on a detached node"), and a press that re-renders the
+      // card it is standing on re-enters its own handler for as long as memory lasts.
+      let html = '';
+      Object.defineProperty(el, 'innerHTML', {
+        get: () => html,
+        set: (next: string) => {
+          html = next;
+          byId.clear();
+        },
+      });
       dom.root = el;
       return el;
     },
@@ -96,7 +111,7 @@ function fakeDom(): FakeDom {
 // --- A session that is a real watchdog behind a counted surface ---------------
 
 interface FakeSession extends WatchedSession {
-  readonly calls: { reconnect: number; leave: number; hidden: number };
+  readonly calls: { reconnect: number; leave: number; hidden: number; manual: number };
   /** Make the next redial refuse to start, the way `./websocket-transport` `redial`
    *  does for a dead room or a spent window — the case that leaves the player on the
    *  CONNECTION LOST card with a RECONNECT button to press. */
@@ -109,7 +124,7 @@ interface FakeSession extends WatchedSession {
 
 function fakeSession(watch: LinkWatch): FakeSession {
   const session: FakeSession = {
-    calls: { reconnect: 0, leave: 0, hidden: 0 },
+    calls: { reconnect: 0, leave: 0, hidden: 0, manual: 0 },
     dialFails: false,
     now: T0,
     frame: (): void => watch.frame(session.now),
@@ -129,14 +144,16 @@ function fakeSession(watch: LinkWatch): FakeSession {
       watch.shown(now);
       return session.pollLink(now);
     },
-    // The same two-branch shape as `./session` `reconnect`.
-    reconnect: (now = session.now): boolean => {
+    // The same two-branch shape as `./session` `reconnect`, `manual` and all — so a
+    // press here reaches the watchdog exactly as a press reaches it in the client.
+    reconnect: (now = session.now, manual = false): boolean => {
       session.calls.reconnect++;
+      if (manual) session.calls.manual++;
       if (session.dialFails) {
-        watch.redialFailed(now);
+        watch.redialFailed(now, manual);
         return false;
       }
-      watch.beginRedial(now);
+      watch.beginRedial(now, manual);
       return true;
     },
     leave: (): void => {
@@ -221,9 +238,11 @@ describe('attachLinkLoss', () => {
 
     expect(h.dom.html()).toContain('no server data for');
     // The one automatic attempt is spent inside the poll, so the card a player
-    // actually meets is RECONNECTING… with ABANDON MATCH under it.
+    // actually meets is RECONNECTING… — and it carries BOTH buttons the developer
+    // asked for (n8-01; before it, this card offered ABANDON MATCH alone).
     expect(h.session.calls.reconnect).toBe(1);
     expect(h.dom.html()).toContain('RECONNECTING…');
+    expect(h.dom.button(LINK_LOSS_BUTTON_IDS.reconnect)).not.toBeNull();
     expect(h.dom.button(LINK_LOSS_BUTTON_IDS.abandon)).not.toBeNull();
   });
 
@@ -268,6 +287,84 @@ describe('attachLinkLoss', () => {
 
     expect(h.session.calls.reconnect).toBe(2); // the automatic one, then the press
     expect(h.dom.html()).toContain('RECONNECTING…');
+  });
+
+  /**
+   * n8-01. The developer asked for *"reconnect / abandon buttons"* and the served
+   * build drew one of them: sampled every two seconds across the whole 112-second
+   * window, the only controls ever offered were ABANDON MATCH and BACK TO MENU.
+   *
+   * Both halves are asserted here, because presence alone is what shipped last time
+   * and it was not enough: the button is on the card the player is looking at, AND
+   * pressing it starts a real attempt.
+   */
+  describe('RECONNECT, on the card the grace window actually shows', () => {
+    /** Into the grace window the way a player gets there: silence, then frames. */
+    function inGraceWindow(): Harness {
+      const h = harness();
+      h.session.now += SILENCE_FLOOR_MS;
+      h.frame();
+      expect(h.handle.status().phase).toBe('redialing');
+      return h;
+    }
+
+    it('is on screen for the whole window, not just the instant before the auto-dial', () => {
+      const h = inGraceWindow();
+      // Two seconds of frames later — the sampling interval a1-13 used — and it is
+      // still there. A button that exists only in the phase between detecting the
+      // loss and spending the automatic redial is a button nobody can press.
+      for (let i = 0; i < 120; i++) {
+        h.session.now += 16;
+        h.frame();
+      }
+      expect(h.dom.html()).toContain('RECONNECTING…');
+      expect(h.dom.button(LINK_LOSS_BUTTON_IDS.reconnect)).not.toBeNull();
+    });
+
+    it('presses through to a real attempt, even with the automatic dial in flight', () => {
+      const h = inGraceWindow();
+      expect(h.session.calls.reconnect).toBe(1); // the client's own, already spent
+      expect(h.session.calls.manual).toBe(0);
+
+      h.dom.button(LINK_LOSS_BUTTON_IDS.reconnect)?.click();
+
+      // The press reached the session, was marked as the player's, and counted as
+      // its own dial — not swallowed as a duplicate of the one already running.
+      expect(h.session.calls.reconnect).toBe(2);
+      expect(h.session.calls.manual).toBe(1);
+      expect(h.handle.status().attempts).toBe(2);
+      expect(h.handle.status().manualRedial).toBe('dialing');
+      // …and the card answered in the same press, not on some later frame.
+      expect(h.dom.html()).toContain('RECONNECTING… ATTEMPT 2');
+      expect(h.dom.html()).toContain('You pressed RECONNECT');
+    });
+
+    it('says what happened when the press cannot get out', () => {
+      const h = inGraceWindow();
+      // The server is gone: no dial can be started (`./websocket-transport` `redial`
+      // returning false for a dead room or a spent window). A button that answers
+      // this with nothing at all is the failure this brief exists to fix.
+      h.session.dialFails = true;
+      h.dom.button(LINK_LOSS_BUTTON_IDS.reconnect)?.click();
+
+      expect(h.session.calls.manual).toBe(1);
+      expect(h.handle.status().manualRedial).toBe('failed');
+      expect(h.dom.html()).toContain('could not go out');
+      // Still a way out, and still a way to try again: the press failing is not the
+      // end of the grace window.
+      expect(h.dom.button(LINK_LOSS_BUTTON_IDS.abandon)).not.toBeNull();
+      expect(h.dom.button(LINK_LOSS_BUTTON_IDS.reconnect)).not.toBeNull();
+    });
+
+    it('is gone from the terminal card, where there is nothing left to reclaim', () => {
+      const h = inGraceWindow();
+      h.session.now += 60_000;
+      h.frame();
+
+      expect(h.dom.html()).toContain('SEAT EXPIRED');
+      expect(h.dom.button(LINK_LOSS_BUTTON_IDS.reconnect)).toBeNull();
+      expect(h.dom.button(LINK_LOSS_BUTTON_IDS.menu)).not.toBeNull();
+    });
   });
 
   it('judges a tab that comes back — the developer’s own case, and the loss with no event', () => {

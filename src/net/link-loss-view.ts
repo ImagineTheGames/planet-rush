@@ -82,7 +82,14 @@ export function renderLinkLossHtml(notice: LinkNotice): string {
     `<style>${linkLossCss(accent)}</style>` +
     // `alert` rather than `status`: this interrupts. A screen reader should say it
     // now, not when it gets round to it — the player is being kicked out of a match.
-    `<div class="pr-ll-card" role="alertdialog" aria-live="assertive" aria-label="Connection lost">` +
+    // `aria-busy` while a dial is in flight — the card is working, and a screen
+    // reader should say so. Note what it is NOT: `disabled` on the RECONNECT button.
+    // The card is busy; the button is not spent. A dial sleeping out the transport's
+    // backoff is exactly when a player most wants to press "now", and n8-01 §2 is
+    // explicit that the press must stay a real attempt rather than a label on a timer
+    // the player cannot see (`./link-loss` `beginRedial`).
+    `<div class="pr-ll-card" role="alertdialog" aria-live="assertive" aria-label="Connection lost"` +
+    `${notice.busy ? ' aria-busy="true"' : ''}>` +
     `<h1 id="${LINK_LOSS_TITLE_ID}" class="pr-ll-title">${escapeHtml(notice.title)}</h1>` +
     `<p id="${LINK_LOSS_DETAIL_ID}" class="pr-ll-detail">${escapeHtml(notice.detail)}</p>` +
     `<div class="pr-ll-actions">${buttons}</div>` +

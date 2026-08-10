@@ -149,6 +149,24 @@ export type LinkEnding = 'grace-elapsed' | 'room-gone' | 'join-rejected' | 'left
  */
 export type LinkPhase = 'live' | 'lost' | 'redialing' | 'expired';
 
+/**
+ * What the **player's own RECONNECT press** did, since the current loss began.
+ *
+ * Separate from {@link LinkStatus.attempts}, which counts every dial including the
+ * automatic one, because the two answer different questions. `attempts` answers
+ * "how hard is the client trying?"; this answers "did the thing I just pressed do
+ * anything?" — and that second question is the one a player asks with their finger
+ * still on the button.
+ *
+ *   • `'none'`    — not pressed since this loss. The card says nothing about it.
+ *   • `'dialing'` — pressed, and a dial actually went out.
+ *   • `'failed'`  — pressed, and no dial could be started. **This is the state the
+ *                   overlay must never swallow**: a button that silently does
+ *                   nothing when the server is gone is worse than no button, so the
+ *                   detail line says so out loud (n8-01).
+ */
+export type ManualRedial = 'none' | 'dialing' | 'failed';
+
 /** The link, as of the last {@link LinkWatch.poll}. Immutable, so a view compares
  *  rather than re-reads. */
 export interface LinkStatus {
@@ -171,6 +189,8 @@ export interface LinkStatus {
   readonly graceRemainingMs: number;
   /** Redial attempts since this loss — the "attempt 2" in the overlay. */
   readonly attempts: number;
+  /** What the player's last RECONNECT press did, if they have pressed it. */
+  readonly manualRedial: ManualRedial;
   /** How it ended, when {@link phase} is `'expired'`. */
   readonly ending: LinkEnding | null;
 }
@@ -181,6 +201,7 @@ const LIVE: LinkStatus = {
   silentMs: 0,
   graceRemainingMs: 0,
   attempts: 0,
+  manualRedial: 'none',
   ending: null,
 };
 
@@ -230,6 +251,8 @@ export class LinkWatch {
   private rttMs: number | null = null;
   /** One automatic redial per loss, offered before the overlay asks (brief §2). */
   private autoRedialPending = false;
+  /** What the player's own press did, this loss ({@link ManualRedial}). */
+  private manual: ManualRedial = 'none';
   /** True once the match is over ({@link retire}): nothing is detected any more. */
   private retired = false;
   private current: LinkStatus = LIVE;
@@ -384,10 +407,25 @@ export class LinkWatch {
     return true;
   }
 
-  /** A dial is in flight — the automatic one or the player's RECONNECT. */
-  beginRedial(now: number): void {
+  /**
+   * A dial is in flight — the automatic one or the player's RECONNECT.
+   *
+   * `manual` says which, and it is not bookkeeping: it is the difference between a
+   * card that reports the client's own background effort and a card that answers the
+   * press the player just made. Note there is no guard against beginning a redial
+   * while one is already in flight — that is the point of n8-01's button. The
+   * automatic attempt runs on the transport's exponential backoff, which a player
+   * cannot see and has no way to hurry; pressing RECONNECT cancels that wait and
+   * dials now (`./websocket-transport` `redial` — "this is a human saying *try
+   * now*"). A button that went inert for the seconds the client happened to be
+   * sleeping would be the same silence this whole feature exists to remove.
+   */
+  beginRedial(now: number, manual = false): void {
     if (this.phase !== 'lost' && this.phase !== 'redialing') return;
     if (this.graceRemaining(now) <= 0) {
+      // Pressed a hair too late. The seat is gone, and the terminal card says so —
+      // but the press was still not nothing, so it is recorded as the failure it was.
+      if (manual) this.manual = 'failed';
       this.expire('grace-elapsed', now);
       this.sync(now);
       return;
@@ -395,6 +433,7 @@ export class LinkWatch {
     this.attempts++;
     this.autoRedialPending = false;
     this.phase = 'redialing';
+    if (manual) this.manual = 'dialing';
     this.sync(now);
   }
 
@@ -405,8 +444,18 @@ export class LinkWatch {
    * (`./websocket-transport` `onDrop`), and telling the player to press a button at
    * a client that is already pressing it would be the ask this file removes.
    */
-  redialFailed(now: number): void {
-    if (this.phase !== 'redialing') return;
+  redialFailed(now: number, manual = false): void {
+    // Recorded BEFORE the phase guard, and that ordering is the whole of n8-01 §3. A
+    // press that fails while the phase is already `'lost'` — a transport with no
+    // redial gesture at all, the case that used to fall straight through this early
+    // return — would otherwise change nothing on screen and nothing in the model: the
+    // player presses, the same card stares back, and the button is indistinguishable
+    // from a picture of a button.
+    if (manual) this.manual = 'failed';
+    if (this.phase !== 'redialing') {
+      if (manual) this.sync(now);
+      return;
+    }
     if (this.graceRemaining(now) <= 0) this.expire('grace-elapsed', now);
     else this.phase = 'lost';
     this.sync(now);
@@ -432,6 +481,7 @@ export class LinkWatch {
     this.cause = null;
     this.ending = null;
     this.autoRedialPending = false;
+    this.manual = 'none';
     this.sync(now);
   }
 
@@ -453,6 +503,9 @@ export class LinkWatch {
     this.graceFrom = this.lastFrameAt;
     this.attempts = 0;
     this.autoRedialPending = true;
+    // A fresh loss is a fresh question: whatever the player pressed during the last
+    // one has no bearing on this one.
+    this.manual = 'none';
   }
 
   private recover(): void {
@@ -463,6 +516,7 @@ export class LinkWatch {
     this.graceFrom = -1;
     this.attempts = 0;
     this.autoRedialPending = false;
+    this.manual = 'none';
   }
 
   private expire(ending: LinkEnding, now: number): void {
@@ -486,6 +540,7 @@ export class LinkWatch {
       silentMs: Math.max(0, now - this.lastFrameAt),
       graceRemainingMs: this.phase === 'expired' ? 0 : this.graceRemaining(now),
       attempts: this.attempts,
+      manualRedial: this.manual,
       ending: this.ending,
     };
     return this.current;
@@ -577,6 +632,33 @@ export function lossPhrase(cause: LossCause | null, silentMs: number): string {
   }
 }
 
+/**
+ * **What the player's own press did** — the second half of *"verbosity of what
+ * happened"* (n8-01 §3), and the half a drawn-but-mute button leaves out.
+ *
+ * Appended to the detail line rather than replacing it: the sentence a1-13 verified
+ * (the cause, and the seconds of grace left) is the answer to *"what happened to my
+ * connection"*, and this is the answer to *"what happened when I pressed that"*. Both
+ * are true at once, and a player who has just pressed a button needs both.
+ *
+ * Empty while `'none'`, which is every frame the player has not pressed anything —
+ * so an untouched card reads exactly as it did before this function existed.
+ */
+export function manualRedialPhrase(manual: ManualRedial, attempts: number): string {
+  switch (manual) {
+    case 'dialing':
+      // Names the attempt number so a second press is visibly a second press, rather
+      // than the same sentence appearing to sit there unchanged.
+      return ` You pressed RECONNECT — attempt ${attempts} went out just now.`;
+    case 'failed':
+      // No dial could even be started: the socket is gone and there is nothing on the
+      // other end to dial at. Says the press was heard, and says it did not land.
+      return ' You pressed RECONNECT and it could not go out — nothing is answering at the server.';
+    default:
+      return '';
+  }
+}
+
 /** The sentence a terminal ending gets. Each names what is true now, in the tone
  *  the GDD asks for at a death: plain, and not a joke (§4.7). */
 export function endingTitle(ending: LinkEnding | null): string {
@@ -615,15 +697,33 @@ export function linkNotice(status: LinkStatus): LinkNotice {
   }
 
   const grace = `${seconds(status.graceRemainingMs)}s`;
+  const pressed = manualRedialPhrase(status.manualRedial, status.attempts);
   if (status.phase === 'redialing') {
     return {
       visible: true,
       title: `RECONNECTING…${status.attempts > 1 ? ` ATTEMPT ${status.attempts}` : ''}`,
       // The cause is kept through the redial: a player watching this needs to know
       // what it is recovering *from*, and it is the line they will screenshot.
-      detail: `${lossPhrase(status.cause, status.silentMs)} — reclaiming your seat, ${grace} of grace left.`,
+      detail: `${lossPhrase(status.cause, status.silentMs)} — reclaiming your seat, ${grace} of grace left.${pressed}`,
       grace,
-      actions: [{ kind: 'abandon', label: 'ABANDON MATCH', primary: false }],
+      // **RECONNECT belongs here, and for most of the grace window this is the only
+      // card there is** (n8-01). The earlier reading — "nothing for the player to
+      // press but ABANDON: the client is already dialling" — was right about the
+      // client and wrong about the player. A fresh loss spends its automatic redial
+      // inside the same poll that detected it (`./session` `pollLink`), the transport
+      // then retries on its own backoff and never reports a failure, so the phase is
+      // `'redialing'` from second 4 to second 62 and the `'lost'` card below is
+      // almost never reached. Withholding the button here meant withholding it
+      // altogether: measured on the served build, the whole 112-second window offered
+      // ABANDON MATCH and BACK TO MENU and nothing else.
+      //
+      // A dial being in flight is not a reason to refuse the press. That dial is
+      // sleeping out an exponential backoff the player cannot see; theirs cancels the
+      // wait and goes now (`./websocket-transport` `redial`).
+      actions: [
+        { kind: 'reconnect', label: `RECONNECT NOW · ${grace}`, primary: true },
+        { kind: 'abandon', label: 'ABANDON MATCH', primary: false },
+      ],
       busy: true,
       failed: false,
     };
@@ -632,7 +732,7 @@ export function linkNotice(status: LinkStatus): LinkNotice {
   return {
     visible: true,
     title: `CONNECTION LOST — ${lossPhrase(status.cause, status.silentMs)}`,
-    detail: `A bot is flying your ship. RECONNECT inside ${grace} and you get it back — same cargo, same upgrades.`,
+    detail: `A bot is flying your ship. RECONNECT inside ${grace} and you get it back — same cargo, same upgrades.${pressed}`,
     grace,
     actions: [
       // The countdown rides the button itself, because the seconds are the whole
@@ -666,6 +766,10 @@ export function linkLossLogEntry(status: LinkStatus): {
       silentMs: Math.round(status.silentMs),
       graceMs: Math.round(status.graceRemainingMs),
       attempts: status.attempts,
+      // Whether the human pressed the button, and whether their press got out — the
+      // one part of this story a `attempts` count cannot tell apart from the client's
+      // own background retries (n8-01).
+      manualRedial: status.manualRedial,
       ending: status.ending,
     },
   };
