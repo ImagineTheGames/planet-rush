@@ -1,0 +1,196 @@
+{
+  "base": "https://imaginethegames.github.io/planet-rush/",
+  "capturedAt": "2026-08-10T15:01:22.773Z",
+  "frames": 180,
+  "rounds": 3,
+  "profiles": [
+    {
+      "name": "desktop",
+      "width": 1280,
+      "height": 800,
+      "errors": [],
+      "windows": [
+        {
+          "calls": 3098,
+          "frames": 180,
+          "drawCallsPerFrame": 17.211111111111112,
+          "elapsedMs": 9828.89999999851,
+          "fps": 18.313341269117327,
+          "frameMs": {
+            "median": 54,
+            "p95": 104
+          },
+          "vfx": {
+            "attached": true,
+            "particles": 32,
+            "sprites": 156,
+            "quality": 1,
+            "reduced": false,
+            "drawnTotal": 1542
+          },
+          "debugFps": 28.589228469107386
+        },
+        {
+          "calls": 3099,
+          "frames": 180,
+          "drawCallsPerFrame": 17.216666666666665,
+          "elapsedMs": 9615.5,
+          "fps": 18.71977536269565,
+          "frameMs": {
+            "median": 51.899999998509884,
+            "p95": 100
+          },
+          "vfx": {
+            "attached": true,
+            "particles": 21,
+            "sprites": 156,
+            "quality": 0.5,
+            "reduced": true,
+            "drawnTotal": 1917
+          },
+          "debugFps": 23.910533775547112
+        },
+        {
+          "calls": 3279,
+          "frames": 180,
+          "drawCallsPerFrame": 18.216666666666665,
+          "elapsedMs": 9216.69999999553,
+          "fps": 19.529766619298375,
+          "frameMs": {
+            "median": 48.80000000447035,
+            "p95": 100.60000000149012
+          },
+          "vfx": {
+            "attached": true,
+            "particles": 8,
+            "sprites": 156,
+            "quality": 0.5,
+            "reduced": true,
+            "drawnTotal": 2301
+          },
+          "debugFps": 26.319849434971104
+        }
+      ],
+      "build": {
+        "sha": "ffc414e",
+        "time": "2026-08-10T14:31:11.934Z",
+        "dirty": false
+      },
+      "canvas": {
+        "w": 1280,
+        "h": 800,
+        "cssW": 1280,
+        "cssH": 800
+      },
+      "viewportSeam": {
+        "w": 1280,
+        "h": 800,
+        "width": 1280,
+        "height": 800
+      },
+      "byName": {
+        "drawElements": 14912
+      },
+      "drawCallsPerFrame": {
+        "mean": 17.548148148148147,
+        "min": 17.211111111111112,
+        "max": 18.216666666666665
+      },
+      "image": "images/a1-13-drawcalls-desktop.png"
+    },
+    {
+      "name": "phone-landscape",
+      "width": 844,
+      "height": 390,
+      "errors": [],
+      "windows": [
+        {
+          "calls": 3024,
+          "frames": 180,
+          "drawCallsPerFrame": 16.8,
+          "elapsedMs": 5556.89999999851,
+          "fps": 32.39216109702321,
+          "frameMs": {
+            "median": 25.700000002980232,
+            "p95": 62.80000000447035
+          },
+          "vfx": {
+            "attached": true,
+            "particles": 34,
+            "sprites": 226,
+            "quality": 1,
+            "reduced": false,
+            "drawnTotal": 1923
+          },
+          "debugFps": 40.42948820534717
+        },
+        {
+          "calls": 3060,
+          "frames": 180,
+          "drawCallsPerFrame": 17,
+          "elapsedMs": 5620.20000000298,
+          "fps": 32.027329988239664,
+          "frameMs": {
+            "median": 25.700000002980232,
+            "p95": 65.80000000447035
+          },
+          "vfx": {
+            "attached": true,
+            "particles": 39,
+            "sprites": 226,
+            "quality": 1,
+            "reduced": false,
+            "drawnTotal": 2513
+          },
+          "debugFps": 36.20959221769972
+        },
+        {
+          "calls": 3038,
+          "frames": 180,
+          "drawCallsPerFrame": 16.877777777777776,
+          "elapsedMs": 5567,
+          "fps": 32.33339320998743,
+          "frameMs": {
+            "median": 25.399999998509884,
+            "p95": 54.899999998509884
+          },
+          "vfx": {
+            "attached": true,
+            "particles": 65,
+            "sprites": 226,
+            "quality": 1,
+            "reduced": false,
+            "drawnTotal": 2872
+          },
+          "debugFps": 38.359190940917976
+        }
+      ],
+      "build": {
+        "sha": "ffc414e",
+        "time": "2026-08-10T14:31:11.934Z",
+        "dirty": false
+      },
+      "canvas": {
+        "w": 844,
+        "h": 390,
+        "cssW": 844,
+        "cssH": 390
+      },
+      "viewportSeam": {
+        "w": 844,
+        "h": 390,
+        "width": 844,
+        "height": 390
+      },
+      "byName": {
+        "drawElements": 17440
+      },
+      "drawCallsPerFrame": {
+        "mean": 16.892592592592592,
+        "min": 16.8,
+        "max": 17
+      },
+      "image": "images/a1-13-drawcalls-phone-landscape.png"
+    }
+  ]
+}

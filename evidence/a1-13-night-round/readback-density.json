@@ -1,0 +1,258 @@
+{
+  "base": "https://imaginethegames.github.io/planet-rush/",
+  "capturedAt": "2026-08-10T15:04:15.328Z",
+  "view": {
+    "width": 844,
+    "height": 390
+  },
+  "frames": 120,
+  "samples": [
+    {
+      "i": 0,
+      "atMs": 4474,
+      "image": "images/a1-13-density-00.png",
+      "calls": 2036,
+      "frames": 120,
+      "drawCallsPerFrame": 16.966666666666665,
+      "fps": 32.13539713998813,
+      "ticks": 712,
+      "vfx": {
+        "sprites": 203,
+        "particles": 10,
+        "quality": 1,
+        "reduced": false
+      }
+    },
+    {
+      "i": 1,
+      "atMs": 58911,
+      "calls": 2038,
+      "frames": 120,
+      "drawCallsPerFrame": 16.983333333333334,
+      "fps": 32.62199266005165,
+      "ticks": 3977,
+      "vfx": {
+        "sprites": 203,
+        "particles": 24,
+        "quality": 1,
+        "reduced": false
+      },
+      "imageDropped": "images/a1-13-density-01.png"
+    },
+    {
+      "i": 2,
+      "atMs": 113341,
+      "image": "images/a1-13-density-02.png",
+      "calls": 2034,
+      "frames": 120,
+      "drawCallsPerFrame": 16.95,
+      "fps": 32.40965807809423,
+      "ticks": 7245,
+      "vfx": {
+        "sprites": 203,
+        "particles": 43,
+        "quality": 1,
+        "reduced": false
+      }
+    },
+    {
+      "i": 3,
+      "atMs": 168665,
+      "image": "images/a1-13-density-03.png",
+      "calls": 1560,
+      "frames": 120,
+      "drawCallsPerFrame": 13,
+      "fps": 27.23558783477077,
+      "ticks": 10547,
+      "vfx": {
+        "sprites": 203,
+        "particles": 11,
+        "quality": 1,
+        "reduced": false
+      }
+    },
+    {
+      "i": 4,
+      "atMs": 223990,
+      "calls": 1629,
+      "frames": 120,
+      "drawCallsPerFrame": 13.575,
+      "fps": 27.46246796044468,
+      "ticks": 13866,
+      "vfx": {
+        "sprites": 203,
+        "particles": 35,
+        "quality": 1,
+        "reduced": false
+      },
+      "imageDropped": "images/a1-13-density-04.png"
+    },
+    {
+      "i": 5,
+      "atMs": 279410,
+      "calls": 1781,
+      "frames": 120,
+      "drawCallsPerFrame": 14.841666666666667,
+      "fps": 26.452693765990524,
+      "ticks": 17194,
+      "vfx": {
+        "sprites": 203,
+        "particles": 64,
+        "quality": 1,
+        "reduced": false
+      },
+      "imageDropped": "images/a1-13-density-05.png"
+    },
+    {
+      "i": 6,
+      "atMs": 334734,
+      "calls": 1811,
+      "frames": 120,
+      "drawCallsPerFrame": 15.091666666666667,
+      "fps": 26.808453599017046,
+      "ticks": 20516,
+      "vfx": {
+        "sprites": 203,
+        "particles": 54,
+        "quality": 1,
+        "reduced": false
+      },
+      "imageDropped": "images/a1-13-density-06.png"
+    },
+    {
+      "i": 7,
+      "atMs": 390101,
+      "calls": 1560,
+      "frames": 120,
+      "drawCallsPerFrame": 13,
+      "fps": 26.658965187852274,
+      "ticks": 23837,
+      "vfx": {
+        "sprites": 203,
+        "particles": 13,
+        "quality": 1,
+        "reduced": false
+      },
+      "imageDropped": "images/a1-13-density-07.png"
+    },
+    {
+      "i": 8,
+      "atMs": 445450,
+      "calls": 1590,
+      "frames": 120,
+      "drawCallsPerFrame": 13.25,
+      "fps": 26.807255830587067,
+      "ticks": 27158,
+      "vfx": {
+        "sprites": 203,
+        "particles": 10,
+        "quality": 1,
+        "reduced": false
+      },
+      "imageDropped": "images/a1-13-density-08.png"
+    },
+    {
+      "i": 9,
+      "atMs": 500900,
+      "calls": 1714,
+      "frames": 120,
+      "drawCallsPerFrame": 14.283333333333333,
+      "fps": 26.863065523485027,
+      "ticks": 30480,
+      "vfx": {
+        "sprites": 203,
+        "particles": 18,
+        "quality": 1,
+        "reduced": false
+      },
+      "imageDropped": "images/a1-13-density-09.png"
+    },
+    {
+      "i": 10,
+      "atMs": 556371,
+      "calls": 1591,
+      "frames": 120,
+      "drawCallsPerFrame": 13.258333333333333,
+      "fps": 26.404383127581866,
+      "ticks": 33810,
+      "vfx": {
+        "sprites": 203,
+        "particles": 37,
+        "quality": 1,
+        "reduced": false
+      },
+      "imageDropped": "images/a1-13-density-10.png"
+    },
+    {
+      "i": 11,
+      "atMs": 611723,
+      "calls": 1556,
+      "frames": 120,
+      "drawCallsPerFrame": 12.966666666666667,
+      "fps": 27.04652001444298,
+      "ticks": 37132,
+      "vfx": {
+        "sprites": 203,
+        "particles": 33,
+        "quality": 1,
+        "reduced": false
+      },
+      "imageDropped": "images/a1-13-density-11.png"
+    },
+    {
+      "i": 12,
+      "atMs": 667078,
+      "calls": 1540,
+      "frames": 120,
+      "drawCallsPerFrame": 12.833333333333334,
+      "fps": 26.833631484794275,
+      "ticks": 40456,
+      "vfx": {
+        "sprites": 203,
+        "particles": 16,
+        "quality": 1,
+        "reduced": false
+      },
+      "imageDropped": "images/a1-13-density-12.png"
+    },
+    {
+      "i": 13,
+      "atMs": 722440,
+      "image": "images/a1-13-density-13.png",
+      "calls": 1560,
+      "frames": 120,
+      "drawCallsPerFrame": 13,
+      "fps": 26.746311237899555,
+      "ticks": 43778,
+      "vfx": {
+        "sprites": 203,
+        "particles": 8,
+        "quality": 0.5,
+        "reduced": true
+      }
+    }
+  ],
+  "errors": [],
+  "build": {
+    "sha": "ffc414e",
+    "time": "2026-08-10T14:31:11.934Z",
+    "dirty": false
+  },
+  "summary": {
+    "min": 12.833333333333334,
+    "max": 16.983333333333334,
+    "mean": 14.285714285714288,
+    "first": 16.966666666666665,
+    "last": 13,
+    "spanMs": 722440
+  },
+  "imagesKept": {
+    "note": "Ten of the fourteen frames were byte-for-byte the same ELIMINATED end screen and were not committed; the numbers for every sample are kept in full above. Frames 0 and 2 are the match, 3 is the first end-screen sample (which is what the drop from ~17 to ~13 draw calls actually is), 13 is the last.",
+    "kept": [
+      0,
+      2,
+      3,
+      13
+    ]
+  }
+}
