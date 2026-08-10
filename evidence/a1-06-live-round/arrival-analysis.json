@@ -1,0 +1,108 @@
+{
+  "note": "newly-lit = dark in the earlier frame, lit in the later one",
+  "ink": [
+    {
+      "atS": 140,
+      "inkPct": 3.3812
+    },
+    {
+      "atS": 165,
+      "inkPct": 3.3812
+    },
+    {
+      "atS": 178,
+      "inkPct": 3.3812
+    },
+    {
+      "atS": 192,
+      "inkPct": 4.0804
+    },
+    {
+      "atS": 205,
+      "inkPct": 4.0804
+    },
+    {
+      "atS": 225,
+      "inkPct": 4.0804
+    }
+  ],
+  "steps": [
+    {
+      "from": "140s",
+      "to": "165s",
+      "newlyLitPixels": 195,
+      "inHudTextRow": 131,
+      "inPlayField": 64,
+      "biggestCells": []
+    },
+    {
+      "from": "165s",
+      "to": "178s",
+      "newlyLitPixels": 293,
+      "inHudTextRow": 260,
+      "inPlayField": 33,
+      "biggestCells": []
+    },
+    {
+      "from": "178s",
+      "to": "192s",
+      "newlyLitPixels": 25377,
+      "inHudTextRow": 1771,
+      "inPlayField": 23606,
+      "biggestCells": [
+        {
+          "cell": "15,3",
+          "pixels": 11966,
+          "cssX": 1240,
+          "cssY": 280
+        },
+        {
+          "cell": "15,2",
+          "pixels": 4765,
+          "cssX": 1240,
+          "cssY": 200
+        },
+        {
+          "cell": "15,7",
+          "pixels": 3771,
+          "cssX": 1240,
+          "cssY": 600
+        },
+        {
+          "cell": "14,3",
+          "pixels": 3045,
+          "cssX": 1160,
+          "cssY": 280
+        },
+        {
+          "cell": "8,0",
+          "pixels": 949,
+          "cssX": 680,
+          "cssY": 40
+        },
+        {
+          "cell": "7,0",
+          "pixels": 813,
+          "cssX": 600,
+          "cssY": 40
+        }
+      ]
+    },
+    {
+      "from": "192s",
+      "to": "205s",
+      "newlyLitPixels": 229,
+      "inHudTextRow": 196,
+      "inPlayField": 33,
+      "biggestCells": []
+    },
+    {
+      "from": "205s",
+      "to": "225s",
+      "newlyLitPixels": 268,
+      "inHudTextRow": 196,
+      "inPlayField": 72,
+      "biggestCells": []
+    }
+  ]
+}
