@@ -5,11 +5,36 @@
  * layer *reads* sim state and never writes it; the sim never imports PixiJS.
  *
  * Discipline (GDD §4.3, risk 5): sprites are **pooled and reused** — the hot,
- * many-entity paths (asteroids, ore chunks) allocate their Graphics once and per
- * frame only touch transforms (position / scale / tint), never geometry, so the
- * frame loop makes zero per-frame allocations. Ships (≤8) get one Graphics each,
- * with player-identity colour baked in (hull stays steel — style guide §3).
+ * many-entity paths (asteroids, ore chunks) allocate their display object once
+ * and per frame only touch transforms (position / scale / tint), never geometry,
+ * so the frame loop makes zero per-frame allocations. Ships (≤8) get one Graphics
+ * each, with player-identity colour baked in (hull stays steel — style guide §3).
  * Turret muzzle flashes are a handful of short-lived lines redrawn each frame.
+ *
+ * **And the three densest layers share TEXTURES, not just geometry (a1-11).**
+ * Rocks, turrets and shots are pooled `Sprite`s over a handful of baked textures
+ * — §4.3's "instanced sprites", the half of the budget this layer used to skip.
+ * a1-10 measured what skipping it cost on the §4.3 stress scene: the 200-rock
+ * layer alone was 26.1 ms and **200 draw calls** as one `Graphics` per rock,
+ * against 3.9 ms and 1.8 draw calls over 46 shared textures
+ * (`docs/atlas-pooling-measured.md`). Pooling geometry is not pooling submission:
+ * Pixi issues one draw call per `Graphics` however much geometry they share, and
+ * a rock's veins and cracks clear the batcher's vertex threshold every time.
+ *
+ * Three things make that swap a pixel-for-pixel one rather than a re-authoring,
+ * and they are the reason the goldens moved by as little as they did:
+ *
+ *  - **The bake density is the draw density.** Each look is baked at exactly the
+ *    pixels-per-unit the direct path rasterised at (`ROCK_ART_SCALE` and friends),
+ *    so the sprite's per-frame scale is the very `radius / ART_SCALE` the
+ *    `Graphics` carried. Every entity minifies and none is ever magnified.
+ *  - **The bake is framed on the art's ORIGIN**, not cropped to its bounding box
+ *    ({@link CenteredBaker}) — otherwise an asymmetric silhouette would draw off
+ *    where it collides.
+ *  - **There is one draw path, not two.** The renderer always draws sprites; what
+ *    is injected is the *baker*. Without one it bakes blank textures of the right
+ *    size, so a headless suite asserts the same scene graph players get and only
+ *    the pixels are absent — which is the one thing it never asserted anyway.
  *
  * Placeholder shapes stand in until art lands (GDD §2.4 day-1: "placeholder
  * triangle ok"): a steel triangle ship with a player-colour cockpit, grey rocks
@@ -26,7 +51,7 @@
  * screen.
  */
 
-import { Container, Graphics } from 'pixi.js';
+import { Container, Graphics, Rectangle, Sprite, Texture, TextureSource } from 'pixi.js';
 import { UpgradeTrack } from '@shared/types';
 import type { PlayerId, ShipClass, Vec2 } from '@shared/types';
 import { writeCameraOffset } from '@platform/camera';
@@ -38,11 +63,12 @@ import { stationHealthVisible } from '../sim/sensing';
 import type { Asteroid, OreChunk, MiningStation, Projectile, Ship, World } from '../sim/state';
 import { atmosphereHaloSprite, beaconRingSprite, stationSprite, stationVariantFor } from '../art/stations';
 import { stationWreckSprite } from '../art/wrecks';
-import { asteroidArt } from '../art/atlas';
+import { asteroidArt, asteroidTexture } from '../art/atlas';
 import { shipSprite } from '../art/ships';
 import { turretSprite, shieldSprite, shieldStrength, type TurretState } from '../art/buildings';
 import { shotSprite, type ShotFamily } from '../art/vfx/shots';
-import { drawSprite, spriteGraphics } from '../art/textures';
+import type { SpriteDef } from '../art/shapes';
+import { SpriteTextureCache, drawSprite, spriteGraphics, type TextureBaker } from '../art/textures';
 import { ARENA_WALL_BANDS, VoidBackdrop } from '../art/backdrop';
 
 // ---------------------------------------------------------------------------
@@ -145,30 +171,153 @@ class GraphicsPool {
   }
 }
 
+/**
+ * The same pool, over `Sprite`s — the textured-quad half of GDD §4.3's
+ * "instanced sprites". A slot's texture is swapped only when its entity's *look*
+ * changes (the key guards below); a steady frame writes position, rotation,
+ * scale and alpha and nothing else, so the layer submits one batched quad per
+ * entity instead of one draw call each.
+ *
+ * Anchored at the centre because the sprite IR's origin is the entity's centre
+ * (`../art/shapes` unit space) and {@link CenteredBaker} keeps the bake square
+ * about that origin — so anchor 0.5 puts the art exactly where the collider is.
+ */
+class SpritePool {
+  private readonly items: Sprite[] = [];
+
+  constructor(private readonly layer: Container) {}
+
+  /** The i-th pooled sprite, creating it (once) if the pool must grow. */
+  at(i: number): Sprite {
+    let s = this.items[i];
+    if (!s) {
+      s = new Sprite();
+      s.anchor.set(0.5);
+      this.items[i] = s;
+      this.layer.addChild(s);
+    }
+    s.visible = true;
+    return s;
+  }
+
+  /** Hide every pooled sprite from `count` onward (reused, not destroyed). */
+  hideFrom(count: number): void {
+    for (let i = count; i < this.items.length; i++) {
+      const s = this.items[i];
+      if (s) s.visible = false;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Baking: sim look → one shared texture
+// ---------------------------------------------------------------------------
+
+/**
+ * What this layer needs from PixiJS in order to bake. `pixi.js`'s `Renderer`
+ * satisfies it structurally (that is what `main.ts` passes); a test double
+ * satisfies it in four lines.
+ *
+ * It is `../art/textures`'s `TextureBaker` plus the one option that interface
+ * does not carry — `frame`, the region to rasterise. {@link CenteredBaker} needs
+ * it and Art's cache is not this layer's file to widen.
+ */
+export interface EntityTextureBaker {
+  generateTexture(options: {
+    target: Container;
+    frame?: Rectangle;
+    resolution?: number;
+    antialias?: boolean;
+  }): Texture;
+}
+
+/** Options for {@link Renderer}. Both default to the headless behaviour, so an
+ *  existing two-argument caller (every render unit test) is unchanged. */
+export interface RendererOptions {
+  /** Bakes the pooled entity textures. Pass `app.renderer`. Omitted ⇒ the
+   *  correctly-sized blank textures a headless suite draws with. */
+  readonly baker?: EntityTextureBaker;
+  /** Device pixel ratio to bake at. `Math.min(devicePixelRatio, 2)` in `main.ts`. */
+  readonly resolution?: number;
+}
+
+/**
+ * Margin baked around a look's declared half-extent. `drawSprite` strokes on the
+ * path centre-line and floors thin widths at half a pixel, so a shape that
+ * reaches the declared extent overhangs it by half its stroke; without the
+ * margin the outermost hairline would be clipped by the frame. It costs
+ * transparent texels and no screen area — the sprite scales by the *nominal*
+ * size, so the margin lands outside the art exactly as it does in the vectors.
+ */
+const BAKE_MARGIN = 1.08;
+
+/**
+ * Bakes a look into a texture framed **symmetrically about the art's origin**.
+ *
+ * `SpriteTextureCache` asks for `generateTexture({ target })`, which crops to the
+ * target's local bounds. Cropped, the sprite's centre is its bounding box's
+ * centre — and an asteroid silhouette is not symmetric, so the rock would draw a
+ * pixel or so off the position it collides at, differently per seed. Passing an
+ * explicit square `frame` makes the texture's centre the sprite IR's origin, by
+ * construction and for every look.
+ *
+ * {@link frameFor} is set immediately before each cache lookup. That is safe
+ * because a bake only ever happens *inside* that lookup, synchronously, and on a
+ * cache hit it is simply unread.
+ */
+class CenteredBaker implements TextureBaker {
+  private half = 0;
+
+  constructor(
+    private readonly inner: EntityTextureBaker | undefined,
+    private readonly resolution: number,
+  ) {}
+
+  /** Frame the next bake to a `px`-square about the origin, plus the margin. */
+  frameFor(px: number): void {
+    this.half = Math.ceil((px * BAKE_MARGIN) / 2);
+  }
+
+  generateTexture(options: { target: Container; resolution?: number; antialias?: boolean }): Texture {
+    const size = this.half * 2;
+    const resolution = options.resolution ?? this.resolution;
+    if (!this.inner) {
+      // Headless: no WebGL, so no raster — but a `TextureSource` is plain data,
+      // and a blank one of the right size gives the pooled sprite the bounds,
+      // and therefore the drawn size, it will have in the browser.
+      return new Texture({ source: new TextureSource({ width: size, height: size, resolution }) });
+    }
+    return this.inner.generateTexture({
+      target: options.target,
+      frame: new Rectangle(-this.half, -this.half, size, size),
+      resolution,
+      antialias: options.antialias ?? true,
+    });
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Unit-shape factories (drawn once at unit scale; sized per frame via transform)
 // ---------------------------------------------------------------------------
 
-function makeUnitRock(): Graphics {
-  // An empty shell. The rock's real geometry — one of the six ratified pool
-  // types (docs/art-direction §5.5) at its crack stage and payout band — is
-  // played into it per look-change by `drawAsteroids`, via the art pipeline
-  // (`asteroidArt` / `drawSprite`), the same way ship hulls are drawn. Pooling
-  // is unchanged: geometry is rebuilt only when a rock's look actually moves.
-  return new Graphics();
-}
-
 /**
- * Pixels-per-unit asteroid art is drawn at before the per-frame `scale.set`,
+ * Pixels-per-unit asteroid art is rasterised at before the per-frame `scale.set`,
  * matching the ships' trick: drawing above 1 keeps thin vein/crack strokes off
  * `drawSprite`'s 0.5px floor, and `drawAsteroids` divides it back out so the
  * rock still lands at `asteroid.radius` world units.
+ *
+ * It is also the **bake density** (a1-11): the pooled texture is rasterised at
+ * this many pixels per art unit, which is what makes the pooled rock the same
+ * picture the direct-drawn one was. 64 px/unit against `ASTEROID.maxRadius` 46
+ * means the largest rock on screen is still a minification of its texture.
  */
 const ROCK_ART_SCALE = 64;
 
 /** Pixels-per-unit the turret/scaffold art is rasterised at before the per-frame
  *  `scale.set` back down to `turret.radius`. Above 1 so the thin trim/panel
- *  strokes (~0.03–0.05 unit) clear `drawSprite`'s 0.5px floor and stay crisp. */
+ *  strokes (~0.03–0.05 unit) clear `drawSprite`'s 0.5px floor and stay crisp —
+ *  and, as above, the density the pooled texture is baked at (`TURRET.radius` is
+ *  12, so a turret is a 4× minification of its own texture). */
 const TURRET_ART_SCALE = 48;
 
 function makeUnitChunk(): Graphics {
@@ -193,13 +342,6 @@ function makeImpactGlow(): Graphics {
   g.circle(0, 0, 1).fill({ color: PALETTE.plasma, alpha: 0.35 }); // halo
   g.circle(0, 0, 0.45).fill({ color: PALETTE.plasma, alpha: 0.95 }); // core
   return g;
-}
-
-/** An empty pooled Graphics whose geometry is (re)drawn from the art pipeline on
- *  demand — the turret and the build scaffold both fill their slot this way, so
- *  the factory is just a blank canvas (cf. the asteroid pool). */
-function makeArtSlot(): Graphics {
-  return new Graphics();
 }
 
 /**
@@ -290,26 +432,42 @@ export class Renderer {
   private readonly shipLayer = new Container();
   private readonly shotLayer = new Container();
 
-  private readonly asteroidPool: GraphicsPool;
-  /** The look-key drawn into each pooled rock, so geometry rebuilds only on change. */
+  private readonly asteroidPool: SpritePool;
+  /** The look-key held by each pooled rock, so its texture is swapped only on change. */
   private readonly asteroidKeys: string[] = [];
+  /** World units per texture pixel for the look in each rock slot — the sprite's
+   *  scale is this times the rock's collision radius. Cached per slot rather than
+   *  looked up per frame so a 200-rock field reads one array entry each. */
+  private readonly asteroidUnits: number[] = [];
   private readonly chunkPool: GraphicsPool;
   private readonly muzzlePool: GraphicsPool;
   private readonly impactPool: GraphicsPool;
-  private readonly turretPool: GraphicsPool;
-  /** The (silhouette, state, owner, damage-band) drawn into each turret slot, so
-   *  its vector geometry rebuilds only when the read changes — steady state stays
-   *  allocation-free, the same discipline the rock pool uses (GDD §4.3). */
+  private readonly turretPool: SpritePool;
+  /** The (silhouette, state, owner) held by each turret slot, so its texture is
+   *  swapped only when the read changes — steady state stays allocation-free, the
+   *  same discipline the rock pool uses (GDD §4.3). */
   private readonly turretKeys: string[] = [];
+  private readonly turretUnits: number[] = [];
   /** Construction scaffolds (the `building` art) — one per in-progress turret job,
    *  placed on the reserved mount so the finished gun lands where the frame stood. */
-  private readonly scaffoldPool: GraphicsPool;
+  private readonly scaffoldPool: SpritePool;
   private readonly scaffoldKeys: string[] = [];
-  private readonly shotPool: GraphicsPool;
-  /** The `${family}:${tier}` shot look baked into each shot slot, so the DAMAGE-tier
-   *  ramp geometry is rebuilt only when a slot's shot changes side or tier (the
+  private readonly scaffoldUnits: number[] = [];
+  private readonly shotPool: SpritePool;
+  /** The `${family}:${tier}` shot look held by each shot slot, so the DAMAGE-tier
+   *  ramp texture is swapped only when a slot's shot changes side or tier (the
    *  asteroid-pool discipline) — a firefight stays transform-only per frame. */
   private readonly shotKeys: string[] = [];
+  private readonly shotUnits: number[] = [];
+
+  /** The shared texture pool the three dense layers draw from (GDD §4.3). One
+   *  texture per distinct look; ~46 carry a 200-rock field, ~24 all 32 turrets. */
+  private readonly textures: SpriteTextureCache;
+  /** The framing wrapper around whatever bakes those textures. */
+  private readonly baker: CenteredBaker;
+  /** A look's authored half-extent, remembered so sizing a bake never re-runs a
+   *  generator on a cache hit. See {@link extentOf}. */
+  private readonly extents = new Map<string, number>();
   /** Ships keyed by PlayerId (≤ 8), colour baked in — not an index pool. */
   private readonly shipGfx: Graphics[] = [];
   /** A station's static body: disc, beacon ring, core. Keyed by station index
@@ -352,8 +510,10 @@ export class Renderer {
   /** Reused scratch so centerCamera allocates nothing per frame (GDD §4.3). */
   private readonly offsetScratch: Vec2 = { x: 0, y: 0 };
 
-  constructor(stage: Container, viewport: Viewport) {
+  constructor(stage: Container, viewport: Viewport, options: RendererOptions = {}) {
     this.viewport = viewport;
+    this.baker = new CenteredBaker(options.baker, options.resolution ?? 1);
+    this.textures = new SpriteTextureCache(this.baker, options.resolution ?? 1);
 
     // Back to front: your home's atmosphere halo (behind its own station),
     // stations (the map's furniture — big, static, and behind
@@ -387,13 +547,63 @@ export class Renderer {
     stage.addChild(this.backdrop.view);
     stage.addChild(this.worldRoot);
 
-    this.asteroidPool = new GraphicsPool(this.asteroidLayer, makeUnitRock);
+    this.asteroidPool = new SpritePool(this.asteroidLayer);
     this.chunkPool = new GraphicsPool(this.chunkLayer, makeUnitChunk);
     this.muzzlePool = new GraphicsPool(this.muzzleLayer, () => new Graphics());
     this.impactPool = new GraphicsPool(this.impactLayer, makeImpactGlow);
-    this.turretPool = new GraphicsPool(this.turretLayer, makeArtSlot);
-    this.scaffoldPool = new GraphicsPool(this.turretLayer, makeArtSlot);
-    this.shotPool = new GraphicsPool(this.shotLayer, makeArtSlot);
+    this.turretPool = new SpritePool(this.turretLayer);
+    this.scaffoldPool = new SpritePool(this.turretLayer);
+    this.shotPool = new SpritePool(this.shotLayer);
+  }
+
+  /** Distinct textures the entity layers are sharing — the pooling assertion
+   *  GDD §4.3 states as "a field of 200 rocks shares a couple of dozen textures". */
+  get textureCount(): number {
+    return this.textures.size;
+  }
+
+  /** How many of those were actually baked. Equal to {@link textureCount} unless
+   *  something is rebuilding a look it already had. */
+  get bakeCount(): number {
+    return this.textures.bakeCount;
+  }
+
+  /**
+   * A look's authored half-extent (`../art/shapes` unit space), generated once
+   * and remembered.
+   *
+   * Sizing a bake needs it — the texture is `2 · extent · pxPerUnit` pixels
+   * across — and the atlas hands back a `Texture`, not the definition it baked
+   * from. So a generator runs one extra time per *distinct look*, at most once
+   * each per match (46 rocks, 24 turrets, 4 shots), and never on a cache hit or
+   * on a steady frame.
+   */
+  private extentOf(key: string, make: () => SpriteDef): number {
+    const hit = this.extents.get(key);
+    if (hit !== undefined) return hit;
+    const extent = make().extent;
+    this.extents.set(key, extent);
+    return extent;
+  }
+
+  /**
+   * Bake (or fetch) one look and return the **world units per texture pixel**
+   * that lands it at the same size the direct-draw path drew it at.
+   *
+   * `pxPerUnit` is the density the vectors were rasterised at before their
+   * per-frame `scale.set`, so `units` comes back as `1 / pxPerUnit` (bar
+   * rounding) and the caller's scale is the very `radius / ART_SCALE` the
+   * `Graphics` carried. `bake` is the atlas (or, where the atlas has no entry for
+   * a look, a direct keyed lookup) — it is passed the pixel size to bake at.
+   */
+  private lookUnits(key: string, pxPerUnit: number, make: () => SpriteDef, bake: (size: number) => Texture): {
+    texture: Texture;
+    units: number;
+  } {
+    const extent = this.extentOf(key, make);
+    const size = Math.max(8, Math.round(2 * extent * pxPerUnit));
+    this.baker.frameFor(size);
+    return { texture: bake(size), units: (2 * extent) / size };
   }
 
   /** Point the camera at a new visible viewport (resize / orientationchange /
@@ -505,6 +715,14 @@ export class Renderer {
    * beacon ring under it made a quarter-dead station look untouched. `viewerId`
    * is still the eye for everything that genuinely is fog (the atmosphere halo is
    * an own-station affordance, shots read by side), just not for health.
+   *
+   * **Turrets are pooled here rather than through `atlas.turretTexture` (a1-11).**
+   * The atlas's entry predates the Mk I→III ladder and keys on `(owner, state)`
+   * alone, so routing through it would put every Mk II and Mk III barrel on the
+   * Mk I silhouette — a visible regression, and this brief's whole guard rail is
+   * that appearance must not degrade. The key below is the atlas's own idiom with
+   * `tier` restored; `src/art/atlas.ts` is Art's file and was left alone.
+   * **Recommended to Art: `turretTexture` should take the tier.**
    */
   private drawStations(world: World, viewerId: PlayerId): void {
     const viewer = world.ships.find((s) => s.id === viewerId);
@@ -532,30 +750,39 @@ export class Renderer {
 
       for (const turret of station.turrets) {
         if (turret.hp <= 0) continue; // killed this tick, swept at end of step
-        const g = this.turretPool.at(turrets);
+        const s = this.turretPool.at(turrets);
         // The barrel state is the threat telegraph (style-guide §5.5): a fired
         // muzzle this tick is `firing`; a committed target is `tracking`; else
         // the barrel is cold. The tier picks the ratified pool silhouette.
         const state: TurretState =
           turret.muzzle != null ? 'firing' : turret.targetId != null ? 'tracking' : 'idle';
         const tier = turret.tier ?? 0;
-        // Rebuild geometry only when the read changes — steady state is a
-        // transform-only frame (GDD §4.3), exactly like the rock pool.
-        const key = `${turret.owner}:${tier}:${state}`;
+        // Swap the texture only when the read changes — steady state is a
+        // transform-only frame (GDD §4.3), exactly like the rock pool. Owner ×
+        // tier × state is 8 × 3 × 3 at the design cap, and a1-10 measured 24 of
+        // them carrying all 32 turrets on the §4.3 scene.
+        const key = `turret:${turret.owner}:${tier}:${state}`;
         if (this.turretKeys[turrets] !== key) {
-          g.clear();
-          drawSprite(g, turretSprite({ playerId: turret.owner, state, tier }), TURRET_ART_SCALE);
+          const look = this.lookUnits(
+            key,
+            TURRET_ART_SCALE,
+            () => turretSprite({ playerId: turret.owner, state, tier }),
+            (size) =>
+              this.textures.getBy(`${key}:${size}`, () => turretSprite({ playerId: turret.owner, state, tier }), size),
+          );
+          s.texture = look.texture;
+          this.turretUnits[turrets] = look.units;
           this.turretKeys[turrets] = key;
         }
-        g.x = turret.pos.x;
-        g.y = turret.pos.y;
-        g.rotation = turret.angle;
-        // Art is authored at TURRET_ART_SCALE px/unit; divide it back out to land
-        // the turret at its collision radius in world units.
-        g.scale.set(turret.radius / TURRET_ART_SCALE);
+        s.x = turret.pos.x;
+        s.y = turret.pos.y;
+        s.rotation = turret.angle;
+        // The texture is TURRET_ART_SCALE px per art unit; divide it back out to
+        // land the turret at its collision radius in world units.
+        s.scale.set(this.turretUnits[turrets]! * turret.radius);
         // Damaged turrets fade toward the vacuum rather than recolouring —
         // threat red is reserved for damage *events*, not for standing objects.
-        g.alpha = 0.45 + 0.55 * clamp01(turret.hp / turret.maxHp);
+        s.alpha = 0.45 + 0.55 * clamp01(turret.hp / turret.maxHp);
         turrets++;
       }
 
@@ -564,17 +791,21 @@ export class Renderer {
       for (const job of station.builds) {
         if (job.kind !== 'turret') continue; // a shield builds centred — arc only
         const pos = turretOrbitPos(station, turretHomeAngle(station, job.slot));
-        const g = this.scaffoldPool.at(scaffolds);
-        const key = `${station.owner}`;
+        const s = this.scaffoldPool.at(scaffolds);
+        const key = `scaffold:${station.owner}`;
         if (this.scaffoldKeys[scaffolds] !== key) {
-          g.clear();
-          drawSprite(g, turretSprite({ playerId: station.owner, state: 'building' }), TURRET_ART_SCALE);
+          const make = (): SpriteDef => turretSprite({ playerId: station.owner, state: 'building' });
+          const look = this.lookUnits(key, TURRET_ART_SCALE, make, (size) =>
+            this.textures.getBy(`${key}:${size}`, make, size),
+          );
+          s.texture = look.texture;
+          this.scaffoldUnits[scaffolds] = look.units;
           this.scaffoldKeys[scaffolds] = key;
         }
-        g.x = pos.x;
-        g.y = pos.y;
-        g.rotation = turretHomeAngle(station, job.slot);
-        g.scale.set(TURRET.radius / TURRET_ART_SCALE);
+        s.x = pos.x;
+        s.y = pos.y;
+        s.rotation = turretHomeAngle(station, job.slot);
+        s.scale.set(this.scaffoldUnits[scaffolds]! * TURRET.radius);
         scaffolds++;
       }
     }
@@ -810,10 +1041,20 @@ export class Renderer {
    * any ally's) fire climbs the plasma family, an enemy's climbs threat red — and
    * brightens with the shooter's weapon tier, so "whose shot" and "how strong" both
    * read at a glance. The `${family}:${tier}` look is baked from the art ramp
-   * (`shotSprite`) and rebuilt into a slot only when that slot's shot changes side
-   * or tier, so the sparse pool stays transform-only in a steady firefight (GDD
-   * §4.3). The pool is sparse — skip inactive slots rather than assume density
-   * (see {@link Projectile}).
+   * (`shotSprite`) into a shared texture and swapped into a slot only when that
+   * slot's shot changes side or tier, so the sparse pool stays transform-only in a
+   * steady firefight (GDD §4.3). The pool is sparse — skip inactive slots rather
+   * than assume density (see {@link Projectile}).
+   *
+   * a1-10 measured this layer at **11.7 ms** drawn as one `Graphics` per shot and
+   * **3.5 ms** over four shared textures. It is the one layer that already
+   * collapsed to a single draw call either way — a shot's geometry is simple
+   * enough to clear Pixi's batching threshold — so the whole win here is that a
+   * `Sprite` moves a quad where a batched `Graphics` re-uploads its vertices every
+   * frame, 300 times a frame at the §4.3 counts.
+   *
+   * `src/art/atlas.ts` has no entry for a shot (its art lives under
+   * `src/art/vfx/`), so the key is written here, in the atlas's own idiom.
    */
   private drawShots(world: World, viewer: PlayerId): void {
     let live = 0;
@@ -821,40 +1062,55 @@ export class Renderer {
       if (!p.active) continue;
       const family: ShotFamily = areEnemies(world, viewer, p.owner) ? 'enemy' : 'own';
       const tier = shotTier(world, p);
-      const key = `${family}:${tier}`;
-      const g = this.shotPool.at(live);
+      const key = `shot:${family}:${tier}`;
+      const s = this.shotPool.at(live);
       if (this.shotKeys[live] !== key) {
-        g.clear();
-        drawSprite(g, shotSprite(family, tier), SHOT_ART_SCALE);
+        const make = (): SpriteDef => shotSprite(family, tier);
+        const look = this.lookUnits(key, SHOT_ART_SCALE, make, (size) =>
+          this.textures.getBy(`${key}:${size}`, make, size),
+        );
+        s.texture = look.texture;
+        this.shotUnits[live] = look.units;
         this.shotKeys[live] = key;
       }
-      g.x = p.pos.x;
-      g.y = p.pos.y;
-      // Art is baked at SHOT_ART_SCALE px/unit; divide it back out so unit radius 1
-      // lands at the shot's collision radius (the glow overhangs from there).
-      g.scale.set(p.radius / SHOT_ART_SCALE);
+      s.x = p.pos.x;
+      s.y = p.pos.y;
+      // The texture is SHOT_ART_SCALE px per art unit; divide it back out so unit
+      // radius 1 lands at the shot's collision radius (the glow overhangs it).
+      s.scale.set(this.shotUnits[live]! * p.radius);
       live++;
     }
     this.shotPool.hideFrom(live);
   }
 
+  /**
+   * The rock field — the layer a1-10 measured at **26.1 ms and 200 draw calls**
+   * as one `Graphics` each, and 3.9 ms over 46 shared textures pooled.
+   *
+   * `asteroidArt` still supplies the cheap look key (seed fold × crack stage ×
+   * payout band), so a slot's texture is swapped only when its rock's look
+   * actually moves; `atlas.asteroidTexture` — whose header has carried the claim
+   * "a field of 200 rocks shares a couple of dozen textures" since M1, with
+   * nothing calling it — is what supplies the texture.
+   */
   private drawAsteroids(asteroids: readonly Asteroid[]): void {
     for (let i = 0; i < asteroids.length; i++) {
       const a = asteroids[i]!;
-      const g = this.asteroidPool.at(i);
-      // Rebuild geometry only when this slot's rock changes its look — a crack
-      // stage or a payout band — so steady state stays allocation-free (GDD §4.3).
+      const s = this.asteroidPool.at(i);
       const art = asteroidArt(a);
       if (this.asteroidKeys[i] !== art.key) {
-        g.clear();
-        drawSprite(g, art.build(), ROCK_ART_SCALE);
+        const look = this.lookUnits(art.key, ROCK_ART_SCALE, () => art.build(), (size) =>
+          asteroidTexture(this.textures, a, size),
+        );
+        s.texture = look.texture;
+        this.asteroidUnits[i] = look.units;
         this.asteroidKeys[i] = art.key;
       }
-      g.x = a.pos.x;
-      g.y = a.pos.y;
-      // Art is authored at ROCK_ART_SCALE px/unit; divide it back out to land the
-      // rock at its collision radius. The crack stage is in the art now, not alpha.
-      g.scale.set(a.radius / ROCK_ART_SCALE);
+      s.x = a.pos.x;
+      s.y = a.pos.y;
+      // The texture is ROCK_ART_SCALE px per art unit; divide it back out to land
+      // the rock at its collision radius. The crack stage is in the art, not alpha.
+      s.scale.set(this.asteroidUnits[i]! * a.radius);
     }
     this.asteroidPool.hideFrom(asteroids.length);
   }
