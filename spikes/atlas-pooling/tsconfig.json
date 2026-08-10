@@ -1,0 +1,13 @@
+{
+  // The root `tsconfig.json` does not include `spikes/` — and cannot: several
+  // existing spikes predate constants that have since moved and no longer
+  // typecheck, and they belong to other agents. This config keeps THIS spike
+  // honest anyway, on the project's own settings:
+  //
+  //     npx tsc --noEmit --project spikes/atlas-pooling
+  //
+  // It is additive and invisible to the root check, so `npx tsc --noEmit` (the
+  // DoD gate) is unchanged by its existence.
+  "extends": "../../tsconfig.json",
+  "include": ["."]
+}
