@@ -1225,10 +1225,6 @@ async function boot(): Promise<void> {
   const vfxTextures = new SpriteTextureCache(app.renderer, Math.min(window.devicePixelRatio || 1, 2));
   const vfxField = new VfxField({ seed: matchSeed });
   const vfxLayer = new VfxLayer(vfxTextures);
-  /** Reused scratch for the camera read-back below — zero per-frame allocation. */
-  const vfxOriginScratch: Vec2 = { x: 0, y: 0 };
-  /** Whether the frozen review sheet has been staged this boot (`?freeze=1`). */
-  let vfxShowcased = false;
   //     Above the world the renderer just added to `gameRoot`, below the HUD that
   //     is added after us — an explosion draws over the ship it came off, and
   //     under the readouts. It is a WORLD-space layer parked in screen space: the
@@ -1236,6 +1232,10 @@ async function boot(): Promise<void> {
   //     `projectToScreen` seam each frame (below), so nothing in `src/render/`
   //     — the Platform Engineer's file — has to change to carry it.
   gameRoot.addChild(vfxLayer);
+  /** Reused scratch for that camera read-back — zero per-frame allocation. */
+  const vfxOriginScratch: Vec2 = { x: 0, y: 0 };
+  /** Whether the frozen review sheet has been staged this boot (`?freeze=1`). */
+  let vfxShowcased = false;
 
   // --- Debug instrument (debug-hook.ts): only when ?debug=1. Exposes the read-
   //     only window.__planetRush the QA suite asserts centring against. Inert
