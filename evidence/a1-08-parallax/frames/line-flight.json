@@ -1,0 +1,860 @@
+{
+  "brief": "a1-08",
+  "base": "http://127.0.0.1:4291",
+  "served": {
+    "sha": "f79aa61",
+    "time": "2026-08-10T04:04:52.704Z"
+  },
+  "map": "line",
+  "capturedAt": "2026-08-10T04:11:56.774Z",
+  "viewport": {
+    "width": 1440,
+    "height": 900,
+    "deviceScaleFactor": 1
+  },
+  "note": "deviceScaleFactor 1 on purpose: image px = CSS px = world units, so every number below is in one unit.",
+  "screenWidthU": 844,
+  "marks": [
+    0,
+    422,
+    844,
+    1266
+  ],
+  "layers": [
+    {
+      "tag": "ground",
+      "match": "void-ground",
+      "parallax": 0,
+      "note": "null control — camera-locked"
+    },
+    {
+      "tag": "nebula",
+      "match": "void-nebula-",
+      "parallax": null,
+      "note": "the subject"
+    },
+    {
+      "tag": "deep",
+      "match": "void-stars-deep",
+      "parallax": 0.1,
+      "note": "the layer the sky must travel with"
+    },
+    {
+      "tag": "mid",
+      "match": "void-stars-mid",
+      "parallax": 0.26,
+      "note": "what a1-05 measured"
+    },
+    {
+      "tag": "near",
+      "match": "void-stars-near",
+      "parallax": 0.5,
+      "note": ""
+    }
+  ],
+  "stops": [
+    {
+      "index": 0,
+      "targetU": 0,
+      "rested": true,
+      "before": {
+        "layers": [
+          {
+            "label": "void-ground",
+            "visible": true,
+            "x": 720,
+            "y": 450,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-nebula-deepEmber",
+            "visible": true,
+            "x": 723.1722,
+            "y": 387.4264,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-stars-deep",
+            "visible": true,
+            "x": 723.732,
+            "y": 376.384,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-stars-mid",
+            "visible": true,
+            "x": 729.7032,
+            "y": 258.59839999999997,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-stars-near",
+            "visible": true,
+            "x": 738.6600000000001,
+            "y": 81.91999999999996,
+            "alpha": 1,
+            "blendMode": "inherit"
+          }
+        ],
+        "camera": {
+          "x": 37.32000000000005,
+          "y": -736.1600000000001,
+          "label": null
+        },
+        "shipWorld": {
+          "x": 682.68,
+          "y": 1186.16
+        },
+        "shipScreen": {
+          "x": 720,
+          "y": 450
+        },
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        },
+        "ticks": 2807,
+        "fps": 6.870402496867363,
+        "build": {
+          "sha": "f79aa61",
+          "time": "2026-08-10T04:04:52.704Z",
+          "dirty": false
+        }
+      },
+      "frames": {
+        "all": "line-stop0-all.png",
+        "ground": "line-stop0-ground.png",
+        "nebula": "line-stop0-nebula.png",
+        "deep": "line-stop0-deep.png",
+        "mid": "line-stop0-mid.png",
+        "near": "line-stop0-near.png"
+      },
+      "isolation": {
+        "ground": {
+          "shown": [
+            "void-ground"
+          ],
+          "hiddenCount": 4,
+          "visibleVoidLayers": [
+            "void-ground"
+          ]
+        },
+        "nebula": {
+          "shown": [
+            "void-nebula-deepEmber"
+          ],
+          "hiddenCount": 4,
+          "visibleVoidLayers": [
+            "void-nebula-deepEmber"
+          ]
+        },
+        "deep": {
+          "shown": [
+            "void-stars-deep"
+          ],
+          "hiddenCount": 4,
+          "visibleVoidLayers": [
+            "void-stars-deep"
+          ]
+        },
+        "mid": {
+          "shown": [
+            "void-stars-mid"
+          ],
+          "hiddenCount": 4,
+          "visibleVoidLayers": [
+            "void-stars-mid"
+          ]
+        },
+        "near": {
+          "shown": [
+            "void-stars-near"
+          ],
+          "hiddenCount": 4,
+          "visibleVoidLayers": [
+            "void-stars-near"
+          ]
+        }
+      },
+      "after": {
+        "layers": [
+          {
+            "label": "void-ground",
+            "visible": true,
+            "x": 720,
+            "y": 450,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-nebula-deepEmber",
+            "visible": true,
+            "x": 723.1722,
+            "y": 387.4264,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-stars-deep",
+            "visible": true,
+            "x": 723.732,
+            "y": 376.384,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-stars-mid",
+            "visible": true,
+            "x": 729.7032,
+            "y": 258.59839999999997,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-stars-near",
+            "visible": true,
+            "x": 738.6600000000001,
+            "y": 81.91999999999996,
+            "alpha": 1,
+            "blendMode": "inherit"
+          }
+        ],
+        "camera": {
+          "x": 37.32000000000005,
+          "y": -736.1600000000001,
+          "label": null
+        },
+        "shipWorld": {
+          "x": 682.68,
+          "y": 1186.16
+        },
+        "shipScreen": {
+          "x": 720,
+          "y": 450
+        },
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        },
+        "ticks": 3122,
+        "fps": 45.857175671422574,
+        "build": {
+          "sha": "f79aa61",
+          "time": "2026-08-10T04:04:52.704Z",
+          "dirty": false
+        }
+      },
+      "cameraDriftDuringShots": {
+        "dx": 0,
+        "dy": 0
+      }
+    },
+    {
+      "index": 1,
+      "targetU": 422,
+      "rested": true,
+      "before": {
+        "layers": [
+          {
+            "label": "void-ground",
+            "visible": true,
+            "x": 720,
+            "y": 450,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-nebula-deepEmber",
+            "visible": true,
+            "x": 674.3454503295746,
+            "y": 387.4264,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-stars-deep",
+            "visible": true,
+            "x": 666.2887650936173,
+            "y": 376.384,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-stars-mid",
+            "visible": true,
+            "x": 580.350789243405,
+            "y": 258.59839999999997,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-stars-near",
+            "visible": true,
+            "x": 451.4438254680864,
+            "y": 81.91999999999996,
+            "alpha": 1,
+            "blendMode": "inherit"
+          }
+        ],
+        "camera": {
+          "x": -537.1123490638272,
+          "y": -736.1600000000001,
+          "label": null
+        },
+        "shipWorld": {
+          "x": 1257.1123490638272,
+          "y": 1186.16
+        },
+        "shipScreen": {
+          "x": 720,
+          "y": 450
+        },
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        },
+        "ticks": 3494,
+        "fps": 7.387765825420796,
+        "build": {
+          "sha": "f79aa61",
+          "time": "2026-08-10T04:04:52.704Z",
+          "dirty": false
+        }
+      },
+      "frames": {
+        "all": "line-stop1-all.png",
+        "ground": "line-stop1-ground.png",
+        "nebula": "line-stop1-nebula.png",
+        "deep": "line-stop1-deep.png",
+        "mid": "line-stop1-mid.png",
+        "near": "line-stop1-near.png"
+      },
+      "isolation": {
+        "ground": {
+          "shown": [
+            "void-ground"
+          ],
+          "hiddenCount": 4,
+          "visibleVoidLayers": [
+            "void-ground"
+          ]
+        },
+        "nebula": {
+          "shown": [
+            "void-nebula-deepEmber"
+          ],
+          "hiddenCount": 4,
+          "visibleVoidLayers": [
+            "void-nebula-deepEmber"
+          ]
+        },
+        "deep": {
+          "shown": [
+            "void-stars-deep"
+          ],
+          "hiddenCount": 4,
+          "visibleVoidLayers": [
+            "void-stars-deep"
+          ]
+        },
+        "mid": {
+          "shown": [
+            "void-stars-mid"
+          ],
+          "hiddenCount": 4,
+          "visibleVoidLayers": [
+            "void-stars-mid"
+          ]
+        },
+        "near": {
+          "shown": [
+            "void-stars-near"
+          ],
+          "hiddenCount": 4,
+          "visibleVoidLayers": [
+            "void-stars-near"
+          ]
+        }
+      },
+      "after": {
+        "layers": [
+          {
+            "label": "void-ground",
+            "visible": true,
+            "x": 720,
+            "y": 450,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-nebula-deepEmber",
+            "visible": true,
+            "x": 674.345411624721,
+            "y": 387.4264,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-stars-deep",
+            "visible": true,
+            "x": 666.2887195584954,
+            "y": 376.384,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-stars-mid",
+            "visible": true,
+            "x": 580.3506708520879,
+            "y": 258.59839999999997,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-stars-near",
+            "visible": true,
+            "x": 451.4435977924768,
+            "y": 81.91999999999996,
+            "alpha": 1,
+            "blendMode": "inherit"
+          }
+        ],
+        "camera": {
+          "x": -537.1128044150464,
+          "y": -736.1600000000001,
+          "label": null
+        },
+        "shipWorld": {
+          "x": 1257.1128044150464,
+          "y": 1186.16
+        },
+        "shipScreen": {
+          "x": 720,
+          "y": 450
+        },
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        },
+        "ticks": 3808,
+        "fps": 45.2621440848873,
+        "build": {
+          "sha": "f79aa61",
+          "time": "2026-08-10T04:04:52.704Z",
+          "dirty": false
+        }
+      },
+      "cameraDriftDuringShots": {
+        "dx": 0,
+        "dy": 0
+      }
+    },
+    {
+      "index": 2,
+      "targetU": 844,
+      "rested": true,
+      "before": {
+        "layers": [
+          {
+            "label": "void-ground",
+            "visible": true,
+            "x": 720,
+            "y": 450,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-nebula-deepEmber",
+            "visible": true,
+            "x": 641.0527176038296,
+            "y": 392.9135908687623,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-stars-deep",
+            "visible": true,
+            "x": 627.1208442397995,
+            "y": 382.8395186691321,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-stars-mid",
+            "visible": true,
+            "x": 478.5141950234787,
+            "y": 275.3827485397435,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-stars-near",
+            "visible": true,
+            "x": 255.6042211989975,
+            "y": 114.1975933456605,
+            "alpha": 1,
+            "blendMode": "inherit"
+          }
+        ],
+        "camera": {
+          "x": -928.791557602005,
+          "y": -671.604813308679,
+          "label": null
+        },
+        "shipWorld": {
+          "x": 1648.791557602005,
+          "y": 1121.604813308679
+        },
+        "shipScreen": {
+          "x": 720,
+          "y": 450
+        },
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        },
+        "ticks": 4148,
+        "fps": 8.016513345650875,
+        "build": {
+          "sha": "f79aa61",
+          "time": "2026-08-10T04:04:52.704Z",
+          "dirty": false
+        }
+      },
+      "frames": {
+        "all": "line-stop2-all.png",
+        "ground": "line-stop2-ground.png",
+        "nebula": "line-stop2-nebula.png",
+        "deep": "line-stop2-deep.png",
+        "mid": "line-stop2-mid.png",
+        "near": "line-stop2-near.png"
+      },
+      "isolation": {
+        "ground": {
+          "shown": [
+            "void-ground"
+          ],
+          "hiddenCount": 4,
+          "visibleVoidLayers": [
+            "void-ground"
+          ]
+        },
+        "nebula": {
+          "shown": [
+            "void-nebula-deepEmber"
+          ],
+          "hiddenCount": 4,
+          "visibleVoidLayers": [
+            "void-nebula-deepEmber"
+          ]
+        },
+        "deep": {
+          "shown": [
+            "void-stars-deep"
+          ],
+          "hiddenCount": 4,
+          "visibleVoidLayers": [
+            "void-stars-deep"
+          ]
+        },
+        "mid": {
+          "shown": [
+            "void-stars-mid"
+          ],
+          "hiddenCount": 4,
+          "visibleVoidLayers": [
+            "void-stars-mid"
+          ]
+        },
+        "near": {
+          "shown": [
+            "void-stars-near"
+          ],
+          "hiddenCount": 4,
+          "visibleVoidLayers": [
+            "void-stars-near"
+          ]
+        }
+      },
+      "after": {
+        "layers": [
+          {
+            "label": "void-ground",
+            "visible": true,
+            "x": 720,
+            "y": 450,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-nebula-deepEmber",
+            "visible": true,
+            "x": 641.0526754636347,
+            "y": 392.9135949447103,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-stars-deep",
+            "visible": true,
+            "x": 627.1207946630997,
+            "y": 382.83952346436513,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-stars-mid",
+            "visible": true,
+            "x": 478.51406612405924,
+            "y": 275.38276100734925,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-stars-near",
+            "visible": true,
+            "x": 255.6039733154986,
+            "y": 114.19761732182553,
+            "alpha": 1,
+            "blendMode": "inherit"
+          }
+        ],
+        "camera": {
+          "x": -928.7920533690028,
+          "y": -671.6047653563489,
+          "label": null
+        },
+        "shipWorld": {
+          "x": 1648.7920533690028,
+          "y": 1121.604765356349
+        },
+        "shipScreen": {
+          "x": 720,
+          "y": 450
+        },
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        },
+        "ticks": 4448,
+        "fps": 45.280850411309146,
+        "build": {
+          "sha": "f79aa61",
+          "time": "2026-08-10T04:04:52.704Z",
+          "dirty": false
+        }
+      },
+      "cameraDriftDuringShots": {
+        "dx": 0,
+        "dy": 0
+      }
+    },
+    {
+      "index": 3,
+      "targetU": 1266,
+      "rested": true,
+      "before": {
+        "layers": [
+          {
+            "label": "void-ground",
+            "visible": true,
+            "x": 720,
+            "y": 450,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-nebula-deepEmber",
+            "visible": true,
+            "x": 603.6103820989975,
+            "y": 387.67489988529235,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-stars-deep",
+            "visible": true,
+            "x": 583.0710377635265,
+            "y": 376.67635280622625,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-stars-mid",
+            "visible": true,
+            "x": 363.984698185169,
+            "y": 259.35851729618827,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-stars-near",
+            "visible": true,
+            "x": 35.35518881763278,
+            "y": 83.3817640311313,
+            "alpha": 1,
+            "blendMode": "inherit"
+          }
+        ],
+        "camera": {
+          "x": -1369.2896223647344,
+          "y": -733.2364719377374,
+          "label": null
+        },
+        "shipWorld": {
+          "x": 2089.2896223647344,
+          "y": 1183.2364719377374
+        },
+        "shipScreen": {
+          "x": 720,
+          "y": 450
+        },
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        },
+        "ticks": 5047,
+        "fps": 6.765986419999271,
+        "build": {
+          "sha": "f79aa61",
+          "time": "2026-08-10T04:04:52.704Z",
+          "dirty": false
+        }
+      },
+      "frames": {
+        "all": "line-stop3-all.png",
+        "ground": "line-stop3-ground.png",
+        "nebula": "line-stop3-nebula.png",
+        "deep": "line-stop3-deep.png",
+        "mid": "line-stop3-mid.png",
+        "near": "line-stop3-near.png"
+      },
+      "isolation": {
+        "ground": {
+          "shown": [
+            "void-ground"
+          ],
+          "hiddenCount": 4,
+          "visibleVoidLayers": [
+            "void-ground"
+          ]
+        },
+        "nebula": {
+          "shown": [
+            "void-nebula-deepEmber"
+          ],
+          "hiddenCount": 4,
+          "visibleVoidLayers": [
+            "void-nebula-deepEmber"
+          ]
+        },
+        "deep": {
+          "shown": [
+            "void-stars-deep"
+          ],
+          "hiddenCount": 4,
+          "visibleVoidLayers": [
+            "void-stars-deep"
+          ]
+        },
+        "mid": {
+          "shown": [
+            "void-stars-mid"
+          ],
+          "hiddenCount": 4,
+          "visibleVoidLayers": [
+            "void-stars-mid"
+          ]
+        },
+        "near": {
+          "shown": [
+            "void-stars-near"
+          ],
+          "hiddenCount": 4,
+          "visibleVoidLayers": [
+            "void-stars-near"
+          ]
+        }
+      },
+      "after": {
+        "layers": [
+          {
+            "label": "void-ground",
+            "visible": true,
+            "x": 720,
+            "y": 450,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-nebula-deepEmber",
+            "visible": true,
+            "x": 603.610341386998,
+            "y": 387.67489832326436,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-stars-deep",
+            "visible": true,
+            "x": 583.0709898670565,
+            "y": 376.67635096854633,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-stars-mid",
+            "visible": true,
+            "x": 363.9845736543468,
+            "y": 259.3585125182204,
+            "alpha": 1,
+            "blendMode": "inherit"
+          },
+          {
+            "label": "void-stars-near",
+            "visible": true,
+            "x": 35.3549493352823,
+            "y": 83.38175484273154,
+            "alpha": 1,
+            "blendMode": "inherit"
+          }
+        ],
+        "camera": {
+          "x": -1369.2901013294354,
+          "y": -733.2364903145369,
+          "label": null
+        },
+        "shipWorld": {
+          "x": 2089.2901013294354,
+          "y": 1183.236490314537
+        },
+        "shipScreen": {
+          "x": 720,
+          "y": 450
+        },
+        "viewport": {
+          "w": 1440,
+          "h": 900
+        },
+        "ticks": 5392,
+        "fps": 45.150718817315976,
+        "build": {
+          "sha": "f79aa61",
+          "time": "2026-08-10T04:04:52.704Z",
+          "dirty": false
+        }
+      },
+      "cameraDriftDuringShots": {
+        "dx": 0,
+        "dy": 0
+      }
+    }
+  ],
+  "pageErrors": [],
+  "x0": 682.68,
+  "direction": "east"
+}
