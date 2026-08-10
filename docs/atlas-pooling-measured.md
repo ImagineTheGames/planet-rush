@@ -31,7 +31,7 @@ touch. It degrades the picture and does not rescue the frame.
 
 ```
 GPU        : ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader driver)
-Browser    : Chromium (Playwright 1.49.1), vsync and frame-rate cap disabled
+Browser    : HeadlessChrome/131.0.6778.33 (Playwright 1.49.1), vsync and frame-rate cap disabled
 Viewport   : 1280×800 @ dpr 1  — the `desktop` profile from tests/perf/playwright.perf.config.ts
 Scene      : GDD §4.3, via harness/perf.ts `stressWorld()` —
              8 ships · 32 turrets · 16 shields · 200 asteroids · 300 projectiles · 120 chunks
@@ -255,8 +255,12 @@ visible viewport alone.
 **B. Wire the pooled path (`atlas.ts` → `src/render/index.ts`).** Bigger, and it
 needs three decisions this brief could not take: a golden re-baseline (Art/QA), a
 ruling on whether the render layer keeps its headless tests, and a bake
-resolution for a dpr-3 phone. Worth it — 263 draw calls to roughly 10 — but it is
-a milestone-sized change wearing a plumbing brief's clothes.
+resolution for a dpr-3 phone. Worth it — pooling the three measured layers takes
+the frame from 263 draw calls to about 34, and taking the stations and ships too
+(the remaining ~30, which `atlas.ts` already keys with `stationTexture`,
+`beaconTexture`, `damageRingTexture`, `shieldTexture` and `shipTexture`) would
+land it near ten. But it is a milestone-sized change wearing a plumbing brief's
+clothes.
 
 **C. Raise `reduce-VFX` with the Director as a design question, not a bug.** The
 auto-reducer works exactly as specified and its specification does not contain
