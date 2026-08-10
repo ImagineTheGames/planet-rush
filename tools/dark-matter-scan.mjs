@@ -80,7 +80,15 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // ── File roles ────────────────────────────────────────────────────────────
 //
 // PROD is the only role whose references keep an export out of the candidate
-// list. `server/` is production: it is the match authority and it ships.
+// list. `server/` is production: it is the match authority and it ships. So is
+// `allocator/` — a THIRD deployed app, which cost two false positives before it
+// was listed here: it imports `signTicket` and `verifyFleetRequest` out of
+// `src/net/`, and with `allocator/` unclassified the scan called the fleet's
+// request-signing dark while the control plane was calling it on every request.
+// A production tree missing from this list is the one way this scan can be
+// confidently wrong, so unclassified directories are NAMED in the report rather
+// than silently bucketed (see `otherDirs`).
+//
 // `harness/` is the balance/soak CLI — real, useful, and NOT the game, so an
 // export only the harness reaches is still not on any player's boot path.
 
@@ -93,7 +101,9 @@ function roleOf(rel) {
   if (rel.startsWith('harness/') || rel.startsWith('tools/') || rel.startsWith('evidence/')) {
     return 'tool';
   }
-  if (rel.startsWith('src/') || rel.startsWith('server/')) return 'prod';
+  if (rel.startsWith('src/') || rel.startsWith('server/') || rel.startsWith('allocator/')) {
+    return 'prod';
+  }
   if (/^vite\.config\.ts$|^vitest\.config\.ts$|^playwright[.\w-]*\.config\.ts$/.test(rel)) {
     return 'prod';
   }
@@ -103,12 +113,19 @@ function roleOf(rel) {
 // ── Arguments ─────────────────────────────────────────────────────────────
 
 /**
- * The boot path's front doors. `src/main.ts` is what `index.html` loads;
- * `server/index.ts` is what the fly.io gameserver runs; `vite.config.ts` is
- * loaded by the build itself (it imports `src/platform/build-stamp`, which is
- * therefore live even though no game code calls it).
+ * The boot path's front doors — all three deployed apps, plus the build. Miss
+ * one and everything only it reaches reports dark. `src/main.ts` is what
+ * `index.html` loads; `server/index.ts` is what the fly.io gameserver runs;
+ * `allocator/index.ts` is the fleet control plane; `vite.config.ts` is loaded by
+ * the build itself (it imports `src/platform/build-stamp`, which is therefore
+ * live even though no game code calls it).
  */
-const DEFAULT_ENTRIES = ['src/main.ts', 'server/index.ts', 'vite.config.ts'];
+const DEFAULT_ENTRIES = [
+  'src/main.ts',
+  'server/index.ts',
+  'allocator/index.ts',
+  'vite.config.ts',
+];
 
 function parseArgs(argv) {
   const opts = {
@@ -426,10 +443,18 @@ function scan(opts) {
     }
   }
 
+  // Every top-level directory whose files this scan does not recognise. A
+  // production app landing in here is the failure mode that matters: its calls
+  // are counted as nothing and everything only it uses reports dark. It is
+  // printed with the results rather than logged, because a diagnostic nobody
+  // reads is how `allocator/` went unnoticed in the first place.
+  const otherDirs = new Set();
+
   // 2. Count references, from every file in the program.
   for (const file of program.getSourceFiles()) {
     if (file.isDeclarationFile) continue;
     const rel = relOf(file);
+    if (roleOf(rel) === 'other') otherDirs.add(rel.split('/')[0]);
     // A production file the boot path never reaches contributes `orphan`
     // references, not `prod` ones. See the reachability note above.
     const role = roleOf(rel) === 'prod' && !isReachable(file) ? 'orphan' : roleOf(rel);
@@ -499,7 +524,13 @@ function scan(opts) {
     );
   }
 
-  return { all, modules: [...modules.values()], missingEntries, program };
+  return {
+    all,
+    modules: [...modules.values()],
+    missingEntries,
+    otherDirs: [...otherDirs].sort(),
+    program,
+  };
 }
 
 /**
@@ -535,11 +566,33 @@ const HINT_ORDER = [
   'self-used',
 ];
 
-function moduleReport(modules, missingEntries, opts) {
+/**
+ * The two ways this scan is wrong rather than merely noisy: an entry point that
+ * does not resolve (so a whole app looks unreachable), and a directory it does
+ * not recognise (so a real caller is counted as nothing). Both are printed with
+ * every result — human, module and gate — because they invalidate the output
+ * they appear next to.
+ */
+function warnings(diag) {
   const out = [];
-  if (missingEntries.length) {
-    out.push(`WARNING: entry point not found in the program: ${missingEntries.join(', ')}`);
+  if (diag.missingEntries?.length) {
+    out.push(
+      `WARNING: entry point not found in the program: ${diag.missingEntries.join(', ')} —` +
+        ` everything only it reaches will report dark.`,
+    );
   }
+  if (diag.otherDirs?.length) {
+    out.push(
+      `WARNING: unclassified directories in the program: ${diag.otherDirs.join(', ')} —` +
+        ` if any of those ship, add it to roleOf() and to the entry points, or its` +
+        ` calls count as nothing (this is how allocator/ was missed).`,
+    );
+  }
+  return out;
+}
+
+function moduleReport(modules, diag, opts) {
+  const out = [...warnings(diag)];
   const unbooted = modules.filter((m) => !m.booted).sort((a, b) => a.file.localeCompare(b.file));
   out.push('');
   out.push(`── modules the boot path never reaches  (${unbooted.length}) ${'─'.repeat(24)}`);
@@ -557,7 +610,7 @@ function moduleReport(modules, missingEntries, opts) {
   return out.join('\n');
 }
 
-function humanReport(rows, opts) {
+function humanReport(rows, opts, diag) {
   const out = [];
   const shown = opts.all ? rows : rows.filter((r) => r.dark);
   const byHint = new Map();
@@ -591,6 +644,7 @@ function humanReport(rows, opts) {
   const dark = rows.filter((r) => r.dark);
   out.push('');
   out.push('─'.repeat(64));
+  out.push(...warnings(diag));
   out.push(`${rows.length} exports under src/ · ${dark.length} with zero production references`);
   const values = dark.filter((r) => !TYPE_ONLY_KINDS.has(r.kind));
   out.push(`${values.length} of those are values (function/const/class/enum), ${dark.length - values.length} are types`);
@@ -647,7 +701,7 @@ const ALLOWLIST_COMMENT = [
   'surface, or an accepted backlog item — say which in docs/dark-matter-scan.md.',
 ].join(' ');
 
-function runCheck(rows, opts) {
+function runCheck(rows, opts, diag) {
   if (!existsSync(opts.allowlist)) {
     process.stderr.write(`dark-matter-scan: --check needs an allowlist at ${opts.allowlist}\n`);
     return 2;
@@ -699,13 +753,14 @@ function runCheck(rows, opts) {
 // ── main ──────────────────────────────────────────────────────────────────
 
 const opts = parseArgs(process.argv.slice(2));
-const { all, modules, missingEntries } = scan(opts);
+const { all, modules, missingEntries, otherDirs } = scan(opts);
+const diag = { missingEntries, otherDirs };
 const rows = opts.types ? all : all.filter((r) => !TYPE_ONLY_KINDS.has(r.kind));
 
 if (opts.writeAllowlist) {
   process.exit(writeAllowlist(rows, opts));
 } else if (opts.check) {
-  process.exit(runCheck(rows, opts));
+  process.exit(runCheck(rows, opts, diag));
 } else if (opts.json) {
   process.stdout.write(
     JSON.stringify(
@@ -713,6 +768,7 @@ if (opts.writeAllowlist) {
         project: relative(REPO_ROOT, opts.project) || opts.project,
         entries: opts.entries,
         missingEntries,
+        otherDirs,
         total: rows.length,
         dark: rows.filter((r) => r.dark).length,
         modules,
@@ -723,7 +779,7 @@ if (opts.writeAllowlist) {
     ) + '\n',
   );
 } else if (opts.modules) {
-  process.stdout.write(moduleReport(modules, missingEntries, opts) + '\n');
+  process.stdout.write(moduleReport(modules, diag, opts) + '\n');
 } else {
-  process.stdout.write(humanReport(rows, opts) + '\n');
+  process.stdout.write(humanReport(rows, opts, diag) + '\n');
 }

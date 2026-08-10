@@ -39,6 +39,31 @@ jobs:
       - name: Unit tests
         run: npx vitest run
 
+      # --- The dark-matter gate (a1-09). ------------------------------------
+      #
+      # Fails on a NEW export that no production code calls. It is here, after
+      # the tests, because it catches the one thing a green test run cannot:
+      # `matchAbundance` was three correct lines with a passing spec and full
+      # coverage, and no caller, so every match ran a 150 s wave schedule under
+      # a lobby chip promising SCARCE. Typecheck, tests and build were all green
+      # the entire time. The only symptom was that nobody called it, and that is
+      # the symptom this step reads.
+      #
+      # It is a DELTA gate, not a backlog gate: the 278 candidates triaged in
+      # docs/dark-matter-scan.md sit in tools/dark-matter-allowlist.json and do
+      # not fail anything, so what goes red is what this push added. Over the 99
+      # merges to main in the week before it landed, that would have been 65
+      # exports — roughly one every other merge, and a third of them findings
+      # worth acting on (docs/dark-matter-scan.md §5 has the count and the
+      # working).
+      #
+      # When it is red: wire the export up, delete it, or — if it is a
+      # deliberate seam, an invariant a spec pins, or public surface — add it to
+      # the allowlist WITH A REASON and record the verdict in the report. The
+      # allowlist entry is the claim; `npm run dark-matter` shows the evidence.
+      - name: Dark matter (no new uncalled exports)
+        run: npm run dark-matter:check
+
       - name: Build
         run: npx vite build
         env:

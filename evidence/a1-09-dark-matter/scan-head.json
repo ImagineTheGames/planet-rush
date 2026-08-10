@@ -1,0 +1,7810 @@
+{
+  "$comment": "a1-09. The gate-relevant candidates at the branch head: value exports with zero references from reachable production code, excluding self-used. The full 2770-export dump is reproducible with: npm run dark-matter -- --json",
+  "scannedAt": "4c1b200",
+  "entries": [
+    "src/main.ts",
+    "server/index.ts",
+    "allocator/index.ts",
+    "vite.config.ts"
+  ],
+  "otherDirs": [
+    "content"
+  ],
+  "totals": {
+    "exports": 2769,
+    "dark": 1528,
+    "gateRelevant": 278
+  },
+  "modules": [
+    {
+      "file": "src/art/asteroids.ts",
+      "booted": true,
+      "exports": 8,
+      "dark": 4,
+      "values": 6,
+      "darkValues": 2
+    },
+    {
+      "file": "src/art/atlas.ts",
+      "booted": true,
+      "exports": 16,
+      "dark": 15,
+      "values": 12,
+      "darkValues": 11
+    },
+    {
+      "file": "src/art/audio/alarm.ts",
+      "booted": true,
+      "exports": 8,
+      "dark": 6,
+      "values": 7,
+      "darkValues": 6
+    },
+    {
+      "file": "src/art/audio/bank.ts",
+      "booted": true,
+      "exports": 16,
+      "dark": 3,
+      "values": 11,
+      "darkValues": 1
+    },
+    {
+      "file": "src/art/audio/candidates.ts",
+      "booted": false,
+      "exports": 4,
+      "dark": 4,
+      "values": 2,
+      "darkValues": 2
+    },
+    {
+      "file": "src/art/audio/engine.ts",
+      "booted": true,
+      "exports": 11,
+      "dark": 10,
+      "values": 10,
+      "darkValues": 9
+    },
+    {
+      "file": "src/art/audio/graph.ts",
+      "booted": true,
+      "exports": 7,
+      "dark": 2,
+      "values": 3,
+      "darkValues": 2
+    },
+    {
+      "file": "src/art/audio/music.ts",
+      "booted": true,
+      "exports": 12,
+      "dark": 9,
+      "values": 8,
+      "darkValues": 6
+    },
+    {
+      "file": "src/art/audio/spatial.ts",
+      "booted": true,
+      "exports": 12,
+      "dark": 6,
+      "values": 11,
+      "darkValues": 6
+    },
+    {
+      "file": "src/art/audio/synth.ts",
+      "booted": true,
+      "exports": 14,
+      "dark": 9,
+      "values": 11,
+      "darkValues": 7
+    },
+    {
+      "file": "src/art/audio/ui-cues.ts",
+      "booted": true,
+      "exports": 39,
+      "dark": 31,
+      "values": 32,
+      "darkValues": 26
+    },
+    {
+      "file": "src/art/audio/unlock.ts",
+      "booted": true,
+      "exports": 5,
+      "dark": 3,
+      "values": 3,
+      "darkValues": 1
+    },
+    {
+      "file": "src/art/backdrop.ts",
+      "booted": true,
+      "exports": 24,
+      "dark": 22,
+      "values": 19,
+      "darkValues": 17
+    },
+    {
+      "file": "src/art/buildings.ts",
+      "booted": true,
+      "exports": 11,
+      "dark": 6,
+      "values": 6,
+      "darkValues": 2
+    },
+    {
+      "file": "src/art/catalogue.ts",
+      "booted": false,
+      "exports": 4,
+      "dark": 4,
+      "values": 3,
+      "darkValues": 3
+    },
+    {
+      "file": "src/art/compliance.ts",
+      "booted": false,
+      "exports": 9,
+      "dark": 9,
+      "values": 8,
+      "darkValues": 8
+    },
+    {
+      "file": "src/art/decals.ts",
+      "booted": true,
+      "exports": 3,
+      "dark": 2,
+      "values": 3,
+      "darkValues": 2
+    },
+    {
+      "file": "src/art/materials.ts",
+      "booted": true,
+      "exports": 67,
+      "dark": 31,
+      "values": 53,
+      "darkValues": 24
+    },
+    {
+      "file": "src/art/palette.ts",
+      "booted": true,
+      "exports": 18,
+      "dark": 10,
+      "values": 15,
+      "darkValues": 8
+    },
+    {
+      "file": "src/art/presenter.ts",
+      "booted": false,
+      "exports": 2,
+      "dark": 2,
+      "values": 1,
+      "darkValues": 1
+    },
+    {
+      "file": "src/art/preview.ts",
+      "booted": false,
+      "exports": 1,
+      "dark": 1,
+      "values": 1,
+      "darkValues": 1
+    },
+    {
+      "file": "src/art/raster.ts",
+      "booted": false,
+      "exports": 6,
+      "dark": 6,
+      "values": 5,
+      "darkValues": 5
+    },
+    {
+      "file": "src/art/ring-scan.ts",
+      "booted": false,
+      "exports": 6,
+      "dark": 6,
+      "values": 2,
+      "darkValues": 2
+    },
+    {
+      "file": "src/art/rings.ts",
+      "booted": true,
+      "exports": 3,
+      "dark": 2,
+      "values": 2,
+      "darkValues": 1
+    },
+    {
+      "file": "src/art/shapes.ts",
+      "booted": true,
+      "exports": 23,
+      "dark": 8,
+      "values": 14,
+      "darkValues": 3
+    },
+    {
+      "file": "src/art/ships.ts",
+      "booted": true,
+      "exports": 9,
+      "dark": 7,
+      "values": 6,
+      "darkValues": 4
+    },
+    {
+      "file": "src/art/stations.ts",
+      "booted": true,
+      "exports": 20,
+      "dark": 13,
+      "values": 16,
+      "darkValues": 9
+    },
+    {
+      "file": "src/art/svg.ts",
+      "booted": false,
+      "exports": 3,
+      "dark": 3,
+      "values": 3,
+      "darkValues": 3
+    },
+    {
+      "file": "src/art/tells.ts",
+      "booted": true,
+      "exports": 8,
+      "dark": 4,
+      "values": 6,
+      "darkValues": 3
+    },
+    {
+      "file": "src/art/tokens.ts",
+      "booted": true,
+      "exports": 13,
+      "dark": 8,
+      "values": 9,
+      "darkValues": 4
+    },
+    {
+      "file": "src/art/vfx/death-moment.ts",
+      "booted": true,
+      "exports": 4,
+      "dark": 3,
+      "values": 4,
+      "darkValues": 3
+    },
+    {
+      "file": "src/art/vfx/emitters.ts",
+      "booted": false,
+      "exports": 25,
+      "dark": 25,
+      "values": 25,
+      "darkValues": 25
+    },
+    {
+      "file": "src/art/vfx/field.ts",
+      "booted": false,
+      "exports": 2,
+      "dark": 2,
+      "values": 1,
+      "darkValues": 1
+    },
+    {
+      "file": "src/art/vfx/kinds.ts",
+      "booted": false,
+      "exports": 10,
+      "dark": 10,
+      "values": 6,
+      "darkValues": 6
+    },
+    {
+      "file": "src/art/vfx/layer.ts",
+      "booted": false,
+      "exports": 3,
+      "dark": 3,
+      "values": 2,
+      "darkValues": 2
+    },
+    {
+      "file": "src/art/vfx/observer.ts",
+      "booted": true,
+      "exports": 17,
+      "dark": 15,
+      "values": 4,
+      "darkValues": 3
+    },
+    {
+      "file": "src/art/vfx/particles.ts",
+      "booted": false,
+      "exports": 2,
+      "dark": 2,
+      "values": 2,
+      "darkValues": 2
+    },
+    {
+      "file": "src/art/vfx/shots.ts",
+      "booted": true,
+      "exports": 9,
+      "dark": 7,
+      "values": 8,
+      "darkValues": 7
+    },
+    {
+      "file": "src/art/wrecks.ts",
+      "booted": true,
+      "exports": 2,
+      "dark": 1,
+      "values": 2,
+      "darkValues": 1
+    },
+    {
+      "file": "src/bots/ally.ts",
+      "booted": true,
+      "exports": 17,
+      "dark": 4,
+      "values": 16,
+      "darkValues": 4
+    },
+    {
+      "file": "src/bots/behaviors.ts",
+      "booted": true,
+      "exports": 77,
+      "dark": 44,
+      "values": 73,
+      "darkValues": 42
+    },
+    {
+      "file": "src/bots/bot.ts",
+      "booted": true,
+      "exports": 11,
+      "dark": 6,
+      "values": 8,
+      "darkValues": 6
+    },
+    {
+      "file": "src/bots/easy.ts",
+      "booted": true,
+      "exports": 8,
+      "dark": 7,
+      "values": 8,
+      "darkValues": 7
+    },
+    {
+      "file": "src/bots/hard.ts",
+      "booted": true,
+      "exports": 10,
+      "dark": 9,
+      "values": 10,
+      "darkValues": 9
+    },
+    {
+      "file": "src/bots/harness.ts",
+      "booted": true,
+      "exports": 12,
+      "dark": 7,
+      "values": 9,
+      "darkValues": 4
+    },
+    {
+      "file": "src/bots/medium.ts",
+      "booted": true,
+      "exports": 10,
+      "dark": 9,
+      "values": 10,
+      "darkValues": 9
+    },
+    {
+      "file": "src/bots/perception.ts",
+      "booted": true,
+      "exports": 16,
+      "dark": 7,
+      "values": 7,
+      "darkValues": 4
+    },
+    {
+      "file": "src/bots/personalities.ts",
+      "booted": true,
+      "exports": 13,
+      "dark": 2,
+      "values": 8,
+      "darkValues": 1
+    },
+    {
+      "file": "src/bots/radio.ts",
+      "booted": true,
+      "exports": 13,
+      "dark": 6,
+      "values": 9,
+      "darkValues": 5
+    },
+    {
+      "file": "src/bots/roles.ts",
+      "booted": true,
+      "exports": 3,
+      "dark": 2,
+      "values": 3,
+      "darkValues": 2
+    },
+    {
+      "file": "src/bots/steering.ts",
+      "booted": true,
+      "exports": 29,
+      "dark": 9,
+      "values": 28,
+      "darkValues": 9
+    },
+    {
+      "file": "src/bots/targeting.ts",
+      "booted": true,
+      "exports": 30,
+      "dark": 16,
+      "values": 29,
+      "darkValues": 16
+    },
+    {
+      "file": "src/bots/tree.ts",
+      "booted": true,
+      "exports": 12,
+      "dark": 3,
+      "values": 9,
+      "darkValues": 3
+    },
+    {
+      "file": "src/net/action-journal.ts",
+      "booted": true,
+      "exports": 4,
+      "dark": 2,
+      "values": 2,
+      "darkValues": 1
+    },
+    {
+      "file": "src/net/connect-trace-view.ts",
+      "booted": true,
+      "exports": 14,
+      "dark": 9,
+      "values": 11,
+      "darkValues": 8
+    },
+    {
+      "file": "src/net/connect-trace.ts",
+      "booted": true,
+      "exports": 22,
+      "dark": 7,
+      "values": 18,
+      "darkValues": 6
+    },
+    {
+      "file": "src/net/cors.ts",
+      "booted": true,
+      "exports": 8,
+      "dark": 4,
+      "values": 7,
+      "darkValues": 3
+    },
+    {
+      "file": "src/net/input-queue.ts",
+      "booted": true,
+      "exports": 7,
+      "dark": 5,
+      "values": 3,
+      "darkValues": 2
+    },
+    {
+      "file": "src/net/interpolation.ts",
+      "booted": true,
+      "exports": 13,
+      "dark": 10,
+      "values": 11,
+      "darkValues": 10
+    },
+    {
+      "file": "src/net/latency-transport.ts",
+      "booted": true,
+      "exports": 2,
+      "dark": 2,
+      "values": 1,
+      "darkValues": 1
+    },
+    {
+      "file": "src/net/link-loss-view.ts",
+      "booted": true,
+      "exports": 12,
+      "dark": 12,
+      "values": 11,
+      "darkValues": 11
+    },
+    {
+      "file": "src/net/link-loss.ts",
+      "booted": true,
+      "exports": 20,
+      "dark": 13,
+      "values": 13,
+      "darkValues": 10
+    },
+    {
+      "file": "src/net/local-revert-view.ts",
+      "booted": true,
+      "exports": 4,
+      "dark": 3,
+      "values": 3,
+      "darkValues": 2
+    },
+    {
+      "file": "src/net/loopback.ts",
+      "booted": true,
+      "exports": 7,
+      "dark": 3,
+      "values": 5,
+      "darkValues": 2
+    },
+    {
+      "file": "src/net/order-ledger.ts",
+      "booted": true,
+      "exports": 8,
+      "dark": 4,
+      "values": 4,
+      "darkValues": 3
+    },
+    {
+      "file": "src/net/ping-badge.ts",
+      "booted": true,
+      "exports": 7,
+      "dark": 2,
+      "values": 7,
+      "darkValues": 2
+    },
+    {
+      "file": "src/net/ping.ts",
+      "booted": true,
+      "exports": 11,
+      "dark": 6,
+      "values": 8,
+      "darkValues": 5
+    },
+    {
+      "file": "src/net/playtest-log-attach.ts",
+      "booted": true,
+      "exports": 10,
+      "dark": 8,
+      "values": 3,
+      "darkValues": 2
+    },
+    {
+      "file": "src/net/playtest-log-button.ts",
+      "booted": true,
+      "exports": 25,
+      "dark": 18,
+      "values": 17,
+      "darkValues": 10
+    },
+    {
+      "file": "src/net/playtest-log-capture.ts",
+      "booted": true,
+      "exports": 12,
+      "dark": 10,
+      "values": 6,
+      "darkValues": 4
+    },
+    {
+      "file": "src/net/playtest-log-export.ts",
+      "booted": true,
+      "exports": 10,
+      "dark": 6,
+      "values": 3,
+      "darkValues": 2
+    },
+    {
+      "file": "src/net/playtest-log.ts",
+      "booted": true,
+      "exports": 23,
+      "dark": 18,
+      "values": 15,
+      "darkValues": 11
+    },
+    {
+      "file": "src/net/prediction.ts",
+      "booted": true,
+      "exports": 15,
+      "dark": 13,
+      "values": 12,
+      "darkValues": 10
+    },
+    {
+      "file": "src/net/reconnect.ts",
+      "booted": true,
+      "exports": 6,
+      "dark": 3,
+      "values": 2,
+      "darkValues": 1
+    },
+    {
+      "file": "src/net/region-probe.ts",
+      "booted": true,
+      "exports": 26,
+      "dark": 21,
+      "values": 16,
+      "darkValues": 12
+    },
+    {
+      "file": "src/net/room-code.ts",
+      "booted": true,
+      "exports": 3,
+      "dark": 2,
+      "values": 3,
+      "darkValues": 2
+    },
+    {
+      "file": "src/net/server-url.ts",
+      "booted": true,
+      "exports": 4,
+      "dark": 4,
+      "values": 3,
+      "darkValues": 3
+    },
+    {
+      "file": "src/net/session.ts",
+      "booted": true,
+      "exports": 11,
+      "dark": 7,
+      "values": 5,
+      "darkValues": 2
+    },
+    {
+      "file": "src/net/snapshot.ts",
+      "booted": true,
+      "exports": 20,
+      "dark": 9,
+      "values": 17,
+      "darkValues": 9
+    },
+    {
+      "file": "src/net/spike/bench.ts",
+      "booted": false,
+      "exports": 4,
+      "dark": 4,
+      "values": 2,
+      "darkValues": 2
+    },
+    {
+      "file": "src/net/spike/sim-standin.ts",
+      "booted": false,
+      "exports": 4,
+      "dark": 4,
+      "values": 2,
+      "darkValues": 2
+    },
+    {
+      "file": "src/net/spike/snapshot.ts",
+      "booted": false,
+      "exports": 12,
+      "dark": 12,
+      "values": 9,
+      "darkValues": 9
+    },
+    {
+      "file": "src/net/telemetry.ts",
+      "booted": true,
+      "exports": 10,
+      "dark": 8,
+      "values": 7,
+      "darkValues": 6
+    },
+    {
+      "file": "src/net/websocket-transport.ts",
+      "booted": true,
+      "exports": 8,
+      "dark": 4,
+      "values": 4,
+      "darkValues": 3
+    },
+    {
+      "file": "src/net/wire.ts",
+      "booted": true,
+      "exports": 17,
+      "dark": 11,
+      "values": 16,
+      "darkValues": 11
+    },
+    {
+      "file": "src/platform/boot-error.ts",
+      "booted": true,
+      "exports": 17,
+      "dark": 15,
+      "values": 12,
+      "darkValues": 10
+    },
+    {
+      "file": "src/platform/build-identity.ts",
+      "booted": true,
+      "exports": 15,
+      "dark": 12,
+      "values": 13,
+      "darkValues": 10
+    },
+    {
+      "file": "src/platform/build-info.ts",
+      "booted": true,
+      "exports": 12,
+      "dark": 3,
+      "values": 10,
+      "darkValues": 3
+    },
+    {
+      "file": "src/platform/build-stamp.ts",
+      "booted": true,
+      "exports": 11,
+      "dark": 8,
+      "values": 7,
+      "darkValues": 4
+    },
+    {
+      "file": "src/platform/camera.ts",
+      "booted": true,
+      "exports": 6,
+      "dark": 4,
+      "values": 5,
+      "darkValues": 4
+    },
+    {
+      "file": "src/platform/freeze.ts",
+      "booted": true,
+      "exports": 8,
+      "dark": 4,
+      "values": 8,
+      "darkValues": 4
+    },
+    {
+      "file": "src/platform/gl-probe.ts",
+      "booted": true,
+      "exports": 17,
+      "dark": 14,
+      "values": 9,
+      "darkValues": 6
+    },
+    {
+      "file": "src/platform/haptics.ts",
+      "booted": true,
+      "exports": 8,
+      "dark": 7,
+      "values": 5,
+      "darkValues": 4
+    },
+    {
+      "file": "src/platform/layout-registry.ts",
+      "booted": true,
+      "exports": 18,
+      "dark": 7,
+      "values": 7,
+      "darkValues": 1
+    },
+    {
+      "file": "src/platform/loop.ts",
+      "booted": true,
+      "exports": 4,
+      "dark": 3,
+      "values": 2,
+      "darkValues": 1
+    },
+    {
+      "file": "src/platform/tap-pilot.ts",
+      "booted": true,
+      "exports": 12,
+      "dark": 7,
+      "values": 3,
+      "darkValues": 1
+    },
+    {
+      "file": "src/platform/touch-visuals.ts",
+      "booted": true,
+      "exports": 10,
+      "dark": 6,
+      "values": 6,
+      "darkValues": 3
+    },
+    {
+      "file": "src/platform/touch.ts",
+      "booted": true,
+      "exports": 4,
+      "dark": 3,
+      "values": 2,
+      "darkValues": 1
+    },
+    {
+      "file": "src/platform/vfx-quality.ts",
+      "booted": true,
+      "exports": 3,
+      "dark": 2,
+      "values": 2,
+      "darkValues": 1
+    },
+    {
+      "file": "src/platform/wheel-input.ts",
+      "booted": true,
+      "exports": 11,
+      "dark": 8,
+      "values": 7,
+      "darkValues": 4
+    },
+    {
+      "file": "src/progression/accrual.ts",
+      "booted": true,
+      "exports": 6,
+      "dark": 1,
+      "values": 4,
+      "darkValues": 1
+    },
+    {
+      "file": "src/progression/curve.ts",
+      "booted": true,
+      "exports": 8,
+      "dark": 4,
+      "values": 7,
+      "darkValues": 3
+    },
+    {
+      "file": "src/progression/profile.ts",
+      "booted": true,
+      "exports": 11,
+      "dark": 7,
+      "values": 9,
+      "darkValues": 6
+    },
+    {
+      "file": "src/progression/xp.ts",
+      "booted": true,
+      "exports": 18,
+      "dark": 14,
+      "values": 15,
+      "darkValues": 13
+    },
+    {
+      "file": "src/render/build-badge.ts",
+      "booted": true,
+      "exports": 11,
+      "dark": 4,
+      "values": 11,
+      "darkValues": 4
+    },
+    {
+      "file": "src/render/fullscreen-affordance.ts",
+      "booted": true,
+      "exports": 6,
+      "dark": 3,
+      "values": 6,
+      "darkValues": 3
+    },
+    {
+      "file": "src/sim/allegiance.ts",
+      "booted": true,
+      "exports": 4,
+      "dark": 1,
+      "values": 4,
+      "darkValues": 1
+    },
+    {
+      "file": "src/sim/anchors.ts",
+      "booted": true,
+      "exports": 3,
+      "dark": 3,
+      "values": 3,
+      "darkValues": 3
+    },
+    {
+      "file": "src/sim/blockade.ts",
+      "booted": true,
+      "exports": 7,
+      "dark": 6,
+      "values": 4,
+      "darkValues": 3
+    },
+    {
+      "file": "src/sim/buildings.ts",
+      "booted": true,
+      "exports": 37,
+      "dark": 14,
+      "values": 35,
+      "darkValues": 12
+    },
+    {
+      "file": "src/sim/combat-credit.ts",
+      "booted": true,
+      "exports": 5,
+      "dark": 1,
+      "values": 4,
+      "darkValues": 1
+    },
+    {
+      "file": "src/sim/constants.ts",
+      "booted": true,
+      "exports": 96,
+      "dark": 21,
+      "values": 88,
+      "darkValues": 17
+    },
+    {
+      "file": "src/sim/maps.ts",
+      "booted": true,
+      "exports": 6,
+      "dark": 2,
+      "values": 4,
+      "darkValues": 1
+    },
+    {
+      "file": "src/sim/match-config.ts",
+      "booted": true,
+      "exports": 12,
+      "dark": 5,
+      "values": 8,
+      "darkValues": 5
+    },
+    {
+      "file": "src/sim/match.ts",
+      "booted": true,
+      "exports": 7,
+      "dark": 2,
+      "values": 7,
+      "darkValues": 2
+    },
+    {
+      "file": "src/sim/ore-ledger.ts",
+      "booted": true,
+      "exports": 6,
+      "dark": 2,
+      "values": 5,
+      "darkValues": 2
+    },
+    {
+      "file": "src/sim/projectiles.ts",
+      "booted": true,
+      "exports": 6,
+      "dark": 2,
+      "values": 6,
+      "darkValues": 2
+    },
+    {
+      "file": "src/sim/rng.ts",
+      "booted": true,
+      "exports": 4,
+      "dark": 2,
+      "values": 3,
+      "darkValues": 1
+    },
+    {
+      "file": "src/sim/sensing.ts",
+      "booted": true,
+      "exports": 9,
+      "dark": 4,
+      "values": 7,
+      "darkValues": 3
+    },
+    {
+      "file": "src/sim/upgrades.ts",
+      "booted": true,
+      "exports": 28,
+      "dark": 13,
+      "values": 25,
+      "darkValues": 11
+    },
+    {
+      "file": "src/sim/vec.ts",
+      "booted": true,
+      "exports": 8,
+      "dark": 5,
+      "values": 8,
+      "darkValues": 5
+    },
+    {
+      "file": "src/sim/waves.ts",
+      "booted": true,
+      "exports": 6,
+      "dark": 1,
+      "values": 6,
+      "darkValues": 1
+    },
+    {
+      "file": "src/ui/affordability.ts",
+      "booted": true,
+      "exports": 2,
+      "dark": 1,
+      "values": 2,
+      "darkValues": 1
+    },
+    {
+      "file": "src/ui/alarm.ts",
+      "booted": true,
+      "exports": 14,
+      "dark": 7,
+      "values": 6,
+      "darkValues": 3
+    },
+    {
+      "file": "src/ui/build-button.ts",
+      "booted": true,
+      "exports": 5,
+      "dark": 2,
+      "values": 4,
+      "darkValues": 1
+    },
+    {
+      "file": "src/ui/build-wheel.ts",
+      "booted": true,
+      "exports": 26,
+      "dark": 16,
+      "values": 19,
+      "darkValues": 14
+    },
+    {
+      "file": "src/ui/button-theme.ts",
+      "booted": false,
+      "exports": 8,
+      "dark": 8,
+      "values": 6,
+      "darkValues": 6
+    },
+    {
+      "file": "src/ui/chrome.ts",
+      "booted": true,
+      "exports": 8,
+      "dark": 6,
+      "values": 7,
+      "darkValues": 5
+    },
+    {
+      "file": "src/ui/class-tile-view.ts",
+      "booted": true,
+      "exports": 10,
+      "dark": 6,
+      "values": 8,
+      "darkValues": 5
+    },
+    {
+      "file": "src/ui/codex-view.ts",
+      "booted": true,
+      "exports": 2,
+      "dark": 1,
+      "values": 2,
+      "darkValues": 1
+    },
+    {
+      "file": "src/ui/codex.ts",
+      "booted": true,
+      "exports": 44,
+      "dark": 19,
+      "values": 25,
+      "darkValues": 9
+    },
+    {
+      "file": "src/ui/connection-status-view.ts",
+      "booted": true,
+      "exports": 2,
+      "dark": 2,
+      "values": 2,
+      "darkValues": 2
+    },
+    {
+      "file": "src/ui/connection-status.ts",
+      "booted": true,
+      "exports": 13,
+      "dark": 6,
+      "values": 7,
+      "darkValues": 4
+    },
+    {
+      "file": "src/ui/controls-strip.ts",
+      "booted": true,
+      "exports": 5,
+      "dark": 2,
+      "values": 4,
+      "darkValues": 2
+    },
+    {
+      "file": "src/ui/end-of-match-view.ts",
+      "booted": true,
+      "exports": 2,
+      "dark": 1,
+      "values": 2,
+      "darkValues": 1
+    },
+    {
+      "file": "src/ui/end-of-match.ts",
+      "booted": true,
+      "exports": 31,
+      "dark": 18,
+      "values": 20,
+      "darkValues": 15
+    },
+    {
+      "file": "src/ui/gantry.ts",
+      "booted": true,
+      "exports": 9,
+      "dark": 4,
+      "values": 7,
+      "darkValues": 2
+    },
+    {
+      "file": "src/ui/hangar-view.ts",
+      "booted": true,
+      "exports": 2,
+      "dark": 1,
+      "values": 2,
+      "darkValues": 1
+    },
+    {
+      "file": "src/ui/hangar.ts",
+      "booted": true,
+      "exports": 32,
+      "dark": 19,
+      "values": 20,
+      "darkValues": 12
+    },
+    {
+      "file": "src/ui/healthbar-view.ts",
+      "booted": true,
+      "exports": 4,
+      "dark": 2,
+      "values": 3,
+      "darkValues": 2
+    },
+    {
+      "file": "src/ui/healthbar.ts",
+      "booted": true,
+      "exports": 15,
+      "dark": 5,
+      "values": 13,
+      "darkValues": 5
+    },
+    {
+      "file": "src/ui/hud-geometry.ts",
+      "booted": true,
+      "exports": 49,
+      "dark": 28,
+      "values": 49,
+      "darkValues": 28
+    },
+    {
+      "file": "src/ui/instrument.ts",
+      "booted": true,
+      "exports": 33,
+      "dark": 16,
+      "values": 31,
+      "darkValues": 15
+    },
+    {
+      "file": "src/ui/lobby-entry-view.ts",
+      "booted": true,
+      "exports": 3,
+      "dark": 2,
+      "values": 3,
+      "darkValues": 2
+    },
+    {
+      "file": "src/ui/lobby-entry.ts",
+      "booted": true,
+      "exports": 37,
+      "dark": 14,
+      "values": 25,
+      "darkValues": 9
+    },
+    {
+      "file": "src/ui/lobby-flow.ts",
+      "booted": true,
+      "exports": 30,
+      "dark": 29,
+      "values": 26,
+      "darkValues": 25
+    },
+    {
+      "file": "src/ui/lobby-geometry.ts",
+      "booted": true,
+      "exports": 83,
+      "dark": 63,
+      "values": 74,
+      "darkValues": 61
+    },
+    {
+      "file": "src/ui/lobby-view.ts",
+      "booted": true,
+      "exports": 4,
+      "dark": 3,
+      "values": 4,
+      "darkValues": 3
+    },
+    {
+      "file": "src/ui/lobby.ts",
+      "booted": true,
+      "exports": 107,
+      "dark": 48,
+      "values": 94,
+      "darkValues": 41
+    },
+    {
+      "file": "src/ui/main-menu-view.ts",
+      "booted": true,
+      "exports": 2,
+      "dark": 1,
+      "values": 2,
+      "darkValues": 1
+    },
+    {
+      "file": "src/ui/main-menu.ts",
+      "booted": true,
+      "exports": 21,
+      "dark": 8,
+      "values": 13,
+      "darkValues": 4
+    },
+    {
+      "file": "src/ui/map-picker-view.ts",
+      "booted": true,
+      "exports": 2,
+      "dark": 1,
+      "values": 2,
+      "darkValues": 1
+    },
+    {
+      "file": "src/ui/map-picker.ts",
+      "booted": true,
+      "exports": 25,
+      "dark": 10,
+      "values": 20,
+      "darkValues": 9
+    },
+    {
+      "file": "src/ui/map-select-view.ts",
+      "booted": true,
+      "exports": 2,
+      "dark": 1,
+      "values": 2,
+      "darkValues": 1
+    },
+    {
+      "file": "src/ui/map-select.ts",
+      "booted": true,
+      "exports": 19,
+      "dark": 12,
+      "values": 13,
+      "darkValues": 9
+    },
+    {
+      "file": "src/ui/menu-geometry.ts",
+      "booted": true,
+      "exports": 9,
+      "dark": 5,
+      "values": 9,
+      "darkValues": 5
+    },
+    {
+      "file": "src/ui/menu-nav.ts",
+      "booted": true,
+      "exports": 7,
+      "dark": 6,
+      "values": 5,
+      "darkValues": 5
+    },
+    {
+      "file": "src/ui/minimap-view.ts",
+      "booted": true,
+      "exports": 6,
+      "dark": 4,
+      "values": 5,
+      "darkValues": 4
+    },
+    {
+      "file": "src/ui/minimap.ts",
+      "booted": true,
+      "exports": 42,
+      "dark": 20,
+      "values": 28,
+      "darkValues": 14
+    },
+    {
+      "file": "src/ui/nameplates-view.ts",
+      "booted": true,
+      "exports": 11,
+      "dark": 9,
+      "values": 10,
+      "darkValues": 9
+    },
+    {
+      "file": "src/ui/nameplates.ts",
+      "booted": true,
+      "exports": 16,
+      "dark": 9,
+      "values": 9,
+      "darkValues": 8
+    },
+    {
+      "file": "src/ui/onboarding.ts",
+      "booted": true,
+      "exports": 4,
+      "dark": 2,
+      "values": 3,
+      "darkValues": 1
+    },
+    {
+      "file": "src/ui/online-copy.ts",
+      "booted": true,
+      "exports": 10,
+      "dark": 6,
+      "values": 6,
+      "darkValues": 3
+    },
+    {
+      "file": "src/ui/ore-hold-view.ts",
+      "booted": true,
+      "exports": 4,
+      "dark": 2,
+      "values": 3,
+      "darkValues": 2
+    },
+    {
+      "file": "src/ui/ore-hold.ts",
+      "booted": true,
+      "exports": 8,
+      "dark": 3,
+      "values": 7,
+      "darkValues": 3
+    },
+    {
+      "file": "src/ui/pause-menu.ts",
+      "booted": true,
+      "exports": 27,
+      "dark": 8,
+      "values": 17,
+      "darkValues": 4
+    },
+    {
+      "file": "src/ui/press-feedback.ts",
+      "booted": true,
+      "exports": 27,
+      "dark": 20,
+      "values": 19,
+      "darkValues": 16
+    },
+    {
+      "file": "src/ui/settings-view.ts",
+      "booted": true,
+      "exports": 2,
+      "dark": 1,
+      "values": 2,
+      "darkValues": 1
+    },
+    {
+      "file": "src/ui/settings.ts",
+      "booted": true,
+      "exports": 41,
+      "dark": 20,
+      "values": 28,
+      "darkValues": 13
+    },
+    {
+      "file": "src/ui/ship-select-view.ts",
+      "booted": true,
+      "exports": 2,
+      "dark": 1,
+      "values": 2,
+      "darkValues": 1
+    },
+    {
+      "file": "src/ui/ship-select.ts",
+      "booted": true,
+      "exports": 21,
+      "dark": 13,
+      "values": 14,
+      "darkValues": 9
+    },
+    {
+      "file": "src/ui/station-hp.ts",
+      "booted": true,
+      "exports": 6,
+      "dark": 2,
+      "values": 5,
+      "darkValues": 1
+    },
+    {
+      "file": "src/ui/summary-sequence.ts",
+      "booted": true,
+      "exports": 16,
+      "dark": 11,
+      "values": 7,
+      "darkValues": 4
+    },
+    {
+      "file": "src/ui/tap-markers-view.ts",
+      "booted": true,
+      "exports": 4,
+      "dark": 2,
+      "values": 3,
+      "darkValues": 2
+    },
+    {
+      "file": "src/ui/upgrade-wheel.ts",
+      "booted": true,
+      "exports": 33,
+      "dark": 18,
+      "values": 21,
+      "darkValues": 11
+    },
+    {
+      "file": "src/ui/wave-clock.ts",
+      "booted": true,
+      "exports": 4,
+      "dark": 2,
+      "values": 3,
+      "darkValues": 1
+    },
+    {
+      "file": "src/ui/wheel-nav.ts",
+      "booted": true,
+      "exports": 9,
+      "dark": 7,
+      "values": 7,
+      "darkValues": 6
+    },
+    {
+      "file": "src/ui/wheel-stack.ts",
+      "booted": true,
+      "exports": 20,
+      "dark": 8,
+      "values": 16,
+      "darkValues": 6
+    },
+    {
+      "file": "src/ui/wheel-toggle.ts",
+      "booted": true,
+      "exports": 3,
+      "dark": 2,
+      "values": 2,
+      "darkValues": 1
+    }
+  ],
+  "candidates": [
+    {
+      "name": "asteroidOutline",
+      "file": "src/art/asteroids.ts",
+      "line": 186,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/generators.test.ts",
+        "src/art/generators.test.ts",
+        "src/art/generators.test.ts"
+      ],
+      "id": "src/art/asteroids.ts#asteroidOutline",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "shipTexture",
+      "file": "src/art/atlas.ts",
+      "line": 73,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 4,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/atlas.test.ts",
+        "src/art/atlas.test.ts",
+        "src/art/atlas.test.ts",
+        "src/art/atlas.test.ts"
+      ],
+      "id": "src/art/atlas.ts#shipTexture",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "asteroidTexture",
+      "file": "src/art/atlas.ts",
+      "line": 87,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/atlas.test.ts",
+        "src/art/atlas.test.ts",
+        "src/art/atlas.test.ts"
+      ],
+      "id": "src/art/atlas.ts#asteroidTexture",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "oreChunkTexture",
+      "file": "src/art/atlas.ts",
+      "line": 132,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/atlas.test.ts"
+      ],
+      "id": "src/art/atlas.ts#oreChunkTexture",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "stationTexture",
+      "file": "src/art/atlas.ts",
+      "line": 146,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/atlas.test.ts",
+        "src/art/atlas.test.ts",
+        "src/art/atlas.test.ts"
+      ],
+      "id": "src/art/atlas.ts#stationTexture",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "beaconTexture",
+      "file": "src/art/atlas.ts",
+      "line": 154,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/atlas.test.ts"
+      ],
+      "id": "src/art/atlas.ts#beaconTexture",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "damageRingTexture",
+      "file": "src/art/atlas.ts",
+      "line": 164,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/atlas.test.ts",
+        "src/art/atlas.test.ts"
+      ],
+      "id": "src/art/atlas.ts#damageRingTexture",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "turretTexture",
+      "file": "src/art/atlas.ts",
+      "line": 173,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/atlas.test.ts"
+      ],
+      "id": "src/art/atlas.ts#turretTexture",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "satelliteTexture",
+      "file": "src/art/atlas.ts",
+      "line": 188,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/atlas.ts#satelliteTexture",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "satelliteWreckTexture",
+      "file": "src/art/atlas.ts",
+      "line": 202,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/atlas.ts#satelliteWreckTexture",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "shieldTexture",
+      "file": "src/art/atlas.ts",
+      "line": 212,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 4,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/atlas.test.ts",
+        "src/art/atlas.test.ts",
+        "src/art/atlas.test.ts",
+        "src/art/atlas.test.ts"
+      ],
+      "id": "src/art/atlas.ts#shieldTexture",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "buildProgressTexture",
+      "file": "src/art/atlas.ts",
+      "line": 229,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/atlas.test.ts"
+      ],
+      "id": "src/art/atlas.ts#buildProgressTexture",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "SUSTAINED_TELLS",
+      "file": "src/art/audio/bank.ts",
+      "line": 2495,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 4,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/audio/audio.test.ts",
+        "src/art/audio/audio.test.ts",
+        "src/art/audio/audio.test.ts",
+        "src/art/audio/audio.test.ts"
+      ],
+      "id": "src/art/audio/bank.ts#SUSTAINED_TELLS",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "CANDIDATE_SLOT_ORDER",
+      "file": "src/art/audio/candidates.ts",
+      "line": 423,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/audio/candidates.test.ts"
+      ],
+      "id": "src/art/audio/candidates.ts#CANDIDATE_SLOT_ORDER",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "CANDIDATE_SLOTS",
+      "file": "src/art/audio/candidates.ts",
+      "line": 475,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 16,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/audio/candidates.test.ts",
+        "src/art/audio/candidates.test.ts",
+        "src/art/audio/candidates.test.ts",
+        "src/art/audio/candidates.test.ts"
+      ],
+      "id": "src/art/audio/candidates.ts#CANDIDATE_SLOTS",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "EARSHOT_NEAR",
+      "file": "src/art/audio/engine.ts",
+      "line": 76,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/audio/audio.test.ts"
+      ],
+      "id": "src/art/audio/engine.ts#EARSHOT_NEAR",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "EARSHOT_FAR",
+      "file": "src/art/audio/engine.ts",
+      "line": 79,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 4,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/audio/audio.test.ts",
+        "src/art/audio/audio.test.ts",
+        "src/art/audio/audio.test.ts",
+        "src/art/audio/audio.test.ts"
+      ],
+      "id": "src/art/audio/engine.ts#EARSHOT_FAR",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "peak",
+      "file": "src/art/audio/synth.ts",
+      "line": 486,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 23,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/audio/audio.test.ts",
+        "src/art/audio/audio.test.ts",
+        "src/art/audio/audio.test.ts",
+        "src/art/audio/audio.test.ts"
+      ],
+      "id": "src/art/audio/synth.ts#peak",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "rms",
+      "file": "src/art/audio/synth.ts",
+      "line": 496,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 10,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/audio/audio.test.ts",
+        "src/art/audio/audio.test.ts",
+        "src/art/audio/audio.test.ts",
+        "src/art/audio/audio.test.ts"
+      ],
+      "id": "src/art/audio/synth.ts#rms",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "cueNotes",
+      "file": "src/art/audio/ui-cues.ts",
+      "line": 514,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 10,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/audio/ui-cues.test.ts",
+        "src/art/audio/ui-cues.test.ts",
+        "src/art/audio/ui-cues.test.ts",
+        "src/art/audio/ui-cues.test.ts"
+      ],
+      "id": "src/art/audio/ui-cues.ts#cueNotes",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "cueDirection",
+      "file": "src/art/audio/ui-cues.ts",
+      "line": 542,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 5,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/audio/ui-cues.test.ts",
+        "src/art/audio/ui-cues.test.ts",
+        "src/art/audio/ui-cues.test.ts",
+        "src/art/audio/ui-cues.test.ts"
+      ],
+      "id": "src/art/audio/ui-cues.ts#cueDirection",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "isForward",
+      "file": "src/art/audio/ui-cues.ts",
+      "line": 559,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/audio/ui-cues.test.ts",
+        "src/art/audio/ui-cues.test.ts"
+      ],
+      "id": "src/art/audio/ui-cues.ts#isForward",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "resolves",
+      "file": "src/art/audio/ui-cues.ts",
+      "line": 571,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 4,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/audio/ui-cues.test.ts",
+        "src/art/audio/ui-cues.test.ts",
+        "src/art/audio/ui-cues.test.ts",
+        "src/art/audio/ui-cues.test.ts"
+      ],
+      "id": "src/art/audio/ui-cues.ts#resolves",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "NEBULA_IDS",
+      "file": "src/art/backdrop.ts",
+      "line": 905,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 27,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/backdrop-reducer.test.ts",
+        "src/art/backdrop.test.ts",
+        "src/art/backdrop.test.ts",
+        "src/art/backdrop.test.ts"
+      ],
+      "id": "src/art/backdrop.ts#NEBULA_IDS",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "UNASSIGNED_NEBULAE",
+      "file": "src/art/backdrop.ts",
+      "line": 1008,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/backdrop.test.ts"
+      ],
+      "id": "src/art/backdrop.ts#UNASSIGNED_NEBULAE",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "nebulaTileSprite",
+      "file": "src/art/backdrop.ts",
+      "line": 1129,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/backdrop.test.ts",
+        "src/art/backdrop.test.ts",
+        "src/art/backdrop.test.ts"
+      ],
+      "id": "src/art/backdrop.ts#nebulaTileSprite",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "ART_CATALOGUE",
+      "file": "src/art/catalogue.ts",
+      "line": 260,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 1,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/compliance.test.ts",
+        "src/art/compliance.test.ts",
+        "src/art/preview.test.ts"
+      ],
+      "id": "src/art/catalogue.ts#ART_CATALOGUE",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "ALL_SPRITES",
+      "file": "src/art/catalogue.ts",
+      "line": 263,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 11,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/backdrop.test.ts",
+        "src/art/compliance.test.ts",
+        "src/art/compliance.test.ts",
+        "src/art/compliance.test.ts"
+      ],
+      "id": "src/art/catalogue.ts#ALL_SPRITES",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "CATALOGUED_CLASSES",
+      "file": "src/art/catalogue.ts",
+      "line": 266,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/catalogue.ts#CATALOGUED_CLASSES",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "YELLOW_FAMILY",
+      "file": "src/art/compliance.ts",
+      "line": 77,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 1,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/backdrop.test.ts",
+        "src/art/vfx/shots.test.ts"
+      ],
+      "id": "src/art/compliance.ts#YELLOW_FAMILY",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "RED_FAMILY",
+      "file": "src/art/compliance.ts",
+      "line": 79,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 1,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/backdrop.test.ts",
+        "src/art/vfx/shots.test.ts",
+        "src/art/vfx/shots.test.ts"
+      ],
+      "id": "src/art/compliance.ts#RED_FAMILY",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "SKY_ALPHA_MAX",
+      "file": "src/art/compliance.ts",
+      "line": 95,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 2,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/backdrop.test.ts"
+      ],
+      "id": "src/art/compliance.ts#SKY_ALPHA_MAX",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "SKY_RESERVED_ALPHA_MAX",
+      "file": "src/art/compliance.ts",
+      "line": 112,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 2,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/backdrop.test.ts"
+      ],
+      "id": "src/art/compliance.ts#SKY_RESERVED_ALPHA_MAX",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "auditSprite",
+      "file": "src/art/compliance.ts",
+      "line": 115,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 6,
+        "tool": 0,
+        "other": 0,
+        "internal": 1,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/compliance.test.ts",
+        "src/art/compliance.test.ts",
+        "src/art/compliance.test.ts",
+        "src/art/compliance.test.ts"
+      ],
+      "id": "src/art/compliance.ts#auditSprite",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "auditAll",
+      "file": "src/art/compliance.ts",
+      "line": 188,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 1,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/compliance.test.ts",
+        "src/art/vfx/vfx.test.ts"
+      ],
+      "id": "src/art/compliance.ts#auditAll",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "formatViolations",
+      "file": "src/art/compliance.ts",
+      "line": 193,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 1,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/compliance.test.ts",
+        "src/art/vfx/vfx.test.ts"
+      ],
+      "id": "src/art/compliance.ts#formatViolations",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "assertPaletteCompliance",
+      "file": "src/art/compliance.ts",
+      "line": 200,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/backdrop.test.ts",
+        "src/art/compliance.test.ts",
+        "src/art/compliance.test.ts"
+      ],
+      "id": "src/art/compliance.ts#assertPaletteCompliance",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "deriveMaterialShade",
+      "file": "src/art/materials.ts",
+      "line": 163,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/materials.test.ts"
+      ],
+      "id": "src/art/materials.ts#deriveMaterialShade",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "SUPERSEDED_TRACKING",
+      "file": "src/art/materials.ts",
+      "line": 235,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/materials.ts#SUPERSEDED_TRACKING",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "contentTop",
+      "file": "src/art/materials.ts",
+      "line": 301,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/materials.test.ts"
+      ],
+      "id": "src/art/materials.ts#contentTop",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "contentHeight",
+      "file": "src/art/materials.ts",
+      "line": 306,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/materials.test.ts",
+        "src/art/materials.test.ts"
+      ],
+      "id": "src/art/materials.ts#contentHeight",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "PLATE_MOTION",
+      "file": "src/art/materials.ts",
+      "line": 642,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/materials.ts#PLATE_MOTION",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "derive",
+      "file": "src/art/palette.ts",
+      "line": 238,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/compliance.test.ts",
+        "src/art/compliance.test.ts"
+      ],
+      "id": "src/art/palette.ts#derive",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "MATERIAL_COLORS",
+      "file": "src/art/palette.ts",
+      "line": 249,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/palette.ts#MATERIAL_COLORS",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "IDENTITY_COLORS",
+      "file": "src/art/palette.ts",
+      "line": 252,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 2,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/ships.test.ts",
+        "src/art/ships.test.ts",
+        "src/art/ships.test.ts"
+      ],
+      "id": "src/art/palette.ts#IDENTITY_COLORS",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "ALLOWED_COLORS",
+      "file": "src/art/palette.ts",
+      "line": 256,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 5,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/compliance.test.ts",
+        "src/art/compliance.test.ts",
+        "src/art/compliance.test.ts",
+        "src/art/compliance.test.ts"
+      ],
+      "id": "src/art/palette.ts#ALLOWED_COLORS",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "hex",
+      "file": "src/art/palette.ts",
+      "line": 265,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 12,
+        "test": 5,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/backdrop.test.ts",
+        "src/art/backdrop.test.ts",
+        "src/art/compliance.test.ts",
+        "src/art/compliance.test.ts"
+      ],
+      "id": "src/art/palette.ts#hex",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "ArtPresenter",
+      "file": "src/art/presenter.ts",
+      "line": 68,
+      "kind": "class",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 14,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/presenter.test.ts",
+        "src/art/presenter.test.ts",
+        "src/art/presenter.test.ts",
+        "src/art/presenter.test.ts"
+      ],
+      "id": "src/art/presenter.ts#ArtPresenter",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "buildContactSheet",
+      "file": "src/art/preview.ts",
+      "line": 70,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/preview.test.ts",
+        "src/art/preview.test.ts"
+      ],
+      "id": "src/art/preview.ts#buildContactSheet",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "pointInPoly",
+      "file": "src/art/raster.ts",
+      "line": 31,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 1,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/backdrop.test.ts"
+      ],
+      "id": "src/art/raster.ts#pointInPoly",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "rasterize",
+      "file": "src/art/raster.ts",
+      "line": 49,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/ships.test.ts"
+      ],
+      "id": "src/art/raster.ts#rasterize",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "coverage",
+      "file": "src/art/raster.ts",
+      "line": 84,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/ships.test.ts"
+      ],
+      "id": "src/art/raster.ts#coverage",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "jaccard",
+      "file": "src/art/raster.ts",
+      "line": 95,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/ships.test.ts"
+      ],
+      "id": "src/art/raster.ts#jaccard",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "asciiMask",
+      "file": "src/art/raster.ts",
+      "line": 109,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/ships.test.ts",
+        "src/art/ships.test.ts"
+      ],
+      "id": "src/art/raster.ts#asciiMask",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "RING_JND",
+      "file": "src/art/ring-scan.ts",
+      "line": 50,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 1,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/generators.test.ts",
+        "src/art/generators.test.ts"
+      ],
+      "id": "src/art/ring-scan.ts#RING_JND",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "scanRings",
+      "file": "src/art/ring-scan.ts",
+      "line": 120,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/generators.test.ts",
+        "src/art/generators.test.ts"
+      ],
+      "id": "src/art/ring-scan.ts#scanRings",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "filledStroke",
+      "file": "src/art/shapes.ts",
+      "line": 129,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/shapes.ts#filledStroke",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "spriteKey",
+      "file": "src/art/shapes.ts",
+      "line": 259,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/generators.test.ts",
+        "src/art/generators.test.ts",
+        "src/art/generators.test.ts"
+      ],
+      "id": "src/art/shapes.ts#spriteKey",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "spriteColors",
+      "file": "src/art/shapes.ts",
+      "line": 264,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 6,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/compliance.test.ts",
+        "src/art/compliance.test.ts",
+        "src/art/ships.test.ts",
+        "src/art/ships.test.ts"
+      ],
+      "id": "src/art/shapes.ts#spriteColors",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "SHIP_CLASSES",
+      "file": "src/art/ships.ts",
+      "line": 213,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 10,
+        "test": 14,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/ships.test.ts",
+        "src/art/ships.test.ts",
+        "src/art/ships.test.ts",
+        "src/art/ships.test.ts"
+      ],
+      "id": "src/art/ships.ts#SHIP_CLASSES",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "shipSilhouette",
+      "file": "src/art/ships.ts",
+      "line": 230,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 2,
+        "test": 6,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/ships.test.ts",
+        "src/art/ships.test.ts",
+        "src/art/ships.test.ts",
+        "src/art/ships.test.ts"
+      ],
+      "id": "src/art/ships.ts#shipSilhouette",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "shipHulkSprite",
+      "file": "src/art/ships.ts",
+      "line": 371,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/ships.test.ts",
+        "src/art/ships.test.ts",
+        "src/art/ships.test.ts"
+      ],
+      "id": "src/art/ships.ts#shipHulkSprite",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "stationVariantNote",
+      "file": "src/art/stations.ts",
+      "line": 280,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/stations.ts#stationVariantNote",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "stationHullParts",
+      "file": "src/art/stations.ts",
+      "line": 857,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/compliance.test.ts",
+        "src/art/compliance.test.ts"
+      ],
+      "id": "src/art/stations.ts#stationHullParts",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "repairAuraSprite",
+      "file": "src/art/stations.ts",
+      "line": 913,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/generators.test.ts"
+      ],
+      "id": "src/art/stations.ts#repairAuraSprite",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "shapeToSvg",
+      "file": "src/art/svg.ts",
+      "line": 51,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 1,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/svg.ts#shapeToSvg",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "spriteToGroup",
+      "file": "src/art/svg.ts",
+      "line": 65,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 3,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 1,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/svg.ts#spriteToGroup",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "spriteToSvg",
+      "file": "src/art/svg.ts",
+      "line": 74,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/preview.test.ts",
+        "src/art/preview.test.ts",
+        "src/art/preview.test.ts"
+      ],
+      "id": "src/art/svg.ts#spriteToSvg",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "TELL_COUNT",
+      "file": "src/art/tells.ts",
+      "line": 128,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/vfx/particles.test.ts",
+        "src/art/vfx/particles.test.ts",
+        "src/art/vfx/vfx.test.ts"
+      ],
+      "id": "src/art/tells.ts#TELL_COUNT",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "TELL_PAYLOAD",
+      "file": "src/art/tells.ts",
+      "line": 142,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts"
+      ],
+      "id": "src/art/tells.ts#TELL_PAYLOAD",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "MATERIALS",
+      "file": "src/art/tokens.ts",
+      "line": 140,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/compliance.test.ts",
+        "src/art/compliance.test.ts",
+        "src/ui/chrome.test.ts"
+      ],
+      "id": "src/art/tokens.ts#MATERIALS",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "GLOW",
+      "file": "src/art/tokens.ts",
+      "line": 229,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/tokens.ts#GLOW",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "SILHOUETTE",
+      "file": "src/art/tokens.ts",
+      "line": 255,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/tokens.ts#SILHOUETTE",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "TYPE",
+      "file": "src/art/tokens.ts",
+      "line": 283,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/materials.test.ts"
+      ],
+      "id": "src/art/tokens.ts#TYPE",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "tintFor",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 75,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 4,
+        "tool": 0,
+        "other": 0,
+        "internal": 2,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts"
+      ],
+      "id": "src/art/vfx/emitters.ts#tintFor",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "weaponImpact",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 97,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 2,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts"
+      ],
+      "id": "src/art/vfx/emitters.ts#weaponImpact",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "asteroidCrack",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 179,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/vfx/vfx.test.ts"
+      ],
+      "id": "src/art/vfx/emitters.ts#asteroidCrack",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "asteroidBurst",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 218,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/vfx/particles.test.ts",
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts"
+      ],
+      "id": "src/art/vfx/emitters.ts#asteroidBurst",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "oreCollect",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 270,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/vfx/emitters.ts#oreCollect",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "holdFull",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 300,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/vfx/emitters.ts#holdFull",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "bankOre",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 323,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/vfx/emitters.ts#bankOre",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "muzzleFlash",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 362,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts"
+      ],
+      "id": "src/art/vfx/emitters.ts#muzzleFlash",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "shotImpact",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 408,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/vfx/emitters.ts#shotImpact",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "shieldShimmer",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 447,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts"
+      ],
+      "id": "src/art/vfx/emitters.ts#shieldShimmer",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "shieldDown",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 480,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/vfx/emitters.ts#shieldDown",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "coreHit",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 511,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/vfx/emitters.ts#coreHit",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "explosion",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 551,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 8,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/vfx/particles.test.ts",
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts"
+      ],
+      "id": "src/art/vfx/emitters.ts#explosion",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "turretDown",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 626,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/vfx/emitters.ts#turretDown",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "thrusterTrail",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 668,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 4,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/vfx/particles.test.ts",
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts"
+      ],
+      "id": "src/art/vfx/emitters.ts#thrusterTrail",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "spawnGlow",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 708,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/vfx/vfx.test.ts"
+      ],
+      "id": "src/art/vfx/emitters.ts#spawnGlow",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "spawnPulse",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 739,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/vfx/emitters.ts#spawnPulse",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "buildPlaced",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 748,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/vfx/emitters.ts#buildPlaced",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "buildComplete",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 778,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/vfx/emitters.ts#buildComplete",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "repairPulse",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 815,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/vfx/emitters.ts#repairPulse",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "upgradeBought",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 846,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/vfx/emitters.ts#upgradeBought",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "stationDeath",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 889,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 4,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/vfx/particles.test.ts",
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts"
+      ],
+      "id": "src/art/vfx/emitters.ts#stationDeath",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "collapsePulse",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 967,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/vfx/emitters.ts#collapsePulse",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "matchEnd",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 972,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/vfx/emitters.ts#matchEnd",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "ring",
+      "file": "src/art/vfx/emitters.ts",
+      "line": 998,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 10,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/vfx/emitters.ts#ring",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "VfxField",
+      "file": "src/art/vfx/field.ts",
+      "line": 95,
+      "kind": "class",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 2,
+        "test": 7,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/vfx/particles.test.ts",
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts"
+      ],
+      "id": "src/art/vfx/field.ts#VfxField",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "PARTICLE",
+      "file": "src/art/vfx/kinds.ts",
+      "line": 38,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 66,
+        "test": 19,
+        "tool": 0,
+        "other": 0,
+        "internal": 25,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts"
+      ],
+      "id": "src/art/vfx/kinds.ts#PARTICLE",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "PARTICLE_KINDS",
+      "file": "src/art/vfx/kinds.ts",
+      "line": 159,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 2,
+        "test": 6,
+        "tool": 0,
+        "other": 0,
+        "internal": 3,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts"
+      ],
+      "id": "src/art/vfx/kinds.ts#PARTICLE_KINDS",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "particleSprite",
+      "file": "src/art/vfx/kinds.ts",
+      "line": 262,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 2,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 1,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts"
+      ],
+      "id": "src/art/vfx/kinds.ts#particleSprite",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "PARTICLE_SPRITES",
+      "file": "src/art/vfx/kinds.ts",
+      "line": 267,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts"
+      ],
+      "id": "src/art/vfx/kinds.ts#PARTICLE_SPRITES",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "particleKind",
+      "file": "src/art/vfx/kinds.ts",
+      "line": 270,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 33,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 1,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts"
+      ],
+      "id": "src/art/vfx/kinds.ts#particleKind",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "fadeAt",
+      "file": "src/art/vfx/kinds.ts",
+      "line": 281,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 6,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts",
+        "src/art/vfx/vfx.test.ts"
+      ],
+      "id": "src/art/vfx/kinds.ts#fadeAt",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "PARTICLE_TEXTURE_PX",
+      "file": "src/art/vfx/layer.ts",
+      "line": 30,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 1,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/vfx/layer.ts#PARTICLE_TEXTURE_PX",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "VfxLayer",
+      "file": "src/art/vfx/layer.ts",
+      "line": 49,
+      "kind": "class",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 3,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/art/vfx/layer.ts#VfxLayer",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "PARTICLE_CAPACITY",
+      "file": "src/art/vfx/particles.ts",
+      "line": 36,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 1,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/vfx/particles.test.ts"
+      ],
+      "id": "src/art/vfx/particles.ts#PARTICLE_CAPACITY",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "ParticlePool",
+      "file": "src/art/vfx/particles.ts",
+      "line": 45,
+      "kind": "class",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 27,
+        "test": 17,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/vfx/particles.test.ts",
+        "src/art/vfx/particles.test.ts",
+        "src/art/vfx/particles.test.ts",
+        "src/art/vfx/particles.test.ts"
+      ],
+      "id": "src/art/vfx/particles.ts#ParticlePool",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "SHOT_FAMILIES",
+      "file": "src/art/vfx/shots.ts",
+      "line": 49,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 6,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/vfx/shots.test.ts",
+        "src/art/vfx/shots.test.ts",
+        "src/art/vfx/shots.test.ts",
+        "src/art/vfx/shots.test.ts"
+      ],
+      "id": "src/art/vfx/shots.ts#SHOT_FAMILIES",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "SHOT_TIERS",
+      "file": "src/art/vfx/shots.ts",
+      "line": 68,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 5,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/vfx/shots.test.ts",
+        "src/art/vfx/shots.test.ts",
+        "src/art/vfx/shots.test.ts",
+        "src/art/vfx/shots.test.ts"
+      ],
+      "id": "src/art/vfx/shots.ts#SHOT_TIERS",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "shotTierColor",
+      "file": "src/art/vfx/shots.ts",
+      "line": 83,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 12,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/vfx/shots.test.ts",
+        "src/art/vfx/shots.test.ts",
+        "src/art/vfx/shots.test.ts",
+        "src/art/vfx/shots.test.ts"
+      ],
+      "id": "src/art/vfx/shots.ts#shotTierColor",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "debrisFieldSprite",
+      "file": "src/art/wrecks.ts",
+      "line": 132,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 4,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/art/generators.test.ts",
+        "src/art/generators.test.ts",
+        "src/art/generators.test.ts",
+        "src/art/generators.test.ts"
+      ],
+      "id": "src/art/wrecks.ts#debrisFieldSprite",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "ALLY_RESPONSE_RANGE_WIDE",
+      "file": "src/bots/ally.ts",
+      "line": 84,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/bots/ally.ts#ALLY_RESPONSE_RANGE_WIDE",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "ASSAULT_JOIN_RANGE_WIDE",
+      "file": "src/bots/ally.ts",
+      "line": 189,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/bots/ally-assault.test.ts"
+      ],
+      "id": "src/bots/ally.ts#ASSAULT_JOIN_RANGE_WIDE",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "resetAllyResponse",
+      "file": "src/bots/ally.ts",
+      "line": 342,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/bots/ally.ts#resetAllyResponse",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "createDoNothingBot",
+      "file": "src/bots/bot.ts",
+      "line": 241,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/bots/harness.test.ts",
+        "src/bots/harness.test.ts",
+        "src/bots/match-endgame.test.ts"
+      ],
+      "id": "src/bots/bot.ts#createDoNothingBot",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "runHeadlessMatch",
+      "file": "src/bots/harness.ts",
+      "line": 352,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 27,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/bots/cast-seam.test.ts",
+        "src/bots/cast-seam.test.ts",
+        "src/bots/ffa-parity.test.ts",
+        "src/bots/fog-honesty.test.ts"
+      ],
+      "id": "src/bots/harness.ts#runHeadlessMatch",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "resolvePerception",
+      "file": "src/bots/perception.ts",
+      "line": 121,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 5,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/bots/perception.test.ts",
+        "src/bots/perception.test.ts",
+        "src/bots/perception.test.ts",
+        "src/bots/perception.test.ts"
+      ],
+      "id": "src/bots/perception.ts#resolvePerception",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "DOCK_RANGE",
+      "file": "src/bots/perception.ts",
+      "line": 793,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/bots/perception.ts#DOCK_RANGE",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "nearest",
+      "file": "src/bots/perception.ts",
+      "line": 797,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/bots/perception.test.ts",
+        "src/bots/perception.test.ts"
+      ],
+      "id": "src/bots/perception.ts#nearest",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "connectTraceView",
+      "file": "src/net/connect-trace-view.ts",
+      "line": 267,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/net/connect-trace-view.ts#connectTraceView",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "resetConnectTraceView",
+      "file": "src/net/connect-trace-view.ts",
+      "line": 283,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/net/connect-trace-view.ts#resetConnectTraceView",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "LatencyTransport",
+      "file": "src/net/latency-transport.ts",
+      "line": 55,
+      "kind": "class",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 6,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/net/latency-transport.test.ts",
+        "src/net/latency-transport.test.ts",
+        "src/net/latency-transport.test.ts",
+        "src/net/latency-transport.test.ts"
+      ],
+      "id": "src/net/latency-transport.ts#LatencyTransport",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "installLinkLossView",
+      "file": "src/net/link-loss-view.ts",
+      "line": 231,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/net/link-loss-view.ts#installLinkLossView",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "linkLossView",
+      "file": "src/net/link-loss-view.ts",
+      "line": 238,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/net/link-loss-view.ts#linkLossView",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "showLinkLoss",
+      "file": "src/net/link-loss-view.ts",
+      "line": 244,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/net/link-loss-view.ts#showLinkLoss",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "hideLinkLoss",
+      "file": "src/net/link-loss-view.ts",
+      "line": 249,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/net/link-loss-view.ts#hideLinkLoss",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "resetLinkLossView",
+      "file": "src/net/link-loss-view.ts",
+      "line": 254,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/net/link-loss-view.ts#resetLinkLossView",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "resetDownloadLogButton",
+      "file": "src/net/playtest-log-button.ts",
+      "line": 504,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/net/playtest-log-button.test.ts"
+      ],
+      "id": "src/net/playtest-log-button.ts#resetDownloadLogButton",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "resetPlaytestLog",
+      "file": "src/net/playtest-log.ts",
+      "line": 531,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/net/playtest-log.test.ts",
+        "src/net/wire.test.ts"
+      ],
+      "id": "src/net/playtest-log.ts#resetPlaytestLog",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "DEFAULT_GRACE_WINDOW_MS",
+      "file": "src/net/reconnect.ts",
+      "line": 46,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/net/reconnect.test.ts",
+        "src/net/reconnect.test.ts",
+        "src/net/reconnect.test.ts"
+      ],
+      "id": "src/net/reconnect.ts#DEFAULT_GRACE_WINDOW_MS",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "formatRegionPings",
+      "file": "src/net/region-probe.ts",
+      "line": 513,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/net/region-probe.test.ts"
+      ],
+      "id": "src/net/region-probe.ts#formatRegionPings",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "resolveServerUrl",
+      "file": "src/net/server-url.ts",
+      "line": 54,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 16,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/net/server-url.test.ts",
+        "src/net/server-url.test.ts",
+        "src/net/server-url.test.ts",
+        "src/net/server-url.test.ts"
+      ],
+      "id": "src/net/server-url.ts#resolveServerUrl",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "createLocalSession",
+      "file": "src/net/session.ts",
+      "line": 157,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/net/loopback.test.ts",
+        "src/net/loopback.test.ts"
+      ],
+      "id": "src/net/session.ts#createLocalSession",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "WORST_CASE_BYTES",
+      "file": "src/net/snapshot.ts",
+      "line": 95,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 6,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/net/snapshot.test.ts",
+        "src/net/snapshot.test.ts",
+        "src/net/snapshot.test.ts",
+        "src/net/snapshot.test.ts"
+      ],
+      "id": "src/net/snapshot.ts#WORST_CASE_BYTES",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "MAX_WIRE_COORD",
+      "file": "src/net/snapshot.ts",
+      "line": 188,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/net/snapshot.test.ts",
+        "src/net/snapshot.test.ts"
+      ],
+      "id": "src/net/snapshot.ts#MAX_WIRE_COORD",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "runBench",
+      "file": "src/net/spike/bench.ts",
+      "line": 56,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/net/spike/spike.bench.test.ts"
+      ],
+      "id": "src/net/spike/bench.ts#runBench",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "formatReport",
+      "file": "src/net/spike/bench.ts",
+      "line": 117,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/net/spike/spike.bench.test.ts"
+      ],
+      "id": "src/net/spike/bench.ts#formatReport",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "DEFAULT_SIM",
+      "file": "src/net/spike/sim-standin.ts",
+      "line": 36,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 1,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/net/spike/sim-standin.ts#DEFAULT_SIM",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "createStandInSim",
+      "file": "src/net/spike/sim-standin.ts",
+      "line": 75,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/net/spike/sim-standin.ts#createStandInSim",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "HEADER_BYTES",
+      "file": "src/net/spike/snapshot.ts",
+      "line": 44,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 2,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/net/spike/spike.bench.test.ts"
+      ],
+      "id": "src/net/spike/snapshot.ts#HEADER_BYTES",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "SHIP_BYTES",
+      "file": "src/net/spike/snapshot.ts",
+      "line": 45,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 2,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/net/spike/spike.bench.test.ts"
+      ],
+      "id": "src/net/spike/snapshot.ts#SHIP_BYTES",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "PROJECTILE_BYTES",
+      "file": "src/net/spike/snapshot.ts",
+      "line": 46,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 2,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/net/spike/spike.bench.test.ts"
+      ],
+      "id": "src/net/spike/snapshot.ts#PROJECTILE_BYTES",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "MAX_SHIPS",
+      "file": "src/net/spike/snapshot.ts",
+      "line": 49,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 3,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/net/spike/spike.bench.test.ts"
+      ],
+      "id": "src/net/spike/snapshot.ts#MAX_SHIPS",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "MAX_PROJECTILES",
+      "file": "src/net/spike/snapshot.ts",
+      "line": 50,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 2,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/net/spike/spike.bench.test.ts"
+      ],
+      "id": "src/net/spike/snapshot.ts#MAX_PROJECTILES",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "WORST_CASE_BYTES",
+      "file": "src/net/spike/snapshot.ts",
+      "line": 53,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 2,
+        "test": 5,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/net/snapshot.test.ts",
+        "src/net/spike/spike.bench.test.ts",
+        "src/net/spike/spike.bench.test.ts",
+        "src/net/spike/spike.bench.test.ts"
+      ],
+      "id": "src/net/spike/snapshot.ts#WORST_CASE_BYTES",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "encodeSnapshot",
+      "file": "src/net/spike/snapshot.ts",
+      "line": 95,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 1,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/net/spike/spike.bench.test.ts"
+      ],
+      "id": "src/net/spike/snapshot.ts#encodeSnapshot",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "decodeSnapshot",
+      "file": "src/net/spike/snapshot.ts",
+      "line": 147,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/net/spike/spike.bench.test.ts"
+      ],
+      "id": "src/net/spike/snapshot.ts#decodeSnapshot",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "buildWorstCaseSnapshot",
+      "file": "src/net/spike/snapshot.ts",
+      "line": 205,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 1,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/net/spike/spike.bench.test.ts"
+      ],
+      "id": "src/net/spike/snapshot.ts#buildWorstCaseSnapshot",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "WIRE_ACTION_TYPES",
+      "file": "src/net/wire.ts",
+      "line": 576,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/net/protocol-parity.test.ts",
+        "src/net/protocol-parity.test.ts"
+      ],
+      "id": "src/net/wire.ts#WIRE_ACTION_TYPES",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "resetBuildIdentity",
+      "file": "src/platform/build-identity.ts",
+      "line": 302,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/platform/build-identity.test.ts",
+        "src/platform/build-identity.test.ts"
+      ],
+      "id": "src/platform/build-identity.ts#resetBuildIdentity",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "viewportCenter",
+      "file": "src/platform/camera.ts",
+      "line": 53,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/platform/camera.test.ts",
+        "src/platform/camera.test.ts"
+      ],
+      "id": "src/platform/camera.ts#viewportCenter",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "cameraOffset",
+      "file": "src/platform/camera.ts",
+      "line": 74,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/platform/camera.test.ts",
+        "src/platform/camera.test.ts",
+        "src/platform/camera.test.ts"
+      ],
+      "id": "src/platform/camera.ts#cameraOffset",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "worldToScreen",
+      "file": "src/platform/camera.ts",
+      "line": 79,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/platform/camera.test.ts"
+      ],
+      "id": "src/platform/camera.ts#worldToScreen",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "toViewportSpace",
+      "file": "src/platform/camera.ts",
+      "line": 89,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/platform/camera.test.ts"
+      ],
+      "id": "src/platform/camera.ts#toViewportSpace",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "buildFrozenWorld",
+      "file": "src/platform/freeze.ts",
+      "line": 55,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 11,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/platform/freeze.test.ts",
+        "src/platform/freeze.test.ts",
+        "src/platform/freeze.test.ts",
+        "src/platform/freeze.test.ts"
+      ],
+      "id": "src/platform/freeze.ts#buildFrozenWorld",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "affordanceVisibility",
+      "file": "src/platform/touch-visuals.ts",
+      "line": 121,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 5,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/platform/touch-visuals.test.ts",
+        "src/platform/touch-visuals.test.ts",
+        "src/platform/touch-visuals.test.ts",
+        "src/platform/touch-visuals.test.ts"
+      ],
+      "id": "src/platform/touch-visuals.ts#affordanceVisibility",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "affordanceRects",
+      "file": "src/platform/touch-visuals.ts",
+      "line": 232,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 5,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/platform/touch-visuals.test.ts",
+        "src/platform/touch-visuals.test.ts",
+        "src/platform/touch-visuals.test.ts",
+        "src/platform/touch-visuals.test.ts"
+      ],
+      "id": "src/platform/touch-visuals.ts#affordanceRects",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "MIGRATABLE_VERSIONS",
+      "file": "src/progression/profile.ts",
+      "line": 243,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/progression/profile.test.ts",
+        "src/progression/profile.test.ts",
+        "src/progression/profile.test.ts"
+      ],
+      "id": "src/progression/profile.ts#MIGRATABLE_VERSIONS",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "sameSide",
+      "file": "src/sim/allegiance.ts",
+      "line": 71,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 10,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/sim/alarm-ownership.test.ts",
+        "src/sim/alarm-ownership.test.ts",
+        "src/sim/ffa-hostility.test.ts",
+        "src/ui/end-of-match.test.ts"
+      ],
+      "id": "src/sim/allegiance.ts#sameSide",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "clampAnchorOutside",
+      "file": "src/sim/anchors.ts",
+      "line": 62,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 9,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "tests/sim/anchors.test.ts",
+        "tests/sim/anchors.test.ts",
+        "tests/sim/anchors.test.ts",
+        "tests/sim/anchors.test.ts"
+      ],
+      "id": "src/sim/anchors.ts#clampAnchorOutside",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "turretUpgradeCost",
+      "file": "src/sim/buildings.ts",
+      "line": 214,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "tests/sim/turret-tiers.test.ts",
+        "tests/sim/turret-tiers.test.ts"
+      ],
+      "id": "src/sim/buildings.ts#turretUpgradeCost",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "turretMountPos",
+      "file": "src/sim/buildings.ts",
+      "line": 257,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 1,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/sim/buildings.test.ts",
+        "tests/sim-render-parity.test.ts"
+      ],
+      "id": "src/sim/buildings.ts#turretMountPos",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "orderCost",
+      "file": "src/sim/buildings.ts",
+      "line": 288,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/sim/buildings.ts#orderCost",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "assistsOn",
+      "file": "src/sim/combat-credit.ts",
+      "line": 210,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/sim/combat-credit.test.ts",
+        "src/sim/combat-credit.test.ts",
+        "src/sim/combat-credit.test.ts"
+      ],
+      "id": "src/sim/combat-credit.ts#assistsOn",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "SHIP_HULL",
+      "file": "src/sim/constants.ts",
+      "line": 62,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/sim/constants.ts#SHIP_HULL",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "MINING_YIELD_PER_HIT",
+      "file": "src/sim/constants.ts",
+      "line": 377,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/sim/constants.ts#MINING_YIELD_PER_HIT",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "WAVE_ORE",
+      "file": "src/sim/constants.ts",
+      "line": 664,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/sim/match.test.ts"
+      ],
+      "id": "src/sim/constants.ts#WAVE_ORE",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "homeFieldOre",
+      "file": "src/sim/constants.ts",
+      "line": 670,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "tests/sim/maps.test.ts"
+      ],
+      "id": "src/sim/constants.ts#homeFieldOre",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "AUTO_AIM_ARC",
+      "file": "src/sim/constants.ts",
+      "line": 1099,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/sim/constants.ts#AUTO_AIM_ARC",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "classWeaponDps",
+      "file": "src/sim/constants.ts",
+      "line": 1141,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 8,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "tests/sim/damage-integrity.test.ts",
+        "tests/sim/damage-integrity.test.ts",
+        "tests/sim/damage-integrity.test.ts",
+        "tests/sim/damage-integrity.test.ts"
+      ],
+      "id": "src/sim/constants.ts#classWeaponDps",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "classCoreDps",
+      "file": "src/sim/constants.ts",
+      "line": 1147,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 4,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "tests/sim/damage-integrity.test.ts",
+        "tests/sim/damage-integrity.test.ts",
+        "tests/sim/damage-integrity.test.ts",
+        "tests/sim/damage-integrity.test.ts"
+      ],
+      "id": "src/sim/constants.ts#classCoreDps",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "miningRate",
+      "file": "src/sim/constants.ts",
+      "line": 1153,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/sim/constants.ts#miningRate",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "WEDGE_SLIDE_SPEED",
+      "file": "src/sim/constants.ts",
+      "line": 1384,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "tests/sim/wedge-escape.test.ts"
+      ],
+      "id": "src/sim/constants.ts#WEDGE_SLIDE_SPEED",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "TEAM_MAP_IDS",
+      "file": "src/sim/maps.ts",
+      "line": 629,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "tests/sim/team-maps.test.ts",
+        "tests/sim/team-maps.test.ts",
+        "tests/sim/team-maps.test.ts"
+      ],
+      "id": "src/sim/maps.ts#TEAM_MAP_IDS",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "matchAbundance",
+      "file": "src/sim/match-config.ts",
+      "line": 83,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 5,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/sim/abundance.test.ts",
+        "src/sim/abundance.test.ts",
+        "src/sim/abundance.test.ts",
+        "tests/net/abundance-reaches-world.test.ts"
+      ],
+      "id": "src/sim/match-config.ts#matchAbundance",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "isValidSize",
+      "file": "src/sim/match-config.ts",
+      "line": 105,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "tests/sim/match-config.test.ts",
+        "tests/sim/match-config.test.ts"
+      ],
+      "id": "src/sim/match-config.ts#isValidSize",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "ffaConfig",
+      "file": "src/sim/match-config.ts",
+      "line": 137,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 8,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/sim/abundance.test.ts",
+        "src/sim/alarm-ownership.test.ts",
+        "src/sim/alarm-ownership.test.ts",
+        "src/sim/ffa-hostility.test.ts"
+      ],
+      "id": "src/sim/match-config.ts#ffaConfig",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "isWreck",
+      "file": "src/sim/match.ts",
+      "line": 73,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/sim/match.ts#isWreck",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "oreResidual",
+      "file": "src/sim/ore-ledger.ts",
+      "line": 130,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 21,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/net/ore-authority.test.ts",
+        "src/net/ore-authority.test.ts",
+        "src/net/ore-authority.test.ts",
+        "src/net/ore-authority.test.ts"
+      ],
+      "id": "src/sim/ore-ledger.ts#oreResidual",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "activeProjectilesOf",
+      "file": "src/sim/projectiles.ts",
+      "line": 340,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 9,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/sim/projectiles.test.ts",
+        "src/sim/projectiles.test.ts",
+        "src/sim/projectiles.test.ts",
+        "src/sim/projectiles.test.ts"
+      ],
+      "id": "src/sim/projectiles.ts#activeProjectilesOf",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "rngInt",
+      "file": "src/sim/rng.ts",
+      "line": 40,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [],
+      "id": "src/sim/rng.ts#rngInt",
+      "dark": true,
+      "verdictHint": "reexported-unused"
+    },
+    {
+      "name": "sensedState",
+      "file": "src/sim/sensing.ts",
+      "line": 236,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 25,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/sim/radar-fog.test.ts",
+        "src/sim/radar-fog.test.ts",
+        "src/sim/radar-fog.test.ts",
+        "src/sim/radar-fog.test.ts"
+      ],
+      "id": "src/sim/sensing.ts#sensedState",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "rememberedStationMask",
+      "file": "src/sim/sensing.ts",
+      "line": 382,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/sim/sensing.test.ts",
+        "src/sim/sensing.test.ts"
+      ],
+      "id": "src/sim/sensing.ts#rememberedStationMask",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "trackSpec",
+      "file": "src/sim/upgrades.ts",
+      "line": 92,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/sim/upgrades.ts#trackSpec",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "oreSpentOnUpgrades",
+      "file": "src/sim/upgrades.ts",
+      "line": 124,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 5,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/sim/upgrades.test.ts",
+        "src/sim/upgrades.test.ts",
+        "src/sim/upgrades.test.ts",
+        "tests/sim/upgrade-after-respawn.test.ts"
+      ],
+      "id": "src/sim/upgrades.ts#oreSpentOnUpgrades",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "tierStep",
+      "file": "src/sim/upgrades.ts",
+      "line": 144,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/sim/upgrades.ts#tierStep",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "shipCoreDps",
+      "file": "src/sim/upgrades.ts",
+      "line": 218,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 5,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/sim/upgrades.test.ts",
+        "src/sim/upgrades.test.ts",
+        "src/sim/upgrades.test.ts",
+        "src/sim/upgrades.test.ts"
+      ],
+      "id": "src/sim/upgrades.ts#shipCoreDps",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "shotDamage",
+      "file": "src/sim/upgrades.ts",
+      "line": 309,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/sim/upgrades.test.ts"
+      ],
+      "id": "src/sim/upgrades.ts#shotDamage",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "shotSpeed",
+      "file": "src/sim/upgrades.ts",
+      "line": 315,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/sim/upgrades.test.ts"
+      ],
+      "id": "src/sim/upgrades.ts#shotSpeed",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "vec",
+      "file": "src/sim/vec.ts",
+      "line": 15,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/sim/vec.ts#vec",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "len2",
+      "file": "src/sim/vec.ts",
+      "line": 20,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/sim/vec.ts#len2",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "dist",
+      "file": "src/sim/vec.ts",
+      "line": 37,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/sim/vec.ts#dist",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "dot",
+      "file": "src/sim/vec.ts",
+      "line": 53,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/sim/vec.ts#dot",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "buildButtonHighlighted",
+      "file": "src/ui/build-button.ts",
+      "line": 112,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 5,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/build-button.test.ts",
+        "src/ui/build-button.test.ts",
+        "src/ui/build-button.test.ts",
+        "src/ui/build-button.test.ts"
+      ],
+      "id": "src/ui/build-button.ts#buildButtonHighlighted",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "segmentAtDirection",
+      "file": "src/ui/build-wheel.ts",
+      "line": 220,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 8,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/platform/wheel-input.test.ts",
+        "src/ui/build-wheel.test.ts",
+        "src/ui/build-wheel.test.ts",
+        "src/ui/build-wheel.test.ts"
+      ],
+      "id": "src/ui/build-wheel.ts#segmentAtDirection",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "DISABLED_LABEL",
+      "file": "src/ui/button-theme.ts",
+      "line": 69,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 2,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/ui/button-theme.test.ts",
+        "src/ui/button-theme.test.ts",
+        "src/ui/button-theme.test.ts"
+      ],
+      "id": "src/ui/button-theme.ts#DISABLED_LABEL",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "DISABLED_LABEL_ALPHA",
+      "file": "src/ui/button-theme.ts",
+      "line": 72,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 1,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/ui/button-theme.test.ts"
+      ],
+      "id": "src/ui/button-theme.ts#DISABLED_LABEL_ALPHA",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "ENABLED_LABEL_MIN_ALPHA",
+      "file": "src/ui/button-theme.ts",
+      "line": 75,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 1,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/ui/button-theme.test.ts",
+        "src/ui/button-theme.test.ts"
+      ],
+      "id": "src/ui/button-theme.ts#ENABLED_LABEL_MIN_ALPHA",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "BUTTON_STYLES",
+      "file": "src/ui/button-theme.ts",
+      "line": 114,
+      "kind": "const",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 7,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/ui/button-theme.test.ts",
+        "src/ui/button-theme.test.ts",
+        "src/ui/button-theme.test.ts",
+        "src/ui/button-theme.test.ts"
+      ],
+      "id": "src/ui/button-theme.ts#BUTTON_STYLES",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "buttonStyle",
+      "file": "src/ui/button-theme.ts",
+      "line": 128,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 8,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/ui/button-theme.test.ts",
+        "src/ui/button-theme.test.ts",
+        "src/ui/button-theme.test.ts",
+        "src/ui/button-theme.test.ts"
+      ],
+      "id": "src/ui/button-theme.ts#buttonStyle",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "usesDisabledTokens",
+      "file": "src/ui/button-theme.ts",
+      "line": 138,
+      "kind": "function",
+      "booted": false,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 5,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/ui/button-theme.test.ts",
+        "src/ui/button-theme.test.ts",
+        "src/ui/button-theme.test.ts",
+        "src/ui/button-theme.test.ts"
+      ],
+      "id": "src/ui/button-theme.ts#usesDisabledTokens",
+      "dark": true,
+      "verdictHint": "orphan-module"
+    },
+    {
+      "name": "PANEL_RULE",
+      "file": "src/ui/chrome.ts",
+      "line": 43,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/ui/chrome.test.ts",
+        "src/ui/chrome.test.ts"
+      ],
+      "id": "src/ui/chrome.ts#PANEL_RULE",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "PANEL_FILL_ALPHA",
+      "file": "src/ui/chrome.ts",
+      "line": 61,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/ui/chrome.test.ts",
+        "src/ui/chrome.test.ts"
+      ],
+      "id": "src/ui/chrome.ts#PANEL_FILL_ALPHA",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "PANEL_RULE_WIDTH",
+      "file": "src/ui/chrome.ts",
+      "line": 64,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/ui/chrome.test.ts"
+      ],
+      "id": "src/ui/chrome.ts#PANEL_RULE_WIDTH",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "PANEL_RULE_ALPHA",
+      "file": "src/ui/chrome.ts",
+      "line": 67,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/ui/chrome.test.ts"
+      ],
+      "id": "src/ui/chrome.ts#PANEL_RULE_ALPHA",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "activeEntryIndex",
+      "file": "src/ui/codex.ts",
+      "line": 244,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/codex.test.ts"
+      ],
+      "id": "src/ui/codex.ts#activeEntryIndex",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "ConnectionStatusView",
+      "file": "src/ui/connection-status-view.ts",
+      "line": 59,
+      "kind": "class",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [],
+      "id": "src/ui/connection-status-view.ts#ConnectionStatusView",
+      "dark": true,
+      "verdictHint": "reexported-unused"
+    },
+    {
+      "name": "connectionStatusModel",
+      "file": "src/ui/connection-status.ts",
+      "line": 90,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 18,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/connection-status.test.ts",
+        "src/ui/connection-status.test.ts",
+        "src/ui/connection-status.test.ts",
+        "src/ui/connection-status.test.ts"
+      ],
+      "id": "src/ui/connection-status.ts#connectionStatusModel",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "controlsStripRows",
+      "file": "src/ui/controls-strip.ts",
+      "line": 39,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 5,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/controls-strip.test.ts",
+        "src/ui/controls-strip.test.ts",
+        "src/ui/controls-strip.test.ts",
+        "src/ui/controls-strip.test.ts"
+      ],
+      "id": "src/ui/controls-strip.ts#controlsStripRows",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "singlePrimary",
+      "file": "src/ui/gantry.ts",
+      "line": 280,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 13,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/codex.test.ts",
+        "src/ui/end-of-match.test.ts",
+        "src/ui/gantry.test.ts",
+        "src/ui/gantry.test.ts"
+      ],
+      "id": "src/ui/gantry.ts#singlePrimary",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "COSMETIC_INVARIANT",
+      "file": "src/ui/hangar.ts",
+      "line": 89,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/hangar.test.ts",
+        "src/ui/hangar.test.ts"
+      ],
+      "id": "src/ui/hangar.ts#COSMETIC_INVARIANT",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "COSMETIC_SLOTS",
+      "file": "src/ui/hangar.ts",
+      "line": 103,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/hangar.test.ts",
+        "src/ui/hangar.test.ts"
+      ],
+      "id": "src/ui/hangar.ts#COSMETIC_SLOTS",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "wedgeChordWidth",
+      "file": "src/ui/hud-geometry.ts",
+      "line": 73,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/ui/hud-geometry.test.ts",
+        "src/ui/hud-geometry.test.ts"
+      ],
+      "id": "src/ui/hud-geometry.ts#wedgeChordWidth",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "wedgeHitTarget",
+      "file": "src/ui/hud-geometry.ts",
+      "line": 92,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/ui/hud-geometry.test.ts",
+        "src/ui/hud-geometry.test.ts",
+        "src/ui/hud-geometry.test.ts"
+      ],
+      "id": "src/ui/hud-geometry.ts#wedgeHitTarget",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "TOUCH_TARGET_MIN",
+      "file": "src/ui/hud-geometry.ts",
+      "line": 107,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 4,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/ui/hud-geometry.test.ts",
+        "src/ui/hud-geometry.test.ts",
+        "src/ui/hud-geometry.test.ts",
+        "src/ui/hud-geometry.test.ts"
+      ],
+      "id": "src/ui/hud-geometry.ts#TOUCH_TARGET_MIN",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "panelBounds",
+      "file": "src/ui/hud-geometry.ts",
+      "line": 157,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/hud-geometry.test.ts"
+      ],
+      "id": "src/ui/hud-geometry.ts#panelBounds",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "stationHpBounds",
+      "file": "src/ui/hud-geometry.ts",
+      "line": 222,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/ui/hud-geometry.test.ts",
+        "src/ui/hud-geometry.test.ts",
+        "src/ui/hud-geometry.test.ts"
+      ],
+      "id": "src/ui/hud-geometry.ts#stationHpBounds",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "respawnBounds",
+      "file": "src/ui/hud-geometry.ts",
+      "line": 504,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/ui/hud-geometry.test.ts",
+        "src/ui/hud-geometry.test.ts",
+        "src/ui/hud-geometry.test.ts"
+      ],
+      "id": "src/ui/hud-geometry.ts#respawnBounds",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "alarmFrameBounds",
+      "file": "src/ui/hud-geometry.ts",
+      "line": 534,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/hud-geometry.test.ts",
+        "src/ui/hud-geometry.test.ts"
+      ],
+      "id": "src/ui/hud-geometry.ts#alarmFrameBounds",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "polyBounds",
+      "file": "src/ui/hud-geometry.ts",
+      "line": 568,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/hud-geometry.test.ts"
+      ],
+      "id": "src/ui/hud-geometry.ts#polyBounds",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "HUD_TRACKING",
+      "file": "src/ui/instrument.ts",
+      "line": 129,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/ui/instrument.test.ts",
+        "src/ui/instrument.test.ts"
+      ],
+      "id": "src/ui/instrument.ts#HUD_TRACKING",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "INSTRUMENT_MID",
+      "file": "src/ui/instrument.ts",
+      "line": 173,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/ui/instrument.test.ts",
+        "src/ui/instrument.test.ts"
+      ],
+      "id": "src/ui/instrument.ts#INSTRUMENT_MID",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "KEYPAD_ROWS",
+      "file": "src/ui/lobby-entry.ts",
+      "line": 218,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [],
+      "id": "src/ui/lobby-entry.ts#KEYPAD_ROWS",
+      "dark": true,
+      "verdictHint": "reexported-unused"
+    },
+    {
+      "name": "FLOW_SCREENS",
+      "file": "src/ui/lobby-flow.ts",
+      "line": 147,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 4,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/main-menu.test.ts",
+        "src/ui/main-menu.test.ts",
+        "src/ui/main-menu.test.ts",
+        "src/ui/main-menu.test.ts"
+      ],
+      "id": "src/ui/lobby-flow.ts#FLOW_SCREENS",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "flowScreenHandler",
+      "file": "src/ui/lobby-flow.ts",
+      "line": 163,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/main-menu.test.ts",
+        "src/ui/main-menu.test.ts"
+      ],
+      "id": "src/ui/lobby-flow.ts#flowScreenHandler",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "flowTapEntry",
+      "file": "src/ui/lobby-flow.ts",
+      "line": 398,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 25,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts"
+      ],
+      "id": "src/ui/lobby-flow.ts#flowTapEntry",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "flowKey",
+      "file": "src/ui/lobby-flow.ts",
+      "line": 441,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 12,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts"
+      ],
+      "id": "src/ui/lobby-flow.ts#flowKey",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "flowConnected",
+      "file": "src/ui/lobby-flow.ts",
+      "line": 475,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 13,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts"
+      ],
+      "id": "src/ui/lobby-flow.ts#flowConnected",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "flowFailed",
+      "file": "src/ui/lobby-flow.ts",
+      "line": 509,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/lobby-flow.test.ts"
+      ],
+      "id": "src/ui/lobby-flow.ts#flowFailed",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "flowTapLobby",
+      "file": "src/ui/lobby-flow.ts",
+      "line": 532,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 50,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts"
+      ],
+      "id": "src/ui/lobby-flow.ts#flowTapLobby",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "flowTapShipSelect",
+      "file": "src/ui/lobby-flow.ts",
+      "line": 637,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 7,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts"
+      ],
+      "id": "src/ui/lobby-flow.ts#flowTapShipSelect",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "flowTapMapSelect",
+      "file": "src/ui/lobby-flow.ts",
+      "line": 661,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts"
+      ],
+      "id": "src/ui/lobby-flow.ts#flowTapMapSelect",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "tickFlow",
+      "file": "src/ui/lobby-flow.ts",
+      "line": 681,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 9,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts"
+      ],
+      "id": "src/ui/lobby-flow.ts#tickFlow",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "flowLobbySlots",
+      "file": "src/ui/lobby-flow.ts",
+      "line": 694,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 4,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts"
+      ],
+      "id": "src/ui/lobby-flow.ts#flowLobbySlots",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "flowMatchStart",
+      "file": "src/ui/lobby-flow.ts",
+      "line": 703,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 9,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts"
+      ],
+      "id": "src/ui/lobby-flow.ts#flowMatchStart",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "flowTapSettings",
+      "file": "src/ui/lobby-flow.ts",
+      "line": 741,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 8,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts"
+      ],
+      "id": "src/ui/lobby-flow.ts#flowTapSettings",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "flowOpenHangar",
+      "file": "src/ui/lobby-flow.ts",
+      "line": 784,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 7,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts"
+      ],
+      "id": "src/ui/lobby-flow.ts#flowOpenHangar",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "flowTapHangar",
+      "file": "src/ui/lobby-flow.ts",
+      "line": 810,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 6,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts"
+      ],
+      "id": "src/ui/lobby-flow.ts#flowTapHangar",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "setFlowProfile",
+      "file": "src/ui/lobby-flow.ts",
+      "line": 827,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts"
+      ],
+      "id": "src/ui/lobby-flow.ts#setFlowProfile",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "flowMatchEnded",
+      "file": "src/ui/lobby-flow.ts",
+      "line": 851,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 11,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts"
+      ],
+      "id": "src/ui/lobby-flow.ts#flowMatchEnded",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "flowEliminated",
+      "file": "src/ui/lobby-flow.ts",
+      "line": 868,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts"
+      ],
+      "id": "src/ui/lobby-flow.ts#flowEliminated",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "flowTapEnd",
+      "file": "src/ui/lobby-flow.ts",
+      "line": 893,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 6,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts"
+      ],
+      "id": "src/ui/lobby-flow.ts#flowTapEnd",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "setFlowFireMode",
+      "file": "src/ui/lobby-flow.ts",
+      "line": 903,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts",
+        "src/ui/lobby-flow.test.ts"
+      ],
+      "id": "src/ui/lobby-flow.ts#setFlowFireMode",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "LOBBY_PAD",
+      "file": "src/ui/lobby-geometry.ts",
+      "line": 144,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [],
+      "id": "src/ui/lobby-geometry.ts#LOBBY_PAD",
+      "dark": true,
+      "verdictHint": "reexported-unused"
+    },
+    {
+      "name": "TITLE_HEIGHT",
+      "file": "src/ui/lobby-geometry.ts",
+      "line": 153,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/ui/lobby-geometry.ts#TITLE_HEIGHT",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "CLASS_TILE_COMPACT",
+      "file": "src/ui/lobby-geometry.ts",
+      "line": 214,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/ui/lobby-geometry.test.ts",
+        "src/ui/lobby-geometry.test.ts",
+        "src/ui/lobby-geometry.test.ts"
+      ],
+      "id": "src/ui/lobby-geometry.ts#CLASS_TILE_COMPACT",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "SEAT_ROW_FULL_WIDTH",
+      "file": "src/ui/lobby-geometry.ts",
+      "line": 662,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/ui/lobby-geometry.test.ts",
+        "src/ui/lobby-geometry.test.ts",
+        "src/ui/lobby-geometry.test.ts"
+      ],
+      "id": "src/ui/lobby-geometry.ts#SEAT_ROW_FULL_WIDTH",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "lobbyPlateRoles",
+      "file": "src/ui/lobby-view.ts",
+      "line": 1164,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/ui/lobby.test.ts",
+        "src/ui/lobby.test.ts"
+      ],
+      "id": "src/ui/lobby-view.ts#lobbyPlateRoles",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "LOBBY_SCREENS",
+      "file": "src/ui/lobby.ts",
+      "line": 920,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [],
+      "id": "src/ui/lobby.ts#LOBBY_SCREENS",
+      "dark": true,
+      "verdictHint": "reexported-unused"
+    },
+    {
+      "name": "seatDifficulty",
+      "file": "src/ui/lobby.ts",
+      "line": 1202,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 4,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/lobby.test.ts",
+        "src/ui/lobby.test.ts",
+        "src/ui/lobby.test.ts",
+        "src/ui/lobby.test.ts"
+      ],
+      "id": "src/ui/lobby.ts#seatDifficulty",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "pickShipClass",
+      "file": "src/ui/lobby.ts",
+      "line": 1344,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 5,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/lobby.test.ts",
+        "src/ui/ship-select.test.ts",
+        "src/ui/ship-select.test.ts",
+        "src/ui/ship-select.test.ts"
+      ],
+      "id": "src/ui/lobby.ts#pickShipClass",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "pickMap",
+      "file": "src/ui/lobby.ts",
+      "line": 1359,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 6,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/lobby.test.ts",
+        "src/ui/map-select.test.ts",
+        "src/ui/map-select.test.ts",
+        "src/ui/map-select.test.ts"
+      ],
+      "id": "src/ui/lobby.ts#pickMap",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "setPlayerName",
+      "file": "src/ui/lobby.ts",
+      "line": 1393,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 8,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/lobby.test.ts",
+        "src/ui/lobby.test.ts",
+        "src/ui/lobby.test.ts",
+        "src/ui/lobby.test.ts"
+      ],
+      "id": "src/ui/lobby.ts#setPlayerName",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "playerNameTable",
+      "file": "src/ui/lobby.ts",
+      "line": 1438,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/lobby.test.ts"
+      ],
+      "id": "src/ui/lobby.ts#playerNameTable",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "COLOR_ROSTER_SIZE",
+      "file": "src/ui/lobby.ts",
+      "line": 2307,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/ui/lobby.ts#COLOR_ROSTER_SIZE",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "mainMenuRoute",
+      "file": "src/ui/main-menu.ts",
+      "line": 139,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 4,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/main-menu.test.ts",
+        "src/ui/main-menu.test.ts",
+        "src/ui/main-menu.test.ts",
+        "src/ui/main-menu.test.ts"
+      ],
+      "id": "src/ui/main-menu.ts#mainMenuRoute",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "mapIndexOf",
+      "file": "src/ui/map-picker.ts",
+      "line": 119,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/map-picker.test.ts"
+      ],
+      "id": "src/ui/map-picker.ts#mapIndexOf",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "MAP_CARD_MIN_HEIGHT",
+      "file": "src/ui/map-picker.ts",
+      "line": 211,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/map-picker.test.ts"
+      ],
+      "id": "src/ui/map-picker.ts#MAP_CARD_MIN_HEIGHT",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "mapSelectPlateRoles",
+      "file": "src/ui/map-select.ts",
+      "line": 158,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/map-select.test.ts"
+      ],
+      "id": "src/ui/map-select.ts#mapSelectPlateRoles",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "mapSelectTargetKey",
+      "file": "src/ui/map-select.ts",
+      "line": 190,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/map-select.test.ts",
+        "src/ui/map-select.test.ts",
+        "src/ui/map-select.test.ts"
+      ],
+      "id": "src/ui/map-select.ts#mapSelectTargetKey",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "mapIdAtCard",
+      "file": "src/ui/map-select.ts",
+      "line": 197,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/map-select.test.ts",
+        "src/ui/map-select.test.ts"
+      ],
+      "id": "src/ui/map-select.ts#mapIdAtCard",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "MENU_COLUMN_MAX",
+      "file": "src/ui/menu-geometry.ts",
+      "line": 32,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [],
+      "id": "src/ui/menu-geometry.ts#MENU_COLUMN_MAX",
+      "dark": true,
+      "verdictHint": "reexported-unused"
+    },
+    {
+      "name": "centeredColumn",
+      "file": "src/ui/menu-geometry.ts",
+      "line": 59,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [],
+      "id": "src/ui/menu-geometry.ts#centeredColumn",
+      "dark": true,
+      "verdictHint": "reexported-unused"
+    },
+    {
+      "name": "NAV_SCREENS",
+      "file": "src/ui/menu-nav.ts",
+      "line": 90,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 8,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/ui/main-menu.test.ts",
+        "src/ui/main-menu.test.ts",
+        "src/ui/menu-nav.test.ts",
+        "src/ui/menu-nav.test.ts"
+      ],
+      "id": "src/ui/menu-nav.ts#NAV_SCREENS",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "screenExits",
+      "file": "src/ui/menu-nav.ts",
+      "line": 262,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 5,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/ui/menu-nav.test.ts",
+        "src/ui/menu-nav.test.ts",
+        "src/ui/menu-nav.test.ts",
+        "src/ui/menu-nav.test.ts"
+      ],
+      "id": "src/ui/menu-nav.ts#screenExits",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "reachesMainMenuWithoutMatch",
+      "file": "src/ui/menu-nav.ts",
+      "line": 272,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 7,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/ui/main-menu.test.ts",
+        "src/ui/menu-nav.test.ts",
+        "src/ui/menu-nav.test.ts",
+        "src/ui/menu-nav.test.ts"
+      ],
+      "id": "src/ui/menu-nav.ts#reachesMainMenuWithoutMatch",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "resolveFailureCopy",
+      "file": "src/ui/online-copy.ts",
+      "line": 107,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 5,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/online-copy.test.ts",
+        "src/ui/online-copy.test.ts",
+        "src/ui/online-copy.test.ts",
+        "src/ui/online-copy.test.ts"
+      ],
+      "id": "src/ui/online-copy.ts#resolveFailureCopy",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "crossRegionWarning",
+      "file": "src/ui/online-copy.ts",
+      "line": 180,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 4,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/online-copy.test.ts",
+        "src/ui/online-copy.test.ts",
+        "src/ui/online-copy.test.ts",
+        "src/ui/online-copy.test.ts"
+      ],
+      "id": "src/ui/online-copy.ts#crossRegionWarning",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "COST_FLOAT_RISE",
+      "file": "src/ui/press-feedback.ts",
+      "line": 88,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [],
+      "id": "src/ui/press-feedback.ts#COST_FLOAT_RISE",
+      "dark": true,
+      "verdictHint": "reexported-unused"
+    },
+    {
+      "name": "setReduceVfx",
+      "file": "src/ui/settings.ts",
+      "line": 208,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/settings.test.ts",
+        "src/ui/settings.test.ts"
+      ],
+      "id": "src/ui/settings.ts#setReduceVfx",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "SETTINGS_FONT",
+      "file": "src/ui/settings.ts",
+      "line": 588,
+      "kind": "const",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 0,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [],
+      "id": "src/ui/settings.ts#SETTINGS_FONT",
+      "dark": true,
+      "verdictHint": "unreferenced"
+    },
+    {
+      "name": "shipSelectPlateRoles",
+      "file": "src/ui/ship-select.ts",
+      "line": 185,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 1,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/ship-select.test.ts"
+      ],
+      "id": "src/ui/ship-select.ts#shipSelectPlateRoles",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "shipSelectTargetKey",
+      "file": "src/ui/ship-select.ts",
+      "line": 215,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 3,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/ship-select.test.ts",
+        "src/ui/ship-select.test.ts",
+        "src/ui/ship-select.test.ts"
+      ],
+      "id": "src/ui/ship-select.ts#shipSelectTargetKey",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "wheelLevel",
+      "file": "src/ui/wheel-nav.ts",
+      "line": 102,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 5,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 1
+      },
+      "testSites": [
+        "src/ui/wheel-nav.test.ts",
+        "src/ui/wheel-nav.test.ts",
+        "src/ui/wheel-nav.test.ts",
+        "src/ui/wheel-nav.test.ts"
+      ],
+      "id": "src/ui/wheel-nav.ts#wheelLevel",
+      "dark": true,
+      "verdictHint": "test-only"
+    },
+    {
+      "name": "placeWedgeLines",
+      "file": "src/ui/wheel-stack.ts",
+      "line": 331,
+      "kind": "function",
+      "booted": true,
+      "uses": {
+        "prod": 0,
+        "orphan": 0,
+        "test": 2,
+        "tool": 0,
+        "other": 0,
+        "internal": 0,
+        "reexport": 0
+      },
+      "testSites": [
+        "src/ui/hud-geometry.test.ts",
+        "src/ui/hud-geometry.test.ts"
+      ],
+      "id": "src/ui/wheel-stack.ts#placeWedgeLines",
+      "dark": true,
+      "verdictHint": "test-only"
+    }
+  ]
+}

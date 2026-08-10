@@ -1,0 +1,25 @@
+# A deliberately dark export is added to a file the gate already watches.
+$ cat >> src/platform/wheel-input.ts
+  /** Deliberately unwired, to prove the gate fires. */
+  export const GATE_DEMO_UNWIRED = 1;
+
+$ npm run dark-matter:check
+
+DARK MATTER: 1 new export that no production code calls.
+
+  src/platform/wheel-input.ts:328  GATE_DEMO_UNWIRED  [const]  (unreferenced)
+
+  An export nothing calls is either unfinished wiring or dead code.
+  This gate exists because `matchAbundance` shipped tested, covered, green
+  and uncalled, and every match ran the wrong wave schedule for weeks.
+
+  Wire it up, delete it, or — if it is a deliberate seam or public
+  surface — add it to tools/dark-matter-allowlist.json with a reason,
+  and record the verdict in docs/dark-matter-scan.md.
+  -> exit 1
+
+# …and with the export removed again:
+$ npm run dark-matter:check
+
+dark-matter-scan: no new dark exports (278 known, 1198 value exports scanned).
+  -> exit 0

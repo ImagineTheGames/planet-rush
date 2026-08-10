@@ -1,0 +1,35 @@
+{
+  "commit": "7e175ac (51e8445^)",
+  "scannedAt": "a1-09",
+  "entries": [
+    "src/main.ts",
+    "server/index.ts",
+    "allocator/index.ts",
+    "vite.config.ts"
+  ],
+  "finding": {
+    "name": "matchAbundance",
+    "file": "src/sim/match-config.ts",
+    "line": 83,
+    "kind": "function",
+    "booted": true,
+    "uses": {
+      "prod": 0,
+      "orphan": 0,
+      "test": 3,
+      "tool": 0,
+      "other": 0,
+      "internal": 0,
+      "reexport": 0
+    },
+    "prodSites": [],
+    "testSites": [
+      "src/sim/abundance.test.ts",
+      "src/sim/abundance.test.ts",
+      "src/sim/abundance.test.ts"
+    ],
+    "id": "src/sim/match-config.ts#matchAbundance",
+    "dark": true,
+    "verdictHint": "test-only"
+  }
+}

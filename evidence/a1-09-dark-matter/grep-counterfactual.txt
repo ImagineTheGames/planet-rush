@@ -1,0 +1,10 @@
+$ cd /tmp/dm-pre   # worktree at 51e8445^ = 7e175ac
+$ grep -rn "matchAbundance" --include='*.ts' src server tests harness | grep -v '\.test\.ts:'
+src/sim/match-config.ts:72:   * {@link matchAbundance}. Optional so pre-p11 configs (and the lobby before the
+src/sim/match-config.ts:74:   * SCARCE default ({@link matchAbundance}, `DEFAULT_ABUNDANCE`) — "by default
+src/sim/match-config.ts:83:export function matchAbundance(cfg: MatchConfig): Abundance {
+
+# …and the same trap at HEAD, an order of magnitude worse:
+$ grep -rn 'singlePrimary' --include='*.ts' src server | grep -v '\.test\.ts:' | wc -l
+22
+# every one of those is a comment or the declaration; production calls it zero times.
