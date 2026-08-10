@@ -412,12 +412,6 @@ reports. A check that is right a third of the time and costs one line to answer
 is worth keeping; the cost of being wrong the other two-thirds is a line of
 JSON, and the cost of not having it is `matchAbundance`, five times.
 
-**`--audit` is deliberately not in CI.** It has two hits today, both answered in
-§4.0, and it would print them on every run for as long as `vec.ts` keeps four
-dead members in a live file — a red-that-means-nothing is how the gate next to it
-would get disabled too. It is run by hand when this document is edited, or when a
-DEAD row is about to be acted on.
-
 Two things keep it from becoming noise nobody reads:
 
 - **It ignores `self-used`.** 826 value exports are called by their own module.
@@ -425,6 +419,13 @@ Two things keep it from becoming noise nobody reads:
 - **Stale allowlist entries are a note, not a failure.** When production starts
   calling something on the list, `--check` says so and stays green. Failing a
   build because someone *fixed* dark matter is how a check gets disabled.
+
+And the third, which is why `--audit` (a1-14, §4.0) is **deliberately not a CI
+step** next to it: `--audit` has a standing hit today — `vec.ts`, whose row is
+*correct* — and it will keep printing for as long as that file holds four dead
+members. A step that is amber every run, forever, teaches people to skip the
+window the real gate's output appears in. It is run by hand when this document
+is edited, or before a DEAD verdict is acted on, and it always exits 0.
 
 ## 6. What it cannot see
 
