@@ -1,0 +1,936 @@
+{
+  "pre": "111db86",
+  "served": "ebdae99",
+  "layers": {
+    "asteroids": {
+      "visibleTrue": 213,
+      "straddling": 86,
+      "drawn": 223,
+      "missing": 0,
+      "overdraw": 10
+    },
+    "chunks": {
+      "visibleTrue": 0,
+      "straddling": 0,
+      "drawn": 0,
+      "missing": 0,
+      "overdraw": 0
+    }
+  },
+  "profiles": {
+    "desktop-1280x800": {
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 21,
+          "straddling": 6,
+          "drawn": 23,
+          "missing": 0,
+          "overdraw": 2,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "desktop-1440x900": {
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 24,
+          "straddling": 0,
+          "drawn": 24,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "phone-landscape-844x390": {
+      "viewport": {
+        "width": 844,
+        "height": 390
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 6,
+          "straddling": 3,
+          "drawn": 6,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-380x390": {
+      "viewport": {
+        "width": 380,
+        "height": 390
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-420x390": {
+      "viewport": {
+        "width": 420,
+        "height": 390
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-460x390": {
+      "viewport": {
+        "width": 460,
+        "height": 390
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-500x390": {
+      "viewport": {
+        "width": 500,
+        "height": 390
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-540x390": {
+      "viewport": {
+        "width": 540,
+        "height": 390
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-580x390": {
+      "viewport": {
+        "width": 580,
+        "height": 390
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-620x390": {
+      "viewport": {
+        "width": 620,
+        "height": 390
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-660x390": {
+      "viewport": {
+        "width": 660,
+        "height": 390
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-700x390": {
+      "viewport": {
+        "width": 700,
+        "height": 390
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 1,
+          "straddling": 1,
+          "drawn": 1,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-740x390": {
+      "viewport": {
+        "width": 740,
+        "height": 390
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 3,
+          "straddling": 3,
+          "drawn": 3,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-780x390": {
+      "viewport": {
+        "width": 780,
+        "height": 390
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 4,
+          "straddling": 4,
+          "drawn": 6,
+          "missing": 0,
+          "overdraw": 2,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-820x390": {
+      "viewport": {
+        "width": 820,
+        "height": 390
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 6,
+          "straddling": 5,
+          "drawn": 6,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-860x390": {
+      "viewport": {
+        "width": 860,
+        "height": 390
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 6,
+          "straddling": 3,
+          "drawn": 6,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-900x390": {
+      "viewport": {
+        "width": 900,
+        "height": 390
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 6,
+          "straddling": 3,
+          "drawn": 6,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-940x390": {
+      "viewport": {
+        "width": 940,
+        "height": 390
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 6,
+          "straddling": 3,
+          "drawn": 7,
+          "missing": 0,
+          "overdraw": 1,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-980x390": {
+      "viewport": {
+        "width": 980,
+        "height": 390
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 8,
+          "straddling": 5,
+          "drawn": 10,
+          "missing": 0,
+          "overdraw": 2,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-1020x390": {
+      "viewport": {
+        "width": 1020,
+        "height": 390
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 12,
+          "straddling": 9,
+          "drawn": 12,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-1100x390": {
+      "viewport": {
+        "width": 1100,
+        "height": 390
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 12,
+          "straddling": 3,
+          "drawn": 12,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-1180x390": {
+      "viewport": {
+        "width": 1180,
+        "height": 390
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 12,
+          "straddling": 3,
+          "drawn": 12,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-1260x390": {
+      "viewport": {
+        "width": 1260,
+        "height": 390
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 12,
+          "straddling": 3,
+          "drawn": 12,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-1340x390": {
+      "viewport": {
+        "width": 1340,
+        "height": 390
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 12,
+          "straddling": 3,
+          "drawn": 12,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-844x300": {
+      "viewport": {
+        "width": 844,
+        "height": 300
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 3,
+          "straddling": 0,
+          "drawn": 5,
+          "missing": 0,
+          "overdraw": 2,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-844x340": {
+      "viewport": {
+        "width": 844,
+        "height": 340
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 5,
+          "straddling": 2,
+          "drawn": 6,
+          "missing": 0,
+          "overdraw": 1,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-844x380": {
+      "viewport": {
+        "width": 844,
+        "height": 380
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 6,
+          "straddling": 3,
+          "drawn": 6,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-844x420": {
+      "viewport": {
+        "width": 844,
+        "height": 420
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 6,
+          "straddling": 3,
+          "drawn": 6,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-844x460": {
+      "viewport": {
+        "width": 844,
+        "height": 460
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 6,
+          "straddling": 3,
+          "drawn": 6,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-844x500": {
+      "viewport": {
+        "width": 844,
+        "height": 500
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 6,
+          "straddling": 3,
+          "drawn": 6,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-844x560": {
+      "viewport": {
+        "width": 844,
+        "height": 560
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 6,
+          "straddling": 3,
+          "drawn": 6,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-844x620": {
+      "viewport": {
+        "width": 844,
+        "height": 620
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 6,
+          "straddling": 3,
+          "drawn": 6,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-844x680": {
+      "viewport": {
+        "width": 844,
+        "height": 680
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 6,
+          "straddling": 3,
+          "drawn": 6,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-844x740": {
+      "viewport": {
+        "width": 844,
+        "height": 740
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 6,
+          "straddling": 3,
+          "drawn": 6,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    },
+    "sweep-844x800": {
+      "viewport": {
+        "width": 844,
+        "height": 800
+      },
+      "worldHashPre": "4302b39e",
+      "worldHashServed": "4302b39e",
+      "layers": {
+        "asteroids": {
+          "visibleTrue": 6,
+          "straddling": 3,
+          "drawn": 6,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        },
+        "chunks": {
+          "visibleTrue": 0,
+          "straddling": 0,
+          "drawn": 0,
+          "missing": 0,
+          "overdraw": 0,
+          "missingDetail": []
+        }
+      }
+    }
+  },
+  "worst": [],
+  "profilesCompared": 35,
+  "straddleCasesChecked": 86,
+  "verdict": "CULL INNOCENT — no visible body was dropped"
+}

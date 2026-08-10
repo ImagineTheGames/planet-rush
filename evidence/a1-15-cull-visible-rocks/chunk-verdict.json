@@ -1,0 +1,82 @@
+{
+  "profile": "desktop-1280x800",
+  "pre": "111db86",
+  "served": "ebdae99",
+  "tolerancePx": 40,
+  "method": "chunks the pre-cull build DREW and whose rect reaches the viewport, matched to a chunk the served build DREW within TOL px",
+  "whyTolerance": "the two live builds are never on exactly the same tick; their HUD MATCH clocks differ by up to 1s, so exact position equality is the wrong test",
+  "tol": 40,
+  "onScreen": 2,
+  "matched": 2,
+  "missing": 0,
+  "offScreen": 9,
+  "offScreenWronglyDrawn": 0,
+  "offsets": [
+    6.9,
+    20.1
+  ],
+  "misses": [],
+  "offsetsPx": [
+    6.9,
+    20.1
+  ],
+  "maxOffsetPx": 20.1,
+  "comparableSamples": 9,
+  "totalSamples": 14,
+  "ignoringClockAgreement": {
+    "onScreen": 3,
+    "matched": 2,
+    "missing": 1,
+    "misses": [
+      {
+        "atMs": 21000,
+        "rect": [
+          122.867,
+          20.721,
+          134.867,
+          32.721
+        ],
+        "nearestPx": null
+      }
+    ]
+  },
+  "sensitivitySweep": [
+    {
+      "tol": 10,
+      "matched": 1,
+      "missing": 1,
+      "offScreenWronglyDrawn": 0
+    },
+    {
+      "tol": 20,
+      "matched": 1,
+      "missing": 1,
+      "offScreenWronglyDrawn": 0
+    },
+    {
+      "tol": 30,
+      "matched": 2,
+      "missing": 0,
+      "offScreenWronglyDrawn": 0
+    },
+    {
+      "tol": 40,
+      "matched": 2,
+      "missing": 0,
+      "offScreenWronglyDrawn": 0
+    },
+    {
+      "tol": 60,
+      "matched": 2,
+      "missing": 0,
+      "offScreenWronglyDrawn": 0
+    },
+    {
+      "tol": 100,
+      "matched": 2,
+      "missing": 0,
+      "offScreenWronglyDrawn": 0
+    }
+  ],
+  "verdict": "CHUNK CULL INNOCENT on this run — every on-screen chunk the pre-cull build drew was also drawn by the served build"
+}

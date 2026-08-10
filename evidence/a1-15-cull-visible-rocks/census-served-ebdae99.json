@@ -1,0 +1,3678 @@
+{
+  "label": "served-ebdae99",
+  "dist": "/lanes/lane-1/dist",
+  "buildSha": "ebdae99",
+  "builtAt": "2026-08-10T16:01:05.441Z",
+  "profiles": {
+    "desktop-1280x800": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 1280,
+        "h": 800,
+        "width": 1280,
+        "height": 800
+      },
+      "screen": {
+        "width": 1280,
+        "height": 800
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 23,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 212.865,
+            "minY": 245.151,
+            "maxX": 288.681,
+            "maxY": 320.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 225.128,
+            "minY": 262.032,
+            "maxX": 305.427,
+            "maxY": 342.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 209.831,
+            "minY": 479.206,
+            "maxX": 281.857,
+            "maxY": 551.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 184.614,
+            "minY": 547.235,
+            "maxX": 260.43,
+            "maxY": 623.051
+          },
+          {
+            "x": 1547.258,
+            "y": 1408.921,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 179.108,
+            "minY": 568.772,
+            "maxX": 259.407,
+            "maxY": 649.071
+          },
+          {
+            "x": 1382.875,
+            "y": 1545.82,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 18.862,
+            "minY": 709.807,
+            "maxX": 90.888,
+            "maxY": 781.833
+          },
+          {
+            "x": 1316.941,
+            "y": 1578.773,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -48.967,
+            "minY": 740.865,
+            "maxX": 26.849,
+            "maxY": 816.681
+          },
+          {
+            "x": 1297.818,
+            "y": 1593.278,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -70.331,
+            "minY": 753.128,
+            "maxX": 9.968,
+            "maxY": 833.427
+          },
+          {
+            "x": 1315.219,
+            "y": 826.156,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -48.794,
+            "minY": -9.857,
+            "maxX": 23.233,
+            "maxY": 62.169
+          },
+          {
+            "x": 1385.143,
+            "y": 849.478,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 19.235,
+            "minY": 11.57,
+            "maxX": 95.051,
+            "maxY": 87.386
+          },
+          {
+            "x": 1408.921,
+            "y": 852.742,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 40.772,
+            "minY": 12.593,
+            "maxX": 121.071,
+            "maxY": 92.892
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 181.807,
+            "minY": 181.112,
+            "maxX": 253.833,
+            "maxY": 253.138
+          },
+          {
+            "x": 1448.376,
+            "y": 1299.386,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 89.816,
+            "minY": 468.826,
+            "maxX": 150.936,
+            "maxY": 529.946
+          },
+          {
+            "x": 1467.568,
+            "y": 1294.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 105.147,
+            "minY": 459.76,
+            "maxX": 173.989,
+            "maxY": 528.603
+          },
+          {
+            "x": 1457.291,
+            "y": 1295.068,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 104.107,
+            "minY": 469.883,
+            "maxX": 154.475,
+            "maxY": 520.252
+          },
+          {
+            "x": 1305.352,
+            "y": 1445.904,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -53.208,
+            "minY": 615.344,
+            "maxX": 7.912,
+            "maxY": 676.464
+          },
+          {
+            "x": 1322.603,
+            "y": 1455.796,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -39.819,
+            "minY": 621.374,
+            "maxX": 29.024,
+            "maxY": 690.217
+          },
+          {
+            "x": 1314.709,
+            "y": 1449.155,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -38.475,
+            "minY": 623.971,
+            "maxX": 11.893,
+            "maxY": 674.339
+          },
+          {
+            "x": 1299.386,
+            "y": 951.624,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -59.174,
+            "minY": 121.064,
+            "maxX": 1.946,
+            "maxY": 182.184
+          },
+          {
+            "x": 1294.182,
+            "y": 932.432,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -68.24,
+            "minY": 98.011,
+            "maxX": 0.603,
+            "maxY": 166.853
+          },
+          {
+            "x": 1445.904,
+            "y": 1094.648,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 87.344,
+            "minY": 264.088,
+            "maxX": 148.464,
+            "maxY": 325.208
+          },
+          {
+            "x": 1455.796,
+            "y": 1077.397,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 93.374,
+            "minY": 242.976,
+            "maxX": 162.217,
+            "maxY": 311.819
+          },
+          {
+            "x": 1449.155,
+            "y": 1085.291,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 95.971,
+            "minY": 260.107,
+            "maxX": 146.339,
+            "maxY": 310.475
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "desktop-1280x800",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 1280,
+        "bottom": 800
+      }
+    },
+    "desktop-1440x900": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 1440,
+        "h": 900,
+        "width": 1440,
+        "height": 900
+      },
+      "screen": {
+        "width": 1440,
+        "height": 900
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 24,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 292.865,
+            "minY": 295.151,
+            "maxX": 368.681,
+            "maxY": 370.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 305.128,
+            "minY": 312.032,
+            "maxX": 385.427,
+            "maxY": 392.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 289.831,
+            "minY": 529.206,
+            "maxX": 361.857,
+            "maxY": 601.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 264.614,
+            "minY": 597.235,
+            "maxX": 340.43,
+            "maxY": 673.051
+          },
+          {
+            "x": 1547.258,
+            "y": 1408.921,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 259.108,
+            "minY": 618.772,
+            "maxX": 339.407,
+            "maxY": 699.071
+          },
+          {
+            "x": 1382.875,
+            "y": 1545.82,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 98.862,
+            "minY": 759.807,
+            "maxX": 170.888,
+            "maxY": 831.833
+          },
+          {
+            "x": 1316.941,
+            "y": 1578.773,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 31.033,
+            "minY": 790.865,
+            "maxX": 106.849,
+            "maxY": 866.681
+          },
+          {
+            "x": 1297.818,
+            "y": 1593.278,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 9.669,
+            "minY": 803.128,
+            "maxX": 89.968,
+            "maxY": 883.427
+          },
+          {
+            "x": 1315.219,
+            "y": 826.156,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 31.206,
+            "minY": 40.143,
+            "maxX": 103.233,
+            "maxY": 112.169
+          },
+          {
+            "x": 1385.143,
+            "y": 849.478,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 99.235,
+            "minY": 61.57,
+            "maxX": 175.051,
+            "maxY": 137.386
+          },
+          {
+            "x": 1408.921,
+            "y": 852.742,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 120.772,
+            "minY": 62.593,
+            "maxX": 201.071,
+            "maxY": 142.892
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 261.807,
+            "minY": 231.112,
+            "maxX": 333.833,
+            "maxY": 303.138
+          },
+          {
+            "x": 1448.376,
+            "y": 1299.386,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 169.816,
+            "minY": 518.826,
+            "maxX": 230.936,
+            "maxY": 579.946
+          },
+          {
+            "x": 1467.568,
+            "y": 1294.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 185.147,
+            "minY": 509.76,
+            "maxX": 253.989,
+            "maxY": 578.603
+          },
+          {
+            "x": 1457.291,
+            "y": 1295.068,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 184.107,
+            "minY": 519.883,
+            "maxX": 234.475,
+            "maxY": 570.252
+          },
+          {
+            "x": 1305.352,
+            "y": 1445.904,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 26.792,
+            "minY": 665.344,
+            "maxX": 87.912,
+            "maxY": 726.464
+          },
+          {
+            "x": 1322.603,
+            "y": 1455.796,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 40.181,
+            "minY": 671.374,
+            "maxX": 109.024,
+            "maxY": 740.217
+          },
+          {
+            "x": 1314.709,
+            "y": 1449.155,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 41.525,
+            "minY": 673.971,
+            "maxX": 91.893,
+            "maxY": 724.339
+          },
+          {
+            "x": 1299.386,
+            "y": 951.624,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 20.826,
+            "minY": 171.064,
+            "maxX": 81.946,
+            "maxY": 232.184
+          },
+          {
+            "x": 1294.182,
+            "y": 932.432,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 11.76,
+            "minY": 148.011,
+            "maxX": 80.603,
+            "maxY": 216.853
+          },
+          {
+            "x": 1295.068,
+            "y": 942.709,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 21.883,
+            "minY": 167.525,
+            "maxX": 72.252,
+            "maxY": 217.893
+          },
+          {
+            "x": 1445.904,
+            "y": 1094.648,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 167.344,
+            "minY": 314.088,
+            "maxX": 228.464,
+            "maxY": 375.208
+          },
+          {
+            "x": 1455.796,
+            "y": 1077.397,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 173.374,
+            "minY": 292.976,
+            "maxX": 242.217,
+            "maxY": 361.819
+          },
+          {
+            "x": 1449.155,
+            "y": 1085.291,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 175.971,
+            "minY": 310.107,
+            "maxX": 226.339,
+            "maxY": 360.475
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "desktop-1440x900",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 1440,
+        "bottom": 900
+      }
+    },
+    "phone-landscape-844x390": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 844,
+        "h": 390,
+        "width": 844,
+        "height": 390
+      },
+      "screen": {
+        "width": 844,
+        "height": 390
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 6,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -5.135,
+            "minY": 40.151,
+            "maxX": 70.681,
+            "maxY": 115.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 7.128,
+            "minY": 57.032,
+            "maxX": 87.427,
+            "maxY": 137.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -8.169,
+            "minY": 274.206,
+            "maxX": 63.857,
+            "maxY": 346.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -33.386,
+            "minY": 342.235,
+            "maxX": 42.43,
+            "maxY": 418.051
+          },
+          {
+            "x": 1547.258,
+            "y": 1408.921,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -38.892,
+            "minY": 363.772,
+            "maxX": 41.407,
+            "maxY": 444.071
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -36.193,
+            "minY": -23.888,
+            "maxX": 35.833,
+            "maxY": 48.138
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "phone-landscape-844x390",
+      "viewport": {
+        "width": 844,
+        "height": 390
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 844,
+        "bottom": 390
+      }
+    },
+    "sweep-380x390": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 380,
+        "h": 390,
+        "width": 380,
+        "height": 390
+      },
+      "screen": {
+        "width": 380,
+        "height": 390
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 0,
+        "items": []
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-380x390",
+      "viewport": {
+        "width": 380,
+        "height": 390
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 380,
+        "bottom": 390
+      }
+    },
+    "sweep-420x390": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 420,
+        "h": 390,
+        "width": 420,
+        "height": 390
+      },
+      "screen": {
+        "width": 420,
+        "height": 390
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 0,
+        "items": []
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-420x390",
+      "viewport": {
+        "width": 420,
+        "height": 390
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 420,
+        "bottom": 390
+      }
+    },
+    "sweep-460x390": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 460,
+        "h": 390,
+        "width": 460,
+        "height": 390
+      },
+      "screen": {
+        "width": 460,
+        "height": 390
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 0,
+        "items": []
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-460x390",
+      "viewport": {
+        "width": 460,
+        "height": 390
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 460,
+        "bottom": 390
+      }
+    },
+    "sweep-500x390": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 500,
+        "h": 390,
+        "width": 500,
+        "height": 390
+      },
+      "screen": {
+        "width": 500,
+        "height": 390
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 0,
+        "items": []
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-500x390",
+      "viewport": {
+        "width": 500,
+        "height": 390
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 500,
+        "bottom": 390
+      }
+    },
+    "sweep-540x390": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 540,
+        "h": 390,
+        "width": 540,
+        "height": 390
+      },
+      "screen": {
+        "width": 540,
+        "height": 390
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 0,
+        "items": []
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-540x390",
+      "viewport": {
+        "width": 540,
+        "height": 390
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 540,
+        "bottom": 390
+      }
+    },
+    "sweep-580x390": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 580,
+        "h": 390,
+        "width": 580,
+        "height": 390
+      },
+      "screen": {
+        "width": 580,
+        "height": 390
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 0,
+        "items": []
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-580x390",
+      "viewport": {
+        "width": 580,
+        "height": 390
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 580,
+        "bottom": 390
+      }
+    },
+    "sweep-620x390": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 620,
+        "h": 390,
+        "width": 620,
+        "height": 390
+      },
+      "screen": {
+        "width": 620,
+        "height": 390
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 0,
+        "items": []
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-620x390",
+      "viewport": {
+        "width": 620,
+        "height": 390
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 620,
+        "bottom": 390
+      }
+    },
+    "sweep-660x390": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 660,
+        "h": 390,
+        "width": 660,
+        "height": 390
+      },
+      "screen": {
+        "width": 660,
+        "height": 390
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 0,
+        "items": []
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-660x390",
+      "viewport": {
+        "width": 660,
+        "height": 390
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 660,
+        "bottom": 390
+      }
+    },
+    "sweep-700x390": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 700,
+        "h": 390,
+        "width": 700,
+        "height": 390
+      },
+      "screen": {
+        "width": 700,
+        "height": 390
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 1,
+        "items": [
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -64.872,
+            "minY": 57.032,
+            "maxX": 15.427,
+            "maxY": 137.331
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-700x390",
+      "viewport": {
+        "width": 700,
+        "height": 390
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 700,
+        "bottom": 390
+      }
+    },
+    "sweep-740x390": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 740,
+        "h": 390,
+        "width": 740,
+        "height": 390
+      },
+      "screen": {
+        "width": 740,
+        "height": 390
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 3,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -57.135,
+            "minY": 40.151,
+            "maxX": 18.681,
+            "maxY": 115.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -44.872,
+            "minY": 57.032,
+            "maxX": 35.427,
+            "maxY": 137.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -60.169,
+            "minY": 274.206,
+            "maxX": 11.857,
+            "maxY": 346.233
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-740x390",
+      "viewport": {
+        "width": 740,
+        "height": 390
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 740,
+        "bottom": 390
+      }
+    },
+    "sweep-780x390": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 780,
+        "h": 390,
+        "width": 780,
+        "height": 390
+      },
+      "screen": {
+        "width": 780,
+        "height": 390
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 6,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -37.135,
+            "minY": 40.151,
+            "maxX": 38.681,
+            "maxY": 115.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -24.872,
+            "minY": 57.032,
+            "maxX": 55.427,
+            "maxY": 137.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -40.169,
+            "minY": 274.206,
+            "maxX": 31.857,
+            "maxY": 346.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -65.386,
+            "minY": 342.235,
+            "maxX": 10.43,
+            "maxY": 418.051
+          },
+          {
+            "x": 1547.258,
+            "y": 1408.921,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -70.892,
+            "minY": 363.772,
+            "maxX": 9.407,
+            "maxY": 444.071
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -68.193,
+            "minY": -23.888,
+            "maxX": 3.833,
+            "maxY": 48.138
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-780x390",
+      "viewport": {
+        "width": 780,
+        "height": 390
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 780,
+        "bottom": 390
+      }
+    },
+    "sweep-820x390": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 820,
+        "h": 390,
+        "width": 820,
+        "height": 390
+      },
+      "screen": {
+        "width": 820,
+        "height": 390
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 6,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -17.135,
+            "minY": 40.151,
+            "maxX": 58.681,
+            "maxY": 115.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -4.872,
+            "minY": 57.032,
+            "maxX": 75.427,
+            "maxY": 137.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -20.169,
+            "minY": 274.206,
+            "maxX": 51.857,
+            "maxY": 346.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -45.386,
+            "minY": 342.235,
+            "maxX": 30.43,
+            "maxY": 418.051
+          },
+          {
+            "x": 1547.258,
+            "y": 1408.921,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -50.892,
+            "minY": 363.772,
+            "maxX": 29.407,
+            "maxY": 444.071
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -48.193,
+            "minY": -23.888,
+            "maxX": 23.833,
+            "maxY": 48.138
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-820x390",
+      "viewport": {
+        "width": 820,
+        "height": 390
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 820,
+        "bottom": 390
+      }
+    },
+    "sweep-860x390": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 860,
+        "h": 390,
+        "width": 860,
+        "height": 390
+      },
+      "screen": {
+        "width": 860,
+        "height": 390
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 6,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 2.865,
+            "minY": 40.151,
+            "maxX": 78.681,
+            "maxY": 115.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 15.128,
+            "minY": 57.032,
+            "maxX": 95.427,
+            "maxY": 137.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -0.169,
+            "minY": 274.206,
+            "maxX": 71.857,
+            "maxY": 346.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -25.386,
+            "minY": 342.235,
+            "maxX": 50.43,
+            "maxY": 418.051
+          },
+          {
+            "x": 1547.258,
+            "y": 1408.921,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -30.892,
+            "minY": 363.772,
+            "maxX": 49.407,
+            "maxY": 444.071
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -28.193,
+            "minY": -23.888,
+            "maxX": 43.833,
+            "maxY": 48.138
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-860x390",
+      "viewport": {
+        "width": 860,
+        "height": 390
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 860,
+        "bottom": 390
+      }
+    },
+    "sweep-900x390": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 900,
+        "h": 390,
+        "width": 900,
+        "height": 390
+      },
+      "screen": {
+        "width": 900,
+        "height": 390
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 6,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 22.865,
+            "minY": 40.151,
+            "maxX": 98.681,
+            "maxY": 115.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 35.128,
+            "minY": 57.032,
+            "maxX": 115.427,
+            "maxY": 137.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 19.831,
+            "minY": 274.206,
+            "maxX": 91.857,
+            "maxY": 346.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -5.386,
+            "minY": 342.235,
+            "maxX": 70.43,
+            "maxY": 418.051
+          },
+          {
+            "x": 1547.258,
+            "y": 1408.921,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -10.892,
+            "minY": 363.772,
+            "maxX": 69.407,
+            "maxY": 444.071
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -8.193,
+            "minY": -23.888,
+            "maxX": 63.833,
+            "maxY": 48.138
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-900x390",
+      "viewport": {
+        "width": 900,
+        "height": 390
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 900,
+        "bottom": 390
+      }
+    },
+    "sweep-940x390": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 940,
+        "h": 390,
+        "width": 940,
+        "height": 390
+      },
+      "screen": {
+        "width": 940,
+        "height": 390
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 7,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 42.865,
+            "minY": 40.151,
+            "maxX": 118.681,
+            "maxY": 115.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 55.128,
+            "minY": 57.032,
+            "maxX": 135.427,
+            "maxY": 137.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 39.831,
+            "minY": 274.206,
+            "maxX": 111.857,
+            "maxY": 346.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 14.614,
+            "minY": 342.235,
+            "maxX": 90.43,
+            "maxY": 418.051
+          },
+          {
+            "x": 1547.258,
+            "y": 1408.921,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 9.108,
+            "minY": 363.772,
+            "maxX": 89.407,
+            "maxY": 444.071
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 11.807,
+            "minY": -23.888,
+            "maxX": 83.833,
+            "maxY": 48.138
+          },
+          {
+            "x": 1467.568,
+            "y": 1294.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -64.853,
+            "minY": 254.76,
+            "maxX": 3.989,
+            "maxY": 323.603
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-940x390",
+      "viewport": {
+        "width": 940,
+        "height": 390
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 940,
+        "bottom": 390
+      }
+    },
+    "sweep-980x390": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 980,
+        "h": 390,
+        "width": 980,
+        "height": 390
+      },
+      "screen": {
+        "width": 980,
+        "height": 390
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 10,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 62.865,
+            "minY": 40.151,
+            "maxX": 138.681,
+            "maxY": 115.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 75.128,
+            "minY": 57.032,
+            "maxX": 155.427,
+            "maxY": 137.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 59.831,
+            "minY": 274.206,
+            "maxX": 131.857,
+            "maxY": 346.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 34.614,
+            "minY": 342.235,
+            "maxX": 110.43,
+            "maxY": 418.051
+          },
+          {
+            "x": 1547.258,
+            "y": 1408.921,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 29.108,
+            "minY": 363.772,
+            "maxX": 109.407,
+            "maxY": 444.071
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 31.807,
+            "minY": -23.888,
+            "maxX": 103.833,
+            "maxY": 48.138
+          },
+          {
+            "x": 1448.376,
+            "y": 1299.386,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -60.184,
+            "minY": 263.826,
+            "maxX": 0.936,
+            "maxY": 324.946
+          },
+          {
+            "x": 1467.568,
+            "y": 1294.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -44.853,
+            "minY": 254.76,
+            "maxX": 23.989,
+            "maxY": 323.603
+          },
+          {
+            "x": 1457.291,
+            "y": 1295.068,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -45.893,
+            "minY": 264.883,
+            "maxX": 4.475,
+            "maxY": 315.252
+          },
+          {
+            "x": 1455.796,
+            "y": 1077.397,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -56.626,
+            "minY": 37.976,
+            "maxX": 12.217,
+            "maxY": 106.819
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-980x390",
+      "viewport": {
+        "width": 980,
+        "height": 390
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 980,
+        "bottom": 390
+      }
+    },
+    "sweep-1020x390": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 1020,
+        "h": 390,
+        "width": 1020,
+        "height": 390
+      },
+      "screen": {
+        "width": 1020,
+        "height": 390
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 12,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 82.865,
+            "minY": 40.151,
+            "maxX": 158.681,
+            "maxY": 115.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 95.128,
+            "minY": 57.032,
+            "maxX": 175.427,
+            "maxY": 137.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 79.831,
+            "minY": 274.206,
+            "maxX": 151.857,
+            "maxY": 346.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 54.614,
+            "minY": 342.235,
+            "maxX": 130.43,
+            "maxY": 418.051
+          },
+          {
+            "x": 1547.258,
+            "y": 1408.921,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 49.108,
+            "minY": 363.772,
+            "maxX": 129.407,
+            "maxY": 444.071
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 51.807,
+            "minY": -23.888,
+            "maxX": 123.833,
+            "maxY": 48.138
+          },
+          {
+            "x": 1448.376,
+            "y": 1299.386,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -40.184,
+            "minY": 263.826,
+            "maxX": 20.936,
+            "maxY": 324.946
+          },
+          {
+            "x": 1467.568,
+            "y": 1294.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -24.853,
+            "minY": 254.76,
+            "maxX": 43.989,
+            "maxY": 323.603
+          },
+          {
+            "x": 1457.291,
+            "y": 1295.068,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -25.893,
+            "minY": 264.883,
+            "maxX": 24.475,
+            "maxY": 315.252
+          },
+          {
+            "x": 1445.904,
+            "y": 1094.648,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -42.656,
+            "minY": 59.088,
+            "maxX": 18.464,
+            "maxY": 120.208
+          },
+          {
+            "x": 1455.796,
+            "y": 1077.397,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -36.626,
+            "minY": 37.976,
+            "maxX": 32.217,
+            "maxY": 106.819
+          },
+          {
+            "x": 1449.155,
+            "y": 1085.291,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -34.029,
+            "minY": 55.107,
+            "maxX": 16.339,
+            "maxY": 105.475
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-1020x390",
+      "viewport": {
+        "width": 1020,
+        "height": 390
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 1020,
+        "bottom": 390
+      }
+    },
+    "sweep-1100x390": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 1100,
+        "h": 390,
+        "width": 1100,
+        "height": 390
+      },
+      "screen": {
+        "width": 1100,
+        "height": 390
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 12,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 122.865,
+            "minY": 40.151,
+            "maxX": 198.681,
+            "maxY": 115.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 135.128,
+            "minY": 57.032,
+            "maxX": 215.427,
+            "maxY": 137.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 119.831,
+            "minY": 274.206,
+            "maxX": 191.857,
+            "maxY": 346.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 94.614,
+            "minY": 342.235,
+            "maxX": 170.43,
+            "maxY": 418.051
+          },
+          {
+            "x": 1547.258,
+            "y": 1408.921,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 89.108,
+            "minY": 363.772,
+            "maxX": 169.407,
+            "maxY": 444.071
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 91.807,
+            "minY": -23.888,
+            "maxX": 163.833,
+            "maxY": 48.138
+          },
+          {
+            "x": 1448.376,
+            "y": 1299.386,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -0.184,
+            "minY": 263.826,
+            "maxX": 60.936,
+            "maxY": 324.946
+          },
+          {
+            "x": 1467.568,
+            "y": 1294.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 15.147,
+            "minY": 254.76,
+            "maxX": 83.989,
+            "maxY": 323.603
+          },
+          {
+            "x": 1457.291,
+            "y": 1295.068,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 14.107,
+            "minY": 264.883,
+            "maxX": 64.475,
+            "maxY": 315.252
+          },
+          {
+            "x": 1445.904,
+            "y": 1094.648,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -2.656,
+            "minY": 59.088,
+            "maxX": 58.464,
+            "maxY": 120.208
+          },
+          {
+            "x": 1455.796,
+            "y": 1077.397,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 3.374,
+            "minY": 37.976,
+            "maxX": 72.217,
+            "maxY": 106.819
+          },
+          {
+            "x": 1449.155,
+            "y": 1085.291,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 5.971,
+            "minY": 55.107,
+            "maxX": 56.339,
+            "maxY": 105.475
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-1100x390",
+      "viewport": {
+        "width": 1100,
+        "height": 390
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 1100,
+        "bottom": 390
+      }
+    },
+    "sweep-1180x390": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 1180,
+        "h": 390,
+        "width": 1180,
+        "height": 390
+      },
+      "screen": {
+        "width": 1180,
+        "height": 390
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 12,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 162.865,
+            "minY": 40.151,
+            "maxX": 238.681,
+            "maxY": 115.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 175.128,
+            "minY": 57.032,
+            "maxX": 255.427,
+            "maxY": 137.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 159.831,
+            "minY": 274.206,
+            "maxX": 231.857,
+            "maxY": 346.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 134.614,
+            "minY": 342.235,
+            "maxX": 210.43,
+            "maxY": 418.051
+          },
+          {
+            "x": 1547.258,
+            "y": 1408.921,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 129.108,
+            "minY": 363.772,
+            "maxX": 209.407,
+            "maxY": 444.071
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 131.807,
+            "minY": -23.888,
+            "maxX": 203.833,
+            "maxY": 48.138
+          },
+          {
+            "x": 1448.376,
+            "y": 1299.386,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 39.816,
+            "minY": 263.826,
+            "maxX": 100.936,
+            "maxY": 324.946
+          },
+          {
+            "x": 1467.568,
+            "y": 1294.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 55.147,
+            "minY": 254.76,
+            "maxX": 123.989,
+            "maxY": 323.603
+          },
+          {
+            "x": 1457.291,
+            "y": 1295.068,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 54.107,
+            "minY": 264.883,
+            "maxX": 104.475,
+            "maxY": 315.252
+          },
+          {
+            "x": 1445.904,
+            "y": 1094.648,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 37.344,
+            "minY": 59.088,
+            "maxX": 98.464,
+            "maxY": 120.208
+          },
+          {
+            "x": 1455.796,
+            "y": 1077.397,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 43.374,
+            "minY": 37.976,
+            "maxX": 112.217,
+            "maxY": 106.819
+          },
+          {
+            "x": 1449.155,
+            "y": 1085.291,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 45.971,
+            "minY": 55.107,
+            "maxX": 96.339,
+            "maxY": 105.475
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-1180x390",
+      "viewport": {
+        "width": 1180,
+        "height": 390
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 1180,
+        "bottom": 390
+      }
+    },
+    "sweep-1260x390": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 1260,
+        "h": 390,
+        "width": 1260,
+        "height": 390
+      },
+      "screen": {
+        "width": 1260,
+        "height": 390
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 12,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 202.865,
+            "minY": 40.151,
+            "maxX": 278.681,
+            "maxY": 115.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 215.128,
+            "minY": 57.032,
+            "maxX": 295.427,
+            "maxY": 137.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 199.831,
+            "minY": 274.206,
+            "maxX": 271.857,
+            "maxY": 346.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 174.614,
+            "minY": 342.235,
+            "maxX": 250.43,
+            "maxY": 418.051
+          },
+          {
+            "x": 1547.258,
+            "y": 1408.921,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 169.108,
+            "minY": 363.772,
+            "maxX": 249.407,
+            "maxY": 444.071
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 171.807,
+            "minY": -23.888,
+            "maxX": 243.833,
+            "maxY": 48.138
+          },
+          {
+            "x": 1448.376,
+            "y": 1299.386,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 79.816,
+            "minY": 263.826,
+            "maxX": 140.936,
+            "maxY": 324.946
+          },
+          {
+            "x": 1467.568,
+            "y": 1294.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 95.147,
+            "minY": 254.76,
+            "maxX": 163.989,
+            "maxY": 323.603
+          },
+          {
+            "x": 1457.291,
+            "y": 1295.068,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 94.107,
+            "minY": 264.883,
+            "maxX": 144.475,
+            "maxY": 315.252
+          },
+          {
+            "x": 1445.904,
+            "y": 1094.648,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 77.344,
+            "minY": 59.088,
+            "maxX": 138.464,
+            "maxY": 120.208
+          },
+          {
+            "x": 1455.796,
+            "y": 1077.397,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 83.374,
+            "minY": 37.976,
+            "maxX": 152.217,
+            "maxY": 106.819
+          },
+          {
+            "x": 1449.155,
+            "y": 1085.291,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 85.971,
+            "minY": 55.107,
+            "maxX": 136.339,
+            "maxY": 105.475
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-1260x390",
+      "viewport": {
+        "width": 1260,
+        "height": 390
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 1260,
+        "bottom": 390
+      }
+    },
+    "sweep-1340x390": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 1340,
+        "h": 390,
+        "width": 1340,
+        "height": 390
+      },
+      "screen": {
+        "width": 1340,
+        "height": 390
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 12,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 242.865,
+            "minY": 40.151,
+            "maxX": 318.681,
+            "maxY": 115.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 255.128,
+            "minY": 57.032,
+            "maxX": 335.427,
+            "maxY": 137.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 239.831,
+            "minY": 274.206,
+            "maxX": 311.857,
+            "maxY": 346.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 214.614,
+            "minY": 342.235,
+            "maxX": 290.43,
+            "maxY": 418.051
+          },
+          {
+            "x": 1547.258,
+            "y": 1408.921,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 209.108,
+            "minY": 363.772,
+            "maxX": 289.407,
+            "maxY": 444.071
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 211.807,
+            "minY": -23.888,
+            "maxX": 283.833,
+            "maxY": 48.138
+          },
+          {
+            "x": 1448.376,
+            "y": 1299.386,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 119.816,
+            "minY": 263.826,
+            "maxX": 180.936,
+            "maxY": 324.946
+          },
+          {
+            "x": 1467.568,
+            "y": 1294.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 135.147,
+            "minY": 254.76,
+            "maxX": 203.989,
+            "maxY": 323.603
+          },
+          {
+            "x": 1457.291,
+            "y": 1295.068,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 134.107,
+            "minY": 264.883,
+            "maxX": 184.475,
+            "maxY": 315.252
+          },
+          {
+            "x": 1445.904,
+            "y": 1094.648,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 117.344,
+            "minY": 59.088,
+            "maxX": 178.464,
+            "maxY": 120.208
+          },
+          {
+            "x": 1455.796,
+            "y": 1077.397,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 123.374,
+            "minY": 37.976,
+            "maxX": 192.217,
+            "maxY": 106.819
+          },
+          {
+            "x": 1449.155,
+            "y": 1085.291,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 125.971,
+            "minY": 55.107,
+            "maxX": 176.339,
+            "maxY": 105.475
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-1340x390",
+      "viewport": {
+        "width": 1340,
+        "height": 390
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 1340,
+        "bottom": 390
+      }
+    },
+    "sweep-844x300": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 844,
+        "h": 300,
+        "width": 844,
+        "height": 300
+      },
+      "screen": {
+        "width": 844,
+        "height": 300
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 5,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -5.135,
+            "minY": -4.849,
+            "maxX": 70.681,
+            "maxY": 70.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 7.128,
+            "minY": 12.032,
+            "maxX": 87.427,
+            "maxY": 92.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -8.169,
+            "minY": 229.206,
+            "maxX": 63.857,
+            "maxY": 301.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -33.386,
+            "minY": 297.235,
+            "maxX": 42.43,
+            "maxY": 373.051
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -36.193,
+            "minY": -68.888,
+            "maxX": 35.833,
+            "maxY": 3.138
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-844x300",
+      "viewport": {
+        "width": 844,
+        "height": 300
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 844,
+        "bottom": 300
+      }
+    },
+    "sweep-844x340": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 844,
+        "h": 340,
+        "width": 844,
+        "height": 340
+      },
+      "screen": {
+        "width": 844,
+        "height": 340
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 6,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -5.135,
+            "minY": 15.151,
+            "maxX": 70.681,
+            "maxY": 90.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 7.128,
+            "minY": 32.032,
+            "maxX": 87.427,
+            "maxY": 112.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -8.169,
+            "minY": 249.206,
+            "maxX": 63.857,
+            "maxY": 321.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -33.386,
+            "minY": 317.235,
+            "maxX": 42.43,
+            "maxY": 393.051
+          },
+          {
+            "x": 1547.258,
+            "y": 1408.921,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -38.892,
+            "minY": 338.772,
+            "maxX": 41.407,
+            "maxY": 419.071
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -36.193,
+            "minY": -48.888,
+            "maxX": 35.833,
+            "maxY": 23.138
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-844x340",
+      "viewport": {
+        "width": 844,
+        "height": 340
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 844,
+        "bottom": 340
+      }
+    },
+    "sweep-844x380": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 844,
+        "h": 380,
+        "width": 844,
+        "height": 380
+      },
+      "screen": {
+        "width": 844,
+        "height": 380
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 6,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -5.135,
+            "minY": 35.151,
+            "maxX": 70.681,
+            "maxY": 110.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 7.128,
+            "minY": 52.032,
+            "maxX": 87.427,
+            "maxY": 132.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -8.169,
+            "minY": 269.206,
+            "maxX": 63.857,
+            "maxY": 341.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -33.386,
+            "minY": 337.235,
+            "maxX": 42.43,
+            "maxY": 413.051
+          },
+          {
+            "x": 1547.258,
+            "y": 1408.921,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -38.892,
+            "minY": 358.772,
+            "maxX": 41.407,
+            "maxY": 439.071
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -36.193,
+            "minY": -28.888,
+            "maxX": 35.833,
+            "maxY": 43.138
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-844x380",
+      "viewport": {
+        "width": 844,
+        "height": 380
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 844,
+        "bottom": 380
+      }
+    },
+    "sweep-844x420": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 844,
+        "h": 420,
+        "width": 844,
+        "height": 420
+      },
+      "screen": {
+        "width": 844,
+        "height": 420
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 6,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -5.135,
+            "minY": 55.151,
+            "maxX": 70.681,
+            "maxY": 130.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 7.128,
+            "minY": 72.032,
+            "maxX": 87.427,
+            "maxY": 152.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -8.169,
+            "minY": 289.206,
+            "maxX": 63.857,
+            "maxY": 361.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -33.386,
+            "minY": 357.235,
+            "maxX": 42.43,
+            "maxY": 433.051
+          },
+          {
+            "x": 1547.258,
+            "y": 1408.921,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -38.892,
+            "minY": 378.772,
+            "maxX": 41.407,
+            "maxY": 459.071
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -36.193,
+            "minY": -8.888,
+            "maxX": 35.833,
+            "maxY": 63.138
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-844x420",
+      "viewport": {
+        "width": 844,
+        "height": 420
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 844,
+        "bottom": 420
+      }
+    },
+    "sweep-844x460": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 844,
+        "h": 460,
+        "width": 844,
+        "height": 460
+      },
+      "screen": {
+        "width": 844,
+        "height": 460
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 6,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -5.135,
+            "minY": 75.151,
+            "maxX": 70.681,
+            "maxY": 150.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 7.128,
+            "minY": 92.032,
+            "maxX": 87.427,
+            "maxY": 172.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -8.169,
+            "minY": 309.206,
+            "maxX": 63.857,
+            "maxY": 381.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -33.386,
+            "minY": 377.235,
+            "maxX": 42.43,
+            "maxY": 453.051
+          },
+          {
+            "x": 1547.258,
+            "y": 1408.921,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -38.892,
+            "minY": 398.772,
+            "maxX": 41.407,
+            "maxY": 479.071
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -36.193,
+            "minY": 11.112,
+            "maxX": 35.833,
+            "maxY": 83.138
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-844x460",
+      "viewport": {
+        "width": 844,
+        "height": 460
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 844,
+        "bottom": 460
+      }
+    },
+    "sweep-844x500": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 844,
+        "h": 500,
+        "width": 844,
+        "height": 500
+      },
+      "screen": {
+        "width": 844,
+        "height": 500
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 6,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -5.135,
+            "minY": 95.151,
+            "maxX": 70.681,
+            "maxY": 170.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 7.128,
+            "minY": 112.032,
+            "maxX": 87.427,
+            "maxY": 192.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -8.169,
+            "minY": 329.206,
+            "maxX": 63.857,
+            "maxY": 401.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -33.386,
+            "minY": 397.235,
+            "maxX": 42.43,
+            "maxY": 473.051
+          },
+          {
+            "x": 1547.258,
+            "y": 1408.921,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -38.892,
+            "minY": 418.772,
+            "maxX": 41.407,
+            "maxY": 499.071
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -36.193,
+            "minY": 31.112,
+            "maxX": 35.833,
+            "maxY": 103.138
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-844x500",
+      "viewport": {
+        "width": 844,
+        "height": 500
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 844,
+        "bottom": 500
+      }
+    },
+    "sweep-844x560": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 844,
+        "h": 560,
+        "width": 844,
+        "height": 560
+      },
+      "screen": {
+        "width": 844,
+        "height": 560
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 6,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -5.135,
+            "minY": 125.151,
+            "maxX": 70.681,
+            "maxY": 200.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 7.128,
+            "minY": 142.032,
+            "maxX": 87.427,
+            "maxY": 222.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -8.169,
+            "minY": 359.206,
+            "maxX": 63.857,
+            "maxY": 431.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -33.386,
+            "minY": 427.235,
+            "maxX": 42.43,
+            "maxY": 503.051
+          },
+          {
+            "x": 1547.258,
+            "y": 1408.921,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -38.892,
+            "minY": 448.772,
+            "maxX": 41.407,
+            "maxY": 529.071
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -36.193,
+            "minY": 61.112,
+            "maxX": 35.833,
+            "maxY": 133.138
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-844x560",
+      "viewport": {
+        "width": 844,
+        "height": 560
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 844,
+        "bottom": 560
+      }
+    },
+    "sweep-844x620": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 844,
+        "h": 620,
+        "width": 844,
+        "height": 620
+      },
+      "screen": {
+        "width": 844,
+        "height": 620
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 6,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -5.135,
+            "minY": 155.151,
+            "maxX": 70.681,
+            "maxY": 230.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 7.128,
+            "minY": 172.032,
+            "maxX": 87.427,
+            "maxY": 252.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -8.169,
+            "minY": 389.206,
+            "maxX": 63.857,
+            "maxY": 461.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -33.386,
+            "minY": 457.235,
+            "maxX": 42.43,
+            "maxY": 533.051
+          },
+          {
+            "x": 1547.258,
+            "y": 1408.921,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -38.892,
+            "minY": 478.772,
+            "maxX": 41.407,
+            "maxY": 559.071
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -36.193,
+            "minY": 91.112,
+            "maxX": 35.833,
+            "maxY": 163.138
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-844x620",
+      "viewport": {
+        "width": 844,
+        "height": 620
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 844,
+        "bottom": 620
+      }
+    },
+    "sweep-844x680": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 844,
+        "h": 680,
+        "width": 844,
+        "height": 680
+      },
+      "screen": {
+        "width": 844,
+        "height": 680
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 6,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -5.135,
+            "minY": 185.151,
+            "maxX": 70.681,
+            "maxY": 260.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 7.128,
+            "minY": 202.032,
+            "maxX": 87.427,
+            "maxY": 282.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -8.169,
+            "minY": 419.206,
+            "maxX": 63.857,
+            "maxY": 491.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -33.386,
+            "minY": 487.235,
+            "maxX": 42.43,
+            "maxY": 563.051
+          },
+          {
+            "x": 1547.258,
+            "y": 1408.921,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -38.892,
+            "minY": 508.772,
+            "maxX": 41.407,
+            "maxY": 589.071
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -36.193,
+            "minY": 121.112,
+            "maxX": 35.833,
+            "maxY": 193.138
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-844x680",
+      "viewport": {
+        "width": 844,
+        "height": 680
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 844,
+        "bottom": 680
+      }
+    },
+    "sweep-844x740": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 844,
+        "h": 740,
+        "width": 844,
+        "height": 740
+      },
+      "screen": {
+        "width": 844,
+        "height": 740
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 6,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -5.135,
+            "minY": 215.151,
+            "maxX": 70.681,
+            "maxY": 290.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 7.128,
+            "minY": 232.032,
+            "maxX": 87.427,
+            "maxY": 312.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -8.169,
+            "minY": 449.206,
+            "maxX": 63.857,
+            "maxY": 521.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -33.386,
+            "minY": 517.235,
+            "maxX": 42.43,
+            "maxY": 593.051
+          },
+          {
+            "x": 1547.258,
+            "y": 1408.921,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -38.892,
+            "minY": 538.772,
+            "maxX": 41.407,
+            "maxY": 619.071
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -36.193,
+            "minY": 151.112,
+            "maxX": 35.833,
+            "maxY": 223.138
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-844x740",
+      "viewport": {
+        "width": 844,
+        "height": 740
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 844,
+        "bottom": 740
+      }
+    },
+    "sweep-844x800": {
+      "worldHash": "4302b39e",
+      "seam": {
+        "w": 844,
+        "h": 800,
+        "width": 844,
+        "height": 800
+      },
+      "screen": {
+        "width": 844,
+        "height": 800
+      },
+      "resolution": 1,
+      "asteroids": {
+        "children": 6,
+        "items": [
+          {
+            "x": 1578.773,
+            "y": 1083.059,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -5.135,
+            "minY": 245.151,
+            "maxX": 70.681,
+            "maxY": 320.967
+          },
+          {
+            "x": 1593.278,
+            "y": 1102.182,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": 7.128,
+            "minY": 262.032,
+            "maxX": 87.427,
+            "maxY": 342.331
+          },
+          {
+            "x": 1573.844,
+            "y": 1315.219,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -8.169,
+            "minY": 479.206,
+            "maxX": 63.857,
+            "maxY": 551.233
+          },
+          {
+            "x": 1550.522,
+            "y": 1385.143,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -33.386,
+            "minY": 547.235,
+            "maxX": 42.43,
+            "maxY": 623.051
+          },
+          {
+            "x": 1547.258,
+            "y": 1408.921,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -38.892,
+            "minY": 568.772,
+            "maxX": 41.407,
+            "maxY": 649.071
+          },
+          {
+            "x": 1545.82,
+            "y": 1017.125,
+            "visible": true,
+            "renderable": true,
+            "alpha": 1,
+            "minX": -36.193,
+            "minY": 181.112,
+            "maxX": 35.833,
+            "maxY": 253.138
+          }
+        ]
+      },
+      "chunks": {
+        "children": 0,
+        "items": []
+      },
+      "profile": "sweep-844x800",
+      "viewport": {
+        "width": 844,
+        "height": 800
+      },
+      "pageErrors": [],
+      "visibleRect": {
+        "left": 0,
+        "top": 0,
+        "right": 844,
+        "bottom": 800
+      }
+    }
+  }
+}

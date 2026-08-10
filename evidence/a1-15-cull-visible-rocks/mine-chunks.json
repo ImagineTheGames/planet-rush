@@ -1,0 +1,601 @@
+{
+  "profile": "desktop-1280x800",
+  "pre": "111db86",
+  "served": "ebdae99",
+  "target": {
+    "x": 605,
+    "y": 590
+  },
+  "stepMs": 3000,
+  "samples": [
+    {
+      "atMs": 3000,
+      "worldsAgree": false,
+      "chunksInWorld": 2,
+      "chunkObjectsServed": 1,
+      "chunksRealPre": 2,
+      "chunksRealServed": 1,
+      "shipsDrawnPre": 8,
+      "shipsDrawnServed": 3,
+      "hudServed": [
+        "ORE",
+        "MATCH 0:04",
+        "ORE"
+      ],
+      "rawPre": [
+        {
+          "x": 1498.095,
+          "y": 826.733,
+          "visible": true,
+          "renderable": true,
+          "alpha": 1,
+          "minX": 164.095,
+          "minY": 20.733,
+          "maxX": 176.095,
+          "maxY": 32.733
+        },
+        {
+          "x": 910.977,
+          "y": 1569.319,
+          "visible": true,
+          "renderable": true,
+          "alpha": 1,
+          "minX": -423.023,
+          "minY": 763.319,
+          "maxX": -411.023,
+          "maxY": 775.319
+        }
+      ],
+      "rawServed": [
+        {
+          "x": 1491.247,
+          "y": 826.93,
+          "visible": true,
+          "renderable": true,
+          "alpha": 1,
+          "minX": 157.247,
+          "minY": 20.93,
+          "maxX": 169.247,
+          "maxY": 32.93
+        }
+      ],
+      "chunksVisibleTrue": 1,
+      "straddling": 0,
+      "chunksDrawnServed": 1,
+      "missing": 0,
+      "nearestChunkToShipPx": 600,
+      "missingDetail": [],
+      "hud": [
+        "ORE",
+        "MATCH 0:04",
+        "ORE"
+      ]
+    },
+    {
+      "atMs": 6000,
+      "worldsAgree": false,
+      "chunksInWorld": 5,
+      "chunkObjectsServed": 5,
+      "chunksRealPre": 1,
+      "chunksRealServed": 1,
+      "shipsDrawnPre": 8,
+      "shipsDrawnServed": 3,
+      "hudServed": [
+        "ORE",
+        "MATCH 0:07",
+        "ORE"
+      ],
+      "rawPre": [
+        {
+          "x": 1473.403,
+          "y": 1412.714,
+          "visible": true,
+          "renderable": true,
+          "alpha": 1,
+          "minX": 139.403,
+          "minY": 606.714,
+          "maxX": 151.403,
+          "maxY": 618.714
+        }
+      ],
+      "rawServed": [
+        {
+          "x": 1493.54,
+          "y": 1413.386,
+          "visible": true,
+          "renderable": true,
+          "alpha": 1,
+          "minX": 159.54,
+          "minY": 607.386,
+          "maxX": 171.54,
+          "maxY": 619.386
+        }
+      ],
+      "chunksVisibleTrue": 1,
+      "straddling": 0,
+      "chunksDrawnServed": 1,
+      "missing": 0,
+      "nearestChunkToShipPx": 538,
+      "missingDetail": [],
+      "hud": [
+        "ORE",
+        "MATCH 0:07",
+        "ORE"
+      ]
+    },
+    {
+      "atMs": 9000,
+      "worldsAgree": false,
+      "chunksInWorld": 5,
+      "chunkObjectsServed": 5,
+      "chunksRealPre": 1,
+      "chunksRealServed": 0,
+      "shipsDrawnPre": 8,
+      "shipsDrawnServed": 3,
+      "hudServed": [
+        "ORE",
+        "MATCH 0:10",
+        "ORE"
+      ],
+      "rawPre": [
+        {
+          "x": 1665.104,
+          "y": 1649.604,
+          "visible": true,
+          "renderable": true,
+          "alpha": 1,
+          "minX": 331.104,
+          "minY": 843.604,
+          "maxX": 343.104,
+          "maxY": 855.604
+        }
+      ],
+      "rawServed": [],
+      "chunksVisibleTrue": 0,
+      "straddling": 0,
+      "chunksDrawnServed": 0,
+      "missing": 0,
+      "nearestChunkToShipPx": null,
+      "missingDetail": [],
+      "hud": [
+        "ORE",
+        "MATCH 0:10",
+        "ORE"
+      ]
+    },
+    {
+      "atMs": 12000,
+      "worldsAgree": false,
+      "chunksInWorld": 5,
+      "chunkObjectsServed": 5,
+      "chunksRealPre": 0,
+      "chunksRealServed": 0,
+      "shipsDrawnPre": 8,
+      "shipsDrawnServed": 4,
+      "hudServed": [
+        "ORE",
+        "MATCH 0:13",
+        "ORE"
+      ],
+      "rawPre": [],
+      "rawServed": [],
+      "chunksVisibleTrue": 0,
+      "straddling": 0,
+      "chunksDrawnServed": 0,
+      "missing": 0,
+      "nearestChunkToShipPx": null,
+      "missingDetail": [],
+      "hud": [
+        "ORE",
+        "MATCH 0:13",
+        "ORE"
+      ]
+    },
+    {
+      "atMs": 15000,
+      "worldsAgree": false,
+      "chunksInWorld": 5,
+      "chunkObjectsServed": 5,
+      "chunksRealPre": 3,
+      "chunksRealServed": 0,
+      "shipsDrawnPre": 6,
+      "shipsDrawnServed": 2,
+      "hudServed": [
+        "ORE",
+        "MATCH 0:16",
+        "ORE"
+      ],
+      "rawPre": [
+        {
+          "x": 1370.16,
+          "y": 1694.153,
+          "visible": true,
+          "renderable": true,
+          "alpha": 1,
+          "minX": 36.16,
+          "minY": 888.153,
+          "maxX": 48.16,
+          "maxY": 900.153
+        },
+        {
+          "x": 1182.852,
+          "y": 937.488,
+          "visible": true,
+          "renderable": true,
+          "alpha": 1,
+          "minX": -151.148,
+          "minY": 131.488,
+          "maxX": -139.148,
+          "maxY": 143.488
+        },
+        {
+          "x": 1026.553,
+          "y": 1878.994,
+          "visible": true,
+          "renderable": true,
+          "alpha": 1,
+          "minX": -307.447,
+          "minY": 1072.994,
+          "maxX": -295.447,
+          "maxY": 1084.994
+        }
+      ],
+      "rawServed": [],
+      "chunksVisibleTrue": 0,
+      "straddling": 0,
+      "chunksDrawnServed": 0,
+      "missing": 0,
+      "nearestChunkToShipPx": null,
+      "missingDetail": [],
+      "hud": [
+        "ORE",
+        "MATCH 0:16",
+        "ORE"
+      ]
+    },
+    {
+      "atMs": 18000,
+      "worldsAgree": false,
+      "chunksInWorld": 5,
+      "chunkObjectsServed": 5,
+      "chunksRealPre": 1,
+      "chunksRealServed": 0,
+      "shipsDrawnPre": 6,
+      "shipsDrawnServed": 2,
+      "hudServed": [
+        "ORE",
+        "MATCH 0:19",
+        "ORE"
+      ],
+      "rawPre": [
+        {
+          "x": 1698.869,
+          "y": 1775.929,
+          "visible": true,
+          "renderable": true,
+          "alpha": 1,
+          "minX": 364.869,
+          "minY": 969.929,
+          "maxX": 376.869,
+          "maxY": 981.929
+        }
+      ],
+      "rawServed": [],
+      "chunksVisibleTrue": 0,
+      "straddling": 0,
+      "chunksDrawnServed": 0,
+      "missing": 0,
+      "nearestChunkToShipPx": null,
+      "missingDetail": [],
+      "hud": [
+        "ORE",
+        "MATCH 0:19",
+        "ORE"
+      ]
+    },
+    {
+      "atMs": 21000,
+      "worldsAgree": false,
+      "chunksInWorld": 5,
+      "chunkObjectsServed": 5,
+      "chunksRealPre": 1,
+      "chunksRealServed": 0,
+      "shipsDrawnPre": 8,
+      "shipsDrawnServed": 1,
+      "hudServed": [
+        "ORE",
+        "MATCH 0:22",
+        "ORE"
+      ],
+      "rawPre": [
+        {
+          "x": 1456.867,
+          "y": 826.721,
+          "visible": true,
+          "renderable": true,
+          "alpha": 1,
+          "minX": 122.867,
+          "minY": 20.721,
+          "maxX": 134.867,
+          "maxY": 32.721
+        }
+      ],
+      "rawServed": [],
+      "chunksVisibleTrue": 1,
+      "straddling": 0,
+      "chunksDrawnServed": 0,
+      "missing": 0,
+      "nearestChunkToShipPx": 633,
+      "missingDetail": [],
+      "hud": [
+        "ORE",
+        "MATCH 0:23",
+        "ORE"
+      ]
+    },
+    {
+      "atMs": 24000,
+      "worldsAgree": false,
+      "chunksInWorld": 5,
+      "chunkObjectsServed": 5,
+      "chunksRealPre": 1,
+      "chunksRealServed": 0,
+      "shipsDrawnPre": 8,
+      "shipsDrawnServed": 1,
+      "hudServed": [
+        "ORE",
+        "MATCH 0:25",
+        "ORE"
+      ],
+      "rawPre": [
+        {
+          "x": 1750.949,
+          "y": 603.589,
+          "visible": true,
+          "renderable": true,
+          "alpha": 1,
+          "minX": 416.949,
+          "minY": -202.411,
+          "maxX": 428.949,
+          "maxY": -190.411
+        }
+      ],
+      "rawServed": [],
+      "chunksVisibleTrue": 0,
+      "straddling": 0,
+      "chunksDrawnServed": 0,
+      "missing": 0,
+      "nearestChunkToShipPx": null,
+      "missingDetail": [],
+      "hud": [
+        "ORE",
+        "MATCH 0:26",
+        "ORE"
+      ]
+    },
+    {
+      "atMs": 27000,
+      "worldsAgree": false,
+      "chunksInWorld": 5,
+      "chunkObjectsServed": 5,
+      "chunksRealPre": 0,
+      "chunksRealServed": 0,
+      "shipsDrawnPre": 7,
+      "shipsDrawnServed": 1,
+      "hudServed": [
+        "ORE",
+        "MATCH 0:28",
+        "ORE"
+      ],
+      "rawPre": [],
+      "rawServed": [],
+      "chunksVisibleTrue": 0,
+      "straddling": 0,
+      "chunksDrawnServed": 0,
+      "missing": 0,
+      "nearestChunkToShipPx": null,
+      "missingDetail": [],
+      "hud": [
+        "ORE",
+        "MATCH 0:29",
+        "ORE"
+      ]
+    },
+    {
+      "atMs": 30000,
+      "worldsAgree": false,
+      "chunksInWorld": 5,
+      "chunkObjectsServed": 5,
+      "chunksRealPre": 0,
+      "chunksRealServed": 0,
+      "shipsDrawnPre": 7,
+      "shipsDrawnServed": 1,
+      "hudServed": [
+        "ORE",
+        "MATCH 0:31",
+        "ORE"
+      ],
+      "rawPre": [],
+      "rawServed": [],
+      "chunksVisibleTrue": 0,
+      "straddling": 0,
+      "chunksDrawnServed": 0,
+      "missing": 0,
+      "nearestChunkToShipPx": null,
+      "missingDetail": [],
+      "hud": [
+        "ORE",
+        "MATCH 0:32",
+        "ORE"
+      ]
+    },
+    {
+      "atMs": 33000,
+      "worldsAgree": false,
+      "chunksInWorld": 5,
+      "chunkObjectsServed": 5,
+      "chunksRealPre": 1,
+      "chunksRealServed": 0,
+      "shipsDrawnPre": 5,
+      "shipsDrawnServed": 1,
+      "hudServed": [
+        "ORE",
+        "MATCH 0:34",
+        "ORE"
+      ],
+      "rawPre": [
+        {
+          "x": 760.171,
+          "y": 1362.252,
+          "visible": true,
+          "renderable": true,
+          "alpha": 1,
+          "minX": -573.829,
+          "minY": 556.252,
+          "maxX": -561.829,
+          "maxY": 568.252
+        }
+      ],
+      "rawServed": [],
+      "chunksVisibleTrue": 0,
+      "straddling": 0,
+      "chunksDrawnServed": 0,
+      "missing": 0,
+      "nearestChunkToShipPx": null,
+      "missingDetail": [],
+      "hud": [
+        "ORE",
+        "MATCH 0:35",
+        "ORE"
+      ]
+    },
+    {
+      "atMs": 36000,
+      "worldsAgree": false,
+      "chunksInWorld": 5,
+      "chunkObjectsServed": 5,
+      "chunksRealPre": 1,
+      "chunksRealServed": 0,
+      "shipsDrawnPre": 6,
+      "shipsDrawnServed": 1,
+      "hudServed": [
+        "ORE",
+        "MATCH 0:38",
+        "ORE"
+      ],
+      "rawPre": [
+        {
+          "x": 763.022,
+          "y": 1362.252,
+          "visible": true,
+          "renderable": true,
+          "alpha": 1,
+          "minX": -570.978,
+          "minY": 556.252,
+          "maxX": -558.978,
+          "maxY": 568.252
+        }
+      ],
+      "rawServed": [],
+      "chunksVisibleTrue": 0,
+      "straddling": 0,
+      "chunksDrawnServed": 0,
+      "missing": 0,
+      "nearestChunkToShipPx": null,
+      "missingDetail": [],
+      "hud": [
+        "ORE",
+        "MATCH 0:38",
+        "ORE"
+      ]
+    },
+    {
+      "atMs": 39000,
+      "worldsAgree": false,
+      "chunksInWorld": 5,
+      "chunkObjectsServed": 5,
+      "chunksRealPre": 1,
+      "chunksRealServed": 0,
+      "shipsDrawnPre": 7,
+      "shipsDrawnServed": 1,
+      "hudServed": [
+        "ORE",
+        "MATCH 0:41",
+        "ORE"
+      ],
+      "rawPre": [
+        {
+          "x": 763.045,
+          "y": 1362.252,
+          "visible": true,
+          "renderable": true,
+          "alpha": 1,
+          "minX": -570.955,
+          "minY": 556.252,
+          "maxX": -558.955,
+          "maxY": 568.252
+        }
+      ],
+      "rawServed": [],
+      "chunksVisibleTrue": 0,
+      "straddling": 0,
+      "chunksDrawnServed": 0,
+      "missing": 0,
+      "nearestChunkToShipPx": null,
+      "missingDetail": [],
+      "hud": [
+        "ORE",
+        "MATCH 0:41",
+        "ORE"
+      ]
+    },
+    {
+      "atMs": 42000,
+      "worldsAgree": false,
+      "chunksInWorld": 5,
+      "chunkObjectsServed": 5,
+      "chunksRealPre": 1,
+      "chunksRealServed": 0,
+      "shipsDrawnPre": 8,
+      "shipsDrawnServed": 2,
+      "hudServed": [
+        "ORE",
+        "MATCH 0:44",
+        "ORE"
+      ],
+      "rawPre": [
+        {
+          "x": 763.045,
+          "y": 1362.252,
+          "visible": true,
+          "renderable": true,
+          "alpha": 1,
+          "minX": -570.955,
+          "minY": 556.252,
+          "maxX": -558.955,
+          "maxY": 568.252
+        }
+      ],
+      "rawServed": [],
+      "chunksVisibleTrue": 0,
+      "straddling": 0,
+      "chunksDrawnServed": 0,
+      "missing": 0,
+      "nearestChunkToShipPx": null,
+      "missingDetail": [],
+      "hud": [
+        "ORE",
+        "MATCH 0:44",
+        "ORE"
+      ]
+    }
+  ],
+  "totals": {
+    "samples": 14,
+    "peakChunksInWorld": 5,
+    "chunksVisibleTrue": 3,
+    "straddling": 0,
+    "missing": 0,
+    "divergentSamples": 14
+  }
+}
