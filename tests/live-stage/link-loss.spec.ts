@@ -164,7 +164,13 @@ async function gag(on: boolean): Promise<void> {
 async function press(page: Page, selector: string, answered: () => Promise<void>): Promise<void> {
   await expect(async () => {
     const box = await page.locator(selector).boundingBox();
-    expect(box, `${selector} is not on screen`).not.toBeNull();
+    if (!box) {
+      // Say WHICH card is up when the button is missing — "not on screen" alone
+      // cannot tell a broken install from a link that recovered while we watched.
+      const card = await page.locator(TITLE).textContent().catch(() => '(no title)');
+      const gone = (await page.locator(ROOT).getAttribute('hidden').catch(() => null)) !== null;
+      expect(box, `${selector} is not on screen — card says "${card}", overlay hidden=${gone}`).not.toBeNull();
+    }
     await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2);
     await answered();
   }).toPass({ timeout: 45_000 });
