@@ -16,7 +16,7 @@ import {
   hitPanel,
   hitWheel,
   segmentIndexAt,
-  INNER_FRACTION,
+  hubRadius,
   PANEL_ROWS_TOP,
 } from './wheel-input';
 import { WHEEL_ORDER, segmentAtDirection } from '../ui';
@@ -56,7 +56,7 @@ describe('hitWheel', () => {
 
   it('reads the hub as a miss, never as a purchase', () => {
     expect(hitWheel(200, 150, WHEEL).kind).toBe('hub');
-    const justInside = WHEEL.radius * INNER_FRACTION - 1;
+    const justInside = hubRadius(WHEEL.radius) - 1;
     expect(hitWheel(200, 150 - justInside, WHEEL).kind).toBe('hub');
   });
 
@@ -67,8 +67,8 @@ describe('hitWheel', () => {
     // one number. This is the guard against it coming back: the behaviour the
     // constant was describing is asserted here, at every radius it covered, so
     // re-introducing a separate hub radius has to survive these presses rather
-    // than merely compile. The wheel's dead centre is `INNER_FRACTION` and only
-    // `INNER_FRACTION`.
+    // than merely compile. The wheel's dead centre is the hub the wheel is drawn
+    // with, and only that.
     for (const fraction of [0, 0.1, 0.22, 0.29]) {
       const r = WHEEL.radius * fraction;
       expect(hitWheel(200, 150 - r, WHEEL).kind, `at ${fraction}r`).toBe('hub');
@@ -76,10 +76,21 @@ describe('hitWheel', () => {
     }
     // …and the first ring radius outside it still buys, so the guard above is
     // pinning a boundary rather than a wheel that refuses every press.
-    expect(hitWheel(200, 150 - WHEEL.radius * 0.31, WHEEL)).toEqual({
+    //
+    // MOVED, DELIBERATELY (u13-01): this line read `0.31` until the hit boundary
+    // was moved onto the drawn one. 0.31r was never "the first radius outside the
+    // hub" — it sat *inside* the disputed 0.300–0.319 band, i.e. inside the
+    // painted hub, and it asserted `segment` because that is what the code did,
+    // not because that is what the wheel showed. It is the bug this guard was
+    // written beside rather than a second guard, so it moves out to 0.33r, which
+    // is on the ring under every profile; 0.31r's new answer — `hub` — is pinned
+    // by name in the u13-01 cases below, so nothing that this line used to cover
+    // is now uncovered.
+    expect(hitWheel(200, 150 - WHEEL.radius * 0.33, WHEEL)).toEqual({
       kind: 'segment',
       index: 0,
     });
+    expect(hitWheel(200, 150 - WHEEL.radius * 0.31, WHEEL).kind).toBe('hub');
   });
 
   it('reads the drawn hub\'s rim as hub, not as a purchase (u13-01)', () => {
