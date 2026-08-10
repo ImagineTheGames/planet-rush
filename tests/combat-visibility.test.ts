@@ -59,6 +59,26 @@ interface Fixture {
   stationPos: { x: number; y: number };
 }
 
+/**
+ * A window that contains the whole 4000×4000 siege fixture.
+ *
+ * ── Touched by a1-12 (Platform), and deliberately narrowly ───────────────────
+ * The render layer now submits only what the camera is showing
+ * (`src/render/cull.ts`): 200 rocks were being handed to the GPU to show 6 on a
+ * landscape phone. This fixture deliberately places its two shooters ~2800 units
+ * apart — an attacker besieging station 2 at (1000, 1000) and a turret firing
+ * from station 1 at (3000, 3000) — so on an 800×600 window the camera can only
+ * ever be looking at one of them.
+ *
+ * The claim these cases make is unchanged and is not about distance: combat
+ * visuals are driven from **combat state**, not from the local player's fire
+ * input, so a shot draws whoever the camera follows. That is what the widened
+ * window keeps asking. What it stops asking is "are both shooters within 400
+ * units of the camera", which was never the field report — nobody ever saw an
+ * enemy shooting their station from two screens away either.
+ */
+const SIEGE_VIEW = { width: 9000, height: 9000, originX: 0, originY: 0 };
+
 function combatFixture(): Fixture {
   const world = createWorld({
     seed: 3,
@@ -177,7 +197,7 @@ describe('combat visibility — every shooter is seen from sim state', () => {
     // ship and turret alike — so it is visible even though the camera follows a
     // different player (the attacker is not the local slot).
     const stage = new Container();
-    const renderer = new Renderer(stage, { width: 800, height: 600, originX: 0, originY: 0 });
+    const renderer = new Renderer(stage, SIEGE_VIEW);
     renderer.draw(world, { cameraTarget: 1, muzzles: [] });
     expect(visibleChildren(shotLayer(stage)).length).toBeGreaterThanOrEqual(1);
 
@@ -232,7 +252,7 @@ describe('combat visibility — every shooter is seen from sim state', () => {
     // flash draws in the muzzles layer; every active shot (ship + turret) draws in
     // the shots layer — so neither shooter is invisible, whoever the camera follows.
     const stage = new Container();
-    const renderer = new Renderer(stage, { width: 800, height: 600, originX: 0, originY: 0 });
+    const renderer = new Renderer(stage, SIEGE_VIEW);
     const views = flashes.map(toMuzzleView);
     renderer.draw(world, { cameraTarget: 2, muzzles: views });
 
