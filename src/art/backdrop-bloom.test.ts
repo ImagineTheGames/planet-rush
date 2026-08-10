@@ -107,7 +107,11 @@ function starLayers(b: VoidBackdrop): Map<string, Graphics> {
   return out;
 }
 
-function boot(view = VIEW, mapId: MapId = 'octagon', reduced = false): VoidBackdrop {
+function boot(
+  view: { readonly w: number; readonly h: number } = VIEW,
+  mapId: MapId = 'octagon',
+  reduced = false,
+): VoidBackdrop {
   const b = new VoidBackdrop();
   b.setMap(mapId);
   if (reduced) b.setReduceVfx(true);
