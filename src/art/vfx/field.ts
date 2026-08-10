@@ -108,6 +108,8 @@ export class VfxField {
   private readonly hitNext = new Float32Array(SLOTS);
   /** Tells this field has actually DRAWN, per kind — see {@link drawn}. */
   private readonly tally = new Int32Array(TELL_COUNT);
+  /** Who owned the last drawn tell of each kind — see {@link drawnBy}. */
+  private readonly tallyBy = new Int8Array(TELL_COUNT).fill(-1);
 
   constructor(options: VfxFieldOptions = {}) {
     this.pool = new ParticlePool(options.capacity ?? PARTICLE_CAPACITY);
@@ -225,7 +227,10 @@ export class VfxField {
           break;
       }
 
-      if (pool.count + pool.stolen !== before) this.tally[kind]!++;
+      if (pool.count + pool.stolen !== before) {
+        this.tally[kind]!++;
+        this.tallyBy[kind] = player;
+      }
     }
   }
 
@@ -245,6 +250,7 @@ export class VfxField {
     this.time = 0;
     this.hitNext.fill(0);
     this.tally.fill(0);
+    this.tallyBy.fill(-1);
   }
 
   /** Live particles. */
@@ -265,6 +271,20 @@ export class VfxField {
    */
   drawn(kind: TellKind): number {
     return this.tally[kind] ?? 0;
+  }
+
+  /**
+   * The slot that owned the last drawn tell of `kind`, or −1 for nobody yet (and
+   * for the tells that belong to nobody — a rock, the arena centre).
+   *
+   * This is what lets a live-stage test ATTRIBUTE a burst. On a running match
+   * eight ships are mining and dying, so "the ore-pickup counter went up" is a
+   * claim about the board, not about the thing the test just staged; "the last
+   * ore pickup this field drew was the LOCAL seat's" is the claim that catches a
+   * dead wire, on a stage busy enough to be real.
+   */
+  drawnBy(kind: TellKind): number {
+    return this.tallyBy[kind] ?? -1;
   }
 
   /** Tells drawn since the last {@link reset}, all kinds — "is anything alive?" */

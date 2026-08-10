@@ -5263,14 +5263,21 @@ async function boot(): Promise<void> {
         /** Per-kind draw counts, keyed by tell name (`art/tells` TELL_NAMES) —
          *  the "which of the 25 are wired" readout. */
         drawn: Record<string, number>;
+        /** Who owned each kind's LAST drawn tell, −1 for nobody. On a running
+         *  match eight ships are mining and dying, so this is what attributes a
+         *  burst to the seat a test just staged rather than to the board. */
+        drawnBy: Record<string, number>;
         /** True while the frozen review sheet is what is on screen, so a test can
          *  tell a staged golden apart from a live match (`vfx/showcase.ts`). */
         frozen: boolean;
       } {
         const drawn: Record<string, number> = {};
+        const drawnBy: Record<string, number> = {};
         for (let kind = 0; kind < TELL_NAMES.length; kind++) {
           const name = TELL_NAMES[kind];
-          if (name) drawn[name] = vfxField.drawn(kind as TellKind);
+          if (!name) continue;
+          drawn[name] = vfxField.drawn(kind as TellKind);
+          drawnBy[name] = vfxField.drawnBy(kind as TellKind);
         }
         return {
           attached: vfxLayer.parent !== null,
@@ -5280,6 +5287,7 @@ async function boot(): Promise<void> {
           reduced: vfxField.quality < 1,
           drawnTotal: vfxField.drawnTotal,
           drawn,
+          drawnBy,
           frozen: vfxShowcased,
         };
       },
