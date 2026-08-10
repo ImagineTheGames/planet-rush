@@ -215,7 +215,8 @@ describe('the capture — what the two screens actually showed', () => {
     // output is the sentence the brief asks for — "one volley = one set of shots on
     // BOTH screens" — with the frames written down instead of described. Printed
     // rather than snapshotted so a reviewer reads it in the CI log, the same way
-    // `src/net/spike/spike.bench.test.ts` publishes its measurements.
+    // `src/net/reconcile-capture.test.ts` publishes its telemetry. (This used to
+    // cite the day-0 spike bench, deleted as dead code by n7-01.)
     const rows: string[] = [];
     let seats: [PlayerId, PlayerId] = [0, 1];
 
