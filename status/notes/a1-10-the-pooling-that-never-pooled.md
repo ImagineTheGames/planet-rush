@@ -7,94 +7,102 @@ you work; a future you reads it first. This is a working note, not evidence —
 ## BUILT
 <!-- what is actually finished, with the commit that did it -->
 
-- Branch `agent/platform/a1-10-atlas-pooling-measured` cut from `main` @ `0f84bf7`.
-- `2e06ced` — the A/B rig: `spikes/atlas-pooling/{bench.html,bench.ts,run.mjs,tsconfig.json}`.
-  Real WebGL in Chromium with vsync off, the GDD §4.3 stress scene from
-  `harness/perf.ts`, draw calls counted by patching `WebGL2RenderingContext`.
+Branch `agent/platform/a1-10-atlas-pooling-measured`, cut from `main` @ `0f84bf7`.
 
-### First numbers (box: ANGLE / SwiftShader — software GL, no GPU)
-
-    baseline (SHIPPED renderer, 668 entities)
-      median 97.10 ms · 10.3 fps · 263 draw calls/frame · VfxAutoQuality: ENGAGES
-
-    scenario           n     pooled  draws/f   median ms
-    rocks:graphics     200   200     200.0     31.20      <- what ships
-    rocks:sprites      200    60       3.5      7.10      <- atlas.ts's path
-    rocks:contexts     200    58     200.0     27.90
-    turrets:graphics    32    32      32.0     11.30
-    turrets:sprites     32    24       1.0      6.80
-    shots:graphics     300   300       1.0     14.00
-    shots:sprites      300     4       1.0      6.30
-
-Read with care — there is a ~6 ms empty-stage floor in every row (clear+present
-at 1280×800), which is why the rig now measures that floor explicitly. Marginal
-rock-layer cost is therefore ~25 ms vector vs ~1 ms pooled.
+- `2e06ced` + `765a572` — **the A/B rig**, `spikes/atlas-pooling/`. Real WebGL in
+  Chromium with vsync off, the GDD §4.3 stress scene from `harness/perf.ts`, draw
+  calls counted by patching `WebGL2RenderingContext.prototype.draw*`. Carries its
+  own `tsconfig.json` (root `include` has no `spikes`, and adding it breaks on
+  three pre-existing spikes that belong to other agents). `README.md` says how to
+  re-run it.
+- `53535ad` — **the guard**, `src/render/draw-cost.test.ts`. Headless. Pins the
+  two facts the report rests on so the deferral cannot rot in a document.
+- `92be282` — **the deliverable**, `docs/atlas-pooling-measured.md`, plus the raw
+  capture at `evidence/a1-10-atlas-pooling/capture-swiftshader.json`.
+- `d71918c` — separate, shared-tooling: the eleven `atlas.ts` reason strings in
+  `tools/dark-matter-allowlist.json` now read "dark by deferral, not deadness".
 
 ## DECISIONS
 <!-- why you chose an approach, what you rejected, and the trap you hit -->
 
-**The premise needed checking before the measurement.** `a2-07` ("just wired the
-VFX presenter") is **not on `main`** — `git merge-base --is-ancestor 41ca60c HEAD`
-says NOT-in-main; it lives on `agent/art/a2-07-wire-the-vfx-presenter` with 6
-commits. So the "particles are drawing for the first time" frame is not the
-frame `main` renders today. Measurement plan therefore covers BOTH: `main`'s
-scene, and `main` + `a2-07` merged locally, so the number the brief is worried
-about actually exists.
+**The verdict: the pooling PAYS, and it was NOT wired.** Both halves matter.
 
-**What "the direct-draw path" actually is.** `src/render/index.ts` is not
-un-pooled. Every hot path already key-guards its geometry: `asteroidKeys`,
-`turretKeys`, `scaffoldKeys`, `shotKeys`, `stationDrawnDead`. Geometry is
-rebuilt only on a look change; a steady frame writes transforms only. So the
-brief's A/B is **not** "pooled vs unpooled" — it is:
+Numbers (floor-subtracted, SwiftShader box, `docs/atlas-pooling-measured.md` §3):
 
-  - A: one `Graphics` (own `GraphicsContext`) per entity, geometry key-guarded
-  - B: one `Sprite` per entity, all sharing ~N `Texture`s from
-    `SpriteTextureCache` (what `atlas.ts` exists to key)
+    rocks    26.10 ms / 200 draws  →  3.90 ms / 1.8 draws   (46 textures for 200 rocks)
+    turrets   8.30 ms /  32 draws  →  3.70 ms / 1.0 draw
+    shots    11.70 ms              →  3.50 ms, 300 looks over 4 textures
 
-The difference that can actually move a frame is **batching**: N distinct
-GraphicsContexts cannot batch with each other; N Sprites over a few textures
-collapse into a handful of draw calls. That is the number to measure, and it is
-hardware-independent, which matters because this box has no real GPU.
+**Why not wired.** The brief says "pooling pays → wire it" AND "if a golden moves
+you have gone out of scope". A raster of a vector is never the vector, and there
+are five frozen-scene goldens at `maxDiffPixelRatio: 0.01`. Those two
+instructions cannot both be satisfied, and the goldens are Art's/QA's to re-cut.
+Reported as a conflict in the doc's summary rather than resolved silently either
+way. **`atlas.ts` is NOT deleted** — deletion was the honest fix only in the
+branch where the pooling does not pay.
 
-**The tension the numbers create, which the brief does not resolve.** Pooling
-pays, hugely. But the brief also says *"if a golden moves you have changed
-appearance and gone out of scope"* — and a raster of a vector is never
-pixel-identical to the vector. There are five frozen-scene goldens
-(`tests/mobile/goldens.spec.ts-snapshots/*frozen*`) at `maxDiffPixelRatio: 0.01`.
-So "wire it" and "move no golden" cannot both be satisfied by the texture path,
-and the goldens are not my files to re-baseline.
+**Both pixel-free escape routes were measured and are dead.** This is what makes
+the "not wired" conclusion binding rather than lazy:
 
-Two things follow, and both are being measured before anything is written:
+- Pooling the `GraphicsContext` by look key: 200 rocks over 60 shared geometries,
+  still **26.2 ms and 200 draw calls**. Pixi shares geometry, not submission.
+- `batchMode: 'batch'`: **no-op in Pixi 8.6.6.** `updateGpuContext` has branches
+  for `'no-batch'` and `'auto'` and none for `'batch'`, and `GpuGraphicsContext`'s
+  constructor never initialises `isBatchable` — so asking for it leaves the flag
+  `undefined`, which `GraphicsPipe` reads as false. Measured 200 draw calls,
+  identical to `'auto'`. Read the source *after* the measurement agreed with it,
+  not instead of measuring.
 
-1. **`batchMode: 'batch'`** — Pixi decides batchability per context on one line
-   (`GraphicsContextSystem`: `isBatchable = vertices.length < 400`), and a rock
-   clears 400 comfortably, which is *why* 200 rocks are 200 draw calls. Forcing
-   the batch keeps the identical triangles and only changes the submission path,
-   so it is the one candidate that cannot move a pixel by construction. Whether
-   it is fast is the open question (a forced batch re-uploads vertices every
-   frame instead of drawing a static geometry).
-2. **Culling** — nothing in `src/render/` culls (`grep cullable|Culler` is
-   empty). A 1280×800 window sees 18% of a 2400×2400 arena; a 844×390 phone sees
-   under 6%. So ~5–17× of the rock draw calls are for rocks that are not on the
-   screen. Also cannot move a pixel, by definition. Measured as a control here;
-   **shipping it is a widening of this brief**, so it is a recommendation, not a
-   commit, unless the Director says otherwise.
+**Second bill on wiring, found in the tests, not guessed:** the render layer is
+headless today (five suites build Graphics geometry with no WebGL). Baking needs
+a live `generateTexture`, so wiring means either injecting a `TextureBaker` plus a
+Graphics fallback — two paths, CI testing one and players seeing the other, the
+exact failure `8ae9121` is about — or those suites lose their headlessness.
 
-**A second cost of the texture path, found while reading the tests.** The render
-layer is headless-testable today — `src/render/*.test.ts`,
-`tests/sim-render-parity.test.ts` and `tests/combat-visibility.test.ts` all build
-Graphics geometry with no WebGL. Baking textures needs a live
-`generateTexture`, so wiring it means either a `TextureBaker` injected into
-`Renderer` plus a Graphics fallback when there isn't one — two draw paths, one of
-which is what CI tests and the other of which is what ships (the exact failure
-`8ae9121` was written about) — or those five suites lose their headlessness.
-That is a real architectural bill and it belongs in the decision.
+**The finding that outranks the A/B** (the brief said watch for it): the reducer
+engages on the reference capture and buys back **2.1 ms of 96.9 — 2.2%**, draw
+calls flat at 263→264. `setReduceVfx` sheds impact glows, the nebula and the halo
+gradient; it touches no entity layer. Caveat stated in the doc because it cuts
+against the headline: this baseline runs `muzzles: []`, so no glows existed to
+shed and 2.2% is a floor on what it buys, not a ceiling.
+
+**Rejected: shipping the culling.** Nothing culls (`grep cullable|Culler` empty)
+and a landscape phone submits **660 bodies to show 11** — pixel-free by
+construction, my file, huge, and aimed at the tighter (mobile) gate. It is still
+a *different change from the one the brief authorised*, so it is §6's first
+recommendation and not a commit. If a future session is told to widen: the care
+is in the cull rectangle, not the idea — the canvas can overhang the visual
+viewport (URL bar/notch, `camera.ts`), and `computeRootTransform`'s portrait path
+puts the world under a rotated root.
+
+**Rejected: measuring on `main` alone.** The brief's premise is that a2-07 wired
+the VFX presenter. It has NOT merged (`git merge-base --is-ancestor 41ca60c HEAD`
+→ not in main); it is six commits on `agent/art/a2-07-wire-the-vfx-presenter`.
+The baseline here is therefore `main`'s frame, without particles, and the doc's
+numbers are a floor for the post-a2-07 frame rather than a description of it.
+
+**Traps hit, so a resume does not re-pay them.** `spikes/` is outside the root
+tsconfig and three existing spikes fail to compile — hence the local project
+file, never an edit to the root `include` (that would break the DoD's
+`npx tsc --noEmit` on other agents' files). And the rig lost two capture runs to
+a readiness poll using node's `fetch`, which refused a vite that was serving 200
+to curl; it navigates with the browser now, and SIGKILLs vite so a survivor on
+`--strictPort 5183` cannot break the next run.
 
 ## NEXT
 <!-- what remains, in order, and anything blocking -->
 
-1. Final capture with the floor, the culled control, `batchMode: 'batch'`, and
-   the reduce-VFX baseline pair.
-2. Decide and write `docs/atlas-pooling-measured.md`.
-3. Whatever the decision permits inside this brief's scope, with the goldens run
-   as proof that what renders did not change.
+Work is complete against the brief. Remaining: push, open the PR, and confirm
+checks. Nothing is blocked.
+
+For whoever picks up the follow-up, `docs/atlas-pooling-measured.md` §6 ranks it:
+**(A)** cull off-screen entities — small, pixel-free, verifiable by running the
+goldens *unchanged*, and it hits the mobile gate hardest; **(B)** wire the pooled
+path — worth it (263 draw calls → ~10) but it needs a golden re-baseline, a
+ruling on the render layer's headless tests, and a dpr-3 bake resolution; **(C)**
+`reduce-VFX` buying 2.2% is a design question for the Director under r9-01, not a
+Platform bug.
+
+Whatever lands, re-run both instruments — the rig for the shape, and
+`PERF_GATE=1` `tests/perf/playwright.perf.config.ts` on real hardware for the
+gate. This box has no GPU and cannot answer the second one.
