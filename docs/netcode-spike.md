@@ -7,16 +7,26 @@ This spike **decides**, it does not confirm (GDD §3.5). The ~2 KB snapshot and
 it — treated like the balance constants in §2.8: hypotheses to falsify. Below,
 one is busted and one holds.
 
-Everything here is reproducible from the repo:
+**The spike's own code was deleted on 2026-08-10 (n7-01), and this section says
+so rather than leaving a command that no longer runs.** `src/net/spike/`
+(`snapshot.ts` wire layout + `sim-standin.ts` workload + `bench.ts` harness) was
+the scaffolding that produced the MEASUREMENTS block below. It had been dead
+since day 3, when the wire layout was promoted into `src/net/snapshot.ts` and
+started encoding the real `World`; a dark-matter scan found it unreachable from
+every deployed entry point and it went. **The numbers below are unchanged and
+still stand** — they are a day-0 record of a measurement that was made, not a
+claim that can be re-run today:
 
 ```
-npx vitest run src/net/spike     # prints the MEASUREMENTS block; asserts wire invariants
-npx tsc --noEmit                 # the whole spike type-checks under the strict config
+git show 111db86:src/net/spike/bench.ts     # the harness, and its two siblings
+npx vitest run src/net/snapshot.test.ts     # the wire layout that SHIPPED, still pinned
+npx tsc --noEmit                            # strict, whole repo
 ```
 
-The measured code lives in `src/net/spike/` (`snapshot.ts` wire layout +
-`sim-standin.ts` workload + `bench.ts` harness); the `Transport` interface is in
-`src/net/transport.ts`.
+What survives the deletion is the part that matters: `src/net/snapshot.test.ts`
+holds the live encoder to the same **494 B** worst case (`toBe(494)`), so the
+bandwidth arithmetic in §1 below cannot drift without a red test. The
+`Transport` interface is in `src/net/transport.ts`.
 
 **Status since (prediction):** the client no longer waits for the wire. It runs
 the same `step()` the server runs on its own input the moment that input is sent,
@@ -84,7 +94,9 @@ against the real bot trees rather than today's do-nothing baseline.
 
 ## MEASUREMENTS
 
-Captured from a real run of `npx vitest run src/net/spike` on this hardware:
+Captured from a real run of the spike bench on this hardware (day 0, by
+`npx vitest run src/net/spike` — a command that worked when this was written and
+that the deletion above retired; the capture is kept verbatim):
 
 ```
 host CPU        : Intel(R) Core(TM) i9-14900HX (8 logical cores)
@@ -107,7 +119,9 @@ all three.
 
 ### 1. Snapshot size — MEASURED, not assumed
 
-Wire layout (`src/net/spike/snapshot.ts`, little-endian, hand-packed):
+Wire layout (measured in the deleted `src/net/spike/snapshot.ts`; the shipping
+one is `src/net/snapshot.ts`, which encodes the real `World` in the same
+little-endian hand-packed record and is pinned to the same total):
 
 | Section | Fields | Bytes |
 |---|---|---|
@@ -440,7 +454,8 @@ disagreeing.
 > straight-line flight at 250 ms reconciles at **0.06 u** — see
 > `docs/netcode-tick-alignment.md`.
 
-**Capture** (reproduce: `npx vitest run src/net/spike/reconcile-capture.test.ts`;
+**Capture** (reproduce: `npx vitest run src/net/reconcile-capture.test.ts` —
+moved out of `src/net/spike/` by n7-01, because it tests only shipping modules;
 `NetTelemetry` fed through a real client↔authority round trip over an
 artificially delayed wire at one-way 3 frames + 0–2 jitter, 30 Hz broadcast):
 
