@@ -92,8 +92,18 @@ to curl; it navigates with the browser now, and SIGKILLs vite so a survivor on
 ## NEXT
 <!-- what remains, in order, and anything blocking -->
 
-Work is complete against the brief. Remaining: push, open the PR, and confirm
-checks. Nothing is blocked.
+Work is complete against the brief. **PR #372** is open and the branch is pushed.
+
+DoD status:
+- `npx tsc --noEmit` — **clean**.
+- `npm test -- --run` — **276 files / 4798 tests passed**, 474 s.
+- doc present on the remote branch — verified with the DoD's own
+  `git cat-file -e FETCH_HEAD:docs/atlas-pooling-measured.md`.
+- PR checks — running; nothing failing. The mobile-emulation shards carry the
+  goldens, which is the real proof that "what renders" did not change, since this
+  branch touches no render behaviour at all.
+
+Nothing is blocked.
 
 For whoever picks up the follow-up, `docs/atlas-pooling-measured.md` §6 ranks it:
 **(A)** cull off-screen entities — small, pixel-free, verifiable by running the
