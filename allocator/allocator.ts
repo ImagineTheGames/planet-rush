@@ -42,6 +42,7 @@ import type { MachineId } from '../src/net/ticket';
 import { signTicket } from '../src/net/ticket';
 import { makeRoomCode } from '../src/net/room-code';
 import type { RoomRegistry, MachineView, Reservation, ReserveConfig } from './registry';
+import { nearestRegion } from './region-geo';
 
 /**
  * The legal match-size range (variable-slots plan, `MatchConfig`). Restated here
@@ -386,14 +387,31 @@ export class Allocator {
   /**
    * Choose the Machine a new room goes on, **and say why**: prefer the creator's
    * region whenever it has a free slot, spread onto the least-loaded candidate
-   * there, and fall back across the whole fleet only when it does not. Returns
-   * `null` when nothing in the whole fleet has a free slot.
+   * there, and when that region cannot take the room, move to the **nearest**
+   * region that can. Returns `null` when nothing in the fleet has a free slot.
    *
-   * The semantics are exactly the ones that shipped — the region has always been a
-   * preference and a full region has always fallen back rather than refused. What
-   * is new is the second half of the return value: the *reason*, so the decision
-   * survives into the response and the log instead of being re-derived (or
-   * guessed at) by whoever reads it later.
+   * The capacity semantics are the ones that shipped: the region is a preference,
+   * a region that cannot take the room falls back rather than refuses, and the
+   * {@link PlacementReason} distinguishes the two ways it can fail, because they
+   * call for different actions — `region-full` means *scale that region*,
+   * `region-absent` means *there is nothing there to scale*. (A region whose only
+   * Machines are cordoned reads as `region-full`: it is live and has no slot to
+   * offer, which is what the word has to mean here.)
+   *
+   * **What n9-01 changed is the shape of the fallback, not the reasons.** It used
+   * to be the whole fleet as one flat pool, which made "the creator's region is
+   * not one this fleet runs" indistinguishable from "the creator did not say" — so
+   * a request arriving on the `dfw` POP, where we have never run a Machine,
+   * competed for `gru` on load alone. Live on 2026-08-11, three consecutive
+   * allocations from a `dfw` POP went `iad`, `iad`, **`gru`**, with twelve free
+   * slots still sitting in `iad`. The fallback now walks regions by distance
+   * (`./region-geo`) and reaches the far side of an ocean only when the near side
+   * is genuinely out of slots: **crossing a continent is a capacity decision,
+   * never a default.**
+   *
+   * The flat whole-fleet pool survives for exactly the two cases with no geography
+   * to reason about: nobody stated a region at all, and a POP this deployment has
+   * no coordinates for.
    */
   private pickMachine(region: string | undefined, now: number): PickedMachine | null {
     const leases = this.registry.reservations(now);
@@ -416,28 +434,56 @@ export class Allocator {
       return { view: this.leastLoaded(inRegion, leases), reason: 'preferred' };
     }
 
-    // It does not. Fall back to the whole fleet — never refuse capacity the fleet
-    // has — and distinguish the two ways a region can fail to take a room, because
-    // they call for different actions: `region-full` means scale that region,
-    // `region-absent` means there is nothing there to scale. (A region whose only
-    // Machines are cordoned reads as `region-full`: it is live and has no slot to
-    // offer, which is what the word has to mean here.)
-    const liveThere = fleet.some((m) => m.region === region);
-    return {
-      view: this.leastLoaded(withFree, leases),
-      reason: liveThere ? 'region-full' : 'region-absent',
-    };
+    // It does not — but the room still places, and the reason still says which of
+    // the two failures this was.
+    const reason: PlacementReason = fleet.some((m) => m.region === region)
+      ? 'region-full'
+      : 'region-absent';
+
+    // The nearest region that can *actually take the room*. Only regions with a
+    // free slot are candidates, so the ranking and the capacity check are one
+    // step: this can never answer with a region that would then fall back again.
+    const nearest = nearestRegion(region, [...new Set(withFree.map((m) => m.region))]);
+    if (nearest !== undefined) {
+      const pool = withFree.filter((m) => m.region === nearest);
+      return { view: this.leastLoaded(pool, leases), reason };
+    }
+
+    // No coordinates for the stated region, or none for anything the fleet runs:
+    // there is nothing to be *near*, so spread across the fleet exactly as this
+    // did before `./region-geo` existed. A missing table row degrades to the old
+    // behaviour, never to a guess.
+    return { view: this.leastLoaded(withFree, leases), reason };
   }
 
-  /** The least-loaded Machine of a non-empty pool (spreads matches); ties break on
-   *  machine id so the choice is deterministic for a seeded test. */
+  /**
+   * The best home for the next room out of a non-empty pool. Least-loaded first —
+   * that is the spread rule — and every tie-break under it is a *fact about the
+   * host*, never its name.
+   *
+   * The name matters, because an id sort is how a Florida creator reached São
+   * Paulo (n9-01): with the whole fleet in one pool and every host idle, `<` on a
+   * machine id was the entire decision — a coin flip wearing determinism's
+   * clothes. The ranking is now, in order:
+   *
+   *   1. **lower load** — the spread rule (full-room-equivalents, {@link loadOf});
+   *   2. **more free capacity** — same load, bigger host: the one that still has
+   *      the most headroom once this room lands, which is what spreading *means*
+   *      on a mixed-size fleet;
+   *   3. **fresher heartbeat** — among equals, the host most recently confirmed
+   *      alive is the one least likely to be a view about to lapse;
+   *   4. **incumbency** — still indistinguishable, so the host the fleet learned
+   *      about first keeps it. Pool order is heartbeat-arrival order (the registry
+   *      is insertion-ordered), which is deterministic for a seeded test without
+   *      comparing one character of anybody's id.
+   *
+   * By rule 4 the candidates are in the same region and identical on every fact
+   * the registry holds, so there is no decision left to make — only a
+   * deterministic one to record.
+   */
   private leastLoaded(pool: readonly MachineView[], leases: readonly Reservation[]): MachineView {
-    return pool.reduce((best, m) => {
-      const dl = this.loadOf(m, leases) - this.loadOf(best, leases);
-      if (dl < 0) return m;
-      if (dl > 0) return best;
-      return m.machine < best.machine ? m : best;
-    });
+    const ranked = pool.map((view) => ({ view, load: this.loadOf(view, leases) }));
+    return ranked.reduce((best, host) => (betterHost(host, best) ? host : best)).view;
   }
 
   /**
@@ -515,6 +561,28 @@ export class Allocator {
 interface PickedMachine {
   readonly view: MachineView;
   readonly reason: PlacementReason;
+}
+
+/** A Machine with its load already computed, so the ranking below reads once per
+ *  host instead of recomputing the same sum inside every comparison. */
+interface RankedHost {
+  readonly view: MachineView;
+  readonly load: number;
+}
+
+/**
+ * Is `host` a better home for the next room than the incumbent `best`? The
+ * ranking {@link Allocator.leastLoaded} documents, in code: load, then headroom,
+ * then heartbeat freshness. There is deliberately no fourth clause — a `false`
+ * here leaves the incumbent standing, which is rule 4 (the host the fleet learned
+ * about first keeps it) and is the reason no machine id is ever compared.
+ */
+function betterHost(host: RankedHost, best: RankedHost): boolean {
+  if (host.load !== best.load) return host.load < best.load;
+  const headroom = host.view.capacity - host.load;
+  const bestHeadroom = best.view.capacity - best.load;
+  if (headroom !== bestHeadroom) return headroom > bestHeadroom;
+  return host.view.lastSeen > best.view.lastSeen;
 }
 
 /**

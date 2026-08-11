@@ -40,8 +40,10 @@
  * it to the allocator as a preference, and returns the decision *with its reason*
  * — `placement: { requested, region, reason, detail }`, e.g. `gru — your region` or
  * `iad — gru full`. The same line goes to the process log. Nothing about capacity
- * changed: the creator's region wins whenever it has a free slot, and a full one
- * still falls back to the whole fleet rather than refusing.
+ * changed: the creator's region wins whenever it has a free slot, and a region
+ * that cannot take the room falls back rather than refusing — to its **nearest**
+ * neighbour with a slot (`./region-geo`, n9-01), and to the whole fleet only when
+ * there is no geography to reason with.
  *
  * **CORS (M10).** The game runs from GitHub Pages (a *different* origin from the
  * allocator), so a browser's `POST /rooms` is a cross-origin request the browser
@@ -439,6 +441,8 @@ function fleetAuthFailure(
  *      accepted this request, which is by construction the one nearest the
  *      creator. This is what turns "a Brazilian creator lands on Virginia by
  *      tie-break" into "a Brazilian creator lands on gru whenever gru has room".
+ *      The POP does **not** have to be a region we run: `dfw` is a place, and
+ *      `Allocator.pickMachine` resolves it to the nearest region that is (n9-01).
  *   3. Neither → `undefined`, whole-fleet spread, exactly as before. Off Fly there
  *      is no header, and a header-less request must still allocate.
  */
