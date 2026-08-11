@@ -295,6 +295,20 @@ const FONT_DISPLAY = 'Audiowide, "Trebuchet MS", sans-serif';
 /** Oxanium — body and numerals. The sub-line under a control's word. */
 const FONT_TEXT = 'Oxanium, "Liberation Mono", monospace';
 
+/**
+ * Both pressed words keep the weight they shipped with.
+ *
+ * Audiowide has one upstream weight, so `bold` here is a *synthesised* stroke —
+ * which is why the menus do not ask for it. This is not a menu: it is a word on
+ * glass, over a firefight, under a thumb, and the heavier stroke is worth real
+ * pixels there. Measured on the frozen phone golden, dropping it cost the word
+ * `FIRE` 22% of its lit pixels (354 → 277 above mid-grey) for no gain — so the
+ * one thing this brief must not do, make the primary action harder to hit, is
+ * exactly what it would have done. `src/ui/hud.ts` makes the same call for the
+ * respawn line, the other Audiowide string that lives on the glass.
+ */
+const PRESSED_WEIGHT = 'bold';
+
 /** `FIRE`. 18px, unchanged — the button's diameter did not move, so neither did
  *  the word that has to fit inside it. */
 const FIRE_SIZE = 18;
@@ -309,7 +323,7 @@ const BUILD_SIZE = 15;
  * placement suite asserts against) rather than a drawing detail, so the button
  * cannot grow to fit a bigger word. Ten px of Oxanium at dpr 3 is 30 device
  * pixels of a face designed for game interfaces; the frames in
- * `evidence/a0-23/` are what settle whether that reads, and they do.
+ * `evidence/a0-23-touch-controls-theme/` are what settle whether that reads, and they do.
  */
 const BUILD_SUB_SIZE = 10;
 
@@ -390,6 +404,7 @@ export class TouchVisuals extends Container {
         fontFamily: FONT_DISPLAY,
         fontSize: FIRE_SIZE,
         fill: TOUCH_CHROME.label,
+        fontWeight: PRESSED_WEIGHT,
         letterSpacing: trackingPx(DISPLAY_TRACKING.heading, FIRE_SIZE),
       },
     });
@@ -448,6 +463,7 @@ export class TouchVisuals extends Container {
         fontFamily: FONT_DISPLAY,
         fontSize: BUILD_SIZE,
         fill: TOUCH_CHROME.label,
+        fontWeight: PRESSED_WEIGHT,
         letterSpacing: trackingPx(DISPLAY_TRACKING.heading, BUILD_SIZE),
       },
     });

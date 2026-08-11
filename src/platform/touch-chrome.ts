@@ -45,7 +45,7 @@
  * art's, and `src/platform/wheel-input.ts` already reaches for them the same way.
  */
 
-import { BONE, MATERIAL_SHADES } from '../art/materials';
+import { BONE } from '../art/materials';
 import { PALETTE } from '@render/index';
 
 // ---------------------------------------------------------------------------
@@ -95,8 +95,19 @@ export const TOUCH_CHROME = {
   /** The top of a rim on an *idle hint* — a stick zone nobody's thumb is on. A
    *  step down the same ramp rather than a different material. */
   hintLit: BONE.mid,
-  /** That hint's underside. */
-  hintShadow: MATERIAL_SHADES.rulePlate,
+  /**
+   * That hint's underside — the same tone as a live rim's, and only its alpha is
+   * lower.
+   *
+   * It was `rulePlate` (the inert-plate rule) for one draft, which is the
+   * materially "correct" step and was wrong on glass: at a hint's alpha, a tone
+   * that dark over vacuum resolves to nothing, so the ring's bottom half
+   * disappeared and what was left read as a broken arc rather than as a lit one
+   * (`evidence/a0-23-touch-controls-theme/stick-before-after.png`, first pass). A
+   * plate can spend a dark step on its underside because there is a plate under
+   * it; over the void there is nothing for a shadow to fall on.
+   */
+  hintShadow: BONE.lo,
   /** The lift a face gives over the fight. `BONE.fill` is the ratified "lit end
    *  of a primary plate's face"; over glass it is a lift, never a surface. */
   face: BONE.fill,
@@ -124,12 +135,12 @@ export const TOUCH_CHROME = {
  * and a 4px ring at 0.85 on FIRE. Bone's `hi` is the ramp's white endpoint, so
  * the same alpha buys **more** luminance contrast against vacuum than the blue
  * did — the numbers below are equal or higher anyway, and the frames in
- * `evidence/a0-23/` are what actually settle it.
+ * `evidence/a0-23-touch-controls-theme/` are what actually settle it.
  */
 export const TOUCH_ALPHA = {
   /** An idle stick-zone ghost: barely there, but there. */
   hintLit: 0.34,
-  hintShadow: 0.24,
+  hintShadow: 0.26,
   /** A live stick base, under a thumb that has landed. */
   liveLit: 0.75,
   liveShadow: 0.5,

@@ -13,7 +13,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { Graphics } from 'pixi.js';
-import { BONE, MATERIAL_SHADES } from '../art/materials';
+import { BONE } from '../art/materials';
 import { PALETTE } from '@render/index';
 import {
   TOUCH_ALPHA,
@@ -84,7 +84,7 @@ describe('the tones are the ratified Bone ramp, and nothing else', () => {
     expect(TOUCH_CHROME.rimLit).toBe(BONE.hi);
     expect(TOUCH_CHROME.rimShadow).toBe(BONE.lo);
     expect(TOUCH_CHROME.hintLit).toBe(BONE.mid);
-    expect(TOUCH_CHROME.hintShadow).toBe(MATERIAL_SHADES.rulePlate);
+    expect(TOUCH_CHROME.hintShadow).toBe(BONE.lo);
     expect(TOUCH_CHROME.face).toBe(BONE.fill);
     expect(TOUCH_CHROME.label).toBe(BONE.hi);
     expect(TOUCH_CHROME.sub).toBe(BONE.mid);
