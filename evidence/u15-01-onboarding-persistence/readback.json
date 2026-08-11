@@ -1,0 +1,112 @@
+{
+  "what": "onboarding completion persists through the ONE career profile (u15-01, a0-19 G-3)",
+  "matchOne": [
+    {
+      "beat": "near a rock, nothing mined",
+      "prompt": "mine"
+    },
+    {
+      "beat": "mined a chunk",
+      "prompt": null
+    },
+    {
+      "beat": "hold full",
+      "prompt": "haul-home"
+    },
+    {
+      "beat": "drained in the collection field",
+      "prompt": null
+    },
+    {
+      "beat": "wheel opened for the first time",
+      "prompt": "spend"
+    },
+    {
+      "beat": "confirmed TURRET with 2 ore — the sim refused it",
+      "prompt": "spend"
+    },
+    {
+      "beat": "bought a turret — the sim took the ore",
+      "prompt": null
+    },
+    {
+      "beat": "the alarm sounds",
+      "prompt": "under-attack"
+    },
+    {
+      "beat": "the siege is survived",
+      "prompt": null
+    }
+  ],
+  "afterMatchOne": {
+    "storage": {
+      "planet-rush:profile": "{\"v\":1,\"xp\":0,\"level\":1,\"matches\":0,\"onboarded\":[\"mine\",\"haul-home\",\"spend\",\"under-attack\"]}"
+    },
+    "onboarded": [
+      "mine",
+      "haul-home",
+      "spend",
+      "under-attack"
+    ],
+    "allCompleted": true
+  },
+  "matchTwo": {
+    "beats": [
+      {
+        "beat": "near a rock, empty hold",
+        "prompt": null
+      },
+      {
+        "beat": "hold full",
+        "prompt": null
+      },
+      {
+        "beat": "wheel opened",
+        "prompt": null
+      },
+      {
+        "beat": "under attack",
+        "prompt": null
+      },
+      {
+        "beat": "every trigger at once",
+        "prompt": null
+      }
+    ],
+    "everyPromptNull": true
+  },
+  "matchThreeAfterReload": {
+    "beats": [
+      {
+        "beat": "near a rock, empty hold",
+        "prompt": null
+      },
+      {
+        "beat": "wheel opened",
+        "prompt": null
+      },
+      {
+        "beat": "under attack",
+        "prompt": null
+      }
+    ],
+    "everyPromptNull": true
+  },
+  "careerIsUntouched": {
+    "before": {
+      "v": 1,
+      "xp": 4211,
+      "level": 4,
+      "matches": 7
+    },
+    "after": {
+      "v": 1,
+      "xp": 4211,
+      "level": 4,
+      "matches": 7,
+      "onboarded": [
+        "mine"
+      ]
+    }
+  }
+}
