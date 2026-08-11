@@ -691,8 +691,9 @@ export function promptMaxHeight(
  * home indicator, or a fullscreen transition crops the bottom off the canvas
  * without resizing it (`main.ts` `readViewport`). Everything anchored to the top
  * survives that; a bottom-anchored panel is drawn into the crop. Feeding the crop
- * in here is what puts the prompt back on screen — see `HudFrame.minimapInsets`,
- * which `main.ts` now populates from the live visual viewport.
+ * in here is what puts the prompt back on screen — see `HudFrame.safeInsets`,
+ * which `main.ts` now populates from the live visual viewport and the device's
+ * own `env(safe-area-inset-*)`.
  */
 function promptBottom(viewportHeight: number, isTouch: boolean, insets: MinimapInsets): number {
   const bottomInset = Math.max(0, insets.bottom ?? 0);
