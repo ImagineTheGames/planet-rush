@@ -17,7 +17,56 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Planet Rush" />
     <title>Planet Rush</title>
+
+    <!-- The two ratified faces, SELF-HOSTED (GDD §5.6) — never a CDN. The game
+         must run offline (§4.3/§4.8) and the strict artifact hosts these builds
+         are reviewed on do not allow a third-party font-src. Provenance, the
+         subset and the licences: public/fonts/README.md. `crossorigin` is
+         required on a font preload even same-origin — without it the browser
+         fetches the file a second time and the preload buys nothing. -->
+    <link
+      rel="preload"
+      href="./fonts/Audiowide-Regular-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="./fonts/Oxanium-Variable-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
     <style>
+      /* Audiowide — wordmark, headings, menu confirmations. Upstream ships one
+         weight (Regular); a bold heading is synthesised, as it always was. */
+      @font-face {
+        font-family: 'Audiowide';
+        font-style: normal;
+        font-weight: 400;
+        font-display: block;
+        src: url('./fonts/Audiowide-Regular-latin.woff2') format('woff2');
+        unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+          U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+          U+FEFF, U+FFFD;
+      }
+      /* Oxanium — HUD numerals and body text. One VARIABLE file covers the whole
+         `wght` axis, so `normal` and `bold` are real instances rather than a
+         synthetic smear and cost no second download. The range is not optional:
+         the font's own default instance is 200 (ExtraLight), so a face declared
+         without it would render the entire HUD hairline-thin. */
+      @font-face {
+        font-family: 'Oxanium';
+        font-style: normal;
+        font-weight: 200 800;
+        font-display: block;
+        src: url('./fonts/Oxanium-Variable-latin.woff2') format('woff2');
+        unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+          U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+          U+FEFF, U+FFFD;
+      }
+
       html,
       body {
         margin: 0;
@@ -37,6 +86,42 @@
   </head>
   <body>
     <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
+    <!--
+      FIRST PAINT IS BLOCKED ON THE FACES, NOT LEFT TO RACE THEM (u14-01).
+
+      `font-display` is a DOM rule and this game draws its text into a canvas,
+      where it buys nothing: Pixi calls `fillText` with whatever face is resolved
+      at that instant, bakes the result into a texture, and never redraws it
+      because a font arrived later. So a frame composited before the woff2
+      decodes is a permanently-wrong frame — the menu in Trebuchet, the HUD in
+      Liberation Mono — and in `goldens.spec.ts` it is a coin flip between two
+      different baselines. Waiting on `document.fonts.ready` inside the app would
+      be too late for anything drawn during boot; the only place early enough is
+      here, before the module that builds the renderer is evaluated at all.
+
+      `document.fonts.load()` (not `.ready`) is what actually *starts* a load:
+      `ready` resolves immediately when no face is pending, and a face nothing
+      has asked for yet is not pending. The preload links above mean the bytes
+      are usually already in cache by the time this runs.
+
+      The deadline is the NO BLACK SCREENS rule (src/platform/boot-error.ts): a
+      font that 404s or hangs must cost the player a fallback face, never the
+      game. It races the load and boots regardless, and it matches the
+      `font-display: block` period so the two cannot disagree about how long the
+      screen is allowed to be bare.
+    -->
+    <script type="module">
+      const FACES = ['400 16px Audiowide', '400 16px Oxanium', '700 16px Oxanium'];
+      const BOOT_FONT_DEADLINE_MS = 3000;
+
+      await Promise.race([
+        Promise.all(FACES.map((f) => document.fonts.load(f))).catch((err) => {
+          console.warn('Planet Rush: a ratified face did not load; falling back.', err);
+        }),
+        new Promise((resolve) => setTimeout(resolve, BOOT_FONT_DEADLINE_MS)),
+      ]);
+
+      await import('/src/main.ts');
+    </script>
   </body>
 </html>
