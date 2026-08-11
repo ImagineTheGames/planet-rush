@@ -77,6 +77,26 @@ export const isBlueGlow: Pred = (r, g, b) => b - r > 20 && g - r > 8 && b > 38;
 export const isBoneLit: Pred = (r, g, b) => r > 170 && g > 170 && b > 170;
 
 /**
+ * **Faint Bone over the void** — the a0-23 counterpart of {@link isBlueGlow},
+ * for the affordances that are deliberately barely there: an idle stick-zone
+ * ring is `BONE.mid` at alpha 0.34 over vacuum, which lands near (68,71,74).
+ *
+ * The point of it is the *negative* half. Bone is a value ramp on steel, so it
+ * is neutral by construction — `b - r` is 8 on the ramp itself and single digits
+ * once it is laid over vacuum. Plasma at the same faintness is (25,48,63), a
+ * `b - r` of 38. So this predicate counts the new ring and **rejects the blue one
+ * it replaced**, which is what makes "the controls are drawn, in Bone" a single
+ * assertion rather than two.
+ *
+ * It is not hue-blind enough to tell a ring from an asteroid — steel rock is
+ * neutral too — so a caller must aim it at the affordance rather than at a
+ * corner of the screen. `emulation.spec.ts` samples the ring's own arc, from the
+ * bounds the layout registry publishes.
+ */
+export const isBoneGhost: Pred = (r, g, b) =>
+  r > 28 && b - r < 18 && Math.abs(r - g) < 16 && Math.abs(g - b) < 16;
+
+/**
  * Signal-yellow `#F2D24B` (242,210,75): ore / the "ORE" banked total in the HUD
  * top-left. Used as the "game HUD is visible" anchor (proves no overlay covers).
  */
