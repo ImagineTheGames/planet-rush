@@ -337,6 +337,119 @@ and there is nothing to explain.
 
 ---
 
+## Task 16 — an unserved POP is a place, not a shrug
+
+**Found by a0-29 and flagged rather than fixed** (docs/region-picker.md §8): the
+region *ping* was inverted by concurrency, and while proving that, the lab found
+the other half. Task 15 taught the allocator to read the edge POP; it did not
+teach it what to do with a POP the fleet runs nothing in.
+
+From Florida the anycast POP is `dfw`. The fleet is `iad ×2 + gru ×1`. So
+`pickMachine` returned `region-absent` and put **the whole fleet** in one pool,
+where placement fell through to load and then — hosts being idle — to a `<` on
+the machine id. A US creator could land in São Paulo on a string comparison.
+
+### Before: measured live, not argued
+
+Three consecutive `POST /rooms` against `planet-rush-allocator.fly.dev` from this
+lane's machine (Davenport, Florida — Charter/Spectrum; the POP was `dfw`, per
+`fly-request-id: 01KZSDYDMAAWGP3E0ZER0NNXB7-dfw`), with **no body at all**, which
+is exactly what the client sends when the region survey measures nothing:
+
+| # | region | machine | `placement.detail` |
+|---|---|---|---|
+| 1 | `iad` | `0800d5b6d62328` | `iad — no dfw machines` |
+| 2 | `iad` | `6836293b5161d8` | `iad — no dfw machines` |
+| 3 | **`gru`** | `d891dd0a1443e8` | `gru — no dfw machines` |
+
+`/regions` at the same moment: **`iad` 2 machines / 12 free**, `gru` 1 / 6 free.
+So the third room crossed the equator with twelve free slots in Virginia — the
+first two reservations weighted the two `iad` hosts to 1 each, `gru` was still 0,
+and the flat pool did the rest. Requests 1 and 2 stayed in Virginia only because
+`0800…` and `6836…` sort ahead of `d891…`; a `gru` Machine whose id began with a
+`0` would have taken the very first room.
+
+### After: the fallback is ranked by distance
+
+`allocator/region-geo.ts` holds the coordinates, `Allocator.pickMachine` applies
+them. The stated region still wins outright whenever it has a slot; when it
+cannot take the room, the fallback walks the **regions that still have a slot**,
+nearest first. `dfw` → `iad` at 1,882 km, against 8,244 km to `gru`.
+
+**Crossing a continent is a capacity decision, never a default.** `gru` is still
+reachable from `dfw` — when `iad` has no slot left, a placed match beats a
+refused one, exactly as before.
+
+**The reasons did not change.** `region-absent` is still `region-absent`
+(we genuinely run nothing in Dallas) and still reads differently from
+`region-full`: one says *create that region*, the other says *scale it*. What
+changed is where the room goes, not what the allocator calls it.
+
+### Coordinates, not a POP→region table
+
+A static `dfw → iad` table is smaller and auditable, and it was the first answer.
+Rejected for two reasons a table cannot fix:
+
+1. **Every row silently encodes today's fleet.** Add `cdg` and every European row
+   is wrong, with nothing in the file saying which.
+2. **A table has one answer per POP, not a ranking** — so it cannot answer
+   placement's second question: *`iad` is full, which region is next-nearest?*
+
+Coordinates encode only facts about the world, which do not change when the fleet
+does; the nearest region is derived per request against whichever regions are
+live *and have capacity*. One table to maintain (where places are), not one per
+fleet shape. It also gets answers a hand-written table would likely have got
+wrong: on this two-region fleet `jnb` and `syd` resolve to `gru`, not `iad`
+(Johannesburg is 7,439 km from São Paulo against 13,094 km to Ashburn).
+
+### What the table covers, and what an unknown POP inherits
+
+**Covered: all 35 regions Fly publishes as of 2026-08** — `ams arn atl bog bom
+bos cdg den dfw ewr eze fra gdl gig gru hkg iad jnb lax lhr mad mia nrt ord otp
+phx qro scl sea sin sjc syd waw yul yyz` — each keyed by the IATA code it is
+named for and carrying that airport's coordinates, so every row is checkable
+against a public source. Fly's POP codes and region codes are one namespace,
+which is why one table serves both sides: the `from` is an edge POP (possibly one
+we run nothing in), the candidates are the regions the fleet is actually in.
+
+**An unknown code answers `undefined`, and that is deliberate.** No guess, no
+nearest-by-alphabet, no silent default. `pickMachine` then does exactly what it
+did before this task existed: whole-fleet spread, still reported as
+`region-absent`. Likewise a *fleet* region with no row can still take a room —
+it just never wins on the grounds of being close.
+
+**So: adding a region to the fleet means adding its row to
+`allocator/region-geo.ts`.** The cost of forgetting is a fallback to the old
+behaviour, not a wrong continent.
+
+### The tie-break no longer has a name in it
+
+`leastLoaded` ranked hosts by load and then by `machine.id <`. That comparison is
+what made the flat pool a coin flip, so it is gone. In order now:
+
+1. **lower load** (full-room-equivalents — the spread rule);
+2. **more free capacity** — same load, bigger host: the one with the most
+   headroom left once this room lands;
+3. **fresher heartbeat** — among equals, the host least likely to be a view about
+   to lapse;
+4. **incumbency** — the host the fleet learned about first keeps it. Pool order is
+   heartbeat-arrival order, which is deterministic for a seeded test without
+   comparing one character of anybody's id.
+
+By rule 4 the two candidates are in the same region and identical on every fact
+the registry holds, so there is no decision left to make.
+
+### Out of scope, deliberately
+
+- **a0-29's serial probe and the client picker** — the *measurement* was fixed
+  there; this is the server's *choice*, and it only governs the case where the
+  client sent nothing.
+- **A stated region still wins.** The body's `region` is read before the edge
+  header (`allocator/index.ts`), and a stated region reaching `pickMachine` is
+  `preferred` before any of this runs.
+
+---
+
 ## Still open (kept, not closed)
 
 The spike's discipline: state what remains open rather than quietly closing it.

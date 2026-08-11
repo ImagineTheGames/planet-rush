@@ -28,6 +28,15 @@
  * preference, whole-fleet placement, exactly the behaviour that shipped before
  * this file existed. Nothing here can *refuse* an allocation.
  *
+ * **This file reads the POP; it does not decide what the POP means.** The two are
+ * separate on purpose, because the answer to "which of our regions is that?"
+ * depends on the fleet and this file does not know the fleet. A POP we run
+ * nothing in used to fall out of placement entirely — `dfw`, the anycast POP a
+ * Florida creator arrives on, read as *no opinion at all* and let the room go
+ * anywhere the load happened to point. It now resolves to its nearest fleet
+ * region (`./region-geo`, applied in `Allocator.pickMachine`), so the region code
+ * this function returns is used even when the fleet has no Machine wearing it.
+ *
  * **A forged header buys nothing.** The region is a *preference*: it can only ask
  * for a region the fleet already has, and a full one falls back anyway. It has
  * precisely the power the request body's `region` field has had since Task 5, and
