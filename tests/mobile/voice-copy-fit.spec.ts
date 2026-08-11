@@ -37,15 +37,24 @@
  * `drawToggle` and the end-screen headline all centre the text and let it spill.
  * Overflow here is silent, which is exactly why it needs an assertion.
  *
- * ── A CAVEAT THE NUMBERS DEPEND ON ─────────────────────────────────────────
- * `src/ui/typography.ts` names Audiowide/Oxanium and says the page loads them.
- * It does not: there is no `@font-face` in `index.html` and no font file in the
- * repo, so every string here is really drawn in the fallback (`Trebuchet MS` /
- * `Liberation Mono` and their substitutes). This spec measures the FULL declared
- * stack, so it measures whatever the page actually resolves — and if the real
- * faces are ever added, it re-measures against them and fails if a label stopped
- * fitting. Audiowide is materially wider than Trebuchet, so that is a real
- * possibility and the headroom is reported below rather than merely asserted.
+ * ── THE CAVEAT THE NUMBERS USED TO DEPEND ON, NOW SPENT (u14-01) ───────────
+ * This block used to warn that `src/ui/typography.ts` named Audiowide/Oxanium
+ * and the page did not load them — no `@font-face`, no font file in the repo, so
+ * every string here was really measured in the fallback. It said that if the real
+ * faces were ever added this spec would re-measure against them and fail if a
+ * label stopped fitting, and that "Audiowide is materially wider than Trebuchet,
+ * so that is a real possibility."
+ *
+ * **They were added, on 2026-08-11, and it was a real possibility.** Audiowide
+ * measures ~14% wider than Trebuchet at the same size (`CLAIM HELD` at 16px:
+ * 112.0px against 98.2px), which is a whole extra character on a headline. Every
+ * label below was re-measured against the self-hosted faces and every one still
+ * fits; the tightest is 36% headroom. The mechanism the caveat described is why
+ * that is known rather than assumed — this spec measures the FULL declared stack,
+ * so it measures whatever the page actually resolves, and the page now resolves
+ * the ratified faces because `index.html` blocks boot until they have loaded.
+ * The headroom column is still printed on pass, because the next copy change is
+ * the one that spends it.
  *
  * ── WHY THE STACKS ARE IMPORTED AND NOT RETYPED (r6-01) ────────────────────
  * This file shipped with its own copy of the two stacks, and the body one said

@@ -119,14 +119,24 @@ function roleOf(rel) {
 
 /**
  * The boot path's front doors — all three deployed apps, plus the build. Miss
- * one and everything only it reaches reports dark. `src/main.ts` is what
- * `index.html` loads; `server/index.ts` is what the fly.io gameserver runs;
- * `allocator/index.ts` is the fleet control plane; `vite.config.ts` is loaded by
- * the build itself (it imports `src/platform/build-stamp`, which is therefore
- * live even though no game code calls it).
+ * one and everything only it reaches reports dark. `server/index.ts` is what the
+ * fly.io gameserver runs; `allocator/index.ts` is the fleet control plane;
+ * `vite.config.ts` is loaded by the build itself (it imports
+ * `src/platform/build-stamp`, which is therefore live even though no game code
+ * calls it).
+ *
+ * `index.html` loads **two** modules, not one (u14-01). Its inline entry script
+ * statically imports `src/ui/font-boot.ts` and awaits it before it dynamically
+ * imports `src/main.ts` — the boot gate that blocks first paint on the two
+ * self-hosted typefaces, which has to run before the renderer is built or the
+ * first frame bakes a fallback face into a texture (GDD §5.6). It is a literal
+ * front door, so it is listed as one: without it the gate and everything only it
+ * reaches — the ratified-face table — report dark while actually running on
+ * every boot, which is the exact inversion this scan exists to prevent.
  */
 const DEFAULT_ENTRIES = [
   'src/main.ts',
+  'src/ui/font-boot.ts',
   'server/index.ts',
   'allocator/index.ts',
   'vite.config.ts',
