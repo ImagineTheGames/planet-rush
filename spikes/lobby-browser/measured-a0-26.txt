@@ -1,0 +1,106 @@
+
+── §1  STALENESS — the age of a listed fact ────────────────────────────────
+
+heartbeat interval          5000 ms   (server/heartbeat.ts)
+registry liveness window    15000 ms   (allocator/registry.ts)
+reservation lease TTL       15000 ms   (allocator/registry.ts)
+
+(a) a seat fills between beats — the allocator keeps saying the old number
+    t+0ms      joinableSeats=7 joinable=true
+    t+4999ms   joinableSeats=7 joinable=true   <- WRONG for up to one interval
+    t+5000ms   joinableSeats=0 joinable=false
+
+(b) the Machine dies at t+0 — its rooms are listed until liveness lapses
+    t+  5000ms   listed=YES
+    t+ 10000ms   listed=YES
+    t+ 15000ms   listed=YES
+    t+ 15001ms   listed=no 
+
+(c) the boot gap — a reserved room advertises joinable with no occupancy
+    t+1000ms   {"code":"CCCC","machine":"m3","region":"iad","size":4,"mode":"ffa","joinable":true}   <- players/joinableSeats simply ABSENT
+    t+15001ms  null
+
+WORST-CASE AGE OF A ROW, as the player reads it:
+    heartbeat 5000ms + client poll 5000ms = 10000ms of drift on occupancy,
+    and up to 15000ms on EXISTENCE when the host Machine dies rather than the room.
+
+── §2  DEAD ROWS — tapping a room that is already gone ─────────────────────
+
+room YK8D opened by one host, no bots seated (a0-11: a new room is EMPTY)
+    heartbeat says: {"code":"YK8D","players":1,"size":8,"mode":"ffa","joinableSeats":7}
+
+the host closes the tab in the LOBBY (no grace — `room.vacate` frees the seat):
+    heartbeat says: []   <- the room is swept at once
+
+the allocator still lists it for one beat: {"code":"YK8D","machine":"m1","region":"iad","size":8,"mode":"ffa","joinableSeats":7,"joinable":true}
+    allocator.join() → ticket signed: YES (no refusal)
+    MatchServer join → welcome{you:0, room:YK8D}, room now: {"code":"YK8D","players":1,"size":8,"mode":"ffa","joinableSeats":7}
+
+  THE TRAP: the player tapped "1/8 · FFA" and landed ALONE in a brand-new
+  room wearing the same four characters. Nothing refused them, nothing lied
+  in a way any layer can detect — `MatchServer.openRoom` creates on join
+  (server/match-server.ts) and that is what makes the CODE path work.
+
+after the next beat drops it: allocator.join() → not-found (HTTP 404)
+    window in which a dead row is silently re-created: 0..5000ms
+    (and 0..15000ms for a room that never booted at all)
+
+── §3  PAYLOAD — the weight of one listing, and of an idle browser ─────────
+
+| fleet                    | rooms | all rooms | joinable only | bytes/room |
+|--------------------------|-------|-----------|---------------|------------|
+| one Machine, full        |     6 |    671 B  |     449 B ( 4) |    112 B   |
+| the DEPLOYED fleet, full |    12 |   1331 B  |     887 B ( 8) |    111 B   |
+| 10 Machines, full        |    60 |   6611 B  |    4391 B (40) |    110 B   |
+| 20 Machines, full        |   120 |  13271 B  |    8811 B (80) |    111 B   |
+
+THE DEPLOYED FLEET TODAY: 2 Machines × 6 rooms = 12 rooms max.
+A full listing is 1331 bytes of JSON — one MTU, uncompressed.
+
+ONE BROWSER SITTING OPEN, at three poll cadences:
+| poll | requests/min | bytes/min (full fleet) | bytes/hour |
+|------|--------------|------------------------|------------|
+|   2s |           30 |                  39930 |    2395800 |
+|   5s |           12 |                  15972 |     958320 |
+|  10s |            6 |                   7986 |     479160 |
+
+WHAT BUILDING ONE COSTS THE ALLOCATOR (the state is already in memory):
+     2 Machines × 6 rooms =  12 rooms → 0.3 µs per listing built
+    20 Machines × 6 rooms = 120 rooms → 0.9 µs per listing built
+
+THE ALTERNATIVE, for scale: no list route, and the client reads each row
+with the EXISTING GET /rooms/:code — 12 requests per refresh instead of 1,
+i.e. 144 allocator requests/min per open browser at a 5 s poll.
+
+── §4  WHAT A ROW CAN HONESTLY SAY TODAY ───────────────────────────────────
+
+what the HEARTBEAT carries about a lobby-phase room:
+    {"code":"XKWK","players":1,"size":8,"mode":"ffa","joinableSeats":4}
+
+what MATCHSTART carries (the whole static match config, per GDD §4.2):
+    keys = type, tick, seed, you, slots, asteroidCount, abundance
+    abundance = scarce
+
+the live room's advert: {"code":"XKWK","players":1,"size":4,"mode":"ffa","joinableSeats":0}
+
+| column            | on the ad? | where it comes from                          |
+|-------------------|------------|----------------------------------------------|
+| players / slots   | YES        | Room.players + Room.size (heartbeat)         |
+| joinable seats    | YES        | Room.joinableSeats (heartbeat, a0-11-aware)  |
+| mode (FFA/TEAMS)  | YES        | Room.mode (heartbeat, set by lobbyChoice.mode) |
+| region            | YES        | RoomInfo.region, from the host Machine view  |
+| measured ping     | YES        | src/net/region-probe.ts, per REGION not per room |
+| abundance / YIELD | NO         | lobbyChoice.abundance reaches the ROOM, not the ad |
+| map / arena       | NO         | mapId never crosses the wire at all — see below |
+
+THE MAP FINDING, stated exactly:
+  `mapId` does not appear in server/ or src/net/ outside tests. `MatchRoom`
+  calls `createWorld({seed, players, bounds?, asteroidCount?, abundance})`
+  (server/room.ts) with NO mapId, and `MatchStartMessage` carries none, so
+  `beginPredicting` (src/net/session.ts) omits it too. Both sides therefore
+  build `getMap(undefined)` — the default — and AGREE, which is why nothing
+  is broken. But MAP SELECT is client-local: online it moves the backdrop
+  sky (main.ts `chosenMapId` → renderer) and nothing else. A browser row
+  cannot print a map until the map is on the wire.
+
+done.
