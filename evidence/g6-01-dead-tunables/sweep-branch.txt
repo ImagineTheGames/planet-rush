@@ -1,0 +1,17 @@
+table exports: 87 · flagged TUNABLE: 70 · zero production references: 15
+
+CARGO_PER_TIER         L80    TUNABLE  prod:0 self:3 test:1 tool:0 self-used
+TURRET_TIERS           L235   TUNABLE  prod:0 self:3 test:20 tool:0 self-used
+SHOT_SPEED_STEPS       L321   TUNABLE  prod:0 self:1 test:5 tool:0 self-used
+SHOT_SPEED_COSTS       L333   TUNABLE  prod:0 self:1 test:0 tool:0 self-used
+MINING_YIELD_PER_HIT   L383   TUNABLE  prod:0 self:0 test:0 tool:0 unreferenced
+WAVE_INTERVAL_S        L521   TUNABLE  prod:0 self:4 test:32 tool:9 self-used
+WAVE                   L529   TUNABLE  prod:0 self:5 test:1 tool:0 self-used
+WAVE_ORE               L670   TUNABLE  prod:0 self:0 test:1 tool:0 test-only
+homeFieldOre           L676   -        prod:0 self:0 test:1 tool:0 test-only
+ABUNDANCE              L868   TUNABLE  prod:0 self:2 test:20 tool:3 self-used
+abundanceMultipliers   L876   -        prod:0 self:1 test:1 tool:0 self-used
+classWeaponDps         L1153  -        prod:0 self:0 test:8 tool:0 test-only
+classCoreDps           L1159  -        prod:0 self:0 test:4 tool:0 test-only
+miningRate             L1165  -        prod:0 self:0 test:0 tool:0 unreferenced
+WEDGE_SLIDE_SPEED      L1396  TUNABLE  prod:0 self:0 test:1 tool:0 test-only
