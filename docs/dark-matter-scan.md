@@ -443,6 +443,20 @@ Stated so the report is read at the right strength:
   references.)
 - **Reachability is static.** A module reached only through a dynamic import
   with a computed specifier reads as an orphan.
+- **A caller that is not TypeScript.** `index.html` is a front door too, and
+  since u14-01 it opens **two**: its inline entry script imports
+  `src/ui/font-boot.ts` and awaits it before it dynamically imports
+  `src/main.ts`, so the font boot gate runs on every boot of every build while
+  the scan sees no caller for it at all. The fix has two halves and both are
+  needed. `src/ui/font-boot.ts` is now in `DEFAULT_ENTRIES`, which makes
+  everything *beyond* the door live — without it `RATIFIED_FACES`, the table of
+  the two self-hosted typefaces the page actually loads, reported dark while
+  running on every load. The door's own export (`awaitRatifiedFaces`) is then
+  unreachable by construction, because the only thing that calls it is HTML, and
+  that one is allowlisted. **This is the same shape as `allocator/` above:** a
+  real production caller the scan's model did not contain. Adding an entry point
+  is the fix; allowlisting the whole module would have hidden the table behind
+  the door.
 - **It says nothing about whether a called thing is *correctly* called.** It
   finds "nobody calls this", which is one bug shape, not all of them.
 - **It cannot check the triage, which is the half a human writes.** §4.0 is the

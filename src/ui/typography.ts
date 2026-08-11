@@ -59,8 +59,11 @@ export const FONT_HEADING = 'Audiowide, "Trebuchet MS", sans-serif';
  * repo uses**, on a page that ships to a phone browser on every load. Because the
  * cut is expressed as a range rather than baked in, localising later is additive:
  * drop the two `latin-ext` woff2 files in and add a second `@font-face` each.
+ *
+ * Module-private on purpose: it reaches the world as {@link RatifiedFace.unicodeRange}
+ * on both faces, so there is one list and no second place for it to drift to.
  */
-export const LATIN_SUBSET_RANGE =
+const LATIN_SUBSET_RANGE =
   'U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, ' +
   'U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, ' +
   'U+2212, U+2215, U+FEFF, U+FFFD';
@@ -87,7 +90,15 @@ export interface RatifiedFace {
    * a face declared without it renders the whole HUD hairline-thin.
    */
   readonly weight: string;
-  /** The `font: ` shorthands the boot gate passes to `document.fonts.load()`. */
+  /** The subset this file was cut to — see {@link LATIN_SUBSET_RANGE}. */
+  readonly unicodeRange: string;
+  /**
+   * The `font:` shorthands `./font-boot` passes to `document.fonts.load()`.
+   *
+   * One per weight the UI actually asks for, because `.load()` resolves a
+   * *shorthand*, not a family: awaiting `400 16px Oxanium` says nothing about
+   * whether `700` is ready, and on a variable file both are the same download.
+   */
   readonly load: readonly string[];
 }
 
@@ -109,25 +120,17 @@ export const RATIFIED_FACES: readonly RatifiedFace[] = [
     family: 'Audiowide',
     href: '/fonts/Audiowide-Regular-latin.woff2',
     weight: '400',
+    unicodeRange: LATIN_SUBSET_RANGE,
     load: ['400 16px Audiowide'],
   },
   {
     family: 'Oxanium',
     href: '/fonts/Oxanium-Variable-latin.woff2',
     weight: '200 800',
+    unicodeRange: LATIN_SUBSET_RANGE,
     load: ['400 16px Oxanium', '700 16px Oxanium'],
   },
 ];
-
-/**
- * The ceiling the two self-hosted files are held under, in bytes.
- *
- * They are 27.5 KB today. This is a **budget, not a record** — it exists so that
- * un-subsetting a face, or quietly adding a second weight of Oxanium next to a
- * variable file that already covers the axis, fails a test instead of costing
- * every phone on every cold load. Raising it is a decision, which is the point.
- */
-export const FONT_PAYLOAD_BUDGET_BYTES = 32 * 1024;
 
 /**
  * Body text and numerals (style-guide §7). Never the wordmark. Legible at 12px.

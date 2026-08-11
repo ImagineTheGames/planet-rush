@@ -28,16 +28,23 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import {
-  FONT_BODY,
-  FONT_HEADING,
-  FONT_PAYLOAD_BUDGET_BYTES,
-  LATIN_SUBSET_RANGE,
-  RATIFIED_FACES,
-} from './typography';
+import { FONT_BODY, FONT_HEADING, RATIFIED_FACES } from './typography';
+import { BOOT_FONT_DEADLINE_MS, awaitRatifiedFaces } from './font-boot';
 
 const repoPath = (rel: string): string => fileURLToPath(new URL(`../../${rel}`, import.meta.url));
 const INDEX_HTML = readFileSync(repoPath('index.html'), 'utf8');
+
+/**
+ * The ceiling the two self-hosted files are held under, in bytes.
+ *
+ * They are 27.5 KB today. A **budget, not a record** — it exists so that
+ * un-subsetting a face, or quietly adding a second weight of Oxanium next to a
+ * variable file that already covers the axis, fails here instead of costing every
+ * phone on every cold load. Raising it is a decision, which is the point. It
+ * lives in the test rather than in `./typography` because nothing at runtime has
+ * any business knowing it.
+ */
+const FONT_PAYLOAD_BUDGET_BYTES = 32 * 1024;
 
 /** `/fonts/x.woff2` as index.html spells it → the file on disk under public/. */
 const onDisk = (href: string): string => repoPath(`public${href}`);
@@ -98,7 +105,7 @@ describe('index.html declares what typography.ts promises', () => {
       const body = blocks.get(face.family) ?? '';
       expect(body, `${face.family} src`).toContain(`url('${face.href}') format('woff2')`);
       expect(body, `${face.family} weight`).toContain(`font-weight: ${face.weight};`);
-      expect(body, `${face.family} unicode-range`).toContain(flat(LATIN_SUBSET_RANGE));
+      expect(body, `${face.family} unicode-range`).toContain(flat(face.unicodeRange));
     }
   });
 
@@ -133,26 +140,49 @@ describe('index.html declares what typography.ts promises', () => {
 describe('the boot gate makes the first painted frame deterministic', () => {
   const gate = flat(INDEX_HTML);
 
-  it('awaits every ratified face before the app module is evaluated', () => {
-    for (const face of RATIFIED_FACES) {
-      for (const shorthand of face.load) {
-        expect(gate, `${face.family} is awaited as "${shorthand}"`).toContain(`'${shorthand}'`);
-      }
-    }
-    expect(gate).toContain('document.fonts.load');
-
+  it('runs the gate before the app module is evaluated', () => {
     // Order is the whole point. Pixi bakes text into a texture at draw time and
     // never redraws it because a font arrived late, so main.ts must not be
     // evaluated until the faces have resolved (or the deadline has passed).
-    expect(gate.indexOf('document.fonts.load')).toBeLessThan(gate.indexOf("import('/src/main.ts')"));
+    const awaited = gate.indexOf('await awaitRatifiedFaces()');
+    const app = gate.indexOf("import('/src/main.ts')");
+    expect(awaited, 'index.html awaits the gate').toBeGreaterThan(-1);
+    expect(app, 'index.html imports the app').toBeGreaterThan(-1);
+    expect(awaited).toBeLessThan(app);
+
+    // `src/main.ts` must stay a DYNAMIC import. A top-level `await` in a sibling
+    // static import does not hold back the sibling listed after it, so the static
+    // form would be a gate that gates nothing — measured, not assumed.
+    expect(gate).not.toMatch(/import\s+['"]\/src\/main\.ts['"]/);
+  });
+
+  it('asks for every weight the UI actually draws', () => {
+    // `fonts.load()` resolves a SHORTHAND, not a family: awaiting `400 … Oxanium`
+    // says nothing about whether 700 is ready.
+    expect(RATIFIED_FACES.flatMap((f) => f.load)).toEqual([
+      '400 16px Audiowide',
+      '400 16px Oxanium',
+      '700 16px Oxanium',
+    ]);
   });
 
   it('bounds the wait, so a font that hangs never costs the player the game', () => {
     // src/platform/boot-error.ts: NO BLACK SCREENS, EVER.
-    const deadline = /BOOT_FONT_DEADLINE_MS\s*=\s*(\d+)/.exec(gate)?.[1];
-    expect(deadline, 'the gate has an explicit deadline').toBeTruthy();
-    expect(Number(deadline)).toBeGreaterThan(0);
-    expect(Number(deadline)).toBeLessThanOrEqual(3000);
-    expect(gate).toContain('Promise.race');
+    expect(BOOT_FONT_DEADLINE_MS).toBeGreaterThan(0);
+    expect(BOOT_FONT_DEADLINE_MS).toBeLessThanOrEqual(3000);
+  });
+
+  it('boots anyway where there is no font loading API at all', async () => {
+    // Old Safari and some embedded webviews. Nothing to wait on, and stalling
+    // buys a black screen rather than a correct frame.
+    // The suite runs in vitest's `node` environment, so there is no document at
+    // all — stand one up with no `fonts` on it, and take it away again.
+    const global = globalThis as { document?: unknown };
+    global.document = {};
+    try {
+      await expect(awaitRatifiedFaces(0)).resolves.toBeUndefined();
+    } finally {
+      delete global.document;
+    }
   });
 });
