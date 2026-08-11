@@ -30,6 +30,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BLOOM,
+  BLOOM_TINTS,
   GROUND_COLOR,
   MAP_NEBULA,
   NEBULAE,
@@ -50,8 +51,15 @@ import {
   type NebulaId,
 } from './backdrop';
 import { MAPS } from '../sim/maps';
-import { assertPaletteCompliance, RED_FAMILY, SKY_ALPHA_MAX, SKY_RESERVED_ALPHA_MAX, YELLOW_FAMILY } from './compliance';
-import { DERIVED, FLOOR, PALETTE, hex } from './palette';
+import {
+  assertPaletteCompliance,
+  auditSprite,
+  RED_FAMILY,
+  SKY_ALPHA_MAX,
+  SKY_RESERVED_ALPHA_MAX,
+  YELLOW_FAMILY,
+} from './compliance';
+import { DERIVED, FLOOR, IDENTITY_COLORS, PALETTE, hex } from './palette';
 import { pointInPoly } from './raster';
 import type { Shape, SpriteDef } from './shapes';
 import { ALL_SPRITES } from './catalogue';
@@ -99,6 +107,15 @@ function deltaE(a: readonly [number, number, number], b: readonly [number, numbe
   const [l1, a1, b1] = lab(a);
   const [l2, a2, b2] = lab(b);
   return Math.hypot(l1 - l2, a1 - a2, b1 - b2);
+}
+
+/** Lab chroma C* — how far a colour sits from grey. 0 is neutral; the void's
+ *  untinted halos land at 1.0–2.3, so it is the measure of "coloured" that
+ *  survives at a backdrop's alphas, where every ΔE against a bright signal is
+ *  large for the uninteresting reason that everything is dark. */
+function chroma(rgb: readonly [number, number, number]): number {
+  const [, aStar, bStar] = lab(rgb);
+  return Math.hypot(aStar, bStar);
 }
 
 function unpack(color: number): [number, number, number] {
@@ -466,6 +483,298 @@ describe('bloom — seeded scatter, not a brightness threshold', () => {
     expect(BLOOM.intensity[0]).toBeLessThanOrEqual(0.2);
     expect(BLOOM.intensity[1]).toBeLessThanOrEqual(0.1);
     expect(BLOOM.scatter).toBeLessThanOrEqual(0.25);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4b. Bloom colour (a0-22) — a tint may cool a bloom, never brighten it
+// ---------------------------------------------------------------------------
+
+/**
+ * The developer: *"our mockups had different colored blooms these are all 1
+ * color"*. `BLOOM_TINTS` answers that, and this block is the price of the answer
+ * stated as numbers rather than as the paragraph above the constant.
+ *
+ * Every assertion here fails on the two ways this could rot: a warm tint (which
+ * is the failure §1 exists to prevent), and a tint that makes the void brighter
+ * (which is how "a hint of colour" becomes a backdrop competing with the fleet).
+ */
+describe('bloom colour — the tint is cold, and it can only take light out', () => {
+  /** A halo's composited pixel over Floor, at `ink.alpha × BLOOM.intensity[0]`
+   *  — the brightest ring of the brightest bloom that ink ever draws. */
+  const haloPixel = (color: number, inkAlpha: number): [number, number, number] => {
+    const a = inkAlpha * BLOOM.intensity[0];
+    const [r, g, b] = unpack(color);
+    const [fr, fg, fb] = unpack(FLOOR);
+    return [a * r + (1 - a) * fr, a * g + (1 - a) * fg, a * b + (1 - a) * fb];
+  };
+
+  const tints = Object.values(BLOOM_TINTS);
+  /** Every ink in the field, with the layer it belongs to. */
+  const inks = STAR_LAYERS.flatMap((layer) => layer.inks.map((ink) => ({ layer, ink })));
+  const tinted = inks.filter(({ ink }) => ink.halo !== undefined);
+
+  it('names only cold, non-RESERVED hues — the mockup’s cyan, not its yellow or red', () => {
+    expect(tints).toEqual([PALETTE.plasma, PALETTE.patina]);
+    const hueOf = (rgb: readonly [number, number, number]): number => {
+      const [, aStar, bStar] = lab(rgb);
+      return ((Math.atan2(bStar, aStar) * 180) / Math.PI + 360) % 360;
+    };
+    const apart = (a: number, b: number): number => {
+      const d = Math.abs(a - b) % 360;
+      return d > 180 ? 360 - d : d;
+    };
+    for (const t of tints) {
+      expect(YELLOW_FAMILY.has(t), `${hex(t)} is ore yellow or a shade of it`).toBe(false);
+      expect(RED_FAMILY.has(t), `${hex(t)} is threat red or a shade of it`).toBe(false);
+      expect(IDENTITY_COLORS.has(t), `${hex(t)} is a roster colour`).toBe(false);
+      // "Cold" is not a mood here, it is an angle: ore sits at hue 93° and danger
+      // at 29°, and a tint has to be most of the wheel away from both. Plasma is
+      // 250° and patina 174°, so the nearest either gets to a RESERVED hue is 81°.
+      for (const [name, signal] of [
+        ['ore', PALETTE.signalYellow],
+        ['danger', PALETTE.threatRed],
+      ] as const) {
+        const d = apart(hueOf(unpack(t)), hueOf(unpack(signal)));
+        expect(d, `${hex(t)} sits ${d.toFixed(0)}° from ${name}`).toBeGreaterThan(75);
+      }
+    }
+  });
+
+  it('leaves the frame quieter than it found it, and never reaches the ink outline', () => {
+    // The safety argument, as the two numbers that carry it. White is the most
+    // luminous thing in the palette, so the brightest bloom in the game LOSES a
+    // quarter of its value by becoming cyan — and nothing anywhere in the field
+    // gets as bright as the line every sprite is drawn with.
+    const rows: string[] = [];
+    let wasPeak = 0;
+    let nowPeak = 0;
+    let worstWasTax = 0;
+    let worstNowTax = 0;
+    const tax = (px: readonly [number, number, number]): number =>
+      1 - contrast(unpack(DERIVED.shotOwn1), px) / contrast(unpack(DERIVED.shotOwn1), unpack(FLOOR));
+    for (const { layer, ink } of inks) {
+      const was = haloPixel(ink.color, ink.alpha);
+      const now = haloPixel(ink.halo ?? ink.color, ink.alpha);
+      wasPeak = Math.max(wasPeak, luma(was));
+      nowPeak = Math.max(nowPeak, luma(now));
+      worstWasTax = Math.max(worstWasTax, tax(was));
+      worstNowTax = Math.max(worstNowTax, tax(now));
+      rows.push(
+        `  ${layer.key.padEnd(5)} ${hex(ink.color)} @${ink.alpha.toFixed(2)} halo ${
+          ink.halo === undefined ? '—      ' : hex(ink.halo)
+        } | C* ${chroma(was).toFixed(1).padStart(4)} → ${chroma(now).toFixed(1).padStart(4)} | Y′ ${luma(was)
+          .toFixed(1)
+          .padStart(5)} → ${luma(now).toFixed(1).padStart(5)} | tax ${(tax(was) * 100)
+          .toFixed(1)
+          .padStart(5)}% → ${(tax(now) * 100).toFixed(1).padStart(5)}%`,
+      );
+    }
+    const inkOutline = luma(unpack(DERIVED.rockFissure));
+    // eslint-disable-next-line no-console
+    console.log(
+      `\n${rows.join('\n')}\n  peak halo Y′ ${wasPeak.toFixed(1)} → ${nowPeak.toFixed(1)}` +
+        `   worst tax ${(worstWasTax * 100).toFixed(1)}% → ${(worstNowTax * 100).toFixed(1)}%` +
+        `   ink outline Y′ ${inkOutline.toFixed(1)}\n`,
+    );
+
+    // No tinted halo may out-shine the brightest halo the field already draws…
+    for (const { layer, ink } of tinted) {
+      const px = haloPixel(ink.halo!, ink.alpha);
+      expect(luma(px), `${layer.key} ${hex(ink.halo!)} halo vs the field's shipped peak`).toBeLessThan(
+        wasPeak,
+      );
+    }
+    // …nothing anywhere reaches the ink outline (the sky table's own invariant)…
+    for (const { layer, ink } of inks) {
+      const px = haloPixel(ink.halo ?? ink.color, ink.alpha);
+      expect(luma(px), `${layer.key} halo Y′ vs the ink outline ${inkOutline.toFixed(1)}`).toBeLessThan(
+        inkOutline,
+      );
+    }
+    // …and in aggregate the change takes light OUT of the frame, which is why it
+    // is affordable at all. Both of these are strict: a tint set that raised
+    // either number would be a backdrop competing harder with the fleet.
+    expect(nowPeak, 'the brightest halo in the game is dimmer than it was').toBeLessThan(wasPeak);
+    expect(worstNowTax, 'the worst contrast tax any halo levies is lower than it was').toBeLessThan(
+      worstWasTax,
+    );
+  });
+
+  it('puts every tinted halo a whole colour away from every thing that MEANS something', () => {
+    // ΔE ≥ 40 is the floor a0-07 set for "unmistakably two colours", and it is
+    // the check the contrast tax cannot answer. Ore, the core, danger, and all
+    // eight roster hues — the three channels a bloom must never borrow.
+    const signals: Record<string, number> = {
+      oreYellow: PALETTE.signalYellow,
+      oreDeep: DERIVED.oreDeep,
+      coreHot: DERIVED.coreHot,
+      threatRed: PALETTE.threatRed,
+      ...Object.fromEntries([...IDENTITY_COLORS].map((c, i) => [`roster${i + 1}`, c])),
+    };
+    for (const { layer, ink } of tinted) {
+      const px = haloPixel(ink.halo!, ink.alpha);
+      for (const [name, color] of Object.entries(signals)) {
+        expect(
+          deltaE(px, unpack(color)),
+          `${layer.key} ${hex(ink.halo!)} halo vs ${name} ${hex(color)}`,
+        ).toBeGreaterThan(40);
+      }
+    }
+  });
+
+  it('leaves the star’s own point on the steel value ramp (style-guide §1)', () => {
+    // The narrowness of the change, asserted: §1's sentence is about the POINT,
+    // and only the scatter around it takes a hue. This is also what keeps a star
+    // inside every coloured bloom.
+    const ramp = new Set<number>([PALETTE.hullSteel, DERIVED.hullLight, 0xffffff]);
+    for (const { layer, ink } of inks) {
+      expect(ramp.has(ink.color), `${layer.key} paints a star point ${hex(ink.color)}`).toBe(true);
+      if (ink.halo !== undefined) expect(ink.halo).not.toBe(ink.color);
+    }
+  });
+
+  it('spends the tint only where it buys chroma, and leaves the FAR layer alone', () => {
+    // "Hue on the far layer only" was the narrowest change available, and this
+    // is the measurement that priced it out rather than an opinion about it: a
+    // tint's chroma is bought with alpha, and `deep` has the least to spend. Every
+    // tint it could carry lands under C* 4 — against C* 5.6–9.7 where one is
+    // actually spent — on discs ~6 px across. Stated as a test so the option
+    // cannot be quietly re-taken without the number moving first.
+    const CHROMA_FLOOR = 5;
+    const deep = STAR_LAYERS.find((l) => l.key === 'deep')!;
+    for (const ink of deep.inks) {
+      expect(ink.halo, 'the deep layer takes no tint').toBeUndefined();
+      for (const t of tints) {
+        const c = chroma(haloPixel(t, ink.alpha));
+        expect(
+          c,
+          `deep ${hex(ink.color)} @${ink.alpha} → ${hex(t)} would reach only C* ${c.toFixed(1)}`,
+        ).toBeLessThan(CHROMA_FLOOR);
+      }
+    }
+    // …and every tint that IS spent clears that floor, and at least doubles the
+    // chroma of the halo it replaces. A tint under the floor is `deep`'s case
+    // wearing another layer's name, and it would ship colour nobody can see.
+    for (const { layer, ink } of tinted) {
+      const was = chroma(haloPixel(ink.color, ink.alpha));
+      const now = chroma(haloPixel(ink.halo!, ink.alpha));
+      expect(now, `${layer.key} ${hex(ink.halo!)} reaches only C* ${now.toFixed(1)}`).toBeGreaterThan(
+        CHROMA_FLOOR,
+      );
+      expect(now / was, `${layer.key} ${hex(ink.halo!)}: C* ${was.toFixed(1)} → ${now.toFixed(1)}`)
+        .toBeGreaterThan(2);
+    }
+    for (const key of ['mid', 'near']) {
+      expect(
+        STAR_LAYERS.find((l) => l.key === key)!.inks.some((i) => i.halo !== undefined),
+        `${key} carries no tint`,
+      ).toBe(true);
+    }
+  });
+
+  it('keeps the steel ramp the majority read, on every layer', () => {
+    // "different colored blooms" is a claim about a FRAME, not about a table.
+    // Every layer keeps a majority of untinted inks, so the ramp is still what
+    // the void is made of and the tints are the minority that make it a field
+    // rather than a repaint: a screenful at 1440×900 is ~36 blooms, of which the
+    // 25 on `deep` are steel by construction.
+    for (const layer of STAR_LAYERS) {
+      expect(
+        layer.inks.some((i) => i.halo === undefined),
+        `${layer.key} has no untinted ink left`,
+      ).toBe(true);
+    }
+    // Six of the field's nine inks stay on the ramp, and they are weighted toward
+    // the layer that carries most of a frame's blooms — so the majority of what a
+    // player sees is still the steel void a0-07 ratified.
+    const all = inks.length;
+    const untinted = inks.filter(({ ink }) => ink.halo === undefined).length;
+    expect(untinted / all, `${untinted}/${all} inks are untinted`).toBeGreaterThan(0.5);
+    const families = new Set(STAR_LAYERS.flatMap((l) => l.inks.map((i) => i.halo ?? 'ramp')));
+    expect(families.size, 'the field draws blooms in more than one colour').toBeGreaterThan(2);
+  });
+
+  it('emits the tint on both halo rings and never on the star, in the real sprite', () => {
+    // The generator, not the table: `starFieldSprite` must apply `halo` to BOTH
+    // rings (a halo whose rings disagreed would be a ring, not a glow) and to
+    // neither the point nor its glint.
+    const layer = STAR_LAYERS.find((l) => l.key === 'near')!;
+    const def = starFieldSprite(layer, VOID_SEED, 9000, 6000);
+    const tintSet = new Set<number>(tints);
+    let tintedHalos = 0;
+    let halos = 0;
+    for (const s of def.shapes) {
+      if (s.path.kind !== 'circle') continue;
+      const isHalo = s.path.r > layer.maxR + 1e-6;
+      const color = s.fill?.color;
+      if (color === undefined) continue;
+      if (!isHalo) {
+        expect(tintSet.has(color), `a star POINT was painted ${hex(color)}`).toBe(false);
+        continue;
+      }
+      halos++;
+      if (tintSet.has(color)) tintedHalos++;
+    }
+    // The glint is the point's own spike, so it is the point's own colour.
+    for (const s of def.shapes) {
+      if (s.stroke) expect(tintSet.has(s.stroke.color), 'a glint took the halo tint').toBe(false);
+    }
+    expect(halos, 'the near layer bloomed at all').toBeGreaterThan(200);
+    expect(halos % BLOOM.radii.length, 'halos come in whole pairs of rings').toBe(0);
+    expect(tintedHalos % BLOOM.radii.length, 'tinted halos come in whole pairs of rings').toBe(0);
+    // Two of near's three inks are tinted and the inks are sampled uniformly, so
+    // about two thirds of its halos arrive with a hue. ±10% is the sampling noise
+    // on a few hundred stars; the assertion is the rate, not a golden count.
+    const rate = tintedHalos / halos;
+    const expected = layer.inks.filter((i) => i.halo !== undefined).length / layer.inks.length;
+    expect(rate, `tinted halo rate ${rate.toFixed(3)} vs ${expected.toFixed(3)}`).toBeGreaterThan(
+      expected - 0.1,
+    );
+    expect(rate, `tinted halo rate ${rate.toFixed(3)} vs ${expected.toFixed(3)}`).toBeLessThan(
+      expected + 0.1,
+    );
+    expect(assertPaletteCompliance([def])).toBeUndefined();
+  });
+
+  it('states, as arithmetic, why the mockup’s yellow and red blooms are not Art’s to give', () => {
+    // The brief asked for the honest conclusion when a mockup and a ratified rule
+    // disagree. For the two warm hues it is not a taste — it is §2.2's number:
+    // threat red on the backdrop stops at SKY_RESERVED_ALPHA_MAX, and a bloom's
+    // INNER ring is above that on every layer in the field. Signal yellow has no
+    // carve-out at any alpha at all (`YELLOW_ROLES` excludes `sky`).
+    for (const layer of STAR_LAYERS) {
+      const inner = Math.max(...layer.inks.map((i) => i.alpha)) * BLOOM.intensity[0];
+      expect(
+        inner,
+        `${layer.key}: its brightest inner halo is alpha ${inner.toFixed(4)}, against the §2.2 ceiling ${SKY_RESERVED_ALPHA_MAX}`,
+      ).toBeGreaterThan(SKY_RESERVED_ALPHA_MAX);
+    }
+    // On the two layers a bloom is actually visible on, EVERY ink breaches it,
+    // by 1.9x to 2.5x — so a red bloom there is not a tuning question.
+    for (const key of ['mid', 'near']) {
+      for (const ink of STAR_LAYERS.find((l) => l.key === key)!.inks) {
+        expect(ink.alpha * BLOOM.intensity[0], `${key} @${ink.alpha}`).toBeGreaterThan(
+          SKY_RESERVED_ALPHA_MAX,
+        );
+      }
+    }
+    // And the audit already refuses them, which is what makes this a gate rather
+    // than a paragraph: no new rule was needed to keep a warm bloom out.
+    const warm = starFieldSprite(
+      { ...STAR_LAYERS[2]!, inks: [{ color: 0xffffff, alpha: 0.88, halo: PALETTE.signalYellow }] },
+      VOID_SEED,
+      1200,
+      800,
+    );
+    expect(auditSprite(warm).map((v) => v.rule)).toContain('reserved-yellow');
+    const red = starFieldSprite(
+      { ...STAR_LAYERS[2]!, inks: [{ color: 0xffffff, alpha: 0.88, halo: PALETTE.threatRed }] },
+      VOID_SEED,
+      1200,
+      800,
+    );
+    expect(auditSprite(red).map((v) => v.rule)).toContain('reserved-red');
   });
 });
 

@@ -148,9 +148,9 @@ interface StarInk {
    *
    *  - it never touches {@link color}, so the star's *point* is on the steel ramp
    *    whatever its halo does;
-   *  - it may only name a hue no more luminous than {@link color}, so a tint can
-   *    make a bloom cooler and dimmer and can never make one brighter
-   *    (`backdrop.test.ts` asserts exactly that, per ink).
+   *  - it may only name a hue that leaves this halo dimmer than the brightest
+   *    halo the field already draws, and short of the ink outline every sprite in
+   *    the game is drawn with (`backdrop.test.ts` asserts both, per ink).
    */
   readonly halo?: number;
 }
@@ -218,39 +218,53 @@ export interface StarLayerSpec {
  *
  * | tint | palette job (§1) | why a bloom in it is not a signal |
  * |---|---|---|
- * | **plasma `#4DC3FF`** | beams, cockpits, energy | the mockup's own bloom colour. At the near layer's halo alpha it composites to Y′ **25.1** over Floor — **14%** of a plasma shot's value (183) and 58% of the ink outline every sprite is drawn with (43.2). |
- * | **patina `#4FA08B`** | corrosion, continents, repair | the coldest non-reserved hue in the set, already the whole of Patina Drift's sky. Composites to Y′ **21.3**. |
+ * | **plasma `#4DC3FF`** | beams, cockpits, energy | the mockup's own bloom colour, and the most chromatic thing in the palette (C\* 41.7), which is why it is the one that survives being painted at a bloom's alpha. Its brightest halo composites to Y′ **26.2** over Floor — **14%** of a plasma shot's value (188.9) and 60% of the ink outline every sprite is drawn with (43.4). |
+ * | **patina `#4FA08B`** | corrosion, continents, repair | the palette's other cold hue (C\* 30.2), already the whole of Patina Drift's sky. Its brightest halo composites to Y′ **22.4**. |
  *
  * Both are on the **cold** side of the wheel, which is the point: the hue that
  * would be dangerous is a warm one, because warm is where ore and danger live.
  *
- * ## The tint may never make a bloom brighter — measured, per ink
+ * ## A tint is bought with alpha, and `BLOOM.intensity` is what there is to spend
  *
- * The bound that makes this safe is not a new ceiling invented for the occasion.
- * It is that **a tint may only replace an ink at least as luminous as itself**,
- * so tinting a halo can only ever take light *out* of the frame:
+ * A halo paints at 16% of its star's own alpha, so whatever colour it carries
+ * arrives diluted by Floor. That is not a side effect to work around — it is what
+ * makes a *tint* out of a *colour*, and it is also a hard ceiling on how much
+ * hue a bloom can hold. Measured, per ink, as the composited pixel's Lab chroma
+ * C\* (0 = grey; the untinted halos sit at 1.0–2.3) and its luma Y′ over Floor:
  *
  * ```
- *   layer  ink            halo      shipped Y′ / tax     with the tint
- *   deep   hullSteel .26  —              7.4 /  3.2%      7.4 /  3.2%   (untouched)
- *   deep   hullSteel .38  —             10.0 /  4.6%     10.0 /  4.6%
- *   deep   hullLight .30  —             10.0 /  4.7%     10.0 /  4.7%
- *   mid    hullSteel .70  —             16.8 /  8.9%     16.8 /  8.9%
- *   mid    hullLight .55  patina        16.8 /  8.9%     13.5 /  7.3%   ↓
- *   mid    WHITE     .42  plasma        18.9 / 10.4%     13.0 /  6.9%   ↓
- *   near   hullLight .92  patina        26.8 / 16.9%     21.3 / 13.6%   ↓
- *   near   WHITE     .88  plasma        37.6 / 26.7%     25.1 / 17.2%   ↓
- *   near   WHITE     .64  —             27.8 / 17.8%     27.8 / 17.8%
- *   ────────────────────────────────────────────────────────────────
- *   brightest halo pixel in the game     37.6            27.8          −26%
- *   worst contrast tax on a signal       26.7%           17.8%
+ *   layer  ink            halo      C*  →   C*      Y′  →  Y′     tax  →  tax
+ *   deep   hullSteel .26  —        1.0    1.0      7.5    7.5    3.2%   3.2%
+ *   deep   hullSteel .38  —        1.2    1.2     10.0   10.0    4.6%   4.6%
+ *   deep   hullLight .30  —        1.1    1.1     10.1   10.1    4.7%   4.7%
+ *   mid    hullLight .55  —        1.6    1.6     16.8   16.8    8.9%   8.9%
+ *   mid    hullSteel .70  plasma   2.1    8.2     16.8   21.2    8.9%  12.8%
+ *   mid    WHITE     .42  —        1.3    1.3     18.9   18.9   10.4%  10.4%
+ *   near   WHITE     .88  plasma   1.3    9.7     37.6   26.2   26.7%  17.2%
+ *   near   hullLight .92  patina   2.3    5.6     26.8   22.4   16.9%  13.6%
+ *   near   WHITE     .64  —        1.4    1.4     27.8   27.8   17.8%  17.8%
+ *   ──────────────────────────────────────────────────────────────────────────
+ *   brightest halo pixel in the game        Y′ 37.6 → 27.8   (−26%)
+ *   worst contrast tax any halo puts on a signal  26.7% → 17.8%
+ *   the ink outline every sprite is drawn with    Y′ 43.4  ← nothing reaches it
  * ```
  *
  * (`tax` = the fraction of contrast a bright signal loses to that halo's pixel,
  * signal-independent by construction — the same measure `backdrop.test.ts`
- * applies to every sky.) **The void gets quieter, not louder**: white is the most
- * luminous thing in the palette, so every halo that stops being white and starts
- * being a hue loses value. This is the whole reason the colour is affordable.
+ * applies to every sky.) Two things in that table are the whole safety argument:
+ *
+ *  1. **The frame gets quieter, not louder.** White is the most luminous thing in
+ *     the palette, so the brightest bloom in the game — a white halo at 14% —
+ *     *loses* a quarter of its value by becoming cyan. The peak halo pixel falls
+ *     from Y′ 37.6 to 27.8 and the worst tax from 26.7% to 17.8%; no halo, tinted
+ *     or not, comes near the ink outline. One ink moves the other way (mid's
+ *     steel at 0.70, Y′ 16.8 → 21.2, tax 8.9% → 12.8%), and it is stated rather
+ *     than buried: it is still below both the shipped peak and half the outline,
+ *     and it buys the only cyan a frame reliably contains.
+ *  2. **C\* is the honest measure of "coloured", not ΔE.** Every one of these
+ *     lands ΔE ≥ 66 from ore, from danger and from all eight roster hues, because
+ *     at Y′ 20 everything is far from everything; that number proves nothing. The
+ *     chroma column is what a player sees, and its ceiling here is **C\* 10**.
  *
  * ## What does NOT change, and why
  *
@@ -263,19 +277,22 @@ export interface StarLayerSpec {
  *    the point's own spike, not the scatter.
  *  - **`deep` takes no tint at all, and this was priced rather than assumed.** A
  *    tint on the far layer is the narrowest change available and it is the one
- *    that buys nothing: at deep's halo alphas (0.042–0.061) the difference
- *    between a steel halo and a plasma one is **ΔE 1.7–2.9**, at or under the
- *    just-noticeable difference, painted across a **6 px** disc sitting **Δ7 of
- *    luma** above its background. It is a change the developer could not see, on
- *    the layer where 25 of a frame's 36 blooms happen to live. Keeping deep
- *    neutral also keeps the module header's own line true — *distance steals a
- *    star's colour before its light* — so the tint becomes a nearness cue.
+ *    that buys nothing: at deep's halo alphas (0.042–0.061) the most chroma any
+ *    tint can reach is **C\* 3.9**, against C\* 8.2–9.7 on the layers that do
+ *    carry one — painted across a **6 px** disc sitting **Δ7 of luma** above its
+ *    background. It is a change the developer could not see, on the layer where
+ *    25 of a frame's 36 blooms happen to live. Keeping deep neutral also keeps
+ *    the module header's own line true — *distance steals a star's colour before
+ *    its light* — so the tint becomes a nearness cue rather than a repaint.
  *  - **`BLOOM.scatter`, `BLOOM.intensity`, `BLOOM.radii`, every density, every
  *    parallax and every ink alpha.** a0-07 ratified *"seeded scatter, subtle"*
  *    and the developer has not asked for a different set of stars to bloom, only
- *    for a different colour in the ones that do. `BLOOM.intensity` is also what
- *    makes this a *tint* rather than a *colour*: at 16% of a star's own alpha,
- *    the hue arrives as a wash over Floor, never as a saturated mark.
+ *    for a different colour in the ones that do. The consequence is worth naming
+ *    for whoever reads this next: **`BLOOM.intensity` is the ceiling on how
+ *    coloured a bloom can be**, and at 0.16 that ceiling is C\* 10. If the answer
+ *    to this round is "still not colourful enough", the lever is that number and
+ *    it is the developer's to move — a0-07 chose the lowest of the three
+ *    magnitudes they were shown, and Art does not get to raise it back.
  */
 export const BLOOM_TINTS = {
   /** The mockup's own bloom cyan, and the palette's energy hue. */
@@ -314,12 +331,15 @@ export const STAR_LAYERS: readonly StarLayerSpec[] = [
     density: 46,
     minR: 0.7,
     maxR: 1.35,
-    // One steel, one teal-blooming, one cyan-blooming — so a screenful of mid
-    // stars (~10 bloomed at 1440×900) shows all three families rather than one.
+    // The cyan goes on the ink with the most alpha to spend, because a tint's
+    // chroma is bought with alpha: C* 8.2 here against 6.3 and 4.4 on the other
+    // two. The other two stay on the ramp — mid is where most of a frame's
+    // *visible* blooms live (~10 per screenful), so a third of them cyan is a
+    // field with two colours in it rather than a field repainted.
     inks: [
-      { color: DERIVED.hullLight, alpha: 0.55, halo: BLOOM_TINTS.patina },
-      { color: PALETTE.hullSteel, alpha: 0.7 },
-      { color: WHITE, alpha: 0.42, halo: BLOOM_TINTS.plasma },
+      { color: DERIVED.hullLight, alpha: 0.55 },
+      { color: PALETTE.hullSteel, alpha: 0.7, halo: BLOOM_TINTS.plasma },
+      { color: WHITE, alpha: 0.42 },
     ],
     glint: 0.04,
   },
@@ -330,8 +350,9 @@ export const STAR_LAYERS: readonly StarLayerSpec[] = [
     minR: 1.15,
     maxR: 2.2,
     // The closest, brightest points — the ramp's white endpoint carries these,
-    // and the two brightest of them are the frame's only real orbs, so this is
-    // the layer where a tint is worth the most per star.
+    // and they are the only real orbs in a frame (a bloomed near star is ~12–19
+    // px across against mid's ~8), so this is the layer where a tint is worth the
+    // most per star and the only one that can carry the second hue at all.
     inks: [
       { color: WHITE, alpha: 0.88, halo: BLOOM_TINTS.plasma },
       { color: DERIVED.hullLight, alpha: 0.92, halo: BLOOM_TINTS.patina },
