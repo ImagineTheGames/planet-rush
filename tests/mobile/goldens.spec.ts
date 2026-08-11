@@ -204,6 +204,59 @@ test('golden: landscape phone HUD chrome band — the same instruments a quarter
 });
 
 // ---------------------------------------------------------------------------
+// The thumb band — the touch controls, CLIPPED (a0-23)
+// ---------------------------------------------------------------------------
+//
+// PROPOSED BY THE PLATFORM LANE, in a commit of its own, because this file and
+// `tests/mobile/` are QA's. It is additive — one new baseline, no existing test
+// touched — and it drops cleanly if the owner declines.
+//
+// It exists for exactly the reason the two HUD bands above exist, and the number
+// is worse. a0-23 rebuilt all four touch controls in Gantry/Bone — every ring,
+// knob, fill, label, face and tracking on the surface the player's thumbs live
+// on — and **every full-frame phone baseline in this file passed unchanged**,
+// first try, with no `--update-snapshots`. A complete re-skin of the controls
+// was invisible to the gate.
+//
+// That is the same arithmetic u7-07 measured for the HUD: a full 844×390 frame
+// is mostly world, and the thumb furniture is a few thousand translucent pixels
+// paying into a 1% budget that a starfield has already half spent. Clipping to
+// the band the controls actually occupy keeps the same ratio over a third of the
+// area, and every pixel in it is furniture: the left thrust-stick zone, the
+// BUILD button's slot above it, and the hold-to-FIRE button in the right corner.
+//
+// The BUILD button itself is NOT in this baseline and cannot be, today: it draws
+// on `buildVisible`, which is set in `updateBuildWheel()` — and `?freeze=1`
+// returns from the loop's update before that runs, so a frozen scene can never
+// carry it. `__pressStage.openBuild()` docks the ship but also opens the wheel,
+// which covers the slot. Baselining BUILD needs a `dock`-without-opening seam in
+// `src/main.ts`; until someone adds one, its evidence is the live capture in
+// `evidence/a0-23-touch-controls-theme/`.
+
+/** The bottom band, CSS px: the stick zones, the BUILD slot and the FIRE button.
+ *  Derived from the control geometry itself (`@platform/touch-visuals`:
+ *  EDGE_MARGIN 28 + 2·R_STICK 64 = 156), plus a few px of air above the rings. */
+const TOUCH_BAND = 168;
+
+test('golden: landscape phone THUMB BAND — the controls, in Bone (a0-23)', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'iphone', 'the touch controls are a phone affordance (GDD §2.4)');
+  budgetTest({
+    work: 'rotate to landscape → boot the frozen scene → font settle → one clipped golden comparison at dpr 3',
+    measuredSeconds: 8,
+  });
+
+  const vp = page.viewportSize();
+  if (vp) await page.setViewportSize({ width: vp.height, height: vp.width }); // portrait → landscape
+  await bootFrozen(page);
+  await expect(page).toHaveScreenshot('phone-landscape-thumb-band.png', {
+    ...GOLDEN,
+    clip: { x: 0, y: 390 - TOUCH_BAND, width: 844, height: TOUCH_BAND },
+  });
+});
+
+// ---------------------------------------------------------------------------
 // The side labels, in a TEAMS scene (u3 — ratified 2026-08-05)
 // ---------------------------------------------------------------------------
 //
