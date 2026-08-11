@@ -271,6 +271,59 @@ that applies first, putting the element's right edge on the origin so it grows b
 A log the developer has to tilt their head to find is most of the way back to having
 no way to send one.
 
+### …and then it was invisible (a0-28)
+
+> *"download logs used to live in match as well pretty sure it was in pause menu."*
+> … *"I was on mobile."*
+
+The capture showed PAUSED / RESUME / SETTINGS / EXIT TO MENU and an empty footer. It
+was chased as missing wiring twice and it never was: `main.ts` `syncDownloadLog` runs
+every rendered frame from `syncPause` and offers `reason: 'pause'` whenever the
+overlay is up, and it did.
+
+Measured on a real 844×390 landscape touch boot, walked through the **real front
+door** with real thumbs (PLAY → PLAY SOLO → RUSH! → the corner pause button):
+
+```
+fullscreenElement : "app"            <- PLAY entered fullscreen on the game root
+rootParentId      : ""               <- ...and the affordance is in <body>, beside it
+rect              : 643,334 189x44   <- a full box, wholly inside 844x390
+visibility        : "visible"
+elementFromPoint  : "CANVAS"         <- at the button's OWN CENTRE
+```
+
+On touch, PLAY enters fullscreen on the game root (`@platform/fullscreen`
+`FullscreenLifecycle.enter`), which promotes `#app` into the browser's **top layer**
+and paints a `::backdrop` over the rest of the document. **The top layer is not a
+z-index** — it beats every normal-flow box unconditionally — so this affordance,
+appended to `body` as a *sibling* of the fullscreen element, was painted under the
+backdrop while holding the largest z-index the platform has. Nothing about stacking
+order could have rescued it.
+
+Every place it *did* work says the same thing: the desk never auto-fullscreens (the
+lifecycle gates on `isTouch`); the boot-error screen is reached before any PLAY; and
+the connect-trace panel's own DOWNLOAD LOG is drawn **in canvas inside `#app`** and
+merely calls `download()` on this module, so it rides the top layer for free.
+
+It now mounts into `document.fullscreenElement ?? body`, re-homed on
+`fullscreenchange` — the player can back out of fullscreen and re-enter at any
+moment, and the game offers an affordance for exactly that. `main.ts` is untouched:
+the real `document` already satisfies the widened seam.
+
+**Why the suite was green through all of it.** `tests/live-stage/log-download.spec.ts`
+boots `?debug=1`, which drops straight into a match — skipping PLAY, and therefore
+fullscreen. A phone profile that never presses PLAY can be green while the phone is
+blank. The new spec, `tests/live-stage/log-download-fullscreen.spec.ts` under
+`playwright.log-download-fullscreen.config.ts`, boots clean and walks the front door
+for that reason, and asserts *visible and hit-testable* — `elementFromPoint` at the
+button's own centre, and a real finger tap making the label answer — because a box
+was already true while the screen was empty.
+
+One more defect fell out of it, and could not ship separately: `#id{display:flex}`
+outranks the UA's `[hidden]{display:none}`, so `hide()` had never taken the button
+off the glass. Un-burying the affordance without that fix would have left DOWNLOAD
+LOG sitting over live play.
+
 ## The gate
 
 `tests/net/single-volley.test.ts` runs the full two-client stack at 150 ms / ±30 ms

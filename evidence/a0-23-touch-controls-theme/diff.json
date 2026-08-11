@@ -1,0 +1,51 @@
+{
+  "fullFrame": {
+    "moved": 7464,
+    "total": 329160,
+    "pct": 2.267590229675538
+  },
+  "thumbBand": {
+    "moved": 7464,
+    "total": 141792,
+    "pct": 5.26404874746107
+  },
+  "gate": 0.01,
+  "luma": {
+    "fire": {
+      "before": {
+        "peak": 167,
+        "bright": 1354,
+        "mean": 24.5
+      },
+      "after": {
+        "peak": 255,
+        "bright": 903,
+        "mean": 27.7
+      }
+    },
+    "stick": {
+      "before": {
+        "peak": 203,
+        "bright": 66,
+        "mean": 8.5
+      },
+      "after": {
+        "peak": 203,
+        "bright": 66,
+        "mean": 9.5
+      }
+    },
+    "fireLabel": {
+      "before": {
+        "peak": 167,
+        "bright": 354,
+        "mean": 70.7
+      },
+      "after": {
+        "peak": 255,
+        "bright": 377,
+        "mean": 96.5
+      }
+    }
+  }
+}

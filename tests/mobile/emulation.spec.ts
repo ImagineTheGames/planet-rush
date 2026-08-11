@@ -38,10 +38,11 @@ import {
   count,
   isPlasma,
   isBlueGlow,
+  isBoneGhost,
+  isBoneLit,
   isYellow,
   isNonVacuum,
   REGION_FIRE,
-  REGION_STICK,
   REGION_STRIP_LEFT,
   REGION_STRIP_MID,
   REGION_FULL,
@@ -175,6 +176,49 @@ async function minimapRegion(page: Page): Promise<Region | null> {
   });
 }
 
+/**
+ * The top arc of a circular touch affordance, as a fractional {@link Region},
+ * read from the layout registry (a0-23).
+ *
+ * Why an arc and not the corner it sits in. Until a0-23 the stick zone was the
+ * only *blue* thing in the bottom-left, so counting blue over the whole corner
+ * was a sound "is it drawn" probe. In Gantry/Bone the ring is neutral metal and
+ * so is every asteroid behind it, so the same probe over the same corner would
+ * pass on rock alone — it would stop being a test of the thing it names. A band
+ * across the ring's own top arc is almost entirely ring, and the bounds come
+ * from the app's own contract (`touch-left-stick`, registered from the very
+ * `writeAffordanceRects` that draws it) rather than from a hardcoded corner.
+ *
+ * `null` when the entry is absent, which is itself the failure the M1 gap was
+ * about — an affordance that is not registered is one that is not on screen.
+ */
+async function affordanceArcRegion(page: Page, id: string): Promise<Region | null> {
+  return page.evaluate((wanted) => {
+    const pr = (
+      window as unknown as {
+        __planetRush?: {
+          viewport: { w: number; h: number };
+          layout: { id: string; bounds: { x: number; y: number; width: number; height: number } }[];
+        };
+      }
+    ).__planetRush;
+    const e = pr?.layout.find((x) => x.id === wanted);
+    if (!pr || !e || !(pr.viewport.w > 0) || !(pr.viewport.h > 0)) return null;
+    const { x, y, width, height } = e.bounds;
+    // The middle 30% of the width, and a few px either side of the top edge —
+    // where a rim stroke centred on the circle actually lands. Deliberately
+    // generous vertically (the stroke is 3 CSS px) and narrow horizontally, so
+    // the band stays on the flattest part of the arc at every device scale.
+    void height;
+    return {
+      x0: (x + width * 0.35) / pr.viewport.w,
+      y0: (y - 4) / pr.viewport.h,
+      x1: (x + width * 0.65) / pr.viewport.w,
+      y1: (y + 6) / pr.viewport.h,
+    };
+  }, id);
+}
+
 /** What one tick-bounded drag measured: world distance covered and the number of
  *  fixed sim steps it was measured over. */
 interface DragMeasurement {
@@ -293,13 +337,27 @@ test('touch: FIRE button + ghost stick render, controls strip is ABSENT', async 
   const img = await shoot(page);
 
   // Auto-aim is the touch default (GDD §2.4): the right half is a hold-to-FIRE
-  // button — a plasma ring in the bottom-right corner.
-  const fire = count(img, REGION_FIRE, isPlasma);
-  expect(fire.matched, 'FIRE button plasma pixels (bottom-right)').toBeGreaterThan(AFFORDANCE_MIN_PX);
+  // button — since a0-23 a chalk-bright Bone rim and label in the bottom-right
+  // corner, where it was a plasma ring. Brightness is the affordance now, so
+  // brightness is what this counts (`isBoneLit`, the same predicate the menu
+  // assertions use for "the primary action is the brightest thing on screen").
+  const fire = count(img, REGION_FIRE, isBoneLit);
+  expect(fire.matched, 'FIRE button Bone-lit pixels (bottom-right)').toBeGreaterThan(AFFORDANCE_MIN_PX);
 
-  // The left half always shows the thrust-stick zone (faint plasma ghost ring).
-  const stick = count(img, REGION_STICK, isBlueGlow);
-  expect(stick.matched, 'left ghost stick-zone pixels (bottom-left)').toBeGreaterThan(GHOST_MIN_PX);
+  // The left half always shows the thrust-stick zone: a faint Bone ring. Sampled
+  // across the ring's own top arc rather than over the whole corner — see
+  // {@link affordanceArcRegion} for why the corner stopped being a valid probe
+  // the moment the ring became the same neutral metal as the asteroids behind it.
+  const arc = await affordanceArcRegion(page, 'touch-left-stick');
+  expect(arc, 'the left stick zone is registered (i.e. on screen at all)').not.toBeNull();
+  const stick = count(img, arc!, isBoneGhost);
+  expect(stick.matched, 'left ghost stick-zone pixels (its own top arc)').toBeGreaterThan(GHOST_MIN_PX);
+  // …and it is NOT the blue it used to be. `isBoneGhost` already excludes plasma
+  // by construction (a `b - r` of 38 versus single digits on a value ramp), but
+  // stating the negative is what makes this a test of a0-23 rather than a test
+  // that something is drawn there.
+  const stickBlue = count(img, arc!, isBlueGlow);
+  expect(stickBlue.matched, 'the stick zone no longer wears plasma (a0-23)').toBeLessThan(ABSENT_MAX_PX);
 
   // The desktop controls strip must NOT be drawn on touch — the visible sticks
   // are the binding legend (GDD §2.2/§2.4). A stray strip would light this band.
@@ -464,6 +522,15 @@ test('desktop: no touch affordances, controls strip PRESENT', async ({ page }, t
   expect(fireMatched, 'FIRE button must be absent on desktop (minimap corner excluded)').toBeLessThan(
     ABSENT_MAX_PX,
   );
+
+  // …and absent in the colour it is actually drawn in SINCE a0-23, which is the
+  // point of this second count rather than a belt on a brace: the touch controls
+  // came off plasma, so a FIRE button leaking onto desktop would now be a
+  // chalk-bright Bone rim — invisible to the plasma count above, which would have
+  // gone on passing while the invariant it names quietly stopped being checked.
+  const fireBone = count(img, REGION_FIRE, isBoneLit).matched;
+  const mmBone = mmOverlap ? count(img, mmOverlap, isBoneLit).matched : 0;
+  expect(fireBone - mmBone, 'no Bone-lit FIRE rim on desktop either (a0-23)').toBeLessThan(ABSENT_MAX_PX);
 
   // The controls strip IS drawn along the bottom edge (GDD §2.2), plasma keys +
   // grey labels.
