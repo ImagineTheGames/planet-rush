@@ -39,7 +39,7 @@ import { allocateRoom } from '../../src/net/allocator-client';
 import {
   defaultRegionId,
   fetchFleetRegions,
-  measureRegionPing,
+  measureRegionPings,
   summariseRegions,
   surveyRegions,
 } from '../../src/net/region-probe';
@@ -137,9 +137,11 @@ describe('the picker reads the fleet, and times what it reads', () => {
     async () => {
       const { base } = await fixture(['gru', 'iad']);
       const regions = await fetchFleetRegions({ baseUrl: base });
-      // Sequentially, so each number is that region's own round trip and nothing else.
-      const pings = [];
-      for (const region of regions) pings.push(await measureRegionPing(region));
+      // One call for the whole fleet: since a0-29 the survey itself measures the
+      // regions one at a time, so each number is that region's own round trip and
+      // nothing else. This used to be a hand-rolled loop here precisely BECAUSE
+      // the survey overlapped them.
+      const pings = await measureRegionPings(regions);
 
       for (const ping of pings) {
         expect(ping.failure, `${ping.id} failed: ${ping.failure ?? ''}`).toBeUndefined();
@@ -165,8 +167,7 @@ describe('the picker reads the fleet, and times what it reads', () => {
       const dead = regions[0]!;
       await new Promise<void>((r) => servers[0]!.close(() => r()));
 
-      const pings = [];
-      for (const region of regions) pings.push(await measureRegionPing(region, { samples: 1 }));
+      const pings = await measureRegionPings(regions, { samples: 1 });
       const survey = summariseRegions(regions, pings);
 
       const down = survey.regions.find((r) => r.id === dead.id)!;
@@ -190,8 +191,7 @@ describe('the picker reads the fleet, and times what it reads', () => {
         servers.slice(0, 2).map((s) => new Promise<void>((r) => s.close(() => r()))),
       );
 
-      const pings = [];
-      for (const region of regions) pings.push(await measureRegionPing(region, { samples: 1 }));
+      const pings = await measureRegionPings(regions, { samples: 1 });
       expect(defaultRegionId(summariseRegions(regions, pings).regions)).toBeUndefined();
 
       // And that is not a dead end: an allocate with no region still places a room

@@ -42,11 +42,13 @@ check never has to speak WebSocket (`server/index.ts`). It is the closest reacha
 thing to the socket the match will actually use: same process, same port, same
 datacentre.
 
-Three properties make the number mean what it says.
+Four properties make the number mean what it says. (Three, until a0-29 found that
+the missing fourth was inverting the ranking — §8.)
 
 | Rule | Where | Why |
 |---|---|---|
 | **Min of N** (N = 3) | `src/net/region-probe.ts` | The first sample pays TLS and (behind an edge) a CORS preflight. A mean would report that setup cost as the region's latency forever; the minimum is the closest thing to the wire's real round trip. |
+| **One probe in flight at a time** (a0-29) | same | Behind an edge every region shares one origin, so overlapping probes queue on one connection and the *near* region is charged the *far* region's flight. This is the one that shipped broken — see §8. |
 | **Verify the answering region** | same | Behind anycast, an ignored steer would otherwise be measured as "gru is 12ms away" when what was timed is the nearest POP. `/health` states its own `region`; a mismatch is **not a measurement** (`wrong-region`), and reads as `—`. |
 | **Absent, never zero** | same | `0ms` on an unprobed region reads as the best server in the fleet. The lobby's per-seat ping refuses the same lie (`docs/lobby-ping.md` rule 1). |
 
@@ -152,3 +154,93 @@ Two different answers ⇒ the steer works and both regions measure. The same two
 answers ⇒ every region but that one reads `—`, which is the honest failure and not
 a wrong number — and the fallback to fix it is a per-region hostname in
 `MATCH_HEALTH_URL`'s place, which is a config change in one file.
+
+---
+
+## 8. a0-29 — the correction, and the steer verified live
+
+**Nothing above is retracted.** The ratified direction, the four rules, the
+`length > 1` suppression and the `__onlineMenu` seam are all unchanged and all
+verified working on the live build. What follows corrects one factual claim in §2
+and closes the open item in §7.
+
+### The defect
+
+From the United States the picker ranked **São Paulo above Virginia**. The
+developer's own phone, in Florida, on 5G:
+
+```
+[GRU 218ms] · IAD 229ms          ← GRU selected, an 11 ms gap
+```
+
+Virginia is ~1,300 km from Florida; São Paulo is ~6,500 km. An 11 ms gap is not
+possible, and two distant regions reading nearly the same — both far too high —
+is the tell that the number is dominated by something other than the network path.
+
+### The cause
+
+§2's "min of N" is true and was never the problem. The problem is that
+`measureRegionPings` fired the regions **concurrently**, on the reasoning that
+they are different hosts. **Behind an edge they are not.** §3 says it plainly and
+the consequence was missed: every region shares one anycast hostname and differs
+only by a steer header, so a browser puts every probe on **one connection to one
+POP**. Concurrent probes then queue against each other on it — and asymmetrically,
+because a 75 ms request stuck behind a 180 ms request is *measured* at ~255 ms
+while the 180 ms one is barely touched. The near region is dragged up to the far
+region's number; the far region keeps its own. The ordering does not get noisier,
+it gets destroyed.
+
+Measured from Florida, real browser, cold, three rounds each
+(`spikes/a0-29-region-ping/browser-lab.mjs`):
+
+| shape | `gru` | `iad` | order |
+|---|---|---|---|
+| concurrent (as shipped) | 257 / 255 / 253 | 254 / 259 / 234 | coin flip — right twice, wrong once |
+| **warm-up, then concurrent** | 258 / 253 / 255 | 256 / 260 / 258 | **still inverted 2 of 3** |
+| serial | 186 / 180 / 182 | 78 / 75 / 78 | correct 3/3 |
+| **round-robin serial** | 187 / 183 / 180 | 76 / 74 / 74 | **correct 3/3** |
+
+Note row 2: **warming the connection does not fix it.** The cost being measured is
+the other region's flight, not the handshake — so only removing the overlap works.
+
+### The fix
+
+`measureRegionPings` samples **round-robin, one probe in flight at a time**, with:
+
+* **a warm-up per distinct origin** — untimed, headers and all, so TLS *and* the
+  CORS preflight are banked before any clock starts. Min-of-N sheds setup only
+  when every sample lands; a region that keeps one sample out of three must not
+  report the handshake as its latency.
+* **a whole-survey wall-clock budget** (8 s) — the price of being serial is that
+  one dead region can delay the live ones. The budget can only ever produce
+  *fewer* numbers, never a wrong one: a region already measured keeps its number,
+  and one the budget never reached reads `—`. Rules 1–4 are untouched, and a
+  failed probe still cannot block hosting.
+
+Round-robin rather than region-by-region because region-by-region always charges
+the connection's setup to whichever region the allocator happened to list first.
+
+The real bundle against the deployed fleet, same command, only the scheduler
+differing (`tests/live-stage/region-order.spec.ts`):
+
+```
+concurrent   [GRU 255ms] · IAD 260ms   selected gru   FAILS
+serial       [IAD 153ms] · GRU 276ms   selected iad   PASSES
+```
+
+### §7's open item, now closed
+
+The live steer verification §7 asked for has been run, from Florida, against the
+two-region fleet:
+
+```
+$ curl -s -H 'fly-prefer-region: iad' https://planet-rush-gameserver.fly.dev/health
+{"region":"iad", …}          204 / 205 / 177 ms
+$ curl -s -H 'fly-prefer-region: gru' https://planet-rush-gameserver.fly.dev/health
+{"region":"gru", …}          275 / 413 / 406 ms
+```
+
+**Two different answers: `Fly-Prefer-Region` works**, both regions measure, and no
+per-region hostname is needed. The `—` fallback §7 describes stays as the honest
+failure it always was, and is now only reachable if the edge stops honouring the
+header.

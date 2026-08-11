@@ -14,6 +14,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_PROBE_SAMPLES,
+  DEFAULT_SURVEY_BUDGET_MS,
   NO_PING,
   TIMED_OUT,
   defaultRegionId,
@@ -22,13 +23,19 @@ import {
   formatRegionPing,
   formatRegionPings,
   formatRoomRegion,
-  measureRegionPing,
+  measureRegionPings,
   regionLabel,
   summariseRegions,
   surveyRegions,
 } from './region-probe';
 import type { FetchLike, FetchResponse } from './allocator-client';
-import type { FleetRegion, MeasuredRegion, RegionPing, WithTimeout } from './region-probe';
+import type {
+  FleetRegion,
+  MeasuredRegion,
+  RegionPing,
+  RegionProbeOptions,
+  WithTimeout,
+} from './region-probe';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -79,30 +86,47 @@ function wire(hosts: Readonly<Record<string, { latency: number; region?: string;
 /** A timeout that never fires — the default for a fixture whose fetches resolve. */
 const noTimeout: WithTimeout = (work) => work;
 
+/**
+ * One region's measurement, taken through the SURVEY — the only path there is, and
+ * the only path production uses. There is deliberately no measure-one-region
+ * export: a per-region sample loop is what made a0-29's concurrency natural to
+ * write, so scheduling lives with the survey and nowhere else.
+ *
+ * A survey warms each origin before it times anything, so `calls[0]` here is the
+ * warm-up and the timed samples start at `calls[1]`.
+ */
+async function measureOne(region: FleetRegion, options: RegionProbeOptions = {}): Promise<RegionPing> {
+  const pings = await measureRegionPings([region], options);
+  return pings[0]!;
+}
+
 // ---------------------------------------------------------------------------
 // The measurement
 // ---------------------------------------------------------------------------
 
-describe('measureRegionPing — a real round trip, or an honest gap', () => {
+describe('one region measured — a real round trip, or an honest gap', () => {
   it('reports the best of N round trips, verified against the region that answered', async () => {
     const { fetch, now, calls } = wire({ 'https://gru.test/health': { latency: 38, region: 'gru' } });
-    const ping = await measureRegionPing(region('gru'), { fetch, now, withTimeout: noTimeout });
+    const ping = await measureOne(region('gru'), { fetch, now, withTimeout: noTimeout });
 
     expect(ping).toMatchObject({ id: 'gru', pingMs: 38, samples: DEFAULT_PROBE_SAMPLES });
     expect(ping.failure).toBeUndefined();
-    expect(calls).toHaveLength(DEFAULT_PROBE_SAMPLES);
+    // One warm-up, then the samples.
+    expect(calls).toHaveLength(1 + DEFAULT_PROBE_SAMPLES);
   });
 
   it('takes the MINIMUM, so the first sample’s handshake is not the region’s latency', async () => {
     let call = 0;
     let clock = 0;
-    // 300 ms to set up the connection, 40 ms once it is warm — the mean would
-    // report 127 ms for a region that is 40 ms away.
+    // 300 ms while the connection is being set up, 40 ms once it is warm — the mean
+    // would report 127 ms for a region that is 40 ms away. Two calls pay the 300:
+    // the survey's warm-up AND the first timed sample, so the minimum is still the
+    // thing under test here rather than something the warm-up quietly absorbed.
     const fetch: FetchLike = () => {
-      clock += call++ === 0 ? 300 : 40;
+      clock += call++ <= 1 ? 300 : 40;
       return Promise.resolve(ok({ region: 'gru' }));
     };
-    const ping = await measureRegionPing(region('gru'), {
+    const ping = await measureOne(region('gru'), {
       fetch,
       now: () => clock,
       withTimeout: noTimeout,
@@ -112,16 +136,19 @@ describe('measureRegionPing — a real round trip, or an honest gap', () => {
 
   it('sends the steer headers the allocator published, verbatim', async () => {
     const { fetch, now, calls } = wire({ 'https://edge.test/health': { latency: 12, region: 'gru' } });
-    await measureRegionPing(
+    await measureOne(
       { ...region('gru'), probe: { url: 'https://edge.test/health', headers: { 'fly-prefer-region': 'gru' } } },
       { fetch, now, samples: 1, withTimeout: noTimeout },
     );
-    expect(calls[0]?.headers).toEqual({ 'fly-prefer-region': 'gru' });
+    // Both the warm-up and the timed sample carry it — the warm-up must, or it
+    // would not pay the CORS preflight, which is keyed on the request-header set.
+    expect(calls[0]?.headers, 'the warm-up is steered too').toEqual({ 'fly-prefer-region': 'gru' });
+    expect(calls[1]?.headers, 'and so is the sample').toEqual({ 'fly-prefer-region': 'gru' });
   });
 
   it('accepts a health body that names no region — off the edge, the URL IS the machine', async () => {
     const { fetch, now } = wire({ 'https://m-1.test/health': { latency: 7 } });
-    const ping = await measureRegionPing(
+    const ping = await measureOne(
       { ...region('iad'), probe: { url: 'https://m-1.test/health' } },
       { fetch, now, samples: 1, withTimeout: noTimeout },
     );
@@ -132,20 +159,20 @@ describe('measureRegionPing — a real round trip, or an honest gap', () => {
 describe('the fallbacks — a region host that does not answer', () => {
   it('an unreachable host measures nothing, and says so', async () => {
     const { fetch, now } = wire({});
-    const ping = await measureRegionPing(region('syd'), { fetch, now, withTimeout: noTimeout });
+    const ping = await measureOne(region('syd'), { fetch, now, withTimeout: noTimeout });
     expect(ping).toMatchObject({ id: 'syd', pingMs: null, samples: 0, failure: 'unreachable' });
   });
 
   it('a non-2xx answer is not a measurement', async () => {
     const { fetch, now } = wire({ 'https://iad.test/health': { latency: 5, ok: false } });
-    const ping = await measureRegionPing(region('iad'), { fetch, now, withTimeout: noTimeout });
+    const ping = await measureOne(region('iad'), { fetch, now, withTimeout: noTimeout });
     expect(ping).toMatchObject({ pingMs: null, failure: 'unreachable' });
   });
 
   it('a probe past its deadline is a timeout, not a slow number', async () => {
     const { fetch, now } = wire({ 'https://syd.test/health': { latency: 9000, region: 'syd' } });
     const always: WithTimeout = () => Promise.resolve(TIMED_OUT);
-    const ping = await measureRegionPing(region('syd'), { fetch, now, withTimeout: always });
+    const ping = await measureOne(region('syd'), { fetch, now, withTimeout: always });
     expect(ping).toMatchObject({ pingMs: null, failure: 'timeout' });
   });
 
@@ -153,7 +180,7 @@ describe('the fallbacks — a region host that does not answer', () => {
     // The anycast case the whole verification exists for: the request said gru,
     // the nearest POP answered for iad, and 12 ms is iad's number, not gru's.
     const { fetch, now } = wire({ 'https://edge.test/health': { latency: 12, region: 'iad' } });
-    const ping = await measureRegionPing(
+    const ping = await measureOne(
       { ...region('gru'), probe: { url: 'https://edge.test/health', headers: { 'fly-prefer-region': 'gru' } } },
       { fetch, now, withTimeout: noTimeout },
     );
@@ -162,7 +189,7 @@ describe('the fallbacks — a region host that does not answer', () => {
 
   it('a region the deployment cannot address has no target, and that is not the player’s fault', async () => {
     const { fetch, now } = wire({});
-    const ping = await measureRegionPing(region('lhr', null), { fetch, now, withTimeout: noTimeout });
+    const ping = await measureOne(region('lhr', null), { fetch, now, withTimeout: noTimeout });
     expect(ping).toMatchObject({ pingMs: null, samples: 0, failure: 'no-target' });
   });
 
@@ -170,17 +197,265 @@ describe('the fallbacks — a region host that does not answer', () => {
     let call = 0;
     let clock = 0;
     const fetch: FetchLike = () => {
-      if (call++ === 0) return Promise.reject(new Error('reset'));
+      // Call 0 is the survey's warm-up; the sample that is lost has to be a timed
+      // one, or this would be testing that a warm-up may fail (which it may, and
+      // which its own case covers).
+      if (call++ === 1) return Promise.reject(new Error('reset'));
       clock += 55;
       return Promise.resolve(ok({ region: 'gru' }));
     };
-    const ping = await measureRegionPing(region('gru'), {
+    const ping = await measureOne(region('gru'), {
       fetch,
       now: () => clock,
       withTimeout: noTimeout,
     });
     expect(ping).toMatchObject({ pingMs: 55, samples: 2 });
     expect(ping.failure).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// a0-29 — the survey measures one region at a time
+// ---------------------------------------------------------------------------
+
+/**
+ * The regression the whole of a0-29 is about. The `wire` fixture's clock advances
+ * whenever ANY request is in flight, which is exactly the physics of the real
+ * defect: behind an edge every region shares one origin, so two probes overlapping
+ * on one connection each pay the other's flight. A concurrent survey therefore
+ * inverts here for the same reason it inverted from Florida, and a serial one
+ * cannot.
+ */
+/** A far region and a near one, listed far-first (the order `/regions` uses) —
+ *  São Paulo and Virginia as seen from Florida, rounded to what was measured. */
+const FAR = 180;
+const NEAR = 75;
+const fleet = (): FleetRegion[] => [region('gru'), region('iad')];
+const hosts = {
+  'https://gru.test/health': { latency: FAR, region: 'gru' },
+  'https://iad.test/health': { latency: NEAR, region: 'iad' },
+};
+
+describe('the survey measures one region at a time — a0-29', () => {
+  it('reports each region its OWN round trip, not the sum of the ones beside it', async () => {
+    const { fetch, now } = wire(hosts);
+    const pings = await measureRegionPings(fleet(), { fetch, now, withTimeout: noTimeout });
+
+    // Concurrently these both read ~255ms — the near region dragged up to the far
+    // one — and which of them "wins" is a coin flip. Serially they are themselves.
+    expect(pings.map((p) => p.pingMs)).toEqual([FAR, NEAR]);
+  });
+
+  it('ranks the NEAR region first, by the real gap — the developer’s acceptance case', async () => {
+    const { fetch, now } = wire(hosts);
+    const regions = fleet();
+    const survey = summariseRegions(regions, await measureRegionPings(regions, { fetch, now, withTimeout: noTimeout }));
+
+    expect(survey.regions.map((r) => r.id)).toEqual(['iad', 'gru']);
+    expect(survey.defaultId).toBe('iad');
+    // Ordering alone is not enough: overlapping probes collapsed São Paulo and
+    // Virginia to within 11 ms of each other on the developer's phone, which is a
+    // coin flip that sometimes lands the right way up. The gap has to survive too.
+    const [near, far] = survey.regions;
+    expect((far?.pingMs ?? 0) - (near?.pingMs ?? 0)).toBe(FAR - NEAR);
+  });
+
+  it('never has two probes in flight at once — the whole of the fix', async () => {
+    // Both regions behind ONE edge hostname: the live fleet's shape, and the one
+    // where overlapping probes share a connection and corrupt each other. With a
+    // single origin there is a single warm-up, so every overlap here is a real one.
+    let inFlight = 0;
+    let peak = 0;
+    let clock = 0;
+    const fetch: FetchLike = (_url, init) => {
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      clock += 40;
+      // Resolve on a later microtask, so a concurrent caller WOULD be seen here.
+      return Promise.resolve().then(() => {
+        inFlight--;
+        const steer = (init?.headers as Record<string, string> | undefined)?.['fly-prefer-region'];
+        return ok({ region: steer ?? 'gru' });
+      });
+    };
+    const steered = (id: string): FleetRegion => ({
+      ...region(id),
+      probe: { url: 'https://edge.test/health', headers: { 'fly-prefer-region': id } },
+    });
+    await measureRegionPings([steered('gru'), steered('iad')], {
+      fetch,
+      now: () => clock,
+      withTimeout: noTimeout,
+    });
+    expect(peak).toBe(1);
+  });
+
+  it('warms distinct origins concurrently — a warm-up is untimed, so it corrupts nothing', async () => {
+    let inFlight = 0;
+    let peak = 0;
+    let clock = 0;
+    const fetch: FetchLike = () => {
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      clock += 40;
+      return Promise.resolve().then(() => {
+        inFlight--;
+        return ok({ region: 'gru' });
+      });
+    };
+    // Two regions on their own hostnames — the off-Fly deployment's shape.
+    await measureRegionPings([region('gru'), region('iad')], {
+      fetch,
+      now: () => clock,
+      withTimeout: noTimeout,
+      samples: 1,
+    });
+    // The two warm-ups overlapped (that is the point of doing them together)…
+    expect(peak).toBe(2);
+  });
+
+  it('samples ROUND-ROBIN, so the first-listed region is not the only one charged the setup', async () => {
+    const { fetch, now, calls } = wire(hosts);
+    await measureRegionPings(fleet(), { fetch, now, withTimeout: noTimeout });
+
+    // One warm-up per distinct origin, then the rounds — each starting one region
+    // further along, so no region is permanently first.
+    const GRU = 'https://gru.test/health';
+    const IAD = 'https://iad.test/health';
+    expect(calls.slice(2).map((c) => c.url)).toEqual([GRU, IAD, IAD, GRU, GRU, IAD]);
+    // Whichever way they interleave, every region is sampled the same number of times.
+    for (const url of [GRU, IAD]) {
+      expect(calls.slice(2).filter((c) => c.url === url)).toHaveLength(DEFAULT_PROBE_SAMPLES);
+    }
+  });
+
+  it('the budget never develops a favourite — a dead region does not always cut the same neighbour short', async () => {
+    // gru times out on every sample and eats the clock; iad answers instantly.
+    // Without the round-robin rotation, iad would be the region always cut short.
+    let clock = 0;
+    const fetch: FetchLike = (url) => {
+      clock += url.includes('gru') ? 3000 : 10;
+      return Promise.resolve(ok({ region: url.includes('gru') ? 'gru' : 'iad' }));
+    };
+    const pings = await measureRegionPings([region('gru'), region('iad')], {
+      fetch,
+      now: () => clock,
+      withTimeout: noTimeout,
+      budgetMs: 7000,
+    });
+    const iad = pings.find((p) => p.id === 'iad')!;
+    // iad still got measured, and its number is its own — not gru's 3 seconds.
+    expect(iad.pingMs).toBe(10);
+    expect(iad.samples).toBeGreaterThan(0);
+  });
+
+  it('warms each distinct origin ONCE, with the steer headers, and never counts it as a sample', async () => {
+    // Both regions behind one edge hostname — the shape the live fleet actually
+    // has, and the reason the warm-up is per ORIGIN rather than per region.
+    const { fetch, now, calls } = wire({ 'https://edge.test/health': { latency: 20 } });
+    const steered = (id: string): FleetRegion => ({
+      ...region(id),
+      probe: { url: 'https://edge.test/health', headers: { 'fly-prefer-region': id } },
+    });
+    const pings = await measureRegionPings([steered('gru'), steered('iad')], {
+      fetch,
+      now,
+      withTimeout: noTimeout,
+    });
+
+    expect(calls).toHaveLength(1 + 2 * DEFAULT_PROBE_SAMPLES);
+    // The warm-up carries real headers, so it pays the CORS preflight the timed
+    // samples would otherwise pay (the preflight is keyed on the header set).
+    // Both the warm-up and the timed sample carry it — the warm-up must, or it
+    // would not pay the CORS preflight, which is keyed on the request-header set.
+    expect(calls[0]?.headers, 'the warm-up is steered too').toEqual({ 'fly-prefer-region': 'gru' });
+    expect(calls[1]?.headers, 'and so is the sample').toEqual({ 'fly-prefer-region': 'gru' });
+    for (const ping of pings) expect(ping.samples).toBe(DEFAULT_PROBE_SAMPLES);
+  });
+
+  it('a warm-up that fails outright still leaves every region measurable', async () => {
+    let first = true;
+    let clock = 0;
+    const fetch: FetchLike = () => {
+      if (first) {
+        first = false;
+        return Promise.reject(new Error('warm-up refused'));
+      }
+      clock += 60;
+      return Promise.resolve(ok({ region: 'gru' }));
+    };
+    const pings = await measureRegionPings([region('gru')], {
+      fetch,
+      now: () => clock,
+      withTimeout: noTimeout,
+    });
+    expect(pings[0]).toMatchObject({ pingMs: 60, samples: DEFAULT_PROBE_SAMPLES });
+  });
+
+  it('a region with no probe target costs the survey nothing and still comes back', async () => {
+    const { fetch, now, calls } = wire(hosts);
+    const pings = await measureRegionPings([region('lhr', null), region('iad')], {
+      fetch,
+      now,
+      withTimeout: noTimeout,
+    });
+    expect(pings.map((p) => p.id)).toEqual(['lhr', 'iad']);
+    expect(pings[0]).toMatchObject({ pingMs: null, samples: 0, failure: 'no-target' });
+    expect(pings[1]?.pingMs).toBe(NEAR);
+    // Only iad's origin was warmed — a region with nothing to time has no origin.
+    expect(calls.filter((c) => c.url === 'https://iad.test/health')).toHaveLength(
+      1 + DEFAULT_PROBE_SAMPLES,
+    );
+  });
+});
+
+describe('the survey budget — the price of being serial, and its limits', () => {
+  it('stops sampling when the budget is spent, and KEEPS what it already measured', async () => {
+    const { fetch, now } = wire({
+      'https://gru.test/health': { latency: 100, region: 'gru' },
+      'https://iad.test/health': { latency: 100, region: 'iad' },
+    });
+    // Warm-ups (2 origins, concurrent → 200ms of clock) plus one round of two
+    // 100ms samples lands at 400ms; the budget stops the second round.
+    const pings = await measureRegionPings([region('gru'), region('iad')], {
+      fetch,
+      now,
+      withTimeout: noTimeout,
+      budgetMs: 400,
+    });
+    for (const ping of pings) {
+      expect(ping.pingMs).toBe(100);
+      expect(ping.samples).toBe(1);
+      expect(ping.failure).toBeUndefined();
+    }
+  });
+
+  it('a region the budget never reached reads as a timeout — absent, never zero', async () => {
+    const { fetch, now } = wire({
+      'https://gru.test/health': { latency: 500, region: 'gru' },
+      'https://iad.test/health': { latency: 500, region: 'iad' },
+    });
+    const pings = await measureRegionPings([region('gru'), region('iad')], {
+      fetch,
+      now,
+      withTimeout: noTimeout,
+      budgetMs: 1,
+    });
+    for (const ping of pings) {
+      expect(ping.pingMs).toBeNull();
+      expect(ping.failure).toBe('timeout');
+    }
+    // The rule the budget must never break: no number is better than a wrong one,
+    // and an unmeasured region is never the default.
+    expect(defaultRegionId(summariseRegions([region('gru'), region('iad')], pings).regions)).toBeUndefined();
+  });
+
+  it('does not bite a healthy fleet — a full survey finishes well inside the default', async () => {
+    const { fetch, now } = wire(hosts);
+    const pings = await measureRegionPings(fleet(), { fetch, now, withTimeout: noTimeout });
+    // 2 warm-ups + 3 rounds of (180 + 75) = 255 + 765 = 1020ms, against 8000ms.
+    expect(now()).toBeLessThan(DEFAULT_SURVEY_BUDGET_MS);
+    for (const ping of pings) expect(ping.samples).toBe(DEFAULT_PROBE_SAMPLES);
   });
 });
 
@@ -298,12 +573,13 @@ describe('surveyRegions — list, measure, rank, in one read', () => {
     // Ranked by measurement, not by the order the allocator listed them (iad first).
     expect(survey.regions.map((r) => r.id)).toEqual(['gru', 'iad']);
     expect(survey.defaultId).toBe('gru');
-    // The regions are probed CONCURRENTLY and this fixture shares one virtual
-    // clock between them, so iad's elapsed carries gru's flight too. The exact
-    // per-region number is asserted in the sequential cases above; what this one
-    // has to hold is that both were measured and the far one measured as far.
+    // Both numbers are exact. They could not be until a0-29: the regions were
+    // probed CONCURRENTLY and this fixture shares one virtual clock between them,
+    // so iad's elapsed used to carry gru's flight too — and this assertion had been
+    // weakened to `>= 224` to let that pass. That weakening was the bug, visible in
+    // the test suite, a release before a US player was steered to São Paulo.
     expect(survey.regions[0]?.pingMs).toBe(38);
-    expect(survey.regions[1]?.pingMs).toBeGreaterThanOrEqual(224);
+    expect(survey.regions[1]?.pingMs).toBe(224);
   });
 
   it('an allocator with no /regions route leaves an empty survey and no default', async () => {
