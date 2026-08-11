@@ -411,6 +411,61 @@ quoted here unaltered as the contract:
   consequences are open developer questions and are **not** ratified — do not
   restyle an explosion or rename a bot against this section until they are.
 
+### Register 2 — the interface voice (GDD §4.7, ratified 2026-08-05)
+
+*(Added 2026-08-11 — §4.7's Propagation clause says in bold that **"Both mirrors
+must gain register 2,"** and neither this file nor `content/codex/pipeline/tone.md`
+ever did; `docs/gdd-conformance.md` G-5. The paragraph above is what the game
+**feels** like; the block below is what it **says**. Where the two compete,
+register 1 wins on **moments**, register 2 wins on **words**.)*
+
+Everything from *"Who speaks"* to *"The clarity rule"* is GDD §4.7's pinned
+register-2 prompt, quoted here **verbatim** — §4.7 says verbatim, and a
+paraphrase of a pinned prompt is a second contract. Art reads it because every
+mockup, board and HUD study carries strings: a label, a cost, a refusal.
+
+**Who speaks, and to whom.** The interface is **the claim's operating authority** addressing a **contracted operator**. Not a narrator, not a coach, not the game. The player holds a licence to work a plot; the interface is the office that issued it. It logs, prices, permits, and refuses. It has no stake in whether the operator wins.
+
+**What the voice IS:**
+
+1. **Procedural.** It states status, cost, condition, and — when it refuses — the reason. Nothing else.
+2. **Unglamorous.** No adjective that praises, hypes, or dramatises. `CLAIM HELD`, not `GLORIOUS VICTORY`.
+3. **Faintly bureaucratic.** Where a game reaches for the nouns of play (room, level, score), the authority reaches for the nouns of work and paperwork (claim, sector, yield, contract, seal, log).
+4. **Terse and present-tense.** Second person, imperative for instructions. The interface has a word budget and spends it on the reason, not the fiction.
+5. **Indifferent.** It is not on the operator's side. This — not jokes — is where the game's cheek lives in register 2.
+
+**What the voice is NOT:**
+
+1. **Not congratulatory.** It does not cheer, praise, or exclaim. It never says "Nice", "Great", "Awesome", or "!" — with exactly one sanctioned exception, `RUSH!` (§2.1, GDD-verbatim).
+2. **Not menacing.** Indifferent, not hostile. No grimdark, no threats, no "DOOM". The authority does not care enough to menace.
+3. **Not chatty and never winking.** No jokes in a string. The humour is structural — the flat voice over a brawl that is anything but flat — not lexical. *(Amended 2026-08-06: this read "over a toy-bright brawl." The joke is the indifference, not the toy, so the amendment costs register 2 exactly one adjective.)*
+4. **Not a naval or space-opera register.** The operator is not "Commander", "Captain", or "Pilot". This is a mining company, not a fleet.
+5. **Not worldbuilding.** A button never explains the fiction. If a string is teaching lore instead of naming an action, it is the wrong string.
+6. **Not decorative punctuation.** No ellipses for mood, no em-dash flourishes where a full stop works. (`—` is fine where it separates a fact from its reason, which is most of the existing copy.)
+
+**The clarity rule — the one that outranks everything above.** **Clarity always wins over flavour.** A player under fire reading a refusal needs the reason, not the fiction. Concretely:
+
+- A refusal names its reason in the **first three words**. `NEED 1 ORE`, `REACTOR FULL`, `REPAIR IN 12s`.
+- If the flavour word and the plain word compete on comprehension, **the plain word ships** — and the copy sweep records that it was considered and rejected, so nobody re-litigates it.
+- A word a first-time player has to learn before they can act is a bug. The voice may rename the *world*; it may not rename the *verb*.
+- **Length is part of clarity.** The HUD runs at 11–15px and nameplates truncate at 12 characters (`NAMEPLATE_MAX_CHARS`). A longer in-register word that ellipsizes has traded information for flavour, which this rule forbids. Measure before you ship it.
+
+**Operational reading for Art:**
+
+- **A board or mockup is not a licence to invent copy.** Every string in an art
+  artifact is either quoted from the shipped screen or written in this register.
+  Placeholder lorem in a mockup is fine; placeholder *voice* is not.
+- **The fixed strings are not art's to restyle either** — `RUSH!`, the navigation
+  verbs `BACK` / `CLOSE` / `DONE` / `JOIN` / `ERASE`, `HOME`, `FRIENDLY A` /
+  `ENEMY B`, every Build & Upgrade wheel segment label and every settings row
+  (GDD §4.7). A board that renames one is proposing a design change, not a look.
+- **Legibility still outranks the voice**, exactly as it outranks register 1: the
+  clarity rule's length clause is a *measurement*, so a longer in-register label
+  that ellipsizes at 11–15px has failed §4.7, not satisfied it.
+- **The match/machine line is a visual line too** (GDD §4.7). The wordmark, the
+  build badge, boot/WebGL failure copy, connection copy, numbers, units and
+  clocks stay plain and diagnostic — they are not surfaces to dress.
+
 ---
 
 ## 9. Legibility test (the standing check)
