@@ -69,7 +69,15 @@ export const LATIN_SUBSET_RANGE =
 export interface RatifiedFace {
   /** CSS `font-family`, and the first name in the stack that uses it. */
   readonly family: string;
-  /** Path under `public/`, spelled exactly as `index.html` spells it. */
+  /**
+   * The file's URL, spelled exactly as `index.html` spells it: root-absolute,
+   * which is how Vite is told "this is a `public/` asset, not a bundled one."
+   * It is what makes the build base-aware — Vite rewrites it to `./fonts/…` on
+   * output, so the same bundle serves from the Pages project subpath, from
+   * `/dev`, and from a custom domain without a rebuild (vite.config.ts `base`).
+   * Writing `./fonts/…` in the source instead builds *correctly* but warns on
+   * every build that the reference "didn't resolve at build time".
+   */
   readonly href: string;
   /**
    * The `font-weight` descriptor. Audiowide is `'400'` — upstream ships one
@@ -99,13 +107,13 @@ export interface RatifiedFace {
 export const RATIFIED_FACES: readonly RatifiedFace[] = [
   {
     family: 'Audiowide',
-    href: './fonts/Audiowide-Regular-latin.woff2',
+    href: '/fonts/Audiowide-Regular-latin.woff2',
     weight: '400',
     load: ['400 16px Audiowide'],
   },
   {
     family: 'Oxanium',
-    href: './fonts/Oxanium-Variable-latin.woff2',
+    href: '/fonts/Oxanium-Variable-latin.woff2',
     weight: '200 800',
     load: ['400 16px Oxanium', '700 16px Oxanium'],
   },

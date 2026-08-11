@@ -39,8 +39,8 @@ import {
 const repoPath = (rel: string): string => fileURLToPath(new URL(`../../${rel}`, import.meta.url));
 const INDEX_HTML = readFileSync(repoPath('index.html'), 'utf8');
 
-/** `./fonts/x.woff2` as index.html spells it → the file on disk under public/. */
-const onDisk = (href: string): string => repoPath(`public/${href.replace(/^\.\//, '')}`);
+/** `/fonts/x.woff2` as index.html spells it → the file on disk under public/. */
+const onDisk = (href: string): string => repoPath(`public${href}`);
 
 /** Collapse whitespace so a prettier reflow of a long declaration is not a fail. */
 const flat = (s: string): string => s.replace(/\s+/g, ' ').trim();
