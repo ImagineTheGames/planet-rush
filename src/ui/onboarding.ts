@@ -17,14 +17,23 @@
  *
  * Prompts, in the order a first match teaches them (GDD §2.10, verbatim triggers):
  *   1. "Hold {fire} on the asteroid — your shots chip the rock" (teaches mining)
- *   2. "Hold full — fly home and press {build}"                (teaches the haul)
+ *   2. "Hold full — fly into your collection field to bank, then press {build}
+ *      to spend"                                               (teaches the haul)
  *   3. "Spend ore on defense — or UPGRADE SHIP to mine and hit harder"
  *   4. "Your station is under attack — follow the arrow"
  *
  * Day 1 shipped (1) and (2); day 2 lands (3) and (4) alongside stations, the
- * build wheel and the under-attack alarm, and completes (2)'s copy — it now has
- * a station to fly home *to*, so the clause GDD §2.10 quotes ("and press E")
- * joins it, resolved through the action layer like every other binding.
+ * build wheel and the under-attack alarm, and completes (2)'s copy — there is a
+ * station to bank at now, so the clause GDD §2.10 quotes ("and press E") joins
+ * it, resolved through the action layer like every other binding.
+ *
+ * (2) was corrected on 2026-08-11 (a0-25). It had told the player to dock and
+ * park — the way of banking the 2026-07-27 amendment RETIRED (§2.3: the hold
+ * drains inside your own collection field, no docking, no parking), and the
+ * clause that amendment ADDED was the one the prompt was missing. §2.10's
+ * amended sentence is now carried verbatim, with `{build}` standing in for its
+ * "press E" so the phone never says E (GDD §2.4). The retired wording appears
+ * nowhere in this file, deliberately: it is what the brief's check greps for.
  *
  * (3) is the one GDD §2.10 singles out: it "fires the first time the wheel
  * opens, because upgrades are the half of the economy a player can most easily
@@ -44,8 +53,9 @@ export enum PromptId {
   /** "Hold {fire} on the asteroid — your shots chip the rock." Teaches that the gun
    *  is the mining tool — the inversion the whole game turns on (GDD §2.10). */
   Mine = 'mine',
-  /** "Hold full — fly home and press {build}." Teaches that held ore is not safe
-   *  ore, and where the ore goes when you get there (GDD §2.3, §2.5). */
+  /** "Hold full — fly into your collection field to bank, then press {build} to
+   *  spend." Teaches that held ore is not safe ore, and that the hold banks
+   *  itself inside your own collection field (GDD §2.3, §2.5, §2.10). */
   HaulHome = 'haul-home',
   /** "Spend ore on defense — or UPGRADE SHIP to mine and hit harder." Fires the
    *  first time the wheel opens: upgrades are the half of the economy a player
@@ -73,13 +83,17 @@ const PROMPT_COPY: Readonly<Record<PromptId, PromptCopy>> = {
     id: PromptId.Mine,
     template: 'Hold {fire} on the asteroid — your shots chip the rock',
   },
-  // `{build}` resolves to the Build & Upgrade binding — "E" on a keyboard, the
-  // BUILD button on touch. GDD §2.10 quotes this prompt as "fly home and press
-  // E"; the token is how it says that on a pad and a phone too.
+  // GDD §2.10's copy, verbatim post-amendment: "Hold full — fly into your
+  // collection field to bank, then press E to spend" (amended 2026-07-27 —
+  // projectile mining, collection-field banking). Banking is by atmosphere:
+  // the hold drains inside your own station's collection field, no docking and
+  // no parking (GDD §2.3) — and pressing build is the *second* half, the wheel
+  // you spend from. `{build}` carries the "press E" clause across devices, so a
+  // phone reads "press BUILD" and a pad "press Y / △" (GDD §2.4).
   // "Held ore is not safe ore" (GDD §2.3).
   [PromptId.HaulHome]: {
     id: PromptId.HaulHome,
-    template: 'Hold full — fly home and press {build}',
+    template: 'Hold full — fly into your collection field to bank, then press {build} to spend',
   },
   // No token: this one fires *while the wheel is open*, so the bindings are on
   // screen already. It names UPGRADE SHIP in the wheel's own words, because the

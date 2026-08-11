@@ -1546,6 +1546,35 @@ export class Hud extends Container {
     return this.wheel.debugBuildWedges();
   }
 
+  /**
+   * The onboarding prompt the HUD actually DREW this frame — the resolved
+   * string, not the template (a0-25, GDD §2.10). A unit test can prove
+   * {@link resolvePromptText} returns the amended sentence; only the booted
+   * client can prove the sentence a *player* reads carries this device's
+   * binding, so the phone never says "press E" (GDD §2.4).
+   *
+   * `wrapWidth` and the measured `width`/`height` come with it because §4.7's
+   * clarity rule makes length part of correctness: the amended copy is longer
+   * than the one it replaced, and a prompt that ellipsizes or runs off a 390 px
+   * handset is a prompt that didn't fire. `visible: false` means no prompt is
+   * up; `text` is then whatever was last drawn.
+   */
+  debugOnboardingPrompt(): {
+    visible: boolean;
+    text: string;
+    wrapWidth: number;
+    width: number;
+    height: number;
+  } {
+    return {
+      visible: this.promptGroup.visible,
+      text: this.promptText.text,
+      wrapWidth: this.promptText.style.wordWrapWidth,
+      width: this.promptText.width,
+      height: this.promptText.height,
+    };
+  }
+
   /** The controls-strip rows resolved for this frame (empty on touch), so a
    *  live-stage test can prove the Build & Upgrade legend is contextual on the
    *  real client — a live key at your station, a dimmed hint (never a dead key)

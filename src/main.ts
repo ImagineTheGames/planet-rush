@@ -1423,6 +1423,7 @@ async function boot(): Promise<void> {
     installNameplateStage();
     installOreDepositStage();
     installOreHudStage();
+    installOnboardingStage();
     installEndScreenStage();
     installUpgradeWheelStage();
     installPressStage();
@@ -4132,6 +4133,44 @@ async function boot(): Promise<void> {
     };
     try {
       Object.defineProperty(window, '__oreHudStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
+  /**
+   * Install `window.__onboardingStage` — the ?debug=1 read-back seam for the
+   * onboarding prompt's SENTENCE (a0-25, GDD §2.10).
+   *
+   * A unit test proves `resolvePromptText` returns the amended copy. It cannot
+   * prove what a *player* reads, because the binding inside it is chosen by the
+   * live device (GDD §2.4): the failure this guards is a phone that renders
+   * "press E". So this reports the string the HUD actually drew this frame, on
+   * the real bundle, plus the measured box — the amended sentence is longer than
+   * the one it replaced and §4.7 makes length part of clarity.
+   *
+   * Read-only. Staging a full hold is `__oreHudStage.mine()`'s job already (it
+   * parks the ship away from home so the collection field does not drain it),
+   * so this seam adds no second way to mutate the world.
+   */
+  function installOnboardingStage(): void {
+    const stage = {
+      prompt(): ReturnType<typeof hud.debugOnboardingPrompt> {
+        return hud.debugOnboardingPrompt();
+      },
+      /** The device the HUD is resolving bindings for this frame — so a capture
+       *  can state which wording it is looking at rather than inferring it. */
+      device(): DeviceKind {
+        return activeDevice;
+      },
+    };
+    try {
+      Object.defineProperty(window, '__onboardingStage', {
         value: stage,
         writable: false,
         configurable: false,
