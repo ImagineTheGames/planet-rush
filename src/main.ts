@@ -287,6 +287,8 @@ import {
   // A screen shell's "am I still up?" latch. Both shells below own one, and both
   // read it at the top of their `render()` (u12-01).
   createShellLifetime,
+  // Onboarding's memory across matches, page loads and EXIT TO MENU (u15-01).
+  createProfileOnboardingMemory,
 } from './ui';
 import type {
   HudFrame,
@@ -1395,13 +1397,24 @@ async function boot(): Promise<void> {
   const uiSfxLog: { press: number; confirm: number; reject: number; last: UiCue | null } | null = flags.debug
     ? { press: 0, confirm: 0, reject: 0, last: null }
     : null;
-  const hud = new Hud(transform.logicalWidth, transform.logicalHeight, (cue) => {
-    if (uiSfxLog) {
-      uiSfxLog[cue]++;
-      uiSfxLog.last = cue;
-    }
-    audio.cue(cue);
-  });
+  const hud = new Hud(
+    transform.logicalWidth,
+    transform.logicalHeight,
+    (cue) => {
+      if (uiSfxLog) {
+        uiSfxLog[cue]++;
+        uiSfxLog.last = cue;
+      }
+      audio.cue(cue);
+    },
+    // Onboarding's memory (u15-01, GDD §2.10 "never appear again after each is
+    // completed once"). This match is not the first thing that has ever happened
+    // to this player: a prompt they were taught in an earlier match, before an
+    // EXIT TO MENU or a reload, must not be taught again. It rides the ONE career
+    // profile — `platform.storage`, one key, one reader (`progression/profile`) —
+    // rather than a twelfth flat key of its own.
+    createProfileOnboardingMemory(platform.storage),
+  );
   gameRoot.addChild(hud);
 
   // --- Health-bar live-stage seam (?debug=1 only). The enemy over-ship health
@@ -1695,8 +1708,6 @@ async function boot(): Promise<void> {
    *  press of `fire` confirms the pointed-at segment — neither on the hold. */
   let buildHeld = false;
   let fireHeld = false;
-  /** Any wheel order placed this match — retires the SPEND onboarding prompt. */
-  let hasOrdered = false;
   /** The upgrade wheel has drilled into the WEAPON sub-wheel (RATIFIED v0.2.2).
    *  Held here — the two bits of wheel screen state (`up`, `panel`) live in
    *  `WheelInput`; the third level (the nested weapon wheel) is UI navigation, so
@@ -2796,7 +2807,6 @@ async function boot(): Promise<void> {
     endScreen = 'none';
     endButtonsShown = [];
     endOverlay.visible = false;
-    hasOrdered = false;
     tapPilot.clear(); // a fresh match has no standing order (developer §2)
     if (buildWheel.open) buildWheel.toggle();
     // Forget the old world's tell baseline and reset the standing voices, so the
@@ -3312,13 +3322,19 @@ async function boot(): Promise<void> {
     }
 
     if (ordered) {
-      hasOrdered = true;
       haptics.haptic('confirm'); // a build/upgrade order committed — the "done" beat
       // The confirm CHIME is no longer fired here: an order submitted is not an
       // order the sim ACCEPTED (it re-validates docking, affordability and max
       // tier — comment above). The HUD sounds `confirm` off the sim's own state
       // change (a turret/shield/tier count or core HP actually rising), so a
       // refused order can never fake the chime (`ui/press-feedback` confirm()).
+      //
+      // The SPEND onboarding prompt is retired the same way and for the same
+      // reason (u15-01, a0-19 G-3 half B): it used to retire on this flag — an
+      // order SUBMITTED — so a refused press taught nothing and took the prompt
+      // with it. It now rides the HUD's own before/after of the sim's numbers
+      // (`ui/onboarding` `oreWasSpent`), which is why nothing about the wheel's
+      // orders is fed to onboarding from here any more.
     }
   }
 
@@ -3357,7 +3373,6 @@ async function boot(): Promise<void> {
     // the instant the panel closes, so re-opening always lands on the main wheel.
     if (!buildWheel.panelOpen) weaponWheelOpen = false;
     hudFrame.weaponWheelOpen = weaponWheelOpen;
-    hudFrame.hasOrdered = hasOrdered;
     hudFrame.docked = docked;
     // What the player cannot see, per logical edge (a0-24). The HUD's
     // bottom-anchored chrome — the onboarding prompt, the minimap's corner —

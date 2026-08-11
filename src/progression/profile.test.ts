@@ -122,6 +122,47 @@ describe('corrupt', () => {
     }
   });
 
+  it('carries the onboarding record, and omits it on a career with nothing taught', () => {
+    // u15-01: GDD §2.10's "never appear again after each is completed once" is a
+    // claim about a PLAYER, so it is stored with the player. Optional and
+    // additive, which is why `v` stays 1 — an older career simply has none.
+    const store = memoryStorage();
+    const profile: Profile = {
+      v: 1,
+      xp: 10,
+      level: 1,
+      matches: 1,
+      onboarded: ['mine', 'haul-home'],
+    };
+    saveProfile(store, profile);
+    expect(loadProfile(store)).toEqual(profile);
+
+    const bare = memoryStorage();
+    saveProfile(bare, freshProfile());
+    expect('onboarded' in loadProfile(bare)).toBe(false);
+  });
+
+  it('drops a junk onboarding id rather than the whole career', () => {
+    // The same rule `unlocked` gets, for the same reason: a bad id must never
+    // cost a profile that cannot be reset. The player is re-taught one prompt.
+    const store = memoryStorage({
+      [PROFILE_KEY]: JSON.stringify({
+        v: 1,
+        xp: 900,
+        level: 2,
+        matches: 4,
+        onboarded: ['mine', 3, null, ''],
+      }),
+    });
+    expect(loadProfile(store)).toEqual({
+      v: 1,
+      xp: 900,
+      level: 2,
+      matches: 4,
+      onboarded: ['mine'],
+    });
+  });
+
   it('drops a junk entry out of unlocked/equipped rather than the whole profile', () => {
     const store = memoryStorage({
       [PROFILE_KEY]: JSON.stringify({

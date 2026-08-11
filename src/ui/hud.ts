@@ -56,7 +56,8 @@ import type { DeviceKind, FireMode } from '@platform/actions';
 import type { LayoutEntry, Viewport } from '@platform/layout-registry';
 import { ShipClass } from '@shared/types';
 import type { PlayerId } from '@shared/types';
-import { Onboarding, resolvePromptText } from './onboarding';
+import { Onboarding, oreWasSpent, resolvePromptText } from './onboarding';
+import type { OnboardingMemory, SpendFacts } from './onboarding';
 import { computeWaveClock, formatClock } from './wave-clock';
 import { oreHudModel, oreFlashOn } from './ore-hud';
 import { oreHoldModel } from './ore-hold';
@@ -287,9 +288,6 @@ export interface HudFrame {
    *  wedge instead of the main-wheel set. Only meaningful while
    *  {@link upgradePanelOpen}. Default false. */
   readonly weaponWheelOpen?: boolean;
-  /** Any wheel order has been placed this match — retires the SPEND onboarding
-   *  prompt (GDD §2.10). Default false. */
-  readonly hasOrdered?: boolean;
   /** Local ship's current hull HP — the one source both the over-ship own-ship
    *  bar and the HUD hull readout read (field request v0.1.1), so they agree.
    *  Default: full (`maxHull`). */
@@ -473,8 +471,13 @@ interface MutableLocalCombatant {
 // ---------------------------------------------------------------------------
 
 export class Hud extends Container {
-  /** Onboarding state machine — each prompt fires once (GDD §2.10). */
-  private readonly onboarding = new Onboarding();
+  /** Onboarding state machine — each prompt fires once, and stays fired: the
+   *  memory port is what carries that across EXIT TO MENU and a reload (GDD
+   *  §2.10, u15-01). Assigned in the constructor, from the injected port. */
+  private readonly onboarding: Onboarding;
+  /** Ore has actually been spent this match — latched from the sim's own numbers
+   *  in {@link updateWheel}, and what retires the SPEND prompt (u15-01 half B). */
+  private hasSpent = false;
 
   /** The Gantry/Bone frame for this viewport ({@link ./instrument}). Recomputed
    *  on every resize; every type size and every gap on the HUD reads it. */
@@ -645,7 +648,7 @@ export class Hud extends Container {
   /** Last frame's wheel-relevant sim numbers + whether the wheel was open, so a
    *  confirmation is the *change* between two open frames (never a spawn/wiring
    *  jump, which happens with the wheel shut). Null until the first frame. */
-  private prevSnapshot: (WheelSnapshot & { open: boolean }) | null = null;
+  private prevSnapshot: (WheelSnapshot & { open: boolean; satellites: number }) | null = null;
   /** This frame's match time, so a press arriving from a pointer event (between
    *  frames) is stamped with a clock the next sample can measure elapsed against. */
   private frameTime = 0;
@@ -669,8 +672,17 @@ export class Hud extends Container {
      *  component so every wheel/menu control is heard as it is seen; defaults to
      *  silent so a headless Hud (Node, the QA harness) makes no sound. */
     sfx: UiSfx = NO_UI_SFX,
+    /** Where onboarding remembers a completed prompt between matches (u15-01,
+     *  GDD §2.10). The game passes the profile-backed port
+     *  ({@link ./onboarding-memory}); a headless Hud passes nothing and behaves
+     *  exactly as it did before — one page load's memory. */
+    onboardingMemory: OnboardingMemory | null = null,
   ) {
     super();
+
+    // The prompts the player has already been taught cross the page boundary
+    // here, and nowhere else: the state machine itself stays pure.
+    this.onboarding = new Onboarding(onboardingMemory);
 
     // The one press/confirm driver for the whole wheel family, wired to the
     // sound seam: a press ticks (or buzzes, if disabled) and a sim-confirmed
@@ -1769,12 +1781,15 @@ export class Hud extends Container {
     // was open — so a spawn/wiring jump (wheel shut) can never fake a repair, and
     // the celebration only fires while the player is actually at the wheel.
     const tiers = frame.upgradeTiers ?? STOCK_TIERS;
-    const snap: WheelSnapshot & { open: boolean } = {
+    const snap: WheelSnapshot & { open: boolean; satellites: number } = {
       coreHp: frame.coreHp ?? 0,
       banked: frame.banked,
       cargo: frame.cargo,
       turrets: frame.turrets ?? 0,
       shields: frame.shields ?? 0,
+      // Not a confirmation source (no satellite float ships), but a purchase all
+      // the same — so onboarding's SPEND lesson counts it (u15-01 half B).
+      satellites: frame.satellites ?? 0,
       tiers: { ...tiers },
       // The wheel level a bought tier's cost float should land on (a weapon-track
       // buy only happens with the sub-wheel drilled in).
@@ -1784,6 +1799,10 @@ export class Hud extends Container {
     const prev = this.prevSnapshot;
     if (prev && prev.open && snap.open) {
       for (const c of detectConfirmations(prev, snap)) this.pressFeedback.confirm(c, frame.time);
+      // …and the same two frames answer onboarding's question, which is coarser:
+      // not *what* was bought, only *that* something was (GDD §2.10's SPEND
+      // lesson). Sticky for the life of this HUD — a purchase is not un-made.
+      if (!this.hasSpent && oreWasSpent(spendFacts(prev), spendFacts(snap))) this.hasSpent = true;
     }
     this.prevSnapshot = snap;
 
@@ -1872,7 +1891,9 @@ export class Hud extends Container {
       cargo: frame.cargo,
       cargoCap: frame.cargoCap,
       wheelOpen,
-      hasOrdered: frame.hasOrdered ?? false,
+      // The sim's own answer, latched in `updateWheel` — never "a wedge was
+      // pressed" (u15-01 half B).
+      hasSpent: this.hasSpent,
       underAttack,
     });
 
@@ -2177,6 +2198,24 @@ export class Hud extends Container {
       style: { fontFamily, fontSize: size, fill, fontWeight, letterSpacing: hudTracking(tier, size) },
     });
   }
+}
+
+/**
+ * The purchase-observable numbers out of a wheel snapshot, for onboarding's SPEND
+ * lesson ({@link ./onboarding} `oreWasSpent`, u15-01 half B). The tiers collapse
+ * to one total because the question is "did any of them go up", never which —
+ * that is `detectConfirmations`' job, and it needs the wedge.
+ */
+function spendFacts(snap: WheelSnapshot & { satellites: number }): SpendFacts {
+  let upgradeTiers = 0;
+  for (const tier of Object.values(snap.tiers)) upgradeTiers += tier;
+  return {
+    coreHp: snap.coreHp,
+    turrets: snap.turrets,
+    shields: snap.shields,
+    satellites: snap.satellites,
+    upgradeTiers,
+  };
 }
 
 /** Clamp a fraction to 0..1, treating a non-finite value as empty — a hull HP of
