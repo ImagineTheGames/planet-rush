@@ -113,6 +113,15 @@ Branch: `agent/ui/u15-01-onboarding-persistence`.
 
 ## NEXT
 
-- Full `npm test -- --run` and the DoD gates; then push and open the PR.
+- **PR #395 open**, branch pushed. `npx tsc --noEmit` clean; `src/ui` (48 files,
+  1612 tests) and `src/progression` green locally. The full 269-file
+  `npm test -- --run` is slow on this lane (2 workers, three lanes contending —
+  see `vitest.config.ts`) and is in flight alongside CI's own run of it.
+- If a future session picks this up: the run's log is `/tmp/u15-full.log`, and
+  `npm test -- --run | tail` looks HUNG for ~20 minutes because the pipe buffers
+  the whole reporter — redirect to a file and `grep -c ✓` instead.
 - For QA: the four live-stage prompt specs run on a fresh browser context, so an
-  empty profile means they fire exactly as before. Nothing to re-baseline.
+  empty profile means they fire exactly as before. Nothing to re-baseline. On a
+  real device, seeing the prompts a second time now needs storage cleared —
+  that is the fix working, and it is why Q-4's RESET ONBOARDING row is raised in
+  the PR rather than silently built.
