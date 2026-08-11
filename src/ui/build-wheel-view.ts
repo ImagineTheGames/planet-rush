@@ -543,8 +543,8 @@ export class BuildWheelView extends Container {
     const inner = r * m.hub;
     const hub = inner;
 
-    this.drawRings(this.buildRings, r, hub, m);
-    this.drawSpokes(this.buildRings, inner, r, model.segments.length, m);
+    drawWheelRings(this.buildRings, r, hub, m);
+    drawWheelSpokes(this.buildRings, inner, r, model.segments.length, m);
 
     for (let i = 0; i < model.segments.length; i++) {
       const seg = model.segments[i];
@@ -608,8 +608,8 @@ export class BuildWheelView extends Container {
     const hub = inner;
     const arc = upgradeWedgeArc(model.wedges.length);
 
-    this.drawRings(this.upgradeRings, r, hub, m);
-    this.drawSpokes(this.upgradeRings, inner, r, model.wedges.length, m);
+    drawWheelRings(this.upgradeRings, r, hub, m);
+    drawWheelSpokes(this.upgradeRings, inner, r, model.wedges.length, m);
 
     for (let i = 0; i < model.wedges.length; i++) {
       const wedge = model.wedges[i];
@@ -789,119 +789,6 @@ export class BuildWheelView extends Container {
     caption.y = this.hubCaptionTop;
   }
 
-  /**
-   * The disc the wedges sit on — the Gantry/Bone build wheel (u7-02), and the one
-   * place in this file where "no plates over gameplay" is actually enforced.
-   *
-   * Drawn outermost-first:
-   *
-   *  1. **The halo** — a pool of void with no edge ({@link WHEEL_HALO}), stepped
-   *     into nested rings whose alphas carry the increment rather than the target
-   *     ({@link nestedRingAlphas}). This is what the wheel reads *against*. The
-   *     handoff gives it a `radial-gradient` rather than a card precisely so the
-   *     fight stays visible up to the disc; a rectangle would give the HUD a
-   *     corner, and a corner is what turns a wheel into a panel.
-   *  2. **A faint halo ring**, the handoff's `inset:-26px` hairline — the machined
-   *     edge of the pool, so the falloff has somewhere to end.
-   *  3. **The disc**, still translucent (the world reads through it) in the
-   *     Gantry face tone rather than the old flat panel fill.
-   *  4. **An inner vignette**, the handoff's `inset 0 0 56px` — the rim is a
-   *     machined lip, so the disc is darker where it turns away from the light.
-   *  5. **The rim**, lit along its top and shadowed along its bottom: the
-   *     handoff's whole diagnosis ("a lit top edge, a shadowed under-line")
-   *     stated on a circle instead of on a rectangle.
-   *  6. **The index diamond** at twelve o'clock — where segment 0 begins.
-   *
-   * Redrawn per frame: one Graphics, open for seconds at a time.
-   */
-  private drawRings(rings: Graphics, r: number, hub: number, m: WheelProfile): void {
-    rings.clear();
-
-    // 1 + 2. The halo, and the hairline that ends it.
-    const holdR = r * WHEEL_HALO.holdTo;
-    const fadeR = r * WHEEL_HALO.fadeTo;
-    const bands = WHEEL_HALO.bands;
-    const targets: number[] = [];
-    for (let i = 0; i < bands; i++) {
-      // 1 at the outer edge of the falloff, 1/bands at its inner edge; squared, so
-      // the pool has a soft shoulder rather than a linear ramp.
-      const outward = (bands - i) / bands;
-      targets.push(WHEEL_HALO.peak * (1 - outward) * (1 - outward));
-    }
-    const alphas = nestedRingAlphas(targets);
-    for (let i = 0; i < bands; i++) {
-      const radius = fadeR + ((holdR - fadeR) * i) / bands;
-      const alpha = alphas[i] ?? 0;
-      if (alpha <= 0) continue;
-      rings.circle(0, 0, radius).fill({ color: PALETTE.vacuum, alpha });
-    }
-    rings.circle(0, 0, holdR).fill({ color: PALETTE.vacuum, alpha: WHEEL_HALO.peak });
-    rings
-      .circle(0, 0, r + m.haloOffset)
-      .stroke({ width: m.haloRing, color: PALETTE.hullSteel, alpha: 0.14 });
-
-    // 3. The disc. Translucent on purpose: the wheel opens over a live fight.
-    rings.circle(0, 0, r).fill({ color: MATERIAL_SHADES.faceShade, alpha: 0.88 });
-
-    // 4. The inner vignette — nested rings inside the rim, darkening outward.
-    const vig = Math.max(1, Math.round(m.vignette / 6));
-    for (let i = 0; i < vig; i++) {
-      const t = (i + 1) / vig;
-      rings
-        .circle(0, 0, r - (m.vignette * (1 - t)) / 1)
-        .stroke({ width: m.vignette / vig + 1, color: PALETTE.vacuum, alpha: 0.16 * t });
-    }
-
-    // 5. The rim: lit across the top, shadowed across the bottom.
-    rings
-      .arc(0, 0, r, Math.PI, 2 * Math.PI)
-      .stroke({ width: m.ring, color: MATERIAL_SHADES.ruleLit, alpha: 0.95 });
-    rings
-      .arc(0, 0, r, 0, Math.PI)
-      .stroke({ width: m.ring, color: MATERIAL_SHADES.ruleDeep, alpha: 0.95 });
-
-    // 6. The index diamond at twelve o'clock — a machined mark, and since u11-01
-    //    the SAME mark tone as the hub's chevron ({@link WHEEL_CHROME.mark}).
-    const d = m.detent;
-    rings
-      .poly([0, -r - d / 2, d / 2, -r, 0, -r + d / 2, -d / 2, -r])
-      .fill({ color: WHEEL_CHROME.mark, alpha: 0.9 });
-
-    // The hub disc, with the same lit-top / shadowed-bottom rim.
-    rings.circle(0, 0, hub).fill({ color: PALETTE.vacuum, alpha: 0.95 });
-    rings
-      .arc(0, 0, hub, Math.PI, 2 * Math.PI)
-      .stroke({ width: m.ring, color: MATERIAL_SHADES.ruleLit, alpha: 0.9 });
-    rings
-      .arc(0, 0, hub, 0, Math.PI)
-      .stroke({ width: m.ring, color: MATERIAL_SHADES.ruleDeep, alpha: 0.9 });
-  }
-
-  /** The hairline spokes between wedges — the handoff's 1.2° conic dividers.
-   *  Drawn once for the whole wheel rather than per wedge, so a wedge's own
-   *  press/confirm overlays never paint over a divider.
-   *
-   *  Since u11-01 these are the ONLY thing dividing one wedge from the next: a
-   *  wedge no longer strokes its own outline, because the ring it sits in is
-   *  already bounded on all four sides (the disc rim outside, the hub ring inside,
-   *  a spoke on each flank) and outlining it again is what made five wedges read
-   *  as five little plates. See {@link ../ui/instrument} `WHEEL_FACE_ALPHA`. */
-  private drawSpokes(rings: Graphics, inner: number, outer: number, count: number, m: WheelProfile): void {
-    if (count <= 1) return;
-    const arc = (2 * Math.PI) / count;
-    for (let i = 0; i < count; i++) {
-      // Boundaries sit half an arc off each wedge centre; segment 0 is centred at
-      // twelve o'clock, so the first boundary is half an arc clockwise from it.
-      const a = -Math.PI / 2 + arc * (i + 0.5);
-      const cos = Math.cos(a);
-      const sin = Math.sin(a);
-      rings
-        .moveTo(cos * inner, sin * inner)
-        .lineTo(cos * outer, sin * outer)
-        .stroke({ width: m.spoke, color: WHEEL_CHROME.divider, alpha: 0.45 });
-    }
-  }
-
   /** Draw one wedge: the body, the words, the second line, and the cost — and
    *  nothing else (GDD §2.5). Written once, used by both wheels. `fb` is the
    *  press/confirm motion for this wedge (field report v0.2.2): a press-down
@@ -1043,6 +930,196 @@ export class BuildWheelView extends Container {
       // wedge's words.
       n.cluster.visible = false;
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The disc and its spokes — the chrome under both wheels
+// ---------------------------------------------------------------------------
+
+/**
+ * Stroke ONE arc, and only the arc — the a0-21 fix, and the reason every arc on
+ * this disc goes through a helper instead of calling `Graphics.arc` directly.
+ *
+ * **The defect.** A horizontal hairline ran from the hub's edge out to the outer
+ * ring at the wheel's vertical centre, just under `OPEN ▸` — straight through the
+ * middle of the UPGRADE SHIP wedge, bisecting the one segment it is not a
+ * boundary of. It shipped, and it was in the committed golden, because it looks
+ * exactly like a rule somebody drew on purpose: it is the rim's own lit tone at
+ * the rim's own weight, since that is literally what it is.
+ *
+ * **The mechanism.** Pixi's `arc()` continues the open sub-path: if a point is
+ * already open it emits a straight LINE from that point to the arc's start before
+ * it begins curving (`ShapePath.arc` → `_ensurePoly(false)`, the same rule as
+ * Canvas2D). And a point is *always* open here, because every `fill()`/`stroke()`
+ * re-opens the path at the last point drawn (`GraphicsContext
+ * ._initNextPathLocation`). So `circle(0,0,r).fill()` followed by
+ * `arc(0,0,r, π, 2π)` does not draw a rim — it draws a chord from wherever the
+ * pen was left to nine o'clock, and then the rim. A `circle`'s last point reads
+ * back as its centre, so the chord ran from (0, 0) to (−r, 0): a full radius of
+ * hairline across the wedge face. The hub's rim arc drew the same chord at hub
+ * radius, over the hub disc, which is why the line reached the middle rather than
+ * stopping where the hub covered it.
+ *
+ * **The fix.** `moveTo` the arc's own start point first, so the connector Pixi
+ * insists on drawing is zero-length. Nothing is hidden and nothing is clipped:
+ * the line was never a label separator, so there is nothing here to keep.
+ *
+ * The hub's `CLOSE · ESC` rule is a *different* thing and is untouched — it is
+ * drawn deliberately, by {@link BuildWheelView.drawHubBack}, to {@link
+ * WheelProfile.hubRule} width, and it is correct.
+ */
+function strokeArc(
+  g: Graphics,
+  radius: number,
+  from: number,
+  to: number,
+  style: { width: number; color: number; alpha: number },
+): void {
+  g.moveTo(Math.cos(from) * radius, Math.sin(from) * radius)
+    .arc(0, 0, radius, from, to)
+    .stroke(style);
+}
+
+/**
+ * The disc the wedges sit on — the Gantry/Bone build wheel (u7-02), and the one
+ * place in this file where "no plates over gameplay" is actually enforced.
+ *
+ * Module-level and exported since a0-21, rather than a private method: it reads
+ * nothing off the view, and a bare `Graphics` needs no DOM, so what this disc
+ * actually draws can be asserted headlessly — which is what
+ * `build-wheel-view.test.ts` does, and what a golden alone could not, because a
+ * reviewer approves an image without knowing what it should not contain.
+ *
+ * Drawn outermost-first:
+ *
+ *  1. **The halo** — a pool of void with no edge ({@link WHEEL_HALO}), stepped
+ *     into nested rings whose alphas carry the increment rather than the target
+ *     ({@link nestedRingAlphas}). This is what the wheel reads *against*. The
+ *     handoff gives it a `radial-gradient` rather than a card precisely so the
+ *     fight stays visible up to the disc; a rectangle would give the HUD a
+ *     corner, and a corner is what turns a wheel into a panel.
+ *  2. **A faint halo ring**, the handoff's `inset:-26px` hairline — the machined
+ *     edge of the pool, so the falloff has somewhere to end.
+ *  3. **The disc**, still translucent (the world reads through it) in the
+ *     Gantry face tone rather than the old flat panel fill.
+ *  4. **An inner vignette**, the handoff's `inset 0 0 56px` — the rim is a
+ *     machined lip, so the disc is darker where it turns away from the light.
+ *  5. **The rim**, lit along its top and shadowed along its bottom: the
+ *     handoff's whole diagnosis ("a lit top edge, a shadowed under-line")
+ *     stated on a circle instead of on a rectangle.
+ *  6. **The index diamond** at twelve o'clock — where segment 0 begins.
+ *
+ * Every arc below goes through {@link strokeArc}, and that is load-bearing: a
+ * bare `arc()` drags a chord in from wherever the previous primitive left the
+ * pen, which is the stray rule a0-21 was called in to remove.
+ *
+ * Redrawn per frame: one Graphics, open for seconds at a time.
+ */
+export function drawWheelRings(rings: Graphics, r: number, hub: number, m: WheelProfile): void {
+  rings.clear();
+
+  // 1 + 2. The halo, and the hairline that ends it.
+  const holdR = r * WHEEL_HALO.holdTo;
+  const fadeR = r * WHEEL_HALO.fadeTo;
+  const bands = WHEEL_HALO.bands;
+  const targets: number[] = [];
+  for (let i = 0; i < bands; i++) {
+    // 1 at the outer edge of the falloff, 1/bands at its inner edge; squared, so
+    // the pool has a soft shoulder rather than a linear ramp.
+    const outward = (bands - i) / bands;
+    targets.push(WHEEL_HALO.peak * (1 - outward) * (1 - outward));
+  }
+  const alphas = nestedRingAlphas(targets);
+  for (let i = 0; i < bands; i++) {
+    const radius = fadeR + ((holdR - fadeR) * i) / bands;
+    const alpha = alphas[i] ?? 0;
+    if (alpha <= 0) continue;
+    rings.circle(0, 0, radius).fill({ color: PALETTE.vacuum, alpha });
+  }
+  rings.circle(0, 0, holdR).fill({ color: PALETTE.vacuum, alpha: WHEEL_HALO.peak });
+  rings
+    .circle(0, 0, r + m.haloOffset)
+    .stroke({ width: m.haloRing, color: PALETTE.hullSteel, alpha: 0.14 });
+
+  // 3. The disc. Translucent on purpose: the wheel opens over a live fight.
+  rings.circle(0, 0, r).fill({ color: MATERIAL_SHADES.faceShade, alpha: 0.88 });
+
+  // 4. The inner vignette — nested rings inside the rim, darkening outward.
+  const vig = Math.max(1, Math.round(m.vignette / 6));
+  for (let i = 0; i < vig; i++) {
+    const t = (i + 1) / vig;
+    rings
+      .circle(0, 0, r - (m.vignette * (1 - t)) / 1)
+      .stroke({ width: m.vignette / vig + 1, color: PALETTE.vacuum, alpha: 0.16 * t });
+  }
+
+  // 5. The rim: lit across the top, shadowed across the bottom.
+  strokeArc(rings, r, Math.PI, 2 * Math.PI, {
+    width: m.ring,
+    color: MATERIAL_SHADES.ruleLit,
+    alpha: 0.95,
+  });
+  strokeArc(rings, r, 0, Math.PI, {
+    width: m.ring,
+    color: MATERIAL_SHADES.ruleDeep,
+    alpha: 0.95,
+  });
+
+  // 6. The index diamond at twelve o'clock — a machined mark, and since u11-01
+  //    the SAME mark tone as the hub's chevron ({@link WHEEL_CHROME.mark}).
+  const d = m.detent;
+  rings
+    .poly([0, -r - d / 2, d / 2, -r, 0, -r + d / 2, -d / 2, -r])
+    .fill({ color: WHEEL_CHROME.mark, alpha: 0.9 });
+
+  // The hub disc, with the same lit-top / shadowed-bottom rim.
+  rings.circle(0, 0, hub).fill({ color: PALETTE.vacuum, alpha: 0.95 });
+  strokeArc(rings, hub, Math.PI, 2 * Math.PI, {
+    width: m.ring,
+    color: MATERIAL_SHADES.ruleLit,
+    alpha: 0.9,
+  });
+  strokeArc(rings, hub, 0, Math.PI, {
+    width: m.ring,
+    color: MATERIAL_SHADES.ruleDeep,
+    alpha: 0.9,
+  });
+}
+
+/** The hairline spokes between wedges — the handoff's 1.2° conic dividers.
+ *  Drawn once for the whole wheel rather than per wedge, so a wedge's own
+ *  press/confirm overlays never paint over a divider.
+ *
+ *  Since u11-01 these are the ONLY thing dividing one wedge from the next: a
+ *  wedge no longer strokes its own outline, because the ring it sits in is
+ *  already bounded on all four sides (the disc rim outside, the hub ring inside,
+ *  a spoke on each flank) and outlining it again is what made five wedges read
+ *  as five little plates. See {@link ../ui/instrument} `WHEEL_FACE_ALPHA`.
+ *
+ *  "The ONLY thing" is now asserted rather than asserted-in-prose: a0-21 found a
+ *  sixth line on the face that nobody had drawn on purpose, so
+ *  `build-wheel-view.test.ts` reads the drawn geometry back and fails if anything
+ *  crosses a wedge face away from these boundaries. */
+export function drawWheelSpokes(
+  rings: Graphics,
+  inner: number,
+  outer: number,
+  count: number,
+  m: WheelProfile,
+): void {
+  if (count <= 1) return;
+  const arc = (2 * Math.PI) / count;
+  for (let i = 0; i < count; i++) {
+    // Boundaries sit half an arc off each wedge centre; segment 0 is centred at
+    // twelve o'clock, so the first boundary is half an arc clockwise from it.
+    const a = -Math.PI / 2 + arc * (i + 0.5);
+    const cos = Math.cos(a);
+    const sin = Math.sin(a);
+    rings
+      .moveTo(cos * inner, sin * inner)
+      .lineTo(cos * outer, sin * outer)
+      .stroke({ width: m.spoke, color: WHEEL_CHROME.divider, alpha: 0.45 });
   }
 }
 
