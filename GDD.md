@@ -205,7 +205,7 @@ These are starting values, not commitments — they exist so the Gameplay Engine
 | Weapon vs core | DPS (delivered by projectile now, §2.3); the constant the whole match balances on | 5 |
 | Weapon vs ships/turrets | DPS (delivered by projectile now, §2.3) | 10 |
 | Mining rate | Ore per second of fire-on-asteroid | 0.5 |
-| Ship hull | Base; upgradable | 50 |
+| ~~Ship hull~~ | **Retired 2026-08-11 (g6-01).** Was: *"Base; upgradable — 50"*. Superseded by §2.11's per-class hull, which is what the simulation actually reads: hull is **absolute per class** (Interceptor 35 · Vanguard 50 · Excavator 55 · Hauler 70), and the §2.5 tier ladder multiplies that class row. There is no single base left to turn — the constant behind this row was a fourth copy of the Vanguard's 50 that nothing read, so a QA agent retuning it changed nothing. Deleted rather than kept as a dead knob, exactly as ~~Sensor range~~ below, and *not* wired back in as a floor: a floor would raise the Interceptor's 35 to 50, which is a balance change, not a wiring fix. **What did not change:** hull is still upgradable (§2.5), and the four class values are §2.11's ratified table. | — |
 | Starting ore | One meaningful opening choice | 3 |
 | Spawn protection | Ship and core, match start | 10 s |
 | Cargo hold | Base; +2 per upgrade tier, first tier cheap, escalating; cap 8 | 2 |
