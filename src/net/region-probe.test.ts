@@ -290,16 +290,35 @@ describe('the survey measures one region at a time — a0-29', () => {
     const { fetch, now, calls } = wire(hosts);
     await measureRegionPings(fleet(), { fetch, now, withTimeout: noTimeout });
 
-    // One warm-up per distinct origin, then gru, iad, gru, iad, gru, iad.
-    const timed = calls.slice(2).map((c) => c.url);
-    expect(timed).toEqual([
-      'https://gru.test/health',
-      'https://iad.test/health',
-      'https://gru.test/health',
-      'https://iad.test/health',
-      'https://gru.test/health',
-      'https://iad.test/health',
-    ]);
+    // One warm-up per distinct origin, then the rounds — each starting one region
+    // further along, so no region is permanently first.
+    const GRU = 'https://gru.test/health';
+    const IAD = 'https://iad.test/health';
+    expect(calls.slice(2).map((c) => c.url)).toEqual([GRU, IAD, IAD, GRU, GRU, IAD]);
+    // Whichever way they interleave, every region is sampled the same number of times.
+    for (const url of [GRU, IAD]) {
+      expect(calls.slice(2).filter((c) => c.url === url)).toHaveLength(DEFAULT_PROBE_SAMPLES);
+    }
+  });
+
+  it('the budget never develops a favourite — a dead region does not always cut the same neighbour short', async () => {
+    // gru times out on every sample and eats the clock; iad answers instantly.
+    // Without the round-robin rotation, iad would be the region always cut short.
+    let clock = 0;
+    const fetch: FetchLike = (url) => {
+      clock += url.includes('gru') ? 3000 : 10;
+      return Promise.resolve(ok({ region: url.includes('gru') ? 'gru' : 'iad' }));
+    };
+    const pings = await measureRegionPings([region('gru'), region('iad')], {
+      fetch,
+      now: () => clock,
+      withTimeout: noTimeout,
+      budgetMs: 7000,
+    });
+    const iad = pings.find((p) => p.id === 'iad')!;
+    // iad still got measured, and its number is its own — not gru's 3 seconds.
+    expect(iad.pingMs).toBe(10);
+    expect(iad.samples).toBeGreaterThan(0);
   });
 
   it('warms each distinct origin ONCE, with the steer headers, and never counts it as a sample', async () => {

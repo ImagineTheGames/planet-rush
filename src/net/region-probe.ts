@@ -415,12 +415,19 @@ export async function measureRegionPings(
   const rounds = sampleCount(options);
   let outOfTime = false;
   for (let round = 0; round < rounds && !outOfTime; round++) {
-    for (const state of pending) {
+    // Each round starts one region further along. In a healthy fleet this changes
+    // nothing — every region still gets every sample. It matters only when the
+    // budget truncates the survey: without the rotation a region that eats the
+    // clock (a dead one, timing out) would always be sampled BEFORE the same
+    // neighbours, so the same neighbours would always be the ones cut short. The
+    // budget must not develop a favourite; that is the shape of bug this whole
+    // change is about.
+    for (let i = 0; i < pending.length; i++) {
       if (env.clock() >= deadline) {
         outOfTime = true;
         break;
       }
-      await takeOneSample(state, env);
+      await takeOneSample(pending[(round + i) % pending.length]!, env);
     }
   }
   if (outOfTime) {
