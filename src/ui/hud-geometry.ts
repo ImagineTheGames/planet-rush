@@ -368,7 +368,12 @@ function rowClock(lines: readonly ClockLine[], scale: HudScale): ClockLayout['ch
   const offsets = lines.map((l) => {
     // The three readouts are different type sizes (15/14/13 at the reference), so
     // the row centres each line box on the tallest rather than top-aligning them.
-    const o = { x: cursor + l.width / 2, y: (rowHeight - l.height) / 2 };
+    //
+    // Rounded, unlike the stacked form's zero offsets: a row shares one origin,
+    // so a sub-pixel change in the match clock's width as its digits tick would
+    // otherwise nudge the whole row sideways every second. Whole pixels also keep
+    // 11px type off half-pixel boundaries, where it renders soft.
+    const o = { x: Math.round(cursor + l.width / 2), y: Math.round((rowHeight - l.height) / 2) };
     cursor += l.width + gap;
     return o;
   });

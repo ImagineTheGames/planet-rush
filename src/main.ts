@@ -1274,6 +1274,16 @@ async function boot(): Promise<void> {
   //     for the same reason: a dpr-3 phone would otherwise bake nine times the
   //     texels it can show.
   let viewport: Viewport = readViewport();
+  /**
+   * What the player cannot see, per logical edge — recomputed on relayout only
+   * (a0-24). Both halves of it change exactly when `viewport` does: the visual
+   * viewport by definition, and `env(safe-area-inset-*)` on rotation and
+   * fullscreen, which are the same events. Cached rather than read per frame
+   * because the safe-area half goes through `getComputedStyle`, and forcing a
+   * style recalc inside the render loop is a cost the HUD has no business paying
+   * 60 times a second for four numbers that change on orientation change.
+   */
+  let hudInsets: SafeInsets = viewportInsets();
   const renderer = new Renderer(gameRoot, viewport, {
     baker: app.renderer,
     resolution: Math.min(window.devicePixelRatio || 1, 2),
@@ -3352,7 +3362,7 @@ async function boot(): Promise<void> {
     // bottom-anchored chrome — the onboarding prompt, the minimap's corner —
     // holds clear of this; everything hung off the top never needed it, which is
     // why the field was dead until the prompt was found cut off on a phone.
-    hudFrame.safeInsets = viewportInsets();
+    hudFrame.safeInsets = hudInsets;
 
     const station = stationOf(world, LOCAL_PLAYER);
     if (station) {
@@ -5720,6 +5730,10 @@ async function boot(): Promise<void> {
     const w = transform.logicalWidth;
     const h = transform.logicalHeight;
     viewport = readViewport();
+    // …and what of the canvas that viewport does NOT cover (a0-24), for the HUD
+    // chrome that hangs off an edge rather than a corner. Ordered after
+    // `readViewport`: it is measured against the value just written.
+    hudInsets = viewportInsets();
     renderer.setViewport(viewport);
     touch.setScreenWidth(w);
     hud.resize(w, h);
