@@ -233,6 +233,151 @@ describe('Allocator.allocate — the placement is explainable', () => {
   });
 });
 
+describe('Allocator.allocate — an unserved POP falls back to its NEAREST region (n9-01)', () => {
+  /**
+   * The developer's case, by name. From Florida the anycast POP is `dfw`; the
+   * fleet has run `iad ×2 + gru ×1` since 2026-07-30 and has never had a `dfw`
+   * Machine. Before this, `dfw` meant *no opinion*: the whole fleet went into one
+   * pool and the room went wherever load — and then a machine-id string
+   * comparison — happened to send it. Live on 2026-08-11, three consecutive
+   * `POST /rooms` from a `dfw` POP answered `iad`, `iad`, **`gru`**, with twelve
+   * free slots still in `iad`.
+   */
+  const FLORIDA_POP = 'dfw';
+
+  it('places a dfw request in iad, not gru', () => {
+    const { alloc } = withFleet([beat('m-gru', 'gru', [], 8), beat('m-iad', 'iad', [], 8)]);
+    const a = alloc.allocate({ region: FLORIDA_POP }, 1000);
+
+    expect(a.region).toBe('iad');
+    expect(a.machine).toBe('m-iad');
+    // `region-absent` is still the truth of it — we run nothing in Dallas — and it
+    // still reads differently from `region-full`. What changed is where the room
+    // went, not what the allocator calls it.
+    expect(a.placement).toEqual({
+      requested: 'dfw',
+      region: 'iad',
+      reason: 'region-absent',
+      detail: 'iad — no dfw machines',
+    });
+  });
+
+  it('places a dfw request in iad even when gru is emptier', () => {
+    // The live case exactly: two outstanding rooms in Virginia, an idle São Paulo
+    // box, and a Florida creator. Load is a tie-break WITHIN a region, never a
+    // reason to cross a continent.
+    const { alloc } = withFleet([
+      beat('m-iad-1', 'iad', ['AAAA'], 8),
+      beat('m-iad-2', 'iad', ['BBBB'], 8),
+      beat('m-gru', 'gru', [], 8), // idle, and 6,400 km further away
+    ]);
+    const a = alloc.allocate({ region: FLORIDA_POP }, 1000);
+    expect(a.region).toBe('iad');
+  });
+
+  it('reaches gru from dfw only when iad genuinely cannot take the room', () => {
+    // Crossing the continent is a CAPACITY decision. iad is full to its ceiling,
+    // so a placed match in São Paulo still beats a refused one.
+    const { alloc } = withFleet([
+      beat('m-iad', 'iad', ['AAAA'], 1), // full
+      beat('m-gru', 'gru', [], 8),
+    ]);
+    const a = alloc.allocate({ region: FLORIDA_POP }, 1000);
+    expect(a.region).toBe('gru');
+    expect(a.placement?.reason).toBe('region-absent');
+  });
+
+  it('still honours a region the picker actually sent — inference never outranks it', () => {
+    // The brief's boundary: this governs only the case where nothing was sent. A
+    // player who deliberately chose São Paulo gets São Paulo.
+    const { alloc } = withFleet([beat('m-iad', 'iad', [], 8), beat('m-gru', 'gru', [], 8)]);
+    const a = alloc.allocate({ region: 'gru' }, 1000);
+    expect(a.region).toBe('gru');
+    expect(a.placement?.reason).toBe('preferred');
+  });
+
+  it('picks the nearest region with room, not merely the nearest region', () => {
+    // Three regions, the nearest one full: the fallback must walk the ranking
+    // rather than give up on geography and spread across everything.
+    const { alloc } = withFleet([
+      beat('m-iad', 'iad', ['AAAA'], 1), // nearest to dfw — and full
+      beat('m-lhr', 'lhr', [], 8), // 5,900 km from iad
+      beat('m-gru', 'gru', [], 8), // 7,600 km from iad, further from dfw than lhr
+    ]);
+    expect(alloc.allocate({ region: FLORIDA_POP }, 1000).region).toBe('lhr');
+  });
+
+  it('a full region falls back to its nearest neighbour too, not to the whole fleet', () => {
+    // Same rule, the other reason. `region-full` used to spread fleet-wide; a
+    // London creator whose region is full belongs in Frankfurt, not Sydney.
+    const { alloc } = withFleet([
+      beat('m-lhr', 'lhr', ['AAAA'], 1), // the creator's region, full
+      beat('m-syd', 'syd', [], 8),
+      beat('m-fra', 'fra', [], 8),
+    ]);
+    const a = alloc.allocate({ region: 'lhr' }, 1000);
+    expect(a.region).toBe('fra');
+    expect(a.placement?.reason).toBe('region-full');
+  });
+
+  it('an UNKNOWN pop keeps the old whole-fleet spread — no guess, no wrong continent', () => {
+    // What the next person adding a region inherits: a code with no row in
+    // region-geo.ts degrades to exactly the behaviour that shipped before it, and
+    // the reason still says `region-absent`.
+    const { alloc } = withFleet([
+      beat('m-iad', 'iad', ['AAAA', 'BBBB'], 8), // load 2
+      beat('m-gru', 'gru', [], 8), // load 0 — least-loaded of the whole fleet
+    ]);
+    const a = alloc.allocate({ region: 'zzz' }, 1000);
+    expect(a.region).toBe('gru');
+    expect(a.placement?.reason).toBe('region-absent');
+  });
+});
+
+describe('Allocator.allocate — placement never turns on a machine id (n9-01)', () => {
+  it('sends a dfw creator to iad however the machine ids sort', () => {
+    // The coin flip, stated as the test that would have caught it. Under the old
+    // rule an idle fleet tied on load and `<` on the id decided — so a gru box
+    // whose id sorted first took the room. Rename the machines so an id sort
+    // gives the opposite answer, and the placement must not move.
+    const aFirst = withFleet([beat('aaa-gru', 'gru', [], 8), beat('zzz-iad', 'iad', [], 8)]);
+    const zFirst = withFleet([beat('zzz-gru', 'gru', [], 8), beat('aaa-iad', 'iad', [], 8)]);
+
+    expect(aFirst.alloc.allocate({ region: 'dfw' }, 1000).region).toBe('iad');
+    expect(zFirst.alloc.allocate({ region: 'dfw' }, 1000).region).toBe('iad');
+  });
+
+  it('breaks a within-region tie on headroom, not on the id', () => {
+    // Same region, same load, different size of host. The bigger box has more
+    // room left once this match lands, which is a fact about capacity; its id
+    // sorts last, which is a fact about nothing.
+    const { alloc } = withFleet([beat('a-small', 'iad', [], 2), beat('z-large', 'iad', [], 8)]);
+    expect(alloc.allocate({ region: 'iad' }, 1000).machine).toBe('z-large');
+  });
+
+  it('breaks a headroom tie on heartbeat freshness, not on the id', () => {
+    // Identical hosts, one heard from more recently: prefer the view least likely
+    // to be about to lapse. `a-stale` would win an id sort.
+    const reg = new InMemoryRoomRegistry();
+    reg.observe(beat('a-stale', 'iad', [], 8), 1000);
+    reg.observe(beat('z-fresh', 'iad', [], 8), 9000);
+    const alloc = new Allocator({ registry: reg, rng: mulberry32(1), secret: SECRET });
+
+    expect(alloc.allocate({ region: 'iad' }, 9000).machine).toBe('z-fresh');
+  });
+
+  it('leaves the incumbent standing when two hosts are indistinguishable', () => {
+    // Everything the registry knows is equal, so there is no decision left — only
+    // a deterministic record of one. The host the fleet learned about first keeps
+    // it, and that is heartbeat-arrival order, not alphabetical order.
+    const later = withFleet([beat('z-first', 'iad', [], 8), beat('a-second', 'iad', [], 8)]);
+    expect(later.alloc.allocate({}, 1000).machine).toBe('z-first');
+
+    const swapped = withFleet([beat('a-first', 'iad', [], 8), beat('z-second', 'iad', [], 8)]);
+    expect(swapped.alloc.allocate({}, 1000).machine).toBe('a-first');
+  });
+});
+
 describe('Allocator.allocate — size-aware fleet density (Task F1)', () => {
   // A heartbeat whose rooms carry a per-room match size, so the allocator can
   // weight each by its seats instead of counting one flat unit per room.
