@@ -47,6 +47,41 @@
  * different outcome from a download; it is a download with the phone's own chooser
  * in front of it, which is why one button covers both. Never text, never the
  * clipboard, on any device.
+ *
+ * ── IT MOUNTS INSIDE THE FULLSCREEN ELEMENT, NOT BESIDE IT (a0-28) ──────────
+ * *"download logs used to live in match as well pretty sure it was in pause menu."*
+ * … *"I was on mobile."* The capture showed PAUSED / RESUME / SETTINGS / EXIT TO
+ * MENU and an empty footer, and the wiring above it was never the problem: `main.ts`
+ * `syncDownloadLog` offers `reason: 'pause'` every frame the overlay is up, and it
+ * did. Measured on a real 844×390 landscape touch boot driven through the real front
+ * door (PLAY → PLAY SOLO → RUSH! → pause), the button had a full 189×44 box at
+ * (643, 334) — wholly inside the viewport, `visibility: visible`, `opacity: 1` — and
+ * `document.elementFromPoint` at its own centre returned the **canvas**.
+ *
+ * The reason is the landscape lock's other half. On touch, PLAY enters fullscreen on
+ * the game root (`@platform/fullscreen` `FullscreenLifecycle.enter`), which promotes
+ * `#app` into the browser's **top layer** and paints a `::backdrop` over the rest of
+ * the document. The top layer is not a z-index — it sits above every normal-flow
+ * box no matter what, so this affordance, appended to `body` as a *sibling* of the
+ * fullscreen element, was painted under the backdrop with the largest z-index the
+ * platform has. Laid out, hit-tested against, and never shown.
+ *
+ * That is also why nothing else caught it, and why each of those is consistent:
+ * the desk never auto-fullscreens (the lifecycle gates on `isTouch`), the boot-error
+ * screen is reached before any PLAY, the connect-trace panel's own DOWNLOAD LOG is
+ * drawn *in canvas inside `#app`* and merely calls `download()` here, and the phone
+ * live-stage run boots `?debug=1` straight into a match, which skips PLAY.
+ *
+ * The fix is to mount where the pixels are: **`document.fullscreenElement` when there
+ * is one, else `body`**, re-homed on every `fullscreenchange` because the player can
+ * back out of fullscreen and re-enter it at any moment (the game offers an affordance
+ * for exactly that). Falling back to `body` is what keeps every non-fullscreen
+ * path — the desk, iPhone Safari, the boot-error screen — character for character
+ * unchanged. It stays DOM, and it stays this module's own business: `main.ts` still
+ * hands it the bare `document`.
+ *
+ * Not the same bug as a0-24's bottom-edge clipping, and the measurement says so in
+ * one number: the box's bottom edge was 378 of 390.
  */
 
 import { downloadPlaytestLog } from './playtest-log-export';
@@ -225,6 +260,12 @@ const DOWNLOAD_LOG_CSS =
   `display:flex;flex-direction:column;align-items:flex-end;gap:.4rem;` +
   `max-width:min(22rem,80vw);font-family:${FONT_BODY};text-align:right;` +
   `-webkit-text-size-adjust:100%;}` +
+  // …and `hidden` has to beat that `display:flex`, or `hide()` is a no-op. The UA's
+  // `[hidden]{display:none}` loses to an id rule, so the withdrawal the match relies
+  // on ("the match owns the screen again") never happened once the element existed:
+  // it simply stayed on the glass over live play. Invisible until a0-28 un-buried
+  // the affordance, which is why one fix cannot ship without the other.
+  `#${DOWNLOAD_LOG_ROOT_ID}[hidden]{display:none;}` +
   `#${DOWNLOAD_LOG_ROOT_ID} .pr-log-hint{margin:0;padding:.35rem .55rem;border-radius:4px;` +
   `font-size:clamp(11px,2.8vw,13px);line-height:1.4;color:${CSS_CHALK};` +
   `background:${CSS_PANEL};border:1px solid rgba(126,136,148,.35);}` +
@@ -299,11 +340,31 @@ export interface DownloadLogElement {
   remove(): void;
 }
 
+/**
+ * The slice of a parent this module appends into. Narrower than
+ * {@link DownloadLogElement} on purpose: the fullscreen element is typed `Element`
+ * by the DOM, and `Element` has no `hidden`, so requiring the wider shape would make
+ * a real `Document` unassignable to {@link DownloadLogDom}.
+ */
+export interface DownloadLogHost {
+  appendChild(child: unknown): void;
+}
+
 /** The slice of `Document` this module uses. */
 export interface DownloadLogDom {
   createElement(tag: string): DownloadLogElement;
   getElementById(id: string): DownloadLogElement | null;
-  readonly body: DownloadLogElement | null;
+  readonly body: DownloadLogHost | null;
+  /**
+   * The element the browser is presenting fullscreen, or null/absent. **Where this
+   * affordance has to live when there is one** — a fullscreen element is in the top
+   * layer, and a sibling of it in `body` is painted under its `::backdrop` at any
+   * z-index (a0-28). Optional so a host with no fullscreen concept needs no stub.
+   */
+  readonly fullscreenElement?: DownloadLogHost | null;
+  /** Document-level events — `fullscreenchange`, so the affordance follows the
+   *  player in and out of fullscreen. Optional for the same reason. */
+  addEventListener?(type: string, handler: () => void): void;
 }
 
 /** Schedules the "…and back to DOWNLOAD LOG" revert. `setTimeout`'s shape. */
@@ -339,8 +400,19 @@ export class DownloadLogAffordance {
   private inFlight = false;
   /** Counts presses so a stale revert timer cannot clear a newer answer. */
   private press = 0;
+  /** The parent the element is currently in, so a re-home costs one comparison
+   *  rather than an `appendChild` every frame (a0-28). */
+  private host: DownloadLogHost | null = null;
 
-  constructor(private readonly config: DownloadLogConfig) {}
+  constructor(private readonly config: DownloadLogConfig) {
+    // Follow the player in and out of fullscreen. Entering it promotes the game root
+    // into the top layer, which buries anything left in `body`; leaving it puts the
+    // root back in the normal flow, and the affordance has to come back with it.
+    // `webkitfullscreenchange` for the older WebKit that still only fires that one.
+    for (const type of ['fullscreenchange', 'webkitfullscreenchange']) {
+      this.config.dom.addEventListener?.(type, () => this.rehome());
+    }
+  }
 
   /** Whether the affordance is currently offered. */
   get visible(): boolean {
@@ -356,6 +428,9 @@ export class DownloadLogAffordance {
    *  a press's answer is not wiped by the next frame's identical call. */
   show(offer: DownloadLogOffer): void {
     if (this.offer && this.offer.reason === offer.reason && this.offer.hint === offer.hint) {
+      // Still the right parent? A per-frame caller is also how a fullscreen change
+      // that fired no event gets caught — one property read and a comparison.
+      this.rehome();
       if (this.root) this.root.hidden = false;
       return;
     }
@@ -372,11 +447,14 @@ export class DownloadLogAffordance {
     if (this.root) this.root.hidden = true;
   }
 
-  /** Remove the element entirely — teardown. */
+  /** Remove the element entirely — teardown. The `fullscreenchange` listener
+   *  outlives this (the seam has no `removeEventListener`), which costs nothing:
+   *  {@link rehome} is a no-op once there is no element to move. */
   destroy(): void {
     this.offer = null;
     this.root?.remove();
     this.root = null;
+    this.host = null;
   }
 
   /**
@@ -443,17 +521,47 @@ export class DownloadLogAffordance {
     });
   }
 
-  /** The container, created and appended on first use. Null when the page has no
-   *  body to mount into (which is not a failure worth throwing over — it just means
-   *  no button on a page that has no DOM). */
+  /**
+   * Where the element has to live *right now*: the fullscreen element when the
+   * browser is presenting one, else `body`.
+   *
+   * This is the whole of a0-28. A fullscreen element is in the **top layer**, which
+   * paints above every normal-flow box regardless of z-index and lays a `::backdrop`
+   * over the rest of the document — so an affordance left in `body` while the game
+   * root is fullscreen is laid out, sized, `visibility: visible`, and invisible. On
+   * touch that is the ordinary state of a match: PLAY enters fullscreen on `#app`.
+   */
+  private desiredHost(): DownloadLogHost | null {
+    return this.config.dom.fullscreenElement ?? this.config.dom.body;
+  }
+
+  /** Move an existing element to {@link desiredHost} if it is no longer there.
+   *  Creates nothing — an affordance that has never been offered stays unmounted. */
+  private rehome(): void {
+    if (!this.root) return;
+    const host = this.desiredHost();
+    if (!host || host === this.host) return;
+    // `appendChild` moves a node that already has a parent; no detach step needed.
+    host.appendChild(this.root);
+    this.host = host;
+  }
+
+  /** The container, created and appended on first use — and re-parented on later
+   *  ones, because the right parent changes with fullscreen ({@link desiredHost}).
+   *  Null when the page has nothing to mount into (which is not a failure worth
+   *  throwing over — it just means no button on a page that has no DOM). */
   private mount(): DownloadLogElement | null {
-    if (this.root) return this.root;
-    const host = this.config.dom.body;
+    if (this.root) {
+      this.rehome();
+      return this.root;
+    }
+    const host = this.desiredHost();
     if (!host) return null;
     const root = this.config.dom.createElement('div');
     root.id = DOWNLOAD_LOG_ROOT_ID;
     host.appendChild(root);
     this.root = root;
+    this.host = host;
     return root;
   }
 }
