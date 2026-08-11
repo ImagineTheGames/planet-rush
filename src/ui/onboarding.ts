@@ -39,6 +39,33 @@
  * opens, because upgrades are the half of the economy a player can most easily
  * miss." (4) rides the alarm's sustained-damage trigger ({@link ../ui/alarm}),
  * so it fires on a siege and never on a taunt-tap.
+ *
+ * ---------------------------------------------------------------------------
+ * THE MEMORY (u15-01, a0-19 gap G-3 half A)
+ * ---------------------------------------------------------------------------
+ * §2.10's "never appear again after each is completed once" used to last exactly
+ * one page load: `Onboarding` is a field of the `Hud`, EXIT TO MENU is a full
+ * navigation, and the second match taught the game again. Completion now crosses
+ * that boundary through an injected {@link OnboardingMemory} port — `load()` at
+ * construction, `save()` when (and only when) the completed set grows.
+ *
+ * The port is why this file is still pure: the module that knows about
+ * `localStorage` is {@link ./onboarding-memory}, which reads and writes the ONE
+ * career profile `p1-01` established (`src/progression/profile.ts`). No second
+ * storage scheme, and nothing here imports a browser global.
+ *
+ * ---------------------------------------------------------------------------
+ * AND WHAT RETIRES THE SPEND PROMPT (u15-01, half B)
+ * ---------------------------------------------------------------------------
+ * The SPEND prompt's lesson is *spending*, so only a spend may retire it. It used
+ * to retire on `hasOrdered` — an order **submitted** from the wheel — and an
+ * order submitted is not an order the sim accepted: confirm TURRET with 2 ore,
+ * be refused on cost, and the prompt that exists to stop you missing UPGRADE
+ * SHIP has dismissed itself having taught nothing. It now retires on
+ * {@link OnboardingSignals.hasSpent}, derived from the sim's own numbers by
+ * {@link oreWasSpent} — the same discipline {@link ./press-feedback} uses for the
+ * confirm chime, and for the same reason. With the memory above, a wrong
+ * retirement is no longer one match of missing tuition; it is permanent.
  */
 
 import { describeBindings, FireMode } from '@platform/actions';
@@ -168,13 +195,99 @@ export interface OnboardingSignals {
    *  ("fires the first time the wheel opens", GDD §2.10). Optional so day-1
    *  callers that predate the wheel keep compiling; absent reads as closed. */
   readonly wheelOpen?: boolean;
-  /** An order has been placed from the wheel at least once this match — the
-   *  SPEND lesson, learned. Optional for the same reason. */
-  readonly hasOrdered?: boolean;
+  /**
+   * Ore has actually been **spent** — a purchase the sim landed, not a wedge the
+   * player pressed. The SPEND lesson, learned (GDD §2.5, §2.10). Optional for the
+   * same reason; absent reads as "nothing bought yet".
+   *
+   * The caller derives it with {@link oreWasSpent} from the numbers the HUD
+   * already receives, so a refused order — too little ore, a maxed tier, a
+   * collapsed field — cannot retire the prompt, and neither can banking, which
+   * is not a purchase and is not the lesson (u15-01, a0-19 G-3 half B).
+   */
+  readonly hasSpent?: boolean;
   /** The under-attack alarm is sounding ({@link ../ui/alarm}) — the UNDER-ATTACK
    *  prompt's trigger (GDD §2.2, §2.10). Optional; absent reads as quiet. */
   readonly underAttack?: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// What "ore was spent" means (u15-01 half B)
+// ---------------------------------------------------------------------------
+
+/**
+ * The purchase-observable slice of the local player's own station and ship —
+ * every field one the HUD already reads each frame ({@link ./hud} `HudFrame`),
+ * so deciding that a purchase landed needs no new sim plumbing.
+ *
+ * Each of these numbers moves UP for exactly one reason, and that reason is ore
+ * leaving the player's total (GDD §2.5):
+ *  - **core HP** rises only under a bought repair (shield regen is a different
+ *    number; the same rule {@link ./press-feedback} `detectConfirmations` runs on);
+ *  - **turret / shield / satellite** counts include what is under construction,
+ *    so they tick the instant the order is *accepted*;
+ *  - **upgrade tiers** rise only when a tier is bought.
+ */
+export interface SpendFacts {
+  readonly coreHp: number;
+  readonly turrets: number;
+  readonly shields: number;
+  readonly satellites: number;
+  /** Tiers bought across every upgrade track, summed — one number, because the
+   *  question here is "did any of them go up", never which. */
+  readonly upgradeTiers: number;
+}
+
+/** Below this, an HP delta is float noise rather than a repair. Matches
+ *  {@link ./press-feedback}'s `EPSILON`, because it is the same comparison. */
+const SPEND_EPSILON = 1e-3;
+
+/**
+ * Did the player actually buy something between these two frames?
+ *
+ * Pure and one-directional: only a RISE counts. A siege that takes a turret off
+ * the roof, a core losing HP, a shield collapsing — those move the same numbers
+ * the other way and are not purchases, which is what keeps this from mistaking
+ * losing the game for learning the economy.
+ *
+ * The caller compares two frames where the wheel was open on both, so a
+ * match-boot jump (a new station's full core after the last one's damaged one)
+ * can never read as a repair. See {@link ./hud} `updateWheel`.
+ */
+export function oreWasSpent(prev: SpendFacts, next: SpendFacts): boolean {
+  return (
+    next.coreHp > prev.coreHp + SPEND_EPSILON ||
+    next.turrets > prev.turrets ||
+    next.shields > prev.shields ||
+    next.satellites > prev.satellites ||
+    next.upgradeTiers > prev.upgradeTiers
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The memory port (u15-01 half A)
+// ---------------------------------------------------------------------------
+
+/**
+ * Where completed prompts are remembered between matches. Deliberately a port
+ * and not an import: this module stays pure and DOM-free, and the game's own
+ * implementation ({@link ./onboarding-memory}) is the ONE career profile — no
+ * second storage scheme (u15-01).
+ *
+ * `load()` returns plain strings rather than {@link PromptId}s because that is
+ * what comes off a store: an id this build does not know (a fifth prompt, from a
+ * profile a later build wrote) is dropped rather than trusted.
+ */
+export interface OnboardingMemory {
+  /** Prompt ids completed in an earlier match, session or page load. */
+  load(): readonly string[];
+  /** Persist the completed set. Called only when it GROWS — `update` runs every
+   *  frame, and a store write per frame is a store write per frame. */
+  save(completed: readonly PromptId[]): void;
+}
+
+/** The known ids, for filtering whatever a store hands back. */
+const KNOWN_PROMPTS: ReadonlySet<string> = new Set<string>(PROMPT_ORDER);
 
 // ---------------------------------------------------------------------------
 // The trigger state machine (each fires once)
@@ -184,13 +297,33 @@ export interface OnboardingSignals {
  * Drives the first-match prompts. Feed it {@link OnboardingSignals} every tick;
  * it returns the {@link PromptId} to show right now (or `null`). The contract is
  * GDD §2.10's "never appear again after each is completed once": a completed
- * prompt can never become active again, for the life of the match.
+ * prompt can never become active again — and since u15-01 that is *once*, not
+ * once per page load. Pass an {@link OnboardingMemory} and the set is seeded
+ * from it here and written back as it grows.
  *
  * Pure state — no timers, no DOM, no device. The Pixi HUD owns one of these.
  */
 export class Onboarding {
   /** Prompts the player has already learned; a member here never re-fires. */
   private readonly completed = new Set<PromptId>();
+  /** How many were completed at the end of the last {@link update} — the change
+   *  detector that keeps the store write to one per lesson, not one per frame. */
+  private savedCount = 0;
+
+  /**
+   * @param memory Where completion is remembered between matches (u15-01).
+   *   Optional: a machine with no memory behaves exactly as it did before, which
+   *   is what every unit test that does not care about persistence relies on.
+   */
+  constructor(private readonly memory: OnboardingMemory | null = null) {
+    if (!memory) return;
+    // Seeded, never trusted: a store can hand back anything, including an id
+    // from a build that shipped a fifth prompt.
+    for (const id of memory.load()) {
+      if (KNOWN_PROMPTS.has(id)) this.completed.add(id as PromptId);
+    }
+    this.savedCount = this.completed.size;
+  }
   /** Sticky: the player has mined at least once (cargo was ever > 0). */
   private hasMined = false;
   /** Sticky within a haul: the hold has reached full since it was last emptied. */
@@ -218,13 +351,23 @@ export class Onboarding {
     // HAUL-HOME is done once a full hold has been emptied (flew home / dropped
     // on death) — they experienced held-ore-is-not-safe (GDD §2.3, §2.7).
     if (this.wasFull && !full) this.completed.add(PromptId.HaulHome);
-    // SPEND is done the moment ore is actually spent from the wheel — the
-    // player has found the economy, including the segment behind the arrow.
-    if (signals.hasOrdered === true) this.completed.add(PromptId.Spend);
+    // SPEND is done the moment ore is actually spent — the player has found the
+    // economy, including the segment behind the arrow. A press the sim refused
+    // is not a spend, and banking is not a spend either (u15-01 half B).
+    if (signals.hasSpent === true) this.completed.add(PromptId.Spend);
     // UNDER-ATTACK is done once a siege has been *survived* — the alarm sounded
     // and then fell silent. Retiring it while it is still sounding would pull
     // the instruction off screen mid-lesson.
     if (this.wasUnderAttack && !underAttack) this.completed.add(PromptId.UnderAttack);
+
+    // --- Remember it, once per lesson ---------------------------------------
+    // Completion only ever grows, so a size change IS a new lesson. Writing on
+    // the change rather than at the end of the match is deliberate: a player who
+    // learns to mine and then closes the tab has still learned to mine.
+    if (this.memory && this.completed.size !== this.savedCount) {
+      this.savedCount = this.completed.size;
+      this.memory.save([...this.completed]);
+    }
 
     // --- Active prompt: first eligible, uncompleted, in priority order -------
     for (const id of PROMPT_ORDER) {

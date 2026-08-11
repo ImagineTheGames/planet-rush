@@ -41,8 +41,11 @@ export type { HudFrame } from './hud';
 export { createShellLifetime } from './shell-lifetime';
 export type { ShellLifetime } from './shell-lifetime';
 
-export { Onboarding, PromptId, resolvePromptText } from './onboarding';
-export type { OnboardingSignals } from './onboarding';
+export { Onboarding, PromptId, oreWasSpent, resolvePromptText } from './onboarding';
+export type { OnboardingMemory, OnboardingSignals, SpendFacts } from './onboarding';
+// Where a completed prompt is remembered between matches (u15-01): the ONE
+// career profile, never a storage scheme of onboarding's own.
+export { createProfileOnboardingMemory } from './onboarding-memory';
 
 export { computeWaveClock, formatClock, WAVE_NAMES } from './wave-clock';
 export type { WaveClock } from './wave-clock';

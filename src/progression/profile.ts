@@ -113,6 +113,22 @@ export interface Profile {
    * why the boundary lives in the contract rather than in the content.
    */
   readonly equipped?: Readonly<Record<string, string>>;
+  /**
+   * The onboarding prompts this player has already been taught (u15-01; GDD
+   * §2.10 *"they never appear again after each is completed once"*). Ids are
+   * `src/ui/onboarding.ts` `PromptId`s, written and read through
+   * `src/ui/onboarding-memory.ts` — this module never interprets them, exactly
+   * as it never interprets a cosmetic id.
+   *
+   * It is a profile field and not an eleventh flat `planet-rush:*` key because
+   * it passes plan §2.1's own test — *would this still be true if the player
+   * picked up a different phone and signed in?* A player who has learned that
+   * their gun is their mining tool has learned it; the lesson is career, like
+   * XP, not a device setting like fire mode. Optional and additive, so `v` stays
+   * `1`: an older profile simply has nothing taught yet, which is the honest
+   * reading of a career written before the memory existed.
+   */
+  readonly onboarded?: readonly string[];
 }
 
 /** The flat key the profile lives under — the same `planet-rush:` prefix every
@@ -194,6 +210,7 @@ export function validateProfile(raw: unknown): Profile | null {
   const derived = levelForXp(xp);
   const unlocked = blob['unlocked'] === undefined ? null : asIdArray(blob['unlocked']);
   const equipped = blob['equipped'] === undefined ? null : asEquipped(blob['equipped']);
+  const onboarded = blob['onboarded'] === undefined ? null : asIdArray(blob['onboarded']);
   return {
     v: PROFILE_VERSION,
     xp,
@@ -202,6 +219,7 @@ export function validateProfile(raw: unknown): Profile | null {
     // `exactOptionalPropertyTypes` — an absent field is absent, not `undefined`.
     ...(unlocked ? { unlocked } : {}),
     ...(equipped ? { equipped } : {}),
+    ...(onboarded ? { onboarded } : {}),
   };
 }
 
