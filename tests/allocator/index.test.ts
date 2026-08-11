@@ -376,6 +376,71 @@ describe('POST /rooms — the creator lands in their own region (region placemen
     expect((await res.json()).machine).toBe('m-gru');
   });
 
+  it('places a dfw request in iad — an unserved POP is a place, not a shrug (n9-01)', async () => {
+    // The acceptance case, end to end and with nothing in the body: the developer
+    // in Florida, whose requests arrive on the `dfw` POP, which this fleet has
+    // never run a Machine in. Reproduced live on 2026-08-11 against
+    // planet-rush-allocator.fly.dev — three of these returned iad, iad, **gru**,
+    // with twelve free slots still sitting in iad.
+    const { base, registry, now, logs } = await fixture();
+    liveFleet(registry, now.value);
+
+    const res = await fetch(`${base}/rooms`, {
+      method: 'POST',
+      headers: { 'fly-region': 'dfw' },
+    });
+    const body = await res.json();
+
+    expect(res.status).toBe(201);
+    expect(body.region).toBe('iad');
+    expect(body.placement).toEqual({
+      requested: 'dfw',
+      region: 'iad',
+      reason: 'region-absent',
+      detail: 'iad — no dfw machines',
+    });
+    // The operator's half: `fly logs` says which region and why, unchanged.
+    expect(logs).toEqual([`room ${body.room} → ${body.machine} (iad — no dfw machines)`]);
+  });
+
+  it('places a dfw request in iad off the request id alone, with iad busier', async () => {
+    // The same case through the fallback header, with the live shape that made
+    // the third request cross the equator: both Virginia boxes carrying a room,
+    // São Paulo idle. Load is a tie-break within a region, never a reason to
+    // leave one. The request id is the real one this lane's machine was served.
+    const { base, registry, now } = await fixture();
+    registry.observe(heartbeat('m-iad-a', 'iad', ['AAAA']), now.value);
+    registry.observe(heartbeat('m-iad-b', 'iad', ['BBBB']), now.value);
+    registry.observe(heartbeat('m-gru', 'gru', []), now.value);
+
+    const res = await fetch(`${base}/rooms`, {
+      method: 'POST',
+      headers: { 'fly-request-id': '01KZSDYDMAAWGP3E0ZER0NNXB7-dfw' },
+    });
+    const body = await res.json();
+
+    expect(body.region).toBe('iad');
+    expect(body.placement.requested).toBe('dfw');
+  });
+
+  it('sends a dfw request to gru only when iad has no slot left', async () => {
+    // Crossing the continent stays possible — it is just a capacity decision now.
+    const { base, registry, now } = await fixture();
+    registry.observe(heartbeat('m-iad-a', 'iad', ['AAAA'], 1), now.value);
+    registry.observe(heartbeat('m-iad-b', 'iad', ['BBBB'], 1), now.value);
+    registry.observe(heartbeat('m-gru', 'gru', []), now.value);
+
+    const res = await fetch(`${base}/rooms`, {
+      method: 'POST',
+      headers: { 'fly-region': 'dfw' },
+    });
+    const body = await res.json();
+
+    expect(res.status).toBe(201);
+    expect(body.region).toBe('gru');
+    expect(body.placement.reason).toBe('region-absent');
+  });
+
   it('writes the decision to the process log, in the same words', async () => {
     const { base, registry, now, logs } = await fixture();
     liveFleet(registry, now.value);

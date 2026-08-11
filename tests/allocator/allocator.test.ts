@@ -310,10 +310,12 @@ describe('Allocator.allocate — an unserved POP falls back to its NEAREST regio
   it('a full region falls back to its nearest neighbour too, not to the whole fleet', () => {
     // Same rule, the other reason. `region-full` used to spread fleet-wide; a
     // London creator whose region is full belongs in Frankfurt, not Sydney.
+    // Frankfurt is the busier of the two, so only geography can pick it: under
+    // the old flat spread the idle Sydney box won on load.
     const { alloc } = withFleet([
       beat('m-lhr', 'lhr', ['AAAA'], 1), // the creator's region, full
-      beat('m-syd', 'syd', [], 8),
-      beat('m-fra', 'fra', [], 8),
+      beat('m-syd', 'syd', [], 8), // idle
+      beat('m-fra', 'fra', ['BBBB'], 8), // load 1, and 16,000 km nearer
     ]);
     const a = alloc.allocate({ region: 'lhr' }, 1000);
     expect(a.region).toBe('fra');
