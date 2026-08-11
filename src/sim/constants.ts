@@ -1094,8 +1094,14 @@ export const SATELLITE = {
 // ---------------------------------------------------------------------------
 
 /** Auto-aim engages the nearest valid target across the full 360° with no
- *  front-arc restriction (GDD §2.4, explicitly `TUNABLE`). A value < 2π would
- *  reintroduce a firing arc. TUNABLE */
+ *  front-arc restriction (GDD §2.4, explicitly `TUNABLE`). A value < 2π
+ *  reintroduces a firing arc of that width, centred on the ship's facing: every
+ *  candidate outside it — ship, turret, satellite, core or rock — stops being a
+ *  valid target, so auto-aim engages the nearest one *inside* the arc.
+ *
+ *  Read by `withinAimArc` in `./step`, which gates every acquisition candidate.
+ *  At exactly 2π that gate short-circuits to "everything", so the ratified
+ *  behaviour is what it always was: no arc test at all. TUNABLE */
 export const AUTO_AIM_ARC: Tunable<number> = 2 * Math.PI;
 
 // ---------------------------------------------------------------------------
