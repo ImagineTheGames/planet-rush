@@ -24,6 +24,7 @@ import type { AnchorSpec, Rect, Viewport } from '@platform/layout-registry';
 import { homeArrow, ARROW_EDGE_INSET } from './alarm';
 import { hudMetrics, hudType } from './instrument';
 import { collapsedRect } from './minimap';
+import type { MinimapInsets } from './minimap';
 import {
   wheelBounds,
   panelBounds,
@@ -44,8 +45,11 @@ import {
   SHIELD_BAR_HEIGHT,
   promptBounds,
   promptBand,
+  promptMaxHeight,
   promptPad,
   promptWrapWidth,
+  waveClockLayout,
+  CLOCK_WHEEL_GAP,
   PROMPT_MIN_TEXT_WIDTH,
   PROMPT_STRIP_RESERVE,
   PROMPT_THUMB_COLUMN,
@@ -72,6 +76,10 @@ import {
 } from './upgrade-wheel';
 import type { UpgradeLadder, UpgradeWheelSignals } from './upgrade-wheel';
 import { ShipClass } from '@shared/types';
+import { PromptId, resolvePromptText } from './onboarding';
+import { WAVE_NAMES } from './wave-clock';
+import { FireMode } from '@platform/actions';
+import type { DeviceKind } from '@platform/actions';
 
 // ---------------------------------------------------------------------------
 // The device matrix — QA's playwright.config.ts profiles, both orientations,
@@ -111,6 +119,19 @@ const FULL: AnchorSpec = { region: 'full', margin: 0 };
 
 const fmt = (r: Rect): string =>
   `{x:${r.x.toFixed(1)}, y:${r.y.toFixed(1)}, w:${r.width.toFixed(1)}, h:${r.height.toFixed(1)}}`;
+
+/** Do two rects overlap at all? Touching edges do not count as an overlap — the
+ *  clock clearing the wheel by exactly zero is still clear. Lives here rather
+ *  than in hud-geometry.ts because only this suite asks the question; the view
+ *  draws the two rects, it never tests them against each other. */
+function rectsIntersect(a: Rect, b: Rect): boolean {
+  return (
+    a.x < b.x + b.width &&
+    b.x < a.x + a.width &&
+    a.y < b.y + b.height &&
+    b.y < a.y + a.height
+  );
+}
 
 /** The registry's own verdict, with its own resolver — not a re-implementation. */
 function withinAnchor(bounds: Rect, anchor: AnchorSpec, vp: Viewport): boolean {
@@ -274,6 +295,123 @@ describe('station-hp placement', () => {
 // The own-ship HULL readout that used to stack under HOME was removed (field
 // report v0.2 — the over-ship bar is the truth now), so its top-right placement
 // block went with it. The corner now carries only `station-hp`, tested above.
+
+// ---------------------------------------------------------------------------
+// The wave clock vs the open wheel (a0-24) — two top-anchored things, one phone
+// ---------------------------------------------------------------------------
+
+describe('wave clock placement', () => {
+  /** One line box at a reference type size, the same derivation the prompt's
+   *  worst case uses: the HUD's own scaled size times Pixi's ~1.3 leading. */
+  const lineBox = (vp: Viewport, referencePx: number): number =>
+    Math.ceil(hudType(referencePx, hudMetrics(vp.width, vp.height)) * 1.3);
+
+  /**
+   * The three readouts as the view measures them. Widths are estimated from the
+   * drawn type size and the longest string each line can carry, deliberately on
+   * the generous side — a WIDER clock is the harder case for the row form, so an
+   * over-estimate cannot make this test pass by accident.
+   *
+   *  - `WAVE 5/5 · <name>` — over the longest name in `WAVE_NAMES`, read from the
+   *    clock's own module so a renamed wave is measured rather than assumed.
+   *  - `FINAL WAVE` / `NEXT 12:00` — the longest the countdown line goes.
+   *  - `MATCH 12:00`               — the longest the match clock goes.
+   */
+  const LONGEST_WAVE_LINE = `WAVE 5/5 · ${WAVE_NAMES.reduce((a, b) => (b.length > a.length ? b : a), '')}`;
+  const CLOCK_STRINGS: readonly { chars: number; size: number }[] = [
+    { chars: LONGEST_WAVE_LINE.length, size: 15 },
+    { chars: 'FINAL WAVE'.length, size: 14 },
+    { chars: 'MATCH 12:00'.length, size: 13 },
+  ];
+  /** Advance per character as a fraction of the em, for the widest face the HUD
+   *  draws (Audiowide) plus its `name`-tier tracking. Audiowide's own average is
+   *  ~0.72em; 0.85 is the ceiling this test holds the layout to. */
+  const ADVANCE = 0.85;
+
+  const lines = (vp: Viewport): { width: number; height: number }[] =>
+    CLOCK_STRINGS.map(({ chars, size }) => {
+      const px = hudType(size, hudMetrics(vp.width, vp.height));
+      return { width: Math.ceil(chars * px * ADVANCE), height: lineBox(vp, size) };
+    });
+
+  it('NEVER INTERSECTS THE OPEN WHEEL — the clip a0-24 was filed with', () => {
+    // The developer's capture: at 844×390 the wheel's footprint starts at y 54.6
+    // and the stacked strip runs past it, so `MATCH 0:10` is drawn under the
+    // TURRET wedge. The clock is what the build decision is being made against,
+    // so the strip re-flows to one row rather than losing its third line.
+    //
+    // Asserted as a RULE, not as a picture: the strip's drawn rect and the
+    // wheel's drawn rect do not overlap, on every profile in the matrix, in both
+    // wheel states. A golden proves one string at one length; this proves the
+    // rule for every screen we claim to run on.
+    for (const { name, vp } of PROFILES) {
+      const wheel = wheelBounds(vp.width, vp.height);
+      const open = waveClockLayout(vp.width, vp.height, lines(vp), true);
+      expect(
+        rectsIntersect(open.bounds, wheel),
+        `${name}: clock ${fmt(open.bounds)} overlaps the open wheel ${fmt(wheel)}`,
+      ).toBe(false);
+      // …and with the clearance the compact decision is taken on, so a strip that
+      // merely grazes the disc still counts as a failure here.
+      expect(open.bounds.y + open.bounds.height + CLOCK_WHEEL_GAP, name).toBeLessThanOrEqual(
+        wheel.y + 1e-6,
+      );
+    }
+  });
+
+  it('stays inside the screen and under the HUD margin, in both forms', () => {
+    for (const { name, vp } of PROFILES) {
+      for (const wheelOpen of [false, true]) {
+        const layout = waveClockLayout(vp.width, vp.height, lines(vp), wheelOpen);
+        const label = `${name} / wheel=${wheelOpen ? 'open' : 'closed'}`;
+        expect(layout.bounds.y, label).toBeGreaterThanOrEqual(HUD_PAD - 1e-6);
+        expect(layout.bounds.x, label).toBeGreaterThanOrEqual(0);
+        expect(layout.bounds.x + layout.bounds.width, label).toBeLessThanOrEqual(vp.width + 1e-6);
+      }
+    }
+  });
+
+  it('re-flows ONLY where the stack cannot fit — desktop is untouched', () => {
+    // The compact row is a phone answer, and the assertion that keeps it one is
+    // this: the desktop control never re-flows, in either wheel state, and no
+    // profile re-flows while the wheel is closed. Pinning the SET of screens that
+    // do means a change which compacts a new one fails here rather than shipping.
+    const compactWhileOpen: string[] = [];
+    for (const { name, vp } of PROFILES) {
+      expect(
+        waveClockLayout(vp.width, vp.height, lines(vp), false).compact,
+        `${name}: the strip re-flowed with no wheel on screen`,
+      ).toBe(false);
+      if (waveClockLayout(vp.width, vp.height, lines(vp), true).compact) compactWhileOpen.push(name);
+    }
+    expect(compactWhileOpen, 'the short landscape viewports, and only those').toEqual([
+      'iphone/landscape',
+      'pixel/landscape',
+      'small/landscape',
+    ]);
+  });
+
+  it('keeps all three readouts, in order, whichever form it takes', () => {
+    // The whole point of re-flowing rather than dropping a line: the row carries
+    // the same three readouts, left to right, in the stack's top-to-bottom order.
+    const vp = { width: 844, height: 390 };
+    const measured = lines(vp);
+    const row = waveClockLayout(vp.width, vp.height, measured, true);
+    expect(row.compact).toBe(true);
+    expect(row.lines).toHaveLength(3);
+    for (let i = 1; i < row.lines.length; i++) {
+      expect(row.lines[i]!.x, `readout ${i} sits right of ${i - 1}`).toBeGreaterThan(
+        row.lines[i - 1]!.x,
+      );
+    }
+    // …and every one of them is inside the chrome that darkens it.
+    for (let i = 0; i < row.lines.length; i++) {
+      const half = measured[i]!.width / 2;
+      expect(row.lines[i]!.x - half).toBeGreaterThanOrEqual(row.chrome.x - 1e-6);
+      expect(row.lines[i]!.x + half).toBeLessThanOrEqual(row.chrome.x + row.chrome.width + 1e-6);
+    }
+  });
+});
 
 // ---------------------------------------------------------------------------
 // The onboarding prompt (GDD §2.10) — registered `full`, margin HUD_PAD
@@ -441,6 +579,139 @@ describe('onboarding placement', () => {
           clears || atFloor,
           `${name} / touch=${isTouch}: band right ${(band.x + band.width).toFixed(1)} vs map left ${map.x.toFixed(1)}`,
         ).toBe(true);
+      }
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // a0-24 — the bottom edge, for EVERY authored prompt and every safe area
+  // -------------------------------------------------------------------------
+
+  /**
+   * Every string GDD §2.10 actually puts on screen, resolved through the action
+   * layer for every device and both fire modes — because `{fire}` and `{build}`
+   * are what make one template four strings of different lengths, and the brief
+   * asks for the longest one in `./onboarding`, not the one in the screenshot.
+   */
+  const AUTHORED_PROMPTS: readonly { label: string; text: string }[] = (() => {
+    const out: { label: string; text: string }[] = [];
+    const devices: DeviceKind[] = ['keyboard', 'gamepad', 'touch'];
+    for (const id of Object.values(PromptId)) {
+      for (const device of devices) {
+        for (const mode of [FireMode.Manual, FireMode.AutoAim]) {
+          out.push({ label: `${id}/${device}/${mode}`, text: resolvePromptText(id, device, mode) });
+        }
+      }
+    }
+    return out;
+  })();
+
+  /**
+   * Advance per character as a fraction of the em, generous for the widest face
+   * the HUD draws. An OVER-estimate is the conservative direction here: it wraps
+   * the prompt onto more lines than it will really take, so the panel this test
+   * measures is taller than the one that ships.
+   */
+  const ADVANCE = 0.85;
+
+  /** How tall the panel gets for one authored string on one screen: wrapped to
+   *  the band, at the HUD's own scaled type, plus the panel's padding. */
+  const panelHeight = (text: string, vp: Viewport, isTouch: boolean, insets: MinimapInsets): number => {
+    const px = hudType(16, hudMetrics(vp.width, vp.height));
+    const wrap = promptWrapWidth(vp.width, vp.height, isTouch, insets);
+    const rows = Math.max(1, Math.ceil((text.length * px * ADVANCE) / wrap));
+    return rows * Math.ceil(px * 1.3) + promptPad(vp.width, vp.height).y;
+  };
+
+  /**
+   * The safe-area crops a real phone reports. Zero is every desktop and every
+   * Playwright baseline — which is exactly why no golden caught a0-24. The rest
+   * are a home indicator, a landscape notch, and a browser URL bar left standing
+   * over the bottom of a canvas that was never resized (`main.ts` `readViewport`).
+   */
+  const BOTTOM_INSETS: readonly number[] = [0, 21, 34, 44, 88];
+
+  it('KEEPS ITS BOTTOM EDGE INSIDE THE SAFE AREA — every prompt, every crop', () => {
+    // The second clip a0-24 was filed with: the panel ran off the bottom of the
+    // screen mid-sentence. It is a rule, not a picture — for every authored
+    // string, on every profile, at every safe-area crop, the drawn panel's bottom
+    // edge is inside the visible viewport with the HUD margin still to spare.
+    for (const { name, vp, isTouch } of PROFILES) {
+      for (const bottom of BOTTOM_INSETS) {
+        const insets: MinimapInsets = { bottom };
+        for (const { label, text } of AUTHORED_PROMPTS) {
+          const h = panelHeight(text, vp, isTouch, insets);
+          const b = promptBounds(vp.width, vp.height, 10_000, h - promptPad(vp.width, vp.height).y, isTouch, insets);
+          const visibleBottom = vp.height - bottom;
+          expect(
+            b.y + b.height,
+            `${name} / inset ${bottom} / ${label}: panel ${fmt(b)} past the safe area`,
+          ).toBeLessThanOrEqual(visibleBottom - HUD_PAD + 1e-6);
+          expect(b.y, `${name} / inset ${bottom} / ${label}: panel above the top margin`)
+            .toBeGreaterThanOrEqual(HUD_PAD - 1e-6);
+        }
+      }
+    }
+  });
+
+  it('never needs the height cap for authored copy — the cap is a guardrail', () => {
+    // `promptBounds` clamps the panel to `promptMaxHeight`, which is what makes
+    // the bottom edge unconditional. That clamp must never actually BITE for a
+    // real prompt, because a capped panel is a panel the text overflows: if this
+    // fails, the copy or the type has outgrown the screen and the answer is one
+    // of those, not a taller clamp.
+    for (const { name, vp, isTouch } of PROFILES) {
+      for (const bottom of BOTTOM_INSETS) {
+        const insets: MinimapInsets = { bottom };
+        const cap = promptMaxHeight(vp.height, isTouch, insets);
+        for (const { label, text } of AUTHORED_PROMPTS) {
+          expect(
+            panelHeight(text, vp, isTouch, insets),
+            `${name} / inset ${bottom} / ${label}: needs more than the ${cap.toFixed(0)}px cap`,
+          ).toBeLessThanOrEqual(cap);
+        }
+      }
+    }
+  });
+
+  it('lifts off the bottom by exactly the safe-area inset', () => {
+    // The inset is *consumed*, not merely tolerated: feeding a crop in moves the
+    // panel up by that crop and nothing else.
+    //
+    // Worth being exact about what this does and does not catch. The geometry
+    // below already honoured an inset on `main`; what `main` did not have was
+    // anyone PASSING one — `HudFrame`'s inset field was declared, read by this
+    // file's callers, and written by nobody, so the prompt was laid out against
+    // the uncropped canvas and drawn into the strip of it the player cannot see.
+    // That wiring is `main.ts` `viewportInsets()`, and it is not reachable from a
+    // headless test; this assertion pins the contract that wiring depends on.
+    for (const { name, vp, isTouch } of PROFILES) {
+      const flat = promptBounds(vp.width, vp.height, 200, 20, isTouch);
+      const cropped = promptBounds(vp.width, vp.height, 200, 20, isTouch, { bottom: 40 });
+      expect(flat.y - cropped.y, `${name}`).toBeCloseTo(40, 6);
+    }
+  });
+
+  it('CANNOT be pushed off the bottom by its own height — the clamp that was inverted', () => {
+    // The bug in the clamp itself. It read `y = max(HUD_PAD, bandBottom − height)`
+    // and its comment claimed an over-tall panel "grows upward into the wheel".
+    // It does the opposite: pinning `y` at the top margin while keeping the full
+    // height puts the BOTTOM edge at `HUD_PAD + height`, past the band, past the
+    // safe area and — for a tall enough panel — past the viewport. A prompt cut
+    // off by the bottom of the screen is precisely a0-24's second capture, and it
+    // is length-dependent because `height` is the wrapped text's height.
+    //
+    // Fed a panel taller than the whole screen, so the old clamp is the one that
+    // would be reached: the rect still ends on the safe-area line.
+    for (const { name, vp, isTouch } of PROFILES) {
+      for (const bottom of [0, 44]) {
+        const b = promptBounds(vp.width, vp.height, 400, vp.height * 3, isTouch, { bottom });
+        const label = `${name} / inset ${bottom}`;
+        expect(b.y + b.height, label).toBeLessThanOrEqual(vp.height - bottom - HUD_PAD + 1e-6);
+        expect(b.y, label).toBeGreaterThanOrEqual(HUD_PAD - 1e-6);
+        expect(b.height, `${label}: capped at the safe band`).toBeLessThanOrEqual(
+          promptMaxHeight(vp.height, isTouch, { bottom }) + 1e-6,
+        );
       }
     }
   });
