@@ -27,7 +27,7 @@
  *    BUILD"** and never "press E" — §2.10's input-agnostic rule, at the only
  *    place it can actually fail;
  *  - the drawn box **fits the band it was wrapped to**. §4.7: *"Length is part of
- *    clarity."* The amended copy is 33 characters longer than the one it
+ *    clarity."* The amended copy is 41 characters longer than the one it
  *    replaced, so the phone case measures rather than assumes.
  *
  * ## How it stages

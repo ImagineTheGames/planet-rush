@@ -39,7 +39,7 @@ so the fix keeps the token and the phone frames are the check that it held.
 
 ## Length is part of clarity (GDD §4.7)
 
-The amended sentence is 33 characters longer than the one it replaced, and
+The amended sentence is 41 characters longer than the one it replaced, and
 `docs/gdd-conformance.md` asked for it to be measured rather than assumed. It is,
 in the spec, on the narrowest handset in QA's matrix — drawn width against the
 band's own wrap width, both read off the live Pixi text:
