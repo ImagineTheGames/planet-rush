@@ -26,6 +26,17 @@ import { hudMetrics, hudSpace } from './instrument';
 import { collapsedRect } from './minimap';
 import type { MinimapInsets } from './minimap';
 
+/**
+ * How far a readout's scrim reaches past the rule that closes it, reference px —
+ * so the darkness starts before the type does rather than at its cap-height.
+ *
+ * It lives here rather than in {@link ./hud} because it is part of what an
+ * element *draws*, and therefore part of the rect the layout registry records:
+ * a0-24's clock/wheel clearance is measured against the strip's scrim, not
+ * against its last baseline, and a test cannot check a number it cannot import.
+ */
+export const SCRIM_BLEED = 8;
+
 // ---------------------------------------------------------------------------
 // The Build & Upgrade wheel (GDD §2.5)
 // ---------------------------------------------------------------------------
@@ -237,6 +248,184 @@ export function stationHpBounds(viewportWidth: number, labelWidth = 0): Rect {
 // and layout test went with it; nothing references the old `HULL_*`/`hullHudBounds`.)
 
 // ---------------------------------------------------------------------------
+// The asteroid-wave clock (GDD §2.2 — top-centre) and the wheel under it
+// ---------------------------------------------------------------------------
+//
+// ## The collision (a0-24)
+//
+// The clock strip is top-centred and the Build & Upgrade wheel is screen-centred
+// (the follow camera holds the docked ship at the middle), and on a landscape
+// phone the two meet. At 844×390 the wheel's radius is
+// `clamp(min(844,390) × 0.36, 120, 230)` = **140.4 px**, so its footprint starts
+// at y **54.6** — while the three-line strip, at the 0.75 frame scale, runs from
+// the 16 px margin down to y ≈ **69**. The third line, `MATCH 0:10`, is drawn
+// *under* the wheel (the wheel is the later child) and is half-eaten by the
+// TURRET wedge. Neither element is misplaced on its own; they have simply never
+// been asked to share 390 px of height.
+//
+// ## Which one yields, and why it is the clock
+//
+// **The clock.** The wheel is forbidden to move — its geometry, `u13-01`'s
+// hit-test and `a0-21`'s arc all read off {@link wheelRadius} and
+// {@link wheelBounds}, and a wheel that shifts or shrinks while open is a wheel
+// whose wedges are no longer where the thumb learned they were. But "the clock
+// yields" cannot mean "the clock is dropped", because the wave countdown is the
+// number the build decision is being *made against*: choosing a turret with 12
+// seconds left on the wave is a different choice from choosing it with 2:51.
+//
+// So the strip does not move out of the way, it **re-flows**: while the wheel is
+// open on a viewport too short to hold both, the three stacked lines become one
+// row — the same three readouts, the same words, the same colours, laid out
+// left-to-right instead of top-to-bottom. That trades the one axis the screen has
+// none of (height) for the one it has plenty of (844 px of width), keeps the
+// element at the `top-center` placement GDD §2.2 puts in writing, and leaves
+// every clock line fully legible instead of two-thirds of them.
+//
+// The strip stays stacked everywhere it fits — desktop never re-flows, and a
+// phone re-flows only for as long as the wheel is actually open.
+//
+// The one metric that changes in the compact row is the scrim's bleed below the
+// closing rule: a one-line strip does not need the 8 px of extra darkness a
+// three-line stack does, and on the shortest landscape screen in the matrix
+// (568×320, where the wheel's own 120 px minimum radius starts at y 40) those
+// pixels are exactly the clearance that keeps the row clear of the disc.
+
+/** Leading of the stacked strip's three lines from the group's top, reference px. */
+export const CLOCK_LINE_LEADING: readonly number[] = [0, 20, 38];
+/** Air between two readouts of the compact single-row strip, reference px. */
+export const CLOCK_ROW_GAP = 12;
+/** Scrim width beyond the widest line of the strip, reference px (half each side). */
+export const CLOCK_CHROME_PAD_X = 24;
+/** Air between the strip's last line and the rule that closes it, reference px. */
+export const CLOCK_RULE_GAP = 4;
+/** Clearance the strip keeps above the open wheel's footprint, CSS px. Small on
+ *  purpose: this is the threshold that decides whether the strip re-flows, and a
+ *  generous one would compact screens that do not need it. */
+export const CLOCK_WHEEL_GAP = 4;
+
+/** One drawn line of the clock, as measured by the view (real text metrics). */
+export interface ClockLine {
+  readonly width: number;
+  readonly height: number;
+}
+
+/** Where the view puts each line, and the chrome behind them. All offsets are in
+ *  the strip group's own space — origin at the top-centre of the strip, which the
+ *  view pins to `(viewportWidth / 2, HUD_PAD)`. Lines are centre-anchored in x. */
+export interface ClockLayout {
+  /** True when the strip re-flowed to a single row to clear the open wheel. */
+  readonly compact: boolean;
+  /** Per input line, its centre-x and top-y in group space. */
+  readonly lines: readonly { readonly x: number; readonly y: number }[];
+  /** The scrim rect and the y of the rule inside it, in group space. */
+  readonly chrome: {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+    readonly ruleY: number;
+  };
+  /** The strip's drawn footprint in SCREEN space — what the registry would
+   *  record, and the rect the clock/wheel clearance is asserted on
+   *  ({@link rectsIntersect} against {@link wheelBounds}). */
+  readonly bounds: Rect;
+}
+
+/** The stacked strip: three centred lines, the form the HUD has always drawn. */
+function stackedClock(lines: readonly ClockLine[], scale: HudScale): ClockLayout['chrome'] & {
+  offsets: { x: number; y: number }[];
+} {
+  const offsets = lines.map((_, i) => ({
+    x: 0,
+    // Line 0 hangs from the group origin exactly; `hudSpace` floors at 2, so it
+    // is spelled as a literal rather than run through the scale.
+    y: i === 0 ? 0 : hudSpace(CLOCK_LINE_LEADING[i] ?? 0, scale),
+  }));
+  const widest = lines.reduce((w, l) => Math.max(w, l.width), 0);
+  const width = widest + hudSpace(CLOCK_CHROME_PAD_X, scale);
+  const last = lines.length - 1;
+  const ruleY =
+    (offsets[last]?.y ?? 0) + (lines[last]?.height ?? 0) + hudSpace(CLOCK_RULE_GAP, scale);
+  return {
+    offsets,
+    x: -width / 2,
+    y: 0,
+    width,
+    height: ruleY + hudSpace(SCRIM_BLEED, scale),
+    ruleY,
+  };
+}
+
+/** The compact strip: the same readouts in one row, for a short viewport with an
+ *  open wheel. The scrim closes on the rule (no bleed) — see the note above. */
+function rowClock(lines: readonly ClockLine[], scale: HudScale): ClockLayout['chrome'] & {
+  offsets: { x: number; y: number }[];
+} {
+  const gap = hudSpace(CLOCK_ROW_GAP, scale);
+  const span = lines.reduce((w, l) => w + l.width, 0) + gap * Math.max(0, lines.length - 1);
+  const rowHeight = lines.reduce((h, l) => Math.max(h, l.height), 0);
+  let cursor = -span / 2;
+  const offsets = lines.map((l) => {
+    // The three readouts are different type sizes (15/14/13 at the reference), so
+    // the row centres each line box on the tallest rather than top-aligning them.
+    const o = { x: cursor + l.width / 2, y: (rowHeight - l.height) / 2 };
+    cursor += l.width + gap;
+    return o;
+  });
+  const width = span + hudSpace(CLOCK_CHROME_PAD_X, scale);
+  const ruleY = rowHeight + hudSpace(CLOCK_RULE_GAP, scale);
+  return { offsets, x: -width / 2, y: 0, width, height: ruleY, ruleY };
+}
+
+/** Just the frame scale, so the two builders above can be pure helpers. */
+type HudScale = ReturnType<typeof hudMetrics>;
+
+/**
+ * Lay the wave clock out for a viewport, given the lines the view measured and
+ * whether the Build & Upgrade wheel is open this frame.
+ *
+ * The strip stays in its stacked form unless it would run into the open wheel's
+ * footprint, in which case it re-flows to a single row (see the note above).
+ * `lines` are the drawn readouts in top-to-bottom / left-to-right order — the
+ * view passes real text metrics, so a font swap that widens the wave name is
+ * measured rather than assumed.
+ */
+export function waveClockLayout(
+  viewportWidth: number,
+  viewportHeight: number,
+  lines: readonly ClockLine[],
+  wheelOpen: boolean,
+): ClockLayout {
+  const scale = hudMetrics(viewportWidth, viewportHeight);
+  const stacked = stackedClock(lines, scale);
+  const wheelTop = wheelBounds(viewportWidth, viewportHeight).y;
+  const compact = wheelOpen && HUD_PAD + stacked.height + CLOCK_WHEEL_GAP > wheelTop;
+  const { offsets, ...chrome } = compact ? rowClock(lines, scale) : stacked;
+  return {
+    compact,
+    lines: offsets,
+    chrome,
+    bounds: {
+      x: viewportWidth / 2 + chrome.x,
+      y: HUD_PAD + chrome.y,
+      width: chrome.width,
+      height: chrome.height,
+    },
+  };
+}
+
+/** Do two rects overlap at all? Touching edges do not count as an overlap — the
+ *  clock clearing the wheel by exactly zero is still clear. */
+export function rectsIntersect(a: Rect, b: Rect): boolean {
+  return (
+    a.x < b.x + b.width &&
+    b.x < a.x + a.width &&
+    a.y < b.y + b.height &&
+    b.y < a.y + a.height
+  );
+}
+
+// ---------------------------------------------------------------------------
 // The onboarding prompt (GDD §2.10)
 // ---------------------------------------------------------------------------
 
@@ -357,12 +546,10 @@ export function promptBand(
 ): Rect {
   const left = HUD_PAD + Math.max(0, insets.left ?? 0);
   const right = viewportWidth - HUD_PAD - Math.max(0, insets.right ?? 0);
-  const bottomInset = Math.max(0, insets.bottom ?? 0);
 
   // Vertical: under the wheel, above the strip (desktop) / the bottom margin.
   const wheel = wheelBounds(viewportWidth, viewportHeight);
-  const bottom =
-    viewportHeight - HUD_PAD - bottomInset - (isTouch ? 0 : PROMPT_STRIP_RESERVE);
+  const bottom = promptBottom(viewportHeight, isTouch, insets);
   const top = Math.min(bottom, wheel.y + wheel.height + PROMPT_WHEEL_GAP);
 
   // Horizontal: centred, and no wider than twice its distance to the nearest
@@ -423,9 +610,27 @@ export function promptWrapWidth(
  * `textWidth`/`textHeight` are the measured metrics of the wrapped text — the
  * registry records what was actually drawn, so the caller passes real numbers
  * rather than the ceiling. Feed {@link promptWrapWidth} to get the worst case.
- * The `y` is clamped to the HUD margin, so an over-tall prompt on a tiny screen
- * grows upward into the wheel (readable through the scrim) rather than off the
- * top edge, which would break the `full` + `HUD_PAD` claim.
+ *
+ * ## The bottom edge is a hard bound, not a preference (a0-24)
+ *
+ * The panel hangs from the bottom of {@link promptBand}, so its bottom edge is
+ * `viewportHeight − HUD_PAD − insets.bottom` for every prompt that fits. The
+ * clamp that keeps an over-tall panel on screen used to be written
+ * `y = max(HUD_PAD, bandBottom − height)`, and the comment claimed the panel
+ * "grows upward into the wheel". It does not: pinning `y` at the top margin and
+ * keeping the full height pushes the **bottom** edge to `HUD_PAD + height`, which
+ * is past the band, past the safe-area inset and — for a tall enough panel — past
+ * the viewport itself. A prompt cut off mid-sentence by the bottom of the screen
+ * is the exact failure a0-24 was filed for, and it is length-dependent because
+ * `height` is the wrapped text's height.
+ *
+ * So the bottom is clamped first and the top second: the panel keeps its bottom
+ * edge on the safe-area line whatever its height, and only its **top** is allowed
+ * to run up into the wheel (where the scrim makes it readable, u7-07). When even
+ * that is not enough — a panel taller than the whole safe area — the top is held
+ * at the HUD margin and {@link promptMaxHeight} is what the view should have
+ * wrapped/shrunk against; the rect returned is still inside the screen, because a
+ * clipped instruction is worse than a cramped one (GDD §2.10).
  */
 export function promptBounds(
   viewportWidth: number,
@@ -438,13 +643,55 @@ export function promptBounds(
   const band = promptBand(viewportWidth, viewportHeight, isTouch, insets);
   const pad = promptPad(viewportWidth, viewportHeight);
   const width = Math.min(textWidth + pad.x + PROMPT_STROKE, band.width);
-  const height = textHeight + pad.y + PROMPT_STROKE;
+  const height = Math.min(
+    textHeight + pad.y + PROMPT_STROKE,
+    promptMaxHeight(viewportHeight, isTouch, insets),
+  );
+  const bottom = band.y + band.height;
   return {
     x: viewportWidth / 2 - width / 2,
-    y: Math.max(HUD_PAD, band.y + band.height - height),
+    y: bottom - height,
     width,
     height,
   };
+}
+
+/**
+ * The tallest the prompt panel may be on this screen, CSS px: the safe-area band
+ * between the HUD's top margin and the bottom edge the panel hangs from.
+ *
+ * This is the number the view wraps and shrinks against, and the ceiling
+ * {@link promptBounds} caps at — the two are one computation so a panel can never
+ * be drawn taller than the rect the registry is handed. On a landscape phone with
+ * no safe-area crop it is 358 px, which no authored prompt comes close to; it
+ * bites when the visible viewport is cropped (a browser bar, a home indicator)
+ * and the room under the wheel collapses.
+ */
+export function promptMaxHeight(
+  viewportHeight: number,
+  isTouch: boolean,
+  insets: MinimapInsets = {},
+): number {
+  return Math.max(0, promptBottom(viewportHeight, isTouch, insets) - HUD_PAD);
+}
+
+/**
+ * The line the prompt panel's bottom edge sits on, CSS px from the top of the
+ * viewport — the HUD margin above the **visible** bottom, less the desktop
+ * controls strip's reserve.
+ *
+ * `insets.bottom` is what makes this the *visible* bottom rather than the
+ * canvas's. The HUD is laid out against the renderer's logical viewport, which on
+ * a phone browser is taller than the region the player can see: a URL bar, a
+ * home indicator, or a fullscreen transition crops the bottom off the canvas
+ * without resizing it (`main.ts` `readViewport`). Everything anchored to the top
+ * survives that; a bottom-anchored panel is drawn into the crop. Feeding the crop
+ * in here is what puts the prompt back on screen — see `HudFrame.minimapInsets`,
+ * which `main.ts` now populates from the live visual viewport.
+ */
+function promptBottom(viewportHeight: number, isTouch: boolean, insets: MinimapInsets): number {
+  const bottomInset = Math.max(0, insets.bottom ?? 0);
+  return viewportHeight - HUD_PAD - bottomInset - (isTouch ? 0 : PROMPT_STRIP_RESERVE);
 }
 
 // ---------------------------------------------------------------------------

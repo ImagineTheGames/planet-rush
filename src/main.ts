@@ -292,6 +292,7 @@ import type {
   HudFrame,
   Combatant,
   DifficultyTable,
+  MinimapInsets,
   MinimapStation,
   MinimapShip,
   MinimapSatellite,
@@ -568,6 +569,42 @@ const WORLD_ORIGIN: Vec2 = { x: 0, y: 0 };
 /** Index of UPGRADE SHIP: the one segment that opens a screen instead of
  *  spending (GDD §2.5). Read from the wheel's own order so it cannot drift. */
 const UPGRADE_SEGMENT = WHEEL_ORDER.indexOf('upgrade');
+
+/** Insets with every edge resolved — the shape {@link viewportInsets} builds and
+ *  `HudFrame.safeInsets` consumes (`MinimapInsets`, all four edges present). */
+type SafeInsets = Required<MinimapInsets>;
+
+/**
+ * The device's safe-area insets, CSS px, read back off the document root.
+ *
+ * `index.html` already puts `env(safe-area-inset-*)` on `html`/`body` padding, so
+ * the browser has resolved the four numbers for us and this is a read rather than
+ * a second probe element with its own styles to keep in sync. A notch, a
+ * punch-hole and a home indicator all report here; none of them shrink
+ * `visualViewport`, which is why the visual-viewport crop alone is not the whole
+ * answer (see `viewportInsets`).
+ *
+ * PHYSICAL space — the caller rotates it into logical space under the landscape
+ * lock. Returns zeroes anywhere the values are absent or unparseable, which is
+ * every desktop browser and every headless run.
+ */
+function readSafeAreaInsets(): SafeInsets {
+  try {
+    const style = getComputedStyle(document.documentElement);
+    const px = (v: string): number => {
+      const n = Number.parseFloat(v);
+      return Number.isFinite(n) && n > 0 ? n : 0;
+    };
+    return {
+      top: px(style.paddingTop),
+      right: px(style.paddingRight),
+      bottom: px(style.paddingBottom),
+      left: px(style.paddingLeft),
+    };
+  } catch {
+    return { top: 0, right: 0, bottom: 0, left: 0 };
+  }
+}
 
 async function boot(): Promise<void> {
   // --- The playtest log (developer ratification, M10). FIRST, before anything can
@@ -3311,6 +3348,11 @@ async function boot(): Promise<void> {
     hudFrame.weaponWheelOpen = weaponWheelOpen;
     hudFrame.hasOrdered = hasOrdered;
     hudFrame.docked = docked;
+    // What the player cannot see, per logical edge (a0-24). The HUD's
+    // bottom-anchored chrome — the onboarding prompt, the minimap's corner —
+    // holds clear of this; everything hung off the top never needed it, which is
+    // why the field was dead until the prompt was found cut off on a phone.
+    hudFrame.safeInsets = viewportInsets();
 
     const station = stationOf(world, LOCAL_PLAYER);
     if (station) {
@@ -5711,6 +5753,52 @@ async function boot(): Promise<void> {
       };
     }
     return { width: app.screen.width, height: app.screen.height, originX: 0, originY: 0 };
+  }
+
+  /**
+   * The part of the canvas the player CANNOT see, per logical edge, CSS px —
+   * what the HUD has to hold its bottom-anchored chrome clear of (a0-24).
+   *
+   * Two independent crops, taken together edge by edge:
+   *
+   *  1. **The visual viewport.** `readViewport` already knows the visible region
+   *     is not the canvas — a phone browser's URL bar, a notch and fullscreen
+   *     transitions shift and shrink it without resizing the canvas underneath.
+   *     The camera has consumed that since it was written; the HUD never has. It
+   *     is laid out against `transform.logicalWidth/Height`, so anything hung off
+   *     the BOTTOM margin — the onboarding prompt — is drawn into the crop and
+   *     reads as cut off mid-sentence, which is precisely the phone capture a0-24
+   *     was filed with. Everything anchored to the top was never affected, which
+   *     is why this went unnoticed and why no golden caught it: Playwright has no
+   *     URL bar, so the crop is zero in every baseline we shoot.
+   *  2. **The safe area.** `index.html` puts `env(safe-area-inset-*)` on the root
+   *     element's padding, so the resolved values are already in the DOM and can
+   *     be read back rather than re-probed. A home indicator does not shrink the
+   *     visual viewport, so this is the half (1) cannot see.
+   *
+   * Under the landscape lock the root is rotated +90° (`orientation.ts`), so a
+   * PHYSICAL edge is a different LOGICAL one — physical top becomes logical left,
+   * physical left becomes logical bottom. The safe-area read is in physical space
+   * and is rotated here; the visual-viewport crop is already logical, because
+   * `readViewport` reports the full logical rect when rotated.
+   */
+  function viewportInsets(): SafeInsets {
+    const cropped: SafeInsets = {
+      left: Math.max(0, viewport.originX),
+      top: Math.max(0, viewport.originY),
+      right: Math.max(0, transform.logicalWidth - (viewport.originX + viewport.width)),
+      bottom: Math.max(0, transform.logicalHeight - (viewport.originY + viewport.height)),
+    };
+    const safe = readSafeAreaInsets();
+    const logicalSafe: SafeInsets = transform.rotated
+      ? { left: safe.top, top: safe.right, right: safe.bottom, bottom: safe.left }
+      : safe;
+    return {
+      left: Math.max(cropped.left, logicalSafe.left),
+      top: Math.max(cropped.top, logicalSafe.top),
+      right: Math.max(cropped.right, logicalSafe.right),
+      bottom: Math.max(cropped.bottom, logicalSafe.bottom),
+    };
   }
 
   window.addEventListener('resize', relayout);

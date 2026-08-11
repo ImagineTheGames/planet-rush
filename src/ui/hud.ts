@@ -122,16 +122,17 @@ import {
   HP_BAR_TOP,
   SHIELD_BAR_GAP,
   SHIELD_BAR_HEIGHT,
-  promptPad,
-  PROMPT_STROKE,
   promptBounds,
   promptWrapWidth,
   respawnPad,
   RESPAWN_STROKE,
   RESPAWN_CENTER_Y,
   respawnWrapWidth,
+  SCRIM_BLEED,
+  waveClockLayout,
   wheelRadius,
 } from './hud-geometry';
+import type { ClockLayout } from './hud-geometry';
 
 // ---------------------------------------------------------------------------
 // Typography & neutral colours
@@ -193,10 +194,6 @@ const TYPE = {
   /** A floating ore cost travelling to the bank. */
   costFloat: 18,
 } as const;
-
-/** How much of a readout's height its scrim reaches past, so the darkness starts
- *  before the type does rather than at its cap-height. */
-const SCRIM_BLEED = 8;
 
 /** The accent tick's height beside a prompt, as a fraction of the panel. */
 const PROMPT_TICK_FRACTION = 0.55;
@@ -422,9 +419,19 @@ export interface HudFrame {
    *  the HUD this is NOT pre-projected to screen: the minimap does its own fit
    *  ({@link ./minimap}). Default: none. */
   readonly minimap?: MinimapFrame;
-  /** Safe-area / thumb insets for the minimap's corner + overlay placement
-   *  (mobile amendment §2). Default: none ⇒ plain edges. */
-  readonly minimapInsets?: MinimapInsets;
+  /**
+   * The part of the canvas the player cannot see, per logical edge, CSS px —
+   * the union of the safe-area insets (`env(safe-area-inset-*)`, mobile amendment
+   * §2) and the visual-viewport crop a phone browser's URL bar leaves behind.
+   *
+   * Read by the two elements that hang off an edge rather than a corner: the
+   * minimap's collapsed square and overlay, and the onboarding prompt's bottom
+   * margin. Was `minimapInsets`, and was never populated by anyone — which is how
+   * a0-24's prompt came to be drawn into the crop at the bottom of a real phone
+   * while every Playwright baseline (no URL bar, no home indicator) stayed clean.
+   * `main.ts` `viewportInsets()` fills it now. Default: none ⇒ plain edges.
+   */
+  readonly safeInsets?: MinimapInsets;
   /** The sim tick, driving the minimap's low-frequency content redraw
    *  ({@link ./minimap} `MINIMAP_REDRAW_TICKS}). Default: derived from `time`. */
   readonly tick?: number;
@@ -622,7 +629,7 @@ export class Hud extends Container {
   /** The last frame's touch flag + insets, so a pointer event arriving between
    *  frames hit-tests the minimap against the geometry it actually drew with. */
   private minimapIsTouch = false;
-  private minimapInsets: MinimapInsets = {};
+  private safeInsets: MinimapInsets = {};
 
   // --- Build & Upgrade wheel + upgrade panel (GDD §2.5) -------------------
   private readonly wheel: BuildWheelView;
@@ -862,19 +869,18 @@ export class Hud extends Container {
     set(this.promptText, TYPE.prompt, 'label');
     set(this.respawnText, TYPE.respawn, 'label');
 
-    // The ore cluster's two lines and the clock's three re-stack at the scaled
-    // sizes, so the leading follows the type instead of being pinned to desktop.
+    // The ore cluster's two lines re-stack at the scaled sizes, so the leading
+    // follows the type instead of being pinned to desktop. The clock's three
+    // lines are placed by `waveClockLayout` in `updateWaveClock` instead — since
+    // a0-24 their arrangement depends on the open wheel as well as on the frame
+    // scale, and it is re-derived from measured metrics every frame.
     this.bankedText.y = hudSpace(TOTAL_LABEL_H, m);
-    this.waveName.y = 0;
-    this.waveNext.y = hudSpace(20, m);
-    this.waveMatch.y = hudSpace(38, m);
   }
 
   /** Draw one frame. Pull the pure models, then update the Pixi children. */
   update(frame: HudFrame): void {
     this.frameTime = frame.time;
     this.updateOre(frame);
-    this.updateWaveClock(frame);
     // The alarm runs first now, because three things downstream read its verdict:
     // the onboarding prompt is chosen by it (GDD §2.10's under-attack prompt) and
     // the own-ship health bar is forced on by it during a siege (field request
@@ -889,6 +895,12 @@ export class Hud extends Container {
     this.updateRespawn(frame);
     this.updateControlsStrip(frame);
     const wheelOpen = this.updateWheel(frame);
+    // The clock strip runs AFTER the wheel now (a0-24): on a short landscape
+    // viewport its arrangement depends on whether the wheel is open, and the
+    // wheel's model is what knows. It reads nothing the wheel writes, so moving
+    // it down the list changes only which frame's answer it gets — this one's,
+    // rather than the previous one's.
+    this.updateWaveClock(frame, wheelOpen);
     this.updateCostFloats(frame);
     this.updateOnboarding(frame, wheelOpen, underAttack);
   }
@@ -923,16 +935,16 @@ export class Hud extends Container {
     drawEdgeRule(g, 0, ruleY, width, 1, INSTRUMENT_RULE);
   }
 
-  /** The top-centre wave clock's chrome. Centre-anchored like the clock itself. */
-  private drawWaveChrome(): void {
-    const m = this.metrics;
-    const width =
-      Math.max(this.waveName.width, this.waveNext.width, this.waveMatch.width) + hudSpace(24, m);
-    const ruleY = this.waveMatch.y + this.waveMatch.height + hudSpace(4, m);
+  /** The top-centre wave clock's chrome, from the same {@link waveClockLayout}
+   *  that placed the lines — so the scrim, the rule and the rect the a0-24
+   *  clearance is asserted on are one computation rather than three that have to
+   *  agree. Centre-anchored like the clock itself. */
+  private drawWaveChrome(layout: ClockLayout): void {
+    const { x, width, height, ruleY } = layout.chrome;
     const g = this.waveChrome;
     g.clear();
-    drawScrim(g, -width / 2, 0, width, ruleY + hudSpace(SCRIM_BLEED, m), 'center', SCRIM.corner);
-    drawEdgeRule(g, -width / 2, ruleY, width, 1, INSTRUMENT_RULE);
+    drawScrim(g, x, 0, width, height, 'center', SCRIM.corner);
+    drawEdgeRule(g, x, ruleY, width, 1, INSTRUMENT_RULE);
   }
 
   /** The top-right HOME cluster's chrome. Right-anchored: the group's origin is
@@ -1017,7 +1029,7 @@ export class Hud extends Container {
 
   // --- Wave clock ----------------------------------------------------------
 
-  private updateWaveClock(frame: HudFrame): void {
+  private updateWaveClock(frame: HudFrame, wheelOpen: boolean): void {
     // The match's own wave interval, not the baseline (a0-16). Passed straight
     // through: an absent field falls to `computeWaveClock`'s own fallback, so the
     // baseline is named in one place rather than re-derived here.
@@ -1042,9 +1054,28 @@ export class Hud extends Container {
     }
     this.waveMatch.text = `MATCH ${formatClock(clock.matchTime)}`;
 
-    const waveKey = `${this.waveName.text}|${this.waveNext.text}|${this.waveMatch.text.length}`;
+    // a0-24: the strip re-flows to one row while the wheel is open on a viewport
+    // too short to hold both, so `MATCH 0:10` is never drawn under the TURRET
+    // wedge. Measured metrics in, so the decision survives a font swap.
+    const rows = [this.waveName, this.waveNext, this.waveMatch];
+    const layout = waveClockLayout(
+      this.screenWidth,
+      this.screenHeight,
+      rows.map((t) => ({ width: t.width, height: t.height })),
+      wheelOpen,
+    );
+    rows.forEach((t, i) => {
+      const at = layout.lines[i];
+      if (!at) return;
+      t.x = at.x;
+      t.y = at.y;
+    });
+
+    const waveKey = `${this.waveName.text}|${this.waveNext.text}|${this.waveMatch.text.length}|${
+      layout.compact ? 'row' : 'stack'
+    }|${Math.round(layout.chrome.width)}`;
     if (waveKey !== this.waveChromeKey) {
-      this.drawWaveChrome();
+      this.drawWaveChrome(layout);
       this.waveChromeKey = waveKey;
     }
   }
@@ -1401,14 +1432,14 @@ export class Hud extends Container {
    *  between frames ({@link minimapTap}) hit-tests the same geometry. */
   private updateMinimap(frame: HudFrame): void {
     this.minimapIsTouch = frame.isTouch;
-    this.minimapInsets = frame.minimapInsets ?? {};
+    this.safeInsets = frame.safeInsets ?? {};
     const tick = frame.tick ?? Math.floor(frame.time * 60);
     this.minimap.update(
       frame.minimap ?? null,
       this.minimapModel.state,
       { width: this.screenWidth, height: this.screenHeight },
       this.minimapIsTouch,
-      this.minimapInsets,
+      this.safeInsets,
       tick,
     );
   }
@@ -1437,7 +1468,7 @@ export class Hud extends Container {
       y,
       { width: this.screenWidth, height: this.screenHeight },
       this.minimapIsTouch,
-      this.minimapInsets,
+      this.safeInsets,
     );
   }
 
@@ -1833,7 +1864,7 @@ export class Hud extends Container {
     // the minimap's corner square — see hud-geometry.ts `promptBand` for the
     // measurements, and for why the band replaced a single `PROMPT_CENTER_Y`.
     const isTouch = frame.isTouch;
-    const insets = this.minimapInsets;
+    const insets = this.safeInsets;
     this.promptText.style.wordWrap = true;
     this.promptText.style.wordWrapWidth = promptWrapWidth(
       this.screenWidth,
@@ -1857,9 +1888,13 @@ export class Hud extends Container {
     this.promptGroup.x = this.screenWidth / 2;
     this.promptGroup.y = bounds.y + bounds.height / 2;
 
-    const pad = promptPad(this.screenWidth, this.screenHeight);
-    const w = this.promptText.width + pad.x + PROMPT_STROKE;
-    const h = this.promptText.height + pad.y + PROMPT_STROKE;
+    // The scrim IS the registered rect, not a second sizing of it (a0-24).
+    // `promptBounds` clamps both the width and the height to the band and the
+    // safe area; drawing from `textWidth + pad` instead meant the panel could be
+    // painted outside the rect the layout registry was handed, which is exactly
+    // the drift `describeLayout` exists to catch.
+    const w = bounds.width;
+    const h = bounds.height;
     const key = `${Math.round(w)}x${Math.round(h)}`;
     if (key !== this.promptScrimKey) {
       // A scrim, not a panel. The prompt sits in the same band as the build
@@ -1985,6 +2020,15 @@ export class Hud extends Container {
    * Registering `wave-clock` today would turn QA's suite red on a real finding
    * that nobody has been given the call on. It lands the moment one is made;
    * nothing else here changes.
+   *
+   * **a0-24 does not change that argument.** The strip now re-flows to a single
+   * row while the wheel is open on a short landscape viewport
+   * (`hud-geometry.ts` `waveClockLayout`), which makes it *wider* than the
+   * stacked form, not narrower — so the third-width `top-center` zone is no
+   * closer to holding it and the element still cannot honestly register. What
+   * a0-24 does assert is the constraint that actually bit a player: the strip's
+   * drawn rect never intersects the open wheel's, on every profile in the
+   * matrix, pinned in `hud-geometry.test.ts` rather than in a screenshot.
    */
   describeLayout(viewport: Viewport): LayoutEntry[] {
     const entries: LayoutEntry[] = [];
