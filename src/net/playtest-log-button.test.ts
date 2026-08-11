@@ -48,13 +48,28 @@ interface FakeElement extends DownloadLogElement {
   readonly listeners: (() => void)[];
   readonly children: FakeElement[];
   removed: boolean;
+  /** Who currently holds this node — the fake's `appendChild` MOVES, as a real
+   *  one does, which is what makes a re-home observable (a0-28). */
+  parent: FakeElement | null;
 }
 
-function fakeDom(): DownloadLogDom & {
+/** The fake document, plus the two handles a0-28's tests need: the element the
+ *  browser is "presenting fullscreen", and the document-level `fullscreenchange`
+ *  the affordance follows. */
+interface FakeDom extends DownloadLogDom {
   body: FakeElement;
+  fullscreenElement: FakeElement | null;
   find: (id: string) => FakeElement | null;
-} {
+  /** Make `el` (or none) the fullscreen element and fire `fullscreenchange`, the
+   *  way a browser does when the player enters or backs out of fullscreen. */
+  setFullscreen: (el: FakeElement | null) => void;
+  /** A bare element to stand in for the game root — what `#app` is at runtime. */
+  makeElement: () => FakeElement;
+}
+
+function fakeDom(): FakeDom {
   const registry = new Map<string, FakeElement>();
+  const documentListeners = new Map<string, (() => void)[]>();
 
   const make = (): FakeElement => {
     const el: FakeElement = {
@@ -63,6 +78,7 @@ function fakeDom(): DownloadLogDom & {
       listeners: [],
       children: [],
       removed: false,
+      parent: null,
       get innerHTML(): string {
         return html;
       },
@@ -82,6 +98,14 @@ function fakeDom(): DownloadLogDom & {
       addEventListener: (_type, handler): void => void el.listeners.push(handler),
       appendChild: (child): void => {
         const c = child as FakeElement;
+        // A real `appendChild` MOVES a node that already has a parent. The fake does
+        // too, so "it left `body` and joined the fullscreen element" is one readback
+        // rather than two that could both be true.
+        if (c.parent) {
+          const at = c.parent.children.indexOf(c);
+          if (at >= 0) c.parent.children.splice(at, 1);
+        }
+        c.parent = el;
         el.children.push(c);
         if (c.id) registry.set(c.id, c);
       },
@@ -92,12 +116,24 @@ function fakeDom(): DownloadLogDom & {
   };
 
   const body = make();
-  return {
+  const dom: FakeDom = {
     body,
+    fullscreenElement: null,
     createElement: (): DownloadLogElement => make(),
     getElementById: (id): DownloadLogElement | null => registry.get(id) ?? null,
+    addEventListener: (type, handler): void => {
+      const list = documentListeners.get(type) ?? [];
+      list.push(handler);
+      documentListeners.set(type, list);
+    },
     find: (id): FakeElement | null => registry.get(id) ?? null,
+    makeElement: make,
+    setFullscreen: (el): void => {
+      dom.fullscreenElement = el;
+      for (const handler of documentListeners.get('fullscreenchange') ?? []) handler();
+    },
   };
+  return dom;
 }
 
 // ---------------------------------------------------------------------------
@@ -205,6 +241,15 @@ describe('the markup', () => {
     );
   });
 
+  // a0-28. `hide()` sets `hidden`, and the UA rule that acts on it —
+  // `[hidden]{display:none}` — loses to this stylesheet's own `#id{display:flex}`.
+  // Without a rule of our own the withdrawal never happens and the affordance sits
+  // over live play, which is exactly the chrome the HUD budget refuses (GDD §2.2).
+  it('lets `hidden` actually hide it, over its own display:flex', () => {
+    const css = renderDownloadLogHtml(downloadLogModel({ reason: 'pause' }, 'idle'));
+    expect(css).toContain(`#${DOWNLOAD_LOG_ROOT_ID}[hidden]{display:none;}`);
+  });
+
   // The landscape lock (`@platform/orientation`). The game root is rotated +90° on a
   // touch viewport held portrait, so this affordance — DOM over the canvas, laid out
   // in physical space — has to rotate with it or be the one thing on the screen
@@ -290,6 +335,88 @@ describe('DownloadLogAffordance', () => {
     // The element was not rewritten, so no listener piled up on it.
     expect(dom.find(DOWNLOAD_LOG_BUTTON_ID)).toBe(button);
     expect(button.listeners).toHaveLength(1);
+  });
+
+  // ── a0-28: it mounts where the pixels are ────────────────────────────────
+  //
+  // *"download logs used to live in match as well pretty sure it was in pause
+  // menu."* … *"I was on mobile."* On touch, PLAY makes the game root the
+  // FULLSCREEN element (`@platform/fullscreen`), which puts it in the browser's top
+  // layer and paints a `::backdrop` over the rest of the document. The top layer is
+  // not a z-index: an affordance left in `body` beside the fullscreen element is
+  // laid out, sized, `visibility: visible` — and painted under the backdrop, at the
+  // largest z-index the platform has. Measured on a real 844×390 landscape touch
+  // boot: a 189×44 box at (643, 334), and `elementFromPoint` at its own centre
+  // returning the canvas.
+  //
+  // These assert the parent, which is the thing that decides it. That the result is
+  // actually ON THE GLASS is `tests/live-stage/log-download-fullscreen.spec.ts`,
+  // because a parent is a claim and a photograph is not.
+  describe('with the game root fullscreen', () => {
+    it('mounts INSIDE the fullscreen element, never beside it', () => {
+      const dom = fakeDom();
+      const app = dom.makeElement();
+      app.id = 'app';
+      dom.setFullscreen(app);
+
+      const affordance = new DownloadLogAffordance({ dom, log: newLog(), schedule: null });
+      affordance.show({ reason: 'pause' });
+
+      expect(app.children.map((c) => c.id), 'the log is buried under the backdrop').toEqual([
+        DOWNLOAD_LOG_ROOT_ID,
+      ]);
+      expect(dom.body.children, 'a sibling of the fullscreen element is a hidden one').toHaveLength(
+        0,
+      );
+    });
+
+    it('follows the player in, and back out again', () => {
+      const dom = fakeDom();
+      const app = dom.makeElement();
+      app.id = 'app';
+
+      // Offered first — the boot-error screen and the desk both reach it this way.
+      const affordance = new DownloadLogAffordance({ dom, log: newLog(), schedule: null });
+      affordance.show({ reason: 'error', hint: 'Boot failed.' });
+      expect(dom.body.children).toHaveLength(1);
+
+      // …and then PLAY goes fullscreen under it. The player can also back out with a
+      // system gesture at any moment (the game offers a re-enter affordance for
+      // exactly that), so this has to run both ways, not once at mount.
+      dom.setFullscreen(app);
+      expect(app.children.map((c) => c.id)).toEqual([DOWNLOAD_LOG_ROOT_ID]);
+      expect(dom.body.children).toHaveLength(0);
+
+      dom.setFullscreen(null);
+      expect(dom.body.children.map((c) => c.id)).toEqual([DOWNLOAD_LOG_ROOT_ID]);
+      expect(app.children).toHaveLength(0);
+    });
+
+    it('re-homes on the next per-frame show, for a browser that fired no event', () => {
+      const dom = fakeDom();
+      const affordance = new DownloadLogAffordance({ dom, log: newLog(), schedule: null });
+      affordance.show({ reason: 'pause' });
+
+      // Fullscreen arrives with NO `fullscreenchange` — the pessimistic case. The
+      // per-frame caller (`main.ts` `syncDownloadLog`, every rendered frame) repeats
+      // the identical offer, and the fast path is what has to notice.
+      const app = dom.makeElement();
+      app.id = 'app';
+      dom.fullscreenElement = app;
+      affordance.show({ reason: 'pause' });
+
+      expect(app.children.map((c) => c.id)).toEqual([DOWNLOAD_LOG_ROOT_ID]);
+      expect(dom.body.children).toHaveLength(0);
+    });
+
+    it('still mounts into body where there is no fullscreen at all', () => {
+      // The desk, iPhone Safari, and the boot-error screen — character for character
+      // what they were. `fullscreenElement` is optional on the seam for this reason.
+      const dom = fakeDom();
+      const affordance = new DownloadLogAffordance({ dom, log: newLog(), schedule: null });
+      affordance.show({ reason: 'pause' });
+      expect(dom.body.children.map((c) => c.id)).toEqual([DOWNLOAD_LOG_ROOT_ID]);
+    });
   });
 
   it('hands the share sheet a FILE when the platform takes one', async () => {
