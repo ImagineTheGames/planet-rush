@@ -192,30 +192,16 @@ export const DEFAULT_PROBE_TIMEOUT_MS = 3000;
  */
 export const DEFAULT_SURVEY_BUDGET_MS = 8000;
 
-/**
- * Measure one region. Never throws and never rejects: every way this can fail is
- * a {@link RegionPingFailure} on the returned value, because a region that cannot
- * be timed must still take its place in the list (rule 3).
- *
- * One region measured alone has nothing to be compared against, so this path takes
- * no warm-up and no survey budget — {@link measureRegionPings} owns both, because
- * both exist to make regions comparable *with each other*.
- */
-export async function measureRegionPing(
-  region: FleetRegion,
-  options: RegionProbeOptions = {},
-): Promise<RegionPing> {
-  const state = beginMeasure(region);
-  if (isFinished(state)) return state;
-  const env = probeEnv(options);
-  const count = sampleCount(options);
-  for (let i = 0; i < count; i++) await takeOneSample(state, env);
-  return finishMeasure(state);
-}
-
 // ---------------------------------------------------------------------------
-// The measurement's moving parts, shared by the one-region and whole-fleet paths
+// The measurement's moving parts
 // ---------------------------------------------------------------------------
+//
+// There was a `measureRegionPing` here — one region, its own sample loop — and
+// `measureRegionPings` was `Promise.all` over it. That decomposition is what made
+// the concurrency bug (a0-29) natural to write: with each region owning its own
+// loop, the only way to measure a fleet was to run the loops side by side, which
+// is precisely what corrupts them. Scheduling is a property of the SURVEY, so the
+// survey owns the loop and a region owns only its running best.
 
 /** One region mid-measurement: the best round trip so far, and the first thing
  *  that went wrong. */
