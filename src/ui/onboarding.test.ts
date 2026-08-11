@@ -10,6 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { Onboarding, PromptId, resolvePromptText } from './onboarding';
 import { FireMode } from '@platform/actions';
+import type { DeviceKind } from '@platform/actions';
 import type { OnboardingSignals } from './onboarding';
 
 /** A neutral signal frame (nothing happening) with per-test overrides. */
@@ -188,15 +189,46 @@ describe('resolvePromptText — input-agnostic via the action layer (GDD §2.10)
   });
 
   it('renders the haul-home prompt with each device\'s BUILD binding', () => {
-    // GDD §2.10 quotes this as "Hold full — fly home and press E"; the {build}
-    // token is how the same sentence reads on a pad and on a phone.
+    // GDD §2.10 quotes this as "Hold full — fly into your collection field to
+    // bank, then press E to spend"; the {build} token is how the same sentence
+    // reads on a pad and on a phone.
     const keyboard = resolvePromptText(PromptId.HaulHome, 'keyboard', FireMode.Manual);
-    expect(keyboard).toBe('Hold full — fly home and press E');
+    expect(keyboard).toBe(
+      'Hold full — fly into your collection field to bank, then press E to spend',
+    );
     const touch = resolvePromptText(PromptId.HaulHome, 'touch', FireMode.AutoAim);
-    expect(touch).toBe('Hold full — fly home and press BUILD');
+    expect(touch).toBe(
+      'Hold full — fly into your collection field to bank, then press BUILD to spend',
+    );
     const pad = resolvePromptText(PromptId.HaulHome, 'gamepad', FireMode.Manual);
     expect(pad).toContain('Y / △');
     expect(pad).not.toContain('{build}');
+  });
+
+  it('teaches the shipped mechanic — collection-field banking, not fly-home-and-dock', () => {
+    // The 2026-07-27 amendment retired dock-and-park banking: the hold drains
+    // inside your own station's collection field (GDD §2.3, §2.10 "amended
+    // 2026-07-27 — projectile mining, collection-field banking"). The prompt
+    // that told the player to "fly home" taught the mechanic the game no longer
+    // has. Asserted on EVERY device, because the failure this guards is a phone
+    // that says "press E" as much as it is a keyboard that says "fly home".
+    const devices: Array<[DeviceKind, FireMode]> = [
+      ['keyboard', FireMode.Manual],
+      ['touch', FireMode.AutoAim],
+      ['touch', FireMode.Manual],
+      ['gamepad', FireMode.Manual],
+    ];
+    for (const [device, mode] of devices) {
+      const text = resolvePromptText(PromptId.HaulHome, device, mode);
+      expect(text).not.toMatch(/fly home/i);
+      expect(text).toContain('collection field');
+      expect(text).not.toContain('{build}');
+    }
+    // The keyboard key is a *binding*, never a literal in the copy: a phone must
+    // never be told to press E (GDD §2.4, §2.10 input-agnostic wording).
+    expect(resolvePromptText(PromptId.HaulHome, 'touch', FireMode.AutoAim)).not.toMatch(
+      /press E\b/,
+    );
   });
 
   it('leaves a token-free prompt identical across devices', () => {
