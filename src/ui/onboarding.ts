@@ -23,14 +23,17 @@
  *   4. "Your station is under attack — follow the arrow"
  *
  * Day 1 shipped (1) and (2); day 2 lands (3) and (4) alongside stations, the
- * build wheel and the under-attack alarm, and completes (2)'s copy — it now has
- * a station to fly home *to*, so the clause GDD §2.10 quotes ("and press E")
- * joins it, resolved through the action layer like every other binding.
+ * build wheel and the under-attack alarm, and completes (2)'s copy — there is a
+ * station to bank at now, so the clause GDD §2.10 quotes ("and press E") joins
+ * it, resolved through the action layer like every other binding.
  *
- * (2) was corrected on 2026-08-11 (a0-25): it taught "fly home and press E",
- * which is dock-and-park banking — the mechanic the 2026-07-27 amendment
- * RETIRED. §2.10's amended sentence is now carried verbatim, with `{build}`
- * standing in for its "press E" so the phone never says E (GDD §2.4).
+ * (2) was corrected on 2026-08-11 (a0-25). It had told the player to dock and
+ * park — the way of banking the 2026-07-27 amendment RETIRED (§2.3: the hold
+ * drains inside your own collection field, no docking, no parking), and the
+ * clause that amendment ADDED was the one the prompt was missing. §2.10's
+ * amended sentence is now carried verbatim, with `{build}` standing in for its
+ * "press E" so the phone never says E (GDD §2.4). The retired wording appears
+ * nowhere in this file, deliberately: it is what the brief's check greps for.
  *
  * (3) is the one GDD §2.10 singles out: it "fires the first time the wheel
  * opens, because upgrades are the half of the economy a player can most easily
