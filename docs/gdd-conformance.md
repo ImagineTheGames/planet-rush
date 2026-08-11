@@ -174,6 +174,12 @@ classroom has open is whatever landed on `main` in the last few minutes. The
 ntfy ping on tag *does* work (`ci.yml:112–135`), so the milestone half of §4.6a
 is real; it is the stability half that was never built.
 
+**Something in the repo already assumes it exists.** The performance harness
+documents its own invocation as
+`PERF_GATE=1 PERF_URL=https://…/dev npx playwright test …`
+(`tests/perf/frame-time.spec.ts:31`) — pointing at a URL that has never been
+published. Whoever wrote it read §4.8 and believed the topology was real.
+
 ### G-3 · PARTIAL · Onboarding fires, but it forgets you between matches — and one prompt retires on the wrong action
 
 **§2.10.** *"contextual first-match prompts fire on triggers … The upgrade prompt
