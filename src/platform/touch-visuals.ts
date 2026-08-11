@@ -10,15 +10,47 @@
  * viewport size each frame and only touches child transforms/visibility — no
  * per-frame allocation, no geometry rebuild (GDD §4.3, render discipline).
  *
- * What it draws (style-guide §1 colours — plasma for energy/interactive, never
- * RESERVED signal-yellow or threat-red):
+ * ── THE THUMB CONTROLS DO NOT WEAR PLASMA (a0-23, ruled 2026-08-11) ──────────
+ *
+ * They did until a0-23, and the developer caught it from two phone captures of
+ * the live build: *"look at blue buttons, not matching theme"*. The audit
+ * (`docs/theme-coverage.md` §3) confirmed all four controls were the only
+ * surfaces in the game with no relationship to Gantry/Bone at all — plasma
+ * rings, plasma knobs, plasma labels, flat `letterSpacing`, and no import from
+ * the direction in any form.
+ *
+ * The reason it matters is not tidiness. **Plasma carries meaning in a match** —
+ * energy, shields, the mining torch, weapon fire — so a plasma FIRE button paints
+ * the player's own controls in the same blue as the shield standing in front of
+ * an enemy reactor. Taking the furniture off plasma therefore *frees* a hue
+ * rather than spending one, which is the handoff's own stated reason for Bone
+ * existing ("it spends no colour, which leaves the palette's hues free to mean
+ * things during a match").
+ *
+ * What replaces it, from {@link ./touch-chrome}: a scrim where a plate would
+ * have a face, a rim lit along its top and shadowed along its bottom where a
+ * plate would have a bezel, and **brightness — not hue — as the thing that says
+ * "press me"**.
+ *
+ * ONE PRIMARY, and how the rule survives on glass. Bone's constraint is that the
+ * primary "must never share a screen with a second bright plate", and a match can
+ * legitimately show FIRE and BUILD & UPGRADE at the same instant. It is NOT
+ * resolved by dimming FIRE: FIRE is a held control that is always available, and
+ * a dim always-available control is the gray-active button `src/ui/button-theme`
+ * exists to forbid. It is resolved by the **halo**, which exactly one control
+ * ever carries: BUILD & UPGRADE, and only while you are docked — the moment a
+ * whole new verb opens up. Both rims are bright because both can be pressed; only
+ * one of them has a pool of void around it saying *this one just arrived*.
+ *
+ * What it draws (style-guide §1/§2 — Bone brightness for the furniture; plasma
+ * stays with energy, and never RESERVED signal-yellow or threat-red):
  *
  *  - **Left half — always thrust/steer.** A faint ghost ring shows the thumb
  *    zone while idle; the moment a thumb lands, a live base ring appears at the
  *    landing point (dynamic origin) with a knob that follows the thumb.
  *  - **Right half — morphs with fire mode:**
- *      · **Auto-aim** — a persistent hold-to-FIRE *button* (plasma ring, ≥72px
- *        so it reads as a thumb-scale button) with a pressed state.
+ *      · **Auto-aim** — a persistent hold-to-FIRE *button* (Bone rim over a
+ *        scrim, ≥72px so it reads as a thumb-scale button) with a pressed state.
  *      · **Manual** — a faint aim-zone hint while idle; a live aim base + knob
  *        under the thumb while engaged (aim and fire are one gesture).
  *
@@ -26,13 +58,23 @@
  *
  * Decision logic ({@link affordanceVisibility}) is pure and unit-tested; this
  * file is the thin Pixi view that renders it, mirroring the UI layer's split.
+ * What a control is *painted* in is {@link ./touch-chrome}'s call, not this
+ * file's — see the ruling below.
  */
 
 import { Container, Graphics, Text } from 'pixi.js';
 import type { Vec2 } from '@shared/types';
-import { PALETTE } from '@render/index';
+import { DISPLAY_TRACKING, TRACKING, trackingPx } from '../art/materials';
 import { FireMode } from './actions';
 import type { Rect } from './layout-registry';
+import {
+  TOUCH_ALPHA,
+  TOUCH_CHROME,
+  TOUCH_RIM,
+  drawBoneRing,
+  drawPressOverlay,
+  drawVoidHalo,
+} from './touch-chrome';
 
 // ---------------------------------------------------------------------------
 // Layout constants (CSS pixels; the Application handles devicePixelRatio)
@@ -234,17 +276,42 @@ export function affordanceRects(isTouch: boolean, mode: FireMode, w: number, h: 
 }
 
 // ---------------------------------------------------------------------------
-// Colours (style-guide §1 — plasma for interactive/energy affordances)
+// Type (style-guide §7 — the two ratified faces, on the ratified tracking)
 // ---------------------------------------------------------------------------
+//
+// Every tone and every alpha is {@link ./touch-chrome}'s; what is left here is
+// the type, because a Text style is the view's own furniture.
+//
+// The two stacks are spelled out rather than imported: `src/ui/typography.ts`
+// owns them, and nothing in `src/platform/` imports `src/ui/` at runtime (the
+// sim and the frame never depend on the widgets). `./touch-visuals.test.ts`
+// imports typography and pins these equal to it, so the duplication cannot
+// drift — which matters more than it sounds, because a fallback face was
+// silently deciding what four goldens looked like until a1-01 caught it.
 
-const GHOST_ALPHA = 0.18; // idle affordance — barely there
-const BASE_ALPHA = 0.4; // live stick base ring
-const KNOB_ALPHA = 0.5; // live knob fill
-const FIRE_IDLE_FILL = 0.14; // FIRE button fill, released
-const FIRE_PRESSED_FILL = 0.5; // FIRE button fill, pressed
+/** Audiowide — the wordmark/heading face. A control's own WORD: `FIRE`, `BUILD`. */
+const FONT_DISPLAY = 'Audiowide, "Trebuchet MS", sans-serif';
 
-/** Neutral chalk for the FIRE label (NOT signal yellow — RESERVED, §2). */
-const FIRE_LABEL = 'Audiowide, "Trebuchet MS", sans-serif';
+/** Oxanium — body and numerals. The sub-line under a control's word. */
+const FONT_TEXT = 'Oxanium, "Liberation Mono", monospace';
+
+/** `FIRE`. 18px, unchanged — the button's diameter did not move, so neither did
+ *  the word that has to fit inside it. */
+const FIRE_SIZE = 18;
+/** `BUILD`. */
+const BUILD_SIZE = 15;
+/**
+ * `& UPGRADE`.
+ *
+ * Up from 8px, and it stops there rather than at `TYPE_MIN` (11) for a reason
+ * worth stating: the chord of a 38px-radius circle at this baseline is ~68px,
+ * and `R_BUILD` is a **layout contract** (`buildButtonRect`, which QA's
+ * placement suite asserts against) rather than a drawing detail, so the button
+ * cannot grow to fit a bigger word. Ten px of Oxanium at dpr 3 is 30 device
+ * pixels of a face designed for game interfaces; the frames in
+ * `evidence/a0-23/` are what settle whether that reads, and they do.
+ */
+const BUILD_SUB_SIZE = 10;
 
 // ---------------------------------------------------------------------------
 // The visuals layer
@@ -258,19 +325,21 @@ const FIRE_LABEL = 'Audiowide, "Trebuchet MS", sans-serif';
  */
 export class TouchVisuals extends Container {
   // Left thrust stick.
-  private readonly leftGhost = ring(R_STICK, GHOST_ALPHA);
-  private readonly leftBase = ring(R_STICK, BASE_ALPHA);
+  private readonly leftGhost = zoneRing();
+  private readonly leftBase = liveRing();
   private readonly leftKnob = knob();
 
   // Right aim stick (Manual only).
-  private readonly aimGhost = ring(R_STICK, GHOST_ALPHA);
-  private readonly rightBase = ring(R_STICK, BASE_ALPHA);
+  private readonly aimGhost = zoneRing();
+  private readonly rightBase = liveRing();
   private readonly rightKnob = knob();
 
   // Right hold-to-FIRE button (Auto-aim only).
   private readonly fireGroup = new Container();
-  private readonly fireFill = new Graphics();
-  private readonly fireRing = new Graphics();
+  private readonly fireBody = new Graphics();
+  /** The pressed overlay: drawn once at full strength, shown by node alpha, so a
+   *  press never rebuilds geometry (`./touch-chrome` drawPressOverlay). */
+  private readonly firePress = new Graphics();
 
   // BUILD button — the touch E-equivalent, shown only at your own station.
   private readonly buildGroup = new Container();
@@ -292,21 +361,42 @@ export class TouchVisuals extends Container {
     this.aimGhost.label = 'aim-hint';
     this.fireGroup.label = 'fire-button';
 
-    // FIRE button: a plasma ring over a faint fill, with a centred label. The
+    // FIRE button: a scrim with a Bone rim over it, and a centred label. The
     // label is anchor-centred (no width read — keeps the layer headless-safe).
-    // Fill drawn at full opacity; the released/pressed brightness is the node
-    // alpha (both < 1), so pressing is a transform-cheap alpha change.
-    this.fireFill.circle(0, 0, R_FIRE).fill({ color: PALETTE.plasma, alpha: 1 });
-    this.fireFill.alpha = FIRE_IDLE_FILL;
-    this.fireRing.circle(0, 0, R_FIRE).stroke({ width: 4, color: PALETTE.plasma, alpha: 0.85 });
+    //
+    // The scrim is the part that answers a0-20's fair objection — that Bone's
+    // "the brightest thing is the actionable thing" is easier to state on a menu
+    // of plates than on a translucent ring over a firefight. A ring alone
+    // competes with whatever passes under it; the scrim gives the rim and the
+    // word something to be bright *against*, which is the same job `SCRIM` does
+    // for every corner readout in the HUD and the same reason the build wheel
+    // can sit over a live match at all.
+    drawBoneRing(this.fireBody, R_FIRE, {
+      scrim: TOUCH_ALPHA.actionScrim,
+      face: TOUCH_ALPHA.actionFace,
+      rim: {
+        width: TOUCH_RIM.fire,
+        lit: TOUCH_CHROME.rimLit,
+        shadow: TOUCH_CHROME.rimShadow,
+        litAlpha: TOUCH_ALPHA.actionLit,
+        shadowAlpha: TOUCH_ALPHA.actionShadow,
+      },
+    });
+    drawPressOverlay(this.firePress, R_FIRE, TOUCH_RIM.fire);
+    this.firePress.alpha = 0;
     const label = new Text({
       text: 'FIRE',
-      style: { fontFamily: FIRE_LABEL, fontSize: 18, fill: PALETTE.plasma, fontWeight: 'bold', letterSpacing: 1 },
+      style: {
+        fontFamily: FONT_DISPLAY,
+        fontSize: FIRE_SIZE,
+        fill: TOUCH_CHROME.label,
+        letterSpacing: trackingPx(DISPLAY_TRACKING.heading, FIRE_SIZE),
+      },
     });
     label.anchor.set(0.5);
-    this.fireGroup.addChild(this.fireFill, this.fireRing, label);
+    this.fireGroup.addChild(this.fireBody, this.firePress, label);
 
-    // BUILD button: same plasma vocabulary as FIRE, and named in full —
+    // BUILD button: the same Bone vocabulary as FIRE, and named in full —
     // "BUILD & UPGRADE" is what the strip says on desktop (GDD §2.5: a player
     // who doesn't know upgrades exist will never look for them), so the button
     // carries the second word as a subtitle rather than dropping it.
@@ -323,30 +413,59 @@ export class TouchVisuals extends Container {
     // It stood out from nothing before: fill 0.16 and a 3px ring is the FIRE
     // button's own weight, so the button that means "a whole new verb just
     // opened up" arrived looking like the one that has been there all match.
+    //
+    // a0-23 keeps that separation and changes what pays for it. The two plasma
+    // haloes were the loud part: a *glow*, in the one hue the match needs for
+    // energy, on a project that has twice been told its bloom had to go (a0-18,
+    // a0-22). Bone's answer is the opposite operation — a pool of **void**
+    // outside the rim (`drawVoidHalo`), which separates the primary from the
+    // fight subtractively. The button gains contrast; the screen gains no light,
+    // and no hue. It is also the one mark that is never on two controls at once,
+    // which is how Bone's "never a second bright plate" survives a match where
+    // FIRE and BUILD are both legitimately pressable (see the header).
     this.buildGroup.label = 'build-button';
-    // Two soft plasma haloes outside the rim: the glow that carries the read
-    // across a busy screen, at the periphery of vision, without growing the hit
-    // rect (`buildButtonRect` — the layout contract stays put).
-    const buildGlow = new Graphics();
-    buildGlow.circle(0, 0, R_BUILD + 10).fill({ color: PALETTE.plasma, alpha: 0.1 });
-    buildGlow.circle(0, 0, R_BUILD + 4).fill({ color: PALETTE.plasma, alpha: 0.14 });
-    const buildFill = new Graphics();
-    buildFill.circle(0, 0, R_BUILD).fill({ color: PALETTE.plasma, alpha: 0.38 });
-    const buildRing = new Graphics();
-    buildRing.circle(0, 0, R_BUILD).stroke({ width: 5, color: PALETTE.plasma, alpha: 1 });
+    // Drawn OUTSIDE the rim, and deliberately not into the hit rect: the halo is
+    // periphery-of-vision read, and `buildButtonRect` is a layout contract QA's
+    // placement suite asserts against, so the tappable circle stays exactly where
+    // it was at exactly the size it was.
+    const buildHalo = new Graphics();
+    drawVoidHalo(buildHalo, R_BUILD);
+    const buildBody = new Graphics();
+    drawBoneRing(buildBody, R_BUILD, {
+      scrim: TOUCH_ALPHA.primaryScrim,
+      face: TOUCH_ALPHA.primaryFace,
+      rim: {
+        width: TOUCH_RIM.build,
+        lit: TOUCH_CHROME.rimLit,
+        shadow: TOUCH_CHROME.rimShadow,
+        litAlpha: TOUCH_ALPHA.primaryLit,
+        shadowAlpha: TOUCH_ALPHA.primaryShadow,
+      },
+    });
     const buildLabel = new Text({
       text: 'BUILD',
-      style: { fontFamily: FIRE_LABEL, fontSize: 15, fill: PALETTE.plasma, fontWeight: 'bold', letterSpacing: 1 },
+      style: {
+        fontFamily: FONT_DISPLAY,
+        fontSize: BUILD_SIZE,
+        fill: TOUCH_CHROME.label,
+        letterSpacing: trackingPx(DISPLAY_TRACKING.heading, BUILD_SIZE),
+      },
     });
     buildLabel.anchor.set(0.5);
-    buildLabel.y = -8;
+    buildLabel.y = -10;
     const buildSub = new Text({
       text: '& UPGRADE',
-      style: { fontFamily: FIRE_LABEL, fontSize: 8, fill: PALETTE.plasma, letterSpacing: 0.5 },
+      style: {
+        fontFamily: FONT_TEXT,
+        fontSize: BUILD_SUB_SIZE,
+        fill: TOUCH_CHROME.sub,
+        fontWeight: '700',
+        letterSpacing: trackingPx(TRACKING.label, BUILD_SUB_SIZE),
+      },
     });
     buildSub.anchor.set(0.5);
-    buildSub.y = 9;
-    this.buildGroup.addChild(buildGlow, buildFill, buildRing, buildLabel, buildSub);
+    buildSub.y = 10;
+    this.buildGroup.addChild(buildHalo, buildBody, buildLabel, buildSub);
     this.buildGroup.visible = false;
 
     // Back-to-front: ghosts, live bases, knobs, FIRE, BUILD.
@@ -412,8 +531,12 @@ export class TouchVisuals extends Container {
     this.fireGroup.visible = this.vis.fireButton;
     this.fireGroup.position.set(w - EDGE_MARGIN - R_FIRE, h - EDGE_MARGIN - R_FIRE);
     const pressed = touch.rightButtonEngaged;
-    // Pressed state via alpha + a small "give" — no geometry rebuild.
-    this.fireFill.alpha = pressed ? FIRE_PRESSED_FILL : FIRE_IDLE_FILL;
+    // Pressed state via alpha + a small "give" — no geometry rebuild. Bone's
+    // answer to "this one, now" is luminance, so the press is a bright overlay
+    // fading in over the button rather than a colour change: the same call
+    // u11-01 made for a pressed wheel wedge, and the only shape a press can take
+    // in a layer that draws its geometry exactly once (GDD §4.3).
+    this.firePress.alpha = pressed ? TOUCH_ALPHA.press : 0;
     this.fireGroup.scale.set(pressed ? 0.94 : 1);
 
     // --- BUILD button: contextual, at your own station and nowhere else. ------
@@ -434,16 +557,61 @@ export class TouchVisuals extends Container {
 // Shape factories (drawn once) + per-frame knob placement
 // ---------------------------------------------------------------------------
 
-/** A plasma ring (stroke only) at fixed radius `r`, drawn once. */
-function ring(r: number, alpha: number): Graphics {
-  return new Graphics().circle(0, 0, r).stroke({ width: 3, color: PALETTE.plasma, alpha });
+/**
+ * An idle stick-zone ghost: a Bone rim and nothing inside it, drawn once.
+ *
+ * No scrim and no face here, deliberately. A zone hint is a statement about
+ * where your thumb may land, not a control sitting on the glass — the fight has
+ * to read straight through it, which is the same reason the build wheel's disc
+ * is translucent and the wedges carry no outline of their own.
+ */
+function zoneRing(): Graphics {
+  const g = new Graphics();
+  drawBoneRing(g, R_STICK, {
+    rim: {
+      width: TOUCH_RIM.stick,
+      lit: TOUCH_CHROME.hintLit,
+      shadow: TOUCH_CHROME.hintShadow,
+      litAlpha: TOUCH_ALPHA.hintLit,
+      shadowAlpha: TOUCH_ALPHA.hintShadow,
+    },
+  });
+  return g;
 }
 
-/** A filled plasma knob, drawn once. */
+/** A live stick base — the ring under a thumb that has landed. Brighter than the
+ *  ghost it replaces, with the faintest Bone lift inside so the deflection zone
+ *  reads as a dish rather than as a hoop. */
+function liveRing(): Graphics {
+  const g = new Graphics();
+  drawBoneRing(g, R_STICK, {
+    face: TOUCH_ALPHA.liveFace,
+    rim: {
+      width: TOUCH_RIM.stick,
+      lit: TOUCH_CHROME.rimLit,
+      shadow: TOUCH_CHROME.rimShadow,
+      litAlpha: TOUCH_ALPHA.liveLit,
+      shadowAlpha: TOUCH_ALPHA.liveShadow,
+    },
+  });
+  return g;
+}
+
+/** The knob: the one part of a stick that is a solid object, so it is the one
+ *  part that gets a scrim as well as a face. Drawn once. */
 function knob(): Graphics {
   const g = new Graphics();
-  g.circle(0, 0, R_KNOB).fill({ color: PALETTE.plasma, alpha: KNOB_ALPHA });
-  g.circle(0, 0, R_KNOB).stroke({ width: 2, color: PALETTE.plasma, alpha: 0.8 });
+  drawBoneRing(g, R_KNOB, {
+    scrim: TOUCH_ALPHA.knobScrim,
+    face: TOUCH_ALPHA.knobFace,
+    rim: {
+      width: TOUCH_RIM.knob,
+      lit: TOUCH_CHROME.rimLit,
+      shadow: TOUCH_CHROME.rimShadow,
+      litAlpha: TOUCH_ALPHA.knobLit,
+      shadowAlpha: TOUCH_ALPHA.knobShadow,
+    },
+  });
   return g;
 }
 
