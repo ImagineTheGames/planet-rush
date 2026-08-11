@@ -8,14 +8,39 @@
  * haul-home copy now that there is a station to fly home to.
  */
 import { describe, it, expect } from 'vitest';
-import { Onboarding, PromptId, resolvePromptText } from './onboarding';
+import { Onboarding, PromptId, oreWasSpent, resolvePromptText } from './onboarding';
 import { FireMode } from '@platform/actions';
 import type { DeviceKind } from '@platform/actions';
-import type { OnboardingSignals } from './onboarding';
+import type { OnboardingMemory, OnboardingSignals, SpendFacts } from './onboarding';
 
 /** A neutral signal frame (nothing happening) with per-test overrides. */
 function sig(over: Partial<OnboardingSignals> = {}): OnboardingSignals {
   return { nearAsteroid: false, cargo: 0, cargoCap: 2, ...over };
+}
+
+/** An in-memory {@link OnboardingMemory} that records every write — the test's
+ *  stand-in for the profile store, and the shape the real port must satisfy. */
+function fakeMemory(seed: readonly string[] = []): OnboardingMemory & {
+  readonly writes: string[][];
+  stored: readonly string[];
+} {
+  const m = {
+    stored: seed as readonly string[],
+    writes: [] as string[][],
+    load(): readonly string[] {
+      return m.stored;
+    },
+    save(completed: readonly PromptId[]): void {
+      m.stored = [...completed];
+      m.writes.push([...completed]);
+    },
+  };
+  return m;
+}
+
+/** A neutral purchase-observable snapshot (nothing built, nothing repaired). */
+function facts(over: Partial<SpendFacts> = {}): SpendFacts {
+  return { coreHp: 100, turrets: 0, shields: 0, satellites: 0, upgradeTiers: 0, ...over };
 }
 
 describe('Onboarding — MINE prompt (GDD §2.10 "hold fire on the asteroid")', () => {
@@ -83,10 +108,10 @@ describe('Onboarding — SPEND prompt (GDD §2.10 "the first time the wheel open
     const ob = new Onboarding();
     expect(ob.update(sig({ wheelOpen: true }))).toBe(PromptId.Spend);
     // The player buys something — they have found the economy (GDD §2.5).
-    expect(ob.update(sig({ wheelOpen: true, hasOrdered: true }))).toBeNull();
+    expect(ob.update(sig({ wheelOpen: true, hasSpent: true }))).toBeNull();
     expect(ob.isCompleted(PromptId.Spend)).toBe(true);
     // Opening the wheel again must not bring the lesson back.
-    expect(ob.update(sig({ wheelOpen: true, hasOrdered: true }))).toBeNull();
+    expect(ob.update(sig({ wheelOpen: true, hasSpent: true }))).toBeNull();
   });
 
   it('stays up across an open wheel until something is bought', () => {
@@ -94,6 +119,66 @@ describe('Onboarding — SPEND prompt (GDD §2.10 "the first time the wheel open
     for (let i = 0; i < 5; i++) {
       expect(ob.update(sig({ wheelOpen: true }))).toBe(PromptId.Spend);
     }
+  });
+
+  // ── u15-01 half B ─────────────────────────────────────────────────────────
+  // §2.10: the prompt exists "because upgrades are the half of the economy a
+  // player can most easily miss". The lesson is SPENDING, so only a spend may
+  // retire it — and now that completion PERSISTS, a wrong retirement is not one
+  // match of missing tuition, it is every match this player will ever play.
+  it('is not retired by a press the sim refused — the wheel is not the lesson', () => {
+    const ob = new Onboarding();
+    expect(ob.update(sig({ wheelOpen: true }))).toBe(PromptId.Spend);
+    // The player points at TURRET and confirms with 2 ore. The order is written
+    // and the sim refuses it on cost: nothing was bought, nothing was learned.
+    expect(ob.update(sig({ wheelOpen: true, hasSpent: false }))).toBe(PromptId.Spend);
+    expect(ob.isCompleted(PromptId.Spend)).toBe(false);
+    // …and it is still there on the next wheel-open, which is the point.
+    expect(ob.update(sig({ wheelOpen: true }))).toBe(PromptId.Spend);
+  });
+
+  it('is not retired by banking — a player can bank all match and never spend', () => {
+    const ob = new Onboarding();
+    // A full hold drains in the collection field: `banked` climbs, the hold
+    // empties, and the wheel opens on the way past. None of that is a purchase.
+    ob.update(sig({ cargo: 2, cargoCap: 2 }));
+    ob.update(sig({ cargo: 0, cargoCap: 2 }));
+    expect(ob.update(sig({ wheelOpen: true }))).toBe(PromptId.Spend);
+    expect(ob.isCompleted(PromptId.Spend)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// u15-01 half B — what counts as "ore actually spent"
+// ---------------------------------------------------------------------------
+
+describe('oreWasSpent — a purchase the SIM landed, not a press (GDD §2.5, §2.10)', () => {
+  it('is false when nothing moved', () => {
+    expect(oreWasSpent(facts(), facts())).toBe(false);
+  });
+
+  it('is true when a turret, a shield or a satellite appears', () => {
+    expect(oreWasSpent(facts(), facts({ turrets: 1 }))).toBe(true);
+    expect(oreWasSpent(facts(), facts({ shields: 1 }))).toBe(true);
+    expect(oreWasSpent(facts(), facts({ satellites: 1 }))).toBe(true);
+  });
+
+  it('is true when an upgrade tier is bought', () => {
+    expect(oreWasSpent(facts(), facts({ upgradeTiers: 1 }))).toBe(true);
+  });
+
+  it('is true when the core heals — only a bought repair raises core HP', () => {
+    expect(oreWasSpent(facts({ coreHp: 40 }), facts({ coreHp: 55 }))).toBe(true);
+  });
+
+  it('is false for the losses a siege causes — damage is not a purchase', () => {
+    expect(oreWasSpent(facts({ coreHp: 100 }), facts({ coreHp: 60 }))).toBe(false);
+    expect(oreWasSpent(facts({ turrets: 2 }), facts({ turrets: 1 }))).toBe(false);
+    expect(oreWasSpent(facts({ shields: 1 }), facts({ shields: 0 }))).toBe(false);
+  });
+
+  it('ignores float noise on the core, the way every other HP compare does', () => {
+    expect(oreWasSpent(facts({ coreHp: 50 }), facts({ coreHp: 50 + 1e-9 }))).toBe(false);
   });
 });
 
@@ -138,7 +223,7 @@ describe('Onboarding — once-only across the whole session (GDD §2.10)', () =>
     ob.update(sig({ cargo: 2, cargoCap: 2 })); // HAUL shows
     ob.update(sig({ cargo: 0, cargoCap: 2 })); // HAUL done
     ob.update(sig({ wheelOpen: true })); // SPEND shows
-    ob.update(sig({ wheelOpen: true, hasOrdered: true })); // SPEND done
+    ob.update(sig({ wheelOpen: true, hasSpent: true })); // SPEND done
     ob.update(sig({ underAttack: true })); // UNDER-ATTACK shows
     ob.update(sig({ underAttack: false })); // survived — done
     expect(ob.allCompleted()).toBe(true);
@@ -166,6 +251,79 @@ describe('Onboarding — once-only across the whole session (GDD §2.10)', () =>
     // Full hold means the player has mined → MINE is completed; HAUL shows.
     expect(shown).toBe(PromptId.HaulHome);
     expect(ob.isCompleted(PromptId.Mine)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// u15-01 half A — the memory that outlives the match
+// ---------------------------------------------------------------------------
+
+describe('Onboarding — remembers across matches and page loads (GDD §2.10)', () => {
+  it('never fires a prompt an earlier match already completed', () => {
+    // The second match: a machine built from a memory that already holds MINE.
+    const ob = new Onboarding(fakeMemory([PromptId.Mine]));
+    expect(ob.isCompleted(PromptId.Mine)).toBe(true);
+    expect(ob.update(sig({ nearAsteroid: true }))).toBeNull();
+  });
+
+  it('carries every completed prompt, and only the completed ones', () => {
+    const ob = new Onboarding(fakeMemory([PromptId.Mine, PromptId.Spend]));
+    expect(ob.update(sig({ nearAsteroid: true, wheelOpen: true }))).toBeNull();
+    // …while an untaught lesson is still taught.
+    expect(ob.update(sig({ cargo: 2, cargoCap: 2 }))).toBe(PromptId.HaulHome);
+  });
+
+  it('ignores a stored id this build does not know', () => {
+    // A profile written by a future build (a fifth prompt) must not throw, and
+    // must not silently retire something else.
+    const ob = new Onboarding(fakeMemory(['mine', 'teleport']));
+    expect(ob.isCompleted(PromptId.Mine)).toBe(true);
+    expect(ob.allCompleted()).toBe(false);
+    expect(ob.update(sig({ underAttack: true }))).toBe(PromptId.UnderAttack);
+  });
+
+  it('writes each lesson through the port as it lands', () => {
+    const memory = fakeMemory();
+    const ob = new Onboarding(memory);
+    ob.update(sig({ nearAsteroid: true })); // MINE shows — nothing learned yet
+    expect(memory.writes).toHaveLength(0);
+    ob.update(sig({ nearAsteroid: true, cargo: 1 })); // mined — MINE completes
+    expect(memory.writes).toHaveLength(1);
+    expect(memory.writes[0]).toEqual([PromptId.Mine]);
+    ob.update(sig({ cargo: 2, cargoCap: 2 }));
+    ob.update(sig({ cargo: 0, cargoCap: 2 })); // hauled — HAUL-HOME completes
+    expect(memory.writes).toHaveLength(2);
+    expect(memory.writes[1]).toEqual(expect.arrayContaining([PromptId.Mine, PromptId.HaulHome]));
+  });
+
+  it('writes only when the set GROWS — never once per frame', () => {
+    // `update` runs every frame of every match. A write per frame would put a
+    // JSON round-trip through `localStorage` at 60 Hz.
+    const memory = fakeMemory();
+    const ob = new Onboarding(memory);
+    for (let i = 0; i < 30; i++) ob.update(sig({ nearAsteroid: true, cargo: 1 }));
+    expect(memory.writes).toHaveLength(1);
+  });
+
+  it('works with no memory at all — the port is optional', () => {
+    const ob = new Onboarding();
+    expect(ob.update(sig({ nearAsteroid: true }))).toBe(PromptId.Mine);
+    expect(ob.update(sig({ nearAsteroid: true, cargo: 1 }))).toBeNull();
+  });
+
+  it('survives EXIT TO MENU and a reload: one memory, two machines', () => {
+    // EXIT TO MENU navigates and a reload re-boots the page: either way the HUD,
+    // and the `Onboarding` inside it, is built from scratch. The memory is the
+    // only thing that crosses, so this is exactly what a returning player gets.
+    const memory = fakeMemory();
+    const first = new Onboarding(memory);
+    first.update(sig({ nearAsteroid: true }));
+    first.update(sig({ nearAsteroid: true, cargo: 1 }));
+    expect(first.isCompleted(PromptId.Mine)).toBe(true);
+
+    const second = new Onboarding(memory); // second match, fresh machine
+    expect(second.update(sig({ nearAsteroid: true }))).toBeNull();
+    expect(second.isCompleted(PromptId.Mine)).toBe(true);
   });
 });
 

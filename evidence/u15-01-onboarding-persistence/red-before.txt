@@ -1,0 +1,274 @@
+[pool-size] worker cap 2: cgroup quota 6 cores / LANES 3 = 2 workers (host claims 6)
+
+ RUN  v2.1.8 /lanes/lane-1
+
+ ❯ src/ui/onboarding-memory.test.ts (0 test)
+ ❯ src/ui/onboarding.test.ts (38 tests | 14 failed) 36ms
+   × Onboarding — SPEND prompt (GDD §2.10 "the first time the wheel opens") > completes once ore has actually been spent, and never re-fires 11ms
+     → expected 'spend' to be null
+   × oreWasSpent — a purchase the SIM landed, not a press (GDD §2.5, §2.10) > is false when nothing moved 0ms
+     → oreWasSpent is not a function
+   × oreWasSpent — a purchase the SIM landed, not a press (GDD §2.5, §2.10) > is true when a turret, a shield or a satellite appears 0ms
+     → oreWasSpent is not a function
+   × oreWasSpent — a purchase the SIM landed, not a press (GDD §2.5, §2.10) > is true when an upgrade tier is bought 0ms
+     → oreWasSpent is not a function
+   × oreWasSpent — a purchase the SIM landed, not a press (GDD §2.5, §2.10) > is true when the core heals — only a bought repair raises core HP 0ms
+     → oreWasSpent is not a function
+   × oreWasSpent — a purchase the SIM landed, not a press (GDD §2.5, §2.10) > is false for the losses a siege causes — damage is not a purchase 0ms
+     → oreWasSpent is not a function
+   × oreWasSpent — a purchase the SIM landed, not a press (GDD §2.5, §2.10) > ignores float noise on the core, the way every other HP compare does 0ms
+     → oreWasSpent is not a function
+   × Onboarding — once-only across the whole session (GDD §2.10) > retires every prompt after each has fired once 1ms
+     → expected false to be true // Object.is equality
+   × Onboarding — remembers across matches and page loads (GDD §2.10) > never fires a prompt an earlier match already completed 1ms
+     → expected false to be true // Object.is equality
+   × Onboarding — remembers across matches and page loads (GDD §2.10) > carries every completed prompt, and only the completed ones 0ms
+     → expected 'mine' to be null
+   × Onboarding — remembers across matches and page loads (GDD §2.10) > ignores a stored id this build does not know 0ms
+     → expected false to be true // Object.is equality
+   × Onboarding — remembers across matches and page loads (GDD §2.10) > writes each lesson through the port as it lands 13ms
+     → expected [] to have a length of 1 but got +0
+   × Onboarding — remembers across matches and page loads (GDD §2.10) > writes only when the set GROWS — never once per frame 1ms
+     → expected [] to have a length of 1 but got +0
+   × Onboarding — remembers across matches and page loads (GDD §2.10) > survives EXIT TO MENU and a reload: one memory, two machines 0ms
+     → expected 'mine' to be null
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/onboarding-memory.test.ts [ src/ui/onboarding-memory.test.ts ]
+Error: Failed to load url ./onboarding-memory (resolved id: ./onboarding-memory) in /lanes/lane-1/src/ui/onboarding-memory.test.ts. Does the file exist?
+ ❯ loadAndTransform node_modules/vitest/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51969:17
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/15]⎯
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 14 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/onboarding.test.ts > Onboarding — SPEND prompt (GDD §2.10 "the first time the wheel opens") > completes once ore has actually been spent, and never re-fires
+AssertionError: expected 'spend' to be null
+
+- Expected: 
+null
+
++ Received: 
+"spend"
+
+ ❯ src/ui/onboarding.test.ts:111:65
+    109|     expect(ob.update(sig({ wheelOpen: true }))).toBe(PromptId.Spend);
+    110|     // The player buys something — they have found the economy (GDD §2…
+    111|     expect(ob.update(sig({ wheelOpen: true, hasSpent: true }))).toBeNu…
+       |                                                                 ^
+    112|     expect(ob.isCompleted(PromptId.Spend)).toBe(true);
+    113|     // Opening the wheel again must not bring the lesson back.
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/15]⎯
+
+ FAIL  src/ui/onboarding.test.ts > oreWasSpent — a purchase the SIM landed, not a press (GDD §2.5, §2.10) > is false when nothing moved
+TypeError: oreWasSpent is not a function
+ ❯ src/ui/onboarding.test.ts:157:12
+    155| describe('oreWasSpent — a purchase the SIM landed, not a press (GDD §2…
+    156|   it('is false when nothing moved', () => {
+    157|     expect(oreWasSpent(facts(), facts())).toBe(false);
+       |            ^
+    158|   });
+    159| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/15]⎯
+
+ FAIL  src/ui/onboarding.test.ts > oreWasSpent — a purchase the SIM landed, not a press (GDD §2.5, §2.10) > is true when a turret, a shield or a satellite appears
+TypeError: oreWasSpent is not a function
+ ❯ src/ui/onboarding.test.ts:161:12
+    159| 
+    160|   it('is true when a turret, a shield or a satellite appears', () => {
+    161|     expect(oreWasSpent(facts(), facts({ turrets: 1 }))).toBe(true);
+       |            ^
+    162|     expect(oreWasSpent(facts(), facts({ shields: 1 }))).toBe(true);
+    163|     expect(oreWasSpent(facts(), facts({ satellites: 1 }))).toBe(true);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/15]⎯
+
+ FAIL  src/ui/onboarding.test.ts > oreWasSpent — a purchase the SIM landed, not a press (GDD §2.5, §2.10) > is true when an upgrade tier is bought
+TypeError: oreWasSpent is not a function
+ ❯ src/ui/onboarding.test.ts:167:12
+    165| 
+    166|   it('is true when an upgrade tier is bought', () => {
+    167|     expect(oreWasSpent(facts(), facts({ upgradeTiers: 1 }))).toBe(true…
+       |            ^
+    168|   });
+    169| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/15]⎯
+
+ FAIL  src/ui/onboarding.test.ts > oreWasSpent — a purchase the SIM landed, not a press (GDD §2.5, §2.10) > is true when the core heals — only a bought repair raises core HP
+TypeError: oreWasSpent is not a function
+ ❯ src/ui/onboarding.test.ts:171:12
+    169| 
+    170|   it('is true when the core heals — only a bought repair raises core H…
+    171|     expect(oreWasSpent(facts({ coreHp: 40 }), facts({ coreHp: 55 }))).…
+       |            ^
+    172|   });
+    173| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/15]⎯
+
+ FAIL  src/ui/onboarding.test.ts > oreWasSpent — a purchase the SIM landed, not a press (GDD §2.5, §2.10) > is false for the losses a siege causes — damage is not a purchase
+TypeError: oreWasSpent is not a function
+ ❯ src/ui/onboarding.test.ts:175:12
+    173| 
+    174|   it('is false for the losses a siege causes — damage is not a purchas…
+    175|     expect(oreWasSpent(facts({ coreHp: 100 }), facts({ coreHp: 60 })))…
+       |            ^
+    176|     expect(oreWasSpent(facts({ turrets: 2 }), facts({ turrets: 1 }))).…
+    177|     expect(oreWasSpent(facts({ shields: 1 }), facts({ shields: 0 }))).…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/15]⎯
+
+ FAIL  src/ui/onboarding.test.ts > oreWasSpent — a purchase the SIM landed, not a press (GDD §2.5, §2.10) > ignores float noise on the core, the way every other HP compare does
+TypeError: oreWasSpent is not a function
+ ❯ src/ui/onboarding.test.ts:181:12
+    179| 
+    180|   it('ignores float noise on the core, the way every other HP compare …
+    181|     expect(oreWasSpent(facts({ coreHp: 50 }), facts({ coreHp: 50 + 1e-…
+       |            ^
+    182|   });
+    183| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/15]⎯
+
+ FAIL  src/ui/onboarding.test.ts > Onboarding — once-only across the whole session (GDD §2.10) > retires every prompt after each has fired once
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/ui/onboarding.test.ts:229:31
+    227|     ob.update(sig({ underAttack: true })); // UNDER-ATTACK shows
+    228|     ob.update(sig({ underAttack: false })); // survived — done
+    229|     expect(ob.allCompleted()).toBe(true);
+       |                               ^
+    230|     // Nothing ever fires again.
+    231|     expect(
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/15]⎯
+
+ FAIL  src/ui/onboarding.test.ts > Onboarding — remembers across matches and page loads (GDD §2.10) > never fires a prompt an earlier match already completed
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/ui/onboarding.test.ts:265:43
+    263|     // The second match: a machine built from a memory that already ho…
+    264|     const ob = new Onboarding(fakeMemory([PromptId.Mine]));
+    265|     expect(ob.isCompleted(PromptId.Mine)).toBe(true);
+       |                                           ^
+    266|     expect(ob.update(sig({ nearAsteroid: true }))).toBeNull();
+    267|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/15]⎯
+
+ FAIL  src/ui/onboarding.test.ts > Onboarding — remembers across matches and page loads (GDD §2.10) > carries every completed prompt, and only the completed ones
+AssertionError: expected 'mine' to be null
+
+- Expected: 
+null
+
++ Received: 
+"mine"
+
+ ❯ src/ui/onboarding.test.ts:271:69
+    269|   it('carries every completed prompt, and only the completed ones', ()…
+    270|     const ob = new Onboarding(fakeMemory([PromptId.Mine, PromptId.Spen…
+    271|     expect(ob.update(sig({ nearAsteroid: true, wheelOpen: true }))).to…
+       |                                                                     ^
+    272|     // …while an untaught lesson is still taught.
+    273|     expect(ob.update(sig({ cargo: 2, cargoCap: 2 }))).toBe(PromptId.Ha…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/15]⎯
+
+ FAIL  src/ui/onboarding.test.ts > Onboarding — remembers across matches and page loads (GDD §2.10) > ignores a stored id this build does not know
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ src/ui/onboarding.test.ts:280:43
+    278|     // must not silently retire something else.
+    279|     const ob = new Onboarding(fakeMemory(['mine', 'teleport']));
+    280|     expect(ob.isCompleted(PromptId.Mine)).toBe(true);
+       |                                           ^
+    281|     expect(ob.allCompleted()).toBe(false);
+    282|     expect(ob.update(sig({ underAttack: true }))).toBe(PromptId.UnderA…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/15]⎯
+
+ FAIL  src/ui/onboarding.test.ts > Onboarding — remembers across matches and page loads (GDD §2.10) > writes each lesson through the port as it lands
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/ui/onboarding.test.ts:291:27
+    289|     expect(memory.writes).toHaveLength(0);
+    290|     ob.update(sig({ nearAsteroid: true, cargo: 1 })); // mined — MINE …
+    291|     expect(memory.writes).toHaveLength(1);
+       |                           ^
+    292|     expect(memory.writes[0]).toEqual([PromptId.Mine]);
+    293|     ob.update(sig({ cargo: 2, cargoCap: 2 }));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/15]⎯
+
+ FAIL  src/ui/onboarding.test.ts > Onboarding — remembers across matches and page loads (GDD §2.10) > writes only when the set GROWS — never once per frame
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ src/ui/onboarding.test.ts:305:27
+    303|     const ob = new Onboarding(memory);
+    304|     for (let i = 0; i < 30; i++) ob.update(sig({ nearAsteroid: true, c…
+    305|     expect(memory.writes).toHaveLength(1);
+       |                           ^
+    306|   });
+    307| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/15]⎯
+
+ FAIL  src/ui/onboarding.test.ts > Onboarding — remembers across matches and page loads (GDD §2.10) > survives EXIT TO MENU and a reload: one memory, two machines
+AssertionError: expected 'mine' to be null
+
+- Expected: 
+null
+
++ Received: 
+"mine"
+
+ ❯ src/ui/onboarding.test.ts:325:56
+    323| 
+    324|     const second = new Onboarding(memory); // second match, fresh mach…
+    325|     expect(second.update(sig({ nearAsteroid: true }))).toBeNull();
+       |                                                        ^
+    326|     expect(second.isCompleted(PromptId.Mine)).toBe(true);
+    327|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/15]⎯
+
+ Test Files  2 failed (2)
+      Tests  14 failed | 24 passed (38)
+   Start at  23:11:19
+   Duration  2.32s (transform 228ms, setup 0ms, collect 221ms, tests 36ms, environment 0ms, prepare 3.12s)
+
