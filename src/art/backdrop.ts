@@ -131,10 +131,28 @@ export const VOID_SEED = 0x5061_6365; // 'Pace' — a wink, and a fixed 32-bit s
  */
 export const GROUND_COLOR = FLOOR;
 
-/** A star colour: one of the steel-ramp values, dimmed by alpha, not by hue. */
+/**
+ * A star colour: one of the steel-ramp values, dimmed by alpha, not by hue —
+ * and, since a0-22, an optional colour for the light that *scatters off* it.
+ */
 interface StarInk {
+  /** The star's own point. Always a steel-ramp value (style-guide §1). */
   readonly color: number;
   readonly alpha: number;
+  /**
+   * **The colour of this star's bloom, when it is not the star's own** — one of
+   * {@link BLOOM_TINTS}, or absent for a halo that stays on the value ramp.
+   *
+   * See {@link BLOOM_TINTS} for why this field exists and what bounds it. Two
+   * things are worth having in front of you at the point of use:
+   *
+   *  - it never touches {@link color}, so the star's *point* is on the steel ramp
+   *    whatever its halo does;
+   *  - it may only name a hue no more luminous than {@link color}, so a tint can
+   *    make a bloom cooler and dimmer and can never make one brighter
+   *    (`backdrop.test.ts` asserts exactly that, per ink).
+   */
+  readonly halo?: number;
 }
 
 /** One depth layer of the star-field. */
@@ -158,8 +176,120 @@ export interface StarLayerSpec {
 }
 
 /**
- * Three depth layers, back to front. Steel value ramp only (style-guide §1):
- * a star is a *bright point*, so it climbs by alpha/whiteness, never by hue.
+ * **The two hues a bloom may be tinted with** — the whole of a0-22, in one list.
+ *
+ * The developer, from live play: *"the bloom is still messed up, still doesn't
+ * match our mockups and if you notice our mockups had different colored blooms
+ * these are all 1 color there are no stars in them…"*. They are right about the
+ * colour, and it was not a bug: the rule this block used to open with — *"steel
+ * value ramp only: a star is a bright point, so it climbs by alpha/whiteness,
+ * never by hue"* — is what removed the colour, and it obeyed style-guide §1 while
+ * the compositor page the developer picked from did not. Nobody noticed the two
+ * disagreed until the game was in front of them.
+ *
+ * ## What §1 is actually protecting, which is not the same as what it says
+ *
+ * The in-match palette carries **meaning**: yellow is ore, red is danger, the
+ * roster hues are *who*. The failure the ban prevents is a bloom that reads as
+ * one of those — a warm glow in the corner of the eye that a player checks,
+ * because on this screen a warm glow has always meant something. That is the
+ * line, and it holds independently of anything about "points" or "value ramps".
+ *
+ * Two of the four colours on the mockup were **ore yellow `#F2D24B` and threat
+ * red `#B23A3A`**, and they are exactly the two the line excludes. That is not a
+ * judgement made here — it is already a number and already in CI:
+ *
+ *  - `compliance.ts` fails yellow and red on any role but `ore`/`core`/`danger`,
+ *    and the star field is in `ALL_SPRITES`, so a yellow or red halo reddens the
+ *    build today. It always would have.
+ *  - The §2.2 sky carve-out prices red on the backdrop at **alpha ≤ 0.06**. A
+ *    bloom's inner ring runs `0.042`–`0.147` (ink alpha × `BLOOM.intensity[0]`),
+ *    so a red bloom is over the carve-out on **every layer**, by 1.0× to 2.5×.
+ *    Only the outer ring squeezes under — and an outer ring alone, with a steel
+ *    inner ring inside it, is not a red bloom, it is a steel bloom with a rumour.
+ *  - Signal yellow gets no carve-out at any alpha, by §2.2 clause 3.
+ *
+ * So **the two mockup hues this cannot deliver are barred by a rule with a number
+ * on it, not by taste**, and moving that number is the Director's call, not
+ * Art's. What is left is the other half of the mockup — its cyan `#4DC3FF` and
+ * its steel `#7E8894` — and the palette's own cold green.
+ *
+ * ## The two that are left, and why each is safe
+ *
+ * | tint | palette job (§1) | why a bloom in it is not a signal |
+ * |---|---|---|
+ * | **plasma `#4DC3FF`** | beams, cockpits, energy | the mockup's own bloom colour. At the near layer's halo alpha it composites to Y′ **25.1** over Floor — **14%** of a plasma shot's value (183) and 58% of the ink outline every sprite is drawn with (43.2). |
+ * | **patina `#4FA08B`** | corrosion, continents, repair | the coldest non-reserved hue in the set, already the whole of Patina Drift's sky. Composites to Y′ **21.3**. |
+ *
+ * Both are on the **cold** side of the wheel, which is the point: the hue that
+ * would be dangerous is a warm one, because warm is where ore and danger live.
+ *
+ * ## The tint may never make a bloom brighter — measured, per ink
+ *
+ * The bound that makes this safe is not a new ceiling invented for the occasion.
+ * It is that **a tint may only replace an ink at least as luminous as itself**,
+ * so tinting a halo can only ever take light *out* of the frame:
+ *
+ * ```
+ *   layer  ink            halo      shipped Y′ / tax     with the tint
+ *   deep   hullSteel .26  —              7.4 /  3.2%      7.4 /  3.2%   (untouched)
+ *   deep   hullSteel .38  —             10.0 /  4.6%     10.0 /  4.6%
+ *   deep   hullLight .30  —             10.0 /  4.7%     10.0 /  4.7%
+ *   mid    hullSteel .70  —             16.8 /  8.9%     16.8 /  8.9%
+ *   mid    hullLight .55  patina        16.8 /  8.9%     13.5 /  7.3%   ↓
+ *   mid    WHITE     .42  plasma        18.9 / 10.4%     13.0 /  6.9%   ↓
+ *   near   hullLight .92  patina        26.8 / 16.9%     21.3 / 13.6%   ↓
+ *   near   WHITE     .88  plasma        37.6 / 26.7%     25.1 / 17.2%   ↓
+ *   near   WHITE     .64  —             27.8 / 17.8%     27.8 / 17.8%
+ *   ────────────────────────────────────────────────────────────────
+ *   brightest halo pixel in the game     37.6            27.8          −26%
+ *   worst contrast tax on a signal       26.7%           17.8%
+ * ```
+ *
+ * (`tax` = the fraction of contrast a bright signal loses to that halo's pixel,
+ * signal-independent by construction — the same measure `backdrop.test.ts`
+ * applies to every sky.) **The void gets quieter, not louder**: white is the most
+ * luminous thing in the palette, so every halo that stops being white and starts
+ * being a hue loses value. This is the whole reason the colour is affordable.
+ *
+ * ## What does NOT change, and why
+ *
+ *  - **The star's own point stays on the steel ramp.** §1's sentence is about the
+ *    *point* — how a star climbs in brightness — and the point is untouched: only
+ *    the scattered light around it takes a hue. That also answers the second half
+ *    of the report directly. A white core inside a cyan halo is *more* findable
+ *    than a white core inside a white halo, not less.
+ *  - **The glint** (the diffraction cross) stays the star's own colour too. It is
+ *    the point's own spike, not the scatter.
+ *  - **`deep` takes no tint at all, and this was priced rather than assumed.** A
+ *    tint on the far layer is the narrowest change available and it is the one
+ *    that buys nothing: at deep's halo alphas (0.042–0.061) the difference
+ *    between a steel halo and a plasma one is **ΔE 1.7–2.9**, at or under the
+ *    just-noticeable difference, painted across a **6 px** disc sitting **Δ7 of
+ *    luma** above its background. It is a change the developer could not see, on
+ *    the layer where 25 of a frame's 36 blooms happen to live. Keeping deep
+ *    neutral also keeps the module header's own line true — *distance steals a
+ *    star's colour before its light* — so the tint becomes a nearness cue.
+ *  - **`BLOOM.scatter`, `BLOOM.intensity`, `BLOOM.radii`, every density, every
+ *    parallax and every ink alpha.** a0-07 ratified *"seeded scatter, subtle"*
+ *    and the developer has not asked for a different set of stars to bloom, only
+ *    for a different colour in the ones that do. `BLOOM.intensity` is also what
+ *    makes this a *tint* rather than a *colour*: at 16% of a star's own alpha,
+ *    the hue arrives as a wash over Floor, never as a saturated mark.
+ */
+export const BLOOM_TINTS = {
+  /** The mockup's own bloom cyan, and the palette's energy hue. */
+  plasma: PALETTE.plasma,
+  /** The palette's cold green — Patina Drift's hue, at a star's scale. */
+  patina: PALETTE.patina,
+} as const;
+
+/**
+ * Three depth layers, back to front. **A star's point is the steel value ramp
+ * only** (style-guide §1): it climbs by alpha/whiteness, never by hue. Its
+ * *bloom* may be tinted, from {@link BLOOM_TINTS} and under the bound stated
+ * there — one tint per layer, per hue, on the two layers where a bloom is big
+ * enough to have a colour at all.
  */
 export const STAR_LAYERS: readonly StarLayerSpec[] = [
   {
@@ -169,7 +299,8 @@ export const STAR_LAYERS: readonly StarLayerSpec[] = [
     minR: 0.45,
     maxR: 0.95,
     // Faint far dust: dim steel, a hair of lit steel. Never white — distance
-    // steals a star's colour before its light.
+    // steals a star's colour before its light. No tint either, and for the same
+    // reason measured out: a hue here is ΔE ≤ 2.9 on a 6 px disc (BLOOM_TINTS).
     inks: [
       { color: PALETTE.hullSteel, alpha: 0.26 },
       { color: PALETTE.hullSteel, alpha: 0.38 },
@@ -183,10 +314,12 @@ export const STAR_LAYERS: readonly StarLayerSpec[] = [
     density: 46,
     minR: 0.7,
     maxR: 1.35,
+    // One steel, one teal-blooming, one cyan-blooming — so a screenful of mid
+    // stars (~10 bloomed at 1440×900) shows all three families rather than one.
     inks: [
-      { color: DERIVED.hullLight, alpha: 0.55 },
+      { color: DERIVED.hullLight, alpha: 0.55, halo: BLOOM_TINTS.patina },
       { color: PALETTE.hullSteel, alpha: 0.7 },
-      { color: WHITE, alpha: 0.42 },
+      { color: WHITE, alpha: 0.42, halo: BLOOM_TINTS.plasma },
     ],
     glint: 0.04,
   },
@@ -196,10 +329,12 @@ export const STAR_LAYERS: readonly StarLayerSpec[] = [
     density: 13,
     minR: 1.15,
     maxR: 2.2,
-    // The closest, brightest points — the ramp's white endpoint carries these.
+    // The closest, brightest points — the ramp's white endpoint carries these,
+    // and the two brightest of them are the frame's only real orbs, so this is
+    // the layer where a tint is worth the most per star.
     inks: [
-      { color: WHITE, alpha: 0.88 },
-      { color: DERIVED.hullLight, alpha: 0.92 },
+      { color: WHITE, alpha: 0.88, halo: BLOOM_TINTS.plasma },
+      { color: DERIVED.hullLight, alpha: 0.92, halo: BLOOM_TINTS.patina },
       { color: WHITE, alpha: 0.64 },
     ],
     glint: 0.22,
@@ -1054,12 +1189,16 @@ export function starFieldSprite(
     const y = round(rng.next() * height - hh);
     const r = round(spec.minR + rng.next() * (spec.maxR - spec.minR));
     const ink = spec.inks[Math.floor(rng.next() * spec.inks.length)]!;
-    // Bloom first, so the star's own point sits on top of its halo.
+    // Bloom first, so the star's own point sits on top of its halo — and the
+    // halo takes the ink's tint if it has one, the ink's own colour if not
+    // (a0-22; {@link BLOOM_TINTS}). Both rings take the SAME colour: a halo whose
+    // two rings disagreed would be a ring, not a glow.
+    const haloColor = ink.halo ?? ink.color;
     if (rng.next() < BLOOM.scatter) {
       for (let b = BLOOM.radii.length - 1; b >= 0; b--) {
         const a = round(ink.alpha * BLOOM.intensity[b]!);
         if (a <= 0) continue;
-        shapes.push(circle(x, y, round(r * BLOOM.radii[b]!), fill(ink.color, 'material', a)));
+        shapes.push(circle(x, y, round(r * BLOOM.radii[b]!), fill(haloColor, 'material', a)));
       }
     }
     shapes.push(circle(x, y, r, fill(ink.color, 'material', ink.alpha)));
