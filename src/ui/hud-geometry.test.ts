@@ -49,7 +49,6 @@ import {
   promptPad,
   promptWrapWidth,
   waveClockLayout,
-  rectsIntersect,
   CLOCK_WHEEL_GAP,
   PROMPT_MIN_TEXT_WIDTH,
   PROMPT_STRIP_RESERVE,
@@ -120,6 +119,19 @@ const FULL: AnchorSpec = { region: 'full', margin: 0 };
 
 const fmt = (r: Rect): string =>
   `{x:${r.x.toFixed(1)}, y:${r.y.toFixed(1)}, w:${r.width.toFixed(1)}, h:${r.height.toFixed(1)}}`;
+
+/** Do two rects overlap at all? Touching edges do not count as an overlap — the
+ *  clock clearing the wheel by exactly zero is still clear. Lives here rather
+ *  than in hud-geometry.ts because only this suite asks the question; the view
+ *  draws the two rects, it never tests them against each other. */
+function rectsIntersect(a: Rect, b: Rect): boolean {
+  return (
+    a.x < b.x + b.width &&
+    b.x < a.x + a.width &&
+    a.y < b.y + b.height &&
+    b.y < a.y + a.height
+  );
+}
 
 /** The registry's own verdict, with its own resolver — not a re-implementation. */
 function withinAnchor(bounds: Rect, anchor: AnchorSpec, vp: Viewport): boolean {

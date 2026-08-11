@@ -326,8 +326,8 @@ export interface ClockLayout {
     readonly ruleY: number;
   };
   /** The strip's drawn footprint in SCREEN space — what the registry would
-   *  record, and the rect the clock/wheel clearance is asserted on
-   *  ({@link rectsIntersect} against {@link wheelBounds}). */
+   *  record, and the rect the clock/wheel clearance is asserted on (it must not
+   *  overlap {@link wheelBounds}; see hud-geometry.test.ts). */
   readonly bounds: Rect;
 }
 
@@ -417,17 +417,6 @@ export function waveClockLayout(
       height: chrome.height,
     },
   };
-}
-
-/** Do two rects overlap at all? Touching edges do not count as an overlap — the
- *  clock clearing the wheel by exactly zero is still clear. */
-export function rectsIntersect(a: Rect, b: Rect): boolean {
-  return (
-    a.x < b.x + b.width &&
-    b.x < a.x + a.width &&
-    a.y < b.y + b.height &&
-    b.y < a.y + a.height
-  );
 }
 
 // ---------------------------------------------------------------------------
