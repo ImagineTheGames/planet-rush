@@ -24,7 +24,27 @@ const DIR = 'tests/mobile/goldens.spec.ts-snapshots';
 const PLATES = join(HERE, 'plates');
 const AMP = 10;
 
-const changed = execFileSync('git', ['diff', '--name-only', '--', DIR], { cwd: ROOT, encoding: 'utf8' })
+/**
+ * The ref the plate's "before" column comes from, and the ref the changed-file
+ * list is taken against. Defaults to `HEAD` — the working-tree-vs-last-commit
+ * shape this was written for.
+ *
+ * It is overridable because r12-01 plates a **merge**, where `HEAD` is the wrong
+ * before: the branch tip predates `u14-01`'s self-hosted typefaces, so a plate
+ * cut against it would show the tint *and* every glyph in the frame changing,
+ * and the eye could not separate them. `origin/main` is the honest before for a
+ * merge — same fonts, same arc chord, everything but this branch's tint.
+ *
+ *   node evidence/a0-22-bloom-colour/plate-goldens.mjs origin/main
+ */
+const BASE = process.argv[2] ?? 'HEAD';
+// Resolved and printed ON the plate, because "MAIN" is not a claim anyone can
+// check and a short sha is. It used to be typed into the label by hand.
+const BASE_SHA = execFileSync('git', ['rev-parse', '--short', BASE], { cwd: ROOT, encoding: 'utf8' })
+  .trim()
+  .toUpperCase();
+
+const changed = execFileSync('git', ['diff', '--name-only', BASE, '--', DIR], { cwd: ROOT, encoding: 'utf8' })
   .split('\n')
   .filter(Boolean);
 
@@ -95,7 +115,7 @@ mkdirSync(PLATES, { recursive: true });
 
 for (const name of changed) {
   const base = name.replace(`${DIR}/`, '').replace('.png', '');
-  const A = PNG.sync.read(execFileSync('git', ['show', `HEAD:${name}`], { cwd: ROOT, maxBuffer: 1 << 28 }));
+  const A = PNG.sync.read(execFileSync('git', ['show', `${BASE}:${name}`], { cwd: ROOT, maxBuffer: 1 << 28 }));
   const B = PNG.sync.read(readFileSync(join(ROOT, name)));
   let x0 = Infinity;
   let y0 = Infinity;
@@ -135,7 +155,7 @@ for (const name of changed) {
   text(out, `BOX ${x0},${y0} ${bw}X${bh} OF THE ${A.width}X${A.height} FRAME`, PAD, 54, [140, 150, 162], 1);
   text(out, `ROW 1 MAIN   ROW 2 THIS BRANCH   ROW 3 THE DIFFERENCE AT ${AMP}X (THE ONLY AMPLIFIED THING HERE)`, PAD, 70, [140, 150, 162], 1);
   const rows = [
-    ['MAIN 0F8FD05', (o) => [A.data[o], A.data[o + 1], A.data[o + 2]]],
+    [`MAIN ${BASE_SHA}`, (o) => [A.data[o], A.data[o + 1], A.data[o + 2]]],
     ['THIS BRANCH', (o) => [B.data[o], B.data[o + 1], B.data[o + 2]]],
     [`DIFFERENCE X${AMP}`, (o) => {
       const d = (i) => Math.min(255, Math.abs(B.data[o + i] - A.data[o + i]) * AMP);
