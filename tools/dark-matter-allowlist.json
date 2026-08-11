@@ -172,6 +172,7 @@
     "src/ui/connection-status-view.ts#ConnectionStatusView": "SURFACE — forwarded by a barrel; triaged by pattern (§4.4b)",
     "src/ui/connection-status.ts#connectionStatusModel": "DARK family — overlay model with no production caller (§4.2)",
     "src/ui/controls-strip.ts#controlsStripRows": "SURFACE — exported for a spec to assert; triaged by pattern (§4.4b)",
+    "src/ui/font-boot.ts#awaitRatifiedFaces": "SURFACE — an entry point's own front door, and its CALLER IS HTML (§6). index.html's inline entry script imports this and awaits it before it dynamically imports src/main.ts, so it runs on every boot of every build (u14-01, GDD §5.6): it is what blocks first paint until Audiowide and Oxanium have loaded, because Pixi bakes canvas text into a texture that is never redrawn. A TypeScript reachability scan cannot read that caller. The module is listed in DEFAULT_ENTRIES so everything BEYOND the door — RATIFIED_FACES, BOOT_FONT_DEADLINE_MS — resolves live; only the handle itself is unreachable, which is what a door is. Do not delete: deleting it makes the first painted frame a coin flip between two typefaces and every golden in the suite non-reproducible.",
     "src/ui/gantry.ts#singlePrimary": "SURFACE — an invariant written down so a spec can hold every screen to it (§4.4b)",
     "src/ui/hangar.ts#COSMETIC_INVARIANT": "SURFACE — exported for a spec to assert; triaged by pattern (§4.4b)",
     "src/ui/hangar.ts#COSMETIC_SLOTS": "SURFACE — exported for a spec to assert; triaged by pattern (§4.4b)",

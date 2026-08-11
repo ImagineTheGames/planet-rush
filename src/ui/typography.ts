@@ -11,31 +11,126 @@
  *   legible at 12px, squared geometry that sits beside Audiowide without
  *   competing. Never the wordmark.
  *
- * Both are OFL-licensed and were to be **self-hosted** (`assets/`, no CDN, no
- * Google Fonts call — offline-first, GDD §4.3/§4.8). This module names the two
- * *stacks* so every menu screen in this directory spells them identically and a
- * face swap is a one-line change rather than a grep. The fallback in each stack
- * is the nearest system face, so the menus stay legible for the frame or two
- * before the self-hosted files finish decoding — a menu that flashed invisible
- * would be a worse first impression than one that flashed a fallback.
+ * Both are OFL-licensed and **self-hosted** (`public/fonts/`, no CDN, no Google
+ * Fonts call — offline-first, GDD §4.3/§4.8). This module names the two *stacks*
+ * so every menu screen in this directory spells them identically and a face swap
+ * is a one-line change rather than a grep. The fallback in each stack is the
+ * nearest face both gating machines actually have, for the glyphs the ratified
+ * faces do not carry ({@link RATIFIED_FACES}) and for the case where the woff2
+ * genuinely fails to arrive.
  *
- * **The self-hosting never happened** *(found by a1-01, 2026-08-07)*: there is no
- * `@font-face` in `index.html` and no font file under `assets/`, so neither
- * ratified face has ever loaded and every screen in this game draws in its
- * fallback. That is why the fallbacks below are chosen for what the two gating
- * machines actually have rather than for what is nearest — see {@link FONT_BODY}.
- * Shipping the two files is the real fix and wants its own brief: it is the
- * page's job (`index.html` / `assets/`, below), it changes how every screen
- * looks, and it re-baselines every golden in `tests/mobile/goldens.spec.ts`.
+ * **The self-hosting has actually happened, as of u14-01 (2026-08-11.)** From
+ * a1-01's discovery on 2026-08-07 until then this comment recorded a gap instead
+ * of a wiring: there was no `@font-face` anywhere and no font file in the repo,
+ * so neither ratified face had ever loaded and **every frame this project ever
+ * drew — every golden, every screenshot in `evidence/`, every live round — was
+ * in a fallback.** What closed it:
  *
- * Pure data. No Pixi, no DOM: the `@font-face` declarations that actually load
- * the files, and the `<link>` that pulls them in, are the page's job (index.html
- * / `assets/`), not a model's. This file only says *which family a given piece
- * of text belongs to*, which is the one part of typography that is UI's to own.
+ *   - `public/fonts/*.woff2` — the two files, latin subset, 27.5 KB the pair,
+ *     with their OFL licences and full provenance in `public/fonts/README.md`;
+ *   - `index.html` — the `@font-face` blocks, the `<link rel="preload">` pair,
+ *     and the boot gate that awaits both faces *before* `src/main.ts` is
+ *     evaluated. That gate is not belt-and-braces: this game draws its text into
+ *     a canvas, where `font-display` does nothing, so a frame composited early
+ *     bakes the fallback into a texture that is never redrawn;
+ *   - `./typography.test.ts` — asserts the page and this file still agree, so
+ *     the wiring cannot rot back into a note.
+ *
+ * Pure data still. No Pixi, no DOM: the `@font-face` rules and the `<link>`s are
+ * the page's job (`index.html`), not a model's. This file says *which family a
+ * given piece of text belongs to* and *what the page is contracted to load*,
+ * which is the part of typography that is UI's to own.
  */
 
 /** Wordmark, headings, menu confirmations (style-guide §7). Never HUD numerals. */
 export const FONT_HEADING = 'Audiowide, "Trebuchet MS", sans-serif';
+
+// ---------------------------------------------------------------------------
+// The self-hosted files — one source of truth for what the page must load
+// ---------------------------------------------------------------------------
+
+/**
+ * The `unicode-range` both faces are subsetted to: Google's `latin` block.
+ *
+ * It covers every character the game's copy actually renders, including the ones
+ * that are easy to miss — `·` `×` `°` `§` `—` `’` `…` `−` and the `á`/`ã` in the
+ * region names. What it CUTS is `latin-ext` (Latin Extended-A/B and friends):
+ * 15,000 bytes across the two files, **+53% payload for glyphs no string in this
+ * repo uses**, on a page that ships to a phone browser on every load. Because the
+ * cut is expressed as a range rather than baked in, localising later is additive:
+ * drop the two `latin-ext` woff2 files in and add a second `@font-face` each.
+ *
+ * Module-private on purpose: it reaches the world as {@link RatifiedFace.unicodeRange}
+ * on both faces, so there is one list and no second place for it to drift to.
+ */
+const LATIN_SUBSET_RANGE =
+  'U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, ' +
+  'U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, ' +
+  'U+2212, U+2215, U+FEFF, U+FFFD';
+
+/** One self-hosted face: what `index.html` declares and the boot gate awaits. */
+export interface RatifiedFace {
+  /** CSS `font-family`, and the first name in the stack that uses it. */
+  readonly family: string;
+  /**
+   * The file's URL, spelled exactly as `index.html` spells it: root-absolute,
+   * which is how Vite is told "this is a `public/` asset, not a bundled one."
+   * It is what makes the build base-aware — Vite rewrites it to `./fonts/…` on
+   * output, so the same bundle serves from the Pages project subpath, from
+   * `/dev`, and from a custom domain without a rebuild (vite.config.ts `base`).
+   * Writing `./fonts/…` in the source instead builds *correctly* but warns on
+   * every build that the reference "didn't resolve at build time".
+   */
+  readonly href: string;
+  /**
+   * The `font-weight` descriptor. Audiowide is `'400'` — upstream ships one
+   * weight, so a bold heading is synthesised, as it always was. Oxanium is
+   * `'200 800'`, the variable file's real `wght` axis; the range is **not
+   * optional**, because the font's own default instance is 200 (ExtraLight) and
+   * a face declared without it renders the whole HUD hairline-thin.
+   */
+  readonly weight: string;
+  /** The subset this file was cut to — see {@link LATIN_SUBSET_RANGE}. */
+  readonly unicodeRange: string;
+  /**
+   * The `font:` shorthands `./font-boot` passes to `document.fonts.load()`.
+   *
+   * One per weight the UI actually asks for, because `.load()` resolves a
+   * *shorthand*, not a family: awaiting `400 16px Oxanium` says nothing about
+   * whether `700` is ready, and on a variable file both are the same download.
+   */
+  readonly load: readonly string[];
+}
+
+/**
+ * The two files `index.html` is contracted to self-host, and the only place that
+ * contract is written down in TypeScript. `./typography.test.ts` reads it and the
+ * page together, so a renamed file, a dropped `unicode-range`, a lost preload or
+ * a boot gate that stops waiting fails a unit test rather than a screenshot.
+ *
+ * **Neither face carries the UI's symbol glyphs and neither ever did** — `→`
+ * U+2192, `○` U+25CB and `●` U+25CF (the upgrade panel's pips), `▸` U+25B8,
+ * `△` U+25B3, `⌫` U+232B, thin space U+2009. Checked against the upstream
+ * `cmap`s: Audiowide has 366 codepoints, Oxanium 357, and neither includes any
+ * of them. They fall through to the stack per-character, exactly as they did
+ * before the fonts shipped. That is a browser behaviour, not a subsetting loss.
+ */
+export const RATIFIED_FACES: readonly RatifiedFace[] = [
+  {
+    family: 'Audiowide',
+    href: '/fonts/Audiowide-Regular-latin.woff2',
+    weight: '400',
+    unicodeRange: LATIN_SUBSET_RANGE,
+    load: ['400 16px Audiowide'],
+  },
+  {
+    family: 'Oxanium',
+    href: '/fonts/Oxanium-Variable-latin.woff2',
+    weight: '200 800',
+    unicodeRange: LATIN_SUBSET_RANGE,
+    load: ['400 16px Oxanium', '700 16px Oxanium'],
+  },
+];
 
 /**
  * Body text and numerals (style-guide §7). Never the wordmark. Legible at 12px.
@@ -65,13 +160,14 @@ export const FONT_HEADING = 'Audiowide, "Trebuchet MS", sans-serif';
  * mean what it says on CI — which is the whole premise of `goldens.spec.ts`.
  *
  * This is a FALLBACK, not the ratified face. Style-guide §7 ratifies **Oxanium**,
- * and this stack still asks for it first. The header above says both faces are
- * self-hosted in `assets/` — they are NOT, and never have been: there is no
- * `@font-face` in `index.html` and no font file in `assets/`, so every screen in
- * this game has always drawn in a fallback. Shipping the two OFL files is the
- * real fix and it is worth its own brief — it touches `index.html` and `assets/`
- * (the page's job, not a model's) and it re-baselines every golden in the suite.
- * Until then, this line is what keeps the two machines agreeing.
+ * and since u14-01 that first name resolves: the woff2 is in `public/fonts/` and
+ * the page loads it before the first frame is drawn ({@link RATIFIED_FACES}). So
+ * Liberation Mono no longer decides what a golden looks like — but it is not
+ * dead weight either. It is still what draws the symbol glyphs Oxanium has never
+ * contained (`→`, `○`, `●`, `▸`, `△`, `⌫`, thin space), per-character, and it is
+ * still what the screen falls back to whole if the file 404s or the boot gate's
+ * deadline expires. On both of those paths the two gating machines have to agree
+ * about what they are drawing, so the reasoning above stands unchanged.
  */
 export const FONT_BODY = 'Oxanium, "Liberation Mono", monospace';
 

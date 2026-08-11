@@ -255,9 +255,14 @@ export const CLASS_TILE_MIN_WIDTH = 150;
 export const CLASS_TILE_PAD = 3;
 /** The class-name line. Audiowide 12's MEASURED box (ascent + descent) on the
  *  self-hosted face, not a guess — the first cut of this block guessed the line
- *  heights and every tile drew its stats through its hull nickname. */
+ *  heights and every tile drew its stats through its hull nickname.
+ *  **Re-measured against the real face when u14-01 shipped it: 14 exactly.** It
+ *  had been right about Audiowide all along and wrong about what was on screen —
+ *  the page was drawing Trebuchet 12, whose box is 15, so this line was one pixel
+ *  short of what it was actually rendering for four days. */
 export const CLASS_NAME_LINE = 14;
-/** The hull-nickname line (Oxanium 9, measured box 12). */
+/** The hull-nickname line (Oxanium 9, measured box 12 — confirmed on the real
+ *  face by u14-01; the fallback it was really drawing was 10). */
 export const CLASS_HULL_LINE = 12;
 /** The role blurb — two wrapped Oxanium-10 lines. */
 export const CLASS_BLURB_LINE = 22;
@@ -266,9 +271,29 @@ export const CLASS_BLURB_LINE = 22;
  *  asserted equal in the tests). Mirrored rather than imported so the geometry
  *  stays free of the model, exactly like {@link LOBBY_SLOT_ROWS}. */
 export const STAT_COUNT = 6;
-/** One stat cell: its figure on a text line (Oxanium 8, measured box 10), its
- *  pip bar directly beneath. */
-export const STAT_ROW_TEXT = 10;
+/**
+ * One stat cell: its figure on a text line, its pip bar directly beneath.
+ *
+ * **12, RE-MEASURED ON THE FACE THE GAME NOW ACTUALLY DRAWS (u14-01).** It was
+ * 10, annotated "Oxanium 8, measured box 10" — but the page had no `@font-face`
+ * and no font file, so the figure was really being drawn in Liberation Mono,
+ * whose box at 9px *is* 10. The number described the fallback and credited the
+ * ratified face. The moment the real Oxanium loaded, every stat cell on every
+ * hull tile drew its pip bar through the bottom of its own figure — visible on
+ * `phone-landscape-ship-select` and `desktop-lobby`, all six cells, all four
+ * hulls.
+ *
+ * Oxanium 9 measures ascent 10 / descent 2 = **box 12** by Pixi's own
+ * `CanvasTextMetrics.measureFont` (`actualBoundingBox` of `|ÉqÅM`), against
+ * Liberation Mono 9's 8 / 2 = 10. `class-tile-view` puts the bar at
+ * `box.y + STAT_ROW_TEXT`, so 10 landed it exactly on the baseline. 12 clears the
+ * descender, and because a stat figure (`SPD 100%`) has no descenders it reads as
+ * the same 2px of air the fallback used to give. At the floor size (`STAT_MIN_PX`
+ * 8, box 10) it is 4px, which is air rather than a collision.
+ *
+ * The brief's rule, applied: **the fix is the type metric, not the assertion.**
+ */
+export const STAT_ROW_TEXT = 12;
 export const STAT_PIP_BAR = 3;
 export const STAT_ROW_HEIGHT = STAT_ROW_TEXT + STAT_PIP_BAR;
 /** Air between two rows of the stat grid. */
