@@ -1,0 +1,901 @@
+{
+  "from": "git:origin/main",
+  "to": "tests/mobile/goldens.spec.ts-snapshots",
+  "rows": [
+    {
+      "name": "desktop-build-wheel-desktop-linux.png",
+      "w": 1280,
+      "h": 800,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "desktop-build-wheel-short-desktop-linux.png",
+      "w": 1280,
+      "h": 800,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "desktop-codex-desktop-linux.png",
+      "w": 1280,
+      "h": 800,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "desktop-doors-desktop-linux.png",
+      "w": 1280,
+      "h": 800,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "desktop-end-of-match-desktop-linux.png",
+      "w": 1280,
+      "h": 800,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "desktop-frozen-desktop-linux.png",
+      "w": 1280,
+      "h": 800,
+      "moved": 187,
+      "clusters": 4,
+      "widestCluster": 11,
+      "biggest": [
+        {
+          "x": 703,
+          "y": 229,
+          "w": 11,
+          "h": 10,
+          "size": 80
+        },
+        {
+          "x": 98,
+          "y": 222,
+          "w": 8,
+          "h": 8,
+          "size": 48
+        },
+        {
+          "x": 1147,
+          "y": 328,
+          "w": 7,
+          "h": 7,
+          "size": 40
+        }
+      ],
+      "movedPct": 0.02,
+      "peakDeltaY": 5.39,
+      "meanDeltaY": 1.67,
+      "meanDeltaRGB": [
+        -2.81,
+        2.57,
+        5.9
+      ],
+      "box": {
+        "x0": 98,
+        "y0": 222,
+        "x1": 1153,
+        "y1": 334,
+        "w": 1056,
+        "h": 113
+      }
+    },
+    {
+      "name": "desktop-frozen-teams-desktop-linux.png",
+      "w": 1280,
+      "h": 800,
+      "moved": 187,
+      "clusters": 4,
+      "widestCluster": 11,
+      "biggest": [
+        {
+          "x": 703,
+          "y": 229,
+          "w": 11,
+          "h": 10,
+          "size": 80
+        },
+        {
+          "x": 98,
+          "y": 222,
+          "w": 8,
+          "h": 8,
+          "size": 48
+        },
+        {
+          "x": 1147,
+          "y": 328,
+          "w": 7,
+          "h": 7,
+          "size": 40
+        }
+      ],
+      "movedPct": 0.02,
+      "peakDeltaY": 5.39,
+      "meanDeltaY": 1.67,
+      "meanDeltaRGB": [
+        -2.81,
+        2.57,
+        5.9
+      ],
+      "box": {
+        "x0": 98,
+        "y0": 222,
+        "x1": 1153,
+        "y1": 334,
+        "w": 1056,
+        "h": 113
+      }
+    },
+    {
+      "name": "desktop-hud-footer-desktop-linux.png",
+      "w": 1280,
+      "h": 64,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "desktop-hud-top-desktop-linux.png",
+      "w": 1280,
+      "h": 96,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "desktop-lobby-desktop-linux.png",
+      "w": 1280,
+      "h": 800,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "desktop-lobby-level-badge-desktop-linux.png",
+      "w": 54,
+      "h": 63,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "desktop-lobby-teams-desktop-linux.png",
+      "w": 1280,
+      "h": 800,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "desktop-map-select-desktop-linux.png",
+      "w": 1280,
+      "h": 800,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "desktop-pause-confirm-desktop-linux.png",
+      "w": 1280,
+      "h": 800,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "desktop-pause-desktop-linux.png",
+      "w": 1280,
+      "h": 800,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "desktop-settings-desktop-linux.png",
+      "w": 1280,
+      "h": 800,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "desktop-ship-select-desktop-linux.png",
+      "w": 1280,
+      "h": 800,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "desktop-title-desktop-linux.png",
+      "w": 1280,
+      "h": 800,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "desktop-upgrade-wheel-desktop-linux.png",
+      "w": 1280,
+      "h": 800,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "desktop-upgrade-wheel-short-desktop-linux.png",
+      "w": 1280,
+      "h": 800,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "phone-landscape-build-wheel-iphone-linux.png",
+      "w": 844,
+      "h": 390,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "phone-landscape-codex-iphone-linux.png",
+      "w": 844,
+      "h": 390,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "phone-landscape-doors-iphone-linux.png",
+      "w": 844,
+      "h": 390,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "phone-landscape-frozen-iphone-linux.png",
+      "w": 844,
+      "h": 390,
+      "moved": 34,
+      "clusters": 1,
+      "widestCluster": 7,
+      "biggest": [
+        {
+          "x": 677,
+          "y": 30,
+          "w": 7,
+          "h": 7,
+          "size": 34
+        }
+      ],
+      "movedPct": 0.01,
+      "peakDeltaY": 5.1,
+      "meanDeltaY": 2.06,
+      "meanDeltaRGB": [
+        -3.03,
+        3.18,
+        6.03
+      ],
+      "box": {
+        "x0": 677,
+        "y0": 30,
+        "x1": 683,
+        "y1": 36,
+        "w": 7,
+        "h": 7
+      }
+    },
+    {
+      "name": "phone-landscape-frozen-teams-iphone-linux.png",
+      "w": 844,
+      "h": 390,
+      "moved": 34,
+      "clusters": 1,
+      "widestCluster": 7,
+      "biggest": [
+        {
+          "x": 677,
+          "y": 30,
+          "w": 7,
+          "h": 7,
+          "size": 34
+        }
+      ],
+      "movedPct": 0.01,
+      "peakDeltaY": 5.1,
+      "meanDeltaY": 2.06,
+      "meanDeltaRGB": [
+        -3.03,
+        3.18,
+        6.03
+      ],
+      "box": {
+        "x0": 677,
+        "y0": 30,
+        "x1": 683,
+        "y1": 36,
+        "w": 7,
+        "h": 7
+      }
+    },
+    {
+      "name": "phone-landscape-hud-top-iphone-linux.png",
+      "w": 844,
+      "h": 96,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "phone-landscape-lobby-iphone-linux.png",
+      "w": 844,
+      "h": 390,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "phone-landscape-lobby-level-badge-iphone-linux.png",
+      "w": 54,
+      "h": 52,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "phone-landscape-lobby-teams-iphone-linux.png",
+      "w": 844,
+      "h": 390,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "phone-landscape-map-select-iphone-linux.png",
+      "w": 844,
+      "h": 390,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "phone-landscape-pause-iphone-linux.png",
+      "w": 844,
+      "h": 390,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "phone-landscape-settings-iphone-linux.png",
+      "w": 844,
+      "h": 390,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "phone-landscape-ship-select-iphone-linux.png",
+      "w": 844,
+      "h": 390,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "phone-landscape-title-iphone-linux.png",
+      "w": 844,
+      "h": 390,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "phone-landscape-upgrade-wheel-iphone-linux.png",
+      "w": 844,
+      "h": 390,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "phone-portrait-build-wheel-iphone-linux.png",
+      "w": 390,
+      "h": 844,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "phone-portrait-codex-iphone-linux.png",
+      "w": 390,
+      "h": 844,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "phone-portrait-eliminated-iphone-linux.png",
+      "w": 390,
+      "h": 844,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "phone-portrait-frozen-teams-iphone-linux.png",
+      "w": 390,
+      "h": 844,
+      "moved": 34,
+      "clusters": 1,
+      "widestCluster": 7,
+      "biggest": [
+        {
+          "x": 353,
+          "y": 677,
+          "w": 7,
+          "h": 7,
+          "size": 34
+        }
+      ],
+      "movedPct": 0.01,
+      "peakDeltaY": 5.1,
+      "meanDeltaY": 2.08,
+      "meanDeltaRGB": [
+        -3.06,
+        3.21,
+        6.06
+      ],
+      "box": {
+        "x0": 353,
+        "y0": 677,
+        "x1": 359,
+        "y1": 683,
+        "w": 7,
+        "h": 7
+      }
+    },
+    {
+      "name": "phone-portrait-lobby-iphone-linux.png",
+      "w": 390,
+      "h": 844,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "phone-portrait-pause-iphone-linux.png",
+      "w": 390,
+      "h": 844,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "phone-portrait-settings-iphone-linux.png",
+      "w": 390,
+      "h": 844,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "phone-portrait-title-iphone-linux.png",
+      "w": 390,
+      "h": 844,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    },
+    {
+      "name": "phone-portrait-upgrade-wheel-iphone-linux.png",
+      "w": 390,
+      "h": 844,
+      "moved": 0,
+      "clusters": 0,
+      "widestCluster": 0,
+      "biggest": [],
+      "movedPct": 0,
+      "peakDeltaY": 0,
+      "meanDeltaY": 0,
+      "meanDeltaRGB": [
+        0,
+        0,
+        0
+      ],
+      "box": null
+    }
+  ]
+}

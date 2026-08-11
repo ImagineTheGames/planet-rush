@@ -39,11 +39,23 @@
  * is a bake that quantises 6% to nothing, a cull that reaches a backdrop layer, a
  * reducer that sheds more than it claims, or an editor that "improves" `BLOOM`
  * upward (a0-07 chose the lowest of the three magnitudes shown, on purpose).
+ *
+ * **a0-22 extends it to the halo's COLOUR, for the same reason and on the same
+ * instrument.** *"our mockups had different colored blooms these are all 1 color
+ * there are no stars in them"* — so a bloom's tint (`BLOOM_TINTS`) is now part of
+ * what has to survive the trip from `starFieldSprite` to the frame, and so is the
+ * thing that answers the second half of that sentence: **the star's own point is
+ * submitted inside every halo, last, and never in the halo's colour**. The
+ * geometry read-back below already grouped fills by centre; it now records each
+ * fill's colour too, which is the identical read
+ * `evidence/a0-22-bloom-colour/probe-star-in-bloom.mjs` takes off the running
+ * build. Nothing here weakens an a0-18 assertion — the file only gains.
  */
 
 import { describe, expect, it } from 'vitest';
 import { Container, Graphics } from 'pixi.js';
-import { BLOOM, STAR_LAYERS, VoidBackdrop, type MapId } from './backdrop';
+import { BLOOM, BLOOM_TINTS, STAR_LAYERS, VoidBackdrop, type MapId } from './backdrop';
+import { hex } from './palette';
 
 /** The developer's desktop, over a mid-sized arena. */
 const VIEW = { w: 1440, h: 900 } as const;
@@ -60,6 +72,8 @@ interface SubmittedStar {
    *  star arrives outer halo, inner halo, then its own point. */
   readonly radii: number[];
   readonly alphas: number[];
+  /** Fill colours, in the same submitted order (a0-22). */
+  readonly colors: number[];
 }
 
 /**
@@ -81,17 +95,24 @@ function submittedStars(layer: Graphics): SubmittedStar[] {
   const instructions = ctx?.instructions;
   expect(Array.isArray(instructions), 'the context exposes an instruction list').toBe(true);
 
-  const byCentre = new Map<string, { x: number; y: number; radii: number[]; alphas: number[] }>();
+  const byCentre = new Map<
+    string,
+    { x: number; y: number; radii: number[]; alphas: number[]; colors: number[] }
+  >();
   for (const raw of instructions as { action?: string; data?: unknown }[]) {
     if (raw.action !== 'fill') continue;
-    const data = raw.data as { style?: { alpha?: number }; path?: { instructions?: { action?: string; data?: number[] }[] } };
+    const data = raw.data as {
+      style?: { alpha?: number; color?: number };
+      path?: { instructions?: { action?: string; data?: number[] }[] };
+    };
     const circle = data.path?.instructions?.find((p) => p.action === 'circle');
     if (!circle?.data) continue;
     const [x, y, r] = circle.data as [number, number, number];
     const key = `${x},${y}`;
-    const entry = byCentre.get(key) ?? { x, y, radii: [], alphas: [] };
+    const entry = byCentre.get(key) ?? { x, y, radii: [], alphas: [], colors: [] };
     entry.radii.push(r);
     entry.alphas.push(data.style?.alpha ?? Number.NaN);
+    entry.colors.push(data.style?.color ?? Number.NaN);
     byCentre.set(key, entry);
   }
   return [...byCentre.values()];
@@ -208,6 +229,96 @@ describe('the bloom reaches the frame, not just the sprite definition', () => {
         // would wash over every star it belongs to.
         expect(outer, `${key}: widest ring first`).toBeGreaterThan(inner);
         expect(inner, `${key}: then the inner ring`).toBeGreaterThan(core);
+      }
+    }
+  });
+});
+
+describe('the bloom’s COLOUR reaches the frame, and a star sits inside it (a0-22)', () => {
+  const tints = new Set<number>(Object.values(BLOOM_TINTS));
+  /** The steel value ramp a star's own point is drawn from (style-guide §1). */
+  const ramp = new Set<number>(STAR_LAYERS.flatMap((l) => l.inks.map((i) => i.color)));
+
+  it('submits the tint on both halo rings and the star’s own colour on the point', () => {
+    // The shape of the defect this guards: a generator that tinted the point as
+    // well would put a cyan dot in the sky where §1 requires a bright one, and a
+    // generator that tinted only one ring would draw a coloured RING rather than
+    // a glow. Both are invisible to a golden and both are one edit away.
+    for (const [key, gfx] of starLayers(boot())) {
+      for (const star of bloomedOf(submittedStars(gfx))) {
+        const [outer, inner, core] = star.colors as [number, number, number];
+        expect(ramp.has(core), `${key}: a star POINT was submitted ${hex(core)}`).toBe(true);
+        expect(tints.has(core), `${key}: the point took the halo's tint`).toBe(false);
+        expect(outer, `${key}: the two halo rings disagree on colour`).toBe(inner);
+        expect(
+          tints.has(inner) || inner === core,
+          `${key}: halo ${hex(inner)} is neither a ratified tint nor the star's own colour`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('puts a tinted bloom on the stage, in every hue, on the layers that carry one', () => {
+    const layers = starLayers(boot());
+    const seen = new Map<string, Set<number>>();
+    for (const [key, gfx] of layers) {
+      const hues = new Set<number>();
+      for (const star of bloomedOf(submittedStars(gfx))) {
+        const halo = star.colors[1]!;
+        if (tints.has(halo)) hues.add(halo);
+      }
+      seen.set(key, hues);
+    }
+    for (const spec of STAR_LAYERS) {
+      const declared = new Set(spec.inks.map((i) => i.halo).filter((h): h is number => h !== undefined));
+      const onStage = seen.get(spec.key)!;
+      // Every hue the layer declares reaches the frame…
+      for (const h of declared) {
+        expect(onStage.has(h), `${spec.key} declares ${hex(h)} but the stage has none`).toBe(true);
+      }
+      // …and no layer invents one it never declared. `deep` declares none, which
+      // is the assertion that the far layer stayed on the value ramp.
+      for (const h of onStage) {
+        expect(declared.has(h), `${spec.key} submitted an undeclared tint ${hex(h)}`).toBe(true);
+      }
+    }
+    expect(
+      new Set([...seen.values()].flatMap((s) => [...s])).size,
+      'the frame carries more than one bloom hue',
+    ).toBeGreaterThan(1);
+  });
+
+  it('keeps the steel ramp the majority of what a frame blooms', () => {
+    // a0-07's void is a steel field, and this change is a minority of tints in
+    // it, not a repaint. Measured across all three layers on one stage: the
+    // untinted blooms have to stay the larger half.
+    let tinted = 0;
+    let total = 0;
+    for (const [, gfx] of starLayers(boot())) {
+      for (const star of bloomedOf(submittedStars(gfx))) {
+        total++;
+        if (tints.has(star.colors[1]!)) tinted++;
+      }
+    }
+    expect(total, 'the stage bloomed at all').toBeGreaterThan(100);
+    expect(tinted, 'no tinted bloom reached the stage').toBeGreaterThan(0);
+    expect(tinted / total, `${tinted}/${total} blooms are tinted`).toBeLessThan(0.5);
+  });
+
+  it('draws the star LAST, so a coloured bloom still has a star in it', () => {
+    // The developer's second sentence, as an assertion on the frame: the point is
+    // submitted after both of its halo rings, so it is painted on top of them —
+    // and since the point keeps the ramp's white/steel while the halo takes a
+    // hue, a tinted bloom is now the EASIEST place in the sky to find a star.
+    for (const [key, gfx] of starLayers(boot())) {
+      for (const star of bloomedOf(submittedStars(gfx))) {
+        const [outerA, innerA, coreA] = star.alphas as [number, number, number];
+        expect(coreA, `${key}: the point is fainter than its own inner halo`).toBeGreaterThan(innerA);
+        expect(innerA, `${key}: the inner ring is fainter than the outer one`).toBeGreaterThan(outerA);
+        // Submitted order is draw order, so "last" is "on top".
+        expect(star.radii[2], `${key}: the point is not the last fill at its centre`).toBe(
+          Math.min(...star.radii),
+        );
       }
     }
   });

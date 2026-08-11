@@ -1,0 +1,2189 @@
+{
+  "label": "shipped",
+  "base": "http://localhost:4923",
+  "viewport": {
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "deviceScaleFactor": 2
+  },
+  "maps": [
+    {
+      "map": "octagon",
+      "sky": "none",
+      "build": "0f8fd05",
+      "order": [
+        "void-ground",
+        "void-stars-deep",
+        "void-stars-mid",
+        "void-stars-near"
+      ],
+      "skyDiscs": [],
+      "hiddenFromStage": [
+        "?",
+        "vfx",
+        "?",
+        "?",
+        "badge-root"
+      ],
+      "frame": "frames/shipped/octagon-void-only.png",
+      "layers": [
+        {
+          "label": "void-stars-deep",
+          "stars": 795,
+          "bloomed": 25,
+          "plain": 632,
+          "onScreenBloomed": 25,
+          "distinctColorsHex": [
+            "#7e8894",
+            "#a5acb4"
+          ],
+          "medianCoreOverHalo": 33.44,
+          "medianHaloOverBackground": 6.82,
+          "medianCorePeak": 41.72,
+          "medianCoreDiameterDevicePx": 2.77,
+          "medianHaloDiameterCssPx": 5.95,
+          "coresBelow1": 0,
+          "coresBelow4": 0,
+          "bloomedStars": [
+            {
+              "x": 199.64,
+              "y": 989.86,
+              "coreR": 0.9379,
+              "innerR": 2.251,
+              "outerR": 4.033,
+              "haloDiameterCssPx": 8.07,
+              "coreDiameterCssPx": 1.88,
+              "coreDiameterDevicePx": 3.75,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 41.72,
+                "coreMean": 37.42,
+                "innerRing": 8.69,
+                "outerRing": 3.87,
+                "background": 1.93
+              },
+              "coreOverHalo": 33.03,
+              "haloOverBackground": 6.76
+            },
+            {
+              "x": 1614.08,
+              "y": 757.29,
+              "coreR": 0.6103,
+              "innerR": 1.4647,
+              "outerR": 2.6243,
+              "haloDiameterCssPx": 5.25,
+              "coreDiameterCssPx": 1.22,
+              "coreDiameterDevicePx": 2.44,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.38,
+                "inner": 0.0608,
+                "outer": 0.0247
+              },
+              "luma": {
+                "corePeak": 58.37,
+                "coreMean": 49.98,
+                "innerRing": 11.55,
+                "outerRing": 4.84,
+                "background": 1.93
+              },
+              "coreOverHalo": 46.82,
+              "haloOverBackground": 9.61
+            },
+            {
+              "x": 1632.16,
+              "y": 631,
+              "coreR": 0.8818,
+              "innerR": 2.1163,
+              "outerR": 3.7917,
+              "haloDiameterCssPx": 7.58,
+              "coreDiameterCssPx": 1.76,
+              "coreDiameterDevicePx": 3.53,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.38,
+                "inner": 0.0608,
+                "outer": 0.0247
+              },
+              "luma": {
+                "corePeak": 58.37,
+                "coreMean": 46.25,
+                "innerRing": 12.16,
+                "outerRing": 4.83,
+                "background": 1.93
+              },
+              "coreOverHalo": 46.21,
+              "haloOverBackground": 10.22
+            },
+            {
+              "x": 2181.73,
+              "y": 190.37,
+              "coreR": 0.898,
+              "innerR": 2.1552,
+              "outerR": 3.8614,
+              "haloDiameterCssPx": 7.72,
+              "coreDiameterCssPx": 1.8,
+              "coreDiameterDevicePx": 3.59,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 41.72,
+                "coreMean": 37.77,
+                "innerRing": 8.58,
+                "outerRing": 3.88,
+                "background": 1.93
+              },
+              "coreOverHalo": 33.14,
+              "haloOverBackground": 6.65
+            },
+            {
+              "x": 2378.23,
+              "y": 1066.37,
+              "coreR": 0.6299,
+              "innerR": 1.5118,
+              "outerR": 2.7086,
+              "haloDiameterCssPx": 5.42,
+              "coreDiameterCssPx": 1.26,
+              "coreDiameterDevicePx": 2.52,
+              "colors": {
+                "core": 10857652,
+                "inner": 10857652,
+                "outer": 10857652
+              },
+              "alphas": {
+                "core": 0.3,
+                "inner": 0.048,
+                "outer": 0.0195
+              },
+              "luma": {
+                "corePeak": 59.86,
+                "coreMean": 48.42,
+                "innerRing": 11.98,
+                "outerRing": 4.76,
+                "background": 1.93
+              },
+              "coreOverHalo": 47.88,
+              "haloOverBackground": 10.05
+            },
+            {
+              "x": 2372.28,
+              "y": 1221.93,
+              "coreR": 0.9263,
+              "innerR": 2.2231,
+              "outerR": 3.9831,
+              "haloDiameterCssPx": 7.97,
+              "coreDiameterCssPx": 1.85,
+              "coreDiameterDevicePx": 3.71,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 41.72,
+                "coreMean": 35.98,
+                "innerRing": 8.68,
+                "outerRing": 3.88,
+                "background": 1.93
+              },
+              "coreOverHalo": 33.04,
+              "haloOverBackground": 6.75
+            },
+            {
+              "x": 2192.14,
+              "y": 638.62,
+              "coreR": 0.828,
+              "innerR": 1.9872,
+              "outerR": 3.5604,
+              "haloDiameterCssPx": 7.12,
+              "coreDiameterCssPx": 1.66,
+              "coreDiameterDevicePx": 3.31,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 41.72,
+                "coreMean": 37.33,
+                "innerRing": 8.53,
+                "outerRing": 3.87,
+                "background": 1.93
+              },
+              "coreOverHalo": 33.19,
+              "haloOverBackground": 6.6
+            },
+            {
+              "x": 2485.38,
+              "y": 1040.6,
+              "coreR": 0.7418,
+              "innerR": 1.7803,
+              "outerR": 3.1897,
+              "haloDiameterCssPx": 6.38,
+              "coreDiameterCssPx": 1.48,
+              "coreDiameterDevicePx": 2.97,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 41.72,
+                "coreMean": 34.84,
+                "innerRing": 8.67,
+                "outerRing": 3.85,
+                "background": 1.93
+              },
+              "coreOverHalo": 33.05,
+              "haloOverBackground": 6.74
+            },
+            {
+              "x": 562.1,
+              "y": 500.63,
+              "coreR": 0.9306,
+              "innerR": 2.2334,
+              "outerR": 4.0016,
+              "haloDiameterCssPx": 8,
+              "coreDiameterCssPx": 1.86,
+              "coreDiameterDevicePx": 3.72,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 41.72,
+                "coreMean": 37.42,
+                "innerRing": 8.74,
+                "outerRing": 3.87,
+                "background": 1.93
+              },
+              "coreOverHalo": 32.98,
+              "haloOverBackground": 6.81
+            },
+            {
+              "x": 1313.43,
+              "y": 133.75,
+              "coreR": 0.7635,
+              "innerR": 1.8324,
+              "outerR": 3.2831,
+              "haloDiameterCssPx": 6.57,
+              "coreDiameterCssPx": 1.53,
+              "coreDiameterDevicePx": 3.05,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 41.72,
+                "coreMean": 37.23,
+                "innerRing": 8.67,
+                "outerRing": 3.85,
+                "background": 1.93
+              },
+              "coreOverHalo": 33.05,
+              "haloOverBackground": 6.74
+            },
+            {
+              "x": 215.23,
+              "y": 117.32,
+              "coreR": 0.5854,
+              "innerR": 1.405,
+              "outerR": 2.5172,
+              "haloDiameterCssPx": 5.03,
+              "coreDiameterCssPx": 1.17,
+              "coreDiameterDevicePx": 2.34,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.38,
+                "inner": 0.0608,
+                "outer": 0.0247
+              },
+              "luma": {
+                "corePeak": 58.37,
+                "coreMean": 49.98,
+                "innerRing": 11.91,
+                "outerRing": 4.83,
+                "background": 1.93
+              },
+              "coreOverHalo": 46.46,
+              "haloOverBackground": 9.98
+            },
+            {
+              "x": 335.09,
+              "y": 1196.97,
+              "coreR": 0.6401,
+              "innerR": 1.5362,
+              "outerR": 2.7524,
+              "haloDiameterCssPx": 5.5,
+              "coreDiameterCssPx": 1.28,
+              "coreDiameterDevicePx": 2.56,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 41.72,
+                "coreMean": 41.72,
+                "innerRing": 8.28,
+                "outerRing": 3.86,
+                "background": 1.93
+              },
+              "coreOverHalo": 33.44,
+              "haloOverBackground": 6.35
+            },
+            {
+              "x": 1876.73,
+              "y": 145.9,
+              "coreR": 0.9201,
+              "innerR": 2.2082,
+              "outerR": 3.9564,
+              "haloDiameterCssPx": 7.91,
+              "coreDiameterCssPx": 1.84,
+              "coreDiameterDevicePx": 3.68,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 41.72,
+                "coreMean": 37.42,
+                "innerRing": 8.75,
+                "outerRing": 3.84,
+                "background": 1.93
+              },
+              "coreOverHalo": 32.97,
+              "haloOverBackground": 6.82
+            },
+            {
+              "x": 2704.79,
+              "y": 124.75,
+              "coreR": 0.5356,
+              "innerR": 1.2854,
+              "outerR": 2.3031,
+              "haloDiameterCssPx": 4.61,
+              "coreDiameterCssPx": 1.07,
+              "coreDiameterDevicePx": 2.14,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.38,
+                "inner": 0.0608,
+                "outer": 0.0247
+              },
+              "luma": {
+                "corePeak": 58.37,
+                "coreMean": 47.26,
+                "innerRing": 11.59,
+                "outerRing": 7.45,
+                "background": 2.12
+              },
+              "coreOverHalo": 46.78,
+              "haloOverBackground": 9.47
+            },
+            {
+              "x": 2423.89,
+              "y": 415.28,
+              "coreR": 0.8205,
+              "innerR": 1.9692,
+              "outerR": 3.5282,
+              "haloDiameterCssPx": 7.06,
+              "coreDiameterCssPx": 1.64,
+              "coreDiameterDevicePx": 3.28,
+              "colors": {
+                "core": 10857652,
+                "inner": 10857652,
+                "outer": 10857652
+              },
+              "alphas": {
+                "core": 0.3,
+                "inner": 0.048,
+                "outer": 0.0195
+              },
+              "luma": {
+                "corePeak": 59.86,
+                "coreMean": 47.07,
+                "innerRing": 12.25,
+                "outerRing": 4.87,
+                "background": 1.93
+              },
+              "coreOverHalo": 47.62,
+              "haloOverBackground": 10.31
+            },
+            {
+              "x": 1842.01,
+              "y": 1753.29,
+              "coreR": 0.5232,
+              "innerR": 1.2557,
+              "outerR": 2.2498,
+              "haloDiameterCssPx": 4.5,
+              "coreDiameterCssPx": 1.05,
+              "coreDiameterDevicePx": 2.09,
+              "colors": {
+                "core": 10857652,
+                "inner": 10857652,
+                "outer": 10857652
+              },
+              "alphas": {
+                "core": 0.3,
+                "inner": 0.048,
+                "outer": 0.0195
+              },
+              "luma": {
+                "corePeak": 59.86,
+                "coreMean": 48.33,
+                "innerRing": 11.85,
+                "outerRing": 4.88,
+                "background": 1.93
+              },
+              "coreOverHalo": 48.01,
+              "haloOverBackground": 9.92
+            },
+            {
+              "x": 832.94,
+              "y": 722.44,
+              "coreR": 0.5991,
+              "innerR": 1.4378,
+              "outerR": 2.5761,
+              "haloDiameterCssPx": 5.15,
+              "coreDiameterCssPx": 1.2,
+              "coreDiameterDevicePx": 2.4,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.38,
+                "inner": 0.0608,
+                "outer": 0.0247
+              },
+              "luma": {
+                "corePeak": 58.37,
+                "coreMean": 41.38,
+                "innerRing": 11.7,
+                "outerRing": 4.82,
+                "background": 1.93
+              },
+              "coreOverHalo": 46.67,
+              "haloOverBackground": 9.77
+            },
+            {
+              "x": 688.94,
+              "y": 754.25,
+              "coreR": 0.6208,
+              "innerR": 1.4899,
+              "outerR": 2.6694,
+              "haloDiameterCssPx": 5.34,
+              "coreDiameterCssPx": 1.24,
+              "coreDiameterDevicePx": 2.48,
+              "colors": {
+                "core": 10857652,
+                "inner": 10857652,
+                "outer": 10857652
+              },
+              "alphas": {
+                "core": 0.3,
+                "inner": 0.048,
+                "outer": 0.0195
+              },
+              "luma": {
+                "corePeak": 59.86,
+                "coreMean": 57.1,
+                "innerRing": 11.56,
+                "outerRing": 4.82,
+                "background": 1.93
+              },
+              "coreOverHalo": 48.3,
+              "haloOverBackground": 9.63
+            },
+            {
+              "x": 751.71,
+              "y": 1748.85,
+              "coreR": 0.686,
+              "innerR": 1.6464,
+              "outerR": 2.9498,
+              "haloDiameterCssPx": 5.9,
+              "coreDiameterCssPx": 1.37,
+              "coreDiameterDevicePx": 2.74,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 41.72,
+                "coreMean": 36.48,
+                "innerRing": 8.38,
+                "outerRing": 3.83,
+                "background": 1.93
+              },
+              "coreOverHalo": 33.35,
+              "haloOverBackground": 6.44
+            },
+            {
+              "x": 944.36,
+              "y": 1160.92,
+              "coreR": 0.4701,
+              "innerR": 1.1282,
+              "outerR": 2.0214,
+              "haloDiameterCssPx": 4.04,
+              "coreDiameterCssPx": 0.94,
+              "coreDiameterDevicePx": 1.88,
+              "colors": {
+                "core": 10857652,
+                "inner": 10857652,
+                "outer": 10857652
+              },
+              "alphas": {
+                "core": 0.3,
+                "inner": 0.048,
+                "outer": 0.0195
+              },
+              "luma": {
+                "corePeak": 59.86,
+                "coreMean": 54.33,
+                "innerRing": 12.57,
+                "outerRing": 4.78,
+                "background": 1.93
+              },
+              "coreOverHalo": 47.29,
+              "haloOverBackground": 10.64
+            },
+            {
+              "x": 2198.94,
+              "y": 968.29,
+              "coreR": 0.7174,
+              "innerR": 1.7218,
+              "outerR": 3.0848,
+              "haloDiameterCssPx": 6.17,
+              "coreDiameterCssPx": 1.43,
+              "coreDiameterDevicePx": 2.87,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 41.72,
+                "coreMean": 37.78,
+                "innerRing": 8.45,
+                "outerRing": 3.88,
+                "background": 1.93
+              },
+              "coreOverHalo": 33.28,
+              "haloOverBackground": 6.52
+            },
+            {
+              "x": 1615.59,
+              "y": 297.25,
+              "coreR": 0.8823,
+              "innerR": 2.1175,
+              "outerR": 3.7939,
+              "haloDiameterCssPx": 7.59,
+              "coreDiameterCssPx": 1.76,
+              "coreDiameterDevicePx": 3.53,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 41.72,
+                "coreMean": 36.97,
+                "innerRing": 8.57,
+                "outerRing": 3.84,
+                "background": 1.93
+              },
+              "coreOverHalo": 33.15,
+              "haloOverBackground": 6.64
+            },
+            {
+              "x": 924.85,
+              "y": 423.06,
+              "coreR": 0.639,
+              "innerR": 1.5336,
+              "outerR": 2.7477,
+              "haloDiameterCssPx": 5.5,
+              "coreDiameterCssPx": 1.28,
+              "coreDiameterDevicePx": 2.56,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.38,
+                "inner": 0.0608,
+                "outer": 0.0247
+              },
+              "luma": {
+                "corePeak": 58.37,
+                "coreMean": 58.37,
+                "innerRing": 11.6,
+                "outerRing": 4.92,
+                "background": 1.93
+              },
+              "coreOverHalo": 46.77,
+              "haloOverBackground": 9.67
+            },
+            {
+              "x": 407.26,
+              "y": 699.66,
+              "coreR": 0.6922,
+              "innerR": 1.6613,
+              "outerR": 2.9765,
+              "haloDiameterCssPx": 5.95,
+              "coreDiameterCssPx": 1.38,
+              "coreDiameterDevicePx": 2.77,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 41.72,
+                "coreMean": 34.97,
+                "innerRing": 8.45,
+                "outerRing": 3.82,
+                "background": 1.93
+              },
+              "coreOverHalo": 33.28,
+              "haloOverBackground": 6.52
+            },
+            {
+              "x": 227.93,
+              "y": 1103.56,
+              "coreR": 0.5711,
+              "innerR": 1.3706,
+              "outerR": 2.4557,
+              "haloDiameterCssPx": 4.91,
+              "coreDiameterCssPx": 1.14,
+              "coreDiameterDevicePx": 2.28,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.38,
+                "inner": 0.0608,
+                "outer": 0.0247
+              },
+              "luma": {
+                "corePeak": 58.37,
+                "coreMean": 47.01,
+                "innerRing": 10.94,
+                "outerRing": 4.79,
+                "background": 1.93
+              },
+              "coreOverHalo": 47.43,
+              "haloOverBackground": 9
+            }
+          ]
+        },
+        {
+          "label": "void-stars-mid",
+          "stars": 575,
+          "bloomed": 10,
+          "plain": 473,
+          "onScreenBloomed": 10,
+          "distinctColorsHex": [
+            "#7e8894",
+            "#a5acb4",
+            "#ffffff"
+          ],
+          "medianCoreOverHalo": 90.58,
+          "medianHaloOverBackground": 19.66,
+          "medianCorePeak": 112.32,
+          "medianCoreDiameterDevicePx": 3.51,
+          "medianHaloDiameterCssPx": 7.57,
+          "coresBelow1": 0,
+          "coresBelow4": 0,
+          "bloomedStars": [
+            {
+              "x": 2825.12,
+              "y": 1314.52,
+              "coreR": 1.1913,
+              "innerR": 2.8591,
+              "outerR": 5.1226,
+              "haloDiameterCssPx": 10.25,
+              "coreDiameterCssPx": 2.38,
+              "coreDiameterDevicePx": 4.77,
+              "colors": {
+                "core": 16777215,
+                "inner": 16777215,
+                "outer": 16777215
+              },
+              "alphas": {
+                "core": 0.42,
+                "inner": 0.0672,
+                "outer": 0.0273
+              },
+              "luma": {
+                "corePeak": 121.07,
+                "coreMean": 112.6,
+                "innerRing": 23.03,
+                "outerRing": 7.71,
+                "background": 1.93
+              },
+              "coreOverHalo": 98.04,
+              "haloOverBackground": 21.1
+            },
+            {
+              "x": 2646.47,
+              "y": 809.17,
+              "coreR": 0.7406,
+              "innerR": 1.7774,
+              "outerR": 3.1846,
+              "haloDiameterCssPx": 6.37,
+              "coreDiameterCssPx": 1.48,
+              "coreDiameterDevicePx": 2.96,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.7,
+                "inner": 0.112,
+                "outer": 0.0455
+              },
+              "luma": {
+                "corePeak": 100.95,
+                "coreMean": 84.03,
+                "innerRing": 20.13,
+                "outerRing": 7.37,
+                "background": 2.37
+              },
+              "coreOverHalo": 80.82,
+              "haloOverBackground": 17.76
+            },
+            {
+              "x": 2648.72,
+              "y": 1564.14,
+              "coreR": 0.7768,
+              "innerR": 1.8643,
+              "outerR": 3.3402,
+              "haloDiameterCssPx": 6.68,
+              "coreDiameterCssPx": 1.55,
+              "coreDiameterDevicePx": 3.11,
+              "colors": {
+                "core": 10857652,
+                "inner": 10857652,
+                "outer": 10857652
+              },
+              "alphas": {
+                "core": 0.55,
+                "inner": 0.088,
+                "outer": 0.0358
+              },
+              "luma": {
+                "corePeak": 103.58,
+                "coreMean": 95.07,
+                "innerRing": 20.47,
+                "outerRing": 7.59,
+                "background": 1.93
+              },
+              "coreOverHalo": 83.11,
+              "haloOverBackground": 18.54
+            },
+            {
+              "x": 426.08,
+              "y": 1505.42,
+              "coreR": 1.1139,
+              "innerR": 2.6734,
+              "outerR": 4.7898,
+              "haloDiameterCssPx": 9.58,
+              "coreDiameterCssPx": 2.23,
+              "coreDiameterDevicePx": 4.46,
+              "colors": {
+                "core": 16777215,
+                "inner": 16777215,
+                "outer": 16777215
+              },
+              "alphas": {
+                "core": 0.42,
+                "inner": 0.0672,
+                "outer": 0.0273
+              },
+              "luma": {
+                "corePeak": 121.07,
+                "coreMean": 107.57,
+                "innerRing": 22.79,
+                "outerRing": 7.69,
+                "background": 1.93
+              },
+              "coreOverHalo": 98.28,
+              "haloOverBackground": 20.86
+            },
+            {
+              "x": 1108.97,
+              "y": 485.16,
+              "coreR": 0.7496,
+              "innerR": 1.799,
+              "outerR": 3.2233,
+              "haloDiameterCssPx": 6.45,
+              "coreDiameterCssPx": 1.5,
+              "coreDiameterDevicePx": 3,
+              "colors": {
+                "core": 16777215,
+                "inner": 16777215,
+                "outer": 16777215
+              },
+              "alphas": {
+                "core": 0.42,
+                "inner": 0.0672,
+                "outer": 0.0273
+              },
+              "luma": {
+                "corePeak": 121.07,
+                "coreMean": 105.07,
+                "innerRing": 21.92,
+                "outerRing": 7.56,
+                "background": 1.93
+              },
+              "coreOverHalo": 99.15,
+              "haloOverBackground": 19.99
+            },
+            {
+              "x": 1688.13,
+              "y": 599.45,
+              "coreR": 1.1003,
+              "innerR": 2.6407,
+              "outerR": 4.7313,
+              "haloDiameterCssPx": 9.46,
+              "coreDiameterCssPx": 2.2,
+              "coreDiameterDevicePx": 4.4,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.7,
+                "inner": 0.112,
+                "outer": 0.0455
+              },
+              "luma": {
+                "corePeak": 100.95,
+                "coreMean": 88.6,
+                "innerRing": 20.62,
+                "outerRing": 7.48,
+                "background": 1.93
+              },
+              "coreOverHalo": 80.33,
+              "haloOverBackground": 18.68
+            },
+            {
+              "x": 577.24,
+              "y": 955.75,
+              "coreR": 1.1243,
+              "innerR": 2.6983,
+              "outerR": 4.8345,
+              "haloDiameterCssPx": 9.67,
+              "coreDiameterCssPx": 2.25,
+              "coreDiameterDevicePx": 4.5,
+              "colors": {
+                "core": 16777215,
+                "inner": 16777215,
+                "outer": 16777215
+              },
+              "alphas": {
+                "core": 0.42,
+                "inner": 0.0672,
+                "outer": 0.0273
+              },
+              "luma": {
+                "corePeak": 121.07,
+                "coreMean": 111.47,
+                "innerRing": 22.85,
+                "outerRing": 7.68,
+                "background": 1.93
+              },
+              "coreOverHalo": 98.22,
+              "haloOverBackground": 20.92
+            },
+            {
+              "x": 372.96,
+              "y": 583.04,
+              "coreR": 0.8159,
+              "innerR": 1.9582,
+              "outerR": 3.5084,
+              "haloDiameterCssPx": 7.02,
+              "coreDiameterCssPx": 1.63,
+              "coreDiameterDevicePx": 3.26,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.7,
+                "inner": 0.112,
+                "outer": 0.0455
+              },
+              "luma": {
+                "corePeak": 100.95,
+                "coreMean": 75.77,
+                "innerRing": 19.45,
+                "outerRing": 7.51,
+                "background": 1.93
+              },
+              "coreOverHalo": 81.5,
+              "haloOverBackground": 17.52
+            },
+            {
+              "x": 1286.46,
+              "y": 596.99,
+              "coreR": 0.9431,
+              "innerR": 2.2634,
+              "outerR": 4.0553,
+              "haloDiameterCssPx": 8.11,
+              "coreDiameterCssPx": 1.89,
+              "coreDiameterDevicePx": 3.77,
+              "colors": {
+                "core": 10857652,
+                "inner": 10857652,
+                "outer": 10857652
+              },
+              "alphas": {
+                "core": 0.55,
+                "inner": 0.088,
+                "outer": 0.0358
+              },
+              "luma": {
+                "corePeak": 103.58,
+                "coreMean": 86.72,
+                "innerRing": 21.25,
+                "outerRing": 7.62,
+                "background": 1.93
+              },
+              "coreOverHalo": 82.33,
+              "haloOverBackground": 19.32
+            },
+            {
+              "x": 2733.17,
+              "y": 530.18,
+              "coreR": 0.7434,
+              "innerR": 1.7842,
+              "outerR": 3.1966,
+              "haloDiameterCssPx": 6.39,
+              "coreDiameterCssPx": 1.49,
+              "coreDiameterDevicePx": 2.97,
+              "colors": {
+                "core": 16777215,
+                "inner": 16777215,
+                "outer": 16777215
+              },
+              "alphas": {
+                "core": 0.42,
+                "inner": 0.0672,
+                "outer": 0.0273
+              },
+              "luma": {
+                "corePeak": 121.07,
+                "coreMean": 100.5,
+                "innerRing": 22.45,
+                "outerRing": 7.51,
+                "background": 1.93
+              },
+              "coreOverHalo": 98.62,
+              "haloOverBackground": 20.52
+            }
+          ]
+        },
+        {
+          "label": "void-stars-near",
+          "stars": 254,
+          "bloomed": 1,
+          "plain": 200,
+          "onScreenBloomed": 1,
+          "distinctColorsHex": [
+            "#a5acb4",
+            "#ffffff"
+          ],
+          "medianCoreOverHalo": 182.7,
+          "medianHaloOverBackground": 45.37,
+          "medianCorePeak": 230,
+          "medianCoreDiameterDevicePx": 5.5,
+          "medianHaloDiameterCssPx": 11.83,
+          "coresBelow1": 0,
+          "coresBelow4": 0,
+          "bloomedStars": [
+            {
+              "x": 778.42,
+              "y": 708.9,
+              "coreR": 1.3753,
+              "innerR": 3.3007,
+              "outerR": 5.9138,
+              "haloDiameterCssPx": 11.83,
+              "coreDiameterCssPx": 2.75,
+              "coreDiameterDevicePx": 5.5,
+              "colors": {
+                "core": 16777215,
+                "inner": 16777215,
+                "outer": 16777215
+              },
+              "alphas": {
+                "core": 0.88,
+                "inner": 0.1408,
+                "outer": 0.0572
+              },
+              "luma": {
+                "corePeak": 230,
+                "coreMean": 203.72,
+                "innerRing": 47.3,
+                "outerRing": 15.35,
+                "background": 1.93
+              },
+              "coreOverHalo": 182.7,
+              "haloOverBackground": 45.37
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "map": "oval",
+      "sky": "plasmaReef",
+      "build": "0f8fd05",
+      "order": [
+        "void-ground",
+        "void-nebula-plasmaReef",
+        "void-stars-deep",
+        "void-stars-mid",
+        "void-stars-near"
+      ],
+      "skyDiscs": [
+        {
+          "label": "void-nebula-plasmaReef",
+          "discs": 1004,
+          "minDiameterCssPx": 8.1284,
+          "medianDiameterCssPx": 38.348,
+          "maxDiameterCssPx": 659.235
+        }
+      ],
+      "hiddenFromStage": [
+        "?",
+        "vfx",
+        "?",
+        "?",
+        "badge-root"
+      ],
+      "frame": "frames/shipped/oval-void-only.png",
+      "layers": [
+        {
+          "label": "void-stars-deep",
+          "stars": 803,
+          "bloomed": 22,
+          "plain": 639,
+          "onScreenBloomed": 22,
+          "distinctColorsHex": [
+            "#7e8894",
+            "#a5acb4"
+          ],
+          "medianCoreOverHalo": 33.41,
+          "medianHaloOverBackground": 6.97,
+          "medianCorePeak": 42.91,
+          "medianCoreDiameterDevicePx": 2.82,
+          "medianHaloDiameterCssPx": 6.06,
+          "coresBelow1": 0,
+          "coresBelow4": 0,
+          "bloomedStars": [
+            {
+              "x": 1462.63,
+              "y": 797.05,
+              "coreR": 0.6103,
+              "innerR": 1.4647,
+              "outerR": 2.6243,
+              "haloDiameterCssPx": 5.25,
+              "coreDiameterCssPx": 1.22,
+              "coreDiameterDevicePx": 2.44,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.38,
+                "inner": 0.0608,
+                "outer": 0.0247
+              },
+              "luma": {
+                "corePeak": 58.37,
+                "coreMean": 47.11,
+                "innerRing": 11.61,
+                "outerRing": 4.87,
+                "background": 1.93
+              },
+              "coreOverHalo": 46.76,
+              "haloOverBackground": 9.68
+            },
+            {
+              "x": 1481.53,
+              "y": 674.94,
+              "coreR": 0.8818,
+              "innerR": 2.1163,
+              "outerR": 3.7917,
+              "haloDiameterCssPx": 7.58,
+              "coreDiameterCssPx": 1.76,
+              "coreDiameterDevicePx": 3.53,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.38,
+                "inner": 0.0608,
+                "outer": 0.0247
+              },
+              "luma": {
+                "corePeak": 58.37,
+                "coreMean": 52.11,
+                "innerRing": 11.96,
+                "outerRing": 4.8,
+                "background": 1.93
+              },
+              "coreOverHalo": 46.41,
+              "haloOverBackground": 10.03
+            },
+            {
+              "x": 2055.68,
+              "y": 248.9,
+              "coreR": 0.898,
+              "innerR": 2.1552,
+              "outerR": 3.8614,
+              "haloDiameterCssPx": 7.72,
+              "coreDiameterCssPx": 1.8,
+              "coreDiameterDevicePx": 3.59,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 41.72,
+                "coreMean": 37.8,
+                "innerRing": 8.58,
+                "outerRing": 3.84,
+                "background": 1.93
+              },
+              "coreOverHalo": 33.14,
+              "haloOverBackground": 6.65
+            },
+            {
+              "x": 2260.98,
+              "y": 1095.89,
+              "coreR": 0.6299,
+              "innerR": 1.5118,
+              "outerR": 2.7086,
+              "haloDiameterCssPx": 5.42,
+              "coreDiameterCssPx": 1.26,
+              "coreDiameterDevicePx": 2.52,
+              "colors": {
+                "core": 10857652,
+                "inner": 10857652,
+                "outer": 10857652
+              },
+              "alphas": {
+                "core": 0.3,
+                "inner": 0.048,
+                "outer": 0.0195
+              },
+              "luma": {
+                "corePeak": 59.86,
+                "coreMean": 59.86,
+                "innerRing": 11.35,
+                "outerRing": 4.86,
+                "background": 1.93
+              },
+              "coreOverHalo": 48.51,
+              "haloOverBackground": 9.42
+            },
+            {
+              "x": 2254.76,
+              "y": 1246.29,
+              "coreR": 0.9263,
+              "innerR": 2.2231,
+              "outerR": 3.9831,
+              "haloDiameterCssPx": 7.97,
+              "coreDiameterCssPx": 1.85,
+              "coreDiameterDevicePx": 3.71,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 41.72,
+                "coreMean": 36.69,
+                "innerRing": 8.51,
+                "outerRing": 3.84,
+                "background": 1.93
+              },
+              "coreOverHalo": 33.21,
+              "haloOverBackground": 6.58
+            },
+            {
+              "x": 2066.56,
+              "y": 682.31,
+              "coreR": 0.828,
+              "innerR": 1.9872,
+              "outerR": 3.5604,
+              "haloDiameterCssPx": 7.12,
+              "coreDiameterCssPx": 1.66,
+              "coreDiameterDevicePx": 3.31,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 42.51,
+                "coreMean": 37.17,
+                "innerRing": 9.06,
+                "outerRing": 4.27,
+                "background": 2.49
+              },
+              "coreOverHalo": 33.45,
+              "haloOverBackground": 6.58
+            },
+            {
+              "x": 2372.92,
+              "y": 1070.97,
+              "coreR": 0.7418,
+              "innerR": 1.7803,
+              "outerR": 3.1897,
+              "haloDiameterCssPx": 6.38,
+              "coreDiameterCssPx": 1.48,
+              "coreDiameterDevicePx": 2.97,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 41.72,
+                "coreMean": 41.72,
+                "innerRing": 8.47,
+                "outerRing": 3.87,
+                "background": 1.93
+              },
+              "coreOverHalo": 33.26,
+              "haloOverBackground": 6.53
+            },
+            {
+              "x": 363.58,
+              "y": 548.89,
+              "coreR": 0.9306,
+              "innerR": 2.2334,
+              "outerR": 4.0016,
+              "haloDiameterCssPx": 8,
+              "coreDiameterCssPx": 1.86,
+              "coreDiameterDevicePx": 3.72,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 41.72,
+                "coreMean": 37.42,
+                "innerRing": 8.73,
+                "outerRing": 3.88,
+                "background": 1.93
+              },
+              "coreOverHalo": 32.99,
+              "haloOverBackground": 6.8
+            },
+            {
+              "x": 1148.54,
+              "y": 194.16,
+              "coreR": 0.7635,
+              "innerR": 1.8324,
+              "outerR": 3.2831,
+              "haloDiameterCssPx": 6.57,
+              "coreDiameterCssPx": 1.53,
+              "coreDiameterDevicePx": 3.05,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 41.72,
+                "coreMean": 37.23,
+                "innerRing": 8.58,
+                "outerRing": 3.88,
+                "background": 1.93
+              },
+              "coreOverHalo": 33.14,
+              "haloOverBackground": 6.65
+            },
+            {
+              "x": 126.43,
+              "y": 1222.17,
+              "coreR": 0.6401,
+              "innerR": 1.5362,
+              "outerR": 2.7524,
+              "haloDiameterCssPx": 5.5,
+              "coreDiameterCssPx": 1.28,
+              "coreDiameterDevicePx": 2.56,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 41.87,
+                "coreMean": 32.64,
+                "innerRing": 8.62,
+                "outerRing": 4.03,
+                "background": 2.15
+              },
+              "coreOverHalo": 33.25,
+              "haloOverBackground": 6.47
+            },
+            {
+              "x": 1737.03,
+              "y": 205.91,
+              "coreR": 0.9201,
+              "innerR": 2.2082,
+              "outerR": 3.9564,
+              "haloDiameterCssPx": 7.91,
+              "coreDiameterCssPx": 1.84,
+              "coreDiameterDevicePx": 3.68,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 41.72,
+                "coreMean": 35.19,
+                "innerRing": 8.66,
+                "outerRing": 3.82,
+                "background": 1.93
+              },
+              "coreOverHalo": 33.06,
+              "haloOverBackground": 6.73
+            },
+            {
+              "x": 2602.15,
+              "y": 185.46,
+              "coreR": 0.5356,
+              "innerR": 1.2854,
+              "outerR": 2.3031,
+              "haloDiameterCssPx": 4.61,
+              "coreDiameterCssPx": 1.07,
+              "coreDiameterDevicePx": 2.14,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.38,
+                "inner": 0.0608,
+                "outer": 0.0247
+              },
+              "luma": {
+                "corePeak": 58.44,
+                "coreMean": 47.18,
+                "innerRing": 11.29,
+                "outerRing": 7.62,
+                "background": 2.19
+              },
+              "coreOverHalo": 47.15,
+              "haloOverBackground": 9.1
+            },
+            {
+              "x": 2308.68,
+              "y": 466.37,
+              "coreR": 0.8205,
+              "innerR": 1.9692,
+              "outerR": 3.5282,
+              "haloDiameterCssPx": 7.06,
+              "coreDiameterCssPx": 1.64,
+              "coreDiameterDevicePx": 3.28,
+              "colors": {
+                "core": 10857652,
+                "inner": 10857652,
+                "outer": 10857652
+              },
+              "alphas": {
+                "core": 0.3,
+                "inner": 0.048,
+                "outer": 0.0195
+              },
+              "luma": {
+                "corePeak": 59.86,
+                "coreMean": 52.17,
+                "innerRing": 12.03,
+                "outerRing": 4.85,
+                "background": 1.93
+              },
+              "coreOverHalo": 47.84,
+              "haloOverBackground": 10.1
+            },
+            {
+              "x": 1700.77,
+              "y": 1760.06,
+              "coreR": 0.5232,
+              "innerR": 1.2557,
+              "outerR": 2.2498,
+              "haloDiameterCssPx": 4.5,
+              "coreDiameterCssPx": 1.05,
+              "coreDiameterDevicePx": 2.09,
+              "colors": {
+                "core": 10857652,
+                "inner": 10857652,
+                "outer": 10857652
+              },
+              "alphas": {
+                "core": 0.3,
+                "inner": 0.048,
+                "outer": 0.0195
+              },
+              "luma": {
+                "corePeak": 61.44,
+                "coreMean": 50.01,
+                "innerRing": 14.08,
+                "outerRing": 6.78,
+                "background": 3.69
+              },
+              "coreOverHalo": 47.36,
+              "haloOverBackground": 10.39
+            },
+            {
+              "x": 646.55,
+              "y": 763.35,
+              "coreR": 0.5991,
+              "innerR": 1.4378,
+              "outerR": 2.5761,
+              "haloDiameterCssPx": 5.15,
+              "coreDiameterCssPx": 1.2,
+              "coreDiameterDevicePx": 2.4,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.38,
+                "inner": 0.0608,
+                "outer": 0.0247
+              },
+              "luma": {
+                "corePeak": 58.37,
+                "coreMean": 44.94,
+                "innerRing": 11.96,
+                "outerRing": 4.8,
+                "background": 1.93
+              },
+              "coreOverHalo": 46.41,
+              "haloOverBackground": 10.03
+            },
+            {
+              "x": 496.1,
+              "y": 794.11,
+              "coreR": 0.6208,
+              "innerR": 1.4899,
+              "outerR": 2.6694,
+              "haloDiameterCssPx": 5.34,
+              "coreDiameterCssPx": 1.24,
+              "coreDiameterDevicePx": 2.48,
+              "colors": {
+                "core": 10857652,
+                "inner": 10857652,
+                "outer": 10857652
+              },
+              "alphas": {
+                "core": 0.3,
+                "inner": 0.048,
+                "outer": 0.0195
+              },
+              "luma": {
+                "corePeak": 59.86,
+                "coreMean": 57.1,
+                "innerRing": 11.43,
+                "outerRing": 4.86,
+                "background": 1.93
+              },
+              "coreOverHalo": 48.43,
+              "haloOverBackground": 9.5
+            },
+            {
+              "x": 561.69,
+              "y": 1755.77,
+              "coreR": 0.686,
+              "innerR": 1.6464,
+              "outerR": 2.9498,
+              "haloDiameterCssPx": 5.9,
+              "coreDiameterCssPx": 1.37,
+              "coreDiameterDevicePx": 2.74,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 41.8,
+                "coreMean": 36.56,
+                "innerRing": 8.44,
+                "outerRing": 3.93,
+                "background": 2.04
+              },
+              "coreOverHalo": 33.36,
+              "haloOverBackground": 6.4
+            },
+            {
+              "x": 762.95,
+              "y": 1187.3,
+              "coreR": 0.4701,
+              "innerR": 1.1282,
+              "outerR": 2.0214,
+              "haloDiameterCssPx": 4.04,
+              "coreDiameterCssPx": 0.94,
+              "coreDiameterDevicePx": 1.88,
+              "colors": {
+                "core": 10857652,
+                "inner": 10857652,
+                "outer": 10857652
+              },
+              "alphas": {
+                "core": 0.3,
+                "inner": 0.048,
+                "outer": 0.0195
+              },
+              "luma": {
+                "corePeak": 60.65,
+                "coreMean": 49.27,
+                "innerRing": 13.91,
+                "outerRing": 5.78,
+                "background": 2.66
+              },
+              "coreOverHalo": 46.74,
+              "haloOverBackground": 11.25
+            },
+            {
+              "x": 2073.66,
+              "y": 1001.05,
+              "coreR": 0.7174,
+              "innerR": 1.7218,
+              "outerR": 3.0848,
+              "haloDiameterCssPx": 6.17,
+              "coreDiameterCssPx": 1.43,
+              "coreDiameterDevicePx": 2.87,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 41.72,
+                "coreMean": 37.78,
+                "innerRing": 8.52,
+                "outerRing": 3.85,
+                "background": 1.93
+              },
+              "coreOverHalo": 33.21,
+              "haloOverBackground": 6.58
+            },
+            {
+              "x": 1464.22,
+              "y": 352.25,
+              "coreR": 0.8823,
+              "innerR": 2.1175,
+              "outerR": 3.7939,
+              "haloDiameterCssPx": 7.59,
+              "coreDiameterCssPx": 1.76,
+              "coreDiameterDevicePx": 3.53,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 41.72,
+                "coreMean": 38.23,
+                "innerRing": 8.75,
+                "outerRing": 3.84,
+                "background": 1.93
+              },
+              "coreOverHalo": 32.97,
+              "haloOverBackground": 6.82
+            },
+            {
+              "x": 742.57,
+              "y": 473.89,
+              "coreR": 0.639,
+              "innerR": 1.5336,
+              "outerR": 2.7477,
+              "haloDiameterCssPx": 5.5,
+              "coreDiameterCssPx": 1.28,
+              "coreDiameterDevicePx": 2.56,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.38,
+                "inner": 0.0608,
+                "outer": 0.0247
+              },
+              "luma": {
+                "corePeak": 58.37,
+                "coreMean": 45.2,
+                "innerRing": 12.03,
+                "outerRing": 4.82,
+                "background": 1.93
+              },
+              "coreOverHalo": 46.34,
+              "haloOverBackground": 10.1
+            },
+            {
+              "x": 201.82,
+              "y": 741.32,
+              "coreR": 0.6922,
+              "innerR": 1.6613,
+              "outerR": 2.9765,
+              "haloDiameterCssPx": 5.95,
+              "coreDiameterCssPx": 1.38,
+              "coreDiameterDevicePx": 2.77,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.26,
+                "inner": 0.0416,
+                "outer": 0.0169
+              },
+              "luma": {
+                "corePeak": 43.3,
+                "coreMean": 36.54,
+                "innerRing": 10.92,
+                "outerRing": 6.11,
+                "background": 3.8
+              },
+              "coreOverHalo": 32.37,
+              "haloOverBackground": 7.12
+            }
+          ]
+        },
+        {
+          "label": "void-stars-mid",
+          "stars": 590,
+          "bloomed": 10,
+          "plain": 485,
+          "onScreenBloomed": 10,
+          "distinctColorsHex": [
+            "#7e8894",
+            "#a5acb4",
+            "#ffffff"
+          ],
+          "medianCoreOverHalo": 81.71,
+          "medianHaloOverBackground": 19.09,
+          "medianCorePeak": 105.3,
+          "medianCoreDiameterDevicePx": 4.09,
+          "medianHaloDiameterCssPx": 8.79,
+          "coresBelow1": 0,
+          "coresBelow4": 0,
+          "bloomedStars": [
+            {
+              "x": 2587.78,
+              "y": 1363.46,
+              "coreR": 1.1913,
+              "innerR": 2.8591,
+              "outerR": 5.1226,
+              "haloDiameterCssPx": 10.25,
+              "coreDiameterCssPx": 2.38,
+              "coreDiameterDevicePx": 4.77,
+              "colors": {
+                "core": 16777215,
+                "inner": 16777215,
+                "outer": 16777215
+              },
+              "alphas": {
+                "core": 0.42,
+                "inner": 0.0672,
+                "outer": 0.0273
+              },
+              "luma": {
+                "corePeak": 121.07,
+                "coreMean": 109.07,
+                "innerRing": 23.07,
+                "outerRing": 7.65,
+                "background": 1.93
+              },
+              "coreOverHalo": 98,
+              "haloOverBackground": 21.14
+            },
+            {
+              "x": 2391.07,
+              "y": 892.69,
+              "coreR": 0.7406,
+              "innerR": 1.7774,
+              "outerR": 3.1846,
+              "haloDiameterCssPx": 6.37,
+              "coreDiameterCssPx": 1.48,
+              "coreDiameterDevicePx": 2.96,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.7,
+                "inner": 0.112,
+                "outer": 0.0455
+              },
+              "luma": {
+                "corePeak": 100.95,
+                "coreMean": 86.83,
+                "innerRing": 19.81,
+                "outerRing": 7.29,
+                "background": 1.93
+              },
+              "coreOverHalo": 81.14,
+              "haloOverBackground": 17.88
+            },
+            {
+              "x": 2393.54,
+              "y": 1595.99,
+              "coreR": 0.7768,
+              "innerR": 1.8643,
+              "outerR": 3.3402,
+              "haloDiameterCssPx": 6.68,
+              "coreDiameterCssPx": 1.55,
+              "coreDiameterDevicePx": 3.11,
+              "colors": {
+                "core": 10857652,
+                "inner": 10857652,
+                "outer": 10857652
+              },
+              "alphas": {
+                "core": 0.55,
+                "inner": 0.088,
+                "outer": 0.0358
+              },
+              "luma": {
+                "corePeak": 107.02,
+                "coreMean": 95.12,
+                "innerRing": 28.87,
+                "outerRing": 16.29,
+                "background": 10.62
+              },
+              "coreOverHalo": 78.15,
+              "haloOverBackground": 18.24
+            },
+            {
+              "x": 2380.09,
+              "y": 26.71,
+              "coreR": 1.2612,
+              "innerR": 3.0269,
+              "outerR": 5.4232,
+              "haloDiameterCssPx": 10.85,
+              "coreDiameterCssPx": 2.52,
+              "coreDiameterDevicePx": 5.04,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.7,
+                "inner": 0.112,
+                "outer": 0.0455
+              },
+              "luma": {
+                "corePeak": 100.95,
+                "coreMean": 92.64,
+                "innerRing": 20.7,
+                "outerRing": 7.64,
+                "background": 2.08
+              },
+              "coreOverHalo": 80.25,
+              "haloOverBackground": 18.62
+            },
+            {
+              "x": 698.08,
+              "y": 590.86,
+              "coreR": 0.7496,
+              "innerR": 1.799,
+              "outerR": 3.2233,
+              "haloDiameterCssPx": 6.45,
+              "coreDiameterCssPx": 1.5,
+              "coreDiameterDevicePx": 3,
+              "colors": {
+                "core": 16777215,
+                "inner": 16777215,
+                "outer": 16777215
+              },
+              "alphas": {
+                "core": 0.42,
+                "inner": 0.0672,
+                "outer": 0.0273
+              },
+              "luma": {
+                "corePeak": 121.07,
+                "coreMean": 97.07,
+                "innerRing": 22.3,
+                "outerRing": 7.53,
+                "background": 1.93
+              },
+              "coreOverHalo": 98.77,
+              "haloOverBackground": 20.37
+            },
+            {
+              "x": 1335.81,
+              "y": 697.32,
+              "coreR": 1.1003,
+              "innerR": 2.6407,
+              "outerR": 4.7313,
+              "haloDiameterCssPx": 9.46,
+              "coreDiameterCssPx": 2.2,
+              "coreDiameterDevicePx": 4.4,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.7,
+                "inner": 0.112,
+                "outer": 0.0455
+              },
+              "luma": {
+                "corePeak": 100.95,
+                "coreMean": 90.41,
+                "innerRing": 20.72,
+                "outerRing": 7.47,
+                "background": 1.93
+              },
+              "coreOverHalo": 80.23,
+              "haloOverBackground": 18.79
+            },
+            {
+              "x": 112.58,
+              "y": 1029.25,
+              "coreR": 1.1243,
+              "innerR": 2.6983,
+              "outerR": 4.8345,
+              "haloDiameterCssPx": 9.67,
+              "coreDiameterCssPx": 2.25,
+              "coreDiameterDevicePx": 4.5,
+              "colors": {
+                "core": 16777215,
+                "inner": 16777215,
+                "outer": 16777215
+              },
+              "alphas": {
+                "core": 0.42,
+                "inner": 0.0672,
+                "outer": 0.0273
+              },
+              "luma": {
+                "corePeak": 121.14,
+                "coreMean": 104.67,
+                "innerRing": 22.75,
+                "outerRing": 7.91,
+                "background": 2.11
+              },
+              "coreOverHalo": 98.39,
+              "haloOverBackground": 20.65
+            },
+            {
+              "x": 893.52,
+              "y": 695.03,
+              "coreR": 0.9431,
+              "innerR": 2.2634,
+              "outerR": 4.0553,
+              "haloDiameterCssPx": 8.11,
+              "coreDiameterCssPx": 1.89,
+              "coreDiameterDevicePx": 3.77,
+              "colors": {
+                "core": 10857652,
+                "inner": 10857652,
+                "outer": 10857652
+              },
+              "alphas": {
+                "core": 0.55,
+                "inner": 0.088,
+                "outer": 0.0358
+              },
+              "luma": {
+                "corePeak": 103.58,
+                "coreMean": 88.38,
+                "innerRing": 21.31,
+                "outerRing": 7.65,
+                "background": 1.93
+              },
+              "coreOverHalo": 82.27,
+              "haloOverBackground": 19.38
+            },
+            {
+              "x": 2486.54,
+              "y": 632.8,
+              "coreR": 0.7434,
+              "innerR": 1.7842,
+              "outerR": 3.1966,
+              "haloDiameterCssPx": 6.39,
+              "coreDiameterCssPx": 1.49,
+              "coreDiameterDevicePx": 2.97,
+              "colors": {
+                "core": 16777215,
+                "inner": 16777215,
+                "outer": 16777215
+              },
+              "alphas": {
+                "core": 0.42,
+                "inner": 0.0672,
+                "outer": 0.0273
+              },
+              "luma": {
+                "corePeak": 121.07,
+                "coreMean": 100.5,
+                "innerRing": 22.57,
+                "outerRing": 7.56,
+                "background": 1.93
+              },
+              "coreOverHalo": 98.5,
+              "haloOverBackground": 20.64
+            },
+            {
+              "x": 424.51,
+              "y": 1239.99,
+              "coreR": 1.1407,
+              "innerR": 2.7377,
+              "outerR": 4.905,
+              "haloDiameterCssPx": 9.81,
+              "coreDiameterCssPx": 2.28,
+              "coreDiameterDevicePx": 4.56,
+              "colors": {
+                "core": 8292500,
+                "inner": 8292500,
+                "outer": 8292500
+              },
+              "alphas": {
+                "core": 0.7,
+                "inner": 0.112,
+                "outer": 0.0455
+              },
+              "luma": {
+                "corePeak": 101.74,
+                "coreMean": 95.83,
+                "innerRing": 24.21,
+                "outerRing": 11.05,
+                "background": 5.48
+              },
+              "coreOverHalo": 77.53,
+              "haloOverBackground": 18.72
+            }
+          ]
+        },
+        {
+          "label": "void-stars-near",
+          "stars": 266,
+          "bloomed": 1,
+          "plain": 208,
+          "onScreenBloomed": 1,
+          "distinctColorsHex": [
+            "#a5acb4",
+            "#ffffff"
+          ],
+          "medianCoreOverHalo": 127.23,
+          "medianHaloOverBackground": 35.85,
+          "medianCorePeak": 165.02,
+          "medianCoreDiameterDevicePx": 8.3,
+          "medianHaloDiameterCssPx": 17.84,
+          "coresBelow1": 0,
+          "coresBelow4": 0,
+          "bloomedStars": [
+            {
+              "x": 59.93,
+              "y": 142.66,
+              "coreR": 2.0747,
+              "innerR": 4.9793,
+              "outerR": 8.9212,
+              "haloDiameterCssPx": 17.84,
+              "coreDiameterCssPx": 4.15,
+              "coreDiameterDevicePx": 8.3,
+              "colors": {
+                "core": 10857652,
+                "inner": 10857652,
+                "outer": 10857652
+              },
+              "alphas": {
+                "core": 0.92,
+                "inner": 0.1472,
+                "outer": 0.0598
+              },
+              "luma": {
+                "corePeak": 165.02,
+                "coreMean": 153.33,
+                "innerRing": 37.79,
+                "outerRing": 12.71,
+                "background": 1.94
+              },
+              "coreOverHalo": 127.23,
+              "haloOverBackground": 35.85
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
