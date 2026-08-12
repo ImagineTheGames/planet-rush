@@ -68,7 +68,7 @@
 
 import type { PlayerId, Rng } from '@shared/types';
 import { ShipClass } from '@shared/types';
-import { FireMode } from '@platform/actions';
+import { FireMode, defaultFireMode } from '@platform/actions';
 import type { ClientMessage, FireMode as WireFireMode, LobbySlot, RoomCode } from '../net/transport';
 import type { EntryTarget, LobbyTarget } from './lobby-geometry';
 import { adjustVolume, createSettings, toggleReduceVfx } from './settings';
@@ -269,12 +269,23 @@ export interface FlowResult {
 
 const NO_EFFECTS: readonly FlowEffect[] = [];
 
-/** A flow resting on a clean entry screen. Fire mode and the rest of settings
- *  carry in, so a rematch keeps a player's choices ({@link resetFlow}). */
+/**
+ * A flow resting on a clean entry screen. Fire mode and the rest of settings carry
+ * in, so a rematch keeps a player's choices ({@link resetFlow}).
+ *
+ * **The two how-it-plays defaults are the ratified ones, on every platform (GDD
+ * §2.4, amended 2026-08-12 — a0-30):** Tap Commander and Auto-aim. They are stated
+ * once, here and in `@platform/actions` `defaultFireMode`, so a caller that has
+ * nothing stored for a player cannot seat a *different* first-run pair than the
+ * boot path does. Sticks and Manual are unchanged as choices — every route to them
+ * (settings, the pause menu) is untouched, and the wiring layer still passes a
+ * *saved* preference in explicitly rather than letting these defaults answer for
+ * someone who has already chosen (a0-30 item 2: read before you default).
+ */
 export function createFlow(
-  fireMode: FireMode = FireMode.Manual,
+  fireMode: FireMode = defaultFireMode(),
   settings: SettingsState = createSettings(),
-  controlScheme: ControlScheme = 'sticks',
+  controlScheme: ControlScheme = 'tap',
   profile: Profile = freshProfile(),
 ): FlowState {
   return {

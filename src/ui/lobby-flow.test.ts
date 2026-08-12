@@ -963,16 +963,20 @@ describe('the settings screen (the fourth main-menu option)', () => {
 
   it('toggles the control scheme, and it never rides the wire (local input only)', () => {
     const settings = flowOpenSettings(createFlow()).state;
-    expect(settings.controlScheme).toBe('sticks'); // the untouched default
-    const tap = flowTapSettings(settings, { kind: 'controls' });
-    expect(tap.state.controlScheme).toBe('tap');
-    expect(tap.effects).toEqual([]); // the scheme is local input — nothing to send
-    const back = flowTapSettings(tap.state, { kind: 'controls' });
-    expect(back.state.controlScheme).toBe('sticks');
+    // Tap Commander is the default on every platform since a0-30 (GDD §2.4,
+    // amended 2026-08-12) — so the row toggles AWAY from it first. The toggle
+    // itself, and both destinations, are unchanged: this used to read 'sticks'
+    // here and 'tap' below.
+    expect(settings.controlScheme).toBe('tap');
+    const sticks = flowTapSettings(settings, { kind: 'controls' });
+    expect(sticks.state.controlScheme).toBe('sticks'); // still one press away
+    expect(sticks.effects).toEqual([]); // the scheme is local input — nothing to send
+    const back = flowTapSettings(sticks.state, { kind: 'controls' });
+    expect(back.state.controlScheme).toBe('tap');
 
     // …and unlike the fire mode it does NOT ride a lobbyChoice — the sim never
     // sees the scheme, so opening a room carries no control-scheme field.
-    const done = flowCloseSettings(tap.state).state;
+    const done = flowCloseSettings(sticks.state).state;
     const rng = mulberry32(23);
     const opened = flowTapEntry(done, { kind: 'door', index: doorIndex('solo') }, rng);
     expect(sent(flowConnected(opened.state, 0))[0]).not.toHaveProperty('controlScheme');

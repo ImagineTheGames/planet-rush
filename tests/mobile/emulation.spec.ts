@@ -458,6 +458,14 @@ test('touch drag on the left half moves the ship (world units per sim tick)', as
   // gesture's wall-clock cost went 2.5 s → 31.4 s. The no-input control reads
   // exactly 0.000 at both rates, so the bar still fails a genuinely dead stick.
   // (Platform note m1-12.)
+  //
+  // Seat the STICKS scheme before boot (a0-30). Tap Commander is the first-run
+  // default on every platform since 2026-08-12 (GDD §2.4, amended) and it replaces
+  // the sticks: the left-half drag below writes no thrust at all, and the
+  // no-input control this bar is calibrated against would become the only reading.
+  // The measurement is of the LEFT VIRTUAL STICK, so it asks for the scheme that
+  // has one — the gesture, the tick window and the per-tick bar are unchanged.
+  await page.addInitScript(() => localStorage.setItem('planet-rush:controlScheme', 'sticks'));
   await page.goto('/?debug=1');
   await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
   await page.waitForFunction(
