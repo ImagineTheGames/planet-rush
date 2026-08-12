@@ -73,6 +73,14 @@ tree.
     world exactly as a closed seat is. One tap now, plus an assertion that the
     seat really is closed. Test-only, in another agent's directory, called out in
     the PR body.
+- **A third test elsewhere walked the old three-rung ring on a real phone.**
+  `tests/mobile/slot-state.spec.ts` (QA's) pressed BOT → CLOSED → **OPEN** → BOT
+  in the SOLO lobby, so it would have gone red in CI's Playwright shards while
+  `npm test -- --run` stayed green — vitest does not run the mobile suite. It now
+  walks BOT → CLOSED → BOT → CLOSED and asserts no row read OPEN at any point, so
+  it is a second proof of a0-31 on a real device rather than only a repair.
+  Verified locally: `PREVIEW_PORT=4197 npx playwright test tests/mobile/slot-state.spec.ts`
+  → 9/9 across iphone / pixel / desktop.
 - **Nothing changed for online.** a0-11 is ratified. The online ring, the empty
   room, `lobbyWireSeats`, `applyLobbySlots` and the all-bot local revert are all
   untouched — `occupantOf` is the identity function when `online` is true.

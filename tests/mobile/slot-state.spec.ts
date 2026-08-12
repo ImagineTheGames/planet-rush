@@ -444,7 +444,7 @@ test('the control reads pressable where it works and dead where it refuses', asy
 // 3. The door as a door: a real press on it closes a slot
 // ===========================================================================
 
-test('a real press on the control walks BOT → CLOSED → OPEN → BOT and shrinks the match', async ({
+test('a real press on the control walks BOT ⇄ CLOSED and shrinks the match — and never offers OPEN', async ({
   page,
 }, testInfo) => {
   budgetTest({
@@ -458,8 +458,9 @@ test('a real press on the control walks BOT → CLOSED → OPEN → BOT and shri
   const before = await readLobby(page);
   // The SOLO lobby opens on the bot cast (a0-11; GDD §2.1 amended 2026-08-07 —
   // an OPEN seat means "waiting for a human", and offline there is no wire for
-  // one to arrive on, so it would be a chair nobody could ever take). The ring is
-  // the same ring; this walk starts one rung along from where it used to.
+  // one to arrive on, so it would be a chair nobody could ever take). Since a0-31
+  // that is true of the CONTROL as well as of the opening state: the solo ring is
+  // BOT ⇄ CLOSED, two rungs, and OPEN is not one of them.
   const target = before.seatStates.find((c) => c.live && c.label === 'BOT');
   expect(target, 'a BOT seat the host can cycle').toBeTruthy();
   const slot = target!.index;
@@ -489,19 +490,27 @@ test('a real press on the control walks BOT → CLOSED → OPEN → BOT and shri
   const closed = await pressControl('CLOSED');
   expect(closed.size, 'closing a slot did not shrink the match').toBe(before.size - 1);
 
-  // CLOSED → OPEN: an EMPTY chair. It is out of the match exactly as the closed
-  // one was — the difference is that a joiner could take it, and offline nobody
-  // can, which is why the solo lobby does not open on this rung (a0-11).
-  const opened = await pressControl('OPEN');
-  expect(opened.size, 'an OPEN seat is empty — it brings no ship').toBe(before.size - 1);
-
-  // OPEN → BOT: and the control is the way back, so a slot emptied by accident is
-  // one press from carrying a bot again.
+  // CLOSED → BOT: the control is the way back, so a slot shut by accident is one
+  // press from carrying a bot again. This press used to land on OPEN — an empty
+  // chair, out of the match, that a joiner could take. Nobody can join a solo
+  // lobby, so a0-31 took that rung out: *"in solo play there should be no slot
+  // open it's either closed or bot."*
   const reopened = await pressControl('BOT');
   expect(reopened.size, 'seating a bot did not restore the match size').toBe(before.size);
 
+  // A third press proves it is a RING and not a truncated line: it lands back on
+  // CLOSED, and at no point in the walk did any row read OPEN.
+  const shutAgain = await pressControl('CLOSED');
+  expect(shutAgain.size, 'the second close did not shrink the match').toBe(before.size - 1);
+  for (const seen of [before, closed, reopened, shutAgain]) {
+    expect(
+      seen.seatStates.filter((c) => c.label === 'OPEN'),
+      'a solo lobby offered an OPEN seat — nobody can take it (a0-31)',
+    ).toHaveLength(0);
+  }
+
   // Nothing else on the row moved: pressing the state control is not a way to
   // change somebody's side or a bot's tier.
-  expect(reopened.seatStates.filter((c) => c.label === 'CLOSED')).toHaveLength(0);
-  expect(reopened.visible, 'the lobby is still up — no press escaped into the match').toBe(true);
+  expect(shutAgain.seatStates.filter((c) => c.label === 'CLOSED')).toHaveLength(1);
+  expect(shutAgain.visible, 'the lobby is still up — no press escaped into the match').toBe(true);
 });
