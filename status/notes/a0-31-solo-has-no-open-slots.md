@@ -8,9 +8,10 @@ Branch: `agent/ui/a0-31-solo-no-open-slots`.
 
 ## BUILT
 
-`npx tsc --noEmit` clean; `npm test -- --run` 5227/5227 green (two files needed
-updating — see DECISIONS); the evidence capture passes and its images are in the
-tree.
+`npx tsc --noEmit` clean; `npm test -- --run` 5227/5227 green (292 files) at the
+tip; the evidence capture passes and its images are in the tree. **PR #402 is
+open and every CI check is green** — the six mobile Playwright shards, the perf
+gate and typecheck/test/build.
 
 - **`5751616` — the test, RED first (LESSONS §24).** Three tests in
   `src/ui/lobby.test.ts`, all failing against the shipped lobby: the solo ring
@@ -89,10 +90,22 @@ tree.
   now it also has no open seat to advertise, so `joinableSeats > 0` could not be
   true of one even if it did. Stated in the PR body, as the brief asks.
 
+- **`e319faa` — the last two raw readers.** `main.ts` still asked the stored word
+  in two places, and both would be a rung behind on a resolved solo seat: the
+  row's `?` dossier (gated on `seat.personality`, null on a stored-open seat, so
+  a row drawing BOT could carry a `?` that opened nothing) and `botPersonalities`
+  (filtered the same null, while `botDifficulties` beside it now filters on the
+  resolved occupant — and those two rows are indexed against each other). Both go
+  through `isBotSeat(occupantOf(...))`; `isBotSeat` joins the two on `src/ui`'s
+  public surface. Verified with `tests/live-stage/lobby-cast.spec.ts` (3/3,
+  desktop + phone), whose committed evidence PNGs I restored afterwards — they
+  are the Gameplay Engineer's and only differed by this lane's build badge.
+
 ## NEXT
 
-- Nothing outstanding. PR open; DoD commands all run green locally
-  (`tsc --noEmit`, `npm test -- --run`, the `cycleSeatState` grep on FETCH_HEAD).
+- Nothing outstanding. PR #402 open and fully green; DoD commands all run
+  (`tsc --noEmit`, `npm test -- --run` 5227/5227, the `cycleSeatState` grep on
+  FETCH_HEAD, and the PR-checks command reporting zero failures).
 - If a future brief moves the *default* seat state in solo (e.g. "open on a
   smaller cast"), change `createLobby`'s seed — the ring and the read seam follow
   from `online` and need no edit.
