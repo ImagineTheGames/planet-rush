@@ -66,6 +66,14 @@ export interface Room {
   /** Seats a new human can still take right now: open lobby seats, 0 once the
    *  match is live or full (Task C3). What a lobby refuses an incompatible join on. */
   readonly joinableSeats?: number;
+  /**
+   * Whether the room's host consents to it appearing in the lobby browser's list
+   * (a0-26 D1). **Absent reads as listed** — the ruled default, and the shape a
+   * Machine older than this field sends. Read only by `Allocator.rooms`; a
+   * private room is untouched everywhere else, because unlisted is not
+   * unreachable and its code still works (`Allocator.roomInfo`, `join`).
+   */
+  readonly listed?: boolean;
 }
 
 /**

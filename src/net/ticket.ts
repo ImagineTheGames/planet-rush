@@ -62,6 +62,37 @@ export interface TicketClaims {
    * `MatchMode` union (`src/sim/match-config.ts`); the Machine narrows it.
    */
   readonly mode?: string;
+  /**
+   * **What the bearer was allocated to do** (a0-26 Milestone A) — the claim that
+   * makes a dead room refusable.
+   *
+   * The match server has no "create room" verb: an unknown code *creates* the
+   * room, and that is load-bearing, because it is how HOST works (the allocator
+   * mints a code, and the creator's `join` is what brings the room into
+   * existence). The cost is that the same mechanism silently resurrects a room
+   * that has ended — type a code whose room was swept four seconds ago, or tap a
+   * listing built from a heartbeat that has not caught up, and you land alone in
+   * a brand-new room wearing the name of the one you asked for. Nothing errors,
+   * because nothing can tell the two joins apart.
+   *
+   * This is what tells them apart, and it is signed because a client that could
+   * declare its own intent could declare `create` on someone else's code:
+   *
+   *   • `'create'` — issued by `POST /rooms`, and by a join reaching a room the
+   *     allocator knows only through its reservation (the **boot gap** — the room
+   *     may not have booted yet). An unknown code opens a room, exactly as it
+   *     always has.
+   *   • `'join'`   — issued by a join to a room a **heartbeat has confirmed is
+   *     there** (and by the listing join, which is built from those heartbeats
+   *     alone). An unknown code is **refused** (`room-gone`), never opened.
+   *
+   * So the claim means precisely: *the allocator had been told this room exists.*
+   * That is the only case where a Machine not hosting it proves the room ended.
+   *
+   * **Absent reads as `create`**, so a client older than this field and the
+   * self-hosted path with no ticket secret behave byte-for-byte as they did.
+   */
+  readonly intent?: 'create' | 'join';
 }
 
 /**
@@ -123,6 +154,11 @@ function isTicketClaims(value: unknown): value is TicketClaims {
   const c = value as Record<string, unknown>;
   if (c.size !== undefined && (typeof c.size !== 'number' || !Number.isFinite(c.size))) return false;
   if (c.mode !== undefined && typeof c.mode !== 'string') return false;
+  // An intent that is neither word is not a claim this build understands. It is
+  // dropped to a malformed ticket rather than read as the permissive `create`,
+  // because the whole value of the claim is that a `join` cannot be talked out
+  // of being one — fail closed, exactly as the signature check above does.
+  if (c.intent !== undefined && c.intent !== 'create' && c.intent !== 'join') return false;
   return (
     typeof c.room === 'string' &&
     typeof c.machine === 'string' &&

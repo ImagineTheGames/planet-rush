@@ -241,6 +241,23 @@ export interface LobbyChoiceMessage {
    * SCARCE default it opened with (`server/room.ts`, `DEFAULT_ABUNDANCE`).
    */
   abundance?: Abundance;
+  /**
+   * **PUBLIC / PRIVATE** — whether the room consents to appearing in the lobby
+   * browser's list (a0-26 D1; `docs/lobby-browser-plan.md` §2).
+   *
+   * The developer's ruling is public by default with a PRIVATE toggle, so `true`
+   * is what a room already is and this field only ever carries a host's decision
+   * to stop publishing. Creator-only and lobby-phase only, the same seam
+   * {@link mode} and {@link abundance} ride: who may *find* a room is match shape
+   * in the same sense the roster is, and a guest must not be able to publish or
+   * hide a room they merely walked into.
+   *
+   * Absent means "no opinion", which leaves the room on the default it opened at
+   * — so a client older than this field keeps hosting listable rooms and nothing
+   * about the code path changes. **Unlisted is not unreachable:** a private room
+   * still answers `GET /rooms/:code` and still admits anyone who has the code.
+   */
+  listed?: boolean;
 }
 
 /** The room creator starts the match (fills empty slots with bots server-side). */

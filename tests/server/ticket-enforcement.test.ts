@@ -179,6 +179,95 @@ describe('ticket enforcement — a Machine refuses any join it was not sent', ()
     });
   });
 
+  // --- a0-26 Milestone A: a join-intent ticket may not create a room -------
+
+  /**
+   * The measured failure this closes (`spikes/lobby-browser/measure-listing.ts`
+   * §2): a host opens a room and closes the tab in the lobby, the room is swept
+   * on the next update, and for up to one heartbeat the allocator still hands out
+   * a ticket for it. Today that ticket *creates the room again* and the player
+   * sits alone in an empty lobby. Nothing errors. With the intent claim, a ticket
+   * the allocator signed as a `join` is refused on an unknown code, and — the
+   * half that matters most — **no room is created**.
+   */
+  describe('the dead-room refusal (a0-26 Milestone A)', () => {
+    const intended = (
+      server: MatchServer,
+      intent: 'create' | 'join' | undefined,
+    ): FakeSocket => {
+      const socket = new FakeSocket();
+      const ticket = signTicket(
+        {
+          room: ROOM,
+          machine: MACHINE,
+          expiresAt: NOW + 30_000,
+          ...(intent !== undefined ? { intent } : {}),
+        },
+        SECRET,
+      );
+      server.connect(socket).receive(encodeClientMessage({ type: 'join', room: ROOM, ticket }));
+      return socket;
+    };
+
+    it('refuses a join-intent ticket for a room this Machine does not host — and creates nothing', () => {
+      const server = new MatchServer({ seed: 0x5eed, ticketSecret: SECRET, machineId: MACHINE });
+      server.update(NOW);
+
+      const socket = intended(server, 'join');
+
+      expect(socket.welcomed()).toBe(false);
+      expect(socket.errors()[0]?.reason).toBe('room-gone');
+      // The whole point: the dead row was not silently resurrected.
+      expect(server.roomCount).toBe(0);
+      expect(server.roomLoads()).toEqual([]);
+    });
+
+    it('admits a join-intent ticket for a room that is really there', () => {
+      const server = new MatchServer({ seed: 0x5eed, ticketSecret: SECRET, machineId: MACHINE });
+      server.update(NOW);
+      // The host arrives first, on a create-intent ticket, and the room exists.
+      expect(intended(server, 'create').welcomed()).toBe(true);
+
+      const guest = intended(server, 'join');
+
+      expect(guest.welcomed()).toBe(true);
+      expect(guest.errors()).toHaveLength(0);
+      expect(server.roomCount).toBe(1);
+    });
+
+    it('opens the room on a create-intent ticket, exactly as HOST always has', () => {
+      const server = new MatchServer({ seed: 0x5eed, ticketSecret: SECRET, machineId: MACHINE });
+      server.update(NOW);
+
+      const socket = intended(server, 'create');
+
+      expect(socket.welcomed()).toBe(true);
+      expect(server.roomCount).toBe(1);
+    });
+
+    it('opens the room on a ticket with no intent at all — a pre-a0-26 client', () => {
+      const server = new MatchServer({ seed: 0x5eed, ticketSecret: SECRET, machineId: MACHINE });
+      server.update(NOW);
+
+      const socket = intended(server, undefined);
+
+      expect(socket.welcomed()).toBe(true);
+      expect(server.roomCount).toBe(1);
+    });
+
+    it('changes nothing on a Machine with no ticket secret — the self-hosted path', () => {
+      const server = new MatchServer({ seed: 0x5eed });
+      server.update(NOW);
+      // A join-intent ticket cannot even be checked here (no secret to verify
+      // under), and an unticketed join is how solo/self-hosted has always worked.
+      const socket = new FakeSocket();
+      server.connect(socket).receive(encodeClientMessage({ type: 'join', room: ROOM }));
+
+      expect(socket.welcomed()).toBe(true);
+      expect(server.roomCount).toBe(1);
+    });
+  });
+
   // --- Step 3b: the parser must carry the ticket through ------------------
 
   describe('parseClientMessage carries the ticket (Task 7 Step 3b)', () => {

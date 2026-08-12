@@ -345,7 +345,19 @@ interface AllocationBody {
  * defensively. The socket URL is the body's `connectUrl` when the (direct) router
  * handed one back, and otherwise the allocator's own host upgraded to WebSocket —
  * the Fly case, where the edge replays the upgrade to the Machine by header.
+ *
+ * **Exported for `./lobby-list` and for nothing else** (a0-26): joining from a
+ * browse row answers with the identical allocation body a code join does, and one
+ * parser for it is the point — a second one would be the place the two paths
+ * quietly drift, which is exactly what tapping a row must not do.
  */
+export function connectionFromBody(
+  config: AllocatorClientConfig,
+  payload: unknown,
+): ResolvedConnection | null {
+  return toConnection(config, payload);
+}
+
 function toConnection(config: AllocatorClientConfig, payload: unknown): ResolvedConnection | null {
   if (typeof payload !== 'object' || payload === null) return null;
   const body = payload as AllocationBody;

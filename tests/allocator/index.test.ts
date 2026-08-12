@@ -219,6 +219,9 @@ describe('POST /rooms — allocate a new room', () => {
       room: body.room,
       machine: 'm-1',
       expiresAt: body.expiresAt,
+      // An allocate is a *create* (a0-26 Milestone A) — the room does not exist
+      // until this ticket's join reaches the Machine.
+      intent: 'create',
     });
     // The room is reserved, so it is immediately joinable through the boot gap.
     expect(registry.locate(body.room, now.value)).toBe('m-1');
@@ -562,8 +565,9 @@ describe('unknown routes', () => {
 
   it('405s a known path with the wrong method', async () => {
     const { base } = await fixture();
-    // /rooms is POST-only; GET is a method error, not a missing route.
-    expect((await fetch(`${base}/rooms`)).status).toBe(405);
+    // /rooms takes POST (allocate) and GET (the a0-26 browse list) and nothing
+    // else; a PUT is a method error, not a missing route.
+    expect((await fetch(`${base}/rooms`, { method: 'PUT' })).status).toBe(405);
   });
 });
 

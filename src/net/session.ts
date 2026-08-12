@@ -297,6 +297,11 @@ export class TransportSession implements MatchSession {
     /** The ore ABUNDANCE the host's YIELD row is on (n5-01) — match shape like
      *  the mode beside it, so the room builds the economy the lobby promised. */
     abundance?: Abundance;
+    /** PUBLIC / PRIVATE — whether the room may appear in the lobby browser's
+     *  list (a0-26 D1). The same creator-only, lobby-phase-only seam as the
+     *  fields above; omitted means "no opinion", which leaves the room on the
+     *  public default it opened at. */
+    listed?: boolean;
   }): void {
     this.transport.send({
       type: 'lobbyChoice',
@@ -308,6 +313,7 @@ export class TransportSession implements MatchSession {
       ...(options.teams ? { teams: options.teams } : {}),
       ...(options.seats ? { seats: options.seats } : {}),
       ...(options.abundance ? { abundance: options.abundance } : {}),
+      ...(options.listed !== undefined ? { listed: options.listed } : {}),
     });
   }
 
@@ -932,6 +938,8 @@ export interface OnlineSession extends MatchSession {
     teams?: readonly number[];
     /** The host's per-seat OPEN / BOT / CLOSED authoring, by slot (a0-11). */
     seats?: readonly LobbySeatState[];
+    /** PUBLIC / PRIVATE — whether the room may be listed in the browser (a0-26). */
+    listed?: boolean;
   }): void;
   /** RUSH! — the room creator starts the match. */
   startMatch(): void;

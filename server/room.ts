@@ -199,7 +199,16 @@ export type JoinRejection =
   | 'match-live'
   | 'reclaim-unknown'
   | 'reclaim-expired'
-  | 'reclaim-denied';
+  | 'reclaim-denied'
+  /**
+   * The room named by a **join**-intent ticket is not on this Machine (a0-26
+   * Milestone A). The player asked for a room that has ended — a code whose
+   * match was swept a beat ago, or a browse row built from a heartbeat the
+   * allocator has not refreshed yet. Refusing is the whole point: without this
+   * the unknown code would simply *create* the room and the player would sit
+   * alone in an empty lobby wearing the name of a match that is over.
+   */
+  | 'room-gone';
 
 /** The outcome of a join attempt. */
 export type JoinOutcome =
@@ -407,6 +416,24 @@ export class MatchRoom {
    * world's (`world.economy`), not the room's.
    */
   private matchAbundance: Abundance;
+  /**
+   * Whether this room may appear in the lobby browser's list (a0-26 D1, the
+   * developer's ruling: **public by default, with a PRIVATE toggle**).
+   *
+   * Settable for the reason {@link matchMode} and {@link matchAbundance} are: the
+   * toggle lives in the lobby and the host may move it after the room exists.
+   * Creator-only and lobby-phase only, per §2's recommendation — a guest may not
+   * publish or hide someone else's room, and a room that has started is not on
+   * anyone's list to begin with (`joinableSeats` is 0 the moment it goes live, and
+   * the listing is built from joinable rooms).
+   *
+   * Default `true`, because the developer ruled it so and because a0-11's other
+   * half makes it the honest default: a room whose only human is the host boots
+   * *offline* at RUSH!, so an open room nobody can find quietly becomes a solo
+   * match. **What it publishes is stated plainly in the listing's own header —
+   * a listed room is one anyone can walk into.**
+   */
+  private isListed = true;
   private readonly queue = new InputQueue();
   private readonly statics = new StaticEntityTracker();
   /** Watches every ship's `alive` flag so a death and a respawn reach the clients
@@ -577,6 +604,14 @@ export class MatchRoom {
   /** The room's advertised mode (Task C3). */
   get mode(): MatchMode {
     return this.matchMode;
+  }
+
+  /** Whether the room consents to being listed in the lobby browser (a0-26 D1);
+   *  see {@link MatchRoom.isListed}. The heartbeat carries it, the allocator's
+   *  list route honours it, and `GET /rooms/:code` is deliberately unaffected —
+   *  a private room is *unlisted*, not unreachable, and its code still works. */
+  get listed(): boolean {
+    return this.isListed;
   }
 
   /**
@@ -862,6 +897,12 @@ export class MatchRoom {
         // …and the per-seat OPEN / BOT / CLOSED authoring (a0-11). Same rule, same
         // reason: the roster is match shape, and only the creator shapes the match.
         if (player === this.creator && message.seats) this.applySeatStates(message.seats);
+        // …and whether the room is PUBLIC or PRIVATE (a0-26 D1). Same rule and the
+        // same reason once more: who may find this room is the host's call, and a
+        // guest flipping it would be publishing — or hiding — somebody else's room.
+        if (player === this.creator && message.listed !== undefined) {
+          this.isListed = message.listed;
+        }
         this.broadcastLobby();
         break;
       case 'startMatch':

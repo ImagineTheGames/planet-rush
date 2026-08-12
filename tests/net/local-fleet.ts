@@ -72,6 +72,18 @@ export interface LocalFleet {
   /** Arm or disarm the socket-hop pin across the whole fleet at runtime — the
    *  fixture's stand-in for redeploying with `MATCH_ROUTER` set or unset. */
   setPin(on: boolean): void;
+  /**
+   * Beat every Machine **now**, and wait for the allocator to have ingested it.
+   *
+   * Production beats on a 5 s timer and the registry is exactly as fresh as the
+   * last beat it heard — which is the whole staleness envelope the lobby browser
+   * lives inside (a0-26 §3). A test that wants to observe the *listing* has to be
+   * able to say "the allocator has now heard the truth", and a test that wants to
+   * observe a **stale row** has to be able to not say it. Both halves are the
+   * point, so the timer stays running and this is an extra beat, never a
+   * substitute for one.
+   */
+  beat(): Promise<void>;
   stop(): Promise<void>;
 }
 
@@ -260,6 +272,9 @@ export async function startLocalFleet(seed = 7, options: FleetOptions = {}): Pro
     machineOf: (id) => machines.find((m) => m.machine === id),
     setPin: (on: boolean): void => {
       for (const machine of machines) machine.setPin(on);
+    },
+    beat: async (): Promise<void> => {
+      for (const machine of machines) await beat(allocatorBase, machine);
     },
     stop: async (): Promise<void> => {
       clearInterval(heartbeats);

@@ -1,0 +1,68 @@
+
+── §1  ONE ROW — what a browse row carries ─────────────────────────────────
+
+one row, verbatim off the wire:
+    {"id":"w5NFiVlBt8EGENJM","owner":"P9EW46","region":"iad","size":8,"mode":"ffa","players":1,"joinableSeats":7}
+
+fields: id, owner, region, size, mode, players, joinableSeats
+a room code anywhere in the payload? no
+one row weighs 109 B of JSON
+
+── §2  ONE LISTING — the deployed fleet at its ceiling, on the wire ────────
+
+fleet:            2 Machines × 6 rooms = 12 listed
+JSON body:        1364 B
+whole response:   1511 B  (status line + headers + body)
+the request:      232 B  (a bare CORS-simple GET, no preflight)
+round trip:       1743 B
+
+per room:         114 B of body
+empty fleet:      the same route on an empty registry —
+                  411 B round trip, body {"rooms":[],"asOf":1700000000000}
+
+── §3  ONE BROWSER — what an idle browsing player costs, per minute ────────
+
+poll cadence:     5 s (D4; the list cannot be fresher than the
+                  5 s heartbeat that feeds it, so a faster poll buys nothing)
+
+  ┌────────────────────────────────────────────────────────────┐
+  │ ONE PLAYER, BROWSE ON SCREEN, PER MINUTE                   │
+  │    requests:  12                                           │
+  │    bytes:     20916  (20.4 kB, full fleet, uncompressed)   │
+  │ ONE PLAYER, TAB HIDDEN OR OFF THE BROWSE SEGMENT           │
+  │    requests:  0        bytes:  0                           │
+  └────────────────────────────────────────────────────────────┘
+
+   2 s poll → 30 req/min,  52290 B/min, 2.99 MB/hour
+   5 s poll → 12 req/min,  20916 B/min, 1.20 MB/hour
+  10 s poll →  6 req/min,  10458 B/min, 0.60 MB/hour
+
+── §4  A CLASSROOM — thirty browsers, and the CPU under them ───────────────
+
+    1 browsing players →   0.2 req/s, 1.2 MB/hour at the allocator
+    6 browsing players →   1.2 req/s, 7.2 MB/hour at the allocator
+   30 browsing players →   6.0 req/s, 35.9 MB/hour at the allocator
+  100 browsing players →  20.0 req/s, 119.7 MB/hour at the allocator
+
+   2 Machines × 6 rooms =  12 rooms → 60.4 µs to build one listing
+  20 Machines × 6 rooms = 120 rooms → 487.5 µs to build one listing
+
+  (the listing derives two HMACs per room; that is what the µs above includes)
+
+── §5  THE ALTERNATIVE — the fan-out this route was chosen over ────────────
+
+GET /rooms/:code — one room's advert: 496 B round trip (status 200)
+reading the fleet a row at a time: 12 requests per refresh instead of 1,
+i.e. 144 allocator requests/min per open browser at a 5 s poll.
+
+── FOR D5 — the one number, and what it does NOT say ───────────────────────
+
+AN IDLE BROWSING PLAYER COSTS THE ALLOCATOR 12 REQUESTS AND 20916 BYTES PER MINUTE,
+and ZERO while their tab is hidden or they are not on the BROWSE segment.
+
+What that is not: it is not room capacity. This route reads the registry
+and never touches a gameserver, so browsing cannot cost a live match a
+frame and cannot fill a Machine. What a browser MIGHT do is make open
+rooms findable enough that the 12-room ceiling binds sooner — which is
+D5, is the developer's call, and is not answered here.
+

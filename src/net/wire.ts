@@ -219,6 +219,12 @@ export function parseClientMessage(frame: WireFrame): ClientMessage | null {
       // string leaves the room on the abundance it already had — always a legal
       // economy — instead of costing the sender their hull pick.
       const abundance = parseAbundance(raw['abundance']);
+      // …and PUBLIC / PRIVATE (a0-26 D1), on those same dropped-not-refused
+      // terms. Only a real boolean is an opinion: anything else is dropped and
+      // the room keeps the visibility it already had, which is always a legal
+      // one — never coerced, because a truthy string must not publish a room the
+      // host was trying to hide.
+      const listed = typeof raw['listed'] === 'boolean' ? raw['listed'] : undefined;
       return {
         type: 'lobbyChoice',
         shipClass,
@@ -229,6 +235,7 @@ export function parseClientMessage(frame: WireFrame): ClientMessage | null {
         ...(teams ? { teams } : {}),
         ...(seats ? { seats } : {}),
         ...(abundance ? { abundance } : {}),
+        ...(listed !== undefined ? { listed } : {}),
       };
     }
     case 'startMatch':

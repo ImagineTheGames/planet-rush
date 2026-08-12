@@ -41,8 +41,9 @@ import type { RoomCode } from '../src/net/transport';
 import type { MachineId } from '../src/net/ticket';
 import { signTicket } from '../src/net/ticket';
 import { makeRoomCode } from '../src/net/room-code';
-import type { RoomRegistry, MachineView, Reservation, ReserveConfig } from './registry';
+import type { Room, RoomRegistry, MachineView, Reservation, ReserveConfig } from './registry';
 import { nearestRegion } from './region-geo';
+import { listingId, ownerTag, type RoomListing } from './listing';
 
 /**
  * The legal match-size range (variable-slots plan, `MatchConfig`). Restated here
@@ -184,13 +185,20 @@ export interface RoomInfo {
 }
 
 /** Why an allocation could not be answered — maps straight to an HTTP status. */
-export type AllocatorErrorReason = 'no-capacity' | 'not-found';
+export type AllocatorErrorReason = 'no-capacity' | 'not-found' | 'room-full';
 
 /**
  * A refusal the HTTP layer turns into a status: `no-capacity` → 503 (the fleet
  * is full, try later / scale up), `not-found` → 404 (no live Machine hosts that
- * code). Carrying the reason as a field keeps `allocator/index.ts` free of
- * string-matching on messages.
+ * code), `room-full` → 409 (the room is there and has no seat for you). Carrying
+ * the reason as a field keeps `allocator/index.ts` free of string-matching on
+ * messages.
+ *
+ * `room-full` exists for the browse row and only the browse row (a0-26 §3): a
+ * listing is a photograph up to ten seconds old, so the seat a row showed can be
+ * taken by the time a thumb reaches it. "That claim filled up" and "that claim is
+ * gone" are two different things to tell a player, and a list that collapsed them
+ * into one 404 would be lying about one of them.
  */
 export class AllocatorError extends Error {
   constructor(
@@ -294,6 +302,9 @@ export class Allocator {
       picked.view.machine,
       picked.view.region,
       now,
+      // `create` — this ticket's whole purpose is to bring a room that does not
+      // exist yet into existence on the Machine it names (src/net/ticket.ts).
+      'create',
       config,
       placementOf(opts.region, picked),
     );
@@ -315,7 +326,131 @@ export class Allocator {
     // located only through a fresh reservation may not have a view yet; region
     // is a routing hint, not a correctness input, so an empty string is fine.
     const region = this.regionOf(machine, now);
-    return this.issue(code, machine, region, now);
+    // **Which intent this is depends on which of the two realities located the
+    // room** (a0-26 Milestone A), and the registry already distinguishes them:
+    //
+    //  • a live Machine's heartbeat lists it → the room is *real*, so this is a
+    //    `join`. If it has since ended inside the beat the allocator has not
+    //    heard yet, the Machine refuses the ticket instead of opening an empty
+    //    room in its place — which is the whole point of the claim.
+    //  • only an unlapsed lease covers it → the **boot gap**. The room may not
+    //    exist yet, and a join in the gap is *supposed* to create it: that is how
+    //    HOST works, and it is how a friend who types the code a beat before the
+    //    host's socket lands still gets in. Signing `join` here would refuse a
+    //    room for not existing yet — a `room-gone` for a room that is arriving.
+    //
+    // So the claim means exactly what it says: `join` is issued only when the
+    // allocator has heard a heartbeat saying the room is there.
+    const confirmed = this.registry
+      .machines(now)
+      .some((view) => view.rooms.some((room) => room.code === code));
+    return this.issue(code, machine, region, now, confirmed ? 'join' : 'create');
+  }
+
+  /**
+   * **The lobby browser's list** (a0-26 §1): every room in the fleet a stranger
+   * could walk into right now, each named by a derived handle instead of its code
+   * (`./listing`).
+   *
+   * Built from the registry's heartbeat-confirmed rooms and nothing else, over
+   * state the allocator already holds — no new service, no new store, no new
+   * failure mode. Three exclusions, each with its own reason:
+   *
+   *   • **Lease-only rooms — the boot gap.** A room known only through its
+   *     reservation advertises itself as joinable with *no occupancy at all* for
+   *     up to 15 s, whether or not the Machine ever comes up (measured, plan
+   *     §1(c)). It is the single largest generator of ghost rows. Nothing is lost:
+   *     a creator reaches their own room by ticket, not by browsing.
+   *     {@link Allocator.roomInfo} still answers for the gap, on purpose — "may I
+   *     dial this code?" and "what is worth showing a stranger?" are two questions
+   *     and this is the one that gets the cautious answer (Trap 1).
+   *   • **Rooms with no free seat**, which is every full room and every room that
+   *     has started (`joinableSeats` goes to 0 at RUSH!). A row that offers a seat
+   *     that is not there is the failure the brief calls *worse than no list*.
+   *     A room whose Machine does not advertise seats at all is excluded for the
+   *     same reason: a row has nothing true to say about it, and `size − players`
+   *     is not an answer (Trap 3 — bots and closed seats make it wrong).
+   *   • **Rooms whose host said PRIVATE** (`listed === false`, a0-26 D1). Absent
+   *     reads as listed.
+   *
+   * **A dying Machine cannot make this list wronger than the allocator itself**
+   * (plan §1's named failure mode): the fleet is read through
+   * `registry.machines(now)`, which prunes on read, so a Machine that stops
+   * beating drops out of the list on exactly the clock that stops new rooms being
+   * placed on it. Inside that window a row can still be tapped, and the refusal
+   * that catches it is {@link Allocator.joinListing} plus the ticket's `join`
+   * intent — the list is *allowed* to be up to a heartbeat stale, so long as
+   * acting on a stale row fails honestly instead of quietly.
+   *
+   * Clockless like everything else here: `now` is injected, so the staleness
+   * envelope is exact in a test and never `Date.now()` (Trap 12).
+   */
+  rooms(now: number): RoomListing[] {
+    const listings: RoomListing[] = [];
+    for (const view of this.registry.machines(now)) {
+      for (const room of view.rooms) {
+        if (!isListable(room)) continue;
+        listings.push({
+          id: listingId(room.code, this.secret),
+          owner: ownerTag(room.code, this.secret),
+          region: view.region,
+          ...(room.size !== undefined ? { size: room.size } : {}),
+          ...(room.mode !== undefined ? { mode: room.mode } : {}),
+          players: room.players,
+          joinableSeats: room.joinableSeats ?? 0,
+        });
+      }
+    }
+    return listings;
+  }
+
+  /**
+   * Reach a room from a **browse row** rather than from a code (the developer:
+   * *"there should be a join button to join it"*): resolve the handle back to the
+   * room it names and sign a ticket for it, exactly as {@link Allocator.join}
+   * would have for the code.
+   *
+   * The handle is resolved by rebuilding the tokens for the rooms the registry
+   * currently holds, which is what keeps the registry a cache with nothing extra
+   * in it (`./listing`). At 120 rooms that is 120 HMACs — microseconds, and only
+   * on a tap, never on a poll.
+   *
+   * **The two honest refusals a stale row earns** (plan §3). A photograph up to
+   * ten seconds old can be wrong in two different ways, and a player is owed the
+   * difference:
+   *
+   *   • the room is not there any more, or its host has since flipped PRIVATE →
+   *     `not-found` (404). The row is dead; the browser refreshes and says so.
+   *   • the room is there and has no seat left → `room-full` (409). The row is
+   *     alive and the player was simply beaten to it.
+   *
+   * Note what is *not* here: this signs a ticket, it does not admit anyone. The
+   * Machine remains the only authority on a join (Trap 5), and the ticket it gets
+   * carries `intent: 'join'` — so a room that died inside the heartbeat this
+   * listing was built from is refused *there* rather than silently re-created
+   * (Milestone A). The list is allowed to be stale; nothing downstream of it is
+   * allowed to be dishonest about that.
+   *
+   * @throws {AllocatorError} `not-found` or `room-full`, per above.
+   */
+  joinListing(id: string, now: number): Allocation {
+    for (const view of this.registry.machines(now)) {
+      for (const room of view.rooms) {
+        if (listingId(room.code, this.secret) !== id) continue;
+        // Found the room the handle names. A handle is authority to join a room
+        // *while it is publicly open*, so a room that has since gone private is
+        // gone as far as this route is concerned — its code still works, and that
+        // is the difference between a handle and a code (`./listing`).
+        if (room.listed === false) {
+          throw new AllocatorError('not-found', `listing ${id} is no longer published`);
+        }
+        if ((room.joinableSeats ?? 0) <= 0) {
+          throw new AllocatorError('room-full', `room ${room.code} has no free seat`);
+        }
+        return this.issue(room.code, view.machine, view.region, now, 'join');
+      }
+    }
+    throw new AllocatorError('not-found', `no live machine hosts listing ${id}`);
   }
 
   /**
@@ -528,13 +663,14 @@ export class Allocator {
   }
 
   /** Sign the routing decision into a ticket and package it as an {@link Allocation}.
-   *  A `join` (existing room) passes no config, so the ticket is byte-identical to
-   *  the pre-variable-size shape; an `allocate` folds the room's size/mode in. */
+   *  A `join` (existing room) passes no config, so the ticket carries only the
+   *  routing claims and its intent; an `allocate` folds the room's size/mode in. */
   private issue(
     room: RoomCode,
     machine: MachineId,
     region: string,
     now: number,
+    intent: 'create' | 'join',
     config: ReserveConfig = {},
     placement?: Placement,
   ): Allocation {
@@ -546,6 +682,7 @@ export class Allocator {
         expiresAt,
         ...(config.size !== undefined ? { size: config.size } : {}),
         ...(config.mode !== undefined ? { mode: config.mode } : {}),
+        intent,
       },
       this.secret,
     );
@@ -554,6 +691,21 @@ export class Allocator {
     // act on a reason if it had it.
     return { room, machine, region, ticket, expiresAt, ...(placement ? { placement } : {}) };
   }
+}
+
+/**
+ * Is this heartbeat room one a stranger may be *shown*? Deliberately stricter
+ * than {@link RoomInfo.joinable}, which answers the different question "may I
+ * dial this code?" and answers unknown occupancy with a hopeful yes because the
+ * Machine backs it up.
+ *
+ * A **list** has no such backstop: an unmeasured room becomes a row that promises
+ * seats nobody counted. So silence is an exclusion here and an admission there,
+ * and the two paths are kept separate exactly as Trap 1 says to keep them.
+ */
+function isListable(room: Room): boolean {
+  if (room.listed === false) return false;
+  return room.joinableSeats !== undefined && room.joinableSeats > 0;
 }
 
 /** A chosen Machine and the rule that chose it — {@link Allocator.pickMachine}'s
