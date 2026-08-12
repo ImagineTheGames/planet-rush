@@ -409,6 +409,11 @@ export {
   // "In the match" — a human or a bot, and nothing else. Every count on the
   // screen is taken through it (GDD §2.1, amended 2026-08-07).
   isParticipant,
+  // …and what a seat IS in the lobby doing the reading: in SOLO there is no OPEN
+  // seat, so one stored as OPEN reads BOT, and the host's tap walks two rungs
+  // instead of three (a0-31 — "no one can join in solo").
+  occupantOf,
+  seatStateCycle,
   lobbyMatchConfig,
   lobbyModel,
   // The authored sides, in the two orders the two ends index by (m10 teams-wire):

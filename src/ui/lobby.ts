@@ -279,8 +279,27 @@ export const MODE_LABELS: Readonly<Record<MatchMode, string>> = {
  * previewing the bot who fills it) becomes an explicit BOT, then CLOSED (out of
  * the match entirely — `N` drops by one), then open again. A human seat is never
  * in the ring: you cannot cycle a seat somebody is sitting in.
+ *
+ * **This is the ONLINE ring** since a0-31 — the ring a room a joiner can reach
+ * walks. Solo walks {@link SOLO_SEAT_STATE_CYCLE}; ask {@link seatStateCycle} for
+ * the one a given lobby is on rather than reaching for either by name.
  */
 export const SEAT_STATE_CYCLE: readonly SeatOccupant[] = ['open', 'bot', 'closed'];
+
+/**
+ * The ring a **solo** lobby walks: BOT ⇄ CLOSED, and no OPEN at all (a0-31 —
+ * developer: *"in solo play there should be no slot open it's either closed or
+ * bot. no one can join in solo…."*).
+ *
+ * It is {@link SEAT_STATE_CYCLE} with the one rung removed that solo cannot mean,
+ * not a second vocabulary: OPEN is *"a chair a joiner can still take"*, and offline
+ * there is no wire for a joiner to arrive on. The lobby has always agreed with that
+ * everywhere it *reads* a seat — `createLobby` seeds an offline seat BOT, and
+ * `LobbySeatView.openToJoin` is false offline — and the tap was the one place that
+ * did not, so the control could put the screen into a state the rest of the file
+ * would then have to describe as a seat nobody can fill.
+ */
+export const SOLO_SEAT_STATE_CYCLE: readonly SeatOccupant[] = ['bot', 'closed'];
 
 /**
  * The word a seat's state is shown as, on the row's leading STATE control (u5,
@@ -1228,7 +1247,7 @@ function withCast(state: LobbyState): LobbyState {
     // empty chair (a0-11). None of the three previews a bot. The seat KEEPS its
     // character through all of them, so a seat that empties and re-opens comes
     // back as the character the host chose for it.
-    if (!isBotSeat(seat.occupant)) {
+    if (!isBotSeat(occupantOf(state, seat))) {
       return seat.personality === null ? seat : { ...seat, personality: null };
     }
     const personality = seat.character;
@@ -1407,9 +1426,11 @@ export function nameFor(state: LobbyState, slot: PlayerId): string {
   const seat = state.seats.find((s) => s.player === slot);
   if (!seat) return `P${Math.floor(slot) + 1}`;
   // An empty seat has no name to give — it is not in the match (a0-11) — and says
-  // so, in the same word the roster row shows.
-  if (seat.occupant === 'open') return 'OPEN';
-  if (seat.occupant !== 'human') {
+  // so, in the same word the roster row shows. Solo has no empty seat to name
+  // (a0-31): `occupantOf` has already resolved it to the bot that flies it.
+  const occupant = occupantOf(state, seat);
+  if (occupant === 'open') return 'OPEN';
+  if (occupant !== 'human') {
     // A REPEATED character is numbered, and only when repeated (a0-06;
     // `../bots` `castDisplayNames`). The cast may hold two Wardens now — a full
     // house has eight slots for seven characters — and two rows reading `Warden`
@@ -1421,10 +1442,17 @@ export function nameFor(state: LobbyState, slot: PlayerId): string {
 }
 
 /** The whole roster's bot names in slot order, numbered where a character repeats
- *  — one pass, so every row is numbered against the same cast. */
+ *  — one pass, so every row is numbered against the same cast.
+ *
+ *  Read off each seat's authored `character`, gated by the same bot predicate
+ *  every other reader uses ({@link occupantOf} + {@link isBotSeat}), rather than off
+ *  the projected `personality` — which is that same pair, already computed, and so
+ *  a copy that a solo seat stored as OPEN could be stale in. */
 function castNames(state: LobbyState): (string | null)[] {
   const cast: (PersonalityId | null)[] = [];
-  for (const seat of state.seats) cast[seat.player] = seat.personality;
+  for (const seat of state.seats) {
+    cast[seat.player] = isBotSeat(occupantOf(state, seat)) ? seat.character : null;
+  }
   return castDisplayNames(cast);
 }
 
@@ -1469,7 +1497,7 @@ export function cycleSeatCharacter(state: LobbyState, player: PlayerId): LobbySt
   const seat = state.seats[player];
   // Only a bot-bearing seat has a character to cycle: a human flies their own
   // hull, a closed seat holds nobody.
-  if (!seat || !isBotSeat(seat.occupant)) return state;
+  if (!seat || !isBotSeat(occupantOf(state, seat))) return state;
   const at = CHARACTER_CYCLE.indexOf(seat.character);
   const next = CHARACTER_CYCLE[(at + 1) % CHARACTER_CYCLE.length] ?? ROSTER[0]!;
   if (next === seat.character) return state;
@@ -1495,7 +1523,7 @@ export function cycleSeatCharacter(state: LobbyState, player: PlayerId): LobbySt
  */
 export function botDifficulties(state: LobbyState): readonly BotDifficulty[] {
   return state.seats
-    .filter((s) => isBotSeat(s.occupant))
+    .filter((s) => isBotSeat(occupantOf(state, s)))
     .map((s) => PERSONALITIES[s.character].difficulty as BotDifficulty);
 }
 
@@ -1504,10 +1532,45 @@ export function botDifficulties(state: LobbyState): readonly BotDifficulty[] {
 // ---------------------------------------------------------------------------
 
 /**
+ * **One seat's occupancy as this lobby reads it** — the single seam a0-31's rule
+ * lives behind: *in solo there is no OPEN seat, so a seat stored as one is a BOT.*
+ *
+ * Offline there is no wire for a joiner to arrive on, so OPEN has nothing left to
+ * mean; {@link createLobby} has therefore seeded an offline seat BOT since a0-11
+ * and {@link LobbySeatView.openToJoin} has been false offline for as long. What
+ * this adds is that a seat which arrived at `open` some *other* way — authored
+ * before the rule, restored from a store, handed in by a future caller — reads the
+ * same way as one seeded here, everywhere it is read: the row, the name, the cast,
+ * `N`, and the `MatchConfig` the world is built from. A returning player never
+ * meets a chair that cannot be filled.
+ *
+ * **Derived, never duplicated.** The one input is {@link LobbyState.online} — the
+ * same flag `createLobby` seeds seats from and `openToJoin` is drawn from. There is
+ * no second notion of solo-ness in this file to drift from the first (u13-01,
+ * g6-01), and there must not be: whatever answers "can a human still arrive here?"
+ * answers "can this seat be OPEN?", because they are the same question.
+ */
+export function occupantOf(state: LobbyState, seat: LobbySeat): SeatOccupant {
+  return seat.occupant === 'open' && !state.online ? 'bot' : seat.occupant;
+}
+
+/**
+ * The ring **this** lobby's seat control walks — three rungs online
+ * ({@link SEAT_STATE_CYCLE}), two in solo ({@link SOLO_SEAT_STATE_CYCLE}) — off the
+ * same `online` flag {@link occupantOf} reads, for the same reason.
+ */
+export function seatStateCycle(state: LobbyState): readonly SeatOccupant[] {
+  return state.online ? SEAT_STATE_CYCLE : SOLO_SEAT_STATE_CYCLE;
+}
+
+/**
  * Whether a seat will fly a bot. **Exactly the host-set BOT seats** (a0-11) — an
  * OPEN seat flies nothing at all now, which is the whole of the developer's
  * report. The one predicate the cast, the difficulty tap and the config builder
  * share, so there is no second place that could disagree about what a bot is.
+ *
+ * It takes an *occupant*, not a seat, and in a lobby that has one the occupant to
+ * hand it is {@link occupantOf}'s — solo has no OPEN seat to ask about.
  */
 export function isBotSeat(occupant: SeatOccupant): boolean {
   return occupant === 'bot';
@@ -1530,7 +1593,7 @@ export function isParticipant(occupant: SeatOccupant): boolean {
 /** The seats that take the field — humans and bots, in slot order. `N` is its
  *  length (2..8 when the lobby can RUSH). */
 export function activeSeats(state: LobbyState): readonly LobbySeat[] {
-  return state.seats.filter((s) => isParticipant(s.occupant));
+  return state.seats.filter((s) => isParticipant(occupantOf(state, s)));
 }
 
 /** `N` — the match size, the count of humans plus bots. */
@@ -1551,8 +1614,8 @@ export function matchSizeOf(state: LobbyState): number {
 export function denseSeatIndex(state: LobbyState, slot: PlayerId): number | null {
   let dense = 0;
   for (const seat of state.seats) {
-    if (seat.player === slot) return isParticipant(seat.occupant) ? dense : null;
-    if (isParticipant(seat.occupant)) dense++;
+    if (seat.player === slot) return isParticipant(occupantOf(state, seat)) ? dense : null;
+    if (isParticipant(occupantOf(state, seat))) dense++;
   }
   return null;
 }
@@ -1589,25 +1652,35 @@ export function sideRosterOf(state: LobbyState, player: PlayerId): ReadonlySet<P
   for (const s of state.seats) {
     // Participants only (a0-11): an empty OPEN seat is on nobody's side, exactly
     // as a shut CLOSED one is — neither has a ship for an ally to fight beside.
-    if (isParticipant(s.occupant) && s.team === seat.team) side.add(s.player);
+    if (isParticipant(occupantOf(state, s)) && s.team === seat.team) side.add(s.player);
   }
   return side;
 }
 
 /**
  * Cycle one seat's occupancy — the host's tap on a roster row: OPEN → BOT →
- * CLOSED → OPEN ({@link SEAT_STATE_CYCLE}). A no-op from a guest, after RUSH!, or
- * on a HUMAN seat — you cannot cycle a seat somebody is sitting in (the same three
- * refusals {@link cycleSeatCharacter} keeps, plus the human guard). Closing a seat
- * is never blocked on the count — the developer ratified "show, never block"; the
- * floor of two is enforced at {@link canStart}, not here.
+ * CLOSED → OPEN online ({@link SEAT_STATE_CYCLE}), and **BOT ⇄ CLOSED in solo**,
+ * where OPEN does not exist ({@link SOLO_SEAT_STATE_CYCLE}, a0-31). A no-op from a
+ * guest, after RUSH!, or on a HUMAN seat — you cannot cycle a seat somebody is
+ * sitting in (the same three refusals {@link cycleSeatCharacter} keeps, plus the
+ * human guard). Closing a seat is never blocked on the count — the developer
+ * ratified "show, never block"; the floor of two is enforced at {@link canStart},
+ * not here, and it still is: a solo lobby of eight closed seats is reachable and
+ * refused at RUSH!, not at the tap.
+ *
+ * Which ring, and where the seat *starts* on it, are both {@link seatStateCycle}'s
+ * and {@link occupantOf}'s answer rather than this function's — so the state the
+ * control moves off is exactly the state the row draws, and a solo seat stored as
+ * OPEN (which draws BOT) takes its next tap to CLOSED rather than jumping to a
+ * rung the screen never showed.
  */
 export function cycleSeatState(state: LobbyState, player: PlayerId): LobbyState {
   if (!hostControls(state)) return state;
   const seat = state.seats[player];
   if (!seat || seat.occupant === 'human') return state;
-  const at = SEAT_STATE_CYCLE.indexOf(seat.occupant);
-  const next = SEAT_STATE_CYCLE[(at + 1) % SEAT_STATE_CYCLE.length] ?? 'open';
+  const ring = seatStateCycle(state);
+  const at = ring.indexOf(occupantOf(state, seat));
+  const next = ring[(at + 1) % ring.length] ?? ring[0] ?? 'closed';
   if (next === seat.occupant) return state;
   return withCast({
     ...state,
@@ -1675,14 +1748,14 @@ export function cycleAbundance(state: LobbyState): LobbyState {
  */
 export function lobbyMatchConfig(state: LobbyState): MatchConfig {
   const slots: SlotConfig[] = state.seats.map((seat) => {
-    const slotState = seatSlotState(seat.occupant);
+    const slotState = seatSlotState(occupantOf(state, seat));
     const bot = slotState === 'bot';
     return {
       index: seat.player,
       state: slotState,
       shipClass: seat.shipClass,
       team: state.mode === 'ffa' ? seat.player : seat.team,
-      ...(bot && seat.personality ? { botPersonality: seat.personality } : {}),
+      ...(bot ? { botPersonality: seat.character } : {}),
       ...(bot ? { botDifficulty: PERSONALITIES[seat.character].difficulty as BotDifficulty } : {}),
     };
   });
@@ -1771,7 +1844,10 @@ function seatSlotState(occupant: SeatOccupant): SlotState {
  * all three.
  */
 export function lobbyWireSeats(state: LobbyState): LobbySeatState[] {
-  return state.seats.map((seat) => (seat.occupant === 'human' ? 'open' : seat.occupant));
+  return state.seats.map((seat) => {
+    const occupant = occupantOf(state, seat);
+    return occupant === 'human' ? 'open' : occupant;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -2232,15 +2308,20 @@ function seatView(
   canEdit: boolean,
   castName: string | null,
 ): LobbySeatView {
-  const isBot = isBotSeat(seat.occupant);
-  const isClosed = seat.occupant === 'closed';
+  // The seat as this lobby reads it (a0-31): solo has no OPEN seat, so a seat
+  // stored as one is drawn — and counted, and launched — as the bot it is. Every
+  // field below is off this one word, so the row cannot say one thing and the
+  // match contain another.
+  const occupant = occupantOf(state, seat);
+  const isBot = isBotSeat(occupant);
+  const isClosed = occupant === 'closed';
   // An OPEN seat now names nobody, because nobody is in it and nobody is booked
   // to be (a0-11). It reads as the invitation it is — the row a joiner takes —
   // rather than previewing a character the match will not contain. A BOT row
   // takes its NUMBERED name (a0-06), so two Wardens are tellable apart here.
   const name = isClosed
     ? 'CLOSED'
-    : seat.occupant === 'open'
+    : occupant === 'open'
       ? 'OPEN'
       : isBot
         ? (castName ?? 'BOT')
@@ -2256,12 +2337,12 @@ function seatView(
     className: CLASS_NAMES[seat.shipClass],
     isBot,
     isYou: seat.player === state.you,
-    isHost: seat.player === state.host && seat.occupant === 'human',
-    state: seat.occupant,
-    stateLabel: SEAT_STATE_LABELS[seat.occupant],
+    isHost: seat.player === state.host && occupant === 'human',
+    state: occupant,
+    stateLabel: SEAT_STATE_LABELS[occupant],
     // The control's live/dead look, from the mutation's own three refusals: the
     // host, before RUSH! (both folded into `canEdit`), and never a human seat.
-    canCycleState: canEdit && seat.occupant !== 'human',
+    canCycleState: canEdit && occupant !== 'human',
     isClosed,
     team: seat.team,
     teamLabel: teamLabel(seat.team),
@@ -2274,11 +2355,11 @@ function seatView(
     // closed seat is a shut door; and offline there is no wire for a second player
     // to arrive on, so nothing is ever "claimable by room code" (the empty seats
     // are simply the bot cast).
-    openToJoin: seat.occupant === 'open' && state.phase !== 'started' && state.online,
+    openToJoin: occupant === 'open' && state.phase !== 'started' && state.online,
     // No number on a row nobody is dialing in from: a bot is inside the sim, and
     // an empty or shut seat has no connection to time. Stated as "anything that is
     // not a human in a chair" so the three cases cannot drift apart.
-    ping: seatPing({ isBot: seat.occupant !== 'human', rtt: seat.rtt }),
+    ping: seatPing({ isBot: occupant !== 'human', rtt: seat.rtt }),
     // The level badge, on the ONE row that has a career behind it: the seat the
     // local player is actually sitting in. Stated as "a human, and it is you" so
     // the three ways it could leak are closed by one condition — a bot has no
@@ -2288,7 +2369,7 @@ function seatView(
     // badge follows you when the server seats you somewhere else
     // ({@link seatLocalPlayer}) instead of staying behind on a stranger's row.
     levelBadge:
-      seat.occupant === 'human' && seat.player === state.you ? levelBadgeLabel(state.level) : null,
+      occupant === 'human' && seat.player === state.you ? levelBadgeLabel(state.level) : null,
     // Shown, not chosen (a0-06): the row's tier chip is read off the character
     // the host picked, so the row cannot advertise a tier the cast disagrees with.
     ...(isBot ? { botDifficulty: PERSONALITIES[seat.character].difficulty as BotDifficulty } : {}),

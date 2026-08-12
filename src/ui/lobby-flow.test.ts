@@ -52,9 +52,10 @@ import {
   MODE_LABELS,
   RUSH_COUNTDOWN_SECONDS,
   SEAT_STATE_CYCLE,
+  seatStateCycle,
   lobbyModel,
 } from './lobby';
-import type { SeatOccupant } from './lobby';
+import type { LobbyState, SeatOccupant } from './lobby';
 import { lobbyHitTest, lobbyLayout } from './lobby-geometry';
 import type { LobbyLayout, LobbyTarget } from './lobby-geometry';
 import type { MatchMode } from '../sim/match-config';
@@ -351,9 +352,13 @@ describe('the room tells the server what it chose', () => {
     // It is the only control that does since a0-06 — the row body moved to the
     // character cycle, because that is where the row draws the name. Which rung a
     // seat *starts* on is the flavour's business since a0-11 (an online room opens
-    // its seats OPEN, the solo lobby on the bot cast), so nothing below names one.
+    // its seats OPEN, the solo lobby on the bot cast), so nothing below names one;
+    // and since a0-31 so is HOW MANY rungs there are — solo walks BOT ⇄ CLOSED,
+    // because a seat nobody can join has no OPEN to offer — so the lap length is
+    // asked for rather than assumed.
     let viaControl = inLobby(0, 0);
-    for (let i = 0; i < SEAT_STATE_CYCLE.length; i++) {
+    const ring = seatStateCycle(viaControl.lobby!);
+    for (let i = 0; i < ring.length; i++) {
       const before = viaControl.lobby?.seats[5]?.occupant;
       viaControl = flowTapLobby(viaControl, { kind: 'seatState', index: 5 }).state;
       expect(
@@ -371,12 +376,19 @@ describe('the room tells the server what it chose', () => {
     // on is the flavour's business since a0-11, so two taps from `inLobby` (the
     // SOLO door, which opens on the bot cast) land on OPEN, not CLOSED.
     let closed = inLobby(0, 0);
-    for (let i = 0; i < SEAT_STATE_CYCLE.length; i++) {
+    for (let i = 0; i < ring.length; i++) {
       if (closed.lobby?.seats[5]?.occupant === 'closed') break;
       closed = flowTapLobby(closed, { kind: 'seatState', index: 5 }).state;
     }
     expect(closed.lobby?.seats[5]?.occupant).toBe('closed');
-    expect(flowTapLobby(closed, { kind: 'seat', index: 5 }).state.lobby?.seats[5]?.occupant).toBe('open');
+    // …and what it re-opens INTO is the next rung of this lobby's own ring: BOT
+    // here, because this is the solo door and solo has no OPEN seat (a0-31). The
+    // rule ("the body edits what the row shows") is unchanged; the ring it walks
+    // is the one the flavour has.
+    expect(flowTapLobby(closed, { kind: 'seat', index: 5 }).state.lobby?.seats[5]?.occupant).toBe(
+      ring[0],
+    );
+    expect(ring).toEqual(['bot', 'closed']);
 
     // The row BODY cycles the seat's CHARACTER in BOTH modes (a0-06) — one
     // control per seat, so there is no tier left to disagree with the cast.
@@ -539,16 +551,19 @@ describe('one door, one lobby (ratified: PLAY opens the doors, the doors open th
 /** A roomy desktop viewport — every row chip has extent here, so "reachable"
  *  means "laid out", not "laid out big enough on this phone". */
 /**
- * The next rung of the seat-state ring after `occupant` ({@link SEAT_STATE_CYCLE}).
+ * The next rung of **this lobby's** seat-state ring after `occupant`.
  *
  * Since a0-11 the rung a seat *starts* on depends on the flavour of the lobby —
  * an online room opens its seats OPEN and waits for people, the solo lobby opens
  * them on the bot cast — so a test about the slot editor's ROUTING must assert
  * that a tap moved the seat one rung, not that it landed on a particular word.
+ * Since a0-31 the RING depends on the flavour too (solo is BOT ⇄ CLOSED, because
+ * nobody can join a solo lobby), so it is read off the lobby rather than named.
  */
-function nextRung(occupant: SeatOccupant): SeatOccupant {
-  const at = SEAT_STATE_CYCLE.indexOf(occupant);
-  return SEAT_STATE_CYCLE[(at + 1) % SEAT_STATE_CYCLE.length]!;
+function nextRung(lobby: LobbyState, occupant: SeatOccupant): SeatOccupant {
+  const ring = seatStateCycle(lobby);
+  const at = ring.indexOf(occupant);
+  return ring[(at + 1) % ring.length]!;
 }
 
 const GUARD_VIEWPORT = { width: 1280, height: 800 };
@@ -693,10 +708,11 @@ describe('the slot editor is reachable in EVERY mode AND both lobbies (guard the
         onBot.lobby?.seats[SEAT]?.character,
       );
       // The state control moves the seat one rung, from whichever rung this
-      // flavour started it on (a0-11) — the ring is the same in both.
+      // flavour started it on (a0-11) and round whichever ring the flavour has
+      // (a0-31 — solo's is two rungs, the room's three).
       expect(
         flowTapLobby(state, { kind: 'seatState', index: SEAT }).state.lobby?.seats[SEAT]?.occupant,
-      ).toBe(nextRung(state.lobby!.seats[SEAT]!.occupant));
+      ).toBe(nextRung(state.lobby!, state.lobby!.seats[SEAT]!.occupant));
       // RUSH! needs a match to start: two participants (GDD §2.1, amended
       // 2026-08-07). Offline the cast is already there; in an empty room the host
       // seats one bot first, which is the developer's "up to player to fill it up".

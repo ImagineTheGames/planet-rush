@@ -175,8 +175,14 @@ describe('the sides survive the shapes a lobby can actually be in', () => {
   });
 
   it('spells the same split two ways, on purpose', () => {
-    const lobby = cycleSeatState(authorSplit(soloLobby(5), [0, 0, 0, 1, 1]), 1);
-    const closed = cycleSeatState(lobby, 1);
+    // ONE tap shuts seat 1 — the solo lobby opens on the bot cast, and BOT → CLOSED
+    // is one step round its ring. This used to tap twice and still pass, because
+    // the second tap landed on the old solo OPEN rung and an open seat was dropped
+    // from the world exactly as a closed one is. Solo has no OPEN rung since a0-31
+    // ("no one can join in solo"), so the second tap now seats the bot again and
+    // the fixture would no longer be the closed one this test is named for.
+    const closed = cycleSeatState(authorSplit(soloLobby(5), [0, 0, 0, 1, 1]), 1);
+    expect(closed.seats[1]!.occupant).toBe('closed');
 
     // The wire is indexed by PHYSICAL slot (the server's seats are slots, closed
     // ones included); the world is indexed DENSELY. Two functions because the two

@@ -43,6 +43,8 @@ import {
   RUSH_LABEL,
   SEAT_STATE_CYCLE,
   SEAT_STATE_LABELS,
+  SOLO_SEAT_STATE_CYCLE,
+  seatStateCycle,
   SIDE_COLORS,
   SIDE_WORDS,
   STAT_PIPS,
@@ -1313,6 +1315,19 @@ describe('a solo lobby must not offer an OPEN seat (a0-31)', () => {
     expect(lobbyMatchConfig(room).slots[3]!.state).toBe('closed');
   });
 
+  it('takes its answer from the lobby’s OWN online flag, not a second copy of it', () => {
+    // u13-01 and g6-01 are both a second copy of a value drifting from the first.
+    // `state.online` is the flag `createLobby` seeds seats from and `openToJoin` is
+    // drawn from; flipping it is the whole of what makes a lobby solo, and the ring
+    // follows it with no other input.
+    const base = solo();
+    expect(seatStateCycle(base)).toEqual(SOLO_SEAT_STATE_CYCLE);
+    expect(seatStateCycle({ ...base, online: true })).toEqual(SEAT_STATE_CYCLE);
+    expect(SOLO_SEAT_STATE_CYCLE).toEqual(['bot', 'closed']);
+    // Every rung of the solo ring is a rung of the full one — the solo cycle is the
+    // online one with OPEN removed, never a second vocabulary.
+    expect(SOLO_SEAT_STATE_CYCLE.every((rung) => SEAT_STATE_CYCLE.includes(rung))).toBe(true);
+  });
 });
 
 describe('RUSH! gating on size and sides (variable-slots E)', () => {
