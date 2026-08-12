@@ -1316,7 +1316,11 @@ export function drawWheelSelection(
   // 3b. The bloom behind the name — the design's `text-shadow: 0 0 18px`, cast by
   //     the layer that is already casting light rather than by the glyphs.
   const nameR = labelTopRadius(m, outer) - m.name * 0.6;
-  const bloom = m.name * 1.9;
+  // Clamped to the ring it lights. Unclamped, the phone profile's stack sits
+  // close enough to the rim that a bloom scaled off the name would spill OUTSIDE
+  // the disc — a glow with no wheel under it, over the halo, which is the one
+  // thing on this screen that is supposed to have no edge at all.
+  const bloom = Math.min(m.name * 1.9, outer - nameR, nameR - inner);
   for (let i = 0; i < bands; i++) {
     const t = (i + 1) / bands;
     g.circle(Math.cos(angle) * nameR, Math.sin(angle) * nameR, bloom * (1 - t + 1 / bands)).fill({

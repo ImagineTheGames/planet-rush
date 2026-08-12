@@ -4753,6 +4753,30 @@ async function boot(): Promise<void> {
         const rect = app.canvas.getBoundingClientRect();
         return { x: p.x + rect.left, y: p.y + rect.top };
       },
+      /**
+       * The centre of Build wedge `i` in CLIENT (physical CSS) space — where a
+       * real cursor or a real finger has to be to be pointing at that wedge
+       * (u16-01). `__repairStage.repairWedgeClientPoint()` for one wedge,
+       * generalised to all five, so a spec can HOVER the wheel rather than reach
+       * into the selection and set it.
+       *
+       * This is the point that matters for evidence: the golden below moves a
+       * real mouse here and the highlight has to follow, which is a statement
+       * about the shipped `pointermove` route rather than about a test hook.
+       */
+      wedgeClientPoint(i: number): { x: number; y: number } | null {
+        if (i < 0 || i >= WHEEL_ORDER.length) return null;
+        const w = transform.logicalWidth;
+        const h = transform.logicalHeight;
+        const radius = wheelRadius(w, h);
+        const angle = segmentAngle(i);
+        // 0.6 of the outer radius sits inside the segment ring (hub‥rim), where
+        // the wedge's words are drawn — the honest middle of the wedge.
+        return stage.clientPoint(
+          w / 2 + Math.cos(angle) * radius * 0.6,
+          h / 2 + Math.sin(angle) * radius * 0.6,
+        );
+      },
       /** The logical viewport the wheel and the touch affordances are drawn in —
        *  landscape even on a portrait-held phone, because of the lock. */
       logicalViewport(): { width: number; height: number } {
@@ -5416,7 +5440,15 @@ async function boot(): Promise<void> {
          *  can attribute a sound to the interaction (a live wedge → press, a
          *  disabled one → reject, a landed spend → confirm). Null in a normal build
          *  (the tally is ?debug=1 only). */
-        uiCues: { press: number; confirm: number; reject: number; last: UiCue | null } | null;
+        uiCues: {
+          press: number;
+          confirm: number;
+          reject: number;
+          /** The wheel's own selection cue (u16-01) — a wedge boundary crossed,
+           *  muted on a wedge the player cannot buy. */
+          detent: number;
+          last: UiCue | null;
+        } | null;
         /** The placement of the last spatial one-shot (`./art/audio/spatial`) — the
          *  gain a far siege was heard at and the pan a shot flew in on. Sound cannot
          *  screenshot, so the spatial-audio attestation is these numbers (a3-03). */

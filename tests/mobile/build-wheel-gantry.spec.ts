@@ -64,6 +64,8 @@ interface DrawnWedge {
   cost: number | null;
   ready: boolean;
   costPaint: 'ore' | 'refused' | 'spent' | 'none';
+  /** Whether the view drew this as the wedge being pointed at (u16-01). */
+  selected: boolean;
 }
 
 interface PressStage {
@@ -73,6 +75,15 @@ interface PressStage {
   bank(): number | null;
   clientPoint(x: number, y: number): { x: number; y: number };
   logicalViewport(): { width: number; height: number };
+  /** The client-space centre of Build wedge `i` — where a real cursor or finger
+   *  has to be to be POINTING at it (u16-01). */
+  wedgeClientPoint(i: number): { x: number; y: number } | null;
+}
+
+/** The UI sound seam's own tally, behind ?debug=1 — how the detent is heard
+ *  from a test without listening to a speaker (`__audioStage`, a3-03). */
+interface AudioStage {
+  read(): { uiCues: { press: number; confirm: number; reject: number; detent: number } | null };
 }
 
 /**
@@ -467,5 +478,169 @@ test.describe('PORTRAIT-HELD — the wheel drives through the landscape lock', (
     expect(bounds.y + bounds.height, `[${label}] the wheel spilled off the bottom edge`).toBeLessThanOrEqual(
       vp.height + 1,
     );
+  });
+});
+
+// ===========================================================================
+// The SELECTION STATE, through the real pointer path (u16-01)
+// ===========================================================================
+//
+// `docs/theme-coverage.md`, answering *"is the build wheel FULLY theme
+// compliant like how the design for it was made"*: compliant on every geometric
+// and typographic claim, and **"the in-match `pointermove` handler routes to the
+// pause menu and the end overlay and nothing else — on desktop, moving the mouse
+// across the wheel changes nothing and makes no sound."**
+//
+// Which is precisely the class of defect this file exists for. The sweep is
+// unit-measured (`src/ui/wheel-selection.test.ts`) and the highlight is a golden
+// (`tests/mobile/goldens.spec.ts`), but neither can prove that a REAL pointer on
+// the REAL canvas reaches the model at all — and "the seams said one thing and
+// the pointer did another" is this screen's own history.
+//
+// Nothing below presses anything on desktop. That is the point: before u16-01 a
+// cursor could only ever CLICK the wheel, and the whole feature is what happens
+// when it merely moves.
+
+/** The wedge index these tests point at: RADAR, the one wedge whose cost (6) can
+ *  be made payable or not with `setOre` without touching a cap. */
+const RADAR_INDEX = 2;
+
+/** The detent tally off the UI sound seam, behind ?debug=1 (`__audioStage`). The
+ *  cue itself is the ratified bank's — one note, an octave above the click — so
+ *  what a test can add is only that it FIRED, and when it did not. */
+async function detents(page: Page): Promise<number> {
+  const n = await page.evaluate(() => {
+    const s = (window as unknown as { __audioStage?: AudioStage }).__audioStage;
+    return s?.read().uiCues?.detent ?? null;
+  });
+  expect(n, 'the ?debug=1 UI-cue tally is installed').not.toBeNull();
+  return n!;
+}
+
+/** Which wedges the client drew as selected, by index. */
+async function selectedIndices(page: Page): Promise<number[]> {
+  const all = await drawnWedges(page);
+  return all.map((w, i) => (w.selected ? i : -1)).filter((i) => i >= 0);
+}
+
+/** Move a real cursor onto the drawn centre of wedge `index` — a `pointermove`
+ *  on the canvas and nothing else. No button, no press, no purchase. */
+async function hoverWedge(page: Page, index: number): Promise<void> {
+  const p = await page.evaluate((i) => {
+    const s = (window as unknown as { __pressStage?: PressStage }).__pressStage;
+    return s ? s.wedgeClientPoint(i) : null;
+  }, index);
+  expect(p, 'the wheel is not drawn, so there is nothing to point at').not.toBeNull();
+  await page.mouse.move(p!.x, p!.y);
+  await waitForSimTicks(page, 3, { what: 'the highlight sweeping to the wedge' });
+}
+
+test.describe('the wheel knows what you are pointing at (u16-01)', () => {
+  test('a real CURSOR selects a wedge, deselects on the hub, and is muted on one you cannot buy', async ({
+    page,
+  }, testInfo) => {
+    test.skip(isTouchProject(testInfo.project.name), 'the hover half is desktop — a thumb has no hover');
+    budgetTest({
+      work: 'landscape boot → open the wheel through the real E binding → three real cursor moves across the drawn wheel, reading the drawn selection and the UI-cue tally at each',
+      measuredSeconds: 24,
+    });
+
+    await bootDebug(page);
+    await openWheelForReal(page, false);
+    await setOre(page, 8);
+
+    // 1. At rest, nothing is selected. The wheel that shipped before this is the
+    //    wheel a player who has not moved their mouse still gets — no contrast is
+    //    spent advertising a choice nobody has made.
+    expect(await selectedIndices(page), 'an untouched wheel points at nothing').toEqual([]);
+    const before = await detents(page);
+
+    // 2. The cursor arrives on RADAR, which at 8 ore is payable. THIS is the line
+    //    a0-20 measured as doing nothing at all.
+    await hoverWedge(page, RADAR_INDEX);
+    expect(await selectedIndices(page), 'the cursor did not select the wedge under it').toEqual([
+      RADAR_INDEX,
+    ]);
+    expect(
+      await detents(page),
+      'crossing onto a payable wedge did not fire the detent',
+    ).toBe(before + 1);
+
+    // …and the selection is exactly that: the wedge is not pressed and nothing is
+    // bought. A highlight that spent ore would be the worst bug this could have.
+    const drawn = await drawnWedges(page);
+    expect(drawn[RADAR_INDEX]!.costLabel, 'pointing at a wedge changed its price').toBe('6');
+    expect(await page.evaluate(() => {
+      const s = (window as unknown as { __pressStage?: PressStage }).__pressStage;
+      return s ? s.bank() : null;
+    }), 'pointing at a wedge spent ore').toBe(8);
+
+    // 3. The hub is the BACK affordance, not a wedge (field report v0.2.4): a
+    //    cursor over it is pointing at the wheel but at nothing on it.
+    const centre = await page.evaluate(() => {
+      const s = (window as unknown as { __pressStage?: PressStage }).__pressStage!;
+      const vp = s.logicalViewport();
+      return s.clientPoint(vp.width / 2, vp.height / 2);
+    });
+    await page.mouse.move(centre.x, centre.y);
+    await waitForSimTicks(page, 3, { what: 'the highlight fading out' });
+    expect(await selectedIndices(page), 'the hub is not a wedge and must select none').toEqual([]);
+    const afterHub = await detents(page);
+
+    // 4. The handoff's own rule — "Wedge crossed → detent … MUTED WHILE
+    //    UNAFFORDABLE". Broke, the same crossing lights the same wedge and says
+    //    nothing: a tick on a wedge that is about to refuse you is the game
+    //    telling a lie about a purchase.
+    await setOre(page, 0);
+    await hoverWedge(page, RADAR_INDEX);
+    expect(await selectedIndices(page), 'a wedge you cannot buy must still light up').toEqual([
+      RADAR_INDEX,
+    ]);
+    expect(
+      await detents(page),
+      'the detent fired on a wedge the player cannot afford',
+    ).toBe(afterHub);
+  });
+
+  test('a real THUMB selects the wedge it lands on', async ({ page }, testInfo) => {
+    test.skip(!isTouchProject(testInfo.project.name), 'the thumb half is touch');
+    budgetTest({
+      work: 'landscape boot → open the wheel through the real BUILD button → one real touchStart on the drawn RADAR wedge, held, reading the drawn selection and the UI-cue tally',
+      measuredSeconds: 26,
+    });
+
+    await useLandscape(page);
+    await bootDebug(page);
+    await openWheelForReal(page, true);
+    // Broke on purpose: a thumb going DOWN on a wedge is also a press, and this
+    // suite runs against a LIVE sim — so the wedge under test is one the sim will
+    // refuse, and the match is left exactly as it was found. It is also the half
+    // of the audio rule that is hardest to get right: the wedge lights, and says
+    // nothing.
+    await setOre(page, 0);
+
+    expect(await selectedIndices(page), 'an untouched wheel points at nothing').toEqual([]);
+    const before = await detents(page);
+
+    // A REAL touch: CDP's own dispatch produces a `pointerdown` with
+    // `pointerType: 'touch'`, the event a thumb makes. No `touchEnd` — the finger
+    // stays down, because a lifted finger on a touch device is a pointer that is
+    // no longer over anything, and the highlight goes with it.
+    const p = await page.evaluate((i) => {
+      const s = (window as unknown as { __pressStage?: PressStage }).__pressStage;
+      return s ? s.wedgeClientPoint(i) : null;
+    }, RADAR_INDEX);
+    expect(p, 'the wheel is not drawn, so there is nothing to touch').not.toBeNull();
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ x: p!.x, y: p!.y }],
+    });
+    await waitForSimTicks(page, 5, { what: 'the highlight arriving under the thumb' });
+
+    expect(await selectedIndices(page), 'the thumb did not select the wedge under it').toEqual([
+      RADAR_INDEX,
+    ]);
+    expect(await detents(page), 'the detent fired on a wedge the player cannot afford').toBe(before);
   });
 });
