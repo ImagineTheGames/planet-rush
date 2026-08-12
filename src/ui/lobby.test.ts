@@ -1221,6 +1221,100 @@ describe('the seat-state control SAYS what it is (u5 — the affordance, not the
   });
 });
 
+// ---------------------------------------------------------------------------
+// a0-31 — a SOLO lobby has no OPEN seat
+// ---------------------------------------------------------------------------
+
+describe('a solo lobby must not offer an OPEN seat (a0-31)', () => {
+  // The developer: *"in solo play there should be no slot open it's either closed
+  // or bot. no one can join in solo…."* The MODEL already agreed — `createLobby`
+  // seeds an offline seat BOT and `openToJoin` is false offline — and the CONTROL
+  // did not: the ring was walked unconditionally, so one tap in a solo lobby could
+  // advertise a chair nobody could ever take. These assert the control.
+
+  it('walks BOT ⇄ CLOSED in SOLO and never reaches OPEN — while ONLINE keeps all three', () => {
+    // A full lap and a bit, so a ring of any length is walked past its start.
+    const walk = (start: LobbyState, slot: PlayerId): Set<SeatOccupant> => {
+      const seen = new Set<SeatOccupant>();
+      let state = start;
+      for (let i = 0; i < SEAT_STATE_CYCLE.length * 2 + 1; i++) {
+        seen.add(state.seats[slot]!.occupant);
+        state = cycleSeatState(state, slot);
+      }
+      return seen;
+    };
+
+    // SOLO: two rungs, and OPEN is not one of them.
+    const inSolo = walk(solo(), 1);
+    expect(inSolo.has('open'), 'a solo seat cycled to OPEN — nobody can take it').toBe(false);
+    expect([...inSolo].sort()).toEqual(['bot', 'closed']);
+
+    // ONLINE is untouched — a0-11 is ratified: a created room starts with all
+    // slots OPEN, and the host can put one back.
+    expect([...walk(lobby(), 1)].sort()).toEqual(['bot', 'closed', 'open']);
+  });
+
+  it('says so on the row too: no solo seat reads OPEN, in words or as a joinable chair', () => {
+    let state = solo();
+    // Every non-human row, tapped past a full lap of the longest ring there is —
+    // so a rung reachable from any starting state is reached here.
+    for (let slot = 1; slot < LOBBY_SLOTS; slot++) {
+      for (let tap = 0; tap <= SEAT_STATE_CYCLE.length * 2; tap++) {
+        for (const row of lobbyModel(state).seats) {
+          expect(row.state, `row ${row.player} is OPEN in a solo lobby`).not.toBe('open');
+          expect(row.stateLabel, `row ${row.player} says OPEN in a solo lobby`).not.toBe('OPEN');
+          expect(row.name, `row ${row.player} is named OPEN in a solo lobby`).not.toBe('OPEN');
+          // …and no row was ever advertised as joinable offline, which is the half
+          // of this rule the file already had (a0-11) — asserted here so the two
+          // halves stay together.
+          expect(row.openToJoin).toBe(false);
+        }
+        // The control never goes dead on a solo row; it just has one rung fewer.
+        expect(lobbyModel(state).seats[slot]!.canCycleState).toBe(true);
+        state = cycleSeatState(state, slot);
+      }
+    }
+  });
+
+  it('reads a seat ALREADY STORED as OPEN in a solo lobby as BOT — display, count and match', () => {
+    // The returning-player case: a state authored before this rule (or by a path
+    // that has not learned it) carries an OPEN seat into a lobby nobody can join.
+    // It resolves to BOT wherever it is read, so the screen never shows a chair
+    // that cannot be filled and the match it launches contains what the screen says.
+    const base = solo();
+    const stale: LobbyState = {
+      ...base,
+      seats: base.seats.map((s) =>
+        s.player === 3 ? { ...s, occupant: 'open' as const, personality: null } : s,
+      ),
+    };
+
+    const row = lobbyModel(stale).seats[3]!;
+    expect(row.state).toBe('bot');
+    expect(row.stateLabel).toBe('BOT');
+    expect(row.isBot).toBe(true);
+    expect(row.name).toBe(PERSONALITIES[stale.seats[3]!.character].name);
+    expect(nameFor(stale, 3)).toBe(row.name);
+
+    // …in the count, so `N` and the RUSH gate see the same roster the rows do…
+    expect(matchSizeOf(stale)).toBe(LOBBY_SLOTS);
+    expect(denseSeatIndex(stale, 3)).toBe(3);
+    expect(lobbyModel(stale).botCount).toBe(LOBBY_SLOTS - 1);
+
+    // …and in the match, which is the half a preview can lie about.
+    const slot = lobbyMatchConfig(stale).slots[3]!;
+    expect(slot.state).toBe('bot');
+    expect(slot.botPersonality).toBe(stale.seats[3]!.character);
+    expect(slot.botDifficulty).toBe(PERSONALITIES[stale.seats[3]!.character].difficulty);
+
+    // Online the very same seat is exactly what it says it is — an empty chair.
+    const room: LobbyState = { ...stale, online: true };
+    expect(lobbyModel(room).seats[3]!.state).toBe('open');
+    expect(lobbyMatchConfig(room).slots[3]!.state).toBe('closed');
+  });
+
+});
+
 describe('RUSH! gating on size and sides (variable-slots E)', () => {
   it('refuses a start with fewer than two live players', () => {
     // Close every seat but the host's.
