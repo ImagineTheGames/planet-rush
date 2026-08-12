@@ -207,6 +207,12 @@ async function registered(page: Page, id: string): Promise<Rect | null> {
 }
 
 async function bootDebug(page: Page): Promise<void> {
+  // Seat the STICKS scheme before boot — same reason as the build-wheel spec (a0-30):
+  // Tap Commander is the first-run default on every platform now, and in it the
+  // canvas-focus click is a MOVE ORDER that undocks the ship, so the wheel this
+  // spec opens with `E` would never open. The scheme this spec's click path belongs
+  // to is now stated rather than assumed.
+  await page.addInitScript(() => localStorage.setItem('planet-rush:controlScheme', 'sticks'));
   await page.goto('/?debug=1');
   await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
   await page.waitForFunction(

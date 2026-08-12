@@ -96,6 +96,14 @@ const isTouchProject = (name: string): boolean => TOUCH_PROJECTS.includes(name);
  * hung suite (QA charter).
  */
 async function bootDebug(page: Page): Promise<void> {
+  // Seat the STICKS scheme before boot (a0-30). Tap Commander is the first-run
+  // default on every platform since 2026-08-12 (GDD §2.4 amended) and it REPLACES
+  // the sticks: the pilot writes thrust, and `W` / the left virtual stick write
+  // nothing. This spec would still have passed — a camera holds a stationary ship
+  // dead centre just fine — which is worse than failing, because "assert centred
+  // after sustained thrust" would have been asserting nothing about thrust. So it
+  // states the scheme its input belongs to.
+  await page.addInitScript(() => localStorage.setItem('planet-rush:controlScheme', 'sticks'));
   await page.goto('/?debug=1');
   await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
   await page.waitForFunction(

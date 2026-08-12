@@ -98,6 +98,12 @@ declare const window: Window & StageWindow;
 const CENTRE = (r: Rect): { x: number; y: number } => ({ x: r.x + r.width / 2, y: r.y + r.height / 2 });
 
 async function bootMinimap(page: Page): Promise<DrawnMinimap> {
+  // Seat the STICKS scheme before boot (a0-30): Tap Commander is the first-run
+  // default on every platform now (GDD §2.4, amended 2026-08-12) and it replaces the
+  // sticks, so the held `W` this file uses as "real input, the p1a rule" writes no
+  // thrust at all. The rule is unchanged — a real key on a real device — it just has
+  // to say which scheme that key belongs to.
+  await page.addInitScript(() => localStorage.setItem('planet-rush:controlScheme', 'sticks'));
   await page.goto('/?debug=1', { waitUntil: 'load' });
   await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
   await page.waitForFunction(() => typeof window.__minimapStage?.state === 'function', undefined, {
