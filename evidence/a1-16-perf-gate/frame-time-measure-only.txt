@@ -1,0 +1,25 @@
+
+> planet-rush@0.0.0 test:perf-frame-time
+> playwright test --config tests/perf/playwright.perf.config.ts
+
+[WebServer] [33m
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+
+Running 4 tests using 1 worker
+
+[perf] desktop steady state: 300 frames · median 50.00 ms (20.0 fps) · mean 50.28 · p95 66.60 · p99 66.70 · max 66.70 ms · page fps 20.1 · 1276 sim ticks · measure-only (PERF_GATE unset)
+  ✓  1 [desktop] › frame-time.spec.ts:154:3 › frame-time capture (GDD §4.3 performance budget) › steady-state frame time (22.5s)
+[perf] desktop thrust+fire: 300 frames · median 50.00 ms (20.0 fps) · mean 45.00 · p95 50.10 · p99 50.10 · max 50.10 ms · page fps 22.3 · 1174 sim ticks · measure-only (PERF_GATE unset)
+  ✓  2 [desktop] › frame-time.spec.ts:176:3 › frame-time capture (GDD §4.3 performance budget) › frame time under a held input (21.4s)
+[perf] phone-landscape steady state: 300 frames · median 116.70 ms (8.6 fps) · mean 119.16 · p95 133.40 · p99 150.00 · max 150.10 ms · page fps 8.6 · 3018 sim ticks · measure-only (PERF_GATE unset)
+  ✓  3 [phone-landscape] › frame-time.spec.ts:154:3 › frame-time capture (GDD §4.3 performance budget) › steady-state frame time (52.7s)
+[perf] phone-landscape thrust+fire: 300 frames · median 100.00 ms (10.0 fps) · mean 96.33 · p95 116.70 · p99 133.30 · max 133.40 ms · page fps 10.4 · 2424 sim ticks · measure-only (PERF_GATE unset)
+  ✓  4 [phone-landscape] › frame-time.spec.ts:176:3 › frame-time capture (GDD §4.3 performance budget) › frame time under a held input (43.8s)
+
+  Slow test file: [phone-landscape] › frame-time.spec.ts (1.6m)
+  Slow test file: [desktop] › frame-time.spec.ts (43.9s)
+  Consider splitting slow test files to speed up parallel execution
+  4 passed (3.1m)
