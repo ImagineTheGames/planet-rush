@@ -197,6 +197,18 @@ Nothing here is blocked. What is deliberately **not** in this branch:
 - **Milestone F (`ETag`/`304`)** — not needed; see the numbers above.
 - **The map on the wire** — a live bug, its own brief (D6).
 
+### The dark-matter gate, and the condition attached to it
+
+CI caught `readLobbyList` and `joinListing` with no production caller — correctly,
+because the screen that calls them is part 2. Both are allowlisted with a reason
+(`tools/dark-matter-allowlist.json`) and recorded in `docs/dark-matter-scan.md`
+§4.5, which is what the gate's own failure message instructs.
+
+**The condition is written into both:** if the browse screen does not land, those
+two entries are the evidence that it did not, and the answer then is to delete
+them, not to re-justify them. A future session of mine reading this note should
+check whether the screen shipped before touching either.
+
 ### One fixture caveat, so nobody rediscovers it
 
 In `local-fleet`, `session.close()` does **not** reach the Machine: the client's
