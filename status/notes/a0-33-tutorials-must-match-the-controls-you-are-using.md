@@ -23,10 +23,16 @@ gesture their configuration does not have.
   `HudFrame.controlScheme` (required, beside `device`/`fireMode`) through
   `src/ui/hud.ts`, fed by `src/main.ts` from the live `controlScheme`.
   `hud-geometry.test.ts`'s authored-prompt sweep walks both schemes now.
-- **`evidence/a0-33-scheme-aware-onboarding/readback.{ts,json}`** — the readings
-  under all 60 configurations (5 prompts × 3 devices × 2 modes × 2 schemes), the
-  same sentences laid out on a 390 px handset, and two trigger walks (the first
-  match with two mid-match scheme switches; the settings tip's dwell).
+- **`af30bee` — the evidence.** `evidence/a0-33-scheme-aware-onboarding/readback.{ts,json}`:
+  the readings under all 60 configurations (5 prompts × 3 devices × 2 modes × 2
+  schemes), the same sentences laid out on a 390 px handset, and two trigger
+  walks (the first match with two mid-match scheme switches; the settings tip's
+  dwell). Run with `npx vite-node evidence/a0-33-scheme-aware-onboarding/readback.ts`.
+- **`1768ae1` — the real boot.** `tests/live-stage/haul-prompt.spec.ts` seats the
+  scheme through stored `planet-rush:controlScheme` (and, in two cases, stores
+  nothing — a new player, i.e. Tap Commander since a0-30). Six cases green on the
+  built bundle; `__onboardingStage.scheme()` added beside `device()`. The two
+  superseded phone screenshots are replaced by per-scheme ones.
 
 ## DECISIONS
 
@@ -69,7 +75,23 @@ gesture their configuration does not have.
 
 ## NEXT
 
-- Full `npx vitest run` + `npm run dark-matter:check` green, then push and open
-  the PR with the readings table and the new-copy list.
-- Not done, deliberately: no GDD/`docs/design-amendments.md` edit — those are the
-  Director's to ratify, and the PR is where the copy is proposed.
+**DoD met. PR #404 open, all checks green** — typecheck/test/build, the perf
+gate, and all six mobile Playwright shards (the suite `npm test` does not run).
+Locally: `npx tsc --noEmit` clean, `npx vitest run` 292 files / 5245 tests,
+`npm run dark-matter:check` clean, live-stage 6/6 on `PREVIEW_PORT=4187`.
+
+What remains is not mine to do:
+
+- **Four new sentences await the developer's approval** — listed in the PR under
+  "NEW COPY". If any is redrafted, it is one string in `PROMPT_COPY` plus the
+  test that pins it.
+- **Flagged in the PR, not fixed:** on touch under Tap Commander the FIRE button
+  is still drawn (visible in `haul-prompt-phone-landscape-tap-evidence.png`)
+  though the pilot fires. Same open question a0-30 already logged against
+  `describeBindings` — Platform's touch visuals, the Director's call.
+- **Also flagged:** the developer's *"you don't need that with auto aim"* reads
+  as though auto-aim auto-fires. Per §2.4 it does not — the player still decides
+  *when*. The copy follows §2.4; if the intent was auto-fire, that is a sim
+  change and a separate brief.
+- Deliberately untouched: GDD and `docs/design-amendments.md` — ratification is
+  the Director's, and the PR is where the copy is proposed.
