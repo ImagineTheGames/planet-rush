@@ -44,14 +44,25 @@
  * weights — which is why a stack of four lines is a fifth taller than four times
  * its type size.
  *
- * ── WHAT THIS IS AN UPPER BOUND OF, AND BY HOW MUCH ────────────────────────
- * `measureText` on a whole string applies kerning; summing per-glyph advances
- * does not. Measured across the UI's real strings the difference is ≤ `.1em`
- * TOTAL for a twelve-character line and always in the same direction — the sum is
- * never smaller than the string. So this over-reports by a fraction of one glyph
- * and never under-reports, which is the right way round for a budget: a label
- * that passes here fits on the device, and `voice-copy-fit.spec.ts` asserts that
- * relationship rather than assuming it.
+ * ── QUANTISATION, WHICH IS WHY THE ROUNDING IS WHERE IT IS ─────────────────
+ * The engine does not lay glyphs out on fractional pixels. Every advance comes
+ * back as a whole number — `measureText` of a 28-glyph line at 11px returns
+ * exactly `174`, and it returns it because each glyph in it was rounded first and
+ * then added, not the other way round. Sum the `em` values and round once at the
+ * end and you get 171: three pixels light, in the optimistic direction, on
+ * exactly the kind of line that is drawn into a fixed box.
+ *
+ * So {@link textWidth} rounds per glyph. What it does NOT reproduce is the second
+ * quantisation, of the type SIZE: asked for 13.435px the engine measures the 13px
+ * metrics, so at the fractional sizes the wheel's profile ramp produces this model
+ * reads a little WIDE. That is the direction a budget wants to be wrong in, and
+ * it is why the wheel's own margin is 4px rather than a hairline.
+ *
+ * There is no kerning term because there is no kerning: measured against the real
+ * page, `measureText(whole)` equals the sum of its glyphs' advances exactly, in
+ * every string this UI draws. `tests/mobile/voice-copy-fit.spec.ts` re-measures
+ * both claims — the table, glyph by glyph, and this arithmetic, string by string —
+ * so neither is believed on the strength of this paragraph.
  */
 
 import { ADVANCE_EM, LINE_HEIGHT_EM, type MetricFace } from './font-metrics.data';
@@ -99,15 +110,19 @@ export function untabledGlyphs(text: string, face: MetricFace): readonly string[
 /** One line's width in px — no `\n` handling, so {@link textWidth} can fold. */
 function lineWidth(line: string, spec: TypeSpec): number {
   const table = ADVANCE_EM[spec.face];
-  let em = 0;
+  let px = 0;
   let glyphs = 0;
   for (const ch of line) {
-    em += table[ch] ?? UNTABLED_ADVANCE_EM;
+    // Rounded per glyph, because that is what the engine does — see the note on
+    // quantisation in the header. Summing the un-rounded advances and rounding
+    // once at the end is a different number, and on a 28-glyph line it is a
+    // different number by three pixels.
+    px += Math.round((table[ch] ?? UNTABLED_ADVANCE_EM) * spec.size);
     glyphs++;
   }
   // The spacing lands BETWEEN glyphs — `n − 1` gaps, exactly as Pixi adds them.
   const spacing = glyphs > 1 ? (glyphs - 1) * spec.tracking * spec.size : 0;
-  return em * spec.size + spacing;
+  return px + spacing;
 }
 
 /**
