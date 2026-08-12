@@ -2157,7 +2157,11 @@ function placeJoinModes(
     width: besideWidth,
     height: stripHeight,
   };
-  const stampLineHeight = Math.max(0, Math.min(remaining, Math.round(20 * m.scale)));
+  // A line of its own is still a line of TYPE, and type has a floor (`TYPE_MIN`,
+  // 11px — below it an Oxanium eyebrow stops being small and starts being a
+  // smudge). Scaling this one linearly would have drawn a 6px strip on a 390px-
+  // wide viewport and clipped the very sentence that keeps the screen honest.
+  const stampLineHeight = Math.max(0, Math.min(remaining, Math.max(14, Math.round(20 * m.scale))));
   const stamp: Rect = inline
     ? stampInline
     : { x: band.x, y: belowStrip, width: band.width, height: stampLineHeight };
