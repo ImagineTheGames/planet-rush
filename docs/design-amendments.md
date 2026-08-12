@@ -97,6 +97,14 @@ wrote it, so `E` really does open the Build & Upgrade wheel in either scheme, an
 the wheel's own confirm is unchanged. Not in the conflict either: the parity table,
 which is about the *sticks* scheme's device mapping and is untouched.
 
+**One thing rides along with it.** Onboarding's `{fire}` token resolves through the
+same `describeBindings` (`src/ui/onboarding.ts` `bindingPhrase`), so a first-run
+desktop prompt reads *"Hold Left mouse on the asteroid"* where Tap Commander wants
+*"tap the asteroid"*. Same root cause — the strip and the prompts are generated from
+a map that takes a device and a fire mode and has never taken a scheme — and it is
+resolved by resolution 2 below, or by leaving both alone under resolution 1. It is
+UI's file either way; flagged, not touched.
+
 **Nothing has been dropped or quietly re-bound here** — this brief's mandate was to
 move two defaults, and inventing a third rule for what `W` means in Tap Commander
 is a design call. The two candidate resolutions, for the Director:
