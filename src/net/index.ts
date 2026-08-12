@@ -124,6 +124,9 @@ export * from './link-loss-attach';
 export * from './local-revert';
 export * from './local-revert-view';
 export * from './allocator-client';
+// JOIN's second mode: the list of rooms a stranger may walk into, and the tap
+// that gets into one without a code (a0-26).
+export * from './lobby-list';
 export * from './region-probe';
 export * from './server-url';
 export * from './websocket-transport';
