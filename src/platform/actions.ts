@@ -36,11 +36,41 @@ export enum FireMode {
 }
 
 /**
- * The best first-run default differs by platform (GDD §2.4): Manual on desktop
- * and gamepad, Auto-aim on touch — changeable any time from settings.
+ * The first-run default, and it is the SAME on every platform: **Auto-aim**
+ * *(GDD §2.4, amended 2026-08-12 — a0-30, ratified: "is tap commander and auto
+ * aim default on all platforms it should be" … "I already said BOTH")*.
+ *
+ * This supersedes the per-platform split this function used to encode (Manual on
+ * desktop and gamepad, Auto-aim on touch). Manual is untouched as a *choice* —
+ * still reachable from settings and the pause menu on every device, still the mode
+ * that emits the `aim` action (`mapActions` below), still half of the parity table
+ * (`input-parity.test.ts`). What moved is the mode a player who has never chosen
+ * one starts in.
+ *
+ * Deliberately zero-argument: a `isTouch` parameter the answer no longer depends
+ * on is a signature that invites the split back in. The *stored* preference is
+ * resolved by {@link readStoredFireMode}, which is what any boot path should call
+ * — read before you default.
  */
-export function defaultFireMode(isTouch: boolean): FireMode {
-  return isTouch ? FireMode.AutoAim : FireMode.Manual;
+export const DEFAULT_FIRE_MODE = FireMode.AutoAim;
+
+/** The first-run fire mode on every platform — see {@link DEFAULT_FIRE_MODE}. */
+export function defaultFireMode(): FireMode {
+  return DEFAULT_FIRE_MODE;
+}
+
+/**
+ * Resolve a persisted fire-mode string to the mode it seats — **a saved
+ * preference always wins** (a0-30 item 2).
+ *
+ * Only the two strings the enum itself writes count as a preference; an absent
+ * key, a stale one, or a hand-edited save falls to {@link defaultFireMode}. That
+ * is the whole of "this moves the default for a player with nothing stored, not
+ * everyone's setting": anyone who has already chosen Manual re-boots into Manual.
+ */
+export function readStoredFireMode(stored: string | null | undefined): FireMode {
+  if (stored === FireMode.Manual || stored === FireMode.AutoAim) return stored;
+  return defaultFireMode();
 }
 
 // ---------------------------------------------------------------------------
@@ -166,6 +196,17 @@ export interface BindingLabel {
  * map that drives the sim and can never drift (GDD §2.4). On touch the strip is
  * not shown (the visible sticks are the legend, GDD §2.2), so this returns the
  * touch bindings for onboarding/settings copy rather than a bottom strip.
+ *
+ * **These are the SEATED-SCHEME bindings, and the scheme is not an argument —
+ * flagged OPEN by a0-30.** Tap Commander replaces the sticks entirely
+ * (`src/main.ts` `sampleInput`: in the tap scheme the pilot writes thrust/aim/fire
+ * and the devices' own thrust is zeroed), so on a desktop now defaulting to Tap
+ * Commander the `thrust · WASD` row below describes a binding that does not move
+ * the ship. Build is unaffected — `merged.build` is left as the devices wrote it,
+ * so `E` really does open the wheel in either scheme. Nothing is dropped here:
+ * whether Tap Commander should yield thrust back to WASD, or the strip should read
+ * the scheme, is the Director's call and is written up in
+ * `docs/design-amendments.md` (a0-30, "The one conflict").
  */
 export function describeBindings(device: DeviceKind, mode: FireMode): BindingLabel[] {
   const auto = mode === FireMode.AutoAim;
