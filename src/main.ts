@@ -4340,6 +4340,13 @@ async function boot(): Promise<void> {
       device(): DeviceKind {
         return activeDevice;
       },
+      /** The seated control scheme this frame (a0-33). The device chooses the
+       *  key inside the sentence; the SCHEME chooses the sentence, and since
+       *  a0-30 a fresh profile is seated in Tap Commander on every platform — so
+       *  a capture that did not state this would not say which lesson it read. */
+      scheme(): ControlScheme {
+        return controlScheme;
+      },
     };
     try {
       Object.defineProperty(window, '__onboardingStage', {
