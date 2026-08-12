@@ -206,12 +206,19 @@ export type BrowseRegions = readonly RegionInfo[];
 /**
  * Fold a fresh listing into the screen (§3 rules 1 and 3).
  *
- * Rows the listing carries are rebuilt from it — it is the newer fact — and
- * ordered by {@link compareRows}. Rows the screen had and the listing no longer
+ * Rows the listing carries are rebuilt from it — it is the newer fact — in the
+ * order the allocator sent them. Rows the screen had and the listing no longer
  * carries are marked `closed` and **spliced back at the index they held**, so a
  * room that ends does not yank the row under a descending thumb sideways; on the
  * next listing they are dropped. A row that was already `closed` has had its
  * cycle and leaves now.
+ *
+ * **The ORDER a player sees is not decided here** — {@link browseModel} sorts,
+ * every frame, against the pings this client has measured *by then*. That is not
+ * a nicety: the first listing routinely lands before the region probes answer, so
+ * a sort taken at merge time would freeze the rows in the order they arrived and
+ * silently never re-rank them when the measurements came in. It did exactly that,
+ * once, and the phone caught it (`tests/browse/lobby-browse.spec.ts`).
  *
  * `now` is this client's clock and becomes the stamp's zero.
  */
@@ -219,11 +226,9 @@ export function browseReceived(
   state: BrowseState,
   listing: readonly LobbyListing[],
   now: number,
-  regions: BrowseRegions = [],
 ): BrowseState {
   const fresh = listing.map(toRow);
   const live = new Set(fresh.map((row) => row.id));
-  fresh.sort((a, b) => compareRows(a, b, regions));
 
   // Everything the screen had that this listing does not — one cycle of CLOSED,
   // at the index it is already occupying under the player's eye.
@@ -477,7 +482,10 @@ export interface BrowseModelOptions {
 export function browseModel(state: BrowseState, options: BrowseModelOptions): BrowseModel {
   const { now, capacity } = options;
   const regions = options.regions ?? [];
-  const shown = state.rows.slice(0, Math.max(0, Math.floor(capacity)));
+  // Sorted HERE, per frame, against whatever this client has measured by now —
+  // see `browseReceived` for why it cannot be done when the listing lands.
+  const ranked = [...state.rows].sort((a, b) => compareRows(a, b, regions));
+  const shown = ranked.slice(0, Math.max(0, Math.floor(capacity)));
   const stamp = browseStamp(state, now, options.pollMs ?? BROWSE_POLL_MS);
   const live = browseLive(state);
   return {
@@ -490,8 +498,8 @@ export function browseModel(state: BrowseState, options: BrowseModelOptions): Br
       enabled: live && row.state === 'open',
       action: row.state === 'open' ? 'JOIN' : row.state === 'full' ? 'FULL' : 'CLOSED',
     })),
-    hidden: Math.max(0, state.rows.length - shown.length),
-    hiddenLine: hiddenLine(Math.max(0, state.rows.length - shown.length)),
+    hidden: Math.max(0, ranked.length - shown.length),
+    hiddenLine: hiddenLine(Math.max(0, ranked.length - shown.length)),
     stamp: stamp.text,
     stale: stamp.stale,
     empty: emptyLines(state),
@@ -513,13 +521,26 @@ function emptyLines(state: BrowseState): readonly string[] {
   return [BROWSE_COPY.emptyHeadline, BROWSE_COPY.emptyDetail];
 }
 
-/** `2 PLAYERS · 4 SEATS OPEN · TEAMS`. Singulars are spelled — a row that says
- *  "1 PLAYERS" is a row nobody proofread. */
+/**
+ * `2 PLAYERS · 4 SEATS OPEN · TEAMS`. Singulars are spelled — a row that says
+ * "1 PLAYERS" is a row nobody proofread.
+ *
+ * **A CLOSED row drops the seat clause entirely.** It left the listing, so the
+ * last seat count is a number about a room that is no longer being offered — and
+ * a row reading `4 SEATS OPEN` beside a button reading `CLOSED` is the screen
+ * arguing with itself. The player count stays: it is what the room *was*, and it
+ * is not a claim about what they can do next. (A `full` row keeps its clause and
+ * says `NO SEATS OPEN`, because that is exactly what its own ad carried.)
+ */
 function rowMeta(row: BrowseRow): string {
-  const parts = [
-    `${row.players} ${row.players === 1 ? 'PLAYER' : 'PLAYERS'}`,
-    `${row.joinableSeats} ${row.joinableSeats === 1 ? 'SEAT' : 'SEATS'} OPEN`,
-  ];
+  const parts = [`${row.players} ${row.players === 1 ? 'PLAYER' : 'PLAYERS'}`];
+  if (row.state !== 'closed') {
+    parts.push(
+      row.joinableSeats <= 0
+        ? 'NO SEATS OPEN'
+        : `${row.joinableSeats} ${row.joinableSeats === 1 ? 'SEAT' : 'SEATS'} OPEN`,
+    );
+  }
   const mode = modeWord(row.mode);
   if (mode !== '') parts.push(mode);
   return parts.join(' · ');
@@ -556,6 +577,10 @@ function pingOf(row: BrowseRow, regions: BrowseRegions): number | null {
 
 /**
  * Row order: **nearest first, then the most room, then a stable tie-break.**
+ *
+ * Applied by {@link browseModel} on every frame rather than once when a listing
+ * lands, so a fleet measured a second after the first listing re-ranks the rows
+ * it is already showing.
  *
  * An unmeasured region sorts *after* every measured one rather than at zero — the
  * same refusal `region-probe` rule 1 makes in the picker, because an unprobed

@@ -273,7 +273,11 @@ export class LobbyBrowserView extends Container {
   ): void {
     nodes.body.clear();
     const drawable = rect.width > 0 && rect.height > 0;
-    setVisible(drawable, nodes.owner, nodes.meta, nodes.where, nodes.action);
+    // `body` belongs in this set as much as the text does: a pooled row that was
+    // hidden while the list was empty comes back with its own plate, and leaving
+    // it out drew four rows of floating text on an empty screen — which is what
+    // the first evidence run of this screen actually shot.
+    setVisible(drawable, nodes.body, nodes.owner, nodes.meta, nodes.where, nodes.action);
     if (!drawable) return;
 
     // The row itself: a surface, at row scale, dimmed when the listing is no longer

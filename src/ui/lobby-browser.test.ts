@@ -67,8 +67,12 @@ const MODEL = { now: 0, capacity: 8, regions: FLEET };
 
 /** A screen holding one listing, received at `t`. */
 function withRows(rows: readonly LobbyListing[], t = 1_000): BrowseState {
-  return browseReceived(createBrowse(), rows, t, FLEET);
+  return browseReceived(createBrowse(), rows, t);
 }
+
+/** The rows a frame would DRAW, in the order it would draw them. */
+const drawn = (state: BrowseState, regions = FLEET): readonly string[] =>
+  browseModel(state, { ...MODEL, regions }).rows.map((r) => r.owner);
 
 // ---------------------------------------------------------------------------
 // 1. The mode switch
@@ -137,7 +141,22 @@ describe('a listing lands (§3 rules 1 and 3)', () => {
       listing({ id: 'lhr', owner: 'BBBBBB', region: 'lhr' }),
       listing({ id: 'iad', owner: 'CCCCCC', region: 'iad' }),
     ]);
-    expect(state.rows.map((r) => r.region)).toEqual(['iad', 'gru', 'lhr']);
+    expect(drawn(state)).toEqual(['CCCCCC', 'AAAAAA', 'BBBBBB']);
+  });
+
+  it('RE-RANKS a listing that landed before the pings did', () => {
+    // The first listing routinely lands before the region probes answer — the
+    // request goes out the moment the segment opens and a probe is three samples
+    // deep. Sorting when the listing lands would freeze that arrival order
+    // forever; the phone caught exactly that (tests/browse/lobby-browse.spec.ts).
+    const state = withRows([
+      listing({ id: 'gru', owner: 'AAAAAA', region: 'gru' }),
+      listing({ id: 'iad', owner: 'BBBBBB', region: 'iad' }),
+    ]);
+    // Nothing measured yet: the fleet's own order stands, by seats then owner.
+    expect(drawn(state, [])).toEqual(['AAAAAA', 'BBBBBB']);
+    // …and the moment the probes land, the same rows re-rank under the player.
+    expect(drawn(state)).toEqual(['BBBBBB', 'AAAAAA']);
   });
 
   it('breaks a ping tie by the most room, then stably', () => {
@@ -146,7 +165,7 @@ describe('a listing lands (§3 rules 1 and 3)', () => {
       listing({ id: 'b', owner: 'AAAAAA', joinableSeats: 6 }),
       listing({ id: 'c', owner: 'AAAAA0', joinableSeats: 2 }),
     ]);
-    expect(state.rows.map((r) => r.id)).toEqual(['b', 'c', 'a']);
+    expect(drawn(state)).toEqual(['AAAAAA', 'AAAAA0', 'BBBBBB']);
   });
 
   it('marks a departed room CLOSED for one cycle, in the place it already had', () => {
@@ -163,17 +182,16 @@ describe('a listing lands (§3 rules 1 and 3)', () => {
       first,
       [listing({ id: 'a', owner: 'AAAAAA' }), listing({ id: 'c', owner: 'CCCCCC' })],
       6_000,
-      FLEET,
     );
     expect(second.rows.map((r) => r.id)).toEqual(['a', 'b', 'c']);
     expect(second.rows[1]?.state).toBe('closed');
 
     // …and it is gone on the next one. One cycle, not two — `c`, which left on
     // THIS listing, is now the one taking its single cycle.
-    const third = browseReceived(second, [listing({ id: 'a', owner: 'AAAAAA' })], 11_000, FLEET);
+    const third = browseReceived(second, [listing({ id: 'a', owner: 'AAAAAA' })], 11_000);
     expect(third.rows.map((r) => r.id)).toEqual(['a', 'c']);
     expect(third.rows[1]?.state).toBe('closed');
-    const fourth = browseReceived(third, [listing({ id: 'a', owner: 'AAAAAA' })], 16_000, FLEET);
+    const fourth = browseReceived(third, [listing({ id: 'a', owner: 'AAAAAA' })], 16_000);
     expect(fourth.rows.map((r) => r.id)).toEqual(['a']);
   });
 
@@ -182,6 +200,20 @@ describe('a listing lands (§3 rules 1 and 3)', () => {
     expect(model.rows[0]?.state).toBe('full');
     expect(model.rows[0]?.enabled).toBe(false);
     expect(model.rows[0]?.action).toBe('FULL');
+    // …and it says the seat count its own ad carried, rather than a bare zero.
+    expect(model.rows[0]?.meta).toContain('NO SEATS OPEN');
+  });
+
+  it('stops a CLOSED row advertising seats it no longer knows about', () => {
+    // A row reading `4 SEATS OPEN` beside a button reading `CLOSED` is the screen
+    // arguing with itself. The seat clause goes; the player count — what the room
+    // WAS — stays, because it claims nothing about what to do next.
+    const first = withRows([listing({ id: 'a', players: 2, joinableSeats: 4 })]);
+    const gone = browseReceived(first, [], 6_000);
+    const row = browseModel(gone, MODEL).rows[0]!;
+    expect(row.action).toBe('CLOSED');
+    expect(row.meta).toContain('2 PLAYERS');
+    expect(row.meta).not.toMatch(/SEAT/);
   });
 
   it('keeps the rows through a failed refresh, and lets the stamp say so', () => {
@@ -237,7 +269,7 @@ describe('an empty list', () => {
   });
 
   it('says NO OPEN CLAIMS — and what to do instead — once one has landed', () => {
-    const model = browseModel(browseReceived(createBrowse(), [], 1_000, FLEET), MODEL);
+    const model = browseModel(browseReceived(createBrowse(), [], 1_000), MODEL);
     expect(model.empty).toEqual([BROWSE_COPY.emptyHeadline, BROWSE_COPY.emptyDetail]);
     // The way out is named, and it is on this very screen: the other segment.
     expect(BROWSE_COPY.emptyDetail).toContain(JOIN_MODE_LABELS.code);
@@ -248,7 +280,7 @@ describe('an empty list', () => {
   });
 
   it('is never a blank rectangle: something is always said', () => {
-    for (const state of [createBrowse(), browseReceived(createBrowse(), [], 1, FLEET)]) {
+    for (const state of [createBrowse(), browseReceived(createBrowse(), [], 1)]) {
       expect(browseModel(state, MODEL).empty.join('')).not.toBe('');
     }
   });
@@ -289,7 +321,7 @@ describe('pressing a row', () => {
 
   it('refuses a CLOSED row the same way', () => {
     const first = withRows([listing({ id: 'a' }), listing({ id: 'b', owner: 'BBBBBB' })]);
-    const second = browseReceived(first, [listing({ id: 'a' })], 6_000, FLEET);
+    const second = browseReceived(first, [listing({ id: 'a' })], 6_000);
     const result = pressBrowseRow(second, 'b', 6_100);
     expect(result.join).toBeNull();
     expect(result.refresh).toBe(true);

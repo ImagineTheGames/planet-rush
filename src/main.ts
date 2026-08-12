@@ -7697,7 +7697,7 @@ function openMainMenu(
       // No allocator wired (local dev, the offline build). There is no list to
       // read and never will be on this build, so the screen says the honest
       // thing — an empty list — rather than spinning forever.
-      browse = browseReceived(browse, [], Date.now(), onlineRegions);
+      browse = browseReceived(browse, [], Date.now());
       browseStartedAt = Date.now();
       render();
       return;
@@ -7717,7 +7717,7 @@ function openMainMenu(
     browse =
       list === null
         ? browseRefreshFailed(browse)
-        : browseReceived(browse, list.rooms, Date.now(), onlineRegions);
+        : browseReceived(browse, list.rooms, Date.now());
     render();
   }
 
@@ -7746,7 +7746,11 @@ function openMainMenu(
    * that refusal is a claim about a photograph and the remedy is a newer one.
    */
   function pressBrowseRowAt(index: number): void {
-    const row = browse.rows[index];
+    // The index is the DRAWN row's, and the drawn order is the model's (sorted by
+    // the pings measured so far) — never the state's. Mapping it back through the
+    // same model the view drew is the seam where a drifted order would otherwise
+    // join a different room than the one under the thumb.
+    const row = browseModelNow().rows[index];
     if (!row) return;
     const result = pressBrowseRow(browse, row.id, Date.now());
     browse = result.state;
@@ -7795,13 +7799,23 @@ function openMainMenu(
     if (!life.alive || screen !== 'online' || entry.status !== 'connecting') return;
     if (!result.ok) {
       playtest.recordConnect('allocate failed', { door: 'join', reason: result.reason });
-      if (connectTrace) traceStep(connectFailed(connectTrace, result.reason, Date.now()));
+      // A refusal ABOUT THE ROOM ends the story rather than narrating it. The
+      // connect panel is a modal with RETRY on it, and the plan is explicit that a
+      // refused row goes *back to the list* — never to a modal, never to the doors
+      // — with a line where the row was and an immediate refresh. Its RETRY would
+      // also be wrong: there is nothing to retry about a seat somebody else took.
+      //
+      // The connection-shaped failures keep the panel, because that is exactly
+      // what it is for: `network` and `bad-response` are the cases where the
+      // player needs the trace and DOWNLOAD LOG under it (a0-28, M10).
+      const aboutTheRoom = result.reason === 'room-full' || result.reason === 'not-found';
+      if (aboutTheRoom) endConnectTrace();
+      else if (connectTrace) traceStep(connectFailed(connectTrace, result.reason, Date.now()));
       // The row learns what happened to IT — full, or gone — and the screen says
       // it in words. Then the list re-reads, because both refusals are statements
       // about a picture that is now known to be out of date.
       browse = browseJoinFailed(browse, result.reason);
       entry = entryFailed(entry, browse.error);
-      endConnectTrace();
       render();
       void refreshLobbyList();
       return;
