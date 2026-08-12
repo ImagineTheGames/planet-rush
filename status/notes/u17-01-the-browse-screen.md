@@ -14,15 +14,39 @@ exist only there). **Spec:** `docs/lobby-browser-plan.md` §4 and §5.
 | `0a03a35` | the pure model — `src/ui/lobby-browser.ts`, the two `online-copy` lines, `EntryState.mode` + `chooseJoinMode` |
 | `2927481` | the rects — the mode switch, the rows, the JOIN buttons, the mode-aware hit test |
 | `4a7da88` | the view — `src/ui/lobby-browser-view.ts`, segment chips in `lobby-entry-view.ts` |
-| (wiring) | `src/main.ts` — the poll lifecycle, the row press, the seam |
-| (gate) | n10-01's two dark-matter allowlist entries closed out |
+| `fdbaf01` | `src/main.ts` — the poll lifecycle, the row press, the seam |
+| `a4c89b2` | n10-01's two dark-matter allowlist entries closed out |
+| `91db67a` | the phone evidence — `tests/browse/lobby-browse.spec.ts`, `playwright.u17.config.ts`, four frames |
 
 **Gates:** `npx tsc --noEmit` clean; `npm test -- --run` green (152 files / 2832
 tests); `npm run dark-matter:check` clean.
 
 **Evidence:** `tests/browse/lobby-browse.spec.ts` + `playwright.u17.config.ts` —
 four frames at 390 px landscape against a fixtured fleet (`page.route` answers
-every allocator call; nothing reaches a deployment and nothing spends money).
+every allocator call; nothing reaches a deployment and nothing spends money):
+`evidence/images/u17-lobby-browse/{browse-populated,browse-empty,browse-refused,browse-code-mode}.png`.
+
+**Goldens did NOT move.** The home screen is untouched and no baseline covers the
+JOIN screen, so there was nothing to re-baseline: the eight doors / title /
+settings goldens were re-run against this build and pass unchanged. The mobile
+specs that walk this screen (`campaign-door`, `landscape-lock`, `voice-copy-fit`)
+were re-run too — 27 passed.
+
+### The evidence run earned its keep: three bugs and an honesty gap
+
+1. **Rows sorted at merge time**, i.e. before the region probes answer — so the
+   first listing froze in arrival order and never re-ranked. The sort moved into
+   `browseModel` (per frame, against whatever has been measured by then) and
+   `pressBrowseRowAt` maps the drawn index back through the same model.
+2. **A pooled row came back without its plate** — `body` was missing from the
+   row's visible set, so the first frame after an empty list was four rows of
+   floating text and no JOIN button.
+3. **A refused row put the connect panel over the list** — a modal with RETRY on
+   it, for a seat somebody else took. A refusal about the ROOM now ends the trace
+   and speaks in the message slot; `network` / `bad-response` keep the panel,
+   which is what it is for (a0-28).
+4. A `CLOSED` row was still advertising `4 SEATS OPEN` beside its own `CLOSED`
+   button. The seat clause goes when a row leaves the listing.
 
 ---
 
@@ -116,9 +140,21 @@ not a cast of the keypad's.
 
 ## NEXT
 
-- Re-baseline goldens if the doors/keypad frames moved (the home screen is
-  untouched; the JOIN screen now opens on BROWSE).
-- PR, with the four evidence frames.
+Nothing is blocked. What is deliberately **not** here:
+
+- **This branch is stacked on n10-01 (PR #400).** It must merge after it — or
+  with it. Nothing in `src/net/` or `allocator/` was touched by me.
+- **`tests/browse/` is not in CI.** `playwright.config.ts`'s `testDir` is
+  `tests/mobile/`, and this spec needs a bundle built with an allocator URL plus
+  route interception, which that suite does not do. Adding a CI job is
+  `.github/workflows/ci.yml` — Platform's file. Flagged, not taken.
+- **No golden for the browse screen.** `tests/mobile/goldens.spec.ts` is QA's, and
+  this spec makes no comparison and re-baselines nothing.
+- **The PRIVATE toggle** (`lobbyChoice.listed` is wired and tested end to end by
+  n10-01; the lobby row that flips it is unbuilt) and **the HOST door's hint**,
+  which §2 says is lying by omission under a public default. Both are lobby-screen
+  work, neither is this brief's, and both are worth a brief of their own.
+- **D5 (fleet sizing)** — unanswered and the developer's. Nothing here spends.
 
 ### Flagged, not fixed (cross-owner)
 
@@ -128,3 +164,8 @@ not a cast of the keypad's.
 - `src/art/materials.ts#PLATE_MOTION` is still in the dark-matter allowlist and
   the scan now says it is no longer dark (u16-01 wired it). A NOTE, not a failure;
   left alone because it is not this brief's.
+- `tests/mobile/voice-copy-fit.spec.ts` writes `evidence/voice-*-3-keypad.png` one
+  tap after PLAY → JOIN, which now lands on BROWSE. The spec still passes (it
+  asserts nothing about that shot) but the picture no longer matches its filename:
+  it wants one more press on the ENTER ROOM CODE segment. QA's file; the images in
+  the tree were restored rather than re-committed as browse screens.
