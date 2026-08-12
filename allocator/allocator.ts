@@ -326,10 +326,25 @@ export class Allocator {
     // located only through a fresh reservation may not have a view yet; region
     // is a routing hint, not a correctness input, so an empty string is fine.
     const region = this.regionOf(machine, now);
-    // `join` — the room is expected to be *there*. If it has ended inside the
-    // heartbeat the allocator has not heard about yet, the Machine refuses this
-    // ticket rather than opening an empty room in its place (Milestone A).
-    return this.issue(code, machine, region, now, 'join');
+    // **Which intent this is depends on which of the two realities located the
+    // room** (a0-26 Milestone A), and the registry already distinguishes them:
+    //
+    //  • a live Machine's heartbeat lists it → the room is *real*, so this is a
+    //    `join`. If it has since ended inside the beat the allocator has not
+    //    heard yet, the Machine refuses the ticket instead of opening an empty
+    //    room in its place — which is the whole point of the claim.
+    //  • only an unlapsed lease covers it → the **boot gap**. The room may not
+    //    exist yet, and a join in the gap is *supposed* to create it: that is how
+    //    HOST works, and it is how a friend who types the code a beat before the
+    //    host's socket lands still gets in. Signing `join` here would refuse a
+    //    room for not existing yet — a `room-gone` for a room that is arriving.
+    //
+    // So the claim means exactly what it says: `join` is issued only when the
+    // allocator has heard a heartbeat saying the room is there.
+    const confirmed = this.registry
+      .machines(now)
+      .some((view) => view.rooms.some((room) => room.code === code));
+    return this.issue(code, machine, region, now, confirmed ? 'join' : 'create');
   }
 
   /**

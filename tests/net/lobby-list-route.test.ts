@@ -172,7 +172,11 @@ describe('the lobby list, against a live allocator', () => {
     expect(await list(client)).toHaveLength(1);
 
     // The lobby's PRIVATE toggle, on the wire it will actually ride (a0-26 D1).
+    const room = fleet.machines.find((m) => m.matches.room(code) !== undefined)!.matches.room(code)!;
     session.chooseInLobby({ shipClass: ShipClass.Vanguard, listed: false });
+    // The message crosses a real socket; beat once the room has actually heard it,
+    // or the beat races the wire and states the truth from a moment ago.
+    await until('the room hears PRIVATE', () => !room.listed, 5_000);
     await fleet.beat();
 
     expect(await list(client)).toEqual([]);
@@ -186,7 +190,7 @@ describe('the lobby list, against a live allocator', () => {
   it('drops a room that has started — a row never offers a seat in a live match', async () => {
     fleet = await startLocalFleet(43);
     const client: AllocatorClientConfig = { baseUrl: fleet.allocatorBase, fetch };
-    const { session } = await hostedRoom(client, 4);
+    const { code, session } = await hostedRoom(client, 4);
 
     // A room that cannot field two participants does not start (GDD §2.1), so the
     // host authors one bot seat — seated only at RUSH! (a0-11).
@@ -194,7 +198,9 @@ describe('the lobby list, against a live allocator', () => {
       shipClass: ShipClass.Vanguard,
       seats: ['open', 'bot', 'closed', 'closed'],
     });
+    const room = fleet.machines.find((m) => m.matches.room(code) !== undefined)!.matches.room(code)!;
     session.startMatch();
+    await until('the match starts', () => room.state === 'live', 5_000);
     await fleet.beat();
 
     expect(await list(client)).toEqual([]);

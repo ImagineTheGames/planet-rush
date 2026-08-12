@@ -78,10 +78,16 @@ export interface TicketClaims {
    * This is what tells them apart, and it is signed because a client that could
    * declare its own intent could declare `create` on someone else's code:
    *
-   *   • `'create'` — issued by `POST /rooms`. An unknown code opens a room,
-   *     exactly as it always has.
-   *   • `'join'`   — issued by `POST /rooms/:code/join` (and by the listing
-   *     join). An unknown code is **refused** (`room-gone`), never opened.
+   *   • `'create'` — issued by `POST /rooms`, and by a join reaching a room the
+   *     allocator knows only through its reservation (the **boot gap** — the room
+   *     may not have booted yet). An unknown code opens a room, exactly as it
+   *     always has.
+   *   • `'join'`   — issued by a join to a room a **heartbeat has confirmed is
+   *     there** (and by the listing join, which is built from those heartbeats
+   *     alone). An unknown code is **refused** (`room-gone`), never opened.
+   *
+   * So the claim means precisely: *the allocator had been told this room exists.*
+   * That is the only case where a Machine not hosting it proves the room ended.
    *
    * **Absent reads as `create`**, so a client older than this field and the
    * self-hosted path with no ticket secret behave byte-for-byte as they did.

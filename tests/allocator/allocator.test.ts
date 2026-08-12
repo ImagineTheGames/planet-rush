@@ -484,6 +484,19 @@ describe('Allocator.join — reaching an existing room', () => {
     const j = alloc.join('WXYZ', 1000);
     expect(j.machine).toBe('m-1');
     expect(j.region).toBe('iad');
+    // …and it signs `create`, not `join` (a0-26 Milestone A). In the boot gap the
+    // room may not exist yet, and a join in the gap is *supposed* to bring it into
+    // existence — that is how HOST works, and how a friend who types the code a
+    // beat before the host's socket lands still gets in. Refusing here would be a
+    // `room-gone` for a room that is arriving.
+    expect(verifyTicket(j.ticket, SECRET, 1000)?.intent).toBe('create');
+  });
+
+  it('signs `join` once a heartbeat has confirmed the room is really there', () => {
+    // The claim means exactly "the allocator had been told this room exists",
+    // which is the only case where a Machine not hosting it proves it has ended.
+    const { alloc } = withFleet([beat('m-1', 'iad', ['K7QM'])]);
+    expect(verifyTicket(alloc.join('K7QM', 1000).ticket, SECRET, 1000)?.intent).toBe('join');
   });
 
   it('throws not-found for a room no live Machine hosts', () => {
