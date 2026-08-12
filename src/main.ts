@@ -1394,9 +1394,9 @@ async function boot(): Promise<void> {
   // (a live wedge → press, a disabled one → reject, a landed spend → confirm) —
   // proof the RIGHT sound fired, not just that the one-shot count moved. Zero-cost
   // (null) in a normal build.
-  const uiSfxLog: { press: number; confirm: number; reject: number; last: UiCue | null } | null = flags.debug
-    ? { press: 0, confirm: 0, reject: 0, last: null }
-    : null;
+  const uiSfxLog:
+    | { press: number; confirm: number; reject: number; detent: number; last: UiCue | null }
+    | null = flags.debug ? { press: 0, confirm: 0, reject: 0, detent: 0, last: null } : null;
   const hud = new Hud(
     transform.logicalWidth,
     transform.logicalHeight,
@@ -1598,7 +1598,20 @@ async function boot(): Promise<void> {
       pauseHover = pauseView.hitTest(lp.x, lp.y)?.kind ?? null;
       return;
     }
-    if (endOverlay.visible) endHover = endOverlay.hitTest(lp.x, lp.y)?.kind ?? null;
+    if (endOverlay.visible) {
+      endHover = endOverlay.hitTest(lp.x, lp.y)?.kind ?? null;
+      return;
+    }
+    // ── THE BUILD WHEEL'S SELECTION (u16-01) ───────────────────────────────
+    // `docs/theme-coverage.md`: *"on desktop, moving the mouse across the wheel
+    // changes nothing and makes no sound"* — this route is the fix, and it is
+    // deliberately NOT a desktop-only one. `pointermove` is the same event a
+    // finger fires while it is down, so a thumb dragging across the wheel walks
+    // this exact line and gets the same highlight, the same 140 ms sweep and the
+    // same detent (GDD §2.4 — one gesture, whatever is making it). Nothing here
+    // presses anything: selection lights a wedge, a press buys it, and those stay
+    // two different events on every device.
+    updateWheelSelection(lp.x, lp.y);
   });
   app.canvas.addEventListener('pointerleave', () => {
     pauseSettingsHover = null;
@@ -1607,6 +1620,20 @@ async function boot(): Promise<void> {
     pausePress = null;
     endHover = null;
     endPress = null;
+    // The cursor left the canvas: nothing is pointed at. The highlight fades out
+    // over the same 140 ms it swept in on, rather than being left lit on a wedge
+    // the player has walked away from.
+    wheelSelection = null;
+  });
+  // A lifted finger is a pointer that is no longer over anything on a touch
+  // device — there is no hover to fall back to — so the highlight goes with it.
+  // On a mouse the very next `pointermove` re-lights it, which is why this is
+  // safe to do for both rather than branching on the device.
+  app.canvas.addEventListener('pointerup', () => {
+    if (isTouch) wheelSelection = null;
+  });
+  app.canvas.addEventListener('pointercancel', () => {
+    if (isTouch) wheelSelection = null;
   });
 
   const merged = createControlState();
@@ -1764,6 +1791,48 @@ async function boot(): Promise<void> {
   // targets are computed from the very functions `src/ui` draws the wheel and
   // the panel with, so a press lands on the wedge the player actually sees.
   const buildWheelLayout = { centerX: 0, centerY: 0, radius: 0, segments: WHEEL_ORDER.length };
+
+  // ── THE WHEEL'S SELECTION (u16-01) ───────────────────────────────────────
+  //
+  // ONE integer, written by whichever device last spoke — a cursor over the
+  // wheel, a thumb on it, or the thrust stick pushed at it — and read by the HUD
+  // as `hudFrame.wheelSelection`. The wheel model turns it into the highlighted
+  // wedge, the 140 ms sweep and the detent (`src/ui/wheel-selection.ts`).
+  //
+  // It lives at this level, next to the layout the hit-test uses, because that is
+  // where the three sources meet. It is deliberately NOT stored on `WheelInput`:
+  // that module is Platform's and already holds the stick's own selection for a
+  // gamepad confirm, which is a different question ("what would the confirm
+  // button buy") from this one ("what is the player looking at"). Conflating them
+  // would let a cursor drifting across the wheel arm a purchase.
+  let wheelSelection: number | null = null;
+  /** The stick selection as of the last frame, so a PUSH re-takes the highlight
+   *  from the pointer but a stick merely resting where it was does not fight the
+   *  cursor for it every frame. */
+  let stickSelection: number | null = null;
+
+  /**
+   * Point the wheel at whatever is under (x, y) in logical space — the pointer
+   * half of the selection, shared by the hover route and the press route so a tap
+   * and a hover can never disagree about which wedge they landed on.
+   *
+   * Reads the SAME `hitWheel` the press does, against the SAME layout, which is
+   * what makes the highlight a promise about where a press would go rather than a
+   * second opinion. The hub and everything off the disc select nothing: `null` is
+   * "you are pointing at the wheel but not at a wedge", which is exactly what the
+   * hub is (`WheelHit.kind === 'hub'` — the BACK affordance, not a purchase).
+   */
+  function updateWheelSelection(x: number, y: number): void {
+    if (!buildWheel.open || buildWheel.panelOpen) {
+      wheelSelection = null;
+      return;
+    }
+    buildWheelLayout.centerX = transform.logicalWidth / 2;
+    buildWheelLayout.centerY = transform.logicalHeight / 2;
+    buildWheelLayout.radius = wheelRadius(transform.logicalWidth, transform.logicalHeight);
+    const hit = hitWheel(x, y, buildWheelLayout);
+    wheelSelection = hit.kind === 'segment' ? hit.index : null;
+  }
   // The open upgrade wheel's hit target — same geometry as the Build wheel, but
   // its slot count changes with the level (main wheel vs. WEAPON sub-wheel), so
   // `segments` is set per press. Hit-tested radially, like the Build wheel.
@@ -1958,6 +2027,10 @@ async function boot(): Promise<void> {
       // A Build wedge sounds itself through the HUD's shared driver (press tick,
       // or the buzzer if it is disabled) — so a press here does not also cue one.
       if (wheelHit.kind === 'segment') {
+        // The finger landing IS a selection (u16-01): on touch there is no hover
+        // to have lit the wedge first, so this is the frame the highlight and the
+        // detent arrive on. Set before the press so the two are one gesture.
+        wheelSelection = wheelHit.index;
         hud.pressWheelSegment('build', wheelHit.index);
         buildWedgeSounded = true;
       }
@@ -2371,6 +2444,16 @@ async function boot(): Promise<void> {
       // the arena itself), so its placement in the feed order is free.
       feedMinimap();
       hud.update(hudFrame);
+      // The tactile half of the wheel's detent (u16-01). The HUD decides WHETHER
+      // one happened — it is the only thing that knows the crossed wedge's state,
+      // and the handoff mutes the detent on a wedge you cannot buy — and the
+      // motor lives here, because haptics is a platform capability. `tap` is the
+      // 10 ms whisper the vibration table already calls "just enough to register
+      // a press without buzzing through a rapid menu walk", which is exactly what
+      // a thumb crossing five wedges needs. On a device with no motor (every
+      // desktop, and iOS Safari) `haptic` is a no-op and the detent is the note
+      // plus the sweep.
+      if (hud.takeDetent()) haptics.haptic('tap');
       // Draw the visible touch controls from the live stick/button state (a
       // no-op layer on desktop). Reads the LOGICAL viewport each frame so the
       // idle affordances and FIRE button track resize/orientation flips.
@@ -3294,6 +3377,20 @@ async function boot(): Promise<void> {
       merged.thrust.x = 0;
       merged.thrust.y = 0;
       merged.fire = false;
+      // The stick is the third source of the selection (u16-01), and it takes the
+      // highlight on the frame it MOVES rather than every frame it is held: a
+      // stick resting where it was pushed must not out-shout a cursor that has
+      // since crossed the wheel, or a player on a couch with a mouse on the desk
+      // would find the highlight nailed down. `WheelInput.selection` is already
+      // the wedge a gamepad confirm would buy, so the highlight and the confirm
+      // agree by construction.
+      if (buildWheel.selection !== stickSelection) {
+        stickSelection = buildWheel.selection;
+        if (stickSelection !== null) wheelSelection = stickSelection;
+      }
+    } else {
+      stickSelection = null;
+      wheelSelection = null;
     }
 
     // Four segments spend on the spot; the fifth opened a screen and never
@@ -3369,6 +3466,9 @@ async function boot(): Promise<void> {
     hudFrame.waveInterval = waveIntervalOf(world);
     hudFrame.buildRequested = buildWheel.open;
     hudFrame.upgradePanelOpen = buildWheel.panelOpen;
+    // The wedge the player is pointing at (u16-01) — cursor, thumb or stick, one
+    // integer. The model drops it on a shut wheel, so nothing here has to guard.
+    hudFrame.wheelSelection = wheelSelection;
     // The nested weapon wheel only exists inside the open upgrade panel; drop it
     // the instant the panel closes, so re-opening always lands on the main wheel.
     if (!buildWheel.panelOpen) weaponWheelOpen = false;

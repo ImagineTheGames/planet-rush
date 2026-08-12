@@ -215,6 +215,20 @@ export const WHEEL_CHROME = {
    */
   nameReady: BONE.hi,
   /**
+   * A wedge that is pressable but is NOT the one being pointed at, on a wheel
+   * where something else is (u16-01). Bone's mid step — the design's own second
+   * name tone (`5a` script `wedge(i)`: `#C6CDD6` unselected against `#FFFFFF`
+   * selected), taken off the ramp instead of hand-picked.
+   *
+   * It is a *recede*, not a dim: the wedge is still perfectly pressable and its
+   * cost still carries its RESERVED colour. And it only ever applies while a
+   * selection exists — with nothing pointed at, every ready name is
+   * {@link nameReady} and the wheel is exactly the wheel that shipped before this
+   * landed. A resting wheel that dimmed four of its five wedges to advertise a
+   * choice nobody had made yet would be spending contrast on nothing.
+   */
+  nameReceded: BONE.mid,
+  /**
    * A wedge that is refused, capped or inert. `tickSteel`, the same step the
    * wheel already paints a *spent* cost numeral in (`costPaint: 'spent'`), so
    * "there is nothing to do here" is one tone across the whole wheel rather than
@@ -231,6 +245,15 @@ export const WHEEL_CHROME = {
   /** The hub's BACK word (`CLOSE · ESC`). A step above {@link secondary}, because
    *  it is the one thing in the hub you can press. */
   affordance: BONE.mid,
+  /**
+   * {@link secondary}, one step up: the read-only lines of the wedge the player
+   * is pointing at (u16-01). The design lifts the selected wedge's sub line to
+   * `#DCE3EC` from `#7E8894` (`5a` script `wedge(i)`), and this is that lift
+   * taken off the ramp — the same step {@link nameReceded} steps a name DOWN to,
+   * which is not a coincidence: the selection has exactly one notch of brightness
+   * to spend and it spends it in both directions at once.
+   */
+  secondaryLit: BONE.mid,
   /**
    * A machined mark: the index diamond at twelve o'clock, and the hub's up-chevron.
    * One vocabulary for both — they are the same object (a small solid mark that
@@ -257,6 +280,65 @@ export const WHEEL_CHROME = {
    * other half of style-guide §2, and it is a mechanic rather than chrome.)
    */
   press: BONE.hi,
+  /**
+   * The highlight over the wedge being pointed at, and the two edge lines that
+   * bound it (u16-01). Bone's brightest step, because that is the design's own
+   * answer: screen 5a paints the selected quadrant in `--acc-tint` and its edges
+   * in `--acc-hi`, and under the ratified Bone accent both of those resolve to
+   * white. **The selection spends no hue** (u11-01) — it is brightness and scale,
+   * on a wheel that opens over a live match where every colour already means
+   * something.
+   */
+  selection: BONE.hi,
+} as const;
+
+/**
+ * The selected wedge's highlight, in the design's own amounts (u16-01, screen
+ * 5a). Every one of these is an ALPHA, which is the point: the highlight is a
+ * brightness lift over the disc, never a plate on top of it, so the fight keeps
+ * reading through the wheel exactly as {@link WHEEL_FACE_ALPHA} promises.
+ *
+ * The three layers, and where each number comes from:
+ *
+ *  - `tint` — `background: conic-gradient(from -45deg, var(--acc-tint,
+ *    rgba(220,227,236,.26)) 0deg 90deg, …)` (`5a:55`). One arc of the ring, over
+ *    the wedge face the player is pointing at.
+ *  - `edge` / `edgeGlowAlpha` / `edgeGlowSpread` — `conic-gradient(from -45.8deg,
+ *    var(--acc-hi) 0deg 1.6deg, …)` with `box-shadow: 0 0 26px
+ *    rgba(255,255,255,.16)` (`5a:56`). Two bright lines on the wedge's own
+ *    boundaries, with a bloom around them. `edgeDegrees` is the design's 1.6°.
+ *  - `rim` / `rimFrom` — `radial-gradient(closest-side, transparent 62%,
+ *    var(--acc-tint-soft, rgba(255,255,255,.14)) 100%)` masked to the quadrant
+ *    (`5a:57`). The wedge brightens toward the rim, which is where the words are.
+ *
+ * `nameGlow` has no direct pixel equivalent in the markup: the design gives the
+ * selected NAME a `text-shadow: 0 0 18px`, and this build has no text-shadow path
+ * anywhere in `src/ui` (a blurred glyph raster is also the one thing in this
+ * feature that would rasterise differently on a software-GL golden runner). It is
+ * drawn instead as a soft bloom in the highlight's own `Graphics`, behind the
+ * word — the same light, cast by the layer that is already casting light.
+ */
+export const WHEEL_SELECTION = {
+  /** The accent-tint conic over the selected wedge's face. */
+  tint: 0.26,
+  /** The two edge lines bounding it. */
+  edge: 0.9,
+  /** How wide an edge line is, in degrees of arc — the design's 1.6°. */
+  edgeDegrees: 1.6,
+  /** Peak alpha of the bloom around an edge line. */
+  edgeGlowAlpha: 0.16,
+  /** How far that bloom reaches, as a multiple of the edge line's own width. */
+  edgeGlowSpread: 6,
+  /** Peak alpha of the outward glow, at the rim. */
+  rim: 0.14,
+  /** Where that glow starts, as a fraction of the outer radius. */
+  rimFrom: 0.62,
+  /** Peak alpha of the bloom behind the selected wedge's name. */
+  nameGlow: 0.1,
+  /** How many nested bands each of the two soft gradients is stepped into. A
+   *  `Graphics` has no gradient fill, so a falloff is a stack of rings; six is
+   *  where the banding stops being visible at a desktop radius. */
+  bands: 6,
 } as const;
 
 /**

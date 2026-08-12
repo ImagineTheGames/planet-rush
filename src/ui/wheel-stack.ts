@@ -42,6 +42,7 @@
 import type { WheelProfile } from '../art/materials';
 import { DISPLAY_TRACKING, TRACKING } from '../art/materials';
 import type { SegmentState, WheelSegment } from './build-wheel';
+import { SELECTION_NAME_SCALE } from './wheel-selection';
 import { tierPips } from './upgrade-wheel';
 import type { UpgradeSummaryPip, UpgradeWedge } from './upgrade-wheel';
 
@@ -77,14 +78,26 @@ export const WEDGE_LEAD = { name: 1.25, body: 1.35 } as const;
  * The words a Build-wheel segment shows, in order, for a given wheel profile.
  * Empty lines are omitted entirely rather than drawn blank, so the stack of a
  * three-line wedge is genuinely three lines tall.
+ *
+ * `selected` is the design's `sel === i` (screen 5a, u16-01): the wedge the
+ * player is pointing at draws its NAME larger — {@link SELECTION_NAME_SCALE}, the
+ * design's 19 px from 17 px as a ratio — and nothing else about the stack moves.
+ * The size step is made HERE, in the module the fit budget measures, rather than
+ * scaled in the view, because a wedge does not get wider when its name does and
+ * the 390 px phone is where that stops being obvious (`hud-geometry.test.ts`
+ * holds the enlarged name to the same arc at every profile).
  */
-export function buildWedgeLines(seg: WheelSegment, m: WheelProfile): readonly WedgeLine[] {
+export function buildWedgeLines(
+  seg: WheelSegment,
+  m: WheelProfile,
+  selected = false,
+): readonly WedgeLine[] {
   const lines: WedgeLine[] = [
     {
       slot: 'name',
       text: wrapWedgeName(seg.label),
       face: 'display',
-      size: m.name,
+      size: selected ? m.name * SELECTION_NAME_SCALE : m.name,
       tracking: DISPLAY_TRACKING.heading,
       lead: WEDGE_LEAD.name,
       gap: m.gapName,

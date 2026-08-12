@@ -88,7 +88,8 @@ import type { HubBack } from './wheel-nav';
 import { NEUTRAL_FEEDBACK } from './press-feedback';
 import type { ControlFeedback, PressFeedback, PressSurface } from './press-feedback';
 import { wheelRadius, WHEEL_MIN_RADIUS } from './hud-geometry';
-import { WHEEL_CHROME, WHEEL_FACE_ALPHA } from './instrument';
+import { WHEEL_CHROME, WHEEL_FACE_ALPHA, WHEEL_SELECTION } from './instrument';
+import { WheelSelection } from './wheel-selection';
 import { FONT_BODY as FONT_NUMERAL, FONT_HEADING } from './typography';
 
 /** One Build-wheel wedge as the view drew it — the ?debug=1 live-stage seam's
@@ -100,6 +101,11 @@ import { FONT_BODY as FONT_NUMERAL, FONT_HEADING } from './typography';
 export interface DrawnBuildWedge {
   readonly id: WheelSegment['id'];
   readonly label: string;
+  /** Whether this is the wedge the player is pointing at (u16-01) — the design's
+   *  `sel === i`, read back off the descriptor the view actually drew from, so a
+   *  live-stage test can assert the highlight followed a real pointer rather than
+   *  re-deriving where it should have gone. */
+  readonly selected: boolean;
   /**
    * The wedge's *reason* line as drawn — repair's effect/reason copy ("+15 HP",
    * "REPAIR in 12s"), or the target line ("YOUR STATION") on every other wedge.
@@ -253,6 +259,23 @@ function faceAlpha(ready: boolean): number {
   return ready ? WHEEL_FACE_ALPHA.ready : WHEEL_FACE_ALPHA.inert;
 }
 
+/**
+ * The colour a wedge's NAME is drawn in — its own state first, the selection
+ * second (u16-01).
+ *
+ * A refused wedge stays refused whether or not it is being pointed at: pointing
+ * at a capped turret ring must not make it look buyable, which is why `ready` is
+ * tested before `selection` and not alongside it. What the selection then does is
+ * exactly one step of the Bone ramp, and only downward — the selected name is
+ * already the brightest step the ramp has, so the contrast is bought by the OTHER
+ * wedges stepping back (plus the size step, {@link SELECTION_NAME_SCALE}, and the
+ * highlight behind it). That is the design's own `#FFFFFF` against `#C6CDD6`.
+ */
+function nameColor(ready: boolean, selection: WedgeSelection): number {
+  if (!ready) return WHEEL_CHROME.nameInert;
+  return selection === 'receded' ? WHEEL_CHROME.nameReceded : WHEEL_CHROME.nameReady;
+}
+
 /** The colour a {@link CostPaint} resolves to (the paints themselves, and the
  *  style-guide §2 carve-out they implement, live in {@link ./wheel-stack}). */
 function costColor(paint: CostPaint): number {
@@ -308,6 +331,27 @@ interface WedgeDraw {
   readonly ready: boolean;
   /** How the cost slot is painted (style-guide §2's carve-out, both colours). */
   readonly costPaint: CostPaint;
+  /** Where this wedge stands in the selection (u16-01) — see {@link WedgeSelection}. */
+  readonly selection: WedgeSelection;
+}
+
+/**
+ * One wedge's standing in the selection (u16-01).
+ *
+ *  - `selected` — the wedge being pointed at: its name goes up a step and up a
+ *    size, its read-lines go up a step, and the highlight is over it.
+ *  - `receded`  — a wedge on a wheel where something ELSE is selected: its name
+ *    steps down one, and nothing else about it moves.
+ *  - `none`     — nothing is selected anywhere on this wheel. Every wedge draws
+ *    exactly as it did before this landed; a resting wheel spends no contrast
+ *    advertising a choice nobody has made.
+ */
+export type WedgeSelection = 'selected' | 'receded' | 'none';
+
+/** Where wedge `index` stands, given the model's selected wedge. */
+function selectionOf(selected: number | null, index: number): WedgeSelection {
+  if (selected === null) return 'none';
+  return selected === index ? 'selected' : 'receded';
 }
 
 /** The text a `WedgeDraw` put in one slot, or `''` if the slot is unused. */
@@ -336,6 +380,18 @@ export class BuildWheelView extends Container {
 
   // --- Build wheel ---------------------------------------------------------
   private readonly buildRings = new Graphics();
+  // The wedge faces and the wedge WORDS are parented separately so the selection
+  // highlight can sit between them — over the faces, under the type — which is
+  // the order screen 5a draws them in and the only order in which a 0.26 white
+  // tint lights a wedge instead of washing out its name (u16-01). Pooled wedge
+  // nodes used to be added straight to the group as they were created, which made
+  // the z-order an accident of creation time.
+  private readonly buildBodies = new Container();
+  private readonly buildSelection = new Graphics();
+  private readonly buildClusters = new Container();
+  /** The 140 ms sweep between wedges — the design's own transition, and the first
+   *  consumer `PLATE_MOTION.wheelMs` has ever had ({@link ./wheel-selection}). */
+  private readonly selection = new WheelSelection();
   private readonly buildWedges: WedgeNodes[] = [];
   private readonly buildHubOre: Text;
   private readonly buildHubLabel: Text;
@@ -354,6 +410,8 @@ export class BuildWheelView extends Container {
 
   // --- Upgrade wheel -------------------------------------------------------
   private readonly upgradeRings = new Graphics();
+  private readonly upgradeBodies = new Container();
+  private readonly upgradeClusters = new Container();
   private readonly upgradeWedges: WedgeNodes[] = [];
   private readonly upgradeHubOre: Text;
   private readonly upgradeHubLabel: Text;
@@ -405,6 +463,9 @@ export class BuildWheelView extends Container {
     this.buildGroup.addChild(
       this.buildHubHit,
       this.buildRings,
+      this.buildBodies,
+      this.buildSelection,
+      this.buildClusters,
       this.buildHubOre,
       this.buildHubLabel,
       this.buildHubRule,
@@ -424,6 +485,8 @@ export class BuildWheelView extends Container {
     this.upgradeGroup.addChild(
       this.upgradeHubHit,
       this.upgradeRings,
+      this.upgradeBodies,
+      this.upgradeClusters,
       this.upgradeHubOre,
       this.upgradeHubLabel,
       this.upgradeHubRule,
@@ -497,13 +560,30 @@ export class BuildWheelView extends Container {
     // The player wants the wheel up iff the model is open; the shared toggle turns
     // that target into a pop and — critically — can never latch shut on it.
     this.toggle.update(wheel.open, dt);
+    // The selection sweep runs off the same clock (u16-01). The model has already
+    // forced `selected` to null on a shut wheel and while the upgrade wheel is in
+    // front, so the highlight fades out with the thing it belongs to rather than
+    // being switched off by a second rule here.
+    this.selection.update(
+      upgrade.open ? null : wheel.selected,
+      wheel.segments.length,
+      dt,
+    );
     // With no time to animate across (a frozen frame, or the very first update),
-    // land on the target rather than sitting at scale 0 — the pop needs a clock.
-    if (dt <= 0) this.toggle.settle();
+    // land on the target rather than sitting at scale 0 — the pop needs a clock,
+    // and so does the sweep.
+    if (dt <= 0) {
+      this.toggle.settle();
+      this.selection.settle();
+    }
     this.visible = this.toggle.visible;
     if (!this.visible) {
       this.lastUpgradeDrawn = false;
       this.lastBuildDrawn = false;
+      // A wheel that has finished closing is pointing at nothing, so the next
+      // open starts dark rather than re-lighting whatever the pointer last
+      // crossed on the way out.
+      this.selection.reset();
       return;
     }
 
@@ -546,13 +626,26 @@ export class BuildWheelView extends Container {
     drawWheelRings(this.buildRings, r, hub, m);
     drawWheelSpokes(this.buildRings, inner, r, model.segments.length, m);
 
+    // The highlighted wedge (u16-01) — drawn once for the wheel, at the swept
+    // angle rather than at a wedge index, because mid-sweep it is BETWEEN two
+    // wedges and that is the whole tell.
+    drawWheelSelection(
+      this.buildSelection,
+      r,
+      inner,
+      m,
+      this.selection.angle,
+      SEGMENT_ARC,
+      this.selection.presence,
+    );
+
     for (let i = 0; i < model.segments.length; i++) {
       const seg = model.segments[i];
       if (!seg) continue;
-      const nodes = this.wedgeNodes(this.buildGroup, this.buildWedges, i);
+      const nodes = this.wedgeNodes(this.buildBodies, this.buildClusters, this.buildWedges, i);
       this.drawWedge(
         nodes,
-        buildSegmentDraw(seg, m),
+        buildSegmentDraw(seg, m, selectionOf(model.selected, i)),
         inner,
         r,
         SEGMENT_ARC,
@@ -579,10 +672,11 @@ export class BuildWheelView extends Container {
     // count over its cap), straight off the descriptors the view just
     // drew from, so a Playwright test reads the shipped client rather than a model.
     this.lastBuildDrawn = true;
-    this.lastBuildWedges = model.segments.map((seg) => {
-      const d = buildSegmentDraw(seg, m);
+    this.lastBuildWedges = model.segments.map((seg, i) => {
+      const d = buildSegmentDraw(seg, m, selectionOf(model.selected, i));
       return {
         id: seg.id,
+        selected: d.selection === 'selected',
         label: seg.label,
         // Line 2 as drawn: repair's effect/reason, else what the wedge spends on.
         sub: slotText(d, 'sub'),
@@ -614,7 +708,7 @@ export class BuildWheelView extends Container {
     for (let i = 0; i < model.wedges.length; i++) {
       const wedge = model.wedges[i];
       if (!wedge) continue;
-      const nodes = this.wedgeNodes(this.upgradeGroup, this.upgradeWedges, i);
+      const nodes = this.wedgeNodes(this.upgradeBodies, this.upgradeClusters, this.upgradeWedges, i);
       this.drawWedge(nodes, upgradeWedgeDraw(wedge, m), inner, r, arc, m, this.sample(feedback, 'upgrade', i, time));
     }
     this.hideWedgesFrom(this.upgradeWedges, model.wedges.length);
@@ -865,14 +959,19 @@ export class BuildWheelView extends Container {
       // read, not acted on); the cost slot takes the one RESERVED carve-out —
       // signal yellow when payable, threat red when not, steel where there is no
       // price to pay at all (style-guide §2, amended 2026-08-06).
+      //
+      // The selection moves the first two by exactly one step of the Bone ramp
+      // (u16-01) and the cost slot NOT AT ALL: the cost's colour is the answer to
+      // "can I pay for this", and a numeral that also brightened when you pointed
+      // at it would be saying two things in one channel.
       t.style.fill =
         line.slot === 'name'
-          ? d.ready
-            ? WHEEL_CHROME.nameReady
-            : WHEEL_CHROME.nameInert
+          ? nameColor(d.ready, d.selection)
           : line.slot === 'cost'
             ? costColor(d.costPaint)
-            : WHEEL_CHROME.secondary;
+            : d.selection === 'selected'
+              ? WHEEL_CHROME.secondaryLit
+              : WHEEL_CHROME.secondary;
       restyle(t, line.size, trackingPx(line.tracking, line.size));
       t.y = y;
       y += t.height + line.gap;
@@ -892,8 +991,16 @@ export class BuildWheelView extends Container {
     nodes.cluster.scale.set(fb.scale);
   }
 
-  /** Lazily create (and then reuse) one wedge's children, parented to `group`. */
-  private wedgeNodes(group: Container, pool: WedgeNodes[], index: number): WedgeNodes {
+  /** Lazily create (and then reuse) one wedge's children. The face goes in
+   *  `bodies` and the words in `clusters`, two containers with the selection
+   *  highlight between them, so a wedge's z-order is a property of the wheel's
+   *  layering rather than of which frame the node happened to be created on. */
+  private wedgeNodes(
+    bodies: Container,
+    clusters: Container,
+    pool: WedgeNodes[],
+    index: number,
+  ): WedgeNodes {
     const existing = pool[index];
     if (existing) return existing;
 
@@ -911,8 +1018,8 @@ export class BuildWheelView extends Container {
       t.style.align = 'center';
     }
     cluster.addChild(label, sub, cost, detail);
-    group.addChild(body);
-    group.addChild(cluster);
+    bodies.addChild(body);
+    clusters.addChild(cluster);
 
     const nodes: WedgeNodes = { body, cluster, label, sub, cost, detail };
     pool[index] = nodes;
@@ -1124,6 +1231,119 @@ export function drawWheelSpokes(
 }
 
 // ---------------------------------------------------------------------------
+// The highlighted wedge (u16-01 — screen 5a's selection state)
+// ---------------------------------------------------------------------------
+
+/**
+ * The highlight over the wedge the player is pointing at — the half of screen 5a
+ * that `docs/theme-coverage.md` found was never built.
+ *
+ * Three layers, in the design's own order and its own amounts
+ * ({@link WHEEL_SELECTION}), all of them ALPHA over the disc rather than a
+ * surface on it, so the fight still reads through the wheel:
+ *
+ *  1. **The tint** (`5a:55`) — one arc of the ring, lifted. This is the layer
+ *     that says *this one*.
+ *  2. **The two edge lines** (`5a:56`) — the design's 1.6° conic slivers on the
+ *     wedge's own boundaries, each inside a stepped bloom standing in for its
+ *     `box-shadow: 0 0 26px`. They land exactly on the hairline spokes, which is
+ *     why the highlight cannot be mistaken for a wedge that has grown.
+ *  3. **The outward glow** (`5a:57`) — `closest-side, transparent 62% → …100%`,
+ *     masked to the wedge: it brightens toward the RIM, which is where the words
+ *     are, and a soft bloom behind the name carries the design's `text-shadow:
+ *     0 0 18px` without a blurred glyph raster.
+ *
+ * Module-level and taking a bare `Graphics`, for the same reason
+ * {@link drawWheelRings} is: what this draws can then be read back headlessly
+ * (`build-wheel-view.test.ts`), which is how the a0-21 law — nothing crosses a
+ * wedge face that is not a boundary — is held over a NEW layer that draws inside
+ * one. A golden cannot answer that question; it can only say the picture changed.
+ *
+ * `angle` is the SWEPT angle, not a wedge centre: mid-sweep the highlight sits
+ * between two wedges, and that is the 140 ms the design asks for
+ * ({@link ./wheel-selection}).
+ */
+export function drawWheelSelection(
+  g: Graphics,
+  outer: number,
+  inner: number,
+  m: WheelProfile,
+  angle: number,
+  arc: number,
+  presence: number,
+): void {
+  g.clear();
+  const lit = presence > 0.001;
+  g.visible = lit;
+  if (!lit) return;
+
+  const half = arc / 2;
+  const sector = (from: number, to: number, r0: number, r1: number): Graphics =>
+    g
+      .moveTo(Math.cos(from) * r0, Math.sin(from) * r0)
+      .arc(0, 0, r1, from, to)
+      .lineTo(Math.cos(to) * r0, Math.sin(to) * r0)
+      .arc(0, 0, r0, to, from, true)
+      .closePath();
+
+  // 1. The tint over the selected wedge's face.
+  sector(angle - half, angle + half, inner, outer).fill({
+    color: WHEEL_CHROME.selection,
+    alpha: WHEEL_SELECTION.tint * presence,
+  });
+
+  // 3a. The outward glow — nested annular sectors from `rimFrom` out to the rim,
+  //     each carrying the INCREMENT rather than the target ({@link
+  //     nestedRingAlphas}), or a stepped falloff reads as a stack of hoops.
+  const bands = WHEEL_SELECTION.bands;
+  const glowFrom = Math.max(inner, outer * WHEEL_SELECTION.rimFrom);
+  const glowTargets: number[] = [];
+  for (let i = 0; i < bands; i++) {
+    const t = (i + 1) / bands;
+    glowTargets.push(WHEEL_SELECTION.rim * t * t);
+  }
+  const glowAlphas = nestedRingAlphas(glowTargets);
+  for (let i = bands - 1; i >= 0; i--) {
+    const alpha = glowAlphas[i] ?? 0;
+    if (alpha <= 0) continue;
+    const r0 = glowFrom + ((outer - glowFrom) * i) / bands;
+    sector(angle - half, angle + half, r0, outer).fill({
+      color: WHEEL_CHROME.selection,
+      alpha: alpha * presence,
+    });
+  }
+
+  // 3b. The bloom behind the name — the design's `text-shadow: 0 0 18px`, cast by
+  //     the layer that is already casting light rather than by the glyphs.
+  const nameR = labelTopRadius(m, outer) - m.name * 0.6;
+  const bloom = m.name * 1.9;
+  for (let i = 0; i < bands; i++) {
+    const t = (i + 1) / bands;
+    g.circle(Math.cos(angle) * nameR, Math.sin(angle) * nameR, bloom * (1 - t + 1 / bands)).fill({
+      color: WHEEL_CHROME.selection,
+      alpha: (WHEEL_SELECTION.nameGlow / bands) * presence,
+    });
+  }
+
+  // 2. The two edge lines, each inside its bloom. Drawn last so the brightest
+  //    thing on the wheel is the boundary of the thing you are pointing at.
+  const edge = (WHEEL_SELECTION.edgeDegrees * Math.PI) / 360; // half-width, radians
+  for (const boundary of [angle - half, angle + half]) {
+    for (let i = bands; i >= 1; i--) {
+      const spread = edge * (1 + (WHEEL_SELECTION.edgeGlowSpread - 1) * (i / bands));
+      sector(boundary - spread, boundary + spread, inner, outer).fill({
+        color: WHEEL_CHROME.selection,
+        alpha: (WHEEL_SELECTION.edgeGlowAlpha / bands) * presence,
+      });
+    }
+    sector(boundary - edge, boundary + edge, inner, outer).fill({
+      color: WHEEL_CHROME.selection,
+      alpha: WHEEL_SELECTION.edge * presence,
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Model → wedge descriptor (the only place the two wheels differ)
 // ---------------------------------------------------------------------------
 
@@ -1140,16 +1360,21 @@ export function drawWheelSpokes(
  * buys, or why it is refused). UPGRADE SHIP has neither, and spends its cost slot
  * on the words that say it opens a screen.
  */
-function buildSegmentDraw(seg: WheelSegment, m: WheelProfile): WedgeDraw {
+function buildSegmentDraw(
+  seg: WheelSegment,
+  m: WheelProfile,
+  selection: WedgeSelection = 'none',
+): WedgeDraw {
   return {
     angle: seg.angle,
-    lines: buildWedgeLines(seg, m),
+    lines: buildWedgeLines(seg, m, selection === 'selected'),
     cost: seg.cost,
     ready: wedgeReady(seg.state),
     // UPGRADE SHIP keeps its arrow rather than a number — it is the one segment
     // that opens a second screen (GDD §2.5), and the handoff says so in the slot
     // the others spend on a price: `OPEN ▸`, in chalk rather than in ore yellow.
     costPaint: segmentCostPaint(seg),
+    selection,
   };
 }
 
@@ -1176,6 +1401,11 @@ function upgradeWedgeDraw(wedge: UpgradeWedge, m: WheelProfile): WedgeDraw {
     cost: wedge.cost,
     ready: wedgeReady(wedge.state),
     costPaint: upgradeCostPaint(wedge),
+    // The upgrade wheel has no selection state of its own. Screen 5a is the BUILD
+    // wheel, and a0-20's finding is about that screen; giving this one a highlight
+    // by inheritance would be inventing design rather than implementing it. The
+    // slot is here so the two wheels keep sharing one drawing routine.
+    selection: 'none',
   };
 }
 

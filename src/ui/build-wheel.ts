@@ -211,6 +211,28 @@ export function segmentAngle(index: number): number {
 }
 
 /**
+ * A wedge index this wheel can honour, or `null` — the guard on
+ * {@link BuildWheelModel.selected}.
+ *
+ * `null` is a real, resting state and not a missing value: on desktop it is "the
+ * pointer is not over the wheel", on touch it is "no thumb is down", on a gamepad
+ * it is "the stick has not been pushed". The design's prototype opens with
+ * `sel: 0` because it is a prototype and something has to be lit; a live wheel
+ * that opens with TURRET pre-selected is claiming a choice the player has not
+ * made — and on a gamepad the confirm button is then one press away from acting
+ * on it, which would turn "the wheel came up" into "you bought a turret".
+ *
+ * Anything that is not an in-range integer is `null` rather than clamped to an
+ * end: a caller with an off-by-one would otherwise light its neighbour, and a
+ * highlight on the wrong wedge is worse than no highlight.
+ */
+export function clampSelection(index: number | null | undefined, count: number): number | null {
+  if (index === null || index === undefined) return null;
+  if (!Number.isInteger(index) || index < 0 || index >= count) return null;
+  return index;
+}
+
+/**
  * The segment a stick/pointer direction selects. Device-agnostic on purpose:
  * a gamepad stick, a mouse vector from the hub, and a touch drag all hand this
  * the same `(dx, dy)` and get the same answer (GDD §2.4). A dead-centre
@@ -292,6 +314,25 @@ export interface BuildWheelSignals {
    * cooling", the pre-cooldown behaviour it had.
    */
   readonly repairGate?: number;
+  /**
+   * The wedge the player is pointing at, or `null` for none (u16-01).
+   *
+   * **Device-neutral, and that is the whole design of it** (GDD §2.4). A mouse
+   * hovering the wheel, a thumb dragging across it and a gamepad stick pushed at
+   * it all arrive here as the same integer, so the highlight, the sweep and the
+   * detent are one behaviour rather than three — and the desktop half that
+   * `docs/theme-coverage.md` found missing entirely ("on desktop the wheel has no
+   * hover at all") is the same code path the thumb already walks.
+   *
+   * Selection is NOT a purchase. Pointing at a wedge lights it and nothing else;
+   * the press/confirm path is untouched by this field, which is what keeps a
+   * resting stick or a cursor crossing the screen from spending a player's ore.
+   *
+   * Optional and `null` when absent, so a caller that predates the selection
+   * reads as "nothing is pointed at" — the resting wheel, drawn exactly as it was
+   * before this landed.
+   */
+  readonly selected?: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -411,6 +452,23 @@ export interface BuildWheelModel {
    * ({@link ./wheel-nav}). `null` only when the wheel is closed (no hub to press).
    */
   readonly hubBack: HubBack | null;
+  /**
+   * The wedge the player is pointing at — the design's `sel` (screen 5a), which
+   * keys the highlighted wedge, the 140 ms sweep and the brighter, larger name
+   * ({@link ./wheel-selection}). `null` when nothing is pointed at, which is a
+   * resting state and not a missing value.
+   *
+   * It lives on the MODEL rather than in `BuildWheelView` deliberately
+   * (`docs/theme-coverage.md` §6.4): every other decision on this wheel is made
+   * in this pure, headless-tested module and the view only paints, and a
+   * `selected` flag stashed in the view would be the one piece of wheel state no
+   * test can reach.
+   *
+   * Always `null` while the wheel is shut — a wheel nobody can see is a wheel
+   * nobody is pointing at, so re-opening never restores a stale highlight — and
+   * always in range, so a caller cannot light a wedge that does not exist.
+   */
+  readonly selected: number | null;
 }
 
 /** Static per-segment copy. Words only — the numbers come from `segmentCost`. */
@@ -550,7 +608,17 @@ export function buildWheelModel(signals: BuildWheelSignals): BuildWheelModel {
   const open = canOpenWheel(signals);
   // The hub is the BACK affordance (field report v0.2.4); the Build wheel is the
   // top level, so its back CLOSES the wheel. `null` while shut — no hub is drawn.
-  return { open, ore: Math.floor(ore), segments, hubBack: open ? hubBack('build') : null };
+  return {
+    open,
+    ore: Math.floor(ore),
+    segments,
+    hubBack: open ? hubBack('build') : null,
+    // A shut wheel is pointed at nothing, whatever the caller last said: the
+    // pointer route in the boot path cannot know the wheel closed under it on the
+    // frame the ship undocked, and a highlight that survives that is a wedge lit
+    // on a wheel that is not there.
+    selected: open ? clampSelection(signals.selected, segments.length) : null,
+  };
 }
 
 /**
