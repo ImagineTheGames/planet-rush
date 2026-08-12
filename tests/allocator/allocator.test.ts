@@ -62,7 +62,14 @@ describe('Allocator.allocate — placing a new room', () => {
     // The ticket the client will carry names exactly this room+Machine and
     // verifies under the shared secret — it is the allocator's signed decision.
     const claims = verifyTicket(a.ticket, SECRET, 1000);
-    expect(claims).toEqual({ room: a.room, machine: 'm-1', expiresAt: a.expiresAt });
+    // `intent: 'create'` since a0-26 Milestone A: this ticket's job is to bring a
+    // room that does not exist yet into existence (src/net/ticket.ts).
+    expect(claims).toEqual({
+      room: a.room,
+      machine: 'm-1',
+      expiresAt: a.expiresAt,
+      intent: 'create',
+    });
   });
 
   it('reserves the minted code so a heartbeat gap still locates the room', () => {
@@ -465,6 +472,9 @@ describe('Allocator.join — reaching an existing room', () => {
       room: 'K7QM',
       machine: 'm-1',
       expiresAt: j.expiresAt,
+      // A join expects the room to be *there*; the Machine refuses this ticket on
+      // an unknown code rather than opening an empty room (a0-26 Milestone A).
+      intent: 'join',
     });
   });
 
@@ -556,7 +566,7 @@ describe('Allocator.allocate — the room config it signs and advertises (Task C
     expect(lease).toMatchObject({ size: 6, mode: 'ffa' });
   });
 
-  it('leaves a default allocate byte-identical to before — no size/mode on the ticket', () => {
+  it('leaves a default allocate free of size/mode on the ticket', () => {
     const { alloc } = withFleet([beat('m-1', 'iad', [])]);
     const a = alloc.allocate({}, 1000);
     // `toEqual` is exact: an unrequested config adds no keys to the claims.
@@ -564,6 +574,7 @@ describe('Allocator.allocate — the room config it signs and advertises (Task C
       room: a.room,
       machine: 'm-1',
       expiresAt: a.expiresAt,
+      intent: 'create',
     });
   });
 

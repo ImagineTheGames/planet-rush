@@ -199,7 +199,16 @@ export type JoinRejection =
   | 'match-live'
   | 'reclaim-unknown'
   | 'reclaim-expired'
-  | 'reclaim-denied';
+  | 'reclaim-denied'
+  /**
+   * The room named by a **join**-intent ticket is not on this Machine (a0-26
+   * Milestone A). The player asked for a room that has ended — a code whose
+   * match was swept a beat ago, or a browse row built from a heartbeat the
+   * allocator has not refreshed yet. Refusing is the whole point: without this
+   * the unknown code would simply *create* the room and the player would sit
+   * alone in an empty lobby wearing the name of a match that is over.
+   */
+  | 'room-gone';
 
 /** The outcome of a join attempt. */
 export type JoinOutcome =

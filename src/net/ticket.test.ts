@@ -101,3 +101,52 @@ describe('verifyTicket', () => {
     expect(verifyTicket(`${badPayload}.${sig}`, SECRET, 0)).toBeNull();
   });
 });
+
+/**
+ * The intent claim (a0-26 Milestone A) — the one bit that tells "create this
+ * room" apart from "put me in the room that is already there". A0-26 §2 measured
+ * what its absence costs: a code whose room ended a beat ago is silently
+ * re-created as an empty lobby, and a browse row multiplies that failure by
+ * making dead rooms tappable.
+ */
+describe('the intent claim', () => {
+  /** Sign a payload the module's own way, so only the structural check can fail
+   *  it — the way a hostile-but-well-signed claim would actually arrive. */
+  const signRaw = (payload: unknown): string => {
+    const encoded = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+    return `${encoded}.${createHmac('sha256', SECRET).update(encoded).digest('base64url')}`;
+  };
+
+  it('round-trips a join intent', () => {
+    const ticket = signTicket({ ...claims, intent: 'join' }, SECRET);
+    expect(verifyTicket(ticket, SECRET, 0)?.intent).toBe('join');
+  });
+
+  it('round-trips a create intent', () => {
+    const ticket = signTicket({ ...claims, intent: 'create' }, SECRET);
+    expect(verifyTicket(ticket, SECRET, 0)?.intent).toBe('create');
+  });
+
+  it('reads as undefined on a ticket that carries none — the pre-a0-26 shape', () => {
+    const verified = verifyTicket(signTicket(claims, SECRET), SECRET, 0);
+    expect(verified).not.toBeNull();
+    expect(verified?.intent).toBeUndefined();
+  });
+
+  it('is signed — flipping create to join breaks the HMAC', () => {
+    const created = signTicket({ ...claims, intent: 'create' }, SECRET);
+    const joined = signTicket({ ...claims, intent: 'join' }, SECRET);
+    expect(created).not.toBe(joined);
+    // Splice the joined ticket's payload onto the created one's signature: the
+    // claim a client would most like to edit, and the one it cannot.
+    const forged = `${joined.split('.')[0]}.${created.split('.')[1]}`;
+    expect(verifyTicket(forged, SECRET, 0)).toBeNull();
+  });
+
+  it('refuses a word that is neither, rather than reading it as create', () => {
+    // Fail closed: a claim the verifier cannot understand is not quietly
+    // downgraded to the permissive one.
+    expect(verifyTicket(signRaw({ ...claims, intent: 'joinish' }), SECRET, 0)).toBeNull();
+    expect(verifyTicket(signRaw({ ...claims, intent: 7 }), SECRET, 0)).toBeNull();
+  });
+});

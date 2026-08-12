@@ -294,6 +294,9 @@ export class Allocator {
       picked.view.machine,
       picked.view.region,
       now,
+      // `create` — this ticket's whole purpose is to bring a room that does not
+      // exist yet into existence on the Machine it names (src/net/ticket.ts).
+      'create',
       config,
       placementOf(opts.region, picked),
     );
@@ -315,7 +318,10 @@ export class Allocator {
     // located only through a fresh reservation may not have a view yet; region
     // is a routing hint, not a correctness input, so an empty string is fine.
     const region = this.regionOf(machine, now);
-    return this.issue(code, machine, region, now);
+    // `join` — the room is expected to be *there*. If it has ended inside the
+    // heartbeat the allocator has not heard about yet, the Machine refuses this
+    // ticket rather than opening an empty room in its place (Milestone A).
+    return this.issue(code, machine, region, now, 'join');
   }
 
   /**
@@ -528,13 +534,14 @@ export class Allocator {
   }
 
   /** Sign the routing decision into a ticket and package it as an {@link Allocation}.
-   *  A `join` (existing room) passes no config, so the ticket is byte-identical to
-   *  the pre-variable-size shape; an `allocate` folds the room's size/mode in. */
+   *  A `join` (existing room) passes no config, so the ticket carries only the
+   *  routing claims and its intent; an `allocate` folds the room's size/mode in. */
   private issue(
     room: RoomCode,
     machine: MachineId,
     region: string,
     now: number,
+    intent: 'create' | 'join',
     config: ReserveConfig = {},
     placement?: Placement,
   ): Allocation {
@@ -546,6 +553,7 @@ export class Allocator {
         expiresAt,
         ...(config.size !== undefined ? { size: config.size } : {}),
         ...(config.mode !== undefined ? { mode: config.mode } : {}),
+        intent,
       },
       this.secret,
     );

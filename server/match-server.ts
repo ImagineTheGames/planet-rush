@@ -263,6 +263,32 @@ export class MatchServer {
     return true;
   }
 
+  /**
+   * Must this join be **refused** rather than allowed to open a room (a0-26
+   * Milestone A)? True for exactly one case: a ticket the allocator signed with
+   * `intent: 'join'` naming a code this process does not host.
+   *
+   * `openRoom` creating an unknown code is load-bearing — it is how HOST works —
+   * so the room-creating join and the room-expecting join cannot be told apart by
+   * anything the *client* says. The allocator says it instead, in the one channel
+   * a client cannot forge (`src/net/ticket.ts` `TicketClaims.intent`): a ticket
+   * from `POST /rooms` says `create`, a ticket from a join or a listing tap says
+   * `join`. So a room that ended inside the last heartbeat is refused here
+   * instead of being silently resurrected as an empty lobby.
+   *
+   * **Everything else is unchanged, on purpose.** No secret (the self-hosted and
+   * solo paths), no ticket, an unreadable ticket, a ticket for another room, or a
+   * ticket with no intent at all — all `false`, which means "carry on exactly as
+   * this Machine always has". The claim only ever *adds* a refusal, and only when
+   * the allocator explicitly said this was a join.
+   */
+  refusesUnknownRoom(code: RoomCode, ticket: string | undefined): boolean {
+    if (this.ticketSecret === undefined || ticket === undefined) return false;
+    const claims = verifyTicket(ticket, this.ticketSecret, this.now);
+    if (claims === null || claims.room !== code) return false;
+    return claims.intent === 'join' && this.room(code) === undefined;
+  }
+
   /** The server's clock: the last reading {@link update} was handed. */
   get now(): number {
     return this.clockMs;
@@ -483,6 +509,18 @@ class ServerConnection implements Connection {
     // a Machine that is not enforcing, this admits everything and costs nothing.
     if (!this.server.admitsJoin(code, message.ticket)) {
       this.refuse('bad-ticket');
+      return;
+    }
+
+    // A join that was allocated to an *existing* room does not get to create one
+    // (a0-26 Milestone A). This sits above `openRoom` rather than inside it
+    // because `openRoom`'s create-on-unknown-code is how HOST works and must not
+    // move; what changes is only that a ticket saying `join` is held to it.
+    if (
+      message.reclaim === undefined &&
+      this.server.refusesUnknownRoom(code, message.ticket)
+    ) {
+      this.refuse('room-gone');
       return;
     }
 
