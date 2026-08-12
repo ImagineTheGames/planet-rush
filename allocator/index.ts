@@ -25,7 +25,15 @@
  *   POST /fleet/heartbeat  a Machine restates its rooms + load (authenticated, M10)
  *   POST /deregister       a Machine leaves the fleet at once (authenticated, M10)
  *   POST /rooms            allocate a NEW room  → 201 + signed ticket
+ *   GET  /rooms            the lobby browser's LIST → 200 + { rooms, asOf } (a0-26)
  *   POST /rooms/:code/join reach an EXISTING room → 200 + signed ticket, 404 if gone
+ *   POST /listings/:id/join  join a room from a browse ROW → 200 + signed ticket,
+ *                          404 gone / gone-private, 409 the seat was taken (a0-26)
+ *
+ * **The list publishes no room codes** (a0-26, the developer's refinement of D1).
+ * A row carries a derived owner id, the region, the seats and the mode; the join
+ * handle beside it is what makes the row tappable without a code ever being shown
+ * or typed (`./listing` states exactly how much that is worth, and how little).
  *
  * **The fleet write routes are authenticated (M10).** `/register`, `/fleet/heartbeat`
  * and `/deregister` are the ones that mutate who-hosts-what, so each must carry an
@@ -170,6 +178,7 @@ interface RouteResult {
 
 const JOIN_PATH = /^\/rooms\/([^/]+)\/join$/;
 const ROOM_PATH = /^\/rooms\/([^/]+)$/;
+const LISTING_JOIN_PATH = /^\/listings\/([^/]+)\/join$/;
 
 /**
  * Build the allocator's `http.Server` without listening. Reads each request's
@@ -245,7 +254,18 @@ function route(
     return method === 'POST' ? heartbeatRoute(deps, request, raw, now) : methodNotAllowed();
   }
   if (pathname === '/rooms') {
-    return method === 'POST' ? allocateRoute(deps, request, raw, now) : methodNotAllowed();
+    // One path, two verbs, dispatched here rather than in two places (Trap 10):
+    // POST allocates a room, GET lists the ones a stranger may walk into. A PUT
+    // still gets `methodNotAllowed`, exactly as it did before the list existed.
+    if (method === 'POST') return allocateRoute(deps, request, raw, now);
+    if (method === 'GET') return roomListRoute(deps, now);
+    return methodNotAllowed();
+  }
+  const listingJoin = LISTING_JOIN_PATH.exec(pathname);
+  if (listingJoin) {
+    return method === 'POST'
+      ? listingJoinRoute(deps, decodeURIComponent(listingJoin[1] ?? ''), now)
+      : methodNotAllowed();
   }
   const joinMatch = JOIN_PATH.exec(pathname);
   if (joinMatch) {
@@ -502,6 +522,53 @@ function defaultLog(line: string): void {
   console.log(`[planet-rush] ${line}`);
 }
 
+/**
+ * **The lobby browser's list** (a0-26): `GET /rooms` → `{ rooms, asOf }`. One
+ * request per refresh, built from state the registry already holds, and never a
+ * byte to a gameserver — a hundred idle browsers cannot cost a live match a frame.
+ *
+ * **No room code crosses this route** (the developer: *"a browse shouldn't show
+ * the room code, just the room owner id and location / ping"*). Each row carries
+ * a derived owner id and a derived join handle instead (`./listing`), and the
+ * handle is what `POST /listings/:id/join` takes — so a public room is joinable
+ * straight from the list without the player ever seeing or typing a code.
+ *
+ * `asOf` is **this allocator's clock at the instant the listing was built**, and a
+ * client must not subtract it from its own: the two clocks are not the same one,
+ * and the plan's `UPDATED 3s AGO` stamp has to be measured from when the *client*
+ * received the answer. What `asOf` is honestly good for is the allocator's own
+ * side of that story — which snapshot a row came from, in a log or a bug report.
+ *
+ * Deliberately **CORS-simple** (Trap 11): a plain GET with no custom request
+ * header, so a browser on GitHub Pages never sends an `OPTIONS` preflight for it.
+ * A custom header here would double the only cost this feature has.
+ */
+function roomListRoute(deps: AllocatorServerDeps, now: number): RouteResult {
+  return { status: 200, body: { rooms: deps.allocator.rooms(now), asOf: now } };
+}
+
+/**
+ * **Join from a row** (a0-26; the developer: *"there should be a join button to
+ * join it"*): `POST /listings/:id/join` → the same signed decision `POST
+ * /rooms/:code/join` returns, for the room the handle names.
+ *
+ * The response carries the room **code**, because it must: the code is what a
+ * `join` message names on the socket (`src/net/transport.ts`), so a player who
+ * joins a room learns its code exactly as a host who opens one does. That is not
+ * the thing the row was keeping back — what a browse does not do is hand every
+ * reader the code of every *other* room in the list.
+ *
+ * Two refusals, and they say different things on purpose (plan §3): 404 the row
+ * is gone or has gone private, 409 the room is there and the seat is taken.
+ */
+function listingJoinRoute(deps: AllocatorServerDeps, id: string, now: number): RouteResult {
+  try {
+    return decided(deps, deps.allocator.joinListing(id, now), 200);
+  } catch (e) {
+    return errorResult(e);
+  }
+}
+
 /** Reach an existing room; 200 with a ticket, 404 when no live Machine hosts it. */
 function joinRoute(deps: AllocatorServerDeps, code: string, now: number): RouteResult {
   try {
@@ -561,8 +628,10 @@ function decided(
 /** Map an {@link AllocatorError} to its status; anything else re-throws. */
 function errorResult(e: unknown): RouteResult {
   if (e instanceof AllocatorError) {
-    // no-capacity → 503 (full, retry / scale up); not-found → 404 (room is gone).
-    const status = e.reason === 'no-capacity' ? 503 : 404;
+    // no-capacity → 503 (the fleet is full, retry / scale up); room-full → 409
+    // (this room is there and has no seat — a browse row somebody else reached
+    // first); not-found → 404 (the room is gone).
+    const status = e.reason === 'no-capacity' ? 503 : e.reason === 'room-full' ? 409 : 404;
     return { status, body: { error: e.reason } };
   }
   throw e;
