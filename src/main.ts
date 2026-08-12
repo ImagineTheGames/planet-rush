@@ -60,7 +60,7 @@ import type { MatchBoot } from '@platform/match-boot';
 import {
   createControlState,
   mapActions,
-  defaultFireMode,
+  readStoredFireMode,
   resetControlState,
   FireMode,
 } from '@platform/actions';
@@ -456,12 +456,27 @@ const HAPTIC_ALARM_REARM_MS = 2500;
 const FIRE_MODE_KEY = 'planet-rush:fireMode';
 /** Where the chosen control scheme is remembered (developer's ratified
  *  tap/click-to-move scheme). Same storage seam as the fire mode, so both survive
- *  a reload identically. `'sticks'` (the existing twin-stick / keyboard / gamepad
- *  scheme) is the default; `'tap'` is Tap Commander. The existing schemes are
- *  untouched and default — Tap Commander is an OPTIONAL layer. */
+ *  a reload identically. `'sticks'` is the twin-stick / keyboard / gamepad scheme;
+ *  `'tap'` is Tap Commander, and **since a0-30 (2026-08-12) `'tap'` is the
+ *  first-run default on every platform** — see {@link DEFAULT_CONTROL_SCHEME}. The
+ *  stored strings did NOT move with the default: a save that says `sticks` still
+ *  seats the sticks (`./ui` `CONTROL_SCHEME_STORAGE`). */
 const CONTROL_SCHEME_KEY = 'planet-rush:controlScheme';
-/** The two control schemes (developer ratification §3). Sticks is default. */
+/** The two control schemes (developer ratification §3). */
 type ControlScheme = 'sticks' | 'tap';
+/**
+ * The scheme a player who has never chosen one starts in: **Tap Commander, on
+ * every platform** *(GDD §2.4, amended 2026-08-12 — a0-30, ratified: "is tap
+ * commander and auto aim default on all platforms it should be" … "I already said
+ * BOTH")*. It is still an OPTIONAL layer in the sense that matters — the sticks
+ * remain fully available and switchable from settings and the pause menu, and the
+ * six-verb contract is unchanged either way — but it is no longer the opt-in one.
+ *
+ * The companion half of the same amendment is `@platform/actions`
+ * `defaultFireMode` (Auto-aim everywhere), and both are read through a resolver
+ * that consults storage FIRST.
+ */
+const DEFAULT_CONTROL_SCHEME: ControlScheme = 'tap';
 /** Surface-gap standoff (world units) the Tap Commander pilot holds a fly-to at
  *  its OWN station — the "fly to atmosphere" order (developer §2). Sits the ship in
  *  its home's atmosphere, near docking range (STATION.dockRange), without slamming
@@ -1523,12 +1538,13 @@ async function boot(): Promise<void> {
    *  frees it onto a survivor (GDD §2.7 "watch the rest"). Reset on rematch. */
   let cameraTarget: PlayerId = LOCAL_PLAYER;
 
-  let fireMode = readFireMode(platform, isTouch);
-  // The active control scheme (developer §3): the twin-stick/keyboard/gamepad
-  // 'sticks' scheme (default, untouched) or 'tap' — Tap Commander, where a
-  // tap/click places a move or a lock and the local pilot flies the ship. Read
-  // through the same storage seam as the fire mode; a stale value folds to
-  // 'sticks', so nothing a player ever saved can seat an unknown scheme.
+  let fireMode = readFireMode(platform);
+  // The active control scheme (developer §3): 'tap' — Tap Commander, where a
+  // tap/click places a move or a lock and the local pilot flies the ship, and the
+  // FIRST-RUN DEFAULT on every platform since a0-30 — or the twin-stick /
+  // keyboard / gamepad 'sticks' scheme, which is still fully available and one
+  // press away in settings or the pause menu. Read through the same storage seam
+  // as the fire mode, and a saved choice wins over the default either way.
   let controlScheme = readControlScheme(platform);
   // The active input device drives the controls strip + prompt wording (GDD
   // §2.4 auto device-switch); updated in sampleInput() by whichever device acts.
@@ -6402,23 +6418,38 @@ function turretPool(station: MiningStation): number {
   return hp;
 }
 
-/** Read the persisted fire mode, falling back to the platform default (§2.4). */
-function readFireMode(platform: ReturnType<typeof createBrowserPlatform>, isTouch: boolean): FireMode {
-  const stored = platform.storage.get(FIRE_MODE_KEY);
-  if (stored === FireMode.Manual || stored === FireMode.AutoAim) return stored;
-  return defaultFireMode(isTouch);
+/**
+ * Read the persisted fire mode, falling back to the default (§2.4) — which since
+ * a0-30 is Auto-aim on every platform, not a per-device answer.
+ *
+ * **Read before you default** (a0-30 item 2): the storage read comes first and a
+ * stored `manual` still seats Manual, so moving the default moved it only for a
+ * player with nothing saved. The decision itself lives in
+ * {@link readStoredFireMode} so it is unit-tested rather than trapped in the
+ * bootstrap.
+ */
+function readFireMode(platform: ReturnType<typeof createBrowserPlatform>): FireMode {
+  return readStoredFireMode(platform.storage.get(FIRE_MODE_KEY));
 }
 
-/** Read the persisted control scheme (developer §3). Anything other than the
- *  explicit `'tap'` — an absent key, a stale value — folds to `'sticks'`, so the
- *  existing schemes stay the untouched default and a bad key can never seat an
- *  unknown scheme. Read through the same platform seam as the fire mode. */
+/**
+ * Read the persisted control scheme (developer §3), defaulting to
+ * {@link DEFAULT_CONTROL_SCHEME} — Tap Commander, everywhere (a0-30).
+ *
+ * The same "read before you default" rule as the fire mode, and the reason this is
+ * not simply `parseControlScheme(...)` any more: that function folds *everything*
+ * unrecognised to `'sticks'`, which was the default when it was written and is not
+ * one now. So a **saved** value is decoded by the UI's own round trip (`./ui`
+ * `parseControlScheme` / `storedControlScheme`, whose two strings are pinned by
+ * `settings.test.ts` and did not move with the default) — anyone who chose the
+ * sticks keeps them — and only an **absent or stale** key reaches the default. A
+ * stale key was never a preference; seating the current default for it is the same
+ * rule, not a new one, and it still cannot seat an unknown scheme.
+ */
 function readControlScheme(platform: ReturnType<typeof createBrowserPlatform>): ControlScheme {
-  // The stored string is the UI's own round trip (`./ui` `parseControlScheme` /
-  // `storedControlScheme`), so the persisted value and the scheme it seats can
-  // never drift apart — and `sticks` keeps meaning the default scheme even now
-  // that no screen prints that word on a PC (u8-01).
-  return parseControlScheme(platform.storage.get(CONTROL_SCHEME_KEY));
+  const stored = platform.storage.get(CONTROL_SCHEME_KEY);
+  const saved = stored === storedControlScheme('sticks') || stored === storedControlScheme('tap');
+  return saved ? parseControlScheme(stored) : DEFAULT_CONTROL_SCHEME;
 }
 
 /**
@@ -6682,6 +6713,23 @@ interface SettingsControlReport {
   readonly physicalCenter: { x: number; y: number };
 }
 
+/** One settings row's WORDS, exactly as the screen is drawing them this frame
+ *  (a0-30). The row reports are press points; this is what the player reads at
+ *  that point — `CONTROLS · TAP COMMANDER`, `FIRE MODE · AUTO-AIM`.
+ *
+ *  It exists because the CONTROLS row's wording is a *rule* (u8-01, 2026-08-06:
+ *  the row names the DEVICE, never the internal scheme name) and the developer has
+ *  already caught that row lying once. A rule about words needs an assertion on
+ *  the words, on a real device profile — a unit test on `controlsValue` cannot
+ *  prove which device the booted client passed it. Readback only: these are the
+ *  strings from the same {@link settingsModel} the view draws, never a second copy
+ *  built for the seam. */
+interface SettingsRowReport {
+  readonly kind: string;
+  readonly label: string;
+  readonly value: string;
+}
+
 /** One CODEX control as the seam reports it: BACK, a tab, or a (visible) entry
  *  row, with the index the model routes on and the physical press point. Lets a
  *  live-stage run drive the codex through the front door on both form factors. */
@@ -6705,6 +6753,10 @@ interface MainMenuSeam {
   /** The settings-screen rows + DONE, each with the physical point a real press
    *  must land on — the same landscape-lock remap the menu buttons get. */
   settingsControls: readonly SettingsControlReport[];
+  /** What those rows SAY while the settings screen is up — label and value, from
+   *  the model the view is drawing (see {@link SettingsRowReport}). Empty until the
+   *  screen has been open, because there is nothing on screen to report. */
+  settingsRows: readonly SettingsRowReport[];
   /** The CODEX controls (BACK, the four tabs, the visible entry rows), each with
    *  the physical press point — the front-door handles a live-stage run drives the
    *  reference screen through, on both form factors. */
@@ -6868,13 +6920,17 @@ function openMainMenu(
   ctx: MenuContext,
 ): MainMenuHandle {
   const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-  let fireMode = readFireMode(platform, isTouch);
+  let fireMode = readFireMode(platform);
   // The control scheme (developer §3), read from the same storage the match boots
   // with. The CONTROLS settings row shows and toggles it here, persisting to that
   // seam so the choice carries into the match exactly as the fire mode does.
   let controlScheme = readControlScheme(platform);
-  // Whether a pad is connected, for the CONTROLS row's word (u8-01): STICKS on
-  // touch, TWIN STICKS with a pad, KEYBOARD + MOUSE on a PC without one. The menu
+  // Whether a pad is connected, for the CONTROLS row's word (u8-01): with the
+  // sticks seated, STICKS on touch, TWIN STICKS with a pad, KEYBOARD + MOUSE on a
+  // PC without one — and TAP COMMANDER on every device with the tap scheme seated,
+  // which since a0-30 is what a fresh profile reads. Still the device, never the
+  // internal name: the row's wording rule is untouched by the default moving. The
+  // menu
   // has no input funnel and no `activeDevice`, so this is the whole of what it
   // needs to know about the hardware — and it is a live value, because a pad can
   // be plugged in or die while the screen is open (see the listeners below).
@@ -6984,6 +7040,7 @@ function openMainMenu(
     rotated: ctx.isRotated(),
     controls: [],
     settingsControls: [],
+    settingsRows: [],
     codexControls: [],
     codexTab: codexState.activeTab,
     codexEntry: activeEntries(codexState).find((e) => e.id === codexState.selectedId)?.title ?? '',
@@ -7199,6 +7256,30 @@ function openMainMenu(
     hideConnectTrace();
   }
 
+  /** The seam's settings-row readback records, reused frame to frame (§4.3). */
+  const settingsRowSlots: { kind: string; label: string; value: string }[] = [];
+
+  /**
+   * Report what the settings rows SAY, from the model the view is drawing (a0-30).
+   *
+   * The one thing this must never become is a second computation of those strings:
+   * the whole value of the readback is that a live-stage run on a real device
+   * profile can assert the CONTROLS row's ratified wording (u8-01) — `TAP COMMANDER`
+   * on every device with the tap scheme seated, the device's own word with the
+   * sticks — against the words actually on the glass.
+   */
+  function reportSettingsRows(model: ReturnType<typeof settingsModel>): void {
+    for (let i = 0; i < model.rows.length; i++) {
+      const row = model.rows[i]!;
+      const slot = settingsRowSlots[i] ?? (settingsRowSlots[i] = { kind: '', label: '', value: '' });
+      slot.kind = row.kind;
+      slot.label = row.label;
+      slot.value = row.value;
+    }
+    settingsRowSlots.length = model.rows.length;
+    seam.settingsRows = settingsRowSlots;
+  }
+
   /** Refresh the seam's logical viewport, rotation flag, and per-button reports
    *  (logical rect + physical tap point) from the live transform — the executable
    *  form of "the menu lays out in landscape and a tap lands where it's drawn." */
@@ -7287,12 +7368,18 @@ function openMainMenu(
     if (hangarView.visible) hangarView.update(hangarModelNow());
     if (menuView.visible) menuView.update(mainMenuModel({ hover: menuHover, press: menuPress }));
     if (settingsView.visible) {
-      settingsView.update(
-        settingsModel(settings, fireMode, controlScheme, controlsDevice({ isTouch, gamepadConnected }), {
-          hover: settingsHover,
-          press: settingsPress,
-        }),
+      const model = settingsModel(
+        settings,
+        fireMode,
+        controlScheme,
+        controlsDevice({ isTouch, gamepadConnected }),
+        { hover: settingsHover, press: settingsPress },
       );
+      settingsView.update(model);
+      // …and report the words it just drew (a0-30). The same model object, so the
+      // readback cannot say one thing while the screen says another; written into
+      // reused records, so a settings screen sitting open allocates nothing (§4.3).
+      reportSettingsRows(model);
     }
     if (codexView.visible) codexView.update(codexModel(codexState, { hover: codexHover, press: codexPress }));
     if (entryView.visible) {
@@ -9349,7 +9436,7 @@ function openLobby(
     const host = state.you === state.host;
     room.session.chooseInLobby({
       shipClass: state.shipClass,
-      fireMode: wireFireMode(readFireMode(platform, isTouch)),
+      fireMode: wireFireMode(readFireMode(platform)),
       ...(host
         ? {
             botDifficulties: botDifficulties(state),
