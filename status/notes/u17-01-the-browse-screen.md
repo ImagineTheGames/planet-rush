@@ -1,9 +1,11 @@
 # u17-01 — the browse screen (working note)
 
-**Branch:** `agent/ui/u17-01-browse-screen` (stacked on
-`agent/netcode/n10-01-lobby-list-route`, PR #400 — **not merged yet**; this branch
-was cut from it because the screen calls `readLobbyList` / `joinListing`, which
-exist only there). **Spec:** `docs/lobby-browser-plan.md` §4 and §5.
+**Branch:** `agent/ui/u17-01-browse-screen` · **PR:** #401 (open, every check
+green). Cut from `agent/netcode/n10-01-lobby-list-route` because the screen calls
+`readLobbyList` / `joinListing`, which existed only there; **#400 has since merged
+and `main` is merged in** (`784f815` — one conflict, two neighbouring comments in
+the storage-key block, both kept), so the diff is this brief's work alone.
+**Spec:** `docs/lobby-browser-plan.md` §4 and §5.
 
 ---
 
@@ -18,8 +20,9 @@ exist only there). **Spec:** `docs/lobby-browser-plan.md` §4 and §5.
 | `a4c89b2` | n10-01's two dark-matter allowlist entries closed out |
 | `91db67a` | the phone evidence — `tests/browse/lobby-browse.spec.ts`, `playwright.u17.config.ts`, four frames |
 
-**Gates:** `npx tsc --noEmit` clean; `npm test -- --run` green (152 files / 2832
-tests); `npm run dark-matter:check` clean.
+**Gates:** `npx tsc --noEmit` clean; `npx vitest run` green (**292 files / 5220
+tests**); `npm run dark-matter:check` clean. On PR #401: both CI jobs, the perf
+gate and **all six mobile-emulation shards** pass.
 
 **Evidence:** `tests/browse/lobby-browse.spec.ts` + `playwright.u17.config.ts` —
 four frames at 390 px landscape against a fixtured fleet (`page.route` answers
@@ -142,8 +145,8 @@ not a cast of the keypad's.
 
 Nothing is blocked. What is deliberately **not** here:
 
-- **This branch is stacked on n10-01 (PR #400).** It must merge after it — or
-  with it. Nothing in `src/net/` or `allocator/` was touched by me.
+- Nothing in `src/net/`, `server/` or `allocator/` was touched by me — n10-01
+  built that half and it is on `main`.
 - **`tests/browse/` is not in CI.** `playwright.config.ts`'s `testDir` is
   `tests/mobile/`, and this spec needs a bundle built with an allocator URL plus
   route interception, which that suite does not do. Adding a CI job is
