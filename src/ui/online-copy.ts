@@ -28,6 +28,11 @@
  *   • `bad-response`      — a 2xx (or other) the client could not read. The
  *     server answered but not sanely; retrying is the only sensible move.
  *
+ * A tap on a lobby-browser ROW can fail one further way — `room-full`, the seat
+ * that went to somebody else while the player was reading the card — and means
+ * something different by `not-found`, because a row is not something you typed.
+ * {@link listingFailureMessage} is that table (u17-01).
+ *
  * ---------------------------------------------------------------------------
  * A LOST SERVER IS NOT A LOST CONNECTION
  * ---------------------------------------------------------------------------
@@ -51,6 +56,7 @@
  */
 
 import type { ResolveFailure } from '../net/allocator-client';
+import type { ListingJoinFailure } from '../net/lobby-list';
 import type { StopReason } from '../net/reconnect';
 
 // ---------------------------------------------------------------------------
@@ -112,6 +118,45 @@ export function resolveFailureCopy(reason: ResolveFailure): OnlineErrorCopy {
  *  screen's error line). */
 export function resolveFailureMessage(reason: ResolveFailure): string {
   return ONLINE_ERROR_COPY[reason].message;
+}
+
+// ---------------------------------------------------------------------------
+// …and the two refusals only a BROWSE ROW can earn (u17-01)
+// ---------------------------------------------------------------------------
+
+/**
+ * The same job for a tap on a row in the lobby browser
+ * (`src/net/lobby-list.ts` `joinListing`), which can fail two ways a typed code
+ * cannot — and means something different by one of the ways it shares.
+ *
+ * n10-01 built the route and left these two lines to the UI lane in as many
+ * words; they are here rather than in `./lobby-browser` for the same reason every
+ * other refusal is here: one place turns a network reason into a sentence, so the
+ * browse screen and the front door cannot end up wording the same failure twice.
+ *
+ *   • `room-full` (409) — the claim is there and its last seat went to somebody
+ *     else while the player was looking at the card. **This is the answer to "what
+ *     does a player see when they press JOIN on a room that filled up?"**
+ *   • `not-found` (404) — on the code path this means *you mistyped it*, and the
+ *     copy above says so ("Check it and try again"). On a ROW there is nothing to
+ *     check: the player did not type anything, and a row that 404s is a claim that
+ *     has ended or gone private. Same status, different fact, different sentence —
+ *     which is exactly why this table exists instead of a cast.
+ *
+ * Total over {@link ListingJoinFailure}, so a new failure kind cannot reach a
+ * player as a blank line.
+ */
+const LISTING_ERROR_COPY: Readonly<Record<ListingJoinFailure, string>> = {
+  'room-full': 'That claim filled up while you were looking. Pick another.',
+  'not-found': 'That claim has closed. Pick another, or press SOLO.',
+  'no-capacity': ONLINE_ERROR_COPY['no-capacity'].message,
+  network: ONLINE_ERROR_COPY.network.message,
+  'bad-response': ONLINE_ERROR_COPY['bad-response'].message,
+};
+
+/** The sentence for a refused row join. */
+export function listingFailureMessage(reason: ListingJoinFailure): string {
+  return LISTING_ERROR_COPY[reason];
 }
 
 // ---------------------------------------------------------------------------

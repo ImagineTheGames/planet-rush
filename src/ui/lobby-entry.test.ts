@@ -38,6 +38,7 @@ import {
   backToDoors,
   canSubmitJoin,
   chooseDoor,
+  chooseJoinMode,
   createEntry,
   entryConnected,
   entryErrorFor,
@@ -713,8 +714,11 @@ describe('the doors in Gantry/Bone (u7-04)', () => {
     // panel in the ratified vocabulary — `CLAIM`, and a code is still a CODE.
     expect(entryModel(createEntry()).eyebrow).toBe('DEEP FIELD MINING AUTHORITY');
     expect(entryModel(createEntry()).status).toBe('CONTRACT OPEN · SECTOR 04');
+    // JOIN now lands on BROWSE (u17-01, plan D2), so the keypad's line is reached
+    // through the mode switch — and each mode names the thing it actually is.
     const join = chooseDoor(createEntry(), 'join', rng()).state;
-    expect(entryModel(join).status).toBe('CLAIM CODE');
+    expect(entryModel(join).status).toBe('OPEN CLAIMS');
+    expect(entryModel(chooseJoinMode(join, 'code')).status).toBe('CLAIM CODE');
   });
 
   it('never lets the keypad hold two vocabularies at once (l2-02 merge gap)', () => {
