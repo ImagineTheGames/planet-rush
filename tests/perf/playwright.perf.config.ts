@@ -33,6 +33,16 @@ const usingRemote = Boolean(process.env.PERF_URL);
 
 export default defineConfig({
   testDir: '.',
+  // CROSS-OWNER, one line, flagged in a1-16's PR — this file is QA's.
+  //
+  // `testDir: '.'` with Playwright's default `testMatch` claims every spec in
+  // `tests/perf/`, and since a1-16 that directory also holds `draw-budget.spec.ts`
+  // — the CI half of the gate, which drives a rig page that is deliberately NOT
+  // in the production bundle. This config's `webServer` builds and previews that
+  // bundle, so it would serve that spec a 404 and report the gate as broken.
+  // Naming the file keeps each config running exactly the suite its own server
+  // can serve. Nothing about what this suite asserts changes.
+  testMatch: 'frame-time.spec.ts',
   // A hung capture is a failed test, never a hung suite (the QA charter's
   // enforced-timeout rule, applied outside the sim).
   timeout: 120_000,

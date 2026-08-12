@@ -1,0 +1,19 @@
+<!doctype html>
+<!--
+  tests/perf/draw-budget.html — the page `draw-budget.spec.ts` drives.
+  OWNER: Platform Engineer (a1-16).
+
+  Served by the Vite dev server only. `vite build` takes `index.html` as its
+  single input, so this file and its module never reach the shipped bundle —
+  the same arrangement `spikes/atlas-pooling/bench.html` has lived under.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Planet Rush — submission budget rig</title>
+  </head>
+  <body style="margin: 0; background: #0d1015; color: #c8d2dc; font: 12px/1.4 monospace">
+    <pre id="out">measuring…</pre>
+    <script type="module" src="./draw-budget.rig.ts"></script>
+  </body>
+</html>

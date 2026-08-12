@@ -1,0 +1,24 @@
+[pool-size] worker cap 2: cgroup quota 6 cores / LANES 3 = 2 workers (host claims 6)
+
+ RUN  v2.1.8 /lanes/lane-1
+
+stdout | tests/harness/perf.test.ts > sim frame time at the GDD §4.3 entity counts > holds the sim inside its share of a 60 fps frame
+[perf] sim @budget: mean 0.106 ms · p95 0.146 ms · p99 0.303 ms · 9398 ticks/s (156.6× real time) · 3.5% of the 60 fps sim budget
+
+stdout | tests/harness/perf.test.ts > sim frame time at the GDD §4.3 entity counts > scales sub-quadratically with entity count — the spatial hash is doing its job
+[perf] 2× entities costs 1.95× the frame time (median of 5: 1.77, 1.82, 1.95, 1.99, 2.24)
+
+ ✓ tests/harness/perf.test.ts > the GDD §4.3 stress scene > is the scene the GDD names: 8 ships, 32 turrets, ~200 asteroids
+ ✓ tests/harness/perf.test.ts > the GDD §4.3 stress scene > carries hundreds of live projectiles and a drift of chunks
+ ✓ tests/harness/perf.test.ts > the GDD §4.3 stress scene > starts past spawn protection, so the turrets have something to shoot
+ ✓ tests/harness/perf.test.ts > the GDD §4.3 stress scene > re-uses pooled projectile slots instead of growing the array forever
+ ✓ tests/harness/perf.test.ts > the budget split > gives the sim a documented share of the frame, not the whole thing
+ ✓ tests/harness/perf.test.ts > sim frame time at the GDD §4.3 entity counts > holds the sim inside its share of a 60 fps frame
+ ✓ tests/harness/perf.test.ts > sim frame time at the GDD §4.3 entity counts > scales sub-quadratically with entity count — the spatial hash is doing its job 754ms
+ ✓ tests/harness/perf.test.ts > sim frame time at the GDD §4.3 entity counts > allocates no per-frame garbage that grows the world (GDD §4.3 pooling)
+
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Start at  00:54:49
+   Duration  2.53s (transform 602ms, setup 0ms, collect 777ms, tests 829ms, environment 0ms, prepare 573ms)
+
