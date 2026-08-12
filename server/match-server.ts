@@ -221,6 +221,7 @@ export class MatchServer {
     size: number;
     mode: MatchMode;
     joinableSeats: number;
+    listed?: boolean;
   }[] {
     const loads = [];
     for (const [code, room] of this.rooms) {
@@ -230,6 +231,10 @@ export class MatchServer {
         size: room.size,
         mode: room.mode,
         joinableSeats: room.joinableSeats,
+        // Only a room whose host said PRIVATE spends the bytes (a0-26 D1):
+        // absent reads as listed on the far side, which is the ruled default and
+        // is also exactly what a pre-a0-26 Machine sends.
+        ...(room.listed ? {} : { listed: false }),
       });
     }
     return loads;

@@ -605,6 +605,10 @@ function isHeartbeat(value: unknown): value is Heartbeat {
     if (r['size'] !== undefined && typeof r['size'] !== 'number') return false;
     if (r['mode'] !== undefined && typeof r['mode'] !== 'string') return false;
     if (r['joinableSeats'] !== undefined && typeof r['joinableSeats'] !== 'number') return false;
+    // The room's own PUBLIC/PRIVATE flag (a0-26 D1) — only a real boolean is an
+    // opinion; anything else would have to be coerced, and coercing this one
+    // publishes rooms whose hosts asked not to be.
+    if (r['listed'] !== undefined && typeof r['listed'] !== 'boolean') return false;
     return true;
   });
 }

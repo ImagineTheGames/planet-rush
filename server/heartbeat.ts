@@ -198,6 +198,14 @@ export interface HeartbeatRoom {
   readonly mode?: string;
   /** Seats a new human can still take right now (0 once live or full). */
   readonly joinableSeats?: number;
+  /**
+   * Whether the room consents to being **listed** in the lobby browser (a0-26
+   * D1). Absent reads as listed, which is both the default the developer ruled
+   * (public, with a PRIVATE toggle) and the cheap encoding: a Machine only spends
+   * the bytes on the rooms whose host actually said no, and a Machine older than
+   * this field keeps listing exactly as it does today.
+   */
+  readonly listed?: boolean;
 }
 
 /**
