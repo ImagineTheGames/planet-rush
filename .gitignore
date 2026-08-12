@@ -31,3 +31,8 @@ dist-alarm-stage/
 # build, served on a private port so a stale preview on the shared 4173 can never
 # be what a capture is taken against. Kept out of dist/ like the two above.
 dist-a0-14/
+
+# The a0-31 evidence capture's client bundle (evidence/a0-31-solo-no-open-slots/)
+# — same story as dist-a0-14: a private outDir on a private port, so a capture
+# can never be taken against another lane's preview.
+dist-a0-31/

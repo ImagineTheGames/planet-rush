@@ -802,7 +802,10 @@ export class LobbyView extends Container {
    *     own words (`./lobby` SEAT_STATE_LABELS) for the model's own cycle, so a
    *     player can answer *"can I close this slot?"* by reading rather than by
    *     experimenting. `TAKEN` on a seat with a person in it, which is the one
-   *     state the ring does not contain.
+   *     state the ring does not contain. **In a SOLO lobby the ring is BOT ⇄
+   *     CLOSED and `OPEN` never appears** (a0-31 — nobody can join a solo
+   *     lobby); this control draws whatever the model's `stateLabel` says, so
+   *     that is one rung fewer to read here and no change at all to draw.
    *  2. **It reads as pressable** — a `secondary` chip, which under Bone is a
    *     raised, bright-hairlined plate: the same material every other control on
    *     this screen wears. The screen had been advertising its two lesser

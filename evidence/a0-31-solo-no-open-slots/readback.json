@@ -1,0 +1,49 @@
+{
+  "servedVersion": {
+    "sha": "5da4870",
+    "time": "2026-08-12T19:35:59.806Z"
+  },
+  "freshSolo": {
+    "online": false,
+    "you": 0,
+    "isHost": true,
+    "slotCount": 8,
+    "humanCount": 1,
+    "size": 8,
+    "seatLabels": [
+      "TAKEN",
+      "BOT",
+      "BOT",
+      "BOT",
+      "BOT",
+      "BOT",
+      "BOT",
+      "BOT"
+    ]
+  },
+  "ringWalked": [
+    "CLOSED",
+    "BOT",
+    "CLOSED"
+  ],
+  "shapedSolo": {
+    "size": 6,
+    "humanCount": 1,
+    "seatLabels": [
+      "TAKEN",
+      "BOT",
+      "BOT",
+      "CLOSED",
+      "BOT",
+      "BOT",
+      "CLOSED",
+      "BOT"
+    ]
+  },
+  "everSeenLabels": [
+    "BOT",
+    "CLOSED",
+    "TAKEN"
+  ],
+  "pageErrors": []
+}
