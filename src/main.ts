@@ -185,6 +185,7 @@ import {
   browseJoined,
   browseModel,
   browseReceived,
+  browseRefreshFailed,
   browseShouldRefresh,
   chooseJoinMode,
   createBrowse,
@@ -7709,7 +7710,14 @@ function openMainMenu(
     // The player left the segment while the request was in flight — the answer is
     // still true, and nothing is drawn from it.
     if (!life.alive) return;
-    if (list !== null) browse = browseReceived(browse, list.rooms, Date.now(), onlineRegions);
+    // `null` is every failure at once — 404, a thrown fetch, a body that is not a
+    // listing — and the answer to all of them is the same: keep what is on screen
+    // and let the stamp age. `browseRefreshFailed` IS that answer, named, so the
+    // rule is greppable rather than implied by a missing else.
+    browse =
+      list === null
+        ? browseRefreshFailed(browse)
+        : browseReceived(browse, list.rooms, Date.now(), onlineRegions);
     render();
   }
 
