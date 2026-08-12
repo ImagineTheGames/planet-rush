@@ -139,6 +139,64 @@ jobs:
             -d "${body}" \
             "https://ntfy.sh/${NTFY_TOPIC}"
 
+  # --- The performance gate's PORTABLE half (a1-16, G-15). -----------------
+  #
+  # GDD §4.3 ends "Verified by the M5 performance gate, not assumed." Until this
+  # job existed the renderer's half of that gate was `PERF_GATE=1` and out of CI
+  # by design, so the sentence held only as often as somebody ran it by hand.
+  # Four render-path changes landed in one night — a1-11's atlas pooling,
+  # a1-12's viewport cull, a2-07's VFX layer, u14-01's typefaces — against a gate
+  # documented as automatic that nobody had run.
+  #
+  # WHAT THIS JOB ASSERTS, AND WHAT IT REFUSES TO. Draw calls per frame and
+  # entities submitted per frame on the §4.3 stress scene. Those are
+  # architecture: N un-batchable contexts cannot batch on any silicon, and an
+  # entity the cull skipped is submitted nowhere — the numbers travel from a
+  # GPU-less runner to integrated graphics and to a phone. Milliseconds do not,
+  # in either direction, so this job measures none. A green "60 fps" from a box
+  # drawing WebGL through SwiftShader on a shared vCPU would be worse than no
+  # claim at all, because it reads as verification.
+  #
+  # THE OTHER HALF IS STILL MANUAL, ON PURPOSE, AND IT IS WRITTEN DOWN:
+  #
+  #   PERF_GATE=1 npx playwright test --config tests/perf/playwright.perf.config.ts
+  #
+  # on the developer's own machine and phone. docs/perf-gate.md says what to run,
+  # on what hardware, and when it is required (before a milestone tag, at
+  # minimum). Nothing in CI substitutes for it.
+  #
+  # Runs on every push, like the merge gate above and unlike the mobile suite:
+  # it is ~20 s of measurement behind a ~2 min fixed cost, and a renderer
+  # regression is cheapest to see on the push that caused it.
+  perf-budget:
+    name: Perf gate — submission budget (draw calls, entities)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - id: pw
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      # The thresholds live in tests/perf/budget.ts with their provenance. They
+      # are NOT overridden here, and the one knob that exists (PERF_BUDGET_SCALE)
+      # is clamped to <= 1 in the spec so a workflow file cannot loosen a budget
+      # it happens to be failing.
+      - run: npm run test:perf-budget
+
   # --- The mobile gate, sharded across parallel runners (a0-00, a0-00b). ----
   #
   # The suite is 213 collected tests — of which 123 actually execute, the rest
