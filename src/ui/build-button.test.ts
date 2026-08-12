@@ -22,9 +22,17 @@ import { BUILD_RING_RADIUS } from '../art/stations';
 import {
   BUILD_BUTTON_ID,
   BUILD_BUTTON_ANCHOR,
+  BUILD_BUTTON_LABEL,
+  BUILD_BUTTON_RADIUS,
+  BUILD_BUTTON_RIM,
+  ROUND_LABEL_PAD,
   buildButtonVisible,
   buildButtonHighlighted,
+  fitRoundLabelSize,
+  roundLabelHalfWidth,
 } from './build-button';
+import { textHeight, textWidth } from './font-metrics';
+import { DISPLAY_TRACKING, TRACKING } from '../art/materials';
 
 describe('buildButtonVisible — the persistence rule', () => {
   it('is shown when docked on a touch device', () => {
@@ -161,5 +169,73 @@ describe('build button layout contract', () => {
     // short landscape phone where no lower-band region contains the button.
     const zone = resolveAnchor(BUILD_BUTTON_ANCHOR, { width: 844, height: 390 });
     expect(zone).toEqual({ x: 0, y: 0, width: 844, height: 390 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The words on the circle (a0-32)
+// ---------------------------------------------------------------------------
+
+describe('the button\'s label is fitted to the circle, not guessed at', () => {
+  it('both lines are inside the ring, measured as boxes rather than baselines', () => {
+    for (const line of BUILD_BUTTON_LABEL) {
+      const spec = { face: line.face, size: line.size, tracking: line.tracking };
+      const yExtent = Math.abs(line.centreY) + textHeight(line.text, spec) / 2;
+      const room = 2 * roundLabelHalfWidth(BUILD_BUTTON_RADIUS, BUILD_BUTTON_RIM, yExtent) - 2 * ROUND_LABEL_PAD;
+      expect(textWidth(line.text, spec), `"${line.text}" does not fit the button`).toBeLessThanOrEqual(room);
+    }
+  });
+
+  it('the interior stops at the RIM, not at the radius — that is the silhouette', () => {
+    // Half the report: the ring is stroked centred on the radius, so a word drawn
+    // out to the radius sits under it. Measured on the widest line of the circle,
+    // where the difference is exactly half a rim on each side.
+    const atRim = roundLabelHalfWidth(BUILD_BUTTON_RADIUS, BUILD_BUTTON_RIM, 0);
+    expect(atRim).toBeCloseTo(BUILD_BUTTON_RADIUS - BUILD_BUTTON_RIM / 2, 10);
+    expect(atRim).toBeLessThan(BUILD_BUTTON_RADIUS);
+  });
+
+  it('a circle is narrowest where the type is furthest from its middle', () => {
+    // The other half: a chord at the label's own baseline is not the room the
+    // label has, because a line of type has height. `& UPGRADE`'s box reaches
+    // ~5px past its centre, and the circle has closed in by then.
+    const wide = roundLabelHalfWidth(BUILD_BUTTON_RADIUS, BUILD_BUTTON_RIM, 10);
+    const narrow = roundLabelHalfWidth(BUILD_BUTTON_RADIUS, BUILD_BUTTON_RIM, 15.2);
+    expect(narrow).toBeLessThan(wide);
+    // …and past the interior there is no room at all, rather than a negative one.
+    expect(roundLabelHalfWidth(BUILD_BUTTON_RADIUS, BUILD_BUTTON_RIM, 999)).toBe(0);
+  });
+
+  it('takes the biggest size that fits, and refuses rather than shrink past a floor', () => {
+    // The fitter is a fit, not a clamp: a word with room keeps its design size,
+    // and a word with none comes back `null` so the caller can throw. A silent
+    // clamp to something unreadable is the failure mode this brief is about.
+    const roomy = fitRoundLabelSize('& UPGRADE', 'bodyBold', TRACKING.label, 10, 10, 200, 5, 6);
+    expect(roomy, 'a big enough circle keeps the design size').toBe(10);
+
+    const hopeless = fitRoundLabelSize('& UPGRADE', 'bodyBold', TRACKING.label, 10, 10, 12, 5, 6);
+    expect(hopeless, 'a circle this small cannot hold nine glyphs at any size').toBeNull();
+  });
+
+  it('spends exactly one pixel of type, on the line that needed it', () => {
+    // Stated as an assertion because the brief asks for it to be stated at all:
+    // `& UPGRADE` came down from a0-23's 10px to 9px, and `BUILD` did not move.
+    // If a future change makes either of these false it should be a decision
+    // somebody makes, not a number that drifted.
+    const byText = new Map(BUILD_BUTTON_LABEL.map((l) => [l.text, l]));
+    expect(byText.get('BUILD')!.size).toBe(15);
+    expect(byText.get('& UPGRADE')!.size).toBe(9);
+    // …and the copy did not change, which was the point of spending the pixel.
+    expect([...byText.keys()]).toEqual(['BUILD', '& UPGRADE']);
+  });
+
+  it('draws each word in its ratified face and tracking tier', () => {
+    const byText = new Map(BUILD_BUTTON_LABEL.map((l) => [l.text, l]));
+    // The pressed word takes the display face and its own tracking axis; the
+    // sub-line is body copy at the label tier (style-guide §7, materials.ts).
+    expect(byText.get('BUILD')!.face).toBe('headingBold');
+    expect(byText.get('BUILD')!.tracking).toBe(DISPLAY_TRACKING.heading);
+    expect(byText.get('& UPGRADE')!.face).toBe('bodyBold');
+    expect(byText.get('& UPGRADE')!.tracking).toBe(TRACKING.label);
   });
 });
