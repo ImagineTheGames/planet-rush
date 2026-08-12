@@ -44,7 +44,7 @@ import { DISPLAY_TRACKING, TRACKING } from '../art/materials';
 import type { AnnularSector } from './hud-geometry';
 import { sectorOverflow } from './hud-geometry';
 import type { Box, MetricFace, TypeSpec } from './font-metrics';
-import { textHeight, textWidth } from './font-metrics';
+import { textBox, textHeight } from './font-metrics';
 import type { SegmentState, WheelSegment } from './build-wheel';
 import { SELECTION_NAME_SCALE } from './wheel-selection';
 import { tierPips } from './upgrade-wheel';
@@ -434,7 +434,6 @@ export function wedgeStackBoxes(
   radiusOverride?: number,
 ): WedgeStackPlacement {
   const heights = lines.map((l) => textHeight(l.text, wedgeTypeSpec(l)));
-  const widths = lines.map((l) => textWidth(l.text, wedgeTypeSpec(l)));
   let stackHeight = 0;
   for (let i = 0; i < lines.length; i++) stackHeight += heights[i]! + lines[i]!.gap;
 
@@ -447,13 +446,13 @@ export function wedgeStackBoxes(
   let y = 0;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
+    // Top-centred, which is Pixi's `anchor = (0.5, 0)` — the anchor every line of
+    // every wedge is drawn with, so the box is the view's own box and not a
+    // second arithmetic that has to be kept in step with it.
     boxes.push({
       slot: line.slot,
       text: line.text,
-      x: cx - widths[i]! / 2,
-      y: cy + y - stackHeight / 2,
-      width: widths[i]!,
-      height: heights[i]!,
+      ...textBox(line.text, wedgeTypeSpec(line), cx, cy + y - stackHeight / 2, 0.5, 0),
     });
     y += heights[i]! + line.gap;
   }

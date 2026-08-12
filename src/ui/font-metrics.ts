@@ -81,9 +81,9 @@ export type { MetricFace };
  * wider than any glyph in either ratified face (Audiowide's `W`, the widest thing
  * in the game, is 1.002em and is the only one that reaches it).
  *
- * A measurement that spends this is conservative and says so —
- * {@link untabledGlyphs} names them — so a caller can tell "this label fits" from
- * "this label fits even at the worst thing the glyph could be".
+ * A measurement that spends this is therefore conservative in the one direction a
+ * fit budget may be conservative in: it reads WIDE, so "this label fits" is still
+ * true when the untabled glyph turns out to be whatever the machine had.
  */
 export const UNTABLED_ADVANCE_EM = 1;
 
@@ -94,17 +94,6 @@ export interface TypeSpec {
   readonly size: number;
   /** Tracking in `em` — the ratified scale (`../art/materials` TRACKING). */
   readonly tracking: number;
-}
-
-/** The glyphs of `text` the table does not carry — see {@link UNTABLED_ADVANCE_EM}. */
-export function untabledGlyphs(text: string, face: MetricFace): readonly string[] {
-  const table = ADVANCE_EM[face];
-  const missing: string[] = [];
-  for (const ch of text) {
-    if (ch === '\n') continue;
-    if (table[ch] === undefined && !missing.includes(ch)) missing.push(ch);
-  }
-  return missing;
 }
 
 /** One line's width in px — no `\n` handling, so {@link textWidth} can fold. */
