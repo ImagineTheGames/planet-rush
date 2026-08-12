@@ -1014,6 +1014,10 @@ describe('a wedge at 390 px, with its longest values (u7-02, a0-32)', () => {
         expect(fit.radius, `${name}/${seg.id} hangs its words past the design radius`).toBeLessThanOrEqual(
           design + 1e-6,
         );
+        // …and the view is handed that as a DELTA off its own measurement, so a
+        // wedge that needs no fitting is not moved by a rounding difference
+        // between two rulers. Never negative: this fix does not push words out.
+        expect(fit.pullIn, `${name}/${seg.id} is pushed OUT, not pulled in`).toBeGreaterThanOrEqual(0);
       }
     }
   });
@@ -1028,11 +1032,13 @@ describe('a wedge at 390 px, with its longest values (u7-02, a0-32)', () => {
       const turret = buildWheelModel(WORST_CASE).segments[0]!;
       expect(segmentAngle(0)).toBeCloseTo(-Math.PI / 2, 10);
       const lines = buildWedgeLines(turret, m);
-      const design = wedgeStackBoxes(lines, outer, m, segmentAngle(0)).centreRadius;
+      // `pullIn`, not the radius: zero here is the assertion that the SHIPPED
+      // frame is byte-identical for this wedge, because zero is what the view
+      // subtracts from its own measurement.
       expect(
-        fitWedgeStack(lines, outer, m, segmentAngle(0), SEGMENTS).radius,
+        fitWedgeStack(lines, outer, m, segmentAngle(0), SEGMENTS).pullIn,
         `${name}: the top wedge moved, and it had no reason to`,
-      ).toBeCloseTo(design, 6);
+      ).toBe(0);
     }
   });
 

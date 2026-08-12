@@ -1002,7 +1002,14 @@ export class BuildWheelView extends Container {
 
     // The cluster's own origin is its top-centre (children are anchored 0.5, 0),
     // so the pivot puts the pulse's centre of gravity in the middle of the stack.
-    const centre = fit.radius;
+    //
+    // The design hangs the stack from just inside the rim; a0-32's fit is applied
+    // as a DELTA off that rather than as an absolute radius, so a wedge that needs
+    // no fitting lands exactly where it always did. (The two measure the stack's
+    // height with different rulers — PixiJS here, `./font-metrics` there — and
+    // they agree to about a pixel; a pixel is not worth moving four wedges that
+    // were never wrong.)
+    const centre = labelTopRadius(m, outer) - stackHeight / 2 - fit.pullIn;
     const lx = Math.cos(d.angle) * centre;
     const ly = Math.sin(d.angle) * centre;
     nodes.cluster.pivot.set(0, stackHeight / 2);
@@ -1077,7 +1084,7 @@ export class BuildWheelView extends Container {
       cost,
       detail,
       fitKey: '',
-      fit: { radius: 0, nameScale: 1 },
+      fit: { radius: 0, pullIn: 0, nameScale: 1 },
     };
     pool[index] = nodes;
     return nodes;

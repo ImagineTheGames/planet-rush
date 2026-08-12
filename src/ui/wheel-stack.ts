@@ -475,6 +475,19 @@ export const MIN_NAME_FIT_SCALE = 0.8;
 export interface WedgeFit {
   /** The radius the stack's centre hangs at — the design's, or nearer the hub. */
   readonly radius: number;
+  /**
+   * How far IN from the design's rim-anchored radius the stack was pulled, px.
+   * Zero on every wedge that already fitted.
+   *
+   * Reported alongside {@link radius} — and it is what the view actually applies —
+   * because the view measures its own stack with PixiJS and this module measures
+   * it with `./font-metrics`, and the two agree to about a pixel rather than
+   * exactly. Handing the view an absolute radius would move every wedge on the
+   * wheel by that pixel, including the ones with nothing wrong with them; handing
+   * it a DELTA moves only the wedges this fix is for, and leaves the rest of the
+   * ratified wheel byte-identical.
+   */
+  readonly pullIn: number;
   /** What the NAME's size was multiplied by. `1` at every profile that did not
    *  need it, which is all of them but the phone's selected wedge. */
   readonly nameScale: number;
@@ -558,8 +571,9 @@ export function fitWedgeStack(
     return { radius: lo, inward: overflowAt(scaled, lo).inward };
   };
 
+  const design = wedgeStackBoxes(lines, outerRadius, m, angle).centreRadius;
   const at = place(lines);
-  if (at.inward <= 0) return { radius: at.radius, nameScale: 1 };
+  if (at.inward <= 0) return { radius: at.radius, pullIn: design - at.radius, nameScale: 1 };
 
   // The stack cannot be placed at this name size. Bisect the name down for the
   // largest scale that can be, and stop at the floor rather than at "readable
@@ -567,14 +581,21 @@ export function fitWedgeStack(
   // test says so by name.
   let lo = MIN_NAME_FIT_SCALE;
   let hi = 1;
-  let best = { radius: place(scaleName(lines, lo)).radius, nameScale: lo };
+  const answer = (radius: number, nameScale: number): WedgeFit => ({
+    radius,
+    // Measured against the design radius the SCALED stack would hang at, since a
+    // shorter name makes a shorter stack and the rim anchor moves with it.
+    pullIn: wedgeStackBoxes(scaleName(lines, nameScale), outerRadius, m, angle).centreRadius - radius,
+    nameScale,
+  });
+  let best = answer(place(scaleName(lines, lo)).radius, lo);
   if (place(scaleName(lines, lo)).inward > 0) return best;
   for (let i = 0; i < 10; i++) {
     const mid = (lo + hi) / 2;
     const tried = place(scaleName(lines, mid));
     if (tried.inward <= 0) {
       lo = mid;
-      best = { radius: tried.radius, nameScale: mid };
+      best = answer(tried.radius, mid);
     } else {
       hi = mid;
     }
