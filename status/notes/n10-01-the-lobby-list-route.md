@@ -111,6 +111,24 @@ the secret agrees without sharing state. Pinned by a test.
 The tag names *this claim's host*, is stable for the room's life, and dies with
 it. It does not pretend to be more than that, in the code or in this note.
 
+### What `intent` actually claims — refined after a test caught it
+
+The plan's A2 says allocate signs `create` and join signs `join`. Shipping that
+literally broke the **boot gap**, and `tests/net/live-pin.test.ts` caught it: a
+room the allocator knows only through its *reservation* may not have booted, and
+a join reaching it in that window is supposed to create it — that is how HOST
+works, and how a friend who types the code a beat before the host's socket lands
+gets in. `join` there is a `room-gone` for a room that is arriving.
+
+So `Allocator.join` signs **`join` only when a live Machine's heartbeat lists the
+room**, and `create` when only a lease covers it. The claim now means exactly
+*the allocator had been told this room exists*, which is the only state in which
+"this Machine does not host it" proves the room has ended. The measured bug stays
+closed: a swept room is still heartbeat-confirmed until the next beat.
+
+Worth carrying into any future edit of this: **the intent is a fact about what
+the allocator knew, not about which route was called.**
+
 ### Rejected
 
 - **A handle that is the owner tag** (one token doing both jobs). Cheaper by ten
