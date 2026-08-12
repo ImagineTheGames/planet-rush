@@ -136,6 +136,13 @@ function report(label: string, c: Capture): void {
 
 /** Boot the shipped bundle with the debug hook on, and wait for a live canvas. */
 async function boot(page: Page): Promise<void> {
+  // Seat the STICKS scheme before boot (a0-30). Tap Commander became the first-run
+  // default on every platform on 2026-08-12 (GDD §2.4, amended), and in that scheme
+  // the pilot replaces the sticks — the held `w` + mouse in the "under a held input"
+  // capture would drive nothing, and the gate would quietly be measuring an idle
+  // frame instead of the busiest one. The measurement this file exists for is the
+  // sticks scheme's thrust+fire frame, so it asks for that scheme.
+  await page.addInitScript(() => localStorage.setItem('planet-rush:controlScheme', 'sticks'));
   await page.goto('/?debug=1');
   await page.waitForSelector('canvas', { state: 'attached' });
   // The hook only exists once the first frame has rendered; a capture started

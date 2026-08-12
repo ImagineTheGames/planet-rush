@@ -247,13 +247,17 @@ async function switchToTapCommanderThroughSettings(page: Page, press: Press): Pr
     await press(origin.x + p.x, origin.y + p.y);
   };
 
-  // --- On the menu: sticks is the untouched default (developer §3). -----------
+  // --- On the menu: Tap Commander is now the default (a0-30, GDD §2.4 amended
+  // 2026-08-12: "I already said BOTH"). This read used to assert 'sticks' — the
+  // walk below therefore presses the CONTROLS row TWICE, out to the sticks and
+  // back, so what this spec has always proved is unchanged: a real press on that
+  // row flips the scheme at once, persists it, and the choice reaches the match.
   const onMenu = await page.evaluate(() => ({
     screen: window.__mainMenu!.screen,
     scheme: window.__mainMenu!.controlScheme,
   }));
   expect(onMenu.screen, 'opens on the menu, not settings').toBe('menu');
-  expect(onMenu.scheme, 'the untouched default scheme is sticks').toBe('sticks');
+  expect(onMenu.scheme, 'the first-run default scheme is Tap Commander, every platform').toBe('tap');
 
   // --- Real-press SETTINGS → the settings screen opens. -----------------------
   await pressPoint(await controlPoint(page, 'controls', 'settings'));
@@ -263,7 +267,17 @@ async function switchToTapCommanderThroughSettings(page: Page, press: Press): Pr
   // report found. Its press point is reported because the client drew the row.
   const controlsRow = await controlPoint(page, 'settingsControls', 'controls');
 
-  // --- Real-press the CONTROLS row → the scheme flips to Tap Commander AT ONCE. -
+  // --- Real-press the CONTROLS row → the scheme flips AT ONCE, and persists. ----
+  // Out to the sticks first (the row's other destination, still one press away)…
+  await pressPoint(controlsRow);
+  await page.waitForFunction(() => window.__mainMenu?.controlScheme === 'sticks', undefined, {
+    timeout: 10_000,
+  });
+  expect(
+    await page.evaluate(() => localStorage.getItem('planet-rush:controlScheme')),
+    'the press away from the default persists too — nothing about the row changed',
+  ).toBe('sticks');
+  // …and back to Tap Commander, which is what the rest of this walk follows.
   await pressPoint(controlsRow);
   await page.waitForFunction(() => window.__mainMenu?.controlScheme === 'tap', undefined, { timeout: 10_000 });
   const persisted = await page.evaluate(() => localStorage.getItem('planet-rush:controlScheme'));

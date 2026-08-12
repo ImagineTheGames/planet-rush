@@ -175,6 +175,15 @@ async function registered(page: Page, id: string): Promise<Rect | null> {
 }
 
 async function bootDebug(page: Page): Promise<void> {
+  // Seat the STICKS scheme before the app's first line runs (a0-30). Tap Commander
+  // is the first-run default on every platform since 2026-08-12 (GDD §2.4 amended),
+  // and in that scheme a left click on the canvas is a MOVE ORDER — including the
+  // click `pressBuildAffordance` uses merely to focus the canvas before pressing
+  // `E`, which flies the ship off its own station and leaves the wheel correctly
+  // refusing to open (`updateBuildWheel` gates on docked). This spec is about the
+  // wheel's own click/`E` path in the sticks scheme, so it now ASKS for that scheme
+  // rather than inheriting it from a default that has moved.
+  await page.addInitScript(() => localStorage.setItem('planet-rush:controlScheme', 'sticks'));
   await page.goto('/?debug=1');
   await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
   await page.waitForFunction(

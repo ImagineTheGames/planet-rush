@@ -152,7 +152,13 @@ function gamepadActions(): Set<ActionType> {
   const rich = fakePad({ axes: [0.8, -0.6, -1, 0.5], buttons: { 7: 1, 3: 1 } });
   const s = createControlState();
   new GamepadSource(pads(rich)).update(s);
-  addActive(got, mapActions(s, defaultFireMode(false))); // gamepad default = Manual → aim emitted
+  // Both modes, from the SAME pad frame — and that pairing is the point since
+  // a0-30 made Auto-aim the default on every platform. Parity is about what a
+  // device can REACH, not what it starts in: `aim` is reachable from a pad because
+  // Manual is still a mode a pad player can pick (auto-aim everywhere must not
+  // become auto-aim only), and the new default still thrusts, fires and builds.
+  addActive(got, mapActions(s, FireMode.Manual)); // → aim emitted
+  addActive(got, mapActions(s, defaultFireMode())); // the first-run default (Auto-aim)
   addWheelOrders(got);
   return got;
 }

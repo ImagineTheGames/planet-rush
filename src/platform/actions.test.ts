@@ -10,7 +10,9 @@ import type { Action, AimAction, FireAction, ThrustAction } from '@shared/types'
 import { UpgradeTrack } from '@shared/types';
 import {
   FireMode,
+  DEFAULT_FIRE_MODE,
   defaultFireMode,
+  readStoredFireMode,
   createControlState,
   resetControlState,
   mapActions,
@@ -21,10 +23,37 @@ function pick<T extends Action['type']>(actions: Action[], type: T): Extract<Act
   return actions.find((a) => a.type === type) as Extract<Action, { type: T }> | undefined;
 }
 
-describe('defaultFireMode (GDD §2.4)', () => {
-  it('is Manual on desktop/gamepad and Auto-aim on touch', () => {
-    expect(defaultFireMode(false)).toBe(FireMode.Manual);
-    expect(defaultFireMode(true)).toBe(FireMode.AutoAim);
+describe('defaultFireMode (GDD §2.4, amended 2026-08-12 — a0-30)', () => {
+  it('is Auto-aim, the same on every platform', () => {
+    // The ratified change: "is tap commander and auto aim default on all platforms
+    // it should be" … "I already said BOTH". There is no per-platform split left to
+    // test, which is the point — the old test passed `false` / `true` here.
+    expect(defaultFireMode()).toBe(FireMode.AutoAim);
+    expect(DEFAULT_FIRE_MODE).toBe(FireMode.AutoAim);
+  });
+
+  it('still has Manual as a mode the funnel maps — auto-aim everywhere, not auto-aim only', () => {
+    // The default moved; the choice did not. This is the regression the amendment
+    // names explicitly, and `input-parity.test.ts` holds the device half of it.
+    const s = createControlState();
+    s.aim = { x: 1, y: 0 };
+    expect(pick(mapActions(s, FireMode.Manual), 'aim')).toBeDefined();
+  });
+});
+
+describe('readStoredFireMode — a saved preference always wins (a0-30)', () => {
+  it('seats exactly what a player chose, both ways', () => {
+    expect(readStoredFireMode('manual')).toBe(FireMode.Manual);
+    expect(readStoredFireMode('auto-aim')).toBe(FireMode.AutoAim);
+    // …and the strings are the enum's own, so the round trip cannot drift.
+    expect(readStoredFireMode(FireMode.Manual)).toBe(FireMode.Manual);
+    expect(readStoredFireMode(FireMode.AutoAim)).toBe(FireMode.AutoAim);
+  });
+
+  it('falls to the new default only when nothing was ever chosen', () => {
+    for (const nothing of [null, undefined, '', 'auto', 'AUTO-AIM', 'sticks']) {
+      expect(readStoredFireMode(nothing)).toBe(FireMode.AutoAim);
+    }
   });
 });
 

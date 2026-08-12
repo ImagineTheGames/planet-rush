@@ -8,6 +8,123 @@ half of these amendments; this file is the human-readable why.
 
 ---
 
+## Tap Commander and Auto-aim are the DEFAULT — on every platform
+
+**Date:** 2026-08-12 · branch `agent/platform/a0-30-defaults-everywhere`
+**Ratified by:** Developer (Reinaldo)
+**Amends:** GDD §2.4 (folded in directly, two sentences retired) and §5.7's
+settings-row note. **Supersedes both per-platform splits §2.4 carried** — the fire
+mode's ("Manual on desktop and gamepad, Auto-aim on touch") and the scheme's ("the
+default scheme is the twin sticks").
+
+### The ratification, verbatim
+
+> "is tap commander and auto aim default on all platforms it should be"
+
+and, when the answer came back asking which of the two:
+
+> "I already said BOTH"
+
+Both defaults, every platform. Recorded here so it is not re-litigated (LESSONS
+§17: the developer's word is the design).
+
+### What changed — exactly two lines of behaviour
+
+| | before | after |
+|---|---|---|
+| fire mode, fresh profile | Manual on desktop/gamepad, Auto-aim on touch | **Auto-aim everywhere** |
+| control scheme, fresh profile | Sticks everywhere | **Tap Commander everywhere** |
+
+`src/platform/actions.ts` `defaultFireMode()` lost its `isTouch` argument — the
+answer no longer depends on the device, and a parameter that invites the split
+back in is worse than no parameter. `src/ui/lobby-flow.ts` `createFlow()` seats the
+same pair, so the flow seam and the boot path cannot disagree about what a player
+with nothing stored starts in.
+
+### What did NOT change, deliberately
+
+- **Manual and Sticks are untouched as choices.** Both settings routes (the main
+  menu's settings screen and the in-match pause menu) work exactly as §2.4
+  requires; toggling either still persists to `planet-rush:fireMode` /
+  `planet-rush:controlScheme`, and the stored strings did not move.
+- **The parity principle.** Auto-aim *everywhere* must not become auto-aim *only*.
+  `input-parity.test.ts` now proves the pad reaches `aim` through Manual **and**
+  thrust/fire/build through the new default, from the same pad frame — the aim
+  cell is filled by a mode a player can pick, not by the mode they happen to
+  start in.
+- **`AUTO_AIM_ARC`** — 360°, no front arc (live since `g6-01`).
+- **Anyone's saved preference.** See below; it is the regression this change could
+  most easily have caused.
+- **The CONTROLS row's wording rule** (2026-08-06). The row still names the
+  *device* for the sticks — `STICKS` / `TWIN STICKS` / `KEYBOARD + MOUSE` — and
+  `TAP COMMANDER` on every device for the tap scheme. Since the tap scheme is now
+  what a fresh profile seats, `TAP COMMANDER` is simply what the row reads first,
+  on all three devices. **That is truthful and needed no change** — a tap is a tap
+  whether it lands from a finger or a mouse, so unlike `STICKS` on a PC it names
+  nothing the player does not have. It is now asserted rather than reasoned about:
+  the menu's read-only seam reports what each settings row *says*
+  (`window.__mainMenu.settingsRows`), and `tests/live-stage/a0-30-defaults.spec.ts`
+  reads it back on a desktop profile, a touch profile and with a pad connected.
+
+### A saved preference always wins — read before you default
+
+This moves the default **for a player with nothing stored**, not everyone's
+setting. Both reads consult storage first:
+
+- `readStoredFireMode()` (`src/platform/actions.ts`) seats a stored `manual` /
+  `auto-aim` and falls to the default only for an absent or stale key. Unit-tested
+  both ways.
+- `readControlScheme()` (`src/main.ts`) decodes a **saved** value through the UI's
+  own round trip (`parseControlScheme` / `storedControlScheme`, whose two strings
+  `settings.test.ts` pins literally) and reaches the default only when the key is
+  absent or unrecognised. It can no longer be a bare `parseControlScheme(...)`:
+  that function folds everything unrecognised to `'sticks'`, which was the default
+  when it was written and is not one now.
+
+### The one conflict — ⚠ OPEN, flagged, not silently resolved
+
+**On desktop, Tap Commander and the `WASD` thrust binding do not both work, and
+Tap Commander is now what a first-run desktop player gets.** In the tap scheme the
+pilot *replaces* the sticks: `src/main.ts` `sampleInput` zeroes the devices'
+thrust/aim/fire and writes the pilot's instead (that is Tap Commander's ratified
+design — a local pilot flying the standing order, developer §1–2). So on a fresh
+desktop profile, `W` does nothing, while the controls strip along the bottom still
+reads `Thrust · WASD`, because `describeBindings` takes a device and a fire mode
+and has never taken a scheme.
+
+Not in the conflict: **Build**. `merged.build` is deliberately left as the devices
+wrote it, so `E` really does open the Build & Upgrade wheel in either scheme, and
+the wheel's own confirm is unchanged. Not in the conflict either: the parity table,
+which is about the *sticks* scheme's device mapping and is untouched.
+
+**One thing rides along with it.** Onboarding's `{fire}` token resolves through the
+same `describeBindings` (`src/ui/onboarding.ts` `bindingPhrase`), so a first-run
+desktop prompt reads *"Hold Left mouse on the asteroid"* where Tap Commander wants
+*"tap the asteroid"*. Same root cause — the strip and the prompts are generated from
+a map that takes a device and a fire mode and has never taken a scheme — and it is
+resolved by resolution 2 below, or by leaving both alone under resolution 1. It is
+UI's file either way; flagged, not touched.
+
+**Nothing has been dropped or quietly re-bound here** — this brief's mandate was to
+move two defaults, and inventing a third rule for what `W` means in Tap Commander
+is a design call. The two candidate resolutions, for the Director:
+
+1. **Thrust takes the wheel back.** A real thrust input in the tap scheme drops the
+   standing order and hands the ship to the sticks for as long as the player is
+   flying it (tap again to resume). The binding table stays true on every device,
+   and a desktop player who reaches for `WASD` is never ignored. Costs: a second
+   authority over the ship, and a rule about which one wins.
+2. **The strip reads the scheme.** `describeBindings` takes the seated scheme and
+   the desktop rows become the tap scheme's own — thrust/aim/fire read `Click to
+   move`, `Click a target`, and `E` stays. Honest and small, but it means a
+   first-run desktop player's `WASD` genuinely does nothing, and the keyboard's
+   thrust binding exists only in the other scheme.
+
+Until one is ratified the build behaves exactly as Tap Commander always has; only
+how many players meet it first has changed.
+
+---
+
 ## Looted ore that "doesn't count" — the ledger says it always counted
 
 **Date:** 2026-08-08 · branch `agent/gameplay/a0-08-looted-ore-that-does-not-count`
