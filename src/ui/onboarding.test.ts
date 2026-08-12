@@ -397,6 +397,22 @@ describe('resolvePromptText — input-agnostic via the action layer (GDD §2.10)
     expect(b).toBe(a);
   });
 
+  // ── a0-33 ────────────────────────────────────────────────────────────────
+  // The failure this brief exists for. `a0-30` made Tap Commander the default
+  // scheme on every platform, and in that scheme a rock is mined by TAPPING it
+  // (GDD §2.4: "tap a target to attack it … an asteroid to mine it") — there is
+  // no fire button to hold, because the local pilot fires. The very first
+  // sentence a new player reads was telling them to hold one.
+  it('never tells a Tap Commander player to hold fire — the pilot fires (GDD §2.4)', () => {
+    for (const device of ['keyboard', 'touch', 'gamepad'] as DeviceKind[]) {
+      for (const mode of [FireMode.AutoAim, FireMode.Manual]) {
+        const text = resolvePromptText(PromptId.Mine, device, mode, 'tap');
+        expect(text).not.toMatch(/hold/i);
+        expect(text).toMatch(/^Tap the asteroid/);
+      }
+    }
+  });
+
   it('names UPGRADE SHIP in the wheel\'s own words, so the segment is findable', () => {
     // "The upgrade prompt fires the first time the wheel opens, because upgrades
     // are the half of the economy a player can most easily miss" (GDD §2.10).
