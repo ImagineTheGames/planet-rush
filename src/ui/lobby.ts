@@ -1678,6 +1678,11 @@ export function cycleSeatState(state: LobbyState, player: PlayerId): LobbyState 
   if (!hostControls(state)) return state;
   const seat = state.seats[player];
   if (!seat || seat.occupant === 'human') return state;
+  // Which ring, and where on it: ONLINE walks OPEN → BOT → CLOSED, SOLO walks
+  // BOT ⇄ CLOSED (a0-31 — nobody can join a solo lobby, so it has no OPEN seat
+  // to offer). Both answers come off `state.online`, through the two functions
+  // every reader on this screen shares, so the tap can never put the roster in a
+  // state the rows would then have to draw as a chair nobody can take.
   const ring = seatStateCycle(state);
   const at = ring.indexOf(occupantOf(state, seat));
   const next = ring[(at + 1) % ring.length] ?? ring[0] ?? 'closed';
