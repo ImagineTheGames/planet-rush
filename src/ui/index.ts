@@ -650,6 +650,7 @@ export {
   backToDoors,
   canSubmitJoin,
   chooseDoor,
+  chooseJoinMode,
   createEntry,
   entryConnected,
   entryErrorFor,
@@ -670,9 +671,46 @@ export type {
   EntryNarration,
   EntryResult,
   EntryScreen,
+  EntrySegmentView,
   EntryState,
   EntryStatus,
 } from './lobby-entry';
+
+// --- JOIN's second mode: the lobby browser (u17-01) -------------------------
+//
+// The developer: *"join gives you both options BROWSE and ENTER ROOM CODE"* and
+// *"there should be a join button to join it"*. The read and the tap are
+// `src/net/lobby-list.ts`'s (n10-01); everything below is what the player sees —
+// the rows, the age stamp over them, the sentence an empty list says, and the
+// refusal a row that filled up answers with.
+export {
+  BROWSE_COPY,
+  BROWSE_NO_PING,
+  BROWSE_POLL_MS,
+  BROWSE_TICK_MS,
+  JOIN_MODES,
+  JOIN_MODE_LABELS,
+  browseCleared,
+  browseJoinFailed,
+  browseJoined,
+  browseLive,
+  browseModel,
+  browseReceived,
+  browseRefreshFailed,
+  browseShouldRefresh,
+  browseStamp,
+  createBrowse,
+  pressBrowseRow,
+} from './lobby-browser';
+export type {
+  BrowseModel,
+  BrowseRow,
+  BrowseRowModel,
+  BrowseRowState,
+  BrowseState,
+  JoinMode,
+} from './lobby-browser';
+export { LobbyBrowserView } from './lobby-browser-view';
 
 export {
   entryHitTest,
@@ -685,7 +723,7 @@ export {
   KEY_MAX,
   KEY_MIN,
 } from './lobby-geometry';
-export type { DoorShape, EntryLayout, EntryTarget } from './lobby-geometry';
+export type { DoorShape, EntryLayout, EntryTarget, JoinSwitchShape } from './lobby-geometry';
 
 export { LobbyEntryView, ENTRY_ID, ENTRY_ANCHOR } from './lobby-entry-view';
 

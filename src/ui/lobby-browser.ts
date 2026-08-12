@@ -441,6 +441,10 @@ export interface BrowseModel {
   /** How many rooms the list holds that this screen did not have room to draw.
    *  Declared rather than dropped: a silent cap reads as "that is all of them". */
   readonly hidden: number;
+  /** …and that count as the words beside the stamp, or `''`. The screen says what
+   *  it left out (LESSONS: no silent caps), in the model rather than in the view,
+   *  so the sentence is unit-tested like every other one on this screen. */
+  readonly hiddenLine: string;
   readonly stamp: string;
   readonly stale: boolean;
   /** The two-line answer for a list with nothing in it, or `[]` when there are
@@ -487,12 +491,18 @@ export function browseModel(state: BrowseState, options: BrowseModelOptions): Br
       action: row.state === 'open' ? 'JOIN' : row.state === 'full' ? 'FULL' : 'CLOSED',
     })),
     hidden: Math.max(0, state.rows.length - shown.length),
+    hiddenLine: hiddenLine(Math.max(0, state.rows.length - shown.length)),
     stamp: stamp.text,
     stale: stamp.stale,
     empty: emptyLines(state),
     error: state.error,
     busy: !live,
   };
+}
+
+/** `3 NOT SHOWN` — what did not fit, said rather than dropped. */
+function hiddenLine(hidden: number): string {
+  return hidden > 0 ? `${hidden} NOT SHOWN` : '';
 }
 
 /** The line a list with no rows in it shows — and the different line for a list

@@ -362,12 +362,14 @@ describe('more rooms than rects', () => {
     const model = browseModel(withRows(rooms), { ...MODEL, capacity: 3 });
     expect(model.rows).toHaveLength(3);
     expect(model.hidden).toBe(4);
+    expect(model.hiddenLine).toBe('4 NOT SHOWN');
     // …and what it kept is the top of the sort, not an arbitrary slice.
     expect(model.rows[0]?.owner).toBe('OWNER0');
   });
 
   it('hides nothing when everything fits', () => {
     expect(browseModel(withRows([listing()]), MODEL).hidden).toBe(0);
+    expect(browseModel(withRows([listing()]), MODEL).hiddenLine).toBe('');
   });
 });
 
