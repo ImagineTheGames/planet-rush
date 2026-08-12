@@ -175,6 +175,21 @@ import {
   DOOR_ORDER,
   KEYPAD_KEYS,
   regionPickerVisible,
+  // JOIN's second mode (u17-01): the list of open claims, its age stamp, and the
+  // JOIN button on a row. The read and the tap behind it are `./net`'s.
+  JOIN_MODES,
+  BROWSE_POLL_MS,
+  BROWSE_TICK_MS,
+  browseCleared,
+  browseJoinFailed,
+  browseJoined,
+  browseModel,
+  browseReceived,
+  browseRefreshFailed,
+  browseShouldRefresh,
+  chooseJoinMode,
+  createBrowse,
+  pressBrowseRow,
   CodexView,
   codexTargetKey,
   codexModel,
@@ -326,6 +341,8 @@ import type {
   EntryDoor,
   EntryNarration,
   RegionInfo,
+  BrowseState,
+  JoinMode,
 } from './ui';
 import {
   OFFLINE_ROOM,
@@ -335,6 +352,8 @@ import {
   // The region picker (n3): the fleet's regions with a ping this client measured,
   // the room's region on the JOIN screen, and the two lines that say either.
   readRoomAdvert,
+  readLobbyList,
+  joinListing,
   surveyRegions,
   formatRegionChoices,
   formatRoomRegion,
@@ -462,6 +481,16 @@ const FIRE_MODE_KEY = 'planet-rush:fireMode';
  *  stored strings did NOT move with the default: a save that says `sticks` still
  *  seats the sticks (`./ui` `CONTROL_SCHEME_STORAGE`). */
 const CONTROL_SCHEME_KEY = 'planet-rush:controlScheme';
+/**
+ * Which half of the JOIN screen the player used last (u17-01, plan D2).
+ *
+ * BROWSE on a first visit — the player with no code is the one the list is for —
+ * and whatever they used after that, remembered through the same storage seam the
+ * map pick and the fire mode already ride. A stale or absent value folds to
+ * BROWSE; a stored mode this build does not know is not a reason to open a screen
+ * nobody asked for.
+ */
+const JOIN_MODE_KEY = 'planet-rush:joinMode';
 /** The two control schemes (developer ratification §3). */
 type ControlScheme = 'sticks' | 'tap';
 /**
@@ -6452,6 +6481,14 @@ function readControlScheme(platform: ReturnType<typeof createBrowserPlatform>): 
   return saved ? parseControlScheme(stored) : DEFAULT_CONTROL_SCHEME;
 }
 
+/** Read the remembered JOIN mode (u17-01). Anything but the explicit `'code'` —
+ *  an absent key, a stale value, a mode a later build invented — folds to BROWSE,
+ *  which is the first-visit default and the one that always has something to
+ *  show. */
+function readJoinMode(platform: ReturnType<typeof createBrowserPlatform>): JoinMode {
+  return platform.storage.get(JOIN_MODE_KEY) === 'code' ? 'code' : 'browse';
+}
+
 /**
  * Is a gamepad connected RIGHT NOW? The one browser read behind the CONTROLS
  * row's `TWIN STICKS` (u8-01) — asked here, in the wiring layer, because
@@ -6875,6 +6912,38 @@ interface OnlineSeam {
    *  so the mobile suite can shoot the words themselves rather than trust the
    *  string the model handed the view. */
   messageBounds: { x: number; y: number; width: number; height: number };
+  // --- JOIN's second mode: the lobby browser (u17-01) ----------------------
+  /** Which half of the JOIN screen is up: `browse` (the list) or `code` (the
+   *  keypad that shipped, unchanged). Meaningless while `screen` is `home`. */
+  joinMode: JoinMode;
+  /** The list as it is DRAWN — one entry per row on screen, in screen order, each
+   *  with the words on it and the physical points a real press must land on. Its
+   *  `joinBounds` is the JOIN button's own rect: the developer asked for that
+   *  button, and a0-24 had just finished pulling two other elements back off this
+   *  exact phone edge, so the suite shoots it rather than trusting it. */
+  browseRows: readonly {
+    owner: string;
+    meta: string;
+    where: string;
+    action: string;
+    state: string;
+    enabled: boolean;
+    physicalCenter: { x: number; y: number };
+    physicalBounds: { x: number; y: number; width: number; height: number };
+    joinBounds: { x: number; y: number; width: number; height: number };
+  }[];
+  /** `UPDATED 3s AGO` / `LAST SEEN 24s AGO`, exactly as drawn, and whether it has
+   *  crossed into the failure register. */
+  browseStamp: string;
+  browseStale: boolean;
+  /** The empty-list sentence, or `[]` when there are rows to show. */
+  browseEmpty: readonly string[];
+  /** How many rooms the listing holds that did not fit on screen. */
+  browseHidden: number;
+  /** Switch modes — the same transition a tap on the segment makes. */
+  setJoinMode(mode: JoinMode): void;
+  /** Press a row (its JOIN button and its body are one action). */
+  pressRow(index: number): void;
   open(): void;
   /** CAMPAIGN — the teaser above SOLO (u9-01). Says `Coming Soon…` and goes
    *  nowhere: no transport, no lobby, no screen change. */
@@ -6955,8 +7024,23 @@ function openMainMenu(
   // holds the allocator's minted code once a CREATE succeeds (never client-guessed
   // — M3 rule). One region at launch, so the picker stays suppressed by config
   // (`regionPickerVisible === false`).
-  let entry: EntryState = createEntry();
+  let entry: EntryState = createEntry(readJoinMode(platform));
   let onlineResolved: string | null = null;
+  // --- The lobby browser (u17-01) ------------------------------------------
+  // The list the BROWSE segment draws, and the poll that feeds it. `browse` is the
+  // pure model (`./ui/lobby-browser`); everything else here is the lifecycle it
+  // deliberately does not own — the clock, the request, and the tab's visibility.
+  let browse: BrowseState = createBrowse();
+  /** The 1 s heartbeat that ticks the age stamp and asks whether to re-read the
+   *  list. Null whenever the BROWSE segment is not on screen — the poll is a
+   *  LIFECYCLE, not a heuristic (plan §6 rule 2). */
+  let browseTimer: ReturnType<typeof setInterval> | null = null;
+  /** When the last listing request was STARTED, or `null` — dropped on the way
+   *  out and on a hidden tab, so coming back re-reads at once instead of serving
+   *  a picture from however long the phone was in a pocket. */
+  let browseStartedAt: number | null = null;
+  /** A listing request in flight, so a tick cannot start a second one. */
+  let browseInFlight = false;
   // The fleet's regions, MEASURED (n3). Empty until the survey lands — and empty
   // is the honest state for the offline build, an allocator that is down, and a
   // fleet with no /regions route, all of which keep the picker suppressed by count
@@ -7084,6 +7168,14 @@ function openMainMenu(
     resolvedCode: null,
     doorControls: [],
     messageBounds: { x: 0, y: 0, width: 0, height: 0 },
+    joinMode: entry.mode,
+    browseRows: [],
+    browseStamp: '',
+    browseStale: false,
+    browseEmpty: [],
+    browseHidden: 0,
+    setJoinMode: (mode: JoinMode): void => chooseEntryMode(mode),
+    pressRow: (index: number): void => pressBrowseRowAt(index),
     open: (): void => openDoors(),
     campaign: (): void => chooseEntryDoor('campaign'),
     solo: (): void => chooseEntryDoor('solo'),
@@ -7383,7 +7475,12 @@ function openMainMenu(
     }
     if (codexView.visible) codexView.update(codexModel(codexState, { hover: codexHover, press: codexPress }));
     if (entryView.visible) {
-      entryView.update(entryModel(entry, connectNarration(), { hover: entryHover, press: entryPress }));
+      // The list's model is built only when the list is the thing on screen: it
+      // reads the clock, and a screen nobody is looking at has no age to stamp.
+      entryView.update(
+        entryModel(entry, connectNarration(), { hover: entryHover, press: entryPress }),
+        browsing() ? browseModelNow() : null,
+      );
     }
     seam.screen = screen;
     updateOnlineSeam();
@@ -7444,18 +7541,50 @@ function openMainMenu(
       physicalBounds: box(r),
     });
     const nowhere: Rect = { x: 0, y: 0, width: 0, height: 0 };
+    // The set follows the SCREEN, and now the MODE too: a control reported at a
+    // point nobody drew is exactly the class of bug this seam exists to catch.
+    const list = browsing() ? browseModelNow() : null;
     const front =
+      entry.screen !== 'join'
+        ? DOOR_OPTIONS.map((option, i) => control(option.door, layout.doors[i] ?? nowhere))
+        : entry.mode === 'browse'
+          ? (list?.rows ?? []).map((_, i) => control(`row:${i}`, layout.browseRows[i] ?? nowhere))
+          : [
+              // The pad, in `KEYPAD_KEYS` order — `key:A`, `key:B`, … so a test types a
+              // room code by pressing the very keys a player's thumb finds.
+              ...KEYPAD_KEYS.map((ch, i) => control(`key:${ch}`, layout.keys[i] ?? nowhere)),
+              control('erase', layout.erase),
+              control('submit', layout.submit),
+            ];
+    // The mode switch is on BOTH segments of the join screen, and on neither of
+    // the doors — the same rule the rest of this list follows.
+    const segments =
       entry.screen === 'join'
-        ? [
-            // The pad, in `KEYPAD_KEYS` order — `key:A`, `key:B`, … so a test types a
-            // room code by pressing the very keys a player's thumb finds.
-            ...KEYPAD_KEYS.map((ch, i) => control(`key:${ch}`, layout.keys[i] ?? nowhere)),
-            control('erase', layout.erase),
-            control('submit', layout.submit),
-          ]
-        : DOOR_OPTIONS.map((option, i) => control(option.door, layout.doors[i] ?? nowhere));
-    onlineSeam.doorControls = [...front, control('back', layout.back)];
+        ? JOIN_MODES.map((mode, i) => control(`mode:${mode}`, layout.segments[i] ?? nowhere))
+        : [];
+    onlineSeam.doorControls = [...front, ...segments, control('back', layout.back)];
     onlineSeam.messageBounds = box(layout.message);
+
+    // --- The list, as DRAWN (u17-01) ----------------------------------------
+    onlineSeam.joinMode = entry.mode;
+    onlineSeam.browseStamp = list?.stamp ?? '';
+    onlineSeam.browseStale = list?.stale ?? false;
+    onlineSeam.browseEmpty = list?.empty ?? [];
+    onlineSeam.browseHidden = list?.hidden ?? 0;
+    onlineSeam.browseRows = (list?.rows ?? []).map((row, i) => {
+      const rect = layout.browseRows[i] ?? nowhere;
+      return {
+        owner: row.owner,
+        meta: row.meta,
+        where: row.where,
+        action: row.action,
+        state: row.state,
+        enabled: row.enabled,
+        physicalCenter: point(rect),
+        physicalBounds: box(rect),
+        joinBounds: box(layout.browseJoins[i] ?? nowhere),
+      };
+    });
   }
 
   /** Open THE DOORS — what PLAY does now (ratified: one play flow), and the only
@@ -7463,7 +7592,8 @@ function openMainMenu(
   function openDoors(): void {
     if (played) return;
     screen = 'online';
-    entry = createEntry();
+    entry = createEntry(readJoinMode(platform));
+    browse = createBrowse();
     onlineResolved = null;
     // A fresh visit starts a fresh story; a panel left over from a previous
     // refusal must not sit under a door the player has not tapped yet.
@@ -7565,6 +7695,249 @@ function openMainMenu(
     render();
   }
 
+  // --- The lobby browser (u17-01) ------------------------------------------
+
+  /** The list's frame model, built against the rects the layout actually has —
+   *  so what did not fit is COUNTED rather than dropped (`browseModel.hidden`). */
+  function browseModelNow(): ReturnType<typeof browseModel> {
+    const { w, h } = ctx.logicalSize();
+    const layout = entryLayout({ width: w, height: h }, { isTouch });
+    return browseModel(browse, {
+      now: Date.now(),
+      regions: onlineRegions,
+      capacity: layout.browseRows.length,
+      pollMs: BROWSE_POLL_MS,
+    });
+  }
+
+  /** Whether the BROWSE segment is the thing on screen right now. */
+  function browsing(): boolean {
+    return screen === 'online' && entry.screen === 'join' && entry.mode === 'browse';
+  }
+
+  /** Is this tab the one the player is looking at? A backgrounded browser is what
+   *  an "idle browser" overwhelmingly is, and its steady cost is meant to be zero
+   *  (plan §6 rule 3). */
+  function tabVisible(): boolean {
+    return typeof document === 'undefined' || document.visibilityState !== 'hidden';
+  }
+
+  /**
+   * Start (or stop) the browse heartbeat.
+   *
+   * One timer, at 1 s — the age stamp ticks in seconds, so it is redrawn in
+   * seconds — and the LISTING is re-read on whichever of those ticks
+   * `browseShouldRefresh` says is due (5 s, measured: 12 requests/min, and zero
+   * while the segment is off screen or the tab is hidden).
+   */
+  function syncBrowsePoll(): void {
+    const wanted = browsing() && tabVisible();
+    if (!wanted) {
+      if (browseTimer !== null) clearInterval(browseTimer);
+      browseTimer = null;
+      // Forget when we last asked, so the next visit — or the tab coming back —
+      // reads immediately rather than serving a stale picture for up to a poll.
+      browseStartedAt = null;
+      return;
+    }
+    if (browseTimer === null) {
+      browseTimer = setInterval(browseTick, BROWSE_TICK_MS);
+      browseTick();
+    }
+  }
+
+  /** One heartbeat: re-read if it is due, and redraw so the stamp ticks. */
+  function browseTick(): void {
+    if (!life.alive) {
+      if (browseTimer !== null) clearInterval(browseTimer);
+      browseTimer = null;
+      return;
+    }
+    if (!browsing() || !tabVisible()) {
+      syncBrowsePoll();
+      return;
+    }
+    if (browseShouldRefresh({ active: true, visible: true, startedAt: browseStartedAt, now: Date.now() })) {
+      void refreshLobbyList();
+    }
+    render();
+  }
+
+  /** The tab came back (or went away). A resume re-reads at ONCE. */
+  function onVisibilityChange(): void {
+    syncBrowsePoll();
+  }
+
+  /**
+   * Re-read the list — one request per refresh, never a fan-out, and CORS-simple
+   * (`readLobbyList` sends a bare GET so a page served from GitHub Pages skips the
+   * preflight that would otherwise double the only cost this feature has).
+   *
+   * A failure changes NOTHING: the rows stay, the stamp keeps ageing off the last
+   * good receipt, and past two polls it says so on its own (§3 rule 5). That is
+   * the whole reason `readLobbyList` answers `null` for every failure rather than
+   * throwing five different ways.
+   */
+  async function refreshLobbyList(): Promise<void> {
+    const base = allocatorUrlFromEnv();
+    if (base === null) {
+      // No allocator wired (local dev, the offline build). There is no list to
+      // read and never will be on this build, so the screen says the honest
+      // thing — an empty list — rather than spinning forever.
+      browse = browseReceived(browse, [], Date.now());
+      browseStartedAt = Date.now();
+      render();
+      return;
+    }
+    if (browseInFlight) return;
+    browseInFlight = true;
+    browseStartedAt = Date.now();
+    const list = await readLobbyList({ baseUrl: base });
+    browseInFlight = false;
+    // The player left the segment while the request was in flight — the answer is
+    // still true, and nothing is drawn from it.
+    if (!life.alive) return;
+    // `null` is every failure at once — 404, a thrown fetch, a body that is not a
+    // listing — and the answer to all of them is the same: keep what is on screen
+    // and let the stamp age. `browseRefreshFailed` IS that answer, named, so the
+    // rule is greppable rather than implied by a missing else.
+    browse =
+      list === null
+        ? browseRefreshFailed(browse)
+        : browseReceived(browse, list.rooms, Date.now());
+    render();
+  }
+
+  /** Switch JOIN's mode — from a tap on a segment, or from the seam. The choice
+   *  is remembered for next time (plan D2), and the poll follows the segment. */
+  function chooseEntryMode(mode: JoinMode): void {
+    const next = chooseJoinMode(entry, mode);
+    if (next === entry) return;
+    entry = next;
+    platform.storage.set(JOIN_MODE_KEY, mode);
+    // A refusal about a room is not an answer to "show me the keypad".
+    browse = browseCleared(browse);
+    render();
+    syncBrowsePoll();
+    // A player who came to browse wants the fleet measured, because the ping on
+    // each row is this client's own (n3, reused not reimplemented).
+    if (mode === 'browse') void surveyFleet();
+  }
+
+  /**
+   * Press a row — its JOIN button or its body, which are one action.
+   *
+   * An OPEN row goes to the allocator, always: the round trip is the only
+   * authority on whether a player gets in (Trap 5). A row the last listing stopped
+   * offering is refused here with a sentence and an immediate re-read, because
+   * that refusal is a claim about a photograph and the remedy is a newer one.
+   */
+  function pressBrowseRowAt(index: number): void {
+    // The index is the DRAWN row's, and the drawn order is the model's (sorted by
+    // the pings measured so far) — never the state's. Mapping it back through the
+    // same model the view drew is the seam where a drifted order would otherwise
+    // join a different room than the one under the thumb.
+    const row = browseModelNow().rows[index];
+    if (!row) return;
+    const result = pressBrowseRow(browse, row.id, Date.now());
+    browse = result.state;
+    if (result.join === null) {
+      // Refused locally: the line goes in the screen's ONE message slot, in red,
+      // exactly where a refused code lands.
+      ctx.cue('reject');
+      entry = entryFailed(entry, browse.error);
+      render();
+      if (result.refresh) void refreshLobbyList();
+      return;
+    }
+    ctx.cue('accept');
+    render();
+    void startListingJoin(result.join);
+  }
+
+  /**
+   * Turn a row's handle into a connection — `POST /listings/:id/join`.
+   *
+   * The connection this lands is the SAME `ResolvedConnection` a typed code lands,
+   * so from here down there is one path: the same connect trace, the same socket,
+   * the same seat, the same failures. Nothing downstream of this screen learns that
+   * a row exists.
+   *
+   * (The plan's D4 asked for a row to produce the identical `EntryIntent` a typed
+   * code does. It cannot, and should not: n10-01 replaced the code in the listing
+   * with a derived handle precisely so a browse payload is not a code-harvesting
+   * feed, and the room's code only comes back IN the answer. The convergence is
+   * one step later than the plan drew it, at `connectMatch`, and it is total.)
+   */
+  async function startListingJoin(id: string): Promise<void> {
+    const base = allocatorUrlFromEnv();
+    entry = { ...entry, status: 'connecting', error: '' };
+    if (base === null) {
+      playtest.recordConnect('no allocator configured', { door: 'join' });
+      traceStep(connectFailed(beginConnect('join', Date.now()), 'no allocator configured', Date.now()));
+      browse = browseJoinFailed(browse, 'network');
+      failOnline('network');
+      return;
+    }
+    const config = { baseUrl: base };
+    playtest.recordConnect('allocate', { door: 'join', allocator: logHost(base), listing: true });
+    traceStep(beginConnect('join', Date.now(), logHost(base)));
+    const result = await joinListing(config, id);
+    if (!life.alive || screen !== 'online' || entry.status !== 'connecting') return;
+    if (!result.ok) {
+      playtest.recordConnect('allocate failed', { door: 'join', reason: result.reason });
+      // A refusal ABOUT THE ROOM ends the story rather than narrating it. The
+      // connect panel is a modal with RETRY on it, and the plan is explicit that a
+      // refused row goes *back to the list* — never to a modal, never to the doors
+      // — with a line where the row was and an immediate refresh. Its RETRY would
+      // also be wrong: there is nothing to retry about a seat somebody else took.
+      //
+      // The connection-shaped failures keep the panel, because that is exactly
+      // what it is for: `network` and `bad-response` are the cases where the
+      // player needs the trace and DOWNLOAD LOG under it (a0-28, M10).
+      const aboutTheRoom = result.reason === 'room-full' || result.reason === 'not-found';
+      if (aboutTheRoom) endConnectTrace();
+      else if (connectTrace) traceStep(connectFailed(connectTrace, result.reason, Date.now()));
+      // The row learns what happened to IT — full, or gone — and the screen says
+      // it in words. Then the list re-reads, because both refusals are statements
+      // about a picture that is now known to be out of date.
+      browse = browseJoinFailed(browse, result.reason);
+      entry = entryFailed(entry, browse.error);
+      render();
+      void refreshLobbyList();
+      return;
+    }
+    onlineResolved = result.connection.room;
+    const placement = result.connection.placement?.detail;
+    playtest.recordConnect('ticket', {
+      room: result.connection.room,
+      machine: result.connection.machine,
+      region: result.connection.region,
+      ...(placement !== undefined ? { placement } : {}),
+      ticket: result.connection.ticket.length > 0,
+      expiresInMs: result.connection.expiresAt > 0 ? result.connection.expiresAt - Date.now() : null,
+    });
+    if (connectTrace) {
+      traceStep(
+        connectTicketed(
+          connectTrace,
+          {
+            room: result.connection.room,
+            machine: result.connection.machine,
+            region: result.connection.region,
+            ...(placement !== undefined ? { placement } : {}),
+            expiresInMs:
+              result.connection.expiresAt > 0 ? result.connection.expiresAt - Date.now() : null,
+          },
+          Date.now(),
+        ),
+      );
+    }
+    browse = browseJoined();
+    connectMatch(config, result.connection, false);
+    render();
+  }
+
   /**
    * What the JOIN screen says once a full code is typed, BEFORE the player commits:
    * where the room is, and what that region costs *them*.
@@ -7596,9 +7969,12 @@ function openMainMenu(
   /** Back out of the doors to the main menu. */
   function closeDoors(): void {
     screen = 'menu';
-    entry = createEntry();
+    entry = createEntry(readJoinMode(platform));
+    browse = createBrowse();
     endConnectTrace();
     render();
+    // Leaving the doors stops the listing poll — a lifecycle, not a heuristic.
+    syncBrowsePoll();
   }
 
   /** Tap (or seam-drive) a door. SOLO needs no server, so it resolves straight
@@ -7622,6 +7998,10 @@ function openMainMenu(
     const result = chooseDoor(entry, door, onlineRng);
     entry = result.state;
     render();
+    // JOIN lands on whichever mode the player used last (plan D2). If that is
+    // BROWSE, the list starts reading itself now — one request, then one every
+    // five seconds for as long as it is the thing on screen.
+    syncBrowsePoll();
     if (result.intent) void startResolve(door, result.intent.room);
   }
 
@@ -7666,12 +8046,17 @@ function openMainMenu(
         render();
         return;
       case 'back':
-        // From the keypad, back to the doors; from the doors, back to the menu.
+        // From either JOIN segment, back to the doors; from the doors, back to the
+        // menu. BACK means one thing on this screen and it did not change.
         ctx.cue('back');
         if (entry.screen === 'join') {
           entry = backToDoors(entry).state;
+          browse = createBrowse();
           endConnectTrace();
           render();
+          // Off the segment, so the poll stops — the request would answer a
+          // screen nobody is looking at.
+          syncBrowsePoll();
         } else {
           closeDoors();
         }
@@ -7685,6 +8070,20 @@ function openMainMenu(
         if (result.intent) void startResolve('join', result.intent.room);
         return;
       }
+      case 'segment': {
+        const mode = JOIN_MODES[target.index];
+        if (mode) {
+          ctx.cue('press');
+          chooseEntryMode(mode);
+        }
+        return;
+      }
+      case 'row':
+        // The cue is the press's own answer (`pressBrowseRowAt` cues `accept` for
+        // a row that goes to the allocator and `reject` for one that cannot), so
+        // this branch does not pre-empt it with a third sound.
+        pressBrowseRowAt(target.index);
+        return;
       case 'settings':
         ctx.cue('press');
         openSettings();
@@ -8382,13 +8781,20 @@ function openMainMenu(
       // A desktop player types the code on a real keyboard; the same rule as the
       // pad (`typeEntryCode` drops anything not in the ambiguity-free alphabet).
       // (Enter is JOIN here, not RUSH! — RUSH! is the lobby's, one screen on.)
+      //
+      // The keypad's keys belong to the CODE segment (u17-01). The model itself is
+      // deliberately not gated on the mode — every case in `lobby-entry.test.ts`
+      // is the regression gate on the keypad and none of them was to be rewritten
+      // for this brief — so the gate is here, where the routing already knows
+      // which half of the screen is up. Escape still backs out from either.
+      const typing = entry.screen !== 'join' || entry.mode === 'code';
       if (e.code === 'Escape') {
         applyEntryTarget({ kind: 'back' });
-      } else if (e.code === 'Backspace') {
+      } else if (e.code === 'Backspace' && typing) {
         applyEntryTarget({ kind: 'erase' });
-      } else if (e.code === 'Enter') {
+      } else if (e.code === 'Enter' && typing) {
         applyEntryTarget({ kind: 'submit' });
-      } else if (e.key.length === 1) {
+      } else if (e.key.length === 1 && typing) {
         entry = typeEntryCode(entry, e.key.toUpperCase());
         render();
       }
@@ -8510,6 +8916,11 @@ function openMainMenu(
     window.removeEventListener('gamepadconnected', onGamepadConnected);
     window.removeEventListener('gamepaddisconnected', onGamepadDisconnected);
     window.visualViewport?.removeEventListener('resize', relayout);
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    // The listing poll outlives nothing: a timer left running against a destroyed
+    // view is exactly the u12-01 failure, one screen over.
+    if (browseTimer !== null) clearInterval(browseTimer);
+    browseTimer = null;
     ctx.root.removeChild(menuView, settingsView, codexView, entryView);
     menuView.destroy({ children: true });
     settingsView.destroy({ children: true });
@@ -8529,6 +8940,10 @@ function openMainMenu(
   window.addEventListener('gamepadconnected', onGamepadConnected);
   window.addEventListener('gamepaddisconnected', onGamepadDisconnected);
   window.visualViewport?.addEventListener('resize', relayout);
+  // The browse poll suspends on a hidden tab and re-reads the moment the tab comes
+  // back (plan §6 rule 3) — the "idle browser" the cost model worries about is
+  // overwhelmingly a backgrounded one, and this takes its steady cost to zero.
+  document.addEventListener('visibilitychange', onVisibilityChange);
 
   installMainMenuSeam(seam);
   installOnlineSeam(onlineSeam);

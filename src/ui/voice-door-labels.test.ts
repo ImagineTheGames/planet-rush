@@ -43,7 +43,9 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { DOOR_OPTIONS, ENTRY_COMING_SOON, ENTRY_ERRORS } from './lobby-entry';
-import { resolveFailureMessage, reconnectEndedCopy } from './online-copy';
+import { BROWSE_COPY, JOIN_MODES, JOIN_MODE_LABELS } from './lobby-browser';
+import { listingFailureMessage, resolveFailureMessage, reconnectEndedCopy } from './online-copy';
+import type { ListingJoinFailure } from '../net/lobby-list';
 import { connectionStatusModel } from './connection-status';
 import type { ConnectionState } from '../net/transport';
 import type { ResolveFailure } from '../net/allocator-client';
@@ -55,6 +57,7 @@ const RESOLVE_FAILURES: readonly ResolveFailure[] = [
   'bad-response',
   'network',
 ];
+const LISTING_FAILURES: readonly ListingJoinFailure[] = [...RESOLVE_FAILURES, 'room-full'];
 const STOP_REASONS: readonly StopReason[] = ['room-gone', 'grace-elapsed'];
 const CONNECTION_STATES: readonly ConnectionState[] = [
   'connecting',
@@ -80,6 +83,12 @@ function renderedCopy(): string[] {
   const out: string[] = [...Object.values(ENTRY_ERRORS), ENTRY_COMING_SOON];
   for (const option of DOOR_OPTIONS) out.push(option.hint);
   for (const reason of RESOLVE_FAILURES) out.push(resolveFailureMessage(reason));
+  // The lobby browser's own lines (u17-01) — the two segment words, the sentence
+  // an empty list says, and every refusal a ROW can earn. They point at controls
+  // exactly as the door copy does, so they are swept exactly as the door copy is.
+  for (const mode of JOIN_MODES) out.push(JOIN_MODE_LABELS[mode]);
+  out.push(...Object.values(BROWSE_COPY));
+  for (const reason of LISTING_FAILURES) out.push(listingFailureMessage(reason));
   for (const reason of STOP_REASONS) {
     const copy = reconnectEndedCopy(reason);
     out.push(copy.headline, copy.detail);
@@ -125,6 +134,13 @@ const NOT_A_DOOR: ReadonlyMap<string, string> = new Map([
   // A control, but not a door — it is drawn inside the overlay that names it, so
   // it can never send anybody to the entry screen looking for it.
   ['BACK TO MENU', 'connection-status action: the button on that same panel'],
+  // The JOIN screen's two modes (u17-01). Controls, and they are drawn on the
+  // very screen the copy naming them is drawn on — a player told to press ENTER
+  // ROOM CODE is looking at it while they read the line.
+  ['BROWSE', 'lobby-browser: the JOIN screen’s own mode switch'],
+  ['ENTER ROOM CODE', 'lobby-browser: the JOIN screen’s own mode switch'],
+  ['BACK', 'the footer plate every screen carries (u2 menu-back)'],
+  ['NO OPEN CLAIMS RIGHT NOW', 'lobby-browser headline: a state, and the one it names'],
 ]);
 
 describe('door labels quoted in other copy', () => {

@@ -13,12 +13,14 @@ import type { StopReason } from '../net/reconnect';
 import {
   CROSS_REGION_PING_WARN_MS,
   crossRegionWarning,
+  listingFailureMessage,
   reconnectEndedCopy,
   regionPickerVisible,
   resolveFailureCopy,
   resolveFailureMessage,
   type RegionInfo,
 } from './online-copy';
+import type { ListingJoinFailure } from '../net/lobby-list';
 
 const ALL_FAILURES: readonly ResolveFailure[] = ['no-capacity', 'not-found', 'network', 'bad-response'];
 const ALL_STOPS: readonly StopReason[] = ['room-gone', 'grace-elapsed'];
@@ -114,5 +116,37 @@ describe('region — modelled, suppressed at one region', () => {
 
   it('exposes a tunable threshold with a sane default', () => {
     expect(CROSS_REGION_PING_WARN_MS).toBeGreaterThan(0);
+  });
+});
+
+describe('a browse row that could not be joined (u17-01)', () => {
+  const FAILURES: readonly ListingJoinFailure[] = [
+    'no-capacity',
+    'not-found',
+    'network',
+    'bad-response',
+    'room-full',
+  ];
+
+  it('has a sentence for every way a row join can fail', () => {
+    for (const reason of FAILURES) {
+      expect(listingFailureMessage(reason).length, reason).toBeGreaterThan(0);
+    }
+  });
+
+  it('says something DIFFERENT for a 404 than the keypad does', () => {
+    // Same status code, two different facts: on the code path a 404 means "check
+    // what you typed"; on a row the player typed nothing, and the claim is gone.
+    expect(listingFailureMessage('not-found')).not.toBe(resolveFailureMessage('not-found'));
+    expect(listingFailureMessage('not-found')).toMatch(/closed/i);
+    expect(listingFailureMessage('room-full')).toMatch(/filled up/i);
+  });
+
+  it('shares the lines that are about the CONNECTION, not the room', () => {
+    // A fleet that is full and a fetch that never landed say nothing about which
+    // room was asked for, so they say what they already say everywhere else.
+    for (const reason of ['no-capacity', 'network', 'bad-response'] as const) {
+      expect(listingFailureMessage(reason)).toBe(resolveFailureMessage(reason));
+    }
   });
 });

@@ -98,7 +98,15 @@
  */
 
 import type { Rect, Viewport } from '@platform/layout-registry';
-import { COLUMN, ROSTER, TOUCH_MIN, plateHeight, rosterRowHeight, valueChipHeight } from '../art/materials';
+import {
+  COLUMN,
+  ROSTER,
+  TOUCH_MIN,
+  plateHeight,
+  rosterRowHeight,
+  rowHeight as plateRowHeight,
+  valueChipHeight,
+} from '../art/materials';
 import type { FrameMetrics, PlateScale } from '../art/materials';
 import { beamContent, beamPlate, gantryFrame, stackPlates } from './gantry';
 
@@ -856,6 +864,71 @@ export const ENTRY_ERASE_WIDTH = 160;
 export const ENTRY_SUBMIT_WIDTH = 160;
 
 // ---------------------------------------------------------------------------
+// The JOIN screen's two modes (u17-01) — BROWSE and ENTER ROOM CODE
+// ---------------------------------------------------------------------------
+
+/**
+ * The mode switch's segment width, at the reference. Two of them plus a row gap
+ * lead the band's top strip on **both** modes, at the same place in each, so the
+ * switch never moves as the screen changes under it — the promise BACK already
+ * makes one beam lower down.
+ *
+ * ── WHY THE SWITCH SHARES A ROW RATHER THAN TAKING ONE ──────────────────────
+ * Measured before it was built, at the developer's own 844×390: the join screen's
+ * band is 221 px, the keypad's floor is 148 px of that (four rows at
+ * {@link KEY_MIN}), and the code cells take what is left. A switch on a row of its
+ * own would cost 48 px + a gutter and leave the cells **2 px** — a code you cannot
+ * see yourself typing, which `placeCodeEntry` already names as the thing worse
+ * than small keys. So the switch takes the LEADING end of the row the cells are
+ * already on, the cells take the rest of it, and the pad below is untouched. At
+ * that profile the cells go 61 px → 48 and the keys go 34 px → 37: the code screen
+ * comes out with *bigger* keys than before this brief.
+ *
+ * A band too narrow to seat the switch and four legible cells side by side falls
+ * back to stacking them — see {@link JOIN_SWITCH_MIN_CELLS}. That is the tall,
+ * narrow viewport, which has the height to spare precisely because it is tall.
+ */
+export const JOIN_SEGMENT_WIDTH = 168;
+
+/** …and the floor a segment may be squeezed to before the pair stops being drawn
+ *  as two words a thumb can pick between. */
+export const JOIN_SEGMENT_MIN = 88;
+
+/** The narrowest the four code cells may be squeezed to while sharing their row
+ *  with the switch. Below this the switch takes a row of its own instead. */
+export const JOIN_SWITCH_MIN_CELLS = 34;
+
+/** A browse row's JOIN button, at the reference — the developer's *"there should
+ *  be a join button to join it"*, sized as a chip rather than a plate so the list
+ *  never grows a second bright action per room (`./gantry` `singlePrimary`). */
+export const BROWSE_JOIN_WIDTH = 104;
+
+/** …and the least of it that survives a squeeze. Below this the row draws the
+ *  word alone; it is still the row's own target, which is the whole row. */
+export const BROWSE_JOIN_MIN = 56;
+
+/**
+ * The narrowest a browse row may be drawn at before two columns of them stop
+ * being better than one. A row carries an owner tag, a player/seat line, a place
+ * and a ping, and a button — halve the band below this and none of it reads.
+ */
+export const BROWSE_ROW_MIN_WIDTH = 300;
+
+/**
+ * Rows below which a single column is not worth keeping on a wide, short band.
+ * At 844×390 one column shows **three** of the fleet's twelve possible rooms and
+ * the band is 800 px wide with nothing in the other 400 — so the same trade the
+ * doors and the roster already make (halve it, fill column-major) doubles what the
+ * player can see without shrinking anything they read.
+ */
+export const BROWSE_COLUMN_THRESHOLD = 4;
+
+/** The most rows the screen will lay out, however tall the band is. The deployed
+ *  fleet's ceiling is 12 rooms (`docs/server-capacity.md`), and a list longer than
+ *  the fleet can be is rects nobody will ever draw into. */
+export const BROWSE_ROW_CAP = 12;
+
+// ---------------------------------------------------------------------------
 // The layout
 // ---------------------------------------------------------------------------
 
@@ -1565,6 +1638,19 @@ export function lobbyHitTest(layout: LobbyLayout, x: number, y: number): LobbyTa
  */
 export type DoorShape = 'stack' | 'columns';
 
+/**
+ * How the JOIN screen's mode switch was seated (u17-01):
+ *
+ *  - `inline`  — sharing the top strip with the code cells beside it. Every
+ *                landscape shape, including the developer's 390 px phone, and the
+ *                one that costs the keypad nothing.
+ *  - `stacked` — a row of its own above them, taken only where the band is too
+ *                narrow to carry the switch and four readable cells side by side.
+ *                That band is a TALL one by construction, so the height it spends
+ *                here is height it had.
+ */
+export type JoinSwitchShape = 'inline' | 'stacked';
+
 /** Every rect the entry screen draws in. Both screens are laid out every time —
  *  they cost a dozen rects, the view draws only the active one, and a layout
  *  that does not branch on state cannot be wrong for the state it is in. */
@@ -1586,10 +1672,28 @@ export interface EntryLayout {
   readonly doors: readonly Rect[];
   /** How those doors were arranged — one column or two. */
   readonly doorShape: DoorShape;
-  /** The four code cells, left to right. Join screen. */
+  /** The four code cells, left to right. Join screen, CODE mode. */
   readonly cells: readonly Rect[];
   /** The keypad, in `KEYPAD_KEYS` order: across a row, then down. */
   readonly keys: readonly Rect[];
+  /** The two mode segments — BROWSE, ENTER ROOM CODE — leading the join screen's
+   *  top strip, in `./lobby-browser` `JOIN_MODES` order. Identical rects in both
+   *  modes: the switch is the one control on this screen that is always true. */
+  readonly segments: readonly Rect[];
+  /** Whether the switch shares the code cells' row (the ordinary case) or took a
+   *  row of its own because the band was too narrow to seat both. */
+  readonly segmentShape: JoinSwitchShape;
+  /** The list's rows, in model order — column-major when there are two columns,
+   *  exactly as the doors and the roster fill. Join screen, BROWSE mode. */
+  readonly browseRows: readonly Rect[];
+  /** Each row's JOIN button, nested at its trailing edge. Same length as
+   *  {@link browseRows}; the row itself is a target too (they are one action). */
+  readonly browseJoins: readonly Rect[];
+  /** The strip the age stamp is drawn in — the trailing end of the top strip, the
+   *  space the code cells occupy in the other mode. */
+  readonly browseStamp: Rect;
+  /** The whole list area, for the empty-list sentence and for the view's clip. */
+  readonly browseList: Rect;
   /** BACK — the one exit both entry screens carry (u2 menu-back). On the keypad
    *  it steps back to the doors; on the home screen it leaves to the main menu
    *  (the standing "every screen you can leave" rule). Same left-anchored rect on
@@ -1617,6 +1721,14 @@ export interface EntryLayout {
 export type EntryTarget =
   | { readonly kind: 'door'; readonly index: number }
   | { readonly kind: 'key'; readonly index: number }
+  /** One of the JOIN screen's two modes, in `./lobby-browser` `JOIN_MODES` order
+   *  (u17-01). Live on both modes — the switch is how you get back. */
+  | { readonly kind: 'segment'; readonly index: number }
+  /** A row in the lobby browser — its JOIN button or its body, which are ONE
+   *  action: the button is what the developer asked for and the row is what a
+   *  thumb actually lands on, and a list where those did two things would be a
+   *  list that punishes the imprecise tap it is designed for. */
+  | { readonly kind: 'row'; readonly index: number }
   | { readonly kind: 'erase' }
   | { readonly kind: 'back' }
   | { readonly kind: 'submit' }
@@ -1640,6 +1752,10 @@ export function entryTargetKey(target: EntryTarget | null): string | null {
       return `door:${target.index}`;
     case 'key':
       return `key:${target.index}`;
+    case 'segment':
+      return `segment:${target.index}`;
+    case 'row':
+      return `row:${target.index}`;
     default:
       return target.kind;
   }
@@ -1729,6 +1845,11 @@ export function entryLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
   const doors: Rect[] = [];
   const doorShape = placeDoors(doors, middle, m);
 
+  // The JOIN screen's two modes share one band: the switch leads its top strip in
+  // both, the code cells take the rest of that strip in CODE mode, and the list
+  // takes everything under it in BROWSE mode. Both are laid out every time.
+  const join = placeJoinModes(middle, m);
+
   return {
     content: frame.content,
     header: frame.header,
@@ -1738,7 +1859,13 @@ export function entryLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     message,
     doors,
     doorShape,
-    ...placeCodeEntry(middle),
+    ...placeCodeEntry(middle, join.cellsRow),
+    segments: join.segments,
+    segmentShape: join.shape,
+    browseRows: join.rows,
+    browseJoins: join.joins,
+    browseStamp: join.stamp,
+    browseList: join.list,
     back,
     erase,
     submit,
@@ -1764,6 +1891,7 @@ export function entryHitTest(
   x: number,
   y: number,
   screen: 'home' | 'join',
+  mode: 'browse' | 'code' = 'code',
 ): EntryTarget | null {
   if (screen === 'home') {
     for (let i = 0; i < layout.doors.length; i++) {
@@ -1774,6 +1902,24 @@ export function entryHitTest(
     // band with SETTINGS, so it is tested first (the two never overlap).
     if (hit(layout.back, x, y)) return { kind: 'back' };
     if (hit(layout.settings, x, y)) return { kind: 'settings' };
+    return null;
+  }
+  // The mode switch is tested first and on BOTH modes: it is the one control the
+  // join screen carries in every state, and nothing else is drawn over it.
+  for (let i = 0; i < layout.segments.length; i++) {
+    const rect = layout.segments[i];
+    if (rect && hit(rect, x, y)) return { kind: 'segment', index: i };
+  }
+  if (mode === 'browse') {
+    // A row's JOIN button and its body are one target (see `EntryTarget`), so the
+    // button is not tested separately — it is drawn inside the rect that already
+    // answers. BACK is the only other live control: the browse screen has nothing
+    // to erase and nothing to submit.
+    for (let i = 0; i < layout.browseRows.length; i++) {
+      const rect = layout.browseRows[i];
+      if (rect && hit(rect, x, y)) return { kind: 'row', index: i };
+    }
+    if (hit(layout.back, x, y)) return { kind: 'back' };
     return null;
   }
   if (hit(layout.submit, x, y)) return { kind: 'submit' };
@@ -1877,7 +2023,7 @@ const DOOR_PLATE_SCALES: readonly PlateScale[] = ['standard', 'hero', 'standard'
  * are capped and centred, so a desktop gets a pad of thumb-sized keys in the
  * middle of the window rather than eight 200px slabs.
  */
-function placeCodeEntry(band: Rect): { cells: Rect[]; keys: Rect[] } {
+function placeCodeEntry(band: Rect, cellsRow: Rect): { cells: Rect[]; keys: Rect[] } {
   const rows = Math.ceil(KEYPAD_KEY_COUNT / KEYPAD_COLUMNS);
 
   // What the pad would like, and what the band can actually give it.
@@ -1885,26 +2031,29 @@ function placeCodeEntry(band: Rect): { cells: Rect[]; keys: Rect[] } {
     0,
     Math.min(KEY_MAX, (band.width - (KEYPAD_COLUMNS - 1) * KEY_GAP) / KEYPAD_COLUMNS),
   );
-  // What the pad must keep is its *floor*, not its ceiling: reserving KEY_MAX
-  // would leave a landscape phone's band with nothing for the cells, and a code
-  // you cannot see yourself typing is worse than one typed on smaller keys.
-  const padFloor = rows * KEY_MIN + (rows - 1) * KEY_GAP;
-  const cellsWanted = Math.min(CODE_CELL_MAX, (band.width - 3 * CODE_CELL_GAP) / 4);
-  // Give the cells their share only out of what the pad does not need.
-  const cellSize = Math.max(
-    0,
-    Math.min(cellsWanted, band.height - padFloor - BLOCK_GAP, band.height * 0.4),
-  );
-  const padHeight = Math.max(0, band.height - cellSize - (cellSize > 0 ? BLOCK_GAP : 0));
+  // The cells fill the row the switch left them — square, so the row's height is
+  // a ceiling as much as its width is. The caller sized that row against the pad's
+  // floor (see `placeJoinModes`), which is what keeps the rule this function has
+  // always kept: **the keys win and the cells give**, because a code cell that is
+  // a little small is still readable while a key too small to hit reliably makes
+  // the screen unusable (GDD §2.4).
+  const cellsWanted = Math.min(CODE_CELL_MAX, (cellsRow.width - 3 * CODE_CELL_GAP) / 4);
+  const cellSize = Math.max(0, Math.min(cellsWanted, cellsRow.height));
+  // The pad starts under the ROW, not under the cells: the switch is as tall as
+  // the row it leads, so a cell squeezed narrow by a short band must not slide the
+  // keypad up under it.
+  const padTop = cellsRow.y + cellsRow.height + (cellsRow.height > 0 ? BLOCK_GAP : 0);
+  const padHeight = Math.max(0, band.y + band.height - padTop);
   const keyHeight = Math.max(0, Math.min(KEY_MAX, rowHeight(padHeight, rows, KEY_GAP, KEY_MAX)));
 
   const cells: Rect[] = [];
   const cellsWidth = 4 * cellSize + 3 * CODE_CELL_GAP;
-  const cellsX = band.x + (band.width - cellsWidth) / 2;
+  const cellsX = cellsRow.x + (cellsRow.width - cellsWidth) / 2;
+  const cellsY = cellsRow.y + Math.max(0, (cellsRow.height - cellSize) / 2);
   for (let i = 0; i < 4; i++) {
     cells.push({
       x: cellsX + i * (cellSize + CODE_CELL_GAP),
-      y: band.y,
+      y: cellsY,
       width: cellSize,
       height: cellSize,
     });
@@ -1913,16 +2062,150 @@ function placeCodeEntry(band: Rect): { cells: Rect[]; keys: Rect[] } {
   const keys: Rect[] = [];
   const padWidth = KEYPAD_COLUMNS * keyWidth + (KEYPAD_COLUMNS - 1) * KEY_GAP;
   const padX = band.x + (band.width - padWidth) / 2;
-  const padY = band.y + cellSize + (cellSize > 0 ? BLOCK_GAP : 0);
   for (let i = 0; i < KEYPAD_KEY_COUNT; i++) {
     keys.push({
       x: padX + (i % KEYPAD_COLUMNS) * (keyWidth + KEY_GAP),
-      y: padY + Math.floor(i / KEYPAD_COLUMNS) * (keyHeight + KEY_GAP),
+      y: padTop + Math.floor(i / KEYPAD_COLUMNS) * (keyHeight + KEY_GAP),
       width: keyWidth,
       height: keyHeight,
     });
   }
   return { cells, keys };
+}
+
+/**
+ * The JOIN screen's two modes, laid out over one band (u17-01).
+ *
+ * The switch leads the band's top strip in BOTH modes and at the SAME rect, which
+ * is the whole point: the developer's ruling is that both ways in are offered and
+ * neither is buried, and a control that moves when you use it is buried in the
+ * other direction. What sits beside it is the mode's business — the code cells in
+ * CODE, the age stamp in BROWSE — and what sits under it is the keypad or the
+ * list. Only one mode is ever drawn, so the two overlap by design, exactly as the
+ * doors and the keypad already do.
+ *
+ * The rows fill **column-major** on a band wide enough to halve, like every other
+ * list in this file ({@link placeSeats}, {@link placeDoors}): the sorted order
+ * still reads top-to-bottom, so the nearest room is the top-left row in both
+ * shapes.
+ */
+function placeJoinModes(
+  band: Rect,
+  m: FrameMetrics,
+): {
+  segments: Rect[];
+  shape: JoinSwitchShape;
+  cellsRow: Rect;
+  stamp: Rect;
+  list: Rect;
+  rows: Rect[];
+  joins: Rect[];
+} {
+  const stripHeight = Math.max(0, Math.min(band.height, valueChipHeight(m)));
+  const segmentGap = m.rowGap;
+  const segmentWidth = Math.max(
+    0,
+    Math.min(
+      Math.round(JOIN_SEGMENT_WIDTH * m.plateScale),
+      (band.width - segmentGap) / 2,
+    ),
+  );
+  const switchWidth = segmentWidth > 0 ? 2 * segmentWidth + segmentGap : 0;
+  const besideWidth = Math.max(0, band.width - switchWidth - m.gutter);
+  // Four cells at their floor plus their gaps: the least the code row can be worth
+  // drawing beside the switch. Under it, the switch takes a row of its own.
+  const cellsFloor = 4 * JOIN_SWITCH_MIN_CELLS + 3 * CODE_CELL_GAP;
+  const inline = segmentWidth >= JOIN_SEGMENT_MIN * m.plateScale && besideWidth >= cellsFloor;
+
+  const segments: Rect[] = [];
+  for (let i = 0; i < 2; i++) {
+    segments.push({
+      x: band.x + i * (segmentWidth + segmentGap),
+      y: band.y,
+      width: segmentWidth,
+      height: stripHeight,
+    });
+  }
+
+  const belowStrip = band.y + stripHeight + m.gutter;
+  const remaining = Math.max(0, band.y + band.height - belowStrip);
+  const padRows = Math.ceil(KEYPAD_KEY_COUNT / KEYPAD_COLUMNS);
+  const padFloor = padRows * KEY_MIN + (padRows - 1) * KEY_GAP;
+
+  const cellsRow: Rect = inline
+    ? { x: band.x + switchWidth + m.gutter, y: band.y, width: besideWidth, height: stripHeight }
+    : {
+        x: band.x,
+        y: belowStrip,
+        width: band.width,
+        // Stacked, the cells take their old share of what is left: capped by the
+        // pad's floor first and by 40% of the band second, so a very short band
+        // gives the cells up rather than the keys.
+        height: Math.max(
+          0,
+          Math.min(CODE_CELL_MAX, remaining - padFloor - BLOCK_GAP, remaining * 0.4),
+        ),
+      };
+
+  // The stamp shares the strip with the switch where there is room beside it, and
+  // takes a line of its own where there is not — the stacked band is the tall one,
+  // so the line it costs is a line it has. The age is never dropped: a listing
+  // that cannot say how old it is has broken the one promise this screen makes.
+  const stampInline: Rect = {
+    x: band.x + switchWidth + m.gutter,
+    y: band.y,
+    width: besideWidth,
+    height: stripHeight,
+  };
+  // A line of its own is still a line of TYPE, and type has a floor (`TYPE_MIN`,
+  // 11px — below it an Oxanium eyebrow stops being small and starts being a
+  // smudge). Scaling this one linearly would have drawn a 6px strip on a 390px-
+  // wide viewport and clipped the very sentence that keeps the screen honest.
+  const stampLineHeight = Math.max(0, Math.min(remaining, Math.max(14, Math.round(20 * m.scale))));
+  const stamp: Rect = inline
+    ? stampInline
+    : { x: band.x, y: belowStrip, width: band.width, height: stampLineHeight };
+  const listTop = inline ? belowStrip : belowStrip + stampLineHeight + m.rowGap;
+  const list: Rect = {
+    x: band.x,
+    y: listTop,
+    width: band.width,
+    height: Math.max(0, band.y + band.height - listTop),
+  };
+
+  const rows: Rect[] = [];
+  const joins: Rect[] = [];
+  const rowH = Math.max(0, Math.min(plateRowHeight(m), list.height));
+  const rowGap = m.rowGap;
+  const perColumn = rowH > 0 ? Math.max(0, Math.floor((list.height + rowGap) / (rowH + rowGap))) : 0;
+  const halfWidth = Math.max(0, (list.width - m.gutter) / 2);
+  const columns = perColumn < BROWSE_COLUMN_THRESHOLD && halfWidth >= BROWSE_ROW_MIN_WIDTH ? 2 : 1;
+  const rowWidth = columns === 2 ? halfWidth : list.width;
+  const count = Math.min(BROWSE_ROW_CAP, perColumn * columns);
+  const pad = Math.max(2, Math.round(4 * m.scale));
+  const joinWidth = Math.max(
+    0,
+    Math.min(Math.round(BROWSE_JOIN_WIDTH * m.plateScale), Math.max(0, rowWidth * 0.4)),
+  );
+  for (let i = 0; i < count; i++) {
+    const column = Math.floor(i / perColumn);
+    const rowIndex = i % perColumn;
+    const rect: Rect = {
+      x: list.x + column * (rowWidth + m.gutter),
+      y: list.y + rowIndex * (rowH + rowGap),
+      width: rowWidth,
+      height: rowH,
+    };
+    rows.push(rect);
+    joins.push({
+      x: rect.x + rect.width - pad - joinWidth,
+      y: rect.y + pad,
+      width: joinWidth >= BROWSE_JOIN_MIN * m.plateScale ? joinWidth : 0,
+      height: Math.max(0, rect.height - 2 * pad),
+    });
+  }
+
+  return { segments, shape: inline ? 'inline' : 'stacked', cellsRow, stamp, list, rows, joins };
 }
 
 // ---------------------------------------------------------------------------

@@ -38,6 +38,7 @@ import {
   backToDoors,
   canSubmitJoin,
   chooseDoor,
+  chooseJoinMode,
   createEntry,
   entryConnected,
   entryErrorFor,
@@ -49,6 +50,7 @@ import {
   typeEntryCode,
 } from './lobby-entry';
 import type { EntryDoor, EntryState } from './lobby-entry';
+import { JOIN_MODES } from './lobby-browser';
 import { TOUCH_MIN } from '../art/materials';
 import { singlePrimary } from './gantry';
 import {
@@ -58,6 +60,7 @@ import {
   KEY_MIN,
   entryHitTest,
   entryLayout,
+  entryTargetKey,
 } from './lobby-geometry';
 import type { EntryLayout } from './lobby-geometry';
 
@@ -492,6 +495,14 @@ function allRects(layout: EntryLayout): Array<{ label: string; rect: Rect }> {
     ...layout.doors.map((rect, i) => ({ label: `door[${i}]`, rect })),
     ...layout.cells.map((rect, i) => ({ label: `cell[${i}]`, rect })),
     ...layout.keys.map((rect, i) => ({ label: `key[${i}]`, rect })),
+    // The join screen's other half (u17-01) rides the same containment contract:
+    // a0-24 had just finished pulling two elements back off this exact edge, and a
+    // JOIN button that clips is the one thing this list may not do.
+    ...layout.segments.map((rect, i) => ({ label: `segment[${i}]`, rect })),
+    ...layout.browseRows.map((rect, i) => ({ label: `browseRow[${i}]`, rect })),
+    ...layout.browseJoins.map((rect, i) => ({ label: `browseJoin[${i}]`, rect })),
+    { label: 'browseStamp', rect: layout.browseStamp },
+    { label: 'browseList', rect: layout.browseList },
     { label: 'back', rect: layout.back },
     { label: 'erase', rect: layout.erase },
     { label: 'submit', rect: layout.submit },
@@ -713,8 +724,11 @@ describe('the doors in Gantry/Bone (u7-04)', () => {
     // panel in the ratified vocabulary — `CLAIM`, and a code is still a CODE.
     expect(entryModel(createEntry()).eyebrow).toBe('DEEP FIELD MINING AUTHORITY');
     expect(entryModel(createEntry()).status).toBe('CONTRACT OPEN · SECTOR 04');
+    // JOIN now lands on BROWSE (u17-01, plan D2), so the keypad's line is reached
+    // through the mode switch — and each mode names the thing it actually is.
     const join = chooseDoor(createEntry(), 'join', rng()).state;
-    expect(entryModel(join).status).toBe('CLAIM CODE');
+    expect(entryModel(join).status).toBe('OPEN CLAIMS');
+    expect(entryModel(chooseJoinMode(join, 'code')).status).toBe('CLAIM CODE');
   });
 
   it('never lets the keypad hold two vocabularies at once (l2-02 merge gap)', () => {
@@ -919,5 +933,214 @@ describe('the allocator refuses (M3/online)', () => {
     expect(failed.error).toBe(entryErrorFor('no-capacity'));
     expect(failed.error).toMatch(/full/i);
     expect(failed.code).toBe(state.code); // the code survives the refusal
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 6. JOIN's two modes, and the list under the BROWSE one (u17-01)
+// ---------------------------------------------------------------------------
+
+describe('the mode switch under JOIN', () => {
+  const joined = (): EntryState => chooseDoor(createEntry(), 'join', rng()).state;
+
+  it('opens on BROWSE and reaches the keypad in one tap (plan D2)', () => {
+    // The player this feature is for is the one with NO code; a keypad is the one
+    // thing they cannot use. The friend WITH a code pays one tap, once.
+    const join = joined();
+    expect(join.mode).toBe('browse');
+    expect(chooseJoinMode(join, 'code').mode).toBe('code');
+  });
+
+  it('remembers the mode across a trip back to the doors', () => {
+    // The caller persists it; the model must at least not throw it away on the way
+    // past, or "remembered" would be a promise the screen breaks every BACK.
+    const code = chooseJoinMode(joined(), 'code');
+    const home = backToDoors(code).state;
+    expect(home.screen).toBe('home');
+    expect(home.mode).toBe('code');
+    expect(chooseDoor(home, 'join', rng()).state.mode).toBe('code');
+  });
+
+  it('keeps what was typed when the player looks at the list and comes back', () => {
+    const code = typed('K7Q');
+    const there = chooseJoinMode(code, 'browse');
+    expect(chooseJoinMode(there, 'code').code).toBe('K7Q');
+  });
+
+  it('is DEAD while an attempt is in flight', () => {
+    // The same gate that stops a double-tap on HOST opening two rooms: a segment
+    // tap mid-connect must not start a second story.
+    const connecting = submitJoin(typed('K7QM')).state;
+    expect(entryLive(connecting)).toBe(false);
+    expect(chooseJoinMode(connecting, 'browse')).toBe(connecting);
+  });
+
+  it('changes nothing on the doors screen', () => {
+    const home = createEntry();
+    expect(chooseJoinMode(home, 'code')).toBe(home);
+  });
+
+  it('draws two segments, in JOIN_MODES order, with exactly one active', () => {
+    const model = entryModel(joined());
+    expect(model.segments.map((s) => s.mode)).toEqual([...JOIN_MODES]);
+    expect(model.segments.map((s) => s.label)).toEqual(['BROWSE', 'ENTER ROOM CODE']);
+    expect(model.segments.filter((s) => s.active)).toHaveLength(1);
+    expect(model.segments.find((s) => s.active)?.mode).toBe('browse');
+  });
+
+  it('leaves the four doors exactly four (Trap 8 — no fifth door)', () => {
+    // a0-15 was a rollback of an over-complicated entry flow. JOIN grows modes;
+    // the home screen grows nothing.
+    expect(DOOR_OPTIONS.map((d) => d.label)).toEqual(['CAMPAIGN', 'SOLO', 'HOST', 'JOIN']);
+    expect(entryModel(createEntry()).doors).toHaveLength(4);
+    expect(entryModel(createEntry()).screen).toBe('home');
+  });
+});
+
+describe('the browse list’s geometry (u17-01)', () => {
+  for (const { name, vp, touch } of PROFILES) {
+    it(`gives the switch a thumb target, in the same place in both modes — ${name}`, () => {
+      const layout = entryLayout(vp, { isTouch: touch, insets: insetsFor(vp) });
+      expect(layout.segments).toHaveLength(2);
+      for (const [i, segment] of layout.segments.entries()) {
+        expect(segment.height, `segment[${i}] height on ${name}`).toBeGreaterThanOrEqual(TOUCH_MIN);
+        expect(segment.width, `segment[${i}] width on ${name}`).toBeGreaterThan(TOUCH_MIN);
+      }
+      // One layout serves both modes, so "the same place in both" is a property of
+      // the construction rather than of a comparison — what is asserted here is
+      // that the switch never lands on top of what either mode draws beside it.
+      for (const cell of layout.cells) {
+        for (const segment of layout.segments) {
+          expect(overlaps(segment, cell), `switch over a code cell on ${name}`).toBe(false);
+        }
+      }
+      for (const row of layout.browseRows) {
+        for (const segment of layout.segments) {
+          expect(overlaps(segment, row), `switch over a row on ${name}`).toBe(false);
+        }
+      }
+    });
+
+    it(`keeps every row and every JOIN button a thumb target — ${name}`, () => {
+      const layout = entryLayout(vp, { isTouch: touch, insets: insetsFor(vp) });
+      for (const [i, row] of layout.browseRows.entries()) {
+        expect(row.height, `row[${i}] height on ${name}`).toBeGreaterThanOrEqual(TOUCH_MIN);
+        const join = layout.browseJoins[i] as Rect;
+        // The button lives INSIDE its row — the a0-24 failure was two elements
+        // hanging off the phone's edge, and a JOIN drawn past its own row is the
+        // same bug one nesting level down.
+        expect(rectContains(row, join), `join[${i}] escaped its row on ${name}`).toBe(true);
+      }
+    });
+
+    it(`never overlaps two rows, or a row and the list’s own box — ${name}`, () => {
+      const layout = entryLayout(vp, { isTouch: touch, insets: insetsFor(vp) });
+      for (let i = 0; i < layout.browseRows.length; i++) {
+        expect(
+          rectContains(layout.browseList, layout.browseRows[i] as Rect),
+          `row[${i}] escaped the list box on ${name}`,
+        ).toBe(true);
+        for (let j = i + 1; j < layout.browseRows.length; j++) {
+          expect(
+            overlaps(layout.browseRows[i] as Rect, layout.browseRows[j] as Rect),
+            `row[${i}] overlaps row[${j}] on ${name}`,
+          ).toBe(false);
+        }
+      }
+    });
+  }
+
+  it('costs the keypad nothing at 390px — the keys got BIGGER, not smaller', () => {
+    // The measurement this shape was chosen from (see `JOIN_SEGMENT_WIDTH`): at
+    // the developer's own 844×390 the band is 221px and the pad's floor is 148 of
+    // it. A switch on a row of its own would have left the code cells 2px. Sharing
+    // the cells' row instead spends the difference on the cells — which had 61px
+    // and had them to spare — and the keypad comes out ahead.
+    const phone = entryLayout({ width: 844, height: 390 }, { isTouch: true, insets: LANDSCAPE_INSETS });
+    expect(phone.segmentShape).toBe('inline');
+    for (const key of phone.keys) expect(key.height).toBeGreaterThanOrEqual(KEY_MIN);
+    for (const cell of phone.cells) expect(cell.width).toBeGreaterThan(40);
+    // …and the pad still ends above the footer beam it must never run under.
+    const lastKey = phone.keys[phone.keys.length - 1] as Rect;
+    expect(lastKey.y + lastKey.height).toBeLessThanOrEqual(phone.footer.y);
+  });
+
+  it('stacks the switch only where the band is too narrow to seat it beside them', () => {
+    // The stacked shape is the tall-and-narrow one, which has the height to spend
+    // precisely because it is tall — and there it keeps the cells at full size.
+    const narrow = entryLayout({ width: 390, height: 844 }, { isTouch: true, insets: PORTRAIT_INSETS });
+    expect(narrow.segmentShape).toBe('stacked');
+    for (const cell of narrow.cells) expect(cell.width).toBeGreaterThan(40);
+    for (const key of narrow.keys) expect(key.height).toBeGreaterThanOrEqual(KEY_MIN);
+  });
+
+  it('shows MORE rooms on a wide, short band by halving it', () => {
+    // The same trade the doors and the roster make. At 390px a single column shows
+    // two rooms of the fleet's twelve with 400px of band doing nothing.
+    const phone = entryLayout({ width: 844, height: 390 }, { isTouch: true, insets: LANDSCAPE_INSETS });
+    expect(phone.browseRows.length).toBeGreaterThanOrEqual(4);
+    // Column-major, like every other list in this file: the sorted order still
+    // reads top-to-bottom, so the nearest room is the top-left row.
+    const first = phone.browseRows[0] as Rect;
+    const second = phone.browseRows[1] as Rect;
+    expect(second.x).toBeCloseTo(first.x, 5);
+    expect(second.y).toBeGreaterThan(first.y);
+  });
+
+  it('degrades to zero-extent rather than to a backwards row', () => {
+    const layout = entryLayout({ width: 40, height: 30 });
+    for (const rect of [...layout.segments, ...layout.browseRows, ...layout.browseJoins]) {
+      expect(rect.width).toBeGreaterThanOrEqual(0);
+      expect(rect.height).toBeGreaterThanOrEqual(0);
+    }
+  });
+});
+
+describe('hit testing the join screen’s two modes (u17-01)', () => {
+  const layout = entryLayout({ width: 844, height: 390 }, { isTouch: true, insets: LANDSCAPE_INSETS });
+
+  it('answers the switch on BOTH modes — it is how you get back', () => {
+    for (const mode of ['browse', 'code'] as const) {
+      for (const [i, segment] of layout.segments.entries()) {
+        const at = center(segment);
+        expect(entryHitTest(layout, at.x, at.y, 'join', mode)).toEqual({ kind: 'segment', index: i });
+      }
+    }
+  });
+
+  it('answers a row — and its JOIN button — with the SAME target', () => {
+    // One action, two rects: the button is what the developer asked for and the
+    // row is what a thumb actually lands on.
+    const row = layout.browseRows[1] as Rect;
+    const join = layout.browseJoins[1] as Rect;
+    expect(entryHitTest(layout, center(row).x, center(row).y, 'join', 'browse')).toEqual({
+      kind: 'row',
+      index: 1,
+    });
+    expect(entryHitTest(layout, center(join).x, center(join).y, 'join', 'browse')).toEqual({
+      kind: 'row',
+      index: 1,
+    });
+  });
+
+  it('never lands a browse tap on a key, or a code tap on a row', () => {
+    // Geometry that is always laid out is not geometry that is always live: both
+    // modes have rects, and only the drawn one answers.
+    const key = center(layout.keys[9] as Rect);
+    expect(entryHitTest(layout, key.x, key.y, 'join', 'browse')?.kind).not.toBe('key');
+    const row = center(layout.browseRows[0] as Rect);
+    expect(entryHitTest(layout, row.x, row.y, 'join', 'code')?.kind).not.toBe('row');
+  });
+
+  it('keeps BACK live on the browse list', () => {
+    // The exit every screen carries (u2 menu-back), in the one state that did not
+    // exist before this brief.
+    const back = center(layout.back);
+    expect(entryHitTest(layout, back.x, back.y, 'join', 'browse')).toEqual({ kind: 'back' });
+  });
+
+  it('names each control once, and stably', () => {
+    expect(entryTargetKey({ kind: 'segment', index: 1 })).toBe('segment:1');
+    expect(entryTargetKey({ kind: 'row', index: 3 })).toBe('row:3');
   });
 });

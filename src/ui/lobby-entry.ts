@@ -86,6 +86,8 @@ import type { Rng } from '@shared/types';
 import type { PlateRole, PlateScale, PlateState } from '../art/materials';
 import type { RoomCode } from '../net/transport';
 import type { ResolveFailure } from '../net/allocator-client';
+import { JOIN_MODES, JOIN_MODE_LABELS } from './lobby-browser';
+import type { JoinMode } from './lobby-browser';
 import { resolveFailureMessage } from './online-copy';
 import {
   ROOM_CODE_ALPHABET,
@@ -221,7 +223,15 @@ export const KEYPAD_ROWS = Math.ceil(KEYPAD_KEYS.length / KEYPAD_COLUMNS);
 // State
 // ---------------------------------------------------------------------------
 
-/** Which of the entry screens is up. */
+/**
+ * Which of the entry screens is up.
+ *
+ * Still two, after u17-01 gave JOIN a second mode: the join *screen* grew a
+ * two-segment switch ({@link EntryState.mode}), the doors did not become five.
+ * a0-15 was a rollback of an over-complicated entry flow and Trap 8 of
+ * `docs/lobby-browser-plan.md` is the standing instruction not to be the second
+ * one — no BROWSE button on the home screen, no quick-join, no auto-matchmake.
+ */
 export type EntryScreen = 'home' | 'join';
 
 /**
@@ -239,6 +249,17 @@ export type EntryStatus = 'idle' | 'connecting' | 'error';
 /** The entry screen, as one immutable value. */
 export interface EntryState {
   readonly screen: EntryScreen;
+  /**
+   * Which half of the JOIN screen is up — the browse list, or the keypad
+   * (u17-01). Meaningless on `home`, and carried there anyway so that leaving the
+   * join screen and coming back does not forget what the player was using.
+   *
+   * The default is `browse` and the caller persists whatever it becomes (plan
+   * D2): a player who has a code is one tap from the keypad and pays that tap
+   * once, while a player with no code has nothing to do on a keypad at all — and
+   * landing them there is the failure this whole brief exists to fix.
+   */
+  readonly mode: JoinMode;
   /** The code being typed on the join screen. Never longer than
    *  {@link ROOM_CODE_LENGTH} and only ever alphabet characters. */
   readonly code: string;
@@ -308,9 +329,16 @@ export const ENTRY_ERRORS = {
   offline: 'Cannot reach the server. SOLO still works.',
 } as const;
 
-/** A fresh entry screen: the home doors, nothing typed, nothing wrong. */
-export function createEntry(): EntryState {
-  return { screen: 'home', code: '', status: 'idle', error: '', notice: '' };
+/**
+ * A fresh entry screen: the home doors, nothing typed, nothing wrong.
+ *
+ * `mode` is what JOIN will open on. It defaults to BROWSE — the first visit, and
+ * the player this feature is for — and the caller hands back whatever it
+ * remembered from last time (`src/main.ts`, through `platform.storage`, exactly
+ * as the map pick is remembered).
+ */
+export function createEntry(mode: JoinMode = 'browse'): EntryState {
+  return { screen: 'home', mode, code: '', status: 'idle', error: '', notice: '' };
 }
 
 // ---------------------------------------------------------------------------
@@ -361,10 +389,27 @@ export function chooseDoor(state: EntryState, door: EntryDoor, rng: Rng): EntryR
   };
 }
 
-/** Back out of the keypad to the doors, dropping what was typed. */
+/** Back out of the join screen to the doors, dropping what was typed — from
+ *  either mode, which is the plan's own rule (§5): BACK is the exit both segments
+ *  share and it always means the same thing. The MODE survives, because it is a
+ *  preference rather than screen state. */
 export function backToDoors(state: EntryState): EntryResult {
   if (!entryLive(state)) return { state, intent: null };
-  return { state: createEntry(), intent: null };
+  return { state: createEntry(state.mode), intent: null };
+}
+
+/**
+ * Switch the JOIN screen between its two modes (u17-01).
+ *
+ * A no-op anywhere but the join screen, and dead while an attempt is in flight —
+ * the same `entryLive` gate the doors and the keypad take, so a tap on a segment
+ * mid-connect cannot start a second story (plan §5). It clears a standing refusal
+ * (the player has moved on to a different way in) and **keeps what was typed**:
+ * looking at the list is not a reason to lose four characters somebody read out.
+ */
+export function chooseJoinMode(state: EntryState, mode: JoinMode): EntryState {
+  if (!entryLive(state) || state.screen !== 'join' || state.mode === mode) return state;
+  return { ...state, mode, status: 'idle', error: '' };
 }
 
 // ---------------------------------------------------------------------------
@@ -546,6 +591,22 @@ export interface EntryNarration {
   readonly failed: boolean;
 }
 
+/**
+ * One segment of the JOIN screen's mode switch, as the view draws it (u17-01).
+ *
+ * A chip, not a plate: *"a tab is a mode switch, not an action"* — the codex's
+ * own dialect ({@link ./codex} `codexTabPlate`), so the active segment is
+ * brightness at chip scale and the screen's one-primary-plate rule
+ * ({@link ./gantry} `singlePrimary`) is untouched by it.
+ */
+export interface EntrySegmentView {
+  readonly mode: JoinMode;
+  readonly label: string;
+  readonly active: boolean;
+  readonly enabled: boolean;
+  readonly state: PlateState;
+}
+
 /** One code cell — a typed character, or the empty box waiting for one. */
 export interface EntryCodeCell {
   readonly char: string;
@@ -557,9 +618,14 @@ export interface EntryCodeCell {
 /** The entry screen for one frame. */
 export interface EntryModel {
   readonly screen: EntryScreen;
+  /** Which half of the join screen is drawn — and, on `home`, which one JOIN will
+   *  open on. */
+  readonly mode: JoinMode;
+  /** The mode switch, in `JOIN_MODES` order — drawn on `join`, both modes. */
+  readonly segments: readonly EntrySegmentView[];
   /** The three doors — drawn on `home`. */
   readonly doors: readonly EntryDoorView[];
-  /** {@link ROOM_CODE_LENGTH} cells — drawn on `join`. */
+  /** {@link ROOM_CODE_LENGTH} cells — drawn on `join`, CODE mode. */
   readonly cells: readonly EntryCodeCell[];
   readonly keys: readonly string[];
   readonly canErase: boolean;
@@ -615,7 +681,18 @@ export const ENTRY_EYEBROW = 'DEEP FIELD MINING AUTHORITY';
 export const ENTRY_STATUS = {
   home: 'CONTRACT OPEN · SECTOR 04',
   join: 'CLAIM CODE',
+  /** …and the same line for the join screen's other half (u17-01). The keypad's
+   *  own heading is untouched — the plan pins the CODE segment as today's join
+   *  screen, unchanged — so BROWSE gets its own word rather than borrowing one
+   *  about a code the player is deliberately not typing. */
+  browse: 'OPEN CLAIMS',
 } as const;
+
+/** The header beam's status line for the screen (and mode) that is up. */
+export function entryStatusLine(state: EntryState): string {
+  if (state.screen !== 'join') return ENTRY_STATUS.home;
+  return state.mode === 'browse' ? ENTRY_STATUS.browse : ENTRY_STATUS.join;
+}
 
 /**
  * Build the frame model. Pure: the view draws exactly this and decides nothing.
@@ -646,6 +723,17 @@ export function entryModel(
   const press = pointer.press ?? null;
   return {
     screen: state.screen,
+    mode: state.mode,
+    segments: JOIN_MODES.map((mode, i) => {
+      const key = `segment:${i}`;
+      return {
+        mode,
+        label: JOIN_MODE_LABELS[mode],
+        active: state.mode === mode,
+        enabled: live,
+        state: !live ? 'rest' : press === key ? 'press' : hover === key ? 'hover' : 'rest',
+      };
+    }),
     doors: DOOR_OPTIONS.map((option, i) => {
       const key = `door:${i}`;
       return {
@@ -669,7 +757,7 @@ export function entryModel(
     prompt: told ? told.line : entryPrompt(state),
     narrating: told !== null,
     eyebrow: ENTRY_EYEBROW,
-    status: ENTRY_STATUS[state.screen],
+    status: entryStatusLine(state),
     hover: live ? hover : null,
     press: live ? press : null,
   };
@@ -695,5 +783,21 @@ export const ENTRY_TAGLINE = 'MINE · DEFEND · ATTACK';
  */
 function entryPrompt(state: EntryState): string {
   if (state.status === 'connecting') return 'CONNECTING…';
-  return state.screen === 'join' ? 'ENTER THE CLAIM CODE' : ENTRY_TAGLINE;
+  if (state.screen !== 'join') return ENTRY_TAGLINE;
+  // The browse half asks for a different thing, so it asks in different words: a
+  // player looking at a list is picking, not typing, and a line telling them to
+  // enter a code they were not given is the keypad-first failure one line higher
+  // up the screen.
+  return state.mode === 'browse' ? ENTRY_BROWSE_PROMPT : 'ENTER THE CLAIM CODE';
 }
+
+/**
+ * The browse half's standing line — the parallel of `ENTER THE CLAIM CODE`, and
+ * as short.
+ *
+ * It deliberately does **not** say "nearest first" or anything else about the
+ * order: the rows sort on pings this client measured, and with no allocator to
+ * measure (the offline build, a fleet that is down) there is no distance to be
+ * nearest by. A line that would be a lie in one honest state is not a line.
+ */
+export const ENTRY_BROWSE_PROMPT = 'PICK A CLAIM';

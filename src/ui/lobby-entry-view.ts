@@ -64,7 +64,9 @@ import type { FrameMetrics, PlateState } from '../art/materials';
 import { PALETTE } from '@render/index';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
 import { entryPlateState } from './lobby-entry';
-import type { EntryCodeCell, EntryDoorView, EntryModel } from './lobby-entry';
+import type { EntryCodeCell, EntryDoorView, EntryModel, EntrySegmentView } from './lobby-entry';
+import { LobbyBrowserView } from './lobby-browser-view';
+import type { BrowseModel } from './lobby-browser';
 import { entryHitTest, entryLayout } from './lobby-geometry';
 import type { EntryLayout, EntryTarget, Insets } from './lobby-geometry';
 import { ScreenCache } from './screen-cache';
@@ -84,6 +86,9 @@ const LABEL_PX = { primary: 27, secondary: 21 } as const;
 const SUB_PX = 13;
 /** The footer plates' labels: BACK, SETTINGS, ERASE, JOIN. */
 const FOOTER_PX = 18;
+/** The mode switch's two words (u17-01), at the codex tab chip's own size — this
+ *  is the same control doing the same job, so it is drawn at the same size. */
+const SEGMENT_PX = 15;
 
 /** The standing line under the beam: a tagline, a prompt, an error. */
 const MESSAGE_SIZE = 13;
@@ -128,6 +133,11 @@ interface ButtonNodes {
   readonly label: Text;
 }
 
+interface SegmentNodes {
+  readonly body: Graphics;
+  readonly label: Text;
+}
+
 // ---------------------------------------------------------------------------
 // The view
 // ---------------------------------------------------------------------------
@@ -150,6 +160,7 @@ export class LobbyEntryView extends Container {
   private readonly status: Text;
   private readonly message: Text;
   private readonly doorNodes: DoorNodes[] = [];
+  private readonly segmentNodes: SegmentNodes[] = [];
   private readonly cellNodes: CellNodes[] = [];
   private readonly keyNodes: KeyNodes[] = [];
   private readonly back: ButtonNodes;
@@ -157,11 +168,18 @@ export class LobbyEntryView extends Container {
   private readonly submit: ButtonNodes;
   /** The home screen's own trailing footer control. */
   private readonly settings: ButtonNodes;
+  /** The browse list — the JOIN screen's other half (u17-01). A child rather than
+   *  a fourth pool of nodes here: it is a screen's worth of drawing with its own
+   *  rules, and the beams, the switch and the footer above it are shared. */
+  private readonly browser = new LobbyBrowserView();
   /** The doors are static between state changes — see ./screen-cache. */
   private readonly cache = new ScreenCache(this);
 
   private layout: EntryLayout;
   private screen: EntryModel['screen'] = 'home';
+  /** Which half of the join screen was last drawn — the hit test takes the same
+   *  one, so a tap can never land on a control the other mode is covering. */
+  private mode: EntryModel['mode'] = 'browse';
 
   constructor(screenWidth: number, screenHeight: number, isTouch = false, insets?: Insets) {
     super();
@@ -189,6 +207,9 @@ export class LobbyEntryView extends Container {
     this.erase = this.makeButton('⌫ ERASE');
     this.submit = this.makeButton('JOIN');
     this.settings = this.makeButton('SETTINGS');
+    // Last, so the list draws over the pad's rects rather than under them if a
+    // very short screen ever brings the two modes' bands together.
+    this.addChild(this.browser);
   }
 
   /** Re-lay-out for a new viewport, device or safe area. */
@@ -204,7 +225,7 @@ export class LobbyEntryView extends Container {
    * for — so a tap can never hit a door that the keypad is currently covering.
    */
   hitTest(x: number, y: number): EntryTarget | null {
-    return entryHitTest(this.layout, x, y, this.screen);
+    return entryHitTest(this.layout, x, y, this.screen, this.mode);
   }
 
   /** The layout-registry seam (`LayoutContributor`), same as `./lobby-view`. */
@@ -213,9 +234,17 @@ export class LobbyEntryView extends Container {
     return [{ id: ENTRY_ID, anchor: ENTRY_ANCHOR, bounds: { ...this.layout.content } }];
   }
 
-  /** Draw one frame. */
-  update(model: EntryModel): void {
+  /**
+   * Draw one frame.
+   *
+   * `browse` is the list's own model (`./lobby-browser` `browseModel`) and is
+   * required whenever the BROWSE segment is up — the caller owns the clock and the
+   * poll, so it owns the model built from them. Absent, the list draws nothing,
+   * which is what the doors screen and the keypad want.
+   */
+  update(model: EntryModel, browse: BrowseModel | null = null): void {
     this.screen = model.screen;
+    this.mode = model.mode;
     if (!this.visible) return;
     // This screen is called per FRAME (src/main.ts `render`), and under Gantry it
     // is now four door plates plus two beam plates plus two beams — around 350
@@ -223,7 +252,10 @@ export class LobbyEntryView extends Container {
     // is a per-frame cost the hairline version did not have, and on a software
     // rasteriser it pegs the page's main thread. Redraw only when the model
     // actually changed; blit the rest of the time (./screen-cache).
-    const signature = JSON.stringify(model);
+    // The list ticks its own age stamp once a second and its rows change under a
+    // poll, so it is part of the signature — a cached blit of a stale stamp would
+    // be this screen telling the exact lie it exists to prevent.
+    const signature = JSON.stringify([model, browse]);
     if (this.cache.unchanged(signature)) return;
 
     const { header, footer, metrics } = this.layout;
@@ -247,6 +279,35 @@ export class LobbyEntryView extends Container {
     this.drawMessage(model, metrics);
 
     const home = model.screen === 'home';
+    // The join screen's two modes. The switch is drawn on BOTH — it is how you get
+    // from either to the other — and everything below it belongs to one of them.
+    const browsing = !home && model.mode === 'browse';
+    const typing = !home && !browsing;
+    for (let i = 0; i < this.layout.segments.length; i++) {
+      const segment = model.segments[i];
+      const rect = this.layout.segments[i];
+      if (!segment || !rect) continue;
+      const nodes = this.segmentSlot(i);
+      setVisible(!home, nodes.body, nodes.label);
+      if (!home) this.drawSegment(nodes, segment, rect, entryPlateState(model, `segment:${i}`), metrics);
+    }
+
+    // …and the list itself, drawn by its own view over the rects the layout holds.
+    this.browser.visible = browsing;
+    if (browsing && browse) {
+      this.browser.update(
+        browse,
+        {
+          rows: this.layout.browseRows,
+          joins: this.layout.browseJoins,
+          stamp: this.layout.browseStamp,
+          list: this.layout.browseList,
+        },
+        metrics,
+        { hover: model.hover, press: model.press },
+      );
+    }
+
     for (let i = 0; i < this.layout.doors.length; i++) {
       const door = model.doors[i];
       const rect = this.layout.doors[i];
@@ -261,8 +322,8 @@ export class LobbyEntryView extends Container {
       const rect = this.layout.cells[i];
       if (!cell || !rect) continue;
       const nodes = this.cellSlot(i);
-      setVisible(!home, nodes.body, nodes.char);
-      if (!home) this.drawCell(nodes, cell, rect);
+      setVisible(typing, nodes.body, nodes.char);
+      if (typing) this.drawCell(nodes, cell, rect);
     }
 
     for (let i = 0; i < this.layout.keys.length; i++) {
@@ -270,8 +331,8 @@ export class LobbyEntryView extends Container {
       const rect = this.layout.keys[i];
       if (key === undefined || !rect) continue;
       const nodes = this.keySlot(i);
-      setVisible(!home, nodes.body, nodes.label);
-      if (!home) {
+      setVisible(typing, nodes.body, nodes.label);
+      if (typing) {
         this.drawKey(nodes, key, rect, model.connecting ? 'rest' : entryPlateState(model, `key:${i}`));
       }
     }
@@ -290,8 +351,11 @@ export class LobbyEntryView extends Container {
       // screen, so the one-primary rule holds in both states.
       [this.submit, this.layout.submit, 'submit', true, model.canSubmit],
     ] as const) {
-      setVisible(!home, nodes.body, nodes.label);
-      if (!home) this.drawFooterPlate(nodes, rect, model, key, primary, enabled, metrics);
+      // ERASE and JOIN belong to the keypad, not to the list: a browse screen has
+      // nothing typed to erase and nothing typed to submit, and a control drawn
+      // where nothing can answer it is the affordance bug this suite exists for.
+      setVisible(typing, nodes.body, nodes.label);
+      if (typing) this.drawFooterPlate(nodes, rect, model, key, primary, enabled, metrics);
     }
 
     // SETTINGS shares the beam's trailing end with JOIN, on the home screen only.
@@ -305,6 +369,65 @@ export class LobbyEntryView extends Container {
     // between state changes cost one blit rather than the whole plate set
     // (./screen-cache).
     this.cache.refresh(signature);
+  }
+
+  // --- The mode switch ------------------------------------------------------
+
+  /**
+   * One segment of BROWSE / ENTER ROOM CODE.
+   *
+   * A CHIP, and the active one is `primary` — the codex tab's exact construction
+   * ({@link ./codex} `codexTabPlate`): *"a tab is a mode switch, not an action"*,
+   * so it is marked by brightness at chip scale, which is a different size family
+   * from the plates the one-primary rule counts ({@link ./gantry} `countPrimaries`
+   * takes a screen's PLATES). The keypad's JOIN stays the join screen's single
+   * bright PLATE, exactly as it was before this brief.
+   */
+  private drawSegment(
+    nodes: SegmentNodes,
+    segment: EntrySegmentView,
+    rect: Rect,
+    state: PlateState,
+    m: FrameMetrics,
+  ): void {
+    nodes.body.clear();
+    const drawable = rect.width > 0 && rect.height > 0;
+    nodes.label.visible = drawable;
+    if (!drawable) return;
+
+    const role = segment.active ? 'primary' : 'secondary';
+    const shown = segment.enabled ? state : 'rest';
+    drawPlate(nodes.body, rect.x, rect.y, rect.width, rect.height, role, 'chip', shown);
+    nodes.body.alpha = segment.enabled ? 1 : 0.5;
+
+    const px = plateTypeSize(SEGMENT_PX, m);
+    nodes.label.text = segment.label;
+    nodes.label.style.fontSize = px;
+    nodes.label.style.letterSpacing = trackingPx(DISPLAY_TRACKING.heading, px);
+    nodes.label.style.fill = segment.active ? BONE.hi : MATERIAL_SHADES.bone;
+    nodes.label.alpha = segment.enabled ? 1 : 0.5;
+    nodes.label.scale.set(1);
+    // `ENTER ROOM CODE` is the longest word-pair on this screen and a phone's chip
+    // is not a desktop's, so it shrinks to its chip rather than spilling past the
+    // bezel — the codex tab's own answer to the same problem.
+    const room = Math.max(0, rect.width - 2 * Math.max(6, Math.round(10 * m.plateScale)));
+    if (nodes.label.width > room && nodes.label.width > 0) {
+      nodes.label.scale.set(room / nodes.label.width);
+    }
+    nodes.label.x = rect.x + rect.width / 2;
+    nodes.label.y = rect.y + rect.height / 2 + plateMaterial(role, shown, 'chip').offsetY;
+  }
+
+  private segmentSlot(index: number): SegmentNodes {
+    const existing = this.segmentNodes[index];
+    if (existing) return existing;
+    const body = new Graphics();
+    const label = makeText('', FONT_HEADING, SEGMENT_PX, MATERIAL_SHADES.bone);
+    label.anchor.set(0.5, 0.5);
+    this.addChild(body, label);
+    const nodes: SegmentNodes = { body, label };
+    this.segmentNodes[index] = nodes;
+    return nodes;
   }
 
   // --- The header beam ------------------------------------------------------

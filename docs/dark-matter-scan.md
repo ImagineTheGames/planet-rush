@@ -385,26 +385,28 @@ judgement over 157 items, not 157 investigations.
 
 ### 4.5 SEAM — a feature landed in two halves, on purpose (n10-01, 2026-08-12)
 
-Two entries, added by the Netcode lane against this gate's own instruction, and
-recorded here so the claim can be argued with:
+**CLOSED, 2026-08-12 (u17-01). Both entries are gone from the allowlist.**
 
-| Export | Verdict | Why it has no production caller yet |
+| Export | Verdict then | Now |
 |---|---|---|
-| `src/net/lobby-list.ts#readLobbyList` | SEAM | the browse screen's read |
-| `src/net/lobby-list.ts#joinListing` | SEAM | the browse screen's JOIN button |
+| `src/net/lobby-list.ts#readLobbyList` | SEAM — the browse screen's read | called by `src/main.ts` `refreshLobbyList` |
+| `src/net/lobby-list.ts#joinListing` | SEAM — the browse screen's JOIN button | called by `src/main.ts` `startListingJoin` |
 
-`docs/lobby-browser-plan.md` splits the lobby browser across two owners: the
-route and its client (Netcode, Milestone B) and the browse screen that calls them
-(UI, Milestone D). These are the client half of the route — exercised end to end
-in `tests/net/lobby-list-route.test.ts` against a live allocator, and called by
-nothing in `src/main.ts` until the screen lands.
+`docs/lobby-browser-plan.md` split the lobby browser across two owners: the route
+and its client (Netcode, Milestone B — n10-01) and the browse screen that calls
+them (UI, Milestone D — u17-01). For one brief's width these two were the client
+half of a route with no caller, allowed with a named and dated successor.
 
-**This is the shape the gate exists to catch**, so it is worth being explicit
-about why it is allowed rather than fixed: `matchAbundance` shipped tested and
-uncalled *and nobody was waiting for it*. These two have a named successor brief
-and a dated one. **If the browse screen does not land, these entries are the
-evidence that it did not** — the right response then is to delete them, not to
-re-justify them.
+The successor landed, so the entries came out. That is the whole of the promise
+n10-01 wrote into both of them: *"if the browse screen does not land, these
+entries are the evidence that it did not — the right response then is to delete
+them, not to re-justify them."* The screen landed; they are deleted either way.
+
+**What this half-brief allowance is worth keeping**, because the gate will meet
+it again: `matchAbundance` shipped tested and uncalled *and nobody was waiting for
+it*, which is why it survived weeks. A SEAM entry is only defensible with a named
+successor brief and a date — and the entry has to say what evidence its own
+survival would be.
 
 ## 5. Should it gate CI? Yes — and here is the number
 

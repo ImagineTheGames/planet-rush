@@ -75,12 +75,14 @@ import { adjustVolume, createSettings, toggleReduceVfx } from './settings';
 import type { ControlScheme, SettingsState, SettingsTarget } from './settings';
 import { endButtons } from './end-of-match';
 import type { EndTarget, MatchOutcome } from './end-of-match';
+import { JOIN_MODES } from './lobby-browser';
 import {
   DOOR_ORDER,
   ENTRY_ERRORS,
   KEYPAD_KEYS,
   backToDoors,
   chooseDoor,
+  chooseJoinMode,
   createEntry,
   eraseEntryCode,
   entryConnected,
@@ -417,6 +419,19 @@ export function flowTapEntry(state: FlowState, target: EntryTarget, rng: Rng): F
       const key = KEYPAD_KEYS[target.index];
       return key ? withEntry(state, typeEntryCode(state.entry, key)) : rest(state);
     }
+    case 'segment': {
+      // The JOIN screen's mode switch (u17-01). A pure entry-model transition —
+      // no listing, no request, nothing to drain — so the seam carries it.
+      const mode = JOIN_MODES[target.index];
+      return mode ? withEntry(state, chooseJoinMode(state.entry, mode)) : rest(state);
+    }
+    case 'row':
+      // …and the one target this seam deliberately does NOT carry. A row is a
+      // handle out of a listing, and this file holds no listing: the browse
+      // screen's state is `./lobby-browser`'s and the poll that feeds it belongs
+      // to whoever owns the clock (`src/main.ts`). Answering here with a guess
+      // would be a second, weaker copy of a join — see plan Trap 5.
+      return rest(state);
     case 'erase':
       return withEntry(state, eraseEntryCode(state.entry));
     case 'back':
