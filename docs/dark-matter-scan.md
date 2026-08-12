@@ -374,6 +374,23 @@ without a cycle — the spec is the only place the two can meet. `src/sim/
 constants.ts`'s derived-stat helpers and the `art/tokens.ts` / `art/palette.ts`
 tables are the same: QA and the balance harness own them from day 2.
 
+`src/ui/build-button.ts#BUILD_BUTTON_LABEL` (a0-32, 2026-08-12) is the same
+shape as `segmentAtDirection` and, unlike the 157 above, was checked one row at
+a time. It is the arithmetic that fits `BUILD` and `& UPGRADE` inside the 38px
+circle. `@platform/touch-visuals` draws the sizes it produces, spelled out as
+literals because `src/platform` may not import `src/ui` at runtime, and
+`touch-visuals.test.ts` pins the two together — the discipline the two font
+stacks were already held to. The spec is the only place the layers can meet, so
+"no production caller" is the design and not a gap.
+
+The same brief resolved its other two findings the other two ways, which is
+worth recording because the gate's whole point is that allowlisting is the last
+option and not the first: `font-metrics.ts#textBox` was **wired** — the wedge
+placement in `wheel-stack.ts` was building the same box inline, so the export
+replaced a second arithmetic rather than sitting beside one — and
+`font-metrics.ts#untabledGlyphs` was **deleted**, having no caller in production
+or in a spec. Only the seam that could not be wired was allowed.
+
 **(c) Test seams** — `resetBuildIdentity`, `resetPlaytestLog`,
 `resetLinkLossView`, `createDoNothingBot`, `LatencyTransport`,
 `platform/freeze.ts#buildFrozenWorld`. Reset and stand-in helpers whose entire

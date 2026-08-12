@@ -62,7 +62,7 @@ export function wheelRadius(viewportWidth: number, viewportHeight: number): numb
   );
 }
 
-// --- One wedge: is it thumb-sized, and do its words fit? (u7-02) ------------
+// --- One wedge: is it thumb-sized, and do its words fit? (u7-02, a0-32) -----
 //
 // The Gantry/Bone pass puts four lines of text on a wedge — the name, what it
 // spends on, the cost, and the count over its cap — inside a fixed radial
@@ -71,28 +71,112 @@ export function wheelRadius(viewportWidth: number, viewportHeight: number): numb
 // overflowed its chrome for exactly this reason and only the phone profiles
 // caught it, so the budget is computed here, in the pure layer, where a test can
 // hold every worst-case string to it (./hud-geometry.test.ts).
+//
+// ── AND WHY THE BUDGET IS NOW A SHAPE AND NOT A WIDTH (a0-32) ──────────────
+// u7-02 spent that budget as a CHORD — "how wide is the wedge at this radius" —
+// and `wedgeChordWidth` was this file's answer to it. A chord is the whole
+// question for the wedge at twelve o'clock: its words run left-to-right and the
+// chord runs left-to-right with them. For the wedge at NINE o'clock it is the
+// wrong axis. The words are not rotated — the point of a radial menu you can read
+// is that its labels stay upright — so on the left-hand wedge a line of text
+// extends along the RADIUS, and what stops it is the rim, which a chord says
+// nothing about.
+//
+// That was the defect, exactly: `UPGRADE` measured 81 px against a chord budget
+// of 127 px and passed, while hanging 10 px past the outer rim of a wheel that is
+// only 140 px in radius, on the phone the developer photographed. So the budget
+// is the SHAPE rather than one of its widths — an annular sector, and a box
+// either fits inside it or does not. `wedgeChordWidth` is gone rather than kept
+// beside it: a budget that is right for one wedge and silent about another is
+// worse than no budget at all.
 
-/**
- * The width available to a wedge's words at a given radius, CSS px: the chord of
- * the wedge's arc there, less a margin so a line stops short of the spokes rather
- * than touching them.
- *
- * A radial menu narrows as it approaches the hub, which is why the word stack
- * hangs from the rim (where the arc is widest) rather than centring in the ring —
- * the *last* line of a four-line stack is the one this budget bites on.
- */
-export function wedgeChordWidth(
-  radiusAtLine: number,
-  segments: number,
-  margin = WEDGE_TEXT_MARGIN,
-): number {
-  if (segments <= 0 || radiusAtLine <= 0) return 0;
-  const half = Math.PI / segments;
-  return Math.max(0, 2 * radiusAtLine * Math.sin(half) - 2 * margin);
+/** Clearance a wedge's words keep from the chrome around them, CSS px — the
+ *  spokes on each side, and (since a0-32, which found out the hard way that it
+ *  matters) the rim and the hub as well. */
+export const WEDGE_TEXT_MARGIN = 4;
+
+/** An annular sector: the ring between two radii, between two angles. The shape
+ *  one wedge of the wheel actually is. Angles in radians, screen space (y down). */
+export interface AnnularSector {
+  readonly innerRadius: number;
+  readonly outerRadius: number;
+  /** The angle the wedge is centred on — `segmentAngle(i)` (`./build-wheel`). */
+  readonly angle: number;
+  /** Half the wedge's angular width: `π / segments`. */
+  readonly halfArc: number;
 }
 
-/** Clearance a wedge's words keep from the spoke on each side, CSS px. */
-export const WEDGE_TEXT_MARGIN = 4;
+/** How far outside its sector a box reaches, CSS px and radians — all four
+ *  numbers zero when it fits. Reported rather than a bare boolean so a failing
+ *  test can say *which* edge it crossed and by how much. */
+export interface SectorOverflow {
+  /** Past the outer rim, CSS px. */
+  readonly outer: number;
+  /** Into the hub, CSS px. */
+  readonly inner: number;
+  /** Past the wedge's own spokes, radians (the worse of the two sides). */
+  readonly arc: number;
+  /** True when none of the above is positive. */
+  readonly fits: boolean;
+}
+
+/**
+ * By how much an axis-aligned box, in wheel-centre coordinates, escapes its
+ * wedge.
+ *
+ * The box is assumed not to contain the wheel's centre — a label never does —
+ * which is what lets the angular extent be read off the four corners: for a
+ * convex region that excludes the origin, the extreme bearings are at vertices.
+ * The radial extremes are not both at corners, though: the FARTHEST point is
+ * always a corner, but the NEAREST is the ordinary point-to-rectangle distance,
+ * which lands on an edge whenever the box straddles an axis through the centre.
+ *
+ * `margin` insets the shape before testing, so words stop short of the chrome
+ * rather than touching it — the same clearance {@link wedgeChordWidth} spends.
+ */
+export function sectorOverflow(
+  box: Rect,
+  sector: AnnularSector,
+  margin = WEDGE_TEXT_MARGIN,
+): SectorOverflow {
+  const x0 = box.x;
+  const x1 = box.x + box.width;
+  const y0 = box.y;
+  const y1 = box.y + box.height;
+
+  let far = 0;
+  let widestArc = 0;
+  for (const [x, y] of [
+    [x0, y0],
+    [x1, y0],
+    [x0, y1],
+    [x1, y1],
+  ] as const) {
+    far = Math.max(far, Math.hypot(x, y));
+    widestArc = Math.max(widestArc, Math.abs(angleDelta(Math.atan2(y, x), sector.angle)));
+  }
+  // Nearest point of the box to the centre: zero on each axis the box straddles.
+  const nx = x0 > 0 ? x0 : x1 < 0 ? -x1 : 0;
+  const ny = y0 > 0 ? y0 : y1 < 0 ? -y1 : 0;
+  const near = Math.hypot(nx, ny);
+
+  // A margin in px is a margin in px on the two radii; on the arc it is that same
+  // clearance read as an angle at the radius where the box actually sits, which
+  // is the honest conversion — 4 px of gap near the hub is a lot of degrees.
+  const arcMargin = far > 0 ? margin / far : 0;
+  const outer = Math.max(0, far - (sector.outerRadius - margin));
+  const inner = Math.max(0, sector.innerRadius + margin - near);
+  const arc = Math.max(0, widestArc - (sector.halfArc - arcMargin));
+  return { outer, inner, arc, fits: outer <= 0 && inner <= 0 && arc <= 0 };
+}
+
+/** `a − b`, wrapped into `(−π, π]`. */
+function angleDelta(a: number, b: number): number {
+  let d = (a - b) % (2 * Math.PI);
+  if (d > Math.PI) d -= 2 * Math.PI;
+  if (d <= -Math.PI) d += 2 * Math.PI;
+  return d;
+}
 
 /**
  * One wedge as a touch target: the arc it spans at its own mid-radius, and how

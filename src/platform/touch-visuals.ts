@@ -312,20 +312,33 @@ const PRESSED_WEIGHT = 'bold';
 /** `FIRE`. 18px, unchanged — the button's diameter did not move, so neither did
  *  the word that has to fit inside it. */
 const FIRE_SIZE = 18;
-/** `BUILD`. */
+/** `BUILD`. Unchanged by a0-32 — it was inside its circle all along, with 5% to
+ *  spare, and `@ui/build-button` now asserts that rather than assuming it. */
 const BUILD_SIZE = 15;
 /**
  * `& UPGRADE`.
  *
- * Up from 8px, and it stops there rather than at `TYPE_MIN` (11) for a reason
- * worth stating: the chord of a 38px-radius circle at this baseline is ~68px,
- * and `R_BUILD` is a **layout contract** (`buildButtonRect`, which QA's
- * placement suite asserts against) rather than a drawing detail, so the button
- * cannot grow to fit a bigger word. Ten px of Oxanium at dpr 3 is 30 device
- * pixels of a face designed for game interfaces; the frames in
- * `evidence/a0-23-touch-controls-theme/` are what settle whether that reads, and they do.
+ * It stops well below `TYPE_MIN` (11) for a reason worth stating: `R_BUILD` is a
+ * **layout contract** (`buildButtonRect`, which QA's placement suite asserts
+ * against) rather than a drawing detail, and GDD §2.4 makes a touch target a
+ * floor rather than a preference, so the button cannot grow to fit a bigger word.
+ *
+ * **9, not a0-23's 10, since a0-32.** That brief was written against a budget of
+ * *"the chord of a 38px circle at this baseline is ~68px"*, and both halves of
+ * that were generous in the same direction: a chord at the BASELINE is not the
+ * room a line of type has (its widest point is the corner of its box, at
+ * `|y| = centre + height/2`), and the 5px rim is stroked centred on the radius,
+ * so the interior ends 2.5px inside the circle. Measured against the shape it is
+ * actually in, the room is 64px — and once u14-01 self-hosted the real Oxanium,
+ * these nine glyphs at 10px came to 68. The developer photographed the result:
+ * *"have words clipping past … build and upgrade"*.
+ *
+ * Nine px of Oxanium 700 at dpr 3 is 27 device pixels of a face designed for game
+ * interfaces. The arithmetic is `@ui/build-button` `BUILD_BUTTON_LABEL`, which
+ * this constant is pinned to by `./touch-visuals.test.ts` — spelled out here
+ * rather than imported for the same layering reason the two font stacks are.
  */
-const BUILD_SUB_SIZE = 10;
+const BUILD_SUB_SIZE = 9;
 
 // ---------------------------------------------------------------------------
 // The visuals layer

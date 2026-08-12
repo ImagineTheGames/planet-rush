@@ -23,6 +23,18 @@ import { DISPLAY_TRACKING, TRACKING, trackingPx } from '../art/materials';
 // import `src/ui/` at runtime, but a TEST may, and this is the one that stops
 // the two spellings of the ratified font stacks from drifting apart.
 import { FONT_BODY, FONT_HEADING } from '../ui/typography';
+// …and the same crossing for the same reason, for the SIZES: `@ui/build-button`
+// owns "the words are inside the circle" (a0-32) and computes what will fit; this
+// file spells the answer out, and this import is what stops the two from drifting.
+import {
+  BUILD_BUTTON_LABEL,
+  BUILD_BUTTON_RADIUS,
+  BUILD_BUTTON_RIM,
+  ROUND_LABEL_PAD,
+  roundLabelHalfWidth,
+} from '../ui/build-button';
+import { textHeight, textWidth } from '../ui/font-metrics';
+import { TOUCH_RIM } from './touch-chrome';
 
 // A hand-built readout — TouchController satisfies TouchReadout structurally, but
 // tests drive the visuals with plain data (no DOM, no controller).
@@ -355,6 +367,64 @@ describe('the touch controls are off plasma and on the Bone ramp (a0-23)', () =>
 
   it('keeps `& UPGRADE` — a player who does not know upgrades exist never looks for them', () => {
     expect(textsOf(fullyDrawn()).map((t) => t.text)).toContain('& UPGRADE');
+  });
+
+  // -------------------------------------------------------------------------
+  // …and every one of them is INSIDE the circle that holds it (a0-32)
+  // -------------------------------------------------------------------------
+  //
+  // The developer's report was that `& UPGRADE` "clips past" this button. It did:
+  // 68px of Oxanium in 64px of usable circle, on a control whose radius is a
+  // layout contract and cannot grow. These three assertions are the rule rather
+  // than the instance — the fit is recomputed from the drawn nodes, so a size
+  // nudged in this file, a face swapped in `typography.ts`, or copy lengthened in
+  // either place fails here instead of in a phone photograph.
+
+  it('the two words this button draws are the two `@ui/build-button` fitted', () => {
+    // The layering pin. `src/platform/` may not import `src/ui/` at runtime, so
+    // the sizes are spelled out twice; this is what makes the second spelling a
+    // copy rather than a fork. Same discipline as the font stacks above.
+    const texts = textsOf(fullyDrawn());
+    for (const line of BUILD_BUTTON_LABEL) {
+      const drawn = texts.find((t) => t.text === line.text);
+      expect(drawn, `the button no longer draws "${line.text}"`).toBeDefined();
+      expect(drawn!.style.fontSize, `"${line.text}" is drawn at a size @ui/build-button did not fit`).toBe(
+        line.size,
+      );
+      expect(drawn!.style.letterSpacing).toBeCloseTo(line.tracking * line.size, 6);
+    }
+  });
+
+  it('the circle the words are fitted to is the circle the button actually draws', () => {
+    // A fit computed against the wrong radius is a fit against nothing. The
+    // button's own rect is `2 * R_BUILD` across, and the rim is `TOUCH_RIM.build`.
+    const rect = buildButtonRect(true, true, 844, 390)!;
+    expect(rect.width).toBe(2 * BUILD_BUTTON_RADIUS);
+    expect(rect.height).toBe(2 * BUILD_BUTTON_RADIUS);
+    expect(TOUCH_RIM.build).toBe(BUILD_BUTTON_RIM);
+  });
+
+  it('neither word breaks the silhouette — the box, not the baseline', () => {
+    // What a0-23's budget got wrong, asserted so it cannot come back: a line of
+    // type is a BOX, and what has to clear the ring is its widest corner at
+    // `|y| = centre + height/2`, inside a rim that is stroked centred on the
+    // radius and therefore eats half its width off the interior.
+    const build = fullyDrawn().getChildByLabel('build-button') as Container;
+    for (const line of BUILD_BUTTON_LABEL) {
+      const node = build.children.find((c) => (c as Text).text === line.text) as Text;
+      expect(node, `"${line.text}" is not on the button`).toBeDefined();
+      const spec = { face: line.face, size: line.size, tracking: line.tracking };
+      const yExtent = Math.abs(node.y) + textHeight(line.text, spec) / 2;
+      const room = 2 * roundLabelHalfWidth(BUILD_BUTTON_RADIUS, BUILD_BUTTON_RIM, yExtent) - 2 * ROUND_LABEL_PAD;
+      const width = textWidth(line.text, spec);
+      expect(
+        width,
+        `"${line.text}" is ${width.toFixed(1)}px wide at y=${node.y}, where the button's interior ` +
+          `gives it ${room.toFixed(1)}px — it would break the ring on both sides`,
+      ).toBeLessThanOrEqual(room);
+      // …and the node really is where the fit assumed it is.
+      expect(node.y, `"${line.text}" is drawn at a baseline the fit did not use`).toBe(line.centreY);
+    }
   });
 
   it('BUILD announces itself by darkening, not by glowing (the plasma haloes are gone)', () => {
