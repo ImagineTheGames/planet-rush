@@ -66,6 +66,7 @@ import type { DrawnOreHold } from './ore-hold-view';
 import { controlsStripView, showControlsStrip } from './controls-strip';
 import type { StripRow } from './controls-strip';
 import { buildWheelModel, segmentAngle } from './build-wheel';
+import { detentOnSelection } from './wheel-selection';
 import type { BuildWheelSignals } from './build-wheel';
 import { BuildWheelView } from './build-wheel-view';
 import type { DrawnBuildWedge, DrawnUpgradeWedge } from './build-wheel-view';
@@ -272,6 +273,13 @@ export interface HudFrame {
   readonly docked?: boolean;
   /** The `build` action is held (GDD §2.4). Default false. */
   readonly buildRequested?: boolean;
+  /**
+   * The Build-wheel wedge the player is pointing at, or `null` for none (u16-01).
+   * Device-neutral: a desktop hover, a thumb on the glass and a gamepad stick all
+   * arrive here as the same index (GDD §2.4). Default `null` — a caller that
+   * never wires it draws the resting wheel, exactly as before.
+   */
+  readonly wheelSelection?: number | null;
   /** Turrets standing or queued (the sim's `turretCount`). Default 0. */
   readonly turrets?: number;
   /** Shields standing or queued (the sim's `shieldCount`). Default 0. */
@@ -659,6 +667,17 @@ export class Hud extends Container {
   /** How many wedges the upgrade wheel last drew — the float layer needs it to
    *  place an upgrade-wedge cost float at the right angle. */
   private upgradeWedgeCount = 0;
+  /** The UI sound seam. Held as well as handed to {@link pressFeedback} because
+   *  the wheel's DETENT (u16-01) is not a press: nothing was pushed and nothing
+   *  was bought, so it has no business travelling through the press driver. */
+  private readonly sfx: UiSfx;
+  /** The Build wheel's selected wedge as of the last frame, so a crossing is the
+   *  CHANGE between two frames rather than a flag anybody has to remember to
+   *  clear ({@link ./wheel-selection.detentOnSelection}). */
+  private prevSelection: number | null = null;
+  /** A wedge boundary was crossed since the last {@link takeDetent} — drained by
+   *  the boot path, which owns the vibration motor (`@platform/haptics`). */
+  private detentPending = false;
   /** The floating ore costs, drawn in screen space so one can travel from a
    *  centred wedge all the way to the top-left bank readout and outlive the wheel
    *  closing. A pooled Text row, same discipline as the rest of the HUD. */
@@ -688,6 +707,7 @@ export class Hud extends Container {
     // sound seam: a press ticks (or buzzes, if disabled) and a sim-confirmed
     // spend chimes, all from the same state that drives the visual tell.
     this.pressFeedback = new PressFeedback(sfx);
+    this.sfx = sfx;
 
     // Ore (top-left): a dim `ORE` eyebrow over the banked number in ore yellow.
     // The chrome behind it is a scrim and a rule — never a plate (./instrument).
@@ -1764,6 +1784,10 @@ export class Hud extends Container {
       maxCoreHp: frame.maxCoreHp ?? 0,
       collapsed: frame.collapsed ?? false,
       repairGate: frame.repairGate ?? 0,
+      // The wedge the player is pointing at — a mouse hover, a thumb, or a stick,
+      // all as one integer (u16-01). The model clamps it and drops it on a shut
+      // wheel, so nothing downstream has to.
+      selected: frame.wheelSelection ?? null,
     };
     const wheel = buildWheelModel(signals);
     const upgrade = upgradeWheelModel({
@@ -1813,8 +1837,39 @@ export class Hud extends Container {
     this.upgradeReady = upgrade.wedges.map((w) => w.state === 'ready');
     this.upgradeWedgeCount = upgrade.wedges.length;
 
+    // The DETENT (u16-01) — the handoff's *"Wedge crossed → detent, one note an
+    // octave above the click, muted while unaffordable"*. Fired from the change
+    // between two frames' selections, which is the same discipline the
+    // confirmations above use and for the same reason: there is no "I moved the
+    // pointer" flag to leave set, so a paused frame or a re-entered handler
+    // cannot double-tick. The cue itself is already in the ratified bank
+    // (`src/art/audio/ui-cues.ts` — one note, A♭7, undetuned, "a wobbling detent
+    // reads as a fault"), so nothing new is synthesised for this.
+    if (detentOnSelection(this.prevSelection, wheel.selected, wheel.segments)) {
+      this.sfx('detent');
+      this.detentPending = true;
+    }
+    this.prevSelection = wheel.selected;
+
     this.wheel.update(wheel, upgrade, frame.time, this.pressFeedback, frame.isTouch ?? false);
     return wheel.open;
+  }
+
+  /**
+   * Drain the detent the wheel crossed this frame, for the half of it the UI does
+   * not own: the vibration motor lives in `@platform/haptics` and is wired by the
+   * boot path, so the HUD reports the event and the platform decides whether the
+   * device can feel it.
+   *
+   * **On a device with no motor — every desktop, and iOS Safari — this drains to
+   * a no-op and the detent is the sound plus the 140 ms sweep.** That is not a
+   * degraded state: the sweep is the primary tell and the one every device gets,
+   * the note is the second, and the buzz is a third that most players never had.
+   */
+  takeDetent(): boolean {
+    const d = this.detentPending;
+    this.detentPending = false;
+    return d;
   }
 
   // --- Press & confirmation feedback (field report v0.2.2) -----------------

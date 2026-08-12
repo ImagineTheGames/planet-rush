@@ -25,12 +25,23 @@
  * platform wires this seam with a one-liner: `sfx: (cue) => audio.cue(cue)`.
  */
 
-/** A UI sound event. One-to-one with the first three `AudioCue` names in
- *  `src/art/audio` (`bank.ts`), so the platform wires the seam straight through.
+/** A UI sound event. One-to-one with `AudioCue` names in `src/art/audio`
+ *  (`bank.ts`), so the platform wires the seam straight through.
  *   - `press`   — a live control was pressed (the lightest tick).
  *   - `confirm` — the SIM confirmed a spend: a purchase or a repair landed.
- *   - `reject`  — a disabled control was pressed (the buzzer; no haptic twin). */
-export type UiCue = 'press' | 'confirm' | 'reject';
+ *   - `reject`  — a disabled control was pressed (the buzzer; no haptic twin).
+ *   - `detent`  — a SELECTION stepped one notch: the build wheel's thumb crossing
+ *     a wedge boundary (u16-01), the same event a menu row or a lobby seat
+ *     already fires. Nothing was pressed and nothing was bought, which is why it
+ *     is its own cue and not a quiet press.
+ *
+ * `detent` was in the ratified bank long before this seam carried it — one note,
+ * an octave above the click, fixed pitch and deliberately UNDETUNED because "a
+ * wobbling detent reads as a fault" (`src/art/audio/ui-cues.ts`, the handoff's
+ * own audio table). The developer's standing ruling is *"modern/sci-fi and not
+ * retro/toony"*, and this adds no sound: it calls one that was already ratified,
+ * already mixed and already used by three other selections in the game. */
+export type UiCue = 'press' | 'confirm' | 'reject' | 'detent';
 
 /** The narrow seam a UI control calls to make a sound. The audio module decides
  *  the rest (sound, volume, ducking); the UI only names the event. */

@@ -921,12 +921,18 @@ describe('a wedge at 390 px, with its longest values (u7-02)', () => {
 
   /** Walk one wheel's real wedges and assert every drawn line fits the arc AT
    *  ITS OWN RADIUS — the bottom line sits where the wedge is narrowest, which is
-   *  the whole reason this exists. */
-  function assertWedgesFit(vp: Viewport): void {
+   *  the whole reason this exists.
+   *
+   *  `selected` runs the same walk with the wedge SELECTED (u16-01), where the
+   *  design grows the name to 19 px from 17. A wedge does not get wider when its
+   *  name does, and the 390 px phone — where the name is already floored at 12 px
+   *  because Audiowide is the first thing a thumb reads — is where that stops
+   *  being obvious. */
+  function assertWedgesFit(vp: Viewport, selected = false): void {
     const outer = wheelRadius(vp.width, vp.height);
     const m = wheelMetrics(outer);
     for (const seg of buildWheelModel(WORST_CASE).segments) {
-      const { placed, innerRadius } = placeWedgeLines(buildWedgeLines(seg, m), outer, m);
+      const { placed, innerRadius } = placeWedgeLines(buildWedgeLines(seg, m, selected), outer, m);
       for (const line of placed) {
         const budget = wedgeChordWidth(line.radius, SEGMENTS);
         const w = textWidth(line.text, line.size, line.tracking, line.face);
@@ -945,11 +951,45 @@ describe('a wedge at 390 px, with its longest values (u7-02)', () => {
     assertWedgesFit(PHONE);
   });
 
+  it('every line of every SELECTED wedge fits too, at the narrowest profile', () => {
+    // The one that could have been skipped, and is the reason the size step is
+    // made in `./wheel-stack` rather than scaled in the view: measured here, an
+    // enlarged name that overflowed its arc is a red test; scaled in the view it
+    // would be a phone-only clip that only a golden could catch, on a screen the
+    // goldens shoot with nothing selected.
+    assertWedgesFit(PHONE, true);
+  });
+
   for (const { name, vp } of PROFILES) {
     it(`[${name}] every line of every wedge fits`, () => {
       assertWedgesFit(vp);
     });
+
+    it(`[${name}] …and still fits when the wedge is selected`, () => {
+      assertWedgesFit(vp, true);
+    });
   }
+
+  it('the selected name really is bigger — the budget is not passing on a no-op', () => {
+    // A fit test that passes because nothing changed is worth nothing. Both ends
+    // of the profile ramp, so neither the stated desktop numbers nor the derived
+    // phone ones can quietly stop growing.
+    for (const vp of [{ width: 1280, height: 800 }, PHONE]) {
+      const m = wheelMetrics(wheelRadius(vp.width, vp.height));
+      const seg = buildWheelModel(WORST_CASE).segments[0]!;
+      const resting = buildWedgeLines(seg, m).find((l) => l.slot === 'name')!;
+      const chosen = buildWedgeLines(seg, m, true).find((l) => l.slot === 'name')!;
+      expect(chosen.size).toBeGreaterThan(resting.size);
+      expect(chosen.size / resting.size).toBeCloseTo(19 / 17, 10);
+      // …and nothing else about the stack moved. The design grows the NAME.
+      expect(buildWedgeLines(seg, m, true).map((l) => l.text)).toEqual(
+        buildWedgeLines(seg, m).map((l) => l.text),
+      );
+      expect(buildWedgeLines(seg, m, true).filter((l) => l.slot !== 'name').map((l) => l.size)).toEqual(
+        buildWedgeLines(seg, m).filter((l) => l.slot !== 'name').map((l) => l.size),
+      );
+    }
+  });
 
   it('the desktop profile takes the handoff\'s own numbers, not a scaled phone', () => {
     // The look is stated twice on purpose. At a desktop radius the wedge must be

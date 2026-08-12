@@ -358,7 +358,17 @@ const WHEEL_ORE_FLUSH = 8;
 
 interface PressStage {
   openBuild(ore: number): { open: boolean; banked: number } | null;
-  wedges(): Array<{ id: string; costLabel: string; caps: string; costPaint: string }>;
+  wedges(): Array<{
+    id: string;
+    costLabel: string;
+    caps: string;
+    costPaint: string;
+    /** Whether the view drew this wedge as the selected one (u16-01). */
+    selected: boolean;
+  }>;
+  /** Ore banked on the local ship — so a baseline can prove that pointing at a
+   *  wedge spent nothing. */
+  bank(): number | null;
 }
 
 /** Boot the frozen scene and open the Build wheel at the local station with
@@ -460,6 +470,126 @@ test('golden: PORTRAIT-HELD phone BUILD WHEEL — the wheel survives the lock', 
   // this project has been bitten by exactly that (PR #93).
   await bootFrozenBuildWheel(page, WHEEL_ORE_SHORT);
   await expect(page).toHaveScreenshot('phone-portrait-build-wheel.png', GOLDEN);
+});
+
+// ---------------------------------------------------------------------------
+// The SELECTION STATE (u16-01) — the half of screen 5a that was never built
+// ---------------------------------------------------------------------------
+//
+// The four baselines above shoot a RESTING wheel: nothing is pointed at, and by
+// design that frame is unchanged by this deliverable. What they cannot show is
+// the thing the developer asked about — *"is the build wheel FULLY theme
+// compliant like how the design for it was made"* — because `a0-20` measured the
+// answer as "yes, except the interactive half", and the interactive half only
+// exists while something is pointing at it.
+//
+// So these two open the same wheel and then point at it, WITH REAL INPUT through
+// the shipped handlers rather than by reaching into the model:
+//
+//   · desktop — `page.mouse.move()` to the wedge's own centre, which is the
+//     `pointermove` route a0-20 recorded as *"on desktop, moving the mouse
+//     across the wheel changes nothing and makes no sound"*;
+//   · phone   — a real `Input.dispatchTouchEvent` touchStart at 390 px
+//     landscape, the profile the developer plays on. A thumb is not a hover: on
+//     touch, `pointermove` only fires while a finger is down, so the finger going
+//     down IS the selection, and the press tell that has always accompanied it is
+//     in the frame because it is part of the same gesture.
+//
+// What a reviewer is looking for in both:
+//   · ONE wedge tinted, bounded by two bright edge lines on its own boundaries,
+//     brightening toward the rim — and the tint stopping dead at those lines;
+//   · that wedge's NAME larger (19/17) and at the top of the Bone ramp, with the
+//     other ready names one step BELOW it — the contrast is bought by the others
+//     receding, because the selected name was already as bright as Bone goes;
+//   · its second line lifted one step, and its COST numeral not moved at all:
+//     that colour answers "can I pay for this" and nothing else may borrow it;
+//   · no hue anywhere in any of it (u11-01 — the chrome spends no colour).
+
+/** The wedge these two point at: RADAR, which at {@link WHEEL_ORE_FLUSH} is
+ *  payable — so the frame shows a selected wedge that is genuinely actionable,
+ *  and the cost numeral under it stays in signal yellow where the selection
+ *  cannot touch it. */
+const SELECTED_WEDGE = 2;
+
+interface SelectionStage extends PressStage {
+  wedgeClientPoint(i: number): { x: number; y: number } | null;
+}
+
+/** The client-space centre of a Build wedge, read off the booted client so the
+ *  pointer lands where the wheel was actually drawn (landscape lock included). */
+async function wedgePoint(page: Page, index: number): Promise<{ x: number; y: number }> {
+  const p = await page.evaluate((i) => {
+    const s = (window as unknown as { __pressStage?: SelectionStage }).__pressStage;
+    return s ? s.wedgeClientPoint(i) : null;
+  }, index);
+  expect(p, 'the press stage can locate the wedge on the drawn wheel').not.toBeNull();
+  return p!;
+}
+
+/** Assert the client actually drew the selection on `index` — read off the same
+ *  descriptors the view painted from, so a golden that silently stopped carrying
+ *  its subject fails by NAME rather than by looking subtly different. */
+async function expectSelected(page: Page, index: number): Promise<void> {
+  const wedges = await page.evaluate(() => {
+    const s = (window as unknown as { __pressStage?: PressStage }).__pressStage;
+    return s ? s.wedges() : [];
+  });
+  const selected = wedges.map((w, i) => (w.selected ? i : -1)).filter((i) => i >= 0);
+  expect(selected, 'exactly one wedge is selected, and it is the one pointed at').toEqual([index]);
+}
+
+test('golden: desktop BUILD WHEEL — a wedge under the CURSOR (u16-01)', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+  budgetTest({
+    work: 'desktop boot of the frozen scene → open the Build wheel with 8 ore → move a real mouse onto the RADAR wedge → font settle → one full-frame golden comparison',
+    measuredSeconds: 7,
+  });
+
+  await bootFrozenBuildWheel(page, WHEEL_ORE_FLUSH);
+  // The whole desktop half of this deliverable, in one line: a real cursor, on
+  // the canvas, through `pointermove`. Before u16-01 this changed nothing at all.
+  const p = await wedgePoint(page, SELECTED_WEDGE);
+  await page.mouse.move(p.x, p.y);
+  await settleFrames(page);
+  await expectSelected(page, SELECTED_WEDGE);
+  await expect(page).toHaveScreenshot('desktop-build-wheel-hover.png', GOLDEN);
+});
+
+test('golden: landscape phone BUILD WHEEL — a wedge under the THUMB, at 390 px', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'iphone', 'one landscape phone baseline only (iphone)');
+  budgetTest({
+    work: 'rotate to landscape → boot the frozen scene → open the Build wheel with 8 ore → dispatch a real touchStart on the RADAR wedge → font settle → one full-frame golden comparison at dpr 3',
+    measuredSeconds: 10,
+  });
+
+  const vp = page.viewportSize();
+  if (vp) await page.setViewportSize({ width: vp.height, height: vp.width }); // portrait → landscape
+  await bootFrozenBuildWheel(page, WHEEL_ORE_FLUSH);
+
+  // A REAL touch, not a mouse move on a touch-capable page: CDP's own touch
+  // dispatch produces a `pointerdown` with `pointerType: 'touch'`, which is the
+  // event a thumb produces and the one the shipped handler reads. `touchStart`
+  // with no `touchEnd` on purpose — the finger stays down, because a lifted
+  // finger on a touch device is a pointer that is no longer over anything and
+  // the highlight goes with it (there is no hover to fall back to).
+  const p = await wedgePoint(page, SELECTED_WEDGE);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [{ x: p.x, y: p.y }],
+  });
+  await settleFrames(page);
+  await expectSelected(page, SELECTED_WEDGE);
+  // Nothing was bought: `?freeze=1` never runs the order drain, so this frame is
+  // the same seeded world every other baseline in this file shoots.
+  const banked = await page.evaluate(() => {
+    const s = (window as unknown as { __pressStage?: PressStage }).__pressStage;
+    return s ? s.bank() : null;
+  });
+  expect(banked, 'a thumb pointing at a wedge spends nothing').toBe(WHEEL_ORE_FLUSH);
+  await expect(page).toHaveScreenshot('phone-landscape-build-wheel-touch.png', GOLDEN);
 });
 
 // ---------------------------------------------------------------------------

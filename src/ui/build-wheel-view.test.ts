@@ -29,8 +29,9 @@
 import { describe, it, expect } from 'vitest';
 import { Graphics } from 'pixi.js';
 import { wheelMetrics } from '../art/materials';
-import { drawWheelRings, drawWheelSpokes } from './build-wheel-view';
+import { drawWheelRings, drawWheelSelection, drawWheelSpokes } from './build-wheel-view';
 import { SEGMENT_ARC, WHEEL_ORDER, segmentAngle } from './build-wheel';
+import { WHEEL_SELECTION } from './instrument';
 
 /** The desktop wheel radius the goldens are taken at, near enough. */
 const R = 235;
@@ -191,6 +192,156 @@ describe('the wheel disc draws nothing across a wedge face', () => {
       const probe = { x: Math.cos(a) * mid, y: Math.sin(a) * mid };
       const nearest = Math.min(...segments.map((s) => distanceToSegment(probe, s)));
       expect(nearest).toBeLessThan(1);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The highlighted wedge (u16-01) — a NEW layer that draws inside a wedge face
+// ---------------------------------------------------------------------------
+//
+// The law above says nothing crosses a wedge face. The selection highlight is
+// the first thing in this wheel's life that is *supposed* to draw across one —
+// so it needs the law restated rather than exempted, and the restatement is the
+// interesting one:
+//
+//   > the highlight may cover the wedge it is on, and NOTHING else.
+//
+// A highlight that leaks into a neighbour is worse than no highlight, because it
+// tells the player a press will land somewhere it will not. And this is exactly
+// the class of defect a golden cannot answer: a 0.26-alpha white lift spread one
+// wedge too far still photographs as "the highlight is there".
+
+/** The selection layer alone, at `angle`, as a bare Graphics. */
+function drawSelection(angle: number, presence = 1): { g: Graphics; inner: number } {
+  const m = wheelMetrics(R);
+  const inner = R * m.hub;
+  const g = new Graphics();
+  drawWheelSelection(g, R, inner, m, angle, SEGMENT_ARC, presence);
+  return { g, inner };
+}
+
+/**
+ * The furthest any drawn ink reaches from the wheel's centre.
+ *
+ * Deliberately not `getLocalBounds()`: that is an axis-aligned box, and the
+ * corner of a box around a quadrant is a good deal further out than any pixel in
+ * it — the question here is a RADIUS. Circles count, unlike in
+ * {@link drawnSegments}, because the bloom behind the selected name is one and it
+ * is precisely the thing that can reach past the rim.
+ */
+function maxReach(g: Graphics): number {
+  let worst = 0;
+  for (const ins of g.context.instructions) {
+    const path = (ins.data as { path?: { shapePath: { shapePrimitives: { shape: unknown }[] } } })
+      .path;
+    if (!path) continue;
+    for (const prim of path.shapePath.shapePrimitives) {
+      const shape = prim.shape as { points?: number[]; x?: number; y?: number; radius?: number };
+      if (shape.points) {
+        for (let i = 0; i + 1 < shape.points.length; i += 2) {
+          const x = shape.points[i] ?? 0;
+          const y = shape.points[i + 1] ?? 0;
+          if (Number.isFinite(x + y)) worst = Math.max(worst, Math.hypot(x, y));
+        }
+      } else if (typeof shape.radius === 'number') {
+        worst = Math.max(worst, Math.hypot(shape.x ?? 0, shape.y ?? 0) + shape.radius);
+      }
+    }
+  }
+  return worst;
+}
+
+/** How far `angle` is from the highlight's centre, radians, unsigned. */
+function offCentre(angle: number, centre: number): number {
+  let d = Math.abs(((angle - centre + Math.PI) % (2 * Math.PI)) - Math.PI + 2 * Math.PI) % (2 * Math.PI);
+  if (d > Math.PI) d = 2 * Math.PI - d;
+  return d;
+}
+
+describe('the highlight covers the wedge it is on, and nothing else', () => {
+  /** Half a wedge, plus the widest the edge-line bloom is allowed to reach past
+   *  the boundary it sits on ({@link WHEEL_SELECTION}), plus a degree of slack
+   *  for the polygonisation of an arc. Anything beyond this is a leak. */
+  const REACH =
+    SEGMENT_ARC / 2 +
+    ((WHEEL_SELECTION.edgeDegrees / 2) * WHEEL_SELECTION.edgeGlowSpread * Math.PI) / 180 +
+    Math.PI / 180;
+
+  for (let i = 0; i < WHEEL_ORDER.length; i++) {
+    it(`stays on wedge ${i} (${WHEEL_ORDER[i]})`, () => {
+      const centre = segmentAngle(i);
+      const { g } = drawSelection(centre);
+      const strays: string[] = [];
+      for (const seg of drawnSegments(g)) {
+        for (const p of samples(seg)) {
+          const rad = Math.hypot(p.x, p.y);
+          if (rad < 1) continue; // a path's own origin point draws nothing
+          const off = offCentre(Math.atan2(p.y, p.x), centre);
+          if (off <= REACH) continue;
+          strays.push(`r=${rad.toFixed(1)} at ${((off * 180) / Math.PI).toFixed(1)}° off centre`);
+        }
+      }
+      expect(strays.slice(0, 4)).toEqual([]);
+    });
+  }
+
+  it('stays inside the ring — never over the hub, never out past the rim', () => {
+    // The bloom behind the name is scaled off the type, and on the phone profile
+    // an unclamped one reaches past the rim into the halo: a glow with no wheel
+    // under it, on the one part of this screen that is meant to have no edge.
+    for (const radius of [235, 140, 90]) {
+      const m = wheelMetrics(radius);
+      const inner = radius * m.hub;
+      const g = new Graphics();
+      drawWheelSelection(g, radius, inner, m, segmentAngle(0), SEGMENT_ARC, 1);
+      expect(maxReach(g), `the highlight spills past the rim at r=${radius}`).toBeLessThanOrEqual(
+        radius + 0.5,
+      );
+    }
+  });
+
+  it('draws the two edge lines ON the wedge\'s own boundaries', () => {
+    // The design's 1.6° slivers (`5a:56`). They land exactly on the hairline
+    // spokes, which is what stops the highlight reading as a wedge that has
+    // grown — and it is why the law above is about leaks rather than about
+    // boundaries.
+    const centre = segmentAngle(0);
+    const { g, inner } = drawSelection(centre);
+    const segments = drawnSegments(g);
+    const mid = inner + (R - inner) / 2;
+    for (const boundary of [centre - SEGMENT_ARC / 2, centre + SEGMENT_ARC / 2]) {
+      const probe = { x: Math.cos(boundary) * mid, y: Math.sin(boundary) * mid };
+      const nearest = Math.min(...segments.map((s) => distanceToSegment(probe, s)));
+      expect(nearest, `no edge line on the boundary at ${boundary.toFixed(2)} rad`).toBeLessThan(1);
+    }
+  });
+
+  it('draws NOTHING at all when nothing is selected', () => {
+    // The resting wheel — a mouse that has not crossed it, a thumb that is not
+    // down. Every existing baseline of this screen depends on this being a
+    // genuine no-op rather than a transparent layer.
+    const { g } = drawSelection(segmentAngle(0), 0);
+    expect(g.visible).toBe(false);
+    expect(drawnSegments(g)).toEqual([]);
+  });
+
+  it('lands BETWEEN two wedges mid-sweep, which is the whole 140 ms', () => {
+    // Half an arc past wedge 0 is the boundary it shares with wedge 1. A
+    // highlight that could only ever be drawn at a wedge centre would have no
+    // sweep to animate.
+    const between = segmentAngle(0) + SEGMENT_ARC / 2;
+    const { g, inner } = drawSelection(between);
+    const segments = drawnSegments(g);
+    const mid = inner + (R - inner) / 2;
+    // Its own centre line now runs down the boundary between the two wedges…
+    const probe = { x: Math.cos(between) * mid, y: Math.sin(between) * mid };
+    const nearestToCentre = Math.min(...segments.map((s) => distanceToSegment(probe, s)));
+    expect(nearestToCentre).toBeGreaterThan(1);
+    // …and its edges sit on the two OUTER boundaries, one in each wedge.
+    for (const edge of [between - SEGMENT_ARC / 2, between + SEGMENT_ARC / 2]) {
+      const p = { x: Math.cos(edge) * mid, y: Math.sin(edge) * mid };
+      expect(Math.min(...segments.map((s) => distanceToSegment(p, s)))).toBeLessThan(1);
     }
   });
 });

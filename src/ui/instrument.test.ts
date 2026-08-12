@@ -48,6 +48,7 @@ import {
   TICK_WIDTH,
   WHEEL_CHROME,
   WHEEL_FACE_ALPHA,
+  WHEEL_SELECTION,
 } from './instrument';
 
 // ---------------------------------------------------------------------------
@@ -345,6 +346,13 @@ describe('the ratified vocabulary, carried across intact', () => {
       expect(WHEEL_CHROME.face).toBe(BONE.fill);
       expect(WHEEL_CHROME.divider).toBe(MATERIAL_SHADES.hairline);
       expect(WHEEL_CHROME.press).toBe(BONE.hi);
+      // …and the selection (u16-01) takes the same ramp rather than an accent.
+      // The design tints the selected quadrant in `--acc-tint` and edges it in
+      // `--acc-hi`; under the ratified Bone accent both are white, which is the
+      // top of this ramp and no new hue at all.
+      expect(WHEEL_CHROME.selection).toBe(BONE.hi);
+      expect(WHEEL_CHROME.nameReceded).toBe(BONE.mid);
+      expect(WHEEL_CHROME.secondaryLit).toBe(BONE.mid);
     });
 
     it('spends none of the three colours a match has jobs for', () => {
@@ -384,6 +392,15 @@ describe('the ratified vocabulary, carried across intact', () => {
         0.2126 * ((c >> 16) & 0xff) + 0.7152 * ((c >> 8) & 0xff) + 0.0722 * (c & 0xff);
       expect(luma(WHEEL_CHROME.nameReady)).toBeGreaterThan(luma(WHEEL_CHROME.affordance));
       expect(luma(WHEEL_CHROME.affordance)).toBeGreaterThan(luma(WHEEL_CHROME.secondary));
+      // The selection's one notch, in both directions at once (u16-01): a name
+      // that is not the one you are pointing at steps DOWN from the primary, and
+      // the read-lines of the one you ARE pointing at step UP from muted. Both
+      // land on the same middle step, which is the whole of what the wheel has to
+      // spend — Bone gives it brightness and nothing else.
+      expect(luma(WHEEL_CHROME.nameReady)).toBeGreaterThan(luma(WHEEL_CHROME.nameReceded));
+      expect(luma(WHEEL_CHROME.nameReceded)).toBeGreaterThan(luma(WHEEL_CHROME.secondary));
+      expect(luma(WHEEL_CHROME.secondaryLit)).toBeGreaterThan(luma(WHEEL_CHROME.secondary));
+      expect(luma(WHEEL_CHROME.selection)).toBeGreaterThanOrEqual(luma(WHEEL_CHROME.nameReady));
       expect(luma(WHEEL_CHROME.secondary)).toBeGreaterThan(luma(WHEEL_CHROME.nameInert));
       expect(luma(WHEEL_CHROME.nameInert)).toBeGreaterThan(luma(WHEEL_CHROME.face));
       // The mark and the primary word are deliberately the SAME step: the index
@@ -405,6 +422,33 @@ describe('the ratified vocabulary, carried across intact', () => {
       const disc = 19; // faceShade at 0.88 over the fight, per-channel, ≈ level 19
       const lift = (a: number): number => a * (((BONE.fill >> 16) & 0xff) - disc);
       expect(lift(WHEEL_FACE_ALPHA.ready)).toBeGreaterThan(lift(WHEEL_FACE_ALPHA.inert) * 2.5);
+    });
+
+    it('the highlight is the design\'s own amounts, and every one is an ALPHA', () => {
+      // u16-01. Screen 5a's selection layers, transcribed: the .26 tint conic,
+      // the 1.6° edge lines inside a `0 0 26px` bloom, and the closest-side glow
+      // running from 62% of the radius out to the rim at .14. Numbers, not
+      // adjectives — "a bit brighter" is how a ratified design turns into a look.
+      expect(WHEEL_SELECTION.tint).toBe(0.26);
+      expect(WHEEL_SELECTION.edgeDegrees).toBe(1.6);
+      expect(WHEEL_SELECTION.edgeGlowAlpha).toBe(0.16);
+      expect(WHEEL_SELECTION.rim).toBe(0.14);
+      expect(WHEEL_SELECTION.rimFrom).toBe(0.62);
+    });
+
+    it('the highlight is a LIFT over the glass, like everything else on this wheel', () => {
+      // The rule the wheel is built on — no plates over gameplay, the world reads
+      // through (`5a:5`). The selection is the brightest thing the wheel draws and
+      // is therefore the most tempting place to reach for opacity; stacked at
+      // their worst, its three layers still leave the fight visible.
+      const stacked =
+        1 -
+        (1 - WHEEL_SELECTION.tint) * (1 - WHEEL_SELECTION.rim) * (1 - WHEEL_FACE_ALPHA.ready);
+      expect(stacked).toBeLessThan(0.6);
+      // The one exception is the pair of edge LINES, which are 1.6° of arc each
+      // and are meant to read as hard bright edges rather than as a wash.
+      expect(WHEEL_SELECTION.edge).toBeGreaterThan(WHEEL_SELECTION.tint);
+      expect(WHEEL_SELECTION.edgeDegrees).toBeLessThan(5);
     });
   });
 

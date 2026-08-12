@@ -642,3 +642,68 @@ describe('radial layout — device-agnostic selection (GDD §2.4)', () => {
     expect(seen.size).toBe(5);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The selection (u16-01) — the design's `sel`, on the model rather than the view
+// ---------------------------------------------------------------------------
+//
+// a0-20 §6.4: "The build wheel's selection state has to arrive on the MODEL, not
+// in the view. Every decision on this wheel is made in the pure, headless-tested
+// sibling and the view only paints — that split is why the wheel's copy can be
+// held to a fit budget at every profile without a canvas. A `selected` flag
+// stashed in `BuildWheelView` would be the one piece of wheel state no test can
+// reach." This block is the reach.
+
+describe('the wedge the player is pointing at (u16-01)', () => {
+  it('carries a pointed-at wedge through to the model', () => {
+    for (let i = 0; i < WHEEL_ORDER.length; i++) {
+      expect(buildWheelModel(sig({ selected: i })).selected).toBe(i);
+    }
+  });
+
+  it('is null when nothing is pointed at — a resting state, not a missing value', () => {
+    // No cursor on the wheel, no thumb down, no stick pushed. Every wedge then
+    // draws exactly as it did before this landed: the wheel spends no contrast
+    // advertising a choice nobody has made.
+    expect(buildWheelModel(sig()).selected).toBeNull();
+    expect(buildWheelModel(sig({ selected: null })).selected).toBeNull();
+  });
+
+  it('DROPS the selection on a wheel that is not open', () => {
+    // The pointer route in the boot path cannot know the wheel closed under it on
+    // the frame the ship undocked or the core died. A highlight that survived
+    // that would be a lit wedge on a wheel that is not there — and, worse, would
+    // be waiting when the wheel next opened.
+    for (const shut of [{ docked: false }, { requested: false }, { shipAlive: false }, { stationAlive: false }]) {
+      const model = buildWheelModel(sig({ selected: 2, ...shut }));
+      expect(model.open).toBe(false);
+      expect(model.selected).toBeNull();
+    }
+  });
+
+  it('refuses an out-of-range index rather than lighting its neighbour', () => {
+    for (const bad of [-1, WHEEL_ORDER.length, 99, 1.5, Number.NaN]) {
+      expect(buildWheelModel(sig({ selected: bad })).selected, `${bad}`).toBeNull();
+    }
+  });
+
+  it('lights a wedge you cannot buy, and does not pretend you can', () => {
+    // Pointing at a capped turret ring highlights it — you are allowed to look at
+    // what you cannot afford, and the count and the price are the reason to. What
+    // it must NOT do is change the wedge's own state, which is what the cost
+    // colour and the dimmed name are drawn from.
+    const model = buildWheelModel(sig({ selected: 0, turrets: TURRET.capPerStation }));
+    expect(model.selected).toBe(0);
+    expect(model.segments[0]?.state).toBe('capped');
+    expect(model.segments[0]?.costLabel).toBe('FULL');
+  });
+
+  it('changes nothing else about the wheel — selection is not a purchase', () => {
+    // The whole model, with and without a selection, must differ in exactly one
+    // field. A selection that quietly moved a cost, a cap or a state would be a
+    // pointer spending ore.
+    const resting = buildWheelModel(sig({ banked: 5 }));
+    const pointed = buildWheelModel(sig({ banked: 5, selected: 3 }));
+    expect({ ...pointed, selected: null }).toEqual(resting);
+  });
+});
