@@ -57,9 +57,15 @@ export const WEAPON_DPS_SHIP: Tunable<number> = 10;
  *  day-1 test pins the Vanguard at exactly this. TUNABLE */
 export const MINING_RATE: Tunable<number> = 0.5;
 
-/** Ship hull, base (Vanguard); per-class values live in `SHIP_STATS`. Upgradable
- *  (GDD §2.5). TUNABLE */
-export const SHIP_HULL: Tunable<number> = 50;
+// `SHIP_HULL` (was 50) is retired — GDD §2.8's "Ship hull" row is now a pointer
+// to §2.11, not a knob. Hull is absolute *per class* (`SHIP_STATS`: 35/50/55/70)
+// and there is no single base to turn: `shipMaxHull` reads the class row and
+// multiplies it by the §2.5 tier ladder, so the constant was a fourth copy of the
+// Vanguard's 50 that nothing read. Retired rather than left at 0 or wired to a
+// floor — a floor would have raised the Interceptor's 35 to 50, which is a
+// balance change, and §2.8 already set this precedent with `Sensor range`
+// ("a `0` would still read as tunable"). The Vanguard's 50 survives where it is
+// load-bearing: `SHIP_STATS`, pinned to the GDD in `upgrades.test.ts`. (g6-01)
 
 /** Starting ore — one meaningful opening choice (GDD §2.1, §2.8). TUNABLE */
 export const STARTING_ORE: Tunable<number> = 3;
@@ -1094,8 +1100,14 @@ export const SATELLITE = {
 // ---------------------------------------------------------------------------
 
 /** Auto-aim engages the nearest valid target across the full 360° with no
- *  front-arc restriction (GDD §2.4, explicitly `TUNABLE`). A value < 2π would
- *  reintroduce a firing arc. TUNABLE */
+ *  front-arc restriction (GDD §2.4, explicitly `TUNABLE`). A value < 2π
+ *  reintroduces a firing arc of that width, centred on the ship's facing: every
+ *  candidate outside it — ship, turret, satellite, core or rock — stops being a
+ *  valid target, so auto-aim engages the nearest one *inside* the arc.
+ *
+ *  Read by `withinAimArc` in `./step`, which gates every acquisition candidate.
+ *  At exactly 2π that gate short-circuits to "everything", so the ratified
+ *  behaviour is what it always was: no arc test at all. TUNABLE */
 export const AUTO_AIM_ARC: Tunable<number> = 2 * Math.PI;
 
 // ---------------------------------------------------------------------------

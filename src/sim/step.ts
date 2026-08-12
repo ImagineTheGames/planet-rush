@@ -39,6 +39,7 @@
 import type { Action, BuildItem, PlayerId, UpgradeTrack, Vec2 } from '@shared/types';
 import {
   ASTEROID,
+  AUTO_AIM_ARC,
   WEAPON_RANGE,
   CHUNK,
   DEPOSIT,
@@ -620,7 +621,8 @@ function updateWedgeEscape(ship: Ship, contact: WedgeContact, dt: number): void 
 // ---------------------------------------------------------------------------
 
 /**
- * A target auto-aim can acquire across the full 360° (GDD §2.4) — the full
+ * A target auto-aim can acquire across the full 360° (GDD §2.4, the arc the
+ * `AUTO_AIM_ARC` knob opens — see `withinAimArc`) — the full
  * target list "asteroid, ship, turret, shield, or core". Shield and core are one
  * `station` hit: the bubble stands in front of the core and `damageStation` decides
  * which pool takes the damage (GDD §2.6). Used for *facing* and for the auto-aim
@@ -754,10 +756,54 @@ function holdFull(ship: Ship): boolean {
   return ship.cargoCap - ship.cargo <= 1e-9;
 }
 
+/** The ratified arc is the whole circle (GDD §2.4, `AUTO_AIM_ARC` = 2π), and at
+ *  that value the gate below is skipped outright rather than computed: a target
+ *  dead astern must be acquired *identically* to how it was before the knob was
+ *  wired, and `cos(π)` compared against a normalized bearing is one rounding
+ *  error away from dropping it. Resolved once at module load — `AUTO_AIM_ARC` is
+ *  a constant, not per-world state. */
+const AIM_ARC_FULL_CIRCLE = AUTO_AIM_ARC >= 2 * Math.PI;
+/** Cosine of the half-arc: the bearing test's threshold when an arc *is* set.
+ *  Never read on the shipped path (see above). */
+const AIM_ARC_COS_HALF = Math.cos(AUTO_AIM_ARC / 2);
+
+/**
+ * Whether a candidate at (`tx`, `ty`) falls inside the auto-aim arc — the front
+ * arc `AUTO_AIM_ARC` opens, centred on the ship's facing (GDD §2.4, explicitly
+ * `TUNABLE`: *"checked across the full 360° around the ship, no front-arc
+ * restriction"*).
+ *
+ * **The shipped value is 2π and this returns `true` for everything**, which is
+ * the ratified behaviour and byte-for-byte what the acquisition did when no arc
+ * check existed at all. The knob is wired so that a *different* value is a real
+ * balance change instead of a silent no-op — the trap §2.8 retired `Sensor range`
+ * to avoid ("a `0` would still read as tunable").
+ *
+ * It gates each **candidate**, not the winner: with an arc set, auto-aim engages
+ * the nearest target *inside* the arc rather than holding fire because the
+ * nearest target overall happened to be behind — "the nearest valid target"
+ * (§2.4), where the arc is part of what makes one valid.
+ *
+ * Deterministic by construction: a dot product against the facing versus a
+ * `Math.sqrt` (IEEE-754 exact) of the squared distance, no `atan2`, no branch on
+ * anything but geometry.
+ */
+function withinAimArc(ship: Ship, tx: number, ty: number): boolean {
+  if (AIM_ARC_FULL_CIRCLE) return true;
+  const dx = tx - ship.pos.x;
+  const dy = ty - ship.pos.y;
+  const d2 = dx * dx + dy * dy;
+  // A body the ship is standing on has no bearing to test; it is in every arc.
+  if (d2 <= 0) return true;
+  const facing = dx * Math.cos(ship.angle) + dy * Math.sin(ship.angle);
+  return facing >= AIM_ARC_COS_HALF * Math.sqrt(d2);
+}
+
 /**
  * TIER 1 — the closest enemy ship, turret, radar satellite, or core within
- * engagement range whose line of sight is clear, across the full 360° with no
- * front arc (GDD §2.4; the satellite is a f1 target). Your
+ * engagement range whose line of sight is clear, across the arc `AUTO_AIM_ARC`
+ * opens — the full 360° with no front arc at the ratified value
+ * (GDD §2.4, `withinAimArc`; the satellite is a f1 target). Your
  * own/allied fleet and home are never targets (`areEnemies`); a spawn-protected
  * ship or core is skipped exactly as a shot passes over it (the projectile
  * collision skips both, GDD §2.1) — acquiring one would aim auto-fire at an
@@ -779,6 +825,7 @@ function acquireEnemy(world: World, ship: Ship): AimTarget | null {
     if (!areEnemies(world, ship.id, t.id) || !t.alive || t.spawnProtect > 0) continue;
     const d2 = dist2(ship.pos, t.pos);
     if (d2 >= bestD2) continue;
+    if (!withinAimArc(ship, t.pos.x, t.pos.y)) continue;
     if (losBlocked(world, ship.pos, t.pos)) continue;
     bestD2 = d2;
     best = { kind: 'ship', index: i };
@@ -792,6 +839,7 @@ function acquireEnemy(world: World, ship: Ship): AimTarget | null {
       if (turret.hp <= 0) continue;
       const d2 = dist2(ship.pos, turret.pos);
       if (d2 >= bestD2) continue;
+      if (!withinAimArc(ship, turret.pos.x, turret.pos.y)) continue;
       if (losBlocked(world, ship.pos, turret.pos)) continue;
       bestD2 = d2;
       best = { kind: 'turret', station: p, index: i };
@@ -805,6 +853,7 @@ function acquireEnemy(world: World, ship: Ship): AimTarget | null {
         if (sat.hp <= 0) continue;
         const d2 = dist2(ship.pos, sat.pos);
         if (d2 >= bestD2) continue;
+        if (!withinAimArc(ship, sat.pos.x, sat.pos.y)) continue;
         if (losBlocked(world, ship.pos, sat.pos)) continue;
         bestD2 = d2;
         best = { kind: 'satellite', station: p, index: i };
@@ -813,6 +862,7 @@ function acquireEnemy(world: World, ship: Ship): AimTarget | null {
     if (!station.alive || station.spawnProtect > 0) continue;
     const d2 = dist2(ship.pos, station.pos);
     if (d2 >= bestD2) continue;
+    if (!withinAimArc(ship, station.pos.x, station.pos.y)) continue;
     if (losBlocked(world, ship.pos, station.pos)) continue;
     bestD2 = d2;
     best = { kind: 'station', station: p };
@@ -830,8 +880,9 @@ function acquireAsteroid(world: World, ship: Ship): AimTarget | null {
   let best: AimTarget | null = null;
   let bestD2 = WEAPON_RANGE * WEAPON_RANGE;
   for (let i = 0; i < world.asteroids.length; i++) {
-    const d2 = dist2(ship.pos, world.asteroids[i]!.pos);
-    if (d2 < bestD2) {
+    const rock = world.asteroids[i]!;
+    const d2 = dist2(ship.pos, rock.pos);
+    if (d2 < bestD2 && withinAimArc(ship, rock.pos.x, rock.pos.y)) {
       bestD2 = d2;
       best = { kind: 'asteroid', index: i };
     }

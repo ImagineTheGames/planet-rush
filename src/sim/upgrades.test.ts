@@ -251,9 +251,15 @@ describe('the class stat table (GDD §2.11)', () => {
   });
 
   it('pins the Vanguard to the §2.8 baselines it is the reference for', () => {
-    // GDD §2.8 states hull 50, weapon-vs-ships 10, weapon-vs-core 5, mining 0.5 —
-    // and §2.11 makes the Vanguard the 100% hull those numbers describe. If this
+    // GDD §2.8 states weapon-vs-ships 10, weapon-vs-core 5, mining 0.5 — and
+    // §2.11 makes the Vanguard the 100% hull those numbers describe. If this
     // fails, one of the two tables moved without the other.
+    //
+    // Hull is the exception, and since g6-01 it is stated only ONCE: §2.8's
+    // "Ship hull | 50" row is retired (it named a constant nothing read, while
+    // the sim has always read §2.11's per-class column), so the 50 below is the
+    // Vanguard's own `SHIP_STATS` row and this line is now the only place the
+    // number is asserted outside the §2.11 table above.
     const van = loadout(ShipClass.Vanguard);
     expect(shipMaxHull(van)).toBe(50);
     expect(shipWeaponDps(van)).toBeCloseTo(WEAPON_DPS_SHIP, 9);
