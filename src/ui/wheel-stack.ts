@@ -41,6 +41,10 @@
 
 import type { WheelProfile } from '../art/materials';
 import { DISPLAY_TRACKING, TRACKING } from '../art/materials';
+import type { AnnularSector } from './hud-geometry';
+import { sectorOverflow } from './hud-geometry';
+import type { Box, MetricFace, TypeSpec } from './font-metrics';
+import { textHeight, textWidth } from './font-metrics';
 import type { SegmentState, WheelSegment } from './build-wheel';
 import { SELECTION_NAME_SCALE } from './wheel-selection';
 import { tierPips } from './upgrade-wheel';
@@ -361,6 +365,228 @@ function lineCount(text: string): number {
   let n = 1;
   for (const ch of text) if (ch === '\n') n++;
   return n;
+}
+
+// ---------------------------------------------------------------------------
+// …and where they land in TWO dimensions (a0-32)
+// ---------------------------------------------------------------------------
+//
+// {@link placeWedgeLines} gives each line a radius, and a radius is enough to ask
+// "how wide is the wedge here". It is not enough to ask "does this word fit",
+// because the words are not rotated with the wedge: the view puts the whole stack
+// at one point on the wheel and then stacks the lines DOWNWARD in screen space,
+// upright, whichever wedge they belong to. On the wedge at twelve o'clock those
+// two models agree. On the wedge at nine o'clock they do not agree at all — the
+// line runs along the radius there, and what stops it is the rim.
+//
+// So this is the second model, and it is a mirror rather than an approximation:
+// the same arithmetic the view does, over the real font metrics
+// ({@link ../ui/font-metrics}) rather than a leading multiple, producing the box
+// each line actually occupies in wheel-centre coordinates. `hud-geometry.ts`
+// `sectorOverflow` is what then asks whether that box is inside its wedge.
+
+/** Which {@link MetricFace} a wedge line is drawn in — the view's own two calls
+ *  (`build-wheel-view` `wedgeNodes`): the name in Audiowide at its default
+ *  weight, everything else in Oxanium at 700. */
+export function wedgeMetricFace(face: WedgeFace): MetricFace {
+  return face === 'display' ? 'heading' : 'bodyBold';
+}
+
+/** The type spec a wedge line is measured with. */
+export function wedgeTypeSpec(line: WedgeLine): TypeSpec {
+  return { face: wedgeMetricFace(line.face), size: line.size, tracking: line.tracking };
+}
+
+/** One line of a wedge, as the box it occupies relative to the wheel's centre. */
+export interface WedgeLineBox extends Box {
+  readonly slot: WedgeLine['slot'];
+  readonly text: string;
+}
+
+/** A whole wedge's stack, placed. */
+export interface WedgeStackPlacement {
+  readonly boxes: readonly WedgeLineBox[];
+  /** Total height of the stack, px — including the trailing gap, exactly as the
+   *  view's own running `y` does, because that is what it centres on. */
+  readonly stackHeight: number;
+  /** The radius the stack's centre hangs at. */
+  readonly centreRadius: number;
+}
+
+/**
+ * Where a wedge's lines actually land, in wheel-centre coordinates.
+ *
+ * Reproduces `BuildWheelView.drawWedge` exactly, which is the whole value of it:
+ * lines are measured with the real font metrics, stacked downward from the top of
+ * the cluster with each line's own gap under it, and the cluster is then pivoted
+ * about its middle and hung at `angle` from the wheel's centre. Each line is
+ * anchored `(0.5, 0)`, so its box is centred on the cluster's x and starts at its
+ * own running y.
+ *
+ * `radiusOverride` replaces the design's rim-anchored `centreRadius` — that is how
+ * {@link fittedStackRadius} draws the wedge it has pulled inward.
+ */
+export function wedgeStackBoxes(
+  lines: readonly WedgeLine[],
+  outerRadius: number,
+  m: WheelProfile,
+  angle: number,
+  radiusOverride?: number,
+): WedgeStackPlacement {
+  const heights = lines.map((l) => textHeight(l.text, wedgeTypeSpec(l)));
+  const widths = lines.map((l) => textWidth(l.text, wedgeTypeSpec(l)));
+  let stackHeight = 0;
+  for (let i = 0; i < lines.length; i++) stackHeight += heights[i]! + lines[i]!.gap;
+
+  const top = outerRadius - m.labelInset * outerRadius;
+  const centreRadius = radiusOverride ?? top - stackHeight / 2;
+  const cx = Math.cos(angle) * centreRadius;
+  const cy = Math.sin(angle) * centreRadius;
+
+  const boxes: WedgeLineBox[] = [];
+  let y = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    boxes.push({
+      slot: line.slot,
+      text: line.text,
+      x: cx - widths[i]! / 2,
+      y: cy + y - stackHeight / 2,
+      width: widths[i]!,
+      height: heights[i]!,
+    });
+    y += heights[i]! + line.gap;
+  }
+  return { boxes, stackHeight, centreRadius };
+}
+
+/** The smallest a wedge's name may be scaled to make it fit, as a fraction of
+ *  the size its profile asks for.
+ *
+ *  It is a FLOOR on a mechanism that is inert at every profile in the device
+ *  matrix except one — see {@link fitWedgeStack} — and it exists so that "the
+ *  words do not fit" cannot silently become "the words are unreadable". A wedge
+ *  that would need more than a fifth off its name is a wedge whose copy is wrong,
+ *  and `hud-geometry.test.ts` is what says so, in words, naming the string.
+ */
+export const MIN_NAME_FIT_SCALE = 0.8;
+
+/** How a wedge's word stack was made to fit its wedge. */
+export interface WedgeFit {
+  /** The radius the stack's centre hangs at — the design's, or nearer the hub. */
+  readonly radius: number;
+  /** What the NAME's size was multiplied by. `1` at every profile that did not
+   *  need it, which is all of them but the phone's selected wedge. */
+  readonly nameScale: number;
+}
+
+/**
+ * Fit a wedge's word stack to the wedge, and say how.
+ *
+ * ── WHAT MOVES, AND WHY IT IS THESE TWO THINGS (a0-32) ─────────────────────
+ * The wheel's geometry is ratified and checked — a0-20's compliance pass,
+ * u13-01's hit-test, a0-21's arc, u16-01's 140 ms sweep — and the profile's type
+ * sizes are the handoff's. Two things in this picture were never anybody's
+ * ratified number, and between them they are enough:
+ *
+ *  1. **How far down the radius the words hang.** The design anchors the stack
+ *     just inside the rim, which is right for the wedge at twelve o'clock and
+ *     wrong for the wedge at nine: a line of upright text on a sideways wedge
+ *     runs along the RADIUS, so the rim is what it hits. Pulling the stack in
+ *     from the rim puts it back inside the disc at full size, in the right words,
+ *     on the same wedge. This is the whole of the reported defect.
+ *  2. **How much bigger the SELECTED name gets.** u16-01 grows it 19/17, and on a
+ *     390 px phone the wedge cannot hold `UPGRADE` at that size at ANY radius:
+ *     the resting name fits with 1.5 px to spare and the enlarged one is 8.7 px
+ *     wider than the resting one. So the name grows by as much as the wedge can
+ *     hold, up to the design's 19/17 — full growth on every desktop and tablet
+ *     profile, capped on the phone, and never below {@link MIN_NAME_FIT_SCALE}.
+ *
+ * Nothing else is touched: not the copy, not the tracking, not the other three
+ * lines' sizes, not the wedge, and not the hit-test.
+ *
+ * ── WHY THE RADIUS IS A BISECTION ─────────────────────────────────────────
+ * Pulling a stack inward trades one constraint for two: every corner gets nearer
+ * the centre, so the rim stops being the problem, but the hub approaches and the
+ * two spokes converge around it as it goes. All three are MONOTONIC in the
+ * radius — the rim is satisfied on `[0, rMax]`, the hub and the spokes on
+ * `[rMin, ∞)` — so the outermost placement that clears the rim is one bisection,
+ * and whether it also clears the other two is a question with a yes/no answer
+ * rather than a search. When it is "no", the name comes down a step and the
+ * question is asked again.
+ */
+export function fitWedgeStack(
+  lines: readonly WedgeLine[],
+  outerRadius: number,
+  m: WheelProfile,
+  angle: number,
+  segments: number,
+): WedgeFit {
+  const sector: AnnularSector = {
+    innerRadius: outerRadius * m.hub,
+    outerRadius,
+    angle,
+    halfArc: Math.PI / segments,
+  };
+
+  /** The worst rim overflow, and the worst of everything else, at one radius. */
+  const overflowAt = (scaled: readonly WedgeLine[], radius?: number) => {
+    const { boxes, centreRadius } = wedgeStackBoxes(scaled, outerRadius, m, angle, radius);
+    let outer = 0;
+    let inward = 0;
+    for (const box of boxes) {
+      const o = sectorOverflow(box, sector);
+      outer = Math.max(outer, o.outer);
+      inward = Math.max(inward, o.inner, o.arc * centreRadius);
+    }
+    return { outer, inward, centreRadius };
+  };
+
+  /** The outermost radius whose stack clears the RIM, and what is left over. */
+  const place = (scaled: readonly WedgeLine[]): { radius: number; inward: number } => {
+    const design = overflowAt(scaled);
+    if (design.outer <= 0) return { radius: design.centreRadius, inward: design.inward };
+    let lo = 0;
+    let hi = design.centreRadius;
+    // 14 halvings of a range bounded by the wheel's own radius settle inside a
+    // hundredth of a pixel — far below what a device can draw.
+    for (let i = 0; i < 14; i++) {
+      const mid = (lo + hi) / 2;
+      if (overflowAt(scaled, mid).outer <= 0) lo = mid;
+      else hi = mid;
+    }
+    return { radius: lo, inward: overflowAt(scaled, lo).inward };
+  };
+
+  const at = place(lines);
+  if (at.inward <= 0) return { radius: at.radius, nameScale: 1 };
+
+  // The stack cannot be placed at this name size. Bisect the name down for the
+  // largest scale that can be, and stop at the floor rather than at "readable
+  // enough" — a name that needs more than that is a copy problem, and the fit
+  // test says so by name.
+  let lo = MIN_NAME_FIT_SCALE;
+  let hi = 1;
+  let best = { radius: place(scaleName(lines, lo)).radius, nameScale: lo };
+  if (place(scaleName(lines, lo)).inward > 0) return best;
+  for (let i = 0; i < 10; i++) {
+    const mid = (lo + hi) / 2;
+    const tried = place(scaleName(lines, mid));
+    if (tried.inward <= 0) {
+      lo = mid;
+      best = { radius: tried.radius, nameScale: mid };
+    } else {
+      hi = mid;
+    }
+  }
+  return best;
+}
+
+/** The same lines with the NAME's size scaled — what {@link fitWedgeStack}
+ *  hands back as {@link WedgeFit.nameScale}, and what the view applies. */
+export function scaleName(lines: readonly WedgeLine[], scale: number): readonly WedgeLine[] {
+  if (scale === 1) return lines;
+  return lines.map((l) => (l.slot === 'name' ? { ...l, size: l.size * scale } : l));
 }
 
 // ---------------------------------------------------------------------------

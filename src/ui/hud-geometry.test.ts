@@ -57,15 +57,26 @@ import {
   respawnWrapWidth,
   RESPAWN_CENTER_Y,
   wheelRadius,
-  wedgeChordWidth,
   wedgeHitTarget,
+  sectorOverflow,
   TOUCH_TARGET_MIN,
 } from './hud-geometry';
+import type { AnnularSector } from './hud-geometry';
 import { wheelMetrics } from '../art/materials';
-import { buildWheelModel, WHEEL_ORDER } from './build-wheel';
+import { buildWheelModel, segmentAngle, WHEEL_ORDER } from './build-wheel';
 import type { BuildWheelSignals } from './build-wheel';
-import { buildWedgeLines, capWords, placeWedgeLines, statWords, targetWords, upgradeWedgeLines } from './wheel-stack';
-import type { WedgeFace } from './wheel-stack';
+import {
+  buildWedgeLines,
+  capWords,
+  fitWedgeStack,
+  MIN_NAME_FIT_SCALE,
+  scaleName,
+  statWords,
+  targetWords,
+  upgradeWedgeLines,
+  wedgeStackBoxes,
+} from './wheel-stack';
+import type { WedgeLine } from './wheel-stack';
 import {
   upgradeWheelModel,
   upgradeWheelSlots,
@@ -858,7 +869,7 @@ describe('anchor honesty', () => {
 });
 
 // ---------------------------------------------------------------------------
-// The wedge, at the narrowest profile with the longest values (u7-02)
+// The wedge, at the narrowest profile with the longest values (u7-02, a0-32)
 // ---------------------------------------------------------------------------
 //
 // The Gantry/Bone pass puts FOUR lines on a wedge — the name, what it spends on,
@@ -867,25 +878,26 @@ describe('anchor honesty', () => {
 // 72° slice of it, so a line has ~100 px. l2-02 shipped copy that overflowed its
 // chrome for exactly this reason, and only the phone profiles caught it.
 //
-// The oracle below is a *conservative* text metric, not a font: real advance
-// widths for Audiowide and Oxanium at these sizes are narrower than these
-// constants, so a string that passes here fits on the device with room to spare,
-// and the goldens (tests/mobile/goldens.spec.ts) are what confirm the pixels.
-
-/** Upper bound on a glyph's advance, as a fraction of the font size. Measured
- *  generously: Oxanium's widest digits and caps sit near .60em, Audiowide's near
- *  .82em. Tracking is added on top, per glyph, exactly as PixiJS applies it. */
-const ADVANCE: Record<WedgeFace, number> = { numeral: 0.6, display: 0.82 };
-
-function textWidth(s: string, size: number, tracking: number, face: WedgeFace): number {
-  // The widest LINE of a wrapped string is what has to fit, not the whole string.
-  const lines = s.split('\n');
-  let widest = 0;
-  for (const line of lines) {
-    widest = Math.max(widest, line.length * (size * ADVANCE[face] + size * tracking));
-  }
-  return widest;
-}
+// ── WHAT a0-32 CHANGED ABOUT THIS SUITE, AND WHY ──────────────────────────
+// It used to compare a line's width against a CHORD of the wedge at that line's
+// radius, over a conservative text metric — "a glyph is at most .82em of
+// Audiowide". Both halves of that were wrong in a way that let a real defect
+// through, and the developer found it on a phone instead:
+//
+//   · **The budget was the wrong axis.** The labels are not rotated with the
+//     wheel — a radial menu you can read keeps them upright — so on the wedge at
+//     NINE o'clock a line of text runs along the RADIUS. The chord says nothing
+//     about the rim, and the rim is what `UPGRADE` was crossing: 81 px of word
+//     against a 127 px chord budget, 10 px past the edge of a 140 px disc.
+//   · **The metric was a guess.** `.82em` is generous for the average string and
+//     not generous at all for `W` (1.002em) or `M` (.962em), and u14-01 moved
+//     every advance in the game when it self-hosted the real faces.
+//
+// So the assertion is now the SHAPE — `sectorOverflow`, over the box each line
+// actually occupies (`wheel-stack` `wedgeStackBoxes`), measured with the real
+// per-glyph advances of the shipped fonts (`./font-metrics`). A golden proves one
+// string at one size; this proves the rule, at every profile, in both selection
+// states, on both wheels.
 
 /**
  * The frame that makes every line as long as it can ever be at once: every cap
@@ -914,35 +926,51 @@ const WORST_CASE: BuildWheelSignals = {
   repairGate: 15,
 };
 
-describe('a wedge at 390 px, with its longest values (u7-02)', () => {
+describe('a wedge at 390 px, with its longest values (u7-02, a0-32)', () => {
   /** The narrowest profile the game claims, held in the play orientation. */
   const PHONE: Viewport = { width: 844, height: 390 };
   const SEGMENTS = WHEEL_ORDER.length;
 
-  /** Walk one wheel's real wedges and assert every drawn line fits the arc AT
-   *  ITS OWN RADIUS — the bottom line sits where the wedge is narrowest, which is
-   *  the whole reason this exists.
+  /**
+   * Walk one wheel's real wedges and assert every drawn line is INSIDE THE WEDGE —
+   * the annular sector between the hub and the rim, between this wedge's own two
+   * spokes — as the box the line actually occupies, where the view actually puts
+   * it, at the real advance widths of the shipped faces.
    *
-   *  `selected` runs the same walk with the wedge SELECTED (u16-01), where the
-   *  design grows the name to 19 px from 17. A wedge does not get wider when its
-   *  name does, and the 390 px phone — where the name is already floored at 12 px
-   *  because Audiowide is the first thing a thumb reads — is where that stops
-   *  being obvious. */
+   * `selected` runs the same walk with the wedge SELECTED (u16-01), where the
+   * design grows the name 19/17. A wedge does not get wider when its name does,
+   * and the 390 px phone — where the name is already down at 12 px because
+   * Audiowide is the first thing a thumb reads — is where that stops being
+   * obvious: on that profile the enlarged `UPGRADE` fits at NO radius, which is
+   * why `fitWedgeStack` caps the growth rather than the wedge losing the word.
+   */
   function assertWedgesFit(vp: Viewport, selected = false): void {
     const outer = wheelRadius(vp.width, vp.height);
     const m = wheelMetrics(outer);
-    for (const seg of buildWheelModel(WORST_CASE).segments) {
-      const { placed, innerRadius } = placeWedgeLines(buildWedgeLines(seg, m, selected), outer, m);
-      for (const line of placed) {
-        const budget = wedgeChordWidth(line.radius, SEGMENTS);
-        const w = textWidth(line.text, line.size, line.tracking, line.face);
+    for (const [i, seg] of buildWheelModel(WORST_CASE).segments.entries()) {
+      const angle = segmentAngle(i);
+      const sector: AnnularSector = {
+        innerRadius: outer * m.hub,
+        outerRadius: outer,
+        angle,
+        halfArc: Math.PI / SEGMENTS,
+      };
+      const lines = buildWedgeLines(seg, m, selected);
+      const fit = fitWedgeStack(lines, outer, m, angle, SEGMENTS);
+      const { boxes } = wedgeStackBoxes(scaleName(lines, fit.nameScale), outer, m, angle, fit.radius);
+      for (const box of boxes) {
+        const o = sectorOverflow(box, sector);
         expect(
-          w,
-          `${seg.id}/${line.slot}: "${line.text.replace('\n', ' ')}" is ${w.toFixed(0)}px at r=${line.radius.toFixed(0)}, where the wedge is only ${budget.toFixed(0)}px wide`,
-        ).toBeLessThanOrEqual(budget);
+          o.fits,
+          `${seg.id}/${box.slot}: "${box.text.replace('\n', ' ')}" is ${box.width.toFixed(0)}px wide and ` +
+            `escapes its wedge — ${o.outer.toFixed(1)}px past the rim, ${o.inner.toFixed(1)}px into the hub, ` +
+            `${((o.arc * 180) / Math.PI).toFixed(1)}° past a spoke`,
+        ).toBe(true);
       }
-      // ...and the stack stays in the ring rather than running under the hub.
-      expect(innerRadius, `${seg.id}: the stack runs past the hub`).toBeGreaterThanOrEqual(outer * m.hub);
+      expect(
+        fit.nameScale,
+        `${seg.id}: the name had to come down ${((1 - fit.nameScale) * 100).toFixed(0)}% to fit — that is copy, not layout`,
+      ).toBeGreaterThanOrEqual(MIN_NAME_FIT_SCALE);
     }
   }
 
@@ -954,7 +982,7 @@ describe('a wedge at 390 px, with its longest values (u7-02)', () => {
   it('every line of every SELECTED wedge fits too, at the narrowest profile', () => {
     // The one that could have been skipped, and is the reason the size step is
     // made in `./wheel-stack` rather than scaled in the view: measured here, an
-    // enlarged name that overflowed its arc is a red test; scaled in the view it
+    // enlarged name that overflowed its wedge is a red test; scaled in the view it
     // would be a phone-only clip that only a golden could catch, on a screen the
     // goldens shoot with nothing selected.
     assertWedgesFit(PHONE, true);
@@ -969,6 +997,44 @@ describe('a wedge at 390 px, with its longest values (u7-02)', () => {
       assertWedgesFit(vp, true);
     });
   }
+
+  it('the fix is the placement, and it only ever pulls the words INWARD', () => {
+    // What a0-32 is allowed to move, stated as an assertion rather than as a
+    // sentence in a header: the stack may hang nearer the hub than the design's
+    // rim-anchored radius, and may never hang past it. Anything else on this
+    // wheel — the disc, the spokes, the hit-test, the sweep — is ratified.
+    for (const { name, vp } of PROFILES) {
+      const outer = wheelRadius(vp.width, vp.height);
+      const m = wheelMetrics(outer);
+      for (const [i, seg] of buildWheelModel(WORST_CASE).segments.entries()) {
+        const lines = buildWedgeLines(seg, m);
+        const angle = segmentAngle(i);
+        const design = wedgeStackBoxes(lines, outer, m, angle).centreRadius;
+        const fit = fitWedgeStack(lines, outer, m, angle, SEGMENTS);
+        expect(fit.radius, `${name}/${seg.id} hangs its words past the design radius`).toBeLessThanOrEqual(
+          design + 1e-6,
+        );
+      }
+    }
+  });
+
+  it('the wedge at twelve o\'clock does not move at all — only the sideways ones did', () => {
+    // The defect is a property of the wedges whose words run along the RADIUS.
+    // TURRET's run along the chord, exactly as the old budget assumed, so if this
+    // fix moved TURRET it would be moving something that was never broken.
+    for (const { name, vp } of PROFILES) {
+      const outer = wheelRadius(vp.width, vp.height);
+      const m = wheelMetrics(outer);
+      const turret = buildWheelModel(WORST_CASE).segments[0]!;
+      expect(segmentAngle(0)).toBeCloseTo(-Math.PI / 2, 10);
+      const lines = buildWedgeLines(turret, m);
+      const design = wedgeStackBoxes(lines, outer, m, segmentAngle(0)).centreRadius;
+      expect(
+        fitWedgeStack(lines, outer, m, segmentAngle(0), SEGMENTS).radius,
+        `${name}: the top wedge moved, and it had no reason to`,
+      ).toBeCloseTo(design, 6);
+    }
+  });
 
   it('the selected name really is bigger — the budget is not passing on a no-op', () => {
     // A fit test that passes because nothing changed is worth nothing. Both ends
@@ -989,6 +1055,33 @@ describe('a wedge at 390 px, with its longest values (u7-02)', () => {
         buildWedgeLines(seg, m).filter((l) => l.slot !== 'name').map((l) => l.size),
       );
     }
+  });
+
+  it('…and the wedge that cannot hold 19/17 still grows its name, by as much as it can', () => {
+    // The one place `fitWedgeStack` caps the design: UPGRADE SHIP on a phone. It
+    // must still read as SELECTED — a cap that quietly became "no growth at all"
+    // would have deleted half of u16-01's tell rather than fitted it — and it must
+    // still be a cap, or this test is asserting a branch nothing takes.
+    const outer = wheelRadius(PHONE.width, PHONE.height);
+    const m = wheelMetrics(outer);
+    const i = WHEEL_ORDER.indexOf('upgrade');
+    const seg = buildWheelModel(WORST_CASE).segments[i]!;
+    const angle = segmentAngle(i);
+
+    const resting = buildWedgeLines(seg, m);
+    const chosen = buildWedgeLines(seg, m, true);
+    const restingFit = fitWedgeStack(resting, outer, m, angle, SEGMENTS);
+    const chosenFit = fitWedgeStack(chosen, outer, m, angle, SEGMENTS);
+
+    expect(restingFit.nameScale, 'the resting name needs no cap').toBe(1);
+    expect(chosenFit.nameScale, 'the selected name is capped by the wedge').toBeLessThan(1);
+
+    const nameSize = (ls: readonly WedgeLine[], scale: number) =>
+      ls.find((l) => l.slot === 'name')!.size * scale;
+    expect(
+      nameSize(chosen, chosenFit.nameScale),
+      'a capped selection still draws a BIGGER name than a resting one',
+    ).toBeGreaterThan(nameSize(resting, restingFit.nameScale));
   });
 
   it('the desktop profile takes the handoff\'s own numbers, not a scaled phone', () => {
@@ -1130,20 +1223,28 @@ describe('an upgrade wedge at 390 px, with its longest values (u7-06)', () => {
     const m = wheelMetrics(outer);
     const signals = { ...WORST_UPGRADE, tiers: { ...WORST_UPGRADE.tiers, ...tiersOver } as never };
     for (const { wedge, count, level } of upgradeWedgesOf(signals, ladder, order)) {
-      const { placed, innerRadius } = placeWedgeLines(upgradeWedgeLines(wedge, m), outer, m);
-      for (const line of placed) {
-        const budget = wedgeChordWidth(line.radius, count);
-        const w = textWidth(line.text, line.size, line.tracking, line.face);
+      const sector: AnnularSector = {
+        innerRadius: outer * m.hub,
+        outerRadius: outer,
+        angle: wedge.angle,
+        halfArc: Math.PI / count,
+      };
+      const lines = upgradeWedgeLines(wedge, m);
+      const fit = fitWedgeStack(lines, outer, m, wedge.angle, count);
+      const { boxes } = wedgeStackBoxes(scaleName(lines, fit.nameScale), outer, m, wedge.angle, fit.radius);
+      for (const box of boxes) {
+        const o = sectorOverflow(box, sector);
         expect(
-          w,
-          `${level}/${wedge.label}/${line.slot}: "${line.text.replace(/\n/g, ' ')}" is ${w.toFixed(0)}px ` +
-            `at r=${line.radius.toFixed(0)}, where a wedge of ${count} is only ${budget.toFixed(0)}px wide`,
-        ).toBeLessThanOrEqual(budget);
+          o.fits,
+          `${level}/${wedge.label}/${box.slot}: "${box.text.replace(/\n/g, ' ')}" is ${box.width.toFixed(0)}px ` +
+            `wide and escapes a wedge of ${count} — ${o.outer.toFixed(1)}px past the rim, ` +
+            `${o.inner.toFixed(1)}px into the hub, ${((o.arc * 180) / Math.PI).toFixed(1)}° past a spoke`,
+        ).toBe(true);
       }
       expect(
-        innerRadius,
-        `${level}/${wedge.label}: the stack runs past the hub`,
-      ).toBeGreaterThanOrEqual(outer * m.hub);
+        fit.nameScale,
+        `${level}/${wedge.label}: the name had to come down ${((1 - fit.nameScale) * 100).toFixed(0)}% to fit`,
+      ).toBeGreaterThanOrEqual(MIN_NAME_FIT_SCALE);
     }
   }
 

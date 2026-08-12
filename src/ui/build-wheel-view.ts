@@ -70,7 +70,9 @@ import {
   buildWedgeLines,
   capWords,
   costWords,
+  fitWedgeStack,
   pipRows,
+  scaleName,
   segmentCostPaint,
   statWords,
   targetWords,
@@ -78,7 +80,7 @@ import {
   upgradeCostWords,
   upgradeWedgeLines,
 } from './wheel-stack';
-import type { CostPaint, WedgeLine } from './wheel-stack';
+import type { CostPaint, WedgeFit, WedgeLine } from './wheel-stack';
 
 export type { CostPaint } from './wheel-stack';
 import { upgradeWedgeArc } from './upgrade-wheel';
@@ -316,6 +318,11 @@ interface WedgeNodes {
    *  ("+15 HP", "REPAIR in 12s"), or the upgrade wheel's ladder pips ("●●○").
    *  Empty on a wedge that has none of them. */
   readonly detail: Text;
+  /** The last {@link fitWedgeStack} answer for this wedge, and the inputs it was
+   *  computed from — see {@link BuildWheelView.fitFor}. Mutable on purpose: it is
+   *  a per-node cache, not state the wheel reasons about. */
+  fitKey: string;
+  fit: WedgeFit;
 }
 
 /** The normalised descriptor {@link BuildWheelView.drawWedge} draws — the one
@@ -950,8 +957,23 @@ export class BuildWheelView extends Container {
     };
     for (const t of [nodes.label, nodes.sub, nodes.cost, nodes.detail]) t.visible = false;
 
+    // ── The stack is FITTED to the wedge, not hung at a fixed radius (a0-32) ──
+    //
+    // The design anchors the words just inside the rim, and for the wedge at
+    // twelve o'clock that is exactly right. The labels are not rotated with the
+    // wheel — a radial menu you can read keeps them upright — so on the wedge at
+    // NINE o'clock a line of text runs along the RADIUS, and what stops it is the
+    // rim rather than the arc. `UPGRADE` ran 10 px past it on a 390 px phone.
+    // {@link ../ui/wheel-stack} `fitWedgeStack` re-answers the two things that
+    // were never ratified numbers — how far in the stack hangs, and how much
+    // bigger u16-01's selected name gets — and is a no-op on every wedge that
+    // already fitted. Memoised on the node, because the answer only changes when
+    // the words, their sizes or the wheel's radius do.
+    const fit = this.fitFor(nodes, d, outer, m, arc);
+    const lines = scaleName(d.lines, fit.nameScale);
+
     let y = 0;
-    for (const line of d.lines) {
+    for (const line of lines) {
       const t = slots[line.slot];
       t.visible = true;
       t.text = line.text;
@@ -978,10 +1000,9 @@ export class BuildWheelView extends Container {
     }
     const stackHeight = y;
 
-    const top = labelTopRadius(m, outer);
     // The cluster's own origin is its top-centre (children are anchored 0.5, 0),
     // so the pivot puts the pulse's centre of gravity in the middle of the stack.
-    const centre = top - stackHeight / 2;
+    const centre = fit.radius;
     const lx = Math.cos(d.angle) * centre;
     const ly = Math.sin(d.angle) * centre;
     nodes.cluster.pivot.set(0, stackHeight / 2);
@@ -989,6 +1010,33 @@ export class BuildWheelView extends Container {
     nodes.cluster.x = lx + fb.shakeX;
     nodes.cluster.y = ly;
     nodes.cluster.scale.set(fb.scale);
+  }
+
+  /**
+   * This wedge's fit ({@link fitWedgeStack}), memoised on its node.
+   *
+   * The answer is a function of the words, their type sizes, the wheel's radius
+   * and the wedge's angle and width — and of nothing else, which is why it can be
+   * cached against exactly those. A wheel sitting open with an unchanged model
+   * therefore pays one string compare per wedge per frame; it recomputes when a
+   * cost changes, when a wedge is pointed at (u16-01 grows the name), and when the
+   * viewport resizes. GDD §4.3's zero-allocation frame path is unbothered: the key
+   * is the only allocation, and `restyle`/`t.text` already make one per line.
+   */
+  private fitFor(
+    nodes: WedgeNodes,
+    d: WedgeDraw,
+    outer: number,
+    m: WheelProfile,
+    arc: number,
+  ): WedgeFit {
+    let key = `${outer.toFixed(2)}|${d.angle.toFixed(4)}|${arc.toFixed(4)}`;
+    for (const line of d.lines) key += `|${line.slot}:${line.size.toFixed(2)}:${line.text}`;
+    if (key !== nodes.fitKey) {
+      nodes.fitKey = key;
+      nodes.fit = fitWedgeStack(d.lines, outer, m, d.angle, Math.round((2 * Math.PI) / arc));
+    }
+    return nodes.fit;
   }
 
   /** Lazily create (and then reuse) one wedge's children. The face goes in
@@ -1021,7 +1069,16 @@ export class BuildWheelView extends Container {
     bodies.addChild(body);
     clusters.addChild(cluster);
 
-    const nodes: WedgeNodes = { body, cluster, label, sub, cost, detail };
+    const nodes: WedgeNodes = {
+      body,
+      cluster,
+      label,
+      sub,
+      cost,
+      detail,
+      fitKey: '',
+      fit: { radius: 0, nameScale: 1 },
+    };
     pool[index] = nodes;
     return nodes;
   }
