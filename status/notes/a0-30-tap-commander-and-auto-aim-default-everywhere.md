@@ -89,3 +89,29 @@ broken loop.
   `parseControlScheme` / `STICKS_LABELS` comments, and `src/net/session.ts`'s
   `options.fireMode ?? 'manual'` protocol default (harmless today — the client
   always sends the field — but it is a third fire-mode default in the tree).
+
+---
+
+## RUN LOG (2026-08-12)
+
+- `npx tsc --noEmit` clean; `npx vitest run` — 287 files / 5062 tests green (CI's
+  "Typecheck, test, build" job passed on the pushed ref, including dark-matter and
+  the vite build).
+- Mobile (CI) suite, all three projects, run locally in full **and** on CI. The only
+  failures were the four listed in the test commit + `emulation.spec.ts:420` on both
+  phone profiles (CI shards 5 and 6) — every one of them a spec that had been
+  relying on the sticks default. All green after each was made to ask for the
+  scheme its input belongs to. **Every golden except `desktop-hud-footer` passed
+  untouched**, which is the useful negative result: nothing else about the frame
+  moved.
+- `tests/live-stage/a0-30-defaults.spec.ts` — 5/5 on the real preview bundle, with
+  the five evidence PNGs committed beside it.
+- PR: #399.
+
+### If you are resuming and something "doesn't move"
+
+A dead `W`, a dead left virtual stick, or a build wheel that refuses to open under
+`?debug=1` is almost certainly this change, not a broken loop: the harness now
+boots into Tap Commander like a real first-run player. Seat the scheme the spec
+means (`localStorage.setItem('planet-rush:controlScheme', 'sticks')` in an
+`addInitScript`, before `goto`) rather than "fixing" the input path.
