@@ -267,6 +267,10 @@ import {
   lobbyRosterTeams,
   denseSeatIndex,
   isParticipant,
+  // "This seat flies a bot", asked of the LOBBY rather than of the stored word:
+  // in solo there is no OPEN seat, so one stored as OPEN reads BOT (a0-31).
+  isBotSeat,
+  occupantOf,
   lobbyWireSeats,
   lobbyWireTeams,
   startLobbyMatch,
@@ -9782,8 +9786,10 @@ function openLobby(
   ): { hint: NonNullable<ReturnType<typeof codexShipHint>>; ax: number; ay: number } | null {
     const seat = state.seats.find((s) => s.player === index);
     const rect = layout.seats[index];
-    if (!seat || seat.occupant === 'human' || !seat.personality || !rect) return null;
-    const hint = codexBotHint(CODEX_DATA, seat.personality);
+    // "This row is showing a bot" — asked of the lobby, not of the stored word, so
+    // a solo seat that reads BOT has the dossier its `?` promises (a0-31).
+    if (!seat || !rect || !isBotSeat(occupantOf(state, seat))) return null;
+    const hint = codexBotHint(CODEX_DATA, seat.personality ?? seat.character);
     if (!hint) return null;
     return { hint, ax: rect.x + rect.width / 2, ay: rect.y };
   }
@@ -9861,15 +9867,18 @@ function openLobby(
             // right *tier* and any of the characters inside it: pick Sable, get
             // Vulture. Offline never had that gap.
             //
-            // Same filter as `botDifficulties`, and that is load-bearing rather
-            // than tidy: `seat.personality` is the seat's character gated by the
-            // same `isBotSeat` the tier list filters on, so the two rows are the
-            // same length in the same order by construction, and neither can slide
-            // against the other — or the seam would hand seat 5's character to
-            // seat 2, which is the very off-by-one both rows are indexed to avoid.
+            // Same filter as `botDifficulties` — now literally the same
+            // expression, and that is load-bearing rather than tidy: the two rows
+            // are the same length in the same order by construction, and neither
+            // can slide against the other, or the seam would hand seat 5's
+            // character to seat 2, which is the very off-by-one both rows are
+            // indexed to avoid. It used to read `seat.personality` filtered for
+            // non-null, which is that same pair already computed — a copy, and
+            // one that a seat whose occupant the lobby RESOLVES (a0-31: solo has
+            // no OPEN seat) could be a rung behind.
             botPersonalities: state.seats
-              .map((s) => s.personality)
-              .filter((p): p is PersonalityId => p !== null),
+              .filter((s) => isBotSeat(occupantOf(state, s)))
+              .map((s) => s.character),
           }
         : {}),
       // The match SHAPE, from the host only (m10 teams-wire): the MODE and the

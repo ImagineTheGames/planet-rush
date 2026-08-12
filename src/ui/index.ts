@@ -411,7 +411,9 @@ export {
   isParticipant,
   // …and what a seat IS in the lobby doing the reading: in SOLO there is no OPEN
   // seat, so one stored as OPEN reads BOT, and the host's tap walks two rungs
-  // instead of three (a0-31 — "no one can join in solo").
+  // instead of three (a0-31 — "no one can join in solo"). `isBotSeat` is the
+  // predicate they feed: "this seat flies a bot", the one every reader shares.
+  isBotSeat,
   occupantOf,
   seatStateCycle,
   lobbyMatchConfig,
