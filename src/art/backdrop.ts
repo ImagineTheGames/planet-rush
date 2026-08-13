@@ -113,7 +113,19 @@
 import { Container, Graphics } from 'pixi.js';
 import { mulberry32 } from '@shared/types';
 import { DERIVED, FLOOR, PALETTE, WHITE } from './palette';
-import { circle, fill, poly, polyline, round, sprite, stroke, type Shape, type SpriteDef } from './shapes';
+import {
+  circle,
+  ellipsePoints,
+  fill,
+  poly,
+  polyline,
+  round,
+  softFill,
+  sprite,
+  stroke,
+  type Shape,
+  type SpriteDef,
+} from './shapes';
 import { drawSprite } from './textures';
 
 // ---------------------------------------------------------------------------
@@ -530,25 +542,54 @@ export interface NebulaSpec {
    */
   readonly overdraw: number;
   /**
-   * **How bright this sky ever gets**: the luma (Y′, 0..255) of its brightest
-   * composited pixel over Floor, measured by `backdrop.test.ts` and pinned there
-   * to within 15%. This is the number "subtle" means, and the ladder it makes is
-   * the whole art direction of the set:
+   * **How bright this sky ever gets**: the luma (Y′, 0..255) of the brightest
+   * pixel it can composite over Floor **in a frame a player can actually see** —
+   * the desktop control profile over the wide arena — measured by
+   * `backdrop.test.ts` and pinned there to within 15%. This is the number
+   * "subtle" means, and the ladder it makes is the whole art direction of the set:
    *
    * ```
-   *   None / Coalsack  1.9   ← the ground itself; Coalsack only ever darkens
-   *   Iron Veil        9.3
-   *   Deep Ember       9.7
-   *   Patina Drift    15.8
-   *   Plasma Reef     17.4   ← the brightest, as the developer described it
+   *                    shipped   a0-39      both columns measured the SAME way:
+   *   None / Coalsack      1.9     1.9      a real 1280×800 frame over the wide
+   *   Deep Ember           9.2     7.6      arena, read off the canvas by
+   *   Patina Drift        19.1    14.9      evidence/a0-39-…/shoot.mjs
+   *   Iron Veil           15.8    14.0
+   *   Plasma Reef         17.9    17.0   ← the brightest, as the developer described it
    *   ----------------------------------------------------------------
-   *   the ink outline 43.4   ← every sky stays under the line every sprite is drawn with
-   *   the rock body   77.5
+   *   the ink outline     43.4            ← every sky stays under the line every sprite is drawn with
+   *   the rock body       77.5
    * ```
    *
    * The invariant the test enforces is that last gap: **no sky is ever brighter
    * than `rockFissure`, the ink every sprite in the game is outlined in.** A
    * backdrop that out-values the linework is a backdrop competing with the fleet.
+   *
+   * **Two things about this column changed in a0-39, and they are different
+   * kinds of change.**
+   *
+   * *The instrument changed.* It used to sample **one screenful** of a sky. A
+   * peak is an extreme value, and the extreme over nine clots is not the extreme
+   * over the sixty a real arena carries, so the old figures under-reported the
+   * brightest pixel a player meets — by 22% on Patina Drift and enough on Plasma
+   * Reef to hide a **contrast-tax breach that was already shipped**. It now
+   * samples the window the camera can actually reach across a crossing
+   * (`SKY_FIELD` / `visibleSpan` in the test). Because of that, the numbers here
+   * are **not** comparable with the ones a0-07 pinned; the table above therefore
+   * quotes the shipped build re-measured the new way, not a0-07's own column.
+   *
+   * *The drawing changed.* A sky is one gradient shape per element now rather
+   * than a stack of four flat ones ({@link Falloff}). Every sky came out a
+   * little quieter and **the order is unchanged**, which is the point: this was
+   * a fix to the drawing, not a re-art-direction.
+   *
+   * **Deep Ember moved the most, and it is a rule that moved it, not a taste.**
+   * Its bodies declared 0.030–0.045 and, as four-stop stacks, painted
+   * **0.068–0.101** — up to 1.7× over `SKY_RESERVED_ALPHA_MAX`, the 0.06 that
+   * style-guide §2.2 grants threat red on the backdrop. `compliance.ts` never
+   * saw it because it audits one shape at a time and the stack was four; the
+   * composite was never in front of it. A single gradient shape paints exactly
+   * what it declares, so this sky is now capped at the ceiling and comes back
+   * dimmer. Raising 0.06 is the Director's call; a0-39 did not take it.
    */
   readonly peakLuma: number;
   /**
@@ -599,45 +640,51 @@ export interface NebulaSpec {
 }
 
 /**
- * How a soft blob fades from centre to rim: `[radius fraction, alpha fraction]`,
- * back to front. A real radial gradient is not expressible in the flat-fill IR
- * (./shapes), so every soft edge in this file is a stack of concentric discs —
- * the same approximation the atmosphere halo uses (./stations), for the same
- * reason: it bakes to one static layer and costs nothing per frame.
+ * **The stop table this file used to fake a gradient with, kept as arithmetic
+ * because two skies' declared alphas are ported off it (a0-39).**
+ *
+ * Every soft edge in the void was a stack of four concentric flat-filled shapes
+ * at radius fractions `1.0 / 0.72 / 0.46 / 0.2` and alpha fractions
+ * `0.18 / 0.42 / 0.72 / 1.0`. At sprite scale that reads as a soft edge. At
+ * *nebula* scale — a body 200 px across on a ground of Y′ 1.9 — it reads as four
+ * hard-edged rings with a dark core, which is what the developer photographed,
+ * and it is measured to the stop radii in {@link Falloff}'s own note.
+ *
+ * Two numbers from it are still load-bearing, and this is why the table survives
+ * as a constant instead of being deleted:
+ *
+ *  - {@link stackedPeak} — what a stack of these actually *painted*, which is
+ *    **not** the alpha it declared. Under normal blending four nested stops
+ *    composite to `1 − Π(1 − a·fᵢ)` ≈ **2.26 a**. A sky ported to a single
+ *    gradient at its declared alpha would be less than half as bright as the one
+ *    the developer ratified, so the port raises each peak to what the stack was
+ *    really painting — where the compliance ceilings allow it (see Deep Ember).
+ *  - Under **additive** blending the same table was already stated as increments
+ *    that sum to one, so an additive sky's painted peak *was* its declared peak
+ *    and ports across unchanged.
  */
-const SOFT_STOPS: readonly (readonly [number, number])[] = [
-  [1.0, 0.18],
-  [0.72, 0.42],
-  [0.46, 0.72],
-  [0.2, 1.0],
-];
+const LEGACY_SOFT_ALPHA_FRACTIONS = [0.18, 0.42, 0.72, 1.0] as const;
 
 /**
- * The same falloff for an **additive** layer, and it is a different table for a
- * reason worth writing down, because getting it wrong is what made the first
- * Plasma Reef a disqualifier.
- *
- * Under normal blending a nested stack *converges*: each disc composites over
- * the last, so a peak alpha of 0.06 stays near 0.06 no matter how many stops are
- * in it. Under **additive** blending it *accumulates* — the four stops of one
- * node add to 2.3× the peak, and five overlapping nodes in a clot add again.
- * The first build of the reef peaked at Y′ 88/255 that way: brighter than the
- * ink outline every sprite in the game is drawn with, and enough to erase the
- * clockwise threat fill it sat behind (measured at 1.10:1 — the frame the brief
- * calls the disqualifier, and it failed).
- *
- * So the additive stops are stated as *increments that sum to one*: the centre
- * of a node adds exactly its declared peak, and the rim adds a seventh of it.
- * Bright stays a decision instead of an accident.
+ * What the four-stop stack painted at its core, for a declared peak of `a` under
+ * normal blending — the port factor above, as a function rather than as 2.26.
  */
-const ADDITIVE_STOPS: readonly (readonly [number, number])[] = [
-  [1.0, 0.14],
-  [0.72, 0.22],
-  [0.46, 0.28],
-  [0.2, 0.36],
-];
+function stackedPeak(a: number): number {
+  let clear = 1;
+  for (const f of LEGACY_SOFT_ALPHA_FRACTIONS) clear *= 1 - a * f;
+  return round(1 - clear);
+}
 
-/** A soft disc: a concentric stack faking a radial falloff. */
+/**
+ * **A soft blob: ONE circle, painted through the radial falloff** (a0-39;
+ * ./shapes `Falloff`, `falloffProfile`).
+ *
+ * The path is the falloff's own zero rim, so the disc has no boundary: alpha
+ * arrives at zero tangentially exactly where the geometry ends. `peakAlpha` is
+ * what the centre paints, and — unlike the stack this replaced — it is also what
+ * the shape *declares*, so `./compliance`'s sky ceilings now bound what a player
+ * actually sees rather than one quarter of it.
+ */
 function softDisc(
   out: Shape[],
   cx: number,
@@ -645,20 +692,25 @@ function softDisc(
   radius: number,
   color: number,
   peakAlpha: number,
-  stops: readonly (readonly [number, number])[] = SOFT_STOPS,
 ): void {
-  for (const [rFrac, aFrac] of stops) {
-    const a = round(peakAlpha * aFrac);
-    if (a <= 0) continue;
-    out.push(circle(cx, cy, round(radius * rFrac), fill(color, 'sky', a)));
-  }
+  const r = round(radius);
+  if (r <= 0 || peakAlpha <= 0) return;
+  out.push(
+    circle(cx, cy, r, softFill(color, 'sky', round(peakAlpha), { cx, cy, rx: r, ry: r, angle: 0 })),
+  );
 }
 
 /**
- * A **wisp**: an elongated, slightly ragged blob at an angle — the shape a
- * nebula filament actually has, and the reason Patina Drift reads as drift
- * rather than as a row of discs. Built as a stack of scaled radial polygons so
- * it fades like {@link softDisc} does.
+ * A **wisp**: one elongated soft blob at an angle — the shape a nebula filament
+ * has, and what makes Patina Drift read as drift rather than as a row of discs.
+ *
+ * **It is no longer ragged, and that is a consequence of the fix rather than a
+ * taste.** A radial falloff's iso-contours are ellipses; a ragged *path* around
+ * one either clips the paint before it reaches zero (a hard edge at up to 15% of
+ * peak — the artefact again, at one ring instead of four) or sits outside the
+ * paint entirely, where it is invisible and costs fill. So irregularity has to
+ * come from where a real nebula gets it — **count, aspect, angle spread and
+ * overlap** — and every sky that uses this leans on that instead.
  */
 function softWisp(
   out: Shape[],
@@ -669,29 +721,31 @@ function softWisp(
   angle: number,
   color: number,
   peakAlpha: number,
-  ragged: () => number,
 ): void {
-  const VERTS = 14;
-  // One ragged radius per vertex, shared by every stop, so the stack nests.
-  const jitter: number[] = [];
-  for (let i = 0; i < VERTS; i++) jitter.push(0.78 + ragged() * 0.44);
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  for (const [rFrac, aFrac] of SOFT_STOPS) {
-    const a = round(peakAlpha * aFrac);
-    if (a <= 0) continue;
-    const pts: number[] = [];
-    for (let i = 0; i < VERTS; i++) {
-      const t = (i / VERTS) * Math.PI * 2;
-      const ex = Math.cos(t) * rx * rFrac * jitter[i]!;
-      const ey = Math.sin(t) * ry * rFrac * jitter[i]!;
-      pts.push(round(cx + ex * cos - ey * sin), round(cy + ex * sin + ey * cos));
-    }
-    out.push(poly(pts, fill(color, 'sky', a)));
-  }
+  const ax = round(rx);
+  const ay = round(ry);
+  if (ax <= 0 || ay <= 0 || peakAlpha <= 0) return;
+  out.push(
+    poly(
+      ellipsePoints(cx, cy, ax, ay, angle),
+      softFill(color, 'sky', round(peakAlpha), { cx, cy, rx: ax, ry: ay, angle: round(angle) }),
+    ),
+  );
 }
 
-/** A rotated rectangle (a "sheet"), as a closed quad. */
+/**
+ * A **sheet**: one long, thin soft streak — Iron Veil's stratum.
+ *
+ * This was a rotated *rectangle* with a flat fill, and it is the second half of
+ * the developer's report: *"diagonal banding"*. It had no falloff to blame,
+ * because it had no falloff at all — fourteen hard-edged quads across one band,
+ * every one of them ending on a straight line the eye reads as an object's edge.
+ *
+ * It is the same primitive as a wisp now, at an extreme aspect. Iron Veil's
+ * "laminated rather than clouded" read survives, because lamination is what
+ * *several parallel strata* look like — it never depended on any one of them
+ * having a visible edge.
+ */
 function sheet(
   out: Shape[],
   cx: number,
@@ -702,20 +756,7 @@ function sheet(
   color: number,
   alpha: number,
 ): void {
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  const pts: number[] = [];
-  for (const [sx, sy] of [
-    [-1, -1],
-    [1, -1],
-    [1, 1],
-    [-1, 1],
-  ] as const) {
-    const ex = sx * halfLength;
-    const ey = sy * halfThick;
-    pts.push(round(cx + ex * cos - ey * sin), round(cy + ex * sin + ey * cos));
-  }
-  out.push(poly(pts, fill(color, 'sky', round(alpha))));
+  softWisp(out, cx, cy, halfLength, halfThick, angle, color, alpha);
 }
 
 /** `count` scaled by a reduced-tier density, never below 1 when the sky is kept. */
@@ -765,7 +806,7 @@ const COALSACK: NebulaSpec = {
   parallax: 0.14,
   occludes: true,
   additive: false,
-  overdraw: 0.691,
+  overdraw: 0.399,
   peakLuma: 1.9,
   // Kept whole. It is the ground colour — one opaque-ish blend, no added light —
   // and shedding it mid-match would make a wall of stars appear at once.
@@ -794,7 +835,9 @@ const COALSACK: NebulaSpec = {
       const cy = round(along * sin + across * cos);
       const r = round(unit * (0.34 + rng.next() * 0.22));
       // Dense along the lane's middle, thinning at both ends — a body with edges.
-      const core = 0.9 * (1 - 0.55 * Math.abs(t));
+      // Ported through `stackedPeak` (a0-39): the lane has to keep *occluding*,
+      // and what it occluded with was the stack's composite, not its declaration.
+      const core = stackedPeak(0.9 * (1 - 0.55 * Math.abs(t)));
       softDisc(out, cx, cy, r, GROUND_COLOR, core);
     }
     return out;
@@ -821,8 +864,8 @@ const IRON_VEIL: NebulaSpec = {
   parallax: SKY_PARALLAX,
   occludes: false,
   additive: false,
-  overdraw: 0.208,
-  peakLuma: 9.3,
+  overdraw: 0.249,
+  peakLuma: 14.0,
   // Half the sheets. A band with 7 sheets is still a band; the read survives.
   reducedDensity: 0.5,
   build(seed, width, height, density, screenW, screenH) {
@@ -847,7 +890,12 @@ const IRON_VEIL: NebulaSpec = {
       const cx = round(along * cos - across * sin);
       const cy = round(along * sin + across * cos);
       const halfLen = round(unit * (0.55 + rng.next() * 0.5));
-      const halfThick = round(unit * (0.02 + rng.next() * 0.035));
+      // Half again as thick as the flat quads were (0.02–0.055), because a
+      // streak's thickness is now a *falloff* rather than an edge: an ellipse's
+      // mean coverage across its minor axis is a fraction of a rectangle's, so
+      // porting the old half-thickness unchanged would have thinned the band to
+      // a set of hairlines. The band's own width across the field is untouched.
+      const halfThick = round(unit * (0.03 + rng.next() * 0.052));
       // Every fourth sheet is rust; the rest are iron. Rust rides the §2.2
       // ceiling (0.06) with headroom, iron rides the ordinary sky ceiling.
       const rusty = i % 4 === 1;
@@ -856,7 +904,11 @@ const IRON_VEIL: NebulaSpec = {
         : i % 3 === 0
           ? DERIVED.hullShadow
           : DERIVED.hullDark;
-      const alpha = rusty ? 0.04 + rng.next() * 0.015 : 0.03 + rng.next() * 0.03;
+      // Raised toward each ceiling, for the same reason the thickness was: a
+      // gradient's mean is a third of its peak, so a flat 0.04 quad and a 0.04
+      // streak are not the same amount of iron. Rust stops at the §2.2 ceiling
+      // (0.06) exactly and iron well under the ordinary one (0.12).
+      const alpha = rusty ? 0.045 + rng.next() * 0.015 : 0.05 + rng.next() * 0.045;
       sheet(out, cx, cy, halfLen, halfThick, band + (rng.next() - 0.5) * 0.06, color, alpha);
     }
     return out;
@@ -879,8 +931,8 @@ const PATINA_DRIFT: NebulaSpec = {
   parallax: SKY_PARALLAX,
   occludes: false,
   additive: false,
-  overdraw: 0.863,
-  peakLuma: 15.8,
+  overdraw: 0.555,
+  peakLuma: 14.9,
   // Ten of twenty-two. The drift angle and the ink mix are unchanged, so what is
   // left is the same sky thinned, not a different one.
   reducedDensity: 0.45,
@@ -890,10 +942,20 @@ const PATINA_DRIFT: NebulaSpec = {
     const unit = Math.min(screenW, screenH) / 2;
     const screens = (width * height) / (screenW * screenH);
     const drift = 0.34;
+    // **Tuned to the measured peak, not ported from the declaration (a0-39).**
+    // `stackedPeak` alone overshoots here, and the reason is worth stating
+    // because it is the one place the port is not arithmetic: a gradient is
+    // *fuller through its middle* than the stack it replaces (at t = 0.5 it
+    // paints 0.051 where three-of-four stops painted 0.024), so its mean over a
+    // blob is 29% higher at the same peak — and Patina Drift is the sky whose
+    // elements overlap most. Ported literally it measured peak Y′ **25.3**
+    // against the ratified 15.8, which would also have made it, not Plasma
+    // Reef, the brightest sky in the set. These three hold the ladder where
+    // a0-07 put it; `backdrop.test.ts` is what says so.
     const inks: readonly (readonly [number, number])[] = [
-      [PALETTE.patina, 0.04],
-      [DERIVED.continentShade, 0.036],
-      [DERIVED.hullShadow, 0.032],
+      [PALETTE.patina, 0.051],
+      [DERIVED.continentShade, 0.046],
+      [DERIVED.hullShadow, 0.041],
     ];
     const wisps = scaled(22 * screens, density);
     for (let i = 0; i < wisps; i++) {
@@ -902,7 +964,13 @@ const PATINA_DRIFT: NebulaSpec = {
       const rx = round(unit * (0.2 + rng.next() * 0.3));
       const ry = round(rx * (0.28 + rng.next() * 0.3));
       const ink = inks[Math.floor(rng.next() * inks.length)]!;
-      softWisp(out, cx, cy, rx, ry, drift + (rng.next() - 0.5) * 0.5, ink[0], ink[1], () => rng.next());
+      // The angle spread is widened from ±0.25 to ±0.45 rad about the drift.
+      // A wisp is a clean ellipse now (see `softWisp`), so the filament read has
+      // to come from wisps crossing each other at a range of angles rather than
+      // from each one being individually ragged — and the drift still wins,
+      // because ±0.45 about a common bearing is a shared direction, not a
+      // scatter.
+      softWisp(out, cx, cy, rx, ry, drift + (rng.next() - 0.5) * 0.9, ink[0], ink[1]);
     }
     return out;
   },
@@ -931,24 +999,29 @@ const PLASMA_REEF: NebulaSpec = {
   parallax: SKY_PARALLAX,
   occludes: false,
   additive: true,
-  overdraw: 1.121,
-  peakLuma: 17.4,
+  overdraw: 0.627,
+  peakLuma: 17.0,
   // **Thinned to a third of its parts, not dropped (r9-01).** The old value was
   // 0 — "a fraction of it saves a fraction of nothing" — and that claim was
   // never measured. It is wrong, and the shape of the cost says why: the reef's
   // fill is not in its clots (r ≈ 0.045–0.095 of a screen half-height) but in
   // the three broad base washes under them (r ≈ 0.5–0.8). Shedding at 0.45 takes
   // the washes 3 → 1 and the clots 9 → 4, and on the canonical 1600×900 screenful
-  // that is measured overdraw **1.121 → 0.463: 59% of this sky's fill, gone.**
-  // The throttled reef then costs less than Coalsack (0.691) or Deep Ember
-  // (0.746) — every coloured sky but Iron Veil — while still being a reef.
+  // that is measured overdraw **0.627 → 0.262: 58% of this sky's fill, gone.**
+  // The throttled reef then costs less than Coalsack (0.399) or Deep Ember
+  // (0.416) — every coloured sky but Iron Veil — while still being a reef.
   //
   // 0.45 rather than lower because below it the saving stops arriving — the last
-  // base wash is the floor of the cost. 0.30 measures 0.443 and 0.15 measures
-  // 0.414: a further 2% and 4% of the full reef's fill, for clots 4 → 3 → 1. The
-  // floor itself (0.25 → 0.427) would buy 3% more frame and cost half the clots.
-  // Nor higher: 0.5 rounds the second base wash back in and jumps to 0.701,
+  // base wash is the floor of the cost. 0.30 measures 0.251 and 0.15 measures
+  // 0.234: a further 2% and 4% of the full reef's fill, for clots 4 → 3 → 1. The
+  // floor itself (0.25 → 0.242) would buy 3% more frame and cost half the clots.
+  // Nor higher: 0.5 rounds the second base wash back in and jumps to 0.393,
   // keeping only 37%.
+  //
+  // **Every number in this note was re-measured for a0-39** — a gradient blob is
+  // one covered layer where the stack was four overlapping ones — and the whole
+  // ladder scaled by 0.56 with its shape intact, so the conclusion it argues
+  // (0.45 is where the saving stops arriving) is unchanged.
   reducedDensity: 0.45,
   build(seed, width, height, density, screenW, screenH) {
     const rng = mulberry32((seed ^ 0x51a5_9aee) >>> 0);
@@ -960,7 +1033,9 @@ const PLASMA_REEF: NebulaSpec = {
     for (let i = 0; i < bases; i++) {
       const cx = round((rng.next() - 0.5) * width * 0.7);
       const cy = round((rng.next() - 0.5) * height * 0.7);
-      softDisc(out, cx, cy, round(unit * (0.5 + rng.next() * 0.3)), DERIVED.plasmaDim, 0.018, ADDITIVE_STOPS);
+      // 0.0126, from 0.018 — the reef's one real tuning change, and it is a
+      // *ceiling* that made it. See the clot alpha below for the measurement.
+      softDisc(out, cx, cy, round(unit * (0.5 + rng.next() * 0.3)), DERIVED.plasmaDim, 0.0126);
     }
     // Nine clots, each a loose cluster of four small nodes. Loose on purpose:
     // additive light adds, so a node that lands on top of its neighbour costs
@@ -980,11 +1055,26 @@ const PLASMA_REEF: NebulaSpec = {
           round(cy + Math.sin(a) * d),
           round(unit * (0.045 + rng.next() * 0.05)),
           PALETTE.plasma,
-          // Tuned DOWN to here, not up: at 0.05+ the reef's brightest clot ate
-          // 11.3% of the owner ring's contrast, over the 10% ceiling
-          // `backdrop.test.ts` sets. Still the brightest sky in the set.
-          0.045 + rng.next() * 0.013,
-          ADDITIVE_STOPS,
+          // **Tuned DOWN by 30% (a0-39), and by the same ceiling that set it at
+          // 0.045 in the first place — measured on a frame this time.**
+          //
+          // An additive stop table summed to one, so a single gradient at the
+          // same alpha has the same *peak*; what it does not have is the same
+          // *middle*. `(1 − t²)²` holds 0.56 of peak at half-radius where the
+          // four stops held 0.36, and a clot is four nodes that overlap, so the
+          // clot's own maximum rose by a third: real-screen peak Y′ 17.9 → 23.5,
+          // and the owner beacon ring's contrast tax 10.6% → 14.8% against a
+          // 10% ceiling.
+          //
+          // Two facts are worth separating there. The 14.8% is a0-39's to fix
+          // and this number fixes it. **The 10.6% was already shipped** — it was
+          // invisible because `skyBrightness` measured one screenful of a sky
+          // instead of the frame a player sees (`SKY_FIELD` in the test says
+          // what changed and why). So the reef lands under its own rule here for
+          // the first time, at a measured tax of **9.4%**, and the 5% of
+          // brightness that costs against the shipped build is not a look
+          // anybody has ever been shown.
+          0.0315 + rng.next() * 0.0091,
         );
       }
     }
@@ -1011,8 +1101,8 @@ const DEEP_EMBER: NebulaSpec = {
   parallax: SKY_PARALLAX,
   occludes: false,
   additive: false,
-  overdraw: 0.746,
-  peakLuma: 9.7,
+  overdraw: 0.416,
+  peakLuma: 7.6,
   // Kept whole. Five discs at 4% is already the cheapest coloured sky there is;
   // there is nothing to shed that would buy a frame.
   reducedDensity: 1,
@@ -1041,7 +1131,18 @@ const DEEP_EMBER: NebulaSpec = {
         if (Math.hypot(nx, ny) >= HOLE) break;
       }
       const r = round(unit * (0.42 + rng.next() * 0.24));
-      softDisc(out, round(nx * hw), round(ny * hh), r, PALETTE.threatRed, 0.03 + rng.next() * 0.015);
+      // **The one sky the port could not keep whole, and it is the §2.2 ceiling
+      // that stops it, not taste (a0-39).** These bodies declared 0.030–0.045
+      // and, as four-stop stacks, painted 0.068–0.101 — up to **1.7× over
+      // `SKY_RESERVED_ALPHA_MAX` (0.06)**, the number style-guide §2.2 grants
+      // rust on the backdrop. The audit never saw it because it reads one shape
+      // at a time and the stack was four; the composite was never in front of
+      // it. One gradient shape *is* what it declares, so this sky can now be at
+      // most the ceiling — and it is exactly the ceiling, less a hair of spread,
+      // which is the most rust Art is allowed to give. Deep Ember therefore
+      // comes back dimmer than the number the a0-07 table quotes. Moving 0.06 is
+      // the Director's call and this brief does not take it.
+      softDisc(out, round(nx * hw), round(ny * hh), r, PALETTE.threatRed, 0.05 + rng.next() * 0.01);
     }
     return out;
   },
@@ -1086,10 +1187,16 @@ export type MapId = 'octagon' | 'compass' | 'oval' | 'diamond' | 'line' | 'cresc
  * modulo would repeat a sky the moment a fifth map lands and would assign it
  * without anyone choosing; this way each line is a decision that can be argued
  * with. The six skies, ranked by measured per-screen overdraw, are NONE `0.000`
- * · Iron Veil `0.208` · Coalsack `0.691` · Deep Ember `0.746` · Patina Drift
- * `0.863` · Plasma Reef `1.121`, and the rule that placed them is: **the
+ * · Iron Veil `0.249` · Coalsack `0.399` · Deep Ember `0.416` · Patina Drift
+ * `0.555` · Plasma Reef `0.627`, and the rule that placed them is: **the
  * cheapest sky goes on the board that runs on the most devices, and the
  * costliest on the board with the fewest entities.** Map by map:
+ *
+ * **a0-39 re-measured every one of those figures** (one gradient shape per
+ * element instead of a stack of four flat ones) and **the ranking did not
+ * move** — every sky got 44% cheaper and Iron Veil, which gained a soft edge it
+ * never had, still comes first. So no assignment below is re-argued: the whole
+ * column is smaller and the reasoning that placed it is untouched.
  *
  *  - **`octagon` → NONE.** The Ring is the default: it is what `?debug=1` boots,
  *    what a returning player finds pre-selected, and the first thing a phone
@@ -1098,14 +1205,14 @@ export type MapId = 'octagon' | 'compass' | 'oval' | 'diamond' | 'line' | 'cresc
  *  - **`compass` → Coalsack.** The Compass is corner-cover and edge-lanes, and
  *    it is a derelict-fill map, so at any roster below eight it also carries
  *    wrecks and their debris — one of the two busiest boards. It gets the
- *    cheapest sky that is not nothing (0.691), and the only one that **adds no
+ *    cheapest sky that is not nothing (0.399), and the only one that **adds no
  *    light to the frame at all**: Coalsack is the ground colour in front of the
  *    stars, so it can never raise a pixel's value (measured peak Y′ 1.9 — the
  *    ground's own) and takes 0% off the contrast of the ring, the threat fill or
  *    the ore. A dust lane also suits a map about cover.
  *  - **`diamond` → Patina Drift.** Double Diamond is the other derelict-fill
  *    board and the most contested centre in the set — the exposed inner homes
- *    sit right on the commons — so it takes the next-cheapest (0.863). No
+ *    sit right on the commons — so it takes the next-cheapest (0.555). No
  *    reserved hue, no additive pass, and the "old system" tint is the right
  *    register for the veteran board with wrecks standing on it.
  *  - **`oval` → Plasma Reef.** The costly sky goes on the *thinnest* map. The
@@ -1123,13 +1230,13 @@ export type MapId = 'octagon' | 'compass' | 'oval' | 'diamond' | 'line' | 'cresc
  *    carries wrecks and their debris. Four stations, their turrets, the whole
  *    commons and eight ships can share one screen at the moment of contact —
  *    nowhere else does. By the rule above the busiest board takes the cheapest
- *    coloured sky, and Iron Veil is it at **0.208**, a third of Coalsack's. A
+ *    coloured sky, and Iron Veil is it at **0.249**, five eighths of Coalsack's. A
  *    laminated iron band with rust through it also suits a board that is a wall
  *    you stand inside.
  *  - **`line` → Deep Ember.** The Line is the thinnest board per screen and the
  *    exact complement of the reasoning above: eight homes strung down two picket
  *    lines 2027 u apart, so a screen holds a couple of stations and a great deal
- *    of empty corridor. Deep Ember at 0.746 is affordable there, and its shape is
+ *    of empty corridor. Deep Ember at 0.416 is affordable there, and its shape is
  *    the argument — "five dying coals at the rim… the middle of the screen, where
  *    the fight is, stays clean" is a description of this map's contested corridor.
  *    The warmth sits out where the lines are and never over the ground being
@@ -1141,7 +1248,8 @@ export type MapId = 'octagon' | 'compass' | 'oval' | 'diamond' | 'line' | 'cresc
  * carve-out, and until now no shipped board depended on it. Two boards do now,
  * so §2.2 is load-bearing rather than merely permitted. Nothing changed about
  * the ink — the audit's `SKY_RESERVED_ALPHA_MAX` still holds both to a whisper
- * (peak luma 9.3 and 9.7 of 255 over Floor) — but the Director's clean seam to
+ * (peak luma 9.1 and 6.9 of 255 over Floor, and since a0-39 it holds them on the
+ * pixel a player sees rather than on one quarter of it) — but the Director's clean seam to
  * veto §2.2 is now a seam with two maps standing on it.
  */
 export const MAP_NEBULA: Readonly<Record<MapId, NebulaId>> = {

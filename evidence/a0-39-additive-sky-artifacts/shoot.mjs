@@ -118,13 +118,45 @@ function scanRings(png) {
 
 async function main() {
   mkdirSync(OUT, { recursive: true });
-  const server = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], {
+  // **Wait for the server WE started, and die if the port was already taken.**
+  // Not defensive coding: on the first run of this rig a stale dev server from a
+  // previous invocation held 5189, the new one exited with "port in use", and
+  // the browser happily connected to the OLD build and produced a full set of
+  // "after" frames that were byte-identical to the "before" ones. `--strictPort`
+  // is what makes that detectable; this is what makes it fatal. (a0-06 lost a
+  // whole result to the same shape of mistake across lanes.)
+  // `node_modules/.bin/vite` directly rather than `npx vite`: SIGTERM to an npx
+  // wrapper does not reach the server it spawned, so the run before this one
+  // left a live dev server on the port and the run after it aborted on the
+  // guard above. One process, one signal, no orphan.
+  const server = spawn(join(ROOT, 'node_modules', '.bin', 'vite'), ['--port', String(PORT), '--strictPort'], {
     cwd: ROOT,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  server.stdout.on('data', (b) => process.stdout.write(`[vite] ${b}`));
-  server.stderr.on('data', (b) => process.stderr.write(`[vite] ${b}`));
-  await new Promise((r) => setTimeout(r, 6000));
+  const ready = new Promise((resolve, reject) => {
+    const onOut = (b) => {
+      const s = String(b);
+      process.stdout.write(`[vite] ${s}`);
+      if (s.includes('ready in')) resolve();
+    };
+    const onErr = (b) => {
+      const s = String(b);
+      process.stderr.write(`[vite] ${s}`);
+      if (/already in use/i.test(s)) {
+        reject(
+          new Error(
+            `port ${PORT} is already in use — refusing to shoot against a server this run did not start. ` +
+              `Kill it, or set SKY_RIG_PORT.`,
+          ),
+        );
+      }
+    };
+    server.stdout.on('data', onOut);
+    server.stderr.on('data', onErr);
+    server.on('exit', (code) => reject(new Error(`vite exited with ${code} before it was ready`)));
+    setTimeout(() => reject(new Error('vite did not report ready within 60 s')), 60_000);
+  });
+  await ready;
 
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 }, deviceScaleFactor: 1 });

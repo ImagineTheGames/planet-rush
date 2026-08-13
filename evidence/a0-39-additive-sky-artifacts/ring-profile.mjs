@@ -122,6 +122,46 @@ for (let r = 0; r <= MAX_R; r += 4) {
   const d = r === 0 ? 0 : profile[r - 4] - profile[r];
   console.log(`  ${String(r).padStart(3)}  ${profile[r].toFixed(3).padStart(7)}  ${d.toFixed(3).padStart(7)}`);
 }
+/**
+ * **The statistic that separates a stop stack from a gradient without needing a
+ * threshold at all: the plateaus.**
+ *
+ * A stack of flat fills is *constant* between its stops — the profile does not
+ * move at all for fifty pixels, then jumps. A gradient is never constant: it
+ * descends by one 8-bit code value every few pixels, forever. So count the runs
+ * of radii over which the profile does not move (|Δ| < 0.02 Y′, a fiftieth of a
+ * code value) and are longer than 8 px. Four long plateaus is a four-stop stack.
+ * None is a ramp.
+ *
+ * This is the honest end of the measurement, because a true 8-bit gradient on a
+ * near-black ground **still steps** — one code value in G is 0.715 Y′, which no
+ * amount of correctness removes. What it cannot do is stay flat in between.
+ */
+const FLAT = 0.02;
+const plateaus = [];
+{
+  let start = 0;
+  for (let r = 1; r <= MAX_R; r++) {
+    const moved = Math.abs(profile[r] - profile[r - 1]) >= FLAT;
+    if (moved) {
+      if (r - 1 - start >= 8) plateaus.push({ from: start, to: r - 1, y: +profile[start].toFixed(3) });
+      start = r;
+    }
+  }
+}
+// Only the plateaus inside the blob: past its rim the profile is the ground and
+// is flat for the uninteresting reason that there is nothing there.
+const rim = merged.length > 0 ? merged[merged.length - 1].r + 8 : MAX_R;
+const inside = plateaus.filter((p) => p.to <= rim);
+const levels = new Set();
+for (let r = 0; r <= rim; r++) levels.add(profile[r].toFixed(2));
+
+console.log(`\nFLAT PLATEAUS INSIDE THE BLOB (|ΔY′| < ${FLAT} for ≥ 8 px): ${inside.length}`);
+for (const p of inside) {
+  console.log(`  r ${String(p.from).padStart(3)}…${String(p.to).padStart(3)}  (${String(p.to - p.from + 1).padStart(3)} px)  flat at Y′ ${p.y}`);
+}
+console.log(`DISTINCT LUMA LEVELS over r 0…${rim}: ${levels.size} of ${rim + 1} radii`);
+
 console.log(`\nSTEEPEST 6 px DROP ANYWHERE IN THE PROFILE: ${maxStep.toFixed(3)} Y′`);
 console.log(`  (a smooth falloff over this blob's own radius could not exceed ${((profile[0] - profile[MAX_R]) / MAX_R * 2 * HALF).toFixed(3)})`);
 console.log(`\nHARD BANDS (drop ≥ 0.5 Y′ across 6 px): ${banded.length}`);
