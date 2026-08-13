@@ -74,13 +74,13 @@ either they are not star blooms, or something is stroking rather than filling.
 profiled radially on its layer's own isolated luma, from two centres:
 
 - **from the blob's peak** — *is one drawn element a donut?*
-  **0 of 8** nebula blobs, **0 of 25** star blobs, **0 of 5** rocks, **0 of 7**
+  **0 of 8** nebula blobs, **0 of 24** star blobs, **0 of 5** rocks, **0 of 7**
   vfx-light blobs. Every element's maximum is at r = 0 and falls outward.
   `starFieldSprite`'s three filled discs and `softDisc`'s four-stop stack both
   composite to a glow, exactly as written.
 - **from the blob's centroid** — *does the GROUP read as one?*
   **5 of 8** nebula blobs are rings, interior dips of 1.2–4.1 luma at radii of
-  12–90 device px. **0 of 25** star blobs are, by either test.
+  12–90 device px. **0 of 24** star blobs are, by either test.
 
 The donut is **`PLASMA_REEF.build`'s clot layout**: each clot places four nodes
 at `(n/4)·2π + jitter`, `spread·(0.45…1)` from a common centre — *on a circle,
