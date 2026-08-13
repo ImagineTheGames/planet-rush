@@ -306,6 +306,8 @@ describe('Onboarding — once-only across the whole session (GDD §2.10)', () =>
   it('retires every prompt after each has fired once', () => {
     const ob = new Onboarding();
     expect(ob.allCompleted()).toBe(false);
+    ob.update(sig({ time: 0 })); // OBJECTIVE shows — the goal, first (a0-34)
+    ob.update(sig({ time: 30 })); // …read, and retired
     ob.update(sig({ nearAsteroid: true })); // MINE shows
     ob.update(sig({ nearAsteroid: true, cargo: 1 })); // MINE done
     ob.update(sig({ cargo: 2, cargoCap: 2 })); // HAUL shows

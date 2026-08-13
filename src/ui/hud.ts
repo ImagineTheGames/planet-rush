@@ -1950,6 +1950,11 @@ export class Hud extends Container {
       // pressed" (u15-01 half B).
       hasSpent: this.hasSpent,
       underAttack,
+      // Match time, for the OBJECTIVE prompt's dwell (a0-34): it teaches the win
+      // condition, so there is no player action that retires it — it retires on
+      // having been on screen long enough to read. The same `world.time` the wave
+      // clock is drawn from; onboarding owns no timer of its own.
+      time: frame.time,
     });
 
     if (active === null) {

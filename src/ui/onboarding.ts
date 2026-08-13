@@ -15,7 +15,10 @@
  * "Hold fire" becomes "Hold Left mouse" on desktop and "Hold the FIRE button"
  * on a touch phone without this module ever knowing which device is present.
  *
- * Prompts, in the order a first match teaches them (GDD §2.10, verbatim triggers):
+ * Prompts, in the order a first match teaches them (GDD §2.10, verbatim triggers;
+ * (0) is a0-34's, NEW COPY awaiting the developer — see below):
+ *   0. "Be the last station standing — mine ore, build defenses, upgrade your
+ *      ship, attack when you judge it right"              (names the OBJECTIVE)
  *   1. "Hold {fire} on the asteroid — your shots chip the rock" (teaches mining)
  *   2. "Hold full — fly into your collection field to bank, then press {build}
  *      to spend"                                               (teaches the haul)
@@ -55,6 +58,59 @@
  * storage scheme, and nothing here imports a browser global.
  *
  * ---------------------------------------------------------------------------
+ * THE PROMPT THAT NAMES THE OBJECTIVE (a0-34)
+ * ---------------------------------------------------------------------------
+ * The four prompts above teach VERBS — mine, bank, spend, defend — and not one of
+ * them says what the player is trying to ACHIEVE; the codex's six strategy
+ * entries are all tactics that presume the reader already knows how a match is
+ * won; and no player-facing string anywhere states the win condition. So a first
+ * match taught every verb for a goal nobody named, and left the objective to be
+ * inferred from the result screen.
+ *
+ * The fix is one more contextual prompt on exactly the same terms as the other
+ * four — §2.10 forbids a separate tutorial mode ("the first match is the
+ * tutorial") and that is ratified, so this is not a screen, not a gate, and not a
+ * new system. What is new is only its PLACE: it fires **first**, before the
+ * mining lesson, because a goal is what makes a verb worth learning.
+ *
+ * **The words are the sim's rule, checked against the code that enforces it.**
+ * GDD §1: *"Own the last surviving station reactor — in Teams, be the last side
+ * with a reactor standing."* `src/sim/match.ts` `resolveWinner` counts distinct
+ * surviving TEAMS and crowns the last one holding a core, with FFA as teams-of-one
+ * (`team ?? owner`) — so "the last station standing" and "the last side standing"
+ * are one rule, and the tie goes to whoever reached zero last. The two agree, so
+ * the prompt says the FFA reading in the fewest words (a first match is against
+ * bots in a Free-for-All), and the codex entry behind it carries the Teams clause
+ * and the tiebreak, which is the headline/paragraph split this pair is for.
+ *
+ * **It is scheme-agnostic on purpose.** a0-33 (in flight) branches copy by control
+ * scheme where the LESSON differs — "hold fire on the rock" is not the gesture a
+ * Tap Commander player has. This prompt names no gesture and no binding: it is a
+ * statement of the goal, identical in every scheme, on every device, in either
+ * fire mode. When the two land together it needs no `(scheme, mode)` branch — the
+ * same sentence in all three slots — and it takes the last of a0-33's dwell
+ * machinery it can share (see {@link DWELL_SECONDS}).
+ *
+ * **It retires on a dwell, not on an action**, because unlike the other four
+ * there is nothing for the player to *do* with it: it is a thing you are told.
+ * The dwell counts only frames where it is the prompt actually SHOWN, so a siege
+ * (which outranks everything, GDD §2.2) cannot retire it unread — and it is
+ * measured on match time handed in by the caller, so this module still owns no
+ * timer and no clock. A caller that feeds no clock does not get the prompt at all
+ * rather than getting one that never retires: an un-retiring prompt at the TOP of
+ * the order would sit on the mining lesson forever, which is a worse bug than the
+ * one this fixes. Completion crosses matches through the same
+ * {@link OnboardingMemory} as the rest (u15-01), so the objective is stated once
+ * in a career, not once a match.
+ *
+ * **NEW COPY, flagged for the developer.** GDD §2.10 quotes four prompts and this
+ * is a fifth, so its sentence is not ratified text. Its substance is (LESSONS
+ * §17): the developer's own four beats — last station alive, mine ore, spend on
+ * defenses / upgrade your ship, attack when you see fit — all four kept, polished
+ * to one line in register 2 (§4.7: procedural, terse, present-tense imperative,
+ * no praise).
+ *
+ * ---------------------------------------------------------------------------
  * AND WHAT RETIRES THE SPEND PROMPT (u15-01, half B)
  * ---------------------------------------------------------------------------
  * The SPEND prompt's lesson is *spending*, so only a spend may retire it. It used
@@ -77,6 +133,11 @@ import type { DeviceKind } from '@platform/actions';
 
 /** The onboarding prompts (GDD §2.10, §4.6 — M1 ships the first two, M2 all four). */
 export enum PromptId {
+  /** "Be the last station standing — mine ore, build defenses, upgrade your ship,
+   *  attack when you judge it right." The win condition, in one line, before any
+   *  verb is taught (GDD §1, enforced by `src/sim/match.ts` `resolveWinner`).
+   *  NEW COPY (a0-34) — the substance is the developer's, the wording is polish. */
+  Objective = 'objective',
   /** "Hold {fire} on the asteroid — your shots chip the rock." Teaches that the gun
    *  is the mining tool — the inversion the whole game turns on (GDD §2.10). */
   Mine = 'mine',
@@ -104,6 +165,26 @@ interface PromptCopy {
 }
 
 const PROMPT_COPY: Readonly<Record<PromptId, PromptCopy>> = {
+  // NEW COPY (a0-34). No token, and none possible: the objective is not a
+  // gesture, so there is no binding to name and nothing that changes with the
+  // device, the fire mode or the control scheme.
+  //
+  // GDD §1's win condition in the first three words — "the last surviving station
+  // reactor", which `resolveWinner` (src/sim/match.ts) enforces as "the last team
+  // still holding a core", FFA being teams-of-one. Then the developer's other
+  // three beats in the order the loop runs them (GDD §2.3's triangle): mine, spend
+  // — on the station or on the ship, the choice the whole economy is — and attack,
+  // with the judgement left where the design puts it ("attacking an occupied
+  // station is a mistake", §2.6), which is why the clause is "when you judge it
+  // right" rather than an instruction to go and do it.
+  //
+  // Register 2 (§4.7): imperative, present tense, no adjective that praises, no
+  // exclamation. It states the contract's terms and does not wish anybody luck.
+  [PromptId.Objective]: {
+    id: PromptId.Objective,
+    template:
+      'Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right',
+  },
   // `{fire}` resolves to the fire/mine binding — the wording is input-agnostic
   // via the action layer (GDD §2.10), so it reads correctly on key, pad, touch.
   [PromptId.Mine]: {
@@ -141,9 +222,16 @@ const PROMPT_COPY: Readonly<Record<PromptId, PromptCopy>> = {
  * UNDER-ATTACK leads: it is the only prompt about something happening *to* the
  * player rather than something they could do next, and a siege outranks a
  * shopping tip (GDD §2.2 — "the triangle decision, made audible").
+ *
+ * OBJECTIVE comes next, which means first in every match that is not already on
+ * fire (a0-34). It outranks the verb lessons because it is what makes them worth
+ * learning — a player told to hold fire on a rock before anyone has said what
+ * winning is has been handed a chore. It does not outrank the siege: a station
+ * burning right now is not the moment for a mission statement.
  */
 const PROMPT_ORDER: readonly PromptId[] = [
   PromptId.UnderAttack,
+  PromptId.Objective,
   PromptId.Mine,
   PromptId.HaulHome,
   PromptId.Spend,
@@ -209,7 +297,51 @@ export interface OnboardingSignals {
   /** The under-attack alarm is sounding ({@link ../ui/alarm}) — the UNDER-ATTACK
    *  prompt's trigger (GDD §2.2, §2.10). Optional; absent reads as quiet. */
   readonly underAttack?: boolean;
+  /**
+   * Elapsed match time in seconds (`world.time`, already on `HudFrame`) — the
+   * clock the OBJECTIVE prompt's dwell is measured on (a0-34).
+   *
+   * Handed in rather than read: no timers, no `Date.now()`, nothing this module
+   * cannot be given by a test. Optional, and **absent means a prompt that retires
+   * on a dwell never becomes eligible at all** — see {@link DWELL_SECONDS} for
+   * why that is the safe direction rather than the obvious one.
+   */
+  readonly time?: number;
 }
+
+// ---------------------------------------------------------------------------
+// Prompts that retire on being READ (a0-34)
+// ---------------------------------------------------------------------------
+
+/**
+ * How long a prompt must have been **on screen** before it counts as read and
+ * retires for good, in seconds of match time. A prompt absent from this table
+ * retires on the player doing the thing it teaches, which is the better rule
+ * wherever there is a thing to do.
+ *
+ * OBJECTIVE has no such thing: it states the win condition, and "the player has
+ * understood the win condition" is not a fact the HUD can observe. Ten seconds of
+ * spawn protection open every match (GDD §2.1) precisely so nothing has happened
+ * yet; eight of them is a long time to read one line and still leaves the band
+ * clear before the protection lapses.
+ *
+ * The dwell counts only frames where the prompt is the one actually SHOWN (see
+ * {@link Onboarding.update}), so a siege taking the band mid-sentence cannot
+ * retire it unread.
+ *
+ * **Why no clock means no prompt.** A dwell-retired prompt with no clock would
+ * never retire, and OBJECTIVE sits near the top of {@link PROMPT_ORDER} — it would
+ * sit on the mining lesson for the rest of the match. Withholding it instead
+ * leaves such a caller exactly where it is today, which is the failure worth
+ * having. Every real feed carries `time`: it is what the wave clock is drawn from.
+ *
+ * (a0-33's CONTROLS tip retires on a dwell for the same shape of reason — nothing
+ * to observe, because the settings screen is a different screen. When the two
+ * branches meet, that prompt is one more row in this table.)
+ */
+const DWELL_SECONDS: Partial<Readonly<Record<PromptId, number>>> = {
+  [PromptId.Objective]: 8,
+};
 
 // ---------------------------------------------------------------------------
 // What "ore was spent" means (u15-01 half B)
@@ -330,6 +462,15 @@ export class Onboarding {
   private wasFull = false;
   /** Sticky: the alarm has sounded at least once since it last fell silent. */
   private wasUnderAttack = false;
+  /** The prompt {@link update} returned last tick — the one the player was
+   *  actually reading, which is what a dwell counts (a0-34). */
+  private lastActive: PromptId | null = null;
+  /** Seconds each dwell-retired prompt has been on screen, summed over the frames
+   *  it was the shown prompt. At its {@link DWELL_SECONDS} it is read, and done. */
+  private readonly dwelled = new Map<PromptId, number>();
+  /** Last tick's `signals.time`, for the delta. `null` until a tick carries a
+   *  clock, so the first clocked frame contributes nothing rather than `time`. */
+  private lastTime: number | null = null;
 
   /**
    * Advance the machine one tick and return the prompt to show, or `null`.
@@ -339,6 +480,20 @@ export class Onboarding {
   update(signals: OnboardingSignals): PromptId | null {
     const full = signals.cargoCap > 0 && signals.cargo >= signals.cargoCap;
     const underAttack = signals.underAttack === true;
+
+    // --- The dwell of whatever was on screen last tick (a0-34) ---------------
+    // Counted on the prompt that was SHOWN, not on the one eligible now: a siege
+    // takes the band away mid-sentence (UNDER-ATTACK outranks everything), and a
+    // prompt that expires while it is off screen is a prompt nobody read. A
+    // backwards clock contributes nothing, so a rematch resetting `world.time` to
+    // zero cannot retire one either.
+    if (signals.time !== undefined) {
+      const shown = this.lastActive;
+      if (this.lastTime !== null && shown !== null && DWELL_SECONDS[shown] !== undefined) {
+        this.dwelled.set(shown, (this.dwelled.get(shown) ?? 0) + Math.max(0, signals.time - this.lastTime));
+      }
+      this.lastTime = signals.time;
+    }
 
     // --- Latch progress facts (sticky) --------------------------------------
     if (signals.cargo > 0) this.hasMined = true;
@@ -359,6 +514,13 @@ export class Onboarding {
     // and then fell silent. Retiring it while it is still sounding would pull
     // the instruction off screen mid-lesson.
     if (this.wasUnderAttack && !underAttack) this.completed.add(PromptId.UnderAttack);
+    // OBJECTIVE (and any other dwell-retired prompt) is done once it has been on
+    // screen long enough to READ (a0-34). There is no player action to watch for:
+    // it names the goal, and being read is the whole of the lesson.
+    for (const [id, seconds] of this.dwelled) {
+      const needed = DWELL_SECONDS[id];
+      if (needed !== undefined && seconds >= needed) this.completed.add(id);
+    }
 
     // --- Remember it, once per lesson ---------------------------------------
     // Completion only ever grows, so a size change IS a new lesson. Writing on
@@ -370,16 +532,28 @@ export class Onboarding {
     }
 
     // --- Active prompt: first eligible, uncompleted, in priority order -------
+    let active: PromptId | null = null;
     for (const id of PROMPT_ORDER) {
       if (this.completed.has(id)) continue;
-      if (this.isTriggered(id, signals, full)) return id;
+      if (this.isTriggered(id, signals, full)) {
+        active = id;
+        break;
+      }
     }
-    return null;
+    // Remembered for the dwell above — this is what the player is reading now.
+    this.lastActive = active;
+    return active;
   }
 
   /** True if this prompt's contextual trigger holds this frame (GDD §2.10). */
   private isTriggered(id: PromptId, signals: OnboardingSignals, full: boolean): boolean {
     switch (id) {
+      // The objective has no contextual trigger, and that is the point (a0-34):
+      // it is true from the first frame of the first match, so it is eligible
+      // from the first frame and the goal is the first thing the game says. Its
+      // one condition is a clock to measure the dwell on — see DWELL_SECONDS.
+      case PromptId.Objective:
+        return signals.time !== undefined;
       // Show the mining lesson while a rock is in reach and they haven't mined.
       case PromptId.Mine:
         return signals.nearAsteroid && !this.hasMined;
