@@ -84,9 +84,11 @@ Three deliberate, defensible departures, listed so nobody re-opens them as bugs:
 - **Five wedges, not four.** The design draws TURRET / SHIELD / REPAIR CORE / UPGRADE
   SHIP at 90°. RADAR was added by feature f1 and GDD §2.5 carries the cap, so the wheel
   is five at 72°. The design is superseded here, not missed.
-- **`cost/held` is gone.** `5a` prints `items[i].cost + '/' + ore`; the developer
-  retracted that on 2026-08-07 (*"just need the needed amount in yellow, and red if
-  insufficient"*, GDD §2.5) and a0-03 executed it. One numeral is correct.
+- **`cost/held` is gone — from every page of the menu.** `5a` prints
+  `items[i].cost + '/' + ore`; the developer retracted that on 2026-08-07 (*"just need
+  the needed amount in yellow, and red if insufficient"*, GDD §2.5) and a0-03 executed
+  it on the build wheel, a0-41 on the upgrade wheel and its WEAPON sub-wheel
+  (2026-08-13). One numeral is correct, on all three.
 - **No 92 px beams on this screen.** `docs/design/gantry-bone-handoff.md:22` claims
   "44 px margins, 92 px header/footer beams" across all five screens — and its **own
   screen 5a has no beams at all**: a 176 px top gradient (`5a:23`) over an 84 px
@@ -301,11 +303,14 @@ that will bite an agent who skims. Each cost me a read to find.
 Two things found while reading, neither in the brief's scope, both cheap to note now
 and expensive to find later:
 
-- **The two wheels still speak different grammars across one press.** The build wheel
-  prints `12`; the upgrade wheel behind its `UPGRADE SHIP ▸` prints `12/8`
-  (`src/ui/upgrade-wheel.ts:329` `costLabelOf`, drawn `src/ui/wheel-stack.ts:203-214`).
-  GDD §2.5 flags this itself — "⚠ **OPEN**, flagged 2026-08-07 by a0-03 and not
-  resolved by it … **The developer's call**" — and it is still open. It is not a theme
+- **~~The two wheels still speak different grammars across one press.~~ RESOLVED
+  2026-08-13 (a0-41).** The build wheel printed `12` and the upgrade wheel behind its
+  `UPGRADE SHIP ▸` printed `12/8`. The developer settled it — *"only the cost … we need
+  to make sure changes to build menu affect all pages"* — so `costLabelOf`
+  (`src/ui/upgrade-wheel.ts:329`) now writes the price through the same `costNumeral`
+  the build wheel uses, on the main wheel AND the WEAPON sub-wheel, and
+  `src/ui/wheel-cost-grammar.test.ts` holds every page to it. GDD §2.5's ⚠ OPEN is
+  struck. Left below for the record of what it was. It was not a theme
   defect, but it is the same wheel the developer is asking about, one press deeper.
 - **The ping badge paints a "fair" latency in signal yellow** (`src/net/ping-badge.ts:64`).
   Style-guide §2 reserves that hue for ore and danger, and a traffic-light readout is
@@ -343,9 +348,13 @@ wheel says what a thing costs and what it acts on; the game teaches what it's wo
 Both are ratified and they disagree. Only the developer can settle which one the wheel
 obeys, and until then no agent should add the copy.
 
-**Q4 — Does the upgrade wheel drop its `cost/held` denominator?** Not raised by this
-brief, but GDD §2.5 has been carrying it as ⚠ OPEN since 2026-08-07 and it is the same
-control one press deeper. A yes is a one-line change in `costLabelOf`.
+**Q4 — Does the upgrade wheel drop its `cost/held` denominator? — ANSWERED
+2026-08-13: YES.** Carried as ⚠ OPEN in GDD §2.5 since 2026-08-07. The developer, on a
+screenshot of the live upgrade wheel at 8 ore: *"I had said I didn't want stuff like
+5/6 only the cost . it got done on the page before this one but none of the sub pages.
+we need to make sure changes to build menu affect all pages"* — so it dropped on the
+upgrade wheel and on the WEAPON sub-wheel behind it, and the "all pages" half is
+enforced by `src/ui/wheel-cost-grammar.test.ts` (a0-41).
 
 **One correction to the brief, on the record.** The brief asks me to surface the
 handoff's first "decision I need from you" — ship stats on ship-select as coarse pips —
