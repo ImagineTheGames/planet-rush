@@ -276,12 +276,14 @@ describe('sound-review candidates', () => {
     }
   });
 
-  it('leaves the other thirty-seven slots denied — nothing else was revived', () => {
-    // Every slot the developer has NOT ruled on since the deny-all keeps a shipped
-    // voice that is none of its three offers. Stated as an inequality rather than
-    // as a list of what shipped, because the incumbents are allowed to be
-    // re-voiced by a future brief; what is not allowed is one of the denied takes
-    // arriving in the bank without a verdict behind it.
+  it('leaves every un-adopted slot alone — nothing else was revived', () => {
+    // The other forty-one: thirty-seven carrying the developer's standing
+    // `deny-all`, and the four summary slots (p1-07) they have not been shown
+    // yet. Neither group has an approval behind it, so neither may be playing one
+    // of its offers. Stated as an inequality rather than as a list of what
+    // shipped, because the incumbents are allowed to be re-voiced by a future
+    // brief; what is not allowed is one of the offers arriving in the bank
+    // without a verdict behind it.
     const denied = SLOT_IDS.filter((id) => ADOPTED[id] === undefined);
     expect(denied.length, 'the adopted set is not three slots any more').toBe(SLOT_IDS.length - 3);
     for (const id of denied) {
@@ -290,7 +292,7 @@ describe('sound-review candidates', () => {
       for (const c of slot.candidates) {
         expect(
           sameSamples(shipped, render(c.spec)),
-          `${id} now plays candidate ${c.id} — that slot is denied, and no brief has adopted it`,
+          `${id} now plays candidate ${c.id} — no verdict has adopted that slot`,
         ).toBe(false);
       }
     }

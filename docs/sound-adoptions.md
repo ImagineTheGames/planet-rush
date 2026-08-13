@@ -44,8 +44,11 @@ inaudible in review and permanent in the game. Instead the five builders moved t
   renders the bank entry and the board's offer and compares every sample. Only layer
   names differ (bank convention, not board convention), and names never reach the
   renderer.
-- **`leaves the other thirty-seven slots denied — nothing else was revived`** — every
-  un-adopted slot's shipped voice must be none of its three offers.
+- **`leaves every un-adopted slot alone — nothing else was revived`** — each of the
+  other forty-one slots' shipped voices must be none of its three offers. Forty-one,
+  not thirty-seven: the thirty-seven carrying the standing `deny-all` plus the four
+  summary slots (p1-07) the developer has not been shown yet. Neither group has an
+  approval behind it.
 
 Both were verified RED before they went green: pointing `rockChip` at letter `c`
 fails the first, and splicing `oreCollect`'s candidate `a` into the bank fails the
@@ -73,6 +76,13 @@ Standing verdict, 2026-08-07T20:09:00Z, in the developer's words:
 
 An adoption brief adopts the letters it was briefed with. It does not take a
 neighbouring slot along for the ride because the offer was sitting right there.
+
+## Awaiting a first verdict
+
+`xpTick`, `xpBarFill`, `levelUp`, `xpSettle` — the four end-of-match summary slots
+added by p1-07, after the deny-all. They carry no verdict of any kind, which is not
+the same as being denied, but it is the same as not being adopted: the bank plays its
+own incumbents for them and none of their offers.
 
 ## Open risk carried by an adoption
 
