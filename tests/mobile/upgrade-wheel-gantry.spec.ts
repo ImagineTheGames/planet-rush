@@ -23,7 +23,8 @@
  * What it proves, per profile and in both orientations:
  *
  *  1. Reaching UPGRADE SHIP through a real press draws the Gantry stack: the
- *     name, the stat this tier moves, `cost/held`, and the ladder pips.
+ *     name, the stat this tier moves, the cost as one number (a0-41), and the
+ *     ladder pips.
  *  2. The cost numeral takes BOTH of its ratified colours off the same wedge —
  *     signal yellow while it is payable, threat red the moment it is not
  *     (style-guide §2.1) — and nothing else on the wheel takes red.
@@ -366,7 +367,9 @@ function expectStackedWedge(w: DrawnUpgradeWedge, radius: number, label: string)
   expect(w.stat, `[${label}] ${w.label} drew no stat line — this is the screen stats live on`).toMatch(
     statPattern(radius),
   );
-  expect(w.costLabel, `[${label}] ${w.label} must price its next tier as cost/held`).toMatch(/^\d+\/\d+$/);
+  // The price alone — no denominator, on this level or the one behind WEAPON
+  // (a0-41). Whether it can be paid is `costPaint`'s job, asserted separately.
+  expect(w.costLabel, `[${label}] ${w.label} must price its next tier as one bare number`).toMatch(/^\d+$/);
   expect(w.tiers, `[${label}] ${w.label} must pip where it sits on its ladder`).toMatch(/^[●○]+$/);
   expect(
     w.tiers.length,

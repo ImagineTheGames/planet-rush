@@ -4797,8 +4797,8 @@ async function boot(): Promise<void> {
       },
       /**
        * The Build-wheel wedges the real view DREW last frame — the whole
-       * four-line stack (u7-02): the name, what it spends on, the `cost/held`
-       * string, the count over its cap, and how the cost numeral was painted.
+       * four-line stack (u7-02): the name, what it spends on, the cost string,
+       * the count over its cap, and how the cost numeral was painted.
        *
        * Read-back only, the sibling of `__upgradeWheelStage.wedges()`: a
        * real-input spec still drives the wheel with genuine taps and clicks and
