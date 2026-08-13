@@ -17,7 +17,15 @@
  * takes `index.html` alone, so nothing here reaches the bundle.
  */
 import { Application } from 'pixi.js';
-import { MAP_NEBULA, VoidBackdrop, type MapId } from '../../src/art/backdrop';
+import {
+  coverSpan,
+  MAP_NEBULA,
+  NEBULAE,
+  nebulaSprite,
+  VOID_SEED,
+  VoidBackdrop,
+  type MapId,
+} from '../../src/art/backdrop';
 import { MAPS } from '../../src/sim/maps';
 
 /** One shot: a map, the viewport it is seen through, and the camera offset. */
@@ -42,8 +50,45 @@ export interface SkyShot {
 
 export interface SkyRig {
   /** Draw one shot and resolve when the frame is on the canvas. */
-  show(shot: SkyShot): Promise<{ nebula: string; boundsW: number; boundsH: number }>;
+  show(shot: SkyShot): Promise<{
+    nebula: string;
+    boundsW: number;
+    boundsH: number;
+    /** Shapes the sky layer's `Graphics` was built from. */
+    skyShapes: number;
+    /** `WebGL2` `draw*` calls for one steady-state frame of this backdrop —
+     *  the number `a1-16`'s budget is denominated in. */
+    drawCalls: number;
+  }>;
 }
+
+// ---------------------------------------------------------------------------
+// The draw-call counter — patched before any context exists
+// ---------------------------------------------------------------------------
+
+let drawCalls = 0;
+
+/**
+ * Count every draw the page issues, on the prototype rather than on a context
+ * instance, before `Application.init` makes one. Same instrument as
+ * `tests/perf/draw-budget.rig.ts`, for the same reason a0-39 needs it at all:
+ * the brief's one hard perf constraint is *"a fix that doubles submissions fails
+ * the build"*, and the a1-16 gate's stress scene runs on `octagon`, whose sky is
+ * NONE — so the gate never draws a nebula and cannot answer the question.
+ */
+function installDrawCallCounter(): void {
+  const proto = WebGL2RenderingContext.prototype as unknown as Record<string, unknown>;
+  for (const name of ['drawElements', 'drawArrays', 'drawElementsInstanced', 'drawArraysInstanced']) {
+    const original = proto[name] as ((...args: unknown[]) => unknown) | undefined;
+    if (typeof original !== 'function') continue;
+    proto[name] = function patched(this: unknown, ...args: unknown[]): unknown {
+      drawCalls++;
+      return original.apply(this, args);
+    };
+  }
+}
+
+installDrawCallCounter();
 
 declare global {
   interface Window {
@@ -81,8 +126,32 @@ async function boot(): Promise<void> {
       }
       app.render();
       await new Promise((r) => requestAnimationFrame(() => r(null)));
+      // One warm frame (the first uploads geometry and the ramp), then count the
+      // steady-state one — which is the only frame the budget is about, because
+      // `configure()` never runs again while the map and the viewport hold.
       app.render();
-      return { nebula: MAP_NEBULA[shot.map], boundsW: map.bounds.width, boundsH: map.bounds.height };
+      const before = drawCalls;
+      app.render();
+      const id = MAP_NEBULA[shot.map];
+      const spec = NEBULAE[id];
+      return {
+        nebula: id,
+        boundsW: map.bounds.width,
+        boundsH: map.bounds.height,
+        // Re-derived rather than read off the `Graphics`: the layer holds baked
+        // geometry, not the shape list it came from, and this is the same call
+        // `VoidBackdrop.configure` makes with the same arguments.
+        skyShapes: nebulaSprite(
+          id,
+          VOID_SEED,
+          coverSpan(spec.parallax, shot.viewW, map.bounds.width),
+          coverSpan(spec.parallax, shot.viewH, map.bounds.height),
+          1,
+          shot.viewW,
+          shot.viewH,
+        ).shapes.length,
+        drawCalls: drawCalls - before,
+      };
     },
   };
   document.title = 'sky-rig ready';

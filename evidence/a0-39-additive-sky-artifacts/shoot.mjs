@@ -203,9 +203,9 @@ async function main() {
     };
     console.log(
       `${map.padEnd(10)} ${meta.nebula.padEnd(12)} sky peak Y′ ${rings.peakLuma.toFixed(2).padStart(6)}` +
-        `  ring edges ${String(rings.bandEdges).padStart(3)}` +
         `  max jump ${rings.maxAdjacentJump.toFixed(2).padStart(5)}` +
-        `  radii [${rings.edgeRadii.join(' ')}]`,
+        `  sky shapes ${String(meta.skyShapes).padStart(4)}` +
+        `  draw calls/frame ${String(meta.drawCalls).padStart(2)}`,
     );
   }
   writeFileSync(join(HERE, `rings-${LABEL}.json`), `${JSON.stringify(report, null, 2)}\n`);
