@@ -88,16 +88,16 @@
   "bundle": {
     "checked": true,
     "chunks": [
-      "CanvasPool-DfMRR95E.js",
-      "SharedSystems-BJJYu__A.js",
-      "WebGLRenderer-JotXeNr6.js",
-      "WebGPURenderer-DpTLM1vj.js",
-      "browserAll-C8QFVP3f.js",
+      "CanvasPool-COcHum_B.js",
+      "SharedSystems-Dp-9SwF6.js",
+      "WebGLRenderer-CwqYTBfN.js",
+      "WebGPURenderer-CxYHfiaC.js",
+      "browserAll-y2CkYrDw.js",
       "colorToUniform-C2GHuDhf.js",
-      "index-O5J95Hbz.js",
-      "main-Cbkchxm4.js",
+      "index-ogWxZ3u7.js",
+      "main-CzXEcSR0.js",
       "typography-CVMcRgo2.js",
-      "webworkerAll-crRFbAG9.js"
+      "webworkerAll-DE6f2d17.js"
     ],
     "adoptedSeedsPresent": {
       "rockChip.mass (30110)": true,
