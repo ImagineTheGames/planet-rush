@@ -12,6 +12,7 @@ import { Onboarding, PromptId, oreWasSpent, resolvePromptText } from './onboardi
 import { FireMode } from '@platform/actions';
 import type { DeviceKind } from '@platform/actions';
 import type { OnboardingMemory, OnboardingSignals, SpendFacts } from './onboarding';
+import type { ControlScheme } from './settings';
 
 /** A neutral signal frame (nothing happening) with per-test overrides. */
 function sig(over: Partial<OnboardingSignals> = {}): OnboardingSignals {
@@ -77,17 +78,20 @@ describe('Onboarding — HAUL-HOME prompt (GDD §2.3 "hold full — fly home")',
     const ob = new Onboarding();
     ob.update(sig({ cargo: 2, cargoCap: 2 })); // full → HaulHome shows
     expect(ob.update(sig({ cargo: 2, cargoCap: 2 }))).toBe(PromptId.HaulHome);
-    // Hold emptied (flew home / dropped on death) — lesson learned.
-    expect(ob.update(sig({ cargo: 0, cargoCap: 2 }))).toBeNull();
+    // Hold emptied (flew home / dropped on death) — lesson learned. What takes
+    // the band next is the CONTROLS tip (a0-33): the loop is flown, so the tip
+    // is now the only thing eligible. HAUL-HOME itself is what must never return.
+    expect(ob.update(sig({ cargo: 0, cargoCap: 2 }))).toBe(PromptId.Controls);
     expect(ob.isCompleted(PromptId.HaulHome)).toBe(true);
     // Fill the hold again — the prompt must stay retired.
-    expect(ob.update(sig({ cargo: 2, cargoCap: 2 }))).toBeNull();
+    expect(ob.update(sig({ cargo: 2, cargoCap: 2 }))).not.toBe(PromptId.HaulHome);
   });
 
   it('does not fire on a full hold that was full from the very first frame, once emptied', () => {
     const ob = new Onboarding();
     expect(ob.update(sig({ cargo: 2, cargoCap: 2 }))).toBe(PromptId.HaulHome);
-    expect(ob.update(sig({ cargo: 1, cargoCap: 2 }))).toBeNull(); // dropped below full
+    // Dropped below full: the lesson is done, and the a0-33 tip is what is left.
+    expect(ob.update(sig({ cargo: 1, cargoCap: 2 }))).toBe(PromptId.Controls);
     expect(ob.isCompleted(PromptId.HaulHome)).toBe(true);
   });
 });
@@ -224,13 +228,23 @@ describe('Onboarding — once-only across the whole session (GDD §2.10)', () =>
     ob.update(sig({ cargo: 0, cargoCap: 2 })); // HAUL done
     ob.update(sig({ wheelOpen: true })); // SPEND shows
     ob.update(sig({ wheelOpen: true, hasSpent: true })); // SPEND done
-    ob.update(sig({ underAttack: true })); // UNDER-ATTACK shows
-    ob.update(sig({ underAttack: false })); // survived — done
+    ob.update(sig({ underAttack: true, time: 0 })); // UNDER-ATTACK shows
+    ob.update(sig({ underAttack: false, time: 0 })); // survived — done
+    // …and the fifth, a0-33's CONTROLS tip: shown, then read (its dwell).
+    expect(ob.update(sig({ time: 0 }))).toBe(PromptId.Controls);
+    ob.update(sig({ time: 20 }));
     expect(ob.allCompleted()).toBe(true);
     // Nothing ever fires again.
     expect(
       ob.update(
-        sig({ nearAsteroid: true, cargo: 2, cargoCap: 2, wheelOpen: true, underAttack: true }),
+        sig({
+          nearAsteroid: true,
+          cargo: 2,
+          cargoCap: 2,
+          wheelOpen: true,
+          underAttack: true,
+          time: 21,
+        }),
       ),
     ).toBeNull();
   });
@@ -329,7 +343,7 @@ describe('Onboarding — remembers across matches and page loads (GDD §2.10)', 
 
 describe('resolvePromptText — input-agnostic via the action layer (GDD §2.10)', () => {
   it('renders the mine prompt with the keyboard fire binding on desktop', () => {
-    const text = resolvePromptText(PromptId.Mine, 'keyboard', FireMode.Manual);
+    const text = resolvePromptText(PromptId.Mine, 'keyboard', FireMode.Manual, 'sticks');
     expect(text).toContain('on the asteroid — your shots chip the rock');
     // {fire} resolved to the keyboard binding, not left as a literal token.
     expect(text).not.toContain('{fire}');
@@ -337,8 +351,8 @@ describe('resolvePromptText — input-agnostic via the action layer (GDD §2.10)
   });
 
   it('renders the mine prompt with touch wording — same map, different device', () => {
-    const desktop = resolvePromptText(PromptId.Mine, 'keyboard', FireMode.Manual);
-    const touch = resolvePromptText(PromptId.Mine, 'touch', FireMode.AutoAim);
+    const desktop = resolvePromptText(PromptId.Mine, 'keyboard', FireMode.Manual, 'sticks');
+    const touch = resolvePromptText(PromptId.Mine, 'touch', FireMode.AutoAim, 'sticks');
     expect(touch).not.toContain('{fire}');
     // Auto-aim touch fire is the FIRE button — proves the wording tracks the
     // action layer, not a hard-coded key.
@@ -350,15 +364,15 @@ describe('resolvePromptText — input-agnostic via the action layer (GDD §2.10)
     // GDD §2.10 quotes this as "Hold full — fly into your collection field to
     // bank, then press E to spend"; the {build} token is how the same sentence
     // reads on a pad and on a phone.
-    const keyboard = resolvePromptText(PromptId.HaulHome, 'keyboard', FireMode.Manual);
+    const keyboard = resolvePromptText(PromptId.HaulHome, 'keyboard', FireMode.Manual, 'sticks');
     expect(keyboard).toBe(
       'Hold full — fly into your collection field to bank, then press E to spend',
     );
-    const touch = resolvePromptText(PromptId.HaulHome, 'touch', FireMode.AutoAim);
+    const touch = resolvePromptText(PromptId.HaulHome, 'touch', FireMode.AutoAim, 'sticks');
     expect(touch).toBe(
       'Hold full — fly into your collection field to bank, then press BUILD to spend',
     );
-    const pad = resolvePromptText(PromptId.HaulHome, 'gamepad', FireMode.Manual);
+    const pad = resolvePromptText(PromptId.HaulHome, 'gamepad', FireMode.Manual, 'sticks');
     expect(pad).toContain('Y / △');
     expect(pad).not.toContain('{build}');
   });
@@ -370,29 +384,37 @@ describe('resolvePromptText — input-agnostic via the action layer (GDD §2.10)
     // that told the player to "fly home" taught the mechanic the game no longer
     // has. Asserted on EVERY device, because the failure this guards is a phone
     // that says "press E" as much as it is a keyboard that says "fly home".
-    const devices: Array<[DeviceKind, FireMode]> = [
-      ['keyboard', FireMode.Manual],
-      ['touch', FireMode.AutoAim],
-      ['touch', FireMode.Manual],
-      ['gamepad', FireMode.Manual],
+    // Since a0-33, on every SCHEME too: Tap Commander gets its own sentence, and
+    // it has to carry the same amendment.
+    const configs: Array<[DeviceKind, FireMode, ControlScheme]> = [
+      ['keyboard', FireMode.Manual, 'sticks'],
+      ['touch', FireMode.AutoAim, 'sticks'],
+      ['touch', FireMode.Manual, 'sticks'],
+      ['gamepad', FireMode.Manual, 'sticks'],
+      ['keyboard', FireMode.AutoAim, 'tap'],
+      ['touch', FireMode.AutoAim, 'tap'],
+      ['gamepad', FireMode.Manual, 'tap'],
     ];
-    for (const [device, mode] of devices) {
-      const text = resolvePromptText(PromptId.HaulHome, device, mode);
+    for (const [device, mode, scheme] of configs) {
+      const text = resolvePromptText(PromptId.HaulHome, device, mode, scheme);
       expect(text).not.toMatch(/fly home/i);
       expect(text).toContain('collection field');
       expect(text).not.toContain('{build}');
     }
     // The keyboard key is a *binding*, never a literal in the copy: a phone must
     // never be told to press E (GDD §2.4, §2.10 input-agnostic wording).
-    expect(resolvePromptText(PromptId.HaulHome, 'touch', FireMode.AutoAim)).not.toMatch(
+    expect(resolvePromptText(PromptId.HaulHome, 'touch', FireMode.AutoAim, 'sticks')).not.toMatch(
+      /press E\b/,
+    );
+    expect(resolvePromptText(PromptId.HaulHome, 'touch', FireMode.AutoAim, 'tap')).not.toMatch(
       /press E\b/,
     );
   });
 
   it('leaves a token-free prompt identical across devices', () => {
     // The under-attack prompt points at the arrow, which is device-agnostic.
-    const a = resolvePromptText(PromptId.UnderAttack, 'keyboard', FireMode.Manual);
-    const b = resolvePromptText(PromptId.UnderAttack, 'touch', FireMode.AutoAim);
+    const a = resolvePromptText(PromptId.UnderAttack, 'keyboard', FireMode.Manual, 'sticks');
+    const b = resolvePromptText(PromptId.UnderAttack, 'touch', FireMode.AutoAim, 'tap');
     expect(a).toBe('Your station is under attack — follow the arrow');
     expect(b).toBe(a);
   });
@@ -400,8 +422,226 @@ describe('resolvePromptText — input-agnostic via the action layer (GDD §2.10)
   it('names UPGRADE SHIP in the wheel\'s own words, so the segment is findable', () => {
     // "The upgrade prompt fires the first time the wheel opens, because upgrades
     // are the half of the economy a player can most easily miss" (GDD §2.10).
-    const text = resolvePromptText(PromptId.Spend, 'keyboard', FireMode.Manual);
+    const text = resolvePromptText(PromptId.Spend, 'keyboard', FireMode.Manual, 'sticks');
     expect(text).toContain('UPGRADE SHIP');
     expect(text).toBe('Spend ore on defense — or UPGRADE SHIP to mine and hit harder');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// a0-33 — the LESSON follows the settings, not just the key name
+// ---------------------------------------------------------------------------
+
+describe('resolvePromptText — the lesson branches on the scheme and the mode (a0-33)', () => {
+  // The failure this brief exists for. `a0-30` made Tap Commander the default
+  // scheme on every platform, and in that scheme a rock is mined by TAPPING it
+  // (GDD §2.4: "tap a target to attack it … an asteroid to mine it") — there is
+  // no fire button to hold, because the local pilot fires. The very first
+  // sentence a new player reads was telling them to hold one.
+  it('never tells a Tap Commander player to hold fire — the pilot fires (GDD §2.4)', () => {
+    for (const device of ['keyboard', 'touch', 'gamepad'] as DeviceKind[]) {
+      for (const mode of [FireMode.AutoAim, FireMode.Manual]) {
+        const text = resolvePromptText(PromptId.Mine, device, mode, 'tap');
+        expect(text).not.toMatch(/hold/i);
+        expect(text).toMatch(/^Tap the asteroid/);
+      }
+    }
+  });
+
+  it('gives Tap Commander the same lesson in both fire modes — the tap is the gesture', () => {
+    // Once the pilot is flying, the fire mode has nothing left to say about how
+    // a rock is mined: the pilot writes thrust, aim AND fire either way.
+    for (const id of Object.values(PromptId)) {
+      expect(resolvePromptText(id, 'touch', FireMode.Manual, 'tap')).toBe(
+        resolvePromptText(id, 'touch', FireMode.AutoAim, 'tap'),
+      );
+    }
+  });
+
+  it('drops the AIMING, not the press, under Auto-aim on the sticks (GDD §2.4)', () => {
+    // Auto-aim does not fire itself — "the player decides *when* to fire,
+    // positioning decides *what* gets hit" — so the press stays and what changes
+    // is that the player is no longer told to aim at the rock.
+    const auto = resolvePromptText(PromptId.Mine, 'keyboard', FireMode.AutoAim, 'sticks');
+    const manual = resolvePromptText(PromptId.Mine, 'keyboard', FireMode.Manual, 'sticks');
+    expect(auto).not.toBe(manual);
+    expect(auto).toContain('Left mouse'); // still a press
+    expect(auto).toContain('auto-aim');
+    expect(auto).toContain('near the asteroid'); // positioning, not aiming
+    expect(auto).not.toContain('{fire}');
+  });
+
+  it('keeps GDD §2.10\'s ratified sentence for the configuration it was written for', () => {
+    // Sticks + Manual is the one configuration the GDD has words for. Nothing in
+    // a0-33 is allowed to move them.
+    expect(resolvePromptText(PromptId.Mine, 'keyboard', FireMode.Manual, 'sticks')).toBe(
+      'Hold Left mouse on the asteroid — your shots chip the rock',
+    );
+    expect(resolvePromptText(PromptId.HaulHome, 'keyboard', FireMode.Manual, 'sticks')).toBe(
+      'Hold full — fly into your collection field to bank, then press E to spend',
+    );
+  });
+
+  it('tells a Tap Commander player to TAP the station, and still says press {build}', () => {
+    // "Fly into" is not the gesture in this scheme — you tap your own station and
+    // the pilot flies to its collection field (GDD §2.4). The build binding is
+    // untouched by the scheme, so the second clause survives verbatim.
+    const phone = resolvePromptText(PromptId.HaulHome, 'touch', FireMode.AutoAim, 'tap');
+    expect(phone).toBe(
+      'Hold full — tap your own station to bank in its collection field, then press BUILD to spend',
+    );
+    const desk = resolvePromptText(PromptId.HaulHome, 'keyboard', FireMode.AutoAim, 'tap');
+    expect(desk).toContain('tap your own station');
+    expect(desk).toContain('press E to spend');
+  });
+
+  it('reads the SETTING, not the device — a desktop can be on tap, a phone on sticks', () => {
+    // The brief's second ask, as an assertion: the scheme is a live setting and
+    // the device is not a proxy for it. A desktop defaults to Tap Commander since
+    // a0-30, and a phone player is free to switch to the sticks.
+    const desktopTap = resolvePromptText(PromptId.Mine, 'keyboard', FireMode.AutoAim, 'tap');
+    const phoneSticks = resolvePromptText(PromptId.Mine, 'touch', FireMode.Manual, 'sticks');
+    expect(desktopTap).toBe('Tap the asteroid to mine it — your shots chip the rock');
+    expect(phoneSticks).toBe('Hold Right stick on the asteroid — your shots chip the rock');
+  });
+
+  it('leaves no {token} unresolved in any configuration the player can be in', () => {
+    for (const id of Object.values(PromptId)) {
+      for (const device of ['keyboard', 'touch', 'gamepad'] as DeviceKind[]) {
+        for (const mode of [FireMode.Manual, FireMode.AutoAim]) {
+          for (const scheme of ['sticks', 'tap'] as ControlScheme[]) {
+            expect(resolvePromptText(id, device, mode, scheme)).not.toMatch(/[{}]/);
+          }
+        }
+      }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// a0-33 — the CONTROLS tip: the settings exist, and you may change them
+// ---------------------------------------------------------------------------
+
+describe('Onboarding — CONTROLS tip (a0-33, the developer\'s third ask)', () => {
+  /** Fly one whole loop: mine a chunk, fill the hold, empty it. */
+  function flyTheLoop(ob: Onboarding, at = 0): void {
+    ob.update(sig({ nearAsteroid: true, cargo: 1, time: at }));
+    ob.update(sig({ cargo: 2, cargoCap: 2, time: at }));
+    ob.update(sig({ cargo: 0, cargoCap: 2, time: at }));
+  }
+
+  it('does not fire before the player has flown a loop — a lesson always outranks it', () => {
+    const ob = new Onboarding();
+    expect(ob.update(sig({ nearAsteroid: true, time: 0 }))).toBe(PromptId.Mine);
+    expect(ob.update(sig({ cargo: 2, cargoCap: 2, time: 1 }))).toBe(PromptId.HaulHome);
+  });
+
+  it('fires once the core loop is learned — mined, and a full hold banked', () => {
+    const ob = new Onboarding();
+    flyTheLoop(ob);
+    expect(ob.update(sig({ time: 1 }))).toBe(PromptId.Controls);
+  });
+
+  it('names both settings rows and both doors to them (GDD §2.4)', () => {
+    const text = resolvePromptText(PromptId.Controls, 'touch', FireMode.AutoAim, 'tap');
+    expect(text).toBe('Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu');
+    // Same sentence in every configuration: it is about the setting, not the seat.
+    for (const scheme of ['sticks', 'tap'] as ControlScheme[]) {
+      for (const mode of [FireMode.Manual, FireMode.AutoAim]) {
+        expect(resolvePromptText(PromptId.Controls, 'keyboard', mode, scheme)).toBe(text);
+      }
+    }
+  });
+
+  it('retires once it has been on screen long enough to read, and never comes back', () => {
+    const ob = new Onboarding();
+    flyTheLoop(ob);
+    expect(ob.update(sig({ time: 1 }))).toBe(PromptId.Controls);
+    expect(ob.update(sig({ time: 5 }))).toBe(PromptId.Controls);
+    // 8 s of dwell — read.
+    expect(ob.update(sig({ time: 9 }))).toBeNull();
+    expect(ob.isCompleted(PromptId.Controls)).toBe(true);
+    expect(ob.update(sig({ time: 40 }))).toBeNull();
+  });
+
+  it('does not burn its dwell while a siege has the band (a0-33)', () => {
+    // UNDER-ATTACK outranks it. A tip that expires off screen is a tip the player
+    // never read, so the dwell counts only the frames it was the shown prompt.
+    const ob = new Onboarding();
+    flyTheLoop(ob);
+    expect(ob.update(sig({ time: 1 }))).toBe(PromptId.Controls);
+    for (let t = 2; t <= 30; t++) {
+      expect(ob.update(sig({ time: t, underAttack: true }))).toBe(PromptId.UnderAttack);
+    }
+    // The siege ends; the tip is still owed its read.
+    expect(ob.update(sig({ time: 31 }))).toBe(PromptId.Controls);
+    expect(ob.isCompleted(PromptId.Controls)).toBe(false);
+  });
+
+  it('never advances its dwell backwards — a rematch resets world.time to 0', () => {
+    const ob = new Onboarding();
+    flyTheLoop(ob, 100);
+    expect(ob.update(sig({ time: 101 }))).toBe(PromptId.Controls);
+    expect(ob.update(sig({ time: 0 }))).toBe(PromptId.Controls);
+    expect(ob.isCompleted(PromptId.Controls)).toBe(false);
+  });
+
+  it('stays up rather than retiring unread when the caller feeds no clock', () => {
+    const ob = new Onboarding();
+    flyTheLoop(ob);
+    for (let i = 0; i < 200; i++) expect(ob.update(sig())).toBe(PromptId.Controls);
+    expect(ob.isCompleted(PromptId.Controls)).toBe(false);
+  });
+
+  it('is remembered like every other lesson — one tip per player, not per match', () => {
+    const memory = fakeMemory();
+    const first = new Onboarding(memory);
+    flyTheLoop(first);
+    first.update(sig({ time: 1 }));
+    first.update(sig({ time: 12 }));
+    expect(first.isCompleted(PromptId.Controls)).toBe(true);
+
+    const second = new Onboarding(memory); // next match, fresh machine
+    expect(second.isCompleted(PromptId.Controls)).toBe(true);
+    expect(second.update(sig({ time: 3 }))).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// a0-33 — a mid-match switch (GDD §2.4: both changeable at any time)
+// ---------------------------------------------------------------------------
+
+describe('a mid-match settings switch (a0-33)', () => {
+  it('re-words the prompt that is ON SCREEN — an instruction describes the NOW', () => {
+    // The HUD resolves the active prompt's text every frame from the live frame
+    // values (`Hud.updateOnboarding`), so this is the sentence a player sees
+    // before and after they flip CONTROLS with the prompt still up.
+    const ob = new Onboarding();
+    const active = ob.update(sig({ nearAsteroid: true, time: 0 }));
+    expect(active).toBe(PromptId.Mine);
+    const before = resolvePromptText(active!, 'keyboard', FireMode.AutoAim, 'sticks');
+    const after = resolvePromptText(active!, 'keyboard', FireMode.AutoAim, 'tap');
+    expect(before).toContain('Hold Left mouse');
+    expect(after).toBe('Tap the asteroid to mine it — your shots chip the rock');
+  });
+
+  it('does not re-fire a prompt the player already completed', () => {
+    // Switching scheme is not un-learning: completion is about what the player
+    // knows, and the machine never sees the scheme at all.
+    const ob = new Onboarding();
+    ob.update(sig({ nearAsteroid: true, cargo: 1, time: 0 }));
+    expect(ob.isCompleted(PromptId.Mine)).toBe(true);
+    expect(ob.update(sig({ nearAsteroid: true, cargo: 0, time: 1 }))).toBeNull();
+  });
+
+  it('gives a prompt that has not fired yet the wording in force when it does', () => {
+    const ob = new Onboarding();
+    // The player switches to the sticks before ever filling the hold.
+    ob.update(sig({ nearAsteroid: true, cargo: 1, time: 0 }));
+    const active = ob.update(sig({ cargo: 2, cargoCap: 2, time: 4 }));
+    expect(active).toBe(PromptId.HaulHome);
+    expect(resolvePromptText(active!, 'touch', FireMode.Manual, 'sticks')).toContain(
+      'fly into your collection field',
+    );
   });
 });
