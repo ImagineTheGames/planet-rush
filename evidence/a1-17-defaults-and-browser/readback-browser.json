@@ -1,0 +1,268 @@
+{
+  "base": "https://imaginethegames.github.io/planet-rush/",
+  "allocator": "https://planet-rush-allocator.fly.dev",
+  "capturedAt": "2026-08-13T01:48:29.064Z",
+  "allocatorHealthBefore": {
+    "status": "ok",
+    "machines": 3,
+    "rooms": 0,
+    "reservations": 0,
+    "uptimeSeconds": 31322
+  },
+  "regionLine": "",
+  "regions": [],
+  "hostConnectTitles": [
+    "ALLOCATING ROOM…",
+    "JOINED · SEAT 1"
+  ],
+  "host": {
+    "room": "YWX7",
+    "online": true,
+    "you": 0,
+    "isHost": true,
+    "humanCount": 1,
+    "size": 1,
+    "seatStates": [
+      {
+        "index": 0,
+        "label": "TAKEN",
+        "live": false
+      },
+      {
+        "index": 1,
+        "label": "OPEN",
+        "live": true
+      },
+      {
+        "index": 2,
+        "label": "OPEN",
+        "live": true
+      },
+      {
+        "index": 3,
+        "label": "OPEN",
+        "live": true
+      },
+      {
+        "index": 4,
+        "label": "OPEN",
+        "live": true
+      },
+      {
+        "index": 5,
+        "label": "OPEN",
+        "live": true
+      },
+      {
+        "index": 6,
+        "label": "OPEN",
+        "live": true
+      },
+      {
+        "index": 7,
+        "label": "OPEN",
+        "live": true
+      }
+    ]
+  },
+  "hostLobbyControlInventory": {
+    "seamKeys": [
+      "abundance",
+      "classControls",
+      "classOrder",
+      "closeScreen",
+      "content",
+      "counting",
+      "defaultClass",
+      "defaultMapId",
+      "expectedStations",
+      "hintTitle",
+      "humanCount",
+      "isHost",
+      "isTouch",
+      "leave",
+      "levelBadgeBounds",
+      "levelBadges",
+      "localShipClass",
+      "logicalViewport",
+      "mapCardControl",
+      "mapCardControls",
+      "mapCards",
+      "mapOrder",
+      "mode",
+      "modeControl",
+      "online",
+      "openMapSelect",
+      "openShipSelect",
+      "room",
+      "rush",
+      "rushControl",
+      "rushHeight",
+      "screen",
+      "seatCharacters",
+      "seatControls",
+      "seatHeight",
+      "seatHelpControls",
+      "seatRows",
+      "seatStates",
+      "selectClass",
+      "selectMap",
+      "selectedClass",
+      "selectedMapId",
+      "shipCardControl",
+      "size",
+      "slotCount",
+      "veteranMapId",
+      "visible",
+      "worldCast",
+      "worldMapId",
+      "worldStations",
+      "you"
+    ],
+    "controlBearingKeys": [
+      {
+        "key": "seatStates",
+        "kind": "list",
+        "count": 8
+      },
+      {
+        "key": "rushControl",
+        "kind": "single"
+      },
+      {
+        "key": "modeControl",
+        "kind": "single"
+      },
+      {
+        "key": "seatControls",
+        "kind": "list",
+        "count": 8
+      },
+      {
+        "key": "seatHelpControls",
+        "kind": "list",
+        "count": 8
+      },
+      {
+        "key": "shipCardControl",
+        "kind": "single"
+      },
+      {
+        "key": "mapCardControl",
+        "kind": "single"
+      }
+    ],
+    "screen": "roster",
+    "hintTitle": null
+  },
+  "allocatorRooms": {
+    "rooms": [],
+    "asOf": 1786585715700
+  },
+  "allocatorRoomsRaw": "{\"rooms\":[],\"asOf\":1786585715700}",
+  "allocatorPayloadContainsCode": false,
+  "guestJoinModeOnArrival": "browse",
+  "guestListWaitMs": 42,
+  "guestRows": [
+    {
+      "owner": "VE3MRL",
+      "meta": "1 PLAYER · 7 SEATS OPEN · FFA",
+      "where": "IAD —",
+      "action": "JOIN",
+      "state": "open",
+      "enabled": true,
+      "physicalCenter": {
+        "x": 640,
+        "y": 300
+      },
+      "physicalBounds": {
+        "x": 44,
+        "y": 268,
+        "width": 1192,
+        "height": 64
+      },
+      "joinBounds": {
+        "x": 1128,
+        "y": 272,
+        "width": 104,
+        "height": 56
+      }
+    }
+  ],
+  "guestBrowseStamp": "UPDATED 0s AGO",
+  "guestBrowseStale": false,
+  "guestBrowseEmpty": [],
+  "guestBrowseHidden": 0,
+  "guestRowZoom": {
+    "x": 36,
+    "y": 260,
+    "width": 1208,
+    "height": 80,
+    "factor": 3
+  },
+  "rowStringsContainingCode": [],
+  "guestKeypadPressesMade": 0,
+  "guestJoinPressedAt": {
+    "x": 1180,
+    "y": 300
+  },
+  "guestCodeFieldBeforePress": "",
+  "guestConnectTitles": [
+    "FINDING ROOM…",
+    "DIALING MACHINE 6836293b…",
+    "JOINED · SEAT 2"
+  ],
+  "guestLandedInLobby": true,
+  "guestLobby": {
+    "room": "YWX7",
+    "online": true,
+    "you": 1,
+    "isHost": false,
+    "humanCount": 2
+  },
+  "guestCodeFieldAfterPress": "",
+  "hostAfterJoin": {
+    "humanCount": 2,
+    "seatStates": [
+      {
+        "index": 0,
+        "label": "TAKEN"
+      },
+      {
+        "index": 1,
+        "label": "TAKEN"
+      },
+      {
+        "index": 2,
+        "label": "OPEN"
+      },
+      {
+        "index": 3,
+        "label": "OPEN"
+      },
+      {
+        "index": 4,
+        "label": "OPEN"
+      },
+      {
+        "index": 5,
+        "label": "OPEN"
+      },
+      {
+        "index": 6,
+        "label": "OPEN"
+      },
+      {
+        "index": 7,
+        "label": "OPEN"
+      }
+    ]
+  },
+  "allocatorHealthAfter": {
+    "status": "ok",
+    "machines": 3,
+    "rooms": 1,
+    "reservations": 0,
+    "uptimeSeconds": 31341
+  }
+}

@@ -1,0 +1,241 @@
+{
+  "base": "https://imaginethegames.github.io/planet-rush/",
+  "capturedAt": "2026-08-13T01:55:13.214Z",
+  "viewport": {
+    "width": 844,
+    "height": 390
+  },
+  "runs": {},
+  "buildSha": "75ec737",
+  "scheme": "tap",
+  "openBuild": {
+    "open": true
+  },
+  "layout": [
+    {
+      "id": "ship-local",
+      "bounds": {
+        "x": 406,
+        "y": 179,
+        "width": 32,
+        "height": 32
+      }
+    },
+    {
+      "id": "touch-left-stick",
+      "bounds": {
+        "x": 28,
+        "y": 234,
+        "width": 128,
+        "height": 128
+      }
+    },
+    {
+      "id": "touch-fire-button",
+      "bounds": {
+        "x": 732,
+        "y": 278,
+        "width": 84,
+        "height": 84
+      }
+    },
+    {
+      "id": "build-button",
+      "bounds": {
+        "x": 54,
+        "y": 140,
+        "width": 76,
+        "height": 76
+      }
+    },
+    {
+      "id": "build-badge",
+      "bounds": {
+        "x": 8,
+        "y": 369,
+        "width": 38,
+        "height": 13
+      }
+    },
+    {
+      "id": "ore-hud",
+      "bounds": {
+        "x": 16,
+        "y": 16,
+        "width": 45.72,
+        "height": 41
+      }
+    },
+    {
+      "id": "banked-total",
+      "bounds": {
+        "x": 16,
+        "y": 27,
+        "width": 10,
+        "height": 21
+      }
+    },
+    {
+      "id": "station-hp",
+      "bounds": {
+        "x": 674,
+        "y": 16,
+        "width": 154.5,
+        "height": 39
+      }
+    },
+    {
+      "id": "nameplates",
+      "bounds": {
+        "x": 299.3,
+        "y": 107,
+        "width": 25.399999999999977,
+        "height": 16
+      }
+    },
+    {
+      "id": "minimap",
+      "bounds": {
+        "x": 632,
+        "y": 298,
+        "width": 80,
+        "height": 80
+      }
+    },
+    {
+      "id": "build-wheel",
+      "bounds": {
+        "x": 260.23914285714284,
+        "y": 33.239142857142866,
+        "width": 323.5217142857143,
+        "height": 323.5217142857143
+      }
+    },
+    {
+      "id": "wheel-hub-back",
+      "bounds": {
+        "x": 377.07259115789475,
+        "y": 150.07259115789475,
+        "width": 89.8548176842105,
+        "height": 89.8548176842105
+      }
+    },
+    {
+      "id": "onboarding",
+      "bounds": {
+        "x": 226.98000000000002,
+        "y": 329,
+        "width": 390.03999999999996,
+        "height": 45
+      }
+    }
+  ],
+  "buildButtonBounds": {
+    "x": 54,
+    "y": 140,
+    "width": 76,
+    "height": 76
+  },
+  "fullImage": "images/a1-17-labels-390-wheel-open.png",
+  "buildButtonZoom": {
+    "x": 38,
+    "y": 124,
+    "width": 108,
+    "height": 108,
+    "factor": 4
+  },
+  "restingWedges": [
+    {
+      "id": "turret",
+      "label": "TURRET",
+      "sub": "YOUR STATION",
+      "selected": false,
+      "costLabel": "3"
+    },
+    {
+      "id": "shield",
+      "label": "SHIELD",
+      "sub": "YOUR STATION",
+      "selected": false,
+      "costLabel": "5"
+    },
+    {
+      "id": "satellite",
+      "label": "RADAR",
+      "sub": "YOUR STATION",
+      "selected": false,
+      "costLabel": "6"
+    },
+    {
+      "id": "repair",
+      "label": "REPAIR REACTOR",
+      "sub": "REACTOR FULL",
+      "selected": false,
+      "costLabel": "1"
+    },
+    {
+      "id": "upgrade",
+      "label": "UPGRADE SHIP",
+      "sub": "YOUR SHIP",
+      "selected": false,
+      "costLabel": "OPEN ▸"
+    }
+  ],
+  "selectionSweepHits": 29,
+  "upgradeShipSelectedAt": {
+    "x": 353.5296679486336,
+    "y": 209.55381835724316,
+    "radius": 70,
+    "deg": 168,
+    "id": "upgrade",
+    "label": "UPGRADE SHIP"
+  },
+  "selectedWedges": [
+    {
+      "id": "turret",
+      "label": "TURRET",
+      "selected": false
+    },
+    {
+      "id": "shield",
+      "label": "SHIELD",
+      "selected": false
+    },
+    {
+      "id": "satellite",
+      "label": "RADAR",
+      "selected": false
+    },
+    {
+      "id": "repair",
+      "label": "REPAIR REACTOR",
+      "selected": false
+    },
+    {
+      "id": "upgrade",
+      "label": "UPGRADE SHIP",
+      "selected": true
+    }
+  ],
+  "selectedImage": "images/a1-17-labels-390-wedge-selected.png",
+  "wedgeRect": {
+    "x": 257,
+    "y": 115,
+    "width": 165,
+    "height": 160
+  },
+  "wedgeSelectedZoom": {
+    "x": 257,
+    "y": 115,
+    "width": 165,
+    "height": 160,
+    "factor": 4
+  },
+  "wedgeRestingZoom": {
+    "x": 257,
+    "y": 115,
+    "width": 165,
+    "height": 160,
+    "factor": 4
+  }
+}

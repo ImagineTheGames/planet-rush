@@ -26,7 +26,7 @@
  */
 
 import { FireMode } from '@platform/actions';
-import type { DeviceKind } from '@platform/actions';
+import type { ControlScheme, DeviceKind } from '@platform/actions';
 import type { Rect, Viewport } from '@platform/layout-registry';
 import { COLUMN, plateHeight, rowHeight, valueChipHeight } from '../art/materials';
 import type { FrameMetrics, PlateRole } from '../art/materials';
@@ -49,10 +49,19 @@ import type { Insets } from './menu-geometry';
  * wiring layer (main.ts persists it to `planet-rush:controlScheme`, the same
  * storage family as the fire mode). The settings screen only shows and toggles
  * it, so the authority stays in one place; {@link settingsModel} reads it by
- * argument for exactly that reason. Structurally identical to the platform
- * lane's private `ControlScheme` so main.ts's live value passes straight in.
+ * argument for exactly that reason.
+ *
+ * **The union itself now lives in the action layer** (`@platform/actions`) and
+ * this is an alias of it — a0-37, when `describeBindings` began taking the scheme
+ * and the binding map had to name the type it branches on. Nothing about the
+ * value changed (the same two strings, the same name, the same import path for
+ * everyone who reads it from here); what changed is that there is one definition
+ * instead of three structurally-identical ones, so the strip, the prompts and
+ * this screen cannot drift apart about what a scheme is. The *stored* strings
+ * stay this module's ({@link CONTROL_SCHEME_STORAGE}): serialising a player's
+ * preference is the settings screen's job, not the action map's.
  */
-export type ControlScheme = 'sticks' | 'tap';
+export type { ControlScheme };
 
 /**
  * The exact string each scheme persists as, under `planet-rush:controlScheme`.

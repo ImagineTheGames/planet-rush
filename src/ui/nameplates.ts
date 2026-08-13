@@ -37,8 +37,10 @@
  *    read through the SAME roster resolver [[station-hp]] and [[healthbar]] use, so
  *    a ship's trim, its bar and its name can never disagree. Never signal yellow
  *    or threat red — those are RESERVED (style-guide §2).
- *  - **Which side, in words — and whose side.** In TEAMS every label carries the
- *    viewer-relative side beside the name ({@link resolveTeamLabel}): `FRIENDLY A`
+ *  - **Which side, in words — and whose side, and FIRST.** In TEAMS every label
+ *    carries the viewer-relative side, and since a0-38 it LEADS the plate —
+ *    `FRIENDLY A Bolt`, not `Bolt FRIENDLY A` ({@link resolveTeamLabel}, ordered by
+ *    the view's {@link ./nameplates-view} `nameplateRowLayout`): `FRIENDLY A`
  *    over an ally, `ENEMY B` / `ENEMY C` over everyone else. Ratified by the
  *    developer after a match they described as *"impossible to know who is on your
  *    team"* (m10 — colour was never able to answer it: identity colour is per-SLOT,
@@ -46,7 +48,11 @@
  *    is the ratification), and refined by them at u3 into `Friendly/Enemy plus
  *    Letters`, because `TEAM A` only helps a player who remembers which team *they*
  *    are. The WORD is relative to the viewer ({@link NameplateOptions.viewerTeam});
- *    the LETTER is absolute — team 1 is `B` on everyone's screen. Both come from
+ *    the LETTER is absolute — team 1 is `B` on everyone's screen. Its POSITION at
+ *    the head of the row is a0-38 (*"friendly or enemy should be the first thing
+ *    displayed on a name so thats its easier to identify"*) — a pure view-order
+ *    change: the three parts were already separate fields here and stay that way,
+ *    and the tags' wording is untouched. Both come from
  *    the lobby's one formatter (`./lobby` {@link teamName}), and the side's colour
  *    ({@link Nameplate.teamColor}) reinforces the word without ever replacing it.
  *    In FFA the label is empty on every plate — teams-of-one has no side worth
@@ -155,6 +161,9 @@ export interface Nameplate {
    * Kept separate from {@link text} and {@link suffix} for the same reason those
    * two are separate from each other: the view weights them differently, and a
    * test can assert *which* string is the team without parsing a run-on label.
+   * That separation is what made a0-38 — putting this token FIRST on the drawn
+   * plate — an ordering change in the view and not a restructure of this model:
+   * nothing here concatenates, so nothing here had to move.
    */
   readonly teamLabel: string;
   /**
@@ -177,9 +186,11 @@ export interface Nameplate {
   /** Entity screen radius, so the view can float the label clear of the sprite. */
   readonly radius: number;
   /** Opacity 0..1 — {@link NAMEPLATE_FULL_ALPHA} on every plate, every frame
-   *  (a0-04). The view still multiplies it for the two *subordinate* tokens in the
-   *  row (the side tag, the difficulty suffix), which is a hierarchy inside the
-   *  plate and not a state signal. */
+   *  (a0-04). The view still multiplies it for the two tokens that flank the name
+   *  (the leading side tag, the trailing difficulty suffix), which is a weight
+   *  hierarchy inside the plate and not a state signal — and, since a0-38, is
+   *  independent of reading order: the side tag comes first and is still drawn a
+   *  step under the name. */
   readonly alpha: number;
   /** True for the local player's own-ship label (only ever present when
    *  {@link NameplateOptions.showOwnShipLabel} is on). */

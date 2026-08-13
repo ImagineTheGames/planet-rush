@@ -1,0 +1,197 @@
+{
+  "brief": "a0-38 — FRIENDLY / ENEMY reads first on a nameplate",
+  "ruling": "\"friendly or enemy should be the first thing displayed on a name so thats its easier to identify\"",
+  "type": {
+    "face": "Oxanium (body)",
+    "size": 12,
+    "tracking": 0.1
+  },
+  "gaps": {
+    "beforeName": 4,
+    "beforeSuffix": 3
+  },
+  "plates": [
+    {
+      "seat": "ally (a team-mate’s ship)",
+      "before": "Bolt FRIENDLY A (MEDIUM)",
+      "after": "FRIENDLY A Bolt (MEDIUM)",
+      "tokens": {
+        "side": "FRIENDLY A",
+        "name": "Bolt",
+        "suffix": "(MEDIUM)"
+      },
+      "drawnWidth": {
+        "side": 76.8,
+        "name": 26.6,
+        "suffix": 62.4,
+        "row": 172.8
+      },
+      "rowUnchangedInWidth": true
+    },
+    {
+      "seat": "enemy (a rival’s ship)",
+      "before": "Rusty ENEMY B (EASY)",
+      "after": "ENEMY B Rusty (EASY)",
+      "tokens": {
+        "side": "ENEMY B",
+        "name": "Rusty",
+        "suffix": "(EASY)"
+      },
+      "drawnWidth": {
+        "side": 58.2,
+        "name": 36.8,
+        "suffix": 43,
+        "row": 145
+      },
+      "rowUnchangedInWidth": true
+    },
+    {
+      "seat": "the local player (their own home)",
+      "before": "YOU FRIENDLY A",
+      "after": "FRIENDLY A YOU",
+      "tokens": {
+        "side": "FRIENDLY A",
+        "name": "YOU",
+        "suffix": ""
+      },
+      "drawnWidth": {
+        "side": 76.8,
+        "name": 25.4,
+        "suffix": 0,
+        "row": 106.2
+      },
+      "rowUnchangedInWidth": true
+    },
+    {
+      "seat": "free-for-all (no side exists)",
+      "before": "Rusty (EASY)",
+      "after": "Rusty (EASY)",
+      "tokens": {
+        "side": "",
+        "name": "Rusty",
+        "suffix": "(EASY)"
+      },
+      "drawnWidth": {
+        "side": 0,
+        "name": 36.8,
+        "suffix": 43,
+        "row": 82.8
+      },
+      "rowUnchangedInWidth": true
+    }
+  ],
+  "width": {
+    "note": "reach = px from the SHIP to each end of its row; the layer culls a plate whose row leaves the canvas, so the WORST reach is what decides how close to an edge a plate survives",
+    "viewport": {
+      "width": 844,
+      "height": 390
+    },
+    "widest": {
+      "strings": {
+        "side": "FRIENDLY A",
+        "name": "WWWWWWWWWWWW",
+        "suffix": "(MEDIUM)"
+      },
+      "before": {
+        "left": 72.6,
+        "right": 218.8,
+        "worst": 218.8
+      },
+      "after": {
+        "left": 153.4,
+        "right": 138,
+        "worst": 153.4
+      },
+      "rowWidth": {
+        "before": 291.4,
+        "after": 291.4
+      }
+    },
+    "typical": {
+      "strings": {
+        "side": "ENEMY B",
+        "name": "Rusty",
+        "suffix": "(EASY)"
+      },
+      "before": {
+        "left": 18.4,
+        "right": 126.6,
+        "worst": 126.6
+      },
+      "after": {
+        "left": 80.6,
+        "right": 64.4,
+        "worst": 80.6
+      },
+      "rowWidth": {
+        "before": 145,
+        "after": 145
+      }
+    }
+  },
+  "cull": {
+    "note": "the horizontal band, in px of the 844-wide landscape phone, in which a ship keeps its plate. Same WIDTH before and after (it is viewport − row width, and the row did not change width); it shifts right, because the row now hangs left of the ship instead of right. So a plate survives further towards the right edge than it used to and less far towards the left — and it is markedly less lopsided about the hull it names (worstReachDroppedBy).",
+    "widest": {
+      "before": "72.6 … 625.2",
+      "after": "153.4 … 706",
+      "bandWidth": {
+        "before": 552.6,
+        "after": 552.6
+      },
+      "shiftedRightBy": 80.8,
+      "worstReachDroppedBy": 65.4
+    },
+    "typical": {
+      "before": "18.4 … 717.4",
+      "after": "80.6 … 779.6",
+      "bandWidth": {
+        "before": 699,
+        "after": 699
+      },
+      "shiftedRightBy": 62.2,
+      "worstReachDroppedBy": 46
+    }
+  },
+  "crowding": {
+    "note": "two ships side by side on the same line, each carrying the same plate. The row is a RIGID body whose width a0-38 did not change — only where the ship sits inside it — so two like plates touch at the same separation they always did.",
+    "typical": {
+      "touchesAt": {
+        "before": 145,
+        "after": 145
+      },
+      "sweep": [
+        {
+          "shipsApart": 40,
+          "gapBefore": -105,
+          "gapAfter": -105
+        },
+        {
+          "shipsApart": 80,
+          "gapBefore": -65,
+          "gapAfter": -65
+        },
+        {
+          "shipsApart": 120,
+          "gapBefore": -25,
+          "gapAfter": -25
+        },
+        {
+          "shipsApart": 160,
+          "gapBefore": 15,
+          "gapAfter": 15
+        },
+        {
+          "shipsApart": 200,
+          "gapBefore": 55,
+          "gapAfter": 55
+        }
+      ]
+    },
+    "widest": {
+      "touchesAt": {
+        "before": 291.5,
+        "after": 291.5
+      }
+    }
+  }
+}

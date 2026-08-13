@@ -1,0 +1,205 @@
+{
+  "base": "https://imaginethegames.github.io/planet-rush/",
+  "capturedAt": "2026-08-13T01:51:59.490Z",
+  "seats": {
+    "solo": {
+      "online": false,
+      "seatIndex": 2,
+      "startedLive": true,
+      "labelsSeen": [
+        "BOT",
+        "CLOSED"
+      ],
+      "sequence": [
+        {
+          "press": 0,
+          "label": "BOT"
+        },
+        {
+          "press": 1,
+          "label": "CLOSED"
+        },
+        {
+          "press": 2,
+          "label": "BOT"
+        },
+        {
+          "press": 3,
+          "label": "CLOSED"
+        },
+        {
+          "press": 4,
+          "label": "BOT"
+        },
+        {
+          "press": 5,
+          "label": "CLOSED"
+        },
+        {
+          "press": 6,
+          "label": "BOT"
+        },
+        {
+          "press": 7,
+          "label": "CLOSED"
+        }
+      ],
+      "allSeatLabels": [
+        "TAKEN",
+        "BOT",
+        "CLOSED",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT",
+        "BOT"
+      ],
+      "pressedAt": {
+        "x": 84,
+        "y": 332.8125
+      },
+      "image": "images/a1-17-seat-solo-lobby.png",
+      "zooms": [
+        "images/a1-17-seat-solo-press1-zoom.png",
+        "images/a1-17-seat-solo-press2-zoom.png",
+        "images/a1-17-seat-solo-press3-zoom.png",
+        "images/a1-17-seat-solo-press4-zoom.png",
+        "images/a1-17-seat-solo-press5-zoom.png",
+        "images/a1-17-seat-solo-press6-zoom.png",
+        "images/a1-17-seat-solo-press7-zoom.png"
+      ]
+    },
+    "online": {
+      "online": true,
+      "seatIndex": 2,
+      "startedLive": true,
+      "labelsSeen": [
+        "OPEN",
+        "BOT",
+        "CLOSED"
+      ],
+      "sequence": [
+        {
+          "press": 0,
+          "label": "OPEN"
+        },
+        {
+          "press": 1,
+          "label": "BOT"
+        },
+        {
+          "press": 2,
+          "label": "CLOSED"
+        },
+        {
+          "press": 3,
+          "label": "OPEN"
+        },
+        {
+          "press": 4,
+          "label": "BOT"
+        },
+        {
+          "press": 5,
+          "label": "CLOSED"
+        },
+        {
+          "press": 6,
+          "label": "OPEN"
+        },
+        {
+          "press": 7,
+          "label": "BOT"
+        }
+      ],
+      "allSeatLabels": [
+        "TAKEN",
+        "OPEN",
+        "BOT",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN",
+        "OPEN"
+      ],
+      "pressedAt": {
+        "x": 84,
+        "y": 332.8125
+      },
+      "image": "images/a1-17-seat-online-lobby.png",
+      "zooms": [
+        "images/a1-17-seat-online-press1-zoom.png",
+        "images/a1-17-seat-online-press2-zoom.png",
+        "images/a1-17-seat-online-press3-zoom.png",
+        "images/a1-17-seat-online-press4-zoom.png",
+        "images/a1-17-seat-online-press5-zoom.png",
+        "images/a1-17-seat-online-press6-zoom.png",
+        "images/a1-17-seat-online-press7-zoom.png"
+      ]
+    }
+  },
+  "labels": {
+    "seamProbe": {
+      "tapCommanderStage": [
+        "setScheme",
+        "stage",
+        "stageAutoEngage",
+        "stageRockOnly",
+        "tapWorld",
+        "stageStationWheel",
+        "wheelState",
+        "buildReadout",
+        "order",
+        "readout"
+      ],
+      "upgradeWheelStage": [
+        "openBuild",
+        "openUpgrade",
+        "openWeapon",
+        "back",
+        "close",
+        "interactive",
+        "buyTier",
+        "buyByTrack",
+        "tierOf",
+        "setOre",
+        "wedges",
+        "wedgePoint",
+        "hubPoint",
+        "legend"
+      ],
+      "buildBadge": [
+        "text",
+        "visible",
+        "server",
+        "rttMs",
+        "bounds",
+        "withinAnchor"
+      ]
+    },
+    "hudImage": "images/a1-17-labels-390-hud.png",
+    "strip": [],
+    "wheelSeam": {
+      "keys": [
+        "openBuild",
+        "openUpgrade",
+        "openWeapon",
+        "back",
+        "close",
+        "interactive",
+        "buyTier",
+        "buyByTrack",
+        "tierOf",
+        "setOre",
+        "wedges",
+        "wedgePoint",
+        "hubPoint",
+        "legend"
+      ],
+      "hub": {
+        "x": 422,
+        "y": 195
+      }
+    }
+  }
+}

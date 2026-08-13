@@ -1,0 +1,29 @@
+{
+  "base": "https://imaginethegames.github.io/planet-rush/",
+  "capturedAt": "2026-08-13T01:59:34.383Z",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "band": {
+    "x": 0,
+    "y": 0,
+    "width": 109,
+    "height": 844
+  },
+  "menuControlScheme": "tap",
+  "matchControlScheme": "tap",
+  "baselineLitPixels": 732,
+  "hit": {
+    "lit": 1199,
+    "baseline": 732,
+    "taps": 1
+  },
+  "bandZoom": {
+    "x": 0,
+    "y": 0,
+    "width": 109,
+    "height": 844,
+    "factor": 3
+  }
+}
