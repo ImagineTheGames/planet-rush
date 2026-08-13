@@ -262,9 +262,13 @@ export const MOCKUP_REFERENCE: Readonly<Record<MockupSkyId, SkyReference>> = {
    * lift **0.02** — and it cannot be anything else, because a blob the colour of
    * the ground is invisible against the ground by construction. The design's
    * Coalsack lifts **4.55**. So the dust has to be *dust*: darker than everything
-   * around it, and not nothing. Vacuum (Y′ 15.7) and `hullShadow` (Y′ 87.3) are
-   * the pair, and they are picked to land the measured lift rather than by taste
-   * — `sky-preview.ts` reports the number.
+   * around it, and not nothing. Vacuum (Y′ 15.7) and `hullDark` (Y′ 61.8) are the
+   * pair, picked by *landing the measured lift* rather than by taste —
+   * `sky-preview.ts` reports the number. Two brighter pairings were rejected on
+   * the same measurement: `hullShadow` (Y′ 87.3) reaches 4.55 but peaks at Y′ 60,
+   * which would make the dust lane brighter than Plasma Reef and is absurd for a
+   * dark nebula; `decalInk` and `wreckBody` only reach it at an aspect near 1.4,
+   * i.e. blobs broader across the lane than along it, which is not a lane.
    *
    * It still occludes, which is the whole read: at α up to 0.39 over the star
    * layer, a star behind the lane's core loses most of its value and the faint

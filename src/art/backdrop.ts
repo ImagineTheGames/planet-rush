@@ -74,12 +74,19 @@
  * > *"i like floor, (nebula i like all of them including none) i think each map
  * > should get one of these … (seeded scatter), and subtle…"*
  *
- * | axis | picked |
- * |---|---|
- * | Ground | **Floor `#010204`** — replaces Vacuum as the *backdrop* (`./tokens` `FLOOR`) |
- * | Bloom rule | **seeded scatter** — which stars bloom is a pure function of the seed, at any magnitude |
- * | Bloom intensity | **subtle** — the lowest of the three shown ({@link BLOOM}) |
- * | Nebula | **all six, one per map** — including NONE ({@link MAP_NEBULA}) |
+ * | axis | picked (a0-07) | now (a0-40) |
+ * |---|---|---|
+ * | Ground | **Floor `#010204`** — replaces Vacuum as the *backdrop* | **`#070910`**, the design's own (`./tokens` `FLOOR`) |
+ * | Bloom rule | **seeded scatter** — a pure function of the seed, at any magnitude | **the brightest** — `magnitude > 0.86` ({@link BLOOM}) |
+ * | Bloom intensity | **subtle** — the lowest of the three shown | **0.48**, the design's ({@link MOCKUP_STARS}) |
+ * | Nebula | **all six, one per map** — including NONE | unchanged ({@link MAP_NEBULA}) |
+ *
+ * The right-hand column is a0-40, and both entries in it overturn a pick from
+ * the left. That is not an art opinion re-litigating a ratification: the skies
+ * on the left were picked off the developer's compositor, the game then drifted
+ * five times darker than that compositor, and the ruling on the sixth report
+ * about it is that the game **matches** the mockup — *"not close enough, the
+ * same"*. Where the two disagree, the mockup is the ratification.
  *
  * ## The sky is part of a map's identity, and it is a registry
  *
@@ -330,73 +337,74 @@ export function starInkFor(spec: StarLayerSpec, mag: number): StarInk {
  *
  * ## A tint is bought with alpha, and `BLOOM.intensity` is what there is to spend
  *
- * A halo paints at 16% of its star's own alpha, so whatever colour it carries
- * arrives diluted by Floor. That is not a side effect to work around — it is what
- * makes a *tint* out of a *colour*, and it is also a hard ceiling on how much
- * hue a bloom can hold. Measured, per ink, as the composited pixel's Lab chroma
- * C\* (0 = grey; the untinted halos sit at 1.0–2.3) and its luma Y′ over Floor:
+ * A halo paints at a fraction of its star's own alpha, so whatever colour it
+ * carries arrives diluted by the ground. That is not a side effect to work
+ * around — it is what makes a *tint* out of a *colour*, and it is also the hard
+ * ceiling on how much hue a bloom can hold.
+ *
+ * **a0-40 re-measured all of it**, because two of the three inputs moved: the
+ * ground went from Y′ 1.9 to 9.1 and the intensity from 0.16 to the design's
+ * 0.48, and a star's alpha now comes from the design's magnitude curve rather
+ * than from its ink. The table is per ink band — the brightest star that band
+ * paints — as the composited pixel's Lab chroma C\* (0 = grey) and its luma Y′
+ * over the ground. Every layer climbs the same ramp since a0-40, so the three
+ * read alike except where a tint lands:
  *
  * ```
- *   layer  ink            halo      C*  →   C*      Y′  →  Y′     tax  →  tax
- *   deep   hullSteel .26  —        1.0    1.0      7.5    7.5    3.2%   3.2%
- *   deep   hullSteel .38  —        1.2    1.2     10.0   10.0    4.6%   4.6%
- *   deep   hullLight .30  —        1.1    1.1     10.1   10.1    4.7%   4.7%
- *   mid    hullLight .55  —        1.6    1.6     16.8   16.8    8.9%   8.9%
- *   mid    hullSteel .70  plasma   2.1    8.2     16.8   21.2    8.9%  12.8%
- *   mid    WHITE     .42  —        1.3    1.3     18.9   18.9   10.4%  10.4%
- *   near   WHITE     .88  plasma   1.3    9.7     37.6   26.2   26.7%  17.2%
- *   near   hullLight .92  patina   2.3    5.6     26.8   22.4   16.9%  13.6%
- *   near   WHITE     .64  —        1.4    1.4     27.8   27.8   17.8%  17.8%
+ *   layer  ink       band      halo      C*  →   C*      Y′  →  Y′     tax  →  tax
+ *   deep   hullSteel mag≤0.45  —        5.8    5.8     25.3   25.3   12.0%  12.0%
+ *   deep   hullLight mag≤0.80  —        5.2    5.2     41.4   41.4   27.4%  27.4%
+ *   deep   WHITE     mag≤1.00  —        3.5    3.5     68.1   68.1   51.1%  51.1%
+ *   mid    (as deep, through its first two bands)
+ *   mid    WHITE     mag≤1.00  plasma   3.5   16.0     68.1   48.7   51.1%  36.3%
+ *   near   (as deep, through its first two bands)
+ *   near   WHITE     mag≤1.00  patina   3.5    8.7     68.1   40.8   51.1%  27.6%
  *   ──────────────────────────────────────────────────────────────────────────
- *   brightest halo pixel in the game        Y′ 37.6 → 27.8   (−26%)
- *   worst contrast tax any halo puts on a signal  26.7% → 17.8%
- *   the ink outline every sprite is drawn with    Y′ 43.4  ← nothing reaches it
+ *   brightest halo pixel in the game        Y′ 68.1   (deep's, and it is untinted)
+ *   the ink outline every sprite is drawn with    Y′ 43.4  ← a bloom clears it now
+ *   the rock body, the darkest large surface      Y′ 77.4  ← nothing reaches it
  * ```
  *
  * (`tax` = the fraction of contrast a bright signal loses to that halo's pixel,
- * signal-independent by construction — the same measure `backdrop.test.ts`
- * applies to every sky.) Two things in that table are the whole safety argument:
+ * signal-independent by construction.) Three things in that table carry the
+ * argument, and the third is a change:
  *
- *  1. **The frame gets quieter, not louder.** White is the most luminous thing in
- *     the palette, so the brightest bloom in the game — a white halo at 14% —
- *     *loses* a quarter of its value by becoming cyan. The peak halo pixel falls
- *     from Y′ 37.6 to 27.8 and the worst tax from 26.7% to 17.8%; no halo, tinted
- *     or not, comes near the ink outline. One ink moves the other way (mid's
- *     steel at 0.70, Y′ 16.8 → 21.2, tax 8.9% → 12.8%), and it is stated rather
- *     than buried: it is still below both the shipped peak and half the outline,
- *     and it buys the only cyan a frame reliably contains.
+ *  1. **A tint still only takes light out.** White is the most luminous thing in
+ *     the palette, so a white halo *loses* value by becoming cyan: Y′ 68.1 → 48.7
+ *     and its tax 51.1% → 36.3%. Patina takes more out again (40.8, 27.6%). No
+ *     ink moves the other way, which is stricter than the position a0-22 shipped.
  *  2. **C\* is the honest measure of "coloured", not ΔE.** Every one of these
- *     lands ΔE ≥ 66 from ore, from danger and from all eight roster hues, because
- *     at Y′ 20 everything is far from everything; that number proves nothing. The
- *     chroma column is what a player sees, and its ceiling here is **C\* 10**.
+ *     lands ΔE ≥ 40 from ore, from danger and from all eight roster hues; at
+ *     these values everything is far from everything and that number proves
+ *     nothing. The chroma column is what a player sees, and at 0.48 the ceiling
+ *     is **C\* 16** against a0-22's 10 — the tint is more visible than it was,
+ *     which is what the developer asked for in the first place.
+ *  3. **A bloom is now brighter than the ink outline (Y′ 43.4), and that is
+ *     reported rather than absorbed.** The design's intensity puts the brightest
+ *     halo at 68.1. The bound that replaces the outline is the **rock body at
+ *     77.4** — the darkest large surface the fleet is drawn against — and nothing
+ *     in the field reaches it. `backdrop.test.ts` holds that, per ink.
  *
  * ## What does NOT change, and why
  *
- *  - **The star's own point stays on the steel ramp.** §1's sentence is about the
- *    *point* — how a star climbs in brightness — and the point is untouched: only
- *    the scattered light around it takes a hue. That also answers the second half
- *    of the report directly. A white core inside a cyan halo is *more* findable
- *    than a white core inside a white halo, not less.
- *  - **The glint** (the diffraction cross) stays the star's own colour too. It is
- *    the point's own spike, not the scatter.
- *  - **`deep` takes no tint at all, and this was priced rather than assumed.** A
- *    tint on the far layer is the narrowest change available and it is the one
- *    that buys nothing: at deep's halo alphas (0.042–0.061) the most chroma any
- *    tint can reach is **C\* 3.9**, against C\* 8.2–9.7 on the layers that do
- *    carry one — painted across a **6 px** disc sitting **Δ7 of luma** above its
- *    background. It is a change the developer could not see, on the layer where
- *    25 of a frame's 36 blooms happen to live. Keeping deep neutral also keeps
- *    the module header's own line true — *distance steals a star's colour before
- *    its light* — so the tint becomes a nearness cue rather than a repaint.
- *  - **`BLOOM.scatter`, `BLOOM.intensity`, `BLOOM.radii`, every density, every
- *    parallax and every ink alpha.** a0-07 ratified *"seeded scatter, subtle"*
- *    and the developer has not asked for a different set of stars to bloom, only
- *    for a different colour in the ones that do. The consequence is worth naming
- *    for whoever reads this next: **`BLOOM.intensity` is the ceiling on how
- *    coloured a bloom can be**, and at 0.16 that ceiling is C\* 10. If the answer
- *    to this round is "still not colourful enough", the lever is that number and
- *    it is the developer's to move — a0-07 chose the lowest of the three
- *    magnitudes they were shown, and Art does not get to raise it back.
+ *  - **The star's own point stays on the steel value ramp.** §1's sentence is
+ *    about the *point* — how a star climbs in brightness — and the point is
+ *    untouched: only the scattered light around it takes a hue. That also answers
+ *    the second half of the report directly. A white core inside a cyan halo is
+ *    *more* findable than a white core inside a white halo, not less.
+ *  - **The spike** (the diffraction cross) stays the star's own colour too. It is
+ *    the point's own light, not the scatter.
+ *  - **`deep` takes no tint at all.** a0-22 priced this out on chroma — deep's
+ *    inks had the least alpha to spend — and a0-40 removed that reason by giving
+ *    all three layers the same ramp, so a tint there would now be just as visible.
+ *    It stays untinted for the reason that survives: **deep carries 61% of the
+ *    field**, so a hue on it is a repaint and not an accent. Keeping it neutral
+ *    also keeps the module header's own line true — *distance steals a star's
+ *    colour before its light* — so the tint remains a nearness cue.
+ *  - **The tint set itself.** Bloom colour was out of a0-40's scope and was not
+ *    re-opened; the two hues, the cold-only rule and every invariant under it are
+ *    a0-22's, unchanged. Only the numbers moved, and they moved because the
+ *    ground and the intensity did.
  */
 export const BLOOM_TINTS = {
   /** The mockup's own bloom cyan, and the palette's energy hue. */
@@ -1010,17 +1018,40 @@ export type MapId = 'octagon' | 'compass' | 'oval' | 'diamond' | 'line' | 'cresc
  * A named registry, deliberately — not a hash of the id and not `index % 6`. A
  * modulo would repeat a sky the moment a fifth map lands and would assign it
  * without anyone choosing; this way each line is a decision that can be argued
- * with. The six skies, ranked by measured per-screen overdraw, are NONE `0.000`
- * · Iron Veil `0.249` · Coalsack `0.399` · Deep Ember `0.416` · Patina Drift
- * `0.555` · Plasma Reef `0.627`, and the rule that placed them is: **the
- * cheapest sky goes on the board that runs on the most devices, and the
- * costliest on the board with the fewest entities.** Map by map:
+ * with. The rule that placed them is: **the cheapest sky goes on the board that
+ * runs on the most devices, and the costliest on the board with the fewest
+ * entities**, against the per-screen overdraw ranking NONE `0.000` · Iron Veil
+ * `0.249` · Coalsack `0.399` · Deep Ember `0.416` · Patina Drift `0.555` ·
+ * Plasma Reef `0.627`. Map by map:
  *
- * **a0-39 re-measured every one of those figures** (one gradient shape per
- * element instead of a stack of four flat ones) and **the ranking did not
- * move** — every sky got 44% cheaper and Iron Veil, which gained a soft edge it
- * never had, still comes first. So no assignment below is re-argued: the whole
- * column is smaller and the reasoning that placed it is untouched.
+ * ## **a0-40 reshuffled that ranking completely, and did NOT re-assign any map**
+ *
+ * Porting to the design (`./mockup-reference`) changed every count and every
+ * alpha, and the column came out in a different order:
+ *
+ * ```
+ *                  a0-39    a0-40
+ *   None           0.000    0.000
+ *   Iron Veil      0.249    2.459
+ *   Coalsack       0.399    2.263
+ *   Deep Ember     0.416    3.033
+ *   Patina Drift   0.555    3.174   ← now the costliest
+ *   Plasma Reef    0.627    2.175   ← now the cheapest coloured one
+ * ```
+ *
+ * So the sentence above no longer describes this registry: Plasma Reef, placed
+ * on the thinnest map *because* it was the most expensive, is now the cheapest
+ * coloured sky in the set, and Patina Drift, placed on a contested board because
+ * it was mid-priced, is the dearest. Only the first line still holds, and it is
+ * the one the default map depends on — NONE is still free.
+ *
+ * **Nothing below is re-assigned, deliberately.** A map's sky is part of that
+ * map's identity, which is the whole reason this is a hand-written registry and
+ * not `index % 6`; re-sorting it silently to satisfy a cost rule would be the
+ * modulo wearing a different hat. `backdrop.test.ts` prints the new ranking every
+ * run so the decision is in front of whoever makes it, and the argument each
+ * assignment rests on is left standing below with its old number, marked, rather
+ * than quietly corrected. **Director's call.**
  *
  *  - **`octagon` → NONE.** The Ring is the default: it is what `?debug=1` boots,
  *    what a returning player finds pre-selected, and the first thing a phone
@@ -1029,11 +1060,16 @@ export type MapId = 'octagon' | 'compass' | 'oval' | 'diamond' | 'line' | 'cresc
  *  - **`compass` → Coalsack.** The Compass is corner-cover and edge-lanes, and
  *    it is a derelict-fill map, so at any roster below eight it also carries
  *    wrecks and their debris — one of the two busiest boards. It gets the
- *    cheapest sky that is not nothing (0.399), and the only one that **adds no
- *    light to the frame at all**: Coalsack is the ground colour in front of the
- *    stars, so it can never raise a pixel's value (measured peak Y′ 1.9 — the
- *    ground's own) and takes 0% off the contrast of the ring, the threat fill or
- *    the ore. A dust lane also suits a map about cover.
+ *    cheapest sky that is not nothing (0.399 then; **2.263 since a0-40**), and
+ *    the only one that **adds no light to the frame at all**: Coalsack was the
+ *    ground colour in front of the stars, so it could never raise a pixel's
+ *    value (measured peak Y′ 1.9 — the ground's own) and took 0% off the
+ *    contrast of the ring, the threat fill or the ore. **Both of those stopped
+ *    being true in a0-40**, which found that a blob the colour of the ground
+ *    cannot lift a panel the 4.55 the design measures at any parameters: the dust
+ *    is now vacuum-and-dark-steel, it peaks at Y′ 46.3, and it costs 2.263. A
+ *    dust lane still suits a map about cover; the *cost* half of this line no
+ *    longer holds, and the reshuffle above is where that is dealt with.
  *  - **`diamond` → Patina Drift.** Double Diamond is the other derelict-fill
  *    board and the most contested centre in the set — the exposed inner homes
  *    sit right on the commons — so it takes the next-cheapest (0.555). No
