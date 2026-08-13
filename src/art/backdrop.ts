@@ -1,5 +1,36 @@
 /**
- * src/art/backdrop.ts — the void, v3: the darker space. OWNER: Art Agent.
+ * src/art/backdrop.ts — the void, v4: the space the design actually drew.
+ * OWNER: Art Agent.
+ *
+ * **a0-40 — the numbers come from `./mockup-reference` now, and nothing here may
+ * tune them.** Six reports on one subject, the last of them with the design and
+ * the game rendered side by side: *"the mockup still looks a million times
+ * better"*. The first five were treated as rendering bugs. None was. The renderer
+ * was always fine — handed the design's numbers it reproduces the design exactly
+ * (`sky-preview.ts`, the `ported` column) — and what had happened instead is that
+ * **the parameters drifted away from the design and no gate ever compared the two.**
+ * Every ceiling CI could see (`peakLuma`, `overdraw`, `SKY_ALPHA_MAX`) rewards a
+ * darker sky, so five briefs optimised toward them and nothing pulled back.
+ *
+ * So the direction of authority is inverted here. `./mockup-reference` holds the
+ * design as data; this file *consumes* it; `./compliance`'s ceilings are
+ * re-derived **from** the ported art rather than the art being trimmed to fit
+ * them; and `backdrop.test.ts` asserts every built sky against
+ * `MOCKUP_REFERENCE`, so the drift that caused six reports fails CI the next time
+ * it starts.
+ *
+ * What that changed, concretely — the three divergences, which compounded:
+ *
+ * ```
+ *                    design    game before a0-40
+ *   ground luma        9.1          1.9        FLOOR #010204 → #070910
+ *   star p99           46–53        7–9        35 stars a screenful → 560
+ *   nebula lift        3.8–10.0     0.02–0.92  every sky's count/radius/alpha
+ * ```
+ *
+ * Iron Veil is the control: the one sky whose numbers never drifted, and the one
+ * sky the developer has never complained about. It is unchanged here except for
+ * the ground under it and the stars over it.
  *
  * **r9-01 — a sky may thin, and it may never leave.** Nothing about what any sky
  * *is* changed here either; what changed is what the auto-reducer is allowed to
@@ -112,7 +143,19 @@
 
 import { Container, Graphics } from 'pixi.js';
 import { mulberry32 } from '@shared/types';
-import { DERIVED, FLOOR, PALETTE, WHITE } from './palette';
+import { FLOOR, PALETTE } from './palette';
+import {
+  MOCKUP_REFERENCE,
+  MOCKUP_STARS,
+  MOCKUP_STAR_DENSITY,
+  mockupBlobs,
+  starAlpha,
+  starBlooms,
+  starMagnitude,
+  starRadius,
+  type MockupSkyId,
+  type SkyReference,
+} from './mockup-reference';
 import {
   circle,
   ellipsePoints,
@@ -140,17 +183,48 @@ export const VOID_SEED = 0x5061_6365; // 'Pace' — a wink, and a fixed 32-bit s
  * **The ground.** Every layer below is composited over this, and it is drawn as
  * a real opaque quad rather than left to the canvas clear colour — the backdrop
  * owns its own ground, so the void looks the same whatever is behind it.
+ *
+ * `./tokens` `FLOOR`, which a0-40 moved from `#010204` to the design's own
+ * `#070910` ({@link MOCKUP_GROUND}) — the first and largest of the three
+ * divergences, since everything above it composites over it.
  */
 export const GROUND_COLOR = FLOOR;
 
+/** The ground's luma Y′, 0..255 — **9.1**. The floor of every `peakLuma` in the
+ *  table below, and the baseline `sky-preview.ts` measures every sky's lift
+ *  above. Stated once, so no sky's declaration quietly disagrees with the ground
+ *  it sits on (which is exactly how Coalsack came to declare 1.9 forever). */
+export const GROUND_LUMA =
+  Math.round(
+    (0.2126 * ((GROUND_COLOR >> 16) & 0xff) +
+      0.7152 * ((GROUND_COLOR >> 8) & 0xff) +
+      0.0722 * (GROUND_COLOR & 0xff)) *
+      10,
+  ) / 10;
+
 /**
- * A star colour: one of the steel-ramp values, dimmed by alpha, not by hue —
- * and, since a0-22, an optional colour for the light that *scatters off* it.
+ * A star colour: one of the steel-ramp values, climbing by *value* and not by
+ * hue — and, since a0-22, an optional colour for the light that *scatters off*
+ * it.
+ *
+ * **a0-40 replaced `alpha` with {@link minMagnitude}.** An ink used to declare
+ * how bright its stars were, and inks were sampled uniformly, so a layer's
+ * brightness distribution was a three-value histogram. The design draws one
+ * continuous **magnitude curve** ({@link MOCKUP_STARS}) and lets the value ramp
+ * *follow* it: a faint star is dim steel, a bright one is white, and the ink is
+ * chosen by the magnitude rather than the other way round. That is what makes a
+ * field instead of three tiers, and the three-tier version is what the developer
+ * described as *"all 1 color"*.
  */
 interface StarInk {
   /** The star's own point. Always a steel-ramp value (style-guide §1). */
   readonly color: number;
-  readonly alpha: number;
+  /**
+   * The bottom of the magnitude band this ink paints, 0..1. The inks of a layer
+   * are listed in ascending order and the last one at or below a star's
+   * magnitude wins, so the ramp climbs with the curve.
+   */
+  readonly minMagnitude: number;
   /**
    * **The colour of this star's bloom, when it is not the star's own** — one of
    * {@link BLOOM_TINTS}, or absent for a halo that stays on the value ramp.
@@ -174,17 +248,39 @@ export interface StarLayerSpec {
   /** Parallax factor: 0 = fixed to the screen (infinitely far), 1 = locked to
    *  the world (moves with the fleet). Far layers are small, near layers large. */
   readonly parallax: number;
-  /** Stars per 1e6 px² of covered area — far layers are dense with faint dust,
-   *  near layers sparse with bright points. */
+  /**
+   * This layer's share of the field, 0..1. The three sum to 1, and the total is
+   * {@link MOCKUP_STAR_DENSITY} — **the design's 560 stars a screenful**, against
+   * the 35 that shipped. The split is the shipped one (0.61 / 0.30 / 0.09,
+   * from the old 92 : 46 : 13), because how the field is *layered* is a parallax
+   * decision (a0-07b) and this brief is about how much of it there is.
+   */
+  readonly share: number;
+  /** Stars per 1e6 px² of covered area — {@link share} of the design's total. */
   readonly density: number;
-  /** Star radius range, world/screen px. */
-  readonly minR: number;
-  readonly maxR: number;
-  /** The brightness palette a star is drawn from (sampled uniformly). */
+  /** The value ramp this layer climbs, in ascending magnitude order. */
   readonly inks: readonly StarInk[];
-  /** Fraction of stars in this layer that get a faint diffraction glint (a
-   *  short cross through the point) — a touch of sparkle on the brightest layer. */
-  readonly glint: number;
+}
+
+/**
+ * The biggest star the field can draw — the line between a point and its halo,
+ * and the same on every layer.
+ *
+ * **The layers do not scale it, and that is deliberate.** A per-layer size
+ * multiplier is the obvious way to sell depth, and it is what a0-40 removed: the
+ * design has *one* magnitude curve, so a size multiplier on top of it is a second
+ * distribution nobody specified, and it pulls the field's measured p99 away from
+ * the design's by more than the ground did. Depth is carried by
+ * {@link StarLayerSpec.parallax}, which is what actually reads as depth in
+ * motion, and the curve alone already spans 0.4–2.45 px.
+ */
+export const MAX_STAR_RADIUS = round(starRadius(1));
+
+/** The ink a star of this magnitude is painted in: the last band it clears. */
+export function starInkFor(spec: StarLayerSpec, mag: number): StarInk {
+  let chosen = spec.inks[0]!;
+  for (const ink of spec.inks) if (mag >= ink.minMagnitude) chosen = ink;
+  return chosen;
 }
 
 /**
@@ -320,57 +416,58 @@ export const BLOOM_TINTS = {
  * there — one tint per layer, per hue, on the two layers where a bloom is big
  * enough to have a colour at all.
  */
+/**
+ * The value ramp every layer climbs, from {@link MOCKUP_STARS}`.ramp` — one
+ * curve, one ramp, three depths. a0-07 gave each layer its own three-value ink
+ * set (and barred white from `deep`, on the reasoning that *distance steals a
+ * star's colour before its light*); at 35 stars a screenful that was a density
+ * compensation, and at 560 it is a third distribution nobody specified. Depth is
+ * carried by {@link StarLayerSpec.parallax}, which is what reads as depth.
+ */
+const RAMP_INKS: readonly StarInk[] = MOCKUP_STARS.ramp.map((b) => ({
+  color: b.color,
+  minMagnitude: b.minMagnitude,
+}));
+
+/** The ramp with `tint` on its top band — the only band that ever blooms, and so
+ *  the only one a halo colour can reach (a0-22, {@link BLOOM_TINTS}). */
+function tinted(tint: number): readonly StarInk[] {
+  return RAMP_INKS.map((ink, i) => (i === RAMP_INKS.length - 1 ? { ...ink, halo: tint } : ink));
+}
+
 export const STAR_LAYERS: readonly StarLayerSpec[] = [
   {
     key: 'deep',
     parallax: 0.1,
-    density: 92,
-    minR: 0.45,
-    maxR: 0.95,
-    // Faint far dust: dim steel, a hair of lit steel. Never white — distance
-    // steals a star's colour before its light. No tint either, and for the same
-    // reason measured out: a hue here is ΔE ≤ 2.9 on a 6 px disc (BLOOM_TINTS).
-    inks: [
-      { color: PALETTE.hullSteel, alpha: 0.26 },
-      { color: PALETTE.hullSteel, alpha: 0.38 },
-      { color: DERIVED.hullLight, alpha: 0.3 },
-    ],
-    glint: 0,
+    share: 0.61,
+    density: round(MOCKUP_STAR_DENSITY * 0.61),
+    // Faint far dust: dim steel, climbing to a hair of lit steel at the top of
+    // the layer's own range. Never white — distance steals a star's colour before
+    // its light. No tint either, and for the same reason measured out: a hue here
+    // is worth C* < 5 on a disc a few px across (BLOOM_TINTS).
+    inks: RAMP_INKS,
   },
   {
     key: 'mid',
     parallax: 0.26,
-    density: 46,
-    minR: 0.7,
-    maxR: 1.35,
-    // The cyan goes on the ink with the most alpha to spend, because a tint's
-    // chroma is bought with alpha: C* 8.2 here against 6.3 and 4.4 on the other
-    // two. The other two stay on the ramp — mid is where most of a frame's
-    // *visible* blooms live (~10 per screenful), so a third of them cyan is a
-    // field with two colours in it rather than a field repainted.
-    inks: [
-      { color: DERIVED.hullLight, alpha: 0.55 },
-      { color: PALETTE.hullSteel, alpha: 0.7, halo: BLOOM_TINTS.plasma },
-      { color: WHITE, alpha: 0.42 },
-    ],
-    glint: 0.04,
+    share: 0.3,
+    density: round(MOCKUP_STAR_DENSITY * 0.3),
+    // The cyan goes on the band that actually blooms, because a tint's chroma is
+    // bought with the halo's alpha and only a bloomed star has one. Below it the
+    // layer is plain ramp, so mid is a steel field with cyan flares in it rather
+    // than a repainted layer.
+    inks: tinted(BLOOM_TINTS.plasma),
   },
   {
     key: 'near',
     parallax: 0.5,
-    density: 13,
-    minR: 1.15,
-    maxR: 2.2,
-    // The closest, brightest points — the ramp's white endpoint carries these,
-    // and they are the only real orbs in a frame (a bloomed near star is ~12–19
-    // px across against mid's ~8), so this is the layer where a tint is worth the
-    // most per star and the only one that can carry the second hue at all.
-    inks: [
-      { color: WHITE, alpha: 0.88, halo: BLOOM_TINTS.plasma },
-      { color: DERIVED.hullLight, alpha: 0.92, halo: BLOOM_TINTS.patina },
-      { color: WHITE, alpha: 0.64 },
-    ],
-    glint: 0.22,
+    share: 0.09,
+    density: round(MOCKUP_STAR_DENSITY * 0.09),
+    // The closest, brightest points — the only real orbs in a frame, and the
+    // layer where a tint is worth the most per star. It carries the second hue
+    // because it is the only one whose halos are big enough for two to be
+    // *distinguishable* rather than merely both present.
+    inks: tinted(BLOOM_TINTS.patina),
   },
 ];
 
@@ -440,42 +537,44 @@ export const STAR_LAYERS: readonly StarLayerSpec[] = [
 export const SKY_PARALLAX = 0.085;
 
 /**
- * **Bloom — seeded scatter, subtle** (the developer's pick, a0-07).
+ * **Bloom — the brightest stars, at the design's intensity** (a0-40). Re-exported
+ * from {@link MOCKUP_STARS}`.bloom` so there is exactly one copy of it; see there
+ * for the rule, its threshold and what it replaces.
  *
- * The compositor showed two rules: bloom by *brightness threshold* (the top N%
- * of stars glow) and bloom by **seeded scatter** (which stars glow is drawn from
- * the seed, at any magnitude). Scatter won, and the difference is not cosmetic:
- * a threshold makes bloom a *property of a star's magnitude*, so the void reads
- * as one uniform material with a bright tier stamped on it. Scatter makes it a
- * property of the star, so a faint far point can flare and a bright near one can
- * sit flat — which is what real fields do, and what stops the near layer from
- * looking like a row of headlights.
+ * The rule this supersedes was a0-07's **seeded scatter** — which stars glow
+ * drawn from the seed, at any magnitude — and the swap is not cosmetic, so it is
+ * worth having the trade in front of whoever reads this next. Scatter makes bloom
+ * a property of the *star*, so a faint far point can flare; a threshold makes it
+ * a property of the *magnitude*, so the field carries a bright tier. A bright
+ * tier is what an **orb** is, and all six reports on this backdrop ask for the
+ * orbs back — most explicitly *"bloom orbs gone"* and *"there are no stars in
+ * them"*. The developer's ruling on a0-40 is that the game matches the mockup:
+ * *"not close enough — the same."* So the threshold ships.
  *
- * It is a pure function of the seed, so two players in one match see the same
- * sky and a replay is stable (GDD §4.1) — the whole reason the rule is stated as
- * "seeded" rather than "random".
+ * Both halves stay seeded and therefore stable across a match and a replay
+ * (GDD §4.1): the magnitude is drawn from the layer's seeded stream, so two
+ * players see the same sky and the frozen golden scene is byte-deterministic.
  *
- * `intensity` is the **lowest of the three magnitudes shown**, and it is meant to
- * stay there. Subtle was chosen so that bloom *survives a bright nebula without
- * adding to it*: over Plasma Reef, a halo at this alpha is still a halo and not a
- * second wash. Do not "improve" it upward.
+ * The halo is **one soft-falloff disc**, not the two flat rings it replaces — a
+ * quarter of the geometry, no Mach band at either ring's edge, and a mean of a
+ * third of its peak (`./shapes` `falloffProfile`). `intensity` is that peak, as a
+ * fraction of the star's own alpha: **0.48** against the shipped 0.16. It is the
+ * design's number and it is not Art's to move.
  */
-export const BLOOM = {
-  /** Fraction of stars, in every layer, that bloom. Chosen by seed, not by size. */
-  scatter: 0.18,
-  /** Halo radii, as multiples of the star's own radius (inner ring, outer ring). */
-  radii: [2.4, 4.3] as const,
-  /** Halo alphas, as fractions of the star's own alpha. **Subtle** — the lowest
-   *  of the compositor's three. */
-  intensity: [0.16, 0.065] as const,
-} as const;
+export const BLOOM = MOCKUP_STARS.bloom;
+
+/** The diffraction cross a bloomed star carries — the same population as the
+ *  halo, because a spike and a halo are one physical event ({@link MOCKUP_STARS}). */
+export const SPIKE = MOCKUP_STARS.spike;
 
 // ---------------------------------------------------------------------------
 // The six skies (a0-07) — one per map, including NONE
 // ---------------------------------------------------------------------------
 
-/** The six ratified skies, as the developer named them off the compositor. */
-export type NebulaId = 'none' | 'coalsack' | 'ironVeil' | 'patinaDrift' | 'plasmaReef' | 'deepEmber';
+/** The six ratified skies, as the developer named them off the compositor. The
+ *  five with geometry are `./mockup-reference`'s, so a sky cannot exist here
+ *  without a design entry — or exist there without a spec below. */
+export type NebulaId = 'none' | MockupSkyId;
 
 /**
  * **The floor under a shed sky (r9-01).** The auto-reducer may take at most
@@ -640,79 +739,22 @@ export interface NebulaSpec {
 }
 
 /**
- * **The stop table this file used to fake a gradient with, kept as arithmetic
- * because two skies' declared alphas are ported off it (a0-39).**
- *
- * Every soft edge in the void was a stack of four concentric flat-filled shapes
- * at radius fractions `1.0 / 0.72 / 0.46 / 0.2` and alpha fractions
- * `0.18 / 0.42 / 0.72 / 1.0`. At sprite scale that reads as a soft edge. At
- * *nebula* scale — a body 200 px across on a ground of Y′ 1.9 — it reads as four
- * hard-edged rings with a dark core, which is what the developer photographed,
- * and it is measured to the stop radii in {@link Falloff}'s own note.
- *
- * Two numbers from it are still load-bearing, and this is why the table survives
- * as a constant instead of being deleted:
- *
- *  - {@link stackedPeak} — what a stack of these actually *painted*, which is
- *    **not** the alpha it declared. Under normal blending four nested stops
- *    composite to `1 − Π(1 − a·fᵢ)` ≈ **2.26 a**. A sky ported to a single
- *    gradient at its declared alpha would be less than half as bright as the one
- *    the developer ratified, so the port raises each peak to what the stack was
- *    really painting — where the compliance ceilings allow it (see Deep Ember).
- *  - Under **additive** blending the same table was already stated as increments
- *    that sum to one, so an additive sky's painted peak *was* its declared peak
- *    and ports across unchanged.
- */
-const LEGACY_SOFT_ALPHA_FRACTIONS = [0.18, 0.42, 0.72, 1.0] as const;
-
-/**
- * What the four-stop stack painted at its core, for a declared peak of `a` under
- * normal blending — the port factor above, as a function rather than as 2.26.
- */
-function stackedPeak(a: number): number {
-  let clear = 1;
-  for (const f of LEGACY_SOFT_ALPHA_FRACTIONS) clear *= 1 - a * f;
-  return round(1 - clear);
-}
-
-/**
- * **A soft blob: ONE circle, painted through the radial falloff** (a0-39;
+ * A **soft blob: ONE ellipse, painted through the radial falloff** (a0-39;
  * ./shapes `Falloff`, `falloffProfile`).
  *
  * The path is the falloff's own zero rim, so the disc has no boundary: alpha
  * arrives at zero tangentially exactly where the geometry ends. `peakAlpha` is
- * what the centre paints, and — unlike the stack this replaced — it is also what
- * the shape *declares*, so `./compliance`'s sky ceilings now bound what a player
- * actually sees rather than one quarter of it.
- */
-function softDisc(
-  out: Shape[],
-  cx: number,
-  cy: number,
-  radius: number,
-  color: number,
-  peakAlpha: number,
-): void {
-  const r = round(radius);
-  if (r <= 0 || peakAlpha <= 0) return;
-  out.push(
-    circle(cx, cy, r, softFill(color, 'sky', round(peakAlpha), { cx, cy, rx: r, ry: r, angle: 0 })),
-  );
-}
-
-/**
- * A **wisp**: one elongated soft blob at an angle — the shape a nebula filament
- * has, and what makes Patina Drift read as drift rather than as a row of discs.
+ * what the centre paints, and — unlike the four-stop stack this replaced — it is
+ * also what the shape *declares*, so `./compliance`'s sky ceilings bound what a
+ * player actually sees rather than one quarter of it.
  *
- * **It is no longer ragged, and that is a consequence of the fix rather than a
- * taste.** A radial falloff's iso-contours are ellipses; a ragged *path* around
- * one either clips the paint before it reaches zero (a hard edge at up to 15% of
- * peak — the artefact again, at one ring instead of four) or sits outside the
- * paint entirely, where it is invisible and costs fill. So irregularity has to
- * come from where a real nebula gets it — **count, aspect, angle spread and
- * overlap** — and every sky that uses this leans on that instead.
+ * Every sky is made of these and of nothing else since a0-40. One primitive is
+ * what lets `backdrop.test.ts` compare a built sky element-for-element against
+ * {@link MOCKUP_REFERENCE}: a blob is a blob whether it is a Coalsack lobe, an
+ * Iron Veil stratum or a Plasma Reef clot, and the difference between the five
+ * skies is entirely in the numbers the design states.
  */
-function softWisp(
+function softBlob(
   out: Shape[],
   cx: number,
   cy: number,
@@ -734,35 +776,22 @@ function softWisp(
 }
 
 /**
- * A **sheet**: one long, thin soft streak — Iron Veil's stratum.
+ * **Every sky's geometry, from the design's own numbers.**
  *
- * This was a rotated *rectangle* with a flat fill, and it is the second half of
- * the developer's report: *"diagonal banding"*. It had no falloff to blame,
- * because it had no falloff at all — fourteen hard-edged quads across one band,
- * every one of them ending on a straight line the eye reads as an object's edge.
- *
- * It is the same primitive as a wisp now, at an extreme aspect. Iron Veil's
- * "laminated rather than clouded" read survives, because lamination is what
- * *several parallel strata* look like — it never depended on any one of them
- * having a visible edge.
+ * There is one of these and it serves all five, which is the shape of the fix:
+ * a sky is no longer a bespoke `build` with its own literals to drift, it is
+ * {@link MOCKUP_REFERENCE}'s entry and nothing else. How many, how big, how
+ * opaque, what colour, where — all of it comes from the design, including the
+ * per-sky seed salt, and all of it is asserted against the design in CI.
  */
-function sheet(
-  out: Shape[],
-  cx: number,
-  cy: number,
-  halfLength: number,
-  halfThick: number,
-  angle: number,
-  color: number,
-  alpha: number,
-): void {
-  softWisp(out, cx, cy, halfLength, halfThick, angle, color, alpha);
-}
-
-/** `count` scaled by a reduced-tier density, never below 1 when the sky is kept. */
-function scaled(count: number, density: number): number {
-  if (density <= 0) return 0;
-  return Math.max(1, Math.round(count * density));
+function skyBuild(ref: SkyReference): NebulaSpec['build'] {
+  return (seed, width, height, density, screenW, screenH): Shape[] => {
+    const out: Shape[] = [];
+    for (const b of mockupBlobs(ref, seed, width, height, density, screenW, screenH)) {
+      softBlob(out, b.cx, b.cy, b.rx, b.ry, b.angle, b.color, b.alpha);
+    }
+    return out;
+  };
 }
 
 // --- NONE ------------------------------------------------------------------
@@ -777,7 +806,7 @@ const NONE: NebulaSpec = {
   occludes: false,
   additive: false,
   overdraw: 0,
-  peakLuma: 1.9,
+  peakLuma: GROUND_LUMA,
   // The one honest 0 in the table: there is no geometry to thin, and the
   // renderer skips this layer on the id rather than on the density, so it is
   // never a sky that leaves — it is a sky that was never there.
@@ -789,11 +818,21 @@ const NONE: NebulaSpec = {
 
 /**
  * **Coalsack** — "dust that occludes: stars go missing behind it, no additive
- * blend." The only sky drawn *over* the star layers, and the only one that is
- * darkness rather than light: seven overlapping lobes of {@link GROUND_COLOR},
- * near-opaque at the core and gone by the rim, so the field it crosses simply
- * stops having stars in it. It adds no light to the frame at all, which is why
- * it is also the sky that survives the auto-reducer whole.
+ * blend." Nine large lobes walking one lane, drawn *over* the star layers, at the
+ * highest alpha in the set by a factor of three.
+ *
+ * **a0-40 gave it a colour, and that is the one thing about this sky the design
+ * could not simply be copied for.** It used to paint lobes of {@link
+ * GROUND_COLOR} itself — pure occlusion, adding no light, measured lift **0.02**
+ * — and a blob the colour of the ground is invisible against the ground by
+ * construction, at any parameters. The design's Coalsack lifts **4.55**, so the
+ * dust has to be dust: darker than the field it crosses, and not nothing. See
+ * `./mockup-reference` for the pair and how it was picked.
+ *
+ * It still occludes, which is the whole read. At α up to 0.39 over the star
+ * layer a star behind the lane's core keeps a fraction of its value and the faint
+ * ones go missing entirely — a dark nebula is dark *against the field*, never
+ * against the vacuum, and that is now what it draws instead of a hole.
  */
 const COALSACK: NebulaSpec = {
   id: 'coalsack',
@@ -806,346 +845,135 @@ const COALSACK: NebulaSpec = {
   parallax: 0.14,
   occludes: true,
   additive: false,
-  overdraw: 0.399,
-  peakLuma: 1.9,
-  // Kept whole. It is the ground colour — one opaque-ish blend, no added light —
-  // and shedding it mid-match would make a wall of stars appear at once.
-  reducedDensity: 1,
-  build(seed, width, height, density, screenW, screenH) {
-    const rng = mulberry32((seed ^ 0x0c0a_15ac) >>> 0);
-    const out: Shape[] = [];
-    const hw = width / 2;
-    const hh = height / 2;
-    const unit = Math.min(screenW, screenH) / 2;
-    const screens = (width * height) / (screenW * screenH);
-    // A lane, not a scatter: the lobes walk one line so the dust reads as a body
-    // with a direction. The lane spans the whole FIELD (it is one continuous
-    // thing) while each lobe is sized off the SCREEN, so the dust is the same
-    // size on a phone whatever arena it is over.
-    const laneAngle = -0.42 + rng.next() * 0.84;
-    const cos = Math.cos(laneAngle);
-    const sin = Math.sin(laneAngle);
-    const reach = Math.max(hw, hh) * 1.15;
-    const lobes = scaled(7 * screens, density);
-    for (let i = 0; i < lobes; i++) {
-      const t = (i / Math.max(1, lobes - 1)) * 2 - 1; // −1 … +1 along the lane
-      const along = t * reach;
-      const across = (rng.next() - 0.5) * unit * 0.9;
-      const cx = round(along * cos - across * sin);
-      const cy = round(along * sin + across * cos);
-      const r = round(unit * (0.34 + rng.next() * 0.22));
-      // Dense along the lane's middle, thinning at both ends — a body with edges.
-      // Ported through `stackedPeak` (a0-39): the lane has to keep *occluding*,
-      // and what it occluded with was the stack's composite, not its declaration.
-      const core = stackedPeak(0.9 * (1 - 0.55 * Math.abs(t)));
-      softDisc(out, cx, cy, r, GROUND_COLOR, core);
-    }
-    return out;
-  },
+  overdraw: 2.263,
+  peakLuma: 46.3,
+  // **Five lobes of nine, where it used to be kept whole (a0-40).** The reason it
+  // was whole is gone twice over: the hazard was a wall of stars appearing
+  // *mid-match*, and r9-01 closed that by pinning the density at build; and the
+  // claim that it cost nothing to keep was true of a lane painted in the ground
+  // colour and is not true of one that lifts 4.55. At 2.263 it is real fill, and
+  // a lane of five lobes is still a lane.
+  reducedDensity: 0.55,
+  build: skyBuild(MOCKUP_REFERENCE.coalsack),
 };
 
 // --- IRON VEIL -------------------------------------------------------------
 
 /**
- * **Iron Veil** — "a rust band, 14 sheets." Hard-edged where every other sky is
- * soft: fourteen thin flat sheets stacked along one band, iron-grey with rust
- * through it, so the void looks laminated rather than clouded.
+ * **Iron Veil** — "a rust band, 14 sheets." **The control.** Fourteen thin
+ * strata stacked along one band, iron-grey with rust through it, so the void
+ * looks laminated rather than clouded.
  *
- * The rust is threat red at 4–5.5% alpha — the §2.2 sky carve-out, and the whole
- * reason that section exists. At this alpha over Floor it composites to luma ≈
- * 6/255: a seventh of the ink outline every sprite in the game carries, and
- * nothing a player could read as "this hurts". Most of the veil is steel; the
- * rust is the minority of sheets that tints the band warm.
+ * It is the one sky whose numbers never drifted — shipped 14 sheets at r 100–177
+ * and α .047–.093 against the design's 14 at r 102–166 and α .045–.097 — and it
+ * is the one sky the developer has never complained about. That coincidence is
+ * the whole argument of a0-40: the renderer drew this one right because this one
+ * was still asking it for the right thing. Everything it gains in this brief it
+ * gains from the ground beneath it and the stars above it.
+ *
+ * The rust is threat red under the §2.2 sky carve-out (`./compliance`
+ * `SKY_RESERVED_ALPHA_MAX`), which a0-40 re-derived from this sky rather than the
+ * other way round.
  */
 const IRON_VEIL: NebulaSpec = {
   id: 'ironVeil',
   name: 'Iron Veil',
-  blurb: 'Fourteen flat sheets in one band — iron with rust through it.',
+  blurb: 'Fourteen strata in one band — iron with rust through it.',
   parallax: SKY_PARALLAX,
   occludes: false,
   additive: false,
-  overdraw: 0.249,
-  peakLuma: 14.0,
+  overdraw: 2.459,
+  peakLuma: 43.9,
   // Half the sheets. A band with 7 sheets is still a band; the read survives.
   reducedDensity: 0.5,
-  build(seed, width, height, density, screenW, screenH) {
-    const rng = mulberry32((seed ^ 0x1207_e011) >>> 0);
-    const out: Shape[] = [];
-    const hw = width / 2;
-    const hh = height / 2;
-    const unit = Math.min(screenW, screenH) / 2;
-    const screens = (width * height) / (screenW * screenH);
-    const band = -0.38; // the band's tilt across the field
-    const cos = Math.cos(band);
-    const sin = Math.sin(band);
-    const sheets = scaled(14 * screens, density);
-    // The band's thickness is a screen's business (it has to read as a band on a
-    // phone); its length is the field's (it is one band, not one per screenful).
-    const reach = Math.max(hw, hh) * 1.1;
-    for (let i = 0; i < sheets; i++) {
-      const t = i / Math.max(1, sheets - 1);
-      // Stagger across the band's thickness, drift along its length.
-      const across = (t - 0.5) * unit * 0.86 + (rng.next() - 0.5) * unit * 0.07;
-      const along = (rng.next() - 0.5) * reach * 2;
-      const cx = round(along * cos - across * sin);
-      const cy = round(along * sin + across * cos);
-      const halfLen = round(unit * (0.55 + rng.next() * 0.5));
-      // Half again as thick as the flat quads were (0.02–0.055), because a
-      // streak's thickness is now a *falloff* rather than an edge: an ellipse's
-      // mean coverage across its minor axis is a fraction of a rectangle's, so
-      // porting the old half-thickness unchanged would have thinned the band to
-      // a set of hairlines. The band's own width across the field is untouched.
-      const halfThick = round(unit * (0.03 + rng.next() * 0.052));
-      // Every fourth sheet is rust; the rest are iron. Rust rides the §2.2
-      // ceiling (0.06) with headroom, iron rides the ordinary sky ceiling.
-      const rusty = i % 4 === 1;
-      const color = rusty
-        ? PALETTE.threatRed
-        : i % 3 === 0
-          ? DERIVED.hullShadow
-          : DERIVED.hullDark;
-      // Raised toward each ceiling, for the same reason the thickness was: a
-      // gradient's mean is a third of its peak, so a flat 0.04 quad and a 0.04
-      // streak are not the same amount of iron. Rust stops at the §2.2 ceiling
-      // (0.06) exactly and iron well under the ordinary one (0.12).
-      const alpha = rusty ? 0.045 + rng.next() * 0.015 : 0.05 + rng.next() * 0.045;
-      sheet(out, cx, cy, halfLen, halfThick, band + (rng.next() - 0.5) * 0.06, color, alpha);
-    }
-    return out;
-  },
+  build: skyBuild(MOCKUP_REFERENCE.ironVeil),
 };
 
 // --- PATINA DRIFT ----------------------------------------------------------
 
 /**
  * **Patina Drift** — "wispy teal from the palette's own green, 22 soft blobs."
- * The safest sky in the set and the direct descendant of the a2-06 wash: the
- * corroded void, in the one hue §1 already hands to corrosion. Twenty-two
- * elongated wisps at a shared drift angle, patina at the peaks and deep patina
- * in the pockets, none of it above 5%.
+ * The corroded void, in the one hue §1 already hands to corrosion. The count
+ * never drifted; the radii and the alphas did, by about a third and about a half,
+ * and the sky measured **0.92** against the design's **6.94**.
  */
 const PATINA_DRIFT: NebulaSpec = {
   id: 'patinaDrift',
   name: 'Patina Drift',
-  blurb: 'Twenty-two teal wisps on one drift — the corroded void, v2’s wash grown up.',
+  blurb: 'Twenty-two teal wisps on one drift — the corroded void.',
   parallax: SKY_PARALLAX,
   occludes: false,
   additive: false,
-  overdraw: 0.555,
-  peakLuma: 14.9,
-  // Ten of twenty-two. The drift angle and the ink mix are unchanged, so what is
-  // left is the same sky thinned, not a different one.
+  overdraw: 3.174,
+  peakLuma: 32.3,
+  // Ten of twenty-two. The drift bearing and the hue pair are unchanged, so what
+  // is left is the same sky thinned, not a different one.
   reducedDensity: 0.45,
-  build(seed, width, height, density, screenW, screenH) {
-    const rng = mulberry32((seed ^ 0x9e37_79b9) >>> 0);
-    const out: Shape[] = [];
-    const unit = Math.min(screenW, screenH) / 2;
-    const screens = (width * height) / (screenW * screenH);
-    const drift = 0.34;
-    // **Tuned to the measured peak, not ported from the declaration (a0-39).**
-    // `stackedPeak` alone overshoots here, and the reason is worth stating
-    // because it is the one place the port is not arithmetic: a gradient is
-    // *fuller through its middle* than the stack it replaces (at t = 0.5 it
-    // paints 0.051 where three-of-four stops painted 0.024), so its mean over a
-    // blob is 29% higher at the same peak — and Patina Drift is the sky whose
-    // elements overlap most. Ported literally it measured peak Y′ **25.3**
-    // against the ratified 15.8, which would also have made it, not Plasma
-    // Reef, the brightest sky in the set. These three hold the ladder where
-    // a0-07 put it; `backdrop.test.ts` is what says so.
-    const inks: readonly (readonly [number, number])[] = [
-      [PALETTE.patina, 0.051],
-      [DERIVED.continentShade, 0.046],
-      [DERIVED.hullShadow, 0.041],
-    ];
-    const wisps = scaled(22 * screens, density);
-    for (let i = 0; i < wisps; i++) {
-      const cx = round((rng.next() - 0.5) * width * 0.94);
-      const cy = round((rng.next() - 0.5) * height * 0.94);
-      const rx = round(unit * (0.2 + rng.next() * 0.3));
-      const ry = round(rx * (0.28 + rng.next() * 0.3));
-      const ink = inks[Math.floor(rng.next() * inks.length)]!;
-      // The angle spread is widened from ±0.25 to ±0.45 rad about the drift.
-      // A wisp is a clean ellipse now (see `softWisp`), so the filament read has
-      // to come from wisps crossing each other at a range of angles rather than
-      // from each one being individually ragged — and the drift still wins,
-      // because ±0.45 about a common bearing is a shared direction, not a
-      // scatter.
-      softWisp(out, cx, cy, rx, ry, drift + (rng.next() - 0.5) * 0.9, ink[0], ink[1]);
-    }
-    return out;
-  },
+  build: skyBuild(MOCKUP_REFERENCE.patinaDrift),
 };
 
 // --- PLASMA REEF -----------------------------------------------------------
 
 /**
  * **Plasma Reef** — "clotted cyan, the brightest and the most expensive." The
- * only additive sky, and the only one that spends the energy hue on the
- * backdrop, which the v2 module header explicitly refused to do. The developer
- * has since picked it, so the refusal is withdrawn and replaced by a *measured*
- * limit: the reef is bright enough to see and nowhere near bright enough to be
- * confused with the thing it shares a hue with. `backdrop.test.ts` pins the
- * owner beacon ring's contrast over the reef's brightest clot; if that number
- * ever fails, the map gets a different sky.
+ * only additive sky, and the sky a0-40 changes most: **39 shapes back to 9**.
  *
- * Structurally it is clots, not clouds: three broad base washes with tight
- * clusters of small nodes on top, so the light is concentrated instead of
- * smeared — which is what keeps a *bright* sky from becoming a *loud* one.
+ * What shipped was three broad washes at α 0.0126 with thirty-six little nodes
+ * at α 0.039 scattered over them, radii an eighth of the design's. It is a
+ * structure that spends its fill on smear and never gets a clot bright enough to
+ * see, and it measured lift **0.53** — the second-*darkest* sky in the game
+ * wearing the name of the brightest. Nine large clots at 4–9× the alpha is the
+ * design, and it measures 9.97.
+ *
+ * The reef is bright enough to see and nowhere near bright enough to be confused
+ * with the thing it shares a hue with. `backdrop.test.ts` pins the owner beacon
+ * ring's contrast over the reef's brightest clot; if that number ever fails, the
+ * map gets a different sky.
  */
 const PLASMA_REEF: NebulaSpec = {
   id: 'plasmaReef',
   name: 'Plasma Reef',
-  blurb: 'Clotted cyan, additive — the brightest sky and the only one that costs real fill.',
+  blurb: 'Nine clots of additive cyan — the brightest sky and the only one that costs real fill.',
   parallax: SKY_PARALLAX,
   occludes: false,
   additive: true,
-  overdraw: 0.627,
-  peakLuma: 17.0,
+  overdraw: 2.175,
+  peakLuma: 59,
   // **Thinned to a third of its parts, not dropped (r9-01).** The old value was
   // 0 — "a fraction of it saves a fraction of nothing" — and that claim was
-  // never measured. It is wrong, and the shape of the cost says why: the reef's
-  // fill is not in its clots (r ≈ 0.045–0.095 of a screen half-height) but in
-  // the three broad base washes under them (r ≈ 0.5–0.8). Shedding at 0.45 takes
-  // the washes 3 → 1 and the clots 9 → 4, and on the canonical 1600×900 screenful
-  // that is measured overdraw **0.627 → 0.262: 58% of this sky's fill, gone.**
-  // The throttled reef then costs less than Coalsack (0.399) or Deep Ember
-  // (0.416) — every coloured sky but Iron Veil — while still being a reef.
-  //
-  // 0.45 rather than lower because below it the saving stops arriving — the last
-  // base wash is the floor of the cost. 0.30 measures 0.251 and 0.15 measures
-  // 0.234: a further 2% and 4% of the full reef's fill, for clots 4 → 3 → 1. The
-  // floor itself (0.25 → 0.242) would buy 3% more frame and cost half the clots.
-  // Nor higher: 0.5 rounds the second base wash back in and jumps to 0.393,
-  // keeping only 37%.
-  //
-  // **Every number in this note was re-measured for a0-39** — a gradient blob is
-  // one covered layer where the stack was four overlapping ones — and the whole
-  // ladder scaled by 0.56 with its shape intact, so the conclusion it argues
-  // (0.45 is where the saving stops arriving) is unchanged.
+  // never measured. It is wrong: 0.45 of the reef is 4 clots of 9, and on the
+  // canonical screenful that is most of this sky's fill gone while it is still
+  // a reef. Below 0.45 the saving stops arriving and the sky stops being one.
   reducedDensity: 0.45,
-  build(seed, width, height, density, screenW, screenH) {
-    const rng = mulberry32((seed ^ 0x51a5_9aee) >>> 0);
-    const out: Shape[] = [];
-    const unit = Math.min(screenW, screenH) / 2;
-    const screens = (width * height) / (screenW * screenH);
-    // Three broad, very faint base washes — the water the reef sits in.
-    const bases = scaled(3 * screens, density);
-    for (let i = 0; i < bases; i++) {
-      const cx = round((rng.next() - 0.5) * width * 0.7);
-      const cy = round((rng.next() - 0.5) * height * 0.7);
-      // 0.0126, from 0.018 — the reef's one real tuning change, and it is a
-      // *ceiling* that made it. See the clot alpha below for the measurement.
-      softDisc(out, cx, cy, round(unit * (0.5 + rng.next() * 0.3)), DERIVED.plasmaDim, 0.0126);
-    }
-    // Nine clots, each a loose cluster of four small nodes. Loose on purpose:
-    // additive light adds, so a node that lands on top of its neighbour costs
-    // brightness twice. The spread is wide enough that a clot reads as a knot of
-    // light rather than as one bright dot.
-    const clots = scaled(9 * screens, density);
-    for (let i = 0; i < clots; i++) {
-      const cx = (rng.next() - 0.5) * width * 0.82;
-      const cy = (rng.next() - 0.5) * height * 0.82;
-      const spread = unit * (0.1 + rng.next() * 0.1);
-      for (let n = 0; n < 4; n++) {
-        const a = (n / 4) * Math.PI * 2 + rng.next() * 1.2;
-        const d = spread * (0.45 + rng.next() * 0.55);
-        softDisc(
-          out,
-          round(cx + Math.cos(a) * d),
-          round(cy + Math.sin(a) * d),
-          round(unit * (0.045 + rng.next() * 0.05)),
-          PALETTE.plasma,
-          // **Tuned DOWN by 30% (a0-39), and by the same ceiling that set it at
-          // 0.045 in the first place — measured on a frame this time.**
-          //
-          // An additive stop table summed to one, so a single gradient at the
-          // same alpha has the same *peak*; what it does not have is the same
-          // *middle*. `(1 − t²)²` holds 0.56 of peak at half-radius where the
-          // four stops held 0.36, and a clot is four nodes that overlap, so the
-          // clot's own maximum rose by a third: real-screen peak Y′ 17.9 → 23.5,
-          // and the owner beacon ring's contrast tax 10.6% → 14.8% against a
-          // 10% ceiling.
-          //
-          // Two facts are worth separating there. The 14.8% is a0-39's to fix
-          // and this number fixes it. **The 10.6% was already shipped** — it was
-          // invisible because `skyBrightness` measured one screenful of a sky
-          // instead of the frame a player sees (`SKY_FIELD` in the test says
-          // what changed and why). So the reef lands under its own rule here for
-          // the first time, at a measured tax of **9.4%**, and the 5% of
-          // brightness that costs against the shipped build is not a look
-          // anybody has ever been shown.
-          0.0315 + rng.next() * 0.0091,
-        );
-      }
-    }
-    return out;
-  },
+  build: skyBuild(MOCKUP_REFERENCE.plasmaReef),
 };
 
 // --- DEEP EMBER ------------------------------------------------------------
 
 /**
- * **Deep Ember** — "sparse, low alpha, felt at the edges." The quietest sky:
- * five big, very faint bodies pushed out toward the field's rim, so the middle
- * of the screen — where the fight is — stays clean and the warmth is only ever
- * in the corner of the eye.
+ * **Deep Ember** — "sparse, low alpha, felt at the edges." The quietest sky, and
+ * still four times what shipped: **5 bodies became 22**.
  *
- * Threat red at 3–4.5%, under the §2.2 ceiling with room to spare. Composited
- * over Floor its brightest pixel is luma ≈ 5/255: an eighth of the ink outline,
- * a thirtieth of the damage fill it shares a hue with.
+ * Five discs at 5% alpha is not a sparse sky, it is an absent one — measured lift
+ * **0.91** against the design's **3.80**. Sparse in the design means *small and
+ * many*, not *few and faint*, which is the difference between warmth you catch at
+ * the edge of the frame and a sky nobody can see. Threat red under the §2.2
+ * carve-out, with ash through it.
  */
 const DEEP_EMBER: NebulaSpec = {
   id: 'deepEmber',
   name: 'Deep Ember',
-  blurb: 'Five dying coals at the rim — the warmth you notice only at the edges.',
+  blurb: 'Twenty-two dying coals — the warmth you notice at the edges of the frame.',
   parallax: SKY_PARALLAX,
   occludes: false,
   additive: false,
-  overdraw: 0.416,
-  peakLuma: 7.6,
-  // Kept whole. Five discs at 4% is already the cheapest coloured sky there is;
-  // there is nothing to shed that would buy a frame.
-  reducedDensity: 1,
-  build(seed, width, height, density, screenW, screenH) {
-    const rng = mulberry32((seed ^ 0x0dee_e3be) >>> 0);
-    const out: Shape[] = [];
-    const hw = width / 2;
-    const hh = height / 2;
-    const unit = Math.min(screenW, screenH) / 2;
-    const screens = (width * height) / (screenW * screenH);
-    const bodies = scaled(5 * screens, density);
-    // Scattered over the field, with a **hole punched through the middle** — the
-    // sky sits at SKY_PARALLAX, so the field's centre stays within ~±0.085·arena
-    // of the screen's centre, which is where the fight is. Rejecting that disc is
-    // what makes the warmth something you catch at the edge of the eye rather than something you
-    // are staring through. (Rejection-sampled rather than placed on a rim ring:
-    // the field is ~2.2 screens across, so a ring on the FIELD's rim would sit
-    // entirely outside the visible window and the sky would be invisible.)
-    const HOLE = 0.3;
-    for (let i = 0; i < bodies; i++) {
-      let nx = 0;
-      let ny = 0;
-      for (let tries = 0; tries < 12; tries++) {
-        nx = rng.next() * 2 - 1;
-        ny = rng.next() * 2 - 1;
-        if (Math.hypot(nx, ny) >= HOLE) break;
-      }
-      const r = round(unit * (0.42 + rng.next() * 0.24));
-      // **The one sky the port could not keep whole, and it is the §2.2 ceiling
-      // that stops it, not taste (a0-39).** These bodies declared 0.030–0.045
-      // and, as four-stop stacks, painted 0.068–0.101 — up to **1.7× over
-      // `SKY_RESERVED_ALPHA_MAX` (0.06)**, the number style-guide §2.2 grants
-      // rust on the backdrop. The audit never saw it because it reads one shape
-      // at a time and the stack was four; the composite was never in front of
-      // it. One gradient shape *is* what it declares, so this sky can now be at
-      // most the ceiling — and it is exactly the ceiling, less a hair of spread,
-      // which is the most rust Art is allowed to give. Deep Ember therefore
-      // comes back dimmer than the number the a0-07 table quotes. Moving 0.06 is
-      // the Director's call and this brief does not take it.
-      softDisc(out, round(nx * hw), round(ny * hh), r, PALETTE.threatRed, 0.05 + rng.next() * 0.01);
-    }
-    return out;
-  },
+  overdraw: 3.033,
+  peakLuma: 22.3,
+  // **Eleven coals of twenty-two, where five bodies used to be kept whole.** At 22
+  // elements it is the joint most expensive sky in the set (3.033) rather than the
+  // cheapest coloured one, and half of a sparse sky is a sparse sky.
+  reducedDensity: 0.5,
+  build: skyBuild(MOCKUP_REFERENCE.deepEmber),
 };
 
 /** The six, by id. */
@@ -1299,8 +1127,20 @@ function keySalt(key: string): number {
  * area-scaled by the layer's density, so a bigger arena gets proportionally
  * more field rather than the same field stretched.
  *
- * Bloom is drawn here, by **seeded scatter** ({@link BLOOM}): each star draws one
- * number, and that number — not its magnitude — decides whether it flares.
+ * **a0-40 rebuilt this against the design** ({@link MOCKUP_STARS}), and three
+ * things changed together, because separately none of them is the defect:
+ *
+ *  1. **Sixteen times as many stars.** The design carries 560 a screenful; the
+ *     three layers shipped 35 between them. At 35 the 99th percentile of a frame
+ *     is still background — measured p99 7–9 against the design's 46–53 — which
+ *     is a frame with specks in it, and *"these are all 1 color, there are no
+ *     stars in them"* is the accurate description of one.
+ *  2. **A magnitude curve, not three tiers.** A star draws one magnitude and its
+ *     radius, its alpha and its place on the value ramp all follow from it.
+ *  3. **Bloom on the brightest, with its spikes.** One soft-falloff halo instead
+ *     of two flat rings, at 0.48 of the star's alpha instead of 0.16, on the
+ *     `magnitude > 0.86` population — and the same population gets the
+ *     diffraction cross, because a spike and a halo are one event.
  */
 export function starFieldSprite(
   spec: StarLayerSpec,
@@ -1309,36 +1149,47 @@ export function starFieldSprite(
   height: number,
 ): SpriteDef {
   const rng = mulberry32((seed ^ keySalt(spec.key)) >>> 0);
-  const count = Math.max(1, Math.round((width * height) / 1e6 * spec.density));
+  const count = Math.max(1, Math.round(((width * height) / 1e6) * spec.density));
   const hw = width / 2;
   const hh = height / 2;
   const shapes: Shape[] = [];
   for (let i = 0; i < count; i++) {
     const x = round(rng.next() * width - hw);
     const y = round(rng.next() * height - hh);
-    const r = round(spec.minR + rng.next() * (spec.maxR - spec.minR));
-    const ink = spec.inks[Math.floor(rng.next() * spec.inks.length)]!;
+    const mag = starMagnitude(rng.next());
+    const r = round(starRadius(mag));
+    const alpha = round(starAlpha(mag));
+    const ink = starInkFor(spec, mag);
     // Bloom first, so the star's own point sits on top of its halo — and the
     // halo takes the ink's tint if it has one, the ink's own colour if not
-    // (a0-22; {@link BLOOM_TINTS}). Both rings take the SAME colour: a halo whose
-    // two rings disagreed would be a ring, not a glow.
-    const haloColor = ink.halo ?? ink.color;
-    if (rng.next() < BLOOM.scatter) {
-      for (let b = BLOOM.radii.length - 1; b >= 0; b--) {
-        const a = round(ink.alpha * BLOOM.intensity[b]!);
-        if (a <= 0) continue;
-        shapes.push(circle(x, y, round(r * BLOOM.radii[b]!), fill(haloColor, 'material', a)));
+    // (a0-22; {@link BLOOM_TINTS}).
+    if (starBlooms(mag)) {
+      const haloAlpha = round(alpha * BLOOM.intensity);
+      const haloR = round(r * BLOOM.radius);
+      if (haloAlpha > 0 && haloR > 0) {
+        shapes.push(
+          circle(
+            x,
+            y,
+            haloR,
+            softFill(ink.halo ?? ink.color, 'material', haloAlpha, {
+              cx: x,
+              cy: y,
+              rx: haloR,
+              ry: haloR,
+              angle: 0,
+            }),
+          ),
+        );
       }
+      // The diffraction cross. It is the point's own spike, not the scatter, so
+      // it keeps the star's own colour even when the halo around it is tinted.
+      const len = round(r * SPIKE.length);
+      const a = round(alpha * SPIKE.intensity);
+      shapes.push(polyline([x - len, y, x + len, y], stroke(ink.color, SPIKE.width, 'material', a)));
+      shapes.push(polyline([x, y - len, x, y + len], stroke(ink.color, SPIKE.width, 'material', a)));
     }
-    shapes.push(circle(x, y, r, fill(ink.color, 'material', ink.alpha)));
-    // A faint diffraction cross on a few of the brightest points — sparkle, not
-    // noise. Two short strokes through the star at a lower alpha than its body.
-    if (spec.glint > 0 && rng.next() < spec.glint) {
-      const len = round(r * 3.2);
-      const a = ink.alpha * 0.4;
-      shapes.push(polyline([x - len, y, x + len, y], stroke(ink.color, 0.4, 'material', a)));
-      shapes.push(polyline([x, y - len, x, y + len], stroke(ink.color, 0.4, 'material', a)));
-    }
+    shapes.push(circle(x, y, r, fill(ink.color, 'material', alpha)));
   }
   return sprite(`backdrop/stars/${spec.key}/${round(width)}x${round(height)}`, Math.max(hw, hh), shapes);
 }
