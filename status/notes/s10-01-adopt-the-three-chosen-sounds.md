@@ -20,20 +20,40 @@ Every letter resolved cleanly. Nothing substituted; no neighbour taken along.
 
 Commits:
 
-- `51c0b90` refactor — the five builders (`place`/`band`/`plate`/`swept`/`grains`/
-  `returns`) move out of `candidates.ts` into `src/art/audio/instrument.ts` so
-  `bank.ts` can call them. Verified render-neutral: all 176 committed previews
-  reproduce byte-for-byte after the move.
+- `51c0b90` refactor — the builders (`place`/`band`/`plate`/`swept`/`grains`) move out
+  of `candidates.ts` into `src/art/audio/instrument.ts` so `bank.ts` can call them.
+  Verified render-neutral: all 176 committed previews reproduce byte-for-byte after
+  the move.
 - `56a65d7` feat — the three bank entries, built by calling `./instrument` with the
   candidate's own arguments and seeds. Baselines re-taken, `docs/sound-adoptions.md`
   written, `sound-review/previews/*/current.wav` re-rendered for the three.
 - `263241e` evidence — `evidence/s10-01-adopted-sounds.ts` + `report.json` + the
   three shipped WAVs.
+- `fec0f49` notes — this file, mirrored into the repo.
+- `d46f238` fix — `returns` goes back to `candidates.ts` as a module-local. CI's
+  dark-matter gate was red on `51c0b90`; see DECISIONS. Render-neutral, re-checked:
+  176/176 previews byte-for-byte.
 
-Gates: `npx tsc --noEmit` clean. `npm test -- --run` — **292 files, 5276 tests, all
-passing** (600 s).
+Gates, all four from CI's "Typecheck, test, build" job, run locally after `d46f238`:
+`npx tsc --noEmit` clean; `npx vitest run` — **292 files, 5276 tests, all passing**
+(569 s); `npm run dark-matter:check` green; `npx vite build` clean, with
+`candidates.ts` confirmed absent from `dist/` (the 37 denied takes do not ship).
+
+PR **#413**, open.
 
 ## DECISIONS
+
+**`returns` stays on the review board (`d46f238`).** The lesson of this resume: I ran
+tsc and the tests locally and called the gates green, but CI's "Typecheck, test, build"
+job has **four** steps, and the one I never ran went red. `51c0b90` exported `returns`
+along with the builders it moved; no adopted voice has a room, so nothing in the game
+calls it, and the dark-matter gate (a1-09) exists precisely to catch an export that
+ships uncalled. Un-exported and moved back beside the seven un-adopted offers that use
+it. *Not* allowlisted — the gate offers that escape hatch for a deliberate seam or
+public surface, and this is neither; buying a weaker gate to keep a speculative export
+is a bad trade. It moves to `instrument.ts` the day a slot with a room is adopted, with
+a caller. **A future me: run all four gates — `tsc --noEmit`, `vitest run`,
+`dark-matter:check`, `vite build` — not just the two the DoD names.**
 
 **Shared instrument module rather than transcription.** The bank cannot import
 `./candidates` (a 2 500-line review artifact; importing it would pull the 37 denied
@@ -120,4 +140,5 @@ Worth a Director decision at some point, not this brief: the review board still
 offers three candidates for all three adopted slots. Correct as a record, but a
 future reviewer opening the page will be offered choices on settled slots.
 
-Remaining for this brief: push the branch, open the PR, watch its checks.
+Remaining for this brief: watch PR #413's checks settle after `d46f238`. Branch is
+pushed, PR is open, the four gates pass locally.
