@@ -214,6 +214,94 @@ describe('Onboarding — UNDER-ATTACK prompt (GDD §2.2, §2.10)', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// a0-34 — the prompt that names the objective
+// ---------------------------------------------------------------------------
+//
+// The four prompts above teach verbs — mining, banking, spending, defending —
+// and not one of them says what the player is trying to ACHIEVE. The codex's
+// strategy entries all presume the reader already knows. So the first thing a
+// first match says is now the win condition itself (GDD §1), and it says it
+// BEFORE the mining lesson, because the goal is what frames every verb after it.
+
+describe('Onboarding — OBJECTIVE prompt (GDD §1 win condition, §2.10)', () => {
+  it('names the objective — the win condition, in the prompt copy itself', () => {
+    // GDD §1: "Own the last surviving station reactor — in Teams, be the last
+    // side with a reactor standing", enforced by `resolveWinner` in
+    // src/sim/match.ts (the last team holding a core wins; FFA is teams-of-one).
+    // The prompt has to SAY that, not gesture at it.
+    const text = resolvePromptText(PromptId.Objective, 'keyboard', FireMode.Manual);
+    expect(text).toMatch(/last station standing/i);
+    // …and the developer's other three beats, so the one line is the whole loop:
+    // mine ore, spend it on defenses / your ship, and attack when you judge it.
+    expect(text).toMatch(/mine ore/i);
+    expect(text).toMatch(/defen[cs]e/i);
+    expect(text).toMatch(/upgrade your ship/i);
+    expect(text).toMatch(/attack/i);
+  });
+
+  it('fires FIRST — before the mining prompt, with a rock already in reach', () => {
+    // The failure this pins: a player who is taught "hold fire on the asteroid"
+    // before anyone has told them what winning is.
+    const ob = new Onboarding();
+    expect(ob.update(sig({ nearAsteroid: true, time: 0 }))).toBe(PromptId.Objective);
+    expect(ob.isCompleted(PromptId.Mine)).toBe(false);
+  });
+
+  it('hands the band to MINE once it has been on screen long enough to read', () => {
+    const ob = new Onboarding();
+    expect(ob.update(sig({ nearAsteroid: true, time: 0 }))).toBe(PromptId.Objective);
+    expect(ob.update(sig({ nearAsteroid: true, time: 4 }))).toBe(PromptId.Objective);
+    // Read — and now the verb lessons follow, in their own order.
+    expect(ob.update(sig({ nearAsteroid: true, time: 20 }))).toBe(PromptId.Mine);
+    expect(ob.isCompleted(PromptId.Objective)).toBe(true);
+  });
+
+  it('yields to a siege, and is not retired by the seconds it spent off screen', () => {
+    // UNDER-ATTACK outranks everything (GDD §2.2). A tip that expires while it is
+    // not on screen is a tip nobody read.
+    const ob = new Onboarding();
+    expect(ob.update(sig({ time: 0 }))).toBe(PromptId.Objective);
+    expect(ob.update(sig({ time: 1, underAttack: true }))).toBe(PromptId.UnderAttack);
+    expect(ob.update(sig({ time: 60, underAttack: true }))).toBe(PromptId.UnderAttack);
+    expect(ob.update(sig({ time: 61 }))).toBe(PromptId.Objective);
+    expect(ob.isCompleted(PromptId.Objective)).toBe(false);
+  });
+
+  it('is shown once and never again — across matches, through the memory', () => {
+    // §2.10's "never appear again after each is completed once", made durable by
+    // u15-01: the objective is a thing you are told, not a thing you re-learn.
+    const memory = fakeMemory();
+    const first = new Onboarding(memory);
+    first.update(sig({ time: 0 }));
+    first.update(sig({ time: 30 }));
+    expect(first.isCompleted(PromptId.Objective)).toBe(true);
+    expect(memory.stored).toContain(PromptId.Objective);
+
+    const second = new Onboarding(memory); // next match, fresh machine
+    expect(second.update(sig({ nearAsteroid: true, time: 0 }))).toBe(PromptId.Mine);
+  });
+
+  it('stays off the screen entirely when the caller feeds no clock', () => {
+    // The dwell is measured on match time the caller hands in. A feed without one
+    // cannot know when the sentence has been read, so it must not take the band
+    // from the mining lesson forever — the safe direction to fail.
+    const ob = new Onboarding();
+    expect(ob.update(sig({ nearAsteroid: true }))).toBe(PromptId.Mine);
+  });
+
+  it('reads the same on every device and in every fire mode — no binding in it', () => {
+    // It teaches the goal, not a gesture, so there is no key to name: the copy is
+    // input-agnostic by having nothing device-shaped in it at all (GDD §2.10).
+    const desktop = resolvePromptText(PromptId.Objective, 'keyboard', FireMode.Manual);
+    const touch = resolvePromptText(PromptId.Objective, 'touch', FireMode.AutoAim);
+    const pad = resolvePromptText(PromptId.Objective, 'gamepad', FireMode.Manual);
+    expect(touch).toBe(desktop);
+    expect(pad).toBe(desktop);
+    expect(desktop).not.toMatch(/[{}]/);
+  });
+});
+
 describe('Onboarding — once-only across the whole session (GDD §2.10)', () => {
   it('retires every prompt after each has fired once', () => {
     const ob = new Onboarding();
