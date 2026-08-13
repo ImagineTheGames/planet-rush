@@ -207,7 +207,10 @@ nothing new needed to be.
 
 ## NEXT
 
-Nothing outstanding on this branch. Deliberately **not** in it:
+**PR #408** — opened, and **every check green** (Typecheck/test/build, all six
+mobile shards, the perf gate; zero failing). Nothing outstanding on this branch.
+
+Deliberately **not** in it:
 
 - **The HOST door's hint.** With a public default the hint *"Start a new game and
   get a code for friends to join"* is still lying by omission (plan §2's
