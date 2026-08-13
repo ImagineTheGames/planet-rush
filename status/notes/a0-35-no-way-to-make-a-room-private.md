@@ -226,6 +226,20 @@ host's control strip at 390 px landscape, and the second client's browse screen
 says `NO OPEN CLAIMS RIGHT NOW` at the same moment that room is alive and
 joinable by code. That pair is the brief.
 
+**Verified a second time on 2026-08-13** by a later resumed session, again
+against the pushed branch: `tsc` clean · `npm test -- --run` 292 files / **5274
+passed** (658 s) · PR #408 **0 failing** · both note copies byte-identical (the
+trap below stayed fixed). All four screenshots were re-read, and the guest's
+code-join shot carries a detail worth naming: the joiner's strip shows **MODE
+and YIELD only, no CLAIM chip** — the "absent, never flattering" ruling above,
+photographed rather than merely asserted.
+
+**Two CI runs fire per push on this branch** (a push event and a PR event), so
+`gh pr checks` can show five mobile shards `pending` while the head SHA already
+has a *completed success* run. Check `gh run list --branch …` before reading
+that as trouble; on this resume both runs on `c993114` ended green. It is not a
+re-trigger and nothing is wrong.
+
 ### The trap this resume hit — write the note in BOTH places
 
 `/status/notes/` is the live directory the fleet keeps current (79 of its 123
