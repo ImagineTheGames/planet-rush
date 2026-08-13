@@ -179,9 +179,11 @@ export interface SkyReference {
   readonly bearing: number;
   /**
    * **The hue pair.** Derived: colour is the one axis of the backdrop the
-   * developer has *never* reported. Each pair is the sky's own shipped ink set,
-   * reduced to the two the build actually leans on, so the port moves size,
-   * count, alpha and ground — and moves no hue at all.
+   * developer has *never* reported, so four of the five pairs are the sky's own
+   * shipped ink set reduced to the two the build leans on — the port moves size,
+   * count, alpha and ground, and moves no hue. **Coalsack is the exception and
+   * had to be**: it painted the ground colour, which cannot lift a panel at any
+   * parameters. See its entry.
    */
   readonly hues: readonly [number, number];
   /**
@@ -200,7 +202,8 @@ export interface SkyReference {
   readonly additive: boolean;
   /**
    * **Measured.** The mean luma this sky lifts its panel above its own ground, on
-   * the design's instrument (`sky-preview.ts` `measurePanel`). This is the number
+   * the design's instrument (`sky-preview.ts` `measure` / `previewTable`, a
+   * 320×180 point-sample grid over the panel). This is the number
    * the whole brief is about, and `sky-preview` reports the port against it.
    */
   readonly lift: number;
