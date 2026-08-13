@@ -8,6 +8,90 @@ half of these amendments; this file is the human-readable why.
 
 ---
 
+## In TEAMS, the fog lifts where your teammates are
+
+**Date:** 2026-08-13 · branch `agent/gameplay/a0-42-team-shared-fog`
+**Ratified by:** Developer (Reinaldo)
+**Amends:** GDD §2.2 (the minimap sentence gains a Teams clause, plus a new
+paragraph) and GDD §2.1 (shared vision joins the list of what a side buys).
+**Retires nothing** — no earlier rule said vision was per-player in Teams; the
+simulation simply had no notion of a side in its sensing model.
+
+### The ratification, verbatim
+
+> "when playing on a team the fog of war should lift where your team mates are it
+> should be like as if you were there...."
+
+### The rule
+
+**A side's sight is the union of its members' sight.** A teammate's coverage
+gives you what your own coverage would give you standing in the same spot — and
+*"as if you were there"* is the standard the implementation is measured against,
+not a dimmer, second-class version of it. That standard has two halves, and both
+are shared:
+
+| | shared? | why |
+|---|---|---|
+| **live dots** — enemy ships, satellites, shots under an ally's disc | yes | the reveal a player expects the moment they read the sentence |
+| **remembered geography** — homes and ore fields an ally scouted | **yes** | sharing only the live half would have a teammate's radar reveal the ships standing in an ore field and forget the field. That is not "as if you were there" — it is a worse version of your own coverage, which is exactly what the developer's sentence rules out |
+
+The **coverage discs an ally projects are drawn as discs** on your minimap, as
+your own are: *you see what your team's radar buys you*. That is what keeps the
+reveal legible — an ally's contribution reads as something the side paid ore for,
+not as the fog arbitrarily deciding to lift.
+
+### Why this belongs on §2.1's list, not only in §2.2
+
+**Sides that cannot see for each other cannot coordinate.** Everything else
+allegiance buys is already about acting together — friendly fire off, turrets and
+auto-aim ignoring allies, clustered spawns — and the under-attack alarm already
+opened to a teammate's home on **exactly this predicate** (`sameSide`,
+`src/sim/allegiance.ts:59–69`, ratified with the s5 alarm amendment). A player
+reading §2.1 to learn what picking a side means should not have to infer the most
+consequential of the four from the minimap section.
+
+### FFA is unaffected — by construction, not by a switch
+
+**FFA is teams-of-one.** `createWorld` defaults each player's `team` to their own
+id, so the union runs over a side of one and returns precisely the per-player
+answer it always returned. There is **no `mode === 'teams'` test anywhere in
+`src/sim/sensing.ts`, and there must not be one** — the same discipline
+`allegiance.ts` was written to enforce. `src/sim/team-sensing.test.ts` pins it
+against a verbatim copy of the pre-change function, field for field, and the FFA
+golden frames are byte-identical across the change.
+
+### What did NOT change
+
+- **The live/remembered split.** A teammate's disc is CURRENT coverage: the tick
+  their ship dies it is gone and everything only under it drops with it, exactly
+  as a killed radar satellite collapses its own disc (feature f1, item 2). A
+  teammate's coverage is never remembered as live dots.
+- **The write side.** `updateSensory` still records one memory per player, so
+  `world.sensory` keeps meaning *who actually saw this*, and one player's memory
+  never depends on another player's tick. The union is taken at **read** time, so
+  the memory pass, `world.sensory`'s shape, and the determinism hash are untouched.
+- **What fog never hid.** Enemy cargo, bank and upgrade tiers are drawn for nobody
+  at any range, and station health is visible to everyone at every range (§2.2,
+  amended 2026-08-07).
+- **Friendly fire, targeting and the alarm.** `sameSide` is *read* here; nothing
+  about who may shoot whom moved.
+- **The wire.** Snapshots already stream every ship and projectile to every
+  client; fog is a client-side read over the replicated world. No bytes changed —
+  which also means fog is **not** an anti-cheat boundary and must never be
+  described as one.
+
+### The gap this opens, flagged deliberately
+
+Human teammates now share vision **instantly**, through the minimap. Allied
+**bots** trade what they saw over `src/bots/radio.ts` at a per-tier latency with a
+miss roll, and the `sighting` callout that would carry *"enemy here"* is not
+implemented yet (`docs/team-bots-plan.md` §2.2). GDD §2.9's invariant is
+*"symmetry, not blindness"* — a bot must perceive what a human in its cockpit
+could — so the two sides of a Teams match now learn things on different terms.
+That is real, it belongs to the Bot Engineer, and it is briefed separately.
+
+---
+
 ## Tap Commander and Auto-aim are the DEFAULT — on every platform
 
 **Date:** 2026-08-12 · branch `agent/platform/a0-30-defaults-everywhere`

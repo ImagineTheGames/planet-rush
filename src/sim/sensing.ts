@@ -30,9 +30,32 @@
  *    only under it drops off the sensed-set the same tick (feature f1, item 2:
  *    "its destruction collapses that coverage immediately").
  *
- * A player always senses **their own** live entities and stations (cockpit /
- * home knowledge, the same rule the bot perception uses for its own ship and
+ * A player always senses **their own SIDE's** live entities and stations (cockpit
+ * / home knowledge, the same rule the bot perception uses for its own ship and
  * station — GDD §2.2). Enemies and neutral bodies are fog-gated.
+ *
+ * **In TEAMS the fog lifts under a teammate's coverage as if it were your own**
+ * (GDD §2.2 and §2.1, amended 2026-08-13; developer, verbatim: *"when playing on a
+ * team the fog of war should lift where your team mates are it should be like as
+ * if you were there"*). That standard — *as if you were there* — is why the union
+ * is taken over BOTH halves of the mechanic and not just the visible one: an
+ * ally's disc hands you the live dots under it ({@link teamSensorSources} feeding
+ * {@link sensedState}) **and** the geography it uncovered ({@link
+ * rememberedStationMask}, {@link rememberedOreIds}). Sharing only the first would
+ * give a teammate's radar a second-class version of your own — it would reveal
+ * the ships and forget the ore field it flew over.
+ *
+ * **FFA is untouched, and by construction rather than by a mode check.** Every
+ * union here runs over {@link teamMembers}, which is `sameSide` (`./allegiance`)
+ * — and `createWorld` defaults each player's `team` to their own id, so in FFA a
+ * side is exactly one player and every union collapses to the per-player answer
+ * it always gave. There is no `mode === 'teams'` branch in this file and there
+ * must never be one.
+ *
+ * **The union is READ-side only.** {@link updateSensory} still writes one record
+ * per player, so `world.sensory` keeps meaning *who actually saw this* and one
+ * player's stored memory never depends on another player's tick — the memory pass
+ * and the replay hash do not move. Widening the write would be the bug.
  *
  * **Station HEALTH is not part of that fog** (GDD §2.2, amended 2026-08-07;
  * a0-05). Presence and health are two different questions and this module now
@@ -54,6 +77,7 @@
  */
 
 import type { PlayerId, Vec2 } from '@shared/types';
+import { sameSide } from './allegiance';
 import { SATELLITE, SHIP_SENSOR_RANGE, STATION_SENSOR_RANGE } from './constants';
 import type { MiningStation, Ship, World } from './state';
 
@@ -170,6 +194,59 @@ export function sensorSources(world: World, viewer: PlayerId): SensorSource[] {
 }
 
 /**
+ * The players on `viewer`'s side, ASCENDING by id — the roster every team-wide
+ * union in this module folds over (shared vision, GDD §2.1/§2.2, amended
+ * 2026-08-13).
+ *
+ * Membership is {@link sameSide} (`./allegiance`) and nothing else: this module
+ * never reads a `team` number, which is the mistake that predicate exists to
+ * prevent. **In FFA the answer is always `[viewer]`** — `createWorld` defaults a
+ * player's team to their own id, so a side is a side of one and every union built
+ * on this list collapses to the per-player answer, with no mode check anywhere.
+ *
+ * The roster is `world.ships`, the same list {@link updateSensory} walks, so a
+ * body with no pilot can never enter it — a neutral derelict wreck owns a station
+ * and no ship, so it is nobody's teammate here whatever its board index reads.
+ * `viewer` is seeded first and therefore always present, even in a hand-built
+ * world that gives them no ship, so `teamSensorSources ⊇ sensorSources` always
+ * holds. Ascending by construction ({@link sortedInsert}) and deduped, so the
+ * fold order is fixed and a replay reproduces it exactly.
+ */
+export function teamMembers(world: World, viewer: PlayerId): PlayerId[] {
+  const out: PlayerId[] = [viewer];
+  for (const s of world.ships) {
+    if (s.id === viewer || !sameSide(world, viewer, s.id)) continue;
+    sortedInsert(out, s.id);
+  }
+  return out;
+}
+
+/**
+ * The coverage discs `viewer`'s SIDE projects this tick — {@link sensorSources}
+ * unioned over every ally ({@link teamMembers}), ally by ally in ascending player
+ * id, each ally's own discs in the fixed order that function already guarantees.
+ *
+ * This is the fog seam every consumer should read; {@link sensorSources} stays
+ * the honest answer to the narrower question *"what does THIS player project?"*
+ * and is what the per-player memory pass folds. **In FFA the two are the same
+ * discs**, because a side is one player.
+ *
+ * Fresh array, an off-hot-path selector like `sensorSources` itself. A dead ally
+ * contributes exactly what a dead player contributes to their own set — nothing:
+ * their ship casts no disc the tick it dies, so everything seen only through them
+ * drops that same tick, precisely as a killed satellite collapses its own disc
+ * (feature f1, item 2). A teammate's coverage is shared, never remembered as live
+ * dots.
+ */
+export function teamSensorSources(world: World, viewer: PlayerId): SensorSource[] {
+  const out: SensorSource[] = [];
+  for (const member of teamMembers(world, viewer)) {
+    for (const source of sensorSources(world, member)) out.push(source);
+  }
+  return out;
+}
+
+/**
  * Whether a point lies inside ANY of `sources` — the union coverage test. A
  * `bodyRadius` lets a body count as sensed when its SURFACE (not just its centre)
  * enters coverage, which matters for large bodies like a station: a shot standing
@@ -204,13 +281,13 @@ export interface SensedState {
   readonly viewer: PlayerId;
   /** The coverage discs this set was computed from (feature f1's "per source"). */
   readonly sources: readonly SensorSource[];
-  /** Ship ids currently sensed — the viewer's own (alive) plus any alive ship
-   *  under current coverage. */
+  /** Ship ids currently sensed — the viewer's own SIDE's (alive) plus any alive
+   *  ship under the side's current coverage. */
   readonly ships: readonly PlayerId[];
-  /** Radar-satellite ids currently sensed — the viewer's own plus any alive
+  /** Radar-satellite ids currently sensed — the side's own plus any alive
    *  satellite under current coverage (a high-value thing to spot). */
   readonly satellites: readonly number[];
-  /** Live projectile ids currently sensed — the viewer's own plus any active
+  /** Live projectile ids currently sensed — the side's own plus any active
    *  shot under current coverage. */
   readonly projectiles: readonly number[];
   /** Station board-ids REMEMBERED — seen at least once (or owned, or sensed now).
@@ -225,32 +302,39 @@ export interface SensedState {
 }
 
 /**
- * Build `viewer`'s sensed-set for the current tick (feature f1). Own live
- * entities are always included (cockpit knowledge); enemy/neutral ones only under
- * current coverage. Remembered stations come from `world.sensory` (the persistent
- * memory {@link updateSensory} maintains) unioned with the ones covered right now
- * and the viewer's own — so the set is correct even on the very first tick, and
- * degrades gracefully to "currently covered + own" when a foreign world carries no
- * `sensory` memory at all.
+ * Build `viewer`'s sensed-set for the current tick (feature f1). Own-SIDE live
+ * entities are always included (cockpit knowledge — and a teammate's ship is on
+ * your side, so it is never fogged); enemy/neutral ones only under the side's
+ * current coverage ({@link teamSensorSources}). Remembered stations come from
+ * `world.sensory` (the persistent memory {@link updateSensory} maintains, unioned
+ * across the side) plus the ones covered right now and the side's own — so the
+ * set is correct even on the very first tick, and degrades gracefully to
+ * "currently covered + own side" when a foreign world carries no `sensory` memory
+ * at all.
+ *
+ * Every own-side test below is {@link sameSide}, which is `a === b` in FFA
+ * (teams-of-one), so an FFA sensed-set is field-for-field what it was before
+ * shared vision existed — `team-sensing.test.ts` pins exactly that.
  */
 export function sensedState(world: World, viewer: PlayerId): SensedState {
-  const sources = sensorSources(world, viewer);
+  const sources = teamSensorSources(world, viewer);
 
   const ships: PlayerId[] = [];
   for (const s of world.ships) {
     if (!s.alive) continue;
-    if (s.id === viewer || pointSensed(sources, s.pos)) ships.push(s.id);
+    if (sameSide(world, viewer, s.id) || pointSensed(sources, s.pos)) ships.push(s.id);
   }
 
   const satellites: number[] = [];
   const projectiles: number[] = [];
   const rememberedStations: number[] = [];
 
-  const rememberedMask = world.sensory?.seenStations[viewer] ?? 0;
+  const rememberedMask = rememberedStationMask(world, viewer);
   for (const station of world.stations) {
-    // A station is remembered if the viewer owns it, has ever sensed it (the
-    // stored mask), or senses it right now (surface-aware — a body has size).
-    const owned = station.owner === viewer;
+    // A station is remembered if the viewer's side owns it, anyone on that side
+    // has ever sensed it (the unioned mask), or the side senses it right now
+    // (surface-aware — a body has size).
+    const owned = sameSide(world, viewer, station.owner);
     const rememberedBit = (rememberedMask & (1 << station.id)) !== 0;
     if (owned || rememberedBit || pointSensed(sources, station.pos, station.radius)) {
       rememberedStations.push(station.id);
@@ -258,14 +342,14 @@ export function sensedState(world: World, viewer: PlayerId): SensedState {
     if (station.satellites) {
       for (const sat of station.satellites) {
         if (sat.hp <= 0) continue;
-        if (sat.owner === viewer || pointSensed(sources, sat.pos)) satellites.push(sat.id);
+        if (sameSide(world, viewer, sat.owner) || pointSensed(sources, sat.pos)) satellites.push(sat.id);
       }
     }
   }
 
   for (const p of world.projectiles) {
     if (!p.active) continue;
-    if (p.owner === viewer || pointSensed(sources, p.pos)) projectiles.push(p.id);
+    if (sameSide(world, viewer, p.owner) || pointSensed(sources, p.pos)) projectiles.push(p.id);
   }
 
   // Ore fields: remembered from the stored list, unioned with the rocks under
@@ -274,7 +358,7 @@ export function sensedState(world: World, viewer: PlayerId): SensedState {
   // that carries no memory. `world.asteroids` is the iteration order, so the
   // result is ascending by construction (the field list is id-ordered) and holds
   // only rocks that still exist — a mined-out one drops out on its own.
-  const oreMemory = world.sensory?.seenOre?.[viewer];
+  const oreMemory = rememberedOreIds(world, viewer);
   const rememberedOre: number[] = [];
   for (const a of world.asteroids) {
     if (sortedHas(oreMemory, a.id) || pointSensed(sources, a.pos, a.radius)) {
@@ -340,6 +424,15 @@ function sortedInsert(list: number[], id: number): void {
  * Rocks already remembered skip the coverage test entirely (a binary-search
  * lookup instead), so the pass gets CHEAPER as a field becomes known.
  *
+ * **This pass is PER-PLAYER and stays that way, shared vision or not** (amended
+ * 2026-08-13). It folds `sensorSources(world, viewer)` — that one player's own
+ * discs — so a stored record keeps meaning *who actually saw this*, and one
+ * player's memory never depends on another player's tick. The side-wide answer is
+ * taken at READ time instead ({@link rememberedStationMask},
+ * {@link rememberedOreIds}), which is why sharing vision moved no bytes in
+ * `world.sensory` and nothing in the determinism hash. Widening what gets
+ * *written* here would be the bug.
+ *
  * A no-op when the world carries no `sensory` memory (a foreign/hand-built world),
  * exactly like `ledgerAdd` — `createWorld` always attaches one. Runs once per
  * `step`, after all bodies have their final positions for the tick, so a station
@@ -376,17 +469,84 @@ export function updateSensory(world: World): void {
   }
 }
 
-/** A player's remembered-station mask, or 0 — a small read helper for tests and
- *  any consumer that wants the raw persistent memory rather than the resolved
- *  {@link SensedState}. */
+/** Nothing remembered — the shared empty result, so the common "no memory" and
+ *  "no ore known" answers cost no allocation. Never handed out mutably. */
+const NOTHING_REMEMBERED: readonly number[] = [];
+
+/**
+ * The remembered-station mask of `viewer`'s SIDE — every ally's stored mask ORed
+ * together, or 0 — a small read helper for tests and any consumer that wants the
+ * persistent memory rather than the resolved {@link SensedState}.
+ *
+ * A bit set by any teammate is set for the whole side: a home one of them scouted
+ * is a home the side knows, which is the "as if you were there" half that live
+ * coverage alone cannot give (a teammate's disc would reveal ships and forget the
+ * geography it flew over). **In FFA this is one player's own mask, unchanged** —
+ * a side of one ORs one number. The write side is still strictly per-player
+ * ({@link updateSensory}); this unions at READ time only.
+ */
 export function rememberedStationMask(world: World, viewer: PlayerId): number {
-  return world.sensory?.seenStations[viewer] ?? 0;
+  const seen = world.sensory?.seenStations;
+  if (!seen) return 0;
+  let mask = 0;
+  for (const member of teamMembers(world, viewer)) mask |= seen[member] ?? 0;
+  return mask;
 }
 
-/** A player's raw remembered-ore list (ascending asteroid ids), or an empty array
- *  — the ore counterpart of {@link rememberedStationMask}. Includes ids of rocks
- *  since mined out of existence; {@link sensedState} intersects with the live
- *  field, which is what a consumer drawing dots wants. */
+/**
+ * The remembered-ore list of `viewer`'s SIDE (ASCENDING asteroid ids), or an empty
+ * array — the ore counterpart of {@link rememberedStationMask}, and remembered on
+ * the same terms: a field one teammate scouted is on the whole side's map.
+ *
+ * Ascending and deduped, because the callers rely on that order —
+ * {@link sensedState} binary-searches it, and the minimap fills its hint set from
+ * it. **In FFA it is the player's own stored list, returned as-is**, so a side of
+ * one costs no merge and no allocation. Includes ids of rocks since mined out of
+ * existence; {@link sensedState} intersects with the live field, which is what a
+ * consumer drawing dots wants.
+ */
 export function rememberedOreIds(world: World, viewer: PlayerId): readonly number[] {
-  return world.sensory?.seenOre?.[viewer] ?? [];
+  const seen = world.sensory?.seenOre;
+  if (!seen) return NOTHING_REMEMBERED;
+
+  // Only the allies who actually remember something take part in the merge, so
+  // the FFA path (and any side with one scout) returns a stored list untouched.
+  const lists: (readonly number[])[] = [];
+  for (const member of teamMembers(world, viewer)) {
+    const list = seen[member];
+    if (list && list.length > 0) lists.push(list);
+  }
+  if (lists.length === 0) return NOTHING_REMEMBERED;
+
+  let merged = lists[0]!;
+  for (let i = 1; i < lists.length; i++) merged = mergeAscending(merged, lists[i]!);
+  return merged;
+}
+
+/** Merge two ASCENDING id lists into a fresh ascending one, dropping duplicates —
+ *  the fold {@link rememberedOreIds} unions a side's ore memories with. A plain
+ *  two-pointer walk: the result depends only on the SET of ids in the inputs, so
+ *  which ally scouted a rock first can never change the order it comes back in. */
+function mergeAscending(a: readonly number[], b: readonly number[]): number[] {
+  const out: number[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < a.length && j < b.length) {
+    const x = a[i]!;
+    const y = b[j]!;
+    if (x === y) {
+      out.push(x);
+      i++;
+      j++;
+    } else if (x < y) {
+      out.push(x);
+      i++;
+    } else {
+      out.push(y);
+      j++;
+    }
+  }
+  while (i < a.length) out.push(a[i++]!);
+  while (j < b.length) out.push(b[j++]!);
+  return out;
 }

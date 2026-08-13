@@ -39,8 +39,9 @@ import {
   shieldCount,
   shieldPool,
   turretCount,
-  sensorSources,
+  teamSensorSources,
   rememberedOreIds,
+  rememberedStationMask,
   waveIntervalOf,
 } from './sim';
 import type { MuzzleFlash, MiningStation, Turret, World, SensorSource } from './sim';
@@ -3923,10 +3924,11 @@ async function boot(): Promise<void> {
 
     // Fog of war (feature f1): the minimap renders ONLY the local player's sensed-
     // state. Consume the sim's own sensing truth — the CURRENT coverage discs
-    // (`sensorSources`, the union of the ship / stations / alive satellites the
-    // player projects this tick) and the persistent remembered-station bitmask.
-    // The pure model (src/ui/minimap.ts) does the gating from these; a killed
-    // satellite simply stops appearing here, collapsing its disc the same tick.
+    // (`teamSensorSources`, the union of the ship / stations / alive satellites
+    // the player's SIDE projects this tick) and the persistent remembered-station
+    // bitmask. The pure model (src/ui/minimap.ts) does the gating from these; a
+    // killed satellite simply stops appearing here, collapsing its disc the same
+    // tick — and so does a teammate's ship the tick it dies.
     feedMinimapFog();
 
     hudFrame.minimap = minimapFrame;
@@ -3935,13 +3937,20 @@ async function boot(): Promise<void> {
 
   /** Fill the fog feed for the local player (feature f1): copy the sim's current
    *  coverage discs into the pooled array and read the REMEMBERED geography — the
-   *  station mask and the scouted-ore ids. A short-lived `sensorSources` allocation
-   *  (≤ ~17 tiny records) each frame is the honest cost of consuming the ratified
-   *  seam rather than duplicating its three-source union here — the same
-   *  off-hot-path selector pattern as `muzzleFlashes`. The ore set is refilled in
-   *  place from the sim's own ascending list, never rebuilt. */
+   *  station mask and the scouted-ore ids. A short-lived `teamSensorSources`
+   *  allocation (≤ ~17 tiny records per ally) each frame is the honest cost of
+   *  consuming the ratified seam rather than duplicating its three-source union
+   *  here — the same off-hot-path selector pattern as `muzzleFlashes`. The ore set
+   *  is refilled in place from the sim's own ascending list, never rebuilt.
+   *
+   *  **All three reads are the TEAM's** (shared vision, GDD §2.2 amended
+   *  2026-08-13): the coverage discs, the remembered-station mask AND the
+   *  remembered-ore ids. Taking only the first would half-ship it — a teammate's
+   *  disc would light up the live dots under it and forget the ore field it flew
+   *  over, which is not "as if you were there". In FFA every one of the three is
+   *  the local player's own answer, byte for byte, because a side is one player. */
   function feedMinimapFog(): void {
-    const sources: SensorSource[] = sensorSources(world, LOCAL_PLAYER);
+    const sources: SensorSource[] = teamSensorSources(world, LOCAL_PLAYER);
     let cn = 0;
     for (const s of sources) {
       const r = minimapCoverageSlot(cn++);
@@ -3951,7 +3960,7 @@ async function boot(): Promise<void> {
     }
     minimapCoverage.length = 0;
     for (let i = 0; i < cn; i++) minimapCoverage.push(minimapCoveragePool[i]!);
-    minimapFog.rememberedMask = world.sensory?.seenStations[LOCAL_PLAYER] ?? 0;
+    minimapFog.rememberedMask = rememberedStationMask(world, LOCAL_PLAYER);
     minimapRememberedOre.clear();
     for (const id of rememberedOreIds(world, LOCAL_PLAYER)) minimapRememberedOre.add(id);
     minimapFrame.fog = minimapFog;
