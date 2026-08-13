@@ -46,13 +46,38 @@ That last line is why the fix subtracts the prompt's registered rect rather than
 moving the prompt: the rect being excluded does not contain a single pixel a FIRE
 affordance could ever be drawn in, so the assertion keeps every tooth it had.
 
+## The negative control — the guard still has every tooth
+
+An exemption is only honest if the thing it exempts is not hiding the thing the
+test is for. So the same screen was shot again with touch emulated
+(`leaked-desktop.png`, `leaked-corner.png`, `leaked.json`), which puts a real
+Auto-aim FIRE button on that exact corner:
+
+| Bone-lit pixels in `REGION_FIRE`, touch emulated at 1280×800 | count |
+|---|---|
+| all | 1122 |
+| inside the `onboarding` prompt panel | 278 |
+| **with BOTH tenants excluded — what the fixed check reads** | **844** |
+
+844 against a bar of 40: **21× over**, from a single 84 px button. And the
+registry names it outright — `touch-left-stick, touch-fire-button` — which is the
+cheap half of the assertion the fix also adds. `leaked-corner.png` is the picture
+of what this test is actually looking for; put it beside `before-corner.png` and
+the difference between "a FIRE rim leaked onto desktop" and "a sentence is long"
+is not subtle.
+
 ## Reproducing
 
 ```
 npm run build
 npx vite preview --port 4193 --strictPort &
 PREVIEW_PORT=4193 node evidence/r15-01-the-frame-the-fire-test-sees/capture.mjs before
+PREVIEW_PORT=4193 node evidence/r15-01-the-frame-the-fire-test-sees/capture.mjs leaked touch
 ```
+
+There is no `after-*.png` here on purpose: **nothing the player sees changed.**
+The fix is in what the test counts, so `before-desktop.png` is also the after
+frame — the same pixels, now attributed.
 
 `capture.mjs` copies `REGION_FIRE`, `ABSENT_MAX_PX` and `isBoneLit` from
 `tests/mobile/` verbatim (they are QA's numbers, quoted, not re-derived) and reads

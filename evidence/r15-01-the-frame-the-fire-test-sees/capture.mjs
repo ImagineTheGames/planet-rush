@@ -22,9 +22,15 @@
  * well. If the second number is small and the first is not, the prompt is what
  * trips the assertion and no FIRE affordance is on screen.
  *
+ * A second argument `touch` emulates the same 1280×800 screen WITH touch, which
+ * is the negative control: it puts a real Auto-aim FIRE button on that exact
+ * corner, so the run shows what the guard reads when the thing it names is
+ * genuinely there — with both tenants excluded, i.e. against the post-fix count.
+ *
  * Usage — with a preview server already up on PREVIEW_PORT:
  *   node evidence/r15-01-the-frame-the-fire-test-sees/capture.mjs before
  *   node evidence/r15-01-the-frame-the-fire-test-sees/capture.mjs after
+ *   node evidence/r15-01-the-frame-the-fire-test-sees/capture.mjs leaked touch
  *
  * Writes `<label>-desktop.png` (the whole 1280×800 frame), `<label>-corner.png`
  * (REGION_FIRE at 2×, which is where the argument is), and `<label>.json` (the
@@ -37,6 +43,8 @@ import { PNG } from 'pngjs';
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const label = process.argv[2] ?? 'after';
+/** `touch` = the negative control (see the header): same screen, real FIRE button. */
+const TOUCH = process.argv[3] === 'touch';
 const PORT = process.env.PREVIEW_PORT ?? '4193';
 
 /** The desktop control profile from playwright.config.ts, verbatim. */
@@ -112,8 +120,8 @@ const browser = await chromium.launch();
 const context = await browser.newContext({
   viewport: VIEWPORT,
   deviceScaleFactor: DPR,
-  hasTouch: false,
-  isMobile: false,
+  hasTouch: TOUCH,
+  isMobile: TOUCH,
 });
 const page = await context.newPage();
 
@@ -179,6 +187,8 @@ fs.writeFileSync(
 
 const out = {
   label,
+  touchEmulated: TOUCH,
+  registeredTouchAffordances: registry.ids.filter((id) => id.startsWith('touch-')),
   viewport: registry.viewport,
   dpr: DPR,
   ticks: TICKS,

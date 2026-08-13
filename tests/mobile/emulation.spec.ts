@@ -47,6 +47,7 @@ import {
   REGION_STRIP_MID,
   REGION_FULL,
   type Img,
+  type Pred,
   type Region,
 } from './pixels';
 import { budgetTest } from './budgets';
@@ -135,6 +136,41 @@ async function shoot(page: Page): Promise<Img> {
   return decode(await page.screenshot());
 }
 
+/**
+ * `count()` over a region, skipping any pixel that falls inside one of
+ * `exclude` — the "this corner, minus the elements that legitimately live in it"
+ * count the desktop FIRE-absent check is built on.
+ *
+ * Per-pixel rather than `count(region) − Σ count(excluded)`, which is what the
+ * check used while it had exactly one exemption to make. With two, subtracting
+ * sub-counts discounts anything in BOTH twice and can drive the result negative —
+ * i.e. it would hide pixels rather than attribute them, in a negative assertion
+ * whose whole job is not to hide any.
+ */
+function countOutside(img: Img, region: Region, exclude: readonly Region[], pred: Pred): number {
+  const px = (f: number, span: number, up: boolean): number =>
+    Math.max(0, Math.min(span, up ? Math.ceil(f * span) : Math.floor(f * span)));
+  const box = (r: Region) => ({
+    x0: px(r.x0, img.width, false),
+    y0: px(r.y0, img.height, false),
+    x1: px(r.x1, img.width, true),
+    y1: px(r.y1, img.height, true),
+  });
+  const b = box(region);
+  const outs = exclude.map(box);
+  let matched = 0;
+  for (let y = b.y0; y < b.y1; y++) {
+    for (let x = b.x0; x < b.x1; x++) {
+      if (outs.some((o) => x >= o.x0 && x < o.x1 && y >= o.y0 && y < o.y1)) continue;
+      const i = (y * img.width + x) * 4;
+      if (pred(img.data[i] ?? 0, img.data[i + 1] ?? 0, img.data[i + 2] ?? 0, img.data[i + 3] ?? 0)) {
+        matched++;
+      }
+    }
+  }
+  return matched;
+}
+
 /** The overlap of two fractional {@link Region}s, or null when they don't meet. */
 function intersectRegions(a: Region, b: Region): Region | null {
   const x0 = Math.max(a.x0, b.x0);
@@ -145,17 +181,26 @@ function intersectRegions(a: Region, b: Region): Region | null {
 }
 
 /**
- * The collapsed minimap's own square as a fractional {@link Region}, read from the
- * layout registry the app publishes under `?debug=1` (`window.__planetRush.layout`,
- * id `minimap`) — authoritative, never a hardcoded corner. Null if the entry is
- * absent (the minimap was expanded, or the seam is off). Field report v0.2.4 moved
- * the collapsed map into the bottom-right corner, so it now overlaps `REGION_FIRE`
- * and legitimately paints team-plasma dots there (own ship + own home station); the
- * desktop FIRE-absent check subtracts this square so a real leaked FIRE ring — which
- * lights the corner well beyond the small map — is still what trips the guard.
+ * A registered HUD element's own rect as a fractional {@link Region}, read from
+ * the layout registry the app publishes under `?debug=1`
+ * (`window.__planetRush.layout`) — authoritative, never a hardcoded corner. Null
+ * if the entry is absent, which for these callers means "that element is not on
+ * screen this frame".
+ *
+ * Two ids matter to the desktop FIRE-absent check below, and both for the same
+ * reason: they are ratified HUD elements that legitimately paint inside
+ * `REGION_FIRE`, so the check subtracts the rect the APP says they occupy rather
+ * than widening its bar.
+ *
+ *  - `minimap`   — field report v0.2.4 moved the collapsed map into the
+ *    bottom-right corner, where it paints team-plasma dots (own ship + own home
+ *    station);
+ *  - `onboarding`— the prompt panel. It is centred and hangs from the bottom of
+ *    its band (`src/ui/hud-geometry.ts` `promptBand`), so on a wide desktop a
+ *    long sentence's tail reaches past x 0.7 in chalk-bright Bone (r15-01).
  */
-async function minimapRegion(page: Page): Promise<Region | null> {
-  return page.evaluate(() => {
+async function registryRegion(page: Page, id: string): Promise<Region | null> {
+  return page.evaluate((wanted) => {
     const pr = (
       window as unknown as {
         __planetRush?: {
@@ -164,7 +209,7 @@ async function minimapRegion(page: Page): Promise<Region | null> {
         };
       }
     ).__planetRush;
-    const e = pr?.layout.find((x) => x.id === 'minimap');
+    const e = pr?.layout.find((x) => x.id === wanted);
     if (!pr || !e || !(pr.viewport.w > 0) || !(pr.viewport.h > 0)) return null;
     const { x, y, width, height } = e.bounds;
     return {
@@ -173,6 +218,14 @@ async function minimapRegion(page: Page): Promise<Region | null> {
       x1: (x + width) / pr.viewport.w,
       y1: (y + height) / pr.viewport.h,
     };
+  }, id);
+}
+
+/** Every element id the layout registry carries this frame. */
+async function registeredIds(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const pr = (window as unknown as { __planetRush?: { layout: { id: string }[] } }).__planetRush;
+    return pr ? pr.layout.map((e) => e.id) : [];
   });
 }
 
@@ -508,26 +561,60 @@ test('touch drag on the left half moves the ship (world units per sim tick)', as
 test('desktop: no touch affordances, controls strip PRESENT', async ({ page }, testInfo) => {
   test.skip(isTouchProject(testInfo.project.name), 'desktop control only');
   budgetTest({
-    work: 'desktop boot → 1 s of sim settle → one screenshot → minimap-region read → two region pixel counts',
+    work: 'desktop boot → 1 s of sim settle → one screenshot → two registry reads → four region pixel counts',
     measuredSeconds: 5,
   });
 
   await boot(page);
   const img = await shoot(page);
 
-  // No hold-to-FIRE button on desktop (mouse/keyboard). The collapsed minimap now
-  // hugs the bottom-right corner (field report v0.2.4) and legitimately paints
-  // team-plasma dots (own ship + own home station) inside REGION_FIRE — so subtract
-  // its own square (read from the layout registry, not hardcoded) and assert the
-  // plasma that REMAINS is absent. A real leaked FIRE ring lights the corner well
-  // beyond that small map square, so the "no touch FIRE on desktop" invariant is
-  // preserved; only the ratified minimap is exempted.
-  const mmRegion = await minimapRegion(page);
-  const firePlasma = count(img, REGION_FIRE, isPlasma).matched;
-  const mmOverlap = mmRegion ? intersectRegions(REGION_FIRE, mmRegion) : null;
-  const mmPlasma = mmOverlap ? count(img, mmOverlap, isPlasma).matched : 0;
-  const fireMatched = firePlasma - mmPlasma;
-  expect(fireMatched, 'FIRE button must be absent on desktop (minimap corner excluded)').toBeLessThan(
+  // ── Nothing touch-shaped is even REGISTERED (a0-23, the cheap half) ────────
+  //
+  // `writeAffordanceRects` returns three nulls on desktop, and main.ts registers
+  // each rect only when it is non-null, so a FIRE button that reached desktop at
+  // all would announce itself here — before any question of what colour it is or
+  // whose corner it lands in. This is not a replacement for the pixel counts
+  // below (a registered element can be invisible, which is the M1 miss this whole
+  // suite exists for); it is the half of the invariant that no exemption can ever
+  // blunt, and it says which of the two possible failures is happening.
+  const ids = await registeredIds(page);
+  expect(
+    ids.filter((id) => id.startsWith('touch-')),
+    'no touch affordance is registered on desktop (a0-23)',
+  ).toEqual([]);
+
+  // ── …and none is DRAWN in the corner one would land in ────────────────────
+  //
+  // No hold-to-FIRE button on desktop (mouse/keyboard). `REGION_FIRE` is a fixed
+  // corner box rather than an affordance's own rect — on touch it is aimed at the
+  // FIRE button, but on desktop there is no such button to aim at, so it is a
+  // plain 30%×20% of the screen and it collects whatever the layout legitimately
+  // puts there. Two ratified elements do, and both are subtracted at the rect the
+  // app itself publishes (never a hardcoded corner):
+  //
+  //  - the collapsed `minimap`, which hugs the bottom-right corner since field
+  //    report v0.2.4 and paints team-plasma dots (own ship + own home station);
+  //  - the `onboarding` prompt panel — centred, hung from the bottom of its band
+  //    (`src/ui/hud-geometry.ts` `promptBand`), and since a0-34 carrying a
+  //    first-match objective sentence long enough that its tail reaches past
+  //    x 0.7 in chalk-bright Bone. Measured at 1280×800 (r15-01): 308 Bone-lit
+  //    pixels in this region, all 308 of them inside that rect.
+  //
+  // **This exempts no pixel a FIRE affordance can occupy**, which is what keeps it
+  // an exemption rather than a relaxation: the prompt band stops short of the
+  // minimap's square by `PROMPT_MINIMAP_GAP`, and the Auto-aim button's anchor is
+  // hard against the screen's own corner (`@platform/touch-visuals`: `EDGE_MARGIN`
+  // 28 + `R_FIRE` 42, i.e. x 1168→1252 at 1280×800) — 85 px to the RIGHT of where
+  // the prompt panel ends. A real leaked FIRE ring lights that corner, well beyond
+  // both tenants, and still trips both counts below.
+  const tenants = (
+    await Promise.all([registryRegion(page, 'minimap'), registryRegion(page, 'onboarding')])
+  )
+    .map((r) => (r ? intersectRegions(REGION_FIRE, r) : null))
+    .filter((r): r is Region => r !== null);
+  const fireOnly = (pred: Pred): number => countOutside(img, REGION_FIRE, tenants, pred);
+
+  expect(fireOnly(isPlasma), 'FIRE button must be absent on desktop (minimap + prompt excluded)').toBeLessThan(
     ABSENT_MAX_PX,
   );
 
@@ -536,9 +623,7 @@ test('desktop: no touch affordances, controls strip PRESENT', async ({ page }, t
   // came off plasma, so a FIRE button leaking onto desktop would now be a
   // chalk-bright Bone rim — invisible to the plasma count above, which would have
   // gone on passing while the invariant it names quietly stopped being checked.
-  const fireBone = count(img, REGION_FIRE, isBoneLit).matched;
-  const mmBone = mmOverlap ? count(img, mmOverlap, isBoneLit).matched : 0;
-  expect(fireBone - mmBone, 'no Bone-lit FIRE rim on desktop either (a0-23)').toBeLessThan(ABSENT_MAX_PX);
+  expect(fireOnly(isBoneLit), 'no Bone-lit FIRE rim on desktop either (a0-23)').toBeLessThan(ABSENT_MAX_PX);
 
   // The controls strip IS drawn along the bottom edge (GDD §2.2), plasma keys +
   // grey labels.
