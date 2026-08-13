@@ -482,6 +482,26 @@ export const ABUNDANCE_LABELS: Readonly<Record<Abundance, string>> = {
 };
 
 /**
+ * The two words the CLAIM control shows (a0-35; `docs/lobby-browser-plan.md` §2:
+ * *"a `CLAIM · PUBLIC / PRIVATE` control beside the mode and YIELD rows… It is a
+ * **word**, not an icon, per §4.7's interface voice"*).
+ *
+ * Keyed by the flag the wire carries ({@link LobbyState.listed}) rather than by a
+ * second enum, so the screen and the heartbeat cannot end up with two vocabularies
+ * for one fact: `listed` is the field on `lobbyChoice`, on `HeartbeatRoom` and in
+ * the allocator's registry, and PUBLIC / PRIVATE is only ever how it is *said*.
+ */
+export const CLAIM_LABELS: Readonly<Record<'public' | 'private', string>> = {
+  public: 'PUBLIC',
+  private: 'PRIVATE',
+};
+
+/** The word the CLAIM control is showing right now. */
+export function claimLabel(listed: boolean): string {
+  return listed ? CLAIM_LABELS.public : CLAIM_LABELS.private;
+}
+
+/**
  * The identity colours in words (style-guide §3.1), indexed by slot. Named on
  * every roster row beside the hull, because the roster has to read with the hue
  * removed — the same reason every ship carries a hull decal (§3 rule 3, §9).
@@ -986,6 +1006,28 @@ export interface LobbyState {
    */
   readonly abundance: Abundance;
   /**
+   * **PUBLIC or PRIVATE** — whether this room may appear in the lobby browser's
+   * list (a0-26 D1, a0-35). `true` is the ratified default and the word the
+   * CLAIM control opens on; flipping it to `false` is the host's opt-out.
+   *
+   * It is **not match config** and deliberately does not ride
+   * {@link lobbyMatchConfig}: nothing about who may *find* a room reaches the
+   * simulation, and a value that cannot change the world has no business on the
+   * seam the world is built from. It rides the room seam instead — the same
+   * `lobbyChoice` the mode and the abundance ride (`../net/session`
+   * `chooseInLobby`), where `server/room.ts` honours it from the creator, in the
+   * lobby phase, and nowhere else.
+   *
+   * **Every new room opens PUBLIC**, and this is the one control on the strip
+   * that is *not* restored from storage (the mode, the size and the yield all
+   * are). D1 ruled the default rather than the memory, and a remembered PRIVATE
+   * is the a0-11 failure with a longer fuse: a host who went private once for
+   * one match would silently keep hosting rooms nobody can find, and an open
+   * room nobody can find is the thing that quietly becomes a solo match at RUSH!
+   * The opt-out is one tap; a wrong memory is invisible.
+   */
+  readonly listed: boolean;
+  /**
    * **The LOCAL player's career level** — the one number this screen is allowed
    * to show about a career, and the only place in the whole game it may appear
    * (pr-06; plan §Q2, ratified 2026-08-07: *"we can show the LEVEL but not XP
@@ -1148,6 +1190,10 @@ export function createLobby(options: LobbyOptions): LobbyState {
     mapId,
     mode: options.mode ?? 'ffa',
     abundance: options.abundance ?? DEFAULT_ABUNDANCE,
+    // PUBLIC, always, on every new room (a0-26 D1, ratified). Deliberately NOT
+    // restored from storage the way the mode and the yield are — see
+    // {@link LobbyState.listed}.
+    listed: true,
     // A fresh career is level 1 (`freshProfile`), which is also what an absent
     // option means — so the badge is never blank on a first boot.
     level: normalizeLevel(options.level),
@@ -1735,6 +1781,55 @@ export function cycleAbundance(state: LobbyState): LobbyState {
 }
 
 /**
+ * Flip the room PUBLIC ⇄ PRIVATE — the CLAIM control (a0-35; the developer:
+ * *"when i host, i hav eno way to make a match private i dont see a button to do
+ * it"*).
+ *
+ * Three refusals, each the same one the room itself enforces
+ * (`server/room.ts`), so a tap this screen accepts is a tap the room will honour
+ * and a tap it refuses costs the wire nothing:
+ *
+ *  - **a guest** ({@link hostControls}) — publishing, or hiding, someone else's
+ *    room is not a joiner's call;
+ *  - **after RUSH!** (same predicate) — a room that has started is on nobody's
+ *    list to begin with, its `joinableSeats` having gone to zero;
+ *  - **an OFFLINE lobby** — a solo-vs-bots room has no transport, no code and no
+ *    row, so there is nothing to publish and nothing to hide. This is the one
+ *    refusal the mode and yield toggles beside it do not have, and it is why
+ *    {@link showsClaimControl} keeps the control off that screen entirely rather
+ *    than drawing a dead chip about a list the room can never be on.
+ */
+export function toggleClaim(state: LobbyState): LobbyState {
+  if (!hostControls(state) || !state.online) return state;
+  return { ...state, listed: !state.listed };
+}
+
+/**
+ * Is the CLAIM control on this screen at all?
+ *
+ * **Creator-only, and online-only.** The mode and yield toggles draw *dead* for a
+ * guest, because the value they show is the match everyone in the room is about
+ * to fly. Visibility is not like that: the room never tells a joiner whether it
+ * is listed, so a guest's chip could only ever show that guest's own local
+ * default — and a chip reading PUBLIC over a room its host has made private is a
+ * screen inventing a fact. Absent, never flattering (the discipline
+ * `../net/region-probe` rule 1 sets for the ping, and the same reason).
+ *
+ * It is read off the CREATOR rather than off {@link hostControls}, which also
+ * goes false at RUSH!: a control that vanished as the countdown started would
+ * re-flow the strip under the host's thumb. The host keeps the chip and it draws
+ * dead, exactly as its two neighbours do.
+ *
+ * One function, because the geometry has to lay the strip out for two chips or
+ * three and the view has to draw the same number the wiring hit-tests — this is
+ * what stops those two answering differently ({@link ./lobby-geometry}
+ * `LobbyLayoutOptions.claim`).
+ */
+export function showsClaimControl(state: LobbyState): boolean {
+  return state.online && state.you === state.host;
+}
+
+/**
  * The whole authored match, as the one {@link MatchConfig} the sim consumes
  * (`../sim/match-config`): the mode, the abundance, and eight slots each mapped
  * from its seat —
@@ -2185,6 +2280,12 @@ export interface LobbyModel {
   readonly mode: MatchMode;
   /** The ore abundance — the row drawn as SCARCE / STANDARD / RICH (ratified p11). */
   readonly abundance: Abundance;
+  /** PUBLIC / PRIVATE — the word on the CLAIM chip (a0-35, {@link claimLabel}). */
+  readonly listed: boolean;
+  /** Whether that chip is on the strip at all — creator-only and online-only
+   *  ({@link showsClaimControl}). The layout takes the same answer, so the strip
+   *  is laid out for exactly the chips that get drawn. */
+  readonly showClaim: boolean;
   /** `N` — active (non-closed) seats, 2..8. The size the world will build at. */
   readonly size: number;
   /** Per-side active headcounts, always present so TEAMS shows them and never
@@ -2246,6 +2347,8 @@ export function lobbyModel(state: LobbyState): LobbyModel {
     mapId: state.mapId,
     mode: state.mode,
     abundance: state.abundance,
+    listed: state.listed,
+    showClaim: showsClaimControl(state),
     size: active.length,
     teamCounts: teamCountsOf(active),
     viewerTeam: viewer,

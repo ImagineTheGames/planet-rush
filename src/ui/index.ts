@@ -390,6 +390,7 @@ export {
   botDifficulties,
   canStart,
   castForEmptySeat,
+  claimLabel,
   classLocked,
   colorName,
   countdownLabel,
@@ -473,8 +474,10 @@ export {
   teamName,
   viewerTeamOf,
   tickLobby,
+  toggleClaim,
   toggleMode,
   typeRoomCode,
+  showsClaimControl,
 } from './lobby';
 export type {
   LobbyModel,
