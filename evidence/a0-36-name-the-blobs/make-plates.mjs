@@ -286,56 +286,111 @@ const stamp = `served <b>${SHA}</b> · arena <b>The Oval</b> (sky <b>plasmaReef<
 }
 
 // --- Plate 4: drift ---------------------------------------------------------
-if (motion) {
-  const p1 = motion.pass1.driftPerCameraPx;
-  const rows2 = motion.pass2
+{
+  const d = JSON.parse(readFileSync(join(HERE, `drift-${MAP}-${VIEW}.json`), 'utf8'));
+  const SW = d.screenWidthCssPx;
+  const by = (k) => d.classes.find((c) => c.key === k);
+  const rows = d.classes
     .map(
-      (m) => `<tr>
-        <td>${m.key}</td><td class="dim">${m.labels.join(', ')}</td>
-        <td>${m.cameraPanDevicePx}</td>
-        <td>${m.xcorrLagDevicePx}${m.lagWindowRailed ? ' <span class="tag warn">railed</span>' : ''}</td>
-        <td class="dim">${m.xcorrR}</td>
-        <td class="big">${m.ratioMeasured}</td>
-        <td class="big">${m.driftPerScreenWidth}</td>
+      (c) => `<tr>
+        <td>${c.key}</td><td class="dim">${c.labels.join(', ')}</td>
+        <td class="big">${c.readRatio}</td>
+        <td class="big">${c.measuredRatio}</td>
+        <td class="dim">${c.xcorrLagDevicePx}</td>
+        <td class="dim">${c.xcorrR}${c.lagWindowRailed ? ' <span class="tag warn">railed</span>' : ''}</td>
+        <td class="big">${c.readDriftPerScreenWidthCssPx}</td>
       </tr>`,
     )
     .join('');
-  const rows1 = Object.entries(p1)
-    .map(([k, v]) => `<tr><td>${k}</td><td class="big">${v}</td><td class="dim">${v === null ? '—' : (v * VIEWW()).toFixed(0)}</td></tr>`)
-    .join('');
-  function VIEWW() {
-    return motion.viewport.viewport.width;
+
+  // The same screen band at both ends of one flight, per class. A crop rather
+  // than the whole frame because the drift is what is being looked at, and at
+  // page scale a full 2880-px frame hides a 116-px shift.
+  const bandH = 320;
+  /** Pick the band by where the layer actually HAS ink, not by a fixed offset —
+   *  a fixed band picked a stretch of empty sky for the star layer and the strip
+   *  proved nothing. Same band for A and B, chosen from A. */
+  function bandFor(key) {
+    const img = PNG.sync.read(readFileSync(join(FRAMES, `drift-${MAP}-${VIEW}-${key}-A.png`)));
+    let best = 0, bestInk = -1;
+    for (let y = 0; y + bandH < img.height; y += 40) {
+      let ink = 0;
+      for (let yy = y; yy < y + bandH; yy += 4) {
+        for (let x = 0; x < 1500; x += 4) {
+          const i = (yy * img.width + x) * 4;
+          ink += img.data[i] + img.data[i + 1] + img.data[i + 2];
+        }
+      }
+      if (ink > bestInk) { bestInk = ink; best = y; }
+    }
+    return best;
   }
+  const bands = Object.fromEntries(d.classes.map((c) => [c.key, bandFor(c.key)]));
+  const strip = (key, tag) =>
+    crop(`drift-${MAP}-${VIEW}-${key}-${tag}.png`, `p4-${key}-${tag}.png`, 0, bands[key], 1500, bandH, 1, 7);
+  const pair = (key, label, note) => `
+    <div class="card" style="margin-bottom:12px">
+      <div class="cap" style="margin-bottom:6px"><b>${label}</b> — ${note}</div>
+      <img src="${url(strip(key, 'A').path)}" width="700">
+      <div class="cap" style="margin:4px 0 6px">before — camera at 0</div>
+      <img src="${url(strip(key, 'B').path)}" width="700">
+      <div class="cap" style="margin-top:4px">after — camera panned ${d.cameraPanCssPx} css px right</div>
+    </div>`;
+
+  const mid = by('stars-mid'), near = by('stars-near'), neb = by('nebula');
   await shoot(
     'a0-36-drift-per-screen-width.png',
-    `<h1>A star and the disc it sits on are <span class="verdict">on different layers</span> — and they separate by design</h1>
-     <p class="sub">${stamp.replace('freeze=1', 'live')} · flown in the shipped scheme (Tap Commander, a0-33)<br>
-     Two independent routes. <b>Read:</b> the camera offset is the world container's own screen position, and each backdrop layer's position is
-     written from it every frame — least squares over a real flight gives drift per camera pixel. <b>Measured:</b> the flight is flown again with
-     every layer hidden but one, and the two end frames are cross-correlated, which needs no faith in the first route at all.</p>
+    `<h1>A star and the disc it sits on are <span class="verdict">on different layers</span>, and they separate by design</h1>
+     <p class="sub">served <b>${SHA}</b> · arena <b>The Oval</b> · desktop 1440×900 @dpr 2 · <b>live</b>, flown in the shipped scheme (Tap Commander, a0-33)<br>
+     One boot, ONE flight of <b>${d.cameraPanCssPx} css px</b> of camera pan, every class photographed at both ends. Two independent routes on the same flight.
+     <b>Read:</b> the layer's own <code>position</code>, off the running build. <b>Measured:</b> the layer's pixels, cross-correlated between the two frames —
+     which needs no faith in the first route at all.</p>
      <div class="row">
-       <div class="card">
-         <div class="cap" style="margin-bottom:8px"><b>Route 1 — transforms read off the running build</b></div>
-         <table><tr><th>layer</th><th>drift / camera px</th><th>px per screen-width (${VIEWW()} css)</th></tr>${rows1}</table>
-       </div>
-       <div class="card" style="flex:1; min-width:390px">
-         <div class="cap" style="margin-bottom:8px"><b>Route 2 — cross-correlated pixels, one layer at a time</b></div>
-         <table><tr><th>class</th><th>layers shown</th><th>camera pan, dev px</th><th>lag, dev px</th><th>r</th><th>ratio</th><th>drift / screen-width</th></tr>${rows2}</table>
+       <div class="card" style="flex:1; min-width:640px">
+         <table style="width:100%">
+           <tr><th>class</th><th>layers shown</th><th>read ratio</th><th>measured ratio</th><th>lag, dev px</th><th>r</th><th>drift per screen-width, css px</th></tr>
+           ${rows}
+         </table>
+         <div class="cap" style="margin-top:12px; font-size:13px; line-height:1.75">
+           <span class="tag good">both routes agree</span>The transform and the pixels match to
+           <b>${(() => { const ok = d.classes.filter((c) => !c.lagWindowRailed); return ok.length ? Math.max(...ok.map((c) => Math.abs(c.readRatio - c.measuredRatio))).toFixed(4) : 'n/a'; })()}</b>
+           on all ${d.classes.filter((c) => !c.lagWindowRailed).length} classes whose lag landed inside the search, at correlations of
+           ${by('nebula').xcorrR} down to ${by('stars-near').xcorrR}.
+           So nothing is moving a layer outside <code>position</code>, and the running build's parallax IS
+           <code>SKY_PARALLAX</code> 0.085 and <code>STAR_LAYERS</code> 0.10 / 0.26 / 0.50.<br><br>
+           <span class="tag warn">stated, not hidden</span>The <b>world</b> row's lag window railed: a parallax-1 layer moves the whole
+           camera pan, which is past the 45% of frame that still leaves a band to correlate over, and its content is live sim that moved between
+           the two shots as well (r ${by('world').xcorrR}). Its READ ratio is 1 by construction — the world container's position <i>is</i> the
+           camera offset — so the row is reported rather than dropped, and its measured column is a floor.
+         </div>
        </div>
      </div>
-     <div class="foot" style="max-width:1090px; font-size:13px; line-height:1.75">
-       <b>This is the "weird effect", and it is the design.</b> A Plasma Reef clot travels at <b>${p1['void-nebula-plasmaReef']}</b> of the camera;
-       the star layers travel at <b>${p1['void-stars-deep']}</b>, <b>${p1['void-stars-mid']}</b> and <b>${p1['void-stars-near']}</b>.
-       So a star that happens to sit on a clot node — which is the only way a soft disc ever HAS a star in it — slides off it at
-       ${(((p1['void-stars-mid'] ?? 0) - (p1['void-nebula-plasmaReef'] ?? 0)) * VIEWW()).toFixed(0)} px per screen-width for a mid star, and
-       ${(((p1['void-stars-near'] ?? 0) - (p1['void-nebula-plasmaReef'] ?? 0)) * VIEWW()).toFixed(0)} px for a near one.
-       Nothing is coming apart: they were never one object. <code>SKY_PARALLAX</code> is 0.085 and the star layers are 0.10 / 0.26 / 0.50,
-       and the running build is measured at exactly those values.<br>
-       <b>What is NOT happening:</b> a halo separating from its own star. Bloom and star are pushed into the same shapes array at the same
-       <code>x,y</code> inside one baked sprite (<code>backdrop.ts</code> <code>starFieldSprite</code>) — they are one layer and move as one, and
-       every star layer's read and measured ratio agree to the pixel above.
-     </div>`,
-    1180,
+     <div class="row" style="margin-top:14px">
+       <div style="flex:1">
+         ${pair('nebula', 'void-nebula-plasmaReef · 0.085', 'the same band of screen, before and after. gain 7')}
+         ${pair('stars-near', 'void-stars-near · 0.50', 'the same band, the same flight. gain 7')}
+       </div>
+       <div class="card" style="flex:1; min-width:380px">
+         <div class="cap" style="font-size:13.5px; line-height:1.8">
+           <b>This is the "weird effect", and it is the design.</b><br><br>
+           A Plasma Reef clot travels <b>${neb.readDriftPerScreenWidthCssPx} css px</b> per screen-width flown.
+           A near star travels <b>${near.readDriftPerScreenWidthCssPx}</b>, a mid star <b>${mid.readDriftPerScreenWidthCssPx}</b>.
+           So a star that happens to sit on a clot node — <b>the only way a soft disc ever HAS a star in it</b> —
+           slides off it at <b>${(near.readDriftPerScreenWidthCssPx - neb.readDriftPerScreenWidthCssPx).toFixed(0)} px</b> per screen-width
+           if it is a near star and <b>${(mid.readDriftPerScreenWidthCssPx - neb.readDriftPerScreenWidthCssPx).toFixed(0)} px</b> if it is a mid one.
+           Nothing is coming apart: <b>they were never one object.</b><br><br>
+           <b>What is NOT happening is a halo separating from its own star.</b>
+           Bloom and star are pushed into the same shapes array at the same <code>x,y</code> inside one baked sprite
+           (<code>backdrop.ts</code>, <code>starFieldSprite</code>) — one layer, one transform. Every star layer's read and
+           measured ratios agree above, so no star layer is moving relative to itself.
+         </div>
+       </div>
+     </div>
+     <div class="foot">Flown by clicking, because the ratified default scheme is <b>Tap Commander</b> (a0-33) and the ship goes where the player
+       clicks; a first pass held <code>KeyD</code> for six seconds and the ship did not move a world unit. Soloing is applied only while the
+       shutter is open — hiding the UI to isolate a layer also stops the click landing, and a pass that flies while soloed measures a camera pan
+       of zero. Both traps are written up in the round's README.</div>`,
+    1400,
   );
 }
 

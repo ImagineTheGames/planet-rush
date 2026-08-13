@@ -1,6 +1,18 @@
 /**
- * evidence/a0-36-name-the-blobs/motion.mjs — a0-36, the drift meter.
+ * evidence/a0-36-name-the-blobs/motion.mjs — a0-36, the drift meter, first cut.
  * OWNER: QA Manager.
+ *
+ * **SUPERSEDED BY `drift.mjs` — read that one first.** This file's route 1 is
+ * sound and is what first measured the parallax off the running build: least
+ * squares over nine samples of a real flight, twice, at 679 and 1359 css px of
+ * camera pan, returning 0 / 0.085 / 0.10 / 0.26 / 0.50 / 1 / 1 both times.
+ *
+ * **Its route 2 does not work and is kept only as the record of why.** It solos
+ * each layer and THEN flies, and taking the UI out of the scene — by `visible`
+ * or by `alpha` — stops the click Tap Commander flies on from landing, so the
+ * flight measures a camera pan of zero on most classes. `drift.mjs` solos only
+ * while the shutter is open, flies once for every class, and verifies the pan
+ * against the camera before it will report a ratio off it.
  *
  * The developer's second claim: the discs "seem to move when i move the camera",
  * and the ones with stars **separate from their star** as the camera pans.

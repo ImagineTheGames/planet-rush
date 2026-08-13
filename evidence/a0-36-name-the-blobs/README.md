@@ -95,22 +95,30 @@ quantisation wearing a shape's clothes.
 ## The motion — measured, and it is the design
 
 `SKY_PARALLAX` and `STAR_LAYERS` are the code's claim. These are the running
-build's numbers, read off live node positions across a real flight of
-**1358.9 css px** of camera pan:
+build's numbers, measured **two independent ways on one flight of 679.4 css px
+of camera pan** — the layer's own `position` (*read*), and the layer's pixels
+cross-correlated between the two ends (*measured*). The two agree to **0.0004**
+on every class whose lag landed inside the search:
 
-|layer|drift per camera px, measured|px per screen-width (1440 css)|
-|---|---|---|
-|`void-ground`|0|0|
-|`void-nebula-plasmaReef`|**0.085**|122|
-|`void-stars-deep`|**0.10**|144|
-|`void-stars-mid`|**0.26**|374|
-|`void-stars-near`|**0.50**|720|
-|world container (rocks, stations, ships)|1|1440|
-|`vfx` container|1|1440|
+|layer|read|measured|xcorr r|px per screen-width (1440 css)|
+|---|---|---|---|---|
+|`void-ground`|0|—|—|0|
+|`void-nebula-plasmaReef`|**0.085**|0.0854|0.9996|**122.4**|
+|`void-stars-deep`|**0.10**|0.1001|0.9965|**144**|
+|`void-stars-mid`|**0.26**|0.2598|0.989|**374.4**|
+|`void-stars-near`|**0.50**|0.4997|0.9538|**720**|
+|world (boundary, asteroids, stations)|1|0.9537 *(railed)*|0.3814|1440|
+|`vfx` container|1|—|—|1440|
+
+The `world` row is the one that did not measure cleanly and it is reported
+rather than dropped: a parallax-1 layer moves the whole camera pan, which is past
+the 45% of frame that still leaves a band to correlate over, and its content is
+live sim that moved between the two shots as well. Its *read* ratio is 1 by
+construction — the world container's position **is** the camera offset.
 
 So a star that happens to sit on a clot node — **the only way a soft disc ever
 has a star in it** — slides off it at **252 px per screen-width** for a mid star
-and **598 px** for a near one. That is the developer's "weird effect", and
+(374.4 − 122.4) and **598 px** for a near one (720 − 122.4). That is the developer's "weird effect", and
 nothing is coming apart: the two were never one object.
 
 **What is NOT happening is a halo separating from its own star.** Bloom and star
@@ -134,16 +142,22 @@ ratios agree.
 - **Both viewports.** A sky is authored *per screen* (`NebulaSpec.build` takes
   `screenW/screenH`), so desktop and phone are genuinely different skies, not one
   scaled. Shooting only one would have been a guess about which the developer had.
-- **Two traps this round actually hit**, both recorded because a future run will
+- **Three traps this round actually hit**, all recorded because a future run will
   hit them again:
   1. **WASD does nothing.** The ratified default scheme is Tap Commander
      (a0-33): the pilot replaces the sticks and the ship flies to a *click*. A
      first motion pass held `KeyD` for six seconds and the ship did not move a
      world unit — the build behaving correctly and the harness asking wrong.
-  2. **`visible = false` prunes hit-testing.** Hiding the HUD to isolate a layer
-     also killed the click the flight is driven by, and the pass measured a camera
-     pan of zero. The UI is now taken out with `alpha = 0`, which draws nothing
-     and still hit-tests.
+  2. **Soloing a layer stops the flight.** Hiding the HUD to isolate a layer also
+     stops the click the flight is driven by from landing — with `visible = false`
+     *and* with `alpha = 0` — and the pass measures a camera pan of zero on most
+     classes. `drift.mjs` therefore solos **only while the shutter is open** and
+     flies with the scene normal.
+  3. **A tap does not always take, and a 0 px pan looks like a result** — every
+     ratio comes back `NaN` and every correlation a perfect 1. The flight is now
+     verified against the camera and *throws* below 400 css px rather than
+     reporting off it. It also keeps ONE direction: alternating sides cancelled
+     the pan out and spent ten taps travelling 364 px.
 
 ### One caveat, stated rather than buried
 
@@ -173,12 +187,18 @@ node evidence/a0-36-name-the-blobs/analyse.mjs                   # → inventory
 node evidence/a0-36-name-the-blobs/solo.mjs      4336 oval desktop        # each layer alone, live
 node evidence/a0-36-name-the-blobs/solo.mjs      4336 oval desktop --freeze
 node evidence/a0-36-name-the-blobs/profile.mjs   oval desktop     # → ring or glow
-node evidence/a0-36-name-the-blobs/motion.mjs    4336 oval desktop # → drift per screen-width
+node evidence/a0-36-name-the-blobs/drift.mjs     4336 oval desktop # → drift per screen-width, both routes
 node evidence/a0-36-name-the-blobs/make-plates.mjs               # the four plates
 ```
 
+`motion.mjs` is the first cut of the drift meter and is **superseded by
+`drift.mjs`**. It is kept because its route 1 is what first measured the parallax
+(least squares over nine samples, twice, at 679 and 1359 css px of pan, the same
+ratios both times) and because its route 2 is the record of trap 2 above. Use
+`drift.mjs`.
+
 `frames/` holds the raw material for **The Oval and The Octagon** (the subject and
-the control) plus every solo and motion frame. The per-arena B-frames for
+the control) plus every solo, motion and drift frame. The per-arena B-frames for
 diamond, line, crescents and compass are **not committed** — their numbers are in
 `inventory.json` and `isolate.mjs` regenerates them; that is 60 MB of near-identical
 PNG this repo does not need. Said out loud so their absence reads as a decision
