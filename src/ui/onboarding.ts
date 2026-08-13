@@ -182,8 +182,9 @@ const PROMPT_COPY: Readonly<Record<PromptId, PromptCopy>> = {
   // exclamation. It states the contract's terms and does not wish anybody luck.
   [PromptId.Objective]: {
     id: PromptId.Objective,
-    template:
-      'Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right',
+    // On one line on purpose: the brief's gate greps this file for `template: '`
+    // and a wrapped assignment reads to it as a prompt that does not exist.
+    template: 'Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right',
   },
   // `{fire}` resolves to the fire/mine binding — the wording is input-agnostic
   // via the action layer (GDD §2.10), so it reads correctly on key, pad, touch.
