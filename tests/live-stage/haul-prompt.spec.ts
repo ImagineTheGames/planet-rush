@@ -72,6 +72,31 @@ async function frames(page: import('@playwright/test').Page, n = 6): Promise<voi
   );
 }
 
+/**
+ * Wait out the OBJECTIVE prompt (a0-34).
+ *
+ * A first match now opens by naming the win condition, and that prompt outranks
+ * every lesson except the siege — deliberately: the goal is what frames the verbs
+ * after it. It retires once it has been on screen long enough to read, so a
+ * HAUL-HOME test has to let a first-time player finish reading before it stages
+ * the hold a first-time player would take a minute to fill. This waits for the
+ * band to stop carrying it rather than sleeping a fixed number of seconds, so it
+ * tracks the dwell instead of duplicating its number.
+ */
+async function readTheObjective(page: import('@playwright/test').Page): Promise<void> {
+  await page.waitForFunction(
+    () => {
+      const p = window.__onboardingStage?.prompt();
+      // `text` is whatever was last drawn even when nothing is up, so the band
+      // being EMPTY is the objective having been read as much as another prompt
+      // replacing it.
+      return !!p && (!p.visible || !/last station standing/i.test(p.text));
+    },
+    undefined,
+    { timeout: 30_000 },
+  );
+}
+
 /** Boot, fill the hold away from home, and read back what the HUD drew. */
 async function stageFullHold(page: import('@playwright/test').Page): Promise<{
   prompt: { visible: boolean; text: string; wrapWidth: number; width: number; height: number };
@@ -86,6 +111,10 @@ async function stageFullHold(page: import('@playwright/test').Page): Promise<{
     undefined,
     { timeout: 20_000 },
   );
+
+  // The objective is stated first in a first match (a0-34) — let it be read, or
+  // the band under test still belongs to it.
+  await readTheObjective(page);
 
   // Fill the hold to exactly its capacity — "hold full" is the trigger, and the
   // staging widens nothing, so this is the cargo bay the hull really has.

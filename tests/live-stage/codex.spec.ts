@@ -111,12 +111,15 @@ async function browseCodexThroughMenu(page: Page, press: Press): Promise<void> {
   }));
   expect(onCodex.matchStarted, 'CODEX is a door, never a gate — it builds no world').toBe(false);
   expect(onCodex.debugPresent, 'clean boot: no match instrument').toBe(false);
-  // It opens on the first tab (BOTS) with an entry selected.
-  expect(onCodex.tab).toBe('bots');
+  // It opens on the first tab with an entry selected — OBJECTIVE since a0-34
+  // put the win condition at the head of the strip (the developer's ruling).
+  expect(onCodex.tab).toBe('objective');
   expect(onCodex.entry.length).toBeGreaterThan(0);
 
-  // --- Real-press the SYSTEMS tab (index 2) → the section switches. ------------
-  await pressPoint(await codexPoint(page, 'tab', 2));
+  // --- Real-press the SYSTEMS tab (index 3) → the section switches. ------------
+  // Index 3, not 2: OBJECTIVE joined the strip in front of the original four
+  // (a0-34), and this walk presses where the client says it drew the chip.
+  await pressPoint(await codexPoint(page, 'tab', 3));
   await page.waitForFunction(() => window.__mainMenu?.codexTab === 'systems', undefined, { timeout: 10_000 });
   const firstSystemsEntry = await page.evaluate(() => window.__mainMenu!.codexEntry);
   expect(firstSystemsEntry.length).toBeGreaterThan(0);
