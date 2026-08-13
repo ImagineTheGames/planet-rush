@@ -79,6 +79,7 @@ import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-r
 import { PALETTE } from '@render/index';
 import {
   ABUNDANCE_LABELS,
+  claimLabel,
   DIFFICULTY_LABELS,
   LOBBY_EYEBROW,
   LOBBY_TITLE,
@@ -228,6 +229,9 @@ export class LobbyView extends Container {
   private readonly toggles = new Graphics();
   private readonly modeText: Text;
   private readonly abundanceText: Text;
+  /** The CLAIM chip's word — PUBLIC / PRIVATE (a0-35). Hidden on every screen the
+   *  chip is not on, which is every offline lobby and every guest's. */
+  private readonly claimText: Text;
   /** BACK and RUSH! — the footer beam's two plates — and the hint between them. */
   private readonly actions = new Graphics();
   private readonly backText: Text;
@@ -242,9 +246,27 @@ export class LobbyView extends Container {
   private readonly cache = new ScreenCache(this);
 
   private layout: LobbyLayout;
+  /**
+   * What the layout above was built from, so the strip can be re-flowed when the
+   * CLAIM chip arrives (a0-35) without the caller having to re-`resize` for it.
+   *
+   * The chip's presence is a fact about the MODEL (creator-only, online-only —
+   * `./lobby` `showsClaimControl`) and the layout is built from the VIEWPORT, so
+   * one of the two has to be remembered. Remembering the viewport is the cheaper
+   * half: it is four numbers, and it keeps `lobbyLayout` the only place that
+   * knows how a strip of two chips differs from a strip of three.
+   */
+  private viewport: { width: number; height: number };
+  private laidOutTouch: boolean;
+  private laidOutInsets: Insets | undefined;
+  /** Whether {@link layout} was built WITH the CLAIM chip. */
+  private laidOutClaim = false;
 
   constructor(screenWidth: number, screenHeight: number, isTouch = false, insets?: Insets) {
     super();
+    this.viewport = { width: screenWidth, height: screenHeight };
+    this.laidOutTouch = isTouch;
+    this.laidOutInsets = insets;
     this.layout = lobbyLayout({ width: screenWidth, height: screenHeight }, touchOpts(isTouch, insets));
 
     this.heading = makeText(LOBBY_TITLE, FONT_HEADING, HEADING_PX, MATERIAL_SHADES.bone);
@@ -268,6 +290,8 @@ export class LobbyView extends Container {
     this.modeText.anchor.set(0.5, 0.5);
     this.abundanceText = makeText('', FONT_HEADING, TOGGLE_PX, MATERIAL_SHADES.bone);
     this.abundanceText.anchor.set(0.5, 0.5);
+    this.claimText = makeText('', FONT_HEADING, TOGGLE_PX, MATERIAL_SHADES.bone);
+    this.claimText.anchor.set(0.5, 0.5);
 
     this.shipEyebrow = makeText('', FONT_BODY, EYEBROW_PX, MATERIAL_SHADES.boneLo);
     this.shipEyebrow.anchor.set(0, 0.5);
@@ -280,7 +304,7 @@ export class LobbyView extends Container {
     this.addChild(this.pickPlates, this.mapPicker);
     this.shipCard = createClassTileNodes(this);
     this.addChild(this.shipEyebrow, this.mapEyebrow);
-    this.addChild(this.toggles, this.modeText, this.abundanceText);
+    this.addChild(this.toggles, this.modeText, this.abundanceText, this.claimText);
     this.addChild(this.actions, this.backText, this.rushText, this.rushHint);
     this.visible = false;
   }
@@ -288,10 +312,22 @@ export class LobbyView extends Container {
   /** Re-lay-out for a new viewport, device or safe area. Cheap: the layout is
    *  a handful of rects, and nothing is re-created. */
   resize(width: number, height: number, isTouch = this.layout.isTouch, insets?: Insets): void {
-    this.layout = lobbyLayout({ width, height }, touchOpts(isTouch, insets));
+    this.viewport = { width, height };
+    this.laidOutTouch = isTouch;
+    this.laidOutInsets = insets;
+    this.relayout();
     // The cached texture is the size the OLD viewport rasterised to; refreshing
     // it in place would blit a stale-sized screen, so drop it (./screen-cache).
     this.cache.invalidate();
+  }
+
+  /** Rebuild the layout from what this view was last told — the viewport, the
+   *  device, the safe area, and whether the strip carries a CLAIM chip. */
+  private relayout(): void {
+    this.layout = lobbyLayout(this.viewport, {
+      ...touchOpts(this.laidOutTouch, this.laidOutInsets),
+      claim: this.laidOutClaim,
+    });
   }
 
   /** The rects this frame was drawn at — so a tap is tested against the same
@@ -318,6 +354,16 @@ export class LobbyView extends Container {
    * forget to hide is a screen that gets drawn under another one.
    */
   update(model: LobbyModel): void {
+    // The strip is laid out for the chips it is going to DRAW (a0-35), and whether
+    // it carries a third one is the model's answer, not the viewport's. Re-flow on
+    // the frame that answer moves — which is once, when an online host's room
+    // opens — so `hitTest` is never asked about a strip that was laid out for a
+    // different number of chips than the one on screen.
+    if (model.showClaim !== this.laidOutClaim) {
+      this.laidOutClaim = model.showClaim;
+      this.relayout();
+      this.cache.invalidate();
+    }
     const visible = model.phase !== 'started' && model.screen === 'roster';
     if (visible !== this.visible) this.cache.invalidate();
     this.visible = visible;
@@ -1124,6 +1170,18 @@ export class LobbyView extends Container {
       this.abundanceText,
       this.layout.abundance,
       `YIELD · ${ABUNDANCE_LABELS[model.abundance]}`,
+      enabled,
+      m,
+    );
+    // …and the room's own visibility beside them (a0-35): CLAIM · PUBLIC /
+    // PRIVATE, in the same chip, the same face and the same two Bone shades as
+    // its neighbours, because it is the same kind of control. It is drawn only
+    // where it was laid out — a zero-extent rect hides its own label — so a guest
+    // and an offline lobby see the strip that shipped.
+    this.drawToggle(
+      this.claimText,
+      this.layout.claim,
+      `CLAIM · ${claimLabel(model.listed)}`,
       enabled,
       m,
     );

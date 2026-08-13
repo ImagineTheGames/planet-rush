@@ -404,11 +404,38 @@ describe('the room tells the server what it chose', () => {
     expect(assigned.state.lobby?.seats[2]?.character).toBe(teams.state.lobby?.seats[2]?.character);
   });
 
+  it('routes the CLAIM control — PUBLIC ⇄ PRIVATE (a0-35)', () => {
+    // The developer's missing button, through the flow: *"when i host, i hav eno
+    // way to make a match private"*. It is not match config, so unlike the two
+    // toggles beside it nothing about the world it builds moves with it.
+    const online = inLobbyVia('create', 0, 0);
+    expect(online.lobby?.listed).toBe(true);
+    const priv = flowTapLobby(online, { kind: 'claim' });
+    expect(priv.state.lobby?.listed).toBe(false);
+    // …and the room is TOLD, on the same `lobbyChoice` the mode and the roster
+    // ride: a screen that said PRIVATE while the heartbeat still said listed would
+    // be exactly the lie this brief is about, one layer further down.
+    expect(priv.effects).toEqual([
+      expect.objectContaining({
+        kind: 'send',
+        message: expect.objectContaining({ type: 'lobbyChoice', listed: false }),
+      }),
+    ]);
+    expect(flowTapLobby(priv.state, { kind: 'claim' }).state.lobby?.listed).toBe(true);
+    // …and an OFFLINE lobby refuses it outright — a solo room is on no list, so a
+    // tap that could not change anything returns the identical state.
+    const offline = inLobbyVia('solo', 0, 0);
+    const tapped = flowTapLobby(offline, { kind: 'claim' });
+    expect(tapped.state).toBe(offline);
+    expect(tapped.effects).toEqual([]);
+  });
+
   it('refuses every variable-match control from a guest', () => {
     const guest = inLobby(4, 0);
     for (const target of [
       { kind: 'mode' } as const,
       { kind: 'abundance' } as const,
+      { kind: 'claim' } as const,
       { kind: 'seat', index: 2 } as const,
       { kind: 'seatState', index: 2 } as const,
       { kind: 'seatTeamChip', index: 2 } as const,

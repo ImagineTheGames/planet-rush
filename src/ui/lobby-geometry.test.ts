@@ -1325,3 +1325,95 @@ describe('the roster is untouched at 390px (u10-01)', () => {
     expect(rosterBottom - layout.band.y).toBeGreaterThan(layout.band.height * 0.5);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 8. The CLAIM chip — the third chip on the control strip (a0-35)
+// ---------------------------------------------------------------------------
+
+/**
+ * **PUBLIC / PRIVATE, and what it costs the strip.**
+ *
+ * The developer could not find a way to make a room private, because there was no
+ * control — only a wire field (a0-26 D1, shipped by n10-01). Adding one puts a
+ * THIRD chip where two have lived since variable-slots Milestone E, and the three
+ * split one budget: the roster's width, on the tightest phone the game claims to
+ * run on. So this section asserts the two things that could go wrong, in the order
+ * they would bite:
+ *
+ *  1. **The screens that do NOT carry it are untouched, to the pixel.** An offline
+ *     lobby and a guest's are laid out with `claim: false`, which must be the
+ *     layout that shipped — not "close enough", identical. Five golden baselines
+ *     are of exactly that screen.
+ *  2. **The strip still fits, and is still tappable, everywhere.** Three chips
+ *     inside the roster, none overlapping another, each still clearing the thumb
+ *     floor in landscape — the orientation this screen is used in — and each still
+ *     hit-testing to itself.
+ */
+describe('the CLAIM chip (a0-35)', () => {
+  it('changes NOTHING when it is not asked for — the shipped strip, rect for rect', () => {
+    for (const { name, vp, touch } of PROFILES) {
+      const shipped = lobbyLayout(vp, { isTouch: touch });
+      const off = lobbyLayout(vp, { isTouch: touch, claim: false });
+      expect(off.modeToggle, `${name} MODE`).toEqual(shipped.modeToggle);
+      expect(off.abundance, `${name} YIELD`).toEqual(shipped.abundance);
+      expect(off.seats, `${name} roster`).toEqual(shipped.seats);
+      expect(off.rushButton, `${name} RUSH!`).toEqual(shipped.rushButton);
+      // …and the chip itself is not merely undrawn but unhittable: `hit` refuses a
+      // zero-extent rect, so an absent control cannot be pressed by accident.
+      expect(off.claim.width, `${name} claim width`).toBe(0);
+      expect(off.claim.height, `${name} claim height`).toBe(0);
+      expect(lobbyHitTest(off, off.claim.x, off.claim.y), `${name} claim tap`).not.toEqual({ kind: 'claim' });
+    }
+  });
+
+  for (const { name, vp, touch } of PROFILES) {
+    it(`seats three chips that fit, do not overlap, and hit themselves — ${name}`, () => {
+      const layout = lobbyLayout(vp, { isTouch: touch, claim: true });
+      const strip = [
+        { label: 'MODE', rect: layout.modeToggle, kind: 'mode' },
+        { label: 'YIELD', rect: layout.abundance, kind: 'abundance' },
+        { label: 'CLAIM', rect: layout.claim, kind: 'claim' },
+      ] as const;
+      for (const { label, rect, kind } of strip) {
+        // Inside the safe content box, like every other rect on this screen.
+        expect(rectContains(layout.content, rect), `${label} ${fmt(rect)} inside content`).toBe(true);
+        expect(rect.width, `${label} has width`).toBeGreaterThan(0);
+        // Every chip on the strip is the same size: they are one control repeated,
+        // and a strip whose chips differed would read as a hierarchy that is not
+        // there.
+        expect(rect.width).toBeCloseTo(layout.modeToggle.width, 5);
+        expect(rect.height).toBe(layout.modeToggle.height);
+        // …and a tap on it reaches it, through the same hit test the view uses.
+        const c = center(rect);
+        expect(lobbyHitTest(layout, c.x, c.y), `${label} tap`).toEqual({ kind });
+      }
+      // Left to right, in reading order, with clear air between them.
+      expect(layout.modeToggle.x).toBeLessThan(layout.abundance.x);
+      expect(layout.abundance.x).toBeLessThan(layout.claim.x);
+      for (const a of strip) {
+        for (const b of strip) {
+          if (a.label === b.label) continue;
+          expect(overlaps(a.rect, b.rect), `${a.label} overlaps ${b.label}`).toBe(false);
+        }
+      }
+      // The strip must not push the roster off the screen either: the eight rows
+      // still start under it and still fit.
+      const first = layout.seats[0]!;
+      expect(first.y).toBeGreaterThanOrEqual(layout.claim.y + layout.claim.height);
+      expect(layout.seats).toHaveLength(LOBBY_SLOTS);
+    });
+  }
+
+  it('clears the thumb floor on a phone in LANDSCAPE — the way it is actually held', () => {
+    // The developer hosts from a phone, and the lobby is played in landscape
+    // (`tests/mobile/landscape-lock.spec.ts`). The same promise u7-03 made for the
+    // roster's per-row controls, made for the third chip.
+    for (const { name, vp, touch } of PROFILES) {
+      if (vp.width < vp.height) continue;
+      const layout = lobbyLayout(vp, { isTouch: touch, insets: insetsFor(vp), claim: true });
+      expect(layout.claim.height, `${name} claim height`).toBeGreaterThanOrEqual(TOUCH_MIN);
+      expect(layout.claim.width, `${name} claim width`).toBeGreaterThanOrEqual(TOUCH_MIN);
+      expect(rectContains(layout.content, layout.claim), `${name} claim inside content`).toBe(true);
+    }
+  });
+});
