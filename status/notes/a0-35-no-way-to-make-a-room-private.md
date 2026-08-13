@@ -210,6 +210,31 @@ nothing new needed to be.
 **PR #408** — opened, and **every check green** (Typecheck/test/build, all six
 mobile shards, the perf gate; zero failing). Nothing outstanding on this branch.
 
+**Re-verified from scratch on 2026-08-13**, on a resumed session, against the
+pushed branch rather than against this note:
+
+| Gate | Result |
+|---|---|
+| `npx tsc --noEmit` | clean |
+| `npm test -- --run` | 292 files, **5274 tests passed**, 607 s |
+| the DoD allocator grep, verbatim | **cannot pass** — see TWO THINGS #1 |
+| the same grep, parens quoted | `allocator/allocator.ts`, `allocator/registry.ts` |
+| PR #408 checks | **0 failing**; all six mobile shards SUCCESS |
+
+The screenshots were re-read, not just re-counted: `CLAIM · PRIVATE` is on the
+host's control strip at 390 px landscape, and the second client's browse screen
+says `NO OPEN CLAIMS RIGHT NOW` at the same moment that room is alive and
+joinable by code. That pair is the brief.
+
+### The trap this resume hit — write the note in BOTH places
+
+`/status/notes/` is the live directory the fleet keeps current (79 of its 123
+notes are full). The previous session wrote this note **only** to the repo copy
+at `status/notes/`, so the resumed session was handed the blank 14-line
+template as *"your notes from the previous session"* and had to re-derive the
+branch state from `git log`. The repo copy is what review reads; the
+`/status/notes/` copy is what **future-you** is given. **Keep both.**
+
 Deliberately **not** in it:
 
 - **The HOST door's hint.** With a public default the hint *"Start a new game and
