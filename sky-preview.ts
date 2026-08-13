@@ -514,6 +514,27 @@ export async function mountSkyPreview(root: HTMLElement): Promise<void> {
   // eslint-disable-next-line no-console
   console.log(`\n${formatTable(seed)}\n`);
 
+  // **One WebGL context for the whole page.** Twelve `Application`s — two Pixi
+  // panels per sky — is over Chrome's per-page context limit on some machines
+  // and right at it on the rest, and a review surface that silently drops half
+  // its panels is worse than no review surface. So the two Pixi columns render
+  // through a single off-screen app and get blitted into plain 2D canvases.
+  const app = new Application();
+  await app.init({ width: w, height: h, background: 0x000000, antialias: true });
+
+  /** Render `build`'s container through the shared app and blit it into `host`. */
+  const blit = (host: HTMLElement, stage: Container): void => {
+    app.stage.removeChildren();
+    app.stage.addChild(stage);
+    app.render();
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext('2d')?.drawImage(app.canvas, 0, 0);
+    host.appendChild(canvas);
+    app.stage.removeChildren();
+  };
+
   for (const id of NEBULA_IDS) {
     const spec = NEBULAE[id];
     const row = document.createElement('section');
@@ -540,6 +561,7 @@ export async function mountSkyPreview(root: HTMLElement): Promise<void> {
       strip.appendChild(cell);
 
       if (label === 'mockup') {
+        // The design, on canvas gradients — no game code anywhere in it.
         const canvas = document.createElement('canvas');
         canvas.width = w;
         canvas.height = h;
@@ -548,24 +570,17 @@ export async function mountSkyPreview(root: HTMLElement): Promise<void> {
         if (ctx) paintMockupPanel(ctx, id === 'none' ? 'none' : (id as MockupSkyId), seed, w, h);
       } else if (label === 'game today') {
         // The real class, through its real API — nothing re-implemented.
-        const app = new Application();
-        await app.init({ width: w, height: h, background: 0x000000, antialias: true });
-        host.appendChild(app.canvas);
         const backdrop = new VoidBackdrop(seed);
         backdrop.setMap(skyOf.get(id));
         backdrop.configure(w, h, w, h);
         backdrop.update(0, 0, w, h);
-        app.stage.addChild(backdrop.view);
-        app.render();
+        blit(host, backdrop.view);
       } else {
-        const app = new Application();
-        await app.init({ width: w, height: h, background: 0x000000, antialias: true });
-        host.appendChild(app.canvas);
+        // The design's numbers as the game's own Shapes, through drawSprite.
         const stage = new Container();
-        const ground = new Graphics();
-        drawSprite(ground, groundSprite(w, h), 1);
-        ground.position.set(w / 2, h / 2);
-        stage.addChild(ground);
+        const groundGfx = new Graphics();
+        drawSprite(groundGfx, groundSprite(w, h), 1);
+        groundGfx.position.set(w / 2, h / 2);
         const skyGfx = new Graphics();
         drawSprite(skyGfx, nebulaSprite(id, seed, w, h, 1, w, h), 1);
         if (spec.additive) skyGfx.blendMode = 'add';
@@ -573,10 +588,10 @@ export async function mountSkyPreview(root: HTMLElement): Promise<void> {
         const starGfx = new Graphics();
         for (const layer of STAR_LAYERS) drawSprite(starGfx, starFieldSprite(layer, seed, w, h), 1);
         starGfx.position.set(w / 2, h / 2);
+        stage.addChild(groundGfx);
         if (spec.occludes) stage.addChild(starGfx, skyGfx);
         else stage.addChild(skyGfx, starGfx);
-        app.stage.addChild(stage);
-        app.render();
+        blit(host, stage);
       }
     }
   }
