@@ -15,7 +15,7 @@
  * {@link afterTheObjective} — see that helper for why.
  */
 import { describe, it, expect } from 'vitest';
-import { Onboarding, PromptId, oreWasSpent, resolvePromptText } from './onboarding';
+import { Onboarding, PromptId, oreWasSpent, resolvePromptText, unresolvedBindings } from './onboarding';
 import { FireMode } from '@platform/actions';
 import type { DeviceKind } from '@platform/actions';
 import type { OnboardingMemory, OnboardingSignals, SpendFacts } from './onboarding';
@@ -622,6 +622,12 @@ describe('resolvePromptText — the lesson branches on the scheme and the mode (
     // none of them asks for a press); this walks the whole matrix and proves it,
     // so a future edit that drops a `{fire}` into the tap column fails here
     // rather than in a playtest.
+    //
+    // It asks the binding map (`unresolvedBindings`) rather than scanning the
+    // finished sentence for a bare "fire"/"build". The scan could not tell a
+    // fallback from English, and a0-34's OBJECTIVE line — "mine ore, build
+    // defenses, upgrade your ship" — is English that says "build". The two briefs
+    // were green apart and red together, which is the worst way to find this.
     for (const id of Object.values(PromptId)) {
       for (const device of ['keyboard', 'touch', 'gamepad'] as DeviceKind[]) {
         for (const mode of [FireMode.Manual, FireMode.AutoAim]) {
@@ -629,9 +635,10 @@ describe('resolvePromptText — the lesson branches on the scheme and the mode (
             const text = resolvePromptText(id, device, mode, scheme);
             const where = `${id}/${device}/${mode}/${scheme}`;
             expect(text, where).not.toMatch(/[{}]/);
-            expect(text, `${where}: an unresolved binding fell back to a bare verb`).not.toMatch(
-              /(^|\s)(fire|build)(\s|$)/,
-            );
+            expect(
+              unresolvedBindings(id, device, mode, scheme),
+              `${where}: the sentence asks for a binding this configuration has no row for, so it fell back to the bare verb`,
+            ).toEqual([]);
           }
         }
       }
