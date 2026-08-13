@@ -31,6 +31,14 @@
  *  3. **An unmeasured region is still choosable.** It has no number, not no
  *     existence: a player who knows they want `gru` may pick it whether or not the
  *     probe got through. Nothing here can drop a region from the list.
+ *  3b. **Not measured YET is one of the ways a region has no number.** A screen
+ *     opens before a probe finishes — the lobby browser draws its first listing
+ *     at ~0.6 s and this survey answers at ~1.5 s (n11-01) — so "we have not
+ *     timed this yet" is a state every consumer meets, and rule 1 covers it
+ *     character for character: absent, never zero. What the survey owes such a
+ *     screen is *speed and sequence*, not a guess: it publishes each completed
+ *     round ({@link RegionProbeOptions.onRound}), and after the very first one
+ *     every region carries either a round trip or the reason it has none.
  *  4. **The list comes from the fleet.** `GET /regions` is the only source; there
  *     is no hard-coded region anywhere in this module, so a new fleet region
  *     appears in the picker the moment it registers — and the one-region launch
@@ -165,6 +173,18 @@ export interface RegionProbeOptions {
   readonly budgetMs?: number;
   /** The deadline mechanism; defaults to a real (cancelled) timer. */
   readonly withTimeout?: WithTimeout;
+  /**
+   * Every region's verdict **at the end of each completed round**, so a screen may
+   * print the fleet before the whole survey has settled (see "WHEN A CALLER MAY
+   * HAVE THE NUMBERS" on {@link measureRegionPings}).
+   *
+   * Called with exactly what the survey itself returns — same shape, same order —
+   * and only on a **whole** round, because that is the moment every region has had
+   * the same number of attempts and the numbers are comparable at all (a0-29). A
+   * partial round is never published, and a callback that throws is swallowed: a
+   * screen's redraw must not be able to abort a measurement.
+   */
+  readonly onRound?: (pings: readonly RegionPing[]) => void;
 }
 
 /** Samples per region, unless a caller says otherwise. Three is enough for the
@@ -385,6 +405,34 @@ async function readSample(response: FetchResponse, region: string): Promise<Samp
  * region with a number keeps it, and a region the budget never reached reads as a
  * `timeout`, which is what it is. The tolerance contract is untouched: this can
  * only ever produce *fewer* numbers, never a wrong one, and never a refusal.
+ *
+ * ---------------------------------------------------------------------------
+ * WHEN A CALLER MAY HAVE THE NUMBERS ({@link RegionProbeOptions.onRound})
+ * ---------------------------------------------------------------------------
+ * Serial sampling costs wall-clock, and the screens that show these numbers open
+ * faster than the survey finishes: measured on the live fleet from Florida, the
+ * lobby browser's first listing lands ~0.6 s after the segment opens and the whole
+ * survey answers at ~1.5 s, so a row is drawn beside a region with no number for
+ * about a second (n11-01, and the frame `a1-17` photographed).
+ *
+ * The answer is **not** to start a second probe, to overlap the samples, or to
+ * report a region the moment its own first sample lands — the first would double
+ * the traffic, the second is a0-29 exactly, and the third would rank a region that
+ * has been sampled against one that has not. It is to publish **at each round
+ * boundary**, where every region has had the same number of attempts under the
+ * same conditions:
+ *
+ *   after round 1  every region carries a measured round trip OR the reason it
+ *                  has none — no region is still silent, and the ranking is
+ *                  already like-for-like
+ *   after round k  the min-of-N settles: a published number can only ever FALL,
+ *                  never rise, and a failure can only ever be replaced by a number
+ *
+ * So a caller that draws on `onRound` shows the same fleet the return value will,
+ * about one round-trip-per-region after the first sample rather than after the
+ * last. Nothing about the schedule changes: same order, same serial loop, same
+ * budget, same total requests, and a caller that passes no callback cannot tell
+ * this paragraph exists.
  */
 export async function measureRegionPings(
   regions: readonly FleetRegion[],
@@ -399,6 +447,8 @@ export async function measureRegionPings(
   await warmOrigins(pending, env);
 
   const rounds = sampleCount(options);
+  const settle = (): readonly RegionPing[] =>
+    states.map((state) => (isFinished(state) ? state : finishMeasure(state)));
   let outOfTime = false;
   for (let round = 0; round < rounds && !outOfTime; round++) {
     // Each round starts one region further along. In a healthy fleet this changes
@@ -415,6 +465,11 @@ export async function measureRegionPings(
       }
       await takeOneSample(pending[(round + i) % pending.length]!, env);
     }
+    // A WHOLE round, and only a whole one: a round the budget cut short has
+    // sampled some regions once more than others, and publishing that would rank
+    // them on unequal evidence — the exact asymmetry the rotation above exists to
+    // prevent. The final round's numbers reach the caller as the return value.
+    if (!outOfTime && round < rounds - 1) publish(options.onRound, settle());
   }
   if (outOfTime) {
     // A region the budget never reached has no measurement and nothing to blame it
@@ -422,7 +477,22 @@ export async function measureRegionPings(
     // the failure vocabulary the picker and the logs already speak.
     for (const state of pending) if (state.best === null) state.failure ??= 'timeout';
   }
-  return states.map((state) => (isFinished(state) ? state : finishMeasure(state)));
+  return settle();
+}
+
+/** Hand a round to a caller that asked for one. A screen that throws while
+ *  redrawing is a bug in the screen, and it must not become a fleet that could not
+ *  be measured — the survey swallows it and keeps sampling. */
+function publish(
+  onRound: ((pings: readonly RegionPing[]) => void) | undefined,
+  pings: readonly RegionPing[],
+): void {
+  if (onRound === undefined) return;
+  try {
+    onRound(pings);
+  } catch {
+    // Not a fact about any region.
+  }
 }
 
 /**
@@ -569,21 +639,55 @@ export interface RegionSurvey {
   readonly defaultId?: string;
 }
 
+/** {@link surveyRegions}'s options: the probe's, plus the one thing only a whole
+ *  survey can hand back early. */
+export interface RegionSurveyOptions extends RegionProbeOptions {
+  /**
+   * The survey **as each round finishes it** — ranked and with a default named,
+   * exactly like the returned one, so a screen can draw the fleet a round at a
+   * time instead of waiting for the last sample (see
+   * {@link RegionProbeOptions.onRound}, which this is built on).
+   *
+   * Never called for a fleet with no regions: an allocator that answered with an
+   * empty list has said nothing about anybody's connection, and a screen holding
+   * numbers from a moment ago must not be told to throw them away.
+   */
+  readonly onSurvey?: (survey: RegionSurvey) => void;
+}
+
 /**
  * The whole read, in one call: list the fleet's regions, time each of them, sort
  * by what was measured, and name the default. This is what a lobby calls when it
  * opens.
+ *
+ * With {@link RegionSurveyOptions.onSurvey} it also answers *while* it measures —
+ * one ranked survey per completed round — which is how a screen that opens faster
+ * than the probe (the lobby browser: a listing at ~0.6 s against a survey at
+ * ~1.5 s, n11-01) shows a real number rather than a placeholder that reads like a
+ * failure.
  */
 export async function surveyRegions(
   config: AllocatorClientConfig,
-  options: RegionProbeOptions = {},
+  options: RegionSurveyOptions = {},
 ): Promise<RegionSurvey> {
   const regions = await fetchFleetRegions(config);
   if (regions.length === 0) return { regions: [] };
   // The probe borrows the allocator client's injected `fetch` unless given its own,
   // so one fixture drives both halves of a survey in a test.
   const shared = options.fetch ?? config.fetch;
-  const probe: RegionProbeOptions = { ...options, ...(shared !== undefined ? { fetch: shared } : {}) };
+  const { onSurvey, onRound } = options;
+  const probe: RegionProbeOptions = {
+    ...options,
+    ...(shared !== undefined ? { fetch: shared } : {}),
+    ...(onSurvey !== undefined || onRound !== undefined
+      ? {
+          onRound: (pings: readonly RegionPing[]): void => {
+            onRound?.(pings);
+            onSurvey?.(summariseRegions(regions, pings));
+          },
+        }
+      : {}),
+  };
   const pings = await measureRegionPings(regions, probe);
   return summariseRegions(regions, pings);
 }
