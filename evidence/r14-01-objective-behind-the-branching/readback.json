@@ -1,0 +1,1341 @@
+{
+  "what": "r14-01 — a0-33's six readings, re-run with a0-34's OBJECTIVE prompt in place",
+  "order": [
+    "under-attack",
+    "objective",
+    "mine",
+    "haul-home",
+    "spend",
+    "controls"
+  ],
+  "phoneProfile": {
+    "width": 844,
+    "height": 390,
+    "note": "iPhone-ish 390×844, landscape-locked as the client locks it",
+    "insets": {
+      "bottom": 34
+    }
+  },
+  "sixReadings": [
+    {
+      "configuration": "desktop · Sticks + Manual",
+      "device": "keyboard",
+      "fireMode": "manual",
+      "scheme": "sticks",
+      "prompts": [
+        {
+          "rank": 1,
+          "prompt": "under-attack",
+          "text": "Your station is under attack — follow the arrow",
+          "copy": "GDD §2.10"
+        },
+        {
+          "rank": 2,
+          "prompt": "objective",
+          "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right",
+          "copy": "NEW (a0-34)"
+        },
+        {
+          "rank": 3,
+          "prompt": "mine",
+          "text": "Hold Left mouse on the asteroid — your shots chip the rock",
+          "copy": "GDD §2.10"
+        },
+        {
+          "rank": 4,
+          "prompt": "haul-home",
+          "text": "Hold full — fly into your collection field to bank, then press E to spend",
+          "copy": "GDD §2.10"
+        },
+        {
+          "rank": 5,
+          "prompt": "spend",
+          "text": "Spend ore on defense — or UPGRADE SHIP to mine and hit harder",
+          "copy": "GDD §2.10"
+        },
+        {
+          "rank": 6,
+          "prompt": "controls",
+          "text": "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu",
+          "copy": "NEW (a0-33)"
+        }
+      ]
+    },
+    {
+      "configuration": "desktop · Sticks + Auto-aim",
+      "device": "keyboard",
+      "fireMode": "auto-aim",
+      "scheme": "sticks",
+      "prompts": [
+        {
+          "rank": 1,
+          "prompt": "under-attack",
+          "text": "Your station is under attack — follow the arrow",
+          "copy": "GDD §2.10"
+        },
+        {
+          "rank": 2,
+          "prompt": "objective",
+          "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right",
+          "copy": "NEW (a0-34)"
+        },
+        {
+          "rank": 3,
+          "prompt": "mine",
+          "text": "Hold Left mouse near the asteroid — auto-aim does the aiming, your shots chip the rock",
+          "copy": "NEW (a0-33)"
+        },
+        {
+          "rank": 4,
+          "prompt": "haul-home",
+          "text": "Hold full — fly into your collection field to bank, then press E to spend",
+          "copy": "GDD §2.10"
+        },
+        {
+          "rank": 5,
+          "prompt": "spend",
+          "text": "Spend ore on defense — or UPGRADE SHIP to mine and hit harder",
+          "copy": "GDD §2.10"
+        },
+        {
+          "rank": 6,
+          "prompt": "controls",
+          "text": "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu",
+          "copy": "NEW (a0-33)"
+        }
+      ]
+    },
+    {
+      "configuration": "desktop · Tap Commander",
+      "device": "keyboard",
+      "fireMode": "auto-aim",
+      "scheme": "tap",
+      "prompts": [
+        {
+          "rank": 1,
+          "prompt": "under-attack",
+          "text": "Your station is under attack — follow the arrow",
+          "copy": "GDD §2.10"
+        },
+        {
+          "rank": 2,
+          "prompt": "objective",
+          "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right",
+          "copy": "NEW (a0-34)"
+        },
+        {
+          "rank": 3,
+          "prompt": "mine",
+          "text": "Tap the asteroid to mine it — your shots chip the rock",
+          "copy": "NEW (a0-33)"
+        },
+        {
+          "rank": 4,
+          "prompt": "haul-home",
+          "text": "Hold full — tap your own station to bank in its collection field, then press E to spend",
+          "copy": "NEW (a0-33)"
+        },
+        {
+          "rank": 5,
+          "prompt": "spend",
+          "text": "Spend ore on defense — or UPGRADE SHIP to mine and hit harder",
+          "copy": "GDD §2.10"
+        },
+        {
+          "rank": 6,
+          "prompt": "controls",
+          "text": "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu",
+          "copy": "NEW (a0-33)"
+        }
+      ]
+    },
+    {
+      "configuration": "390 px phone · Sticks + Manual",
+      "device": "touch",
+      "fireMode": "manual",
+      "scheme": "sticks",
+      "prompts": [
+        {
+          "rank": 1,
+          "prompt": "under-attack",
+          "text": "Your station is under attack — follow the arrow",
+          "copy": "GDD §2.10"
+        },
+        {
+          "rank": 2,
+          "prompt": "objective",
+          "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right",
+          "copy": "NEW (a0-34)"
+        },
+        {
+          "rank": 3,
+          "prompt": "mine",
+          "text": "Hold Right stick on the asteroid — your shots chip the rock",
+          "copy": "GDD §2.10"
+        },
+        {
+          "rank": 4,
+          "prompt": "haul-home",
+          "text": "Hold full — fly into your collection field to bank, then press BUILD to spend",
+          "copy": "GDD §2.10"
+        },
+        {
+          "rank": 5,
+          "prompt": "spend",
+          "text": "Spend ore on defense — or UPGRADE SHIP to mine and hit harder",
+          "copy": "GDD §2.10"
+        },
+        {
+          "rank": 6,
+          "prompt": "controls",
+          "text": "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu",
+          "copy": "NEW (a0-33)"
+        }
+      ]
+    },
+    {
+      "configuration": "390 px phone · Sticks + Auto-aim",
+      "device": "touch",
+      "fireMode": "auto-aim",
+      "scheme": "sticks",
+      "prompts": [
+        {
+          "rank": 1,
+          "prompt": "under-attack",
+          "text": "Your station is under attack — follow the arrow",
+          "copy": "GDD §2.10"
+        },
+        {
+          "rank": 2,
+          "prompt": "objective",
+          "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right",
+          "copy": "NEW (a0-34)"
+        },
+        {
+          "rank": 3,
+          "prompt": "mine",
+          "text": "Hold FIRE button near the asteroid — auto-aim does the aiming, your shots chip the rock",
+          "copy": "NEW (a0-33)"
+        },
+        {
+          "rank": 4,
+          "prompt": "haul-home",
+          "text": "Hold full — fly into your collection field to bank, then press BUILD to spend",
+          "copy": "GDD §2.10"
+        },
+        {
+          "rank": 5,
+          "prompt": "spend",
+          "text": "Spend ore on defense — or UPGRADE SHIP to mine and hit harder",
+          "copy": "GDD §2.10"
+        },
+        {
+          "rank": 6,
+          "prompt": "controls",
+          "text": "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu",
+          "copy": "NEW (a0-33)"
+        }
+      ]
+    },
+    {
+      "configuration": "390 px phone · Tap Commander",
+      "device": "touch",
+      "fireMode": "auto-aim",
+      "scheme": "tap",
+      "prompts": [
+        {
+          "rank": 1,
+          "prompt": "under-attack",
+          "text": "Your station is under attack — follow the arrow",
+          "copy": "GDD §2.10"
+        },
+        {
+          "rank": 2,
+          "prompt": "objective",
+          "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right",
+          "copy": "NEW (a0-34)"
+        },
+        {
+          "rank": 3,
+          "prompt": "mine",
+          "text": "Tap the asteroid to mine it — your shots chip the rock",
+          "copy": "NEW (a0-33)"
+        },
+        {
+          "rank": 4,
+          "prompt": "haul-home",
+          "text": "Hold full — tap your own station to bank in its collection field, then press BUILD to spend",
+          "copy": "NEW (a0-33)"
+        },
+        {
+          "rank": 5,
+          "prompt": "spend",
+          "text": "Spend ore on defense — or UPGRADE SHIP to mine and hit harder",
+          "copy": "GDD §2.10"
+        },
+        {
+          "rank": 6,
+          "prompt": "controls",
+          "text": "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu",
+          "copy": "NEW (a0-33)"
+        }
+      ]
+    }
+  ],
+  "objectiveAcrossTheSix": {
+    "distinctSentences": [
+      "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right"
+    ],
+    "perConfiguration": [
+      {
+        "configuration": "desktop · Sticks + Manual",
+        "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right"
+      },
+      {
+        "configuration": "desktop · Sticks + Auto-aim",
+        "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right"
+      },
+      {
+        "configuration": "desktop · Tap Commander",
+        "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right"
+      },
+      {
+        "configuration": "390 px phone · Sticks + Manual",
+        "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right"
+      },
+      {
+        "configuration": "390 px phone · Sticks + Auto-aim",
+        "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right"
+      },
+      {
+        "configuration": "390 px phone · Tap Commander",
+        "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right"
+      }
+    ],
+    "beats": {
+      "last station alive": true,
+      "mine ore": true,
+      "spend on defenses / upgrade your ship": true,
+      "attack when you see fit": true
+    }
+  },
+  "readings": [
+    {
+      "prompt": "objective",
+      "device": "keyboard",
+      "fireMode": "manual",
+      "scheme": "sticks",
+      "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right",
+      "copy": "NEW (a0-34)"
+    },
+    {
+      "prompt": "objective",
+      "device": "keyboard",
+      "fireMode": "auto-aim",
+      "scheme": "sticks",
+      "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right",
+      "copy": "NEW (a0-34)"
+    },
+    {
+      "prompt": "objective",
+      "device": "gamepad",
+      "fireMode": "manual",
+      "scheme": "sticks",
+      "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right",
+      "copy": "NEW (a0-34)"
+    },
+    {
+      "prompt": "objective",
+      "device": "gamepad",
+      "fireMode": "auto-aim",
+      "scheme": "sticks",
+      "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right",
+      "copy": "NEW (a0-34)"
+    },
+    {
+      "prompt": "objective",
+      "device": "touch",
+      "fireMode": "manual",
+      "scheme": "sticks",
+      "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right",
+      "copy": "NEW (a0-34)"
+    },
+    {
+      "prompt": "objective",
+      "device": "touch",
+      "fireMode": "auto-aim",
+      "scheme": "sticks",
+      "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right",
+      "copy": "NEW (a0-34)"
+    },
+    {
+      "prompt": "objective",
+      "device": "keyboard",
+      "fireMode": "manual",
+      "scheme": "tap",
+      "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right",
+      "copy": "NEW (a0-34)"
+    },
+    {
+      "prompt": "objective",
+      "device": "keyboard",
+      "fireMode": "auto-aim",
+      "scheme": "tap",
+      "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right",
+      "copy": "NEW (a0-34)"
+    },
+    {
+      "prompt": "objective",
+      "device": "gamepad",
+      "fireMode": "manual",
+      "scheme": "tap",
+      "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right",
+      "copy": "NEW (a0-34)"
+    },
+    {
+      "prompt": "objective",
+      "device": "gamepad",
+      "fireMode": "auto-aim",
+      "scheme": "tap",
+      "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right",
+      "copy": "NEW (a0-34)"
+    },
+    {
+      "prompt": "objective",
+      "device": "touch",
+      "fireMode": "manual",
+      "scheme": "tap",
+      "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right",
+      "copy": "NEW (a0-34)"
+    },
+    {
+      "prompt": "objective",
+      "device": "touch",
+      "fireMode": "auto-aim",
+      "scheme": "tap",
+      "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right",
+      "copy": "NEW (a0-34)"
+    },
+    {
+      "prompt": "mine",
+      "device": "keyboard",
+      "fireMode": "manual",
+      "scheme": "sticks",
+      "text": "Hold Left mouse on the asteroid — your shots chip the rock",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "mine",
+      "device": "keyboard",
+      "fireMode": "auto-aim",
+      "scheme": "sticks",
+      "text": "Hold Left mouse near the asteroid — auto-aim does the aiming, your shots chip the rock",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "mine",
+      "device": "gamepad",
+      "fireMode": "manual",
+      "scheme": "sticks",
+      "text": "Hold Right trigger on the asteroid — your shots chip the rock",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "mine",
+      "device": "gamepad",
+      "fireMode": "auto-aim",
+      "scheme": "sticks",
+      "text": "Hold Right trigger near the asteroid — auto-aim does the aiming, your shots chip the rock",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "mine",
+      "device": "touch",
+      "fireMode": "manual",
+      "scheme": "sticks",
+      "text": "Hold Right stick on the asteroid — your shots chip the rock",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "mine",
+      "device": "touch",
+      "fireMode": "auto-aim",
+      "scheme": "sticks",
+      "text": "Hold FIRE button near the asteroid — auto-aim does the aiming, your shots chip the rock",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "mine",
+      "device": "keyboard",
+      "fireMode": "manual",
+      "scheme": "tap",
+      "text": "Tap the asteroid to mine it — your shots chip the rock",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "mine",
+      "device": "keyboard",
+      "fireMode": "auto-aim",
+      "scheme": "tap",
+      "text": "Tap the asteroid to mine it — your shots chip the rock",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "mine",
+      "device": "gamepad",
+      "fireMode": "manual",
+      "scheme": "tap",
+      "text": "Tap the asteroid to mine it — your shots chip the rock",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "mine",
+      "device": "gamepad",
+      "fireMode": "auto-aim",
+      "scheme": "tap",
+      "text": "Tap the asteroid to mine it — your shots chip the rock",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "mine",
+      "device": "touch",
+      "fireMode": "manual",
+      "scheme": "tap",
+      "text": "Tap the asteroid to mine it — your shots chip the rock",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "mine",
+      "device": "touch",
+      "fireMode": "auto-aim",
+      "scheme": "tap",
+      "text": "Tap the asteroid to mine it — your shots chip the rock",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "haul-home",
+      "device": "keyboard",
+      "fireMode": "manual",
+      "scheme": "sticks",
+      "text": "Hold full — fly into your collection field to bank, then press E to spend",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "haul-home",
+      "device": "keyboard",
+      "fireMode": "auto-aim",
+      "scheme": "sticks",
+      "text": "Hold full — fly into your collection field to bank, then press E to spend",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "haul-home",
+      "device": "gamepad",
+      "fireMode": "manual",
+      "scheme": "sticks",
+      "text": "Hold full — fly into your collection field to bank, then press Y / △ to spend",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "haul-home",
+      "device": "gamepad",
+      "fireMode": "auto-aim",
+      "scheme": "sticks",
+      "text": "Hold full — fly into your collection field to bank, then press Y / △ to spend",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "haul-home",
+      "device": "touch",
+      "fireMode": "manual",
+      "scheme": "sticks",
+      "text": "Hold full — fly into your collection field to bank, then press BUILD to spend",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "haul-home",
+      "device": "touch",
+      "fireMode": "auto-aim",
+      "scheme": "sticks",
+      "text": "Hold full — fly into your collection field to bank, then press BUILD to spend",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "haul-home",
+      "device": "keyboard",
+      "fireMode": "manual",
+      "scheme": "tap",
+      "text": "Hold full — tap your own station to bank in its collection field, then press E to spend",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "haul-home",
+      "device": "keyboard",
+      "fireMode": "auto-aim",
+      "scheme": "tap",
+      "text": "Hold full — tap your own station to bank in its collection field, then press E to spend",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "haul-home",
+      "device": "gamepad",
+      "fireMode": "manual",
+      "scheme": "tap",
+      "text": "Hold full — tap your own station to bank in its collection field, then press Y / △ to spend",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "haul-home",
+      "device": "gamepad",
+      "fireMode": "auto-aim",
+      "scheme": "tap",
+      "text": "Hold full — tap your own station to bank in its collection field, then press Y / △ to spend",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "haul-home",
+      "device": "touch",
+      "fireMode": "manual",
+      "scheme": "tap",
+      "text": "Hold full — tap your own station to bank in its collection field, then press BUILD to spend",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "haul-home",
+      "device": "touch",
+      "fireMode": "auto-aim",
+      "scheme": "tap",
+      "text": "Hold full — tap your own station to bank in its collection field, then press BUILD to spend",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "spend",
+      "device": "keyboard",
+      "fireMode": "manual",
+      "scheme": "sticks",
+      "text": "Spend ore on defense — or UPGRADE SHIP to mine and hit harder",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "spend",
+      "device": "keyboard",
+      "fireMode": "auto-aim",
+      "scheme": "sticks",
+      "text": "Spend ore on defense — or UPGRADE SHIP to mine and hit harder",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "spend",
+      "device": "gamepad",
+      "fireMode": "manual",
+      "scheme": "sticks",
+      "text": "Spend ore on defense — or UPGRADE SHIP to mine and hit harder",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "spend",
+      "device": "gamepad",
+      "fireMode": "auto-aim",
+      "scheme": "sticks",
+      "text": "Spend ore on defense — or UPGRADE SHIP to mine and hit harder",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "spend",
+      "device": "touch",
+      "fireMode": "manual",
+      "scheme": "sticks",
+      "text": "Spend ore on defense — or UPGRADE SHIP to mine and hit harder",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "spend",
+      "device": "touch",
+      "fireMode": "auto-aim",
+      "scheme": "sticks",
+      "text": "Spend ore on defense — or UPGRADE SHIP to mine and hit harder",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "spend",
+      "device": "keyboard",
+      "fireMode": "manual",
+      "scheme": "tap",
+      "text": "Spend ore on defense — or UPGRADE SHIP to mine and hit harder",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "spend",
+      "device": "keyboard",
+      "fireMode": "auto-aim",
+      "scheme": "tap",
+      "text": "Spend ore on defense — or UPGRADE SHIP to mine and hit harder",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "spend",
+      "device": "gamepad",
+      "fireMode": "manual",
+      "scheme": "tap",
+      "text": "Spend ore on defense — or UPGRADE SHIP to mine and hit harder",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "spend",
+      "device": "gamepad",
+      "fireMode": "auto-aim",
+      "scheme": "tap",
+      "text": "Spend ore on defense — or UPGRADE SHIP to mine and hit harder",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "spend",
+      "device": "touch",
+      "fireMode": "manual",
+      "scheme": "tap",
+      "text": "Spend ore on defense — or UPGRADE SHIP to mine and hit harder",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "spend",
+      "device": "touch",
+      "fireMode": "auto-aim",
+      "scheme": "tap",
+      "text": "Spend ore on defense — or UPGRADE SHIP to mine and hit harder",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "under-attack",
+      "device": "keyboard",
+      "fireMode": "manual",
+      "scheme": "sticks",
+      "text": "Your station is under attack — follow the arrow",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "under-attack",
+      "device": "keyboard",
+      "fireMode": "auto-aim",
+      "scheme": "sticks",
+      "text": "Your station is under attack — follow the arrow",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "under-attack",
+      "device": "gamepad",
+      "fireMode": "manual",
+      "scheme": "sticks",
+      "text": "Your station is under attack — follow the arrow",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "under-attack",
+      "device": "gamepad",
+      "fireMode": "auto-aim",
+      "scheme": "sticks",
+      "text": "Your station is under attack — follow the arrow",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "under-attack",
+      "device": "touch",
+      "fireMode": "manual",
+      "scheme": "sticks",
+      "text": "Your station is under attack — follow the arrow",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "under-attack",
+      "device": "touch",
+      "fireMode": "auto-aim",
+      "scheme": "sticks",
+      "text": "Your station is under attack — follow the arrow",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "under-attack",
+      "device": "keyboard",
+      "fireMode": "manual",
+      "scheme": "tap",
+      "text": "Your station is under attack — follow the arrow",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "under-attack",
+      "device": "keyboard",
+      "fireMode": "auto-aim",
+      "scheme": "tap",
+      "text": "Your station is under attack — follow the arrow",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "under-attack",
+      "device": "gamepad",
+      "fireMode": "manual",
+      "scheme": "tap",
+      "text": "Your station is under attack — follow the arrow",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "under-attack",
+      "device": "gamepad",
+      "fireMode": "auto-aim",
+      "scheme": "tap",
+      "text": "Your station is under attack — follow the arrow",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "under-attack",
+      "device": "touch",
+      "fireMode": "manual",
+      "scheme": "tap",
+      "text": "Your station is under attack — follow the arrow",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "under-attack",
+      "device": "touch",
+      "fireMode": "auto-aim",
+      "scheme": "tap",
+      "text": "Your station is under attack — follow the arrow",
+      "copy": "GDD §2.10"
+    },
+    {
+      "prompt": "controls",
+      "device": "keyboard",
+      "fireMode": "manual",
+      "scheme": "sticks",
+      "text": "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "controls",
+      "device": "keyboard",
+      "fireMode": "auto-aim",
+      "scheme": "sticks",
+      "text": "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "controls",
+      "device": "gamepad",
+      "fireMode": "manual",
+      "scheme": "sticks",
+      "text": "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "controls",
+      "device": "gamepad",
+      "fireMode": "auto-aim",
+      "scheme": "sticks",
+      "text": "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "controls",
+      "device": "touch",
+      "fireMode": "manual",
+      "scheme": "sticks",
+      "text": "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "controls",
+      "device": "touch",
+      "fireMode": "auto-aim",
+      "scheme": "sticks",
+      "text": "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "controls",
+      "device": "keyboard",
+      "fireMode": "manual",
+      "scheme": "tap",
+      "text": "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "controls",
+      "device": "keyboard",
+      "fireMode": "auto-aim",
+      "scheme": "tap",
+      "text": "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "controls",
+      "device": "gamepad",
+      "fireMode": "manual",
+      "scheme": "tap",
+      "text": "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "controls",
+      "device": "gamepad",
+      "fireMode": "auto-aim",
+      "scheme": "tap",
+      "text": "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "controls",
+      "device": "touch",
+      "fireMode": "manual",
+      "scheme": "tap",
+      "text": "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu",
+      "copy": "NEW (a0-33)"
+    },
+    {
+      "prompt": "controls",
+      "device": "touch",
+      "fireMode": "auto-aim",
+      "scheme": "tap",
+      "text": "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu",
+      "copy": "NEW (a0-33)"
+    }
+  ],
+  "phone": [
+    {
+      "prompt": "objective",
+      "scheme": "sticks",
+      "fireMode": "manual",
+      "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right",
+      "chars": 106,
+      "lines": 3,
+      "panelHeight": 65,
+      "capHeight": 324,
+      "fits": true,
+      "bottomEdge": 340,
+      "visibleBottom": 356
+    },
+    {
+      "prompt": "objective",
+      "scheme": "sticks",
+      "fireMode": "auto-aim",
+      "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right",
+      "chars": 106,
+      "lines": 3,
+      "panelHeight": 65,
+      "capHeight": 324,
+      "fits": true,
+      "bottomEdge": 340,
+      "visibleBottom": 356
+    },
+    {
+      "prompt": "objective",
+      "scheme": "tap",
+      "fireMode": "manual",
+      "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right",
+      "chars": 106,
+      "lines": 3,
+      "panelHeight": 65,
+      "capHeight": 324,
+      "fits": true,
+      "bottomEdge": 340,
+      "visibleBottom": 356
+    },
+    {
+      "prompt": "objective",
+      "scheme": "tap",
+      "fireMode": "auto-aim",
+      "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right",
+      "chars": 106,
+      "lines": 3,
+      "panelHeight": 65,
+      "capHeight": 324,
+      "fits": true,
+      "bottomEdge": 340,
+      "visibleBottom": 356
+    },
+    {
+      "prompt": "mine",
+      "scheme": "sticks",
+      "fireMode": "manual",
+      "text": "Hold Right stick on the asteroid — your shots chip the rock",
+      "chars": 59,
+      "lines": 2,
+      "panelHeight": 49,
+      "capHeight": 324,
+      "fits": true,
+      "bottomEdge": 340,
+      "visibleBottom": 356
+    },
+    {
+      "prompt": "mine",
+      "scheme": "sticks",
+      "fireMode": "auto-aim",
+      "text": "Hold FIRE button near the asteroid — auto-aim does the aiming, your shots chip the rock",
+      "chars": 87,
+      "lines": 3,
+      "panelHeight": 65,
+      "capHeight": 324,
+      "fits": true,
+      "bottomEdge": 340,
+      "visibleBottom": 356
+    },
+    {
+      "prompt": "mine",
+      "scheme": "tap",
+      "fireMode": "manual",
+      "text": "Tap the asteroid to mine it — your shots chip the rock",
+      "chars": 54,
+      "lines": 2,
+      "panelHeight": 49,
+      "capHeight": 324,
+      "fits": true,
+      "bottomEdge": 340,
+      "visibleBottom": 356
+    },
+    {
+      "prompt": "mine",
+      "scheme": "tap",
+      "fireMode": "auto-aim",
+      "text": "Tap the asteroid to mine it — your shots chip the rock",
+      "chars": 54,
+      "lines": 2,
+      "panelHeight": 49,
+      "capHeight": 324,
+      "fits": true,
+      "bottomEdge": 340,
+      "visibleBottom": 356
+    },
+    {
+      "prompt": "haul-home",
+      "scheme": "sticks",
+      "fireMode": "manual",
+      "text": "Hold full — fly into your collection field to bank, then press BUILD to spend",
+      "chars": 77,
+      "lines": 3,
+      "panelHeight": 65,
+      "capHeight": 324,
+      "fits": true,
+      "bottomEdge": 340,
+      "visibleBottom": 356
+    },
+    {
+      "prompt": "haul-home",
+      "scheme": "sticks",
+      "fireMode": "auto-aim",
+      "text": "Hold full — fly into your collection field to bank, then press BUILD to spend",
+      "chars": 77,
+      "lines": 3,
+      "panelHeight": 65,
+      "capHeight": 324,
+      "fits": true,
+      "bottomEdge": 340,
+      "visibleBottom": 356
+    },
+    {
+      "prompt": "haul-home",
+      "scheme": "tap",
+      "fireMode": "manual",
+      "text": "Hold full — tap your own station to bank in its collection field, then press BUILD to spend",
+      "chars": 91,
+      "lines": 3,
+      "panelHeight": 65,
+      "capHeight": 324,
+      "fits": true,
+      "bottomEdge": 340,
+      "visibleBottom": 356
+    },
+    {
+      "prompt": "haul-home",
+      "scheme": "tap",
+      "fireMode": "auto-aim",
+      "text": "Hold full — tap your own station to bank in its collection field, then press BUILD to spend",
+      "chars": 91,
+      "lines": 3,
+      "panelHeight": 65,
+      "capHeight": 324,
+      "fits": true,
+      "bottomEdge": 340,
+      "visibleBottom": 356
+    },
+    {
+      "prompt": "spend",
+      "scheme": "sticks",
+      "fireMode": "manual",
+      "text": "Spend ore on defense — or UPGRADE SHIP to mine and hit harder",
+      "chars": 61,
+      "lines": 2,
+      "panelHeight": 49,
+      "capHeight": 324,
+      "fits": true,
+      "bottomEdge": 340,
+      "visibleBottom": 356
+    },
+    {
+      "prompt": "spend",
+      "scheme": "sticks",
+      "fireMode": "auto-aim",
+      "text": "Spend ore on defense — or UPGRADE SHIP to mine and hit harder",
+      "chars": 61,
+      "lines": 2,
+      "panelHeight": 49,
+      "capHeight": 324,
+      "fits": true,
+      "bottomEdge": 340,
+      "visibleBottom": 356
+    },
+    {
+      "prompt": "spend",
+      "scheme": "tap",
+      "fireMode": "manual",
+      "text": "Spend ore on defense — or UPGRADE SHIP to mine and hit harder",
+      "chars": 61,
+      "lines": 2,
+      "panelHeight": 49,
+      "capHeight": 324,
+      "fits": true,
+      "bottomEdge": 340,
+      "visibleBottom": 356
+    },
+    {
+      "prompt": "spend",
+      "scheme": "tap",
+      "fireMode": "auto-aim",
+      "text": "Spend ore on defense — or UPGRADE SHIP to mine and hit harder",
+      "chars": 61,
+      "lines": 2,
+      "panelHeight": 49,
+      "capHeight": 324,
+      "fits": true,
+      "bottomEdge": 340,
+      "visibleBottom": 356
+    },
+    {
+      "prompt": "under-attack",
+      "scheme": "sticks",
+      "fireMode": "manual",
+      "text": "Your station is under attack — follow the arrow",
+      "chars": 47,
+      "lines": 2,
+      "panelHeight": 49,
+      "capHeight": 324,
+      "fits": true,
+      "bottomEdge": 340,
+      "visibleBottom": 356
+    },
+    {
+      "prompt": "under-attack",
+      "scheme": "sticks",
+      "fireMode": "auto-aim",
+      "text": "Your station is under attack — follow the arrow",
+      "chars": 47,
+      "lines": 2,
+      "panelHeight": 49,
+      "capHeight": 324,
+      "fits": true,
+      "bottomEdge": 340,
+      "visibleBottom": 356
+    },
+    {
+      "prompt": "under-attack",
+      "scheme": "tap",
+      "fireMode": "manual",
+      "text": "Your station is under attack — follow the arrow",
+      "chars": 47,
+      "lines": 2,
+      "panelHeight": 49,
+      "capHeight": 324,
+      "fits": true,
+      "bottomEdge": 340,
+      "visibleBottom": 356
+    },
+    {
+      "prompt": "under-attack",
+      "scheme": "tap",
+      "fireMode": "auto-aim",
+      "text": "Your station is under attack — follow the arrow",
+      "chars": 47,
+      "lines": 2,
+      "panelHeight": 49,
+      "capHeight": 324,
+      "fits": true,
+      "bottomEdge": 340,
+      "visibleBottom": 356
+    },
+    {
+      "prompt": "controls",
+      "scheme": "sticks",
+      "fireMode": "manual",
+      "text": "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu",
+      "chars": 70,
+      "lines": 2,
+      "panelHeight": 49,
+      "capHeight": 324,
+      "fits": true,
+      "bottomEdge": 340,
+      "visibleBottom": 356
+    },
+    {
+      "prompt": "controls",
+      "scheme": "sticks",
+      "fireMode": "auto-aim",
+      "text": "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu",
+      "chars": 70,
+      "lines": 2,
+      "panelHeight": 49,
+      "capHeight": 324,
+      "fits": true,
+      "bottomEdge": 340,
+      "visibleBottom": 356
+    },
+    {
+      "prompt": "controls",
+      "scheme": "tap",
+      "fireMode": "manual",
+      "text": "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu",
+      "chars": 70,
+      "lines": 2,
+      "panelHeight": 49,
+      "capHeight": 324,
+      "fits": true,
+      "bottomEdge": 340,
+      "visibleBottom": 356
+    },
+    {
+      "prompt": "controls",
+      "scheme": "tap",
+      "fireMode": "auto-aim",
+      "text": "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu",
+      "chars": 70,
+      "lines": 2,
+      "panelHeight": 49,
+      "capHeight": 324,
+      "fits": true,
+      "bottomEdge": 340,
+      "visibleBottom": 356
+    }
+  ],
+  "firstMatch": [
+    {
+      "moment": "t=0 — the match opens",
+      "scheme": "tap",
+      "prompt": "objective",
+      "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right"
+    },
+    {
+      "moment": "t=3 — drifts into asteroid range, still reading",
+      "scheme": "tap",
+      "prompt": "objective",
+      "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right"
+    },
+    {
+      "moment": "t=9 — the objective is read, and retires for the career",
+      "scheme": "tap",
+      "prompt": "mine",
+      "text": "Tap the asteroid to mine it — your shots chip the rock"
+    },
+    {
+      "moment": "t=10 — SWITCHES to the sticks with the prompt on screen",
+      "scheme": "sticks",
+      "prompt": "mine",
+      "text": "Hold FIRE button near the asteroid — auto-aim does the aiming, your shots chip the rock"
+    },
+    {
+      "moment": "t=14 — chips off a first ore, MINE is learned",
+      "scheme": "sticks",
+      "prompt": "(none)",
+      "text": ""
+    },
+    {
+      "moment": "t=30 — the hold fills",
+      "scheme": "sticks",
+      "prompt": "haul-home",
+      "text": "Hold full — fly into your collection field to bank, then press BUILD to spend"
+    },
+    {
+      "moment": "t=34 — switches BACK to Tap Commander, hold still full",
+      "scheme": "tap",
+      "prompt": "haul-home",
+      "text": "Hold full — tap your own station to bank in its collection field, then press BUILD to spend"
+    },
+    {
+      "moment": "t=50 — banks in the collection field, HAUL is learned",
+      "scheme": "tap",
+      "prompt": "controls",
+      "text": "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu"
+    },
+    {
+      "moment": "t=52 — opens the Build wheel",
+      "scheme": "tap",
+      "prompt": "spend",
+      "text": "Spend ore on defense — or UPGRADE SHIP to mine and hit harder"
+    },
+    {
+      "moment": "t=55 — buys a turret, SPEND is learned; the settings tip takes the band",
+      "scheme": "tap",
+      "prompt": "controls",
+      "text": "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu"
+    },
+    {
+      "moment": "t=63 — 8 s of shown time: the settings tip is read, and retires",
+      "scheme": "tap",
+      "prompt": "(none)",
+      "text": ""
+    },
+    {
+      "moment": "t=70 — the station is sieged",
+      "scheme": "tap",
+      "prompt": "under-attack",
+      "text": "Your station is under attack — follow the arrow"
+    },
+    {
+      "moment": "t=95 — the siege is survived; every lesson is behind the player",
+      "scheme": "tap",
+      "prompt": "(none)",
+      "text": ""
+    },
+    {
+      "moment": "t=300 — near a rock, hold full, wheel open: nothing re-fires",
+      "scheme": "tap",
+      "prompt": "(none)",
+      "text": ""
+    }
+  ],
+  "dwells": [
+    {
+      "moment": "the match opens — the objective takes the band",
+      "scheme": "tap",
+      "prompt": "objective",
+      "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right"
+    },
+    {
+      "moment": "t+2 s",
+      "scheme": "tap",
+      "prompt": "objective",
+      "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right"
+    },
+    {
+      "moment": "t+3 s — a siege interrupts the read",
+      "scheme": "tap",
+      "prompt": "under-attack",
+      "text": "Your station is under attack — follow the arrow"
+    },
+    {
+      "moment": "t+40 s — still under siege; the dwell has not moved",
+      "scheme": "tap",
+      "prompt": "under-attack",
+      "text": "Your station is under attack — follow the arrow"
+    },
+    {
+      "moment": "t+41 s — survived; the objective is owed its read",
+      "scheme": "tap",
+      "prompt": "objective",
+      "text": "Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right"
+    },
+    {
+      "moment": "t+47 s — 8 s of SHOWN time; read, and retired",
+      "scheme": "tap",
+      "prompt": "(none)",
+      "text": ""
+    }
+  ],
+  "allCompleted": {
+    "firstMatch": true
+  }
+}
