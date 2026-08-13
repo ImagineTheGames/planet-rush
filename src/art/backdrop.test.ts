@@ -61,12 +61,62 @@ import {
 } from './compliance';
 import { DERIVED, FLOOR, IDENTITY_COLORS, PALETTE, hex } from './palette';
 import { pointInPoly } from './raster';
-import type { Shape, SpriteDef } from './shapes';
+import { inkAlphaAt, type Shape, type SpriteDef } from './shapes';
 import { ALL_SPRITES } from './catalogue';
 
-/** The field every sky is measured over — a 16:9 landscape field, the shape a
- *  phone actually plays in (the game is landscape-locked, GDD §4.6). */
+/** The field every sky's **cost** is measured over — a 16:9 landscape field, the
+ *  shape a phone actually plays in (the game is landscape-locked, GDD §4.6).
+ *  One screenful exactly, which is what makes `NebulaSpec.overdraw` a per-screen
+ *  constant a test can pin on any map (see `overdrawOf`). */
 const FIELD = { w: 1600, h: 900 } as const;
+
+/**
+ * **The field every sky's *brightness* is measured over, and it is a different
+ * field from the one its cost is (a0-39).**
+ *
+ * Overdraw is a per-screenful *average* and is arena-invariant by construction,
+ * so measuring it on one screenful is exact. **Peak brightness is an extreme
+ * value**, and an extreme over nine clots is not the extreme over the sixty a
+ * real arena carries — so measuring it on one screenful systematically
+ * under-reports the brightest pixel a player can actually meet.
+ *
+ * That gap was live before this brief and it was not small: on the shipped
+ * build, Plasma Reef pinned at Y′ 17.4 here and rendered at **17.9** in a real
+ * 1280×800 frame over the wide arena, where the owner beacon ring lost **10.6%**
+ * of its contrast — over the 10% ceiling the disqualifier test below sets, and
+ * invisible to it. a0-39 made the reef fuller through its middle (a gradient
+ * holds more alpha at mid-radius than the stack it replaced), which would have
+ * taken that to 15.3% unnoticed.
+ *
+ * So brightness is measured where the player is: the **desktop control profile**
+ * (`docs/perf-gate.md`, 1280×800) over the **wide arena** (`sim/maps.ts` `WIDE`,
+ * the bounds `oval`/`diamond`/`line` play on), across the parallax field
+ * `VoidBackdrop.configure` actually builds for that pair — and, crucially, only
+ * across {@link visibleSpan} of it. `coverSpan` deliberately over-provisions the
+ * field; more than half of it is never on screen at any camera offset, and a
+ * peak found out there is a peak nobody meets.
+ */
+const SCREEN = { w: 1280, h: 800 } as const;
+const ARENA = { w: 3200, h: 2000 } as const;
+const SKY_FIELD = {
+  w: coverSpan(SKY_PARALLAX, SCREEN.w, ARENA.w),
+  h: coverSpan(SKY_PARALLAX, SCREEN.h, ARENA.h),
+} as const;
+
+/**
+ * How much of a parallax field is **ever visible**, on one axis, and where.
+ *
+ * The layer sits at `view/2 + offset·f` and the camera offset runs over
+ * `[−(bound − view), 0]`, so screen `[0, view]` maps to field coordinates
+ * `[−view/2, view/2 + f·(bound − view)]` across the whole crossing. At
+ * `SKY_PARALLAX` over the wide arena that is **1443 px of a 3315 px field** —
+ * the sky is built more than twice as wide as it is ever seen, which is the
+ * cover slack `coverSpan` exists to provide and is exactly the region a
+ * brightness measurement must NOT include.
+ */
+function visibleSpan(f: number, view: number, bound: number): { min: number; max: number } {
+  return { min: -view / 2, max: view / 2 + f * (bound - view) };
+}
 
 // ---------------------------------------------------------------------------
 // A compositing sampler — the measuring device
@@ -122,6 +172,30 @@ function unpack(color: number): [number, number, number] {
   return [(color >> 16) & 0xff, (color >> 8) & 0xff, color & 0xff];
 }
 
+/** A shape's axis-aligned bounds — a cheap reject for the samplers below. */
+function boundsOf(s: Shape): { minX: number; maxX: number; minY: number; maxY: number } {
+  if (s.path.kind === 'circle') {
+    return {
+      minX: s.path.cx - s.path.r,
+      maxX: s.path.cx + s.path.r,
+      minY: s.path.cy - s.path.r,
+      maxY: s.path.cy + s.path.r,
+    };
+  }
+  const p = s.path.points;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (let i = 0; i < p.length; i += 2) {
+    minX = Math.min(minX, p[i]!);
+    maxX = Math.max(maxX, p[i]!);
+    minY = Math.min(minY, p[i + 1]!);
+    maxY = Math.max(maxY, p[i + 1]!);
+  }
+  return { minX, maxX, minY, maxY };
+}
+
 /** Does a shape cover `(x, y)`? Fills only — a sky is fills. */
 function covers(shape: Shape, x: number, y: number): boolean {
   if (!shape.fill) return false;
@@ -143,7 +217,10 @@ function compositeAt(shapes: readonly Shape[], additive: boolean, x: number, y: 
   for (const s of shapes) {
     if (!s.fill || !covers(s, x, y)) continue;
     const [r, g, b] = unpack(s.fill.color);
-    const a = s.fill.alpha;
+    // `fill.alpha` is a soft fill's PEAK; what it paints here is the falloff's
+    // own value at this point, and every consumer of "how bright is this ink
+    // here" goes through the one definition of it (a0-39, ./shapes).
+    const a = inkAlphaAt(s.fill, x, y);
     if (additive) {
       out[0] = Math.min(255, out[0] + r * a);
       out[1] = Math.min(255, out[1] + g * a);
@@ -173,17 +250,42 @@ function skyBrightness(
   density = 1,
 ): { peak: [number, number, number]; peakLuma: number; meanLuma: number } {
   const spec = NEBULAE[id];
-  const shapes = nebulaSprite(id, VOID_SEED, FIELD.w, FIELD.h, density).shapes;
-  const COLS = 200;
-  const ROWS = 120;
+  const shapes = nebulaSprite(
+    id,
+    VOID_SEED,
+    SKY_FIELD.w,
+    SKY_FIELD.h,
+    density,
+    SCREEN.w,
+    SCREEN.h,
+  ).shapes;
+  // The window a player can ever see of this field, and only the shapes that
+  // reach into it. Two things at once: the measurement stops counting pixels
+  // nobody meets, and the sampler drops from ~260 shapes to ~50, which is what
+  // makes a 3.8 px grid affordable at all.
+  const vx = visibleSpan(spec.parallax, SCREEN.w, ARENA.w);
+  const vy = visibleSpan(spec.parallax, SCREEN.h, ARENA.h);
+  const boxed = shapes
+    .map((s) => ({ s, ...boundsOf(s) }))
+    .filter((b) => b.maxX >= vx.min && b.minX <= vx.max && b.maxY >= vy.min && b.minY <= vy.max);
+  // ~3.8 px cells. The smallest thing that has to survive the grid is a Plasma
+  // Reef clot node (r 18–38 px at this screen), so a cell is a fifth of the
+  // smallest feature's radius and a peak cannot slip between samples.
+  const COLS = 384;
+  const ROWS = 248;
   let peak: [number, number, number] = unpack(GROUND_COLOR);
   let peakY = luma(peak);
   let sum = 0;
+  const hit: Shape[] = [];
   for (let r = 0; r < ROWS; r++) {
+    const y = vy.min + ((r + 0.5) / ROWS) * (vy.max - vy.min);
     for (let c = 0; c < COLS; c++) {
-      const x = ((c + 0.5) / COLS - 0.5) * FIELD.w;
-      const y = ((r + 0.5) / ROWS - 0.5) * FIELD.h;
-      const px = compositeAt(shapes, spec.additive, x, y);
+      const x = vx.min + ((c + 0.5) / COLS) * (vx.max - vx.min);
+      hit.length = 0;
+      for (const b of boxed) {
+        if (x >= b.minX && x <= b.maxX && y >= b.minY && y <= b.maxY) hit.push(b.s);
+      }
+      const px = hit.length === 0 ? unpack(GROUND_COLOR) : compositeAt(hit, spec.additive, x, y);
       const l = luma(px);
       sum += l;
       if (l > peakY) {

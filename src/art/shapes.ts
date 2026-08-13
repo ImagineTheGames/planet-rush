@@ -75,10 +75,66 @@ export type PathData = PolyPath | CirclePath;
 // Paint
 // ---------------------------------------------------------------------------
 
+/**
+ * A **smooth radial falloff** over a fill: the alpha at a point is the ink's own
+ * alpha times {@link falloffProfile} of that point's elliptical distance from
+ * `(cx, cy)`. At the falloff's own rim the alpha is exactly zero, so a
+ * gradient-filled shape has no visible boundary at all.
+ *
+ * ## Why this is in the IR rather than faked with more geometry (a0-39)
+ *
+ * Before this existed, every soft edge in the art was a **stack of concentric
+ * flat-filled shapes** — four of them, at radius fractions `1.0 / 0.72 / 0.46 /
+ * 0.2`. At sprite scale that reads as a soft edge. At *nebula* scale it reads as
+ * four hard-edged rings with a dark core, and it is precisely what the developer
+ * photographed and reported three times as *"bloom orbs with no stars in them"*:
+ *
+ * ```
+ *   an isolated Deep Ember body, 720-ray rotational profile, Y′ over Floor
+ *   r      0…40    40   44…92    93   96…144   145  148…202  202   ≥208
+ *   Y′     7.633   ↓    4.995    ↓    3.357    ↓    2.144    ↓     1.932   ← Floor
+ *   rings at r/r_outer  0.198 / 0.460 / 0.718 / 1.000
+ *   SOFT_STOPS radii    0.200 / 0.460 / 0.720 / 1.000
+ * ```
+ *
+ * Four dead-flat plateaus, four hard edges, nothing in between. The steepest
+ * 6 px drop was **2.629 Y′** where a smooth falloff over the same blob cannot
+ * exceed **0.143** — an 18× overshoot.
+ *
+ * Adding stops does not fix it: sixteen bands is still bands, and every stop is
+ * another covered layer on a per-frame fill-rate budget CI pins
+ * (`NebulaSpec.overdraw`). What fixes it is one shape whose *alpha* varies,
+ * which is what this is — and it costs a **quarter** of the geometry the stack
+ * did, because one shape replaces four.
+ *
+ * It stays in the IR rather than becoming a texture-mapped layer of its own so
+ * that a sky is still plain data: `./compliance` still audits its colour and its
+ * peak alpha, `./raster` still rasterizes it, `./svg` still draws it for review,
+ * and `backdrop.test.ts` still measures its brightness and its overdraw.
+ */
+export interface Falloff {
+  /** Centre of the falloff, in the same space as the path. */
+  readonly cx: number;
+  readonly cy: number;
+  /** The radii at which the alpha reaches **zero**, before rotation. */
+  readonly rx: number;
+  readonly ry: number;
+  /** Rotation of the falloff's axes, radians. */
+  readonly angle: number;
+}
+
 /** A colour and its opacity. */
 export interface Ink {
   readonly color: number;
+  /**
+   * The opacity — and, when {@link falloff} is present, the **peak** opacity,
+   * reached only at the falloff's centre. Every consumer that bounds a fill
+   * (notably `./compliance`'s sky ceilings) therefore reads the conservative
+   * number without having to know about the falloff at all.
+   */
   readonly alpha: number;
+  /** A smooth radial falloff over this fill, or absent for a flat one. */
+  readonly falloff?: Falloff | undefined;
 }
 
 /** An outline: an {@link Ink} plus a width, in unit-space units. */
@@ -118,6 +174,23 @@ export interface SpriteDef {
 /** A solid fill in `color` at `alpha`, meaning `role`. */
 export function fill(color: number, role: PaintRole, alpha = 1): Paint {
   return { role, fill: { color, alpha } };
+}
+
+/**
+ * A fill in `color` whose alpha falls smoothly from `peakAlpha` at the
+ * falloff's centre to **zero** at its rim ({@link Falloff}).
+ *
+ * The path is still the path: the falloff modulates the paint, it does not
+ * clip. Give the shape a path that sits at or inside the falloff's zero rim and
+ * the result has no boundary a player can see.
+ */
+export function softFill(
+  color: number,
+  role: PaintRole,
+  peakAlpha: number,
+  falloff: Falloff,
+): Paint {
+  return { role, fill: { color, alpha: peakAlpha, falloff } };
 }
 
 /** An outline `width` unit-units thick. */
@@ -227,6 +300,99 @@ export function blob(
     pts.push(round(cx + Math.cos(a) * r), round(cy + Math.sin(a) * r));
   }
   return pts;
+}
+
+/**
+ * A closed ellipse as a polygon: `rx`×`ry`, rotated by `angle`. The path a
+ * {@link Falloff}'s own zero rim traces, so a soft element's geometry and its
+ * paint end in the same place.
+ */
+export function ellipsePoints(
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number,
+  angle: number,
+  vertices = 28,
+): number[] {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const pts: number[] = [];
+  const n = Math.max(3, Math.floor(vertices));
+  for (let i = 0; i < n; i++) {
+    const t = (i / n) * Math.PI * 2;
+    const ex = Math.cos(t) * rx;
+    const ey = Math.sin(t) * ry;
+    pts.push(round(cx + ex * cos - ey * sin), round(cy + ex * sin + ey * cos));
+  }
+  return pts;
+}
+
+// ---------------------------------------------------------------------------
+// The falloff profile — one curve, for the whole art
+// ---------------------------------------------------------------------------
+
+/**
+ * **The falloff curve: `(1 − t²)²`**, for `t` = elliptical distance from the
+ * centre in units of the falloff's own radius. 1 at the centre, 0 from `t = 1`
+ * outward.
+ *
+ * One curve for every soft element in the game, and it is this one for three
+ * reasons that are all about *not producing an edge*:
+ *
+ *  1. **Its slope is zero at both ends.** `f′(t) = −4t(1 − t²)` is 0 at `t = 0`
+ *     and at `t = 1`, so the blob has a naturally flat core without a plateau
+ *     spliced onto it, and it meets the background tangentially instead of
+ *     landing on it. A curve that arrives at the rim with slope — `1 − t`, or
+ *     any of the stop tables this replaced — leaves a Mach band there, which is
+ *     the artefact all over again at one ring instead of four.
+ *  2. **It is smooth everywhere in between.** No knot, no piecewise join, so
+ *     there is no radius at which the *second* derivative jumps either — the
+ *     other place the eye finds a ring that the arithmetic says is not there.
+ *  3. **It has a closed-form mean**, `∫₀¹ (1−t²)²·2t dt = 1/3`, so "what does
+ *     this blob cost the frame on average" is arithmetic rather than a sample.
+ *
+ * Its practical consequence, worth having in front of you when tuning a sky:
+ * **a gradient blob's average alpha is a third of its peak**, where the old
+ * four-stop stack's was most of its peak across most of its radius. A sky ported
+ * from stops to a gradient at the same declared alpha gets dimmer, and the
+ * honest fix is to re-declare the peak — not to widen the curve.
+ */
+export function falloffProfile(t: number): number {
+  if (t <= 0) return 1;
+  if (t >= 1) return 0;
+  const v = 1 - t * t;
+  return v * v;
+}
+
+/** Elliptical distance of `(x, y)` from a falloff's centre, in radius units. */
+export function falloffDistance(f: Falloff, x: number, y: number): number {
+  const dx = x - f.cx;
+  const dy = y - f.cy;
+  const cos = Math.cos(f.angle);
+  const sin = Math.sin(f.angle);
+  // Into the falloff's own axes: the inverse rotation, then divide by each
+  // radius, so a circle in that space is the ellipse in this one.
+  const ex = (dx * cos + dy * sin) / f.rx;
+  const ey = (-dx * sin + dy * cos) / f.ry;
+  return Math.hypot(ex, ey);
+}
+
+/**
+ * The alpha an ink actually paints at `(x, y)`: its own alpha for a flat fill,
+ * and its peak alpha shaped by {@link falloffProfile} for a soft one.
+ *
+ * This is the single definition of "how bright is this ink here" for a consumer
+ * holding a point in the sprite's own space: the CPU rasterizer and the sky's
+ * brightness and overdraw measurements. The two drawing paths — the ramp
+ * texture and the SVG review sheets — take {@link falloffProfile} directly,
+ * because both work in the falloff's unit space and have no world point to ask
+ * about. The shape of the falloff is shared either way, so a picture, a
+ * measurement and a frame can never disagree about a gradient.
+ */
+export function inkAlphaAt(ink: Ink, x: number, y: number): number {
+  if (!ink.falloff) return ink.alpha;
+  return ink.alpha * falloffProfile(falloffDistance(ink.falloff, x, y));
 }
 
 /** Mirror a polygon across the x axis (y → −y), reversing winding. */

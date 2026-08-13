@@ -14,7 +14,7 @@
  * be measuring something the player can't see.
  */
 
-import type { SpriteDef } from './shapes';
+import { inkAlphaAt, type SpriteDef } from './shapes';
 
 /** A rasterized silhouette: `size × size`, row-major, 1 = covered. */
 export interface Mask {
@@ -48,6 +48,10 @@ export function pointInPoly(points: readonly number[], x: number, y: number): bo
  */
 export function rasterize(def: SpriteDef, size: number): Mask {
   const bits = new Uint8Array(size * size);
+  // `alpha` is a soft fill's PEAK, so a gradient shape gets into this list on
+  // its centre and then has to earn each pixel on what it paints THERE
+  // (`inkAlphaAt`, below) — otherwise a blob whose rim fades to nothing would
+  // contribute its whole disc to a silhouette.
   const solids = def.shapes.filter((s) => s.fill !== undefined && s.fill.alpha >= 0.5);
   const step = (def.extent * 2) / size;
   const sub = step / (SUBSAMPLES + 1);
@@ -69,6 +73,7 @@ export function rasterize(def: SpriteDef, size: number): Mask {
             } else if (s.path.closed && pointInPoly(s.path.points, x, y)) {
               covered = true;
             }
+            if (covered && inkAlphaAt(s.fill!, x, y) < 0.5) covered = false;
             if (covered) break;
           }
           if (covered) hits++;
