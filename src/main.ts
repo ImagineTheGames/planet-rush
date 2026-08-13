@@ -7689,7 +7689,32 @@ function openMainMenu(
   async function measureFleet(): Promise<void> {
     const base = allocatorUrlFromEnv();
     if (base === null) return;
-    const survey = await surveyRegions({ baseUrl: base });
+    // Each COMPLETED round is drawn as it lands (n11-01). The browse row is the
+    // reason: its listing arrives in ~0.6 s and the whole survey answers at ~1.5 s,
+    // so a row sat beside a region with no number for about a second — read as a
+    // failure by anyone looking at it. Nothing about the probe changes; this is the
+    // same serial survey, reporting sooner. The last round is the returned value
+    // below, so it is not drawn twice.
+    const survey = await surveyRegions({ baseUrl: base }, { onSurvey: takeSurvey });
+    takeSurvey(survey);
+    playtest.recordConnect('regions', {
+      regions: survey.regions.map((r) => ({ region: r.id, pingMs: r.pingMs, free: r.free })),
+      default: survey.defaultId ?? null,
+    });
+  }
+
+  /**
+   * Hold a survey and draw it — a round of one, or the whole thing.
+   *
+   * **An empty fleet never replaces a measured one.** `surveyRegions` answers with
+   * no regions for an allocator that is down, older than `/regions`, or answering
+   * nonsense — which is a fact about the allocator, not about anybody's ping — and
+   * letting that blank the list would drop every row back to `IAD —` mid-session
+   * for a hiccup. A fleet that genuinely has no regions has nothing to draw either
+   * way, so keeping the last measurement costs nothing and saves the numbers.
+   */
+  function takeSurvey(survey: RegionSurvey): void {
+    if (survey.regions.length === 0 && onlineRegions.length > 0) return;
     // The player may have left the doors while the probes were in flight; the
     // measurement is still worth keeping (it is this client's, not this screen's),
     // but nothing is drawn from it.
@@ -7699,10 +7724,6 @@ function openMainMenu(
       label: regionLabel(region.id),
       pingMs: region.pingMs,
     }));
-    playtest.recordConnect('regions', {
-      regions: survey.regions.map((r) => ({ region: r.id, pingMs: r.pingMs, free: r.free })),
-      default: survey.defaultId ?? null,
-    });
     if (screen !== 'online') return;
     // The doors' message slot carries the fleet: `GRU 38ms · [IAD 224ms]`. It is
     // the same slot the CAMPAIGN teaser answers in, so it yields to an error and
