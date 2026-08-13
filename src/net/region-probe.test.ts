@@ -591,6 +591,20 @@ describe('the survey publishes each completed round — n11-01', () => {
     expect(final.regions.map((r) => r.id)).toEqual(['iad', 'gru']);
   });
 
+  it('keys a region the way a room listing spells it — trimmed, lower case', async () => {
+    // The browse row joins these two lists on this string. `/regions` and
+    // `GET /rooms` are two different code paths on the allocator, so the client
+    // normalises both ends rather than trusting either to agree with the other.
+    const doFetch: FetchLike = () =>
+      Promise.resolve(ok({ regions: [{ region: ' IAD ', machines: 1, capacity: 6, rooms: 0, free: 6 }] }));
+
+    const regions = await fetchFleetRegions({ baseUrl: 'https://alloc.test', fetch: doFetch });
+
+    expect(regions.map((r) => r.id)).toEqual(['iad']);
+    // And a player still reads the code in caps, exactly as before.
+    expect(formatRegionPing({ id: regions[0]!.id, pingMs: 38 })).toBe('IAD 38ms');
+  });
+
   it('never publishes a survey for a fleet with no regions — an empty read is not news', async () => {
     const doFetch: FetchLike = () => Promise.resolve(ok({ regions: [] }));
     let called = 0;

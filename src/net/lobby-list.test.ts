@@ -134,6 +134,18 @@ describe('readLobbyList', () => {
     expect(await readLobbyList({ baseUrl: BASE, fetch })).toEqual({ rooms: [], asOf: 1_000 });
   });
 
+  it('normalises the region to the form a ping is looked up by — n11-01', async () => {
+    // The row's ping is found by matching this string against the measured fleet
+    // (`./region-probe`, which normalises `/regions` the same way). A machine that
+    // reported `IAD ` would otherwise be a region nobody has a measurement for,
+    // and the row would print the em dash for a number the client is holding.
+    const { fetch } = stubFetch(listOf([{ ...ROW, region: ' IAD ' }]));
+
+    const list = await readLobbyList({ baseUrl: BASE, fetch });
+
+    expect(list?.rooms[0]?.region).toBe('iad');
+  });
+
   it('reads a missing asOf as 0 rather than dropping the listing', async () => {
     const { fetch } = stubFetch({ status: 200, json: () => Promise.resolve({ rooms: [ROW] }) });
     expect((await readLobbyList({ baseUrl: BASE, fetch }))?.asOf).toBe(0);

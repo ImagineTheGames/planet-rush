@@ -586,7 +586,13 @@ export async function fetchFleetRegions(
 function toFleetRegion(entry: unknown): FleetRegion | null {
   if (typeof entry !== 'object' || entry === null) return null;
   const e = entry as Record<string, unknown>;
-  const id = typeof e['region'] === 'string' ? e['region'].trim() : '';
+  // Lower-cased as well as trimmed: this id is the key every other module looks a
+  // measurement up by — a browse row finds its ping by matching the room's region
+  // against it (`./lobby-list`, which normalises the same way) — and a lookup is
+  // the one place where `IAD` and `iad` are two different regions. Everything a
+  // player reads upper-cases it back (`formatRegionPing`), and the probe already
+  // compared case-insensitively when verifying who answered.
+  const id = typeof e['region'] === 'string' ? e['region'].trim().toLowerCase() : '';
   if (id.length === 0) return null;
   const probe = toProbeTarget(e['probe']);
   return {
