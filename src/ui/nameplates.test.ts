@@ -33,7 +33,19 @@ import type { DifficultyTable, Nameable, Nameplate, NameTable, TeamTable } from 
 // The stack the label sits on top of — rule 3's surviving half after a0-04. The
 // clearance is read from the label layer and the bar's own geometry from the bar
 // layer, so the assertion below compares the two REAL numbers, not a restatement.
-import { NAMEPLATE_SHIP_GAP, nameplateClusterClearance } from './nameplates-view';
+import {
+  NAMEPLATE_SHIP_GAP,
+  NAMEPLATE_SUFFIX_GAP,
+  NAMEPLATE_TEAM_GAP,
+  NAMEPLATE_FONT_SIZE,
+  nameplateClusterClearance,
+  nameplateRowLayout,
+} from './nameplates-view';
+// a0-32's discipline for a width claim: measure the real faces headlessly rather
+// than guess an em budget. The side tag leads the row now, so what a plate costs
+// in pixels is a load-bearing number, not a note in a PR body.
+import { textWidth } from './font-metrics';
+import { HUD_TRACKING } from './instrument';
 import { HEALTHBAR_GAP, HEALTHBAR_HEIGHT, combatantGetsBar } from './healthbar';
 import type { Combatant } from './healthbar';
 // The side vocabulary and its motif colours live with the lobby's `teamName`, so
@@ -472,5 +484,174 @@ describe('the side label', () => {
     const [plate] = nameplateModel([ship({ owner: 0 })], NAMES, IN_TEAMS, DIFFS, TEAMS);
     expect(plate!.suffix).toBe(''); // humans never carry a tier
     expect(plate!.teamLabel).toBe('FRIENDLY A'); // but they do carry a side
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The side reads FIRST (a0-38 — the developer: "friendly or enemy should be the
+// first thing displayed on a name so thats its easier to identify")
+// ---------------------------------------------------------------------------
+//
+// The plate used to read `Bolt FRIENDLY A (EASY)`: the fact a player scans for
+// sat second, behind a name that varies in length, so it had no fixed place on
+// the row. It leads now — `FRIENDLY A Bolt (EASY)`.
+//
+// The three parts were ALREADY separate fields on the model (deliberately: m10 /
+// u3 / v0.2.2), so nothing above this line changed — every side-label assertion in
+// the block before it still passes verbatim, which is the proof that this is an
+// ordering change in the view and not a restructure. The order itself lives in
+// `nameplateRowLayout`, the pure half of the draw loop, and is asserted here
+// without a GPU the same way the cluster clearance is.
+
+/** The row a plate lays out for the given token widths, centred at x = 100. */
+function row(side: number, name: number, suffix: number) {
+  return nameplateRowLayout(100, { side, name, suffix });
+}
+
+describe('the side leads the row (a0-38)', () => {
+  it('puts the side tag before the name, and the difficulty tag after it', () => {
+    const r = row(50, 30, 20);
+    expect(r.sideX).toBeLessThan(r.nameX);
+    expect(r.nameX).toBeLessThan(r.suffixX);
+    // …and by exactly the declared gaps, so "before" is a measured beat and not
+    // an overlap that happens to sort correctly.
+    expect(r.nameX - (r.sideX + 50)).toBeCloseTo(NAMEPLATE_TEAM_GAP, 10);
+    expect(r.suffixX - (r.nameX + 30)).toBeCloseTo(NAMEPLATE_SUFFIX_GAP, 10);
+  });
+
+  it('keeps the name centred on the entity, whatever flanks it', () => {
+    // The name is the thing pinned to the ship; the tags flank it. So a plate does
+    // not slide out from under its own hull when a side tag appears — which is
+    // what centring the whole ROW would have done to every plate in the game.
+    for (const r of [row(50, 30, 20), row(50, 30, 0), row(0, 30, 20), row(0, 30, 0)]) {
+      expect(r.nameX).toBeCloseTo(100 - 30 / 2, 10);
+    }
+  });
+
+  it('opens an FFA plate with the NAME — no gap, no stray separator', () => {
+    // `side` is '' on every plate in a free-for-all (asserted in the block above),
+    // so the leading gap must not be charged: the row starts at the name itself.
+    const ffa = row(0, 30, 20);
+    expect(ffa.left).toBeCloseTo(ffa.nameX, 10);
+    expect(ffa.left).toBeCloseTo(100 - 30 / 2, 10);
+    // The bare case too — an FFA human seat, which has neither tag.
+    const bare = row(0, 30, 0);
+    expect(bare.left).toBeCloseTo(100 - 30 / 2, 10);
+    expect(bare.width).toBeCloseTo(30, 10);
+  });
+
+  it('leaves the FFA plate exactly where it drew before a0-38', () => {
+    // The FFA HUD has no side and no business moving for a change about sides.
+    // The pre-a0-38 arrangement was: name centred on the entity, suffix hanging
+    // off its right edge. Spelled out here as the old arithmetic, so a future
+    // rearrangement of the row cannot quietly drag free-for-all along with it.
+    for (const [name, suffix] of [[30, 20], [44, 0], [12, 33]] as const) {
+      const oldLeft = 100 - name / 2;
+      const oldRight = oldLeft + name + (suffix > 0 ? NAMEPLATE_SUFFIX_GAP + suffix : 0);
+      const r = row(0, name, suffix);
+      expect(r.left).toBeCloseTo(oldLeft, 10);
+      expect(r.right).toBeCloseTo(oldRight, 10);
+    }
+  });
+
+  it('charges the trailing gap only for a seat that HAS a difficulty tag', () => {
+    const human = row(50, 30, 0);
+    expect(human.right).toBeCloseTo(human.nameX + 30, 10);
+    const bot = row(50, 30, 20);
+    expect(bot.right).toBeCloseTo(bot.nameX + 30 + NAMEPLATE_SUFFIX_GAP + 20, 10);
+  });
+
+  it('leads the LOCAL player’s own plate with the side too — `FRIENDLY A YOU`', () => {
+    // a0-38 asks which the local plate becomes, and the answer is the same rule as
+    // every other plate: the side leads, the name follows. `YOU` alone was the
+    // alternative — it is already unambiguous, and a side tag over your own home
+    // is arguably noise — but it was rejected on two counts. The tag is the ONE
+    // place in a match that tells the viewer which letter is theirs, and u3's whole
+    // ratification is that a letter only helps a player who knows that ("`TEAM A`
+    // only helps a player who remembers which team they are"): in a 1v1 teams match
+    // with no ally on screen, dropping it leaves `ENEMY B` with nothing to be read
+    // against. And it would be a content change — dropping a ratified tag from a
+    // plate — inside a brief that is an ordering change. Width is not the reason to
+    // do it either: `YOU` is the shortest name in the game and a human seat carries
+    // no difficulty tag, so this is the narrowest plate on the screen, not the one
+    // the width risk lives in.
+    const [own] = nameplateModel([station({ owner: 0 })], NAMES, IN_TEAMS, DIFFS, TEAMS);
+    expect(own!.text).toBe('YOU');
+    expect(own!.teamLabel).toBe('FRIENDLY A');
+    expect(own!.suffix).toBe('');
+    const r = nameplateRowLayout(100, {
+      side: widthOf(own!.teamLabel),
+      name: widthOf(own!.text),
+      suffix: 0,
+    });
+    expect(r.sideX).toBeLessThan(r.nameX);
+    expect(r.left).toBeCloseTo(r.sideX, 10);
+  });
+
+  it('spans side → name → tag as ONE piece, which is what the cull measures', () => {
+    const r = row(50, 30, 20);
+    expect(r.left).toBeCloseTo(r.sideX, 10);
+    expect(r.right).toBeCloseTo(r.suffixX + 20, 10);
+    expect(r.width).toBeCloseTo(50 + NAMEPLATE_TEAM_GAP + 30 + NAMEPLATE_SUFFIX_GAP + 20, 10);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Width, measured — the risk a0-38 names (and a0-32's method for answering it)
+// ---------------------------------------------------------------------------
+
+/** The plate's own type, as the view styles it (`./nameplates-view`): Oxanium at
+ *  the exported size, `name`-tier tracking. Read from the source, not restated. */
+const PLATE_TYPE = { face: 'body', size: NAMEPLATE_FONT_SIZE, tracking: HUD_TRACKING.name } as const;
+/** The widest thing that can stand in each of the three slots: the longer side
+ *  word, a name at the model's own 12-character clamp in the widest Latin glyph
+ *  this UI draws, and the longest difficulty tier. */
+const WIDEST_SIDE = 'FRIENDLY A';
+const WIDEST_NAME = 'W'.repeat(NAMEPLATE_MAX_CHARS);
+const WIDEST_SUFFIX = '(MEDIUM)';
+/** The landscape phone the brief measures at — 390px tall, 844 wide. */
+const PHONE_LANDSCAPE = { width: 844, height: 390 } as const;
+
+function widthOf(text: string): number {
+  return text.length > 0 ? textWidth(text, PLATE_TYPE) : 0;
+}
+
+describe('the widest possible plate, measured on the real faces', () => {
+  const side = widthOf(WIDEST_SIDE);
+  const name = widthOf(WIDEST_NAME);
+  const suffix = widthOf(WIDEST_SUFFIX);
+  const worst = nameplateRowLayout(PHONE_LANDSCAPE.width / 2, { side, name, suffix });
+
+  it('fits across the landscape phone with the screen to spare', () => {
+    // Leading with `FRIENDLY A` makes the common case wider in WORDS; the drawn
+    // row is the same three tokens and the same two gaps it always was, so what
+    // is at stake is the cull, not the truncation. The worst row is a third of
+    // the 844px screen, so a plate is culled only near an edge — never for being
+    // long in itself.
+    expect(worst.width).toBeLessThan(PHONE_LANDSCAPE.width / 2);
+    expect(worst.left).toBeGreaterThan(0);
+    expect(worst.right).toBeLessThan(PHONE_LANDSCAPE.width);
+  });
+
+  it('reaches LESS far from its ship than the old name-first plate did', () => {
+    // The width answer in one number. Before a0-38 both tags hung off the name's
+    // right edge, so the whole row's reach was one-sided; now it is split either
+    // side of a name that has not moved. Same tokens, same gaps, smaller radius —
+    // so a side-first plate survives closer to a screen edge than the plate it
+    // replaces, on the exact frame the brief calls the risk.
+    const centre = PHONE_LANDSCAPE.width / 2;
+    const reachNow = Math.max(centre - worst.left, worst.right - centre);
+    const reachBefore =
+      name / 2 + NAMEPLATE_TEAM_GAP + side + NAMEPLATE_SUFFIX_GAP + suffix;
+    expect(reachNow).toBeLessThan(reachBefore);
+  });
+
+  it('keeps the model’s 12-character clamp doing the truncating, not the layer', () => {
+    // The name is the only variable-length token — the side words and the tier
+    // tags are a closed set — and it is clamped in the model with a visible
+    // ellipsis. So no drawn plate is wider than the one measured here.
+    const clamped = resolveName(['A-Very-Long-Callsign-Indeed'], 0);
+    expect(clamped.length).toBe(NAMEPLATE_MAX_CHARS);
+    expect(widthOf(clamped)).toBeLessThanOrEqual(name);
   });
 });

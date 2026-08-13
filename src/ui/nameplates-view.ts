@@ -8,9 +8,19 @@
  * labels are a fixed size regardless of camera zoom (field request rule 3) — the
  * same discipline as the over-ship health bars ({@link ./healthbar-view}).
  *
+ * **The row (a0-38).** A plate reads **side, name, difficulty tag** — `FRIENDLY A
+ * Bolt (EASY)` — the side first because that is what the developer is scanning
+ * for (*"friendly or enemy should be the first thing displayed on a name so thats
+ * its easier to identify"*). The wording of the tags is untouched (m10, u3); only
+ * the order moved. In FFA there is no side and the row opens with the name, with
+ * no gap where the tag would have been — an FFA plate is untouched to the pixel.
+ * The name stays centred on its entity and the two tags flank it; see
+ * {@link nameplateRowLayout}, which owns the arithmetic so the order is
+ * unit-testable without a GPU.
+ *
  * **The stack (field request rule 1, and the whole of rule 3 after a0-04).** A
  * ship's status marks read as one unit,
- * top to bottom: the **name + difficulty-tag** row on top, the **health bar +
+ * top to bottom: the **side + name + difficulty-tag** row on top, the **health bar +
  * "68/70" number** row below it (the number hangs off the bar's right edge, not
  * under it — field request v0.2.4, drawn by {@link ./healthbar-view}), and the
  * **ship** under that. So a ship label is floated clear of the health-bar cluster
@@ -63,8 +73,12 @@ export const NAMEPLATE_ANCHOR: AnchorSpec = { region: 'full' };
  *  a name over a hull is drawn in the same stack as everything else. Spelling the
  *  stack out here again is the drift that module exists to prevent (a1-01). */
 const FONT_NAME = FONT_BODY;
-/** Label size, CSS px — small chrome over the world, legible at thumb-scale. */
-const FONT_SIZE = 12;
+/** Label size, CSS px — small chrome over the world, legible at thumb-scale.
+ *  Exported since a0-38 so the width budget for a side-first plate is *measured*
+ *  headlessly at the real type size (`./font-metrics`, a0-32's discipline) rather
+ *  than restated in a test as a number that can drift away from this one. */
+export const NAMEPLATE_FONT_SIZE = 12;
+const FONT_SIZE = NAMEPLATE_FONT_SIZE;
 /** A name IS a proper noun, so it takes the ratified `name` tier — and so do the
  *  two tags that trail it, because they are read as part of the same row. This
  *  replaces the flat `letterSpacing: 0.5` all three pools used to spell, which is
@@ -85,20 +99,98 @@ export const NAMEPLATE_SUFFIX_GAP = 3;
  *  on the name's own alpha so it recedes in step through the combat fade too. */
 export const NAMEPLATE_SUFFIX_ALPHA = 0.55;
 
-/** Horizontal gap between the name and the `FRIENDLY A` side label after it,
+/** Horizontal gap between the `FRIENDLY A` side label and the name it LEADS,
  *  CSS px — the same beat as the difficulty gap, so a plate reads as one row. */
 export const NAMEPLATE_TEAM_GAP = 4;
 /**
- * How much dimmer the side label is than the name it trails.
+ * How much dimmer the side label is than the name it leads.
  *
  * Deliberately close to full: the difficulty tag is metadata and recedes hard
  * ({@link NAMEPLATE_SUFFIX_ALPHA}), but the side is the thing the developer could
  * not read at all — *"impossible to know who is on your team"* — so it steps back
- * from the name without ever becoming decoration. Applied as a factor on the
- * plate's own alpha, so it fades in step through the combat fade like everything
- * else in the row.
+ * from the name without ever becoming decoration. It steps back in WEIGHT only:
+ * since a0-38 it is also the token the eye lands on first, which is the developer's
+ * ruling (*"friendly or enemy should be the first thing displayed on a name"*), so
+ * the dimming must never be read as demotion. Applied as a factor on the plate's
+ * own alpha, so the whole row dims together when a caller dims the layer.
  */
 export const NAMEPLATE_TEAM_ALPHA = 0.85;
+
+// ---------------------------------------------------------------------------
+// The row (a0-38 — the side reads first)
+// ---------------------------------------------------------------------------
+
+/** The three tokens' drawn widths, CSS px, as PixiJS measured them — `0` for a
+ *  token that is not there (no side in FFA, no difficulty on a human seat). */
+export interface NameplateRowWidths {
+  /** `FRIENDLY A` / `ENEMY B`, or 0 in FFA and for any slot with no side. */
+  readonly side: number;
+  /** The name itself — always present (a nameless slot still shows `P{n}`). */
+  readonly name: number;
+  /** `(HARD)` etc., or 0 for a human seat / an unfed difficulty table. */
+  readonly suffix: number;
+}
+
+/** Where each token's LEFT edge goes, and what the whole row spans. Every x is
+ *  absolute screen px on the plate's own baseline; a token with a zero width has
+ *  no meaningful x and the caller hides it. */
+export interface NameplateRow {
+  /** Left edge of the leading side tag — only meaningful when `side > 0`. */
+  readonly sideX: number;
+  /** Left edge of the name. Always `centerX - name / 2`: the NAME is what stays
+   *  centred on the entity, whatever flanks it (see below). */
+  readonly nameX: number;
+  /** Left edge of the trailing difficulty tag — only meaningful when `suffix > 0`. */
+  readonly suffixX: number;
+  /** The row's outer edges and total span, which is what the cull and the layer's
+   *  registered bounds are computed from — the row draws and culls as one piece. */
+  readonly left: number;
+  readonly right: number;
+  readonly width: number;
+}
+
+/**
+ * Lay a plate's row out left→right: **side, then name, then difficulty tag**.
+ *
+ * The order is the a0-38 ruling — the developer, on a live build: *"friendly or
+ * enemy should be the first thing displayed on a name so thats its easier to
+ * identify"*. Until then a plate read `Bolt FRIENDLY A (EASY)`; the fact a player
+ * is actually scanning for was second, behind a name that varies in length, so
+ * there was no fixed place on the row for the eye to land. Leading with it gives
+ * one. The tags' WORDING is untouched (ratified m10, refined u3); only their
+ * position moved. The difficulty tag stays last — it is recessive metadata and has
+ * no claim on the front of the row.
+ *
+ * **FFA opens with the name, never with a gap.** `side` is `''` on every plate in
+ * a free-for-all, and the leading gap is charged only when there IS a side — so an
+ * FFA row is `Bolt (EASY)`, the same tokens in the same places it has always had.
+ * Same for the trailing gap and a human seat's absent tag.
+ *
+ * **The NAME stays centred on the entity; the tags flank it.** The alternative was
+ * to centre the whole row, which reads tidier in the abstract and would have moved
+ * every plate in the game — including every FFA plate, which has no side and no
+ * business moving for a change about sides. This way the FFA HUD is untouched to
+ * the pixel and the diff is exactly the thing a0-38 asked for: in TEAMS the side
+ * tag moves from the name's right to its left.
+ *
+ * It also makes the row NARROWER about its entity than it was, which is the answer
+ * to the width risk: the tokens and the two gaps are the same ones, but they no
+ * longer all pile up on one side. A worst-case plate reached `name / 2 + side +
+ * gap + gap + suffix` to the right before; now it reaches `name / 2 + side + gap`
+ * left and `name / 2 + gap + suffix` right — the larger of which is smaller than
+ * the old one-sided reach, so a plate now survives CLOSER to a screen edge than it
+ * did (the cull in {@link NameplateView.update} tests exactly these edges).
+ */
+export function nameplateRowLayout(centerX: number, w: NameplateRowWidths): NameplateRow {
+  const hasSide = w.side > 0;
+  const hasSuffix = w.suffix > 0;
+  const nameX = centerX - w.name / 2;
+  const sideX = nameX - NAMEPLATE_TEAM_GAP - w.side;
+  const suffixX = nameX + w.name + NAMEPLATE_SUFFIX_GAP;
+  const left = hasSide ? sideX : nameX;
+  const right = hasSuffix ? suffixX + w.suffix : nameX + w.name;
+  return { sideX, nameX, suffixX, left, right, width: right - left };
+}
 
 /**
  * Vertical clearance from the entity centre to the label's bottom edge, so the
@@ -137,10 +229,10 @@ export interface DrawnNameplate {
   /** The recessive difficulty suffix drawn beside the name — `(HARD)` etc., or
    *  `''` for a human seat (field request v0.2.2). */
   suffix: string;
-  /** The side label drawn beside the name — `FRIENDLY A` / `ENEMY B` in TEAMS,
-   *  `''` in FFA (m10 teams, u3 wording). This is the readback a live-stage teams
-   *  match asserts on: proof the label a player is supposed to be able to read
-   *  actually DREW. */
+  /** The side label drawn at the FRONT of the row — `FRIENDLY A` / `ENEMY B` in
+   *  TEAMS, `''` in FFA (m10 teams, u3 wording; leading since a0-38). This is the
+   *  readback a live-stage teams match asserts on: proof the label a player is
+   *  supposed to be able to read actually DREW. */
   teamLabel: string;
   /** …and the tint it drew in — blue for the viewer's own side, red for a rival
    *  (`./lobby` SIDE_COLORS), so a screenshot's colour claim is checkable too. */
@@ -152,7 +244,9 @@ export interface DrawnNameplate {
    *  test (and the evidence capture) can show a fighting ship's name and a calm
    *  one's name at the same number, not merely assert it. */
   alpha: number;
-  /** Label centre-x in screen space, CSS px (the entity it tracks). */
+  /** Label centre-x in screen space, CSS px (the entity it tracks) — the NAME's
+   *  centre, which is what stays pinned to the entity now that the side tag leads
+   *  the row (a0-38). */
   x: number;
   /** Label-top y in screen space, CSS px. */
   y: number;
@@ -197,50 +291,56 @@ export class NameplateView extends Container {
       t.alpha = plate.alpha;
 
       // The side label (m10 teams, u3 wording) — `FRIENDLY A` / `ENEMY B`, in
-      // words, immediately after the name, because colour cannot say it on its own:
-      // identity colour is per-SLOT, so a side has no hue (style-guide §3.1;
-      // "colour alone insufficient", ratified). Its own tint IS the side colour —
-      // blue ally / red rival — but only as reinforcement over a word that already
-      // says it. Empty in FFA, where every plate would otherwise read a different
-      // side and say nothing.
+      // words, and since a0-38 it LEADS the row, because that is the fact a player
+      // is scanning for (*"friendly or enemy should be the first thing displayed on
+      // a name"*). Colour cannot say it on its own: identity colour is per-SLOT, so
+      // a side has no hue (style-guide §3.1; "colour alone insufficient", ratified).
+      // Its own tint IS the side colour — blue ally / red rival — but only as
+      // reinforcement over a word that already says it. Empty in FFA, where every
+      // plate would otherwise read a different side and say nothing.
       const tm = this.teamSlot(drawn);
       if (tm.text !== plate.teamLabel) tm.text = plate.teamLabel;
       const hasTeam = plate.teamLabel.length > 0;
-      const teamWidth = hasTeam ? NAMEPLATE_TEAM_GAP + tm.width : 0;
 
       // The recessive difficulty suffix (field request v0.2.2), trailing the name
       // in the owner colour but a step dimmer, so it reads as metadata not identity.
       const st = this.suffixSlot(drawn);
       if (st.text !== plate.suffix) st.text = plate.suffix;
       const hasSuffix = plate.suffix.length > 0;
-      const suffixWidth = hasSuffix ? NAMEPLATE_SUFFIX_GAP + st.width : 0;
 
-      // Bottom-centre anchor: position the label's baseline just above the
-      // entity's status cluster, so it grows upward and never into the bar/ship.
+      // Bottom anchors: the row's baseline sits just above the entity's status
+      // cluster, so it grows upward and never into the bar/ship. The row itself —
+      // side, name, tag — is laid out and centred by the pure function above, so
+      // its order and its FFA/human-seat gaps are unit-testable without a GPU.
       const bottom = plate.y - nameplateClusterClearance(plate);
-      const width = t.width;
       const height = t.height;
-      const left = plate.x - width / 2;
-      // Side label and suffix hang off the name's right edge, so the drawn unit
-      // runs wider than the name alone — cull and bounds count it as one piece.
-      const right = left + width + teamWidth + suffixWidth;
+      const row = nameplateRowLayout(plate.x, {
+        side: hasTeam ? tm.width : 0,
+        name: t.width,
+        suffix: hasSuffix ? st.width : 0,
+      });
       const top = bottom - height;
 
       // Cull anything that would spill off the canvas: a partial label reads worse
-      // than none, and a clipped rect would break the `full` contract.
-      if (left < 0 || top < 0 || right > viewportWidth || top + height > viewportHeight) {
+      // than none, and a clipped rect would break the `full` contract. The row is
+      // one piece — the side tag is not decoration a ship can be labelled without,
+      // so a row that does not fit takes the whole plate with it.
+      if (row.left < 0 || top < 0 || row.right > viewportWidth || top + height > viewportHeight) {
         tm.visible = false;
         st.visible = false;
         continue;
       }
 
       t.visible = true;
+      // Centre-anchored, so it is drawn AT the entity — `row.nameX` is that same
+      // point expressed as the name's left edge, which is what the two tags and
+      // the cull are measured from.
       t.position.set(plate.x, bottom);
       if (hasTeam) {
         tm.visible = true;
         tm.tint = plate.teamColor;
         tm.alpha = plate.alpha * NAMEPLATE_TEAM_ALPHA;
-        tm.position.set(left + width + NAMEPLATE_TEAM_GAP, bottom);
+        tm.position.set(row.sideX, bottom);
       } else {
         tm.visible = false;
       }
@@ -248,17 +348,17 @@ export class NameplateView extends Container {
         st.visible = true;
         st.tint = plate.color;
         st.alpha = plate.alpha * NAMEPLATE_SUFFIX_ALPHA;
-        // Left-anchored past the name and its side label, sharing their baseline.
-        st.position.set(left + width + teamWidth + NAMEPLATE_SUFFIX_GAP, bottom);
+        // Left-anchored past the name, sharing its baseline.
+        st.position.set(row.suffixX, bottom);
       } else {
         st.visible = false;
       }
       if (this.debugCapture) this.recordDebug(drawn, plate, top);
       drawn++;
 
-      if (left < minX) minX = left;
+      if (row.left < minX) minX = row.left;
       if (top < minY) minY = top;
-      if (right > maxX) maxX = right;
+      if (row.right > maxX) maxX = row.right;
       if (top + height > maxY) maxY = top + height;
     }
 
