@@ -232,6 +232,72 @@ describe('sound-review candidates', () => {
     }
   });
 
+  // -------------------------------------------------------------------------
+  // The adoption (s10-01)
+  // -------------------------------------------------------------------------
+  //
+  // On 2026-08-13 three verdicts came back from the review page, the first
+  // approvals since the developer pressed DENY ALL on the whole board:
+  //
+  //   rockChip  → b   04:01:48Z    "blunt pressure bite, sub weight"
+  //   hullHit   → a   04:02:30Z    "coil bite on plate, hard and dry"
+  //   rockCrack → c   04:03:05Z    "crystalline shear, ringing shards"
+  //
+  // The two tests below are the ratification, held as code. The first says the
+  // three slots really do play what was chosen; the second says nothing ELSE
+  // came with them. The second is the one that matters most in a year: the
+  // standing verdict on the other thirty-seven is `deny-all`, in the developer's
+  // own words — *"still have all the old sounds i said i didnt want there"* —
+  // and the failure mode of an adoption brief is that it quietly revives a
+  // neighbour while it is in there.
+  const ADOPTED: Readonly<Record<string, string>> = { rockChip: 'b', hullHit: 'a', rockCrack: 'c' };
+
+  const sameSamples = (a: Float32Array, b: Float32Array): boolean => {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+  };
+
+  it('plays the chosen candidate in the three adopted slots, sample for sample', () => {
+    // Not "looks similar" and not "was copied carefully" — identical samples. The
+    // bank builds these three out of `./instrument` with the candidate's own
+    // arguments and seeds, so the only way this fails is if someone edited one
+    // side and not the other, which is precisely the thing to catch. Only the
+    // layer NAMES differ (the bank's convention, not the board's), and names do
+    // not reach the renderer — `synth.renderVoice` reads `seed` and nothing else.
+    for (const [slot, letter] of Object.entries(ADOPTED)) {
+      const chosen = CANDIDATE_SLOTS[slot]!.candidates.find((c) => c.id === letter);
+      expect(chosen, `${slot}/${letter} is not on the board — the letter does not resolve`).toBeDefined();
+      const shipped = render(soundSpec(slot as SoundName));
+      expect(
+        sameSamples(shipped, render(chosen!.spec)),
+        `${slot} does not play candidate ${letter} — the shipped voice has drifted off the ratified one`,
+      ).toBe(true);
+    }
+  });
+
+  it('leaves every un-adopted slot alone — nothing else was revived', () => {
+    // The other forty-one: thirty-seven carrying the developer's standing
+    // `deny-all`, and the four summary slots (p1-07) they have not been shown
+    // yet. Neither group has an approval behind it, so neither may be playing one
+    // of its offers. Stated as an inequality rather than as a list of what
+    // shipped, because the incumbents are allowed to be re-voiced by a future
+    // brief; what is not allowed is one of the offers arriving in the bank
+    // without a verdict behind it.
+    const denied = SLOT_IDS.filter((id) => ADOPTED[id] === undefined);
+    expect(denied.length, 'the adopted set is not three slots any more').toBe(SLOT_IDS.length - 3);
+    for (const id of denied) {
+      const slot = CANDIDATE_SLOTS[id]!;
+      const shipped = render(soundSpec(slot.current));
+      for (const c of slot.candidates) {
+        expect(
+          sameSamples(shipped, render(c.spec)),
+          `${id} now plays candidate ${c.id} — no verdict has adopted that slot`,
+        ).toBe(false);
+      }
+    }
+  });
+
   it('the committed manifest matches the source', () => {
     const manifest = JSON.parse(readFileSync('sound-review/manifest.json', 'utf8')) as {
       slots: { id: string; candidates: { id: string; params: string }[] }[];

@@ -23,7 +23,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { TELL, TellQueue } from '../tells';
-import { CUE_SOUND, CUE_UI, SOUND, soundSpec, type AudioCue } from './bank';
+import { CUE_SOUND, CUE_UI, isLayered, SOUND, soundSpec, type AudioCue, type LayeredSpec } from './bank';
 import type {
   AudioBufferLike,
   AudioContextLike,
@@ -703,8 +703,17 @@ describe('what the cue set leaves alone', () => {
     // These are UI cues, not world tells. The rock voices keep the exact numbers
     // the developer signed off on — pinned here so a future UI pass cannot drift
     // them while "tidying the bank".
+    //
+    // What they signed off on CHANGED under s10-01: the developer listened to the
+    // board and chose `rockChip` candidate **b** ("blunt pressure bite, sub
+    // weight"), which is a two-layer stack rather than the single band-limited
+    // `noise` hit this line used to pin. The pin follows the ratification rather
+    // than the shape it happened to have — a UI pass still may not touch it, and
+    // now the thing it may not touch is the adopted voice.
     const chip = soundSpec(SOUND.rockChip);
-    expect(chip).toMatchObject({ name: 'rockChip', wave: 'noise' });
+    expect(isLayered(chip)).toBe(true);
+    expect(chip.name).toBe('rockChip');
+    expect((chip as LayeredSpec).layers.map((l) => l.spec.name)).toEqual(['rockChip.mass', 'rockChip.crush']);
     for (const name of UI_CUE_NAMES) {
       expect(JSON.stringify(UI_CUES[name])).not.toContain('rock');
     }

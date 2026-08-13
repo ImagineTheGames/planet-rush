@@ -586,8 +586,14 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
   });
 
   it('layers the sounds that are layered and keeps the rest single voices', () => {
-    expect(isLayered(soundSpec(SOUND.rockCrack))).toBe(false);
+    // `rockCrack` was the single-voice example here until s10-01, when the
+    // developer chose its candidate **c** — a struck plate with a grain of dust
+    // behind it, which is a stack. `shotImpact` takes its place as the one-voice
+    // case: it is still one band-limited hit, and it is one of the thirty-seven
+    // slots sitting at deny-all, so it is not about to become a stack either.
+    expect(isLayered(soundSpec(SOUND.shotImpact))).toBe(false);
     expect(isLayered(soundSpec(SOUND.shipExplode))).toBe(true);
+    expect(isLayered(soundSpec(SOUND.rockCrack))).toBe(true); // adopted: candidates.ts#rockCrack.c
     expect(loops(soundSpec(SOUND.rockCrack))).toBe(false);
   });
 
@@ -628,19 +634,43 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
       expect(spec.wave, `${sound}/${spec.name} is an arcade oscillator`).not.toBe('saw');
     }
 
-    // §5.3 — the arcade idioms, retired outright. No exceptions. These are
-    // jsfxr's own vocabulary: `arpMul`/`arpTime` is the "blip up" (the synth's
-    // doc comment calls it that), `dutySweep` is "the classic sweeping buzz",
-    // and `repeat` in this bank was only ever a trill. They stay in VoiceSpec —
-    // `repeat` has a legitimate non-arcade use as a rattle and may return with a
-    // written reason — but nothing in the bank reaches for them.
+    // §5.3 — the arcade idioms, retired outright. These are jsfxr's own
+    // vocabulary: `arpMul`/`arpTime` is the "blip up" (the synth's doc comment
+    // calls it that), `dutySweep` is "the classic sweeping buzz", and `repeat` in
+    // this bank was only ever a trill.
+    //
+    // Two of the three have no exceptions and never will. `repeat` is the one the
+    // clause itself leaves a door open for — *"`repeat` in particular has a
+    // legitimate non-arcade use (a rattle, a stutter) and may return with a
+    // written reason"* — and s10-01 is the brief that walked through it: the
+    // developer chose `rockChip` **b** and `rockCrack` **c**, and the grain rate
+    // of a granular texture is what `repeat` is doing in both. So the door is
+    // used exactly as written — named voices, a reason each, and a bound.
+    //
+    // The bound is the line between the two uses and it is not a matter of
+    // taste: below ~20 ms the retriggers fuse into a texture you hear as
+    // *material*, and above it they separate into events you hear as *notes* —
+    // which is the trill. `candidates.test.ts` holds the offers to the same 20 ms
+    // and has since p1-07, so this is the same rule on both sides of the board.
+    const GRAIN_RATTLE: Readonly<Record<string, string>> = {
+      'rockChip.crush': 'the crush under the pressure bite — a 6 ms grain, the cutting head biting, adopted with candidate b (s10-01)',
+      'rockCrack.dust': 'dust falling off the fracture — an 11 ms grain behind the plate, adopted with candidate c (s10-01)',
+    };
+    const RATTLE_MAX_S = 0.02;
     for (const { sound, spec } of voices) {
       const where = `${sound}/${spec.name}`;
       expect(spec.arpMul, `${where} arpeggios`).toBeUndefined();
       expect(spec.arpTime, `${where} arpeggios`).toBeUndefined();
       expect(spec.dutySweep, `${where} sweeps its duty`).toBeUndefined();
-      expect(spec.repeat, `${where} trills`).toBeUndefined();
+      if (spec.repeat === undefined) continue;
+      const reason = GRAIN_RATTLE[spec.name];
+      expect(reason, `${where} trills — no written reason on file for its \`repeat\``).toBeDefined();
+      expect(reason!.length, `${spec.name} claims an exemption with no reason`).toBeGreaterThan(20);
+      expect(spec.repeat, `${where} repeats every ${(spec.repeat * 1000).toFixed(0)} ms — that is a trill, not a grain`).toBeLessThanOrEqual(RATTLE_MAX_S);
     }
+    // A budget as well as a list: a rattle is a texture two voices reach for, not
+    // a habit. If a third one wants it, it wants a look rather than a line here.
+    expect(Object.keys(GRAIN_RATTLE).length, 'the rattle exemption is growing into a policy').toBeLessThanOrEqual(2);
 
     // §5.4 — modulation and glide, the clauses the audit proved actually carry
     // the register. Removing rockChip's vibrato moved its spectral centroid by
@@ -835,18 +865,57 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
     };
     const chip = renderSound(soundSpec(SOUND.rockChip));
     expect(windowedZcr(chip), 'the shipped mining voice is not lower in tone').toBeLessThan(CEILING);
+    // Adopted candidate **b** measures 0.0024 here — an order of magnitude under
+    // the ceiling. "Lower in tone" is not in doubt any more.
 
-    // **And a floor, because "lower" has one, and it is the phone.** A phone
-    // speaker rolls off hard below 500 Hz. s4-01's approved-but-never-shipped
-    // candidate "a" put 89% of its energy under that line — on `TELL.mineHit`, a
-    // voice that fires all match, on a device the mobile gate (GDD §4.3) makes a
-    // first-class target. It would have arrived as "the mining sound is gone".
-    // So the ceiling above and this floor bracket the voice together: lower than
-    // the ratification demands, and still a sound a phone can make.
+    // **The floor that used to be here, and why it is gone (s10-01).**
+    //
+    // This test also asserted `bandShare(chip, 500, Nyquist) > 0.4` — that at
+    // least 40% of the chip's energy stays above 500 Hz — under the heading
+    // *"lower has a floor, and it is the phone"*. The reasoning was s7-01 §4.1
+    // Finding 3: a phone speaker rolls off hard below 500 Hz, `TELL.mineHit`
+    // fires all match, the mobile gate (GDD §4.3) makes the developer's own phone
+    // a first-class target, and s4-01's candidate at 89% below that line would
+    // therefore have arrived as *"the mining sound is gone"*.
+    //
+    // On 2026-08-13 the developer listened to the board and chose `rockChip`
+    // candidate **b** — which puts 100.0% of its energy below 500 Hz. It is not
+    // near the floor, it is entirely under it. The other two offers were audibly
+    // brighter (a at 5.4% above the line, c at 0.6%) and both were passed over.
+    //
+    // **Finding 3 was a prediction about a sound nobody had heard; this is a
+    // decision about a sound they did hear.** A measurement that exists to
+    // anticipate the developer's ear does not get to overrule it once the ear has
+    // spoken (LESSONS §17, §19) — and a guard kept in place by weakening its
+    // number until the ratified voice slips under it would be worse than one
+    // removed on purpose, because it would look like it still meant something.
+    //
+    // The risk it was guarding is REAL and is not closed: if the mining voice
+    // reads thin or absent on a phone speaker, the fix is to put a new offer on
+    // the board, not to quietly re-brighten what was chosen. That is written into
+    // `docs/sound-adoptions.md` and into s10-01's PR rather than left here.
+    //
+    // What is still true, and still worth pinning: the chip has to be AUDIBLE, and
+    // the thing it is most often heard beside is a shot landing. Candidate b is
+    // the loudest of the three offers, and it stays comfortably above the
+    // projectile impact it shares a fight with — so "lower" did not become "gone"
+    // in the mix, whatever it does to a small speaker.
     expect(
-      bandShare(chip, 500, DEFAULT_SAMPLE_RATE / 2),
-      'the mining voice has fallen below what a phone speaker can emit',
-    ).toBeGreaterThan(0.4);
+      rms(chip),
+      'the mining voice is quieter than the shot landing beside it — lower has become gone',
+    ).toBeGreaterThan(rms(renderSound(soundSpec(SOUND.shotImpact))));
+
+    // And the half of the pair that a phone CAN emit, which is the part of
+    // Finding 3 that survives. §2.3's inversion is *am I mining or shooting a
+    // ship*, and it is only answerable on a small speaker if at least one of the
+    // two voices lives above the roll-off. The chip no longer does, by the
+    // developer's choice — so `hullHit` carries it, and this is now the line that
+    // fails if someone darkens the hull as well. Adopted candidate a measures
+    // 99.9% above 500 Hz; the floor is set where "most of it" starts.
+    expect(
+      bandShare(renderSound(soundSpec(SOUND.hullHit)), 500, DEFAULT_SAMPLE_RATE / 2),
+      'neither firing voice is left above what a phone speaker can emit (§2.3)',
+    ).toBeGreaterThan(0.6);
   });
 
   // -------------------------------------------------------------------------

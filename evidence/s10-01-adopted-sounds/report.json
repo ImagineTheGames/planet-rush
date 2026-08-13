@@ -1,0 +1,118 @@
+{
+  "brief": "s10-01",
+  "what": "the three chosen sounds, played off the shipped bank",
+  "source": "/status/sound-choices.json",
+  "slots": [
+    {
+      "slot": "rockChip",
+      "letter": "b",
+      "decidedAt": "2026-08-13T04:01:48.225Z",
+      "character": "blunt pressure bite, sub weight",
+      "resolvedTo": {
+        "previewTheDeveloperHeard": "sound-review/previews/rockChip/b.wav",
+        "params": "src/art/audio/candidates.ts#rockChip.b",
+        "candidateSpecName": "rockChip_b_pressureBite"
+      },
+      "shippedPlaysTheChosenCandidate": true,
+      "sha256": {
+        "shippedFromBankTs": "08489978143ef7928bb997ee26f7e0c4c9cef431ced5985ff84ecd1249e9db17",
+        "previewTheDeveloperHeard": "08489978143ef7928bb997ee26f7e0c4c9cef431ced5985ff84ecd1249e9db17",
+        "boardCurrentAfterAdoption": "08489978143ef7928bb997ee26f7e0c4c9cef431ced5985ff84ecd1249e9db17"
+      },
+      "boardCurrentMatchesTheChosenPreview": true,
+      "shippedWavMatchesTheChosenPreview": true,
+      "measured": {
+        "seconds": 0.0628,
+        "peak": 0.7087,
+        "rms": 0.1247,
+        "zcr": 0.00361,
+        "windowedZcr": 0.00244
+      }
+    },
+    {
+      "slot": "hullHit",
+      "letter": "a",
+      "decidedAt": "2026-08-13T04:02:30.839Z",
+      "character": "coil bite on plate, hard and dry",
+      "resolvedTo": {
+        "previewTheDeveloperHeard": "sound-review/previews/hullHit/a.wav",
+        "params": "src/art/audio/candidates.ts#hullHit.a",
+        "candidateSpecName": "hullHit_a_coilBite"
+      },
+      "shippedPlaysTheChosenCandidate": true,
+      "sha256": {
+        "shippedFromBankTs": "9a9aed741881125373bbccddfa8bc70b17d65f6e5d1cf64705f6979ac664454f",
+        "previewTheDeveloperHeard": "9a9aed741881125373bbccddfa8bc70b17d65f6e5d1cf64705f6979ac664454f",
+        "boardCurrentAfterAdoption": "9a9aed741881125373bbccddfa8bc70b17d65f6e5d1cf64705f6979ac664454f"
+      },
+      "boardCurrentMatchesTheChosenPreview": true,
+      "shippedWavMatchesTheChosenPreview": true,
+      "measured": {
+        "seconds": 0.0623,
+        "peak": 0.5201,
+        "rms": 0.0699,
+        "zcr": 0.06917,
+        "windowedZcr": 0.06543
+      }
+    },
+    {
+      "slot": "rockCrack",
+      "letter": "c",
+      "decidedAt": "2026-08-13T04:03:05.100Z",
+      "character": "crystalline shear, ringing shards",
+      "resolvedTo": {
+        "previewTheDeveloperHeard": "sound-review/previews/rockCrack/c.wav",
+        "params": "src/art/audio/candidates.ts#rockCrack.c",
+        "candidateSpecName": "rockCrack_c_crystal"
+      },
+      "shippedPlaysTheChosenCandidate": true,
+      "sha256": {
+        "shippedFromBankTs": "c3df80bfd9a203f168d0b2916f990acd67348395f41346b6a805fa86291909e0",
+        "previewTheDeveloperHeard": "c3df80bfd9a203f168d0b2916f990acd67348395f41346b6a805fa86291909e0",
+        "boardCurrentAfterAdoption": "c3df80bfd9a203f168d0b2916f990acd67348395f41346b6a805fa86291909e0"
+      },
+      "boardCurrentMatchesTheChosenPreview": true,
+      "shippedWavMatchesTheChosenPreview": true,
+      "measured": {
+        "seconds": 0.1323,
+        "peak": 0.3411,
+        "rms": 0.0492,
+        "zcr": 0.03977,
+        "windowedZcr": 0.04932
+      }
+    }
+  ],
+  "everySlotPlaysItsChosenCandidate": true,
+  "deniedSlotsChecked": 41,
+  "deniedSlotsRevived": [],
+  "bundle": {
+    "checked": true,
+    "chunks": [
+      "CanvasPool-COcHum_B.js",
+      "SharedSystems-Dp-9SwF6.js",
+      "WebGLRenderer-CwqYTBfN.js",
+      "WebGPURenderer-CxYHfiaC.js",
+      "browserAll-y2CkYrDw.js",
+      "colorToUniform-C2GHuDhf.js",
+      "index-ogWxZ3u7.js",
+      "main-CzXEcSR0.js",
+      "typography-CVMcRgo2.js",
+      "webworkerAll-DE6f2d17.js"
+    ],
+    "adoptedSeedsPresent": {
+      "rockChip.mass (30110)": true,
+      "rockChip.crush (30112)": true,
+      "hullHit.plate (30300)": true,
+      "hullHit.coil (30304)": true,
+      "rockCrack.shard (30150)": true,
+      "rockCrack.dust (30154)": true
+    },
+    "retiredSeedsGone": {
+      "rockChip (0x9e37 = 40503)": true,
+      "hullHit.bite (0x4dc3 = 19907)": true,
+      "rockCrack (0x1a2b = 6699)": true
+    },
+    "reviewBoardNotBundled": true
+  },
+  "wavsWritten": "evidence/s10-01-adopted-sounds/*.shipped.wav"
+}
