@@ -1,0 +1,737 @@
+{
+  "developerFrame": {
+    "who": "the developer, on PC, with Tap Commander + Auto-aim (the a0-30 defaults)",
+    "theirWords": "these need to change to instead display the presses needed to play",
+    "before": "WASD Thrust    Left mouse Fire / Mine    E Build & Upgrade",
+    "after": "Click anywhere Move or attack    E Build & Upgrade",
+    "passes": true,
+    "ifTheySwitchToSticks": "WASD Thrust    Left mouse Hold to fire / mine — auto-aim picks the target    E Build & Upgrade"
+  },
+  "strip": [
+    {
+      "scheme": "sticks",
+      "device": "keyboard",
+      "fireMode": "manual",
+      "docked": true,
+      "strip": "WASD Thrust    Mouse Aim    Left mouse Fire / Mine    E Build & Upgrade",
+      "was": "WASD Thrust    Mouse Aim    Left mouse Fire / Mine    E Build & Upgrade",
+      "changed": false,
+      "drawn": true,
+      "rows": [
+        {
+          "action": "thrust",
+          "binding": "WASD",
+          "label": "Thrust"
+        },
+        {
+          "action": "aim",
+          "binding": "Mouse",
+          "label": "Aim"
+        },
+        {
+          "action": "fire",
+          "binding": "Left mouse",
+          "label": "Fire / Mine"
+        },
+        {
+          "action": "build",
+          "binding": "E",
+          "label": "Build & Upgrade"
+        }
+      ]
+    },
+    {
+      "scheme": "sticks",
+      "device": "keyboard",
+      "fireMode": "manual",
+      "docked": false,
+      "strip": "WASD Thrust    Mouse Aim    Left mouse Fire / Mine    Build & Upgrade — get closer to your station",
+      "was": "WASD Thrust    Mouse Aim    Left mouse Fire / Mine    Build & Upgrade — get closer to your station",
+      "changed": false,
+      "drawn": true,
+      "rows": [
+        {
+          "action": "thrust",
+          "binding": "WASD",
+          "label": "Thrust"
+        },
+        {
+          "action": "aim",
+          "binding": "Mouse",
+          "label": "Aim"
+        },
+        {
+          "action": "fire",
+          "binding": "Left mouse",
+          "label": "Fire / Mine"
+        },
+        {
+          "action": "build",
+          "binding": "E",
+          "label": "Build & Upgrade"
+        }
+      ]
+    },
+    {
+      "scheme": "sticks",
+      "device": "keyboard",
+      "fireMode": "auto-aim",
+      "docked": true,
+      "strip": "WASD Thrust    Left mouse Hold to fire / mine — auto-aim picks the target    E Build & Upgrade",
+      "was": "WASD Thrust    Left mouse Fire / Mine    E Build & Upgrade",
+      "changed": true,
+      "drawn": true,
+      "rows": [
+        {
+          "action": "thrust",
+          "binding": "WASD",
+          "label": "Thrust"
+        },
+        {
+          "action": "fire",
+          "binding": "Left mouse",
+          "label": "Hold to fire / mine — auto-aim picks the target"
+        },
+        {
+          "action": "build",
+          "binding": "E",
+          "label": "Build & Upgrade"
+        }
+      ]
+    },
+    {
+      "scheme": "sticks",
+      "device": "keyboard",
+      "fireMode": "auto-aim",
+      "docked": false,
+      "strip": "WASD Thrust    Left mouse Hold to fire / mine — auto-aim picks the target    Build & Upgrade — get closer to your station",
+      "was": "WASD Thrust    Left mouse Fire / Mine    Build & Upgrade — get closer to your station",
+      "changed": true,
+      "drawn": true,
+      "rows": [
+        {
+          "action": "thrust",
+          "binding": "WASD",
+          "label": "Thrust"
+        },
+        {
+          "action": "fire",
+          "binding": "Left mouse",
+          "label": "Hold to fire / mine — auto-aim picks the target"
+        },
+        {
+          "action": "build",
+          "binding": "E",
+          "label": "Build & Upgrade"
+        }
+      ]
+    },
+    {
+      "scheme": "sticks",
+      "device": "gamepad",
+      "fireMode": "manual",
+      "docked": true,
+      "strip": "Left stick Thrust    Right stick Aim    Right trigger Fire / Mine    Y / △ Build & Upgrade",
+      "was": "Left stick Thrust    Right stick Aim    Right trigger Fire / Mine    Y / △ Build & Upgrade",
+      "changed": false,
+      "drawn": true,
+      "rows": [
+        {
+          "action": "thrust",
+          "binding": "Left stick",
+          "label": "Thrust"
+        },
+        {
+          "action": "aim",
+          "binding": "Right stick",
+          "label": "Aim"
+        },
+        {
+          "action": "fire",
+          "binding": "Right trigger",
+          "label": "Fire / Mine"
+        },
+        {
+          "action": "build",
+          "binding": "Y / △",
+          "label": "Build & Upgrade"
+        }
+      ]
+    },
+    {
+      "scheme": "sticks",
+      "device": "gamepad",
+      "fireMode": "manual",
+      "docked": false,
+      "strip": "Left stick Thrust    Right stick Aim    Right trigger Fire / Mine    Build & Upgrade — get closer to your station",
+      "was": "Left stick Thrust    Right stick Aim    Right trigger Fire / Mine    Build & Upgrade — get closer to your station",
+      "changed": false,
+      "drawn": true,
+      "rows": [
+        {
+          "action": "thrust",
+          "binding": "Left stick",
+          "label": "Thrust"
+        },
+        {
+          "action": "aim",
+          "binding": "Right stick",
+          "label": "Aim"
+        },
+        {
+          "action": "fire",
+          "binding": "Right trigger",
+          "label": "Fire / Mine"
+        },
+        {
+          "action": "build",
+          "binding": "Y / △",
+          "label": "Build & Upgrade"
+        }
+      ]
+    },
+    {
+      "scheme": "sticks",
+      "device": "gamepad",
+      "fireMode": "auto-aim",
+      "docked": true,
+      "strip": "Left stick Thrust    Right trigger Hold to fire / mine — auto-aim picks the target    Y / △ Build & Upgrade",
+      "was": "Left stick Thrust    Right trigger Fire / Mine    Y / △ Build & Upgrade",
+      "changed": true,
+      "drawn": true,
+      "rows": [
+        {
+          "action": "thrust",
+          "binding": "Left stick",
+          "label": "Thrust"
+        },
+        {
+          "action": "fire",
+          "binding": "Right trigger",
+          "label": "Hold to fire / mine — auto-aim picks the target"
+        },
+        {
+          "action": "build",
+          "binding": "Y / △",
+          "label": "Build & Upgrade"
+        }
+      ]
+    },
+    {
+      "scheme": "sticks",
+      "device": "gamepad",
+      "fireMode": "auto-aim",
+      "docked": false,
+      "strip": "Left stick Thrust    Right trigger Hold to fire / mine — auto-aim picks the target    Build & Upgrade — get closer to your station",
+      "was": "Left stick Thrust    Right trigger Fire / Mine    Build & Upgrade — get closer to your station",
+      "changed": true,
+      "drawn": true,
+      "rows": [
+        {
+          "action": "thrust",
+          "binding": "Left stick",
+          "label": "Thrust"
+        },
+        {
+          "action": "fire",
+          "binding": "Right trigger",
+          "label": "Hold to fire / mine — auto-aim picks the target"
+        },
+        {
+          "action": "build",
+          "binding": "Y / △",
+          "label": "Build & Upgrade"
+        }
+      ]
+    },
+    {
+      "scheme": "sticks",
+      "device": "touch",
+      "fireMode": "manual",
+      "docked": true,
+      "strip": "",
+      "was": "",
+      "changed": false,
+      "drawn": false,
+      "rows": [
+        {
+          "action": "thrust",
+          "binding": "Left stick",
+          "label": "Thrust"
+        },
+        {
+          "action": "aim",
+          "binding": "Right stick",
+          "label": "Aim"
+        },
+        {
+          "action": "fire",
+          "binding": "Right stick",
+          "label": "Fire / Mine"
+        },
+        {
+          "action": "build",
+          "binding": "BUILD",
+          "label": "Build & Upgrade"
+        }
+      ]
+    },
+    {
+      "scheme": "sticks",
+      "device": "touch",
+      "fireMode": "manual",
+      "docked": false,
+      "strip": "",
+      "was": "",
+      "changed": false,
+      "drawn": false,
+      "rows": [
+        {
+          "action": "thrust",
+          "binding": "Left stick",
+          "label": "Thrust"
+        },
+        {
+          "action": "aim",
+          "binding": "Right stick",
+          "label": "Aim"
+        },
+        {
+          "action": "fire",
+          "binding": "Right stick",
+          "label": "Fire / Mine"
+        },
+        {
+          "action": "build",
+          "binding": "BUILD",
+          "label": "Build & Upgrade"
+        }
+      ]
+    },
+    {
+      "scheme": "sticks",
+      "device": "touch",
+      "fireMode": "auto-aim",
+      "docked": true,
+      "strip": "",
+      "was": "",
+      "changed": false,
+      "drawn": false,
+      "rows": [
+        {
+          "action": "thrust",
+          "binding": "Left stick",
+          "label": "Thrust"
+        },
+        {
+          "action": "fire",
+          "binding": "FIRE button",
+          "label": "Hold to fire / mine — auto-aim picks the target"
+        },
+        {
+          "action": "build",
+          "binding": "BUILD",
+          "label": "Build & Upgrade"
+        }
+      ]
+    },
+    {
+      "scheme": "sticks",
+      "device": "touch",
+      "fireMode": "auto-aim",
+      "docked": false,
+      "strip": "",
+      "was": "",
+      "changed": false,
+      "drawn": false,
+      "rows": [
+        {
+          "action": "thrust",
+          "binding": "Left stick",
+          "label": "Thrust"
+        },
+        {
+          "action": "fire",
+          "binding": "FIRE button",
+          "label": "Hold to fire / mine — auto-aim picks the target"
+        },
+        {
+          "action": "build",
+          "binding": "BUILD",
+          "label": "Build & Upgrade"
+        }
+      ]
+    },
+    {
+      "scheme": "tap",
+      "device": "keyboard",
+      "fireMode": "manual",
+      "docked": true,
+      "strip": "Click anywhere Move or attack    E Build & Upgrade",
+      "was": "WASD Thrust    Mouse Aim    Left mouse Fire / Mine    E Build & Upgrade",
+      "changed": true,
+      "drawn": true,
+      "rows": [
+        {
+          "action": "command",
+          "binding": "Click anywhere",
+          "label": "Move or attack"
+        },
+        {
+          "action": "build",
+          "binding": "E",
+          "label": "Build & Upgrade"
+        }
+      ]
+    },
+    {
+      "scheme": "tap",
+      "device": "keyboard",
+      "fireMode": "manual",
+      "docked": false,
+      "strip": "Click anywhere Move or attack    Build & Upgrade — get closer to your station",
+      "was": "WASD Thrust    Mouse Aim    Left mouse Fire / Mine    Build & Upgrade — get closer to your station",
+      "changed": true,
+      "drawn": true,
+      "rows": [
+        {
+          "action": "command",
+          "binding": "Click anywhere",
+          "label": "Move or attack"
+        },
+        {
+          "action": "build",
+          "binding": "E",
+          "label": "Build & Upgrade"
+        }
+      ]
+    },
+    {
+      "scheme": "tap",
+      "device": "keyboard",
+      "fireMode": "auto-aim",
+      "docked": true,
+      "strip": "Click anywhere Move or attack    E Build & Upgrade",
+      "was": "WASD Thrust    Left mouse Fire / Mine    E Build & Upgrade",
+      "changed": true,
+      "drawn": true,
+      "rows": [
+        {
+          "action": "command",
+          "binding": "Click anywhere",
+          "label": "Move or attack"
+        },
+        {
+          "action": "build",
+          "binding": "E",
+          "label": "Build & Upgrade"
+        }
+      ]
+    },
+    {
+      "scheme": "tap",
+      "device": "keyboard",
+      "fireMode": "auto-aim",
+      "docked": false,
+      "strip": "Click anywhere Move or attack    Build & Upgrade — get closer to your station",
+      "was": "WASD Thrust    Left mouse Fire / Mine    Build & Upgrade — get closer to your station",
+      "changed": true,
+      "drawn": true,
+      "rows": [
+        {
+          "action": "command",
+          "binding": "Click anywhere",
+          "label": "Move or attack"
+        },
+        {
+          "action": "build",
+          "binding": "E",
+          "label": "Build & Upgrade"
+        }
+      ]
+    },
+    {
+      "scheme": "tap",
+      "device": "gamepad",
+      "fireMode": "manual",
+      "docked": true,
+      "strip": "Click anywhere Move or attack    Y / △ Build & Upgrade",
+      "was": "Left stick Thrust    Right stick Aim    Right trigger Fire / Mine    Y / △ Build & Upgrade",
+      "changed": true,
+      "drawn": true,
+      "rows": [
+        {
+          "action": "command",
+          "binding": "Click anywhere",
+          "label": "Move or attack"
+        },
+        {
+          "action": "build",
+          "binding": "Y / △",
+          "label": "Build & Upgrade"
+        }
+      ]
+    },
+    {
+      "scheme": "tap",
+      "device": "gamepad",
+      "fireMode": "manual",
+      "docked": false,
+      "strip": "Click anywhere Move or attack    Build & Upgrade — get closer to your station",
+      "was": "Left stick Thrust    Right stick Aim    Right trigger Fire / Mine    Build & Upgrade — get closer to your station",
+      "changed": true,
+      "drawn": true,
+      "rows": [
+        {
+          "action": "command",
+          "binding": "Click anywhere",
+          "label": "Move or attack"
+        },
+        {
+          "action": "build",
+          "binding": "Y / △",
+          "label": "Build & Upgrade"
+        }
+      ]
+    },
+    {
+      "scheme": "tap",
+      "device": "gamepad",
+      "fireMode": "auto-aim",
+      "docked": true,
+      "strip": "Click anywhere Move or attack    Y / △ Build & Upgrade",
+      "was": "Left stick Thrust    Right trigger Fire / Mine    Y / △ Build & Upgrade",
+      "changed": true,
+      "drawn": true,
+      "rows": [
+        {
+          "action": "command",
+          "binding": "Click anywhere",
+          "label": "Move or attack"
+        },
+        {
+          "action": "build",
+          "binding": "Y / △",
+          "label": "Build & Upgrade"
+        }
+      ]
+    },
+    {
+      "scheme": "tap",
+      "device": "gamepad",
+      "fireMode": "auto-aim",
+      "docked": false,
+      "strip": "Click anywhere Move or attack    Build & Upgrade — get closer to your station",
+      "was": "Left stick Thrust    Right trigger Fire / Mine    Build & Upgrade — get closer to your station",
+      "changed": true,
+      "drawn": true,
+      "rows": [
+        {
+          "action": "command",
+          "binding": "Click anywhere",
+          "label": "Move or attack"
+        },
+        {
+          "action": "build",
+          "binding": "Y / △",
+          "label": "Build & Upgrade"
+        }
+      ]
+    },
+    {
+      "scheme": "tap",
+      "device": "touch",
+      "fireMode": "manual",
+      "docked": true,
+      "strip": "",
+      "was": "",
+      "changed": false,
+      "drawn": false,
+      "rows": [
+        {
+          "action": "command",
+          "binding": "Tap anywhere",
+          "label": "Move or attack"
+        },
+        {
+          "action": "build",
+          "binding": "BUILD",
+          "label": "Build & Upgrade"
+        }
+      ]
+    },
+    {
+      "scheme": "tap",
+      "device": "touch",
+      "fireMode": "manual",
+      "docked": false,
+      "strip": "",
+      "was": "",
+      "changed": false,
+      "drawn": false,
+      "rows": [
+        {
+          "action": "command",
+          "binding": "Tap anywhere",
+          "label": "Move or attack"
+        },
+        {
+          "action": "build",
+          "binding": "BUILD",
+          "label": "Build & Upgrade"
+        }
+      ]
+    },
+    {
+      "scheme": "tap",
+      "device": "touch",
+      "fireMode": "auto-aim",
+      "docked": true,
+      "strip": "",
+      "was": "",
+      "changed": false,
+      "drawn": false,
+      "rows": [
+        {
+          "action": "command",
+          "binding": "Tap anywhere",
+          "label": "Move or attack"
+        },
+        {
+          "action": "build",
+          "binding": "BUILD",
+          "label": "Build & Upgrade"
+        }
+      ]
+    },
+    {
+      "scheme": "tap",
+      "device": "touch",
+      "fireMode": "auto-aim",
+      "docked": false,
+      "strip": "",
+      "was": "",
+      "changed": false,
+      "drawn": false,
+      "rows": [
+        {
+          "action": "command",
+          "binding": "Tap anywhere",
+          "label": "Move or attack"
+        },
+        {
+          "action": "build",
+          "binding": "BUILD",
+          "label": "Build & Upgrade"
+        }
+      ]
+    }
+  ],
+  "liveBindings": [
+    {
+      "scheme": "sticks",
+      "rowsClaimed": [
+        "thrust",
+        "fire",
+        "build"
+      ],
+      "liveInScheme": [
+        "thrust",
+        "aim",
+        "fire",
+        "build"
+      ],
+      "everyRowLive": true,
+      "unnamedButLive": [
+        "aim"
+      ]
+    },
+    {
+      "scheme": "tap",
+      "rowsClaimed": [
+        "command",
+        "build"
+      ],
+      "liveInScheme": [
+        "build",
+        "command"
+      ],
+      "everyRowLive": true,
+      "unnamedButLive": []
+    }
+  ],
+  "width": [
+    {
+      "viewport": "desktop 1280×720",
+      "scheme": "sticks",
+      "fireMode": "manual",
+      "line": "WASD Thrust    Mouse Aim    Left mouse Fire / Mine    E Build & Upgrade",
+      "drawnWidth": 668,
+      "viewportWidth": 1280,
+      "fits": true
+    },
+    {
+      "viewport": "desktop 1280×720",
+      "scheme": "sticks",
+      "fireMode": "auto-aim",
+      "line": "WASD Thrust    Left mouse Hold to fire / mine — auto-aim picks the target    E Build & Upgrade",
+      "drawnWidth": 925,
+      "viewportWidth": 1280,
+      "fits": true
+    },
+    {
+      "viewport": "desktop 1280×720",
+      "scheme": "tap",
+      "fireMode": "manual",
+      "line": "Click anywhere Move or attack    E Build & Upgrade",
+      "drawnWidth": 504,
+      "viewportWidth": 1280,
+      "fits": true
+    },
+    {
+      "viewport": "desktop 1280×720",
+      "scheme": "tap",
+      "fireMode": "auto-aim",
+      "line": "Click anywhere Move or attack    E Build & Upgrade",
+      "drawnWidth": 504,
+      "viewportWidth": 1280,
+      "fits": true
+    },
+    {
+      "viewport": "phone 390×844, landscape-locked",
+      "scheme": "sticks",
+      "fireMode": "manual",
+      "line": "WASD Thrust    Mouse Aim    Left mouse Fire / Mine    E Build & Upgrade",
+      "drawnWidth": 588,
+      "viewportWidth": 844,
+      "fits": true
+    },
+    {
+      "viewport": "phone 390×844, landscape-locked",
+      "scheme": "sticks",
+      "fireMode": "auto-aim",
+      "line": "WASD Thrust    Left mouse Hold to fire / mine — auto-aim picks the target    E Build & Upgrade",
+      "drawnWidth": 831,
+      "viewportWidth": 844,
+      "fits": true
+    },
+    {
+      "viewport": "phone 390×844, landscape-locked",
+      "scheme": "tap",
+      "fireMode": "manual",
+      "line": "Click anywhere Move or attack    E Build & Upgrade",
+      "drawnWidth": 447,
+      "viewportWidth": 844,
+      "fits": true
+    },
+    {
+      "viewport": "phone 390×844, landscape-locked",
+      "scheme": "tap",
+      "fireMode": "auto-aim",
+      "line": "Click anywhere Move or attack    E Build & Upgrade",
+      "drawnWidth": 447,
+      "viewportWidth": 844,
+      "fits": true
+    }
+  ]
+}
