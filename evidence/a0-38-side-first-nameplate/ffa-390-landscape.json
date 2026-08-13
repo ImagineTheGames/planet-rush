@@ -1,0 +1,67 @@
+{
+  "viewport": {
+    "width": 844,
+    "height": 390
+  },
+  "rows": [
+    "Rusty (EASY)",
+    "YOU",
+    "Rusty (EASY)"
+  ],
+  "plates": [
+    {
+      "owner": 1,
+      "kind": "ship",
+      "text": "Rusty",
+      "suffix": "(EASY)",
+      "teamLabel": "",
+      "teamColor": 5218443,
+      "color": 2282437,
+      "alpha": 0.92,
+      "x": 542,
+      "y": 31,
+      "local": false,
+      "sideX": 519.6,
+      "nameX": 523.6,
+      "suffixX": 563.4,
+      "left": 523.6,
+      "right": 606.4
+    },
+    {
+      "owner": 0,
+      "kind": "station",
+      "text": "YOU",
+      "suffix": "",
+      "teamLabel": "",
+      "teamColor": 5218443,
+      "color": 4029439,
+      "alpha": 0.92,
+      "x": 518,
+      "y": 107,
+      "local": false,
+      "sideX": 501.3,
+      "nameX": 505.3,
+      "suffixX": 533.7,
+      "left": 505.3,
+      "right": 530.7
+    },
+    {
+      "owner": 1,
+      "kind": "station",
+      "text": "Rusty",
+      "suffix": "(EASY)",
+      "teamLabel": "",
+      "teamColor": 5218443,
+      "color": 2282437,
+      "alpha": 0.92,
+      "x": 542,
+      "y": 247,
+      "local": false,
+      "sideX": 519.6,
+      "nameX": 523.6,
+      "suffixX": 563.4,
+      "left": 523.6,
+      "right": 606.4
+    }
+  ]
+}

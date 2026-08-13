@@ -1,0 +1,67 @@
+{
+  "viewport": {
+    "width": 844,
+    "height": 390
+  },
+  "rows": [
+    "ENEMY B Rusty (EASY)",
+    "FRIENDLY A YOU",
+    "ENEMY B Rusty (EASY)"
+  ],
+  "plates": [
+    {
+      "owner": 1,
+      "kind": "ship",
+      "text": "Rusty",
+      "suffix": "(EASY)",
+      "teamLabel": "ENEMY B",
+      "teamColor": 13334905,
+      "color": 2282437,
+      "alpha": 0.92,
+      "x": 542,
+      "y": 31,
+      "local": false,
+      "sideX": 461.40000000000003,
+      "nameX": 523.6,
+      "suffixX": 563.4,
+      "left": 461.40000000000003,
+      "right": 606.4
+    },
+    {
+      "owner": 0,
+      "kind": "station",
+      "text": "YOU",
+      "suffix": "",
+      "teamLabel": "FRIENDLY A",
+      "teamColor": 5096447,
+      "color": 4029439,
+      "alpha": 0.92,
+      "x": 518,
+      "y": 107,
+      "local": false,
+      "sideX": 425.5,
+      "nameX": 505.3,
+      "suffixX": 533.7,
+      "left": 425.5,
+      "right": 530.7
+    },
+    {
+      "owner": 1,
+      "kind": "station",
+      "text": "Rusty",
+      "suffix": "(EASY)",
+      "teamLabel": "ENEMY B",
+      "teamColor": 13334905,
+      "color": 2282437,
+      "alpha": 0.92,
+      "x": 542,
+      "y": 247,
+      "local": false,
+      "sideX": 461.40000000000003,
+      "nameX": 523.6,
+      "suffixX": 563.4,
+      "left": 461.40000000000003,
+      "right": 606.4
+    }
+  ]
+}

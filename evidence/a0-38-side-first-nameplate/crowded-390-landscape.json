@@ -1,0 +1,22 @@
+{
+  "pairs": [
+    {
+      "a": "ENEMY B Rusty (EASY)",
+      "b": "FRIENDLY A YOU",
+      "xOverlap": 69.30000000000001,
+      "yGap": 76
+    },
+    {
+      "a": "ENEMY B Rusty (EASY)",
+      "b": "ENEMY B Rusty (EASY)",
+      "xOverlap": 144.99999999999994,
+      "yGap": 216
+    },
+    {
+      "a": "FRIENDLY A YOU",
+      "b": "ENEMY B Rusty (EASY)",
+      "xOverlap": 69.30000000000001,
+      "yGap": 140
+    }
+  ]
+}
