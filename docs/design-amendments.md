@@ -81,7 +81,28 @@ setting. Both reads consult storage first:
   that function folds everything unrecognised to `'sticks'`, which was the default
   when it was written and is not one now.
 
-### The one conflict — ⚠ OPEN, flagged, not silently resolved
+### The one conflict — ✔ RESOLVED as **resolution 2**, 2026-08-13 (a0-37)
+
+> **Resolution, ratified by the developer in the a0-37 brief** (their frame, on
+> PC, in Tap Commander + Auto-aim): *"these need to change to instead display the
+> presses needed to play for example now its just Click anywhere to move or
+> attack, someting like that"*.
+>
+> **The strip reads the scheme.** `describeBindings` takes the seated
+> `ControlScheme` (branch `agent/ui/a0-37-scheme-aware-controls-strip`), and in Tap
+> Commander the desktop rows become that scheme's own — `Click anywhere · Move or
+> attack`, then `E · Build & Upgrade`. The device supplies the *verb* (click on a
+> PC and with a pad, tap on glass), on §2.4's 2026-08-06 principle that a control
+> row names what is in front of the player. The `{fire}`/`{build}` rider below is
+> resolved with it: one map, extended once, feeding both §2.2's strip and §2.10's
+> prompts (a0-33 had already branched the prompts' *lesson* on the scheme).
+>
+> **Resolution 1 was NOT adopted and no input behaviour changed**: `W` still does
+> nothing in Tap Commander, and the strip now says so by not naming it. Whether
+> thrust should take the wheel back is still the Director's to call — it is a
+> design change to the scheme, not a labelling one, and nothing here forecloses it.
+
+The conflict as a0-30 flagged it, kept for the record:
 
 **On desktop, Tap Commander and the `WASD` thrust binding do not both work, and
 Tap Commander is now what a first-run desktop player gets.** In the tap scheme the
