@@ -1,0 +1,67 @@
+[pool-size] worker cap 2: cgroup quota 6 cores / LANES 3 = 2 workers (host claims 6)
+
+ RUN  v2.1.8 /lanes/lane-3
+
+ ❯ src/ui/controls-strip.test.ts (14 tests | 3 failed) 19ms
+   × a0-37 — the strip names the scheme the player is actually IN (GDD §2.2, §2.4) > the developer's own frame — PC + Tap Commander + Auto-aim — must not say WASD Thrust · Left mouse Fire / Mine 13ms
+     → thrust keys the scheme zeroes (main.ts sampleInput): expected 'WASD Thrust · Left mouse Fire / Mine …' not to contain 'WASD'
+   × a0-37 — the strip names the scheme the player is actually IN (GDD §2.2, §2.4) > is a device VERB, not a fixed word — click on a PC, tap on glass (§2.4, 2026-08-06) 1ms
+     → expected 'WASD Thrust · Left mouse Fire / Mine …' to contain 'Click anywhere'
+   × a0-37 — the strip names the scheme the player is actually IN (GDD §2.2, §2.4) > Sticks + Auto-aim says WHEN to fire, not how to aim (§2.4) 1ms
+     → expected 'Fire / Mine' to be 'Hold to fire / mine — auto-aim picks …' // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/controls-strip.test.ts > a0-37 — the strip names the scheme the player is actually IN (GDD §2.2, §2.4) > the developer's own frame — PC + Tap Commander + Auto-aim — must not say WASD Thrust · Left mouse Fire / Mine
+AssertionError: thrust keys the scheme zeroes (main.ts sampleInput): expected 'WASD Thrust · Left mouse Fire / Mine …' not to contain 'WASD'
+
+Expected: "WASD"
+Received: "WASD Thrust · Left mouse Fire / Mine · E Build & Upgrade"
+
+ ❯ src/ui/controls-strip.test.ts:54:78
+     52|   it("the developer's own frame — PC + Tap Commander + Auto-aim — must…
+     53|     const strip = read(controlsStripView('keyboard', FireMode.AutoAim,…
+     54|     expect(strip, 'thrust keys the scheme zeroes (main.ts sampleInput)…
+       |                                                                              ^
+     55|     expect(strip, 'a fire key the pilot presses for you').not.toContai…
+     56|     expect(strip, "the developer's own words: click anywhere to move o…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  src/ui/controls-strip.test.ts > a0-37 — the strip names the scheme the player is actually IN (GDD §2.2, §2.4) > is a device VERB, not a fixed word — click on a PC, tap on glass (§2.4, 2026-08-06)
+AssertionError: expected 'WASD Thrust · Left mouse Fire / Mine …' to contain 'Click anywhere'
+
+Expected: "Click anywhere"
+Received: "WASD Thrust · Left mouse Fire / Mine · E Build & Upgrade"
+
+ ❯ src/ui/controls-strip.test.ts:64:16
+     62|   it('is a device VERB, not a fixed word — click on a PC, tap on glass…
+     63|     const pc = read(controlsStripRows('keyboard', FireMode.AutoAim, fa…
+     64|     expect(pc).toContain('Click anywhere');
+       |                ^
+     65|     expect(pc).not.toContain('Tap anywhere');
+     66|     // Touch draws no strip, but the same map feeds onboarding/setting…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  src/ui/controls-strip.test.ts > a0-37 — the strip names the scheme the player is actually IN (GDD §2.2, §2.4) > Sticks + Auto-aim says WHEN to fire, not how to aim (§2.4)
+AssertionError: expected 'Fire / Mine' to be 'Hold to fire / mine — auto-aim picks …' // Object.is equality
+
+Expected: "Hold to fire / mine — auto-aim picks the target"
+Received: "Fire / Mine"
+
+ ❯ src/ui/controls-strip.test.ts:89:25
+     87|       'Left mouse',
+     88|     );
+     89|     expect(fire?.label).toBe('Hold to fire / mine — auto-aim picks the…
+       |                         ^
+     90|     expect(auto.some((r) => r.action === 'aim'), 'the aim row still fo…
+     91|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 11 passed (14)
+   Start at  02:27:16
+   Duration  1.90s (transform 172ms, setup 0ms, collect 219ms, tests 19ms, environment 0ms, prepare 1.07s)
+

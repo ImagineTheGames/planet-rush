@@ -43,6 +43,54 @@ describe('controlsStripRows (GDD §2.4)', () => {
   });
 });
 
+describe('a0-37 — the strip names the scheme the player is actually IN (GDD §2.2, §2.4)', () => {
+  /** The strip as a player reads it, left→right, exactly as `Hud.rebuildStrip`
+   *  lays it out: the key glyph then the action, rows separated by air. */
+  const read = (rows: readonly { binding: string | null; label: string }[]): string =>
+    rows.map((r) => (r.binding === null ? r.label : `${r.binding} ${r.label}`)).join(' · ');
+
+  it("the developer's own frame — PC + Tap Commander + Auto-aim — must not say WASD Thrust · Left mouse Fire / Mine", () => {
+    const strip = read(controlsStripView('keyboard', FireMode.AutoAim, false, true, 'tap'));
+    expect(strip, 'thrust keys the scheme zeroes (main.ts sampleInput)').not.toContain('WASD');
+    expect(strip, 'a fire key the pilot presses for you').not.toContain('Left mouse Fire / Mine');
+    expect(strip, "the developer's own words: click anywhere to move or attack").toContain(
+      'Click anywhere',
+    );
+    expect(strip, 'the primary action comes first').toMatch(/^Click anywhere Move or attack/);
+  });
+
+  it('is a device VERB, not a fixed word — click on a PC, tap on glass (§2.4, 2026-08-06)', () => {
+    const pc = read(controlsStripRows('keyboard', FireMode.AutoAim, false, 'tap'));
+    expect(pc).toContain('Click anywhere');
+    expect(pc).not.toContain('Tap anywhere');
+    // Touch draws no strip, but the same map feeds onboarding/settings copy.
+    const glass = describeBindings('touch', FireMode.AutoAim, 'tap');
+    expect(glass.find((r) => r.action === 'command')?.binding).toBe('Tap anywhere');
+  });
+
+  it('keeps the Build & Upgrade key, which Tap Commander leaves live (main.ts sampleInput)', () => {
+    const rows = controlsStripView('keyboard', FireMode.AutoAim, false, true, 'tap');
+    const build = rows.find((r) => r.action === 'build');
+    expect(build?.binding, 'E really does still open the wheel in this scheme').toBe('E');
+    expect(build?.label).toBe('Build & Upgrade');
+  });
+
+  it('Sticks + Manual keeps today’s wording, to the letter', () => {
+    const strip = read(controlsStripView('keyboard', FireMode.Manual, false, true, 'sticks'));
+    expect(strip).toBe('WASD Thrust · Mouse Aim · Left mouse Fire / Mine · E Build & Upgrade');
+  });
+
+  it('Sticks + Auto-aim says WHEN to fire, not how to aim (§2.4)', () => {
+    const auto = controlsStripRows('keyboard', FireMode.AutoAim, false, 'sticks');
+    const fire = auto.find((r) => r.action === 'fire');
+    expect(fire?.binding, 'the key itself is unchanged — auto-aim moved the aiming, not the button').toBe(
+      'Left mouse',
+    );
+    expect(fire?.label).toBe('Hold to fire / mine — auto-aim picks the target');
+    expect(auto.some((r) => r.action === 'aim'), 'the aim row still folds away').toBe(false);
+  });
+});
+
 describe('controlsStripView — the Build row is contextual on docking (field report v0.2.2)', () => {
   it('shows the live E key + full name when docked at your station', () => {
     const rows = controlsStripView('keyboard', FireMode.Manual, false, true);
