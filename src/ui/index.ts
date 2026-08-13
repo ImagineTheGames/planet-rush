@@ -1067,21 +1067,21 @@ export { MainMenuView, MAIN_MENU_ANCHOR } from './main-menu-view';
 
 // --- The CODEX — the optional main-menu reference (GDD §2.10) ---------------
 //
-// Four tabs (BOTS / SHIPS / SYSTEMS / STRATEGY) over the four `content/codex/
+// Five tabs (OBJECTIVE / BOTS / SHIPS / SYSTEMS / STRATEGY) over the five `content/codex/
 // *.json` files: a scrollable entry rail and a detail pane (summary, body, the
 // machine-checked facts, difficulty/hull badges, cross-links), with a BACK
 // button. A door the player opens voluntarily, never a gate before play — it
 // builds no world. Same pure-model + Pixi-view pair as every screen here, but
 // the DATA is handed in rather than imported: `content/codex/` lives outside
 // `src/`, so whoever boots the client imports the JSON (Vite resolves it) and
-// hands over `normalizeCodex({ bots, ships, systems, strategy })`.
+// hands over `normalizeCodex({ objective, bots, ships, systems, strategy })`.
 //
 // **Wiring seam** (for `src/main.ts`, the menu owner):
 //
-//   import bots from '../content/codex/codex-bots.json';   // + ships/systems/strategy
+//   import objective from '../content/codex/codex-objective.json';  // + bots/ships/systems/strategy
 //   const codex = new CodexView(w, h, isTouch);
 //   ctx.root.addChild(codex);
-//   let state = createCodex(normalizeCodex({ bots, ships, systems, strategy }));
+//   let state = createCodex(normalizeCodex({ objective, bots, ships, systems, strategy }));
 //   // CODEX pressed on the menu → codex.visible = true; menuView.visible = false
 //   // per frame while shown:  codex.update(codexModel(state))
 //   // on tap:   const hit = codex.hitTest(x, y)

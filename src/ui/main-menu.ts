@@ -74,7 +74,7 @@ export interface MainMenuItem {
 
 /**
  * CODEX's sub-line. The handoff has no CODEX plate, so rather than invent a line
- * of voice this names the screen's own four tabs — the same construction the
+ * of voice this names the screen's own tabs — the same construction the
  * handoff uses for SETTINGS, which names that screen's own rows.
  * {@link ./main-menu.test} pins it to {@link CODEX_TABS}, so a fifth tab cannot
  * leave the menu describing four.

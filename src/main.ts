@@ -426,6 +426,7 @@ import type {
 // outside src/ — imported here (Vite inlines the JSON) and handed to the pure
 // codex model as a value, the seam ./ui/codex documents. The screen never
 // reaches across the compile boundary; this file does it once, at boot.
+import codexObjective from '../content/codex/codex-objective.json';
 import codexBots from '../content/codex/codex-bots.json';
 import codexShips from '../content/codex/codex-ships.json';
 import codexSystems from '../content/codex/codex-systems.json';
@@ -459,6 +460,10 @@ let LOCAL_PLAYER = 0;
  *  tooltips ({@link openLobby}). The JSON is imported above (Vite inlines it);
  *  the pure model normalises it. */
 const CODEX_DATA = normalizeCodex({
+  // OBJECTIVE first — the developer's ruling on where the win condition lives
+  // (a0-34); `CODEX_TABS` puts it at the head of the strip and `createCodex`
+  // opens on it, so it is the first thing the codex says.
+  objective: codexObjective,
   bots: codexBots,
   ships: codexShips,
   systems: codexSystems,

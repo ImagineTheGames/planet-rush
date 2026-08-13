@@ -57,7 +57,10 @@ function resolveConstant(path: string): unknown {
   }, C as unknown);
 }
 
-const TYPES = ['bots', 'ships', 'systems', 'strategy'] as const;
+// OBJECTIVE joined the codex as its first section (a0-34): one tab, one file,
+// the same one-to-one contract as the other four — so it is checked here on the
+// same terms (non-empty, unique ids, v0.7 terms) rather than special-cased.
+const TYPES = ['objective', 'bots', 'ships', 'systems', 'strategy'] as const;
 const files = Object.fromEntries(TYPES.map((t) => [t, load(t)])) as Record<
   (typeof TYPES)[number],
   CodexFile
