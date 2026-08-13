@@ -60,12 +60,15 @@ function crop(srcFile, outFile, x0, y0, w, h, zoom, gain) {
   return { path: p, sourceAt: [X, Y], w, h, zoom, gain };
 }
 
-const url = (p) => `file://${p}`;
+/** Inline, as a data URI. A page built with `setContent` has an opaque origin,
+ *  so a `file://` subresource is blocked and the plate renders with broken image
+ *  icons — which is exactly how the first pass of this file came out. */
+const url = (p) => `data:image/png;base64,${readFileSync(p).toString('base64')}`;
 const CSS = `
   * { box-sizing: border-box; }
   body { margin:0; background:#0b0f14; color:#e8eef5;
          font-family: ui-monospace, "SF Mono", Menlo, monospace; }
-  .plate { padding: 26px 30px; }
+  .plate { padding: 26px 30px 34px; }
   h1 { font-size: 25px; margin: 0 0 4px; letter-spacing: .2px; }
   h1 .verdict { color:#7ee0a8; }
   .sub { color:#93a4b6; font-size: 14px; margin: 0 0 18px; line-height:1.5; }
@@ -91,7 +94,7 @@ const CSS = `
 
 const browser = await chromium.launch();
 async function shoot(name, html, width) {
-  const ctx = await browser.newContext({ viewport: { width, height: 900 }, deviceScaleFactor: 1 });
+  const ctx = await browser.newContext({ viewport: { width, height: 2400 }, deviceScaleFactor: 2 });
   const page = await ctx.newPage();
   await page.setContent(`<style>${CSS}</style><div class="plate">${html}</div>`, { waitUntil: 'load' });
   await page.waitForTimeout(250);
@@ -129,7 +132,7 @@ const stamp = `served <b>${SHA}</b> · arena <b>The Oval</b> (sky <b>plasmaReef<
          <div class="cap"><span class="tag">gain 1</span>nebula layer, as played</div></div>
        <div class="card"><img src="${url(b1.path)}" width="330">
          <div class="cap"><span class="tag">gain 1</span>star layers, as played</div></div>
-       <div class="card" style="flex:1">
+       <div class="card" style="flex:1; min-width:390px">
          <table>
            <tr><th>class</th><th>layer</th><th>in frame</th><th>span, css px</th></tr>
            <tr><td>soft disc</td><td>void-nebula-plasmaReef</td><td class="big">${nL.blobs}</td><td class="big">${nL.spanCssPx.min}–${nL.spanCssPx.max} (med ${nL.spanCssPx.median})</td></tr>
@@ -152,7 +155,7 @@ const stamp = `served <b>${SHA}</b> · arena <b>The Oval</b> (sky <b>plasmaReef<
        <div class="card"><img src="${url(b8.path)}" width="330">
          <div class="cap"><span class="tag">gain 8</span><b>Star bloom.</b> A hard point with a tight halo.
            Present, working, and small. This is what "bloom" is.</div></div>
-       <div class="card" style="flex:1">
+       <div class="card" style="flex:1; min-width:390px">
          <div class="cap" style="font-size:13.5px; line-height:1.7">
            <b>What the developer is looking at.</b> The many large soft discs are
            <b>Plasma Reef</b>, the sky assigned to The Oval — not bloom, not rocks, not a cull artefact.
@@ -204,7 +207,7 @@ const stamp = `served <b>${SHA}</b> · arena <b>The Oval</b> (sky <b>plasmaReef<
        <div class="card"><img src="${url(c.path)}" width="420">
          <div class="cap"><span class="tag">gain 8</span>Plasma Reef, alone. Each node is a four-band stack,
            <b>brightest at its own centre</b>. The nodes sit in a knot around a common middle that has nothing in it.</div></div>
-       <div class="card" style="flex:1">
+       <div class="card" style="flex:1; min-width:390px">
          <table>
            <tr><th>layer</th><th>blobs profiled</th><th>element = RING</th><th>group = RING</th></tr>
            <tr><td>void-nebula-plasmaReef</td><td>${neb.profiled.length}</td><td class="dim">${neb.profiled.length - elemGlow}</td><td class="big">${groupRing}</td></tr>
@@ -315,7 +318,7 @@ if (motion) {
          <div class="cap" style="margin-bottom:8px"><b>Route 1 — transforms read off the running build</b></div>
          <table><tr><th>layer</th><th>drift / camera px</th><th>px per screen-width (${VIEWW()} css)</th></tr>${rows1}</table>
        </div>
-       <div class="card" style="flex:1">
+       <div class="card" style="flex:1; min-width:390px">
          <div class="cap" style="margin-bottom:8px"><b>Route 2 — cross-correlated pixels, one layer at a time</b></div>
          <table><tr><th>class</th><th>layers shown</th><th>camera pan, dev px</th><th>lag, dev px</th><th>r</th><th>ratio</th><th>drift / screen-width</th></tr>${rows2}</table>
        </div>
