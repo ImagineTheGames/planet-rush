@@ -102,17 +102,65 @@
  * it is not. The choice on offer is a material, made once and offered everywhere.
  */
 
-import type { SoundName, SoundSpec } from './bank';
-import { band, grains, place, plate, returns, swept } from './instrument';
+import type { SoundLayer, SoundName, SoundSpec } from './bank';
+import { band, grains, place, plate, swept } from './instrument';
 
 // ---------------------------------------------------------------------------
 // The instrument the candidates are built out of lives in `./instrument` now.
 // It moved there under s10-01 when the developer chose three of these offers and
 // the bank had to build the adopted voices out of the same calls with the same
 // arguments — a shipped sound that is a re-typing of an approved one is a sound
-// nobody approved. The five builders are unchanged; the argument for them is
+// nobody approved. The four builders are unchanged; the argument for them is
 // still the file comment above.
+//
+// `returns` did NOT move, and stays local to this file: none of the three adopted
+// voices has a room, so an export in `./instrument` would be an export no shipped
+// code calls — the dark-matter gate's exact target. The seven candidates below that
+// do use it are all still un-adopted offers, and offers live here.
 // ---------------------------------------------------------------------------
+
+/**
+ * Late, quiet, diffuse returns — the space the event happened in.
+ *
+ * Written as ordinary layers because `./synth` refuses to grow a reverb into the
+ * voice model, and reserved for the handful of events big enough to have a room:
+ * an explosion, a structure failing, a station dying. Each return is darker and
+ * quieter than the one before it, which is what a real reflection does.
+ */
+function returns(
+  name: string,
+  o: {
+    readonly freq: number;
+    readonly gain: number;
+    readonly decay: number;
+    readonly from: number;
+    readonly to?: number;
+    readonly at: number;
+    /** Seconds between returns. */
+    readonly gap?: number;
+    readonly count?: number;
+    readonly seed: number;
+  },
+): SoundLayer[] {
+  const count = o.count ?? 2;
+  const gap = o.gap ?? 0.13;
+  return Array.from({ length: count }, (_, i) =>
+    swept(`${name}.r${i}`, {
+      wave: 'noise',
+      freq: o.freq * Math.pow(0.72, i),
+      from: o.from * Math.pow(0.6, i),
+      ...(o.to === undefined ? {} : { to: o.to * Math.pow(0.6, i) }),
+      q: 1.8,
+      gain: o.gain * Math.pow(0.55, i),
+      attack: 0.004 + i * 0.004,
+      hold: 0.01,
+      decay: o.decay * Math.pow(0.85, i),
+      curve: 3 - i * 0.4,
+      at: o.at + gap * i,
+      seed: o.seed + i,
+    }),
+  );
+}
 
 /** One candidate voice for a slot: an id, a short character label, and the spec itself. */
 export interface SoundCandidate {

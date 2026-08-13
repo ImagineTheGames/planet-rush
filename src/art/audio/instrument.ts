@@ -1,10 +1,15 @@
 /**
  * src/art/audio/instrument.ts — the round-2 sound-design instrument. OWNER: Sound Agent.
  *
- * Five builders, all of them made of the round-2 synth (`./synth`) rather than of a
+ * Four builders, all of them made of the round-2 synth (`./synth`) rather than of a
  * bare oscillator, so nothing built here can be round 1 under a new name. Everything
  * that carries character — the corner, the Q, the grain rate, the tail — is a number
  * at the call site, not a default in here.
+ *
+ * A fifth builder, `returns` (late diffuse space), stayed behind in `./candidates` as a
+ * module-local function: no adopted voice uses it, so exporting it here made it an
+ * export no production code calls, which is exactly what the dark-matter gate (a1-09)
+ * is for. It moves here the day a slot that has a room is adopted, with a caller.
  *
  * ## Why it is its own module (s10-01)
  *
@@ -275,45 +280,3 @@ export function grains(
   );
 }
 
-/**
- * Late, quiet, diffuse returns — the space the event happened in.
- *
- * Written as ordinary layers because `./synth` refuses to grow a reverb into the
- * voice model, and reserved for the handful of events big enough to have a room:
- * an explosion, a structure failing, a station dying. Each return is darker and
- * quieter than the one before it, which is what a real reflection does.
- */
-export function returns(
-  name: string,
-  o: {
-    readonly freq: number;
-    readonly gain: number;
-    readonly decay: number;
-    readonly from: number;
-    readonly to?: number;
-    readonly at: number;
-    /** Seconds between returns. */
-    readonly gap?: number;
-    readonly count?: number;
-    readonly seed: number;
-  },
-): SoundLayer[] {
-  const count = o.count ?? 2;
-  const gap = o.gap ?? 0.13;
-  return Array.from({ length: count }, (_, i) =>
-    swept(`${name}.r${i}`, {
-      wave: 'noise',
-      freq: o.freq * Math.pow(0.72, i),
-      from: o.from * Math.pow(0.6, i),
-      ...(o.to === undefined ? {} : { to: o.to * Math.pow(0.6, i) }),
-      q: 1.8,
-      gain: o.gain * Math.pow(0.55, i),
-      attack: 0.004 + i * 0.004,
-      hold: 0.01,
-      decay: o.decay * Math.pow(0.85, i),
-      curve: 3 - i * 0.4,
-      at: o.at + gap * i,
-      seed: o.seed + i,
-    }),
-  );
-}
