@@ -635,15 +635,27 @@ describe('the widest possible plate, measured on the real faces', () => {
 
   it('reaches LESS far from its ship than the old name-first plate did', () => {
     // The width answer in one number. Before a0-38 both tags hung off the name's
-    // right edge, so the whole row's reach was one-sided; now it is split either
+    // right edge, so the row's whole reach was one-sided; now it is split either
     // side of a name that has not moved. Same tokens, same gaps, smaller radius —
-    // so a side-first plate survives closer to a screen edge than the plate it
-    // replaces, on the exact frame the brief calls the risk.
+    // the plate sits over the ship it names instead of trailing off one side of it.
     const centre = PHONE_LANDSCAPE.width / 2;
     const reachNow = Math.max(centre - worst.left, worst.right - centre);
     const reachBefore =
       name / 2 + NAMEPLATE_TEAM_GAP + side + NAMEPLATE_SUFFIX_GAP + suffix;
     expect(reachNow).toBeLessThan(reachBefore);
+  });
+
+  it('costs the cull nothing — the row is the same width it always was', () => {
+    // The claim that is NOT made above, kept separate so it cannot be read into
+    // it: the band of ship positions that keep a plate is `viewport − row width`,
+    // and the row is a rigid body a0-38 only re-anchored. So the band is exactly
+    // as wide as before — it shifts right rather than shrinking, and no plate is
+    // culled for being long that was not culled before.
+    const rowBefore = name + NAMEPLATE_TEAM_GAP + side + NAMEPLATE_SUFFIX_GAP + suffix;
+    expect(worst.width).toBeCloseTo(rowBefore, 10);
+    const bandNow = PHONE_LANDSCAPE.width - worst.width;
+    expect(bandNow).toBeCloseTo(PHONE_LANDSCAPE.width - rowBefore, 10);
+    expect(bandNow).toBeGreaterThan(0);
   });
 
   it('keeps the model’s 12-character clamp doing the truncating, not the layer', () => {

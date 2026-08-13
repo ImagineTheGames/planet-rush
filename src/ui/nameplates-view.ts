@@ -173,13 +173,22 @@ export interface NameplateRow {
  * the pixel and the diff is exactly the thing a0-38 asked for: in TEAMS the side
  * tag moves from the name's right to its left.
  *
- * It also makes the row NARROWER about its entity than it was, which is the answer
- * to the width risk: the tokens and the two gaps are the same ones, but they no
- * longer all pile up on one side. A worst-case plate reached `name / 2 + side +
- * gap + gap + suffix` to the right before; now it reaches `name / 2 + side + gap`
- * left and `name / 2 + gap + suffix` right — the larger of which is smaller than
- * the old one-sided reach, so a plate now survives CLOSER to a screen edge than it
- * did (the cull in {@link NameplateView.update} tests exactly these edges).
+ * **The width answer, stated exactly.** The row is a RIGID body and a0-38 did not
+ * change its width — same three tokens, same two gaps — it changed where the ship
+ * sits inside it. Two consequences, and they are different facts:
+ *
+ *  - **Culling is not worse.** The band of ship positions that keep a plate is
+ *    `viewport − rowWidth` wide whatever the arrangement, so it is the same size
+ *    it was; it SHIFTS right (by 62px on the typical teams plate, measured), so a
+ *    plate survives further towards the right edge and less far towards the left.
+ *  - **The plate is less lopsided about its hull.** It reached `name / 2 + gap +
+ *    side + gap + suffix` to the right before — 127px on that same plate — and now
+ *    reaches at most 81px either way, so it sits over the ship it names instead of
+ *    trailing off one side of it.
+ *
+ * Both numbers are read back on the real faces in
+ * `evidence/a0-38-side-first-nameplate/readback.json`, and the cull in
+ * {@link NameplateView.update} tests exactly these edges.
  */
 export function nameplateRowLayout(centerX: number, w: NameplateRowWidths): NameplateRow {
   const hasSide = w.side > 0;
@@ -248,6 +257,24 @@ export interface DrawnNameplate {
    *  centre, which is what stays pinned to the entity now that the side tag leads
    *  the row (a0-38). */
   x: number;
+  /**
+   * The row's drawn geometry, CSS px: the left edge of each token and the span of
+   * the whole piece. Captured since a0-38 because the ruling this deliverable
+   * implements is about ORDER, and order is a fact about x — `text` and
+   * `teamLabel` read back identically whichever side of the name the tag is on.
+   * With these a live-stage test can assert on a REAL boot that the side tag drew
+   * to the LEFT of the name (`sideX < nameX`), and can measure how near two plates
+   * come in a crowded frame instead of eyeballing a screenshot.
+   *
+   * `sideX` / `suffixX` are only meaningful when the plate carries that token —
+   * an FFA plate's `sideX` is where a side tag WOULD have gone, and `left` is the
+   * name's own left edge, which is the row's true start.
+   */
+  sideX: number;
+  nameX: number;
+  suffixX: number;
+  left: number;
+  right: number;
   /** Label-top y in screen space, CSS px. */
   y: number;
   /** True for the local player's own-ship label. */
@@ -353,7 +380,7 @@ export class NameplateView extends Container {
       } else {
         st.visible = false;
       }
-      if (this.debugCapture) this.recordDebug(drawn, plate, top);
+      if (this.debugCapture) this.recordDebug(drawn, plate, top, row);
       drawn++;
 
       if (row.left < minX) minX = row.left;
@@ -386,10 +413,10 @@ export class NameplateView extends Container {
 
   /** Record one drawn label into the reusable pool at `i` (grows to fit). Only
    *  reached under {@link debugCapture}, so it costs nothing in a normal build. */
-  private recordDebug(i: number, plate: Nameplate, top: number): void {
+  private recordDebug(i: number, plate: Nameplate, top: number, row: NameplateRow): void {
     let d = this.debugDrawn[i];
     if (!d) {
-      d = { owner: plate.owner, kind: plate.kind, text: plate.text, suffix: plate.suffix, teamLabel: plate.teamLabel, teamColor: plate.teamColor, color: plate.color, alpha: plate.alpha, x: plate.x, y: top, local: plate.local };
+      d = { owner: plate.owner, kind: plate.kind, text: plate.text, suffix: plate.suffix, teamLabel: plate.teamLabel, teamColor: plate.teamColor, color: plate.color, alpha: plate.alpha, x: plate.x, y: top, local: plate.local, sideX: row.sideX, nameX: row.nameX, suffixX: row.suffixX, left: row.left, right: row.right };
       this.debugDrawn[i] = d;
       return;
     }
@@ -404,6 +431,11 @@ export class NameplateView extends Container {
     d.x = plate.x;
     d.y = top;
     d.local = plate.local;
+    d.sideX = row.sideX;
+    d.nameX = row.nameX;
+    d.suffixX = row.suffixX;
+    d.left = row.left;
+    d.right = row.right;
   }
 
   /**
