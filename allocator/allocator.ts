@@ -42,6 +42,7 @@ import type { MachineId } from '../src/net/ticket';
 import { signTicket } from '../src/net/ticket';
 import { makeRoomCode } from '../src/net/room-code';
 import type { Room, RoomRegistry, MachineView, Reservation, ReserveConfig } from './registry';
+import { isPrivate } from './registry';
 import { nearestRegion } from './region-geo';
 import { listingId, ownerTag, type RoomListing } from './listing';
 
@@ -441,7 +442,7 @@ export class Allocator {
         // *while it is publicly open*, so a room that has since gone private is
         // gone as far as this route is concerned — its code still works, and that
         // is the difference between a handle and a code (`./listing`).
-        if (room.listed === false) {
+        if (isPrivate(room)) {
           throw new AllocatorError('not-found', `listing ${id} is no longer published`);
         }
         if ((room.joinableSeats ?? 0) <= 0) {
@@ -704,7 +705,10 @@ export class Allocator {
  * and the two paths are kept separate exactly as Trap 1 says to keep them.
  */
 function isListable(room: Room): boolean {
-  if (room.listed === false) return false;
+  // The host's own visibility call comes first and is absolute: a PRIVATE room is
+  // absent from the payload, not greyed and not filtered on the far side (a0-35 —
+  // *"those can only be joined by using the join code"*).
+  if (isPrivate(room)) return false;
   return room.joinableSeats !== undefined && room.joinableSeats > 0;
 }
 
