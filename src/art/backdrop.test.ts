@@ -737,35 +737,68 @@ describe('the built sky IS the design (a0-40)', () => {
   // -------------------------------------------------------------------------
 
   /**
-   * **What `main` builds today**, transcribed from the brief's own runtime
-   * measurement on a 640×360 panel. This is the drifted state a0-40 exists to
-   * end, and the gate above is only worth anything if it refuses this.
+   * **What `main` builds today**, read off `main` at runtime rather than typed
+   * from the brief's rounded quote — `evidence/a0-40-backdrop-matches-mockup/`
+   * holds the run (`gate-against-main.txt`, this same predicate against a `main`
+   * worktree, 8 of 8 failing). This is the drifted state a0-40 exists to end, and
+   * the gate above is only worth anything if it refuses it.
    */
   const SHIPPED_BEFORE_A0_40: Readonly<Record<MockupSkyId, Built & { lift: number }>> = {
     // 3 washes r≈129 α.0126 + 36 nodes r 8–43 α.039.
-    plasmaReef: { count: 39, radii: [8, 43, 129], alphas: [0.0126, 0.039], colors: [PALETTE.plasma], lift: 0.53 },
-    coalsack: { count: 7, radii: [67, 85], alphas: [0.68, 0.98], colors: [0x010204], lift: 0.02 },
+    plasmaReef: {
+      count: 39,
+      radii: [8, 129],
+      alphas: [0.0126, 0.039],
+      colors: [PALETTE.plasma, DERIVED.plasmaDim],
+      lift: 0.53,
+    },
+    coalsack: { count: 7, radii: [67, 85], alphas: [0.676, 0.982], colors: [0x010204], lift: 0.02 },
     deepEmber: { count: 5, radii: [79, 91], alphas: [0.052, 0.058], colors: [PALETTE.threatRed], lift: 0.91 },
-    patinaDrift: { count: 22, radii: [37, 89], alphas: [0.041, 0.051], colors: [PALETTE.patina], lift: 0.92 },
-    // The control: 14 sheets, r 100–177, α .047–.093. Inside the design's ranges.
-    ironVeil: { count: 14, radii: [102.4, 166.4], alphas: [0.047, 0.093], colors: [DERIVED.hullShadow], lift: 0.81 },
+    patinaDrift: {
+      count: 22,
+      radii: [37, 89],
+      alphas: [0.041, 0.051],
+      colors: [PALETTE.patina, DERIVED.continentShade, DERIVED.hullShadow],
+      lift: 0.92,
+    },
+    // The control.
+    ironVeil: {
+      count: 14,
+      radii: [100, 177],
+      alphas: [0.047, 0.093],
+      colors: [DERIVED.hullShadow, DERIVED.hullDark, PALETTE.threatRed],
+      lift: 0.81,
+    },
   };
 
-  it('REJECTS the four skies that drifted, and PASSES the one that did not', () => {
+  it('REJECTS every sky main builds — and Iron Veil only on the axes it did drift', () => {
     // LESSONS §24, and the reason this test exists at all: a gate that passes on
     // main is not a gate. Run the same predicate over what main builds.
+    //
+    // Iron Veil is the control and the result is more interesting than a pass:
+    // its **count and its alpha are the design's**, which is why it is the one
+    // sky the developer has never complained about, and it is still refused —
+    // its radii run 6% wide of the design and it carries a third ink the pair
+    // does not. The gate is fine-grained enough to say which, which is exactly
+    // what six rounds of "the nebula is wrong" needed and never had.
     const rows: string[] = [];
     for (const id of MOCKUP_SKY_IDS) {
       const found = mismatches(id, SHIPPED_BEFORE_A0_40[id]);
-      rows.push(`  ${NEBULAE[id].name.padEnd(13)} ${found.length === 0 ? 'PASSES (the control)' : found.join('; ')}`);
-      if (id === 'ironVeil') {
-        expect(found, 'Iron Veil never drifted — a gate that failed it is measuring the wrong thing').toEqual([]);
-      } else {
-        expect(found.length, `${NEBULAE[id].name} should have been rejected`).toBeGreaterThan(0);
-      }
+      rows.push(`  ${NEBULAE[id].name.padEnd(13)} ${found.join('; ')}`);
+      expect(found.length, `${NEBULAE[id].name} should have been rejected`).toBeGreaterThan(0);
     }
     // eslint-disable-next-line no-console
     console.log(`\n  the gate against main:\n${rows.join('\n')}\n`);
+
+    // The control, stated precisely: on the two axes the brief measured as
+    // unchanged, main's Iron Veil already satisfies the design.
+    const veil = mismatches('ironVeil', SHIPPED_BEFORE_A0_40.ironVeil);
+    expect(veil.some((m) => m.startsWith('count')), 'Iron Veil’s count never drifted').toBe(false);
+    expect(veil.some((m) => m.startsWith('alpha')), 'Iron Veil’s alpha never drifted').toBe(false);
+    // …and Plasma Reef and Deep Ember, the two the brief singles out, are refused
+    // on the axis it singles them out for.
+    expect(mismatches('plasmaReef', SHIPPED_BEFORE_A0_40.plasmaReef)[0]).toBe('count 39, design 9');
+    expect(mismatches('deepEmber', SHIPPED_BEFORE_A0_40.deepEmber)[0]).toBe('count 5, design 22');
   });
 
   it('REJECTS main’s ground, its star count and every one of its lifts', () => {

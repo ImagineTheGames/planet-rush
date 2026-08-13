@@ -1,0 +1,194 @@
+[pool-size] worker cap 2: cgroup quota 6 cores / LANES 3 = 2 workers (host claims 6)
+
+ RUN  v2.1.8 /tmp/pr-main
+
+stdout | src/art/a040-gate.test.ts > a0-40 gate, against main > carries the design’s star field: 560 a screenful, and a p99 of 46–53
+  main: 49 star shapes a screenful, p99 9.08
+
+ ❯ src/art/a040-gate.test.ts (8 tests | 8 failed) 51ms
+   × a0-40 gate, against main > Coalsack: count exactly, radius and alpha inside the design 9ms
+     → Coalsack: count 7, design 9; radius 67–85, design 115–244; alpha 0.676–0.982, design 0.099–0.392; colours #010204 are not the design's pair: expected [ 'count 7, design 9', …(3) ] to deeply equal []
+   × a0-40 gate, against main > Iron Veil: count exactly, radius and alpha inside the design 1ms
+     → Iron Veil: radius 100–177, design 102–167; colours #383e45 are not the design's pair: expected [ …(2) ] to deeply equal []
+   × a0-40 gate, against main > Patina Drift: count exactly, radius and alpha inside the design 1ms
+     → Patina Drift: radius 37–89, design 64–167; colours #515861 are not the design's pair: expected [ 'radius 37–89, design 64–167', …(1) ] to deeply equal []
+   × a0-40 gate, against main > Plasma Reef: count exactly, radius and alpha inside the design 1ms
+     → Plasma Reef: count 39, design 9; radius 8–129, design 115–244; alpha 0.013–0.039, design 0.053–0.115: expected [ 'count 39, design 9', …(2) ] to deeply equal []
+   × a0-40 gate, against main > Deep Ember: count exactly, radius and alpha inside the design 0ms
+     → Deep Ember: count 5, design 22: expected [ 'count 5, design 22' ] to deeply equal []
+   × a0-40 gate, against main > grounds the void in the design’s own ground 0ms
+     → expected 66052 to be 461072 // Object.is equality
+   × a0-40 gate, against main > carries the design’s star field: 560 a screenful, and a p99 of 46–53 26ms
+     → expected 49 to be 560 // Object.is equality
+   × a0-40 gate, against main > lifts each panel by what the design lifts it 13ms
+     → Coalsack lifts -0.81, the design lifts 4.55: expected 1.1780219780219778 to be less than 0.05
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/art/a040-gate.test.ts > a0-40 gate, against main > Coalsack: count exactly, radius and alpha inside the design
+AssertionError: Coalsack: count 7, design 9; radius 67–85, design 115–244; alpha 0.676–0.982, design 0.099–0.392; colours #010204 are not the design's pair: expected [ 'count 7, design 9', …(3) ] to deeply equal []
+
+- Expected
++ Received
+
+- Array []
++ Array [
++   "count 7, design 9",
++   "radius 67–85, design 115–244",
++   "alpha 0.676–0.982, design 0.099–0.392",
++   "colours #010204 are not the design's pair",
++ ]
+
+ ❯ src/art/a040-gate.test.ts:43:65
+     41|     it(`${NEBULAE[id].name}: count exactly, radius and alpha inside th…
+     42|       const found = mismatches(id);
+     43|       expect(found, `${NEBULAE[id].name}: ${found.join('; ')}`).toEqua…
+       |                                                                 ^
+     44|     });
+     45|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  src/art/a040-gate.test.ts > a0-40 gate, against main > Iron Veil: count exactly, radius and alpha inside the design
+AssertionError: Iron Veil: radius 100–177, design 102–167; colours #383e45 are not the design's pair: expected [ …(2) ] to deeply equal []
+
+- Expected
++ Received
+
+- Array []
++ Array [
++   "radius 100–177, design 102–167",
++   "colours #383e45 are not the design's pair",
++ ]
+
+ ❯ src/art/a040-gate.test.ts:43:65
+     41|     it(`${NEBULAE[id].name}: count exactly, radius and alpha inside th…
+     42|       const found = mismatches(id);
+     43|       expect(found, `${NEBULAE[id].name}: ${found.join('; ')}`).toEqua…
+       |                                                                 ^
+     44|     });
+     45|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  src/art/a040-gate.test.ts > a0-40 gate, against main > Patina Drift: count exactly, radius and alpha inside the design
+AssertionError: Patina Drift: radius 37–89, design 64–167; colours #515861 are not the design's pair: expected [ 'radius 37–89, design 64–167', …(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- Array []
++ Array [
++   "radius 37–89, design 64–167",
++   "colours #515861 are not the design's pair",
++ ]
+
+ ❯ src/art/a040-gate.test.ts:43:65
+     41|     it(`${NEBULAE[id].name}: count exactly, radius and alpha inside th…
+     42|       const found = mismatches(id);
+     43|       expect(found, `${NEBULAE[id].name}: ${found.join('; ')}`).toEqua…
+       |                                                                 ^
+     44|     });
+     45|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  src/art/a040-gate.test.ts > a0-40 gate, against main > Plasma Reef: count exactly, radius and alpha inside the design
+AssertionError: Plasma Reef: count 39, design 9; radius 8–129, design 115–244; alpha 0.013–0.039, design 0.053–0.115: expected [ 'count 39, design 9', …(2) ] to deeply equal []
+
+- Expected
++ Received
+
+- Array []
++ Array [
++   "count 39, design 9",
++   "radius 8–129, design 115–244",
++   "alpha 0.013–0.039, design 0.053–0.115",
++ ]
+
+ ❯ src/art/a040-gate.test.ts:43:65
+     41|     it(`${NEBULAE[id].name}: count exactly, radius and alpha inside th…
+     42|       const found = mismatches(id);
+     43|       expect(found, `${NEBULAE[id].name}: ${found.join('; ')}`).toEqua…
+       |                                                                 ^
+     44|     });
+     45|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  src/art/a040-gate.test.ts > a0-40 gate, against main > Deep Ember: count exactly, radius and alpha inside the design
+AssertionError: Deep Ember: count 5, design 22: expected [ 'count 5, design 22' ] to deeply equal []
+
+- Expected
++ Received
+
+- Array []
++ Array [
++   "count 5, design 22",
++ ]
+
+ ❯ src/art/a040-gate.test.ts:43:65
+     41|     it(`${NEBULAE[id].name}: count exactly, radius and alpha inside th…
+     42|       const found = mismatches(id);
+     43|       expect(found, `${NEBULAE[id].name}: ${found.join('; ')}`).toEqua…
+       |                                                                 ^
+     44|     });
+     45|   }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  src/art/a040-gate.test.ts > a0-40 gate, against main > grounds the void in the design’s own ground
+AssertionError: expected 66052 to be 461072 // Object.is equality
+
+- Expected
++ Received
+
+- 461072
++ 66052
+
+ ❯ src/art/a040-gate.test.ts:47:26
+     45|   }
+     46|   it('grounds the void in the design’s own ground', () => {
+     47|     expect(GROUND_COLOR).toBe(MOCKUP_GROUND);
+       |                          ^
+     48|   });
+     49|   it('carries the design’s star field: 560 a screenful, and a p99 of 4…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+ FAIL  src/art/a040-gate.test.ts > a0-40 gate, against main > carries the design’s star field: 560 a screenful, and a p99 of 46–53
+AssertionError: expected 49 to be 560 // Object.is equality
+
+- Expected
++ Received
+
+- 560
++ 49
+
+ ❯ src/art/a040-gate.test.ts:56:26
+     54|     // eslint-disable-next-line no-console
+     55|     console.log(`  main: ${stars.length} star shapes a screenful, p99 …
+     56|     expect(stars.length).toBe(MOCKUP_STARS.count);
+       |                          ^
+     57|     expect(m.p99).toBeGreaterThanOrEqual(MOCKUP_STARS.peakP99.min);
+     58|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+
+ FAIL  src/art/a040-gate.test.ts > a0-40 gate, against main > lifts each panel by what the design lifts it
+AssertionError: Coalsack lifts -0.81, the design lifts 4.55: expected 1.1780219780219778 to be less than 0.05
+ ❯ src/art/a040-gate.test.ts:65:111
+     63|       const m = measure(sampleShapes(shapes, NEBULAE[id].additive, MOC…
+     64|       const want = MOCKUP_REFERENCE[id].lift;
+     65|       expect(Math.abs(m.lift - want) / want, `${NEBULAE[id].name} lift…
+       |                                                                                                               ^
+     66|     }
+     67|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/8]⎯
+
+ Test Files  1 failed (1)
+      Tests  8 failed (8)
+   Start at  20:57:17
+   Duration  4.88s (transform 99ms, setup 0ms, collect 3.83s, tests 51ms, environment 0ms, prepare 645ms)
+
