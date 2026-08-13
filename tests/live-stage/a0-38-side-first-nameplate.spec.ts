@@ -126,7 +126,7 @@ test.describe('the side leads a drawn nameplate (a0-38)', () => {
       // The difficulty tag is still last — recessive metadata keeps its place.
       if (p.suffix.length > 0) {
         expect(p.nameX, `${readRow(p)} — the tier tag still trails`).toBeLessThan(p.suffixX);
-        expect(p.right).toBeCloseTo(p.suffixX + (p.right - p.suffixX), 3);
+        expect(p.right, `${readRow(p)} — and ends the row`).toBeGreaterThan(p.suffixX);
       }
       // The wording is untouched (m10, u3) — this brief moved the tag, not its text.
       expect(p.teamLabel).toMatch(/^(FRIENDLY|ENEMY|TEAM) [A-D]$/);

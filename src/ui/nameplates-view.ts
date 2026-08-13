@@ -80,7 +80,7 @@ const FONT_NAME = FONT_BODY;
 export const NAMEPLATE_FONT_SIZE = 12;
 const FONT_SIZE = NAMEPLATE_FONT_SIZE;
 /** A name IS a proper noun, so it takes the ratified `name` tier — and so do the
- *  two tags that trail it, because they are read as part of the same row. This
+ *  two tags that flank it, because they are read as part of the same row. This
  *  replaces the flat `letterSpacing: 0.5` all three pools used to spell, which is
  *  one of the six drifted values the Gantry handoff set out to retire. */
 const NAME_TRACKING = hudTracking('name', FONT_SIZE);
