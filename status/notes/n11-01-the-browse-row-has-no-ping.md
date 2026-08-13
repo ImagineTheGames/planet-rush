@@ -4,7 +4,7 @@ Scratch memory for THIS brief, across retries and resumes. Keep it current as
 you work; a future you reads it first. This is a working note, not evidence —
 "done" is still the DoD, the PR and QA's attestation, never a line written here.
 
-Branch: `agent/netcode/n11-01-browse-row-ping`, cut from `21a0942`.
+Branch: `agent/netcode/n11-01-browse-row-ping`, cut from `21a0942`. **PR #412.**
 
 ## THE FIRST THING A FUTURE ME SHOULD READ
 
