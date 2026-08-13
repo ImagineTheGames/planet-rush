@@ -77,6 +77,29 @@ export interface Room {
 }
 
 /**
+ * **Is this room PRIVATE?** — the allocator's whole notion of room visibility,
+ * in one predicate (a0-26 D1; the control that moves it landed in a0-35).
+ *
+ * It exists because the ruling is a *negative* one carried by an *optional*
+ * field, and that is two chances to get it backwards. The wire encoding is
+ * **absent means listed** — a PUBLIC room spends no heartbeat bytes and a Machine
+ * older than the field keeps listing exactly as it did — so the only value that
+ * means "private" is an explicit `false`, and every reader has to say
+ * `=== false` rather than `!room.listed`. Said once, here, next to the field it
+ * reads, instead of at each call site where a truthiness check would quietly
+ * unlist every pre-a0-26 room in the fleet.
+ *
+ * **Unlisted is not unreachable.** A private room is absent from
+ * {@link Allocator.rooms} and its browse handle stops resolving; its *code* is
+ * untouched and still joins, which is the developer's own rule for it: *"those
+ * can only be joined by using the join code."* Nothing else in the allocator may
+ * read this — `roomInfo` and `join` answer a code, and a code is not a list.
+ */
+export function isPrivate(room: Room): boolean {
+  return room.listed === false;
+}
+
+/**
  * What a Machine tells the allocator every interval: who it is, what it hosts
  * right now, and how much more it will take. The `rooms` list is *state, not a
  * delta* — each heartbeat is the full truth of that Machine's rooms, so the

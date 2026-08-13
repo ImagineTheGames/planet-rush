@@ -1,0 +1,270 @@
+{
+  "map": "oval",
+  "view": "desktop",
+  "mode": "live",
+  "viewport": {
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "deviceScaleFactor": 2
+  },
+  "bound": {
+    "void": [
+      {
+        "label": "void-ground",
+        "n": 0
+      },
+      {
+        "label": "void-nebula-plasmaReef",
+        "n": 0
+      },
+      {
+        "label": "void-stars-deep",
+        "n": 0
+      },
+      {
+        "label": "void-stars-mid",
+        "n": 0
+      },
+      {
+        "label": "void-stars-near",
+        "n": 0
+      }
+    ],
+    "world": [
+      {
+        "label": "boundary",
+        "n": 1
+      },
+      {
+        "label": "atmosphere",
+        "n": 1
+      },
+      {
+        "label": "stations",
+        "n": 16
+      },
+      {
+        "label": "turrets",
+        "n": 0
+      },
+      {
+        "label": "asteroids",
+        "n": 7
+      },
+      {
+        "label": "chunks",
+        "n": 4
+      },
+      {
+        "label": "muzzles",
+        "n": 0
+      },
+      {
+        "label": "impacts",
+        "n": 0
+      },
+      {
+        "label": "ships",
+        "n": 8
+      },
+      {
+        "label": "shots",
+        "n": 6
+      }
+    ],
+    "vfx": [
+      {
+        "label": "vfx-matter",
+        "n": 7
+      },
+      {
+        "label": "vfx-light",
+        "n": 0
+      }
+    ]
+  },
+  "shot": [
+    {
+      "key": "ground-only",
+      "labels": [],
+      "counts": {},
+      "file": "solo-oval-desktop-live-ground-only.png"
+    },
+    {
+      "key": "nebula",
+      "labels": [
+        "void-nebula-plasmaReef"
+      ],
+      "counts": {},
+      "file": "solo-oval-desktop-live-nebula.png"
+    },
+    {
+      "key": "stars-deep",
+      "labels": [
+        "void-stars-deep"
+      ],
+      "counts": {},
+      "file": "solo-oval-desktop-live-stars-deep.png"
+    },
+    {
+      "key": "stars-mid",
+      "labels": [
+        "void-stars-mid"
+      ],
+      "counts": {},
+      "file": "solo-oval-desktop-live-stars-mid.png"
+    },
+    {
+      "key": "stars-near",
+      "labels": [
+        "void-stars-near"
+      ],
+      "counts": {},
+      "file": "solo-oval-desktop-live-stars-near.png"
+    },
+    {
+      "key": "stars-all",
+      "labels": [
+        "void-stars-deep",
+        "void-stars-mid",
+        "void-stars-near"
+      ],
+      "counts": {},
+      "file": "solo-oval-desktop-live-stars-all.png"
+    },
+    {
+      "key": "asteroids",
+      "labels": [
+        "asteroids"
+      ],
+      "counts": {
+        "asteroids": 7
+      },
+      "file": "solo-oval-desktop-live-asteroids.png"
+    },
+    {
+      "key": "chunks",
+      "labels": [
+        "chunks"
+      ],
+      "counts": {
+        "chunks": 5
+      },
+      "file": "solo-oval-desktop-live-chunks.png"
+    },
+    {
+      "key": "atmosphere",
+      "labels": [
+        "atmosphere"
+      ],
+      "counts": {
+        "atmosphere": 1
+      },
+      "file": "solo-oval-desktop-live-atmosphere.png"
+    },
+    {
+      "key": "stations",
+      "labels": [
+        "stations"
+      ],
+      "counts": {
+        "stations": 16
+      },
+      "file": "solo-oval-desktop-live-stations.png"
+    },
+    {
+      "key": "turrets",
+      "labels": [
+        "turrets"
+      ],
+      "counts": {
+        "turrets": 0
+      },
+      "file": "solo-oval-desktop-live-turrets.png"
+    },
+    {
+      "key": "ships",
+      "labels": [
+        "ships"
+      ],
+      "counts": {
+        "ships": 8
+      },
+      "file": "solo-oval-desktop-live-ships.png"
+    },
+    {
+      "key": "shots",
+      "labels": [
+        "shots"
+      ],
+      "counts": {
+        "shots": 9
+      },
+      "file": "solo-oval-desktop-live-shots.png"
+    },
+    {
+      "key": "muzzles",
+      "labels": [
+        "muzzles"
+      ],
+      "counts": {
+        "muzzles": 0
+      },
+      "file": "solo-oval-desktop-live-muzzles.png"
+    },
+    {
+      "key": "impacts",
+      "labels": [
+        "impacts"
+      ],
+      "counts": {
+        "impacts": 0
+      },
+      "file": "solo-oval-desktop-live-impacts.png"
+    },
+    {
+      "key": "boundary",
+      "labels": [
+        "boundary"
+      ],
+      "counts": {
+        "boundary": 1
+      },
+      "file": "solo-oval-desktop-live-boundary.png"
+    },
+    {
+      "key": "vfx-light",
+      "labels": [
+        "vfx-light"
+      ],
+      "counts": {
+        "vfx-light": 15
+      },
+      "file": "solo-oval-desktop-live-vfx-light.png"
+    },
+    {
+      "key": "vfx-matter",
+      "labels": [
+        "vfx-matter"
+      ],
+      "counts": {
+        "vfx-matter": 15
+      },
+      "file": "solo-oval-desktop-live-vfx-matter.png"
+    },
+    {
+      "key": "vfx-all",
+      "labels": [
+        "vfx-light",
+        "vfx-matter"
+      ],
+      "counts": {
+        "vfx-matter": 15,
+        "vfx-light": 15
+      },
+      "file": "solo-oval-desktop-live-vfx-all.png"
+    }
+  ]
+}

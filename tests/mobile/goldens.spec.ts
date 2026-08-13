@@ -123,6 +123,67 @@ test('golden: landscape phone frozen scene', async ({ page }, testInfo) => {
 });
 
 // ---------------------------------------------------------------------------
+// A frame with a SKY in it (a0-39)
+// ---------------------------------------------------------------------------
+//
+// **The gate could not see the backdrop, and that is why this brief happened.**
+// `?debug=1` has no lobby, so the frozen scene above boots the persisted-or-
+// default map — `octagon`, whose sky is NONE (`src/art/backdrop.ts`
+// `MAP_NEBULA`). Five of the six ratified skies therefore appear in **no golden
+// at all**, and a defect that made every one of them draw as concentric
+// hard-edged discs shipped, was played, and was reported three times before any
+// picture in this repo showed it.
+//
+// Three baselines close that, chosen to be the smallest set that can tell the
+// three failures apart rather than one per sky:
+//
+//   · `oval`    → Plasma Reef  — the **additive** path, the brightest sky, and
+//                                the one whose light is measured against the
+//                                owner beacon ring's contrast;
+//   · `line`    → Deep Ember   — the frame the developer photographed, and the
+//                                only sky that spends a RESERVED hue at its
+//                                §2.2 ceiling;
+//   · `compass` → Coalsack     — **the control.** The developer played this one
+//                                and found it correct, so it is the baseline
+//                                that has to *stay still* while the other two
+//                                move. A fix that could not tell the difference
+//                                would be caught here and nowhere else.
+//
+// The map is seeded into storage rather than passed as a query flag because that
+// is where the debug boot reads it from (`src/main.ts` `readMapId`,
+// `src/ui/map-picker.ts` `MAP_STORAGE_KEY`) — no production seam is added for a
+// test, and the scene stays exactly the shipped one.
+
+/** The key `src/main.ts` reads the persisted arena from (`src/ui/map-picker.ts`). */
+const MAP_STORAGE_KEY = 'planet-rush:mapId';
+
+/** The frozen scene, on a named arena — which is what picks the sky. */
+async function bootFrozenOnMap(page: Page, mapId: string): Promise<void> {
+  await page.addInitScript(
+    ([key, id]) => window.localStorage.setItem(key, id),
+    [MAP_STORAGE_KEY, mapId] as const,
+  );
+  await bootFrozen(page);
+}
+
+for (const [mapId, sky, note] of [
+  ['oval', 'plasma-reef', 'the additive sky, and the brightest'],
+  ['line', 'deep-ember', 'the frame the developer photographed'],
+  ['compass', 'coalsack', 'THE CONTROL — this one was already correct'],
+] as const) {
+  test(`golden: desktop frozen scene on ${mapId} — ${sky} (${note})`, async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'desktop baseline only');
+    budgetTest({
+      work: `desktop boot of the frozen scene on ${mapId} → font settle → one full-frame golden comparison`,
+      measuredSeconds: 5,
+    });
+
+    await bootFrozenOnMap(page, mapId);
+    await expect(page).toHaveScreenshot(`desktop-sky-${sky}.png`, GOLDEN);
+  });
+}
+
+// ---------------------------------------------------------------------------
 // The HUD's own chrome bands, CLIPPED (u7-07)
 // ---------------------------------------------------------------------------
 //

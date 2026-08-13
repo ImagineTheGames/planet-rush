@@ -34,6 +34,7 @@ import type {
   MeasuredRegion,
   RegionPing,
   RegionProbeOptions,
+  RegionSurvey,
   WithTimeout,
 } from './region-probe';
 
@@ -406,6 +407,213 @@ describe('the survey measures one region at a time — a0-29', () => {
     expect(calls.filter((c) => c.url === 'https://iad.test/health')).toHaveLength(
       1 + DEFAULT_PROBE_SAMPLES,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// n11-01 — the numbers reach a screen a round at a time
+// ---------------------------------------------------------------------------
+
+/**
+ * The browse row is drawn beside a listing that lands in ~0.6 s, against a survey
+ * that answers in ~1.5 s, so for about a second the row has a region and no ping —
+ * the frame `a1-17` photographed as `IAD —`. These cases pin the fix and, more
+ * importantly, pin what the fix is NOT allowed to be: not a second probe, not
+ * overlapping samples, and not a region reported before its neighbours have had
+ * the same number of attempts.
+ */
+describe('the survey publishes each completed round — n11-01', () => {
+  it('hands every region a verdict after the FIRST round, long before the last', async () => {
+    const { fetch, now } = wire(hosts);
+    const rounds: RegionPing[][] = [];
+    const pings = await measureRegionPings(fleet(), {
+      fetch,
+      now,
+      withTimeout: noTimeout,
+      onRound: (r) => rounds.push(r.map((p) => ({ ...p }))),
+    });
+
+    // Three samples means three rounds; the last one is the return value, so two
+    // are published early.
+    expect(rounds).toHaveLength(DEFAULT_PROBE_SAMPLES - 1);
+    // And the first of them already carries a real number for EVERY region — a row
+    // drawn from it prints `VIRGINIA 75ms`, not a dash.
+    expect(rounds[0]!.map((p) => [p.id, p.pingMs])).toEqual([
+      ['gru', FAR],
+      ['iad', NEAR],
+    ]);
+    expect(rounds[0]!.every((p) => p.samples === 1)).toBe(true);
+    expect(pings.map((p) => p.pingMs)).toEqual([FAR, NEAR]);
+  });
+
+  it('publishes only WHOLE rounds — every region compared on the same number of attempts', async () => {
+    const { fetch, now } = wire(hosts);
+    const rounds: RegionPing[][] = [];
+    await measureRegionPings(fleet(), {
+      fetch,
+      now,
+      withTimeout: noTimeout,
+      onRound: (r) => rounds.push(r.map((p) => ({ ...p }))),
+    });
+    // Nobody is ever reported one sample ahead of the region it will be ranked
+    // against: that is a0-29's unfairness in a different costume.
+    for (const round of rounds) {
+      expect(new Set(round.map((p) => p.samples)).size).toBe(1);
+    }
+  });
+
+  it('a published number can only ever FALL — min-of-N settling, never a rise', async () => {
+    // The first sample of each region is the slow one (the fixture's setup cost);
+    // later ones are quicker, so the survey's own minimum walks downwards.
+    let clock = 0;
+    const seen = new Map<string, number>();
+    const fetch: FetchLike = (url) => {
+      const n = (seen.get(url) ?? 0) + 1;
+      seen.set(url, n);
+      clock += n === 1 ? 200 : n === 2 ? 120 : 90;
+      return Promise.resolve(ok({ region: url.includes('gru') ? 'gru' : 'iad' }));
+    };
+    const published: number[] = [];
+    const final = await measureRegionPings([region('gru')], {
+      fetch,
+      now: () => clock,
+      withTimeout: noTimeout,
+      onRound: (r) => published.push(r[0]!.pingMs!),
+    });
+    // Sample 1 is the warm-up's successor: 120, then 90. Whatever the fixture's
+    // numbers, each publication is <= the one before it and the return value is
+    // the smallest of all.
+    expect(published).toEqual([...published].sort((a, b) => b - a));
+    expect(final[0]!.pingMs).toBeLessThanOrEqual(published.at(-1)!);
+  });
+
+  it('a failure published early is replaced by a number when a later round lands one', async () => {
+    let call = 0;
+    let clock = 0;
+    const fetch: FetchLike = () => {
+      // 0 is the warm-up; 1 is the first timed sample and it fails outright.
+      if (call++ === 1) return Promise.reject(new Error('reset'));
+      clock += 60;
+      return Promise.resolve(ok({ region: 'gru' }));
+    };
+    const published: RegionPing[] = [];
+    const final = await measureRegionPings([region('gru')], {
+      fetch,
+      now: () => clock,
+      withTimeout: noTimeout,
+      onRound: (r) => published.push({ ...r[0]! }),
+    });
+    expect(published[0]).toMatchObject({ pingMs: null, failure: 'unreachable', samples: 0 });
+    expect(published[1]).toMatchObject({ pingMs: 60 });
+    expect(final[0]).toMatchObject({ pingMs: 60, samples: 2 });
+    // Absent, never zero — not even for the round that had nothing yet (rule 1).
+    expect(published[0]!.pingMs).not.toBe(0);
+  });
+
+  it('publishes nothing from a round the budget cut short', async () => {
+    // One edge origin, two steers — the live fleet's shape — with gru eating the
+    // clock. The arithmetic: warm-up 3000, round 1 costs 3000 + 10 (ends at 6010),
+    // round 2 starts with iad (the rotation) and ends at 6020, and the budget
+    // expires before its second sample. So round 1 is whole and round 2 is not.
+    let clock = 0;
+    const steerOf = (init?: { headers?: Readonly<Record<string, string>> }): string =>
+      init?.headers?.['fly-prefer-region'] ?? 'gru';
+    const fetch: FetchLike = (_url, init) => {
+      const steer = steerOf(init);
+      clock += steer === 'gru' ? 3000 : 10;
+      return Promise.resolve(ok({ region: steer }));
+    };
+    const steered = (id: string): FleetRegion => ({
+      ...region(id),
+      probe: { url: 'https://edge.test/health', headers: { 'fly-prefer-region': id } },
+    });
+    const rounds: RegionPing[][] = [];
+    await measureRegionPings([steered('gru'), steered('iad')], {
+      fetch,
+      now: () => clock,
+      withTimeout: noTimeout,
+      budgetMs: 6015,
+      onRound: (r) => rounds.push(r.map((p) => ({ ...p }))),
+    });
+    // Round 1 completed and was published; the truncated round was not — nobody is
+    // ranked on one more attempt than their neighbour.
+    expect(rounds).toHaveLength(1);
+    expect(rounds[0]!.every((p) => p.samples === 1)).toBe(true);
+  });
+
+  it('changes NOTHING about the schedule — same requests, same order, still one in flight', async () => {
+    const withCb = wire(hosts);
+    const without = wire(hosts);
+    await measureRegionPings(fleet(), { fetch: withCb.fetch, now: withCb.now, withTimeout: noTimeout, onRound: () => {} });
+    await measureRegionPings(fleet(), { fetch: without.fetch, now: without.now, withTimeout: noTimeout });
+    expect(withCb.calls.map((c) => c.url)).toEqual(without.calls.map((c) => c.url));
+  });
+
+  it('a callback that throws costs the survey nothing', async () => {
+    const { fetch, now } = wire(hosts);
+    const pings = await measureRegionPings(fleet(), {
+      fetch,
+      now,
+      withTimeout: noTimeout,
+      onRound: () => {
+        throw new Error('the screen blew up mid-redraw');
+      },
+    });
+    expect(pings.map((p) => p.pingMs)).toEqual([FAR, NEAR]);
+  });
+
+  it('surveyRegions hands back a RANKED survey per round, default and all', async () => {
+    const { fetch, now } = wire({
+      ...hosts,
+      'https://alloc.test/regions': { latency: 0, region: '' },
+    });
+    const list = {
+      regions: [
+        { region: 'gru', machines: 1, capacity: 8, rooms: 0, free: 8, probe: { url: 'https://gru.test/health' } },
+        { region: 'iad', machines: 1, capacity: 8, rooms: 0, free: 8, probe: { url: 'https://iad.test/health' } },
+      ],
+    };
+    const fetchWithList: FetchLike = (url, init) =>
+      url.endsWith('/regions') ? Promise.resolve(ok(list)) : fetch(url, init);
+
+    const surveys: RegionSurvey[] = [];
+    const final = await surveyRegions(
+      { baseUrl: 'https://alloc.test', fetch: fetchWithList },
+      { now, withTimeout: noTimeout, onSurvey: (s) => surveys.push(s) },
+    );
+
+    expect(surveys).toHaveLength(DEFAULT_PROBE_SAMPLES - 1);
+    // The early survey is the same answer the late one is: near region first, and
+    // a default that is a MEASURED region.
+    expect(surveys[0]!.regions.map((r) => r.id)).toEqual(['iad', 'gru']);
+    expect(surveys[0]!.defaultId).toBe('iad');
+    expect(surveys[0]!.regions[0]).toMatchObject({ pingMs: NEAR, free: 8 });
+    expect(final.regions.map((r) => r.id)).toEqual(['iad', 'gru']);
+  });
+
+  it('keys a region the way a room listing spells it — trimmed, lower case', async () => {
+    // The browse row joins these two lists on this string. `/regions` and
+    // `GET /rooms` are two different code paths on the allocator, so the client
+    // normalises both ends rather than trusting either to agree with the other.
+    const doFetch: FetchLike = () =>
+      Promise.resolve(ok({ regions: [{ region: ' IAD ', machines: 1, capacity: 6, rooms: 0, free: 6 }] }));
+
+    const regions = await fetchFleetRegions({ baseUrl: 'https://alloc.test', fetch: doFetch });
+
+    expect(regions.map((r) => r.id)).toEqual(['iad']);
+    // And a player still reads the code in caps, exactly as before.
+    expect(formatRegionPing({ id: regions[0]!.id, pingMs: 38 })).toBe('IAD 38ms');
+  });
+
+  it('never publishes a survey for a fleet with no regions — an empty read is not news', async () => {
+    const doFetch: FetchLike = () => Promise.resolve(ok({ regions: [] }));
+    let called = 0;
+    const survey = await surveyRegions(
+      { baseUrl: 'https://alloc.test', fetch: doFetch },
+      { onSurvey: () => called++ },
+    );
+    expect(survey.regions).toEqual([]);
+    expect(called).toBe(0);
   });
 });
 

@@ -286,6 +286,9 @@ import {
   LOBBY_SLOTS,
   toggleMode,
   cycleAbundance,
+  claimLabel,
+  toggleClaim,
+  showsClaimControl,
   matchSizeOf,
   DEFAULT_SHIP_CLASS,
   CLASS_ORDER,
@@ -7691,7 +7694,32 @@ function openMainMenu(
   async function measureFleet(): Promise<void> {
     const base = allocatorUrlFromEnv();
     if (base === null) return;
-    const survey = await surveyRegions({ baseUrl: base });
+    // Each COMPLETED round is drawn as it lands (n11-01). The browse row is the
+    // reason: its listing arrives in ~0.6 s and the whole survey answers at ~1.5 s,
+    // so a row sat beside a region with no number for about a second — read as a
+    // failure by anyone looking at it. Nothing about the probe changes; this is the
+    // same serial survey, reporting sooner. The last round is the returned value
+    // below, so it is not drawn twice.
+    const survey = await surveyRegions({ baseUrl: base }, { onSurvey: takeSurvey });
+    takeSurvey(survey);
+    playtest.recordConnect('regions', {
+      regions: survey.regions.map((r) => ({ region: r.id, pingMs: r.pingMs, free: r.free })),
+      default: survey.defaultId ?? null,
+    });
+  }
+
+  /**
+   * Hold a survey and draw it — a round of one, or the whole thing.
+   *
+   * **An empty fleet never replaces a measured one.** `surveyRegions` answers with
+   * no regions for an allocator that is down, older than `/regions`, or answering
+   * nonsense — which is a fact about the allocator, not about anybody's ping — and
+   * letting that blank the list would drop every row back to `IAD —` mid-session
+   * for a hiccup. A fleet that genuinely has no regions has nothing to draw either
+   * way, so keeping the last measurement costs nothing and saves the numbers.
+   */
+  function takeSurvey(survey: RegionSurvey): void {
+    if (survey.regions.length === 0 && onlineRegions.length > 0) return;
     // The player may have left the doors while the probes were in flight; the
     // measurement is still worth keeping (it is this client's, not this screen's),
     // but nothing is drawn from it.
@@ -7701,10 +7729,6 @@ function openMainMenu(
       label: regionLabel(region.id),
       pingMs: region.pingMs,
     }));
-    playtest.recordConnect('regions', {
-      regions: survey.regions.map((r) => ({ region: r.id, pingMs: r.pingMs, free: r.free })),
-      default: survey.defaultId ?? null,
-    });
     if (screen !== 'online') return;
     // The doors' message slot carries the fleet: `GRU 38ms · [IAD 224ms]`. It is
     // the same slot the CAMPAIGN teaser answers in, so it yields to an error and
@@ -9216,6 +9240,21 @@ interface LobbySeam {
    * player does and then shoots the roster (u7-03, tests/mobile/goldens.spec.ts).
    */
   modeControl: { logical: Rect; physicalCenter: { x: number; y: number } };
+  /**
+   * **PUBLIC or PRIVATE — the word the CLAIM chip is showing** (a0-35), and null
+   * on every screen that does not carry the chip: an offline lobby, and a guest's
+   * (`./ui/lobby` `showsClaimControl`).
+   *
+   * Read-back, not a lever. The evidence suite presses {@link claimControl} for
+   * real and then reads this — which is the only way to prove the *drawn* control
+   * moved rather than a function having been called: this whole brief exists
+   * because a ruling lived in a plan and in a wire field and never in a button.
+   */
+  claim: string | null;
+  /** The CLAIM chip's logical rect and the physical point a real press has to land
+   *  on, through the landscape-lock rotation — the twin of {@link modeControl}.
+   *  A zero rect when the chip is not on the strip. */
+  claimControl: { logical: Rect; physicalCenter: { x: number; y: number } };
   /** True while the RUSH! countdown is running. */
   counting: boolean;
   /** The hull the built world gave the local ship, or null until the match boots
@@ -9460,6 +9499,8 @@ function openLobby(
     rushHeight: 0,
     rushControl: { logical: { x: 0, y: 0, width: 0, height: 0 }, physicalCenter: { x: 0, y: 0 } },
     modeControl: { logical: { x: 0, y: 0, width: 0, height: 0 }, physicalCenter: { x: 0, y: 0 } },
+    claim: null,
+    claimControl: { logical: { x: 0, y: 0, width: 0, height: 0 }, physicalCenter: { x: 0, y: 0 } },
     counting: false,
     localShipClass: null,
     seatCharacters: [],
@@ -9535,7 +9576,11 @@ function openLobby(
       );
     }
     const { w, h } = ctx.logicalSize();
-    const layout = lobbyLayout({ width: w, height: h }, { isTouch });
+    // The same three options the VIEW laid out with (`./ui/lobby-view`): the strip
+    // splits its width between the chips it draws, so a layout built here for two
+    // chips while the screen shows three would report every control at the wrong
+    // place — the class of bug this seam exists to catch, in the seam itself.
+    const layout = lobbyLayout({ width: w, height: h }, { isTouch, claim: showsClaimControl(state) });
     seam.screen = model.screen;
     seam.visible = view.visible || shipSelectView.visible || mapSelectView.visible;
     seam.slotCount = layout.seats.length;
@@ -9673,6 +9718,11 @@ function openLobby(
       logical: { ...mode },
       physicalCenter: ctx.toPhysical(mode.x + mode.width / 2, mode.y + mode.height / 2),
     };
+    // The CLAIM chip, reported off the SAME layout and only when it was drawn
+    // (a0-35): `showClaim` decides both, so the seam cannot advertise a control at
+    // a point nobody drew — which is the rule the door list above already keeps.
+    seam.claim = model.showClaim ? claimLabel(model.listed) : null;
+    seam.claimControl = controlOf(model.showClaim ? layout.claim : { x: 0, y: 0, width: 0, height: 0 });
     seam.counting = model.countdown.active;
     soundSeatArrivals(model);
   }
@@ -9773,7 +9823,7 @@ function openLobby(
     if (state.screen === 'map-select') return null;
     const hit = view.hitTest(x, y);
     if (!hit) return null;
-    const layout = lobbyLayout({ width: w, height: h }, { isTouch });
+    const layout = lobbyLayout({ width: w, height: h }, { isTouch, claim: showsClaimControl(state) });
     if (hit.kind === 'shipCard') {
       // The roster's one card keeps its dossier too — it is a hull tile, so it
       // explains itself exactly as the four on the picker screen do.
@@ -9837,7 +9887,7 @@ function openLobby(
       return;
     }
     const { w, h } = ctx.logicalSize();
-    const resolved = seatHint(index, lobbyLayout({ width: w, height: h }, { isTouch }));
+    const resolved = seatHint(index, lobbyLayout({ width: w, height: h }, { isTouch, claim: showsClaimControl(state) }));
     if (!resolved) return;
     pinnedHintSeat = index;
     showHint(resolved);
@@ -9927,6 +9977,13 @@ function openLobby(
             teams: lobbyWireTeams(state),
             seats: lobbyWireSeats(state),
             abundance: state.abundance,
+            // …and whether the room may be FOUND (a0-35). It rides here for the
+            // same reason as everything above it — the room is the only thing that
+            // can act on it, and `server/room.ts` honours it from the creator in
+            // the lobby phase and nowhere else — with one difference worth naming:
+            // it is the only field on this list that never reaches the world. It
+            // changes who may walk in, not what they would be flying.
+            listed: state.listed,
           }
         : {}),
     });
@@ -10227,6 +10284,17 @@ function openLobby(
         // SCARCE → STANDARD → RICH (ratified p11). Persisted like the mode.
         state = stepped(state, cycleAbundance(state));
         platform.storage.set(ABUNDANCE_KEY, state.abundance);
+        render();
+        break;
+      case 'claim':
+        // PUBLIC ⇄ PRIVATE — the developer's missing button (a0-35). **Sent, and
+        // deliberately NOT persisted**: the room is the only thing that can hide
+        // itself, and every new room opens public by ratified default (a0-26 D1,
+        // `./ui/lobby` `LobbyState.listed`). A guest's tap, a tap after RUSH! and
+        // a tap in an offline lobby are all refused in the model, and a refusal
+        // returns the identical state, so none of them reaches the wire.
+        state = stepped(state, toggleClaim(state));
+        sendChoice();
         render();
         break;
       case 'leave':

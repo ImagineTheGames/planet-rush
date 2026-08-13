@@ -28,6 +28,8 @@ import type { LobbySlot } from '../net/transport';
 import {
   ABUNDANCE_CYCLE,
   ABUNDANCE_LABELS,
+  CLAIM_LABELS,
+  claimLabel,
   CLASS_ORDER,
   CLASS_OPTIONS,
   COLOR_NAMES,
@@ -45,6 +47,8 @@ import {
   SEAT_STATE_LABELS,
   SOLO_SEAT_STATE_CYCLE,
   seatStateCycle,
+  showsClaimControl,
+  toggleClaim,
   SIDE_COLORS,
   SIDE_WORDS,
   STAT_PIPS,
@@ -61,6 +65,7 @@ import {
   createLobby,
   denseSeatIndex,
   lobbyWireSeats,
+  lobbyWireTeams,
   startRefusal,
   NEEDS_TWO,
   cycleAbundance,
@@ -1917,5 +1922,84 @@ describe('the lobby shows ONE ship card and ONE map card (u10-01)', () => {
     // screen's state (the screen is not a lock).
     expect(cycleSeatState(teams, 3).seats[3]?.occupant).not.toBe(teams.seats[3]?.occupant);
     expect(cycleSeatTeam(teams, 3).seats[3]?.team).not.toBe(teams.seats[3]?.team);
+  });
+});
+
+/**
+ * a0-35 — **the PRIVATE toggle the developer could not find.**
+ *
+ * *"when i host, i hav eno way to make a match private i dont see a button to do
+ * it"*. D1 was ratified as *"public by default **with a PRIVATE toggle**"* and
+ * the toggle reached `n10-01`'s rulings and neither brief's work items, so the
+ * whole seam shipped — wire field, room flag, heartbeat, an allocator that leaves
+ * a private room out of the payload — with nothing on screen to move it.
+ *
+ * What is asserted here is the *control's* half of that ruling, which is three
+ * refusals and a default:
+ *
+ *  - a new room is **PUBLIC**, always, and never restores a stored PRIVATE;
+ *  - only the **creator** flips it, and only **before RUSH!**;
+ *  - an **offline** lobby has no control at all — there is no list for a
+ *    solo-vs-bots room to be on, so a chip about one could only mislead;
+ *  - and it is **not match config**: `lobbyMatchConfig` is byte-identical either
+ *    way, because who may find a room changes nothing about the world it builds.
+ */
+describe('the CLAIM control — PUBLIC / PRIVATE (a0-35, a0-26 D1)', () => {
+  it('opens PUBLIC — the ratified default, online and offline alike', () => {
+    expect(lobby().listed).toBe(true);
+    expect(lobby({ online: false }).listed).toBe(true);
+    expect(lobbyModel(lobby()).listed).toBe(true);
+    expect(claimLabel(true)).toBe(CLAIM_LABELS.public);
+    expect(claimLabel(false)).toBe(CLAIM_LABELS.private);
+  });
+
+  it('the host flips it PUBLIC ⇄ PRIVATE, and the model says the word', () => {
+    const room = lobby();
+    const priv = toggleClaim(room);
+    expect(priv.listed).toBe(false);
+    expect(claimLabel(lobbyModel(priv).listed)).toBe('PRIVATE');
+    // …and back, because an opt-out a host cannot undo is a trap.
+    expect(toggleClaim(priv).listed).toBe(true);
+  });
+
+  it('refuses a GUEST, a lobby past RUSH!, and an OFFLINE room — identically', () => {
+    // A refusal returns the IDENTICAL state, which is what the flow and the
+    // wiring sound a refusal off (`./lobby-flow`, `main.ts` `sendChoice`), so a
+    // tap nobody may make costs the wire nothing.
+    const guest = lobby({ you: 1, host: 0 });
+    expect(toggleClaim(guest)).toBe(guest);
+    // RUSH! is refused below two participants (a0-11), so the room that actually
+    // counts down is one with somebody in it — here a single authored bot.
+    const counting = pressRush(cycleSeatState(lobby(), 1));
+    expect(counting.phase).toBe('counting');
+    expect(toggleClaim(counting)).toBe(counting);
+    const offline = lobby({ online: false });
+    expect(toggleClaim(offline)).toBe(offline);
+  });
+
+  it('shows the control to the online CREATOR and to nobody else', () => {
+    expect(showsClaimControl(lobby())).toBe(true);
+    // A guest never sees it: the room does not tell a joiner whether it is
+    // listed, so a chip on their screen could only show their own default —
+    // PUBLIC over somebody's private room. Absent, never flattering.
+    expect(showsClaimControl(lobby({ you: 1, host: 0 }))).toBe(false);
+    expect(showsClaimControl(lobby({ online: false }))).toBe(false);
+    // It stays on the host's strip through the countdown, drawn dead like its two
+    // neighbours — a control that vanished as RUSH! started would re-flow the
+    // strip under the host's thumb.
+    const counting = pressRush(cycleSeatState(lobby(), 1));
+    expect(counting.phase).toBe('counting');
+    expect(showsClaimControl(counting)).toBe(true);
+    expect(lobbyModel(counting).showClaim).toBe(true);
+  });
+
+  it('is NOT match config — the world is built identically either way', () => {
+    const room = solo();
+    const online = { ...room, online: true };
+    const priv = toggleClaim(online);
+    expect(priv.listed).toBe(false);
+    expect(lobbyMatchConfig(priv)).toEqual(lobbyMatchConfig(online));
+    expect(lobbyWireSeats(priv)).toEqual(lobbyWireSeats(online));
+    expect(lobbyWireTeams(priv)).toEqual(lobbyWireTeams(online));
   });
 });

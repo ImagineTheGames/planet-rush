@@ -1137,11 +1137,24 @@ export class Hud extends Container {
 
     // The Build & Upgrade row is contextual on docking (field report v0.2.2): its
     // live key shows only at your own station, matching the touch BUILD button.
-    const rows = controlsStripView(frame.device, frame.fireMode, frame.isTouch, frame.docked ?? false);
+    //
+    // The seated SCHEME is read from the same frame field the onboarding prompt
+    // reads (a0-37): §2.2's strip and §2.10's prompts are two surfaces on one
+    // contract, and until now only the prompts had been taught that a0-30 made Tap
+    // Commander the default everywhere. Live, so a mid-match switch re-labels the
+    // strip on the next frame, exactly as it re-words the prompt.
+    const rows = controlsStripView(
+      frame.device,
+      frame.fireMode,
+      frame.isTouch,
+      frame.docked ?? false,
+      frame.controlScheme,
+    );
     this.lastStripRows = rows; // captured for the ?debug=1 legend seam
     // Rebuild the label objects only when the binding set changes, not per frame —
-    // and docking flips the Build row, so it rides the signature too.
-    const signature = `${frame.device}:${frame.fireMode}:${rows
+    // and docking flips the Build row, so it rides the signature too. So does the
+    // scheme: it changes the row SET, not just a key inside it.
+    const signature = `${frame.device}:${frame.fireMode}:${frame.controlScheme}:${rows
       .map((r) => `${r.binding ?? '·'}/${r.label}`)
       .join(',')}`;
     if (signature !== this.stripSignature) {

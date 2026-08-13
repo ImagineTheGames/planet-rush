@@ -111,6 +111,7 @@ import {
   sideRosterOf,
   startLobbyMatch,
   tickLobby,
+  toggleClaim,
   toggleMode,
 } from './lobby';
 import type { LobbyState } from './lobby';
@@ -369,6 +370,13 @@ function choiceFor(state: FlowState, lobby: LobbyState): FlowEffect {
       // in an empty seat, so a roster the server was never told about would have
       // it fill every one of them behind the screen's back.
       ...(host ? { mode: lobby.mode, teams: lobbyWireTeams(lobby), seats: lobbyWireSeats(lobby) } : {}),
+      // …and whether the room may be FOUND (a0-35): PUBLIC or PRIVATE, the
+      // developer's missing button. Host-only like the shape above it, and for the
+      // same reason — a joiner publishing or hiding somebody else's room is the
+      // one thing `server/room.ts` refuses this field for — but unlike everything
+      // beside it, it reaches no world. It decides who may walk in, not what they
+      // would be flying, which is why it is absent from `lobbyMatchConfig`.
+      ...(host ? { listed: lobby.listed } : {}),
     },
   };
 }
@@ -615,6 +623,13 @@ export function flowTapLobby(state: FlowState, target: LobbyTarget): FlowResult 
     case 'abundance':
       // SCARCE → STANDARD → RICH (ratified p11). Locked with the hull at RUSH!.
       return withLobby(state, cycleAbundance(lobby));
+    case 'claim':
+      // PUBLIC ⇄ PRIVATE — who may FIND this room (a0-35). Refused from a guest,
+      // after RUSH! and offline, all three in `./lobby`, so a tap this flow cannot
+      // honour returns the identical lobby and costs the wire nothing. It is not
+      // match config and never reaches `lobbyMatchConfig`: it changes who can walk
+      // in, not what they would be flying.
+      return withLobby(state, toggleClaim(lobby));
     case 'rush': {
       // No message yet — the countdown has to run first (rule 2). A guest's
       // press is refused by `pressRush`, which returns the identical lobby, and

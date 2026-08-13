@@ -1,0 +1,88 @@
+{
+  "map": "oval",
+  "view": "desktop",
+  "viewport": {
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "deviceScaleFactor": 2
+  },
+  "screenWidthCssPx": 1440,
+  "cameraPanCssPx": 679.4,
+  "cameraPanDevicePx": 1358.9,
+  "classes": [
+    {
+      "key": "nebula",
+      "labels": [
+        "void-nebula-plasmaReef"
+      ],
+      "readRatio": 0.085,
+      "measuredRatio": 0.0854,
+      "xcorrLagDevicePx": 116,
+      "xcorrR": 0.9996,
+      "lagWindowRailed": false,
+      "maxLagDevicePx": 1296,
+      "driftPerScreenWidthCssPx": 122.9,
+      "readDriftPerScreenWidthCssPx": 122.4
+    },
+    {
+      "key": "stars-deep",
+      "labels": [
+        "void-stars-deep"
+      ],
+      "readRatio": 0.1,
+      "measuredRatio": 0.1001,
+      "xcorrLagDevicePx": 136,
+      "xcorrR": 0.9965,
+      "lagWindowRailed": false,
+      "maxLagDevicePx": 1296,
+      "driftPerScreenWidthCssPx": 144.1,
+      "readDriftPerScreenWidthCssPx": 144
+    },
+    {
+      "key": "stars-mid",
+      "labels": [
+        "void-stars-mid"
+      ],
+      "readRatio": 0.26,
+      "measuredRatio": 0.2598,
+      "xcorrLagDevicePx": 353,
+      "xcorrR": 0.989,
+      "lagWindowRailed": false,
+      "maxLagDevicePx": 1296,
+      "driftPerScreenWidthCssPx": 374.1,
+      "readDriftPerScreenWidthCssPx": 374.4
+    },
+    {
+      "key": "stars-near",
+      "labels": [
+        "void-stars-near"
+      ],
+      "readRatio": 0.5,
+      "measuredRatio": 0.4997,
+      "xcorrLagDevicePx": 679,
+      "xcorrR": 0.9538,
+      "lagWindowRailed": false,
+      "maxLagDevicePx": 1296,
+      "driftPerScreenWidthCssPx": 719.5,
+      "readDriftPerScreenWidthCssPx": 720
+    },
+    {
+      "key": "world",
+      "labels": [
+        "boundary",
+        "asteroids",
+        "stations"
+      ],
+      "readRatio": 1,
+      "measuredRatio": 0.9537,
+      "xcorrLagDevicePx": 1296,
+      "xcorrR": 0.3814,
+      "lagWindowRailed": true,
+      "maxLagDevicePx": 1296,
+      "driftPerScreenWidthCssPx": 1373.4,
+      "readDriftPerScreenWidthCssPx": 1440
+    }
+  ]
+}

@@ -1,0 +1,952 @@
+{
+  "label": "before",
+  "view": {
+    "viewW": 1280,
+    "viewH": 800
+  },
+  "edgeThreshold": 0.5,
+  "maps": {
+    "octagon": {
+      "nebula": "none",
+      "boundsW": 2400,
+      "boundsH": 2400,
+      "skyShapes": 0,
+      "drawCalls": 4,
+      "file": "octagon-none.png",
+      "skyOnly": "octagon-none-skyonly.png",
+      "peakLuma": 1.93,
+      "peakAt": {
+        "x": 0,
+        "y": 0
+      },
+      "bandEdges": 0,
+      "ringsRightOfCore": 0,
+      "edgeRadii": [],
+      "maxAdjacentJump": 0,
+      "edges": []
+    },
+    "compass": {
+      "nebula": "coalsack",
+      "boundsW": 2400,
+      "boundsH": 2400,
+      "skyShapes": 216,
+      "drawCalls": 5,
+      "file": "compass-coalsack.png",
+      "skyOnly": "compass-coalsack-skyonly.png",
+      "peakLuma": 1.93,
+      "peakAt": {
+        "x": 0,
+        "y": 0
+      },
+      "bandEdges": 0,
+      "ringsRightOfCore": 0,
+      "edgeRadii": [],
+      "maxAdjacentJump": 0,
+      "edges": []
+    },
+    "oval": {
+      "nebula": "plasmaReef",
+      "boundsW": 3200,
+      "boundsH": 2000,
+      "skyShapes": 1040,
+      "drawCalls": 5,
+      "file": "oval-plasmaReef.png",
+      "skyOnly": "oval-plasmaReef-skyonly.png",
+      "peakLuma": 17.88,
+      "peakAt": {
+        "x": 1170,
+        "y": 525
+      },
+      "bandEdges": 51,
+      "ringsRightOfCore": 17,
+      "edgeRadii": [
+        0.02,
+        0.041,
+        0.061,
+        0.082,
+        0.122,
+        0.143,
+        0.204,
+        0.224,
+        0.327,
+        0.347,
+        0.408,
+        0.429,
+        0.469,
+        0.592,
+        0.612,
+        0.796,
+        1
+      ],
+      "maxAdjacentJump": 2.65,
+      "edges": [
+        {
+          "x": 529,
+          "dist": 641,
+          "jump": 0.79
+        },
+        {
+          "x": 539,
+          "dist": 631,
+          "jump": 1
+        },
+        {
+          "x": 540,
+          "dist": 630,
+          "jump": 0.79
+        },
+        {
+          "x": 548,
+          "dist": 622,
+          "jump": 1
+        },
+        {
+          "x": 549,
+          "dist": 621,
+          "jump": 0.86
+        },
+        {
+          "x": 558,
+          "dist": 612,
+          "jump": 2.65
+        },
+        {
+          "x": 572,
+          "dist": 598,
+          "jump": -1.65
+        },
+        {
+          "x": 573,
+          "dist": 597,
+          "jump": -1
+        },
+        {
+          "x": 582,
+          "dist": 588,
+          "jump": -1.07
+        },
+        {
+          "x": 587,
+          "dist": 583,
+          "jump": 1.79
+        },
+        {
+          "x": 591,
+          "dist": 579,
+          "jump": -1.79
+        },
+        {
+          "x": 593,
+          "dist": 577,
+          "jump": 1.86
+        },
+        {
+          "x": 599,
+          "dist": 571,
+          "jump": 1
+        },
+        {
+          "x": 600,
+          "dist": 570,
+          "jump": 1.57
+        },
+        {
+          "x": 601,
+          "dist": 569,
+          "jump": -0.72
+        },
+        {
+          "x": 605,
+          "dist": 565,
+          "jump": -0.86
+        },
+        {
+          "x": 606,
+          "dist": 564,
+          "jump": -1.79
+        },
+        {
+          "x": 612,
+          "dist": 558,
+          "jump": -1.86
+        },
+        {
+          "x": 618,
+          "dist": 552,
+          "jump": -1.79
+        },
+        {
+          "x": 625,
+          "dist": 545,
+          "jump": -0.79
+        },
+        {
+          "x": 1127,
+          "dist": 43,
+          "jump": 0.79
+        },
+        {
+          "x": 1136,
+          "dist": 34,
+          "jump": 1
+        },
+        {
+          "x": 1137,
+          "dist": 33,
+          "jump": 0.79
+        },
+        {
+          "x": 1145,
+          "dist": 25,
+          "jump": 1
+        },
+        {
+          "x": 1146,
+          "dist": 24,
+          "jump": 0.86
+        },
+        {
+          "x": 1148,
+          "dist": 22,
+          "jump": 0.79
+        },
+        {
+          "x": 1150,
+          "dist": 20,
+          "jump": 0.79
+        },
+        {
+          "x": 1156,
+          "dist": 14,
+          "jump": 1.79
+        },
+        {
+          "x": 1158,
+          "dist": 12,
+          "jump": 1.79
+        },
+        {
+          "x": 1162,
+          "dist": 8,
+          "jump": 1.86
+        },
+        {
+          "x": 1167,
+          "dist": 3,
+          "jump": 1.07
+        },
+        {
+          "x": 1168,
+          "dist": 2,
+          "jump": 1.79
+        },
+        {
+          "x": 1169,
+          "dist": 1,
+          "jump": 0.79
+        },
+        {
+          "x": 1170,
+          "dist": 0,
+          "jump": 0.86
+        },
+        {
+          "x": 1171,
+          "dist": 1,
+          "jump": -0.79
+        },
+        {
+          "x": 1172,
+          "dist": 2,
+          "jump": -1.07
+        },
+        {
+          "x": 1173,
+          "dist": 3,
+          "jump": -0.86
+        },
+        {
+          "x": 1174,
+          "dist": 4,
+          "jump": -1.79
+        },
+        {
+          "x": 1176,
+          "dist": 6,
+          "jump": 1.79
+        },
+        {
+          "x": 1177,
+          "dist": 7,
+          "jump": 0.86
+        },
+        {
+          "x": 1180,
+          "dist": 10,
+          "jump": -1.79
+        },
+        {
+          "x": 1181,
+          "dist": 11,
+          "jump": -1.86
+        },
+        {
+          "x": 1186,
+          "dist": 16,
+          "jump": -0.79
+        },
+        {
+          "x": 1187,
+          "dist": 17,
+          "jump": -1
+        },
+        {
+          "x": 1190,
+          "dist": 20,
+          "jump": -2.36
+        },
+        {
+          "x": 1191,
+          "dist": 21,
+          "jump": -1.07
+        },
+        {
+          "x": 1193,
+          "dist": 23,
+          "jump": -0.79
+        },
+        {
+          "x": 1199,
+          "dist": 29,
+          "jump": -0.79
+        },
+        {
+          "x": 1200,
+          "dist": 30,
+          "jump": -1.07
+        },
+        {
+          "x": 1209,
+          "dist": 39,
+          "jump": -1.79
+        },
+        {
+          "x": 1219,
+          "dist": 49,
+          "jump": -0.79
+        }
+      ]
+    },
+    "diamond": {
+      "nebula": "patinaDrift",
+      "boundsW": 3200,
+      "boundsH": 2000,
+      "skyShapes": 592,
+      "drawCalls": 5,
+      "file": "diamond-patinaDrift.png",
+      "skyOnly": "diamond-patinaDrift-skyonly.png",
+      "peakLuma": 19.09,
+      "peakAt": {
+        "x": 638,
+        "y": 799
+      },
+      "bandEdges": 42,
+      "ringsRightOfCore": 25,
+      "edgeRadii": [
+        0.005,
+        0.033,
+        0.035,
+        0.071,
+        0.073,
+        0.074,
+        0.076,
+        0.114,
+        0.16,
+        0.186,
+        0.188,
+        0.262,
+        0.264,
+        0.355,
+        0.809,
+        0.823,
+        0.856,
+        0.858,
+        0.889,
+        0.891,
+        0.954,
+        0.956,
+        0.986,
+        0.998,
+        1
+      ],
+      "maxAdjacentJump": 2.79,
+      "edges": [
+        {
+          "x": 7,
+          "dist": 631,
+          "jump": -1.79
+        },
+        {
+          "x": 8,
+          "dist": 630,
+          "jump": -1.79
+        },
+        {
+          "x": 35,
+          "dist": 603,
+          "jump": -1.79
+        },
+        {
+          "x": 65,
+          "dist": 573,
+          "jump": -0.79
+        },
+        {
+          "x": 504,
+          "dist": 134,
+          "jump": 1
+        },
+        {
+          "x": 513,
+          "dist": 125,
+          "jump": 1
+        },
+        {
+          "x": 542,
+          "dist": 96,
+          "jump": 1.79
+        },
+        {
+          "x": 543,
+          "dist": 95,
+          "jump": 1
+        },
+        {
+          "x": 563,
+          "dist": 75,
+          "jump": -1
+        },
+        {
+          "x": 573,
+          "dist": 65,
+          "jump": 1
+        },
+        {
+          "x": 574,
+          "dist": 64,
+          "jump": 0.79
+        },
+        {
+          "x": 582,
+          "dist": 56,
+          "jump": 1
+        },
+        {
+          "x": 583,
+          "dist": 55,
+          "jump": 1.79
+        },
+        {
+          "x": 603,
+          "dist": 35,
+          "jump": 2.79
+        },
+        {
+          "x": 604,
+          "dist": 34,
+          "jump": 0.72
+        },
+        {
+          "x": 636,
+          "dist": 2,
+          "jump": 2.79
+        },
+        {
+          "x": 638,
+          "dist": 0,
+          "jump": 2.5
+        },
+        {
+          "x": 641,
+          "dist": 3,
+          "jump": -2.72
+        },
+        {
+          "x": 659,
+          "dist": 21,
+          "jump": -2.5
+        },
+        {
+          "x": 660,
+          "dist": 22,
+          "jump": -2.79
+        },
+        {
+          "x": 683,
+          "dist": 45,
+          "jump": -0.79
+        },
+        {
+          "x": 684,
+          "dist": 46,
+          "jump": -2.79
+        },
+        {
+          "x": 685,
+          "dist": 47,
+          "jump": -1
+        },
+        {
+          "x": 686,
+          "dist": 48,
+          "jump": -1
+        },
+        {
+          "x": 710,
+          "dist": 72,
+          "jump": -1.79
+        },
+        {
+          "x": 739,
+          "dist": 101,
+          "jump": -0.79
+        },
+        {
+          "x": 756,
+          "dist": 118,
+          "jump": 1
+        },
+        {
+          "x": 757,
+          "dist": 119,
+          "jump": 0.79
+        },
+        {
+          "x": 804,
+          "dist": 166,
+          "jump": -0.79
+        },
+        {
+          "x": 805,
+          "dist": 167,
+          "jump": -1
+        },
+        {
+          "x": 863,
+          "dist": 225,
+          "jump": -1
+        },
+        {
+          "x": 1150,
+          "dist": 512,
+          "jump": 0.79
+        },
+        {
+          "x": 1159,
+          "dist": 521,
+          "jump": 1
+        },
+        {
+          "x": 1180,
+          "dist": 542,
+          "jump": 1
+        },
+        {
+          "x": 1181,
+          "dist": 543,
+          "jump": 0.79
+        },
+        {
+          "x": 1201,
+          "dist": 563,
+          "jump": 1.79
+        },
+        {
+          "x": 1202,
+          "dist": 564,
+          "jump": 1.72
+        },
+        {
+          "x": 1242,
+          "dist": 604,
+          "jump": -1.72
+        },
+        {
+          "x": 1243,
+          "dist": 605,
+          "jump": -1.79
+        },
+        {
+          "x": 1262,
+          "dist": 624,
+          "jump": -0.79
+        },
+        {
+          "x": 1270,
+          "dist": 632,
+          "jump": -0.79
+        },
+        {
+          "x": 1271,
+          "dist": 633,
+          "jump": -1
+        }
+      ]
+    },
+    "line": {
+      "nebula": "deepEmber",
+      "boundsW": 3200,
+      "boundsH": 2000,
+      "skyShapes": 136,
+      "drawCalls": 5,
+      "file": "line-deepEmber.png",
+      "skyOnly": "line-deepEmber-skyonly.png",
+      "peakLuma": 9.2,
+      "peakAt": {
+        "x": 1228,
+        "y": 0
+      },
+      "bandEdges": 3,
+      "ringsRightOfCore": 0,
+      "edgeRadii": [],
+      "maxAdjacentJump": 2.85,
+      "edges": [
+        {
+          "x": 1121,
+          "dist": 107,
+          "jump": 1
+        },
+        {
+          "x": 1172,
+          "dist": 56,
+          "jump": 2.57
+        },
+        {
+          "x": 1227,
+          "dist": 1,
+          "jump": 2.85
+        }
+      ]
+    },
+    "crescents": {
+      "nebula": "ironVeil",
+      "boundsW": 2400,
+      "boundsH": 2400,
+      "skyShapes": 93,
+      "drawCalls": 5,
+      "file": "crescents-ironVeil.png",
+      "skyOnly": "crescents-ironVeil-skyonly.png",
+      "peakLuma": 15.78,
+      "peakAt": {
+        "x": 1279,
+        "y": 312
+      },
+      "bandEdges": 84,
+      "ringsRightOfCore": 0,
+      "edgeRadii": [],
+      "maxAdjacentJump": 4.06,
+      "edges": [
+        {
+          "x": 314,
+          "dist": 965,
+          "jump": 2.07
+        },
+        {
+          "x": 316,
+          "dist": 963,
+          "jump": 2
+        },
+        {
+          "x": 380,
+          "dist": 899,
+          "jump": 1.64
+        },
+        {
+          "x": 382,
+          "dist": 897,
+          "jump": 1.64
+        },
+        {
+          "x": 429,
+          "dist": 850,
+          "jump": 2.35
+        },
+        {
+          "x": 431,
+          "dist": 848,
+          "jump": 1.64
+        },
+        {
+          "x": 437,
+          "dist": 842,
+          "jump": -1
+        },
+        {
+          "x": 438,
+          "dist": 841,
+          "jump": -2
+        },
+        {
+          "x": 448,
+          "dist": 831,
+          "jump": -1.64
+        },
+        {
+          "x": 449,
+          "dist": 830,
+          "jump": -2.43
+        },
+        {
+          "x": 505,
+          "dist": 774,
+          "jump": 2.64
+        },
+        {
+          "x": 507,
+          "dist": 772,
+          "jump": 1.64
+        },
+        {
+          "x": 514,
+          "dist": 765,
+          "jump": 1.79
+        },
+        {
+          "x": 515,
+          "dist": 764,
+          "jump": -2.35
+        },
+        {
+          "x": 516,
+          "dist": 763,
+          "jump": -0.64
+        },
+        {
+          "x": 552,
+          "dist": 727,
+          "jump": -1.64
+        },
+        {
+          "x": 554,
+          "dist": 725,
+          "jump": -2.64
+        },
+        {
+          "x": 563,
+          "dist": 716,
+          "jump": -1
+        },
+        {
+          "x": 564,
+          "dist": 715,
+          "jump": -2
+        },
+        {
+          "x": 601,
+          "dist": 678,
+          "jump": 2
+        },
+        {
+          "x": 603,
+          "dist": 676,
+          "jump": 1
+        },
+        {
+          "x": 621,
+          "dist": 658,
+          "jump": 1
+        },
+        {
+          "x": 622,
+          "dist": 657,
+          "jump": 1
+        },
+        {
+          "x": 646,
+          "dist": 633,
+          "jump": 1
+        },
+        {
+          "x": 647,
+          "dist": 632,
+          "jump": 1
+        },
+        {
+          "x": 666,
+          "dist": 613,
+          "jump": -1
+        },
+        {
+          "x": 667,
+          "dist": 612,
+          "jump": -2
+        },
+        {
+          "x": 684,
+          "dist": 595,
+          "jump": -0.93
+        },
+        {
+          "x": 688,
+          "dist": 591,
+          "jump": 1
+        },
+        {
+          "x": 715,
+          "dist": 564,
+          "jump": 1.07
+        },
+        {
+          "x": 717,
+          "dist": 562,
+          "jump": 1
+        },
+        {
+          "x": 729,
+          "dist": 550,
+          "jump": -1.07
+        },
+        {
+          "x": 744,
+          "dist": 535,
+          "jump": -1
+        },
+        {
+          "x": 746,
+          "dist": 533,
+          "jump": -1
+        },
+        {
+          "x": 749,
+          "dist": 530,
+          "jump": 1.07
+        },
+        {
+          "x": 750,
+          "dist": 529,
+          "jump": 1
+        },
+        {
+          "x": 796,
+          "dist": 483,
+          "jump": -1
+        },
+        {
+          "x": 797,
+          "dist": 482,
+          "jump": -1.07
+        },
+        {
+          "x": 813,
+          "dist": 466,
+          "jump": 2.07
+        },
+        {
+          "x": 815,
+          "dist": 464,
+          "jump": 2
+        },
+        {
+          "x": 841,
+          "dist": 438,
+          "jump": -1
+        },
+        {
+          "x": 842,
+          "dist": 437,
+          "jump": -1.79
+        },
+        {
+          "x": 856,
+          "dist": 423,
+          "jump": 2.57
+        },
+        {
+          "x": 858,
+          "dist": 421,
+          "jump": 1.64
+        },
+        {
+          "x": 869,
+          "dist": 410,
+          "jump": 1.07
+        },
+        {
+          "x": 871,
+          "dist": 408,
+          "jump": 1
+        },
+        {
+          "x": 878,
+          "dist": 401,
+          "jump": -1.28
+        },
+        {
+          "x": 879,
+          "dist": 400,
+          "jump": -1
+        },
+        {
+          "x": 880,
+          "dist": 399,
+          "jump": -1
+        },
+        {
+          "x": 892,
+          "dist": 387,
+          "jump": -4.06
+        },
+        {
+          "x": 906,
+          "dist": 373,
+          "jump": 1
+        },
+        {
+          "x": 908,
+          "dist": 371,
+          "jump": 0.79
+        },
+        {
+          "x": 953,
+          "dist": 326,
+          "jump": 1
+        },
+        {
+          "x": 954,
+          "dist": 325,
+          "jump": 1
+        },
+        {
+          "x": 960,
+          "dist": 319,
+          "jump": -1
+        },
+        {
+          "x": 962,
+          "dist": 317,
+          "jump": -1.79
+        },
+        {
+          "x": 985,
+          "dist": 294,
+          "jump": -1
+        },
+        {
+          "x": 986,
+          "dist": 293,
+          "jump": -1
+        },
+        {
+          "x": 1042,
+          "dist": 237,
+          "jump": 2
+        },
+        {
+          "x": 1043,
+          "dist": 236,
+          "jump": 1
+        }
+      ]
+    }
+  }
+}

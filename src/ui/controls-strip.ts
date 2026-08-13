@@ -20,7 +20,7 @@
  */
 
 import { describeBindings } from '@platform/actions';
-import type { BindingLabel, DeviceKind, FireMode } from '@platform/actions';
+import type { BindingLabel, ControlScheme, DeviceKind, FireMode } from '@platform/actions';
 
 /**
  * The controls strip is shown only on non-touch devices (GDD §2.2, §2.4): on
@@ -31,18 +31,26 @@ export function showControlsStrip(isTouch: boolean): boolean {
 }
 
 /**
- * The rows to render on the strip for the active device and fire mode — a thin,
- * intention-revealing pass-through of {@link describeBindings} so the HUD reads
- * bindings from the one map that drives the sim (GDD §2.4). Returns `[]` for
- * touch, where the strip is not drawn ({@link showControlsStrip}).
+ * The rows to render on the strip for the active device, fire mode and seated
+ * control scheme — a thin, intention-revealing pass-through of
+ * {@link describeBindings} so the HUD reads bindings from the one map that drives
+ * the sim (GDD §2.4). Returns `[]` for touch, where the strip is not drawn
+ * ({@link showControlsStrip}).
+ *
+ * `scheme` is threaded, not guessed (a0-37): the strip in front of a player on
+ * Tap Commander — a0-30's default on every platform — used to list the sticks'
+ * bindings, which that scheme zeroes. It is the live setting off `HudFrame`, so a
+ * mid-match switch re-labels the strip on the next frame, exactly as it re-words
+ * the onboarding prompt.
  */
 export function controlsStripRows(
   device: DeviceKind,
   mode: FireMode,
   isTouch: boolean,
+  scheme: ControlScheme,
 ): readonly BindingLabel[] {
   if (isTouch) return [];
-  return describeBindings(device, mode);
+  return describeBindings(device, mode, scheme);
 }
 
 /**
@@ -77,17 +85,22 @@ export interface StripRow {
  *    by {@link BUILD_AWAY_HINT} so the player learns *why* it is dark and how to
  *    light it, matching the touch language.
  *
- * Every other row is a straight pass-through of {@link describeBindings}. Returns
- * `[]` for touch, where the strip is not drawn.
+ * Every other row is a straight pass-through of {@link describeBindings} — which
+ * means the row *set* is the seated scheme's (a0-37): under Tap Commander that is
+ * `Move or attack` and this same contextual Build row, and nothing else. Docking
+ * gates the Build row in **both** schemes, because the wheel opens near your own
+ * station and nowhere else in either one (GDD §2.5). Returns `[]` for touch, where
+ * the strip is not drawn.
  */
 export function controlsStripView(
   device: DeviceKind,
   mode: FireMode,
   isTouch: boolean,
   docked: boolean,
+  scheme: ControlScheme,
 ): readonly StripRow[] {
   if (isTouch) return [];
-  return describeBindings(device, mode).map((row) => {
+  return describeBindings(device, mode, scheme).map((row) => {
     if (row.action === 'build' && !docked) {
       return { action: 'build', label: BUILD_AWAY_HINT, binding: null, dimmed: true };
     }

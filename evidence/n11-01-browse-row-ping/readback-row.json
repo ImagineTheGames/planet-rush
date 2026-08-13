@@ -1,0 +1,979 @@
+{
+  "capturedAt": "2026-08-13T06:46:53.017Z",
+  "allocator": "https://planet-rush-allocator.fly.dev",
+  "allocatorHealth": {
+    "status": "ok",
+    "machines": 3,
+    "rooms": 0,
+    "reservations": 0,
+    "uptimeSeconds": 235
+  },
+  "fleetRegions": {
+    "regions": [
+      {
+        "region": "iad",
+        "machines": 2,
+        "capacity": 12,
+        "rooms": 0,
+        "free": 12,
+        "probe": {
+          "url": "https://planet-rush-gameserver.fly.dev/health",
+          "headers": {
+            "fly-prefer-region": "iad"
+          }
+        }
+      },
+      {
+        "region": "gru",
+        "machines": 1,
+        "capacity": 6,
+        "rooms": 0,
+        "free": 6,
+        "probe": {
+          "url": "https://planet-rush-gameserver.fly.dev/health",
+          "headers": {
+            "fly-prefer-region": "gru"
+          }
+        }
+      }
+    ]
+  },
+  "baselinePingsFromNode": {
+    "iad": 78,
+    "gru": 177
+  },
+  "note": "BEFORE is the deployed build (a1-17s bundle); AFTER is this branch, built here and served locally. Same live allocator, same live gameservers, interleaved guests.",
+  "before": {
+    "source": "the DEPLOYED build — the bundle a1-17 photographed",
+    "base": "https://imaginethegames.github.io/planet-rush/",
+    "assets": [
+      {
+        "url": "https://imaginethegames.github.io/planet-rush/assets/index-CqVDQAJv.js",
+        "bytes": 1310,
+        "carriesAllocator": false
+      },
+      {
+        "url": "https://imaginethegames.github.io/planet-rush/assets/main-CDbATpO-.js",
+        "bytes": 909306,
+        "carriesAllocator": true
+      },
+      {
+        "url": "https://imaginethegames.github.io/planet-rush/assets/typography-CVMcRgo2.js",
+        "bytes": 1736,
+        "carriesAllocator": false
+      }
+    ],
+    "allocatorBakedIn": true
+  },
+  "after": {
+    "source": "THIS BRANCH, built here and served locally",
+    "base": "http://127.0.0.1:4319/",
+    "assets": [
+      {
+        "url": "http://127.0.0.1:4319/assets/index-B27ydMYH.js",
+        "bytes": 1310,
+        "carriesAllocator": false
+      },
+      {
+        "url": "http://127.0.0.1:4319/assets/main-BNHdNkIF.js",
+        "bytes": 909630,
+        "carriesAllocator": true
+      },
+      {
+        "url": "http://127.0.0.1:4319/assets/typography-CVMcRgo2.js",
+        "bytes": 1736,
+        "carriesAllocator": false
+      }
+    ],
+    "allocatorBakedIn": true
+  },
+  "rooms": {
+    "before": "45MY",
+    "after": "RNRF"
+  },
+  "allocatorRooms": {
+    "rooms": [
+      {
+        "id": "-97x9lDPGBlJW4S-",
+        "owner": "6TP8HF",
+        "region": "iad",
+        "size": 8,
+        "mode": "ffa",
+        "players": 1,
+        "joinableSeats": 7
+      },
+      {
+        "id": "Il78pzgQvCRYhppN",
+        "owner": "DMRPB7",
+        "region": "iad",
+        "size": 8,
+        "mode": "ffa",
+        "players": 1,
+        "joinableSeats": 7
+      }
+    ],
+    "asOf": 1786603640729
+  },
+  "runs": [
+    {
+      "base": "https://imaginethegames.github.io/planet-rush/",
+      "tag": "before-1",
+      "samples": [
+        {
+          "at": 4307,
+          "probes": 2,
+          "regions": [],
+          "rows": []
+        },
+        {
+          "at": 4404,
+          "probes": 2,
+          "regions": [],
+          "rows": []
+        },
+        {
+          "at": 4519,
+          "probes": 2,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 4827,
+          "probes": 3,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 4931,
+          "probes": 3,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 5031,
+          "probes": 3,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 5133,
+          "probes": 4,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 5228,
+          "probes": 4,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 5321,
+          "probes": 4,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 5422,
+          "probes": 5,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 5686,
+          "probes": 5,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 5940,
+          "probes": 5,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 6048,
+          "probes": 6,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 6152,
+          "probes": 6,
+          "regions": [
+            {
+              "id": "iad",
+              "pingMs": 298
+            },
+            {
+              "id": "gru",
+              "pingMs": 461
+            }
+          ],
+          "rows": [
+            "6TP8HF|VIRGINIA 298ms",
+            "DMRPB7|VIRGINIA 298ms"
+          ]
+        }
+      ],
+      "firstRow": {
+        "at": 4519,
+        "probes": 2,
+        "where": "IAD —",
+        "rows": 2
+      },
+      "firstRegions": {
+        "at": 6152,
+        "probes": 6,
+        "regions": [
+          {
+            "id": "iad",
+            "pingMs": 298
+          },
+          {
+            "id": "gru",
+            "pingMs": 461
+          }
+        ]
+      },
+      "firstPing": {
+        "at": 6152,
+        "probes": 6,
+        "where": "VIRGINIA 298ms",
+        "rows": [
+          "VIRGINIA 298ms",
+          "VIRGINIA 298ms"
+        ]
+      },
+      "dashMs": 1633
+    },
+    {
+      "base": "http://127.0.0.1:4319/",
+      "tag": "after-1",
+      "samples": [
+        {
+          "at": 4332,
+          "probes": 2,
+          "regions": [
+            {
+              "id": "iad",
+              "pingMs": 496
+            },
+            {
+              "id": "gru",
+              "pingMs": 609
+            }
+          ],
+          "rows": []
+        },
+        {
+          "at": 4433,
+          "probes": 2,
+          "regions": [
+            {
+              "id": "iad",
+              "pingMs": 496
+            },
+            {
+              "id": "gru",
+              "pingMs": 609
+            }
+          ],
+          "rows": []
+        },
+        {
+          "at": 4541,
+          "probes": 2,
+          "regions": [
+            {
+              "id": "iad",
+              "pingMs": 496
+            },
+            {
+              "id": "gru",
+              "pingMs": 609
+            }
+          ],
+          "rows": [
+            "6TP8HF|VIRGINIA 496ms",
+            "DMRPB7|VIRGINIA 496ms"
+          ]
+        }
+      ],
+      "firstRegions": {
+        "at": 4332,
+        "probes": 2,
+        "regions": [
+          {
+            "id": "iad",
+            "pingMs": 496
+          },
+          {
+            "id": "gru",
+            "pingMs": 609
+          }
+        ]
+      },
+      "firstRow": {
+        "at": 4541,
+        "probes": 2,
+        "where": "VIRGINIA 496ms",
+        "rows": 2
+      },
+      "firstPing": {
+        "at": 4541,
+        "probes": 2,
+        "where": "VIRGINIA 496ms",
+        "rows": [
+          "VIRGINIA 496ms",
+          "VIRGINIA 496ms"
+        ]
+      },
+      "dashMs": 0
+    },
+    {
+      "base": "https://imaginethegames.github.io/planet-rush/",
+      "tag": "before-2",
+      "samples": [
+        {
+          "at": 4284,
+          "probes": 2,
+          "regions": [],
+          "rows": []
+        },
+        {
+          "at": 4383,
+          "probes": 3,
+          "regions": [],
+          "rows": []
+        },
+        {
+          "at": 4482,
+          "probes": 3,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 4786,
+          "probes": 3,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 4891,
+          "probes": 4,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 5146,
+          "probes": 4,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 5432,
+          "probes": 4,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 5531,
+          "probes": 5,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 5630,
+          "probes": 5,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 5719,
+          "probes": 5,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 5827,
+          "probes": 5,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 5928,
+          "probes": 6,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 6034,
+          "probes": 6,
+          "regions": [
+            {
+              "id": "gru",
+              "pingMs": 393
+            },
+            {
+              "id": "iad",
+              "pingMs": 478
+            }
+          ],
+          "rows": [
+            "6TP8HF|VIRGINIA 478ms",
+            "DMRPB7|VIRGINIA 478ms"
+          ]
+        }
+      ],
+      "firstRow": {
+        "at": 4482,
+        "probes": 3,
+        "where": "IAD —",
+        "rows": 2
+      },
+      "firstRegions": {
+        "at": 6034,
+        "probes": 6,
+        "regions": [
+          {
+            "id": "gru",
+            "pingMs": 393
+          },
+          {
+            "id": "iad",
+            "pingMs": 478
+          }
+        ]
+      },
+      "firstPing": {
+        "at": 6034,
+        "probes": 6,
+        "where": "VIRGINIA 478ms",
+        "rows": [
+          "VIRGINIA 478ms",
+          "VIRGINIA 478ms"
+        ]
+      },
+      "dashMs": 1552
+    },
+    {
+      "base": "http://127.0.0.1:4319/",
+      "tag": "after-2",
+      "samples": [
+        {
+          "at": 5207,
+          "probes": 2,
+          "regions": [
+            {
+              "id": "gru",
+              "pingMs": 290
+            },
+            {
+              "id": "iad",
+              "pingMs": 501
+            }
+          ],
+          "rows": []
+        },
+        {
+          "at": 5301,
+          "probes": 3,
+          "regions": [
+            {
+              "id": "gru",
+              "pingMs": 290
+            },
+            {
+              "id": "iad",
+              "pingMs": 501
+            }
+          ],
+          "rows": []
+        },
+        {
+          "at": 5410,
+          "probes": 3,
+          "regions": [
+            {
+              "id": "gru",
+              "pingMs": 290
+            },
+            {
+              "id": "iad",
+              "pingMs": 501
+            }
+          ],
+          "rows": [
+            "6TP8HF|VIRGINIA 501ms",
+            "DMRPB7|VIRGINIA 501ms"
+          ]
+        }
+      ],
+      "firstRegions": {
+        "at": 5207,
+        "probes": 2,
+        "regions": [
+          {
+            "id": "gru",
+            "pingMs": 290
+          },
+          {
+            "id": "iad",
+            "pingMs": 501
+          }
+        ]
+      },
+      "firstRow": {
+        "at": 5410,
+        "probes": 3,
+        "where": "VIRGINIA 501ms",
+        "rows": 2
+      },
+      "firstPing": {
+        "at": 5410,
+        "probes": 3,
+        "where": "VIRGINIA 501ms",
+        "rows": [
+          "VIRGINIA 501ms",
+          "VIRGINIA 501ms"
+        ]
+      },
+      "dashMs": 0
+    },
+    {
+      "base": "https://imaginethegames.github.io/planet-rush/",
+      "tag": "before",
+      "samples": [
+        {
+          "at": 4345,
+          "probes": 2,
+          "regions": [],
+          "rows": []
+        },
+        {
+          "at": 4456,
+          "probes": 2,
+          "regions": [],
+          "rows": []
+        },
+        {
+          "at": 4793,
+          "probes": 2,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 5841,
+          "probes": 5,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 5939,
+          "probes": 5,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 6238,
+          "probes": 6,
+          "regions": [],
+          "rows": [
+            "6TP8HF|IAD —",
+            "DMRPB7|IAD —"
+          ]
+        },
+        {
+          "at": 6340,
+          "probes": 6,
+          "regions": [
+            {
+              "id": "iad",
+              "pingMs": 295
+            },
+            {
+              "id": "gru",
+              "pingMs": 590
+            }
+          ],
+          "rows": [
+            "6TP8HF|VIRGINIA 295ms",
+            "DMRPB7|VIRGINIA 295ms"
+          ]
+        }
+      ],
+      "firstRow": {
+        "at": 4793,
+        "probes": 2,
+        "where": "IAD —",
+        "rows": 2,
+        "frame": "/lanes/lane-1/evidence/images/n11-01-before-row-first.png",
+        "bounds": {
+          "x": 24,
+          "y": 167,
+          "width": 390.5,
+          "height": 55
+        },
+        "crop": {
+          "x": 72,
+          "y": 501,
+          "width": 1172,
+          "height": 165,
+          "factor": 2
+        }
+      },
+      "firstRegions": {
+        "at": 6340,
+        "probes": 6,
+        "regions": [
+          {
+            "id": "iad",
+            "pingMs": 295
+          },
+          {
+            "id": "gru",
+            "pingMs": 590
+          }
+        ]
+      },
+      "firstPing": {
+        "at": 6340,
+        "probes": 6,
+        "where": "VIRGINIA 295ms",
+        "rows": [
+          "VIRGINIA 295ms",
+          "VIRGINIA 295ms"
+        ],
+        "frame": "/lanes/lane-1/evidence/images/n11-01-before-row-ping.png",
+        "bounds": {
+          "x": 24,
+          "y": 167,
+          "width": 390.5,
+          "height": 55
+        },
+        "crop": {
+          "x": 72,
+          "y": 501,
+          "width": 1172,
+          "height": 165,
+          "factor": 2
+        }
+      },
+      "dashMs": 1547
+    },
+    {
+      "base": "http://127.0.0.1:4319/",
+      "tag": "after",
+      "samples": [
+        {
+          "at": 4739,
+          "probes": 3,
+          "regions": [
+            {
+              "id": "iad",
+              "pingMs": 286
+            },
+            {
+              "id": "gru",
+              "pingMs": 386
+            }
+          ],
+          "rows": []
+        },
+        {
+          "at": 4834,
+          "probes": 3,
+          "regions": [
+            {
+              "id": "iad",
+              "pingMs": 286
+            },
+            {
+              "id": "gru",
+              "pingMs": 386
+            }
+          ],
+          "rows": []
+        },
+        {
+          "at": 4942,
+          "probes": 3,
+          "regions": [
+            {
+              "id": "iad",
+              "pingMs": 286
+            },
+            {
+              "id": "gru",
+              "pingMs": 386
+            }
+          ],
+          "rows": [
+            "6TP8HF|VIRGINIA 286ms",
+            "DMRPB7|VIRGINIA 286ms"
+          ]
+        }
+      ],
+      "firstRegions": {
+        "at": 4739,
+        "probes": 3,
+        "regions": [
+          {
+            "id": "iad",
+            "pingMs": 286
+          },
+          {
+            "id": "gru",
+            "pingMs": 386
+          }
+        ]
+      },
+      "firstRow": {
+        "at": 4942,
+        "probes": 3,
+        "where": "VIRGINIA 286ms",
+        "rows": 2,
+        "frame": "/lanes/lane-1/evidence/images/n11-01-after-row-first.png",
+        "bounds": {
+          "x": 24,
+          "y": 167,
+          "width": 390.5,
+          "height": 55
+        },
+        "crop": {
+          "x": 72,
+          "y": 501,
+          "width": 1172,
+          "height": 165,
+          "factor": 2
+        }
+      },
+      "firstPing": {
+        "at": 4942,
+        "probes": 6,
+        "where": "VIRGINIA 286ms",
+        "rows": [
+          "VIRGINIA 286ms",
+          "VIRGINIA 286ms"
+        ],
+        "frame": "/lanes/lane-1/evidence/images/n11-01-after-row-ping.png",
+        "bounds": {
+          "x": 24,
+          "y": 167,
+          "width": 390.5,
+          "height": 55
+        },
+        "crop": {
+          "x": 72,
+          "y": 501,
+          "width": 1172,
+          "height": 165,
+          "factor": 2
+        }
+      },
+      "dashMs": 0
+    }
+  ],
+  "photos": {
+    "base": "http://127.0.0.1:4319/",
+    "tag": "after",
+    "room": "RNRF",
+    "unmeasured": {
+      "regions": [],
+      "regionLine": "",
+      "rows": [
+        {
+          "owner": "DMRPB7",
+          "meta": "1 PLAYER · 7 SEATS OPEN · FFA",
+          "where": "IAD —",
+          "bounds": {
+            "x": 24,
+            "y": 167,
+            "width": 390.5,
+            "height": 55
+          }
+        }
+      ],
+      "frame": "/lanes/lane-1/evidence/images/n11-01-after-row-unmeasured.png",
+      "crop": {
+        "x": 72,
+        "y": 501,
+        "width": 1172,
+        "height": 165,
+        "factor": 2
+      }
+    },
+    "firstNumber": {
+      "regions": [
+        {
+          "id": "iad",
+          "label": "Virginia",
+          "pingMs": 363
+        },
+        {
+          "id": "gru",
+          "label": "São Paulo",
+          "pingMs": 751
+        }
+      ],
+      "rows": [
+        {
+          "owner": "DMRPB7",
+          "meta": "1 PLAYER · 7 SEATS OPEN · FFA",
+          "where": "VIRGINIA 363ms",
+          "bounds": {
+            "x": 24,
+            "y": 167,
+            "width": 390.5,
+            "height": 55
+          }
+        }
+      ],
+      "frame": "/lanes/lane-1/evidence/images/n11-01-after-row-ping.png",
+      "crop": {
+        "x": 72,
+        "y": 501,
+        "width": 1172,
+        "height": 165,
+        "factor": 2
+      }
+    },
+    "settled": {
+      "regions": [
+        {
+          "id": "iad",
+          "label": "Virginia",
+          "pingMs": 259
+        },
+        {
+          "id": "gru",
+          "label": "São Paulo",
+          "pingMs": 418
+        }
+      ],
+      "rows": [
+        {
+          "owner": "DMRPB7",
+          "meta": "1 PLAYER · 7 SEATS OPEN · FFA",
+          "where": "VIRGINIA 259ms",
+          "bounds": {
+            "x": 24,
+            "y": 167,
+            "width": 390.5,
+            "height": 55
+          }
+        }
+      ],
+      "regionLine": "[IAD 259ms] · GRU 418ms",
+      "frame": "/lanes/lane-1/evidence/images/n11-01-after-row-settled.png",
+      "crop": {
+        "x": 72,
+        "y": 501,
+        "width": 1172,
+        "height": 165,
+        "factor": 2
+      }
+    }
+  },
+  "summary": {
+    "before": {
+      "dashMsPerRun": [
+        1633,
+        1552,
+        1547
+      ],
+      "medianDashMs": 1552,
+      "probesWhenTheNumberAppeared": [
+        6,
+        6,
+        6
+      ]
+    },
+    "after": {
+      "dashMsPerRun": [
+        0,
+        0,
+        0
+      ],
+      "medianDashMs": 0,
+      "probesWhenTheNumberAppeared": [
+        2,
+        3,
+        6
+      ]
+    }
+  }
+}

@@ -129,6 +129,18 @@ export interface LobbyLayoutOptions {
   readonly isTouch?: boolean;
   /** Safe-area insets to keep clear. Default none. */
   readonly insets?: Insets;
+  /**
+   * Is the CLAIM chip (PUBLIC / PRIVATE, a0-35) on the control strip? Default
+   * **false**, which is today's two-chip strip to the pixel — so every screen
+   * that does not carry it (an offline lobby, a guest's) is untouched by it.
+   *
+   * The answer is the model's ({@link ./lobby} `showsClaimControl`): creator-only
+   * and online-only. It has to be an option rather than a constant because the
+   * strip splits the roster width between the chips it is *drawing*, and a third
+   * rect laid out where nothing is drawn would shrink the other two for a chip
+   * that is not there.
+   */
+  readonly claim?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -999,8 +1011,13 @@ export interface LobbyLayout {
   readonly seatHelp: readonly Rect[];
   /** The MODE toggle (FFA / TEAMS), top-left of the roster (variable-slots E). */
   readonly modeToggle: Rect;
-  /** The ABUNDANCE toggle (SCARCE / STANDARD / RICH), top-right of the roster. */
+  /** The ABUNDANCE toggle (SCARCE / STANDARD / RICH), middle of the strip when the
+   *  CLAIM chip is on it, top-right when it is not. */
   readonly abundance: Rect;
+  /** The CLAIM toggle (PUBLIC / PRIVATE, a0-35) — the strip's trailing chip, and
+   *  **zero-extent unless {@link LobbyLayoutOptions.claim} asked for it**, which is
+   *  what makes a lobby without it identical to the one that shipped. */
+  readonly claim: Rect;
   /**
    * **The SHIP block — eyebrow plus card — and the whole of it is the hit target**
    * that opens SHIP SELECT (u10-01). One block, because the lobby shows one hull:
@@ -1075,6 +1092,9 @@ export type LobbyTarget =
   | { readonly kind: 'mode' }
   /** The ABUNDANCE toggle (variable-slots E). */
   | { readonly kind: 'abundance' }
+  /** The CLAIM toggle — PUBLIC ⇄ PRIVATE (a0-35). Never returned when the chip
+   *  was not laid out: its rect is zero-extent then, and nothing hits it. */
+  | { readonly kind: 'claim' }
   /**
    * **The ship card — opens SHIP SELECT** (u10-01). It is not a pick: the lobby
    * shows one hull and there is nothing to choose between here, so the only thing
@@ -1254,7 +1274,7 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
   // The MODE / ABUNDANCE strip is carved off the TOP of the roster box (never a
   // band of its own — see the constants header): the roster gives back the space,
   // the tiles and the arena cards keep their floors. The seats take what is left.
-  const controls = placeControls(rosterBox, metrics);
+  const controls = placeControls(rosterBox, metrics, options.claim ?? false);
   const seatsBox: Rect = {
     x: rosterBox.x,
     y: rosterBox.y + controls.height + (controls.height > 0 ? metrics.rowGap : 0),
@@ -1290,6 +1310,7 @@ export function lobbyLayout(viewport: Viewport, options: LobbyLayoutOptions = {}
     seatHelp,
     modeToggle: controls.modeToggle,
     abundance: controls.abundance,
+    claim: controls.claim,
     shipPick: picks.shipPick,
     shipLabel: picks.shipLabel,
     shipCard: picks.shipCard,
@@ -1433,22 +1454,49 @@ function rosterWantedHeight(m: FrameMetrics): number {
 }
 
 /**
- * The MODE toggle (top-left of the roster) and the ABUNDANCE toggle (top-right),
- * splitting the roster width with a gap between. Capped in width so they read as
- * controls on a wide desktop column, and clamped to the roster's own height so a
- * comically short box yields zero-extent rather than a strip taller than its band.
+ * The control strip: MODE at the roster's leading edge, ABUNDANCE next, and —
+ * when the room has one to show (a0-35) — CLAIM at the trailing edge. Two or
+ * three equal chips splitting the roster width with a gap between each pair.
+ * Capped in width so they read as controls on a wide desktop column, and clamped
+ * to the roster's own height so a comically short box yields zero-extent rather
+ * than a strip taller than its band.
+ *
+ * **The chips share one budget, and that is the whole of the third one's cost.**
+ * The strip does not grow a second row for it: the roster is the block that
+ * compresses on this screen (the file header's rule) and a second strip row would
+ * take a whole roster row's height off eight rows to say one word. So the three
+ * split what two used to, the outer two stay pinned to the roster's edges, and at
+ * every viewport in the matrix each chip still clears the thumb floor — asserted,
+ * not assumed (`./lobby-geometry.test.ts`).
+ *
+ * A layout that was not asked for a CLAIM chip returns it **zero-extent and lays
+ * the other two out exactly as before**, so the offline lobby and a guest's are
+ * the screens that shipped, to the pixel.
  *
  * Its height is the frame's own value chip ({@link ../art/materials}
  * `valueChipHeight`) rather than a lobby literal — the same 40px-at-reference,
  * thumb-floored control the settings screen's toggles are, because that is what
  * they are.
  */
-function placeControls(roster: Rect, m: FrameMetrics): { modeToggle: Rect; abundance: Rect; height: number } {
+function placeControls(
+  roster: Rect,
+  m: FrameMetrics,
+  claim: boolean,
+): { modeToggle: Rect; abundance: Rect; claim: Rect; height: number } {
   const height = Math.max(0, Math.min(valueChipHeight(m), roster.height));
-  const width = Math.max(0, Math.min(CONTROL_MAX_WIDTH, (roster.width - m.gap) / 2));
+  const count = claim ? 3 : 2;
+  const width = Math.max(0, Math.min(CONTROL_MAX_WIDTH, (roster.width - (count - 1) * m.gap) / count));
+  const trailing = roster.x + roster.width - width;
   const modeToggle: Rect = { x: roster.x, y: roster.y, width, height };
-  const abundance: Rect = { x: roster.x + roster.width - width, y: roster.y, width, height };
-  return { modeToggle, abundance, height };
+  // Two chips hang off the two edges; a third takes the middle of what is left,
+  // so the strip stays symmetrical however wide the cap lets the chips grow.
+  const abundance: Rect = claim
+    ? { x: roster.x + (roster.width - width) / 2, y: roster.y, width, height }
+    : { x: trailing, y: roster.y, width, height };
+  const claimRect: Rect = claim
+    ? { x: trailing, y: roster.y, width, height }
+    : { x: trailing, y: roster.y, width: 0, height: 0 };
+  return { modeToggle, abundance, claim: claimRect, height };
 }
 
 /**
@@ -1596,6 +1644,10 @@ export function lobbyHitTest(layout: LobbyLayout, x: number, y: number): LobbyTa
   // The MODE / ABUNDANCE toggles (variable-slots E) — above the roster rows.
   if (hit(layout.modeToggle, x, y)) return { kind: 'mode' };
   if (hit(layout.abundance, x, y)) return { kind: 'abundance' };
+  // …and the CLAIM chip beside them (a0-35). `hit` refuses a zero-extent rect, so
+  // a layout that was never asked for the chip cannot return this target — the
+  // absence is structural rather than a second condition to keep in step.
+  if (hit(layout.claim, x, y)) return { kind: 'claim' };
   for (let i = 0; i < layout.seats.length; i++) {
     // A row's own controls win over its body: the LEADING state control names and
     // cycles OPEN/BOT/CLOSED (u5), the trailing `?` opens the seat's codex dossier

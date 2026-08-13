@@ -411,11 +411,27 @@ const PROMPT_ORDER: readonly PromptId[] = [
 // Input-agnostic text resolution (via the action layer)
 // ---------------------------------------------------------------------------
 
-/** The single-word phrase for an action's binding on a given device+mode, read
- *  from {@link describeBindings} so onboarding copy can never drift from the
- *  real controls strip (GDD §2.4, §2.10). */
-function bindingPhrase(action: 'fire' | 'build', device: DeviceKind, mode: FireMode): string {
-  const row = describeBindings(device, mode).find((r) => r.action === action);
+/**
+ * The single-word phrase for an action's binding in this player's configuration,
+ * read from {@link describeBindings} so onboarding copy can never drift from the
+ * real controls strip (GDD §2.4, §2.10).
+ *
+ * The **seated scheme** is part of that configuration as of a0-37 — the same
+ * extension that taught the strip Tap Commander, made once, in the one map both
+ * surfaces read. It matters here for exactly one token: `{build}` resolves in
+ * either scheme (Tap Commander leaves the build binding as the devices wrote it),
+ * while `{fire}` names a press only the sticks scheme has. That is why
+ * {@link PromptCopy} requires a separate `tap` wording — the tap sentences carry
+ * no `{fire}`, which `onboarding.test.ts` pins, so this cannot be asked for a
+ * binding the scheme does not have.
+ */
+function bindingPhrase(
+  action: 'fire' | 'build',
+  device: DeviceKind,
+  mode: FireMode,
+  scheme: ControlScheme,
+): string {
+  const row = describeBindings(device, mode, scheme).find((r) => r.action === action);
   return row ? row.binding : action;
 }
 
@@ -458,8 +474,8 @@ export function resolvePromptText(
   scheme: ControlScheme,
 ): string {
   return lessonFor(PROMPT_COPY[id], mode, scheme)
-    .replace('{fire}', () => bindingPhrase('fire', device, mode))
-    .replace('{build}', () => bindingPhrase('build', device, mode));
+    .replace('{fire}', () => bindingPhrase('fire', device, mode, scheme))
+    .replace('{build}', () => bindingPhrase('build', device, mode, scheme));
 }
 
 // ---------------------------------------------------------------------------

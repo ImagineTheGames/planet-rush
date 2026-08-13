@@ -244,3 +244,80 @@ $ curl -s -H 'fly-prefer-region: gru' https://planet-rush-gameserver.fly.dev/hea
 per-region hostname is needed. The `—` fallback §7 describes stays as the honest
 failure it always was, and is now only reachable if the edge stops honouring the
 header.
+
+---
+
+## 9. n11-01 — when each screen may have the numbers
+
+`a1-17` photographed a browse row reading `IAD —` and reported that the list is
+handed no ping. It is handed one. What it was not handed was one *yet*: the
+lobby browser's first listing lands in ~0.6 s and this survey answered only after
+its **last** sample. That gap is a state every consumer of this module meets, so
+it is written down here rather than left to the order two network reads happen to
+finish in.
+
+### The defect, exactly
+
+`src/ui/lobby-browser.ts` `rowWhere` prints a region's **place name** when it has
+a measurement (`VIRGINIA 153ms`) and falls back to the raw **code** when it has
+none (`IAD —`). a1-17's own readback carries the proof that the second is what was
+photographed: `guestListWaitMs: 42` — the row was read 42 ms after the listing
+landed — with `"regions": []` and `"regionLine": ""`, so neither the row nor the
+doors' picker had been told anything yet. Reproduced live, unchanged, two real
+clients: row at 613 ms reading `IAD —`, number at 1748 ms reading
+`VIRGINIA 161ms`.
+
+Serial sampling is why: 1 warm-up + 3 samples × 2 regions = **7 round trips**
+before a survey that only answers at the end. **That stays serial** (a0-29 is what
+the ordering costs, and it is not for sale).
+
+### The sequence, stated
+
+`measureRegionPings` publishes at every **completed round**
+(`RegionProbeOptions.onRound`; `surveyRegions` ranks it as `onSurvey`), so:
+
+| when | what every region carries | what a browse row prints |
+|---|---|---|
+| before the first round | nothing has been timed | the region, no number — `IAD —` |
+| after **round 1** (3 requests) | a measured round trip **or** the reason it has none | `VIRGINIA 259ms`, or `IAD —` for a region that failed |
+| after each later round | the same, with the min-of-N settling **downwards only** | the number, refining |
+| budget spent mid-round | that round is **not** published; whatever was measured stands | unchanged from the last whole round |
+
+Two rules make this safe rather than merely fast. A round is published **whole or
+not at all** — every region has then had the same number of attempts, and ranking
+two regions on unequal evidence is a0-29's unfairness in a different costume. And
+a published number can only ever fall, so a row never has to un-say something.
+
+**Rule 1 covers the first line of that table.** *Not measured yet* is one of the
+ways a region has no number, and it prints exactly what *could not be measured*
+prints: the em dash, never `0ms`. A screen that wants to distinguish "measuring"
+from "unmeasurable" needs a third state of its own — that is `src/ui/`'s call, not
+this module's, and this module now makes it cheap by ending the ambiguous window
+after one round instead of three.
+
+### Measured, before and after
+
+Interleaved A/B on the live fleet, three guests per build, deployed bundle against
+the branch (`evidence/n11-01-browse-row-ping/`):
+
+```
+BEFORE   row drawn with no number for 1633 / 1552 / 1547 ms   (median 1552)
+AFTER    row drawn with no number for    0 /    0 /    0 ms   (median 0)
+probe requests completed when the number appeared: 6,6,6  →  2,3,6
+```
+
+The request count is the claim that survives a busy machine: a whole survey is 7
+requests and a first round is 3, and no amount of latency moves that.
+
+### And two joins hardened while here
+
+* **A region id is keyed one way.** A row finds its ping by matching the room's
+  region against the measured fleet, and `/regions` and `GET /rooms` are different
+  allocator code paths. Both are now normalised (trimmed, lower-cased) where they
+  are parsed, so `IAD ` and `iad` cannot become two regions to a lookup and one to
+  everyone else. Display is untouched — `formatRegionPing` upper-cases it back.
+* **An empty fleet never replaces a measured one** (`src/main.ts`). `surveyRegions`
+  answers with no regions for an allocator that is down, older than `/regions`, or
+  answering nonsense; that is a fact about the allocator, not about anybody's ping,
+  and letting it through dropped every row back to `IAD —` mid-session for a
+  hiccup.

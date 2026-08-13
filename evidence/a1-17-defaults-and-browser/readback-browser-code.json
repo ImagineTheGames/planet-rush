@@ -1,0 +1,100 @@
+{
+  "base": "https://imaginethegames.github.io/planet-rush/",
+  "allocator": "https://planet-rush-allocator.fly.dev",
+  "capturedAt": "2026-08-13T01:50:16.045Z",
+  "hostCode": "4H39",
+  "allocatorRoomsWhileLive": {
+    "rooms": [
+      {
+        "id": "b7ddcy6UMw981qr-",
+        "owner": "YLXCUV",
+        "region": "iad",
+        "size": 8,
+        "mode": "ffa",
+        "players": 1,
+        "joinableSeats": 7
+      }
+    ],
+    "asOf": 1786585821787
+  },
+  "allocatorRoomsRaw": "{\"rooms\":[{\"id\":\"b7ddcy6UMw981qr-\",\"owner\":\"YLXCUV\",\"region\":\"iad\",\"size\":8,\"mode\":\"ffa\",\"players\":1,\"joinableSeats\":7}],\"asOf\":1786585821787}",
+  "allocatorPayloadContainsCode": false,
+  "hostLobbyPings": {
+    "room": "4H39",
+    "seatPings": 8
+  },
+  "joinModeAfterSegmentPress": "code",
+  "keypadControls": [
+    "key:A",
+    "key:B",
+    "key:C",
+    "key:D",
+    "key:E",
+    "key:F",
+    "key:G",
+    "key:H",
+    "key:J",
+    "key:K",
+    "key:L",
+    "key:M",
+    "key:N",
+    "key:P",
+    "key:Q",
+    "key:R",
+    "key:S",
+    "key:T",
+    "key:U",
+    "key:V",
+    "key:W",
+    "key:X",
+    "key:Y",
+    "key:Z",
+    "key:2",
+    "key:3",
+    "key:4",
+    "key:5",
+    "key:6",
+    "key:7",
+    "key:8",
+    "key:9",
+    "erase",
+    "submit",
+    "mode:browse",
+    "mode:code",
+    "back"
+  ],
+  "typed": [
+    {
+      "ch": "4",
+      "kind": "key:4",
+      "codeNow": "4"
+    },
+    {
+      "ch": "H",
+      "kind": "key:H",
+      "codeNow": "4H"
+    },
+    {
+      "ch": "3",
+      "kind": "key:3",
+      "codeNow": "4H3"
+    },
+    {
+      "ch": "9",
+      "kind": "key:9",
+      "codeNow": "4H39"
+    }
+  ],
+  "codeTypedOnKeypad": "4H39",
+  "submitControl": "submit",
+  "codeJoinTitles": [
+    "FINDING ROOM…",
+    "JOINED · SEAT 2"
+  ],
+  "codeJoinLanded": true,
+  "codeJoinLobby": {
+    "room": "4H39",
+    "you": 1,
+    "humanCount": 2
+  }
+}

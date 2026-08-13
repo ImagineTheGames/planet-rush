@@ -210,12 +210,25 @@ function toListing(value: unknown): LobbyListing | null {
   return {
     id,
     owner,
-    region,
+    // Normalised to the SAME form `/regions` is read in (`./region-probe`
+    // `toFleetRegion`), because a row's ping is found by matching this string
+    // against that list. Two spellings of Virginia are two regions to a lookup and
+    // one region to everyone else, and the row would print the em dash for a
+    // measurement it is holding (n11-01). Both ends of the join normalise, so
+    // neither has to trust the other's casing.
+    region: normaliseRegion(region),
     ...(typeof size === 'number' ? { size } : {}),
     ...(typeof mode === 'string' ? { mode } : {}),
     players,
     joinableSeats,
   };
+}
+
+/** A region code in the one form this client compares them in: trimmed, lower
+ *  case. The display layer upper-cases it back (`./region-probe`
+ *  `formatRegionPing`), so nothing a player reads changes. */
+function normaliseRegion(region: string): string {
+  return region.trim().toLowerCase();
 }
 
 /** The platform `fetch`, resolved lazily; injected in every test. Mirrors

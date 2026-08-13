@@ -613,6 +613,31 @@ describe('resolvePromptText — the lesson branches on the scheme and the mode (
     expect(auto).not.toContain('{fire}');
   });
 
+  it('resolves every token in every configuration — a0-37 gave the map the scheme too', () => {
+    // `describeBindings` now branches on the scheme (a0-37), and the tap branch
+    // has no `fire` row at all: the pilot presses the trigger, so there is no key
+    // to name. A `{fire}` written into a tap sentence would therefore resolve to
+    // the bare word "fire" — the fallback in `bindingPhrase`. The copy table is
+    // built so that cannot happen (each prompt carries its own tap wording, and
+    // none of them asks for a press); this walks the whole matrix and proves it,
+    // so a future edit that drops a `{fire}` into the tap column fails here
+    // rather than in a playtest.
+    for (const id of Object.values(PromptId)) {
+      for (const device of ['keyboard', 'touch', 'gamepad'] as DeviceKind[]) {
+        for (const mode of [FireMode.Manual, FireMode.AutoAim]) {
+          for (const scheme of ['sticks', 'tap'] as ControlScheme[]) {
+            const text = resolvePromptText(id, device, mode, scheme);
+            const where = `${id}/${device}/${mode}/${scheme}`;
+            expect(text, where).not.toMatch(/[{}]/);
+            expect(text, `${where}: an unresolved binding fell back to a bare verb`).not.toMatch(
+              /(^|\s)(fire|build)(\s|$)/,
+            );
+          }
+        }
+      }
+    }
+  });
+
   it('keeps GDD §2.10\'s ratified sentence for the configuration it was written for', () => {
     // Sticks + Manual is the one configuration the GDD has words for. Nothing in
     // a0-33 is allowed to move them.

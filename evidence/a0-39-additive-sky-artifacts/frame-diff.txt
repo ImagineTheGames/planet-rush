@@ -1,0 +1,6 @@
+octagon    none         moved   0.0% of pixels  max Δ   0 codes  mean Δ where moved 0.00
+compass    coalsack     moved   0.1% of pixels  max Δ  44 codes  mean Δ where moved 4.07
+oval       plasmaReef   moved  36.0% of pixels  max Δ   6 codes  mean Δ where moved 1.33
+diamond    patinaDrift  moved  53.5% of pixels  max Δ  16 codes  mean Δ where moved 2.87
+line       deepEmber    moved  30.2% of pixels  max Δ   7 codes  mean Δ where moved 1.51
+crescents  ironVeil     moved  38.9% of pixels  max Δ  18 codes  mean Δ where moved 3.80

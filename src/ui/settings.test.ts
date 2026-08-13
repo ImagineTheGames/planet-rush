@@ -202,7 +202,7 @@ describe('the CONTROLS row says what the player actually holds (u8-01)', () => {
     // label with another. Read from `describeBindings` — the same map that drives
     // the sim — so a re-binding that made the mouse sufficient would fail here
     // rather than leave the label quietly wrong.
-    const rows = describeBindings('keyboard', FireMode.Manual);
+    const rows = describeBindings('keyboard', FireMode.Manual, 'sticks');
     expect(rows.find((r) => r.action === 'thrust')?.binding).toBe('WASD');
     expect(rows.find((r) => r.action === 'aim')?.binding).toBe('Mouse');
     expect(STICKS_LABELS.keyboard).toBe('KEYBOARD + MOUSE');
