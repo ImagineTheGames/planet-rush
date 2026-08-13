@@ -1,0 +1,164 @@
+{
+  "measuredFrom": "images/a1-17-labels-390-wheel-open.png",
+  "viewport": {
+    "width": 844,
+    "height": 390
+  },
+  "results": {
+    "buildButton": {
+      "publishedBounds": {
+        "x": 54,
+        "y": 140,
+        "width": 76,
+        "height": 76
+      },
+      "secondLineRowBand": {
+        "top": 185,
+        "bottom": 191
+      },
+      "rowsMeasured": 7,
+      "glyphRun": {
+        "minX": 62,
+        "maxX": 121,
+        "width": 60
+      },
+      "rimInnerEdgeOverThoseRows": {
+        "left": 58,
+        "right": 125,
+        "interiorWidth": 66
+      },
+      "clearanceLeftPx": 3,
+      "clearanceRightPx": 3,
+      "perRow": [
+        {
+          "y": 185,
+          "rimLeft": 56,
+          "rimRight": 127,
+          "glyphMinX": 62,
+          "glyphMaxX": 121,
+          "runs": 11
+        },
+        {
+          "y": 186,
+          "rimLeft": 56,
+          "rimRight": 126,
+          "glyphMinX": 62,
+          "glyphMaxX": 119,
+          "runs": 14
+        },
+        {
+          "y": 187,
+          "rimLeft": 57,
+          "rimRight": 126,
+          "glyphMinX": 62,
+          "glyphMaxX": 119,
+          "runs": 14
+        },
+        {
+          "y": 188,
+          "rimLeft": 57,
+          "rimRight": 126,
+          "glyphMinX": 62,
+          "glyphMaxX": 121,
+          "runs": 14
+        },
+        {
+          "y": 189,
+          "rimLeft": 57,
+          "rimRight": 126,
+          "glyphMinX": 62,
+          "glyphMaxX": 119,
+          "runs": 14
+        },
+        {
+          "y": 190,
+          "rimLeft": 58,
+          "rimRight": 125,
+          "glyphMinX": 62,
+          "glyphMaxX": 119,
+          "runs": 16
+        },
+        {
+          "y": 191,
+          "rimLeft": 58,
+          "rimRight": 125,
+          "glyphMinX": 62,
+          "glyphMaxX": 121,
+          "runs": 12
+        }
+      ]
+    },
+    "upgradeShipWedge_resting": {
+      "frame": "a1-17-labels-390-wheel-open.png",
+      "hub": {
+        "x": 422,
+        "y": 195
+      },
+      "rimSamples": [
+        {
+          "deg": 168,
+          "rimRadius": 178
+        },
+        {
+          "deg": 174,
+          "rimRadius": 183
+        },
+        {
+          "deg": 180,
+          "rimRadius": 185
+        },
+        {
+          "deg": 186,
+          "rimRadius": 183
+        },
+        {
+          "deg": 192,
+          "rimRadius": 179
+        }
+      ],
+      "outerRimRadiusPx": 178,
+      "glyphPixels": 442,
+      "glyphRadiusRange": {
+        "min": 55.1,
+        "max": 132.8
+      },
+      "radialClearanceToRimPx": 45.2
+    },
+    "upgradeShipWedge_selected": {
+      "frame": "a1-17-labels-390-wedge-selected.png",
+      "hub": {
+        "x": 422,
+        "y": 195
+      },
+      "rimSamples": [
+        {
+          "deg": 168,
+          "rimRadius": 178
+        },
+        {
+          "deg": 174,
+          "rimRadius": 183
+        },
+        {
+          "deg": 180,
+          "rimRadius": 185
+        },
+        {
+          "deg": 186,
+          "rimRadius": 183
+        },
+        {
+          "deg": 192,
+          "rimRadius": 179
+        }
+      ],
+      "outerRimRadiusPx": 178,
+      "glyphPixels": 716,
+      "glyphRadiusRange": {
+        "min": 55,
+        "max": 140.4
+      },
+      "radialClearanceToRimPx": 37.6
+    }
+  }
+}
