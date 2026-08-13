@@ -561,7 +561,7 @@ test('touch drag on the left half moves the ship (world units per sim tick)', as
 test('desktop: no touch affordances, controls strip PRESENT', async ({ page }, testInfo) => {
   test.skip(isTouchProject(testInfo.project.name), 'desktop control only');
   budgetTest({
-    work: 'desktop boot → 1 s of sim settle → one screenshot → two registry reads → four region pixel counts',
+    work: 'desktop boot → 1 s of sim settle → one screenshot → two registry reads → three region pixel counts',
     measuredSeconds: 5,
   });
 
