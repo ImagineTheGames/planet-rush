@@ -519,6 +519,16 @@ export interface MockupBlob {
   readonly alpha: number;
 }
 
+/**
+ * **How much a lane's elements thin toward its two ends** — the fraction of its
+ * alpha the outermost lobe gives up, so the dust reads as a body with edges
+ * rather than as a stripe that stops. Derived with the rest of the placement;
+ * exported because `backdrop.test.ts` has to know the allowed alpha range for a
+ * lane is `[alpha.min · (1 − LANE_TAPER), alpha.max]` and not the bare declared
+ * range.
+ */
+export const LANE_TAPER = 0.45;
+
 /** Uniform in `[r.min, r.max]`. */
 function pick(rng: { next(): number }, r: Range): number {
   return r.min + rng.next() * (r.max - r.min);
@@ -597,7 +607,7 @@ export function mockupBlobs(
         const across = (rng.next() - 0.5) * thickness * 0.9;
         cx = along * cos - across * sin;
         cy = along * sin + across * cos;
-        taper = 1 - 0.45 * Math.abs(t);
+        taper = 1 - LANE_TAPER * Math.abs(t);
         break;
       }
       case 'band': {

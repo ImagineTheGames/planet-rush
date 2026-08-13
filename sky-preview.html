@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Planet Rush — sky preview (a0-40)</title>
+    <!--
+      The review surface for the void. Dev-server only: `npm run dev`, then open
+      /sky-preview.html. It is not linked from the game and not in the bundle.
+
+      Three panels per sky, each from its REAL source — the design's own numbers,
+      the shipping VoidBackdrop through its real API, and the design's numbers
+      through the game's own drawSprite. Six reports about this backdrop were
+      each treated as a rendering bug because there was nowhere to see that the
+      first and the third agreed and the second did not. See sky-preview.ts.
+    -->
+    <style>
+      :root {
+        color-scheme: dark;
+        /* The design's own ground, so the page cannot flatter a panel by
+           surrounding it with something darker than the game's frame. */
+        --ground: #070910;
+        --ink: #7e8894;
+        --lit: #a5acb4;
+      }
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #05070b;
+        color: var(--lit);
+        font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      h1 {
+        font: 600 18px/1.4 system-ui, sans-serif;
+        letter-spacing: 0.04em;
+        margin: 0 0 4px;
+      }
+      p.lede {
+        margin: 0 0 20px;
+        max-width: 68ch;
+        color: var(--ink);
+      }
+      pre.table {
+        display: inline-block;
+        margin: 0 0 28px;
+        padding: 14px 18px;
+        background: var(--ground);
+        border: 1px solid #1d232c;
+        border-radius: 4px;
+      }
+      section.row {
+        margin: 0 0 26px;
+      }
+      section.row h2 {
+        font: 600 13px/1.4 system-ui, sans-serif;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ink);
+        margin: 0 0 8px;
+      }
+      .strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      figure.cell {
+        margin: 0;
+      }
+      figure.cell figcaption {
+        margin-top: 4px;
+        color: var(--ink);
+        letter-spacing: 0.06em;
+      }
+      .panel {
+        background: var(--ground);
+        outline: 1px solid #1d232c;
+      }
+      .panel canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Sky preview — the design, the game, and the design through the game</h1>
+    <p class="lede">
+      Left is the design's own numbers on its own code path. Middle is the shipping
+      <code>VoidBackdrop</code>, unmodified, through its real API. Right is the design's
+      numbers emitted as the game's own shapes and painted by the game's own
+      <code>drawSprite</code>. <code>lift</code> is mean luma above each panel's own ground;
+      <code>p99</code> is the star field's 99th percentile. Numbers also print to the console.
+    </p>
+    <div id="root"></div>
+    <script type="module">
+      import { mountSkyPreview } from './sky-preview.ts';
+      mountSkyPreview(document.getElementById('root'));
+    </script>
+  </body>
+</html>

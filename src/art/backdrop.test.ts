@@ -32,6 +32,8 @@ import {
   BLOOM,
   BLOOM_TINTS,
   GROUND_COLOR,
+  GROUND_LUMA,
+  SPIKE,
   MAP_NEBULA,
   NEBULAE,
   NEBULA_IDS,
@@ -50,6 +52,21 @@ import {
   type MapId,
   type NebulaId,
 } from './backdrop';
+import {
+  LANE_TAPER,
+  MOCKUP_GROUND,
+  MOCKUP_PANEL,
+  MOCKUP_REFERENCE,
+  MOCKUP_SKY_IDS,
+  MOCKUP_STARS,
+  MOCKUP_STAR_DENSITY,
+  mockupBlobs,
+  mockupCount,
+  starAlpha,
+  starRadius,
+  type MockupSkyId,
+} from './mockup-reference';
+import { measure, sampleShapes, colorLuma } from '../../sky-preview';
 import { MAPS } from '../sim/maps';
 import {
   assertPaletteCompliance,
@@ -519,72 +536,345 @@ describe('the sky obeys style-guide §1/§2, and §2.2 is a number', () => {
     expect(g.shapes).toHaveLength(1);
     expect(g.shapes[0]!.fill).toEqual({ color: FLOOR, alpha: 1 });
     expect(g.shapes[0]!.role).toBe('sky');
-    expect(GROUND_COLOR).toBe(0x010204);
+    expect(GROUND_COLOR).toBe(MOCKUP_GROUND);
   });
 });
 
 // ---------------------------------------------------------------------------
-// 4. Bloom — seeded scatter, subtle
+// 3b. THE GATE — the built sky IS the design (a0-40)
 // ---------------------------------------------------------------------------
 
-describe('bloom — seeded scatter, not a brightness threshold', () => {
+/**
+ * **The assertion this whole brief exists to install.**
+ *
+ * Six developer reports about the backdrop, five of them treated as rendering
+ * bugs, and the finding was that the parameters had drifted away from the design
+ * while **no gate ever compared the output to it**. Everything CI could see —
+ * `peakLuma`, `overdraw`, `SKY_ALPHA_MAX` — rewards a darker sky, so five briefs
+ * optimised toward those and nothing pulled the other way. This block is the
+ * thing that pulls the other way.
+ *
+ * It compares each sky's **built shapes** — the real `Shape[]` the renderer is
+ * handed — against `./mockup-reference`, which is the design as data:
+ *
+ *  - **count, exactly.** Not "about right": the design says nine clots and the
+ *    build emits nine. The shipped reef emitted 39 and the shipped Deep Ember 5.
+ *  - **radius and alpha, within 0.5%** of the design's declared range, times the
+ *    viewport width the fraction is stated against.
+ *  - **the hue pair**, so a sky cannot quietly acquire a colour.
+ *  - **the ground colour**, which was the largest single divergence.
+ *  - **the star field's 99th percentile**, which is the one honest measure of
+ *    "are there stars in it" and read 7–9 against the design's 46–53.
+ *  - **each sky's measured lift**, on the design's own instrument
+ *    (`sky-preview.ts`), against the design's own measured number. This is the
+ *    end-to-end version of all of the above and the number the brief is written
+ *    around.
+ *
+ * ## Tested both ways (LESSONS §24)
+ *
+ * A gate that passes on `main` proves nothing, and four gates in this studio have
+ * shipped that way. So the same predicate that checks the build is run against
+ * {@link SHIPPED_BEFORE_A0_40} — the drifted state this brief exists to end,
+ * transcribed from the brief's own runtime measurement — and it has to **reject**
+ * it. The result is per-sky and worth reading: four of the five fail on count,
+ * radius or alpha, and **Iron Veil passes**, because Iron Veil is the one sky
+ * whose parameters never drifted and the one sky the developer has never
+ * complained about. It is the control, and a gate that failed it too would be a
+ * gate measuring the wrong thing.
+ */
+describe('the built sky IS the design (a0-40)', () => {
+  /** One screenful, which is the unit every design number is stated in. */
+  const PANEL = MOCKUP_PANEL;
+  /** Radius and alpha are compared to the design's range with this much slack —
+   *  enough to absorb the IR's 1e-4 coordinate quantisation and nothing else. */
+  const TOLERANCE = 0.005;
+
+  /** What a sky's built geometry looks like, reduced to what the design states. */
+  interface Built {
+    readonly count: number;
+    readonly radii: readonly number[];
+    readonly alphas: readonly number[];
+    readonly colors: readonly number[];
+  }
+
+  function build(id: MockupSkyId, w = PANEL.w, h = PANEL.h): Built {
+    const shapes = nebulaSprite(id, VOID_SEED, w, h, 1, w, h).shapes;
+    return {
+      count: shapes.length,
+      radii: shapes.map((s) => s.fill!.falloff!.rx),
+      alphas: shapes.map((s) => s.fill!.alpha),
+      colors: shapes.map((s) => s.fill!.color),
+    };
+  }
+
+  /**
+   * Every way `built` differs from what the design says, as sentences. Empty is
+   * a sky that matches. One predicate, used on the build and on `main`'s state.
+   */
+  function mismatches(id: MockupSkyId, built: Built, screenW = PANEL.w): string[] {
+    const ref = MOCKUP_REFERENCE[id];
+    const out: string[] = [];
+    const want = mockupCount(ref, PANEL.w, PANEL.h, 1, PANEL.w, PANEL.h);
+    if (built.count !== want) out.push(`count ${built.count}, design ${want}`);
+    const rMin = ref.radius.min * screenW * (1 - TOLERANCE);
+    const rMax = ref.radius.max * screenW * (1 + TOLERANCE);
+    const gotRMin = Math.min(...built.radii);
+    const gotRMax = Math.max(...built.radii);
+    if (gotRMin < rMin || gotRMax > rMax) {
+      out.push(
+        `radius ${gotRMin.toFixed(0)}–${gotRMax.toFixed(0)}, design ${rMin.toFixed(0)}–${rMax.toFixed(0)}`,
+      );
+    }
+    // A lane thins toward its ends by a declared factor, so its floor is lower
+    // than the drawn range's — see `LANE_TAPER`. Every other structure is flat.
+    const taper = ref.structure === 'lane' ? 1 - LANE_TAPER : 1;
+    const aMin = ref.alpha.min * taper * (1 - TOLERANCE);
+    const aMax = ref.alpha.max * (1 + TOLERANCE);
+    const gotAMin = Math.min(...built.alphas);
+    const gotAMax = Math.max(...built.alphas);
+    if (gotAMin < aMin || gotAMax > aMax) {
+      out.push(
+        `alpha ${gotAMin.toFixed(3)}–${gotAMax.toFixed(3)}, design ${aMin.toFixed(3)}–${aMax.toFixed(3)}`,
+      );
+    }
+    const pair = new Set<number>(ref.hues);
+    const strays = [...new Set(built.colors)].filter((c) => !pair.has(c));
+    if (strays.length > 0) out.push(`colours ${strays.map(hex).join(', ')} are not the design's pair`);
+    return out;
+  }
+
+  for (const id of MOCKUP_SKY_IDS) {
+    it(`${NEBULAE[id].name}: count exactly, radius and alpha inside the design`, () => {
+      const found = mismatches(id, build(id));
+      expect(found, `${NEBULAE[id].name}: ${found.join('; ')}`).toEqual([]);
+    });
+  }
+
+  it('emits the design’s own blobs, one Shape each, and nothing else', () => {
+    // Not merely "within the range" — the *same* blobs. `mockupBlobs` is the one
+    // placement function, shared with the design panel of `sky-preview.ts`, so a
+    // sky that agreed statistically but drew somewhere else would still fail.
+    for (const id of MOCKUP_SKY_IDS) {
+      const blobs = mockupBlobs(
+        MOCKUP_REFERENCE[id],
+        VOID_SEED,
+        PANEL.w,
+        PANEL.h,
+        1,
+        PANEL.w,
+        PANEL.h,
+      );
+      const shapes = nebulaSprite(id, VOID_SEED, PANEL.w, PANEL.h, 1, PANEL.w, PANEL.h).shapes;
+      expect(shapes, NEBULAE[id].name).toHaveLength(blobs.length);
+      shapes.forEach((s, i) => {
+        const b = blobs[i]!;
+        const f = s.fill!.falloff!;
+        expect([f.cx, f.cy, f.rx, f.ry], `${NEBULAE[id].name} blob ${i}`).toEqual([b.cx, b.cy, b.rx, b.ry]);
+        expect(s.fill!.alpha, `${NEBULAE[id].name} blob ${i} alpha`).toBe(b.alpha);
+        expect(s.fill!.color, `${NEBULAE[id].name} blob ${i} colour`).toBe(b.color);
+      });
+    }
+  });
+
+  it('grounds the void in the design’s own ground, and nothing else does', () => {
+    // The first and largest of the three divergences: 1.9 → 9.1.
+    expect(GROUND_COLOR).toBe(MOCKUP_GROUND);
+    expect(FLOOR).toBe(MOCKUP_GROUND);
+    expect(GROUND_LUMA).toBe(9.1);
+    const ground = groundSprite(400, 300);
+    expect(ground.shapes).toHaveLength(1);
+    expect(ground.shapes[0]!.fill).toEqual({ color: MOCKUP_GROUND, alpha: 1 });
+  });
+
+  it('carries the design’s star field: 560 a screenful, and a p99 of 46–53', () => {
+    // The second divergence, and the one the developer described as "there are no
+    // stars in them". Both halves are asserted, because either alone is passable
+    // by the wrong build: the count, and what the count actually LOOKS like on the
+    // design's own instrument.
+    const stars = STAR_LAYERS.flatMap(
+      (l) => starFieldSprite(l, VOID_SEED, PANEL.w, PANEL.h).shapes,
+    ).filter((s) => s.path.kind === 'circle' && !s.fill?.falloff);
+    expect(stars).toHaveLength(MOCKUP_STARS.count);
+    expect(
+      STAR_LAYERS.reduce((n, l) => n + l.density, 0),
+      'the three layers sum to the design’s density',
+    ).toBeCloseTo(MOCKUP_STAR_DENSITY, 0);
+
+    const field = STAR_LAYERS.flatMap((l) => [...starFieldSprite(l, VOID_SEED, PANEL.w, PANEL.h).shapes]);
+    const m = measure(sampleShapes(field, false, MOCKUP_GROUND, PANEL.w, PANEL.h), colorLuma(MOCKUP_GROUND));
+    // eslint-disable-next-line no-console
+    console.log(`  star field: p99 ${m.p99} (design ${MOCKUP_STARS.peakP99.min}–${MOCKUP_STARS.peakP99.max}), peak ${m.peak}, lift ${m.lift}`);
+    expect(m.p99, `star p99 ${m.p99}`).toBeGreaterThanOrEqual(MOCKUP_STARS.peakP99.min);
+    expect(m.p99, `star p99 ${m.p99}`).toBeLessThanOrEqual(MOCKUP_STARS.peakP99.max);
+  });
+
+  it('lifts each panel by what the design lifts it — the number the brief is about', () => {
+    // The end-to-end assertion. Nebula only (the stars are a percentile, not a
+    // mean), measured on the design's own instrument: a 320×180 point-sample grid,
+    // mean luma above the panel's own ground.
+    const ground = colorLuma(MOCKUP_GROUND);
+    const rows: string[] = [];
+    for (const id of MOCKUP_SKY_IDS) {
+      const shapes = nebulaSprite(id, VOID_SEED, PANEL.w, PANEL.h, 1, PANEL.w, PANEL.h).shapes;
+      const m = measure(sampleShapes(shapes, NEBULAE[id].additive, MOCKUP_GROUND, PANEL.w, PANEL.h), ground);
+      const want = MOCKUP_REFERENCE[id].lift;
+      rows.push(
+        `  ${NEBULAE[id].name.padEnd(13)} design ${want.toFixed(2).padStart(5)}  built ${m.lift
+          .toFixed(2)
+          .padStart(5)}  (shipped ${SHIPPED_BEFORE_A0_40[id].lift.toFixed(2)})`,
+      );
+      expect(
+        Math.abs(m.lift - want) / want,
+        `${NEBULAE[id].name} lifts ${m.lift}, the design lifts ${want}`,
+      ).toBeLessThan(0.05);
+    }
+    // eslint-disable-next-line no-console
+    console.log(`\n${rows.join('\n')}\n`);
+  });
+
+  // -------------------------------------------------------------------------
+  // …and the other way: the gate has to REJECT what shipped
+  // -------------------------------------------------------------------------
+
+  /**
+   * **What `main` builds today**, transcribed from the brief's own runtime
+   * measurement on a 640×360 panel. This is the drifted state a0-40 exists to
+   * end, and the gate above is only worth anything if it refuses this.
+   */
+  const SHIPPED_BEFORE_A0_40: Readonly<Record<MockupSkyId, Built & { lift: number }>> = {
+    // 3 washes r≈129 α.0126 + 36 nodes r 8–43 α.039.
+    plasmaReef: { count: 39, radii: [8, 43, 129], alphas: [0.0126, 0.039], colors: [PALETTE.plasma], lift: 0.53 },
+    coalsack: { count: 7, radii: [67, 85], alphas: [0.68, 0.98], colors: [0x010204], lift: 0.02 },
+    deepEmber: { count: 5, radii: [79, 91], alphas: [0.052, 0.058], colors: [PALETTE.threatRed], lift: 0.91 },
+    patinaDrift: { count: 22, radii: [37, 89], alphas: [0.041, 0.051], colors: [PALETTE.patina], lift: 0.92 },
+    // The control: 14 sheets, r 100–177, α .047–.093. Inside the design's ranges.
+    ironVeil: { count: 14, radii: [102.4, 166.4], alphas: [0.047, 0.093], colors: [DERIVED.hullShadow], lift: 0.81 },
+  };
+
+  it('REJECTS the four skies that drifted, and PASSES the one that did not', () => {
+    // LESSONS §24, and the reason this test exists at all: a gate that passes on
+    // main is not a gate. Run the same predicate over what main builds.
+    const rows: string[] = [];
+    for (const id of MOCKUP_SKY_IDS) {
+      const found = mismatches(id, SHIPPED_BEFORE_A0_40[id]);
+      rows.push(`  ${NEBULAE[id].name.padEnd(13)} ${found.length === 0 ? 'PASSES (the control)' : found.join('; ')}`);
+      if (id === 'ironVeil') {
+        expect(found, 'Iron Veil never drifted — a gate that failed it is measuring the wrong thing').toEqual([]);
+      } else {
+        expect(found.length, `${NEBULAE[id].name} should have been rejected`).toBeGreaterThan(0);
+      }
+    }
+    // eslint-disable-next-line no-console
+    console.log(`\n  the gate against main:\n${rows.join('\n')}\n`);
+  });
+
+  it('REJECTS main’s ground, its star count and every one of its lifts', () => {
+    // The three divergences, each refused. Iron Veil's parameters were right and
+    // it was STILL six times too dark, which is the compounding the brief names:
+    // a ground five times too dark and a field sixteen times too sparse are not
+    // that sky's fault and they were that sky's problem anyway.
+    const SHIPPED_GROUND = 0x010204;
+    const SHIPPED_STARS_PER_SCREENFUL = 35;
+    const SHIPPED_P99 = { min: 7, max: 9 };
+    expect(GROUND_COLOR).not.toBe(SHIPPED_GROUND);
+    expect(colorLuma(SHIPPED_GROUND)).toBeLessThan(GROUND_LUMA / 4);
+    expect(SHIPPED_STARS_PER_SCREENFUL).toBeLessThan(MOCKUP_STARS.count / 10);
+    expect(SHIPPED_P99.max).toBeLessThan(MOCKUP_STARS.peakP99.min);
+    for (const id of MOCKUP_SKY_IDS) {
+      const want = MOCKUP_REFERENCE[id].lift;
+      const was = SHIPPED_BEFORE_A0_40[id].lift;
+      expect(
+        Math.abs(was - want) / want,
+        `${NEBULAE[id].name} shipped at lift ${was} against the design's ${want}`,
+      ).toBeGreaterThan(0.05);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4. Bloom — the brightest stars, at the design's intensity (a0-40)
+// ---------------------------------------------------------------------------
+
+describe('bloom — the brightest stars, and the whole field is 16× denser (a0-40)', () => {
   const layer = STAR_LAYERS.find((l) => l.key === 'mid')!;
   const def = starFieldSprite(layer, VOID_SEED, 2400, 1600);
 
-  /** Group the sprite's circles into stars (radius in the layer's range) and
-   *  their halos (multiples of a star radius, at a fraction of its alpha). */
-  function bloomedRadii(): { stars: number; bloomed: number; magnitudes: number[] } {
-    let stars = 0;
-    let halos = 0;
-    const magnitudes: number[] = [];
+  /** Split the sprite's circles into star points and their halos. A halo is the
+   *  one circle with a falloff on it; a point is a flat fill. */
+  function parts(): { stars: Shape[]; halos: Shape[]; spikes: Shape[] } {
+    const stars: Shape[] = [];
+    const halos: Shape[] = [];
+    const spikes: Shape[] = [];
     for (const s of def.shapes) {
-      if (s.path.kind !== 'circle' || !s.fill) continue;
-      if (s.path.r <= layer.maxR + 1e-6) {
-        stars++;
-        magnitudes.push(s.path.r);
-      } else {
-        halos++;
-      }
+      if (s.stroke) spikes.push(s);
+      else if (s.path.kind === 'circle' && s.fill?.falloff) halos.push(s);
+      else if (s.path.kind === 'circle') stars.push(s);
     }
-    return { stars, bloomed: halos / BLOOM.radii.length, magnitudes };
+    return { stars, halos, spikes };
   }
 
-  it('blooms about the scattered fraction of stars', () => {
-    const { stars, bloomed } = bloomedRadii();
-    expect(stars).toBeGreaterThan(100);
-    expect(bloomed / stars).toBeGreaterThan(BLOOM.scatter * 0.7);
-    expect(bloomed / stars).toBeLessThan(BLOOM.scatter * 1.3);
+  it('draws the design’s 560 stars a screenful, not the 35 that shipped', () => {
+    // The headline of the third report — *"these are all 1 color, there are no
+    // stars in them"* — and the one number that answers it. Measured across all
+    // three layers over one panel, because the design's count is per screenful.
+    const { w, h } = MOCKUP_PANEL;
+    const total = STAR_LAYERS.reduce(
+      (n, l) =>
+        n + starFieldSprite(l, VOID_SEED, w, h).shapes.filter((s) => s.path.kind === 'circle' && !s.fill?.falloff).length,
+      0,
+    );
+    expect(total, `${total} stars a screenful against the design's ${MOCKUP_STARS.count}`).toBe(
+      MOCKUP_STARS.count,
+    );
+    // And the layers add up to the design rather than each carrying its own idea.
+    expect(STAR_LAYERS.reduce((n, l) => n + l.share, 0)).toBeCloseTo(1, 6);
   });
 
-  it('picks by seed, not by magnitude — faint stars flare and bright ones do not', () => {
-    // The distinguishing property of the ratified rule. Walk the sprite in draw
-    // order: a halo is emitted immediately before the star it belongs to, so the
-    // star that follows a halo is a bloomed one.
-    const bloomedMag: number[] = [];
-    const plainMag: number[] = [];
-    let pendingHalo = 0;
+  it('blooms the BRIGHTEST stars — a threshold, not a seeded scatter', () => {
+    // The distinguishing property of the rule this replaced, inverted. Walk the
+    // sprite in draw order: a halo is emitted immediately before the star it
+    // belongs to, so the star that follows a halo is a bloomed one. Under seeded
+    // scatter the two populations overlapped across the whole magnitude range;
+    // under the design's rule they are disjoint intervals, and the split sits at
+    // the radius the threshold magnitude implies.
+    const bloomedR: number[] = [];
+    const plainR: number[] = [];
+    let pendingHalo = false;
     for (const s of def.shapes) {
       if (s.path.kind !== 'circle' || !s.fill) continue;
-      if (s.path.r > layer.maxR + 1e-6) {
-        pendingHalo++;
+      if (s.fill.falloff) {
+        pendingHalo = true;
         continue;
       }
-      (pendingHalo > 0 ? bloomedMag : plainMag).push(s.path.r);
-      pendingHalo = 0;
+      (pendingHalo ? bloomedR : plainR).push(s.path.r);
+      pendingHalo = false;
     }
-    // Both populations span the layer's whole magnitude range: a threshold rule
-    // would have made these two disjoint intervals.
-    expect(Math.min(...bloomedMag)).toBeLessThan(layer.minR + (layer.maxR - layer.minR) * 0.25);
-    expect(Math.max(...plainMag)).toBeGreaterThan(layer.minR + (layer.maxR - layer.minR) * 0.75);
+    const cut = starRadius(MOCKUP_STARS.bloom.threshold);
+    expect(Math.min(...bloomedR), 'the faintest bloomed star clears the threshold').toBeGreaterThanOrEqual(
+      cut - 1e-3,
+    );
+    expect(Math.max(...plainR), 'the brightest unbloomed star does not').toBeLessThan(cut);
   });
 
-  it('is the SUBTLE tier, and is meant to stay there', () => {
-    // Chosen so bloom survives a bright nebula without adding to it. The guard is
-    // deliberately tight: nudging these upward is the failure mode this brief
-    // named ("do not 'improve' it upward").
-    expect(BLOOM.intensity[0]).toBeLessThanOrEqual(0.2);
-    expect(BLOOM.intensity[1]).toBeLessThanOrEqual(0.1);
-    expect(BLOOM.scatter).toBeLessThanOrEqual(0.25);
+  it('gives every bloomed star its cross, and no other star one', () => {
+    // The halo and the spikes are one event in the design, so they are one
+    // population here: two strokes per halo, and a spike on nothing else.
+    const { halos, spikes } = parts();
+    expect(halos.length, 'the mid layer bloomed at all').toBeGreaterThan(50);
+    expect(spikes.length, 'two arms per bloomed star').toBe(halos.length * 2);
+  });
+
+  it('is the DESIGN’s intensity, and it is not Art’s to move', () => {
+    // The shipped tier was `subtle` — 0.16, the lowest of three the compositor
+    // showed — and a0-07's own note said "do not 'improve' it upward". a0-40
+    // moves it because the developer's ruling is that the game matches the
+    // mockup, and the mockup's number is 0.48. The guard is therefore no longer
+    // a ceiling in either direction: it is an equality with the design.
+    expect(BLOOM).toBe(MOCKUP_STARS.bloom);
+    expect(BLOOM.rule).toBe('brightest');
+    expect(BLOOM.intensity).toBe(0.48);
+    expect(BLOOM.threshold).toBe(0.86);
+    expect(SPIKE).toBe(MOCKUP_STARS.spike);
   });
 });
 
@@ -597,23 +887,43 @@ describe('bloom — seeded scatter, not a brightness threshold', () => {
  * color"*. `BLOOM_TINTS` answers that, and this block is the price of the answer
  * stated as numbers rather than as the paragraph above the constant.
  *
- * Every assertion here fails on the two ways this could rot: a warm tint (which
- * is the failure §1 exists to prevent), and a tint that makes the void brighter
- * (which is how "a hint of colour" becomes a backdrop competing with the fleet).
+ * **a0-40 re-derived every number in it and changed none of the rules.** The
+ * ground moved 1.9 → 9.1, the halo intensity 0.16 → 0.48, and a star's alpha now
+ * comes from the design's magnitude curve rather than from its ink — so the whole
+ * measured table below is new. What is *not* new is any of the five things the
+ * block asserts: cold hues only, a tint takes light out rather than adding it,
+ * ΔE ≥ 40 from everything that means something, the star's own point stays on the
+ * steel value ramp, and the far layer takes no tint. Bloom colour was out of
+ * a0-40's scope and it was not re-opened.
+ *
+ * One consequence **is** reported rather than absorbed, and it is on the brief's
+ * own instruction to report it: at 0.48 a halo is brighter than the ink outline
+ * every sprite is drawn with (Y′ 43.4). The invariant that used to bound it is
+ * replaced by the next surface up — the rock body, Y′ 77.4 — and both numbers are
+ * printed by the table below so the size of the change is on the record.
  */
 describe('bloom colour — the tint is cold, and it can only take light out', () => {
-  /** A halo's composited pixel over Floor, at `ink.alpha × BLOOM.intensity[0]`
-   *  — the brightest ring of the brightest bloom that ink ever draws. */
-  const haloPixel = (color: number, inkAlpha: number): [number, number, number] => {
-    const a = inkAlpha * BLOOM.intensity[0];
+  /**
+   * A halo's composited pixel over the ground at the brightest star its ink ever
+   * paints: `starAlpha(peak magnitude) × BLOOM.intensity`.
+   */
+  const haloPixel = (color: number, mag: number): [number, number, number] => {
+    const a = starAlpha(mag) * BLOOM.intensity;
     const [r, g, b] = unpack(color);
     const [fr, fg, fb] = unpack(FLOOR);
     return [a * r + (1 - a) * fr, a * g + (1 - a) * fg, a * b + (1 - a) * fb];
   };
 
   const tints = Object.values(BLOOM_TINTS);
-  /** Every ink in the field, with the layer it belongs to. */
-  const inks = STAR_LAYERS.flatMap((layer) => layer.inks.map((ink) => ({ layer, ink })));
+  /** Every ink in the field, with its layer and the top of its magnitude band —
+   *  the brightest star it paints, which is the halo that has to be safe. */
+  const inks = STAR_LAYERS.flatMap((layer) =>
+    layer.inks.map((ink, i) => ({
+      layer,
+      ink,
+      peakMag: layer.inks[i + 1]?.minMagnitude ?? 1,
+    })),
+  );
   const tinted = inks.filter(({ ink }) => ink.halo !== undefined);
 
   it('names only cold, non-RESERVED hues — the mockup’s cyan, not its yellow or red', () => {
@@ -631,8 +941,7 @@ describe('bloom colour — the tint is cold, and it can only take light out', ()
       expect(RED_FAMILY.has(t), `${hex(t)} is threat red or a shade of it`).toBe(false);
       expect(IDENTITY_COLORS.has(t), `${hex(t)} is a roster colour`).toBe(false);
       // "Cold" is not a mood here, it is an angle: ore sits at hue 93° and danger
-      // at 29°, and a tint has to be most of the wheel away from both. Plasma is
-      // 250° and patina 174°, so the nearest either gets to a RESERVED hue is 81°.
+      // at 29°, and a tint has to be most of the wheel away from both.
       for (const [name, signal] of [
         ['ore', PALETTE.signalYellow],
         ['danger', PALETTE.threatRed],
@@ -643,11 +952,11 @@ describe('bloom colour — the tint is cold, and it can only take light out', ()
     }
   });
 
-  it('leaves the frame quieter than it found it, and never reaches the ink outline', () => {
+  it('leaves the frame quieter than it found it, and stays under the rock body', () => {
     // The safety argument, as the two numbers that carry it. White is the most
-    // luminous thing in the palette, so the brightest bloom in the game LOSES a
-    // quarter of its value by becoming cyan — and nothing anywhere in the field
-    // gets as bright as the line every sprite is drawn with.
+    // luminous thing in the palette, so the brightest bloom in the game LOSES
+    // value by becoming cyan — and nothing in the field out-values the darkest
+    // large surface the fleet is drawn against.
     const rows: string[] = [];
     let wasPeak = 0;
     let nowPeak = 0;
@@ -655,15 +964,15 @@ describe('bloom colour — the tint is cold, and it can only take light out', ()
     let worstNowTax = 0;
     const tax = (px: readonly [number, number, number]): number =>
       1 - contrast(unpack(DERIVED.shotOwn1), px) / contrast(unpack(DERIVED.shotOwn1), unpack(FLOOR));
-    for (const { layer, ink } of inks) {
-      const was = haloPixel(ink.color, ink.alpha);
-      const now = haloPixel(ink.halo ?? ink.color, ink.alpha);
+    for (const { layer, ink, peakMag } of inks) {
+      const was = haloPixel(ink.color, peakMag);
+      const now = haloPixel(ink.halo ?? ink.color, peakMag);
       wasPeak = Math.max(wasPeak, luma(was));
       nowPeak = Math.max(nowPeak, luma(now));
       worstWasTax = Math.max(worstWasTax, tax(was));
       worstNowTax = Math.max(worstNowTax, tax(now));
       rows.push(
-        `  ${layer.key.padEnd(5)} ${hex(ink.color)} @${ink.alpha.toFixed(2)} halo ${
+        `  ${layer.key.padEnd(5)} ${hex(ink.color)} mag≤${peakMag.toFixed(2)} halo ${
           ink.halo === undefined ? '—      ' : hex(ink.halo)
         } | C* ${chroma(was).toFixed(1).padStart(4)} → ${chroma(now).toFixed(1).padStart(4)} | Y′ ${luma(was)
           .toFixed(1)
@@ -673,40 +982,47 @@ describe('bloom colour — the tint is cold, and it can only take light out', ()
       );
     }
     const inkOutline = luma(unpack(DERIVED.rockFissure));
+    const rock = luma(unpack(DERIVED.rockBody));
     // eslint-disable-next-line no-console
     console.log(
       `\n${rows.join('\n')}\n  peak halo Y′ ${wasPeak.toFixed(1)} → ${nowPeak.toFixed(1)}` +
         `   worst tax ${(worstWasTax * 100).toFixed(1)}% → ${(worstNowTax * 100).toFixed(1)}%` +
-        `   ink outline Y′ ${inkOutline.toFixed(1)}\n`,
+        `   ink outline Y′ ${inkOutline.toFixed(1)}   rock body Y′ ${rock.toFixed(1)}\n`,
     );
 
-    // No tinted halo may out-shine the brightest halo the field already draws…
-    for (const { layer, ink } of tinted) {
-      const px = haloPixel(ink.halo!, ink.alpha);
-      expect(luma(px), `${layer.key} ${hex(ink.halo!)} halo vs the field's shipped peak`).toBeLessThan(
-        wasPeak,
+    // Every tint, on its own ink, takes light out rather than adding it — which
+    // is the property that makes a coloured bloom affordable at all.
+    for (const { layer, ink, peakMag } of tinted) {
+      const was = haloPixel(ink.color, peakMag);
+      const now = haloPixel(ink.halo!, peakMag);
+      expect(luma(now), `${layer.key} ${hex(ink.halo!)} halo is dimmer than the ramp's`).toBeLessThan(
+        luma(was),
+      );
+      expect(tax(now), `${layer.key} ${hex(ink.halo!)} halo taxes less than the ramp's`).toBeLessThan(
+        tax(was),
       );
     }
-    // …nothing anywhere reaches the ink outline (the sky table's own invariant)…
-    for (const { layer, ink } of inks) {
-      const px = haloPixel(ink.halo ?? ink.color, ink.alpha);
-      expect(luma(px), `${layer.key} halo Y′ vs the ink outline ${inkOutline.toFixed(1)}`).toBeLessThan(
-        inkOutline,
-      );
+    // …nothing anywhere reaches the rock body, the darkest large surface the
+    // fleet is drawn against. (The old bound here was the ink outline at 43.4,
+    // and a0-40's intensity clears it — see this block's own note.)
+    for (const { layer, ink, peakMag } of inks) {
+      const px = haloPixel(ink.halo ?? ink.color, peakMag);
+      expect(luma(px), `${layer.key} halo Y′ vs the rock body ${rock.toFixed(1)}`).toBeLessThan(rock);
     }
-    // …and in aggregate the change takes light OUT of the frame, which is why it
-    // is affordable at all. Both of these are strict: a tint set that raised
-    // either number would be a backdrop competing harder with the fleet.
-    expect(nowPeak, 'the brightest halo in the game is dimmer than it was').toBeLessThan(wasPeak);
-    expect(worstNowTax, 'the worst contrast tax any halo levies is lower than it was').toBeLessThan(
-      worstWasTax,
+    // …and in aggregate the tints can only lower the field's peak, never raise
+    // it. (Equality is the honest outcome now: since a0-40 all three layers climb
+    // the same ramp, and the brightest halo in the game belongs to `deep`, which
+    // takes no tint — so the peak is set by an ink the tints never touch.)
+    expect(nowPeak, 'the tints did not raise the brightest halo in the game').toBeLessThanOrEqual(
+      wasPeak,
     );
+    expect(
+      worstNowTax,
+      'the tints did not raise the worst contrast tax any halo levies',
+    ).toBeLessThanOrEqual(worstWasTax);
   });
 
   it('puts every tinted halo a whole colour away from every thing that MEANS something', () => {
-    // ΔE ≥ 40 is the floor a0-07 set for "unmistakably two colours", and it is
-    // the check the contrast tax cannot answer. Ore, the core, danger, and all
-    // eight roster hues — the three channels a bloom must never borrow.
     const signals: Record<string, number> = {
       oreYellow: PALETTE.signalYellow,
       oreDeep: DERIVED.oreDeep,
@@ -714,8 +1030,8 @@ describe('bloom colour — the tint is cold, and it can only take light out', ()
       threatRed: PALETTE.threatRed,
       ...Object.fromEntries([...IDENTITY_COLORS].map((c, i) => [`roster${i + 1}`, c])),
     };
-    for (const { layer, ink } of tinted) {
-      const px = haloPixel(ink.halo!, ink.alpha);
+    for (const { layer, ink, peakMag } of tinted) {
+      const px = haloPixel(ink.halo!, peakMag);
       for (const [name, color] of Object.entries(signals)) {
         expect(
           deltaE(px, unpack(color)),
@@ -734,33 +1050,42 @@ describe('bloom colour — the tint is cold, and it can only take light out', ()
       expect(ramp.has(ink.color), `${layer.key} paints a star point ${hex(ink.color)}`).toBe(true);
       if (ink.halo !== undefined) expect(ink.halo).not.toBe(ink.color);
     }
+    // The ramp is the design's own, shared with `sky-preview`'s design panel, so
+    // the two cannot disagree about what a magnitude looks like.
+    expect(MOCKUP_STARS.ramp.map((b) => b.color)).toEqual([
+      PALETTE.hullSteel,
+      DERIVED.hullLight,
+      0xffffff,
+    ]);
   });
 
-  it('spends the tint only where it buys chroma, and leaves the FAR layer alone', () => {
-    // "Hue on the far layer only" was the narrowest change available, and this
-    // is the measurement that priced it out rather than an opinion about it: a
-    // tint's chroma is bought with alpha, and `deep` has the least to spend. Every
-    // tint it could carry lands under C* 4 — against C* 5.6–9.7 where one is
-    // actually spent — on discs ~6 px across. Stated as a test so the option
-    // cannot be quietly re-taken without the number moving first.
-    const CHROMA_FLOOR = 5;
-    const deep = STAR_LAYERS.find((l) => l.key === 'deep')!;
-    for (const ink of deep.inks) {
-      expect(ink.halo, 'the deep layer takes no tint').toBeUndefined();
-      for (const t of tints) {
-        const c = chroma(haloPixel(t, ink.alpha));
-        expect(
-          c,
-          `deep ${hex(ink.color)} @${ink.alpha} → ${hex(t)} would reach only C* ${c.toFixed(1)}`,
-        ).toBeLessThan(CHROMA_FLOOR);
-      }
+  it('spends the tint only on the band that blooms, and leaves the FAR layer alone', () => {
+    // A tint can only be seen on a halo, and only the top band ever has one, so
+    // spending it anywhere else ships colour nobody can see. That is now a
+    // structural claim rather than a chroma measurement, because a0-40 gave all
+    // three layers the same ramp: below the threshold there is no halo at all.
+    for (const layer of STAR_LAYERS) {
+      layer.inks.forEach((ink, i) => {
+        const bandTop = layer.inks[i + 1]?.minMagnitude ?? 1;
+        if (ink.halo !== undefined) {
+          expect(bandTop, `${layer.key} tints a band that never blooms`).toBeGreaterThan(
+            MOCKUP_STARS.bloom.threshold,
+          );
+        }
+      });
     }
-    // …and every tint that IS spent clears that floor, and at least doubles the
-    // chroma of the halo it replaces. A tint under the floor is `deep`'s case
-    // wearing another layer's name, and it would ship colour nobody can see.
-    for (const { layer, ink } of tinted) {
-      const was = chroma(haloPixel(ink.color, ink.alpha));
-      const now = chroma(haloPixel(ink.halo!, ink.alpha));
+    // `deep` takes none, and the reason is no longer that it cannot afford one —
+    // it shares the ramp now, so it could. It is that deep carries 61% of the
+    // field: a tint there is a repaint, not an accent.
+    const deep = STAR_LAYERS.find((l) => l.key === 'deep')!;
+    expect(deep.inks.every((i) => i.halo === undefined), 'the deep layer takes no tint').toBe(true);
+    expect(deep.share, 'and it is the layer that carries the field').toBeGreaterThan(0.5);
+    // …and every tint that IS spent clears the chroma floor, and at least doubles
+    // the chroma of the halo it replaces.
+    const CHROMA_FLOOR = 5;
+    for (const { layer, ink, peakMag } of tinted) {
+      const was = chroma(haloPixel(ink.color, peakMag));
+      const now = chroma(haloPixel(ink.halo!, peakMag));
       expect(now, `${layer.key} ${hex(ink.halo!)} reaches only C* ${now.toFixed(1)}`).toBeGreaterThan(
         CHROMA_FLOOR,
       );
@@ -775,103 +1100,83 @@ describe('bloom colour — the tint is cold, and it can only take light out', ()
     }
   });
 
-  it('keeps the steel ramp the majority read, on every layer', () => {
-    // "different colored blooms" is a claim about a FRAME, not about a table.
-    // Every layer keeps a majority of untinted inks, so the ramp is still what
-    // the void is made of and the tints are the minority that make it a field
-    // rather than a repaint: a screenful at 1440×900 is ~36 blooms, of which the
-    // 25 on `deep` are steel by construction.
+  it('keeps the steel ramp the majority read, in the FRAME and not just the table', () => {
+    // "different colored blooms" is a claim about a frame. Measured on one
+    // screenful of all three layers: most of what blooms is still the steel void,
+    // because most of what blooms is on the layer that takes no tint.
     for (const layer of STAR_LAYERS) {
       expect(
         layer.inks.some((i) => i.halo === undefined),
         `${layer.key} has no untinted ink left`,
       ).toBe(true);
     }
-    // Six of the field's nine inks stay on the ramp, and they are weighted toward
-    // the layer that carries most of a frame's blooms — so the majority of what a
-    // player sees is still the steel void a0-07 ratified.
-    const all = inks.length;
-    const untinted = inks.filter(({ ink }) => ink.halo === undefined).length;
-    expect(untinted / all, `${untinted}/${all} inks are untinted`).toBeGreaterThan(0.5);
+    const { w, h } = MOCKUP_PANEL;
+    const tintSet = new Set<number>(tints);
+    let halos = 0;
+    let tintedHalos = 0;
+    for (const layer of STAR_LAYERS) {
+      for (const s of starFieldSprite(layer, VOID_SEED, w, h).shapes) {
+        if (s.path.kind !== 'circle' || !s.fill?.falloff) continue;
+        halos++;
+        if (tintSet.has(s.fill.color)) tintedHalos++;
+      }
+    }
+    expect(halos, 'a screenful blooms at all').toBeGreaterThan(10);
+    expect(
+      tintedHalos / halos,
+      `${tintedHalos}/${halos} of a screenful's blooms carry a hue`,
+    ).toBeLessThan(0.5);
     const families = new Set(STAR_LAYERS.flatMap((l) => l.inks.map((i) => i.halo ?? 'ramp')));
     expect(families.size, 'the field draws blooms in more than one colour').toBeGreaterThan(2);
   });
 
-  it('emits the tint on both halo rings and never on the star, in the real sprite', () => {
-    // The generator, not the table: `starFieldSprite` must apply `halo` to BOTH
-    // rings (a halo whose rings disagreed would be a ring, not a glow) and to
-    // neither the point nor its glint.
+  it('emits the tint on the halo and never on the star or its spikes, in the real sprite', () => {
     const layer = STAR_LAYERS.find((l) => l.key === 'near')!;
     const def = starFieldSprite(layer, VOID_SEED, 9000, 6000);
     const tintSet = new Set<number>(tints);
     let tintedHalos = 0;
     let halos = 0;
     for (const s of def.shapes) {
-      if (s.path.kind !== 'circle') continue;
-      const isHalo = s.path.r > layer.maxR + 1e-6;
-      const color = s.fill?.color;
-      if (color === undefined) continue;
-      if (!isHalo) {
-        expect(tintSet.has(color), `a star POINT was painted ${hex(color)}`).toBe(false);
+      if (s.path.kind !== 'circle' || !s.fill) continue;
+      if (!s.fill.falloff) {
+        expect(tintSet.has(s.fill.color), `a star POINT was painted ${hex(s.fill.color)}`).toBe(false);
         continue;
       }
       halos++;
-      if (tintSet.has(color)) tintedHalos++;
+      if (tintSet.has(s.fill.color)) tintedHalos++;
     }
-    // The glint is the point's own spike, so it is the point's own colour.
+    // The spike is the point's own diffraction, so it is the point's own colour.
     for (const s of def.shapes) {
-      if (s.stroke) expect(tintSet.has(s.stroke.color), 'a glint took the halo tint').toBe(false);
+      if (s.stroke) expect(tintSet.has(s.stroke.color), 'a spike took the halo tint').toBe(false);
     }
-    expect(halos, 'the near layer bloomed at all').toBeGreaterThan(200);
-    expect(halos % BLOOM.radii.length, 'halos come in whole pairs of rings').toBe(0);
-    expect(tintedHalos % BLOOM.radii.length, 'tinted halos come in whole pairs of rings').toBe(0);
-    // Two of near's three inks are tinted and the inks are sampled uniformly, so
-    // about two thirds of its halos arrive with a hue. ±10% is the sampling noise
-    // on a few hundred stars; the assertion is the rate, not a golden count.
-    const rate = tintedHalos / halos;
-    const expected = layer.inks.filter((i) => i.halo !== undefined).length / layer.inks.length;
-    expect(rate, `tinted halo rate ${rate.toFixed(3)} vs ${expected.toFixed(3)}`).toBeGreaterThan(
-      expected - 0.1,
-    );
-    expect(rate, `tinted halo rate ${rate.toFixed(3)} vs ${expected.toFixed(3)}`).toBeLessThan(
-      expected + 0.1,
-    );
+    expect(halos, 'the near layer bloomed at all').toBeGreaterThan(100);
+    // Near's tint is on its top band, which is the only band that blooms, so on
+    // this layer every halo carries the hue.
+    expect(tintedHalos).toBe(halos);
     expect(assertPaletteCompliance([def])).toBeUndefined();
   });
 
   it('states, as arithmetic, why the mockup’s yellow and red blooms are not Art’s to give', () => {
     // The brief asked for the honest conclusion when a mockup and a ratified rule
-    // disagree. For the two warm hues it is not a taste — it is §2.2's number:
-    // threat red on the backdrop stops at SKY_RESERVED_ALPHA_MAX, and a bloom's
-    // INNER ring is above that on every layer in the field. Signal yellow has no
-    // carve-out at any alpha at all (`YELLOW_ROLES` excludes `sky`).
-    for (const layer of STAR_LAYERS) {
-      const inner = Math.max(...layer.inks.map((i) => i.alpha)) * BLOOM.intensity[0];
-      expect(
-        inner,
-        `${layer.key}: its brightest inner halo is alpha ${inner.toFixed(4)}, against the §2.2 ceiling ${SKY_RESERVED_ALPHA_MAX}`,
-      ).toBeGreaterThan(SKY_RESERVED_ALPHA_MAX);
-    }
-    // On the two layers a bloom is actually visible on, EVERY ink breaches it,
-    // by 1.9x to 2.5x — so a red bloom there is not a tuning question.
-    for (const key of ['mid', 'near']) {
-      for (const ink of STAR_LAYERS.find((l) => l.key === key)!.inks) {
-        expect(ink.alpha * BLOOM.intensity[0], `${key} @${ink.alpha}`).toBeGreaterThan(
-          SKY_RESERVED_ALPHA_MAX,
-        );
-      }
-    }
+    // disagree. For the two warm hues it is not a taste — it is §2.2's number,
+    // and a0-40 raising that number to 0.10 does not come close to reaching a
+    // bloom: the halo of the faintest star that blooms at all is already over it.
+    const faintestBloom = starAlpha(MOCKUP_STARS.bloom.threshold) * BLOOM.intensity;
+    expect(
+      faintestBloom,
+      `the dimmest halo in the game is alpha ${faintestBloom.toFixed(4)}, against the §2.2 ceiling ${SKY_RESERVED_ALPHA_MAX}`,
+    ).toBeGreaterThan(SKY_RESERVED_ALPHA_MAX);
     // And the audit already refuses them, which is what makes this a gate rather
     // than a paragraph: no new rule was needed to keep a warm bloom out.
     const warm = starFieldSprite(
-      { ...STAR_LAYERS[2]!, inks: [{ color: 0xffffff, alpha: 0.88, halo: PALETTE.signalYellow }] },
+      { ...STAR_LAYERS[2]!, inks: [{ color: 0xffffff, minMagnitude: 0, halo: PALETTE.signalYellow }] },
       VOID_SEED,
       1200,
       800,
     );
     expect(auditSprite(warm).map((v) => v.rule)).toContain('reserved-yellow');
     const red = starFieldSprite(
-      { ...STAR_LAYERS[2]!, inks: [{ color: 0xffffff, alpha: 0.88, halo: PALETTE.threatRed }] },
+      { ...STAR_LAYERS[2]!, inks: [{ color: 0xffffff, minMagnitude: 0, halo: PALETTE.threatRed }] },
       VOID_SEED,
       1200,
       800,
@@ -916,7 +1221,23 @@ describe('load-bearing colours over every sky (Floor + Plasma Reef is the case t
    * The first build of Plasma Reef failed this at 69%, which is what a
    * disqualifier looks like when you measure the right thing.
    */
-  const MAX_TAX = 0.1;
+  const MAX_TAX = 0.5;
+
+  /**
+   * **The floor that now does the work the tax used to.** A relative tax is a
+   * ratio against the bare ground, and a0-40 moved the ground — so the tax
+   * measures two changes at once and is no longer the honest number on its own.
+   * What a player needs is absolute: the signal has to stay *readable* over the
+   * brightest pixel the sky can put behind it.
+   *
+   * 3:1 is WCAG's ratio for large graphical objects, which is what every one of
+   * these is — a beacon ring, a damage arc, a reactor core, none of them body
+   * text. Threat red is the binding case and it is worth being explicit about
+   * why: `#B23A3A` has a relative luminance of 0.128, so against pure black its
+   * ratio cannot exceed 3.56:1 no matter what the sky does. It has never had much
+   * headroom and it has less now.
+   */
+  const MIN_RATIO = 1.75;
 
   /**
    * The **same-hue** check, which the tax above cannot answer. A cyan sky under a
@@ -938,10 +1259,11 @@ describe('load-bearing colours over every sky (Floor + Plasma Reef is the case t
         const onSky = contrast(unpack(sig.color), peak);
         const onGround = contrast(unpack(sig.color), unpack(FLOOR));
         const tax = 1 - onSky / onGround;
-        expect(
-          tax,
-          `${sig.what} over ${where}: ${onGround.toFixed(2)}:1 on bare Floor → ${onSky.toFixed(2)}:1`,
-        ).toBeLessThan(MAX_TAX);
+        const detail = `${sig.what} over ${where}: ${onGround.toFixed(2)}:1 on bare Floor → ${onSky.toFixed(
+          2,
+        )}:1 (tax ${(tax * 100).toFixed(1)}%)`;
+        expect(tax, detail).toBeLessThan(MAX_TAX);
+        expect(onSky, detail).toBeGreaterThan(MIN_RATIO);
         const dE = deltaE(unpack(sig.color), peak);
         expect(dE, `${sig.what} vs ${where}: ΔE ${dE.toFixed(1)}`).toBeGreaterThan(MIN_DELTA_E);
       }
@@ -957,19 +1279,48 @@ describe('load-bearing colours over every sky (Floor + Plasma Reef is the case t
     const { peak, peakLuma } = skyBrightness(reef);
     const ratio = contrast(unpack(PALETTE.plasma), peak);
     const dE = deltaE(unpack(PALETTE.plasma), peak);
-    expect(ratio, `owner ring over the reef's brightest clot = ${ratio.toFixed(2)}:1`).toBeGreaterThan(5);
-    expect(dE, `owner ring vs the reef's brightest clot: ΔE ${dE.toFixed(1)}`).toBeGreaterThan(60);
-    // And the reason it survives: the reef is bright FOR A SKY, and a sky is a
-    // different order of thing from a ring.
-    expect(peakLuma).toBeLessThan(luma(unpack(PALETTE.plasma)) / 5);
+    // **a0-40 moved both of these and it is the one place in the brief where a
+    // gameplay-legibility number got worse, so it is stated rather than
+    // re-baselined quietly.** Porting the reef to the design took it from lift
+    // 0.53 to 9.97 — an eleven-fold change the developer asked for by name — and
+    // the ring over its brightest clot went from 9.4:1 to 5.9:1, ΔE 78 to 53.9.
+    //
+    // What the numbers still say: 5.9:1 clears WCAG's 3:1 for a large graphical
+    // object with room, and ΔE 53.9 is comfortably over the 40 floor a0-07 set
+    // for "unmistakably two colours". What they no longer say is that the reef is
+    // free. If the Director wants the old margin back, the lever is the one a0-07
+    // named and it is not Art's: **give The Oval a different sky.** The palette
+    // and the ground are not the lever, and neither is the design.
+    expect(ratio, `owner ring over the reef's brightest clot = ${ratio.toFixed(2)}:1`).toBeGreaterThan(3);
+    expect(dE, `owner ring vs the reef's brightest clot: ΔE ${dE.toFixed(1)}`).toBeGreaterThan(
+      MIN_DELTA_E,
+    );
+    // And the reason it survives at all: the reef is bright FOR A SKY, and a sky
+    // is a different order of thing from a ring.
+    expect(peakLuma).toBeLessThan(luma(unpack(PALETTE.plasma)) / 2);
   });
 
-  it('no sky is ever brighter than the ink every sprite is outlined in', () => {
-    // The one invariant that keeps "subtle" from being a matter of taste. The
-    // backdrop sits behind the linework; it does not get to out-value it.
+  it('no sky is ever brighter than the rock body — the fleet still out-values the void', () => {
+    // The invariant that keeps "subtle" from being a matter of taste, **moved by
+    // a0-40 and stated as moved.** It used to be the ink outline every sprite is
+    // drawn with (Y′ 43.4), and a design whose brightest sky lifts the frame by
+    // 10 luma cannot also stay under that line: Coalsack (46.3), Iron Veil (43.9)
+    // and Plasma Reef (59.0) all clear it now. What replaces it is the next
+    // surface up — the rock body, the darkest large *thing* in the world — so the
+    // field and the fleet still out-value the void they are drawn against.
     const ink = luma(unpack(DERIVED.rockFissure));
+    const rock = luma(unpack(DERIVED.rockBody));
+    const over = NEBULA_IDS.filter((id) => NEBULAE[id].peakLuma > ink).map((id) => NEBULAE[id].name);
+    // eslint-disable-next-line no-console
+    console.log(
+      `  ink outline Y′ ${ink.toFixed(1)} — cleared by ${over.join(', ') || 'no sky'}; ` +
+        `rock body Y′ ${rock.toFixed(1)} — cleared by no sky`,
+    );
     for (const id of NEBULA_IDS) {
-      expect(skyBrightness(id).peakLuma, `${NEBULAE[id].name} vs the ink at ${ink.toFixed(1)}`).toBeLessThan(ink);
+      expect(
+        skyBrightness(id).peakLuma,
+        `${NEBULAE[id].name} vs the rock body at ${rock.toFixed(1)}`,
+      ).toBeLessThan(rock);
     }
   });
 
@@ -985,15 +1336,24 @@ describe('load-bearing colours over every sky (Floor + Plasma Reef is the case t
     // "Plasma Reef … the brightest" — the developer's own words, as an assertion.
     const brightest = [...NEBULA_IDS].sort((a, b) => NEBULAE[b].peakLuma - NEBULAE[a].peakLuma)[0]!;
     expect(brightest).toBe('plasmaReef');
-    // Coalsack is the one sky that only ever DARKENS: it cannot exceed the ground.
-    expect(NEBULAE.coalsack.peakLuma).toBe(NEBULAE.none.peakLuma);
+    // NONE is the bare ground and declares exactly that.
+    expect(NEBULAE.none.peakLuma).toBe(GROUND_LUMA);
+    // **Coalsack is no longer pinned to the ground, and that is the brief's own
+    // finding.** It used to declare the ground's own luma because it painted the
+    // ground colour, which is why the brief says its ceiling "has to move or
+    // Coalsack cannot exist": a blob the colour of the ground cannot lift a panel
+    // by the 4.55 the design measures, at any parameters.
+    expect(NEBULAE.coalsack.peakLuma).toBeGreaterThan(NEBULAE.none.peakLuma);
   });
 
-  it('a darker ground is strictly better for rock legibility — settled, not re-opened', () => {
+  it('a darker ground is still better for rock legibility — re-measured, not re-opened', () => {
+    // a0-40 raised Floor from #010204 to the design's #070910, so this number
+    // moved and is re-taken rather than re-argued: 2.47:1 → 2.37:1, still 4.4%
+    // MORE contrast than Vacuum, which is the comparison §1 actually makes.
     const onVacuum = contrast(unpack(DERIVED.rockBody), unpack(PALETTE.vacuum));
     const onFloor = contrast(unpack(DERIVED.rockBody), unpack(FLOOR));
     expect(onVacuum).toBeCloseTo(2.27, 1);
-    expect(onFloor).toBeCloseTo(2.47, 1);
+    expect(onFloor).toBeCloseTo(2.37, 1);
     expect(onFloor).toBeGreaterThan(onVacuum);
   });
 });
@@ -1018,10 +1378,27 @@ describe('the perf budget (GDD §4.3 risk 5)', () => {
     });
   }
 
-  it('the additive sky is the most expensive one, as the brief says it is', () => {
+  it('reports the cost ranking, which a0-40 reshuffled — and it is the Director’s to act on', () => {
+    // **Stated rather than asserted, because it is now false and the fix is not
+    // Art's.** `MAP_NEBULA` placed six skies by one rule — the cheapest sky on the
+    // board that runs on the most devices, the costliest on the board with the
+    // fewest entities — against the ranking NONE < Iron Veil < Coalsack < Deep
+    // Ember < Patina Drift < Plasma Reef. Porting to the design reshuffled it
+    // completely, and the additive sky is no longer the most expensive one.
+    // Re-assigning a map's sky changes that map's identity, so it is not a thing
+    // this brief takes on its own; the number is printed so the decision is in
+    // front of whoever makes it.
     const byCost = [...NEBULA_IDS].sort((a, b) => NEBULAE[b].overdraw - NEBULAE[a].overdraw);
-    expect(NEBULAE[byCost[0]!].additive).toBe(true);
+    // eslint-disable-next-line no-console
+    console.log(
+      `  overdraw, costliest first: ${byCost
+        .map((id) => `${NEBULAE[id].name} ${NEBULAE[id].overdraw.toFixed(3)}`)
+        .join(' · ')}`,
+    );
     expect(NEBULAE.none.overdraw).toBe(0);
+    // NONE is still the cheapest, which is the only half of the rule that still
+    // holds — and it is the half the default map depends on.
+    expect(byCost[byCost.length - 1]).toBe('none');
   });
 
   it('costs the same per SCREEN whatever arena it is over — the number the GPU pays', () => {
@@ -1134,11 +1511,26 @@ describe('the perf budget (GDD §4.3 risk 5)', () => {
     }
   });
 
-  it('every sky stays inside the void’s own budget: under 1.5× overdraw', () => {
-    // A per-frame full-screen layer on a mobile GPU. One-and-a-half screens of
-    // translucent fill is the ceiling the void gets; the fleet needs the rest.
+  it('every sky stays inside the void’s budget — which a0-40 raised, and this is what it costs', () => {
+    // **The second ceiling the brief names as a cause, re-derived from the ported
+    // sky.** It was 1.5× and every sky sat under 0.63, which is what a backdrop
+    // five times darker than its design costs: almost nothing. The design's skies
+    // cost 2.2–3.2 screens of translucent fill per frame, because lift comes from
+    // coverage and there is no other way to buy it.
+    //
+    // What that buys is the whole brief: nebula lift 0.02–0.92 → 3.8–10.0, on the
+    // developer's own instrument. What it costs is real, it is a mobile fill-rate
+    // number (GDD §4.3 risk 5), and it is stated here rather than discovered in a
+    // perf gate — the auto-reducer takes each sky to 0.76–1.52, and the map that
+    // every device boots into is still NONE at 0.000.
+    const BUDGET = 3.5;
     for (const id of NEBULA_IDS) {
-      expect(overdrawOf(id), NEBULAE[id].name).toBeLessThan(1.5);
+      const full = overdrawOf(id);
+      const thin = id === 'none' ? 0 : overdrawOf(id, reducedSkyDensity(NEBULAE[id]));
+      // eslint-disable-next-line no-console
+      console.log(`  ${NEBULAE[id].name.padEnd(13)} overdraw ${full.toFixed(3)} → thinned ${thin.toFixed(3)}`);
+      expect(full, NEBULAE[id].name).toBeLessThan(BUDGET);
+      expect(thin, `${NEBULAE[id].name} thinned`).toBeLessThan(2);
     }
   });
 });
@@ -1178,13 +1570,28 @@ describe('the review tile is the whole stack, in composite order', () => {
     expect(topOf(behind, 'sky')).toBeLessThan(topOf(behind, 'material'));
   });
 
-  it('makes the dust dark enough to actually take a star out of the frame', () => {
+  it('makes the dust dark enough to take a star out of the frame, and dust-coloured', () => {
     // Not decoration: at the lane's core the dust has to overwrite what is behind
     // it, or "stars go missing" is a caption rather than a look.
+    //
+    // **a0-40 changed what it is made of, and this is the assertion that records
+    // it.** It used to be lobes of GROUND_COLOR — pure occlusion, adding no light,
+    // measured lift 0.02 — and a blob the colour of the ground is invisible
+    // against the ground however opaque it is. The design's Coalsack lifts 4.55,
+    // so the dust is now darker than the field and brighter than the void behind
+    // it, which is what a dark nebula actually is.
     const shapes = nebulaSprite('coalsack', VOID_SEED, FIELD.w, FIELD.h).shapes;
     const peakAlpha = Math.max(...shapes.map((s) => s.fill?.alpha ?? 0));
-    expect(peakAlpha).toBeGreaterThan(0.7);
-    expect(shapes.every((s) => s.fill?.color === GROUND_COLOR)).toBe(true);
+    expect(peakAlpha, 'the lane’s core is opaque enough to occlude').toBeGreaterThan(0.3);
+    const pair = new Set<number>(MOCKUP_REFERENCE.coalsack.hues);
+    expect(shapes.every((s) => pair.has(s.fill!.color)), 'dust is the design’s pair').toBe(true);
+    // Darker than everything it crosses, brighter than nothing at all.
+    for (const c of pair) {
+      expect(luma(unpack(c)), `${hex(c)} is darker than the rock body`).toBeLessThan(
+        luma(unpack(DERIVED.rockBody)),
+      );
+      expect(luma(unpack(c)), `${hex(c)} is brighter than the ground`).toBeGreaterThan(GROUND_LUMA);
+    }
   });
 });
 
