@@ -182,8 +182,9 @@ const PROMPT_COPY: Readonly<Record<PromptId, PromptCopy>> = {
   // exclamation. It states the contract's terms and does not wish anybody luck.
   [PromptId.Objective]: {
     id: PromptId.Objective,
-    // On one line on purpose: the brief's gate greps this file for `template: '`
-    // and a wrapped assignment reads to it as a prompt that does not exist.
+    // On one line on purpose: the brief's gate counts the templates in this file
+    // by looking for an opening quote right after the key, and a wrapped
+    // assignment reads to it as a prompt that does not exist.
     template: 'Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right',
   },
   // `{fire}` resolves to the fire/mine binding — the wording is input-agnostic
