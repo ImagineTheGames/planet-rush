@@ -263,20 +263,16 @@ export interface StarLayerSpec {
 }
 
 /**
- * The biggest star the field can draw — the line between a point and its halo,
- * and the same on every layer.
+ * The ink a star of this magnitude is painted in: the last band it clears.
  *
- * **The layers do not scale it, and that is deliberate.** A per-layer size
- * multiplier is the obvious way to sell depth, and it is what a0-40 removed: the
- * design has *one* magnitude curve, so a size multiplier on top of it is a second
- * distribution nobody specified, and it pulls the field's measured p99 away from
+ * **The layers do not scale a star's size, and that is deliberate.** A per-layer
+ * size multiplier is the obvious way to sell depth, and it is what a0-40 removed:
+ * the design has *one* magnitude curve, so a multiplier on top of it is a second
+ * distribution nobody specified, and it pulled the field's measured p99 away from
  * the design's by more than the ground did. Depth is carried by
  * {@link StarLayerSpec.parallax}, which is what actually reads as depth in
  * motion, and the curve alone already spans 0.4–2.45 px.
  */
-export const MAX_STAR_RADIUS = round(starRadius(1));
-
-/** The ink a star of this magnitude is painted in: the last band it clears. */
 export function starInkFor(spec: StarLayerSpec, mag: number): StarInk {
   let chosen = spec.inks[0]!;
   for (const ink of spec.inks) if (mag >= ink.minMagnitude) chosen = ink;

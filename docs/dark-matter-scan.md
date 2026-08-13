@@ -448,6 +448,46 @@ it*, which is why it survived weeks. A SEAM entry is only defensible with a name
 successor brief and a date — and the entry has to say what evidence its own
 survival would be.
 
+### 4.6 SURFACE — the design, exported to be compared against (a0-40, 2026-08-13)
+
+| Export | Verdict |
+|---|---|
+| `src/art/mockup-reference.ts#MOCKUP_GROUND` | SURFACE — the reference half of a CI comparison |
+| `src/art/mockup-reference.ts#MOCKUP_SKY_IDS` | SURFACE — the design's own index, iterated by the gate |
+| `src/art/mockup-reference.ts#starRampColor` | SURFACE — shared with the dev-only review surface |
+
+`src/art/mockup-reference.ts` is a new kind of module in this repo and it is
+worth naming the shape rather than pattern-matching it onto §4.4. It is **the
+design, committed as data**: the backdrop compositor's own per-sky counts, radii,
+alphas, ground and star curve, frozen, with a test that holds the shipping art to
+them. It exists because the backdrop drew five times darker than its design for
+six developer reports and *nothing in CI compared the two* — every ceiling the
+gate could see (`peakLuma`, `overdraw`, `SKY_ALPHA_MAX`) rewards a darker sky, so
+five briefs optimised toward them and nothing pulled back.
+
+Most of the module *is* called by production — `backdrop.ts` builds every sky out
+of `MOCKUP_REFERENCE` and `mockupBlobs`, so a sky cannot exist without a design
+entry. The three rows above are the part that cannot be, and each for its own
+reason:
+
+- **`MOCKUP_GROUND`** is the reference half of an equality. `backdrop.test.ts`
+  asserts `FLOOR === MOCKUP_GROUND`; a version of it that production imported
+  could not fail that assertion, which is the only thing it is for.
+- **`MOCKUP_SKY_IDS`** is the *design's* list of skies, so the gate iterates the
+  design rather than `NEBULA_IDS`. Iterating production's list would let a sky
+  that vanished from the registry pass by not being looked at.
+- **`starRampColor`** is shared with `sky-preview.ts`, the dev-only three-panel
+  review surface (design | game | design-through-the-game) that made this
+  visible, so the design panel and the game cannot disagree about what a
+  magnitude looks like. Production reaches the same table through `STAR_LAYERS`.
+
+**One thing for the tool's owner, not a request:** the scan now names
+`sky-preview.ts` in its unclassified-directories warning alongside `content/`. It
+is a root-level dev-server module — `vite build`'s default input is `index.html`
+alone, so it is not in the bundle — and it is deliberately unreachable from
+`main.ts`, exactly like the `evidence/` scripts in §4.4(a). It needs no entry
+point; if `roleOf()` ever grows a *dev-surface* bucket, this belongs in it.
+
 ## 5. Should it gate CI? Yes — and here is the number
 
 **It ships as a gate**, `npm run dark-matter:check`, in the `ci` job. It fails on
