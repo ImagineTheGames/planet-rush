@@ -382,9 +382,12 @@ export function falloffDistance(f: Falloff, x: number, y: number): number {
  * The alpha an ink actually paints at `(x, y)`: its own alpha for a flat fill,
  * and its peak alpha shaped by {@link falloffProfile} for a soft one.
  *
- * This is the single definition of "how bright is this ink here", and every
- * consumer that cares — the CPU rasterizer, the sky's brightness and overdraw
- * measurements, the SVG review sheets — goes through it, so a picture, a
+ * This is the single definition of "how bright is this ink here" for a consumer
+ * holding a point in the sprite's own space: the CPU rasterizer and the sky's
+ * brightness and overdraw measurements. The two drawing paths — the ramp
+ * texture and the SVG review sheets — take {@link falloffProfile} directly,
+ * because both work in the falloff's unit space and have no world point to ask
+ * about. The shape of the falloff is shared either way, so a picture, a
  * measurement and a frame can never disagree about a gradient.
  */
 export function inkAlphaAt(ink: Ink, x: number, y: number): number {

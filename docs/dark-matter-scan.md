@@ -396,9 +396,32 @@ or in a spec. Only the seam that could not be wired was allowed.
 `platform/freeze.ts#buildFrozenWorld`. Reset and stand-in helpers whose entire
 purpose is to be called from a spec.
 
+**(d) `src/art/shapes.ts#inkAlphaAt`** (a0-39, 2026-08-13) — checked one row at
+a time, like `BUILD_BUTTON_LABEL` above. a0-39 replaced the sky's four-disc
+approximation of a nebula with one gradient-filled shape, which put a `falloff`
+on `Ink`; `inkAlphaAt` is the answer to "what alpha does this ink paint at this
+point", and it exists so a picture, a measurement and a frame cannot disagree
+about a gradient. Its callers are `raster.ts` — already SURFACE under (a) — and
+`backdrop.test.ts`'s overdraw and peak-luma measurements.
+
+**Wiring it up was the first option and it does not fit.** Production does draw
+the same falloff, through `falloffProfile`, and that one has two real production
+callers: `textures.ts` bakes it into the shared radial ramp texture, and
+`svg.ts` emits it as `<radialGradient>` stops. But both work in the falloff's
+own unit space (`t ∈ [0,1]`) and neither holds a world-space point, which is
+`inkAlphaAt`'s entire signature — routing them through it would add a coordinate
+round-trip to invent an argument they do not have. The shared arithmetic is
+already factored out and already called: `falloffProfile` is not dark.
+
+So the split is deliberate — `falloffProfile` is the shape of the falloff and is
+production's; `inkAlphaAt` is that shape applied to an ink at a point and is the
+measurement surface's. Deleting it would duplicate the same product in the
+rasterizer and in the spec, which is the thing it was extracted to prevent.
+
 This is the section most likely to be wrong, and wrong in the expensive
 direction — a DARK finding filed as SURFACE stays invisible. It is a pattern
-judgement over 157 items, not 157 investigations.
+judgement over 157 items, not 157 investigations — plus the two rows above
+((b)'s `BUILD_BUTTON_LABEL` and (d)'s `inkAlphaAt`) that were checked singly.
 
 ### 4.5 SEAM — a feature landed in two halves, on purpose (n10-01, 2026-08-12)
 

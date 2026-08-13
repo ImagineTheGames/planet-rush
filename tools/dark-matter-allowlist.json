@@ -72,6 +72,7 @@
     "src/art/ring-scan.ts#RING_JND": "SURFACE — art review measurement (§4.4a)",
     "src/art/ring-scan.ts#scanRings": "SURFACE — art review measurement (§4.4a)",
     "src/art/shapes.ts#filledStroke": "SURFACE — triaged by pattern, not individually verified (§4.4b)",
+    "src/art/shapes.ts#inkAlphaAt": "SURFACE — the measurement-side definition of a soft fill's alpha, checked one row at a time under a0-39 (§4.4d). Its callers are raster.ts (itself SURFACE, §4.4a) and backdrop.test.ts's overdraw/peak-luma. Production draws the same falloff through falloffProfile, which textures.ts and svg.ts DO call — both work in the falloff's own unit space and have no world point to ask about, so wiring this in would be a wrong-shaped call, not a second arithmetic removed.",
     "src/art/shapes.ts#spriteColors": "SURFACE — exported for a spec to assert; triaged by pattern (§4.4b)",
     "src/art/shapes.ts#spriteKey": "SURFACE — exported for a spec to assert; triaged by pattern (§4.4b)",
     "src/art/ships.ts#SHIP_CLASSES": "SURFACE — exported for a spec to assert; triaged by pattern (§4.4b)",
