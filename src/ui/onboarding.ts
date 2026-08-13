@@ -436,36 +436,6 @@ function bindingPhrase(
 }
 
 /**
- * The `{token}`s this configuration's sentence asks for that its device has no
- * binding row to name — the fallback in {@link bindingPhrase}, reported instead
- * of silently rendered.
- *
- * The runtime behaviour is deliberately unchanged: a player who somehow reaches a
- * fallback should read "hold fire", not "hold {fire}". But that makes a fallback
- * invisible in the output, so `onboarding.test.ts` used to hunt it by scanning
- * the finished sentence for a bare "fire"/"build" — a heuristic that cannot tell
- * a fallback from English. a0-34's OBJECTIVE line ("mine ore, build defenses,
- * upgrade your ship") is prose that says "build", and it tripped the guard the
- * moment the two briefs met in a merge, with nothing actually wrong.
- *
- * Asking the map directly is both narrower and stronger: it catches a `{fire}`
- * written into a tap sentence even if the fallback word never survives later
- * edits to the copy, and it stays quiet about prose forever.
- */
-export function unresolvedBindings(
-  id: PromptId,
-  device: DeviceKind,
-  mode: FireMode,
-  scheme: ControlScheme,
-): readonly ('fire' | 'build')[] {
-  const sentence = lessonFor(PROMPT_COPY[id], mode, scheme);
-  const rows = describeBindings(device, mode, scheme);
-  return (['fire', 'build'] as const).filter(
-    (action) => sentence.includes(`{${action}}`) && !rows.some((r) => r.action === action),
-  );
-}
-
-/**
  * The lesson this prompt teaches a player in THIS configuration (a0-33).
  *
  * The scheme decides first and the fire mode second, because that is the order

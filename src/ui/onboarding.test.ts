@@ -15,8 +15,8 @@
  * {@link afterTheObjective} — see that helper for why.
  */
 import { describe, it, expect } from 'vitest';
-import { Onboarding, PromptId, oreWasSpent, resolvePromptText, unresolvedBindings } from './onboarding';
-import { FireMode } from '@platform/actions';
+import { Onboarding, PromptId, oreWasSpent, resolvePromptText } from './onboarding';
+import { describeBindings, FireMode } from '@platform/actions';
 import type { DeviceKind } from '@platform/actions';
 import type { OnboardingMemory, OnboardingSignals, SpendFacts } from './onboarding';
 import type { ControlScheme } from './settings';
@@ -623,11 +623,17 @@ describe('resolvePromptText — the lesson branches on the scheme and the mode (
     // so a future edit that drops a `{fire}` into the tap column fails here
     // rather than in a playtest.
     //
-    // It asks the binding map (`unresolvedBindings`) rather than scanning the
-    // finished sentence for a bare "fire"/"build". The scan could not tell a
-    // fallback from English, and a0-34's OBJECTIVE line — "mine ore, build
-    // defenses, upgrade your ship" — is English that says "build". The two briefs
-    // were green apart and red together, which is the worst way to find this.
+    // It only looks for a verb the configuration has NO ROW for, which is the
+    // only way `bindingPhrase` can fall back. The original scanned for a bare
+    // "fire" OR "build" in every configuration, and that cannot tell a fallback
+    // from English: a0-34's OBJECTIVE line — "mine ore, build defenses, upgrade
+    // your ship" — is English that says "build", in a scheme where `build` has a
+    // row and therefore could never have fallen back. The two briefs were green
+    // apart and red together, which is the worst way to find this.
+    //
+    // Asking `describeBindings` first is also strictly narrower than the old
+    // regex without losing the catch: under `tap` there is no `fire` row, so a
+    // `{fire}` dropped into a tap sentence still fails here.
     for (const id of Object.values(PromptId)) {
       for (const device of ['keyboard', 'touch', 'gamepad'] as DeviceKind[]) {
         for (const mode of [FireMode.Manual, FireMode.AutoAim]) {
@@ -635,10 +641,14 @@ describe('resolvePromptText — the lesson branches on the scheme and the mode (
             const text = resolvePromptText(id, device, mode, scheme);
             const where = `${id}/${device}/${mode}/${scheme}`;
             expect(text, where).not.toMatch(/[{}]/);
-            expect(
-              unresolvedBindings(id, device, mode, scheme),
-              `${where}: the sentence asks for a binding this configuration has no row for, so it fell back to the bare verb`,
-            ).toEqual([]);
+            const rows = describeBindings(device, mode, scheme);
+            for (const action of ['fire', 'build'] as const) {
+              if (rows.some((r) => r.action === action)) continue; // has a row — cannot fall back
+              expect(
+                text,
+                `${where}: this configuration has no {${action}} row, so that word can only be the bare-verb fallback`,
+              ).not.toMatch(new RegExp(`(^|\\s)${action}(\\s|$)`));
+            }
           }
         }
       }
