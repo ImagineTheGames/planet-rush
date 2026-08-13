@@ -10,10 +10,12 @@
  * This module is deliberately **pure and DOM-free** — the trigger state machine
  * is the load-bearing, unit-tested part (each fires once; never re-fires). The
  * Pixi view in {@link ./hud} renders whatever prompt this returns; the text is
- * resolved to the active device's wording through {@link resolvePromptText},
- * which reads {@link describeBindings} — the *same* map that drives the sim — so
- * "Hold fire" becomes "Hold Left mouse" on desktop and "Hold the FIRE button"
- * on a touch phone without this module ever knowing which device is present.
+ * resolved to the player's actual configuration through {@link resolvePromptText}
+ * — the control scheme and the fire mode choose the *lesson*, and
+ * {@link describeBindings} (the *same* map that drives the sim) fills in the
+ * *key*, so "Hold fire" becomes "Hold Left mouse" on desktop and "Hold the FIRE
+ * button" on a touch phone without this module ever knowing which device is
+ * present.
  *
  * Prompts, in the order a first match teaches them (GDD §2.10, verbatim triggers;
  * (0) is a0-34's, NEW COPY awaiting the developer — see below):
@@ -24,6 +26,8 @@
  *      to spend"                                               (teaches the haul)
  *   3. "Spend ore on defense — or UPGRADE SHIP to mine and hit harder"
  *   4. "Your station is under attack — follow the arrow"
+ *   5. "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu"
+ *      (a0-33, NEW COPY awaiting the developer — see below)
  *
  * Day 1 shipped (1) and (2); day 2 lands (3) and (4) alongside stations, the
  * build wheel and the under-attack alarm, and completes (2)'s copy — there is a
@@ -58,6 +62,65 @@
  * storage scheme, and nothing here imports a browser global.
  *
  * ---------------------------------------------------------------------------
+ * THE LESSON, NOT JUST THE KEY (a0-33)
+ * ---------------------------------------------------------------------------
+ * §2.10 says the prompts are *"input-agnostic for free via the action mapping"*,
+ * and until a0-33 this file read that as: resolve the BINDING per device and per
+ * fire mode, keep one fixed sentence per prompt. That resolves the key name. It
+ * does not resolve the lesson, and `ControlScheme` appeared nowhere here at all:
+ *
+ *  - with **Auto-aim**, *"press fire"* is not the lesson — the weapon picks the
+ *    target across the full 360°, and what a player needs told is that they only
+ *    decide *when* (GDD §2.4);
+ *  - with **Tap Commander**, *"hold fire on the asteroid"* is not the gesture at
+ *    all — the scheme is *"tap a spot to fly there, tap a target to attack it …
+ *    (because a rock is just a target) an asteroid to mine it"* (GDD §2.4), and
+ *    the local pilot writes the fire for you (`@platform/tap-pilot`). There is no
+ *    button to hold.
+ *
+ * `a0-30` then made **Tap Commander and Auto-aim the first-run default on every
+ * platform**, so the fixed sentence was wrong for the configuration MOST new
+ * players are in. Copy now branches on `(scheme, mode)` — see {@link PromptCopy},
+ * which requires all three wordings so a prompt that forgets Tap Commander cannot
+ * compile — and the binding is still filled in by the action layer underneath.
+ * The layer was extended, not replaced.
+ *
+ * The scheme is read from the LIVE setting (`HudFrame.controlScheme`, which
+ * main.ts feeds from the same `controlScheme` the settings row toggles), never
+ * guessed from the device: a desktop player on Tap Commander gets Tap Commander's
+ * wording, a phone player who switched to Manual gets Manual's. Both are
+ * changeable mid-match (§2.4), and the resolve is per-frame, so **a prompt on
+ * screen when the setting changes re-words on the next frame** — deliberate: an
+ * instruction has to describe what the player can do *now*, and a stale one is
+ * the whole of this bug. Completion is untouched by a switch (it is about what
+ * the player has learned, not how they drive), so a lesson already retired stays
+ * retired and one not yet fired uses the wording in force when it fires.
+ *
+ * **New copy, flagged for the developer** (a0-33 — GDD §2.10 has words only for
+ * Sticks+Manual, so the rest are written plainly and are not ratified yet): the
+ * Auto-aim and Tap Commander wordings of MINE, the Tap Commander wording of
+ * HAUL-HOME, and the whole of the settings tip below.
+ *
+ * ---------------------------------------------------------------------------
+ * THE PROMPT THAT SAYS THE SETTINGS EXIST (a0-33)
+ * ---------------------------------------------------------------------------
+ * The developer's third ask: *"we need to teach people they can change settings
+ * to their desired preference."* §2.10 forbids a separate tutorial mode, so it is
+ * one more contextual prompt on the same terms as the others — it fires after
+ * the player has flown one full loop (MINE and HAUL-HOME both learned, so it
+ * never competes with a lesson), it names the two rows in the settings screen's
+ * own words, and it retires for good once it has been on screen long enough to
+ * read ({@link DWELL_SECONDS}), through the same {@link OnboardingMemory}.
+ *
+ * It retires on a DWELL and not on "the player opened settings" because the HUD
+ * does not know that the settings screen is up — it is a different screen, owned
+ * by the wiring layer — and a tip that waits for a screen the player may never
+ * open is a tip that nags every match forever, which is exactly what §2.10's
+ * "never appear again" forbids. The dwell counts only frames where this prompt is
+ * the one actually SHOWN (see {@link Onboarding.update}), so a siege that outranks
+ * it mid-read cannot retire it unread.
+ *
+ * ---------------------------------------------------------------------------
  * THE PROMPT THAT NAMES THE OBJECTIVE (a0-34)
  * ---------------------------------------------------------------------------
  * The four prompts above teach VERBS — mine, bank, spend, defend — and not one of
@@ -83,13 +146,23 @@
  * bots in a Free-for-All), and the codex entry behind it carries the Teams clause
  * and the tiebreak, which is the headline/paragraph split this pair is for.
  *
- * **It is scheme-agnostic on purpose.** a0-33 (in flight) branches copy by control
- * scheme where the LESSON differs — "hold fire on the rock" is not the gesture a
- * Tap Commander player has. This prompt names no gesture and no binding: it is a
- * statement of the goal, identical in every scheme, on every device, in either
- * fire mode. When the two land together it needs no `(scheme, mode)` branch — the
- * same sentence in all three slots — and it takes the last of a0-33's dwell
- * machinery it can share (see {@link DWELL_SECONDS}).
+ * **It goes through a0-33's `(scheme, mode)` branch, and lands the same sentence
+ * in every slot** *(r14-01 — a0-33 landed first; this paragraph used to promise
+ * that reconciliation and now records it)*. a0-33 branches copy where the LESSON
+ * differs — "hold fire on the rock" is not the gesture a Tap Commander player
+ * has. The objective names no gesture and no binding, so what differs is
+ * nothing: it is a statement of the goal, and the goal does not change with the
+ * scheme, the device or the fire mode. It still declares all three wordings,
+ * because {@link PromptCopy} requires them — a prompt that could omit `tap` is
+ * exactly how one silently teaches the wrong scheme — so the sentence is written
+ * three times on purpose, and the six readings that prove it are in the PR body.
+ * That is what makes it scheme-AWARE rather than scheme-blind: it resolves
+ * through {@link lessonFor} like every other prompt, and the day the objective
+ * needs a different word under Tap Commander the slot is already there.
+ *
+ * It also shares a0-33's dwell machinery rather than adding a second copy of it:
+ * a0-33's `CONTROLS_TIP_SECONDS` and this prompt's dwell are one
+ * {@link DWELL_SECONDS} table keyed by prompt, and one `dwelled` accumulator.
  *
  * **It retires on a dwell, not on an action**, because unlike the other four
  * there is nothing for the player to *do* with it: it is a thing you are told.
@@ -104,7 +177,8 @@
  * in a career, not once a match.
  *
  * **NEW COPY, flagged for the developer.** GDD §2.10 quotes four prompts and this
- * is a fifth, so its sentence is not ratified text. Its substance is (LESSONS
+ * is not one of them (a0-33's settings tip is the other addition), so its
+ * sentence is not ratified text. Its substance is (LESSONS
  * §17): the developer's own four beats — last station alive, mine ore, spend on
  * defenses / upgrade your ship, attack when you see fit — all four kept, polished
  * to one line in register 2 (§4.7: procedural, terse, present-tense imperative,
@@ -126,6 +200,11 @@
 
 import { describeBindings, FireMode } from '@platform/actions';
 import type { DeviceKind } from '@platform/actions';
+// Type-only, deliberately: `ControlScheme` is the UI's own ratified union
+// ({@link ./settings}), and importing the TYPE keeps this module's runtime graph
+// exactly as empty as it was — no screen model, no art, nothing DOM-adjacent —
+// so the trigger contract still tests headless.
+import type { ControlScheme } from './settings';
 
 // ---------------------------------------------------------------------------
 // Prompt identity and copy
@@ -152,22 +231,53 @@ export enum PromptId {
   /** "Your station is under attack — follow the arrow." The alarm's lesson: the
    *  triangle decision, made audible (GDD §2.2, §2.10). */
   UnderAttack = 'under-attack',
+  /** "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu."
+   *  The developer's third a0-33 ask, as one more contextual prompt: a player who
+   *  does not like the scheme they were seated in has to learn that the choice
+   *  exists (GDD §2.4 — both are changeable at any time). NEW COPY. */
+  Controls = 'controls',
 }
 
 /**
- * A prompt's copy as an action-tokened template. Tokens in `{braces}` name an
- * abstract action (GDD §2.4) and are resolved to the active device's phrasing by
- * {@link resolvePromptText}. A template with no token is device-agnostic as-is.
+ * A prompt's copy, as one action-tokened template **per configuration the player
+ * can actually be in** (a0-33). Tokens in `{braces}` name an abstract action (GDD
+ * §2.4) and are resolved to the active device's phrasing by
+ * {@link resolvePromptText}; a template with no token is device-agnostic as-is.
+ *
+ * All three fields are REQUIRED even where the lesson does not change, and that
+ * is the point: an optional `tap` that fell back to the stick wording is how a
+ * prompt silently teaches the wrong scheme, which is the bug a0-33 exists to fix.
+ * Writing the same sentence three times is cheap; discovering that a prompt
+ * forgot Tap Commander in a playtest is not.
  */
 interface PromptCopy {
   readonly id: PromptId;
-  readonly template: string;
+  /** **Sticks + Manual** — the player aims and holds fire. GDD §2.10's own
+   *  wording lives here, because this is the configuration it was written for. */
+  readonly manual: string;
+  /** **Sticks + Auto-aim** — same scheme, but the weapon picks the target across
+   *  the full 360°; the player only decides *when* to fire (GDD §2.4). */
+  readonly autoAim: string;
+  /** **Tap Commander** — a different gesture entirely: tap a spot to fly there,
+   *  tap a target to attack it, and the local pilot aims and fires (GDD §2.4).
+   *  One string for both fire modes: the player taps either way, so the fire mode
+   *  has nothing left to say about how a rock gets mined. */
+  readonly tap: string;
 }
 
 const PROMPT_COPY: Readonly<Record<PromptId, PromptCopy>> = {
   // NEW COPY (a0-34). No token, and none possible: the objective is not a
   // gesture, so there is no binding to name and nothing that changes with the
   // device, the fire mode or the control scheme.
+  //
+  // Which is why all three slots carry the SAME sentence (r14-01, reconciling
+  // a0-34 with a0-33's branching). It is not an exemption from the branch — this
+  // entry declares `manual`, `autoAim` and `tap` like every other, resolves
+  // through `lessonFor` like every other, and the six readings in r14-01's PR
+  // body are the six the branch produces. What the branch is FOR is a lesson
+  // whose gesture differs; the objective has no gesture, so the branch's honest
+  // answer here is the same line three times. A prompt allowed to skip the slots
+  // is a prompt that can forget Tap Commander, and that is the bug a0-33 fixed.
   //
   // GDD §1's win condition in the first three words — "the last surviving station
   // reactor", which `resolveWinner` (src/sim/match.ts) enforces as "the last team
@@ -182,16 +292,31 @@ const PROMPT_COPY: Readonly<Record<PromptId, PromptCopy>> = {
   // exclamation. It states the contract's terms and does not wish anybody luck.
   [PromptId.Objective]: {
     id: PromptId.Objective,
-    // On one line on purpose: the brief's gate counts the templates in this file
-    // by looking for an opening quote right after the key, and a wrapped
-    // assignment reads to it as a prompt that does not exist.
-    template: 'Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right',
+    // Each slot on one line on purpose: a0-34's gate counted the templates in
+    // this file by looking for an opening quote right after the key, and a
+    // wrapped assignment read to it as a prompt that does not exist.
+    manual: 'Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right',
+    autoAim: 'Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right',
+    tap: 'Be the last station standing — mine ore, build defenses, upgrade your ship, attack when you judge it right',
   },
   // `{fire}` resolves to the fire/mine binding — the wording is input-agnostic
   // via the action layer (GDD §2.10), so it reads correctly on key, pad, touch.
   [PromptId.Mine]: {
     id: PromptId.Mine,
-    template: 'Hold {fire} on the asteroid — your shots chip the rock',
+    // GDD §2.10, verbatim: the ratified sentence, for the configuration it was
+    // ratified for.
+    manual: 'Hold {fire} on the asteroid — your shots chip the rock',
+    // NEW COPY (a0-33). Auto-aim does not fire itself — the player still decides
+    // *when* (GDD §2.4) — so the press stays and the AIMING drops out. What
+    // replaces it is the thing that actually decides what gets hit under
+    // auto-aim: being near the rock. "positioning decides *what* gets hit."
+    autoAim: 'Hold {fire} near the asteroid — auto-aim does the aiming, your shots chip the rock',
+    // NEW COPY (a0-33). No `{fire}` token, because there is no press: the pilot
+    // aims and fires at whatever the tap locked (GDD §2.4, `@platform/tap-pilot`
+    // — "an asteroid is a mine: a rock is just a target"). The tail is §2.10's
+    // own, so the lesson the game turns on — your gun is your mining tool — is
+    // still the sentence's second half in every scheme.
+    tap: 'Tap the asteroid to mine it — your shots chip the rock',
   },
   // GDD §2.10's copy, verbatim post-amendment: "Hold full — fly into your
   // collection field to bank, then press E to spend" (amended 2026-07-27 —
@@ -203,19 +328,53 @@ const PROMPT_COPY: Readonly<Record<PromptId, PromptCopy>> = {
   // "Held ore is not safe ore" (GDD §2.3).
   [PromptId.HaulHome]: {
     id: PromptId.HaulHome,
-    template: 'Hold full — fly into your collection field to bank, then press {build} to spend',
+    // a0-25's amended sentence, untouched, in both stick modes: flying home is
+    // flying home whether the weapon aims itself or not.
+    manual: 'Hold full — fly into your collection field to bank, then press {build} to spend',
+    autoAim: 'Hold full — fly into your collection field to bank, then press {build} to spend',
+    // NEW COPY (a0-33). "Fly into" is not the gesture in this scheme — you *tap*
+    // your own station and the pilot flies to its collection field and holds
+    // there (GDD §2.4; `@platform/tap-pilot` `standoff`). The mechanic the
+    // 2026-07-27 amendment ratified is unchanged and still named in so many
+    // words: the hold drains inside the collection field, no docking, no
+    // parking. `{build}` survives the scheme intact — Tap Commander leaves the
+    // build binding as the devices wrote it (`src/main.ts` `sampleInput`), so E
+    // / Y / △ / BUILD really does still open the wheel here.
+    tap: 'Hold full — tap your own station to bank in its collection field, then press {build} to spend',
   },
   // No token: this one fires *while the wheel is open*, so the bindings are on
   // screen already. It names UPGRADE SHIP in the wheel's own words, because the
-  // whole point is that the player finds the segment they'd otherwise miss.
+  // whole point is that the player finds the segment they'd otherwise miss. The
+  // wheel is one screen with one set of words in every scheme — a tap-commander
+  // player opens it by tapping their station instead of pressing a key, and then
+  // reads the same five segments — so all three wordings are the same sentence.
   [PromptId.Spend]: {
     id: PromptId.Spend,
-    template: 'Spend ore on defense — or UPGRADE SHIP to mine and hit harder',
+    manual: 'Spend ore on defense — or UPGRADE SHIP to mine and hit harder',
+    autoAim: 'Spend ore on defense — or UPGRADE SHIP to mine and hit harder',
+    tap: 'Spend ore on defense — or UPGRADE SHIP to mine and hit harder',
   },
-  // No token: the arrow is the instruction, and it is device-agnostic already.
+  // No token: the arrow is the instruction, and it is device-agnostic already —
+  // and scheme-agnostic too. Following it is flying, which every scheme does.
   [PromptId.UnderAttack]: {
     id: PromptId.UnderAttack,
-    template: 'Your station is under attack — follow the arrow',
+    manual: 'Your station is under attack — follow the arrow',
+    autoAim: 'Your station is under attack — follow the arrow',
+    tap: 'Your station is under attack — follow the arrow',
+  },
+  // NEW COPY (a0-33) — the developer's third ask, and the same in every
+  // configuration on purpose: it is about the setting, not about the seat, and
+  // the player it most needs to reach is the one who does not like the scheme
+  // they are in. It names the two rows in the settings screen's own words
+  // (`./settings` — `CONTROLS`, `FIRE MODE`), the same discipline that makes the
+  // SPEND prompt say UPGRADE SHIP; and it names both doors to them, because
+  // §2.4 makes both changeable "at any time from settings or the pause menu".
+  // No token: reaching a menu is a plain tap/click on every device (GDD §2.4).
+  [PromptId.Controls]: {
+    id: PromptId.Controls,
+    manual: 'Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu',
+    autoAim: 'Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu',
+    tap: 'Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu',
   },
 };
 
@@ -230,6 +389,14 @@ const PROMPT_COPY: Readonly<Record<PromptId, PromptCopy>> = {
  * learning — a player told to hold fire on a rock before anyone has said what
  * winning is has been handed a chore. It does not outrank the siege: a station
  * burning right now is not the moment for a mission statement.
+ *
+ * CONTROLS comes last, and last by a mile: every other prompt teaches the game,
+ * and this one teaches the settings screen. It may never take the screen from a
+ * lesson (a0-33).
+ *
+ * So the whole order reads goal → verbs → settings, with the siege above all of
+ * it: what you are trying to do, then how to do it, then how to change the way
+ * you do it (r14-01, where a0-33's tip and a0-34's objective met).
  */
 const PROMPT_ORDER: readonly PromptId[] = [
   PromptId.UnderAttack,
@@ -237,6 +404,7 @@ const PROMPT_ORDER: readonly PromptId[] = [
   PromptId.Mine,
   PromptId.HaulHome,
   PromptId.Spend,
+  PromptId.Controls,
 ];
 
 // ---------------------------------------------------------------------------
@@ -252,14 +420,44 @@ function bindingPhrase(action: 'fire' | 'build', device: DeviceKind, mode: FireM
 }
 
 /**
- * Resolve a prompt's `{token}` copy into the active device's wording. `{fire}`
- * and `{build}` become that device's binding (e.g. "Left mouse", "Right
- * trigger", "FIRE button") — the input-agnostic wording GDD §2.10 mandates,
- * sourced from the same action map that drives the sim so it can never drift.
+ * The lesson this prompt teaches a player in THIS configuration (a0-33).
+ *
+ * The scheme decides first and the fire mode second, because that is the order
+ * the two settings matter in: Tap Commander replaces the sticks outright (the
+ * pilot writes thrust, aim AND fire), so once you are in it the fire mode has
+ * nothing left to say about how a rock is mined.
  */
-export function resolvePromptText(id: PromptId, device: DeviceKind, mode: FireMode): string {
-  const { template } = PROMPT_COPY[id];
-  return template
+function lessonFor(copy: PromptCopy, mode: FireMode, scheme: ControlScheme): string {
+  if (scheme === 'tap') return copy.tap;
+  return mode === FireMode.AutoAim ? copy.autoAim : copy.manual;
+}
+
+/**
+ * Resolve a prompt to the sentence this player should read — the lesson for
+ * their control scheme and fire mode, with `{token}`s filled in from their
+ * device's real bindings.
+ *
+ * Two layers, and both are load-bearing (a0-33):
+ *
+ *  1. **the lesson**, chosen by `(scheme, mode)` — what the player actually does
+ *     (tap the rock / hold fire near it / hold fire on it);
+ *  2. **the binding**, chosen by `(device, mode)` — `{fire}` and `{build}` become
+ *     "Left mouse", "Right trigger", "FIRE button", "E", "BUILD", read from the
+ *     same action map that drives the sim so the copy can never drift from the
+ *     real controls (GDD §2.10's input-agnostic rule, §2.4's action layer).
+ *
+ * `scheme` is a required argument rather than an optional one that defaults: the
+ * default scheme moved under this module's feet once already (a0-30 made it Tap
+ * Commander on every platform), and a caller that forgets it would go on quietly
+ * teaching whichever scheme this file guessed — which is the bug, not the fix.
+ */
+export function resolvePromptText(
+  id: PromptId,
+  device: DeviceKind,
+  mode: FireMode,
+  scheme: ControlScheme,
+): string {
+  return lessonFor(PROMPT_COPY[id], mode, scheme)
     .replace('{fire}', () => bindingPhrase('fire', device, mode))
     .replace('{build}', () => bindingPhrase('build', device, mode));
 }
@@ -301,18 +499,26 @@ export interface OnboardingSignals {
   readonly underAttack?: boolean;
   /**
    * Elapsed match time in seconds (`world.time`, already on `HudFrame`) — the
-   * clock the OBJECTIVE prompt's dwell is measured on (a0-34).
+   * clock every dwell is measured on: a0-33's CONTROLS tip and a0-34's OBJECTIVE
+   * prompt both retire on being read, and this is what "read" is counted in.
    *
    * Handed in rather than read: no timers, no `Date.now()`, nothing this module
-   * cannot be given by a test. Optional, and **absent means a prompt that retires
-   * on a dwell never becomes eligible at all** — see {@link DWELL_SECONDS} for
-   * why that is the safe direction rather than the obvious one.
+   * cannot be given by a test. Optional — and what "absent" means depends on
+   * where the prompt sits in {@link PROMPT_ORDER}, because the safe direction to
+   * fail is not the same at both ends of it (see {@link DWELL_SECONDS}):
+   *
+   *  - **OBJECTIVE is withheld entirely.** It sits near the TOP, so one that
+   *    never retires would sit on the mining lesson for the whole match.
+   *  - **CONTROLS stays up.** It sits LAST, so it blocks nothing; showing it and
+   *    not retiring it beats never mentioning that the settings exist.
+   *
+   * Every real feed carries `time`: it is what the wave clock is drawn from.
    */
   readonly time?: number;
 }
 
 // ---------------------------------------------------------------------------
-// Prompts that retire on being READ (a0-34)
+// Prompts that retire on being READ (a0-33's CONTROLS tip, a0-34's OBJECTIVE)
 // ---------------------------------------------------------------------------
 
 /**
@@ -331,18 +537,30 @@ export interface OnboardingSignals {
  * {@link Onboarding.update}), so a siege taking the band mid-sentence cannot
  * retire it unread.
  *
- * **Why no clock means no prompt.** A dwell-retired prompt with no clock would
- * never retire, and OBJECTIVE sits near the top of {@link PROMPT_ORDER} — it would
- * sit on the mining lesson for the rest of the match. Withholding it instead
- * leaves such a caller exactly where it is today, which is the failure worth
- * having. Every real feed carries `time`: it is what the wave clock is drawn from.
+ * CONTROLS has no such thing either, and for the same shape of reason (a0-33):
+ * the lesson is that the SETTINGS SCREEN exists, and that screen is a different
+ * screen the HUD does not see. Eight seconds again — long enough to read a
+ * one-line sentence twice on a phone, short enough to be gone before the player
+ * wants the space back.
  *
- * (a0-33's CONTROLS tip retires on a dwell for the same shape of reason — nothing
- * to observe, because the settings screen is a different screen. When the two
- * branches meet, that prompt is one more row in this table.)
+ * **Two prompts, one table** *(r14-01)*. a0-33 shipped this as a lone
+ * `CONTROLS_TIP_SECONDS` constant and a `controlsSeconds` counter; a0-34 shipped
+ * it as a table keyed by prompt, written that way precisely so the two would fold
+ * into one mechanism instead of two that drift. This is that fold: one table, one
+ * `dwelled` accumulator, one retirement rule.
+ *
+ * **Why no clock does not mean the same thing for both.** A dwell-retired prompt
+ * with no clock never retires, and what that costs depends on where it sits in
+ * {@link PROMPT_ORDER}. OBJECTIVE is near the TOP, so an un-retiring one would sit
+ * on the mining lesson for the rest of the match — it is therefore withheld
+ * outright when no clock arrives (see {@link Onboarding.isTriggered}), leaving
+ * such a caller exactly where it was before a0-34. CONTROLS is LAST, so an
+ * un-retiring one blocks no lesson at all, and a0-33's choice to show it anyway
+ * stands. Every real feed carries `time`: it is what the wave clock is drawn from.
  */
 const DWELL_SECONDS: Partial<Readonly<Record<PromptId, number>>> = {
   [PromptId.Objective]: 8,
+  [PromptId.Controls]: 8,
 };
 
 // ---------------------------------------------------------------------------
@@ -465,10 +683,11 @@ export class Onboarding {
   /** Sticky: the alarm has sounded at least once since it last fell silent. */
   private wasUnderAttack = false;
   /** The prompt {@link update} returned last tick — the one the player was
-   *  actually reading, which is what a dwell counts (a0-34). */
+   *  actually reading, which is what a dwell counts (a0-33, a0-34). */
   private lastActive: PromptId | null = null;
-  /** Seconds each dwell-retired prompt has been on screen, summed over the frames
-   *  it was the shown prompt. At its {@link DWELL_SECONDS} it is read, and done. */
+  /** Seconds each dwell-retired prompt (OBJECTIVE, CONTROLS) has been on screen,
+   *  summed over the frames it was the shown prompt. At its {@link DWELL_SECONDS}
+   *  it is read, and done. One map for both, not a counter each (r14-01). */
   private readonly dwelled = new Map<PromptId, number>();
   /** Last tick's `signals.time`, for the delta. `null` until a tick carries a
    *  clock, so the first clocked frame contributes nothing rather than `time`. */
@@ -483,12 +702,14 @@ export class Onboarding {
     const full = signals.cargoCap > 0 && signals.cargo >= signals.cargoCap;
     const underAttack = signals.underAttack === true;
 
-    // --- The dwell of whatever was on screen last tick (a0-34) ---------------
+    // --- The dwell of whatever was on screen last tick (a0-33, a0-34) --------
     // Counted on the prompt that was SHOWN, not on the one eligible now: a siege
     // takes the band away mid-sentence (UNDER-ATTACK outranks everything), and a
     // prompt that expires while it is off screen is a prompt nobody read. A
-    // backwards clock contributes nothing, so a rematch resetting `world.time` to
-    // zero cannot retire one either.
+    // backwards or absent clock contributes nothing, so a rematch resetting
+    // `world.time` to zero cannot retire one either. Every prompt with a
+    // DWELL_SECONDS row goes through here — the CONTROLS tip and the OBJECTIVE
+    // by one rule, not two (r14-01).
     if (signals.time !== undefined) {
       const shown = this.lastActive;
       if (this.lastTime !== null && shown !== null && DWELL_SECONDS[shown] !== undefined) {
@@ -516,9 +737,10 @@ export class Onboarding {
     // and then fell silent. Retiring it while it is still sounding would pull
     // the instruction off screen mid-lesson.
     if (this.wasUnderAttack && !underAttack) this.completed.add(PromptId.UnderAttack);
-    // OBJECTIVE (and any other dwell-retired prompt) is done once it has been on
-    // screen long enough to READ (a0-34). There is no player action to watch for:
-    // it names the goal, and being read is the whole of the lesson.
+    // OBJECTIVE and CONTROLS are done once they have been on screen long enough
+    // to READ (a0-34, a0-33). Neither has a player action to watch for: one names
+    // the goal, and being read is the whole of the lesson; the other names a
+    // screen the HUD cannot see the player open.
     for (const [id, seconds] of this.dwelled) {
       const needed = DWELL_SECONDS[id];
       if (needed !== undefined && seconds >= needed) this.completed.add(id);
@@ -570,6 +792,14 @@ export class Onboarding {
       // taunt-tap (GDD §2.2) — see {@link ../ui/alarm}.
       case PromptId.UnderAttack:
         return signals.underAttack === true;
+      // The settings tip (a0-33). Its trigger is the player having flown one
+      // whole loop — mined, and hauled a full hold home — because by then they
+      // have felt the scheme they were seated in and know whether they like it,
+      // and because until then there is always a real lesson that should have
+      // the band instead. It has no world condition of its own: once the loop is
+      // learned it is eligible until the dwell retires it.
+      case PromptId.Controls:
+        return this.completed.has(PromptId.Mine) && this.completed.has(PromptId.HaulHome);
     }
   }
 

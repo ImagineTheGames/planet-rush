@@ -2182,6 +2182,10 @@ async function boot(): Promise<void> {
     time: 0,
     device: activeDevice,
     fireMode,
+    // The seated scheme, from the same `controlScheme` the CONTROLS row toggles
+    // — the onboarding prompt's LESSON reads it (a0-33): in Tap Commander, which
+    // a0-30 made the default everywhere, a rock is mined by tapping it.
+    controlScheme,
     isTouch,
     nearAsteroid: false,
   };
@@ -3510,6 +3514,10 @@ async function boot(): Promise<void> {
     hudFrame.time = world.time;
     hudFrame.device = activeDevice;
     hudFrame.fireMode = fireMode;
+    // Re-read every frame beside the fire mode, because both are changeable
+    // mid-match from settings and the pause menu (GDD §2.4) and the prompt on
+    // screen has to describe the scheme the player is in NOW (a0-33).
+    hudFrame.controlScheme = controlScheme;
     hudFrame.isTouch = isTouch;
     hudFrame.owner = LOCAL_PLAYER;
     hudFrame.collapsed = isCollapsed(world);
@@ -4336,6 +4344,13 @@ async function boot(): Promise<void> {
        *  can state which wording it is looking at rather than inferring it. */
       device(): DeviceKind {
         return activeDevice;
+      },
+      /** The seated control scheme this frame (a0-33). The device chooses the
+       *  key inside the sentence; the SCHEME chooses the sentence, and since
+       *  a0-30 a fresh profile is seated in Tap Commander on every platform — so
+       *  a capture that did not state this would not say which lesson it read. */
+      scheme(): ControlScheme {
+        return controlScheme;
       },
     };
     try {

@@ -58,6 +58,7 @@ import { ShipClass } from '@shared/types';
 import type { PlayerId } from '@shared/types';
 import { Onboarding, oreWasSpent, resolvePromptText } from './onboarding';
 import type { OnboardingMemory, SpendFacts } from './onboarding';
+import type { ControlScheme } from './settings';
 import { computeWaveClock, formatClock } from './wave-clock';
 import { oreHudModel, oreFlashOn } from './ore-hud';
 import { oreHoldModel } from './ore-hold';
@@ -230,6 +231,18 @@ export interface HudFrame {
   readonly device: DeviceKind;
   /** Manual / Auto-aim — morphs the strip + prompt wording (GDD §2.4). */
   readonly fireMode: FireMode;
+  /**
+   * The seated control scheme — Tap Commander or the sticks (GDD §2.4). It picks
+   * the onboarding prompt's LESSON, where `fireMode` and `device` pick the key
+   * inside it (a0-33): in Tap Commander a rock is mined by tapping it, so a
+   * prompt that says "hold fire" is teaching a gesture this player does not have.
+   *
+   * Required, and beside the other two on purpose. It is the live setting — the
+   * same value the CONTROLS row toggles, fed straight through by `src/main.ts` —
+   * never a guess from the device, because since a0-30 a desktop defaults to Tap
+   * Commander too.
+   */
+  readonly controlScheme: ControlScheme;
   /** Touch build: the strip is hidden and prompts get touch wording (GDD §2.4). */
   readonly isTouch: boolean;
   /** An asteroid is within weapon range — the mine prompt's trigger (GDD §2.10). */
@@ -1950,10 +1963,12 @@ export class Hud extends Container {
       // pressed" (u15-01 half B).
       hasSpent: this.hasSpent,
       underAttack,
-      // Match time, for the OBJECTIVE prompt's dwell (a0-34): it teaches the win
-      // condition, so there is no player action that retires it — it retires on
+      // Match time, for both dwell-retired prompts (a0-33's CONTROLS tip and
+      // a0-34's OBJECTIVE): each teaches something no player action can confirm —
+      // that the settings screen exists, and what winning is — so each retires on
       // having been on screen long enough to read. The same `world.time` the wave
-      // clock is drawn from; onboarding owns no timer of its own.
+      // clock is drawn from, so there is one clock in the HUD and onboarding owns
+      // no timer of its own.
       time: frame.time,
     });
 
@@ -1962,8 +1977,17 @@ export class Hud extends Container {
       return;
     }
 
-    // Input-agnostic wording via the action layer (GDD §2.10).
-    this.promptText.text = resolvePromptText(active, frame.device, frame.fireMode);
+    // The lesson from the live settings, the key from the action layer (a0-33,
+    // GDD §2.10). Resolved every frame off the frame's own values, so a scheme
+    // or fire-mode switch mid-match re-words the prompt that is on screen on the
+    // very next frame — an instruction has to describe what the player can do
+    // *now*, and the settings are changeable at any time (GDD §2.4).
+    this.promptText.text = resolvePromptText(
+      active,
+      frame.device,
+      frame.fireMode,
+      frame.controlScheme,
+    );
     // Thumb-scale: wrap rather than run off the side of a phone. "Hold the FIRE
     // button on the asteroid — your shots chip the rock" is ~440 px on one line, which
     // is wider than a 390 px portrait screen; a prompt the player can't read is a

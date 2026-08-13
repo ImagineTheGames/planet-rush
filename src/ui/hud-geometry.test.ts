@@ -88,6 +88,7 @@ import {
 import type { UpgradeLadder, UpgradeWheelSignals } from './upgrade-wheel';
 import { ShipClass } from '@shared/types';
 import { PromptId, resolvePromptText } from './onboarding';
+import type { ControlScheme } from './settings';
 import { WAVE_NAMES } from './wave-clock';
 import { FireMode } from '@platform/actions';
 import type { DeviceKind } from '@platform/actions';
@@ -603,14 +604,26 @@ describe('onboarding placement', () => {
    * layer for every device and both fire modes — because `{fire}` and `{build}`
    * are what make one template four strings of different lengths, and the brief
    * asks for the longest one in `./onboarding`, not the one in the screenshot.
+   *
+   * **Both control schemes too, since a0-33**: the copy branches on the seated
+   * scheme now, and Tap Commander's wordings are the longest the game authors
+   * ("Hold full — tap your own station to bank in its collection field, then
+   * press BUILD to spend"). A sweep that only knew the stick sentences would be
+   * measuring a screen no defaulted player is on.
    */
   const AUTHORED_PROMPTS: readonly { label: string; text: string }[] = (() => {
     const out: { label: string; text: string }[] = [];
     const devices: DeviceKind[] = ['keyboard', 'gamepad', 'touch'];
+    const schemes: ControlScheme[] = ['sticks', 'tap'];
     for (const id of Object.values(PromptId)) {
       for (const device of devices) {
         for (const mode of [FireMode.Manual, FireMode.AutoAim]) {
-          out.push({ label: `${id}/${device}/${mode}`, text: resolvePromptText(id, device, mode) });
+          for (const scheme of schemes) {
+            out.push({
+              label: `${id}/${device}/${mode}/${scheme}`,
+              text: resolvePromptText(id, device, mode, scheme),
+            });
+          }
         }
       }
     }
