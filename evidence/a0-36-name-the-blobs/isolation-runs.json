@@ -1,0 +1,1644 @@
+[
+  {
+    "mapId": "oval",
+    "view": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "dpr": 2,
+    "uiHidden": [
+      "(unlabelled)",
+      "touch-visuals",
+      "fullscreen-reenter",
+      "(unlabelled)",
+      "(unlabelled)",
+      "(unlabelled)"
+    ],
+    "layers": [
+      {
+        "label": "void-ground",
+        "path": "game-root/void-backdrop/void-ground",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-nebula-plasmaReef",
+        "path": "game-root/void-backdrop/void-nebula-plasmaReef",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-deep",
+        "path": "game-root/void-backdrop/void-stars-deep",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-mid",
+        "path": "game-root/void-backdrop/void-stars-mid",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-near",
+        "path": "game-root/void-backdrop/void-stars-near",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "boundary",
+        "path": "game-root/ot/boundary",
+        "kids": 1,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "atmosphere",
+        "path": "game-root/ot/atmosphere",
+        "kids": 1,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "stations",
+        "path": "game-root/ot/stations",
+        "kids": 16,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "turrets",
+        "path": "game-root/ot/turrets",
+        "kids": 4,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "asteroids",
+        "path": "game-root/ot/asteroids",
+        "kids": 6,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "chunks",
+        "path": "game-root/ot/chunks",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "muzzles",
+        "path": "game-root/ot/muzzles",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "impacts",
+        "path": "game-root/ot/impacts",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "ships",
+        "path": "game-root/ot/ships",
+        "kids": 8,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "shots",
+        "path": "game-root/ot/shots",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "vfx-matter",
+        "path": "game-root/vfx/vfx-matter",
+        "kids": 22,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "vfx-light",
+        "path": "game-root/vfx/vfx-light",
+        "kids": 20,
+        "visible": true,
+        "toggled": 1
+      }
+    ]
+  },
+  {
+    "mapId": "oval",
+    "view": "phone",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "dpr": 3,
+    "uiHidden": [
+      "(unlabelled)",
+      "touch-visuals",
+      "fullscreen-reenter",
+      "(unlabelled)",
+      "(unlabelled)",
+      "(unlabelled)"
+    ],
+    "layers": [
+      {
+        "label": "void-ground",
+        "path": "game-root/void-backdrop/void-ground",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-nebula-plasmaReef",
+        "path": "game-root/void-backdrop/void-nebula-plasmaReef",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-deep",
+        "path": "game-root/void-backdrop/void-stars-deep",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-mid",
+        "path": "game-root/void-backdrop/void-stars-mid",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-near",
+        "path": "game-root/void-backdrop/void-stars-near",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "boundary",
+        "path": "game-root/ot/boundary",
+        "kids": 1,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "atmosphere",
+        "path": "game-root/ot/atmosphere",
+        "kids": 1,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "stations",
+        "path": "game-root/ot/stations",
+        "kids": 16,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "turrets",
+        "path": "game-root/ot/turrets",
+        "kids": 4,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "asteroids",
+        "path": "game-root/ot/asteroids",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "chunks",
+        "path": "game-root/ot/chunks",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "muzzles",
+        "path": "game-root/ot/muzzles",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "impacts",
+        "path": "game-root/ot/impacts",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "ships",
+        "path": "game-root/ot/ships",
+        "kids": 8,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "shots",
+        "path": "game-root/ot/shots",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "vfx-matter",
+        "path": "game-root/vfx/vfx-matter",
+        "kids": 22,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "vfx-light",
+        "path": "game-root/vfx/vfx-light",
+        "kids": 20,
+        "visible": true,
+        "toggled": 1
+      }
+    ]
+  },
+  {
+    "mapId": "diamond",
+    "view": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "dpr": 2,
+    "uiHidden": [
+      "(unlabelled)",
+      "touch-visuals",
+      "fullscreen-reenter",
+      "(unlabelled)",
+      "(unlabelled)",
+      "(unlabelled)"
+    ],
+    "layers": [
+      {
+        "label": "void-ground",
+        "path": "game-root/void-backdrop/void-ground",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-nebula-patinaDrift",
+        "path": "game-root/void-backdrop/void-nebula-patinaDrift",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-deep",
+        "path": "game-root/void-backdrop/void-stars-deep",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-mid",
+        "path": "game-root/void-backdrop/void-stars-mid",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-near",
+        "path": "game-root/void-backdrop/void-stars-near",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "boundary",
+        "path": "game-root/ot/boundary",
+        "kids": 1,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "atmosphere",
+        "path": "game-root/ot/atmosphere",
+        "kids": 1,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "stations",
+        "path": "game-root/ot/stations",
+        "kids": 16,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "turrets",
+        "path": "game-root/ot/turrets",
+        "kids": 4,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "asteroids",
+        "path": "game-root/ot/asteroids",
+        "kids": 12,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "chunks",
+        "path": "game-root/ot/chunks",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "muzzles",
+        "path": "game-root/ot/muzzles",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "impacts",
+        "path": "game-root/ot/impacts",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "ships",
+        "path": "game-root/ot/ships",
+        "kids": 8,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "shots",
+        "path": "game-root/ot/shots",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "vfx-matter",
+        "path": "game-root/vfx/vfx-matter",
+        "kids": 22,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "vfx-light",
+        "path": "game-root/vfx/vfx-light",
+        "kids": 20,
+        "visible": true,
+        "toggled": 1
+      }
+    ]
+  },
+  {
+    "mapId": "diamond",
+    "view": "phone",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "dpr": 3,
+    "uiHidden": [
+      "(unlabelled)",
+      "touch-visuals",
+      "fullscreen-reenter",
+      "(unlabelled)",
+      "(unlabelled)",
+      "(unlabelled)"
+    ],
+    "layers": [
+      {
+        "label": "void-ground",
+        "path": "game-root/void-backdrop/void-ground",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-nebula-patinaDrift",
+        "path": "game-root/void-backdrop/void-nebula-patinaDrift",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-deep",
+        "path": "game-root/void-backdrop/void-stars-deep",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-mid",
+        "path": "game-root/void-backdrop/void-stars-mid",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-near",
+        "path": "game-root/void-backdrop/void-stars-near",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "boundary",
+        "path": "game-root/ot/boundary",
+        "kids": 1,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "atmosphere",
+        "path": "game-root/ot/atmosphere",
+        "kids": 1,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "stations",
+        "path": "game-root/ot/stations",
+        "kids": 16,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "turrets",
+        "path": "game-root/ot/turrets",
+        "kids": 4,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "asteroids",
+        "path": "game-root/ot/asteroids",
+        "kids": 12,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "chunks",
+        "path": "game-root/ot/chunks",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "muzzles",
+        "path": "game-root/ot/muzzles",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "impacts",
+        "path": "game-root/ot/impacts",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "ships",
+        "path": "game-root/ot/ships",
+        "kids": 8,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "shots",
+        "path": "game-root/ot/shots",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "vfx-matter",
+        "path": "game-root/vfx/vfx-matter",
+        "kids": 22,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "vfx-light",
+        "path": "game-root/vfx/vfx-light",
+        "kids": 20,
+        "visible": true,
+        "toggled": 1
+      }
+    ]
+  },
+  {
+    "mapId": "line",
+    "view": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "dpr": 2,
+    "uiHidden": [
+      "(unlabelled)",
+      "touch-visuals",
+      "fullscreen-reenter",
+      "(unlabelled)",
+      "(unlabelled)",
+      "(unlabelled)"
+    ],
+    "layers": [
+      {
+        "label": "void-ground",
+        "path": "game-root/void-backdrop/void-ground",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-nebula-deepEmber",
+        "path": "game-root/void-backdrop/void-nebula-deepEmber",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-deep",
+        "path": "game-root/void-backdrop/void-stars-deep",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-mid",
+        "path": "game-root/void-backdrop/void-stars-mid",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-near",
+        "path": "game-root/void-backdrop/void-stars-near",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "boundary",
+        "path": "game-root/ot/boundary",
+        "kids": 1,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "atmosphere",
+        "path": "game-root/ot/atmosphere",
+        "kids": 1,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "stations",
+        "path": "game-root/ot/stations",
+        "kids": 16,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "turrets",
+        "path": "game-root/ot/turrets",
+        "kids": 4,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "asteroids",
+        "path": "game-root/ot/asteroids",
+        "kids": 13,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "chunks",
+        "path": "game-root/ot/chunks",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "muzzles",
+        "path": "game-root/ot/muzzles",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "impacts",
+        "path": "game-root/ot/impacts",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "ships",
+        "path": "game-root/ot/ships",
+        "kids": 8,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "shots",
+        "path": "game-root/ot/shots",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "vfx-matter",
+        "path": "game-root/vfx/vfx-matter",
+        "kids": 22,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "vfx-light",
+        "path": "game-root/vfx/vfx-light",
+        "kids": 20,
+        "visible": true,
+        "toggled": 1
+      }
+    ]
+  },
+  {
+    "mapId": "line",
+    "view": "phone",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "dpr": 3,
+    "uiHidden": [
+      "(unlabelled)",
+      "touch-visuals",
+      "fullscreen-reenter",
+      "(unlabelled)",
+      "(unlabelled)",
+      "(unlabelled)"
+    ],
+    "layers": [
+      {
+        "label": "void-ground",
+        "path": "game-root/void-backdrop/void-ground",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-nebula-deepEmber",
+        "path": "game-root/void-backdrop/void-nebula-deepEmber",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-deep",
+        "path": "game-root/void-backdrop/void-stars-deep",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-mid",
+        "path": "game-root/void-backdrop/void-stars-mid",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-near",
+        "path": "game-root/void-backdrop/void-stars-near",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "boundary",
+        "path": "game-root/ot/boundary",
+        "kids": 1,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "atmosphere",
+        "path": "game-root/ot/atmosphere",
+        "kids": 1,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "stations",
+        "path": "game-root/ot/stations",
+        "kids": 16,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "turrets",
+        "path": "game-root/ot/turrets",
+        "kids": 4,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "asteroids",
+        "path": "game-root/ot/asteroids",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "chunks",
+        "path": "game-root/ot/chunks",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "muzzles",
+        "path": "game-root/ot/muzzles",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "impacts",
+        "path": "game-root/ot/impacts",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "ships",
+        "path": "game-root/ot/ships",
+        "kids": 8,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "shots",
+        "path": "game-root/ot/shots",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "vfx-matter",
+        "path": "game-root/vfx/vfx-matter",
+        "kids": 22,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "vfx-light",
+        "path": "game-root/vfx/vfx-light",
+        "kids": 20,
+        "visible": true,
+        "toggled": 1
+      }
+    ]
+  },
+  {
+    "mapId": "crescents",
+    "view": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "dpr": 2,
+    "uiHidden": [
+      "(unlabelled)",
+      "touch-visuals",
+      "fullscreen-reenter",
+      "(unlabelled)",
+      "(unlabelled)",
+      "(unlabelled)"
+    ],
+    "layers": [
+      {
+        "label": "void-ground",
+        "path": "game-root/void-backdrop/void-ground",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-nebula-ironVeil",
+        "path": "game-root/void-backdrop/void-nebula-ironVeil",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-deep",
+        "path": "game-root/void-backdrop/void-stars-deep",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-mid",
+        "path": "game-root/void-backdrop/void-stars-mid",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-near",
+        "path": "game-root/void-backdrop/void-stars-near",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "boundary",
+        "path": "game-root/ot/boundary",
+        "kids": 1,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "atmosphere",
+        "path": "game-root/ot/atmosphere",
+        "kids": 1,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "stations",
+        "path": "game-root/ot/stations",
+        "kids": 16,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "turrets",
+        "path": "game-root/ot/turrets",
+        "kids": 4,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "asteroids",
+        "path": "game-root/ot/asteroids",
+        "kids": 22,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "chunks",
+        "path": "game-root/ot/chunks",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "muzzles",
+        "path": "game-root/ot/muzzles",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "impacts",
+        "path": "game-root/ot/impacts",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "ships",
+        "path": "game-root/ot/ships",
+        "kids": 8,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "shots",
+        "path": "game-root/ot/shots",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "vfx-matter",
+        "path": "game-root/vfx/vfx-matter",
+        "kids": 22,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "vfx-light",
+        "path": "game-root/vfx/vfx-light",
+        "kids": 20,
+        "visible": true,
+        "toggled": 1
+      }
+    ]
+  },
+  {
+    "mapId": "crescents",
+    "view": "phone",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "dpr": 3,
+    "uiHidden": [
+      "(unlabelled)",
+      "touch-visuals",
+      "fullscreen-reenter",
+      "(unlabelled)",
+      "(unlabelled)",
+      "(unlabelled)"
+    ],
+    "layers": [
+      {
+        "label": "void-ground",
+        "path": "game-root/void-backdrop/void-ground",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-nebula-ironVeil",
+        "path": "game-root/void-backdrop/void-nebula-ironVeil",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-deep",
+        "path": "game-root/void-backdrop/void-stars-deep",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-mid",
+        "path": "game-root/void-backdrop/void-stars-mid",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-near",
+        "path": "game-root/void-backdrop/void-stars-near",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "boundary",
+        "path": "game-root/ot/boundary",
+        "kids": 1,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "atmosphere",
+        "path": "game-root/ot/atmosphere",
+        "kids": 1,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "stations",
+        "path": "game-root/ot/stations",
+        "kids": 16,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "turrets",
+        "path": "game-root/ot/turrets",
+        "kids": 4,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "asteroids",
+        "path": "game-root/ot/asteroids",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "chunks",
+        "path": "game-root/ot/chunks",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "muzzles",
+        "path": "game-root/ot/muzzles",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "impacts",
+        "path": "game-root/ot/impacts",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "ships",
+        "path": "game-root/ot/ships",
+        "kids": 8,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "shots",
+        "path": "game-root/ot/shots",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "vfx-matter",
+        "path": "game-root/vfx/vfx-matter",
+        "kids": 22,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "vfx-light",
+        "path": "game-root/vfx/vfx-light",
+        "kids": 20,
+        "visible": true,
+        "toggled": 1
+      }
+    ]
+  },
+  {
+    "mapId": "compass",
+    "view": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "dpr": 2,
+    "uiHidden": [
+      "(unlabelled)",
+      "touch-visuals",
+      "fullscreen-reenter",
+      "(unlabelled)",
+      "(unlabelled)",
+      "(unlabelled)"
+    ],
+    "layers": [
+      {
+        "label": "void-ground",
+        "path": "game-root/void-backdrop/void-ground",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-deep",
+        "path": "game-root/void-backdrop/void-stars-deep",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-mid",
+        "path": "game-root/void-backdrop/void-stars-mid",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-near",
+        "path": "game-root/void-backdrop/void-stars-near",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-nebula-coalsack",
+        "path": "game-root/void-backdrop/void-nebula-coalsack",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "boundary",
+        "path": "game-root/ot/boundary",
+        "kids": 1,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "atmosphere",
+        "path": "game-root/ot/atmosphere",
+        "kids": 1,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "stations",
+        "path": "game-root/ot/stations",
+        "kids": 16,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "turrets",
+        "path": "game-root/ot/turrets",
+        "kids": 4,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "asteroids",
+        "path": "game-root/ot/asteroids",
+        "kids": 33,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "chunks",
+        "path": "game-root/ot/chunks",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "muzzles",
+        "path": "game-root/ot/muzzles",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "impacts",
+        "path": "game-root/ot/impacts",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "ships",
+        "path": "game-root/ot/ships",
+        "kids": 8,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "shots",
+        "path": "game-root/ot/shots",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "vfx-matter",
+        "path": "game-root/vfx/vfx-matter",
+        "kids": 22,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "vfx-light",
+        "path": "game-root/vfx/vfx-light",
+        "kids": 20,
+        "visible": true,
+        "toggled": 1
+      }
+    ]
+  },
+  {
+    "mapId": "compass",
+    "view": "phone",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "dpr": 3,
+    "uiHidden": [
+      "(unlabelled)",
+      "touch-visuals",
+      "fullscreen-reenter",
+      "(unlabelled)",
+      "(unlabelled)",
+      "(unlabelled)"
+    ],
+    "layers": [
+      {
+        "label": "void-ground",
+        "path": "game-root/void-backdrop/void-ground",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-deep",
+        "path": "game-root/void-backdrop/void-stars-deep",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-mid",
+        "path": "game-root/void-backdrop/void-stars-mid",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-near",
+        "path": "game-root/void-backdrop/void-stars-near",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-nebula-coalsack",
+        "path": "game-root/void-backdrop/void-nebula-coalsack",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "boundary",
+        "path": "game-root/ot/boundary",
+        "kids": 1,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "atmosphere",
+        "path": "game-root/ot/atmosphere",
+        "kids": 1,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "stations",
+        "path": "game-root/ot/stations",
+        "kids": 16,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "turrets",
+        "path": "game-root/ot/turrets",
+        "kids": 4,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "asteroids",
+        "path": "game-root/ot/asteroids",
+        "kids": 6,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "chunks",
+        "path": "game-root/ot/chunks",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "muzzles",
+        "path": "game-root/ot/muzzles",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "impacts",
+        "path": "game-root/ot/impacts",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "ships",
+        "path": "game-root/ot/ships",
+        "kids": 8,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "shots",
+        "path": "game-root/ot/shots",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "vfx-matter",
+        "path": "game-root/vfx/vfx-matter",
+        "kids": 22,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "vfx-light",
+        "path": "game-root/vfx/vfx-light",
+        "kids": 20,
+        "visible": true,
+        "toggled": 1
+      }
+    ]
+  },
+  {
+    "mapId": "octagon",
+    "view": "desktop",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "dpr": 2,
+    "uiHidden": [
+      "(unlabelled)",
+      "touch-visuals",
+      "fullscreen-reenter",
+      "(unlabelled)",
+      "(unlabelled)",
+      "(unlabelled)"
+    ],
+    "layers": [
+      {
+        "label": "void-ground",
+        "path": "game-root/void-backdrop/void-ground",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-deep",
+        "path": "game-root/void-backdrop/void-stars-deep",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-mid",
+        "path": "game-root/void-backdrop/void-stars-mid",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-near",
+        "path": "game-root/void-backdrop/void-stars-near",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "boundary",
+        "path": "game-root/ot/boundary",
+        "kids": 1,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "atmosphere",
+        "path": "game-root/ot/atmosphere",
+        "kids": 1,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "stations",
+        "path": "game-root/ot/stations",
+        "kids": 16,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "turrets",
+        "path": "game-root/ot/turrets",
+        "kids": 4,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "asteroids",
+        "path": "game-root/ot/asteroids",
+        "kids": 24,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "chunks",
+        "path": "game-root/ot/chunks",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "muzzles",
+        "path": "game-root/ot/muzzles",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "impacts",
+        "path": "game-root/ot/impacts",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "ships",
+        "path": "game-root/ot/ships",
+        "kids": 8,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "shots",
+        "path": "game-root/ot/shots",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "vfx-matter",
+        "path": "game-root/vfx/vfx-matter",
+        "kids": 22,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "vfx-light",
+        "path": "game-root/vfx/vfx-light",
+        "kids": 20,
+        "visible": true,
+        "toggled": 1
+      }
+    ]
+  },
+  {
+    "mapId": "octagon",
+    "view": "phone",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "dpr": 3,
+    "uiHidden": [
+      "(unlabelled)",
+      "touch-visuals",
+      "fullscreen-reenter",
+      "(unlabelled)",
+      "(unlabelled)",
+      "(unlabelled)"
+    ],
+    "layers": [
+      {
+        "label": "void-ground",
+        "path": "game-root/void-backdrop/void-ground",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-deep",
+        "path": "game-root/void-backdrop/void-stars-deep",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-mid",
+        "path": "game-root/void-backdrop/void-stars-mid",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "void-stars-near",
+        "path": "game-root/void-backdrop/void-stars-near",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "boundary",
+        "path": "game-root/ot/boundary",
+        "kids": 1,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "atmosphere",
+        "path": "game-root/ot/atmosphere",
+        "kids": 1,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "stations",
+        "path": "game-root/ot/stations",
+        "kids": 16,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "turrets",
+        "path": "game-root/ot/turrets",
+        "kids": 4,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "asteroids",
+        "path": "game-root/ot/asteroids",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "chunks",
+        "path": "game-root/ot/chunks",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "muzzles",
+        "path": "game-root/ot/muzzles",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "impacts",
+        "path": "game-root/ot/impacts",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "ships",
+        "path": "game-root/ot/ships",
+        "kids": 8,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "shots",
+        "path": "game-root/ot/shots",
+        "kids": 0,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "vfx-matter",
+        "path": "game-root/vfx/vfx-matter",
+        "kids": 22,
+        "visible": true,
+        "toggled": 1
+      },
+      {
+        "label": "vfx-light",
+        "path": "game-root/vfx/vfx-light",
+        "kids": 20,
+        "visible": true,
+        "toggled": 1
+      }
+    ]
+  }
+]
