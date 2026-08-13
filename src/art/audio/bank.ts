@@ -94,6 +94,27 @@
  *  - **Rock chip** is low, grainy, band-limited — stone giving way under a shot.
  *  - **Hull hit** is bright, thin and rude — a round biting plate.
  *
+ * ## The three the developer chose (s10-01, 2026-08-13)
+ *
+ * The forty-slot board (`./candidates`, rendered to `sound-review/`) sat at
+ * **deny-all** on every slot from 2026-08-07 — *"still have all the old sounds i
+ * said i didnt want there … make new ones that match the new theme (modern/sci-fi
+ * and not retro/toony)"* — until three verdicts came back on 2026-08-13:
+ *
+ * | slot | letter | what it is | decided |
+ * |---|---|---|---|
+ * | {@link SOUND.rockChip} | **b** | blunt pressure bite, sub weight | 04:01:48Z |
+ * | {@link SOUND.hullHit} | **a** | coil bite on plate, hard and dry | 04:02:30Z |
+ * | {@link SOUND.rockCrack} | **c** | crystalline shear, ringing shards | 04:03:05Z |
+ *
+ * Those three entries below are the adoption, and they are built by calling
+ * `./instrument` with the candidate's own arguments rather than by transcribing
+ * the resulting numbers — `candidates.test.ts` renders the bank entry and the
+ * board's offer and asserts they are the same samples. **The other thirty-seven
+ * slots are untouched and stay denied**; the same test asserts that too, so a
+ * later brief cannot revive one of them by accident. `docs/sound-adoptions.md`
+ * is the ledger.
+ *
  * The impact of a shot in flight ({@link SOUND.shotImpact}) is the turret/ship
  * projectile landing; it and the two chip voices carry weapon power in their gain
  * (`./engine` `levelFor`), so a tier-4 tool hits heavier than a tier-0 one.
@@ -116,6 +137,7 @@
  */
 
 import { TELL, type TellKind } from '../tells';
+import { grains, plate, swept } from './instrument';
 import type { VoiceSpec } from './synth';
 import {
   GLASS_PAIR,
@@ -443,119 +465,114 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
   // --- Mine ---------------------------------------------------------------
 
   /**
-   * **A cutting tool taking a bite out of stone.** One flat percussive hit: no
-   * pitch movement in it, no wobble, and the whole character in the transient.
+   * **A blunt pressure bite, with sub weight under it.** ADOPTED — the developer
+   * chose `rockChip` candidate **b** on 2026-08-13T04:01:48Z (s10-01).
    *
-   * This is the worked example of the re-voice (GDD §4.7 amended 2026-08-06,
-   * `docs/audio-revoice-spec.md` §6) and the sound the developer has judged
-   * twice, so it is worth saying what changed and what did not.
+   * The offer they heard is `sound-review/previews/rockChip/b.wav`, rendered from
+   * `./candidates`#rockChip.b (*"blunt pressure bite, sub weight"*). What ships
+   * here is the same two calls with the same arguments and the same seeds —
+   * `candidates.test.ts` renders both and asserts them sample-for-sample
+   * identical, so this entry cannot drift away from the thing that was approved.
+   * Only the layer names are the bank's rather than the board's.
    *
-   * The oscillator was never the problem — rock IS broadband, and it stays
-   * `noise`. What made it read as a cartoon were two parameters that made it
-   * *move* the way a cartoon moves: a 22 Hz vibrato inside a 12 ms hold (a
-   * wobble, not a texture) and a ×1.50 fall inside 103 ms (a chirp, not a body
-   * settling). Both are gone; the punch they were decorating went up to carry
-   * the hit on its own, which is where a machine keeps it.
+   * **The voice that was here is gone, and it was the one the developer named
+   * twice.** It was the worked example of the re-voice (`docs/audio-revoice-spec.md`
+   * §6): a single band-limited `noise` hit at 92 Hz with the wobble and the chirp
+   * taken out. It measured well and it was still a filtered *tick*. What b does
+   * differently is structural rather than tonal — a swept sine body with 35%
+   * noise mixed into it carries the mass, and a 6 ms grain rattles the crush on
+   * top of it. Two things happening, one of them heavy.
    *
-   * The pitch also comes down — the ratified s4-01 direction, *"lower in tone"*,
-   * which this bank never actually received (that brief moved `./candidates`,
-   * which the game does not import). Lower stops where a phone does: the audit
-   * measured s4-01's own candidate at 89% of its energy below 500 Hz, and this
-   * is `TELL.mineHit` firing all match on a device the mobile gate makes a
-   * first-class target. So `highPass` goes UP to 130 Hz, trimming sub a phone
-   * cannot emit and the mix would otherwise carry on every shot.
+   * **The phone floor from s7-01 §4.1 Finding 3 does not survive this choice, and
+   * that is the developer's call, not a slip.** That finding predicted a voice
+   * with 89% of its energy below 500 Hz would arrive as *"the mining sound is
+   * gone"*, and `audio.test.ts` held the shipped chip above 40% of its energy
+   * ABOVE 500 Hz on the strength of it. Candidate b measures **0.0%** above
+   * 500 Hz — it is entirely below the line that finding drew. But the finding was
+   * a prediction about a sound nobody had listened to, and this is a decision
+   * about a sound they did: they were offered `a` at 5.4% and `c` at 0.6% above
+   * 500 Hz alongside it and picked the heaviest of the three. A measured
+   * prediction loses to a ratification (LESSONS §17, §19). The floor is retired
+   * in `audio.test.ts` with its history written out, so the next agent finds a
+   * decision rather than a hole — and the risk it was guarding is real and is
+   * flagged in this brief's PR: if the chip reads thin on a phone speaker, this
+   * is the sound to re-offer, not to quietly re-brighten.
    *
-   * Measured, shipped → here: centroid 2281 → 1815 Hz, windowed zcr 0.0483 →
-   * 0.0327 (under the ratified 0.034 ceiling), energy above 500 Hz 69% → 56%,
-   * RMS at the mix's 28.6 Hz retrigger ceiling 0.180 → 0.147 — a *quieter* held
-   * fire, which is the point on a voice that repeats all match. The seed is
-   * unchanged: same seed, same noise, so a replay hears the match (GDD §4.1).
+   * Measured, was → now: centroid 795 → 167 Hz, windowed zcr 0.0337 → 0.0024
+   * (the ratified s4-01 ceiling is 0.034 and this clears it by an order of
+   * magnitude), peak 0.490 → 0.709, length 85 → 63 ms. The separation from
+   * {@link SOUND.hullHit} — the game's central inversion (§2.3) — goes from
+   * ×5.30 to ×17.5, so the pair gets easier to tell apart, not harder.
    */
   [SOUND.rockChip]: {
     name: 'rockChip',
-    wave: 'noise',
-    attack: 0.0006, // a tighter strike: the transient IS the character
-    hold: 0.006,
-    decay: 0.078,
-    decayCurve: 5.2, // the bite, then the stone: a tail, not a fade-out
-    punch: 0.6,
-    freq: 92,
-    freqEnd: 82, // ×1.12 — a body settling, well under the chirp threshold
-    lowPass: 900,
-    lowPassEnd: 520, // the tool coming off the rock — a sweep, not a pitch slide
-    resonance: 3.2, // the band rings: stone, rather than a duller hiss
-    highPass: 130, // sub a phone cannot emit anyway
-    gain: 0.5,
-    seed: 0x9e37,
-  },
-
-  // Hull hit: the same event on plate, an octave and a half up — **a round on
-  // plate, not a buzz.** The saw is retired (§5.1): its documented job was
-  // *"bright and rude"*, and rudeness is not the register — *cut* is, which a
-  // triangle with noise mixed into it and the same high-pass gives without the
-  // buzz. The spit is kept untouched: it is what puts this voice's spectral
-  // centre well above the chip's, the one dimension that survives a bad phone
-  // speaker, and that pair is the game's central inversion (GDD §2.3).
-  [SOUND.hullHit]: {
-    name: 'hullHit',
     layers: [
-      {
-        spec: {
-          name: 'hullHit.bite',
-          wave: 'triangle',
-          attack: 0.0008,
-          hold: 0.006,
-          decay: 0.07,
-          decayCurve: 6, // plate rings and stops; it does not fade evenly
-          punch: 0.6,
-          freq: 452,
-          freqEnd: 400, // ×1.13 — a body settling, not a chirp
-          noiseMix: 0.3,
-          lowPass: 3600,
-          resonance: 2.4, // a plate resonance under the round
-          highPass: 340,
-          gain: 0.5,
-          seed: 0x4dc3,
-        },
-      },
-      {
-        spec: {
-          name: 'hullHit.spit',
-          wave: 'noise',
-          attack: 0.0005,
-          hold: 0.003,
-          decay: 0.055,
-          decayCurve: 7,
-          freq: 1500,
-          lowPass: 4200,
-          resonance: 6,
-          bandPass: true, // the metal's own ring, not a spray of hiss
-          highPass: 950,
-          gain: 0.42,
-          seed: 0x4dc4,
-        },
-      },
+      // The mass: a sine body with a third of its signal as pitched noise, under
+      // a corner closing 240 → 120 Hz. The gesture is the filter, not the pitch.
+      swept('rockChip.mass', { wave: 'sine', freq: 58, from: 240, to: 120, q: 2.4, gain: 0.5, attack: 0.0008, hold: 0.007, decay: 0.055, curve: 5.5, punch: 0.9, noiseMix: 0.35, seed: 30110 }),
+      // The crush: a 6 ms grain — many tiny contacts, the sanctioned non-arcade
+      // use of `repeat` (`docs/audio-revoice-spec.md` §5.3, which leaves it open
+      // "with a written reason"). It is a rattle, never a trill: no interval, no
+      // melody, and it is gone in 30 ms — before the next chip at the mix's
+      // 28.6 Hz retrigger ceiling.
+      grains('rockChip.crush', { freq: 44, grain: 0.006, gain: 0.16, hold: 0.004, decay: 0.03, curve: 6, from: 340, q: 2, hp: 40, seed: 30112 }),
     ],
   },
 
-  // One crack stage advancing — **a step, not a slide.** The ×2.17 fall inside
-  // 114 ms was the same downward chirp `rockChip` carried, on the sound that
-  // answers it; stone gives way in stages, and a stage is a step.
+  /**
+   * **A coil bite on plate — hard and dry.** ADOPTED — the developer chose
+   * `hullHit` candidate **a** on 2026-08-13T04:02:30Z (s10-01).
+   *
+   * The offer they heard is `sound-review/previews/hullHit/a.wav`, from
+   * `./candidates`#hullHit.a (*"coil bite on plate, hard and dry"*), and this is
+   * the same two calls with the same arguments and seeds.
+   *
+   * The shape changes: what was a `triangle` bite with a noise spit over it is
+   * now a struck **plate** — a contact edge, then two inharmonic partials at
+   * 1 · 2.41 ringing and rolling off — with a coil sweep opening 1.2 → 3.6 kHz
+   * across it. The inharmonic spacing is deliberate and is NOT the ratified
+   * `GLASS_PARTIALS` the struck confirmations use ({@link struck}): metal that
+   * was hit, rather than the menu's bell in a lower register.
+   *
+   * §2.3's central inversion still governs this voice and it is the reason the
+   * pair reads: `rockChip` went down to a 167 Hz centroid in the same brief, this
+   * one sits at 2921 Hz, and the separation the s7-01 §8 net guards goes from
+   * ×5.30 to ×17.5. Nearly all of its energy — 99.9% — is above 500 Hz, which is
+   * what carries it out of a phone speaker where the chip now cannot go.
+   */
+  [SOUND.hullHit]: {
+    name: 'hullHit',
+    layers: [
+      ...plate('hullHit.plate', 1450, { gain: 0.42, decay: 0.06, ratios: [1, 2.41], q: 8, curve: 6, punch: 0.7, grain: 0.34, seed: 30300 }),
+      swept('hullHit.coil', { wave: 'noise', freq: 900, from: 1200, to: 3600, q: 7, gain: 0.34, attack: 0.0006, hold: 0.003, decay: 0.035, curve: 7, hp: 600, seed: 30304 }),
+    ],
+  },
+
+  /**
+   * **A crystalline shear — ringing shards.** ADOPTED — the developer chose
+   * `rockCrack` candidate **c** on 2026-08-13T04:03:05Z (s10-01).
+   *
+   * The offer they heard is `sound-review/previews/rockCrack/c.wav`, from
+   * `./candidates`#rockCrack.c (*"crystalline shear, ringing shards"*).
+   *
+   * A crack stage is still **a step, not a slide** — no glide anywhere in it, the
+   * clause (§5.4) this slot was de-telled for in the first place. What is new is
+   * that the step now has a *body*: a 640 Hz plate with three inharmonic partials
+   * where a single swept noise hit used to stand for stone, and a late grain of
+   * dust falling off it 20 ms behind the fracture. It is the brightest of the
+   * three offers (centroid 1933 Hz against b's 677) and the one that keeps this
+   * sound clear of {@link SOUND.rockChip}, which the same brief moved a long way
+   * down — a chip and a stage must not converge, because one of them means the
+   * rock is about to pay out.
+   */
   [SOUND.rockCrack]: {
     name: 'rockCrack',
-    wave: 'noise',
-    attack: 0.0012,
-    hold: 0.008,
-    decay: 0.115,
-    decayCurve: 4.4, // stone gives, then settles
-    punch: 0.55,
-    freq: 260,
-    freqEnd: 220,
-    lowPass: 2100,
-    lowPassEnd: 900, // the fracture closing — energy leaving, not pitch falling
-    resonance: 2.8,
-    gain: 0.26,
-    seed: 0x1a2b,
+    layers: [
+      ...plate('rockCrack.shard', 640, { gain: 0.34, decay: 0.13, ratios: [1, 2.41, 4.17], q: 9, curve: 5, punch: 0.5, seed: 30150 }),
+      // The dust, behind the fracture. `repeat` as a rattle again — see the note
+      // on `rockChip.crush` above; 11 ms, no interval in it, and it never trills.
+      grains('rockCrack.dust', { freq: 260, grain: 0.011, gain: 0.12, hold: 0.008, decay: 0.09, curve: 4.5, from: 2200, to: 900, q: 2.4, hp: 300, at: 0.02, seed: 30154 }),
+    ],
   },
 
   [SOUND.rockBurst]: {
