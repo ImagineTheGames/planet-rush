@@ -189,31 +189,38 @@ describe('mapActions — the wheel presses that spend (GDD §2.5)', () => {
 describe('describeBindings — the controls strip reads from the map (GDD §2.4)', () => {
   it('drops the aim row in Auto-aim, on every device', () => {
     for (const device of ['keyboard', 'gamepad', 'touch'] as const) {
-      const manual = describeBindings(device, FireMode.Manual).map((r) => r.action);
-      const auto = describeBindings(device, FireMode.AutoAim).map((r) => r.action);
+      const manual = describeBindings(device, FireMode.Manual, 'sticks').map((r) => r.action);
+      const auto = describeBindings(device, FireMode.AutoAim, 'sticks').map((r) => r.action);
       expect(manual).toContain('aim');
       expect(auto).not.toContain('aim');
     }
   });
 
   it('morphs the touch fire binding into a FIRE button in Auto-aim', () => {
-    const manualFire = describeBindings('touch', FireMode.Manual).find((r) => r.action === 'fire');
-    const autoFire = describeBindings('touch', FireMode.AutoAim).find((r) => r.action === 'fire');
+    const manualFire = describeBindings('touch', FireMode.Manual, 'sticks').find((r) => r.action === 'fire');
+    const autoFire = describeBindings('touch', FireMode.AutoAim, 'sticks').find((r) => r.action === 'fire');
     expect(manualFire?.binding).toBe('Right stick');
     expect(autoFire?.binding).toBe('FIRE button');
   });
 
   it('names Build & Upgrade in full, never just "BUILD" (GDD §2.5)', () => {
-    const build = describeBindings('keyboard', FireMode.Manual).find((r) => r.action === 'build');
+    const build = describeBindings('keyboard', FireMode.Manual, 'sticks').find((r) => r.action === 'build');
     expect(build?.label).toBe('Build & Upgrade');
   });
 
   it('every row has a real binding on every device — no phantom labels (input-parity)', () => {
-    // The legend must never advertise a control that does not exist.
+    // The legend must never advertise a control that does not exist. Walked over
+    // both control schemes since a0-37: Tap Commander's rows are a different set,
+    // and an empty verb there would be the same phantom in a newer table.
     for (const device of ['keyboard', 'gamepad', 'touch'] as const) {
       for (const mode of [FireMode.Manual, FireMode.AutoAim]) {
-        for (const row of describeBindings(device, mode)) {
-          expect(row.binding.trim().length, `${device}/${mode} ${row.action}`).toBeGreaterThan(0);
+        for (const scheme of ['sticks', 'tap'] as const) {
+          for (const row of describeBindings(device, mode, scheme)) {
+            expect(
+              row.binding.trim().length,
+              `${device}/${mode}/${scheme} ${row.action}`,
+            ).toBeGreaterThan(0);
+          }
         }
       }
     }

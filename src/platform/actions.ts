@@ -9,9 +9,12 @@
  * (Manual / Auto-aim) is resolved *here* — the morph that swaps the right-side
  * bindings (GDD §2.4 fire modes) is a property of this map, not of any device.
  *
- * The device-aware controls strip (GDD §2.4) reads its labels from
- * {@link describeBindings} below, so the legend can never drift out of sync with
- * the real bindings — it is generated from the same map that drives the sim.
+ * The device-aware controls strip (GDD §2.4) and the onboarding prompts (§2.10)
+ * both read their labels from {@link describeBindings} below, so neither can drift
+ * out of sync with the real bindings — they are generated from the same map that
+ * drives the sim. That map takes the seated {@link ControlScheme} as well as the
+ * device and the fire mode (a0-37): Tap Commander replaces the sticks outright, so
+ * the scheme decides which bindings are live at all.
  *
  * This module is pure and DOM-free so it unit-tests headless (the sim never sees
  * a device; neither does this funnel's core).
@@ -180,10 +183,35 @@ export function mapActions(state: ControlState, mode: FireMode): Action[] {
 /** The input devices Planet Rush maps from (GDD §2.4). */
 export type DeviceKind = 'keyboard' | 'gamepad' | 'touch';
 
+/**
+ * How the player drives the ship (GDD §2.4). `'sticks'` is the twin-stick /
+ * keyboard+mouse scheme; `'tap'` is **Tap Commander**, where a tap places a move
+ * or a lock and the local pilot (`./tap-pilot`) flies and fires the ship.
+ *
+ * It lives *here*, next to the map it changes, because a0-37 made it part of the
+ * binding contract: the scheme decides which bindings are live at all, so a
+ * binding table that cannot see it can only describe one scheme and be wrong in
+ * the other. The UI's ratified `ControlScheme` (`@ui/settings`) is now an alias
+ * of this one — the same two strings, one definition, so the strip, the prompts
+ * and the CONTROLS row can never disagree about what a scheme is. The *stored*
+ * strings stay the UI's to own (`CONTROL_SCHEME_STORAGE`); this is the value, not
+ * its serialisation.
+ */
+export type ControlScheme = 'sticks' | 'tap';
+
 /** One row of the device-aware controls strip: an action and its binding. */
 export interface BindingLabel {
-  /** The abstract verb this row explains. */
-  readonly action: 'thrust' | 'aim' | 'fire' | 'build';
+  /**
+   * The abstract verb this row explains.
+   *
+   * `'command'` is Tap Commander's own (a0-37): a single order that is *both*
+   * move and attack ("click anywhere to move or attack"), which is exactly how
+   * the scheme works — `TapPilot.resolveTap` takes one tap and turns it into a
+   * waypoint or a lock, and the pilot then writes thrust, aim AND fire from it.
+   * Splitting it into a thrust row and a fire row would describe two presses the
+   * player does not make.
+   */
+  readonly action: 'thrust' | 'aim' | 'fire' | 'build' | 'command';
   /** Player-facing name of the action (never just "BUILD" — see GDD §2.5). */
   readonly label: string;
   /** The active device's binding, e.g. "WASD", "Right stick", "Right side". */
@@ -191,24 +219,64 @@ export interface BindingLabel {
 }
 
 /**
- * The controls strip's rows for the active device and fire mode. UI renders
- * these; the *labels come from here* so the legend is generated from the same
- * map that drives the sim and can never drift (GDD §2.4). On touch the strip is
- * not shown (the visible sticks are the legend, GDD §2.2), so this returns the
- * touch bindings for onboarding/settings copy rather than a bottom strip.
+ * The **pointer verb**, per device — the word for placing an order in Tap
+ * Commander (a0-37). §2.4's 2026-08-06 amendment settled that a control row must
+ * name what is in front of the player (`KEYBOARD + MOUSE` / `TWIN STICKS` /
+ * `STICKS` — `@ui/settings` `STICKS_LABELS`), and the verb obeys the same rule: a
+ * developer on a PC is told to **click**, a player on glass to **tap**.
  *
- * **These are the SEATED-SCHEME bindings, and the scheme is not an argument —
- * flagged OPEN by a0-30.** Tap Commander replaces the sticks entirely
- * (`src/main.ts` `sampleInput`: in the tap scheme the pilot writes thrust/aim/fire
- * and the devices' own thrust is zeroed), so on a desktop now defaulting to Tap
- * Commander the `thrust · WASD` row below describes a binding that does not move
- * the ship. Build is unaffected — `merged.build` is left as the devices wrote it,
- * so `E` really does open the wheel in either scheme. Nothing is dropped here:
- * whether Tap Commander should yield thrust back to WASD, or the strip should read
- * the scheme, is the Director's call and is written up in
- * `docs/design-amendments.md` (a0-30, "The one conflict").
+ * `gamepad` reads *click* deliberately. Tap Commander's orders are placed by
+ * `pointerdown` on the canvas (`src/main.ts`), and no pad button places one — a
+ * pad seated in this scheme still orders with the mouse next to it (and still
+ * opens the wheel with `Y / △`, which the scheme leaves live). Naming a pad
+ * button here would advertise a control that does not exist, which is the rule
+ * `actions.test.ts` calls "no phantom labels". That the pad cannot place an
+ * order at all is a genuine §2.4 parity gap in the *input* layer, not something
+ * the legend may paper over: a0-37 reports it rather than lying about it.
  */
-export function describeBindings(device: DeviceKind, mode: FireMode): BindingLabel[] {
+const POINTER_VERB: Record<DeviceKind, string> = {
+  keyboard: 'Click',
+  gamepad: 'Click',
+  touch: 'Tap',
+};
+
+/**
+ * The controls strip's rows for the seated device, fire mode **and control
+ * scheme**. UI renders these; the *labels come from here* so the legend is
+ * generated from the same map that drives the sim and can never drift (GDD §2.4).
+ * On touch the strip is not shown (the visible sticks are the legend, GDD §2.2),
+ * so this returns the touch bindings for onboarding/settings copy rather than a
+ * bottom strip.
+ *
+ * **`scheme` closes the hole a0-30 flagged and a0-37 fixed.** Tap Commander
+ * replaces the sticks outright — `src/main.ts` `sampleInput` zeroes `merged.thrust`,
+ * `merged.aim` and `merged.fire` and lets `TapPilot` write all three from the
+ * standing order — so a strip that listed `WASD Thrust` and `Left mouse Fire / Mine`
+ * to a player on the a0-30 defaults named three bindings, of which none moved or
+ * fired the ship (the developer's frame, build `75ec737`). The scheme is therefore
+ * a REQUIRED argument, on a0-33's reasoning: the default moved under this table
+ * once already, and a caller that could forget the scheme would go on quietly
+ * describing whichever one this file guessed.
+ *
+ * What each scheme returns, and why:
+ *
+ *  - **`'tap'`** — one `command` row, *first*, because it is the whole scheme:
+ *    `Click anywhere · Move or attack`. Then Build & Upgrade, whose key survives
+ *    the scheme untouched (`merged.build` is left exactly as the devices wrote
+ *    it, so `E` / `Y / △` / `BUILD` really does open the wheel here — as does
+ *    tapping your own station in range). No thrust row: WASD is *not* live in
+ *    this scheme, measured, so naming it would be the same lie in a smaller font.
+ *    No fire row: the pilot presses the trigger, not the player.
+ *  - **`'sticks'` + Manual** — GDD §2.4's own table, to the letter, untouched.
+ *  - **`'sticks'` + Auto-aim** — the aim row folds away (it always did) and the
+ *    fire row stops describing an aim the player no longer makes: the key is the
+ *    same, the *label* now says when to hold it and who is aiming.
+ */
+export function describeBindings(
+  device: DeviceKind,
+  mode: FireMode,
+  scheme: ControlScheme,
+): BindingLabel[] {
   const auto = mode === FireMode.AutoAim;
   const rows: BindingLabel[] = [];
 
@@ -238,10 +306,31 @@ export function describeBindings(device: DeviceKind, mode: FireMode): BindingLab
     touch: 'BUILD',
   };
 
+  // Tap Commander: one order does both jobs, and the fire mode has nothing left
+  // to say about it — on a lock the pilot aims at what you locked, with no lock
+  // it auto-engages (main.ts `tapMode`), and either way the player only taps.
+  if (scheme === 'tap') {
+    rows.push({
+      action: 'command',
+      label: 'Move or attack',
+      binding: `${POINTER_VERB[device]} anywhere`,
+    });
+    rows.push({ action: 'build', label: 'Build & Upgrade', binding: build[device] });
+    return rows;
+  }
+
   rows.push({ action: 'thrust', label: 'Thrust', binding: thrust[device] });
   // In Auto-aim the aim binding folds away — the right side becomes fire only.
   if (!auto) rows.push({ action: 'aim', label: 'Aim', binding: aim[device] });
-  rows.push({ action: 'fire', label: 'Fire / Mine', binding: (auto ? fireAuto : fireManual)[device] });
+  rows.push({
+    action: 'fire',
+    // Auto-aim engages the nearest valid target across the full 360° and leaves
+    // the player only the decision of *when* (see `mapActions` above), so the row
+    // teaches the hold and hands the aiming to the weapon — the same correction
+    // a0-33 made to the MINE prompt's auto-aim wording, in the strip's register.
+    label: auto ? 'Hold to fire / mine — auto-aim picks the target' : 'Fire / Mine',
+    binding: (auto ? fireAuto : fireManual)[device],
+  });
   rows.push({ action: 'build', label: 'Build & Upgrade', binding: build[device] });
 
   return rows;

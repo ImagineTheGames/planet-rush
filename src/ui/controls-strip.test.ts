@@ -21,23 +21,23 @@ describe('showControlsStrip (GDD §2.2, §2.4)', () => {
 
 describe('controlsStripRows (GDD §2.4)', () => {
   it('returns no rows on touch — the sticks are the legend', () => {
-    expect(controlsStripRows('touch', FireMode.AutoAim, true)).toEqual([]);
+    expect(controlsStripRows('touch', FireMode.AutoAim, true, 'sticks')).toEqual([]);
   });
 
   it('mirrors the live action map exactly (no drift)', () => {
-    const rows = controlsStripRows('keyboard', FireMode.Manual, false);
-    expect(rows).toEqual(describeBindings('keyboard', FireMode.Manual));
+    const rows = controlsStripRows('keyboard', FireMode.Manual, false, 'sticks');
+    expect(rows).toEqual(describeBindings('keyboard', FireMode.Manual, 'sticks'));
   });
 
   it('names Build & Upgrade in full, never just "BUILD" (GDD §2.5)', () => {
-    const rows = controlsStripRows('keyboard', FireMode.Manual, false);
+    const rows = controlsStripRows('keyboard', FireMode.Manual, false, 'sticks');
     const build = rows.find((r) => r.action === 'build');
     expect(build?.label).toBe('Build & Upgrade');
   });
 
   it('morphs with fire mode — Auto-aim folds the aim row away (GDD §2.4)', () => {
-    const manual = controlsStripRows('keyboard', FireMode.Manual, false);
-    const auto = controlsStripRows('keyboard', FireMode.AutoAim, false);
+    const manual = controlsStripRows('keyboard', FireMode.Manual, false, 'sticks');
+    const auto = controlsStripRows('keyboard', FireMode.AutoAim, false, 'sticks');
     expect(manual.some((r) => r.action === 'aim')).toBe(true);
     expect(auto.some((r) => r.action === 'aim')).toBe(false);
   });
@@ -93,7 +93,7 @@ describe('a0-37 — the strip names the scheme the player is actually IN (GDD §
 
 describe('controlsStripView — the Build row is contextual on docking (field report v0.2.2)', () => {
   it('shows the live E key + full name when docked at your station', () => {
-    const rows = controlsStripView('keyboard', FireMode.Manual, false, true);
+    const rows = controlsStripView('keyboard', FireMode.Manual, false, true, 'sticks');
     const build = rows.find((r) => r.action === 'build');
     expect(build?.binding, 'the key is live at the station').toBe('E');
     expect(build?.label, 'named in full, never just BUILD (GDD §2.5)').toBe('Build & Upgrade');
@@ -101,7 +101,7 @@ describe('controlsStripView — the Build row is contextual on docking (field re
   });
 
   it('NEVER promises a dead key away from the station — no key, dimmed hint instead', () => {
-    const rows = controlsStripView('keyboard', FireMode.Manual, false, false);
+    const rows = controlsStripView('keyboard', FireMode.Manual, false, false, 'sticks');
     const build = rows.find((r) => r.action === 'build');
     expect(build?.binding, 'no live "E" is advertised when the wheel cannot open').toBeNull();
     expect(build?.label, 'the dimmed row says WHY it is dark and how to fix it').toBe(BUILD_AWAY_HINT);
@@ -109,15 +109,15 @@ describe('controlsStripView — the Build row is contextual on docking (field re
   });
 
   it('leaves every non-build row untouched by docking', () => {
-    const home = controlsStripView('keyboard', FireMode.Manual, false, true);
-    const away = controlsStripView('keyboard', FireMode.Manual, false, false);
+    const home = controlsStripView('keyboard', FireMode.Manual, false, true, 'sticks');
+    const away = controlsStripView('keyboard', FireMode.Manual, false, false, 'sticks');
     const strip = (rows: readonly { action: string; binding: string | null }[]) =>
       rows.filter((r) => r.action !== 'build').map((r) => `${r.action}:${r.binding}`);
     expect(strip(away), 'only the Build row reacts to docking').toEqual(strip(home));
   });
 
   it('returns no rows on touch — the sticks are the legend (GDD §2.2)', () => {
-    expect(controlsStripView('touch', FireMode.AutoAim, true, true)).toEqual([]);
-    expect(controlsStripView('touch', FireMode.AutoAim, true, false)).toEqual([]);
+    expect(controlsStripView('touch', FireMode.AutoAim, true, true, 'sticks')).toEqual([]);
+    expect(controlsStripView('touch', FireMode.AutoAim, true, false, 'sticks')).toEqual([]);
   });
 });
