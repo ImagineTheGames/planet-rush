@@ -1,0 +1,457 @@
+{
+  "base": "https://imaginethegames.github.io/planet-rush/",
+  "capturedAt": "2026-08-13T01:42:05.598Z",
+  "debugSeam": {
+    "desktop-fresh": {
+      "stored": {},
+      "buildSha": "75ec737",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "schemeAtBoot": "tap",
+      "prompt": {
+        "text": "Tap the asteroid to mine it — your shots chip the rock",
+        "width": 613.6800000000001,
+        "height": 19,
+        "wrapWidth": 904,
+        "device": "keyboard",
+        "scheme": "tap",
+        "legend": [
+          {
+            "action": "thrust",
+            "label": "Thrust",
+            "binding": "WASD",
+            "dimmed": false
+          },
+          {
+            "action": "fire",
+            "label": "Fire / Mine",
+            "binding": "Left mouse",
+            "dimmed": false
+          },
+          {
+            "action": "build",
+            "label": "Build & Upgrade — get closer to your station",
+            "binding": null,
+            "dimmed": true
+          }
+        ]
+      },
+      "flownForMs": 2060,
+      "inputs": 1,
+      "image": "images/a1-17-prompt-debug-desktop-fresh.png",
+      "band": "images/a1-17-prompt-debug-desktop-fresh-band.png",
+      "bandRect": {
+        "x": 0,
+        "y": 688,
+        "width": 1280,
+        "height": 112,
+        "factor": 3
+      }
+    },
+    "phone844x390-fresh": {
+      "stored": {},
+      "buildSha": "75ec737",
+      "viewport": {
+        "width": 844,
+        "height": 390
+      },
+      "schemeAtBoot": "tap",
+      "prompt": {
+        "text": "Tap the asteroid to mine it — your shots chip the rock",
+        "width": 342.88,
+        "height": 28,
+        "wrapWidth": 374,
+        "device": "touch",
+        "scheme": "tap",
+        "legend": []
+      },
+      "flownForMs": 2048,
+      "inputs": 1,
+      "image": "images/a1-17-prompt-debug-phone844x390-fresh.png",
+      "band": "images/a1-17-prompt-debug-phone844x390-fresh-band.png",
+      "bandRect": {
+        "x": 0,
+        "y": 335,
+        "width": 844,
+        "height": 55,
+        "factor": 3
+      }
+    },
+    "phone390x844-fresh": {
+      "stored": {},
+      "buildSha": "75ec737",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "schemeAtBoot": "tap",
+      "prompt": {
+        "text": "Tap the asteroid to mine it — your shots chip the rock",
+        "width": 342.88,
+        "height": 28,
+        "wrapWidth": 374,
+        "device": "touch",
+        "scheme": "tap",
+        "legend": []
+      },
+      "flownForMs": 2077,
+      "inputs": 1,
+      "image": "images/a1-17-prompt-debug-phone390x844-fresh.png",
+      "band": "images/a1-17-prompt-debug-phone390x844-fresh-band.png",
+      "bandRect": {
+        "x": 0,
+        "y": 726,
+        "width": 390,
+        "height": 118,
+        "factor": 3
+      }
+    },
+    "desktop-saved-sticks": {
+      "stored": {
+        "planet-rush:controlScheme": "sticks"
+      },
+      "buildSha": "75ec737",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "schemeAtBoot": "sticks",
+      "prompt": {
+        "text": "Hold Left mouse near the asteroid — auto-aim does the aiming, your shots chip the rock",
+        "width": 892.56,
+        "height": 38,
+        "wrapWidth": 904,
+        "device": "keyboard",
+        "scheme": "sticks",
+        "legend": [
+          {
+            "action": "thrust",
+            "label": "Thrust",
+            "binding": "WASD",
+            "dimmed": false
+          },
+          {
+            "action": "fire",
+            "label": "Fire / Mine",
+            "binding": "Left mouse",
+            "dimmed": false
+          },
+          {
+            "action": "build",
+            "label": "Build & Upgrade — get closer to your station",
+            "binding": null,
+            "dimmed": true
+          }
+        ]
+      },
+      "flownForMs": 3693,
+      "inputs": 1,
+      "image": "images/a1-17-prompt-debug-desktop-saved-sticks.png",
+      "band": "images/a1-17-prompt-debug-desktop-saved-sticks-band.png",
+      "bandRect": {
+        "x": 0,
+        "y": 688,
+        "width": 1280,
+        "height": 112,
+        "factor": 3
+      }
+    },
+    "phone844x390-saved-sticks": {
+      "stored": {
+        "planet-rush:controlScheme": "sticks"
+      },
+      "buildSha": "75ec737",
+      "viewport": {
+        "width": 844,
+        "height": 390
+      },
+      "schemeAtBoot": "sticks",
+      "prompt": {
+        "text": "Hold FIRE button near the asteroid — auto-aim does the aiming, your shots chip the rock",
+        "width": 350.8,
+        "height": 42,
+        "wrapWidth": 374,
+        "device": "touch",
+        "scheme": "sticks",
+        "legend": []
+      },
+      "flownForMs": 4171,
+      "inputs": 1,
+      "image": "images/a1-17-prompt-debug-phone844x390-saved-sticks.png",
+      "band": "images/a1-17-prompt-debug-phone844x390-saved-sticks-band.png",
+      "bandRect": {
+        "x": 0,
+        "y": 335,
+        "width": 844,
+        "height": 55,
+        "factor": 3
+      }
+    }
+  },
+  "cleanBoot": {
+    "desktop-fresh": {
+      "stored": {},
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "presses": {
+        "play": {
+          "x": 640,
+          "y": 269.5
+        },
+        "solo": {
+          "x": 640,
+          "y": 392.5
+        },
+        "rush": {
+          "x": 1126,
+          "y": 754
+        }
+      },
+      "menuControlScheme": "tap",
+      "matchControlScheme": "tap",
+      "litPixels": 1997,
+      "baselineLitPixels": 436,
+      "flownForMs": 2452,
+      "inputs": 1,
+      "image": "images/a1-17-prompt-clean-desktop-fresh.png",
+      "band": "images/a1-17-prompt-clean-desktop-fresh-band.png",
+      "bandRect": {
+        "x": 0,
+        "y": 688,
+        "width": 1280,
+        "height": 112,
+        "factor": 3
+      }
+    },
+    "phone844x390-fresh": {
+      "stored": {},
+      "viewport": {
+        "width": 844,
+        "height": 390
+      },
+      "presses": {
+        "play": {
+          "x": 422,
+          "y": 96.92941176470589
+        },
+        "solo": {
+          "x": 221,
+          "y": 249.5
+        },
+        "rush": {
+          "x": 725.5,
+          "y": 365
+        }
+      },
+      "menuControlScheme": "tap",
+      "matchControlScheme": "tap",
+      "litPixels": 460,
+      "baselineLitPixels": 0,
+      "flownForMs": 1995,
+      "inputs": 1,
+      "image": "images/a1-17-prompt-clean-phone844x390-fresh.png",
+      "band": "images/a1-17-prompt-clean-phone844x390-fresh-band.png",
+      "bandRect": {
+        "x": 0,
+        "y": 335,
+        "width": 844,
+        "height": 55,
+        "factor": 3
+      }
+    },
+    "phone390x844-fresh": {
+      "stored": {},
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "presses": {
+        "play": {
+          "x": 293.0705882352941,
+          "y": 422
+        },
+        "solo": {
+          "x": 140.5,
+          "y": 221
+        },
+        "rush": {
+          "x": 25,
+          "y": 725.5
+        }
+      },
+      "menuControlScheme": "tap",
+      "matchControlScheme": "tap",
+      "litPixels": 1089,
+      "baselineLitPixels": 860,
+      "flownForMs": 21432,
+      "inputs": 11,
+      "image": "images/a1-17-prompt-clean-phone390x844-fresh.png",
+      "band": "images/a1-17-prompt-clean-phone390x844-fresh-band.png",
+      "bandRect": {
+        "x": 0,
+        "y": 726,
+        "width": 390,
+        "height": 118,
+        "factor": 3
+      }
+    },
+    "desktop-saved-sticks": {
+      "stored": {
+        "planet-rush:controlScheme": "sticks"
+      },
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "presses": {
+        "play": {
+          "x": 640,
+          "y": 269.5
+        },
+        "solo": {
+          "x": 640,
+          "y": 392.5
+        },
+        "rush": {
+          "x": 1126,
+          "y": 754
+        }
+      },
+      "menuControlScheme": "sticks",
+      "matchControlScheme": "sticks",
+      "litPixels": 2529,
+      "baselineLitPixels": 436,
+      "flownForMs": 4140,
+      "inputs": 1,
+      "image": "images/a1-17-prompt-clean-desktop-saved-sticks.png",
+      "band": "images/a1-17-prompt-clean-desktop-saved-sticks-band.png",
+      "bandRect": {
+        "x": 0,
+        "y": 688,
+        "width": 1280,
+        "height": 112,
+        "factor": 3
+      }
+    },
+    "phone844x390-saved-sticks": {
+      "stored": {
+        "planet-rush:controlScheme": "sticks"
+      },
+      "viewport": {
+        "width": 844,
+        "height": 390
+      },
+      "presses": {
+        "play": {
+          "x": 422,
+          "y": 96.92941176470589
+        },
+        "solo": {
+          "x": 221,
+          "y": 249.5
+        },
+        "rush": {
+          "x": 725.5,
+          "y": 365
+        }
+      },
+      "menuControlScheme": "sticks",
+      "matchControlScheme": "sticks",
+      "litPixels": 509,
+      "baselineLitPixels": 0,
+      "flownForMs": 4106,
+      "inputs": 1,
+      "image": "images/a1-17-prompt-clean-phone844x390-saved-sticks.png",
+      "band": "images/a1-17-prompt-clean-phone844x390-saved-sticks-band.png",
+      "bandRect": {
+        "x": 0,
+        "y": 335,
+        "width": 844,
+        "height": 55,
+        "factor": 3
+      }
+    }
+  },
+  "thrustProbe": {
+    "fresh-default": {
+      "stored": {},
+      "scheme": "tap",
+      "idleDrift3s": {
+        "a": {
+          "x": 1968,
+          "y": 1200
+        },
+        "b": {
+          "x": 1968,
+          "y": 1200
+        },
+        "dist": 0
+      },
+      "wHeld3s": {
+        "a": {
+          "x": 1968,
+          "y": 1200
+        },
+        "b": {
+          "x": 1968,
+          "y": 1200
+        },
+        "dist": 0
+      },
+      "tapFly3s": {
+        "before": {
+          "x": 1968,
+          "y": 1200
+        },
+        "after": {
+          "x": 1656.9474560990827,
+          "y": 1099.4375011864258
+        },
+        "dist": 326.9044221708574
+      }
+    },
+    "sticks": {
+      "stored": {
+        "planet-rush:controlScheme": "sticks"
+      },
+      "scheme": "sticks",
+      "idleDrift3s": {
+        "a": {
+          "x": 1968,
+          "y": 1200
+        },
+        "b": {
+          "x": 1968,
+          "y": 1200
+        },
+        "dist": 0
+      },
+      "wHeld3s": {
+        "a": {
+          "x": 1968,
+          "y": 1198.6219062500002
+        },
+        "b": {
+          "x": 1968,
+          "y": 460.90052891823734
+        },
+        "dist": 737.7213773317628
+      },
+      "tapFly3s": {
+        "before": {
+          "x": 1968,
+          "y": 365.8174277284403
+        },
+        "after": {
+          "x": 1968,
+          "y": 365.56721451749604
+        },
+        "dist": 0.25021321094425275
+      }
+    }
+  }
+}

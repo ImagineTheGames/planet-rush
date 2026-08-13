@@ -1,0 +1,226 @@
+{
+  "gateRunAt": "2026-08-13T01:24:18.722Z",
+  "baseURL": "https://imaginethegames.github.io/planet-rush/",
+  "versionJson": {
+    "sha": "75ec737",
+    "time": "2026-08-13T00:29:46.555Z"
+  },
+  "comparedAgainstSha": "75ec737",
+  "chunks": [
+    {
+      "chunk": "https://imaginethegames.github.io/planet-rush/assets/index-itMIBi-S.js",
+      "map": "https://imaginethegames.github.io/planet-rush/assets/index-itMIBi-S.js.map",
+      "sources": 2
+    },
+    {
+      "chunk": "https://imaginethegames.github.io/planet-rush/assets/typography-CVMcRgo2.js",
+      "map": "https://imaginethegames.github.io/planet-rush/assets/typography-CVMcRgo2.js.map",
+      "sources": 1
+    },
+    {
+      "chunk": "https://imaginethegames.github.io/planet-rush/assets/main-BgOrVuml.js",
+      "map": "https://imaginethegames.github.io/planet-rush/assets/main-BgOrVuml.js.map",
+      "sources": 396
+    },
+    {
+      "chunk": "https://imaginethegames.github.io/planet-rush/assets/browserAll-j-otJ9kU.js",
+      "map": "https://imaginethegames.github.io/planet-rush/assets/browserAll-j-otJ9kU.js.map",
+      "sources": 14
+    },
+    {
+      "chunk": "https://imaginethegames.github.io/planet-rush/assets/webworkerAll-CbbdEg9u.js",
+      "map": "https://imaginethegames.github.io/planet-rush/assets/webworkerAll-CbbdEg9u.js.map",
+      "sources": 70
+    },
+    {
+      "chunk": "https://imaginethegames.github.io/planet-rush/assets/WebGPURenderer-_us2cIRs.js",
+      "map": "https://imaginethegames.github.io/planet-rush/assets/WebGPURenderer-_us2cIRs.js.map",
+      "sources": 29
+    },
+    {
+      "chunk": "https://imaginethegames.github.io/planet-rush/assets/WebGLRenderer-CDi1tnTw.js",
+      "map": "https://imaginethegames.github.io/planet-rush/assets/WebGLRenderer-CDi1tnTw.js.map",
+      "sources": 49
+    },
+    {
+      "chunk": "https://imaginethegames.github.io/planet-rush/assets/colorToUniform-C2GHuDhf.js",
+      "map": "https://imaginethegames.github.io/planet-rush/assets/colorToUniform-C2GHuDhf.js.map",
+      "sources": 4
+    },
+    {
+      "chunk": "https://imaginethegames.github.io/planet-rush/assets/CanvasPool-4Zb2-yes.js",
+      "map": "https://imaginethegames.github.io/planet-rush/assets/CanvasPool-4Zb2-yes.js.map",
+      "sources": 1
+    },
+    {
+      "chunk": "https://imaginethegames.github.io/planet-rush/assets/SharedSystems-BbMs6u40.js",
+      "map": "https://imaginethegames.github.io/planet-rush/assets/SharedSystems-BbMs6u40.js.map",
+      "sources": 45
+    }
+  ],
+  "filesChecked": 26,
+  "identical": 24,
+  "failures": 0,
+  "results": [
+    {
+      "path": "src/main.ts",
+      "status": "identical",
+      "servedBytes": 521026,
+      "gitBytes": 521026
+    },
+    {
+      "path": "src/platform/actions.ts",
+      "status": "identical",
+      "servedBytes": 10918,
+      "gitBytes": 10918
+    },
+    {
+      "path": "src/ui/lobby-flow.ts",
+      "status": "identical",
+      "servedBytes": 46089,
+      "gitBytes": 46089
+    },
+    {
+      "path": "src/net/allocator-client.ts",
+      "status": "identical",
+      "servedBytes": 19012,
+      "gitBytes": 19012
+    },
+    {
+      "path": "src/net/lobby-list.ts",
+      "status": "identical",
+      "servedBytes": 11057,
+      "gitBytes": 11057
+    },
+    {
+      "path": "src/net/session.ts",
+      "status": "identical",
+      "servedBytes": 51517,
+      "gitBytes": 51517
+    },
+    {
+      "path": "src/net/transport.ts",
+      "status": "absent-type-only",
+      "runtimeExports": [],
+      "note": "no export survives type erasure — the file cannot reach the bundle or its map"
+    },
+    {
+      "path": "src/net/wire.ts",
+      "status": "identical",
+      "servedBytes": 32085,
+      "gitBytes": 32085
+    },
+    {
+      "path": "src/net/ticket.ts",
+      "status": "absent-type-only-in-client",
+      "runtimeExports": [
+        "function signTicket",
+        "function verifyTicket"
+      ],
+      "clientValueImporters": [],
+      "note": "has runtime exports, but no src/ file value-imports it (type-only on the client); its runtime lives server-side"
+    },
+    {
+      "path": "src/ui/lobby-browser.ts",
+      "status": "identical",
+      "servedBytes": 30069,
+      "gitBytes": 30069
+    },
+    {
+      "path": "src/ui/lobby-browser-view.ts",
+      "status": "identical",
+      "servedBytes": 17371,
+      "gitBytes": 17371
+    },
+    {
+      "path": "src/ui/lobby-entry.ts",
+      "status": "identical",
+      "servedBytes": 37802,
+      "gitBytes": 37802
+    },
+    {
+      "path": "src/ui/lobby-entry-view.ts",
+      "status": "identical",
+      "servedBytes": 33739,
+      "gitBytes": 33739
+    },
+    {
+      "path": "src/ui/lobby-geometry.ts",
+      "status": "identical",
+      "servedBytes": 123651,
+      "gitBytes": 123651
+    },
+    {
+      "path": "src/ui/online-copy.ts",
+      "status": "identical",
+      "servedBytes": 11069,
+      "gitBytes": 11069
+    },
+    {
+      "path": "src/ui/lobby.ts",
+      "status": "identical",
+      "servedBytes": 119754,
+      "gitBytes": 119754
+    },
+    {
+      "path": "src/ui/lobby-view.ts",
+      "status": "identical",
+      "servedBytes": 61714,
+      "gitBytes": 61714
+    },
+    {
+      "path": "src/ui/build-button.ts",
+      "status": "identical",
+      "servedBytes": 15743,
+      "gitBytes": 15743
+    },
+    {
+      "path": "src/ui/build-wheel-view.ts",
+      "status": "identical",
+      "servedBytes": 69268,
+      "gitBytes": 69268
+    },
+    {
+      "path": "src/ui/font-metrics.ts",
+      "status": "identical",
+      "servedBytes": 7999,
+      "gitBytes": 7999
+    },
+    {
+      "path": "src/ui/font-metrics.data.ts",
+      "status": "identical",
+      "servedBytes": 12752,
+      "gitBytes": 12752
+    },
+    {
+      "path": "src/ui/hud-geometry.ts",
+      "status": "identical",
+      "servedBytes": 42958,
+      "gitBytes": 42958
+    },
+    {
+      "path": "src/ui/wheel-stack.ts",
+      "status": "identical",
+      "servedBytes": 28297,
+      "gitBytes": 28297
+    },
+    {
+      "path": "src/platform/touch-visuals.ts",
+      "status": "identical",
+      "servedBytes": 28561,
+      "gitBytes": 28561
+    },
+    {
+      "path": "src/ui/onboarding.ts",
+      "status": "identical",
+      "servedBytes": 34953,
+      "gitBytes": 34953
+    },
+    {
+      "path": "src/ui/hud.ts",
+      "status": "identical",
+      "servedBytes": 116765,
+      "gitBytes": 116765
+    }
+  ]
+}
