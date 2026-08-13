@@ -6,6 +6,13 @@
  * Day-1 covered the first two prompts; day 2 adds SPEND (fires the first time
  * the wheel opens) and UNDER-ATTACK (rides the alarm), and completes the
  * haul-home copy now that there is a station to fly home to.
+ *
+ * Since a0-33 and a0-34 there are six prompts and two more contracts:
+ *  - the **lesson** branches on `(scheme, mode)`, not just the binding (a0-33);
+ *  - **OBJECTIVE fires first** and retires on being read (a0-34).
+ * The two met in r14-01, so the OBJECTIVE cases assert their copy across all six
+ * readings the branch can produce, and a0-33's CONTROLS cases start from
+ * {@link afterTheObjective} — see that helper for why.
  */
 import { describe, it, expect } from 'vitest';
 import { Onboarding, PromptId, oreWasSpent, resolvePromptText } from './onboarding';
