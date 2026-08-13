@@ -10,6 +10,7 @@ projectiles, planets not stations, a held repair channel, no fog/radar).
 
 | File | What it covers |
 |---|---|
+| `codex-objective.json` | **What winning is** — the win condition and how a match ends. The codex's first section (a0-34). |
 | `codex-bots.json` | The seven bots as characters — name, difficulty tier, hull, play style. |
 | `codex-ships.json` | The four hulls by lobby name, roles, and the rock-paper-scissors. |
 | `codex-systems.json` | How the game works. **Its numbers are machine-checked** (see below). |

@@ -1976,8 +1976,12 @@ export class Hud extends Container {
       // pressed" (u15-01 half B).
       hasSpent: this.hasSpent,
       underAttack,
-      // The match clock the CONTROLS tip's dwell is measured on (a0-33) — the
-      // same `world.time` the wave clock reads, so there is one clock in the HUD.
+      // Match time, for both dwell-retired prompts (a0-33's CONTROLS tip and
+      // a0-34's OBJECTIVE): each teaches something no player action can confirm —
+      // that the settings screen exists, and what winning is — so each retires on
+      // having been on screen long enough to read. The same `world.time` the wave
+      // clock is drawn from, so there is one clock in the HUD and onboarding owns
+      // no timer of its own.
       time: frame.time,
     });
 

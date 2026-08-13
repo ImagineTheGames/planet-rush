@@ -13,8 +13,13 @@ pipeline's structure; updates every fact to v0.7 (see `critic-rules.md`).
 | Voice / tone | `pipeline/tone.md` (pinned GDD §4.7) |
 | Reject rules | `pipeline/critic-rules.md` |
 
-## The four codex files
+## The five codex files
 
+- **codex-objective.json** — what winning is: the win condition (GDD §1, as
+  `src/sim/match.ts` `resolveWinner` enforces it) and how a match ends for a
+  player and for a side. **First in `CODEX_TABS` and first thing the codex says**
+  — the developer's ruling (a0-34), because every other section presumes the
+  reader already knows how a match is won.
 - **codex-bots.json** — the seven bots as characters: name, difficulty tier, the
   hull they fly (as the lobby names it), and how they play the triangle.
 - **codex-ships.json** — the four hulls, by lobby name (class + hull name), roles,
@@ -31,7 +36,7 @@ pipeline's structure; updates every fact to v0.7 (see `critic-rules.md`).
 {
   "id": "sys-repair-reactor",        // stable kebab id, prefix by codex
   "title": "The Repair Reactor",
-  "category": "systems",             // bots | ships | systems | strategy
+  "category": "systems",             // objective | bots | ships | systems | strategy
   "summary": "one-sentence hook",
   "body": "prose in v0.7 terms and the pinned tone",
   "tags": ["repair", "economy"],

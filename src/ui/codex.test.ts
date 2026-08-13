@@ -1,7 +1,7 @@
 /**
  * src/ui/codex.test.ts — the CODEX screen model, headless.
  *
- * The screen decides four things: which four tabs, which entries are in the live
+ * The screen decides four things: which tabs, which entries are in the live
  * tab, which one's detail is shown, and where a tap lands. All four are pure
  * functions of the parsed codex data and a viewport, so the whole screen is
  * asserted here with no Pixi and no canvas. Two data sources: the REAL
@@ -51,6 +51,7 @@ function loadReal(): CodexData {
   const read = (name: string): unknown =>
     JSON.parse(readFileSync(`${CODEX_DIR}codex-${name}.json`, 'utf8'));
   return normalizeCodex({
+    objective: read('objective'),
     bots: read('bots'),
     ships: read('ships'),
     systems: read('systems'),
@@ -69,6 +70,9 @@ function fixture(): CodexData {
     ...extra,
   });
   return normalizeCodex({
+    // OBJECTIVE first, as CODEX_TABS orders it (a0-34) — so a fixture-driven
+    // test opens where a player opens.
+    objective: { title: 'Objective', entries: [entry('o1', 'Last station standing')] },
     bots: {
       title: 'Bots',
       entries: [
@@ -83,11 +87,28 @@ function fixture(): CodexData {
 }
 
 describe('normalize', () => {
-  it('parses all four real files into non-empty sections', () => {
+  it('parses all five real files into non-empty sections', () => {
     for (const tab of CODEX_TABS) {
       expect(REAL[tab.id].entries.length, `${tab.id} has entries`).toBeGreaterThan(0);
       expect(REAL[tab.id].title, `${tab.id} has a file title`).not.toBe('');
     }
+  });
+
+  it('leads with OBJECTIVE, and its first entry is the win condition (a0-34)', () => {
+    // The developer's ruling: "id make it the first thing in the codex, and make
+    // sure it's section is the first." Asserted on the REAL files, because the
+    // failure worth catching is a section that exists and is not where it was
+    // ruled to be — or one whose first entry is not the objective.
+    expect(CODEX_TABS[0]!.id).toBe('objective');
+    expect(CODEX_TABS.map((t) => t.id).slice(1)).toEqual(['bots', 'ships', 'systems', 'strategy']);
+    const first = REAL.objective.entries[0]!;
+    expect(first.title).toMatch(/last station standing/i);
+    // GDD §1, enforced by `src/sim/match.ts` resolveWinner: the last surviving
+    // reactor takes it, and in Teams the last side with one. Both halves have to
+    // be in the entry, because the FFA half alone is what left a developer
+    // reporting "i lost somehow but my team is the one that won".
+    expect(first.body).toMatch(/reactor/i);
+    expect(REAL.objective.entries.map((e) => e.body).join(' ')).toMatch(/in Teams/i);
   });
 
   it("keeps the bots' difficulty and hull, and the systems' machine-checked facts", () => {
@@ -140,8 +161,18 @@ describe('normalize', () => {
 });
 
 describe('selection', () => {
-  it('opens on BOTS with the first entry selected', () => {
+  it('opens on OBJECTIVE — the first tab — with its first entry selected', () => {
+    // The developer's ruling (a0-34): the objective is the first thing in the
+    // codex and its section is the first, so a codex opened from the menu with no
+    // tab argument lands on it.
     const state = createCodex(fixture());
+    expect(state.activeTab).toBe('objective');
+    expect(state.selectedId).toBe('o1');
+    expect(activeEntry(state)?.title).toBe('Last station standing');
+  });
+
+  it('still opens on an explicitly named tab', () => {
+    const state = createCodex(fixture(), 'bots');
     expect(state.activeTab).toBe('bots');
     expect(state.selectedId).toBe('b1');
     expect(activeEntry(state)?.title).toBe('Alpha');
@@ -155,7 +186,7 @@ describe('selection', () => {
   });
 
   it('is identity-stable when re-selecting the live tab or entry', () => {
-    const state = createCodex(fixture());
+    const state = createCodex(fixture(), 'bots');
     expect(selectCodexTab(state, 'bots')).toBe(state);
     expect(selectCodexEntry(state, 0)).toBe(state);
     // Out-of-range entry index is a no-op too.
@@ -163,7 +194,7 @@ describe('selection', () => {
   });
 
   it('selects an entry by index within the active tab', () => {
-    const state = selectCodexEntry(createCodex(fixture()), 1);
+    const state = selectCodexEntry(createCodex(fixture(), 'bots'), 1);
     expect(state.selectedId).toBe('b2');
     expect(activeEntryIndex(state)).toBe(1);
   });
@@ -176,22 +207,30 @@ describe('selection', () => {
 });
 
 describe('the model', () => {
-  it('names the screen, the back control and the four tabs in order', () => {
+  it('names the screen, the back control and the five tabs in order', () => {
     const model = codexModel(createCodex(fixture()));
     expect(model.title).toBe(CODEX_TITLE);
     expect(model.backLabel).toBe(CODEX_BACK_LABEL);
-    expect(model.tabs.map((t) => t.label)).toEqual(['BOTS', 'SHIPS', 'SYSTEMS', 'STRATEGY']);
-    expect(model.tabs.map((t) => t.active)).toEqual([true, false, false, false]);
+    // OBJECTIVE leads and the original four keep their contents and their
+    // relative order behind it (a0-34).
+    expect(model.tabs.map((t) => t.label)).toEqual([
+      'OBJECTIVE',
+      'BOTS',
+      'SHIPS',
+      'SYSTEMS',
+      'STRATEGY',
+    ]);
+    expect(model.tabs.map((t) => t.active)).toEqual([true, false, false, false, false]);
   });
 
   it('marks exactly the selected entry in the rail', () => {
-    const model = codexModel(selectCodexEntry(createCodex(fixture()), 1));
+    const model = codexModel(selectCodexEntry(createCodex(fixture(), 'bots'), 1));
     expect(model.entries.map((e) => e.title)).toEqual(['Alpha', 'Beta']);
     expect(model.entries.map((e) => e.selected)).toEqual([false, true]);
   });
 
   it('shows difficulty then hull as badges on a bot, and none elsewhere', () => {
-    const bots = codexModel(createCodex(fixture()));
+    const bots = codexModel(createCodex(fixture(), 'bots'));
     expect(bots.detail?.badges).toEqual(['Easy', 'Hauler']);
     const systems = codexModel(selectCodexTab(createCodex(fixture()), 'systems'));
     expect(systems.detail?.badges).toEqual([]);
@@ -208,17 +247,18 @@ describe('the model', () => {
   });
 
   it('carries the active file title', () => {
-    expect(codexModel(createCodex(fixture())).sectionTitle).toBe('Bots');
+    expect(codexModel(createCodex(fixture())).sectionTitle).toBe('Objective');
+    expect(codexModel(createCodex(fixture(), 'bots')).sectionTitle).toBe('Bots');
   });
 
   it('resolves see-also ids to titles and drops unknown ids', () => {
     // b1's see_also is ['b2'] → "Beta".
-    expect(codexModel(createCodex(fixture())).detail?.seeAlso).toEqual(['Beta']);
+    expect(codexModel(createCodex(fixture(), 'bots')).detail?.seeAlso).toEqual(['Beta']);
     const data = normalizeCodex({
       bots: { title: 'B', entries: [{ id: 'a', title: 'A', body: 'x', see_also: ['ghost', 'a'] }] },
     });
     // 'ghost' names nothing and is dropped; 'a' resolves to itself.
-    expect(codexModel(createCodex(data)).detail?.seeAlso).toEqual(['A']);
+    expect(codexModel(createCodex(data, 'bots')).detail?.seeAlso).toEqual(['A']);
   });
 
   it('has a null detail for an empty tab', () => {
@@ -248,9 +288,11 @@ describe('layout', () => {
     expect(l.detail.width).toBeGreaterThan(l.rail.width); // detail is the wider pane
   });
 
-  it('lays out four tabs left-to-right with no overlap', () => {
+  it('lays out one tab chip per section, left-to-right with no overlap', () => {
     const l = layoutFor();
-    expect(l.tabs).toHaveLength(4);
+    // Pinned to CODEX_TABS rather than to a literal, so the fifth section (a0-34)
+    // is laid out rather than silently dropped off the strip.
+    expect(l.tabs).toHaveLength(CODEX_TABS.length);
     for (let i = 1; i < l.tabs.length; i++) {
       expect(l.tabs[i]!.x).toBeGreaterThanOrEqual(l.tabs[i - 1]!.x + l.tabs[i - 1]!.width);
     }

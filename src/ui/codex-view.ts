@@ -392,7 +392,8 @@ export class CodexView extends Container {
   // --- The tab row ----------------------------------------------------------
 
   /**
-   * The four tabs, as chips.
+   * The tabs, as chips — five of them since a0-34 put OBJECTIVE at the head of
+   * the strip; the row is driven by the model's list, never by a count here.
    *
    * The active one is the `primary` chip: the brightest metal in the chip family
    * behind a Bone border — the same material the settings screen's engaged toggle

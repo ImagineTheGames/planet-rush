@@ -1,0 +1,28 @@
+{
+  "codex": "objective",
+  "title": "Objective — what winning is",
+  "gddVersion": "0.7",
+  "generated": { "against": "GDD.md v0.7", "critic_loops": 3, "tone_pinned": true },
+  "entries": [
+    {
+      "id": "obj-win-condition",
+      "title": "Be the last station standing",
+      "category": "objective",
+      "summary": "One reactor still lit when every rival's has gone dark — that is the whole of it.",
+      "body": "You hold a claim plot with a mining station on it, and so does everyone else. The match ends when only one station's reactor is still lit; in Teams, when only one side still has one. That is the win condition, and nothing else scores: not ore banked, not kills taken, not turrets standing. Everything you do is in service of it. Mine the field, because ore is the only currency there is. Spend it on defenses — turrets, shields, a reactor patch — or on the ship itself with UPGRADE SHIP, and the choice between the two is the game's real economy. Attack when you judge it right, which is rarely a fair fight and often the moment a rival is far from home. The board will not let this run forever: the belt delivers five ore surges and then the claim closes in, and the Crush finishes whoever the operators do not.",
+      "tags": ["objective", "win-condition", "fundamentals"],
+      "see_also": ["obj-elimination", "sys-core-loop", "sys-waves-collapse"],
+      "facts": []
+    },
+    {
+      "id": "obj-elimination",
+      "title": "How you go out, and how a side wins without you",
+      "category": "objective",
+      "summary": "Your reactor at zero ends your match; your side's match ends when its last reactor does.",
+      "body": "Ships are cheap — you respawn free at home five seconds after you die, upgrades intact — and the reactor is not. When your own reactor reaches zero you are out from that moment: no ship, no controls, a REMATCH plate and a seat to spectate from. In Teams that is true even while your side plays on, so a 2v2 can run down to two ships against one with all four operators still watching. Your side is eliminated when its last reactor dies, and the side left holding one wins the claim — which is why a result can read as a win for a side whose operator went out minutes before the end. If the last two reactors fail on the same tick, the claim goes to whichever reached zero last in the simulation's resolution order: whoever dies last, wins. When a station goes, it leaves a wreck for the rest of the match, ringed by the fortune its owner had banked. Nobody hauls it away in one trip.",
+      "tags": ["objective", "elimination", "teams", "wrecks"],
+      "see_also": ["obj-win-condition", "sys-death-debris", "sys-reactor-core"],
+      "facts": []
+    }
+  ]
+}

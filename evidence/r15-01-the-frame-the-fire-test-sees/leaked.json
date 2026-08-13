@@ -1,0 +1,76 @@
+{
+  "label": "leaked",
+  "touchEmulated": true,
+  "registeredTouchAffordances": [
+    "touch-left-stick",
+    "touch-fire-button"
+  ],
+  "viewport": {
+    "w": 1280,
+    "h": 800
+  },
+  "dpr": 1,
+  "ticks": 60,
+  "regionFire": {
+    "x0": 0.7,
+    "y0": 0.8,
+    "x1": 1,
+    "y1": 1
+  },
+  "absentMaxPx": 40,
+  "registry": {
+    "minimap": {
+      "x": 1068,
+      "y": 708,
+      "width": 80,
+      "height": 80
+    },
+    "onboarding": {
+      "x": 226.95999999999998,
+      "y": 724,
+      "width": 826.0799999999999,
+      "height": 60
+    },
+    "ids": [
+      "ship-local",
+      "touch-left-stick",
+      "touch-fire-button",
+      "build-button",
+      "build-badge",
+      "pause-button",
+      "ore-hud",
+      "banked-total",
+      "station-hp",
+      "onboarding",
+      "nameplates",
+      "minimap",
+      "healthbars"
+    ]
+  },
+  "overlapsRegionFire": {
+    "minimap": {
+      "x0": 0.834375,
+      "y0": 0.885,
+      "x1": 0.896875,
+      "y1": 0.985
+    },
+    "onboardingPrompt": {
+      "x0": 0.7,
+      "y0": 0.905,
+      "x1": 0.8226875,
+      "y1": 0.98
+    }
+  },
+  "boneLitPixels": {
+    "regionFire": 1122,
+    "inMinimapSquare": 0,
+    "inPromptPanel": 278,
+    "asTestSeesIt": 1122,
+    "withPromptAlsoExcluded": 844
+  },
+  "verdict": {
+    "testAssertion": "1122 < 40",
+    "testPasses": false,
+    "passesOncePromptExcluded": false
+  }
+}

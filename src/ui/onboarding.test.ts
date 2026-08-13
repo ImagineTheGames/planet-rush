@@ -6,10 +6,17 @@
  * Day-1 covered the first two prompts; day 2 adds SPEND (fires the first time
  * the wheel opens) and UNDER-ATTACK (rides the alarm), and completes the
  * haul-home copy now that there is a station to fly home to.
+ *
+ * Since a0-33 and a0-34 there are six prompts and two more contracts:
+ *  - the **lesson** branches on `(scheme, mode)`, not just the binding (a0-33);
+ *  - **OBJECTIVE fires first** and retires on being read (a0-34).
+ * The two met in r14-01, so the OBJECTIVE cases assert their copy across all six
+ * readings the branch can produce, and a0-33's CONTROLS cases start from
+ * {@link afterTheObjective} — see that helper for why.
  */
 import { describe, it, expect } from 'vitest';
 import { Onboarding, PromptId, oreWasSpent, resolvePromptText } from './onboarding';
-import { FireMode } from '@platform/actions';
+import { describeBindings, FireMode } from '@platform/actions';
 import type { DeviceKind } from '@platform/actions';
 import type { OnboardingMemory, OnboardingSignals, SpendFacts } from './onboarding';
 import type { ControlScheme } from './settings';
@@ -37,6 +44,20 @@ function fakeMemory(seed: readonly string[] = []): OnboardingMemory & {
     },
   };
   return m;
+}
+
+/**
+ * A machine whose OBJECTIVE prompt is already behind the player (r14-01).
+ *
+ * a0-34 put the win condition first in {@link PROMPT_ORDER}, so in a *fresh*
+ * career it takes the band ahead of every lesson — which is the whole point, and
+ * is asserted in its own describe block above. a0-33's cases are about what the
+ * band carries AFTER that, and u15-01 makes "after that" the state of every match
+ * a player plays but their first, so they start from a memory that already holds
+ * it rather than re-reading the same sentence in each one.
+ */
+function afterTheObjective(): Onboarding {
+  return new Onboarding(fakeMemory([PromptId.Objective]));
 }
 
 /** A neutral purchase-observable snapshot (nothing built, nothing repaired). */
@@ -218,10 +239,131 @@ describe('Onboarding — UNDER-ATTACK prompt (GDD §2.2, §2.10)', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// a0-34 — the prompt that names the objective
+// ---------------------------------------------------------------------------
+//
+// The four prompts above teach verbs — mining, banking, spending, defending —
+// and not one of them says what the player is trying to ACHIEVE. The codex's
+// strategy entries all presume the reader already knows. So the first thing a
+// first match says is now the win condition itself (GDD §1), and it says it
+// BEFORE the mining lesson, because the goal is what frames every verb after it.
+
+/**
+ * The six readings the merged branch can produce for one prompt (r14-01): the
+ * two stick fire modes and Tap Commander, each on a desktop and on a phone.
+ * Named once here because both the copy test and the identity test below are
+ * about the same six, and because they are the six the PR body quotes.
+ */
+const OBJECTIVE_READINGS: ReadonlyArray<readonly [DeviceKind, FireMode, ControlScheme]> = [
+  ['keyboard', FireMode.Manual, 'sticks'],
+  ['keyboard', FireMode.AutoAim, 'sticks'],
+  ['keyboard', FireMode.AutoAim, 'tap'],
+  ['touch', FireMode.Manual, 'sticks'],
+  ['touch', FireMode.AutoAim, 'sticks'],
+  ['touch', FireMode.AutoAim, 'tap'],
+];
+
+describe('Onboarding — OBJECTIVE prompt (GDD §1 win condition, §2.10)', () => {
+  it('names the objective — the win condition, in every configuration', () => {
+    // GDD §1: "Own the last surviving station reactor — in Teams, be the last
+    // side with a reactor standing", enforced by `resolveWinner` in
+    // src/sim/match.ts (the last team holding a core wins; FFA is teams-of-one).
+    // The prompt has to SAY that, not gesture at it.
+    //
+    // Asserted across all six readings a0-33's branch can produce (r14-01), not
+    // just the one: the objective goes THROUGH that branch, so the four beats
+    // have to survive it in each slot rather than in whichever the test picked.
+    for (const [device, mode, scheme] of OBJECTIVE_READINGS) {
+      const text = resolvePromptText(PromptId.Objective, device, mode, scheme);
+      const where = `${device} / ${scheme} / ${mode}`;
+      expect(text, where).toMatch(/last station standing/i);
+      // …and the developer's other three beats, so the one line is the whole loop:
+      // mine ore, spend it on defenses / your ship, and attack when you judge it.
+      expect(text, where).toMatch(/mine ore/i);
+      expect(text, where).toMatch(/defen[cs]e/i);
+      expect(text, where).toMatch(/upgrade your ship/i);
+      expect(text, where).toMatch(/attack/i);
+    }
+  });
+
+  it('fires FIRST — before the mining prompt, with a rock already in reach', () => {
+    // The failure this pins: a player who is taught "hold fire on the asteroid"
+    // before anyone has told them what winning is.
+    const ob = new Onboarding();
+    expect(ob.update(sig({ nearAsteroid: true, time: 0 }))).toBe(PromptId.Objective);
+    expect(ob.isCompleted(PromptId.Mine)).toBe(false);
+  });
+
+  it('hands the band to MINE once it has been on screen long enough to read', () => {
+    const ob = new Onboarding();
+    expect(ob.update(sig({ nearAsteroid: true, time: 0 }))).toBe(PromptId.Objective);
+    expect(ob.update(sig({ nearAsteroid: true, time: 4 }))).toBe(PromptId.Objective);
+    // Read — and now the verb lessons follow, in their own order.
+    expect(ob.update(sig({ nearAsteroid: true, time: 20 }))).toBe(PromptId.Mine);
+    expect(ob.isCompleted(PromptId.Objective)).toBe(true);
+  });
+
+  it('yields to a siege, and is not retired by the seconds it spent off screen', () => {
+    // UNDER-ATTACK outranks everything (GDD §2.2). A tip that expires while it is
+    // not on screen is a tip nobody read.
+    const ob = new Onboarding();
+    expect(ob.update(sig({ time: 0 }))).toBe(PromptId.Objective);
+    expect(ob.update(sig({ time: 1, underAttack: true }))).toBe(PromptId.UnderAttack);
+    expect(ob.update(sig({ time: 60, underAttack: true }))).toBe(PromptId.UnderAttack);
+    expect(ob.update(sig({ time: 61 }))).toBe(PromptId.Objective);
+    expect(ob.isCompleted(PromptId.Objective)).toBe(false);
+  });
+
+  it('is shown once and never again — across matches, through the memory', () => {
+    // §2.10's "never appear again after each is completed once", made durable by
+    // u15-01: the objective is a thing you are told, not a thing you re-learn.
+    const memory = fakeMemory();
+    const first = new Onboarding(memory);
+    first.update(sig({ time: 0 }));
+    first.update(sig({ time: 30 }));
+    expect(first.isCompleted(PromptId.Objective)).toBe(true);
+    expect(memory.stored).toContain(PromptId.Objective);
+
+    const second = new Onboarding(memory); // next match, fresh machine
+    expect(second.update(sig({ nearAsteroid: true, time: 0 }))).toBe(PromptId.Mine);
+  });
+
+  it('stays off the screen entirely when the caller feeds no clock', () => {
+    // The dwell is measured on match time the caller hands in. A feed without one
+    // cannot know when the sentence has been read, so it must not take the band
+    // from the mining lesson forever — the safe direction to fail.
+    const ob = new Onboarding();
+    expect(ob.update(sig({ nearAsteroid: true }))).toBe(PromptId.Mine);
+  });
+
+  it('reads the same in every scheme, mode and device — it names no gesture', () => {
+    // It teaches the goal, not a gesture, so there is no key to name and no
+    // scheme-specific verb to swap: the copy is input-agnostic by having nothing
+    // device-shaped in it at all (GDD §2.10).
+    //
+    // This is the r14-01 assertion that a0-33's branch did not quietly swallow
+    // the objective, and that the objective did not quietly sit outside it: the
+    // prompt resolves through `lessonFor` like every other, and every one of the
+    // six configurations a player can be in yields the SAME ratified sentence.
+    const baseline = resolvePromptText(PromptId.Objective, 'keyboard', FireMode.Manual, 'sticks');
+    for (const [device, mode, scheme] of OBJECTIVE_READINGS) {
+      expect(resolvePromptText(PromptId.Objective, device, mode, scheme), `${device}/${scheme}`)
+        .toBe(baseline);
+    }
+    // The pad too — a third device, and the one a0-33's own tests use to prove
+    // the binding layer still runs underneath the lesson layer.
+    expect(resolvePromptText(PromptId.Objective, 'gamepad', FireMode.Manual, 'tap')).toBe(baseline);
+    expect(baseline).not.toMatch(/[{}]/);
+  });
+});
+
 describe('Onboarding — once-only across the whole session (GDD §2.10)', () => {
   it('retires every prompt after each has fired once', () => {
     const ob = new Onboarding();
     expect(ob.allCompleted()).toBe(false);
+    ob.update(sig({ time: 0 })); // OBJECTIVE shows — the goal, first (a0-34)
+    ob.update(sig({ time: 30 })); // …read, and retired
     ob.update(sig({ nearAsteroid: true })); // MINE shows
     ob.update(sig({ nearAsteroid: true, cargo: 1 })); // MINE done
     ob.update(sig({ cargo: 2, cargoCap: 2 })); // HAUL shows
@@ -480,6 +622,18 @@ describe('resolvePromptText — the lesson branches on the scheme and the mode (
     // none of them asks for a press); this walks the whole matrix and proves it,
     // so a future edit that drops a `{fire}` into the tap column fails here
     // rather than in a playtest.
+    //
+    // It only looks for a verb the configuration has NO ROW for, which is the
+    // only way `bindingPhrase` can fall back. The original scanned for a bare
+    // "fire" OR "build" in every configuration, and that cannot tell a fallback
+    // from English: a0-34's OBJECTIVE line — "mine ore, build defenses, upgrade
+    // your ship" — is English that says "build", in a scheme where `build` has a
+    // row and therefore could never have fallen back. The two briefs were green
+    // apart and red together, which is the worst way to find this.
+    //
+    // Asking `describeBindings` first is also strictly narrower than the old
+    // regex without losing the catch: under `tap` there is no `fire` row, so a
+    // `{fire}` dropped into a tap sentence still fails here.
     for (const id of Object.values(PromptId)) {
       for (const device of ['keyboard', 'touch', 'gamepad'] as DeviceKind[]) {
         for (const mode of [FireMode.Manual, FireMode.AutoAim]) {
@@ -487,9 +641,14 @@ describe('resolvePromptText — the lesson branches on the scheme and the mode (
             const text = resolvePromptText(id, device, mode, scheme);
             const where = `${id}/${device}/${mode}/${scheme}`;
             expect(text, where).not.toMatch(/[{}]/);
-            expect(text, `${where}: an unresolved binding fell back to a bare verb`).not.toMatch(
-              /(^|\s)(fire|build)(\s|$)/,
-            );
+            const rows = describeBindings(device, mode, scheme);
+            for (const action of ['fire', 'build'] as const) {
+              if (rows.some((r) => r.action === action)) continue; // has a row — cannot fall back
+              expect(
+                text,
+                `${where}: this configuration has no {${action}} row, so that word can only be the bare-verb fallback`,
+              ).not.toMatch(new RegExp(`(^|\\s)${action}(\\s|$)`));
+            }
           }
         }
       }
@@ -556,13 +715,13 @@ describe('Onboarding — CONTROLS tip (a0-33, the developer\'s third ask)', () =
   }
 
   it('does not fire before the player has flown a loop — a lesson always outranks it', () => {
-    const ob = new Onboarding();
+    const ob = afterTheObjective();
     expect(ob.update(sig({ nearAsteroid: true, time: 0 }))).toBe(PromptId.Mine);
     expect(ob.update(sig({ cargo: 2, cargoCap: 2, time: 1 }))).toBe(PromptId.HaulHome);
   });
 
   it('fires once the core loop is learned — mined, and a full hold banked', () => {
-    const ob = new Onboarding();
+    const ob = afterTheObjective();
     flyTheLoop(ob);
     expect(ob.update(sig({ time: 1 }))).toBe(PromptId.Controls);
   });
@@ -579,7 +738,7 @@ describe('Onboarding — CONTROLS tip (a0-33, the developer\'s third ask)', () =
   });
 
   it('retires once it has been on screen long enough to read, and never comes back', () => {
-    const ob = new Onboarding();
+    const ob = afterTheObjective();
     flyTheLoop(ob);
     expect(ob.update(sig({ time: 1 }))).toBe(PromptId.Controls);
     expect(ob.update(sig({ time: 5 }))).toBe(PromptId.Controls);
@@ -592,7 +751,7 @@ describe('Onboarding — CONTROLS tip (a0-33, the developer\'s third ask)', () =
   it('does not burn its dwell while a siege has the band (a0-33)', () => {
     // UNDER-ATTACK outranks it. A tip that expires off screen is a tip the player
     // never read, so the dwell counts only the frames it was the shown prompt.
-    const ob = new Onboarding();
+    const ob = afterTheObjective();
     flyTheLoop(ob);
     expect(ob.update(sig({ time: 1 }))).toBe(PromptId.Controls);
     for (let t = 2; t <= 30; t++) {
@@ -604,7 +763,7 @@ describe('Onboarding — CONTROLS tip (a0-33, the developer\'s third ask)', () =
   });
 
   it('never advances its dwell backwards — a rematch resets world.time to 0', () => {
-    const ob = new Onboarding();
+    const ob = afterTheObjective();
     flyTheLoop(ob, 100);
     expect(ob.update(sig({ time: 101 }))).toBe(PromptId.Controls);
     expect(ob.update(sig({ time: 0 }))).toBe(PromptId.Controls);
@@ -619,7 +778,9 @@ describe('Onboarding — CONTROLS tip (a0-33, the developer\'s third ask)', () =
   });
 
   it('is remembered like every other lesson — one tip per player, not per match', () => {
-    const memory = fakeMemory();
+    // Seeded with OBJECTIVE for the reason `afterTheObjective` states: this is a
+    // later match in a career, which is the only place the CONTROLS tip lives.
+    const memory = fakeMemory([PromptId.Objective]);
     const first = new Onboarding(memory);
     flyTheLoop(first);
     first.update(sig({ time: 1 }));
@@ -641,7 +802,7 @@ describe('a mid-match settings switch (a0-33)', () => {
     // The HUD resolves the active prompt's text every frame from the live frame
     // values (`Hud.updateOnboarding`), so this is the sentence a player sees
     // before and after they flip CONTROLS with the prompt still up.
-    const ob = new Onboarding();
+    const ob = afterTheObjective();
     const active = ob.update(sig({ nearAsteroid: true, time: 0 }));
     expect(active).toBe(PromptId.Mine);
     const before = resolvePromptText(active!, 'keyboard', FireMode.AutoAim, 'sticks');
@@ -653,14 +814,14 @@ describe('a mid-match settings switch (a0-33)', () => {
   it('does not re-fire a prompt the player already completed', () => {
     // Switching scheme is not un-learning: completion is about what the player
     // knows, and the machine never sees the scheme at all.
-    const ob = new Onboarding();
+    const ob = afterTheObjective();
     ob.update(sig({ nearAsteroid: true, cargo: 1, time: 0 }));
     expect(ob.isCompleted(PromptId.Mine)).toBe(true);
     expect(ob.update(sig({ nearAsteroid: true, cargo: 0, time: 1 }))).toBeNull();
   });
 
   it('gives a prompt that has not fired yet the wording in force when it does', () => {
-    const ob = new Onboarding();
+    const ob = afterTheObjective();
     // The player switches to the sticks before ever filling the hold.
     ob.update(sig({ nearAsteroid: true, cargo: 1, time: 0 }));
     const active = ob.update(sig({ cargo: 2, cargoCap: 2, time: 4 }));

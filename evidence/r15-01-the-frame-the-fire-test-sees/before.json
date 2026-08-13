@@ -1,0 +1,68 @@
+{
+  "label": "before",
+  "viewport": {
+    "w": 1280,
+    "h": 800
+  },
+  "dpr": 1,
+  "ticks": 60,
+  "regionFire": {
+    "x0": 0.7,
+    "y0": 0.8,
+    "x1": 1,
+    "y1": 1
+  },
+  "absentMaxPx": 40,
+  "registry": {
+    "minimap": {
+      "x": 1120,
+      "y": 600,
+      "width": 148,
+      "height": 148
+    },
+    "onboarding": {
+      "x": 196.77999999999997,
+      "y": 690,
+      "width": 886.44,
+      "height": 60
+    },
+    "ids": [
+      "ship-local",
+      "build-badge",
+      "ore-hud",
+      "banked-total",
+      "controls-strip",
+      "station-hp",
+      "onboarding",
+      "nameplates",
+      "minimap",
+      "healthbars"
+    ]
+  },
+  "overlapsRegionFire": {
+    "minimap": {
+      "x0": 0.875,
+      "y0": 0.8,
+      "x1": 0.990625,
+      "y1": 0.935
+    },
+    "onboardingPrompt": {
+      "x0": 0.7,
+      "y0": 0.8625,
+      "x1": 0.846265625,
+      "y1": 0.9375
+    }
+  },
+  "boneLitPixels": {
+    "regionFire": 308,
+    "inMinimapSquare": 0,
+    "inPromptPanel": 308,
+    "asTestSeesIt": 308,
+    "withPromptAlsoExcluded": 0
+  },
+  "verdict": {
+    "testAssertion": "308 < 40",
+    "testPasses": false,
+    "passesOncePromptExcluded": true
+  }
+}

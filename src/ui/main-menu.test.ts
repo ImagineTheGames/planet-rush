@@ -66,8 +66,8 @@ describe('the model', () => {
 
   it('gives every plate a sub-line, and derives CODEX\'s from the codex\'s own tabs', () => {
     // The handoff has no CODEX plate, so rather than invent a line of voice the
-    // sub-line names the screen's four tabs. Pinned to CODEX_TABS so a fifth tab
-    // cannot leave the menu describing four.
+    // sub-line names the screen's tabs. Pinned to CODEX_TABS so a new section
+    // (a0-34's OBJECTIVE was the fifth) cannot leave the menu describing four.
     for (const button of mainMenuModel().buttons) expect(button.sub.length).toBeGreaterThan(0);
     const codex = mainMenuModel().buttons.find((b) => b.label === 'CODEX');
     expect(codex?.sub).toBe(codexSubLine());
