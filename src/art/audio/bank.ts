@@ -1591,12 +1591,12 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
    *    swells whose corners travel while their pitch stands still (`./synth`
    *    {@link VoiceSpec.lowPassEnd}: a machine losing or gaining energy, which is
    *    the register §4.7 asks for; a pitch that slid would be the chirp it retires).
-   *    Staggered so one is always rising while another falls, which is what makes
-   *    fifteen minutes of it survivable.
+   *    Staggered so their swells overlap rather than breathing together, which is
+   *    what makes fifteen minutes of it survivable.
    *  - **Nothing arrives.** Every layer fades in. The sustained ones do it inside
    *    the crossfade (below); the tides swell over two to three seconds each.
    *
-   * ## The two arithmetic constraints, written down so an edit keeps them
+   * ## The arithmetic, written down so an edit keeps it
    *
    *  - **The body is 10 s and every layer ends inside it.** `renderLayered` sizes
    *    the buffer to the *latest* layer, so a swell that ran past the sustained
