@@ -17,9 +17,9 @@
 
 import { describe, expect, it } from 'vitest';
 import { ShipClass } from '@shared/types';
-import { createWorld, step, type World } from '../../sim';
+import { createWorld, shipTopSpeed, step, type World } from '../../sim';
 import { TELL, TELL_NAMES, TellQueue } from '../tells';
-import { REFERENCE_ACCEL, REPAIR_PULSE_S, SPAWN_PULSE_S, WorldObserver, type WorldView } from './observer';
+import { REPAIR_PULSE_S, SPAWN_PULSE_S, WorldObserver, type WorldView } from './observer';
 
 /** The compile-time half: a real World *is* a WorldView, or this file fails tsc. */
 function asView(world: World): WorldView {
@@ -54,7 +54,7 @@ describe('WorldObserver — the sim shape it reads', () => {
     // rename that still typechecks structurally on a partially-shared shape.
     const world = newWorld();
     const ship = world.ships[0]!;
-    for (const key of ['id', 'pos', 'vel', 'angle', 'radius', 'alive', 'hull', 'maxHull', 'cargo', 'cargoCap', 'banked', 'spawnProtect', 'tiers', 'firing']) {
+    for (const key of ['id', 'pos', 'vel', 'angle', 'radius', 'alive', 'hull', 'maxHull', 'cargo', 'cargoCap', 'banked', 'spawnProtect', 'tiers', 'firing', 'thrust']) {
       expect(ship, `Ship.${key}`).toHaveProperty(key);
     }
     const station = world.stations[0]!;
@@ -117,6 +117,7 @@ function ship(over: Record<string, unknown> = {}): unknown {
     spawnProtect: 0,
     tiers: { power: 0, engine: 0, cargo: 0, hull: 0 },
     firing: false,
+    thrust: 0,
     ...over,
   };
 }
@@ -263,21 +264,82 @@ describe('WorldObserver — deriving the moments', () => {
     expect(back.has(TELL.shipSpawn)).toBe(true);
   });
 
-  it('measures throttle from the ship rather than asking the sim for it', () => {
-    const moving = ship({ vel: { x: REFERENCE_ACCEL / 60, y: 0 } });
+  it('reads the throttle the sim applied, and puts the exhaust behind the hull', () => {
+    const moving = ship({ thrust: 1 });
     const tells = diff(world({ ships: [ship()] }), world({ ships: [moving] }));
-    // One frame of full acceleration along the nose reads as full throttle.
-    expect(magnitudeOf(tells, TELL.thrust)).toBeCloseTo(1, 2);
+    // Full stick reads as full throttle — no reference constant in between.
+    expect(magnitudeOf(tells, TELL.thrust)).toBeCloseTo(1, 5);
     // And the exhaust leaves from behind the hull, pointing backwards.
     const i = tells.indexOf(TELL.thrust);
     expect(tells.x[i]).toBeCloseTo(100 - 12, 5);
     expect(tells.angle[i]).toBeCloseTo(Math.PI, 5);
   });
 
-  it('reads a coasting ship as no thrust at all', () => {
-    const drifting = ship({ vel: { x: 200, y: 0 } });
-    const tells = diff(world({ ships: [drifting] }), world({ ships: [drifting] }));
-    expect(tells.has(TELL.thrust)).toBe(false);
+  it('carries a part-open throttle through, so easing off thins the trail', () => {
+    // The emitter sizes count, speed, lifetime and alpha off this magnitude
+    // (`./emitters` thrusterTrail), so a half-open stick must arrive as a half —
+    // not as a 1 the moment it clears the deadzone.
+    const half = diff(world({ ships: [ship()] }), world({ ships: [ship({ thrust: 0.5 })] }));
+    expect(magnitudeOf(half, TELL.thrust)).toBeCloseTo(0.5, 5);
+    const nudge = diff(world({ ships: [ship()] }), world({ ships: [ship({ thrust: 0.01 })] }));
+    expect(nudge.has(TELL.thrust)).toBe(false); // deadzone: a stick at rest is not an engine
+  });
+
+  it('still thrusting at top speed', () => {
+    // The a0-47 report: *"the ship's rocket and trails only appear when he's
+    // fully stopped and goes to move, but then it stops like after 1 second."*
+    // At top speed thrust and drag cancel EXACTLY — that is what top speed is —
+    // so a throttle inferred from acceleration reads zero at the one moment the
+    // engine is working hardest. Driven through the real sim, at full stick,
+    // held until the velocity has plateaued.
+    const arena = createWorld({
+      seed: 20260814,
+      players: [{ id: 0, shipClass: ShipClass.Vanguard }],
+      bounds: { width: 4000, height: 4000 },
+      asteroidCount: 0,
+    });
+    const flier = arena.ships[0]!;
+    // Aim the run at the arena centre so 4 s of flight cannot reach a wall.
+    const cx = 2000 - flier.pos.x;
+    const cy = 2000 - flier.pos.y;
+    const l = Math.hypot(cx, cy) || 1;
+    const inputs = [{ id: 0, actions: [{ type: 'thrust' as const, dir: { x: cx / l, y: cy / l } }] }];
+
+    for (let tick = 0; tick < 240; tick++) step(arena, inputs, 1 / 60);
+
+    // Precondition: the engine is at full stretch and the acceleration it buys
+    // is gone — the exact state the old inference read as "coasting".
+    expect(Math.hypot(flier.vel.x, flier.vel.y)).toBeCloseTo(shipTopSpeed(flier), 3);
+    const was = { x: flier.vel.x, y: flier.vel.y };
+    step(arena, inputs, 1 / 60);
+    expect(Math.hypot(flier.vel.x - was.x, flier.vel.y - was.y) * 60).toBeLessThan(1);
+
+    // Two consecutive frames at top speed, both of which must trail.
+    const observer = new WorldObserver({ local: 0 });
+    const tells = new TellQueue();
+    observer.observe(arena, 1 / 60, tells); // primes, silent
+    for (const frame of [1, 2]) {
+      step(arena, inputs, 1 / 60);
+      tells.clear();
+      observer.observe(arena, 1 / 60, tells);
+      expect(tells.has(TELL.thrust), `frame ${frame} at top speed`).toBe(true);
+      expect(magnitudeOf(tells, TELL.thrust)).toBeCloseTo(1, 5);
+    }
+  });
+
+  it('a coasting ship at top speed with zero intent emits nothing', () => {
+    // The negative half of the pair above (LESSONS §26): either test alone is
+    // satisfied by an always-on (or always-off) trail; together they pin it.
+    const coasting = ship({ vel: { x: 300, y: 0 }, thrust: 0 });
+    const observer = new WorldObserver();
+    const tells = new TellQueue();
+    const frame = world({ ships: [coasting] }) as unknown as WorldView;
+    observer.observe(frame, 1 / 60, tells);
+    for (const n of [1, 2]) {
+      tells.clear();
+      observer.observe(frame, 1 / 60, tells);
+      expect(tells.has(TELL.thrust), `coasting frame ${n}`).toBe(false);
+    }
   });
 
   it('pulses spawn protection on one shared clock (GDD §2.1)', () => {
