@@ -38,12 +38,13 @@ import {
   BUILD_RING_RADIUS,
   STATION_VARIANT_COUNT,
 } from './stations';
+import { auditSprite } from './compliance';
 import { RING_JND, scanRings } from './ring-scan';
-import { PALETTE } from './palette';
+import { DERIVED, FLOOR, PALETTE } from './palette';
 import { DEPOSIT_RANGE, STATION } from '../sim/constants';
 import { shipSprite } from './ships';
 import { satelliteSprite, satelliteWreckSprite, type SatelliteState } from './satellite';
-import { spriteKey, type SpriteDef } from './shapes';
+import { spriteKey, type Shape, type SpriteDef } from './shapes';
 import { debrisFieldSprite, stationWreckSprite } from './wrecks';
 
 /** Everything that has to be reproducible, with a second identical call. */
@@ -198,6 +199,197 @@ describe('asteroids — the payout read (style-guide §6)', () => {
     const ore = (kind: (typeof ASTEROID_KINDS)[number]): number =>
       asteroidSprite({ seed: 4, crackStage: 0, richness: 0, kind }).shapes.filter((s) => s.role === 'ore').length;
     for (const kind of ASTEROID_KINDS) expect(ore(kind)).toBe(0);
+  });
+});
+
+describe('ore chunks — CRYSTALLINE, the ratified pick (a0-41)', () => {
+  /**
+   * The developer reviewed every FACET × RIM × HALO combination in scene, at the
+   * chunk's real sim radius beside the 64-unit station, and picked one:
+   * *"ok crystaline with these options"*. Every number below is that pick.
+   *
+   * They are asserted off the SPRITE rather than off the constants that produce
+   * it, deliberately. A test that reads `CHUNK_RADIUS` and checks it is 0.62
+   * asserts that the file equals itself; a test that measures the polygon
+   * asserts that the chunk on screen is the chunk that was approved, whatever
+   * the generator is refactored into.
+   */
+  const RATIFIED = {
+    facets: 7,
+    radius: 0.62,
+    rimWidth: 0.09,
+    /** The subtle halo's alphas × 2.1 — "Strong". */
+    halo: [
+      { r: 0.98, alpha: 0.21 },
+      { r: 0.72, alpha: 0.336 },
+    ],
+  } as const;
+
+  const bodyOf = (def: SpriteDef): Shape =>
+    def.shapes.find((s) => s.path.kind === 'poly' && s.stroke !== undefined)!;
+
+  it('is a seven-facet crystal on a unit radius of 0.62, not a disc', () => {
+    for (let seed = 0; seed < 4; seed++) {
+      const body = bodyOf(oreChunkSprite(seed));
+      const pts = (body.path as { points: readonly number[] }).points;
+      expect(pts.length / 2, `seed ${seed} facet count`).toBe(RATIFIED.facets);
+
+      // Mean vertex radius is the ratified 0.62; the spread around it is the
+      // per-facet jitter, and it has to be there or the crystal is a heptagon.
+      const radii: number[] = [];
+      for (let i = 0; i < pts.length; i += 2) radii.push(Math.hypot(pts[i]!, pts[i + 1]!));
+      const mean = radii.reduce((a, b) => a + b, 0) / radii.length;
+      expect(mean, `seed ${seed} mean radius`).toBeCloseTo(RATIFIED.radius, 1);
+      expect(Math.max(...radii)).toBeGreaterThan(Math.min(...radii) * 1.1);
+
+      // Angles are jittered too — equal-angle vertices read as a turned shape.
+      const angles = [...Array(RATIFIED.facets)].map((_, i) =>
+        Math.atan2(pts[i * 2 + 1]!, pts[i * 2]!),
+      );
+      const gaps = angles.map((a, i) => {
+        const d = angles[(i + 1) % angles.length]! - a;
+        return d < 0 ? d + Math.PI * 2 : d;
+      });
+      expect(Math.max(...gaps)).toBeGreaterThan(Math.min(...gaps) * 1.1);
+    }
+  });
+
+  it('carries the dark rim as a STROKE on the body, never a polygon behind it', () => {
+    const def = oreChunkSprite(0);
+    const body = bodyOf(def);
+    // A scaled-up polygon behind a seven-sided silhouette shows its corners
+    // where a stroke follows the edge — load-bearing at 8 px, so the rim's
+    // *mechanism* is pinned, not just its colour.
+    expect(body.fill?.color).toBe(PALETTE.signalYellow);
+    expect(body.stroke?.color).toBe(DERIVED.oreDeep);
+    expect(body.stroke?.width).toBeCloseTo(RATIFIED.rimWidth, 6);
+    expect(body.role).toBe('ore');
+    const reachOf = (s: Shape): number => {
+      const p = (s.path as { points: readonly number[] }).points;
+      let r = 0;
+      for (let i = 0; i < p.length; i += 2) r = Math.max(r, Math.hypot(p[i]!, p[i + 1]!));
+      return r;
+    };
+    const bodyReach = reachOf(body);
+    for (const s of def.shapes) {
+      if (s === body || s.path.kind !== 'poly') continue;
+      expect(reachOf(s), 'no polygon sits outside the body — the rim is the stroke').toBeLessThan(bodyReach);
+    }
+  });
+
+  it('is three-tone — a shadowed lower-right facet and a lit upper-left one', () => {
+    const def = oreChunkSprite(0);
+    const centroid = (s: Shape): { x: number; y: number } => {
+      const p = (s.path as { points: readonly number[] }).points;
+      let x = 0;
+      let y = 0;
+      for (let i = 0; i < p.length; i += 2) {
+        x += p[i]!;
+        y += p[i + 1]!;
+      }
+      return { x: x / (p.length / 2), y: y / (p.length / 2) };
+    };
+    const shadow = def.shapes.find((s) => s.fill?.color === DERIVED.oreDeep && s.fill.alpha === 0.9)!;
+    const lit = def.shapes.find((s) => s.fill?.color === DERIVED.coreHot && s.fill.alpha === 0.9)!;
+    expect(shadow).toBeDefined();
+    expect(lit).toBeDefined();
+    // +y is down, +x is right: the shadow sits lower-right of the lit facet.
+    expect(centroid(shadow).x).toBeGreaterThan(centroid(lit).x);
+    expect(centroid(shadow).y).toBeGreaterThan(centroid(lit).y);
+  });
+
+  it('wears the STRONG halo — the subtle one × 2.1, at the radii it always used', () => {
+    const def = oreChunkSprite(0);
+    const discs = def.shapes.filter((s) => s.path.kind === 'circle');
+    expect(discs).toHaveLength(RATIFIED.halo.length);
+    for (let i = 0; i < RATIFIED.halo.length; i++) {
+      const want = RATIFIED.halo[i]!;
+      const disc = discs[i]!;
+      expect((disc.path as { r: number }).r).toBeCloseTo(want.r, 6);
+      expect(disc.fill?.alpha).toBeCloseTo(want.alpha, 6);
+      expect(disc.fill?.color).toBe(PALETTE.signalYellow);
+      expect(disc.role).toBe('ore');
+      // 2.1× a subtle halo, stated as the ratio rather than as two more numbers.
+      expect(want.alpha / 2.1).toBeCloseTo([0.1, 0.16][i]!, 6);
+    }
+  });
+
+  /**
+   * **The §2 question the Strong halo has to answer**, and it is a measurement.
+   *
+   * Ore is the RESERVED signal-yellow role, and a0-41 makes a field of 120
+   * chunks brighter. So: does the ore field start competing with the HUD's own
+   * yellow (the hold pips and the banked numeral, `src/ui/hud.ts` /
+   * `ore-hold-view.ts` — flat `signalYellow` at α 1)?
+   *
+   * No, and the reason is structural rather than lucky: **the halo is a ring,
+   * not a fill.** Everything it raises sits *outside* the body, and the body was
+   * already flat signal yellow at α 1 before this brief and still is. So the
+   * brightest ore pixel on screen has not moved at all — what moved is the
+   * mid-value ring around it, which is what "findable from outside tractor
+   * range" means. Composited over Floor, in Y′ (0..255):
+   *
+   * ```
+   *   halo outer α 0.21          50.6      ← was 29.1 (subtle)
+   *   halo inner, over it        103.2     ← was ~55
+   *   the chunk body             207.0     ← unchanged, and it is the HUD's number
+   * ```
+   */
+  it('makes no ore pixel brighter than the HUD yellow it shares a screen with', () => {
+    const luma = (c: number): number =>
+      0.2126 * ((c >> 16) & 0xff) + 0.7152 * ((c >> 8) & 0xff) + 0.0722 * (c & 0xff);
+    /** `over` composited onto `under` at `alpha`, per channel, then Y′. */
+    const overLuma = (under: number, over: number, alpha: number): number => {
+      let out = 0;
+      for (const sh of [16, 8, 0]) {
+        const v = Math.round(((over >> sh) & 0xff) * alpha + ((under >> sh) & 0xff) * (1 - alpha));
+        out |= v << sh;
+      }
+      return luma(out);
+    };
+
+    const def = oreChunkSprite(0);
+    const discs = def.shapes.filter((s) => s.path.kind === 'circle');
+    // The halo, stacked outer-then-inner exactly as it draws, over Floor.
+    let halo = FLOOR;
+    for (const d of discs) {
+      let next = 0;
+      for (const sh of [16, 8, 0]) {
+        const v = Math.round(
+          ((d.fill!.color >> sh) & 0xff) * d.fill!.alpha + ((halo >> sh) & 0xff) * (1 - d.fill!.alpha),
+        );
+        next |= v << sh;
+      }
+      halo = next;
+    }
+    const body = luma(PALETTE.signalYellow);
+
+    // The halo is a finder ring and never a signal: at its brightest it is half
+    // the chunk's own body, which is the HUD's own flat signal yellow.
+    expect(luma(halo)).toBeLessThan(body * 0.55);
+    expect(luma(halo)).toBeGreaterThan(luma(FLOOR) * 4); // …and it is not nothing
+
+    // The one ink on the chunk brighter than the body is the LIT facet, and it
+    // is not new — `coreHot` at α .9 is the same three-tone recipe the previous
+    // blob carried, and it is below the station core's own lit centre, which
+    // spends the identical hue at α 1 under the same RESERVED rule.
+    const lit = def.shapes.find((s) => s.fill?.color === DERIVED.coreHot)!;
+    expect(overLuma(PALETTE.signalYellow, DERIVED.coreHot, lit.fill!.alpha)).toBeLessThan(luma(DERIVED.coreHot));
+  });
+
+  it('keeps four distinct chunks, so a field of 120 does not read as tiling', () => {
+    const looks = [0, 1, 2, 3].map((seed) => spriteKey(oreChunkSprite(seed)));
+    expect(new Set(looks).size).toBe(4);
+    // And the fold the atlas and the renderer both apply is what makes it four.
+    expect(spriteKey(oreChunkSprite(4))).toBe(spriteKey(oreChunkSprite(4)));
+  });
+
+  it('is all ore and nothing else — the RESERVED rule, structurally', () => {
+    for (let seed = 0; seed < 4; seed++) {
+      const def = oreChunkSprite(seed);
+      expect(auditSprite(def)).toEqual([]);
+      for (const s of def.shapes) expect(s.role).toBe('ore');
+    }
   });
 });
 

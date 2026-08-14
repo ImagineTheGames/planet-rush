@@ -155,9 +155,10 @@ export const RENDER_EXTENT = {
   ship: 1.16,
   /** `shieldSprite` — the bubble plus its gauge band. */
   shield: 1.15,
-  /** The ore chunk is drawn as a unit circle scaled by its radius (`makeUnitChunk`),
-   *  so its art reaches exactly its collision radius and no further. */
-  chunk: 1,
+  /** `oreChunkSprite` — the findability halo overhangs the collider (a0-41; it
+   *  was `1` while the chunk was a flat `Graphics` disc drawn at exactly its
+   *  radius, and the sprite has declared 1.05 the whole time). */
+  chunk: 1.05,
 } as const;
 
 /**

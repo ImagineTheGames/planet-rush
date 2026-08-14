@@ -278,6 +278,26 @@ Every `*Texture` pooling function is uncalled. This one is mine to care about �
 60 fps on integrated graphics is a Platform gate — and it is a measurement, not
 a bug report: the pooling that was built is not the pooling that runs.
 **Should be called by:** `src/render/index.ts`. *(Owner: Art + Platform.)*
+**PARTLY FIXED 2026-08-10 by a1-11** — rocks, turrets and shots (`asteroidArt`,
+`asteroidTexture`, and the renderer's own keyed lookups) went through the pool;
+263 draw calls a frame → 32. The other nine `*Texture` functions stayed in the
+allowlist as *dark by deferral*, quoting a1-10 §6B as the costed follow-up.
+**`oreChunkTexture` FIXED 2026-08-14 by a0-41**, and this row is the reason it
+is worth restating rather than just deleting. The ore field was not deferred
+art — it was **better art nobody drew**. `oreChunkSprite` (facets, a lit and a
+shadowed pair, a findability halo) shipped in M1; `src/render/index.ts` drew
+`new Graphics().circle(0, 0, 1).fill(PALETTE.signalYellow)` — one flat disc —
+for every one of the 120 chunks on the §4.3 scene, for the whole milestone. The
+scan called the *texture* function dark and was right; what it could not say is
+that the sprite behind it was dark too, in the only sense that matters, because
+a generator called by a catalogue and a contact sheet is "called". The developer
+found it by looking at the screen: *"less just like a simple circle"*.
+`oreChunkTexture` leaves the allowlist because it is now called from
+`drawChunks`, and `src/art/shapes.ts#filledStroke` leaves it because a0-41's rim
+is the first production call to it. Measured on the same instrument a1-11 used
+(`node spikes/atlas-pooling/run.mjs`, whole-frame desktop baseline), the ore
+layer costs **+1 draw call** for 120 entities and 4 textures — which is the
+shape a1-10 §6B predicted, taken one layer at a time.
 
 **`src/ui/main-menu.ts#mainMenuRoute` — and it defaults differently.**
 `main.ts#activateMenu` (line 7809) reimplements the route as an if/else chain.

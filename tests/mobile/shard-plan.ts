@@ -126,6 +126,17 @@ export const MEASURED_SECONDS: Readonly<Record<string, number>> = {
   'pixel|upgrade-wheel-gantry.spec.ts': 190,
   // +28 s for the same two screens' desktop baselines (14 s each measured).
   'desktop|goldens.spec.ts': 191,
+  // a0-43's offline-TEAMS fog proof. **DERIVED, not measured on the runner** —
+  // this spec has never been through a CI shard, and the table's rule is to take
+  // the number off a green run's `list` durations. So it carries the honest
+  // interim: 84 s measured in-container (36 s for the two lobby journeys and
+  // their pixel comparison, 48 s for the staged pair), × the 5.9 software-GL
+  // factor this suite measured for itself (tests/mobile/budgets.ts — 1.5 min in
+  // a container against 8.9 min on the runner, same commit). Replace it from the
+  // first green run that shards it; a derived number is better than the 180 s
+  // UNMEASURED guess and worse than a measurement, and saying which it is here is
+  // what keeps that distinction from being lost.
+  'desktop|team-fog-offline.spec.ts': 500,
   'iphone|landscape-lock.spec.ts': 142,
   'iphone|campaign-door.spec.ts': 139,
   'desktop|upgrade-wheel-gantry.spec.ts': 133,
@@ -151,6 +162,10 @@ export const MEASURED_SECONDS: Readonly<Record<string, number>> = {
   'desktop|landscape-lock.spec.ts': 7,
   'desktop|layout.spec.ts': 2,
   'pixel|goldens.spec.ts': 0,
+  // Both phone profiles run ZERO tests of a0-43's spec: fog has no device term,
+  // so it is asserted once on the desktop control (see that file's header).
+  'iphone|team-fog-offline.spec.ts': 0,
+  'pixel|team-fog-offline.spec.ts': 0,
   'pixel|menu-frame-cost.spec.ts': 0,
   'desktop|menu-frame-cost.spec.ts': 0,
   'desktop|build-flow.spec.ts': 0,

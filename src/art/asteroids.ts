@@ -38,7 +38,7 @@
  * byte-identical across client, server and replay (GDD §4.1).
  */
 
-import { mulberry32 } from '@shared/types';
+import { mulberry32, type Rng } from '@shared/types';
 import { DERIVED, PALETTE } from './palette';
 import { LINE } from './tokens';
 import {
@@ -46,6 +46,7 @@ import {
   blob,
   circle,
   fill,
+  filledStroke,
   poly,
   polyline,
   round,
@@ -560,23 +561,88 @@ function geodeCrystals(seed: number, richness: number, outline: readonly number[
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// Loose ore chunks — CRYSTALLINE (a0-41)
+// ---------------------------------------------------------------------------
+//
+// The developer reviewed every FACET × RIM × HALO combination in scene, at the
+// chunk's real sim radius of 6 world units beside the 64-unit station, and
+// picked one: *"ok crystaline with these options"*. Every number below is that
+// pick, named rather than inlined so the next brief can quote a constant instead
+// of a magic literal — and so `./generators.test.ts` can assert the ratified
+// value rather than assert that the file equals itself.
+//
+// Regenerate the review page with `npx tsx tools/make-ore-preview.ts`; it draws
+// the full option matrix off THIS generator, so the picture and the shipped
+// chunk cannot drift apart.
+
+/** Facets on a chunk's silhouette. Seven — enough to read as cleaved rather than
+ *  turned, few enough that each facet is still a facet at 8 px. */
+const CHUNK_FACETS = 7;
+
+/** Mean unit radius of the crystal body, before its per-facet jitter. */
+const CHUNK_RADIUS = 0.62;
+
+/**
+ * The findability halo: **Strong** — the subtle halo's alphas (`0.10` / `0.16`)
+ * times 2.1, at the radii it always used.
+ *
+ * It raises the *ring* around a chunk, never the chunk: the body under it is
+ * flat `signalYellow` at α 1 and was before, so this makes no ore pixel brighter
+ * than the HUD's own yellow and the RESERVED read (style-guide §2) is unmoved.
+ * `./generators.test.ts` asserts exactly that, because it is the claim a brighter
+ * ore field has to answer for.
+ */
+const CHUNK_HALO = [
+  { r: 0.98, alpha: 0.21 },
+  { r: 0.72, alpha: 0.336 },
+] as const;
+
+/**
+ * The crystal body: {@link CHUNK_FACETS} facets on a mean unit radius of
+ * {@link CHUNK_RADIUS}, jittered in **angle as well as radius** from the chunk's
+ * own seed.
+ *
+ * The angle jitter is the difference between a crystal and a heptagon. Equal
+ * angles with only the radii moved still reads as a turned, printed shape at any
+ * size; unequal ones read as cleaved. Four seeds carry the whole 120-chunk field
+ * (`../art/atlas` `oreChunkTexture`), so the variety has to live inside four
+ * shapes or the field reads as tiling.
+ */
+function crystalBody(rng: Rng): number[] {
+  const phase = rng.next() * Math.PI * 2;
+  const pts: number[] = [];
+  for (let i = 0; i < CHUNK_FACETS; i++) {
+    const a = phase + (i / CHUNK_FACETS) * Math.PI * 2 + (rng.next() - 0.5) * 0.36;
+    const r = CHUNK_RADIUS * (0.86 + rng.next() * 0.28);
+    pts.push(round(Math.cos(a) * r), round(Math.sin(a) * r));
+  }
+  return pts;
+}
+
 /**
  * A loose ore chunk (GDD §2.3): the thing your mining shot knocks out of a rock and
  * your tractor pulls in. Unambiguously ore — signal yellow, no other colour on
  * it — because it is the payoff the whole triangle turns on.
+ *
+ * Four layers, back to front, and each one is a ratified knob:
+ *
+ *  1–2. the **halo** ({@link CHUNK_HALO}), so a loose chunk is findable against
+ *       Vacuum from outside tractor range — the thing the whole triangle is
+ *       played for should never be missed;
+ *    3. the **body** ({@link crystalBody}) under a **dark rim** — a *stroke* on
+ *       the body, deliberately, not a second polygon scaled up behind it: on a
+ *       seven-sided silhouette a scaled polygon shows its corners where a stroke
+ *       follows the edge, and that difference is load-bearing at 8 px;
+ *  4–5. the **three-tone facet** — a shadowed lower-right and a lit upper-left,
+ *       so the chunk reads as a solid crystal rather than a flat yellow dot.
  */
 export function oreChunkSprite(seed = 0): SpriteDef {
   const rng = rockRng(seed, 5);
-  const phase = rng.next() * Math.PI * 2;
-  const body = blob(0, 0, 7, (_, a) => 0.5 + Math.sin(a * 2 + phase) * 0.09 + rng.next() * 0.08);
-  // A halo, so a loose chunk is findable against Vacuum from outside tractor
-  // range — the thing the whole triangle is played for should never be missed.
+  const body = crystalBody(rng);
   return sprite(`ore/chunk/${seed}`, 1.05, [
-    circle(0, 0, 0.98, fill(PALETTE.signalYellow, 'ore', 0.1)),
-    circle(0, 0, 0.72, fill(PALETTE.signalYellow, 'ore', 0.16)),
-    poly(body, fill(PALETTE.signalYellow, 'ore')),
-    // A shadowed lower-right facet and a lit upper-left one: the chunk reads as
-    // a solid nugget rather than a flat yellow dot at any size.
+    ...CHUNK_HALO.map((h) => circle(0, 0, h.r, fill(PALETTE.signalYellow, 'ore', h.alpha))),
+    poly(body, filledStroke(PALETTE.signalYellow, DERIVED.oreDeep, 0.09, 'ore')),
     poly(body.map((n) => round(n * 0.62 + 0.14)), fill(DERIVED.oreDeep, 'ore', 0.9)),
     poly(body.map((n) => round(n * 0.34 - 0.16)), fill(DERIVED.coreHot, 'ore', 0.9)),
   ]);
