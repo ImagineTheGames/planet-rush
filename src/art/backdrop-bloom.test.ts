@@ -63,7 +63,7 @@ import {
   coverSpan,
   type MapId,
 } from './backdrop';
-import { MOCKUP_STARS, starAlpha } from './mockup-reference';
+import { MOCKUP_STARS } from './mockup-reference';
 import { hex } from './palette';
 
 /**

@@ -818,15 +818,6 @@ export function starBlooms(mag: number): boolean {
 }
 
 /**
- * **A bloomed star's halo radius in screen px** — its own radius times
- * {@link MOCKUP_STARS}`.bloom.radius`. Zero for a star that does not bloom, so a
- * caller can ask without asking twice.
- */
-export function starHaloRadius(mag: number): number {
-  return starBlooms(mag) ? starRadius(mag) * MOCKUP_STARS.bloom.radius : 0;
-}
-
-/**
  * **A halo's peak alpha, and it is the same for every bloomed star** (a0-44).
  *
  * There is a function here rather than a field read because the *shape* of this

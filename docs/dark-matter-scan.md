@@ -481,6 +481,30 @@ reason:
   visible, so the design panel and the game cannot disagree about what a
   magnitude looks like. Production reaches the same table through `STAR_LAYERS`.
 
+**a0-44 adds four more of the same kind, and the reason is sharper than the three
+above** (2026-08-14):
+
+| Export | Verdict |
+|---|---|
+| `src/art/mockup-reference.ts#haloRadiusOf` | SURFACE — the rule its own data is asserted against |
+| `src/art/mockup-reference.ts#haloPeakAlphaOf` | SURFACE — ditto |
+| `src/art/mockup-reference.ts#haloKneeAlphaOf` | SURFACE — ditto |
+| `src/art/mockup-reference.ts#spikeLengthOf` | SURFACE — ditto |
+
+Two numbers in this file — the star bloom's halo radius and its spike length —
+were wrong for a release **while a test asserted each of them**, because what the
+test asserted was that the constant equalled the constant someone had typed. The
+design states both as *rules* (`5 + 13 × intensity`; `haloRadius × 0.62`), and
+those two rules are why the halo cannot be narrower than the cross it contains —
+which is precisely what shipped, and what the developer photographed.
+
+So the rules are exported and `backdrop.test.ts` asserts the data against them.
+Production reads the **values** and must: they are the design's committed
+numbers, and a `mockup-reference` whose values were computed at import time would
+be a file that can no longer disagree with the design — the same reason
+`MOCKUP_GROUND` is not imported by production above. The rules are the half of
+that comparison CI holds.
+
 **One thing for the tool's owner, not a request:** the scan now names
 `sky-preview.ts` in its unclassified-directories warning alongside `content/`. It
 is a root-level dev-server module — `vite build`'s default input is `index.html`

@@ -71,8 +71,8 @@ import {
   MOCKUP_STARS,
   mockupBlobs,
   starAlpha,
+  starBlooms,
   starHaloAlpha,
-  starHaloRadius,
   starMagnitude,
   starRadius,
   starRampColor,
@@ -248,7 +248,7 @@ export function mockupStarPoints(seed: number, width: number, height: number): M
       y,
       r,
       alpha: starAlpha(mag),
-      halo: starHaloRadius(mag),
+      halo: starBlooms(mag) ? r * MOCKUP_STARS.bloom.radius : 0,
       mag,
       color: starRampColor(mag),
     });
