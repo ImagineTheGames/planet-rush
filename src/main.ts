@@ -42,6 +42,11 @@ import {
   teamSensorSources,
   rememberedOreIds,
   rememberedStationMask,
+  // ?debug=1 shared-vision staging only (`__minimapStage`): the allegiance
+  // predicate and the sim's own memory pass, so the seam stages data and never
+  // computes fog of its own.
+  sameSide,
+  updateSensory,
   waveIntervalOf,
 } from './sim';
 import type { MuzzleFlash, MiningStation, Turret, World, SensorSource } from './sim';
@@ -5387,6 +5392,78 @@ async function boot(): Promise<void> {
         if (!sat) return false;
         sat.hp = 0;
         return true;
+      },
+      /**
+       * Stage the TEAMS **scouting run** (a0-42, shared vision): send an ALLY out
+       * to the ore field the side can currently see least of, and fold the sim's
+       * own memory pass over it — so the viewer's minimap gains a patch of board
+       * that only the teammate has ever been near. With `stay: false` (the
+       * default) the ally then flies home, leaving REMEMBERED geography and
+       * nothing live out there: the half of "as if you were there" that a
+       * live-dots-only implementation would have dropped. With `stay: true` the
+       * ally is left parked on the field, so the frame shows their LIVE coverage
+       * over it — the state {@link killAlly} then collapses.
+       *
+       * Same discipline as `buildSatellite` above: it STAGES sim data — a ship
+       * position and the sim's own `updateSensory` — and computes no fog itself,
+       * so the seam cannot fake the wiring it demonstrates. Null when the local
+       * player has no living ally (an FFA boot, where by construction there is
+       * none, and the union it would demonstrate is the identity).
+       *
+       * Returns the ally's slot, how far the chosen field sits from the nearest
+       * disc the side already projects, and how many rocks the viewer remembers
+       * afterwards that they had never seen — so a caller proves the geometry is
+       * honest rather than trusting it.
+       */
+      stageAllyScout(stay = false): { ally: PlayerId; fieldGap: number; scouted: number } | null {
+        const ally = world.ships.find(
+          (s) => s.id !== LOCAL_PLAYER && s.alive && sameSide(world, LOCAL_PLAYER, s.id),
+        );
+        if (!ally) return null;
+        // The rock the side's CURRENT coverage is furthest from — maximise the
+        // distance to the nearest disc, so the staged field is provably one no
+        // ally is sensing right now and the reveal cannot be a live one.
+        const sources = teamSensorSources(world, LOCAL_PLAYER);
+        let far = null as (typeof world.asteroids)[number] | null;
+        let farGap = -1;
+        for (const rock of world.asteroids) {
+          let gap = Infinity;
+          for (const s of sources) {
+            const d = Math.hypot(s.pos.x - rock.pos.x, s.pos.y - rock.pos.y) - s.range;
+            if (d < gap) gap = d;
+          }
+          if (gap > farGap) {
+            farGap = gap;
+            far = rock;
+          }
+        }
+        if (!far) return null;
+        const wasSeen = new Set(rememberedOreIds(world, LOCAL_PLAYER));
+        const origin = { x: ally.pos.x, y: ally.pos.y };
+        ally.pos.x = far.pos.x;
+        ally.pos.y = far.pos.y;
+        updateSensory(world); // the REAL memory pass, per-player as always
+        if (!stay) {
+          ally.pos.x = origin.x;
+          ally.pos.y = origin.y;
+        }
+        let scouted = 0;
+        for (const id of rememberedOreIds(world, LOCAL_PLAYER)) if (!wasSeen.has(id)) scouted++;
+        return { ally: ally.id, fieldGap: farGap, scouted };
+      },
+      /** Kill the local player's first living ALLY (a0-42): their ship stops
+       *  casting a disc that same tick, so the team coverage it contributed —
+       *  and every live dot only it reached — collapses on the next read, exactly
+       *  as `killSatellite` collapses a satellite's. What the ally had already
+       *  MAPPED stays mapped: geography is remembered, never un-remembered.
+       *  Returns the slot killed, or null when there is no ally to kill. */
+      killAlly(): PlayerId | null {
+        const ally = world.ships.find(
+          (s) => s.id !== LOCAL_PLAYER && s.alive && sameSide(world, LOCAL_PLAYER, s.id),
+        );
+        if (!ally) return null;
+        ally.alive = false;
+        return ally.id;
       },
     };
     try {
