@@ -39,11 +39,20 @@ import {
   shieldCount,
   shieldPool,
   turretCount,
-  sensorSources,
-  rememberedOreIds,
+  teamSensorSources,
+  teamRememberedOreIds,
+  teamRememberedStationMask,
   waveIntervalOf,
+  // The a0-42 team-fog live-stage seam's reads (?debug=1 only): the per-player
+  // coverage it measures the ally's separation against, the resolved sensed-set
+  // it reports, the sim's own memory fold, and the one allegiance predicate.
+  sensorSources,
+  sensedState,
+  updateSensory,
+  sameSide,
+  teamOf,
 } from './sim';
-import type { MuzzleFlash, MiningStation, Turret, World, SensorSource } from './sim';
+import type { MuzzleFlash, MiningStation, Ship, Turret, World, SensorSource } from './sim';
 // The sim's real, validated upgrade purchase — used only by the ?debug=1
 // upgrade-wheel live-stage seam below, the exact call a real upgrade order makes.
 import { buyUpgrade, turretTier, satelliteOrbitPos } from './sim/buildings';
@@ -54,7 +63,7 @@ import type { MatchMode } from './sim/match-config';
 import type { Abundance } from './sim/constants';
 // SATELLITE tunables — used only by the ?debug=1 minimap-fog live-stage seam to
 // stage a radar satellite (build → coverage appears; kill → coverage collapses).
-import { SATELLITE } from './sim';
+import { SATELLITE, SHIP_SENSOR_RANGE } from './sim';
 import { bootOfflineMatch } from '@platform/match-boot';
 import type { MatchBoot } from '@platform/match-boot';
 import {
@@ -1500,6 +1509,7 @@ async function boot(): Promise<void> {
     installTapCommanderStage();
     installTapMarkerStage();
     installMinimapStage();
+    installTeamFogStage();
     installStationHealthStage();
     installAudioStage();
     installVfxStage();
@@ -3921,27 +3931,33 @@ async function boot(): Promise<void> {
       minimapFrame.collapse = null;
     }
 
-    // Fog of war (feature f1): the minimap renders ONLY the local player's sensed-
-    // state. Consume the sim's own sensing truth — the CURRENT coverage discs
-    // (`sensorSources`, the union of the ship / stations / alive satellites the
-    // player projects this tick) and the persistent remembered-station bitmask.
-    // The pure model (src/ui/minimap.ts) does the gating from these; a killed
-    // satellite simply stops appearing here, collapsing its disc the same tick.
+    // Fog of war (feature f1): the minimap renders ONLY the local player's SIDE's
+    // sensed-state. Consume the sim's own sensing truth — the CURRENT coverage
+    // discs (`teamSensorSources`, the union of the ship / stations / alive
+    // satellites everyone on that side projects this tick) and the persistent
+    // remembered-station bitmask. The pure model (src/ui/minimap.ts) does the
+    // gating from these; a killed satellite simply stops appearing here,
+    // collapsing its disc the same tick — and so does a killed teammate.
     feedMinimapFog();
 
     hudFrame.minimap = minimapFrame;
     hudFrame.tick = world.tick;
   }
 
-  /** Fill the fog feed for the local player (feature f1): copy the sim's current
-   *  coverage discs into the pooled array and read the REMEMBERED geography — the
-   *  station mask and the scouted-ore ids. A short-lived `sensorSources` allocation
-   *  (≤ ~17 tiny records) each frame is the honest cost of consuming the ratified
-   *  seam rather than duplicating its three-source union here — the same
-   *  off-hot-path selector pattern as `muzzleFlashes`. The ore set is refilled in
-   *  place from the sim's own ascending list, never rebuilt. */
+  /** Fill the fog feed for the local player's SIDE (feature f1; shared team vision
+   *  a0-42): copy the sim's current coverage discs into the pooled array and read
+   *  the REMEMBERED geography — the station mask and the scouted-ore ids. All
+   *  three reads are the `team*` ones, and that is the feature: coverage without
+   *  the remembered mask and the ore ids would show a teammate's live dots and
+   *  forget the field they flew over, which is not "as if you were there". In FFA
+   *  each is its per-player counterpart exactly (teams-of-one), so nothing here
+   *  needs to know which mode it is in. A short-lived allocation (≤ ~17 tiny
+   *  records per ally) each frame is the honest cost of consuming the ratified
+   *  seam rather than duplicating its union here — the same off-hot-path selector
+   *  pattern as `muzzleFlashes`. The ore set is refilled in place from the sim's
+   *  own ascending list, never rebuilt. */
   function feedMinimapFog(): void {
-    const sources: SensorSource[] = sensorSources(world, LOCAL_PLAYER);
+    const sources: SensorSource[] = teamSensorSources(world, LOCAL_PLAYER);
     let cn = 0;
     for (const s of sources) {
       const r = minimapCoverageSlot(cn++);
@@ -3951,9 +3967,9 @@ async function boot(): Promise<void> {
     }
     minimapCoverage.length = 0;
     for (let i = 0; i < cn; i++) minimapCoverage.push(minimapCoveragePool[i]!);
-    minimapFog.rememberedMask = world.sensory?.seenStations[LOCAL_PLAYER] ?? 0;
+    minimapFog.rememberedMask = teamRememberedStationMask(world, LOCAL_PLAYER);
     minimapRememberedOre.clear();
-    for (const id of rememberedOreIds(world, LOCAL_PLAYER)) minimapRememberedOre.add(id);
+    for (const id of teamRememberedOreIds(world, LOCAL_PLAYER)) minimapRememberedOre.add(id);
     minimapFrame.fog = minimapFog;
   }
 
@@ -5382,6 +5398,194 @@ async function boot(): Promise<void> {
     };
     try {
       Object.defineProperty(window, '__minimapStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
+  /**
+   * Install `window.__teamFogStage` — the ?debug=1 live-stage seam for the a0-42
+   * evidence: **in TEAMS the fog lifts where your teammates are** (GDD §2.2,
+   * amended 2026-08-13). The developer: *"when playing on a team the fog of war
+   * should lift where your team mates are it should be like as if you were
+   * there."*
+   *
+   * `src/sim/team-sensing.test.ts` proves the union in the sim and
+   * `src/ui/minimap.ts`'s own tests prove the gating; what neither can reach is
+   * the frame — that the shipped bundle threads the SIDE's coverage and the
+   * SIDE's memory into the map, so a teammate's half of the board is dark before
+   * and lifted after, ore they scouted is drawn in the remembered dimming, and
+   * their death collapses all of it the same tick.
+   *
+   * Four calls make the four frames, and each is staged the way the seams above
+   * stage theirs — by writing plain sim data (`pos`, `alive`, `team`) and by
+   * calling the sim's own {@link updateSensory}. **No fog decision is made here**:
+   * every dot in the resulting frame is computed by the real pipeline, so the
+   * seam cannot fake the thing it is evidence for.
+   *
+   *  - `stage()` — post an ALLY on the far side of the arena with a rival parked
+   *    just inside their ship's sensor, and hold the local ship at its home. The
+   *    separation is checked and reported: no disc of the viewer's own comes near
+   *    the ally's, so anything the viewer sees over there is the ally's coverage
+   *    and can be nothing else.
+   *  - `share(on)` — flip that same ally between the viewer's side and the
+   *    enemy's, nothing else about the scene touched. This is the union's on/off
+   *    switch at ONE tick, in ONE staged world: the before/after pair differs by
+   *    allegiance alone, not by anything that moved.
+   *  - `scout()` — fly the ally over a distant ore field, run the sim's real
+   *    memory fold, and fly them back to their post. What is left is geography
+   *    only the teammate ever saw, under nobody's live coverage.
+   *  - `killAlly()` — kill the ally's ship. Their disc is gone that same tick.
+   *
+   * `state()` reports what the viewer's fog actually reads right now (disc count,
+   * sensed rival ids, remembered mask and ore count) so a capture can assert the
+   * frame carries what it claims. Best paired with `?freeze=1&sides=2`, which
+   * pins the sim and gives the debug boot a sided world. Behind ?debug=1 only.
+   */
+  function installTeamFogStage(): void {
+    /** Anyone on the local player's side but the local player — the teammate the
+     *  whole feature is about. `sameSide` is the only predicate used, here as
+     *  everywhere (`src/sim/allegiance`). */
+    function allyShip(): Ship | null {
+      for (const s of world.ships) {
+        if (s.id === LOCAL_PLAYER) continue;
+        if (sameSide(world, LOCAL_PLAYER, s.id)) return s;
+      }
+      return null;
+    }
+
+    /** The staged ally's post: the far side of the arena from the local home, on
+     *  the wide axis, well outside every disc the viewer projects. */
+    function post(): Vec2 {
+      const home = stationOf(world, LOCAL_PLAYER);
+      const cx = world.bounds.width / 2;
+      const cy = world.bounds.height / 2;
+      if (!home) return { x: cx, y: cy };
+      return { x: 2 * cx - home.pos.x, y: 2 * cy - home.pos.y };
+    }
+
+    const stage = {
+      state(): {
+        discs: number;
+        sensedRivals: PlayerId[];
+        rememberedMask: number;
+        rememberedOre: number;
+        allySeparation: number;
+      } {
+        const ally = allyShip();
+        const own = sensorSources(world, LOCAL_PLAYER);
+        let separation = Number.POSITIVE_INFINITY;
+        if (ally) {
+          for (const s of own) {
+            const d = Math.hypot(s.pos.x - ally.pos.x, s.pos.y - ally.pos.y) - s.range;
+            if (d < separation) separation = d;
+          }
+        }
+        const sensed = sensedState(world, LOCAL_PLAYER);
+        return {
+          discs: teamSensorSources(world, LOCAL_PLAYER).length,
+          sensedRivals: sensed.ships.filter((id) => !sameSide(world, LOCAL_PLAYER, id)),
+          rememberedMask: teamRememberedStationMask(world, LOCAL_PLAYER),
+          rememberedOre: teamRememberedOreIds(world, LOCAL_PLAYER).length,
+          allySeparation: separation,
+        };
+      },
+
+      /** Post the ally far away with a rival under their sensor; hold the viewer
+       *  at home. Returns the geometry so a capture can prove the separation. */
+      stage(): { ally: PlayerId; rival: PlayerId; at: Vec2; rivalDist: number; separation: number } | null {
+        const ally = allyShip();
+        const home = stationOf(world, LOCAL_PLAYER);
+        const local = world.ships.find(isLocalShip);
+        if (!ally || !home || !local) return null;
+        const rival = world.ships.find((s) => !sameSide(world, LOCAL_PLAYER, s.id) && !s.eliminated);
+        if (!rival) return null;
+
+        local.pos.x = home.pos.x + home.radius + 60;
+        local.pos.y = home.pos.y;
+        local.vel.x = 0;
+        local.vel.y = 0;
+
+        const at = post();
+        ally.pos.x = at.x;
+        ally.pos.y = at.y;
+        ally.vel.x = 0;
+        ally.vel.y = 0;
+        ally.alive = true;
+
+        // The rival sits well inside the ally's own ship sensor and nothing else.
+        const rivalDist = SHIP_SENSOR_RANGE * 0.7;
+        rival.pos.x = at.x - rivalDist;
+        rival.pos.y = at.y;
+        rival.vel.x = 0;
+        rival.vel.y = 0;
+        rival.alive = true;
+        rival.spawnProtect = 0;
+
+        return { ally: ally.id, rival: rival.id, at, rivalDist, separation: stage.state().allySeparation };
+      },
+
+      /** The union's on/off switch: put the staged ally on the viewer's side, or
+       *  on the enemy's. Their ship and home move sides together, exactly as the
+       *  lobby would have authored them; nothing else in the scene is touched. */
+      share(on: boolean): { ally: PlayerId; team: number } | null {
+        const ally = allyShip() ?? world.ships.find((s) => s.id !== LOCAL_PLAYER);
+        if (!ally) return null;
+        const mine = teamOf(world, LOCAL_PLAYER);
+        const theirs = world.ships.find((s) => !sameSide(world, LOCAL_PLAYER, s.id) && s.id !== ally.id);
+        const enemyTeam = theirs ? teamOf(world, theirs.id) : mine + 1;
+        const team = on ? mine : enemyTeam;
+        ally.team = team;
+        for (const p of world.stations) {
+          if (p.owner === ally.id) p.team = team;
+        }
+        return { ally: ally.id, team };
+      },
+
+      /** Fly the ally over the ore field furthest from the local home, run the
+       *  sim's REAL memory fold, and fly them back to their post — leaving
+       *  geography only the teammate has ever seen, under nobody's live coverage. */
+      scout(): { ally: PlayerId; at: Vec2; learned: number } | null {
+        const ally = allyShip();
+        const home = stationOf(world, LOCAL_PLAYER);
+        if (!ally || !home || world.asteroids.length === 0) return null;
+        let target = world.asteroids[0]!;
+        let best = -1;
+        for (const a of world.asteroids) {
+          const d = (a.pos.x - home.pos.x) ** 2 + (a.pos.y - home.pos.y) ** 2;
+          if (d > best) {
+            best = d;
+            target = a;
+          }
+        }
+        const before = teamRememberedOreIds(world, LOCAL_PLAYER).length;
+        const at = { x: target.pos.x, y: target.pos.y };
+        ally.pos.x = at.x;
+        ally.pos.y = at.y;
+        updateSensory(world); // the sim's own pass — it writes the SCOUT's record
+        const back = post();
+        ally.pos.x = back.x;
+        ally.pos.y = back.y;
+        return { ally: ally.id, at, learned: teamRememberedOreIds(world, LOCAL_PLAYER).length - before };
+      },
+
+      /** Kill the staged ally's ship. Their disc is gone the same tick, and every
+       *  live dot only under it drops — the live/remembered split, across a side. */
+      killAlly(): PlayerId | null {
+        const ally = allyShip();
+        if (!ally) return null;
+        ally.alive = false;
+        ally.hull = 0;
+        return ally.id;
+      },
+    };
+    try {
+      Object.defineProperty(window, '__teamFogStage', {
         value: stage,
         writable: false,
         configurable: false,
