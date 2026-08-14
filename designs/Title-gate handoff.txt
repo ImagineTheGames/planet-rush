@@ -1,0 +1,60 @@
+# Star Rush — title gate
+
+**From:** design
+**Re:** the screen before the main menu
+**File:** `Star Rush - Title Gate (offline).html` — one self-contained file. No server, no assets, no install. Double-click it, press anywhere, and turn the sound on.
+
+---
+
+## The idea in one line
+
+The wordmark is not a logo on a background — it is **stamped into the leaves of an airlock**, and the main menu is genuinely behind it. You do not watch a title screen transition; you watch a door get operated, and then you are inside.
+
+## What happens when you press
+
+Four beats, in the order a real pressure door does them. The sequencing is the design — collapse it into one move and it reads as a page transition instead of machinery.
+
+| | Beat | What you see |
+|---|---|---|
+| 1 | **The lock turns** | A chamfered rotor, recessed in a bored pocket, ratchets 135° — seven detent clicks, not a servo whine. Nothing else is permitted to move until it has finished. |
+| 2 | **The leaves part** | STAR lifts, RUSH drops, each carrying its stamped type. The lock rides the upper leaf, because it is bolted through it. |
+| 3 | **We go through** | The frame grows until its opening is larger than the screen, so the hull leaves through the edges. |
+| 4 | **The menu is there** | It was behind the door the whole time. |
+
+**ESC reseals**, staged in reverse: we come back through, the leaves drive shut, and only once they are home does the lock throw.
+
+## Five decisions worth defending
+
+- **The doorway is a real hole, not a fade.** The hull is built from eight ring segments and the starfield is punched at the opening. `clip-path` on a filled element yields a solid shape rather than a ring, so every shortcut here silently paints the doorway shut — which is exactly what happened twice during design.
+- **The frame only fades once it is off screen.** It scales until the opening exceeds the viewport, measured from the real window rather than a fixed factor, because which dimension binds differs between a desktop and a phone. A fade while the frame is still visible is the cross-dissolve this screen exists to avoid.
+- **Two starfields.** One behind the menu, never punched; one in front, punched at the doorway. That is what lets the vacuum around the hull be vacuum rather than UI, while the doorway still shows the interior.
+- **The type is struck, not printed.** Same material as the leaf, read by its bevel, sitting inside the opening clip so it travels with the door.
+- **The lock sits IN the door.** A bored pocket, lathe marks, a hex socket a tool would actually engage, six screws holding the flange, and index marks that say which way it has turned. Flat fills and a few big shapes are what made an earlier version read as a toy.
+
+## Sound
+
+The same struck-glass family as the rest of the UI — inharmonic partials, ~2ms strike, upper partials decaying fastest, one short shared room — plus the cue this screen owns.
+
+**Pressure relief.** A hiss is not a tone: it is broadband noise whose *filter* falls as the pressure drops. Three stages:
+
+1. valve crack — 7.6kHz → 3kHz over 200ms
+2. the compartment venting — 4.8kHz → 620Hz over 1.7s
+3. a shorter blast as the leaves break contact, with the sub arriving only when the door's weight actually moves
+
+Every press is detuned ±0.5 semitone, one factor per cue so intervals stay exact. Browsers block audio until the first interaction — the opening press arms it, so nothing should call the cue engine on load.
+
+## Implementation notes
+
+Everything is DOM and CSS. No images, no sprites, no audio files: the cue engine synthesises in a few hundred lines, and the whole title treatment is thirteen values a developer can lift straight out rather than re-derive.
+
+One trap worth writing down, because it cost several rounds: the gradient fill is painted with `background-clip:text`, which makes the ramp the element's **background** — and `text-shadow` paints *above* the background. So outlines must be a `text-stroke` and glows must be `drop-shadow()` filters. Use shadows for either and they fill the letter interiors: a white title renders solid black with no gradient anywhere.
+
+## Tweakables
+
+Thirteen live controls: preset, title colour, gradient type / angle / thickness, size, letter spacing, outline weight and colour, glow and glow colour, sheen timing, clearance from the lock. The shipped defaults are the agreed look.
+
+## Open items
+
+- **The menu is presentation.** PLAY / JOIN BY CODE / SETTINGS have hover, press and sound, but no navigation.
+- **Two full-screen canvases repaint every frame.** Fine on desktop; on phones this belongs behind `VfxAutoQuality`, and the honest reduction is a single field with the punch dropped.
+- **The name.** This screen says **STAR RUSH**. Every other deliverable still says Planet Rush — worth settling before anything else is renamed.
