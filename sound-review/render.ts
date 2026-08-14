@@ -134,6 +134,13 @@ interface ManifestSlot {
   context: string;
   current: string | null;
   candidates: ManifestCandidate[];
+  /**
+   * A fourth answer the slot is allowed to come back with, when it has one — the
+   * `ambient` bed's "ship it off by default" (a0-48). Written through from
+   * `CANDIDATE_SLOTS` so the page can show it beside the three voices; absent on
+   * every slot that is a mechanic, where "cut it" is not on the table.
+   */
+  fourthOption?: string;
 }
 
 const slots: ManifestSlot[] = [];
@@ -171,6 +178,7 @@ for (const slotId of CANDIDATE_SLOT_ORDER) {
     context: slot.context,
     current: currentWav,
     candidates,
+    ...(slot.fourthOption === undefined ? {} : { fourthOption: slot.fourthOption }),
   });
 }
 
