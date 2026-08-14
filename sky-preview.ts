@@ -76,6 +76,7 @@ import {
   starColorFor,
   starMagnitude,
   starRadius,
+  starSpikeAlpha,
   starTemperature,
   type MockupSkyId,
 } from './src/art/mockup-reference';
@@ -322,7 +323,7 @@ export function paintMockupPanel(
         ctx.fill();
         // The diffraction cross — the same population as the halo.
         const len = st.r * MOCKUP_STARS.spike.length;
-        ctx.strokeStyle = withAlpha(hex(st.color), st.alpha * MOCKUP_STARS.spike.intensity);
+        ctx.strokeStyle = withAlpha(hex(st.color), starSpikeAlpha());
         ctx.lineWidth = MOCKUP_STARS.spike.width;
         ctx.beginPath();
         ctx.moveTo(st.x - len, st.y);

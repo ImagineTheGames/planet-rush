@@ -525,12 +525,25 @@ be a file that can no longer disagree with the design — the same reason
 `MOCKUP_GROUND` is not imported by production above. The rules are the half of
 that comparison CI holds.
 
-**a0-45 adds one, and takes one away** (2026-08-14):
+**a0-45 adds two, and takes one away** (2026-08-14):
 
 | Export | Verdict |
 |---|---|
 | `src/art/mockup-reference.ts#STAR_TEMPERATURE_COLORS` | SURFACE — the allow-list's own oracle |
+| `src/art/mockup-reference.ts#spikePeakAlphaOf` | SURFACE — the fifth rule its own data is asserted against |
 | `src/art/mockup-reference.ts#starRampColor` | **dropped** — deleted with the magnitude ramp |
+
+`spikePeakAlphaOf` is the fifth of a0-44's four, and it is here because a0-44's
+own lesson had one more turn in it. That brief exported four *rules* so no value
+could be asserted against the constant someone typed — and then made the halo's
+peak alpha absolute while leaving the cross drawn through it on a fraction of the
+star's own alpha, one line below, in the same loop. Every per-value assertion
+passed. What no per-value assertion can see is that `0.22 × intensity` and
+`0.42 × intensity` are **siblings**, and that the first must be smaller than the
+second or the flare buries the glow. So the rule is exported and
+`backdrop.test.ts` asserts the *relationship*, in the same shape as a0-44's
+`halo is wider than its own spikes` — one gate for the size, one for the
+brightness.
 
 `starRampColor` is gone from the allowlist because it is gone from the file: the
 design colours a star from its **temperature**, not from its magnitude, and a

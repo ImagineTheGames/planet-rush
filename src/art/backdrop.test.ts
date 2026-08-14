@@ -66,6 +66,8 @@ import {
   mockupBlobs,
   mockupCount,
   spikeLengthOf,
+  spikePeakAlphaOf,
+  starAlpha,
   starColorFor,
   starMagnitude,
   starRadius,
@@ -1006,6 +1008,84 @@ describe('bloom — the brightest stars, and the whole field is 16× denser (a0-
     ).toBe(false);
     expect(BLOOM.radius).not.toBe(SHIPPED_BEFORE_A0_44.haloRadius);
     expect(SPIKE.length).not.toBe(SHIPPED_BEFORE_A0_44.spikeLength);
+  });
+
+  // -------------------------------------------------------------------------
+  // a0-45 — and the spike is DIMMER than the halo, which is the other half
+  // -------------------------------------------------------------------------
+
+  /**
+   * **What a0-44 left behind**, read off `main`'s own generator rather than typed
+   * from a brief (`evidence/a0-45-star-temperature-colour/spike-main.txt`): the
+   * halo's alpha absolute and correct, and the cross one line below it still on
+   * `alpha × 0.55` — a *fraction of the star's own*. Over one screenful `main`
+   * draws 64 arms at **α 0.2427–0.2728** inside halos of a flat 0.2016, so every
+   * cross on `main` is **brighter than the glow it is drawn inside**, by 1.20× to
+   * 1.35×, and 2.30–2.58× the design's own 0.1056.
+   *
+   * (The brief states this as 0.55 / 5.2× / 2.72×, which is the same arithmetic
+   * with the star at α 1.0. No star reaches it — `alpha.max` is 0.5 — so the
+   * field's own numbers are the ones here. The defect, its direction and its fix
+   * are exactly as the brief states them; only the multiplier is smaller.)
+   */
+  const SHIPPED_SPIKE_BEFORE_A0_45 = { alphaMin: 0.2427, alphaMax: 0.2728 } as const;
+
+  it('draws a cross whose spike is dimmer than the halo it sits in — a0-45’s first half', () => {
+    // **The sibling inequality to the one above, and the same class of bug.**
+    // a0-44 made the halo's alpha absolute and stopped one line short; a
+    // per-value assertion cannot see a relationship, so `starHaloAlpha()` passed
+    // its own check while the cross drawn through it stayed on the star's own
+    // alpha. The design's cross is 0.22 against its halo's 0.42 — a faint flare
+    // INSIDE a glow — and the build's was brighter than the glow, so the cross
+    // was all the eye got and the developer reported the bloom as absent.
+    expect(
+      SPIKE.peakAlpha,
+      `spike α ${SPIKE.peakAlpha} vs halo α ${BLOOM.peakAlpha} — the cross must be FAINTER than the glow`,
+    ).toBeLessThan(BLOOM.peakAlpha);
+    // And by the design's own margin rather than by a rounding error: 0.22/0.42.
+    expect(SPIKE.peakAlpha / BLOOM.peakAlpha).toBeCloseTo(0.22 / 0.42, 6);
+    // Both are absolute — the same wash on every bloomed star. A spike that is
+    // still a fraction of its star cannot satisfy this, because there is no
+    // single number it takes.
+    expect(SPIKE.peakAlpha, '0.22 × intensity, ABSOLUTE').toBeCloseTo(
+      spikePeakAlphaOf(BLOOM.intensity),
+      10,
+    );
+    expect(SPIKE.width, 'the design’s own ctx.lineWidth').toBe(0.7);
+
+    // …tested the other way (LESSONS §24). A gate that cannot fail is not a gate,
+    // and this is the state it has to refuse — main's own numbers, today.
+    expect(
+      SHIPPED_SPIKE_BEFORE_A0_45.alphaMin < BLOOM.peakAlpha,
+      `main draws its dimmest cross at α ${SHIPPED_SPIKE_BEFORE_A0_45.alphaMin} inside a halo of ${BLOOM.peakAlpha}`,
+    ).toBe(false);
+    expect(SPIKE.peakAlpha).toBeLessThan(SHIPPED_SPIKE_BEFORE_A0_45.alphaMin);
+    // Both ends of main's range are over its own halo, so this is the rule and
+    // not one unlucky star: 1.20× at the faintest, 1.35× at the brightest.
+    for (const a of Object.values(SHIPPED_SPIKE_BEFORE_A0_45)) {
+      expect(a / BLOOM.peakAlpha, `main's cross at α ${a} against its halo`).toBeGreaterThan(1.2);
+    }
+    // The whole population, not just its ends: no star's alpha times any fraction
+    // can land on the design's number, so the old rule is gone rather than retuned.
+    for (const mag of [MOCKUP_STARS.bloom.threshold, 0.9, 1]) {
+      expect(starAlpha(mag) * 0.55).toBeGreaterThan(SPIKE.peakAlpha);
+    }
+  });
+
+  it('gives every cross the SAME alpha, dimmer than every halo, in the field it draws', () => {
+    // The inequality above is about the constants; this is about the shapes, in
+    // the same shape as `keeps the cross inside the glow` does for the geometry.
+    const { halos, spikes } = parts();
+    expect(spikes.length, 'the field drew crosses at all').toBeGreaterThan(100);
+    const spikeAlphas = new Set(spikes.map((s) => s.stroke!.alpha));
+    const haloAlphas = new Set(halos.map((s) => s.fill!.alpha));
+    expect(spikeAlphas, 'one cross alpha across the whole field').toEqual(
+      new Set([SPIKE.peakAlpha]),
+    );
+    expect(Math.max(...spikeAlphas), 'the brightest cross the field draws').toBeLessThan(
+      Math.min(...haloAlphas),
+    );
+    for (const s of spikes) expect(s.stroke!.width).toBe(SPIKE.width);
   });
 
   it('derives every bloom number from the design’s own rule, not from a typist', () => {

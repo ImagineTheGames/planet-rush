@@ -169,6 +169,7 @@ import {
   starHaloAlpha,
   starMagnitude,
   starRadius,
+  starSpikeAlpha,
   starTemperature,
   type MockupSkyId,
   type SkyReference,
@@ -397,8 +398,18 @@ export const SKY_PARALLAX = 0.085;
  */
 export const BLOOM = MOCKUP_STARS.bloom;
 
-/** The diffraction cross a bloomed star carries — the same population as the
- *  halo, because a spike and a halo are one physical event ({@link MOCKUP_STARS}). */
+/**
+ * The diffraction cross a bloomed star carries — the same population as the
+ * halo, because a spike and a halo are one physical event ({@link MOCKUP_STARS}).
+ *
+ * **One event, therefore one rule** (a0-45). Both alphas are absolute and the
+ * cross's is the smaller: `0.22 × intensity` against the halo's `0.42 ×
+ * intensity`, so a spike is 0.52 of the glow it is drawn inside. It was a
+ * *fraction of the star's own alpha* until a0-45, measuring 0.2427–0.2728 — up
+ * to 1.35× its own halo — and a bloom you cannot see under its own spikes is a
+ * bloom the developer reports as absent, which is exactly what happened after
+ * a0-44 fixed the halo alone.
+ */
 export const SPIKE = MOCKUP_STARS.spike;
 
 // ---------------------------------------------------------------------------
@@ -1061,8 +1072,14 @@ export function starFieldSprite(
       }
       // The diffraction cross — the point's own light, in the point's own
       // colour, which is now the same sentence as the halo's.
+      //
+      // And at the design's own ABSOLUTE alpha (a0-45; `starSpikeAlpha`), which
+      // is the other end of the correction a0-44 started one line up. This was a
+      // fraction of the star's own alpha until a0-45 — measuring 0.2427–0.2728
+      // where the halo around it peaks at a flat 0.2016 — so every bloom was
+      // drawn correctly and then buried under its own spikes.
       const len = round(r * SPIKE.length);
-      const a = round(alpha * SPIKE.intensity);
+      const a = round(starSpikeAlpha());
       shapes.push(polyline([x - len, y, x + len, y], stroke(color, SPIKE.width, 'material', a)));
       shapes.push(polyline([x, y - len, x, y + len], stroke(color, SPIKE.width, 'material', a)));
     }
