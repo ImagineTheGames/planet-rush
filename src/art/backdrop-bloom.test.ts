@@ -54,8 +54,30 @@
 
 import { describe, expect, it } from 'vitest';
 import { Container, Graphics } from 'pixi.js';
-import { BLOOM, BLOOM_TINTS, STAR_LAYERS, VoidBackdrop, type MapId } from './backdrop';
+import {
+  BLOOM,
+  BLOOM_TINTS,
+  SPIKE,
+  STAR_LAYERS,
+  VoidBackdrop,
+  coverSpan,
+  type MapId,
+} from './backdrop';
+import { MOCKUP_STARS, starAlpha } from './mockup-reference';
 import { hex } from './palette';
+
+/**
+ * **The fraction of stars that bloom, from the design's own two numbers**
+ * (a0-40). Magnitude is `u^exponent` for a uniform `u`, so the population above
+ * the threshold is `1 − threshold^(1/exponent)` — about 6.2%. It is derived
+ * rather than typed in, so a change to the design's curve moves this with it and
+ * cannot leave the frame silently over- or under-blooming.
+ *
+ * This replaces `BLOOM.scatter`. The rule changed: a0-07's bloom was a seeded
+ * scatter at any magnitude and the design's is the brightest stars, so "how many
+ * blooms should reach the frame" is now a property of the curve.
+ */
+const BLOOM_RATE = 1 - Math.pow(MOCKUP_STARS.bloom.threshold, 1 / MOCKUP_STARS.magnitudeExponent);
 
 /** The developer's desktop, over a mid-sized arena. */
 const VIEW = { w: 1440, h: 900 } as const;
@@ -140,7 +162,11 @@ function boot(
   return b;
 }
 
-const bloomedOf = (stars: SubmittedStar[]) => stars.filter((s) => s.radii.length >= 3);
+// A bloomed star submits TWO fills at its centre since a0-40 — one soft-falloff
+// halo and the point on top of it — where it used to submit three (two flat
+// rings and the point). Its diffraction cross is two strokes, and strokes are
+// not fills, so they do not enter this grouping.
+const bloomedOf = (stars: SubmittedStar[]) => stars.filter((s) => s.radii.length >= 2);
 const plainOf = (stars: SubmittedStar[]) => stars.filter((s) => s.radii.length === 1);
 
 describe('the bloom reaches the frame, not just the sprite definition', () => {
@@ -159,63 +185,51 @@ describe('the bloom reaches the frame, not just the sprite definition', () => {
       const bloomed = bloomedOf(stars);
       expect(bloomed.length, `${key} submitted bloomed stars`).toBeGreaterThan(0);
 
-      // Every star is either plain or fully bloomed — a group of 2 would mean a
-      // halo went missing on the way to the frame, which is precisely the defect
-      // shape the brief suspected of the pooling.
+      // Every star is either plain or fully bloomed — a group of more than 2
+      // would mean the halo and the point disagreed about their centre, which is
+      // precisely the defect shape the brief suspected of the pooling.
       expect(
         bloomed.length + plainOf(stars).length,
-        `${key}: every star is 1 fill or 3, never a partial halo`,
+        `${key}: every star is 1 fill or 2, never a partial halo`,
       ).toBe(stars.length);
+      expect(bloomed.every((s) => s.radii.length === 2), `${key}: a bloom is one halo`).toBe(true);
 
-      // The seeded scatter, measured at the frame. Loose bounds on purpose: the
-      // count is a draw from the seed, so ±30% is the sampling noise on a few
-      // hundred stars, and the assertion under test is "the halos arrive at
-      // roughly the ratified rate", not a golden number.
+      // The design's threshold, measured at the frame. Loose bounds on purpose:
+      // the count is a draw from the seed, so ±30% is the sampling noise, and the
+      // assertion under test is "the halos arrive at the design's rate", not a
+      // golden number.
       const ratio = bloomed.length / stars.length;
-      expect(ratio, `${key} bloom ratio ${ratio.toFixed(3)} vs BLOOM.scatter`).toBeGreaterThan(
-        BLOOM.scatter * 0.7,
-      );
-      expect(ratio, `${key} bloom ratio ${ratio.toFixed(3)} vs BLOOM.scatter`).toBeLessThan(
-        BLOOM.scatter * 1.3,
-      );
+      expect(ratio, `${key} bloom ratio ${ratio.toFixed(3)} vs the design's ${BLOOM_RATE.toFixed(3)}`)
+        .toBeGreaterThan(BLOOM_RATE * 0.7);
+      expect(ratio, `${key} bloom ratio ${ratio.toFixed(3)} vs the design's ${BLOOM_RATE.toFixed(3)}`)
+        .toBeLessThan(BLOOM_RATE * 1.3);
     }
   });
 
-  it('submits each halo at the ratified radius and the ratified alpha', () => {
+  it('submits each halo at the design’s radius and the design’s alpha', () => {
     for (const [key, gfx] of starLayers(boot())) {
       for (const star of bloomedOf(submittedStars(gfx))) {
-        expect(star.radii.length, `${key}: a bloomed star is three fills`).toBe(3);
-        const [outer, inner, core] = star.radii as [number, number, number];
-        const [outerA, innerA, coreA] = star.alphas as [number, number, number];
+        expect(star.radii.length, `${key}: a bloomed star is two fills`).toBe(2);
+        const [halo, core] = star.radii as [number, number];
+        const [haloA, coreA] = star.alphas as [number, number];
 
-        // Radii are multiples of the star's OWN radius (BLOOM.radii), which is
-        // what makes the bloom scale with the star instead of being a fixed disc.
-        // 1e-3 absorbs the 4-decimal quantisation in `round` (../art/shapes).
-        expect(inner, `${key}: inner halo is ${BLOOM.radii[0]}x the star`).toBeCloseTo(
-          core * BLOOM.radii[0],
-          2,
-        );
-        expect(outer, `${key}: outer halo is ${BLOOM.radii[1]}x the star`).toBeCloseTo(
-          core * BLOOM.radii[1],
-          2,
-        );
-
-        // Alphas are fractions of the star's own alpha (BLOOM.intensity). This is
-        // the assertion that a bake which quantises a 6% wash to zero — suspect
-        // one of a0-18, and the one the brief said to test first — cannot pass.
-        expect(innerA, `${key}: inner halo alpha is ${BLOOM.intensity[0]}x the star's`).toBeCloseTo(
-          coreA * BLOOM.intensity[0],
+        // The halo is a multiple of the star's OWN radius, which is what makes
+        // the bloom scale with the star instead of being a fixed disc. 1e-2
+        // absorbs the 4-decimal quantisation in `round` (../art/shapes).
+        expect(halo, `${key}: the halo is ${BLOOM.radius}x the star`).toBeCloseTo(core * BLOOM.radius, 2);
+        // …and its alpha a fraction of the star's own. This is the assertion that
+        // a bake which quantises a faint wash to zero — suspect one of a0-18, and
+        // the one the brief said to test first — cannot pass.
+        expect(haloA, `${key}: halo alpha is ${BLOOM.intensity}x the star's`).toBeCloseTo(
+          coreA * BLOOM.intensity,
           3,
         );
-        expect(outerA, `${key}: outer halo alpha is ${BLOOM.intensity[1]}x the star's`).toBeCloseTo(
-          coreA * BLOOM.intensity[1],
-          3,
+        // The faintest halo in the game belongs to the faintest star that blooms
+        // at all, and it must survive as a positive alpha rather than be floored.
+        expect(haloA, `${key}: the faintest halo still carries ink`).toBeGreaterThan(0);
+        expect(haloA).toBeGreaterThanOrEqual(
+          starAlpha(MOCKUP_STARS.bloom.threshold) * BLOOM.intensity - 1e-3,
         );
-
-        // Subtle is not absent. The faintest halo in the set is the deep layer's
-        // outer ring at 0.26 x 0.065 = 0.0169, and it must survive as a positive
-        // alpha rather than being floored away.
-        expect(outerA, `${key}: the faintest halo still carries ink`).toBeGreaterThan(0);
       }
     }
   });
@@ -223,13 +237,27 @@ describe('the bloom reaches the frame, not just the sprite definition', () => {
   it('draws the halo BEHIND the star, so the point sits on its own glow', () => {
     for (const [key, gfx] of starLayers(boot())) {
       for (const star of bloomedOf(submittedStars(gfx))) {
-        const [outer, inner, core] = star.radii as [number, number, number];
+        const [halo, core] = star.radii as [number, number];
         // Submitted order is draw order (../art/textures `drawSprite`), so the
-        // core arriving last is what puts it on top. Reversed, a 16%-alpha disc
+        // core arriving last is what puts it on top. Reversed, a 48%-alpha disc
         // would wash over every star it belongs to.
-        expect(outer, `${key}: widest ring first`).toBeGreaterThan(inner);
-        expect(inner, `${key}: then the inner ring`).toBeGreaterThan(core);
+        expect(halo, `${key}: the halo comes first and is the wider disc`).toBeGreaterThan(core);
       }
+    }
+  });
+
+  it('gives every bloomed star its diffraction cross, and nothing else one (a0-40)', () => {
+    // The design draws the halo and the spikes on one population, because a halo
+    // and a spike are one physical event. This is that, at the frame: two stroked
+    // polylines per bloomed star, and the arms are the star's own colour.
+    for (const [key, gfx] of starLayers(boot())) {
+      const blooms = bloomedOf(submittedStars(gfx)).length;
+      const ctx = (gfx as unknown as { context?: { instructions?: unknown[] } }).context;
+      const strokes = ((ctx?.instructions ?? []) as { action?: string }[]).filter(
+        (i) => i.action === 'stroke',
+      ).length;
+      expect(strokes, `${key}: two arms per bloomed star`).toBe(blooms * 2);
+      expect(SPIKE.length, 'the arms reach past the halo’s own radius').toBeGreaterThan(BLOOM.radius);
     }
   });
 });
@@ -239,20 +267,20 @@ describe('the bloom’s COLOUR reaches the frame, and a star sits inside it (a0-
   /** The steel value ramp a star's own point is drawn from (style-guide §1). */
   const ramp = new Set<number>(STAR_LAYERS.flatMap((l) => l.inks.map((i) => i.color)));
 
-  it('submits the tint on both halo rings and the star’s own colour on the point', () => {
+  it('submits the tint on the halo and the star’s own colour on the point', () => {
     // The shape of the defect this guards: a generator that tinted the point as
-    // well would put a cyan dot in the sky where §1 requires a bright one, and a
-    // generator that tinted only one ring would draw a coloured RING rather than
-    // a glow. Both are invisible to a golden and both are one edit away.
+    // well would put a cyan dot in the sky where §1 requires a bright one. It is
+    // invisible to a golden and it is one edit away. (Before a0-40 a bloom was
+    // two flat rings and this also checked they agreed; a soft falloff is one
+    // shape, so there is no longer a ring to disagree with.)
     for (const [key, gfx] of starLayers(boot())) {
       for (const star of bloomedOf(submittedStars(gfx))) {
-        const [outer, inner, core] = star.colors as [number, number, number];
+        const [halo, core] = star.colors as [number, number];
         expect(ramp.has(core), `${key}: a star POINT was submitted ${hex(core)}`).toBe(true);
         expect(tints.has(core), `${key}: the point took the halo's tint`).toBe(false);
-        expect(outer, `${key}: the two halo rings disagree on colour`).toBe(inner);
         expect(
-          tints.has(inner) || inner === core,
-          `${key}: halo ${hex(inner)} is neither a ratified tint nor the star's own colour`,
+          tints.has(halo) || halo === core,
+          `${key}: halo ${hex(halo)} is neither a ratified tint nor the star's own colour`,
         ).toBe(true);
       }
     }
@@ -264,7 +292,7 @@ describe('the bloom’s COLOUR reaches the frame, and a star sits inside it (a0-
     for (const [key, gfx] of layers) {
       const hues = new Set<number>();
       for (const star of bloomedOf(submittedStars(gfx))) {
-        const halo = star.colors[1]!;
+        const halo = star.colors[0]!;
         if (tints.has(halo)) hues.add(halo);
       }
       seen.set(key, hues);
@@ -288,21 +316,32 @@ describe('the bloom’s COLOUR reaches the frame, and a star sits inside it (a0-
     ).toBeGreaterThan(1);
   });
 
-  it('keeps the steel ramp the majority of what a frame blooms', () => {
+  it('keeps the steel ramp the majority of what a FRAME blooms', () => {
     // a0-07's void is a steel field, and this change is a minority of tints in
-    // it, not a repaint. Measured across all three layers on one stage: the
-    // untinted blooms have to stay the larger half.
+    // it, not a repaint. The claim is about a *frame*, so the count has to be
+    // per-screenful: a layer's baked field is `coverSpan` of its own parallax, so
+    // `near` bakes a field five times `deep`'s and a raw total over the whole
+    // stage over-weights the two layers that carry a tint. Normalising by field
+    // area recovers the share a player actually sees, which is the design's own
+    // 0.61 / 0.30 / 0.09.
     let tinted = 0;
     let total = 0;
-    for (const [, gfx] of starLayers(boot())) {
+    for (const [key, gfx] of starLayers(boot())) {
+      const spec = STAR_LAYERS.find((l) => l.key === key)!;
+      const area =
+        coverSpan(spec.parallax, VIEW.w, BOUNDS.w) * coverSpan(spec.parallax, VIEW.h, BOUNDS.h);
+      const perScreen = (VIEW.w * VIEW.h) / area;
       for (const star of bloomedOf(submittedStars(gfx))) {
-        total++;
-        if (tints.has(star.colors[1]!)) tinted++;
+        total += perScreen;
+        if (tints.has(star.colors[0]!)) tinted += perScreen;
       }
     }
-    expect(total, 'the stage bloomed at all').toBeGreaterThan(100);
+    expect(total, 'the stage bloomed at all').toBeGreaterThan(10);
     expect(tinted, 'no tinted bloom reached the stage').toBeGreaterThan(0);
-    expect(tinted / total, `${tinted}/${total} blooms are tinted`).toBeLessThan(0.5);
+    expect(
+      tinted / total,
+      `${tinted.toFixed(1)}/${total.toFixed(1)} of a screenful's blooms are tinted`,
+    ).toBeLessThan(0.5);
   });
 
   it('draws the star LAST, so a coloured bloom still has a star in it', () => {
@@ -312,11 +351,10 @@ describe('the bloom’s COLOUR reaches the frame, and a star sits inside it (a0-
     // hue, a tinted bloom is now the EASIEST place in the sky to find a star.
     for (const [key, gfx] of starLayers(boot())) {
       for (const star of bloomedOf(submittedStars(gfx))) {
-        const [outerA, innerA, coreA] = star.alphas as [number, number, number];
-        expect(coreA, `${key}: the point is fainter than its own inner halo`).toBeGreaterThan(innerA);
-        expect(innerA, `${key}: the inner ring is fainter than the outer one`).toBeGreaterThan(outerA);
+        const [haloA, coreA] = star.alphas as [number, number];
+        expect(coreA, `${key}: the point is fainter than its own halo`).toBeGreaterThan(haloA);
         // Submitted order is draw order, so "last" is "on top".
-        expect(star.radii[2], `${key}: the point is not the last fill at its centre`).toBe(
+        expect(star.radii[1], `${key}: the point is not the last fill at its centre`).toBe(
           Math.min(...star.radii),
         );
       }
@@ -394,8 +432,8 @@ describe('nothing downstream may take the bloom back off the stage', () => {
       const stars = submittedStars(gfx);
       expect(stars.length, `${key} rebuilt a field`).toBeGreaterThan(20);
       const ratio = bloomedOf(stars).length / stars.length;
-      expect(ratio, `${key} still blooms at BLOOM.scatter after the reflow`).toBeGreaterThan(
-        BLOOM.scatter * 0.7,
+      expect(ratio, `${key} still blooms at the design's rate after the reflow`).toBeGreaterThan(
+        BLOOM_RATE * 0.7,
       );
     }
   });

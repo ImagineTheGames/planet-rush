@@ -61,29 +61,43 @@ export const WHITE = 0xffffff;
 
 /**
  * **FLOOR — the ground the play-field is drawn on** *(ratified 2026-08-07 by the
- * developer off the backdrop compositor: "i like floor")*.
+ * developer off the backdrop compositor: "i like floor"; **value amended
+ * 2026-08-13, a0-40** — see below)*.
  *
- * `#010204`. Not a seventh hue and not a replacement for {@link PALETTE.vacuum}:
- * it is the *same cool blue-black* at a much lower value — hue 220° against
- * Vacuum's 217.5°, luma 1.9 against Vacuum's 15.5. The distinction is what each
- * one is FOR:
+ * `#070910`. Not a seventh hue and not a replacement for {@link PALETTE.vacuum}:
+ * it is the *same cool blue-black* at a lower value — hue 220° against Vacuum's
+ * 217.5°, luma 9.1 against Vacuum's 15.5. The distinction is what each one is
+ * FOR:
  *
  *  - **Vacuum `#0D1015`** stays the material colour. It is the dark endpoint of
  *    the value ramp (`palette.ts` `shade()`), the HUD panel fill, the tone every
  *    derived shade is mixed toward, and the reference the §1 contrast rule is
  *    quoted against. Nothing about it moves.
- *  - **Floor `#010204`** is the *backdrop*, and only the backdrop: the ground the
+ *  - **Floor `#070910`** is the *backdrop*, and only the backdrop: the ground the
  *    void star-field and its nebula are composited over (`./backdrop`). Nothing
- *    else in the game is ever painted Floor.
+ *    else in the game is ever painted Floor, and `./compliance` fails it on any
+ *    role but `sky`.
  *
- * Darker ground is strictly better for the one legibility worry it raises, and
- * this was measured rather than argued: `rockBody #484E57` reads **2.27:1**
- * against Vacuum and **2.47:1** against Floor — 8.9% *more* contrast. Space is
- * black and the asteroids are grey; a lower ground raises contrast for anything
- * lighter than it, which is everything. No rim light, contrast floor, or other
- * compensation is warranted, and none was added.
+ * ## The amendment (a0-40): `#010204` → `#070910`, Y′ 1.9 → 9.1
+ *
+ * Floor shipped at `#010204` and the design preview's ground was **`#070910`**
+ * all along — nobody compared them, because nothing in CI could. Measured side by
+ * side (`sky-preview.ts`), the shipped stack was ~5× darker than the design at
+ * every level: ground 1.9 against 9.1, star p99 7–9 against 46–53, nebula lift
+ * 0.02–0.92 against 3.8–10.0. The developer, on the sixth report about it: *"the
+ * mockup still looks a million times better"*, and the ruling is that the game
+ * **matches** the mockup rather than approaching it. `./mockup-reference`
+ * `MOCKUP_GROUND` is the design's own number and this constant now carries it.
+ *
+ * The rock-legibility argument the original value rested on is unchanged in
+ * direction and smaller in size, and it was re-measured rather than assumed:
+ * `rockBody #484E57` reads **2.27:1** against Vacuum, **2.47:1** against the old
+ * Floor and **2.37:1** against this one — still 4.4% *more* contrast than Vacuum,
+ * which is the comparison §1 actually makes. Space is black and the asteroids are
+ * grey; a ground below everything raises contrast for everything. No rim light,
+ * contrast floor, or other compensation is warranted, and none was added.
  */
-export const FLOOR = 0x010204;
+export const FLOOR = 0x070910;
 
 /**
  * The 8-slot player identity roster (style-guide §3.1 — ratified, supersedes the

@@ -84,32 +84,88 @@ export const RED_FAMILY: ReadonlySet<number> = family('threatRed');
 const YELLOW_ROLES: readonly PaintRole[] = ['ore', 'core', 'danger'];
 
 /**
- * The ceiling on any {@link FLOOR}-less ink painted on role `sky` (a0-07).
+ * The ceiling on any {@link FLOOR}-less ink painted on role `sky`
+ * *(a0-07: 0.12; **raised to 0.40 by a0-40** — see below)*.
  *
  * The backdrop is the one surface behind every entity in the game at all times,
  * which is exactly why "keep it subtle" cannot be left to taste: a wash that
  * drifts up by 4% of alpha is a wash competing with the fleet on every frame.
- * 12% is the ceiling; the brightest sky actually shipped (Plasma Reef) peaks at
- * 8%, and the rest sit under 6%.
+ *
+ * ## Why it moved, and what it buys
+ *
+ * **This constant is one of the two the a0-40 brief names as the cause.** It, and
+ * `peakLuma`/`overdraw` next door in `./backdrop`, were the only things CI could
+ * see about a sky — and every one of them rewards a darker sky. Six developer
+ * reports later the backdrop was five times darker than the design it was drawn
+ * from, because five briefs in a row optimised toward these numbers and nothing
+ * anywhere pulled the other way. The direction of authority is now inverted:
+ * `./mockup-reference` is the design, and this ceiling is derived from the sky
+ * that ships rather than the sky being trimmed to fit the ceiling.
+ *
+ * **0.40** is Coalsack's declared peak (0.39) plus a hair. Coalsack is the reason
+ * the number had to move at all and the brief says so in as many words —
+ * *"Coalsack's `peakLuma` is 1.9, which is the bare ground: the mockup's dust
+ * cannot fit under it at any parameters"*. Dust that occludes a star field is
+ * opaque where it is thickest; that is what dust **is**, and 12% cannot express
+ * it. The design's dust runs α 0.18–0.39.
+ *
+ * What the raise costs, measured rather than asserted (`backdrop.test.ts`, and
+ * the ladder is on `NebulaSpec.peakLuma`):
+ *
+ * ```
+ *   sky            peak Y′ over the ground   overdraw     (was: peak / overdraw)
+ *   None                  9.1                 0.000        1.9  / 0.000
+ *   Deep Ember           22.3                 3.033        7.6  / 0.416
+ *   Patina Drift         32.3                 3.174       14.9  / 0.555
+ *   Iron Veil            43.9                 2.459       14.0  / 0.249
+ *   Coalsack             46.3                 2.263        1.9  / 0.399
+ *   Plasma Reef          59.0                 2.175       17.0  / 0.627
+ *   ────────────────────────────────────────────────────
+ *   the rock body        77.4    ← the new invariant: no sky reaches it
+ *   the ink outline      43.4    ← the OLD invariant, and three skies now pass it
+ * ```
+ *
+ * The old invariant — *no sky is ever brighter than `rockFissure`, the ink every
+ * sprite is outlined in* — **does not survive this brief**, and it is worth being
+ * blunt about that rather than quietly deleting it. A design whose brightest sky
+ * lifts the frame by 10 luma cannot also stay under a 43.4 line. What replaces it
+ * is the next surface up: **no sky is ever brighter than the rock body (Y′ 77.4)**,
+ * the darkest large *thing* in the world, so the fleet and the field still out-value
+ * the void they fly through. `backdrop.test.ts` holds that, and holds each sky's
+ * own peak to within 15% so the ladder cannot drift again in either direction.
  */
-export const SKY_ALPHA_MAX = 0.12;
+export const SKY_ALPHA_MAX = 0.4;
 
 /**
  * The much lower ceiling for a RESERVED hue on the sky — the whole of the §2.2
- * carve-out, as a number (a0-07).
+ * carve-out, as a number *(a0-07: 0.06; **raised to 0.10 by a0-40**)*.
  *
  * Threat red is barred everywhere but `danger`, for the reason §2 gives: a
  * player scanning a chaotic screen must be able to trust it. The two warm skies
  * the developer picked (Iron Veil, Deep Ember) are *rust and dying coals* — a
  * hue the palette owns and a value nothing else in the game occupies. They are
- * legal only because the composite is provably not a signal: at 6% over Floor,
- * `shade(threatRed)` lands at luma ≈ 5/255, an eighth of the ink outline every
- * sprite in the game is drawn with, and a thirtieth of the damage fill it shares
- * a hue with. Enforced here, so "provably" is a test rather than a claim.
+ * legal only because the composite is provably not a signal, and that clause is
+ * what this number enforces.
  *
- * Signal yellow gets no such carve-out at any alpha. See `YELLOW_ROLES`.
+ * **0.10** is Iron Veil's declared peak (0.097) plus a hair, and Iron Veil is the
+ * sky that makes the case: it is the one sky whose parameters *never drifted*, so
+ * the design's rust has been running at α 0.045–0.097 since the beginning and the
+ * shipped 0.06 ceiling was silently below its own control. (`a0-39` capped Deep
+ * Ember at exactly 0.06 for this reason and recorded that the sky "comes back
+ * dimmer" as a result — that was the ceiling shaping the art, one brief before
+ * the developer said the art was wrong.)
+ *
+ * The carve-out's own argument is unchanged and re-measured at the new number:
+ * threat red at 0.10 over the ground composites to Y′ **16.5**, against a damage
+ * fill at **83.5** and a station's alarm ring brighter still. The rust band peaks
+ * at Y′ 43.9 where its blobs stack, which is a fifth of what the thing it shares a
+ * hue with reads at, and `backdrop.test.ts` measures the ΔE from every signal on
+ * every sky (≥ 40 throughout) so "not a signal" stays a number.
+ *
+ * Signal yellow gets no such carve-out at any alpha, and a0-40 did not touch
+ * that. See `YELLOW_ROLES`.
  */
-export const SKY_RESERVED_ALPHA_MAX = 0.06;
+export const SKY_RESERVED_ALPHA_MAX = 0.1;
 
 /** Audit one sprite. An empty array is a compliant sprite. */
 export function auditSprite(def: SpriteDef): Violation[] {
