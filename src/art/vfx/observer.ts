@@ -88,6 +88,23 @@ export interface ShipView {
   readonly spawnProtect: number;
   readonly tiers: TiersView;
   readonly firing: boolean;
+  /**
+   * The throttle applied to this ship this tick, 0..1 (sim `Ship.thrust`) — the
+   * engine the thruster trail draws. An **input**, published by the simulation for
+   * exactly the reason {@link firing} is: it cannot be recovered from the state it
+   * produced, and the attempt to (acceleration along the nose) is the a0-47 bug —
+   * at top speed thrust and drag cancel, so the exhaust died a second into every
+   * run. See `WorldObserver.observeThrust`.
+   *
+   * Optional on the same back-compatible terms as {@link team}, because the sim's
+   * own field is: a source that does not publish a throttle reads as no throttle,
+   * never as a guess. **The wire snapshot is such a source today** — `src/net/`
+   * carries `firing` as a flag bit and has no thrust field, so a *remote* ship in
+   * an online match trails only while the local prediction is stepping it. That is
+   * the netcode's to close (a quantized byte, or the flags byte's spare bits); the
+   * local ship, every offline ship and every bot are on the real number.
+   */
+  readonly thrust?: number;
 }
 
 /** What the observer reads off an asteroid. */
@@ -181,12 +198,16 @@ export interface WorldView {
 // ---------------------------------------------------------------------------
 
 /**
- * Acceleration (units/s²) that reads as "full throttle" for the thruster trail.
- * Mirrors the sim's Vanguard `BASE_ACCEL` baseline, held here as a *visual*
- * reference so `src/art/` stays a leaf module: if the sim retunes thrust, the
- * trail gets a little longer or shorter and nothing breaks. TUNABLE.
+ * Throttle below which the engine is off rather than idling — a stick at rest,
+ * or the last hair of a thumb leaving one. Small on purpose: this is a deadzone,
+ * not a threshold with an opinion about how hard a ship is flying. TUNABLE.
+ *
+ * It is the only tuning the trail has left. The acceleration that used to stand
+ * in for full throttle here is deleted rather than left unused (a0-47): the
+ * throttle is now read from the simulation, and a guess kept beside the truth is
+ * how the old behaviour comes back — LESSONS §14.
  */
-export const REFERENCE_ACCEL = 900;
+export const THRUST_DEADZONE = 0.05;
 
 /** Seconds between spawn-protection glow pulses (GDD §2.1, 10 s of protection). */
 export const SPAWN_PULSE_S = 0.5;
@@ -342,7 +363,8 @@ export class WorldObserver {
    *
    * @param world The current world (local sim, or a server snapshot).
    * @param dt    Seconds since the previous call. Drives the periodic tells
-   *              (spawn-protection pulse, repair channel) and the throttle read.
+   *              (spawn-protection pulse, repair channel). Nothing *derives* a
+   *              rate from it any more — the throttle used to, and that was a0-47.
    * @param out   Queue to append to. Not cleared here — the caller owns its
    *              lifetime, so one queue can gather a frame from several sources.
    */
@@ -360,7 +382,7 @@ export class WorldObserver {
       pulse = true;
     }
 
-    this.observeShips(world, step, out, silent, pulse);
+    this.observeShips(world, out, silent, pulse);
     this.observeRocks(world, out, silent);
     this.observeStations(world, step, out, silent);
     this.observeMuzzles(world, out, silent);
@@ -374,13 +396,7 @@ export class WorldObserver {
   // Ships: mine, die, respawn, thrust
   // -------------------------------------------------------------------------
 
-  private observeShips(
-    world: WorldView,
-    dt: number,
-    out: TellQueue,
-    silent: boolean,
-    pulse: boolean,
-  ): void {
+  private observeShips(world: WorldView, out: TellQueue, silent: boolean, pulse: boolean): void {
     for (const ship of world.ships) {
       const tierSum = ship.tiers.power + ship.tiers.engine + ship.tiers.cargo + ship.tiers.hull;
       let memo = this.ships.get(ship.id);
@@ -444,7 +460,7 @@ export class WorldObserver {
             );
           }
 
-          this.observeThrust(ship, memo, dt, out);
+          this.observeThrust(ship, out);
 
           if (pulse && ship.spawnProtect > 0) {
             out.push(TELL.spawnPulse, ship.pos.x, ship.pos.y, ship.angle, 1, ship.id);
@@ -492,18 +508,43 @@ export class WorldObserver {
   }
 
   /**
-   * Throttle, measured rather than told: the component of this frame's velocity
-   * change along the ship's facing. Engine output is not in the state tree, and
-   * this needs no constant from the sim to read it — a ship under power has its
-   * nose pushing its own velocity, and a coasting one does not.
+   * Throttle, **told rather than measured** — `Ship.thrust`, the magnitude of the
+   * analog thrust intent the sim applied to this ship this tick. A held state, so
+   * it is read every frame it is above {@link THRUST_DEADZONE} and passed through
+   * as the tell's magnitude, which is what makes the trail thin as the stick eases
+   * off instead of switching off (`./emitters` sizes count, speed, lifetime and
+   * alpha from it).
+   *
+   * ## Why this stopped being an inference (developer report a0-47)
+   *
+   * It used to read the component of the frame's velocity change along the nose,
+   * on the argument that *"a ship under power has its nose pushing its own
+   * velocity, and a coasting one does not."* The sim integrates thrust minus
+   * linear drag, and at top speed those two terms **cancel exactly** — that is
+   * what top speed is. So a ship at full throttle holding maximum velocity has an
+   * acceleration of zero, which read as no engine at all: *"the ship's rocket and
+   * trails only appear when he's fully stopped and goes to move, but then it stops
+   * like after 1 second."* That second was the spin-up from rest, the only window
+   * in which the inference is sound. It was not mistuned — it was wrong by
+   * construction, and no gate or reference constant could have made it right.
+   *
+   * The engine is an *input*, and an input is not recoverable from the state it
+   * produced. `firing` is the precedent, one field along on the same view.
+   *
+   * ## The one other tell that reads a held state, and how it does it
+   *
+   * `repairTick` reads `station.repairing` — the flag itself, not a decrease in
+   * core HP — and pulses on its own clock. Every remaining tell in this file
+   * diffs a **quantity for a discrete event** (an ore chunk arriving, a crack
+   * stage, a hull losing HP, an entity appearing or leaving), where the diff is
+   * the event and no equilibrium can cancel it. `bankOre` looks closest to the
+   * old bug and is not it: a deposit drain raises `banked` monotonically for as
+   * long as it runs, so the difference stays positive throughout. This was the
+   * only continuous input in the file being read off a derivative.
    */
-  private observeThrust(ship: ShipView, memo: ShipMemo, dt: number, out: TellQueue): void {
-    if (dt <= 0) return;
-    const ax = (ship.vel.x - memo.vx) / dt;
-    const ay = (ship.vel.y - memo.vy) / dt;
-    const along = ax * Math.cos(ship.angle) + ay * Math.sin(ship.angle);
-    const throttle = clamp01(along / REFERENCE_ACCEL);
-    if (throttle <= 0.05) return;
+  private observeThrust(ship: ShipView, out: TellQueue): void {
+    const throttle = clamp01(ship.thrust ?? 0);
+    if (throttle < THRUST_DEADZONE) return;
     // The exhaust leaves from behind the hull, travelling backwards.
     const bx = ship.pos.x - Math.cos(ship.angle) * ship.radius;
     const by = ship.pos.y - Math.sin(ship.angle) * ship.radius;

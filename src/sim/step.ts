@@ -83,7 +83,7 @@ import {
   shipTopSpeed,
   shipTurnRate,
 } from './upgrades';
-import { dist2, normalize } from './vec';
+import { dist2, len, normalize } from './vec';
 import { spawnDueWaves } from './waves';
 
 // ---------------------------------------------------------------------------
@@ -232,10 +232,16 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
     for (const track of intent.upgrades) buyUpgrade(world, ship, track);
   }
 
-  // 3. Movement — Euler integration with drag (GDD §4.1).
+  // 3. Movement — Euler integration with drag (GDD §4.1). The throttle tell is
+  //    published here, from the same intent `integrate` is about to spend, so the
+  //    engine the renderer draws and the acceleration the ship got are one number
+  //    (a0-47 — see `Ship.thrust`). Every ship, every tick, dead ones included:
+  //    a tell that is only written sometimes is a tell that goes stale.
   for (let i = 0; i < world.ships.length; i++) {
     const ship = world.ships[i]!;
-    if (ship.alive) integrate(ship, intents[i]!, dt, world.bounds);
+    const intent = intents[i]!;
+    ship.thrust = ship.alive ? len(intent.thrust) : 0;
+    if (ship.alive) integrate(ship, intent, dt, world.bounds);
   }
 
   // 4. Broad phase over the (static) asteroid field, reused by collision + shots.
@@ -1168,6 +1174,7 @@ function respawn(ship: Ship): void {
   ship.pos.y = ship.home.y;
   ship.vel.x = 0;
   ship.vel.y = 0;
+  ship.thrust = 0; // a fresh hull is not under power until its pilot says so.
   ship.cargo = 0;
   ship.respawnTimer = 0;
   ship.spawnProtect = SPAWN_PROTECTION_S;
