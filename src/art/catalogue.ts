@@ -222,10 +222,13 @@ function entries(): CatalogueEntry[] {
   // no seventh hue, all role `material` (style-guide §1). A sample star that went
   // signal yellow would be a RESERVED-rule violation like any other sprite.
   const VOID_TILE = { w: 480, h: 300 } as const;
+  // One magnitude curve and one value ramp across all three (a0-40): a layer is
+  // a depth, not a brightness tier. What differs is the parallax and which of
+  // the two bloom tints, if any, its top band carries.
   const LAYER_NOTE: Record<string, string> = {
-    deep: 'far dust — dim, dense, no white',
-    mid: 'mid field — lit steel + a little white',
-    near: 'near points — the ramp’s white endpoint, faint glints',
+    deep: 'the far 61% of the field — parallax 0.10, no bloom tint',
+    mid: 'the middle 30% — parallax 0.26, plasma on the band that blooms',
+    near: 'the near 9% — parallax 0.50, patina on the band that blooms',
   };
   for (const spec of STAR_LAYERS) {
     out.push({
