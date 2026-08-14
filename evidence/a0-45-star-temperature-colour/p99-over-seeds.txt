@@ -1,0 +1,35 @@
+p99 over seeds — the design’s panel and the game’s, both coloured (a0-45)
+=========================================================================
+
+  seed          design p99   game p99   game halos
+  0x50616365       40.36      44.54           41
+  0xee98dd1e       44.24      45.69           36
+  0x8cd056d7       45.92      43.54           36
+  0x2b07d090       40.18      45.06           32
+  0xc93f4a49       45.38      39.89           26
+  0x6776c402       45.66      46.40           33
+  0x05ae3dbb       40.96      40.07           20
+  0xa3e5b774       46.11      40.83           23
+  0x421d312d       42.66      47.82           28
+  0xe054aae6       42.65      46.78           39
+  0x7e8c249f       54.13      47.08           38
+  0x1cc39e58       49.14      45.64           38
+  0xbafb1811       49.01      40.82           27
+  0x593291ca       41.32      47.41           37
+  0xf76a0b83       48.56      50.34           44
+  0x95a1853c       39.70      40.65           27
+  0x33d8fef5       48.81      40.28           30
+  0xd21078ae       51.17      39.99           32
+  0x7047f267       44.03      47.17           45
+  0x0e7f6c20       46.64      39.62           29
+  0xacb6e5d9       42.46      44.02           33
+  0x4aee5f92       41.80      43.14           36
+  0xe925d94b       46.64      41.77           26
+  0x875d5304       41.86      46.13           32
+
+  design panel  mean 44.97  sd 3.80  range 39.70–54.13
+  game panel    mean 43.94  sd 3.16  range 39.62–50.34
+  game halos    mean 32.8  sd 6.4  range 20–45
+
+  the two panels agree in the mean to 2.29%
+  the declared band is 42–48

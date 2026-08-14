@@ -1,0 +1,16 @@
+the diffraction cross, measured off `starFieldSprite` (a0-45)
+=============================================================
+
+  arms drawn over one 640×360 panel   82
+  spike alpha                          0.1056–0.1056
+  halo alpha                           0.2016–0.2016
+  spike : halo                         0.52–0.52
+  stroke width, px                     0.70
+
+  the design's cross                   0.1056  (0.22 × 0.48)
+  the design's halo                    0.2016  (0.42 × 0.48)
+  the design's spike : halo            0.52  — a flare INSIDE a glow
+  the design's lineWidth               0.70
+
+  this tree is 1.00× the design at its brightest, 1.00× at its faintest
+  the brief states 5.2× / spike:halo 2.72, which is α 1.0 × 0.55 against the halo; no star reaches α 1.0 (alpha.max 0.5)

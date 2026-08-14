@@ -1,0 +1,29 @@
+p99 sensitivity — which knob can reach the declared band, and by how much
+=========================================================================
+
+  the declared band                 42–48
+  the design's panel, as it stands  40.36
+
+  DERIVED knobs (the ones a re-fit is allowed to move):
+  star alpha.max 0.5 → 0.60                  p99 40.59
+  star alpha.max 0.5 → 0.75                  p99 40.90
+  star alpha.max 0.5 → 1.00                  p99 41.19
+  star radius.max 2.45 → 3.68                p99 81.68
+  star radius.max 2.45 → 4.90                p99 95.25
+  magnitudeExponent 2.35 → 1.8               p99 49.34
+  magnitudeExponent 2.35 → 1.5               p99 59.77
+
+  MEASURED knobs (a re-fit may NOT move these — priced only to say what would):
+  bloom.peakAlpha 0.2016 → 0.2419            p99 45.84
+  bloom.peakAlpha 0.2016 → 0.2621            p99 48.45
+  count 560 → 1120                           p99 80.17
+  bloom.threshold 0.86 → 0.75                p99 42.80
+
+  and the thing that actually changed — the halo/point colour:
+    the design's own top-of-range colours   hot a0cdff  cool ebb45f
+    a halo pixel at its own peak, over the ground (α 0.2016, absolute):
+      white  #ffffff   Y′ 58.66   ← what the deleted ramp painted every bloomed star
+      hot    #a0cdff   Y′ 47.38
+      hot    #b2d1e9   Y′ 48.40
+      cool   #ebc995   Y′ 48.47
+      cool   #ebb45f   Y′ 44.66
