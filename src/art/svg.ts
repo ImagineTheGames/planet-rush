@@ -17,7 +17,7 @@
  */
 
 import { hex, PALETTE } from './palette';
-import { falloffProfile, type Falloff, type Shape, type SpriteDef } from './shapes';
+import { curveProfile, HALO_KNEE_AT, type Falloff, type Shape, type SpriteDef } from './shapes';
 
 function num(n: number): string {
   // Trim -0 and trailing zeroes so the output diffs cleanly.
@@ -45,7 +45,10 @@ const SVG_FALLOFF_STOPS = 16;
  * counter every time a sprite is inserted above another.
  */
 function falloffId(f: Falloff, color: number, alpha: number): string {
-  const key = [f.cx, f.cy, f.rx, f.ry, f.angle, color, alpha].map(num).join('_');
+  const key = [f.cx, f.cy, f.rx, f.ry, f.angle, color, alpha]
+    .map(num)
+    .concat(f.curve ?? 'smooth')
+    .join('_');
   let h = 0x811c9dc5;
   for (let i = 0; i < key.length; i++) {
     h ^= key.charCodeAt(i);
@@ -65,15 +68,21 @@ function falloffId(f: Falloff, color: number, alpha: number): string {
  * path.
  */
 function falloffDefs(f: Falloff, color: number, alpha: number, id: string): string {
-  const stops: string[] = [];
-  for (let i = 0; i <= SVG_FALLOFF_STOPS; i++) {
-    const t = i / SVG_FALLOFF_STOPS;
-    stops.push(
+  const profile = curveProfile(f.curve);
+  // A `halo` is the design's own three-stop gradient and SVG interpolates stops
+  // linearly, so three stops reproduce it EXACTLY — sampling it 16 times would
+  // only blunt its knee, which is the one feature it has (a0-44, `./shapes`
+  // `haloProfile`). A `smooth` curve is a curve and still wants its 16.
+  const offsets =
+    f.curve === 'halo'
+      ? [0, HALO_KNEE_AT, 1]
+      : Array.from({ length: SVG_FALLOFF_STOPS + 1 }, (_, i) => i / SVG_FALLOFF_STOPS);
+  const stops = offsets.map(
+    (t) =>
       `<stop offset="${num(t)}" stop-color="${hex(color)}" stop-opacity="${num(
-        Number((alpha * falloffProfile(t)).toFixed(5)),
+        Number((alpha * profile(t)).toFixed(5)),
       )}"/>`,
-    );
-  }
+  );
   const tf =
     `translate(${num(f.cx)} ${num(f.cy)}) rotate(${num((f.angle * 180) / Math.PI)}) ` +
     `scale(${num(f.rx)} ${num(f.ry)})`;
