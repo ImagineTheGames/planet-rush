@@ -1,0 +1,18 @@
+{
+  // The root `tsconfig.json` includes `src`, `server`, `tests` and `harness` —
+  // not `tools`, which was `.mjs` only until a0-41. This config keeps the `.ts`
+  // tools honest on the project's own settings without changing what the DoD
+  // gate (`npx tsc --noEmit`) covers for every other agent:
+  //
+  //     npx tsc --noEmit --project tools
+  //
+  // Additive and invisible to the root check, exactly like
+  // `spikes/atlas-pooling/tsconfig.json`.
+  //
+  // `fixtures/` is excluded on purpose: it is the dark-matter scanner's own test
+  // corpus, and its files are deliberately unused imports and uncalled exports —
+  // the very thing the scanner is there to find.
+  "extends": "../tsconfig.json",
+  "include": ["."],
+  "exclude": ["fixtures"]
+}
