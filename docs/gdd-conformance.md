@@ -467,7 +467,7 @@ testable, so each row below is checked against the thing a player would look at.
 | REPAIR REACTOR also shows the HP a tap restores — including the real partial | **SHIPPED** | `src/ui/build-wheel.ts:306`, `:583` (`"+15 HP"` / `"+7 HP"`). |
 | Every capped wedge shows count over cap — `2 / 4 BUILT` — including queued | **SHIPPED** | `src/ui/build-wheel.ts:342–352`. |
 | UPGRADE SHIP carries an arrow, not a price | **SHIPPED** | `src/ui/build-wheel.ts:22`, `:333`. |
-| The upgrade wheel quotes `cost/held` and `MAX` | **SHIPPED** *(GDD marks this ⚠ OPEN — see Q-3)* | `src/ui/upgrade-wheel.ts:321`, `:455`; `MAXED_COST` `:304`. |
+| The upgrade wheel's cost is ONE number, and `MAX` on a finished ladder | **SHIPPED** *(Q-3 CLOSED by the developer 2026-08-13 — the denominator goes on every page; GDD §2.5 amended, the ⚠ OPEN struck)* | `costLabelOf` `src/ui/upgrade-wheel.ts:329` → `costNumeral` `src/ui/affordability.ts`; `MAXED_COST` `:304`. No `/` in any cost slot on any page, structurally asserted by `src/ui/wheel-cost-grammar.test.ts`. |
 | Each upgrade track shows its ladder position as pips | **SHIPPED** | `pipRow` `src/ui/wheel-stack.ts:251`. |
 | The WEAPON wedge says `OPEN ▸` in the cost slot | **SHIPPED** | `OPENS_SCREEN` `src/ui/wheel-stack.ts:286`. |
 | Construction times: turret ~10 s, shield ~15 s, radar ~12 s | **SHIPPED** | `src/sim/constants.ts:84` (`buildTime: 10`), `:382` (`15`), `:1065` (`12`). |
@@ -710,15 +710,20 @@ a0-12 as the two-sided Teams boards). Either the GDD gains an amendment folding
 a0-12 in — my recommendation, because they shipped for a reason you asked for —
 or two maps come out. Right now the record under-reports the game.
 
-**Q-3 · The upgrade wheel's `cost/held` — the question §2.5 already flagged and
-left open.** You retracted `cost/held` on the **build** wheel on 2026-08-07
-(*"just need the needed amount in yellow, and red if insufficient"*), and a0-03
-changed only that screen because your screenshot showed only that screen. The
-**upgrade** wheel still quotes `12/8` (`src/ui/upgrade-wheel.ts:321`). §2.5 says
-plainly that the two wheels are one control a player crosses in a single press,
-and that a grammar changing across that press is the drift the section exists to
-prevent. **Two screenshots, one press apart: does the denominator go, or does it
-stay and the build wheel become the exception?**
+**Q-3 · The upgrade wheel's `cost/held`. — ANSWERED 2026-08-13, CLOSED by
+a0-41.** The question was: *"Two screenshots, one press apart: does the
+denominator go, or does it stay and the build wheel become the exception?"* The
+developer answered with a screenshot of the live upgrade wheel at 8 ore:
+
+> "I had said I didn't want stuff like 5/6 only the cost . it got done on the
+> page before this one but none of the sub pages. we need to make sure changes to
+> build menu affect all pages"
+
+**The denominator goes, on every level of the wheel** — main and WEAPON sub-wheel
+both. The build wheel was not the exception; it was the first page to be fixed.
+GDD §2.5's upgrade-wheel bullet is rewritten and its ⚠ OPEN flag struck; the
+second sentence is enforced by `src/ui/wheel-cost-grammar.test.ts`, which walks
+every wedge on every page of the menu. Full entry in `docs/design-amendments.md`.
 
 **Q-4 · Should onboarding remember you across matches, or across sessions?**
 §2.10 says *"never appear again after each is completed once"* and *"the first

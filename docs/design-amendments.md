@@ -81,6 +81,89 @@ file; the Director briefs it separately.
 
 ---
 
+## The cost is ONE number on EVERY page of the build menu
+
+**Date:** 2026-08-13 · branch `agent/ui/a0-41-cost-rule-every-page`
+**Ratified by:** Developer (Reinaldo), with a screenshot of the live upgrade
+wheel at 8 ore — `HULL 3/8`, `ENGINE 7/8`, `CARGO 6/8`, `WEAPON OPEN ▸`
+**Amends:** GDD §2.5's upgrade-wheel bullet (folded in directly, *amended
+2026-08-13*; the **⚠ OPEN** flag raised there on 2026-08-07 is STRUCK, not
+appended to). **This CLOSES the question a0-03 left open** — item 2 of that
+entry's "Two things this amendment deliberately leaves OPEN", and Q-3 in
+`docs/gdd-conformance.md`. No mechanic, number, cost, cap, rule or type changes,
+and **not one pixel changed colour**: this is a denominator removed from a label
+on the two pages that still carried one.
+
+### The ratification, verbatim
+
+> "I had said I didn't want stuff like 5/6 only the cost . it got done on the
+> page before this one but none of the sub pages. we need to make sure changes to
+> build menu affect all pages"
+
+Two sentences, two deliverables. The first answers the open question. The second
+is a standing instruction about how this menu is maintained.
+
+### Sentence one — the denominator goes, on every level
+
+The 2026-08-07 retraction ("*just need the needed amount in yellow, and red if
+insufficient*") came with a build-wheel screenshot, so a0-03 scoped itself to
+that screen and flagged the rest. The developer has now named the rest. The
+build wheel was not the exception; it was the **first page to be fixed**.
+
+| upgrade wedge, at 8 ore | before | after |
+|---|---|---|
+| HULL | `3/8` | `3`, signal yellow (payable) |
+| ENGINE | `7/8` | `7`, signal yellow |
+| CARGO | `6/8` | `6`, signal yellow |
+| ENGINE at tier 2 | `12/8` | `12`, threat red (cannot pay) |
+| WEAPON | `OPEN ▸` | `OPEN ▸` — unchanged, it opens a screen |
+
+And **one level deeper**, on the WEAPON sub-wheel, which is the page the report
+actually names: DAMAGE and SPEED price themselves through the same
+`costLabelOf`, so they lost the denominator with it. One function fed both
+levels, which is why one edit fixed both — and why nobody noticed for six days
+that it had only ever been checked on one.
+
+**The colour was already carrying the whole message,** exactly as on the build
+wheel. `upgradeCostPaint` has resolved `ready` → ore-yellow, `unaffordable` →
+threat red and `maxed` → steel since u7-06, driven by the same `affordable()`
+the build wheel uses (`src/ui/affordability.ts`, the one boundary both wheels
+obey). `style-guide.md` §2.1's ore-yellow carve-out is untouched.
+
+**What did NOT change,** because the developer's arrow points at the cost
+numeral and nothing beside it: `2 / 4 BUILT` on the build wheel and the ladder
+pips `●●○` on the upgrade wheel (both separately ratified, 2026-08-06); `MAX` on
+a finished ladder and `FULL` on a capped wedge (state words, not prices); the
+stat line `103% → 117%` and REPAIR REACTOR's `+15 HP`; and the hub's live ore
+total, which is where "how much you have" belongs and is why the second number
+was redundant on every page that printed it.
+
+### Sentence two — "changes to build menu affect all pages"
+
+A fix that only edits the label satisfies the screenshot and not the sentence, so
+the rule is structural now, in two pieces:
+
+1. **One source for the grammar.** `costNumeral(cost)` lives in
+   `src/ui/affordability.ts`, next to `affordable()`, and both wheels write a
+   price through it. The two wheels are **one control** (`style-guide.md` §2.1);
+   a rule stated once in the module they share is a rule that cannot reach one
+   page and not the next. Each wheel keeps its own word for a wedge with no price
+   left to quote — the build wheel's `FULL`, the upgrade wheel's `MAX` — because
+   those are nouns for a state, not prices. Only the numeral's shape is shared.
+2. **One guard that walks every page.** `src/ui/wheel-cost-grammar.test.ts` walks
+   **every wedge on every level** — build wheel, upgrade wheel, WEAPON sub-wheel
+   — through `costWords`/`upgradeCostWords`, over frames that between them hit
+   ready / unaffordable / capped-or-maxed / inactive, and asserts no cost slot on
+   any page contains a `/`, and that a cost slot's whole vocabulary is a bare
+   price, `FULL`/`MAX`, or `OPEN ▸`. It fails the day a fourth page is added that
+   quotes a denominator. a0-03's build-wheel guard was the right idea checked on
+   one page; this is the same idea checked on all of them.
+
+The precise thing this would have caught: **the denominator surviving on a page
+nobody screenshotted.**
+
+---
+
 ## Tap Commander and Auto-aim are the DEFAULT — on every platform
 
 **Date:** 2026-08-12 · branch `agent/platform/a0-30-defaults-everywhere`
@@ -725,6 +808,10 @@ control** — "a player crosses between them in one press; a rule that changed
 colour across that press would be the drift this section exists to prevent" — and
 the same is now true of the grammar. Flagged in GDD §2.5's own upgrade-wheel
 bullet rather than fixed unilaterally.
+
+> **ANSWERED 2026-08-13 — the denominator goes, on every page.** See *"The cost
+> is ONE number on EVERY page of the build menu"* at the top of this file (a0-41).
+> This file runs newest-first, so the entry that closes this one sits above it.
 
 **Related, and being tracked with a0-08.** a0-08 is investigating *"sometimes
 picked up ore from dead ships dont count."* Looting raises `cargo`, not `banked`,

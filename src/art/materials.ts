@@ -1451,7 +1451,7 @@ export interface WheelProfile {
   readonly name: number;
   /** The target line ("YOUR STATION") — Oxanium, `TRACKING.label`. */
   readonly sub: number;
-  /** The `cost/held` numeral — Oxanium, the wheel's one number. */
+  /** The cost numeral — Oxanium, the wheel's one number. */
   readonly cost: number;
   /** The count/cap line ("2 / 4 BUILT") and repair's effect line — Oxanium. */
   readonly detail: number;

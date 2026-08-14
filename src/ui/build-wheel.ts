@@ -73,7 +73,7 @@
 
 import type { BuildItem } from '@shared/types';
 import { REPAIR_HP_PER_ORE, REPAIR_ORE_COST, SATELLITE, SHIELD, TURRET } from '../sim/constants';
-import { affordable } from './affordability';
+import { affordable, costNumeral } from './affordability';
 import { hubBack } from './wheel-nav';
 import type { HubBack } from './wheel-nav';
 
@@ -558,6 +558,11 @@ export function capBuiltLabelCompact(id: WheelSegmentId, signals: BuildWheelSign
  * the affordability answer is said once, in the channel the developer ratified
  * for it on 2026-08-07, and how much ore the player holds stays where it belongs:
  * the hub ({@link BuildWheelModel.ore}).
+ *
+ * The numeral's shape is {@link costNumeral}'s call rather than this file's
+ * (a0-41): this rule is the *menu's*, not this page's, and stating it once is
+ * what stops it reaching one level of the wheel and not the next. `FULL` stays
+ * here, because it is this wheel's own noun for a state rather than a price.
  */
 export function segmentCostLabel(
   id: WheelSegmentId,
@@ -567,7 +572,7 @@ export function segmentCostLabel(
   const cost = segmentCost(id);
   if (cost === null) return null;
   if (state === 'capped') return 'FULL';
-  return `${cost}`;
+  return costNumeral(cost);
 }
 
 /** Ore a press can actually draw on — hold plus bank, mirroring the sim's

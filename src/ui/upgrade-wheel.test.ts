@@ -36,6 +36,8 @@ import {
 } from './upgrade-wheel';
 import type { UpgradeWheelSignals, UpgradeTiers } from './upgrade-wheel';
 import { statLabelOf, costLabelOf, tierPips, MAXED_COST, STAT_ARROW } from './upgrade-wheel';
+import { costNumeral } from './affordability';
+import { upgradeCostPaint } from './wheel-stack';
 import { CARGO_CAP_MAX, SHIP_STATS, UPGRADES } from '../sim/constants';
 
 function tiers(over: Partial<Record<UpgradeTrack, number>> = {}): UpgradeTiers {
@@ -403,26 +405,36 @@ describe('the stat line — the densest text on any wheel (u7-06)', () => {
   });
 });
 
-describe('the cost line — `cost/held`, the Build wheel\'s grammar (u7-06)', () => {
-  it('prints the cost over what the player can actually spend', () => {
+describe('the cost line — one number, the Build wheel\'s grammar (u7-06, a0-41)', () => {
+  it('prints the COST and nothing else — the developer\'s own 8-ore frame', () => {
+    // The screenshot of 2026-08-13: HULL, ENGINE and CARGO all priced at 8 ore.
+    // They read `3/8`, `7/8`, `6/8` there; they read the price alone now.
     const byLabel = new Map(upgradeWheelModel(sig({ ore: 8 })).wedges.map((w) => [w.label, w]));
-    expect(byLabel.get('ENGINE')?.costLabel).toBe('3/8');
-    expect(byLabel.get('CARGO')?.costLabel).toBe('2/8');
-    expect(byLabel.get('HULL')?.costLabel).toBe('3/8');
+    expect(byLabel.get('ENGINE')?.costLabel).toBe('3');
+    expect(byLabel.get('CARGO')?.costLabel).toBe('2');
+    expect(byLabel.get('HULL')?.costLabel).toBe('3');
   });
 
-  it('quotes the same spendable total the hub prints — never a second opinion', () => {
-    // The hub floors fractional ore (repair spends fractional); the wedge must
-    // print the same whole number, or the wheel disagrees with itself.
-    const model = upgradeWheelModel(sig({ ore: 6.8 }));
-    expect(model.ore).toBe(6);
-    expect(model.wedges.find((w) => w.label === 'HULL')?.costLabel).toBe('3/6');
+  it('says the SAME number whatever the player holds — only the colour moves', () => {
+    // The assertion that proves the denominator is gone rather than merely
+    // hidden: the label is a function of the price alone, and affordability is a
+    // function of the wallet alone. Two channels, one each.
+    const broke = wedgeOf('HULL', { ore: 0 });
+    const flush = wedgeOf('HULL', { ore: 6.8 });
+    expect(broke.costLabel).toBe('3');
+    expect(flush.costLabel).toBe('3');
+    expect(upgradeCostPaint(broke)).toBe('refused');
+    expect(upgradeCostPaint(flush)).toBe('ore');
+    // ...and the hub still prints the spendable total, floored, which is where
+    // "how much you have" belongs and why the second number was redundant.
+    expect(upgradeWheelModel(sig({ ore: 6.8 })).ore).toBe(6);
   });
 
-  it('says why a wedge dimmed without a word of copy — 12/8 is four short', () => {
+  it('says why a wedge dimmed in COLOUR, not in a second number', () => {
     const engine = wedgeOf('ENGINE', { tiers: tiers({ [UpgradeTrack.Engine]: 2 }), ore: 8 });
     expect(engine.state).toBe('unaffordable');
-    expect(engine.costLabel).toBe('12/8');
+    expect(engine.costLabel).toBe('12');
+    expect(upgradeCostPaint(engine)).toBe('refused');
     // ...and the numeric cost underneath it is untouched — the label is a label.
     expect(engine.cost).toBe(12);
   });
@@ -435,9 +447,11 @@ describe('the cost line — `cost/held`, the Build wheel\'s grammar (u7-06)', ()
   });
 
   it('keeps the cost line a STRING, so the numeric guarantee survives it', () => {
-    expect(typeof costLabelOf(4, 9)).toBe('string');
-    expect(costLabelOf(4, 0)).toBe('4/0');
-    expect(costLabelOf(4, -3)).toBe('4/0');
+    expect(typeof costLabelOf(4)).toBe('string');
+    expect(costLabelOf(4)).toBe('4');
+    // The one grammar both wheels write a price in (`./affordability`), so the
+    // rule cannot reach one level of this menu and not the next.
+    expect(costLabelOf(12)).toBe(costNumeral(12));
   });
 });
 
@@ -479,7 +493,7 @@ describe('a wedge\'s only numeric fields are the ones it always had (u7-06)', ()
       .sort();
     // `tier`/`maxTier` are a position on a ladder and `angle` is geometry; `cost`
     // is the one number that is a PRICE. Everything the Gantry pass added — the
-    // stat line, `cost/held`, the pips — travels as a string.
+    // stat line, the cost, the pips — travels as a string.
     expect(numericKeys).toEqual(['angle', 'cost', 'maxTier', 'tier']);
   });
 });

@@ -159,7 +159,7 @@ export interface DrawnUpgradeWedge {
   /** The stat line as drawn — `"111% → 123%"`, its compact phone form, or the
    *  WEAPON wedge's stacked pip rows. */
   readonly stat: string;
-  /** The cost line as drawn — `"12/8"`, `"MAX"`, or `"OPEN ▸"` on the wedge that
+  /** The cost line as drawn — `"12"`, `"MAX"`, or `"OPEN ▸"` on the wedge that
    *  opens a screen instead of spending. `''` where no cost slot was drawn. */
   readonly costLabel: string;
   /** The ladder-position pips as drawn — `"●●○"`. `''` on the WEAPON wedge. */
@@ -1449,7 +1449,7 @@ function buildSegmentDraw(
 /**
  * An Upgrade-wheel wedge, in the same four slots the Build wheel's uses (u7-06):
  *
- *   NAME / the stat this tier moves / `cost/held` / where it sits on its ladder.
+ *   NAME / the stat this tier moves / the cost / where it sits on its ladder.
  *
  * Everything about which slot carries what is {@link ./wheel-stack}'s call, so
  * the stat line — the densest text on any wheel in the game — is held to the arc
