@@ -1,0 +1,105 @@
+{
+  "staged": {
+    "ally": 2,
+    "rival": 1,
+    "at": {
+      "x": 336,
+      "y": 1200
+    },
+    "rivalDist": 364,
+    "clearance": 1332
+  },
+  "before": {
+    "sim": {
+      "ally": 2,
+      "allyOnYourSide": false,
+      "ownDiscs": 2,
+      "teamDiscs": 2,
+      "sensedRivals": [],
+      "rememberedMask": 1,
+      "rememberedOre": 5,
+      "allyClearance": 1332
+    },
+    "drawn": {
+      "expanded": true,
+      "coverageDiscs": 2,
+      "shipDots": 0,
+      "stationDots": 1,
+      "oreDots": 5,
+      "satelliteDots": 0
+    }
+  },
+  "after": {
+    "sim": {
+      "ally": 2,
+      "allyOnYourSide": true,
+      "ownDiscs": 2,
+      "teamDiscs": 4,
+      "sensedRivals": [
+        1
+      ],
+      "rememberedMask": 5,
+      "rememberedOre": 10,
+      "allyClearance": 1332
+    },
+    "drawn": {
+      "expanded": true,
+      "coverageDiscs": 4,
+      "shipDots": 2,
+      "stationDots": 3,
+      "oreDots": 13,
+      "satelliteDots": 0
+    }
+  },
+  "scout": {
+    "ally": 2,
+    "at": {
+      "x": 806.7221031278607,
+      "y": 1297.8184607587289
+    },
+    "learned": 13
+  },
+  "remembered": {
+    "sim": {
+      "ally": 2,
+      "allyOnYourSide": true,
+      "ownDiscs": 2,
+      "teamDiscs": 4,
+      "sensedRivals": [
+        1
+      ],
+      "rememberedMask": 7,
+      "rememberedOre": 23,
+      "allyClearance": 1332
+    },
+    "drawn": {
+      "expanded": true,
+      "coverageDiscs": 4,
+      "shipDots": 2,
+      "stationDots": 3,
+      "oreDots": 23,
+      "satelliteDots": 0
+    }
+  },
+  "killed": 2,
+  "collapsed": {
+    "sim": {
+      "ally": 2,
+      "allyOnYourSide": true,
+      "ownDiscs": 2,
+      "teamDiscs": 3,
+      "sensedRivals": [],
+      "rememberedMask": 7,
+      "rememberedOre": 23,
+      "allyClearance": 1332
+    },
+    "drawn": {
+      "expanded": true,
+      "coverageDiscs": 3,
+      "shipDots": 0,
+      "stationDots": 3,
+      "oreDots": 23,
+      "satelliteDots": 0
+    }
+  }
+}
