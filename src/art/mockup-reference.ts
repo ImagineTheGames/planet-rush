@@ -91,7 +91,7 @@
  */
 
 import { mulberry32 } from '@shared/types';
-import { DERIVED, PALETTE, WHITE } from './palette';
+import { DERIVED, PALETTE } from './palette';
 
 // ---------------------------------------------------------------------------
 // The panel and the ground
@@ -453,13 +453,15 @@ export function spikeLengthOf(haloRadius: number): number {
  * it, and the developer described it as one flat colour with no stars in it.
  *
  * **Measured, frozen:** {@link count}, {@link bloom} (rule, threshold,
- * intensity, radius, peak alpha, knee), {@link spike}, {@link peakP99}.
+ * intensity, radius, peak alpha, knee), {@link spike}, {@link temperature}.
  *
- * **Derived:** the magnitude curve and the radius/alpha it drives. The design
- * stated its distribution as an outcome — p99 46–53 on its own instrument — not
- * as a formula, so the formula is recovered by fitting that outcome, and
- * `backdrop.test.ts` asserts the outcome rather than the formula. That is the
- * right way round: the p99 is the design, the exponent is bookkeeping.
+ * **Derived:** the magnitude curve and the radius/alpha it drives, and — since
+ * a0-45 — {@link peakP99} itself. The design stated its distribution as an
+ * outcome, p99 46–53 on its own instrument, and a0-40 recovered the curve by
+ * fitting that outcome; a0-45 found that the outcome and the design's own
+ * `starColor` cannot both be right, re-derived the band from the inputs, and put
+ * the contradiction to the Director rather than tuning an input to hide it. See
+ * {@link peakP99}, which carries all of it.
  *
  * ## The a0-44 re-audit — every value, and what happened to it
  *
@@ -491,6 +493,35 @@ export function spikeLengthOf(haloRadius: number): number {
  * states neither its `lineWidth` nor its stroke alpha, so both keep a0-40's
  * numbers and are marked as carried rather than re-labelled *Measured*.
  *
+ * ## a0-45 — the third CARRIED value was the one that mattered
+ *
+ * `ramp` is gone. It was the one value in this file taken from somewhere other
+ * than the design, it said so in its own doc comment, and it was the axis the
+ * developer's fourth report on the star field is about:
+ *
+ * ```
+ *   value                 verdict     against what
+ *   ramp                  DELETED     the design has no ramp — it has a TEMPERATURE
+ *   temperature           MEASURED    r()<0.78 ? 0.55+r()*0.45 : -(0.4+r()*0.6)
+ *   colour                MOVED       f(magnitude) → f(temperature); see below
+ * ```
+ *
+ * The design gives a star a temperature and colours it from that ({@link
+ * starTemperature}, {@link starColorFor}): 78% of the field blue-white
+ * (`rgb(160,205,255)`…`rgb(178,209,233)`), 22% amber
+ * (`rgb(235,201,149)`…`rgb(235,180,95)`), at a luma that barely moves across the
+ * whole field (189.6–203.1). The build ramped colour by **magnitude** instead —
+ * `hullSteel` / `hullLight` / white — and because magnitude is `u^2.35`, ~78% of
+ * the sky sat in the bottom band at Y′ 135. Dim grey where the design is a
+ * two-temperature field, with the *same* 78/22 split falling out of the two by
+ * coincidence rather than by agreement.
+ *
+ * **Magnitude no longer touches colour at all**, and a colour ramp is not left
+ * standing beside a temperature one for the old behaviour to survive in
+ * (LESSONS §14). `backdrop.test.ts` asserts the separation by name, in both
+ * directions: same magnitude + different temperature ⇒ different colours, and
+ * different magnitude + same temperature ⇒ the same colour.
+ *
  * **Why CONFIRMED means something for the derived four.** They were fitted to
  * p99 46–53 *with the wrong halo*, so the fit had every reason to fall apart once
  * the halo grew 6.8× in area — the two errors could easily have been
@@ -514,8 +545,16 @@ export const MOCKUP_STARS = {
   /** **Derived.** Star radius in screen px, linear in magnitude. */
   radius: { min: 0.4, max: 2.45 } as Range,
   /**
-   * **Derived.** Star alpha, linear in magnitude. The top of the range is what
-   * sets the 99th percentile, and it is fitted to it.
+   * **Derived.** Star alpha, linear in magnitude.
+   *
+   * It used to say *"the top of the range is what sets the 99th percentile, and
+   * it is fitted to it"*. That was true when a0-40 fitted it and **has not been
+   * true since a0-44**, which made the halo's peak alpha absolute: the p99 is set
+   * by the halos, and taking this range's top from 0.5 to 1.0 moves the design
+   * panel by 0.83 of a luma (a0-45, `p99-sensitivity.ts`). The fit that produced
+   * 0.08–0.5 stands; the sentence explaining what it was fitted to does not, and
+   * a stale justification on a derived number is how the next brief re-fits the
+   * wrong knob. See {@link peakP99}.
    */
   alpha: { min: 0.08, max: 0.5 } as Range,
   /**
@@ -620,27 +659,85 @@ export const MOCKUP_STARS = {
     intensity: 0.55,
   },
   /**
-   * **Derived** (style-guide §1, not the design preview). The value ramp a star's
-   * *point* climbs with its magnitude: a faint star is dim steel and a bright one
-   * is white, and it never climbs by hue. The design states the distribution and
-   * §1 states the colour, so this is where the two meet — and it is shared by
-   * `./backdrop`'s three layers and by `sky-preview.ts`'s design panel, so the
-   * two cannot disagree about what a magnitude looks like.
+   * **Measured, and it is the whole of a0-45.** A star's **temperature**, drawn
+   * per star from its own randoms, exactly the way its magnitude is:
    *
-   * Listed in ascending magnitude; the last band at or below a star's magnitude
-   * wins.
+   * ```js
+   * temp: r()<0.78 ? (0.55+r()*0.45) : -(0.4+r()*0.6)
+   * ```
+   *
+   * Positive is hot and negative is cool, and {@link starColorFor} is the only
+   * thing that reads it. **Magnitude drives alpha and radius, and never touches
+   * colour** — which is the sentence this whole entry exists to make true, and
+   * the one the file got wrong for two releases. See {@link starTemperature} for
+   * why it takes the random *source* rather than one uniform.
    */
-  ramp: [
-    { color: PALETTE.hullSteel, minMagnitude: 0 },
-    { color: DERIVED.hullLight, minMagnitude: 0.45 },
-    { color: WHITE, minMagnitude: 0.8 },
-  ] as readonly { readonly color: number; readonly minMagnitude: number }[],
+  temperature: {
+    /** The fraction of the field that is hot. 78% blue-white, 22% amber. */
+    hotShare: 0.78,
+    /** Hot: `0.55 + 0.45u`, so `+0.55…+1`. */
+    hot: { min: 0.55, max: 1 } as Range,
+    /** Cool, as a magnitude before it is negated: `0.4 + 0.6u`, so `−0.4…−1`. */
+    cool: { min: 0.4, max: 1 } as Range,
+  },
   /**
-   * **Measured.** The 99th percentile of panel luma the design's star field
-   * reaches, on the design's instrument. The game measured 7–9. This is the
-   * assertion `backdrop.test.ts` holds; everything above it is the means.
+   * **The 99th percentile of panel luma the design's star field reaches**, on the
+   * design's instrument (`sky-preview.ts`, a 320×180 point-sample grid). The game
+   * measured 7–9 before a0-40. This is the assertion `backdrop.test.ts` holds;
+   * everything above it is the means.
+   *
+   * ## a0-45 re-derived it, and the number moved — 46–53 → 42–48
+   *
+   * The brief's step 4, and it is the one place in this brief where the answer
+   * was not the one anybody expected, so all of it is on the record here and in
+   * `evidence/a0-45-star-temperature-colour/`.
+   *
+   * **What the band is now.** With colour taken from the design and every other
+   * star value already confirmed against the design's own rules by a0-44, the
+   * design's panel *computes* a p99, and over 24 seeds it computes
+   * **44.97 ± 3.80**. The band is that mean ±3σ of a 12-seed estimate — the same
+   * ±7% relative width the old band carried — and `backdrop.test.ts` asserts it
+   * as a mean over seeds rather than on one, for the reason immediately below.
+   *
+   * **The old band is exactly what a WHITE-topped ramp measures.** The same
+   * 24 seeds on `main` — the deleted magnitude ramp, whose top band is `WHITE` —
+   * give the design panel **49.62 ± 2.90**, and the old band's midpoint is 49.5.
+   * That is not a coincidence to leave unremarked: `peakP99` was labelled
+   * *Measured*, and 46–53 is the number a field of white halos produces. Whether
+   * the design preview's own field was measured before its `starColor` was
+   * applied, or whether the design's bloom is brighter than the `0.42 × 0.48` a0-44
+   * read off it, is **the Director's question and not Art's** — it is raised with
+   * the arithmetic in the a0-45 PR body rather than settled here. What is
+   * measurable is the size of it: to put the coloured field back in 46–53 the
+   * halo's peak alpha would have to be **0.2621 (`0.42 × 0.624`)** against the
+   * preview's stated `state.intensity` of 0.48.
+   *
+   * **No derived knob could have absorbed it, and that was checked rather than
+   * assumed** (`p99-sensitivity.ts`). Since a0-44 made the halo's alpha
+   * *absolute*, the p99 is set by the halos and barely notices the star points:
+   * taking `alpha.max` from 0.5 to **1.0** — a field of stars at full opacity —
+   * moves the design panel from 40.36 to **41.19**. The note that used to sit on
+   * {@link alpha} ("the top of the range is what sets the 99th percentile, and it
+   * is fitted to it") was true when it was written and has not been true since
+   * a0-44; it is corrected there. The knobs that *do* move it — `radius`,
+   * `magnitudeExponent`, `count` — are the three the a0-45 brief puts out of
+   * scope as measured correct this cycle.
+   *
+   * ## Why it is a mean over seeds now, and not one panel
+   *
+   * Because one panel is a noisy instrument for this and nobody had noticed. The
+   * p99 of a 320×180 grid is set by the ~35 halos in the frame — a star point is
+   * 2.45 px across and a halo is 26 — so it is really a count statistic with a
+   * real spread (σ 3.80, i.e. 8% of the value). On `main` the design panel drew 27
+   * halos and the game panel 32 and their p99s agreed **to 0.04%**, which reads
+   * like two implementations agreeing and is mostly luck: over 24 seeds the same
+   * two panels are **5.51%** apart. a0-45 shifts every stream by the two draws a
+   * temperature costs, and on `VOID_SEED` alone the design panel now draws 30
+   * halos against the game's 41 and reads 10.4% under it. Over seeds the two
+   * agree to **2.29%** — better than `main`, because there is now one colour rule
+   * instead of two.
    */
-  peakP99: { min: 46, max: 53 } as Range,
+  peakP99: { min: 42, max: 48 } as Range,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -834,9 +931,102 @@ export function starHaloAlpha(): number {
 export const MOCKUP_STAR_DENSITY =
   (MOCKUP_STARS.count * 1e6) / (MOCKUP_PANEL.w * MOCKUP_PANEL.h);
 
-/** The value-ramp colour a star of this magnitude paints its point in. */
-export function starRampColor(mag: number): number {
-  let chosen = MOCKUP_STARS.ramp[0]!.color;
-  for (const band of MOCKUP_STARS.ramp) if (mag >= band.minMagnitude) chosen = band.color;
-  return chosen;
+// ---------------------------------------------------------------------------
+// Temperature — where a star's COLOUR comes from (a0-45)
+// ---------------------------------------------------------------------------
+
+/**
+ * **A star's temperature**, from the field's own random stream. Positive is hot,
+ * negative is cool, and it is a *per-star* property drawn exactly the way
+ * {@link starMagnitude} is — the design's own line, verbatim:
+ *
+ * ```js
+ * temp: r()<0.78 ? (0.55+r()*0.45) : -(0.4+r()*0.6)
+ * ```
+ *
+ * ## Why this takes the RNG and `starMagnitude` takes a uniform
+ *
+ * Because the design's line calls `r()` **twice**: once to choose the branch and
+ * once for the value inside it. That is not a detail of style — it is what sets
+ * the two colour ranges the design actually paints. Sharing one draw between the
+ * branch and the value (`r < 0.78 ? 0.55 + 0.45r : −(0.4 + 0.6r)`) correlates
+ * them: the hot branch could then only reach `0.55 + 0.45×0.78 = 0.901`, so the
+ * bluest star in the design (`rgb(160,205,255)`) would never be drawn, and the
+ * cool branch would start at `k = 0.4 + 0.6×0.78 = 0.868`, so every amber star
+ * would be one of the deepest and the range `rgb(235,201,149)`…`rgb(235,180,95)`
+ * would collapse to its last eighth. Two draws, and the field is the design's.
+ *
+ * Deterministic in the stream (GDD §4.1); it consumes two of its numbers.
+ */
+export function starTemperature(rand: { next(): number }): number {
+  const t = MOCKUP_STARS.temperature;
+  if (rand.next() < t.hotShare) return t.hot.min + rand.next() * (t.hot.max - t.hot.min);
+  return -(t.cool.min + rand.next() * (t.cool.max - t.cool.min));
 }
+
+/** Pack three 0..255 channels, clamped, into one RGB integer. */
+function rgb(r: number, g: number, b: number): number {
+  const c = (v: number): number => (v < 0 ? 0 : v > 255 ? 255 : Math.round(v));
+  return (c(r) << 16) | (c(g) << 8) | c(b);
+}
+
+/**
+ * **The colour of a star at this temperature** — the design's own `starColor`,
+ * both branches, verbatim:
+ *
+ * ```js
+ * function starColor(t,a){
+ *   if(t>=0) return "rgba("+(200-Math.round(40*t))+","+(215-Math.round(10*t))+","+(205+Math.round(50*t))+","+a+")";
+ *   var k=-t; return "rgba(235,"+(215-Math.round(35*k))+","+(185-Math.round(90*k))+","+a+")";
+ * }
+ * ```
+ *
+ * Over the domain {@link starTemperature} draws from, that is **blue-white**
+ * `rgb(160,205,255)`…`rgb(178,209,233)` for the hot 78% and **amber**
+ * `rgb(235,201,149)`…`rgb(235,180,95)` for the cool 22%.
+ *
+ * It is the star's whole colour: its point, its halo and its diffraction cross
+ * are all painted in it (the design's halo gradient is `starColor(s.temp, …)`),
+ * so there is exactly one source of a star's hue and nothing to drift out of
+ * agreement with. The clamp in {@link rgb} cannot bite inside the design's own
+ * domain — `backdrop.test.ts` asserts every channel lands in range untouched —
+ * and exists so that a temperature from outside it fails loudly at the
+ * allow-list rather than silently as a wrapped byte.
+ */
+export function starColorFor(temp: number): number {
+  if (temp >= 0) {
+    return rgb(200 - Math.round(40 * temp), 215 - Math.round(10 * temp), 205 + Math.round(50 * temp));
+  }
+  const k = -temp;
+  return rgb(235, 215 - Math.round(35 * k), 185 - Math.round(90 * k));
+}
+
+/**
+ * **Every colour the star field can paint** — {@link starColorFor} over the whole
+ * of {@link starTemperature}'s domain, enumerated rather than typed.
+ *
+ * `./compliance` needs this because a temperature colour is not one of the six,
+ * not a declared shade of one of the six, and not a roster colour: the design's
+ * star field is the one place in the game where a colour is a *continuous
+ * function*, and the allow-list is a set. Enumerating it keeps the audit exactly
+ * as strict as it was — a hand-edited hex on a star still fails, because it is
+ * either a colour this function produces or it is not.
+ *
+ * **Why sampling is exhaustive and not an approximation.** Each branch is a
+ * rounding of a linear function, so the colour is piecewise constant in `t`, and
+ * the shortest piece is set by how close two rounding breakpoints from different
+ * channels can come. Hot's are at `(n+½)/40`, `(n+½)/10` and `(n+½)/50`, whose
+ * closest distinct pair is `½/200 = 0.0025` apart; cool's are at `(n+½)/35` and
+ * `(n+½)/90`, closest `½/630 ≈ 0.00079`. At a step of 1e-5 the coarsest of those
+ * gets 79 samples, so no piece can be stepped over.
+ */
+export const STAR_TEMPERATURE_COLORS: ReadonlySet<number> = (() => {
+  const out = new Set<number>();
+  const t = MOCKUP_STARS.temperature;
+  const STEP = 1e-5;
+  for (let u = t.hot.min; u <= t.hot.max; u += STEP) out.add(starColorFor(u));
+  out.add(starColorFor(t.hot.max));
+  for (let k = t.cool.min; k <= t.cool.max; k += STEP) out.add(starColorFor(-k));
+  out.add(starColorFor(-t.cool.max));
+  return out;
+})();

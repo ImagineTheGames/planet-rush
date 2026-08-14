@@ -40,14 +40,18 @@
  * reducer that sheds more than it claims, or an editor that "improves" `BLOOM`
  * upward (a0-07 chose the lowest of the three magnitudes shown, on purpose).
  *
- * **a0-22 extends it to the halo's COLOUR, for the same reason and on the same
- * instrument.** *"our mockups had different colored blooms these are all 1 color
- * there are no stars in them"* — so a bloom's tint (`BLOOM_TINTS`) is now part of
- * what has to survive the trip from `starFieldSprite` to the frame, and so is the
- * thing that answers the second half of that sentence: **the star's own point is
- * submitted inside every halo, last, and never in the halo's colour**. The
- * geometry read-back below already grouped fills by centre; it now records each
- * fill's colour too, which is the identical read
+ * **a0-22 extended it to the halo's COLOUR, for the same reason and on the same
+ * instrument** — *"our mockups had different colored blooms these are all 1 color
+ * there are no stars in them"* — and **a0-45 replaced what that block asserts
+ * without touching how it asserts it.** a0-22 could only put a hue on the
+ * *scatter*, because the star's own point was pinned to a grey value ramp; the
+ * design colours the point, from the star's own temperature, and paints its halo
+ * and its cross in the same colour. So the claim that has to survive the trip
+ * from `starFieldSprite` to the frame is now **one colour per star, submitted
+ * three times**, and the second half of the developer's sentence is answered the
+ * same way it was: the point is submitted inside every halo, last, and it is the
+ * brightest thing at that centre. The geometry read-back below records each
+ * fill's colour, which is the identical read
  * `evidence/a0-22-bloom-colour/probe-star-in-bloom.mjs` takes off the running
  * build. Nothing here weakens an a0-18 assertion — the file only gains.
  */
@@ -56,14 +60,13 @@ import { describe, expect, it } from 'vitest';
 import { Container, Graphics } from 'pixi.js';
 import {
   BLOOM,
-  BLOOM_TINTS,
   SPIKE,
   STAR_LAYERS,
   VoidBackdrop,
   coverSpan,
   type MapId,
 } from './backdrop';
-import { MOCKUP_STARS } from './mockup-reference';
+import { MOCKUP_STARS, STAR_TEMPERATURE_COLORS } from './mockup-reference';
 import { hex } from './palette';
 
 /**
@@ -274,69 +277,76 @@ describe('the bloom reaches the frame, not just the sprite definition', () => {
   });
 });
 
-describe('the bloom’s COLOUR reaches the frame, and a star sits inside it (a0-22)', () => {
-  const tints = new Set<number>(Object.values(BLOOM_TINTS));
-  /** The steel value ramp a star's own point is drawn from (style-guide §1). */
-  const ramp = new Set<number>(STAR_LAYERS.flatMap((l) => l.inks.map((i) => i.color)));
-
-  it('submits the tint on the halo and the star’s own colour on the point', () => {
-    // The shape of the defect this guards: a generator that tinted the point as
-    // well would put a cyan dot in the sky where §1 requires a bright one. It is
-    // invisible to a golden and it is one edit away. (Before a0-40 a bloom was
-    // two flat rings and this also checked they agreed; a soft falloff is one
-    // shape, so there is no longer a ring to disagree with.)
+describe('the star’s COLOUR reaches the frame, and the whole star wears it (a0-45)', () => {
+  /**
+   * **a0-45 replaced what this block guards, and the instrument is unchanged.**
+   *
+   * a0-22's version asserted that a halo carried one of two ratified `BLOOM_TINTS`
+   * while the star's point stayed on the grey value ramp — the arrangement that
+   * existed because the point could not be coloured. The design colours the
+   * point: a star has a *temperature*, and its point, its halo and its cross are
+   * all painted in `starColorFor(temp)`. So the claim that has to survive the
+   * trip from `starFieldSprite` to the frame is a different one, and it is
+   * stronger — **one colour per star, submitted three times**.
+   *
+   * Everything a0-22 put on the stage is still checked here on the new
+   * arrangement: the point is submitted last and therefore on top; it is the
+   * brightest of the three; the frame carries more than one bloom colour; and no
+   * layer invents a colour the design cannot produce.
+   */
+  it('submits one colour per star — the point, its halo and its arms agree', () => {
+    // The shape of the defect this guards: a generator that coloured the point
+    // from the temperature and left the halo on a ramp (or on a tint) would put
+    // a grey glow around a blue star. It is invisible to a golden and it is one
+    // edit away — it is, in fact, exactly what `main` does.
     for (const [key, gfx] of starLayers(boot())) {
       for (const star of bloomedOf(submittedStars(gfx))) {
         const [halo, core] = star.colors as [number, number];
-        expect(ramp.has(core), `${key}: a star POINT was submitted ${hex(core)}`).toBe(true);
-        expect(tints.has(core), `${key}: the point took the halo's tint`).toBe(false);
         expect(
-          tints.has(halo) || halo === core,
-          `${key}: halo ${hex(halo)} is neither a ratified tint nor the star's own colour`,
+          STAR_TEMPERATURE_COLORS.has(core),
+          `${key}: a star POINT was submitted ${hex(core)}, which starColorFor cannot produce`,
         ).toBe(true);
+        expect(halo, `${key}: halo ${hex(halo)} is not its own star's colour ${hex(core)}`).toBe(core);
       }
     }
   });
 
-  it('puts a tinted bloom on the stage, in every hue, on the layers that carry one', () => {
+  it('puts both of the design’s temperatures on the stage, on every layer', () => {
+    // The design's field is 78% blue-white and 22% amber, and both have to reach
+    // the frame on every depth — a layer that lost one of the two branches would
+    // read as a single-temperature sky and would pass every count assertion.
     const layers = starLayers(boot());
-    const seen = new Map<string, Set<number>>();
     for (const [key, gfx] of layers) {
-      const hues = new Set<number>();
+      const hot = new Set<number>();
+      const cool = new Set<number>();
       for (const star of bloomedOf(submittedStars(gfx))) {
-        const halo = star.colors[0]!;
-        if (tints.has(halo)) hues.add(halo);
+        const c = star.colors[0]!;
+        const [r, , b] = [(c >> 16) & 0xff, (c >> 8) & 0xff, c & 0xff];
+        (b > r ? hot : cool).add(c);
       }
-      seen.set(key, hues);
+      expect(hot.size, `${key}: no blue-white bloom on the stage`).toBeGreaterThan(0);
+      expect(cool.size, `${key}: no amber bloom on the stage`).toBeGreaterThan(0);
     }
-    for (const spec of STAR_LAYERS) {
-      const declared = new Set(spec.inks.map((i) => i.halo).filter((h): h is number => h !== undefined));
-      const onStage = seen.get(spec.key)!;
-      // Every hue the layer declares reaches the frame…
-      for (const h of declared) {
-        expect(onStage.has(h), `${spec.key} declares ${hex(h)} but the stage has none`).toBe(true);
-      }
-      // …and no layer invents one it never declared. `deep` declares none, which
-      // is the assertion that the far layer stayed on the value ramp.
-      for (const h of onStage) {
-        expect(declared.has(h), `${spec.key} submitted an undeclared tint ${hex(h)}`).toBe(true);
+    // …and nothing anywhere on the stage is a value-ramp colour or an a0-22 tint.
+    for (const [key, gfx] of layers) {
+      for (const star of submittedStars(gfx)) {
+        for (const c of star.colors) {
+          expect(
+            STAR_TEMPERATURE_COLORS.has(c),
+            `${key}: the stage carries ${hex(c)}, which is not a star colour`,
+          ).toBe(true);
+        }
       }
     }
-    expect(
-      new Set([...seen.values()].flatMap((s) => [...s])).size,
-      'the frame carries more than one bloom hue',
-    ).toBeGreaterThan(1);
   });
 
-  it('keeps the steel ramp the majority of what a FRAME blooms', () => {
-    // a0-07's void is a steel field, and this change is a minority of tints in
-    // it, not a repaint. The claim is about a *frame*, so the count has to be
-    // per-screenful: a layer's baked field is `coverSpan` of its own parallax, so
-    // `near` bakes a field five times `deep`'s and a raw total over the whole
-    // stage over-weights the two layers that carry a tint. Normalising by field
-    // area recovers the share a player actually sees, which is the design's own
-    // 0.61 / 0.30 / 0.09.
-    let tinted = 0;
+  it('keeps the frame’s blooms mostly blue-white, in the design’s own proportion', () => {
+    // The claim is about a *frame*, so the count has to be per-screenful: a
+    // layer's baked field is `coverSpan` of its own parallax, so `near` bakes a
+    // field five times `deep`'s and a raw total over the whole stage over-weights
+    // the near layers. Normalising by field area recovers the share a player
+    // actually sees, which is the design's own 0.61 / 0.30 / 0.09.
+    let hot = 0;
     let total = 0;
     for (const [key, gfx] of starLayers(boot())) {
       const spec = STAR_LAYERS.find((l) => l.key === key)!;
@@ -344,23 +354,23 @@ describe('the bloom’s COLOUR reaches the frame, and a star sits inside it (a0-
         coverSpan(spec.parallax, VIEW.w, BOUNDS.w) * coverSpan(spec.parallax, VIEW.h, BOUNDS.h);
       const perScreen = (VIEW.w * VIEW.h) / area;
       for (const star of bloomedOf(submittedStars(gfx))) {
+        const c = star.colors[0]!;
         total += perScreen;
-        if (tints.has(star.colors[0]!)) tinted += perScreen;
+        if ((c & 0xff) > ((c >> 16) & 0xff)) hot += perScreen;
       }
     }
     expect(total, 'the stage bloomed at all').toBeGreaterThan(10);
-    expect(tinted, 'no tinted bloom reached the stage').toBeGreaterThan(0);
     expect(
-      tinted / total,
-      `${tinted.toFixed(1)}/${total.toFixed(1)} of a screenful's blooms are tinted`,
-    ).toBeLessThan(0.5);
+      hot / total,
+      `${hot.toFixed(1)}/${total.toFixed(1)} of a screenful's blooms are blue-white`,
+    ).toBeCloseTo(MOCKUP_STARS.temperature.hotShare, 1);
   });
 
   it('draws the star LAST, so a coloured bloom still has a star in it', () => {
     // The developer's second sentence, as an assertion on the frame: the point is
-    // submitted after both of its halo rings, so it is painted on top of them —
-    // and since the point keeps the ramp's white/steel while the halo takes a
-    // hue, a tinted bloom is now the EASIEST place in the sky to find a star.
+    // submitted after its halo, so it is painted on top of it — and since the
+    // halo's alpha is absolute (0.2016) while the point's runs to 0.5, the star
+    // is the brightest thing inside its own glow whatever its temperature.
     for (const [key, gfx] of starLayers(boot())) {
       for (const star of bloomedOf(submittedStars(gfx))) {
         const [haloA, coreA] = star.alphas as [number, number];

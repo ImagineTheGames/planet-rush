@@ -73,9 +73,10 @@ import {
   starAlpha,
   starBlooms,
   starHaloAlpha,
+  starColorFor,
   starMagnitude,
   starRadius,
-  starRampColor,
+  starTemperature,
   type MockupSkyId,
 } from './src/art/mockup-reference';
 import { falloffProfile, haloProfile, inkAlphaAt, type Shape } from './src/art/shapes';
@@ -226,7 +227,10 @@ interface MockupStar {
   /** Halo radius, or 0 for a star that does not bloom. */
   readonly halo: number;
   readonly mag: number;
-  /** The value-ramp colour of the point — {@link MOCKUP_STARS}`.ramp`. */
+  /** The star's own temperature — {@link MOCKUP_STARS}`.temperature` (a0-45). */
+  readonly temp: number;
+  /** The star's colour, from that temperature and from nothing else. It paints
+   *  the point, the halo gradient and the cross, exactly as the design does. */
   readonly color: number;
 }
 
@@ -242,6 +246,9 @@ export function mockupStarPoints(seed: number, width: number, height: number): M
     const x = (rng.next() - 0.5) * width;
     const y = (rng.next() - 0.5) * height;
     const mag = starMagnitude(rng.next());
+    // Two independent properties, drawn in the design's own order: magnitude
+    // decides how bright and how big, temperature decides what colour (a0-45).
+    const temp = starTemperature(rng);
     const r = starRadius(mag);
     out.push({
       x,
@@ -250,7 +257,8 @@ export function mockupStarPoints(seed: number, width: number, height: number): M
       alpha: starAlpha(mag),
       halo: starBlooms(mag) ? r * MOCKUP_STARS.bloom.radius : 0,
       mag,
-      color: starRampColor(mag),
+      temp,
+      color: starColorFor(temp),
     });
   }
   return out;

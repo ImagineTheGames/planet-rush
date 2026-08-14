@@ -18,7 +18,9 @@
  * Four rules, all structural:
  *
  *  1. **Allow-list.** Every colour is one of the six, a declared shade of one of
- *     the six (./palette `DERIVED`), or a roster identity colour. No seventh hue.
+ *     the six (./palette `DERIVED`), a roster identity colour — or a colour the
+ *     design's own star-temperature function produces, on the backdrop only
+ *     ({@link STAR_TEMPERATURE_COLORS}, a0-45). No seventh hue.
  *  2. **Yellow is reserved.** Signal yellow and its shades appear only on roles
  *     `ore`, `core`, `danger` — the three the style guide names.
  *  3. **Red is reserved.** Threat red and its shades appear only on `danger`:
@@ -44,6 +46,7 @@ import {
   hex,
   type DerivedKey,
 } from './palette';
+import { STAR_TEMPERATURE_COLORS } from './mockup-reference';
 import type { PaintRole, SpriteDef } from './shapes';
 
 /** One broken rule, named precisely enough to fix without opening a renderer. */
@@ -60,8 +63,41 @@ export interface Violation {
     | 'identity-trim'
     | 'alpha'
     | 'sky-whisper'
-    | 'ground-only';
+    | 'ground-only'
+    | 'star-only';
   readonly detail: string;
+}
+
+/**
+ * **The one place a colour is a function rather than a member of a set** — the
+ * design's star field (a0-45; `./mockup-reference` `starColorFor`).
+ *
+ * A star's colour comes from its temperature, continuously: 78% of the field
+ * blue-white and 22% amber, ~80 distinct hexes between them, none of which is one
+ * of the six or a declared shade of one. The allow-list therefore has to admit
+ * them, and the honest way to do that is to admit **exactly the set the design's
+ * own function can produce** — enumerated from that function, not typed out — so
+ * the audit stays as strict as it was: a hand-edited star hex is still either a
+ * colour the design paints or a violation.
+ *
+ * It is scoped twice over, because a widening of §1 should be as narrow as it can
+ * be made:
+ *
+ *  - **role `material` only.** These are stars, not sky and not structure.
+ *  - **`backdrop/` sprites only.** The star field bakes as `backdrop/stars/…` and
+ *    appears composited in `backdrop/tile/…`; nothing else in the game is
+ *    entitled to a temperature colour. A hull plate in star amber — which is
+ *    within ΔE 20 of `coreHot` — fails as {@link Violation.rule} `star-only`.
+ *
+ * **This is the tension the a0-45 brief names, and it is not resolved here.**
+ * Blue is a player identity colour and §1 says structure never takes one; the
+ * blue-white 78% is the design the developer approved and re-approved. Amber is
+ * the same question on the warm side, against ore. Both are put to the Director
+ * with their numbers in the PR body; what this constant does is make sure the
+ * widening they authorise cannot leak past the star field.
+ */
+function isStarColor(color: number, role: PaintRole, sprite: string): boolean {
+  return STAR_TEMPERATURE_COLORS.has(color) && role === 'material' && sprite.startsWith('backdrop/');
 }
 
 /** Colours descended from a given palette entry: the entry plus its shades. */
@@ -176,11 +212,14 @@ export function auditSprite(def: SpriteDef): Violation[] {
       const { color } = ink;
       const at = { sprite: def.name, shapeIndex, role: shape.role, color };
 
-      if (!ALLOWED_COLORS.has(color)) {
+      const starColor = isStarColor(color, shape.role, def.name);
+      if (!ALLOWED_COLORS.has(color) && !starColor) {
         found.push({
           ...at,
-          rule: 'allow-list',
-          detail: `${hex(color)} is not one of the six, a declared shade, or a roster colour (style-guide §1).`,
+          rule: STAR_TEMPERATURE_COLORS.has(color) ? 'star-only' : 'allow-list',
+          detail: STAR_TEMPERATURE_COLORS.has(color)
+            ? `${hex(color)} is a star temperature colour on role '${shape.role}' of '${def.name}' — the design's star hues are the backdrop's star field's alone (see isStarColor).`
+            : `${hex(color)} is not one of the six, a declared shade, or a roster colour (style-guide §1).`,
         });
       }
       if (YELLOW_FAMILY.has(color) && !YELLOW_ROLES.includes(shape.role)) {

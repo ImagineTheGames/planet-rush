@@ -218,17 +218,18 @@ function entries(): CatalogueEntry[] {
   // --- The void (a2-06, re-grounded a0-07) ----------------------------------
   // The layered parallax star-field the fleet flies against (./backdrop). Sampled
   // here at a fixed review tile so the palette audit covers the void's colours —
-  // the live field is the same generator at arena scale. Steel value-ramp stars:
-  // no seventh hue, all role `material` (style-guide §1). A sample star that went
-  // signal yellow would be a RESERVED-rule violation like any other sprite.
+  // the live field is the same generator at arena scale. All role `material`; the
+  // star hues are the design's own temperature colours and the audit admits them
+  // there and nowhere else (a0-45, ./compliance `isStarColor`). A sample star that
+  // went signal yellow would be a RESERVED-rule violation like any other sprite.
   const VOID_TILE = { w: 480, h: 300 } as const;
-  // One magnitude curve and one value ramp across all three (a0-40): a layer is
-  // a depth, not a brightness tier. What differs is the parallax and which of
-  // the two bloom tints, if any, its top band carries.
+  // One magnitude curve and one temperature distribution across all three
+  // (a0-40, a0-45): a layer is a depth, not a brightness tier and not a hue.
+  // What differs between them is the parallax, and nothing else.
   const LAYER_NOTE: Record<string, string> = {
-    deep: 'the far 61% of the field — parallax 0.10, no bloom tint',
-    mid: 'the middle 30% — parallax 0.26, plasma on the band that blooms',
-    near: 'the near 9% — parallax 0.50, patina on the band that blooms',
+    deep: 'the far 61% of the field — parallax 0.10',
+    mid: 'the middle 30% — parallax 0.26',
+    near: 'the near 9% — parallax 0.50',
   };
   for (const spec of STAR_LAYERS) {
     out.push({

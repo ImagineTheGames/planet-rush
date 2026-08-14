@@ -30,7 +30,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   BLOOM,
-  BLOOM_TINTS,
   GROUND_COLOR,
   GROUND_LUMA,
   SPIKE,
@@ -60,14 +59,17 @@ import {
   MOCKUP_SKY_IDS,
   MOCKUP_STARS,
   MOCKUP_STAR_DENSITY,
+  STAR_TEMPERATURE_COLORS,
   haloKneeAlphaOf,
   haloPeakAlphaOf,
   haloRadiusOf,
   mockupBlobs,
   mockupCount,
   spikeLengthOf,
-  starAlpha,
+  starColorFor,
+  starMagnitude,
   starRadius,
+  starTemperature,
   type MockupSkyId,
 } from './mockup-reference';
 import { measure, sampleMockup, sampleShapes, colorLuma } from '../../sky-preview';
@@ -91,6 +93,7 @@ import {
   type SpriteDef,
 } from './shapes';
 import { ALL_SPRITES } from './catalogue';
+import { mulberry32 } from '@shared/types';
 
 /** The field every sky's **cost** is measured over — a 16:9 landscape field, the
  *  shape a phone actually plays in (the game is landscape-locked, GDD §4.6).
@@ -697,7 +700,27 @@ describe('the built sky IS the design (a0-40)', () => {
     expect(ground.shapes[0]!.fill).toEqual({ color: MOCKUP_GROUND, alpha: 1 });
   });
 
-  it('carries the design’s star field: 560 a screenful, and a p99 of 46–53', () => {
+  /**
+   * **The seeds the p99 is measured over, and why there is more than one**
+   * (a0-45).
+   *
+   * The 99th percentile of a 320×180 grid over one panel is set by the ~35 halos
+   * in the frame, not by the 560 star points — a point is 2.45 px across at its
+   * biggest and a halo is 26 — so it is a count statistic with a real spread
+   * (σ 3.80, 8% of the value). On `main` the design panel drew 27 halos, the game
+   * panel drew 32, and their p99s agreed **to 0.04%**: that reads as two
+   * implementations agreeing and is mostly luck, because over 24 seeds the same
+   * two panels sit **5.51%** apart. Asserting a one-seed p99 against a ±7% band
+   * was therefore a gate that could go red on a change that moved nothing and
+   * green on one that moved 8%.
+   *
+   * Twelve seeds put the standard error of the mean at 1.10 — a third of the
+   * band's half-width — for about 12 s of measurement, which is the price of this
+   * being a measurement at all.
+   */
+  const P99_SEEDS = Array.from({ length: 12 }, (_, i) => (VOID_SEED + i * 0x9e37_79b9) >>> 0);
+
+  it('carries the design’s star field: 560 a screenful, and the design’s own p99', () => {
     // The second divergence, and the one the developer described as "there are no
     // stars in them". Both halves are asserted, because either alone is passable
     // by the wrong build: the count, and what the count actually LOOKS like on the
@@ -711,36 +734,40 @@ describe('the built sky IS the design (a0-40)', () => {
       'the three layers sum to the design’s density',
     ).toBeCloseTo(MOCKUP_STAR_DENSITY, 0);
 
-    // **The design's own field, on the design's own instrument** — the band is
-    // the design's, so this is the panel that has to sit in it.
+    // **The design's own field, on the design's own instrument**, and the game's
+    // beside it — the same seeds through two independent implementations.
     const ground = colorLuma(MOCKUP_GROUND);
-    const design = measure(sampleMockup('none', VOID_SEED, PANEL.w, PANEL.h), ground);
-    const field = STAR_LAYERS.flatMap((l) => [...starFieldSprite(l, VOID_SEED, PANEL.w, PANEL.h).shapes]);
-    const m = measure(sampleShapes(field, false, MOCKUP_GROUND, PANEL.w, PANEL.h), ground);
+    const designs: number[] = [];
+    const games: number[] = [];
+    for (const seed of P99_SEEDS) {
+      designs.push(measure(sampleMockup('none', seed, PANEL.w, PANEL.h), ground).p99);
+      const field = STAR_LAYERS.flatMap((l) => [...starFieldSprite(l, seed, PANEL.w, PANEL.h).shapes]);
+      games.push(measure(sampleShapes(field, false, MOCKUP_GROUND, PANEL.w, PANEL.h), ground).p99);
+    }
+    const avg = (xs: readonly number[]): number => xs.reduce((t, v) => t + v, 0) / xs.length;
+    const design = avg(designs);
+    const game = avg(games);
     // eslint-disable-next-line no-console
     console.log(
-      `  star field: design panel p99 ${design.p99} (design ${MOCKUP_STARS.peakP99.min}–${MOCKUP_STARS.peakP99.max}),` +
-        ` game p99 ${m.p99}, peak ${m.peak}, lift ${m.lift}`,
+      `  star field over ${P99_SEEDS.length} seeds: design p99 ${design.toFixed(2)} ` +
+        `(design ${MOCKUP_STARS.peakP99.min}–${MOCKUP_STARS.peakP99.max}), game p99 ${game.toFixed(2)}, ` +
+        `apart ${((Math.abs(game - design) / design) * 100).toFixed(2)}%`,
     );
-    expect(design.p99, `the design's own p99 ${design.p99}`).toBeGreaterThanOrEqual(
+    expect(design, `the design's own p99 ${design.toFixed(2)}`).toBeGreaterThanOrEqual(
       MOCKUP_STARS.peakP99.min,
     );
-    expect(design.p99, `the design's own p99 ${design.p99}`).toBeLessThanOrEqual(
+    expect(design, `the design's own p99 ${design.toFixed(2)}`).toBeLessThanOrEqual(
       MOCKUP_STARS.peakP99.max,
     );
-    // **And the game's field against the design's, within 5%** — the same
-    // tolerance every sky's `lift` is held to a few tests below, and it is a
-    // tolerance rather than the band itself for one measured reason, reported
-    // rather than absorbed (a0-44): the game's blooms are TINTED (a0-22), and
-    // cyan and patina are less luminous than the white the design's ramp tops
-    // out at. Measured by forcing every halo back onto the ramp's own colour,
-    // the tint costs **1.96 of p99** — 45.90 against 47.86 — and every bit of the
-    // gap between the two panels is that. It is a real cost and it is new at this
-    // size, because a0-44's halo covers 6.8× the area a0-40's did; before the
-    // correction the same tint moved the number by less than half a point.
+    // **And the game's field against the design's, within 5%.** Until a0-45 the
+    // gap here was the a0-22 bloom tint — the game painted its halos cyan and
+    // patina where the design painted the ramp, and over these same seeds that
+    // was worth 5.51%, most of the tolerance. There is one colour rule now, so
+    // the two panels are two implementations of the same field and nothing else:
+    // they agree to **2.29%**, and what is left is the sampling spread above.
     expect(
-      Math.abs(m.p99 - design.p99) / design.p99,
-      `the game's star field reads p99 ${m.p99} against the design's ${design.p99}`,
+      Math.abs(game - design) / design,
+      `the game's star field reads p99 ${game.toFixed(2)} against the design's ${design.toFixed(2)}`,
     ).toBeLessThan(0.05);
   });
 
@@ -1063,321 +1090,472 @@ describe('bloom — the brightest stars, and the whole field is 16× denser (a0-
 });
 
 // ---------------------------------------------------------------------------
-// 4b. Bloom colour (a0-22) — a tint may cool a bloom, never brighten it
+// 4b. Star colour (a0-45) — it comes from TEMPERATURE, and from nothing else
 // ---------------------------------------------------------------------------
 
 /**
- * The developer: *"our mockups had different colored blooms these are all 1
- * color"*. `BLOOM_TINTS` answers that, and this block is the price of the answer
- * stated as numbers rather than as the paragraph above the constant.
+ * **The fourth report on the star field, and the one this block answers.**
  *
- * **a0-40 re-derived every number in it and changed none of the rules.** The
- * ground moved 1.9 → 9.1, the halo intensity 0.16 → 0.48, and a star's alpha now
- * comes from the design's magnitude curve rather than from its ink — so the whole
- * measured table below is new. What is *not* new is any of the five things the
- * block asserts: cold hues only, a tint takes light out rather than adding it,
- * ΔE ≥ 40 from everything that means something, the star's own point stays on the
- * steel value ramp, and the far layer takes no tint. Bloom colour was out of
- * a0-40's scope and it was not re-opened.
+ * The design gives a star a *temperature* and colours it from that — 78% of the
+ * field blue-white, 22% amber, at a luma that barely moves across the whole sky.
+ * The build ramped colour by **magnitude** instead (`hullSteel` / `hullLight` /
+ * `WHITE`), and because magnitude is `u^2.35` about 71% of the field landed in
+ * the bottom band at Y′ 135: dim grey where the design is a two-temperature
+ * field. `mockup-reference.ts` said so in its own comment — *"Derived
+ * (style-guide §1, not the design preview)"* — the one value in the file that
+ * exists to be the design that was taken from somewhere else.
  *
- * One consequence **is** reported rather than absorbed, and it is on the brief's
- * own instruction to report it: at 0.48 a halo is brighter than the ink outline
- * every sprite is drawn with (Y′ 43.4). The invariant that used to bound it is
- * replaced by the next surface up — the rock body, Y′ 77.4 — and both numbers are
- * printed by the table below so the size of the change is on the record.
+ * This block replaces a0-22's, which asked a different question and answered it
+ * well: with the star's own colour pinned to a grey ramp, the only place a hue
+ * could go was the *scatter* around it, so `BLOOM_TINTS` put plasma on `mid`'s
+ * halos and patina on `near`'s. The developer was describing the design's field,
+ * and the design's field is coloured at the **star**. So the two tints are not
+ * overturned on taste — they are answered, and removed rather than left standing
+ * beside a temperature (LESSONS §14). What a0-22 asserted that still has to be
+ * true is asserted here on the new arrangement:
+ *
+ *  - a bloom's colour cannot be brighter than the light it scatters from — now
+ *    true by identity, since it *is* that light;
+ *  - nothing in the field reaches the rock body, the darkest large surface the
+ *    fleet is drawn against;
+ *  - every star colour is ΔE ≥ 40 from ore, from danger and from all eight
+ *    roster hues, on the pixel it composites to.
+ *
+ * And two things a0-22 never had to say, because a grey field cannot collide
+ * with anything, are said with numbers instead of buried — see
+ * `'is a colour the palette does not own, and here is exactly how much of one'`.
  */
-describe('bloom colour — the tint is cold, and it can only take light out', () => {
-  /**
-   * A halo's composited pixel over the ground at the brightest star its ink ever
-   * paints.
-   *
-   * **a0-44 made the alpha here absolute** — `BLOOM.peakAlpha`, the design's
-   * `0.42 × intensity` — where it used to be `starAlpha(mag) × BLOOM.intensity`.
-   * The magnitude argument therefore no longer changes the answer, and it is kept
-   * because the *ink* still depends on it: each layer's bands are addressed by
-   * the brightest star they paint. The number moved DOWN (0.2118–0.24 → 0.2016),
-   * so every bound this block asserts is asserted with less headroom used, not
-   * more.
-   */
-  const haloPixel = (color: number, mag: number): [number, number, number] => {
-    void mag;
-    const a = BLOOM.peakAlpha;
+describe('star colour — it comes from temperature, and the whole star wears it', () => {
+  const { w, h } = MOCKUP_PANEL;
+  /** One screenful of every layer, which is the unit the design states. */
+  const field = STAR_LAYERS.flatMap((l) => [...starFieldSprite(l, VOID_SEED, w, h).shapes]);
+  /** A big field, for the populations that need one (halos, spikes). */
+  const near = starFieldSprite(STAR_LAYERS.find((l) => l.key === 'near')!, VOID_SEED, 9000, 6000);
+
+  /** The star points, the halos and the spike arms of a sprite, split apart. */
+  function parts(shapes: readonly Shape[]): {
+    points: Shape[];
+    halos: Shape[];
+    spikes: Shape[];
+  } {
+    const points: Shape[] = [];
+    const halos: Shape[] = [];
+    const spikes: Shape[] = [];
+    for (const s of shapes) {
+      if (s.stroke) spikes.push(s);
+      else if (s.path.kind === 'circle' && s.fill?.falloff) halos.push(s);
+      else if (s.path.kind === 'circle') points.push(s);
+    }
+    return { points, halos, spikes };
+  }
+
+  /** A star's own pixel over the ground, at the alpha it actually paints. */
+  const pixel = (color: number, alpha: number): [number, number, number] => {
     const [r, g, b] = unpack(color);
     const [fr, fg, fb] = unpack(FLOOR);
-    return [a * r + (1 - a) * fr, a * g + (1 - a) * fg, a * b + (1 - a) * fb];
+    return [alpha * r + (1 - alpha) * fr, alpha * g + (1 - alpha) * fg, alpha * b + (1 - alpha) * fb];
   };
 
-  const tints = Object.values(BLOOM_TINTS);
-  /** Every ink in the field, with its layer and the top of its magnitude band —
-   *  the brightest star it paints, which is the halo that has to be safe. */
-  const inks = STAR_LAYERS.flatMap((layer) =>
-    layer.inks.map((ink, i) => ({
-      layer,
-      ink,
-      peakMag: layer.inks[i + 1]?.minMagnitude ?? 1,
-    })),
-  );
-  const tinted = inks.filter(({ ink }) => ink.halo !== undefined);
+  // -------------------------------------------------------------------------
+  // The gate the brief names, by name, and it needs BOTH directions
+  // -------------------------------------------------------------------------
 
-  it('names only cold, non-RESERVED hues — the mockup’s cyan, not its yellow or red', () => {
-    expect(tints).toEqual([PALETTE.plasma, PALETTE.patina]);
-    const hueOf = (rgb: readonly [number, number, number]): number => {
-      const [, aStar, bStar] = lab(rgb);
-      return ((Math.atan2(bStar, aStar) * 180) / Math.PI + 360) % 360;
-    };
-    const apart = (a: number, b: number): number => {
-      const d = Math.abs(a - b) % 360;
-      return d > 180 ? 360 - d : d;
-    };
-    for (const t of tints) {
-      expect(YELLOW_FAMILY.has(t), `${hex(t)} is ore yellow or a shade of it`).toBe(false);
-      expect(RED_FAMILY.has(t), `${hex(t)} is threat red or a shade of it`).toBe(false);
-      expect(IDENTITY_COLORS.has(t), `${hex(t)} is a roster colour`).toBe(false);
-      // "Cold" is not a mood here, it is an angle: ore sits at hue 93° and danger
-      // at 29°, and a tint has to be most of the wheel away from both.
-      for (const [name, signal] of [
-        ['ore', PALETTE.signalYellow],
-        ['danger', PALETTE.threatRed],
-      ] as const) {
-        const d = apart(hueOf(unpack(t)), hueOf(unpack(signal)));
-        expect(d, `${hex(t)} sits ${d.toFixed(0)}° from ${name}`).toBeGreaterThan(75);
+  it('colour comes from temperature, not magnitude', () => {
+    // One pair pins the rule and neither half of it does alone. A build that
+    // ignored temperature passes the second assertion; a build that kept the
+    // magnitude ramp *and* added a temperature would pass the first.
+    const temps = [-1, -0.4, 0.55, 0.8, 1];
+    const mags = [0, 0.2, 0.45, 0.8, 0.86, 1];
+
+    // 1. SAME magnitude, DIFFERENT temperature ⇒ different colours. Colour is a
+    //    function of temperature, so temperature has to reach it.
+    for (const mag of mags) {
+      void mag; // magnitude is not an argument to the colour at all — see below.
+      const colors = temps.map(starColorFor);
+      expect(new Set(colors).size, `${temps.length} temperatures, ${new Set(colors).size} colours`).toBe(
+        temps.length,
+      );
+    }
+
+    // 2. DIFFERENT magnitude, SAME temperature ⇒ the SAME colour. This is the
+    //    half that fails on `main`, where the same temperature at magnitude 0.2
+    //    and at magnitude 0.9 paints hullSteel and WHITE.
+    for (const t of temps) {
+      const c = starColorFor(t);
+      for (const mag of mags) {
+        expect(
+          starColorFor(t),
+          `temperature ${t} paints ${hex(starColorFor(t))} at magnitude ${mag}`,
+        ).toBe(c);
       }
     }
+
+    // 3. …and structurally: `starColorFor` takes one argument and it is not a
+    //    magnitude. A colour function that cannot see the magnitude cannot ramp
+    //    by it, which is the property the two assertions above are evidence for.
+    expect(starColorFor.length, 'starColorFor takes exactly one argument').toBe(1);
+
+    // 4. The same rule where it actually matters — in the sprite the renderer is
+    //    handed. Group the field's stars by radius (radius is linear in
+    //    magnitude, so equal radius IS equal magnitude) and by colour.
+    const { points } = parts(field);
+    expect(points.length, 'one screenful of stars').toBe(MOCKUP_STARS.count);
+    const byRadius = new Map<number, Set<number>>();
+    const byColor = new Map<number, Set<number>>();
+    for (const s of points) {
+      const r = s.path.kind === 'circle' ? s.path.r : 0;
+      const c = s.fill!.color;
+      if (!byRadius.has(r)) byRadius.set(r, new Set());
+      byRadius.get(r)!.add(c);
+      if (!byColor.has(c)) byColor.set(c, new Set());
+      byColor.get(c)!.add(r);
+    }
+    // Stars of ONE magnitude wear many colours…
+    const spread = [...byRadius.values()].filter((cs) => cs.size > 1);
+    expect(spread.length, 'no two stars of the same magnitude differ in colour').toBeGreaterThan(0);
+    // …and one colour is worn across a wide span of magnitudes. On a magnitude
+    // ramp this number is bounded by the band's own width; here it is the field.
+    const widest = Math.max(
+      ...[...byColor.values()].map((rs) => Math.max(...rs) - Math.min(...rs)),
+    );
+    const fullSpan = MOCKUP_STARS.radius.max - MOCKUP_STARS.radius.min;
+    expect(
+      widest / fullSpan,
+      `the widest magnitude span sharing one colour is ${((widest / fullSpan) * 100).toFixed(0)}% of the field`,
+    ).toBeGreaterThan(0.5);
   });
 
-  it('leaves the frame quieter than it found it, and stays under the rock body', () => {
-    // The safety argument, as the two numbers that carry it. White is the most
-    // luminous thing in the palette, so the brightest bloom in the game LOSES
-    // value by becoming cyan — and nothing in the field out-values the darkest
-    // large surface the fleet is drawn against.
-    const rows: string[] = [];
-    let wasPeak = 0;
-    let nowPeak = 0;
-    let worstWasTax = 0;
-    let worstNowTax = 0;
-    const tax = (px: readonly [number, number, number]): number =>
-      1 - contrast(unpack(DERIVED.shotOwn1), px) / contrast(unpack(DERIVED.shotOwn1), unpack(FLOOR));
-    for (const { layer, ink, peakMag } of inks) {
-      const was = haloPixel(ink.color, peakMag);
-      const now = haloPixel(ink.halo ?? ink.color, peakMag);
-      wasPeak = Math.max(wasPeak, luma(was));
-      nowPeak = Math.max(nowPeak, luma(now));
-      worstWasTax = Math.max(worstWasTax, tax(was));
-      worstNowTax = Math.max(worstNowTax, tax(now));
-      rows.push(
-        `  ${layer.key.padEnd(5)} ${hex(ink.color)} mag≤${peakMag.toFixed(2)} halo ${
-          ink.halo === undefined ? '—      ' : hex(ink.halo)
-        } | C* ${chroma(was).toFixed(1).padStart(4)} → ${chroma(now).toFixed(1).padStart(4)} | Y′ ${luma(was)
-          .toFixed(1)
-          .padStart(5)} → ${luma(now).toFixed(1).padStart(5)} | tax ${(tax(was) * 100)
-          .toFixed(1)
-          .padStart(5)}% → ${(tax(now) * 100).toFixed(1).padStart(5)}%`,
-      );
+  /**
+   * **The ramp a0-45 deletes**, transcribed from `main` rather than described —
+   * `MOCKUP_STARS.ramp`, the three bands and the `minMagnitude: 0.45` the DoD
+   * greps for. The gate above is only worth something if it refuses this
+   * (LESSONS §24).
+   */
+  const SHIPPED_BEFORE_A0_45 = [
+    { color: PALETTE.hullSteel, minMagnitude: 0 },
+    { color: DERIVED.hullLight, minMagnitude: 0.45 },
+    { color: 0xffffff, minMagnitude: 0.8 },
+  ] as const;
+
+  it('REJECTS the magnitude ramp main paints, on the same predicate', () => {
+    const rampColor = (mag: number): number => {
+      let chosen: number = SHIPPED_BEFORE_A0_45[0].color;
+      for (const band of SHIPPED_BEFORE_A0_45) if (mag >= band.minMagnitude) chosen = band.color;
+      return chosen;
+    };
+    // Direction 2 of the gate, run against main: different magnitude, same
+    // temperature — and main's colour does not take a temperature at all, so it
+    // is the magnitude that decides and the two disagree.
+    expect(rampColor(0.2), 'main paints a faint star dim steel').toBe(PALETTE.hullSteel);
+    expect(rampColor(0.9), 'and a bright one white').toBe(0xffffff);
+    expect(rampColor(0.2)).not.toBe(rampColor(0.9));
+    // Direction 1, likewise: main gives two temperatures at one magnitude the
+    // same colour, because it never sees them.
+    expect(rampColor(0.5)).toBe(rampColor(0.5));
+    // …and the field main draws is mostly one dim band, which is the report.
+    const rng = mulberry32(VOID_SEED);
+    let bottom = 0;
+    const N = 20000;
+    for (let i = 0; i < N; i++) {
+      if (rampColor(starMagnitude(rng.next())) === PALETTE.hullSteel) bottom++;
     }
-    const inkOutline = luma(unpack(DERIVED.rockFissure));
+    expect(bottom / N, `${((bottom / N) * 100).toFixed(1)}% of main's field is dim steel`).toBeGreaterThan(
+      0.7,
+    );
+    // The design's field, by contrast, is 78/22 across two hues and nothing in it
+    // is grey at all.
+    const { points } = parts(field);
+    const hot = points.filter((s) => unpack(s.fill!.color)[2] > unpack(s.fill!.color)[0]).length;
+    expect(hot / points.length, `${hot}/${points.length} of the design's field is hot`).toBeCloseTo(
+      MOCKUP_STARS.temperature.hotShare,
+      1,
+    );
+    for (const s of points) {
+      expect(
+        chroma(unpack(s.fill!.color)),
+        `a star painted ${hex(s.fill!.color)}, which is grey`,
+      ).toBeGreaterThan(10);
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // The design's own two branches, and the field they make
+  // -------------------------------------------------------------------------
+
+  it('draws the design’s two branches, verbatim, and nothing between them', () => {
+    // The endpoints the brief states, as the arithmetic that produces them.
+    expect(unpack(starColorFor(1)), 'the hottest star').toEqual([160, 205, 255]);
+    expect(unpack(starColorFor(0.55)), 'the coolest hot star').toEqual([178, 209, 233]);
+    expect(unpack(starColorFor(-0.4)), 'the warmest cool star').toEqual([235, 201, 149]);
+    expect(unpack(starColorFor(-1)), 'the coolest star').toEqual([235, 180, 95]);
+    // Every channel lands inside 0..255 without the clamp doing any work, over
+    // the whole of the design's own domain — so `starColorFor` is the design's
+    // arithmetic and not a clipped version of it.
+    const T = MOCKUP_STARS.temperature;
+    for (let t = T.hot.min; t <= T.hot.max; t += 0.001) {
+      expect(200 - Math.round(40 * t)).toBeGreaterThanOrEqual(0);
+      expect(205 + Math.round(50 * t)).toBeLessThanOrEqual(255);
+    }
+    for (let k = T.cool.min; k <= T.cool.max; k += 0.001) {
+      expect(185 - Math.round(90 * k)).toBeGreaterThanOrEqual(0);
+    }
+    // The enumerated set the audit uses is exactly what the function produces.
+    for (const c of STAR_TEMPERATURE_COLORS) expect(c).toBeGreaterThanOrEqual(0);
+    for (const s of parts(field).points) {
+      expect(
+        STAR_TEMPERATURE_COLORS.has(s.fill!.color),
+        `the field painted ${hex(s.fill!.color)}, which starColorFor cannot produce`,
+      ).toBe(true);
+    }
+  });
+
+  it('draws temperature from its OWN randoms, two of them, per star', () => {
+    // The design's line calls `r()` twice — once for the branch and once for the
+    // value — and sharing one draw between them correlates the two, which caps
+    // the hot branch at 0.901 and starts the cool one at 0.868. Both endpoints
+    // the design paints would then be undrawable, so this is a property of the
+    // *field*, not of the function: over a long stream the extremes appear.
+    const rng = mulberry32(VOID_SEED);
+    let hottest = -Infinity;
+    let coolest = Infinity;
+    let hot = 0;
+    const N = 50000;
+    for (let i = 0; i < N; i++) {
+      const t = starTemperature(rng);
+      if (t >= 0) {
+        hot++;
+        hottest = Math.max(hottest, t);
+      } else {
+        coolest = Math.min(coolest, t);
+      }
+    }
+    expect(hot / N, 'the design’s 78/22 split').toBeCloseTo(MOCKUP_STARS.temperature.hotShare, 2);
+    expect(hottest, 'the hot branch reaches its own top, not 0.901').toBeGreaterThan(0.99);
+    expect(coolest, 'the cool branch reaches its own bottom, not −0.868').toBeLessThan(-0.99);
+    // …and its shallow end too, which a shared draw also loses.
+    expect(coolest).toBeGreaterThanOrEqual(-MOCKUP_STARS.temperature.cool.max);
+  });
+
+  // -------------------------------------------------------------------------
+  // The whole star wears one colour — point, halo and cross
+  // -------------------------------------------------------------------------
+
+  it('paints the point, its halo and its cross in the SAME colour, in the real sprite', () => {
+    // The design's gradient is `starColor(s.temp, …)` — the halo is the star's
+    // own light, so it is the star's own colour. Until a0-45 the halo was a
+    // second colour source (`BLOOM_TINTS`); this is the assertion that there is
+    // now exactly one, and it walks the sprite in draw order: halo, two arms,
+    // then the point.
+    const { halos, spikes, points } = parts(near.shapes);
+    expect(halos.length, 'the near layer bloomed at all').toBeGreaterThan(100);
+    expect(spikes.length, 'two arms per bloomed star').toBe(halos.length * 2);
+    let pending: number | null = null;
+    let checked = 0;
+    for (const s of near.shapes) {
+      if (s.path.kind === 'circle' && s.fill?.falloff) {
+        pending = s.fill.color;
+        continue;
+      }
+      if (s.stroke && pending !== null) {
+        expect(s.stroke.color, 'a spike arm left its own star’s colour').toBe(pending);
+        continue;
+      }
+      if (s.path.kind === 'circle' && s.fill && pending !== null) {
+        expect(s.fill.color, 'a star’s point left its own halo’s colour').toBe(pending);
+        pending = null;
+        checked++;
+      }
+    }
+    expect(checked, 'the sprite carried bloomed stars to check').toBeGreaterThan(100);
+    // Every colour in the sprite is a temperature colour and nothing else — no
+    // ramp value survives anywhere in it.
+    const all = new Set<number>([
+      ...points.map((s) => s.fill!.color),
+      ...halos.map((s) => s.fill!.color),
+      ...spikes.map((s) => s.stroke!.color),
+    ]);
+    for (const c of all) expect(STAR_TEMPERATURE_COLORS.has(c), `${hex(c)} is not a star colour`).toBe(true);
+    for (const gone of [PALETTE.hullSteel, DERIVED.hullLight, 0xffffff, PALETTE.plasma, PALETTE.patina]) {
+      expect(all.has(gone), `${hex(gone)} — a ramp or tint value — is still in the field`).toBe(false);
+    }
+    expect(assertPaletteCompliance([near])).toBeUndefined();
+  });
+
+  it('leaves every HALO under the rock body, and every halo under its own star', () => {
+    // a0-22's safety argument, on the new arrangement, and with the scope it
+    // always had stated precisely — because writing it down loosely is how a
+    // brief re-derives a bound it never held.
+    //
+    // **The rock-body bound is about the GLOW, not about the point.** a0-22
+    // measured "the brightest halo pixel in the game" against "the darkest large
+    // surface the fleet is drawn against", and a halo is a 27 px disc: a wash
+    // wide enough to sit behind a ship is a wash that competes with it. A star's
+    // own point is 2.45 px at its very biggest and it is *meant* to be the
+    // brightest thing in the frame — it was already Y′ 132 on `main`, where the
+    // top of the value ramp was white, and this brief takes it DOWN to 104.
+    //
+    // The halo's peak alpha is absolute (0.2016) and a point's runs to 0.5, so a
+    // halo is dimmer than the star inside it by construction — which is what
+    // keeps a star findable in its own glow, and it now holds for every star
+    // rather than for the two layers that happened to carry a tint.
     const rock = luma(unpack(DERIVED.rockBody));
+    const rows: string[] = [];
+    let peakHalo = 0;
+    let peakPoint = 0;
+    for (const t of [1, 0.55, -0.4, -1]) {
+      const c = starColorFor(t);
+      const point = pixel(c, MOCKUP_STARS.alpha.max);
+      const halo = pixel(c, BLOOM.peakAlpha);
+      peakHalo = Math.max(peakHalo, luma(halo));
+      peakPoint = Math.max(peakPoint, luma(point));
+      rows.push(
+        `  temp ${t.toFixed(2).padStart(5)} ${hex(c)} | point Y′ ${luma(point).toFixed(1).padStart(5)} C* ${chroma(point)
+          .toFixed(1)
+          .padStart(4)} | halo Y′ ${luma(halo).toFixed(1).padStart(5)} C* ${chroma(halo).toFixed(1).padStart(4)}`,
+      );
+      expect(luma(halo), `a ${hex(c)} halo out-values its own star`).toBeLessThan(luma(point));
+      expect(luma(halo), `a ${hex(c)} halo reaches the rock body`).toBeLessThan(rock);
+    }
+    // The point that `main` drew, for the comparison to be a number rather than
+    // a claim: the top of the deleted ramp was `WHITE`, so its brightest star
+    // painted 255 at α 0.5.
+    const wasPoint = luma(pixel(0xffffff, MOCKUP_STARS.alpha.max));
     // eslint-disable-next-line no-console
     console.log(
-      `\n${rows.join('\n')}\n  peak halo Y′ ${wasPeak.toFixed(1)} → ${nowPeak.toFixed(1)}` +
-        `   worst tax ${(worstWasTax * 100).toFixed(1)}% → ${(worstNowTax * 100).toFixed(1)}%` +
-        `   ink outline Y′ ${inkOutline.toFixed(1)}   rock body Y′ ${rock.toFixed(1)}\n`,
+      `\n${rows.join('\n')}\n  brightest star point Y′ ${peakPoint.toFixed(1)} (main's white ramp: ${wasPoint.toFixed(
+        1,
+      )})   brightest halo Y′ ${peakHalo.toFixed(1)}   rock body Y′ ${rock.toFixed(1)}   ink outline Y′ ${luma(
+        unpack(DERIVED.rockFissure),
+      ).toFixed(1)}\n`,
     );
-
-    // Every tint, on its own ink, takes light out rather than adding it — which
-    // is the property that makes a coloured bloom affordable at all.
-    for (const { layer, ink, peakMag } of tinted) {
-      const was = haloPixel(ink.color, peakMag);
-      const now = haloPixel(ink.halo!, peakMag);
-      expect(luma(now), `${layer.key} ${hex(ink.halo!)} halo is dimmer than the ramp's`).toBeLessThan(
-        luma(was),
-      );
-      expect(tax(now), `${layer.key} ${hex(ink.halo!)} halo taxes less than the ramp's`).toBeLessThan(
-        tax(was),
-      );
-    }
-    // …nothing anywhere reaches the rock body, the darkest large surface the
-    // fleet is drawn against. (The old bound here was the ink outline at 43.4,
-    // and a0-40's intensity clears it — see this block's own note.)
-    for (const { layer, ink, peakMag } of inks) {
-      const px = haloPixel(ink.halo ?? ink.color, peakMag);
-      expect(luma(px), `${layer.key} halo Y′ vs the rock body ${rock.toFixed(1)}`).toBeLessThan(rock);
-    }
-    // …and in aggregate the tints can only lower the field's peak, never raise
-    // it. (Equality is the honest outcome now: since a0-40 all three layers climb
-    // the same ramp, and the brightest halo in the game belongs to `deep`, which
-    // takes no tint — so the peak is set by an ink the tints never touch.)
-    expect(nowPeak, 'the tints did not raise the brightest halo in the game').toBeLessThanOrEqual(
-      wasPeak,
+    expect(peakHalo, 'the brightest halo pixel in the game').toBeLessThan(rock);
+    expect(peakPoint, 'the design’s brightest star is dimmer than the ramp’s was').toBeLessThan(
+      wasPoint,
     );
-    expect(
-      worstNowTax,
-      'the tints did not raise the worst contrast tax any halo levies',
-    ).toBeLessThanOrEqual(worstWasTax);
   });
 
-  it('puts every tinted halo a whole colour away from every thing that MEANS something', () => {
+  // -------------------------------------------------------------------------
+  // The tension, with numbers on it (the brief's own instruction)
+  // -------------------------------------------------------------------------
+
+  /**
+   * **The two the design does not clear, measured and pinned rather than argued
+   * away.** The studio's floor for "a different colour" is ΔE 40, and on the
+   * pixel a star actually composites to, the design's two extremes clear it
+   * against every live signal except these:
+   *
+   * ```
+   *   the bluest star  #a0cdff  vs the owner beacon ring  #4dc3ff   ΔE 39.0
+   *   the amberest     #ebb45f  vs oreDeep                #9b8836   ΔE 25.6
+   * ```
+   *
+   * **This is the brief's own question, and the answer to it is "yes, a bit."**
+   * The brief asked, in as many words, whether a blue star at luma ~200 can be
+   * confused with a friendly marker at a glance, and told this diff to bring the
+   * answer back as a question rather than quietly desaturating the sky again. So:
+   * ΔE 39.0 against the ring is one point under the floor on the composited pixel
+   * and **16.5 on the raw ink** — the design's blue-white and the game's energy
+   * cyan are the same corner of the wheel. Four things bound it, and none of them
+   * is "it is far away in colour":
+   *
+   *  - **size.** The ring is a stroked circle around a station; a star is a disc
+   *    of 0.4–2.45 px. Nothing in the frame confuses the two by shape.
+   *  - **value.** The ring paints opaque plasma at Y′ 189; the brightest star
+   *    pixel in the sky is 104, and 99% of the field is far below that.
+   *  - **motion.** A ring is world-locked; the star field runs at parallax
+   *    0.10–0.50 and visibly slides past it.
+   *  - **and the field is not blue at a glance** — it is 78% blue-white at 8% to
+   *    50% alpha over a Y′ 9 ground, which is why the frame reads as a sky.
+   *
+   * The amber case is the same shape of answer against `oreDeep`, which is not a
+   * signal on its own: it is the *shadowed facet* of an ore body whose lit faces
+   * are signal yellow (ΔE 60.4 from the same star) and which never appears
+   * without them. But it is the closest anything in this field comes to the one
+   * colour the style guide calls a controlled substance, and it is 25.6.
+   *
+   * **Both numbers are pinned here to ±0.5.** They are the price of the design,
+   * they are the Director's to accept or refuse, and neither may drift by so much
+   * as a rounding without this test going red and someone looking at it.
+   */
+  const NEAR_MISSES = [
+    { star: 1, what: 'the owner beacon ring', color: PALETTE.plasma, deltaE: 39.0 },
+    { star: -1, what: 'oreDeep, the shadow of an ore facet', color: DERIVED.oreDeep, deltaE: 25.6 },
+  ] as const;
+
+  it('is a colour the palette does not own, and here is exactly how much of one', () => {
+    // §1 says structure never takes a player colour and blue IS a player identity
+    // colour; the amber 22% is the same question against ore. Neither is settled
+    // here — the design is what ships, and these are the numbers the PR puts to
+    // the Director. What IS asserted is the line that has always been a number.
     const signals: Record<string, number> = {
-      oreYellow: PALETTE.signalYellow,
-      oreDeep: DERIVED.oreDeep,
+      ore: PALETTE.signalYellow,
       coreHot: DERIVED.coreHot,
-      threatRed: PALETTE.threatRed,
+      danger: PALETTE.threatRed,
       ...Object.fromEntries([...IDENTITY_COLORS].map((c, i) => [`roster${i + 1}`, c])),
     };
-    for (const { layer, ink, peakMag } of tinted) {
-      const px = haloPixel(ink.halo!, peakMag);
-      for (const [name, color] of Object.entries(signals)) {
+    for (const c of STAR_TEMPERATURE_COLORS) {
+      expect(YELLOW_FAMILY.has(c), `${hex(c)} is ore yellow or a declared shade of it`).toBe(false);
+      expect(RED_FAMILY.has(c), `${hex(c)} is threat red or a declared shade of it`).toBe(false);
+      expect(IDENTITY_COLORS.has(c), `${hex(c)} is a roster colour`).toBe(false);
+    }
+    // The brightest star the field can draw, which is the worst case for both
+    // questions: a point at the top of the alpha range.
+    const rows: string[] = [];
+    for (const [name, t] of [
+      ['bluest', 1],
+      ['amberest', -1],
+    ] as const) {
+      const c = starColorFor(t);
+      const px = pixel(c, MOCKUP_STARS.alpha.max);
+      const worst = Object.entries(signals)
+        .map(([k, v]) => [k, deltaE(px, unpack(v))] as const)
+        .sort((a, b) => a[1] - b[1])[0]!;
+      rows.push(
+        `  the ${name.padEnd(9)} star ${hex(c)} composites to Y′ ${luma(px).toFixed(1)} C* ${chroma(px).toFixed(
+          1,
+        )} — nearest of the signals it clears: ${worst[0]} at ΔE ${worst[1].toFixed(1)}`,
+      );
+      for (const [signal, color] of Object.entries(signals)) {
         expect(
           deltaE(px, unpack(color)),
-          `${layer.key} ${hex(ink.halo!)} halo vs ${name} ${hex(color)}`,
+          `the ${name} star's pixel vs ${signal} ${hex(color)}`,
         ).toBeGreaterThan(40);
       }
     }
-  });
-
-  it('leaves the star’s own point on the steel value ramp (style-guide §1)', () => {
-    // The narrowness of the change, asserted: §1's sentence is about the POINT,
-    // and only the scatter around it takes a hue. This is also what keeps a star
-    // inside every coloured bloom.
-    const ramp = new Set<number>([PALETTE.hullSteel, DERIVED.hullLight, 0xffffff]);
-    for (const { layer, ink } of inks) {
-      expect(ramp.has(ink.color), `${layer.key} paints a star point ${hex(ink.color)}`).toBe(true);
-      if (ink.halo !== undefined) expect(ink.halo).not.toBe(ink.color);
-    }
-    // The ramp is the design's own, shared with `sky-preview`'s design panel, so
-    // the two cannot disagree about what a magnitude looks like.
-    expect(MOCKUP_STARS.ramp.map((b) => b.color)).toEqual([
-      PALETTE.hullSteel,
-      DERIVED.hullLight,
-      0xffffff,
-    ]);
-  });
-
-  it('spends the tint only on the band that blooms, and leaves the FAR layer alone', () => {
-    // A tint can only be seen on a halo, and only the top band ever has one, so
-    // spending it anywhere else ships colour nobody can see. That is now a
-    // structural claim rather than a chroma measurement, because a0-40 gave all
-    // three layers the same ramp: below the threshold there is no halo at all.
-    for (const layer of STAR_LAYERS) {
-      layer.inks.forEach((ink, i) => {
-        const bandTop = layer.inks[i + 1]?.minMagnitude ?? 1;
-        if (ink.halo !== undefined) {
-          expect(bandTop, `${layer.key} tints a band that never blooms`).toBeGreaterThan(
-            MOCKUP_STARS.bloom.threshold,
-          );
-        }
-      });
-    }
-    // `deep` takes none, and the reason is no longer that it cannot afford one —
-    // it shares the ramp now, so it could. It is that deep carries 61% of the
-    // field: a tint there is a repaint, not an accent.
-    const deep = STAR_LAYERS.find((l) => l.key === 'deep')!;
-    expect(deep.inks.every((i) => i.halo === undefined), 'the deep layer takes no tint').toBe(true);
-    expect(deep.share, 'and it is the layer that carries the field').toBeGreaterThan(0.5);
-    // …and every tint that IS spent clears the chroma floor, and at least doubles
-    // the chroma of the halo it replaces.
-    const CHROMA_FLOOR = 5;
-    for (const { layer, ink, peakMag } of tinted) {
-      const was = chroma(haloPixel(ink.color, peakMag));
-      const now = chroma(haloPixel(ink.halo!, peakMag));
-      expect(now, `${layer.key} ${hex(ink.halo!)} reaches only C* ${now.toFixed(1)}`).toBeGreaterThan(
-        CHROMA_FLOOR,
+    // …and the two it does NOT clear, pinned. See NEAR_MISSES for the argument
+    // and for what is being put to the Director.
+    for (const n of NEAR_MISSES) {
+      const c = starColorFor(n.star);
+      const px = pixel(c, MOCKUP_STARS.alpha.max);
+      const got = deltaE(px, unpack(n.color));
+      rows.push(
+        `  …and does NOT clear ΔE 40 against ${n.what} ${hex(n.color)}: ΔE ${got.toFixed(1)}` +
+          ` (raw ink ΔE ${deltaE(unpack(c), unpack(n.color)).toFixed(1)})`,
       );
-      expect(now / was, `${layer.key} ${hex(ink.halo!)}: C* ${was.toFixed(1)} → ${now.toFixed(1)}`)
-        .toBeGreaterThan(2);
+      expect(got, `${hex(c)} vs ${n.what} moved from the pinned ${n.deltaE}`).toBeCloseTo(n.deltaE, 0);
     }
-    for (const key of ['mid', 'near']) {
-      expect(
-        STAR_LAYERS.find((l) => l.key === key)!.inks.some((i) => i.halo !== undefined),
-        `${key} carries no tint`,
-      ).toBe(true);
-    }
+    // eslint-disable-next-line no-console
+    console.log(`\n${rows.join('\n')}\n`);
   });
 
-  it('keeps the steel ramp the majority read, in the FRAME and not just the table', () => {
-    // "different colored blooms" is a claim about a frame. Measured on one
-    // screenful of all three layers: most of what blooms is still the steel void,
-    // because most of what blooms is on the layer that takes no tint.
-    for (const layer of STAR_LAYERS) {
-      expect(
-        layer.inks.some((i) => i.halo === undefined),
-        `${layer.key} has no untinted ink left`,
-      ).toBe(true);
-    }
-    const { w, h } = MOCKUP_PANEL;
-    const tintSet = new Set<number>(tints);
-    let halos = 0;
-    let tintedHalos = 0;
-    for (const layer of STAR_LAYERS) {
-      for (const s of starFieldSprite(layer, VOID_SEED, w, h).shapes) {
-        if (s.path.kind !== 'circle' || !s.fill?.falloff) continue;
-        halos++;
-        if (tintSet.has(s.fill.color)) tintedHalos++;
-      }
-    }
-    expect(halos, 'a screenful blooms at all').toBeGreaterThan(10);
-    expect(
-      tintedHalos / halos,
-      `${tintedHalos}/${halos} of a screenful's blooms carry a hue`,
-    ).toBeLessThan(0.5);
-    const families = new Set(STAR_LAYERS.flatMap((l) => l.inks.map((i) => i.halo ?? 'ramp')));
-    expect(families.size, 'the field draws blooms in more than one colour').toBeGreaterThan(2);
-  });
-
-  it('emits the tint on the halo and never on the star or its spikes, in the real sprite', () => {
-    const layer = STAR_LAYERS.find((l) => l.key === 'near')!;
-    const def = starFieldSprite(layer, VOID_SEED, 9000, 6000);
-    const tintSet = new Set<number>(tints);
-    let tintedHalos = 0;
-    let halos = 0;
-    for (const s of def.shapes) {
-      if (s.path.kind !== 'circle' || !s.fill) continue;
-      if (!s.fill.falloff) {
-        expect(tintSet.has(s.fill.color), `a star POINT was painted ${hex(s.fill.color)}`).toBe(false);
-        continue;
-      }
-      halos++;
-      if (tintSet.has(s.fill.color)) tintedHalos++;
-    }
-    // The spike is the point's own diffraction, so it is the point's own colour.
-    for (const s of def.shapes) {
-      if (s.stroke) expect(tintSet.has(s.stroke.color), 'a spike took the halo tint').toBe(false);
-    }
-    expect(halos, 'the near layer bloomed at all').toBeGreaterThan(100);
-    // Near's tint is on its top band, which is the only band that blooms, so on
-    // this layer every halo carries the hue.
-    expect(tintedHalos).toBe(halos);
-    expect(assertPaletteCompliance([def])).toBeUndefined();
-  });
-
-  it('states, as arithmetic, why the mockup’s yellow and red blooms are not Art’s to give', () => {
-    // The brief asked for the honest conclusion when a mockup and a ratified rule
-    // disagree. For the two warm hues it is not a taste — it is §2.2's number,
-    // and a0-40 raising that number to 0.10 does not come close to reaching a
-    // bloom: the halo of the faintest star that blooms at all is already over it.
-    const faintestBloom = starAlpha(MOCKUP_STARS.bloom.threshold) * BLOOM.intensity;
-    expect(
-      faintestBloom,
-      `the dimmest halo in the game is alpha ${faintestBloom.toFixed(4)}, against the §2.2 ceiling ${SKY_RESERVED_ALPHA_MAX}`,
-    ).toBeGreaterThan(SKY_RESERVED_ALPHA_MAX);
-    // And the audit already refuses them, which is what makes this a gate rather
-    // than a paragraph: no new rule was needed to keep a warm bloom out.
-    const warm = starFieldSprite(
-      { ...STAR_LAYERS[2]!, inks: [{ color: 0xffffff, minMagnitude: 0, halo: PALETTE.signalYellow }] },
-      VOID_SEED,
-      1200,
-      800,
+  it('keeps a star colour on the star field and nowhere else in the game', () => {
+    // The allow-list widened by exactly one set, and this is the fence around it:
+    // `./compliance` admits a temperature colour on role `material` of a
+    // `backdrop/` sprite, and refuses it anywhere else. A hull plate in star
+    // amber is ΔE 20.7 from `coreHot` and it fails as `star-only`.
+    const amber = starColorFor(-1);
+    const onAHull: SpriteDef = {
+      ...near,
+      name: 'ship/vanguard/hull',
+      shapes: [near.shapes.find((s) => s.path.kind === 'circle' && s.fill && !s.fill.falloff)!],
+    };
+    expect(auditSprite(onAHull).map((v) => v.rule), `${hex(amber)} on a ship hull`).toContain(
+      'star-only',
     );
-    expect(auditSprite(warm).map((v) => v.rule)).toContain('reserved-yellow');
-    const red = starFieldSprite(
-      { ...STAR_LAYERS[2]!, inks: [{ color: 0xffffff, minMagnitude: 0, halo: PALETTE.threatRed }] },
-      VOID_SEED,
-      1200,
-      800,
-    );
-    expect(auditSprite(red).map((v) => v.rule)).toContain('reserved-red');
+    // …and the whole catalogue, which contains the star field, still passes.
+    expect(assertPaletteCompliance(ALL_SPRITES)).toBeUndefined();
   });
 });
-
 // ---------------------------------------------------------------------------
 // 5. The one real check — same-hue collisions over every sky
 // ---------------------------------------------------------------------------
