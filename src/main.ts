@@ -5448,10 +5448,17 @@ async function boot(): Promise<void> {
    * pins the sim and gives the debug boot a sided world. Behind ?debug=1 only.
    */
   function installTeamFogStage(): void {
-    /** Anyone on the local player's side but the local player — the teammate the
-     *  whole feature is about. `sameSide` is the only predicate used, here as
-     *  everywhere (`src/sim/allegiance`). */
-    function allyShip(): Ship | null {
+    /** The ship `stage()` posted, remembered by id — NOT re-resolved per call.
+     *  `share(false)` moves that ship off the viewer's side, so a seam that asked
+     *  "who is my ally?" a second time would answer with a different ship and
+     *  quietly stage a different scene (it did, once). The staged ally is the
+     *  staged ally whichever side it is currently on. */
+    let stagedAlly: PlayerId | null = null;
+
+    /** Anyone on the local player's side but the local player — how the FIRST
+     *  ally is chosen, and nothing else. `sameSide` is the only predicate used,
+     *  here as everywhere (`src/sim/allegiance`). */
+    function pickAlly(): Ship | null {
       for (const s of world.ships) {
         if (s.id === LOCAL_PLAYER) continue;
         if (sameSide(world, LOCAL_PLAYER, s.id)) return s;
@@ -5459,8 +5466,14 @@ async function boot(): Promise<void> {
       return null;
     }
 
-    /** The staged ally's post: the far side of the arena from the local home, on
-     *  the wide axis, well outside every disc the viewer projects. */
+    /** The staged ally's ship, by the id `stage()` pinned. */
+    function allyShip(): Ship | null {
+      if (stagedAlly === null) return pickAlly();
+      return world.ships.find((s) => s.id === stagedAlly) ?? null;
+    }
+
+    /** The staged ally's post: the far side of the arena from the local home,
+     *  well outside every disc the viewer projects. */
     function post(): Vec2 {
       const home = stationOf(world, LOCAL_PLAYER);
       const cx = world.bounds.width / 2;
@@ -5471,40 +5484,49 @@ async function boot(): Promise<void> {
 
     const stage = {
       state(): {
-        discs: number;
+        ally: PlayerId | null;
+        allyOnYourSide: boolean;
+        ownDiscs: number;
+        teamDiscs: number;
         sensedRivals: PlayerId[];
         rememberedMask: number;
         rememberedOre: number;
-        allySeparation: number;
+        allyClearance: number;
       } {
         const ally = allyShip();
+        // How far the ally stands OUTSIDE every disc the viewer projects alone —
+        // the number behind "no coverage of your own reaches over there".
         const own = sensorSources(world, LOCAL_PLAYER);
-        let separation = Number.POSITIVE_INFINITY;
+        let clearance = Number.POSITIVE_INFINITY;
         if (ally) {
           for (const s of own) {
             const d = Math.hypot(s.pos.x - ally.pos.x, s.pos.y - ally.pos.y) - s.range;
-            if (d < separation) separation = d;
+            if (d < clearance) clearance = d;
           }
         }
         const sensed = sensedState(world, LOCAL_PLAYER);
         return {
-          discs: teamSensorSources(world, LOCAL_PLAYER).length,
+          ally: ally?.id ?? null,
+          allyOnYourSide: !!ally && sameSide(world, LOCAL_PLAYER, ally.id),
+          ownDiscs: own.length,
+          teamDiscs: teamSensorSources(world, LOCAL_PLAYER).length,
           sensedRivals: sensed.ships.filter((id) => !sameSide(world, LOCAL_PLAYER, id)),
           rememberedMask: teamRememberedStationMask(world, LOCAL_PLAYER),
           rememberedOre: teamRememberedOreIds(world, LOCAL_PLAYER).length,
-          allySeparation: separation,
+          allyClearance: clearance,
         };
       },
 
       /** Post the ally far away with a rival under their sensor; hold the viewer
-       *  at home. Returns the geometry so a capture can prove the separation. */
-      stage(): { ally: PlayerId; rival: PlayerId; at: Vec2; rivalDist: number; separation: number } | null {
-        const ally = allyShip();
+       *  at home. Returns the geometry so a capture can prove the clearance. */
+      stage(): { ally: PlayerId; rival: PlayerId; at: Vec2; rivalDist: number; clearance: number } | null {
+        const ally = pickAlly();
         const home = stationOf(world, LOCAL_PLAYER);
         const local = world.ships.find(isLocalShip);
         if (!ally || !home || !local) return null;
         const rival = world.ships.find((s) => !sameSide(world, LOCAL_PLAYER, s.id) && !s.eliminated);
         if (!rival) return null;
+        stagedAlly = ally.id;
 
         local.pos.x = home.pos.x + home.radius + 60;
         local.pos.y = home.pos.y;
@@ -5518,26 +5540,32 @@ async function boot(): Promise<void> {
         ally.vel.y = 0;
         ally.alive = true;
 
-        // The rival sits well inside the ally's own ship sensor and nothing else.
+        // The rival sits well inside the ally's own ship sensor and nothing else,
+        // placed toward the arena centre so it stays on the board.
         const rivalDist = SHIP_SENSOR_RANGE * 0.7;
-        rival.pos.x = at.x - rivalDist;
-        rival.pos.y = at.y;
+        const dx = world.bounds.width / 2 - at.x;
+        const dy = world.bounds.height / 2 - at.y;
+        const len = Math.hypot(dx, dy) || 1;
+        rival.pos.x = at.x + (dx / len) * rivalDist;
+        rival.pos.y = at.y + (dy / len) * rivalDist;
         rival.vel.x = 0;
         rival.vel.y = 0;
         rival.alive = true;
         rival.spawnProtect = 0;
 
-        return { ally: ally.id, rival: rival.id, at, rivalDist, separation: stage.state().allySeparation };
+        return { ally: ally.id, rival: rival.id, at, rivalDist, clearance: stage.state().allyClearance };
       },
 
-      /** The union's on/off switch: put the staged ally on the viewer's side, or
+      /** The union's on/off switch: put the STAGED ally on the viewer's side, or
        *  on the enemy's. Their ship and home move sides together, exactly as the
-       *  lobby would have authored them; nothing else in the scene is touched. */
+       *  lobby would have authored them; nothing else in the scene is touched, and
+       *  nothing moves — which is what makes the before/after pair one tick in one
+       *  world differing by allegiance alone. */
       share(on: boolean): { ally: PlayerId; team: number } | null {
-        const ally = allyShip() ?? world.ships.find((s) => s.id !== LOCAL_PLAYER);
+        const ally = allyShip();
         if (!ally) return null;
         const mine = teamOf(world, LOCAL_PLAYER);
-        const theirs = world.ships.find((s) => !sameSide(world, LOCAL_PLAYER, s.id) && s.id !== ally.id);
+        const theirs = world.ships.find((s) => s.id !== ally.id && !sameSide(world, LOCAL_PLAYER, s.id));
         const enemyTeam = theirs ? teamOf(world, theirs.id) : mine + 1;
         const team = on ? mine : enemyTeam;
         ally.team = team;
