@@ -1,0 +1,34 @@
+<!doctype html>
+<!--
+  evidence/a0-41-crystalline-ore/scene.html — the ore field, drawn by the SHIPPED
+  renderer through real WebGL, so the a0-41 before/after is a photograph of the
+  game and not of an SVG that agrees with it.
+
+  It exists because the golden scenes cannot see this change: `?freeze=1` pins a
+  world at a tick with **zero ore chunks** (measured — `buildFrozenWorld` →
+  `advanceToFreezeTick` → `world.chunks.length === 0`), so all 50 goldens pass
+  unmoved and none of them is evidence of anything about ore. The GDD §4.3 stress
+  scene carries 120 chunks, so that is the scene this draws.
+
+  Served by the Vite DEV server, never by the production build: `vite.config.ts`
+  has a single implicit `index.html` entry and this adds no second one — the same
+  arrangement `spikes/atlas-pooling/bench.html` uses and for the same reason.
+
+  Driven by `capture.mjs`; open it by hand for a look.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>a0-41 — the ore field, shipped renderer</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #0d1015;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="module" src="./scene.ts"></script>
+  </body>
+</html>

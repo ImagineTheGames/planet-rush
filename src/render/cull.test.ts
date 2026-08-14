@@ -25,12 +25,20 @@ import { ShipClass } from '@shared/types';
 import { createWorld, damageStation } from '../sim';
 import type { Asteroid, OreChunk, Projectile, World } from '../sim';
 import { TURRET_MAX_TIER } from '../sim/constants';
-import { asteroidSprite } from '../art/asteroids';
+import { asteroidSprite, oreChunkSprite } from '../art/asteroids';
 import { shieldSprite, turretSprite, type TurretState } from '../art/buildings';
 import { shipSprite } from '../art/ships';
 import { SHOT_MAX_TIER, shotSprite } from '../art/vfx/shots';
 import { Renderer } from './index';
-import { CULL_SLOP, RENDER_EXTENT, cullBox, segmentTouchesBox, touchesBox, writeVisibleWorld } from './cull';
+import {
+  CULL_SLOP,
+  RENDER_EXTENT,
+  cullBox,
+  reachOf,
+  segmentTouchesBox,
+  touchesBox,
+  writeVisibleWorld,
+} from './cull';
 import type { Viewport } from '@platform/camera';
 
 /** A modest window, so "off screen" is a short distance away and the fixtures
@@ -393,15 +401,34 @@ describe('RENDER_EXTENT bounds every look its layer can wear', () => {
     bounds(widest, RENDER_EXTENT.shield, 'shield');
   });
 
-  it('ore chunks are drawn at exactly their collision radius', () => {
+  it('ore chunks, at every one of the four looks', () => {
+    let widest = 0;
+    for (let seed = 0; seed < 4; seed++) widest = Math.max(widest, oreChunkSprite(seed).extent);
+    bounds(widest, RENDER_EXTENT.chunk, 'ore chunk');
+  });
+
+  it("an ore chunk's painted mass is inside the reach the cull pads by", () => {
     const w = world();
     const radius = 6;
     w.chunks.push(chunk(1, CENTRE.x, CENTRE.y, radius));
 
     const [g] = drawn(render(w), 'chunks');
-    // `makeUnitChunk` is a unit circle scaled by the radius, so its art reaches
-    // exactly the collider and `RENDER_EXTENT.chunk` is 1 by construction.
-    expect(g!.getLocalBounds().width * g!.scale.x).toBeCloseTo(2 * radius * RENDER_EXTENT.chunk, 6);
+    const quad = g!.getLocalBounds().width * g!.scale.x;
+    // Since a0-41 a chunk is a POOLED SPRITE of `oreChunkSprite` rather than a
+    // unit `Graphics` circle, so two widths exist where one used to — and only
+    // one of them can pop at the screen edge:
+    //
+    //  - the PAINTED art reaches `extent · radius`, and `extent` is 1.05 because
+    //    the findability halo overhangs the collider. That is what the cull has
+    //    to contain, and it is what this asserts.
+    //  - the QUAD is that times `BAKE_MARGIN`, rounded UP to whole texture
+    //    pixels. On a chunk's small bake the rounding is worth another ~1% on
+    //    top of the 8%, so the quad's corner does sit outside `reachOf` — and
+    //    cannot show anything, because every texel out there is transparent by
+    //    construction (that is what the margin is: room for a hairline, not art).
+    const painted = 2 * radius * oreChunkSprite(0).extent;
+    expect(painted).toBeLessThanOrEqual(2 * reachOf(radius, RENDER_EXTENT.chunk));
+    expect(quad).toBeGreaterThan(painted);
   });
 
   it('pads by the bake margin, so a hairline on the boundary is never clipped', () => {
