@@ -668,8 +668,8 @@ test('golden: landscape phone BUILD WHEEL — a wedge under the THUMB, at 390 px
 // is as deterministic as the scenes above.
 //
 // What each baseline is FOR, so a reviewer knows what a diff means:
-//   · the four-line upgrade stack — name / the stat this tier moves / `cost/held`
-//     / the ladder pips;
+//   · the four-line upgrade stack — name / the stat this tier moves / the cost,
+//     one number (a0-41) / the ladder pips;
 //   · the cost numeral in BOTH of its ratified colours — signal yellow at 99 ore
 //     where every track is payable, threat red at 1 ore where none is;
 //   · `OPEN ▸` on the WEAPON wedge, in the same slot as the build wheel's, with
@@ -716,7 +716,9 @@ async function bootFrozenUpgradeWheel(page: Page, ore: number): Promise<void> {
   const engine = wedges.find((w) => w.label === 'ENGINE');
   const weapon = wedges.find((w) => w.label === 'WEAPON');
   expect(engine?.stat, 'the ENGINE wedge is drawing its stat line (u7-06)').toMatch(/^\d+% ?→ ?\d+%$/);
-  expect(engine?.costLabel, 'the ENGINE wedge prices its next tier as cost/held').toBe(`3/${ore}`);
+  // One number, on this page and on the sub-page behind WEAPON (a0-41): the
+  // price alone, with payability said in `costPaint` below and nowhere else.
+  expect(engine?.costLabel, 'the ENGINE wedge prices its next tier as one bare number').toBe('3');
   expect(engine?.tiers, 'the ENGINE wedge pips its ladder position').toMatch(/^[●○]+$/);
   expect(engine?.costPaint, 'the cost numeral takes the colour its state ratifies').toBe(
     ore >= 3 ? 'ore' : 'refused',

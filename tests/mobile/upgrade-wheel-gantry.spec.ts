@@ -23,7 +23,8 @@
  * What it proves, per profile and in both orientations:
  *
  *  1. Reaching UPGRADE SHIP through a real press draws the Gantry stack: the
- *     name, the stat this tier moves, `cost/held`, and the ladder pips.
+ *     name, the stat this tier moves, the cost as one number (a0-41), and the
+ *     ladder pips.
  *  2. The cost numeral takes BOTH of its ratified colours off the same wedge —
  *     signal yellow while it is payable, threat red the moment it is not
  *     (style-guide §2.1) — and nothing else on the wheel takes red.
@@ -366,7 +367,9 @@ function expectStackedWedge(w: DrawnUpgradeWedge, radius: number, label: string)
   expect(w.stat, `[${label}] ${w.label} drew no stat line — this is the screen stats live on`).toMatch(
     statPattern(radius),
   );
-  expect(w.costLabel, `[${label}] ${w.label} must price its next tier as cost/held`).toMatch(/^\d+\/\d+$/);
+  // The price alone — no denominator, on this level or the one behind WEAPON
+  // (a0-41). Whether it can be paid is `costPaint`'s job, asserted separately.
+  expect(w.costLabel, `[${label}] ${w.label} must price its next tier as one bare number`).toMatch(/^\d+$/);
   expect(w.tiers, `[${label}] ${w.label} must pip where it sits on its ladder`).toMatch(/^[●○]+$/);
   expect(
     w.tiers.length,
@@ -404,6 +407,8 @@ test.describe('the Gantry/Bone upgrade wedge, through the real click path (u7-06
       expect(w.costPaint, `[${label}] ${w.label} is payable at 99 ore`).toBe('ore');
       expect(w.ready, `[${label}] ${w.label} should draw bright`).toBe(true);
     }
+    // Keep the prices this frame quoted, to hold the short frame below to them.
+    const pricedAt99 = new Map(all.filter((w) => w.kind === 'track').map((w) => [w.label, w.costLabel]));
 
     // The WEAPON wedge fills the same slots differently: its stat line is a pip
     // row per weapon track, and it quotes OPEN ▸ where the others quote a price —
@@ -416,12 +421,19 @@ test.describe('the Gantry/Bone upgrade wedge, through the real click path (u7-06
       /^DAMAGE [●○]+\n *SPEED [●○]+$/,
     );
 
-    // --- Short: the same numerals, in threat red (style-guide §2.1) ---------
-    // 1 ore pays for nothing on this ladder (the cheapest tier is 2).
+    // --- Short: the SAME numerals, in threat red (style-guide §2.1) ---------
+    // 1 ore pays for nothing on this ladder (the cheapest tier is 2). "The same
+    // numerals" is now literal (a0-41): a price is a function of the PRICE and
+    // affordability is a function of the WALLET, two channels with one job each,
+    // so the string must not have moved between 99 ore and 1 — only the paint.
     await setOre(page, 1);
     all = await drawnWedges(page);
     for (const w of all.filter((x) => x.kind === 'track')) {
-      expect(w.costLabel, `[${label}] ${w.label} re-prices against the bank`).toMatch(/^\d+\/1$/);
+      expect(w.costLabel, `[${label}] ${w.label} must price its tier as one bare number`).toMatch(/^\d+$/);
+      expect(
+        w.costLabel,
+        `[${label}] ${w.label} re-priced itself against the bank — the wallet is the COLOUR's job`,
+      ).toBe(pricedAt99.get(w.label));
       expect(w.costPaint, `[${label}] ${w.label} cannot be paid for at 1 ore`).toBe('refused');
       expect(w.ready, `[${label}] an unaffordable wedge draws dark, with a reason`).toBe(false);
       // The carve-out's limit: red is spent ONLY on a numeral whose price is out

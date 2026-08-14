@@ -1,0 +1,78 @@
+{
+  "mainWheelAt8": [
+    {
+      "label": "WEAPON",
+      "cost": "OPEN ▸",
+      "paint": "none",
+      "stat": "DAMAGE ○○○\nSPEED ○○",
+      "tiers": ""
+    },
+    {
+      "label": "ENGINE",
+      "cost": "3",
+      "paint": "ore",
+      "stat": "100% → 115%",
+      "tiers": "○○○"
+    },
+    {
+      "label": "CARGO",
+      "cost": "2",
+      "paint": "ore",
+      "stat": "2 → 4",
+      "tiers": "○○○"
+    },
+    {
+      "label": "HULL",
+      "cost": "3",
+      "paint": "ore",
+      "stat": "50 → 60",
+      "tiers": "○○○"
+    }
+  ],
+  "weaponSubWheelAt8": [
+    {
+      "label": "DAMAGE",
+      "cost": "4",
+      "paint": "ore",
+      "stat": "10 → 13",
+      "tiers": "○○○"
+    },
+    {
+      "label": "SPEED",
+      "cost": "8",
+      "paint": "ore",
+      "stat": "100% → 115%",
+      "tiers": "○○"
+    }
+  ],
+  "mainWheelShort": [
+    {
+      "label": "WEAPON",
+      "cost": "OPEN ▸",
+      "paint": "none",
+      "stat": "DAMAGE ○○○\nSPEED ○○",
+      "tiers": ""
+    },
+    {
+      "label": "ENGINE",
+      "cost": "3",
+      "paint": "refused",
+      "stat": "100% → 115%",
+      "tiers": "○○○"
+    },
+    {
+      "label": "CARGO",
+      "cost": "2",
+      "paint": "refused",
+      "stat": "2 → 4",
+      "tiers": "○○○"
+    },
+    {
+      "label": "HULL",
+      "cost": "3",
+      "paint": "refused",
+      "stat": "50 → 60",
+      "tiers": "○○○"
+    }
+  ]
+}

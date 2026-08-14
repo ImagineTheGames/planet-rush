@@ -1178,8 +1178,10 @@ function upgradeWedgesOf(signals: UpgradeWheelSignals, ladder: UpgradeLadder, or
  * The frame that makes every upgrade line as long as it can be at once: the
  * HAULER (the widest class bases, so the biggest printed values), one tier off
  * the top of every ladder (so both a three-digit current AND a three-digit next
- * are printed side by side), and a late-match three-digit hoard so `cost/held`
- * is at its widest.
+ * are printed side by side), and a late-match three-digit hoard, which prices
+ * every track payable so no wedge drops out of the measurement. Since a0-41 the
+ * hoard no longer widens the cost line — that is the price alone, and the price
+ * comes from the ladder's top rung, which this frame is one tier below.
  */
 const WORST_UPGRADE: UpgradeWheelSignals = {
   open: true,

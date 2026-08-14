@@ -19,6 +19,12 @@
  * drift means "the button lies about the sim." So it is ONE helper now: the
  * boundary is decided here, in a single expression, and both wheels move with it
  * — the "same helper, one fix" the field report asked for.
+ *
+ * It also holds the other half of that answer: {@link costNumeral}, how a price
+ * is *written* once the affordability question has been answered in colour. The
+ * two belong together because they are the same decision seen twice — the wheels
+ * say "can you pay?" exactly once, in the numeral's paint, and therefore the
+ * numeral itself is free to be nothing but the price.
  */
 
 /**
@@ -37,4 +43,30 @@ export const AFFORD_EPSILON = 1e-9;
  */
 export function affordable(ore: number, cost: number): boolean {
   return ore + AFFORD_EPSILON >= cost;
+}
+
+/**
+ * A price, as either wheel writes it: **the cost, and nothing else** — `"3"`.
+ *
+ * No denominator. Whether the player can *pay* it is carried by the numeral's
+ * colour — yellow payable, red not (`./wheel-stack`'s `costPaintFor` and
+ * `upgradeCostPaint`, both driven by {@link affordable} above) — so the
+ * affordability answer is said once, in the channel the developer ratified for
+ * it on 2026-08-07, and how much ore the player holds stays where it belongs:
+ * the wheel's hub.
+ *
+ * This lives here, next to the boundary rule, because it is one grammar across
+ * one control: the Build wheel and the Upgrade wheel are the same radial menu at
+ * different levels (style-guide §2.1), and a rule stated twice is a rule that
+ * reaches one page and not the next — which is exactly how the Upgrade wheel and
+ * its WEAPON sub-wheel went on quoting `cost/held` for six days after the Build
+ * wheel stopped (developer, 2026-08-13: *"it got done on the page before this
+ * one but none of the sub pages"*). One function, every page.
+ *
+ * Each wheel keeps its own word for a wedge with no price left to quote — the
+ * Build wheel's `FULL`, the Upgrade wheel's `MAX` — because those are nouns for
+ * a state, not prices. Only the numeral's shape is shared.
+ */
+export function costNumeral(cost: number): string {
+  return `${cost}`;
 }

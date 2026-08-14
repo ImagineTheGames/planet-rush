@@ -47,21 +47,23 @@
  *
  *   ENGINE            ← the words                  (label)
  *   111% → 123%       ← the stat this tier moves    ({@link UpgradeWedge.statLabel})
- *   12/8              ← cost over spendable ore     ({@link UpgradeWedge.costLabel})
+ *   12                ← what the next tier costs    ({@link UpgradeWedge.costLabel})
  *   ●●○               ← where the track sits on its ladder ({@link UpgradeWedge.tierLabel})
  *
  * All three are **strings**, never numbers, and that is deliberate rather than
  * incidental: the wedge's only *numeric* fields stay `cost`, `tier`, `maxTier`
  * and `angle`, so nothing merely printed here can be mistaken for something
- * spendable. It is the same door the Build wheel's `cost/held` and `2 / 4 BUILT`
- * lines ship through.
+ * spendable. It is the same door the Build wheel's cost and `2 / 4 BUILT` lines
+ * ship through.
  *
  * Two of them are new, and both are the Build wheel's answer rather than a new
- * one. `cost/held` is that wheel's grammar for "what it costs, over what you
- * hold" — the wedge that dims stops being a mystery, because the numbers already
- * say why. The pips are the summary this wheel already drew on its WEAPON wedge,
- * extended to every track: "how many rungs are left" is half of a comparison
- * between two upgrades, and this screen is where that comparison is made.
+ * one. The cost line is that wheel's grammar for a price: **one number, the
+ * cost**, with "can you pay it?" said in the numeral's colour and "how much do
+ * you hold?" left to the hub (`./affordability`'s `costNumeral`, shared with the
+ * Build wheel so the two levels of this menu cannot answer differently). The
+ * pips are the summary this wheel already drew on its WEAPON wedge, extended to
+ * every track: "how many rungs are left" is half of a comparison between two
+ * upgrades, and this screen is where that comparison is made.
  *
  * ── DATA-DRIVEN OFF THE LADDER (so new tracks appear for free) ──────────────
  * {@link upgradeWheelModel} builds one wedge per entry in the ladder's track
@@ -76,7 +78,7 @@
 
 import { ShipClass } from '@shared/types';
 import { CARGO_CAP_MAX, SHIP_STATS, UPGRADES } from '../sim/constants';
-import { affordable } from './affordability';
+import { affordable, costNumeral } from './affordability';
 import { hubBack } from './wheel-nav';
 import type { HubBack } from './wheel-nav';
 
@@ -289,8 +291,8 @@ export function formatTrackValue(value: number, format: TrackFormat): string {
 // ---------------------------------------------------------------------------
 //
 // Everything below composes a line a wedge draws. All of it returns strings, and
-// that is the same discipline the Build wheel's `cost/held` and `2 / 4 BUILT`
-// lines were built with (u7-02, `./build-wheel`): a wedge shows several numbers
+// that is the same discipline the Build wheel's cost and `2 / 4 BUILT` lines
+// were built with (u7-02, `./build-wheel`): a wedge shows several numbers
 // and carries exactly one *numeric field*, so nothing that is merely printed can
 // be mistaken by a caller for something spendable.
 
@@ -318,16 +320,17 @@ export function statLabelOf(current: string, next: string | null, compact = fals
 }
 
 /**
- * The cost line: `cost/held` — what the next tier costs over the ore the player
- * can actually spend. A finished ladder has no price to quote and takes
- * {@link MAXED_COST} instead.
+ * The cost line: **the cost, and nothing else** — `"12"`. A finished ladder has
+ * no price to quote and takes {@link MAXED_COST} instead.
  *
- * `held` is floored, because it is the same number the hub prints and the hub
- * floors it (`upgradeWheelModel`): a wheel that quoted `12/7.6` in one place and
- * `7` in the other would be disagreeing with itself about the player's wallet.
+ * The numeral's shape is {@link costNumeral}'s call, shared with the Build wheel
+ * (`./affordability`) so this wheel and its WEAPON sub-wheel cannot drift from
+ * the page in front of them. Whether the price can be paid is said in the
+ * numeral's COLOUR (`./wheel-stack`'s `upgradeCostPaint`), never in a second
+ * number, and how much ore the player holds stays in the hub.
  */
-export function costLabelOf(cost: number, ore: number): string {
-  return `${cost}/${Math.floor(Math.max(0, ore))}`;
+export function costLabelOf(cost: number): string {
+  return costNumeral(cost);
 }
 
 /** Filled-vs-empty pips for a position on a ladder: `"●●○"` at tier 2 of 3.
@@ -438,8 +441,8 @@ export interface UpgradeWedge {
    *
    * A **string**, and that is load-bearing rather than incidental: {@link current}
    * and {@link next} stay exactly what they were, and the composed line ships
-   * through the same door the Build wheel's `cost/held` and `2 / 4 BUILT` lines
-   * use (`./build-wheel`, u7-02). No second numeric field is added to a wedge, so
+   * through the same door the Build wheel's cost and `2 / 4 BUILT` lines use
+   * (`./build-wheel`, u7-02). No second numeric field is added to a wedge, so
    * no rate or stat can leak into one. `''` on the WEAPON wedge, whose stat line
    * is its pip rows.
    */
@@ -452,17 +455,17 @@ export interface UpgradeWedge {
    */
   readonly statLabelCompact: string;
   /**
-   * The cost line, in the Build wheel's own grammar (u7-02): **`cost/held`** —
-   * what the next tier costs over what the player can actually spend (`"12/8"`),
-   * or `"MAX"` on a finished ladder, where there is no price to quote because
-   * there is nothing left to buy. `null` on the WEAPON wedge, which opens a
-   * screen rather than spending.
+   * The cost line, in the Build wheel's own grammar (u7-02, a0-03): **the cost,
+   * and nothing else** — `"12"` — or `"MAX"` on a finished ladder, where there is
+   * no price to quote because there is nothing left to buy. `null` on the WEAPON
+   * wedge, which opens a screen rather than spending.
    *
    * A string, for the same reason the Build wheel's is; {@link cost} stays the
-   * single numeric truth underneath it. The second half is not new information —
-   * it is the same spendable total the hub already prints, restated at the point
-   * of decision, so a player looking at a red `12/8` knows they are four ore
-   * short without the wheel having to say so in words.
+   * single numeric truth underneath it. There is no denominator: a player
+   * looking at a red `12` already knows they cannot pay it, because red is what
+   * this wheel says "you cannot pay this" with ({@link state}, painted by
+   * `./wheel-stack`'s `upgradeCostPaint`), and how much they hold is the hub's
+   * line, printed once.
    */
   readonly costLabel: string | null;
   /**
@@ -721,7 +724,7 @@ export function upgradeWedge(
     // A ladder rung with no price in its `costs` array is malformed rather than
     // finished, and it is already refused by the `unaffordable` state above — so
     // it quotes nothing rather than claiming to be MAX.
-    costLabel: cost === null ? null : costLabelOf(cost, signals.ore),
+    costLabel: cost === null ? null : costLabelOf(cost),
     tierLabel: tierPips(tier, maxTier),
     angle,
   };

@@ -15,7 +15,7 @@
  *
  *     ENGINE            ← the name, Audiowide
  *     111% → 123%       ← the stat this tier moves (GDD §2.5)
- *     12/8              ← cost over spendable ore
+ *     12                ← the cost; yellow if payable, red if not (a0-41)
  *     ●●○               ← where this track sits on its ladder
  *
  * The *drawing* of both is `./build-wheel-view`, which needs PixiJS. The
@@ -166,7 +166,7 @@ export function buildWedgeLines(
 //   ------   --------------------   -------------------------------------------
 //   name     TURRET                 ENGINE                (Audiowide, wraps)
 //   sub      YOUR STATION           111% → 123%           (the stat — GDD §2.5)
-//   cost     3/4  ·  FULL  ·  OPEN ▸   12/8  ·  MAX  ·  OPEN ▸
+//   cost     3  ·  FULL  ·  OPEN ▸    12  ·  MAX  ·  OPEN ▸   (one numeral, a0-41)
 //   detail   2 / 4 BUILT            ●●○                   (position on a ladder)
 //
 // One consequence worth stating out loud, because it is the sharpest constraint
@@ -216,7 +216,7 @@ export function upgradeWedgeLines(wedge: UpgradeWedge, m: WheelProfile): readonl
     });
   }
 
-  // Line 3 — `cost/held`, `MAX`, or the words that say this one opens a screen.
+  // Line 3 — the cost, `MAX`, or the words that say this one opens a screen.
   const cost = upgradeCostWords(wedge);
   if (cost !== null) {
     lines.push({
@@ -253,10 +253,12 @@ export function statWords(wedge: UpgradeWedge, m: WheelProfile): string {
   return m.copy === 'compact' ? wedge.statLabelCompact : wedge.statLabel;
 }
 
-/** What the upgrade wedge's cost slot draws: `cost/held`, `MAX`, or the words
+/** What the upgrade wedge's cost slot draws: the bare cost, `MAX`, or the words
  *  that say this wedge opens a screen (the WEAPON wedge — the same `OPEN ▸` the
  *  Build wheel's UPGRADE SHIP carries, in the same slot, so the one affordance
- *  that means "there is another screen behind this" looks identical on both). */
+ *  that means "there is another screen behind this" looks identical on both).
+ *  Like {@link costWords}, the cost is one numeral since a0-41 — on this wheel
+ *  AND on the WEAPON sub-wheel, which this same function feeds. */
 export function upgradeCostWords(wedge: UpgradeWedge): string | null {
   if (wedge.kind === 'weapon') return OPENS_SCREEN;
   return wedge.costLabel;

@@ -20,7 +20,7 @@ The current UI is 1px hairlines on black, which reads as a wireframe rather than
 
 - **Bone accent** — the primary action is simply the brightest plate on screen. It spends no colour on the menu, which leaves the palette's hues free to mean things during a match.
 - **Type, spacing and beam treatment** are consistent across all five screens: 44px margins, 92px header/footer beams.
-- **Build wheel** shows cost as `cost/held` (yellow when affordable, red when not) — no "need 2 more" copy, because the numbers already say it.
+- **Build wheel** shows cost as `cost/held` (yellow when affordable, red when not) — no "need 2 more" copy, because the numbers already say it. ***Superseded: the shipped build menu shows the COST ALONE, on every page of it.*** The developer retracted the denominator on the build wheel 2026-08-07 (a0-03) and on the upgrade wheel and its WEAPON sub-wheel 2026-08-13 (a0-41). The colour is the whole of what the denominator was saying, and what the player holds is the hub's line. See GDD §2.5 and `docs/design-amendments.md`.
 - **Lobby**: slots are `OPEN` / `CLOSED` buttons on the far left of each row; teams are `T1`–`T8` chips with a FREE FOR ALL / TEAMS toggle, so FFA is just eight teams. Identity colours live on the row bar and P-number only, never as a background wash — that was making identity read as chrome.
 
 ## Audio — please listen before reading the table
