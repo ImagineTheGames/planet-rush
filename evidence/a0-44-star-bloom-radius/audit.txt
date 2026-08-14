@@ -1,0 +1,44 @@
+a0-44 — the star bloom is smaller than its own spikes
+====================================================
+
+1. the inequality the brief is about
+   design   halo 11.24 r   spike 6.97 r   halo/spike 1.613
+   shipped  halo 4.30 r   spike 5.20 r   halo/spike 0.827   ← the cross is OUTSIDE the glow
+   halo area, design ÷ shipped = 6.83×
+
+2. the halo peak alpha
+   design   0.42 × 0.48 = 0.2016, absolute, on every bloomed star
+   shipped  starAlpha × 0.48 over the bloomed population (mag 0.86–1,
+            alpha 0.4412–0.5000) = 0.2118–0.2400
+
+3. the falloff shape — the design’s 0.35 stop against falloffProfile
+   t       design   falloffProfile
+   0.00    1.0000   1.0000
+   0.10    0.8027   0.9801
+   0.20    0.6054   0.9216
+   0.35    0.3095   0.7700
+   0.50    0.2381   0.5625
+   0.62    0.1810   0.3790
+   0.75    0.1190   0.1914
+   0.90    0.0476   0.0361
+   1.00    0.0000   0.0000
+   optical mass (fraction of a flat disc): design 0.1801  falloffProfile 0.3333
+   → falloffProfile carries 1.85× the design’s light in the same disc
+   equal-mass falloffProfile radius = 8.26 r
+
+4. the design instrument, one panel of stars (p99 is the design’s 46–53)
+   rule                                                    p99    peak    lift   halo cover
+   shipped (4.3 r, frac alpha, falloffProfile)             49.41   142.3    1.16     3.3%
+   radius only (11.24 r, frac alpha)                       70.26   142.3    4.82    19.6%
+   a0-44 (11.24 r, absolute 0.2016, falloffProfile)        66.88   142.3    4.39    19.6%
+   the design itself (11.24 r, absolute, design stops)     47.88   142.3    2.63    19.6%
+
+
+  the design's band: p99 46–53
+
+  mockup panel (the design)          p99  47.88   peak  142.3   lift  2.63
+  ported (the game, a0-22 tints)     p99  45.90   peak  157.8   lift  2.78
+  ported, halos untinted             p99  47.86   peak  157.8   lift  3.13
+
+  the tint's share of the gap: 1.96 of p99
+
