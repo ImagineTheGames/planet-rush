@@ -737,7 +737,8 @@ the same is now true of the grammar. Flagged in GDD §2.5's own upgrade-wheel
 bullet rather than fixed unilaterally.
 
 > **ANSWERED 2026-08-13 — the denominator goes, on every page.** See *"The cost
-> is ONE number on EVERY page of the build menu"* below.
+> is ONE number on EVERY page of the build menu"* at the top of this file (a0-41).
+> This file runs newest-first, so the entry that closes this one sits above it.
 
 **Related, and being tracked with a0-08.** a0-08 is investigating *"sometimes
 picked up ore from dead ships dont count."* Looting raises `cargo`, not `banked`,
