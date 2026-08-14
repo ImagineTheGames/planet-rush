@@ -8,6 +8,79 @@ half of these amendments; this file is the human-readable why.
 
 ---
 
+## In TEAMS, the fog lifts where your teammates are
+
+**Date:** 2026-08-13 · branch `agent/gameplay/a0-42-team-shared-fog`
+**Ratified by:** Developer (Reinaldo)
+**Amends:** GDD §2.2 (the minimap sentence gains a Teams clause) and §2.1 (shared
+vision joins the list of what allegiance buys). **FFA is unchanged.**
+
+### The ratification, verbatim
+
+> "when playing on a team the fog of war should lift where your team mates are it
+> should be like as if you were there...."
+
+### The reasoning
+
+**Sides that cannot see for each other cannot coordinate.** Everything else
+allegiance buys is already shared — friendly fire is off, turrets and auto-aim
+ignore allies, teammates spawn adjacent, and the under-attack alarm rings for a
+teammate's home on exactly this predicate (`src/sim/allegiance.ts` `sameSide`,
+the paragraph at :59–69). A team whose members each carried a private map was the
+one place the model stopped short: you could hear your ally's siege and not see
+the attacker your ally was looking straight at.
+
+**"As if you were there" is the whole standard, and it sets the scope.** A
+teammate's coverage gives you what your own coverage would give you in the same
+spot — the **live dots** under it *and* the **remembered geography** it uncovers.
+Sharing the discs alone would have half-shipped it: the teammate's radar would
+reveal ships and forget the ore field it flew over, which is not being there, it
+is watching a camera. So all three reads union — coverage, the remembered-station
+mask, and the scouted-ore ids.
+
+### What changed
+
+- `src/sim/sensing.ts` gains `teamMembers`, `teamSensorSources`,
+  `teamRememberedStationMask` and `teamRememberedOreIds`, and `sensedState` reads
+  the union. `src/main.ts` `feedMinimapFog` feeds the minimap all three.
+- An ally's coverage disc is now one of the discs the minimap draws, which is what
+  makes the reveal legible: you see what your team's radar buys you.
+
+### What did NOT change — and how that is proved rather than promised
+
+- **FFA, in any respect.** `createWorld` defaults every player's `team` to their
+  own id, so **FFA is teams-of-one** and a union over `sameSide` collapses to
+  "self" with **no mode check anywhere** — there is no `mode === 'teams'` branch
+  in the sensing module, by design. `src/sim/team-sensing.test.ts` reimplements
+  the pre-change per-player read model as an oracle and asserts `sensedState` is
+  field-for-field identical to it over a real FFA match, every viewer, every tick;
+  the FFA `frozen` goldens are untouched.
+- **The write side.** `updateSensory` still folds each player's own coverage into
+  that player's own record. The union is **read-time only**, so `world.sensory`
+  stays the honest log of who actually saw what, no player's memory depends on
+  another player's tick, and the determinism hash does not move.
+- **The live/remembered split.** A teammate's coverage is never *remembered* as
+  live dots: the tick their ship dies, their disc is gone and everything only
+  under it drops — the same collapse a killed radar satellite has always had.
+- **The wire.** Snapshots already stream every ship and projectile to every
+  client; fog is a client-side read over the replicated world. Widening a read
+  costs no bytes and no hash — and it follows that **fog is not an anti-cheat
+  boundary today**, which is worth writing down so nobody defends it as one.
+- **Friendly fire, targeting, and the alarm.** `sameSide` is a read here; nothing
+  about who may shoot whom moved.
+
+### Flagged, not fixed: the bot symmetry gap
+
+GDD §2.9's invariant is *"symmetry, not blindness"* — a bot must perceive what a
+human in its cockpit could. After this ships, a human team shares vision
+**instantly** through the minimap, while allied bots trade what they saw over
+`src/bots/radio.ts` at a per-tier latency with a miss roll, and the `sighting`
+callout that would carry "enemy here" is **not implemented yet**
+(`docs/team-bots-plan.md` §2.2). The gap is real and it is the Bot Engineer's
+file; the Director briefs it separately.
+
+---
+
 ## The cost is ONE number on EVERY page of the build menu
 
 **Date:** 2026-08-13 · branch `agent/ui/a0-41-cost-rule-every-page`
