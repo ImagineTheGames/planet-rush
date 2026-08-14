@@ -19,7 +19,7 @@ import { describe, expect, it } from 'vitest';
 import { ShipClass } from '@shared/types';
 import { createWorld, shipTopSpeed, step, type World } from '../../sim';
 import { TELL, TELL_NAMES, TellQueue } from '../tells';
-import { REPAIR_PULSE_S, SPAWN_PULSE_S, WorldObserver, type WorldView } from './observer';
+import { REPAIR_PULSE_S, SPAWN_PULSE_S, THRUST_DEADZONE, WorldObserver, type WorldView } from './observer';
 
 /** The compile-time half: a real World *is* a WorldView, or this file fails tsc. */
 function asView(world: World): WorldView {
@@ -281,8 +281,12 @@ describe('WorldObserver — deriving the moments', () => {
     // not as a 1 the moment it clears the deadzone.
     const half = diff(world({ ships: [ship()] }), world({ ships: [ship({ thrust: 0.5 })] }));
     expect(magnitudeOf(half, TELL.thrust)).toBeCloseTo(0.5, 5);
-    const nudge = diff(world({ ships: [ship()] }), world({ ships: [ship({ thrust: 0.01 })] }));
-    expect(nudge.has(TELL.thrust)).toBe(false); // deadzone: a stick at rest is not an engine
+    // The deadzone is the trail's only remaining tuning: a stick this close to
+    // rest is a thumb leaving it, not an engine.
+    const nudge = diff(world({ ships: [ship()] }), world({ ships: [ship({ thrust: THRUST_DEADZONE / 2 })] }));
+    expect(nudge.has(TELL.thrust)).toBe(false);
+    const open = diff(world({ ships: [ship()] }), world({ ships: [ship({ thrust: THRUST_DEADZONE })] }));
+    expect(open.has(TELL.thrust)).toBe(true);
   });
 
   it('still thrusting at top speed', () => {
