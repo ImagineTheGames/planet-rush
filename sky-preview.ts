@@ -72,12 +72,13 @@ import {
   mockupBlobs,
   starAlpha,
   starBlooms,
+  starHaloAlpha,
   starMagnitude,
   starRadius,
   starRampColor,
   type MockupSkyId,
 } from './src/art/mockup-reference';
-import { falloffProfile, inkAlphaAt, type Shape } from './src/art/shapes';
+import { falloffProfile, haloProfile, inkAlphaAt, type Shape } from './src/art/shapes';
 import { drawSprite } from './src/art/textures';
 import { hex } from './src/art/palette';
 import { mulberry32 } from './src/shared/types';
@@ -193,7 +194,9 @@ export function sampleMockup(
           let a = 0;
           if (d <= st.r) a = st.alpha;
           else if (st.halo > 0 && d <= st.halo) {
-            a = st.alpha * MOCKUP_STARS.bloom.intensity * falloffProfile(d / st.halo);
+            // The design's halo: an ABSOLUTE peak (the same on every bloomed
+            // star) on the design's own three-stop curve (a0-44).
+            a = starHaloAlpha() * haloProfile(d / st.halo);
           }
           if (a <= 0) continue;
           const [sr, sg, sb] = unpack(st.color);
@@ -296,14 +299,15 @@ export function paintMockupPanel(
   const paintStars = (): void => {
     for (const st of mockupStarPoints(seed, width, height)) {
       if (st.halo > 0) {
+        // **The design's own three stops, written the way the design writes
+        // them** — `0 → 0.42·inten`, `0.35 → 0.13·inten`, `1 → 0` — rather than
+        // a curve sampled five times. Canvas interpolates stops linearly, so
+        // this panel now paints the design's glow exactly and not a fit of it.
         const grad = ctx.createRadialGradient(st.x, st.y, 0, st.x, st.y, st.halo);
-        for (let s = 0; s <= 4; s++) {
-          const t = s / 4;
-          grad.addColorStop(
-            t,
-            withAlpha(hex(st.color), st.alpha * MOCKUP_STARS.bloom.intensity * falloffProfile(t)),
-          );
-        }
+        const knee = MOCKUP_STARS.bloom.knee;
+        grad.addColorStop(0, withAlpha(hex(st.color), starHaloAlpha()));
+        grad.addColorStop(knee.at, withAlpha(hex(st.color), knee.alpha));
+        grad.addColorStop(1, withAlpha(hex(st.color), 0));
         ctx.fillStyle = grad;
         ctx.beginPath();
         ctx.arc(st.x, st.y, st.halo, 0, Math.PI * 2);

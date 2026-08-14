@@ -158,6 +158,7 @@ import {
   mockupBlobs,
   starAlpha,
   starBlooms,
+  starHaloAlpha,
   starMagnitude,
   starRadius,
   type MockupSkyId,
@@ -1196,7 +1197,11 @@ export function starFieldSprite(
     // halo takes the ink's tint if it has one, the ink's own colour if not
     // (a0-22; {@link BLOOM_TINTS}).
     if (starBlooms(mag)) {
-      const haloAlpha = round(alpha * BLOOM.intensity);
+      // The halo's peak is the design's own absolute alpha — the SAME wash on
+      // every bloomed star, whatever its own alpha (a0-44; `starHaloAlpha`). The
+      // star's magnitude is carried by the halo's RADIUS, which is the design's
+      // arrangement and not the one that shipped.
+      const haloAlpha = round(starHaloAlpha());
       const haloR = round(r * BLOOM.radius);
       if (haloAlpha > 0 && haloR > 0) {
         shapes.push(
@@ -1210,6 +1215,11 @@ export function starFieldSprite(
               rx: haloR,
               ry: haloR,
               angle: 0,
+              // A glow, not a body: the design's own three-stop gradient
+              // (`./shapes` `haloProfile`). It is the one falloff in the art
+              // that is not `(1 − t²)²`, and the measurement that earns the
+              // exception is on that curve.
+              curve: 'halo',
             }),
           ),
         );

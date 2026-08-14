@@ -60,13 +60,17 @@ import {
   MOCKUP_SKY_IDS,
   MOCKUP_STARS,
   MOCKUP_STAR_DENSITY,
+  haloKneeAlphaOf,
+  haloPeakAlphaOf,
+  haloRadiusOf,
   mockupBlobs,
   mockupCount,
+  spikeLengthOf,
   starAlpha,
   starRadius,
   type MockupSkyId,
 } from './mockup-reference';
-import { measure, sampleShapes, colorLuma } from '../../sky-preview';
+import { measure, sampleMockup, sampleShapes, colorLuma } from '../../sky-preview';
 import { MAPS } from '../sim/maps';
 import {
   assertPaletteCompliance,
@@ -78,7 +82,14 @@ import {
 } from './compliance';
 import { DERIVED, FLOOR, IDENTITY_COLORS, PALETTE, hex } from './palette';
 import { pointInPoly } from './raster';
-import { inkAlphaAt, type Shape, type SpriteDef } from './shapes';
+import {
+  HALO_KNEE_AT,
+  falloffProfile,
+  haloProfile,
+  inkAlphaAt,
+  type Shape,
+  type SpriteDef,
+} from './shapes';
 import { ALL_SPRITES } from './catalogue';
 
 /** The field every sky's **cost** is measured over — a 16:9 landscape field, the
@@ -700,12 +711,37 @@ describe('the built sky IS the design (a0-40)', () => {
       'the three layers sum to the design’s density',
     ).toBeCloseTo(MOCKUP_STAR_DENSITY, 0);
 
+    // **The design's own field, on the design's own instrument** — the band is
+    // the design's, so this is the panel that has to sit in it.
+    const ground = colorLuma(MOCKUP_GROUND);
+    const design = measure(sampleMockup('none', VOID_SEED, PANEL.w, PANEL.h), ground);
     const field = STAR_LAYERS.flatMap((l) => [...starFieldSprite(l, VOID_SEED, PANEL.w, PANEL.h).shapes]);
-    const m = measure(sampleShapes(field, false, MOCKUP_GROUND, PANEL.w, PANEL.h), colorLuma(MOCKUP_GROUND));
+    const m = measure(sampleShapes(field, false, MOCKUP_GROUND, PANEL.w, PANEL.h), ground);
     // eslint-disable-next-line no-console
-    console.log(`  star field: p99 ${m.p99} (design ${MOCKUP_STARS.peakP99.min}–${MOCKUP_STARS.peakP99.max}), peak ${m.peak}, lift ${m.lift}`);
-    expect(m.p99, `star p99 ${m.p99}`).toBeGreaterThanOrEqual(MOCKUP_STARS.peakP99.min);
-    expect(m.p99, `star p99 ${m.p99}`).toBeLessThanOrEqual(MOCKUP_STARS.peakP99.max);
+    console.log(
+      `  star field: design panel p99 ${design.p99} (design ${MOCKUP_STARS.peakP99.min}–${MOCKUP_STARS.peakP99.max}),` +
+        ` game p99 ${m.p99}, peak ${m.peak}, lift ${m.lift}`,
+    );
+    expect(design.p99, `the design's own p99 ${design.p99}`).toBeGreaterThanOrEqual(
+      MOCKUP_STARS.peakP99.min,
+    );
+    expect(design.p99, `the design's own p99 ${design.p99}`).toBeLessThanOrEqual(
+      MOCKUP_STARS.peakP99.max,
+    );
+    // **And the game's field against the design's, within 5%** — the same
+    // tolerance every sky's `lift` is held to a few tests below, and it is a
+    // tolerance rather than the band itself for one measured reason, reported
+    // rather than absorbed (a0-44): the game's blooms are TINTED (a0-22), and
+    // cyan and patina are less luminous than the white the design's ramp tops
+    // out at. Measured by forcing every halo back onto the ramp's own colour,
+    // the tint costs **1.96 of p99** — 45.90 against 47.86 — and every bit of the
+    // gap between the two panels is that. It is a real cost and it is new at this
+    // size, because a0-44's halo covers 6.8× the area a0-40's did; before the
+    // correction the same tint moved the number by less than half a point.
+    expect(
+      Math.abs(m.p99 - design.p99) / design.p99,
+      `the game's star field reads p99 ${m.p99} against the design's ${design.p99}`,
+    ).toBeLessThan(0.05);
   });
 
   it('lifts each panel by what the design lifts it — the number the brief is about', () => {
@@ -909,6 +945,121 @@ describe('bloom — the brightest stars, and the whole field is 16× denser (a0-
     expect(BLOOM.threshold).toBe(0.86);
     expect(SPIKE).toBe(MOCKUP_STARS.spike);
   });
+
+  // -------------------------------------------------------------------------
+  // a0-44 — the halo is wider than its own spikes, and every number is a RULE
+  // -------------------------------------------------------------------------
+
+  /**
+   * **What a0-40 shipped for a year**, read off `main` rather than typed from a
+   * brief: a halo of 4.3 star-radii around a cross of 5.2, at a peak alpha that
+   * was a fraction of the star's own. Every assertion in this block refuses it.
+   */
+  const SHIPPED_BEFORE_A0_44 = { haloRadius: 4.3, spikeLength: 5.2 } as const;
+
+  it('draws a halo that is wider than its own spikes — the whole of a0-44', () => {
+    // **This one inequality is the bug**, and it needs no picture: at 4.3 against
+    // 5.2 every bloomed star painted its diffraction cross OUTSIDE its own glow,
+    // which is precisely "some of these with the lil crosshair looking things"
+    // on stars where "none of them have the bloom effect". The design's cross is
+    // 0.62 of the halo, so in the design it cannot escape the glow at all.
+    expect(
+      BLOOM.radius,
+      `halo ${BLOOM.radius} r vs spike ${SPIKE.length} r — the cross must sit INSIDE the glow`,
+    ).toBeGreaterThan(SPIKE.length);
+    // And with room to spare, rather than by a rounding error: the design's ratio
+    // is 1/0.62 = 1.613.
+    expect(BLOOM.radius / SPIKE.length).toBeCloseTo(1 / 0.62, 6);
+
+    // …tested the other way (LESSONS §24). A gate that cannot fail is not a gate,
+    // and this is the state it has to refuse — main's own numbers, today.
+    expect(
+      SHIPPED_BEFORE_A0_44.haloRadius > SHIPPED_BEFORE_A0_44.spikeLength,
+      `main draws a halo of ${SHIPPED_BEFORE_A0_44.haloRadius} r around a cross of ${SHIPPED_BEFORE_A0_44.spikeLength} r`,
+    ).toBe(false);
+    expect(BLOOM.radius).not.toBe(SHIPPED_BEFORE_A0_44.haloRadius);
+    expect(SPIKE.length).not.toBe(SHIPPED_BEFORE_A0_44.spikeLength);
+  });
+
+  it('derives every bloom number from the design’s own rule, not from a typist', () => {
+    // The lesson of a0-44 in one test. Both wrong numbers were asserted to equal
+    // the constant someone typed, which proves nothing about the design — so
+    // where the design states a RULE, the rule is what is asserted.
+    expect(BLOOM.radius, '5 + 13 × intensity').toBe(haloRadiusOf(BLOOM.intensity));
+    expect(SPIKE.length, 'haloRadius × 0.62').toBe(spikeLengthOf(BLOOM.radius));
+    expect(BLOOM.peakAlpha, '0.42 × intensity, ABSOLUTE').toBeCloseTo(
+      haloPeakAlphaOf(BLOOM.intensity),
+      10,
+    );
+    expect(BLOOM.knee.alpha, '0.13 × intensity').toBeCloseTo(haloKneeAlphaOf(BLOOM.intensity), 10);
+    expect(BLOOM.knee.at, 'the design’s middle gradient stop').toBe(HALO_KNEE_AT);
+    // The glow's SHAPE is those two stops with the intensity divided out, which
+    // is exactly what `haloProfile` is — so the curve the renderer paints and the
+    // alphas the design states cannot drift apart either.
+    expect(haloProfile(BLOOM.knee.at), 'the knee, as a fraction of the peak').toBeCloseTo(
+      BLOOM.knee.alpha / BLOOM.peakAlpha,
+      10,
+    );
+    expect(haloProfile(0)).toBe(1);
+    expect(haloProfile(1)).toBe(0);
+    // …and it is NOT the body curve. 1.85× the light in the same disc is the
+    // difference between a glow and a ball, and the one that misses the design's
+    // p99 by half again (evidence/a0-44-star-bloom-radius/audit.txt).
+    expect(haloProfile(BLOOM.knee.at)).toBeLessThan(falloffProfile(BLOOM.knee.at) / 2);
+  });
+
+  it('gives every bloomed star the SAME wash, and lets the radius carry its magnitude', () => {
+    // The second half of a0-44: the design's halo peak is absolute, so a bright
+    // star and a barely-bloomed one glow at the same alpha and differ in size.
+    // Under the shipped rule the peak scaled with the star's own alpha, which is
+    // small-and-hot where the design is wide-and-soft.
+    const { halos } = parts();
+    const alphas = new Set(halos.map((s) => s.fill!.alpha));
+    expect(halos.length, 'the mid layer bloomed at all').toBeGreaterThan(50);
+    expect(alphas, 'one halo alpha across the whole field').toEqual(new Set([BLOOM.peakAlpha]));
+    for (const s of halos) {
+      expect(s.fill!.falloff!.curve, 'a halo is a glow, not a body').toBe('halo');
+      // The falloff's rim IS the disc's edge, so the glow has no boundary.
+      if (s.path.kind === 'circle') expect(s.fill!.falloff!.rx).toBe(s.path.r);
+    }
+    // The radius is what varies, and it varies with the star — over the bloomed
+    // band only, so the spread is narrow and non-zero.
+    const radii = halos.map((s) => (s.path.kind === 'circle' ? s.path.r : 0));
+    const floor = starRadius(MOCKUP_STARS.bloom.threshold) * BLOOM.radius;
+    expect(Math.min(...radii), 'no halo below the threshold star’s').toBeGreaterThanOrEqual(
+      floor - 1e-3,
+    );
+    expect(Math.max(...radii), 'and the brightest is wider').toBeGreaterThan(Math.min(...radii));
+    expect(Math.max(...radii)).toBeCloseTo(starRadius(1) * BLOOM.radius, 0);
+  });
+
+  it('keeps the cross inside the glow on every bloomed star the field actually draws', () => {
+    // The inequality above is about the constants; this is about the shapes. Walk
+    // the sprite: a halo, then its two arms, then the star. No arm may reach past
+    // the halo it belongs to — which is what the developer was looking at.
+    let halo: Shape | null = null;
+    let checked = 0;
+    for (const s of def.shapes) {
+      if (s.path.kind === 'circle' && s.fill?.falloff) {
+        halo = s;
+        continue;
+      }
+      if (s.stroke && halo && s.path.kind === 'poly') {
+        const r = halo.path.kind === 'circle' ? halo.path.r : 0;
+        const cx = halo.path.kind === 'circle' ? halo.path.cx : 0;
+        const cy = halo.path.kind === 'circle' ? halo.path.cy : 0;
+        const pts = s.path.points;
+        for (let i = 0; i < pts.length; i += 2) {
+          expect(
+            Math.hypot(pts[i]! - cx, pts[i + 1]! - cy),
+            `a spike arm reaches past its own halo (r ${r})`,
+          ).toBeLessThan(r);
+        }
+        checked++;
+      }
+    }
+    expect(checked, 'the field drew crosses at all').toBeGreaterThan(100);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -938,10 +1089,19 @@ describe('bloom — the brightest stars, and the whole field is 16× denser (a0-
 describe('bloom colour — the tint is cold, and it can only take light out', () => {
   /**
    * A halo's composited pixel over the ground at the brightest star its ink ever
-   * paints: `starAlpha(peak magnitude) × BLOOM.intensity`.
+   * paints.
+   *
+   * **a0-44 made the alpha here absolute** — `BLOOM.peakAlpha`, the design's
+   * `0.42 × intensity` — where it used to be `starAlpha(mag) × BLOOM.intensity`.
+   * The magnitude argument therefore no longer changes the answer, and it is kept
+   * because the *ink* still depends on it: each layer's bands are addressed by
+   * the brightest star they paint. The number moved DOWN (0.2118–0.24 → 0.2016),
+   * so every bound this block asserts is asserted with less headroom used, not
+   * more.
    */
   const haloPixel = (color: number, mag: number): [number, number, number] => {
-    const a = starAlpha(mag) * BLOOM.intensity;
+    void mag;
+    const a = BLOOM.peakAlpha;
     const [r, g, b] = unpack(color);
     const [fr, fg, fb] = unpack(FLOOR);
     return [a * r + (1 - a) * fr, a * g + (1 - a) * fg, a * b + (1 - a) * fb];

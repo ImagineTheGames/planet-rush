@@ -1,0 +1,26 @@
+a0-44 — the gate, run both ways (LESSONS §24)
+=============================================
+
+### main (0f2d11b) — evidence/a0-44-star-bloom-radius/gate-against-main.ts
+
+  FAIL  the halo is wider than its own spikes                halo 4.3 r vs spike 5.2 r
+  FAIL  the halo radius IS the design’s rule, 5 + 13 × intensity 4.3 against 11.24
+  FAIL  the spike arm IS the design’s rule, haloRadius × 0.62 5.2 against 2.6660
+  FAIL  the halo’s peak alpha is absolute, 0.42 × intensity  no peak alpha at all — the halo is a fraction of its star’s
+  FAIL  no spike arm reaches past the halo it belongs to     352 of 352 arms escape their own halo
+
+  0/5 pass
+
+exit=1
+
+### this branch
+
+  PASS  the halo is wider than its own spikes                halo 11.24 r vs spike 6.9688 r
+  PASS  the halo radius IS the design’s rule, 5 + 13 × intensity 11.24 against 11.24
+  PASS  the spike arm IS the design’s rule, haloRadius × 0.62 6.9688 against 6.9688
+  PASS  the halo’s peak alpha is absolute, 0.42 × intensity  0.2016
+  PASS  no spike arm reaches past the halo it belongs to     0 of 352 arms escape their own halo
+
+  5/5 pass
+
+exit=0

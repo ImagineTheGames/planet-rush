@@ -63,7 +63,7 @@ import {
   coverSpan,
   type MapId,
 } from './backdrop';
-import { MOCKUP_STARS, starAlpha } from './mockup-reference';
+import { MOCKUP_STARS } from './mockup-reference';
 import { hex } from './palette';
 
 /**
@@ -217,19 +217,23 @@ describe('the bloom reaches the frame, not just the sprite definition', () => {
         // the bloom scale with the star instead of being a fixed disc. 1e-2
         // absorbs the 4-decimal quantisation in `round` (../art/shapes).
         expect(halo, `${key}: the halo is ${BLOOM.radius}x the star`).toBeCloseTo(core * BLOOM.radius, 2);
-        // …and its alpha a fraction of the star's own. This is the assertion that
-        // a bake which quantises a faint wash to zero — suspect one of a0-18, and
-        // the one the brief said to test first — cannot pass.
-        expect(haloA, `${key}: halo alpha is ${BLOOM.intensity}x the star's`).toBeCloseTo(
+        // …and its alpha is the design's ABSOLUTE peak — the same wash on every
+        // bloomed star, whatever its own alpha (a0-44). This is the assertion
+        // that a bake which quantises a faint wash to zero — suspect one of
+        // a0-18, and the one that brief said to test first — cannot pass.
+        expect(haloA, `${key}: halo alpha is the design's ${BLOOM.peakAlpha}`).toBeCloseTo(
+          BLOOM.peakAlpha,
+          3,
+        );
+        // It is emphatically NOT a fraction of the star's own any more, and the
+        // bright end of the field is where the two rules differ most.
+        expect(haloA, `${key}: the halo does not scale with its star`).not.toBeCloseTo(
           coreA * BLOOM.intensity,
           3,
         );
         // The faintest halo in the game belongs to the faintest star that blooms
         // at all, and it must survive as a positive alpha rather than be floored.
         expect(haloA, `${key}: the faintest halo still carries ink`).toBeGreaterThan(0);
-        expect(haloA).toBeGreaterThanOrEqual(
-          starAlpha(MOCKUP_STARS.bloom.threshold) * BLOOM.intensity - 1e-3,
-        );
       }
     }
   });
@@ -257,7 +261,15 @@ describe('the bloom reaches the frame, not just the sprite definition', () => {
         (i) => i.action === 'stroke',
       ).length;
       expect(strokes, `${key}: two arms per bloomed star`).toBe(blooms * 2);
-      expect(SPIKE.length, 'the arms reach past the halo’s own radius').toBeGreaterThan(BLOOM.radius);
+      // **This assertion used to be the other way round** — `SPIKE.length >
+      // BLOOM.radius`, "the arms reach past the halo's own radius" — and it
+      // passed for as long as the defect lived, because it was written from the
+      // numbers rather than from the design. In the design the cross is measured
+      // OFF the halo (`halo × 0.62`), so it is inside the glow by construction,
+      // and a build where it is not is the one the developer photographed:
+      // *"some of these with the lil crosshair looking things"* on stars with
+      // *"none of them have the bloom effect"* (a0-44).
+      expect(SPIKE.length, 'the arms stay inside the halo’s own radius').toBeLessThan(BLOOM.radius);
     }
   });
 });

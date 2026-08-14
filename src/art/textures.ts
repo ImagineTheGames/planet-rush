@@ -24,7 +24,7 @@
  */
 
 import { BufferImageSource, Container, Graphics, Matrix, Texture } from 'pixi.js';
-import { falloffProfile, type Falloff, type SpriteDef } from './shapes';
+import { curveProfile, type Falloff, type FalloffCurve, type SpriteDef } from './shapes';
 
 // ---------------------------------------------------------------------------
 // The falloff ramp — how a gradient fill reaches the GPU (a0-39)
@@ -96,31 +96,37 @@ function texelNoise(x: number, y: number): number {
   return ((h >>> 8) & 0xffff) / 0x10000 - 0.5;
 }
 
-let ramp: Texture | null = null;
+const ramps = new Map<FalloffCurve, Texture>();
 
 /**
- * The one radial ramp every soft fill in the game samples: white, with
- * {@link falloffProfile} baked into its alpha.
+ * The radial ramp a soft fill samples: white, with its falloff's own curve
+ * ({@link curveProfile}) baked into its alpha.
  *
  * Built from a plain buffer rather than a canvas, so it needs no DOM and is the
  * same bytes in the browser, in the test runner and in a headless tool.
  * Premultiplied on the way in — the RGB is the alpha, because the colour comes
  * from the fill's own tint.
  *
- * **One texture, so a whole sky is still one batch.** Every gradient shape in
- * the void shares this, and Pixi batches by texture, so the sky layer submits
- * what it submitted before — over a quarter of the geometry, since one gradient
- * shape replaced four flat ones.
+ * **One texture per curve, so a whole sky is still one batch.** Every gradient
+ * body in the void shares `smooth` and Pixi batches by texture, so the sky layer
+ * submits what it submitted before — over a quarter of the geometry, since one
+ * gradient shape replaced four flat ones. a0-44 adds a second, `halo`, and it
+ * costs nothing at the batch level for the same reason it exists: the only
+ * shapes on it are the star halos, which are a different layer and therefore a
+ * different `Graphics` already. Two 256 KB uploads for the process, not per
+ * frame and not per sprite.
  */
-export function falloffRamp(): Texture {
-  if (ramp) return ramp;
+export function falloffRamp(curve: FalloffCurve = 'smooth'): Texture {
+  const cached = ramps.get(curve);
+  if (cached) return cached;
+  const profile = curveProfile(curve);
   const px = new Uint8Array(RAMP_SIZE * RAMP_SIZE * 4);
   const half = RAMP_SIZE / 2;
   for (let y = 0; y < RAMP_SIZE; y++) {
     for (let x = 0; x < RAMP_SIZE; x++) {
       const dx = ((x + 0.5 - half) / half) * RAMP_OVERSCAN;
       const dy = ((y + 0.5 - half) / half) * RAMP_OVERSCAN;
-      const f = falloffProfile(Math.hypot(dx, dy));
+      const f = profile(Math.hypot(dx, dy));
       // `4f(1−f)` is 1 in the middle of the falloff and 0 at both ends — noise
       // only where the contours are, and none at the rim where it would paint
       // an edge.
@@ -135,13 +141,13 @@ export function falloffRamp(): Texture {
       px[i + 3] = a;
     }
   }
-  ramp = new Texture({
+  const built = new Texture({
     source: new BufferImageSource({
       resource: px,
       width: RAMP_SIZE,
       height: RAMP_SIZE,
       alphaMode: 'premultiplied-alpha',
-      label: 'art/falloff-ramp',
+      label: `art/falloff-ramp/${curve}`,
       // Mipmapped, and that is the dither's own safety catch: Plasma Reef's
       // clots are 36–76 px across and *minify* this ramp 3–7×, where an
       // unmipmapped sample would alias the noise into speckle. With mip levels
@@ -152,7 +158,8 @@ export function falloffRamp(): Texture {
       scaleMode: 'linear',
     }),
   });
-  return ramp;
+  ramps.set(curve, built);
+  return built;
 }
 
 /**
@@ -208,7 +215,7 @@ export function drawSprite(g: Graphics, def: SpriteDef, scale = 1): Graphics {
       g.fill(
         shape.fill.falloff
           ? {
-              texture: falloffRamp(),
+              texture: falloffRamp(shape.fill.falloff.curve),
               matrix: rampMatrix(shape.fill.falloff, scale),
               color: shape.fill.color,
               alpha: shape.fill.alpha,

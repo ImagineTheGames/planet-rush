@@ -394,6 +394,52 @@ export const MOCKUP_SKY_IDS: readonly MockupSkyId[] = [
 // The star field
 // ---------------------------------------------------------------------------
 
+// The design's own bloom arithmetic, written as the rules it is — so that every
+// number in `MOCKUP_STARS.bloom` and `.spike` has something to be asserted
+// against that is not itself (a0-44).
+
+/**
+ * **The design's halo-radius rule**: `5 + 13 × intensity`, as a multiple of the
+ * star's own radius. At the design's `intensity` 0.48 that is **11.24**.
+ *
+ * Quoted from the design preview:
+ * ```js
+ * var halo = rad * (5 + 13 * inten);   // inten = state.intensity = 0.48
+ * ```
+ */
+export function haloRadiusOf(intensity: number): number {
+  return 5 + 13 * intensity;
+}
+
+/**
+ * **The design's halo peak alpha**: `0.42 × intensity`, **absolute** — the
+ * gradient's first stop, `starColor(s.temp, 0.42 * inten)`. It does not scale
+ * with the star's own alpha, which is the second half of what a0-44 corrected.
+ */
+export function haloPeakAlphaOf(intensity: number): number {
+  return 0.42 * intensity;
+}
+
+/**
+ * **The design's halo knee alpha**: `0.13 × intensity`, the gradient's middle
+ * stop at 0.35 of the radius — `g.addColorStop(0.35, starColor(s.temp, 0.13 *
+ * inten))`. With {@link haloPeakAlphaOf} it fixes the *shape* of the glow;
+ * `./shapes` `haloProfile` is that shape, normalised.
+ */
+export function haloKneeAlphaOf(intensity: number): number {
+  return 0.13 * intensity;
+}
+
+/**
+ * **The design's spike-arm rule**: `haloRadius × 0.62`. The design measures the
+ * cross off the halo — `ctx.moveTo(s.x - halo * 0.62, s.y)` — so the arm is
+ * inside the glow by construction, and cannot be otherwise unless someone types
+ * the two numbers independently. Someone did.
+ */
+export function spikeLengthOf(haloRadius: number): number {
+  return haloRadius * 0.62;
+}
+
 /**
  * **The star field.** *"These are all 1 color, there are no stars in them"* is
  * this block, and the headline number is the count.
@@ -407,13 +453,53 @@ export const MOCKUP_SKY_IDS: readonly MockupSkyId[] = [
  * it, and the developer described it as one flat colour with no stars in it.
  *
  * **Measured, frozen:** {@link count}, {@link bloom} (rule, threshold,
- * intensity), {@link peakP99}.
+ * intensity, radius, peak alpha, knee), {@link spike}, {@link peakP99}.
  *
  * **Derived:** the magnitude curve and the radius/alpha it drives. The design
  * stated its distribution as an outcome — p99 46–53 on its own instrument — not
  * as a formula, so the formula is recovered by fitting that outcome, and
  * `backdrop.test.ts` asserts the outcome rather than the formula. That is the
  * right way round: the p99 is the design, the exponent is bookkeeping.
+ *
+ * ## The a0-44 re-audit — every value, and what happened to it
+ *
+ * Two of these were wrong while labelled *Measured*, so the rest could not be
+ * trusted until they were re-read. Each one, against the design preview's own
+ * star routine (quoted at {@link haloRadiusOf} and its neighbours) and against
+ * the design's stated outcome:
+ *
+ * ```
+ *   value                 verdict     against what
+ *   bloom.radius          MOVED       4.3 → 11.24 = 5 + 13×intensity
+ *   spike.length          MOVED       5.2 → 6.9688 = haloRadius × 0.62
+ *   bloom peak alpha      MOVED       α×0.48 (a fraction) → 0.2016 (absolute)
+ *   halo falloff shape    MOVED       (1−t²)² → the design's own 3 stops
+ *   bloom.intensity       CONFIRMED   the preview's `state.intensity` = 0.48
+ *   bloom.rule            CONFIRMED   `magnitude > threshold`, a0-40's ruling
+ *   bloom.threshold       CONFIRMED   0.86 — 6.2% of the field blooms, and the
+ *                                     field's p99 lands in the design's band
+ *   count 560             CONFIRMED   unchanged, and now p99 47.9 ∈ 46–53
+ *   magnitudeExponent     CONFIRMED   the fit still holds AFTER the halo moved
+ *   radius, alpha         CONFIRMED   likewise — see below, this is the point
+ *   spike.width           CARRIED     0.5 px; not stated in the quoted routine
+ *   spike.intensity       CARRIED     0.55 of the star's alpha; likewise
+ *   ramp                  CARRIED     style-guide §1, never the preview's
+ * ```
+ *
+ * **The two CARRIED values are the honest gap in this audit**: the excerpt of the
+ * design preview available to a0-44 draws the cross with `moveTo/lineTo` and
+ * states neither its `lineWidth` nor its stroke alpha, so both keep a0-40's
+ * numbers and are marked as carried rather than re-labelled *Measured*.
+ *
+ * **Why CONFIRMED means something for the derived four.** They were fitted to
+ * p99 46–53 *with the wrong halo*, so the fit had every reason to fall apart once
+ * the halo grew 6.8× in area — the two errors could easily have been
+ * compensating. Re-measured after the correction, the design's field reads p99
+ * **47.9** (`evidence/a0-44-star-bloom-radius/audit.txt`), comfortably inside the
+ * design's own band, so count, exponent, radius and alpha stand unchanged. Note
+ * what did *not* survive: the same field with the halo corrected but drawn on
+ * `falloffProfile` reads **66.9**, which is how the falloff shape came to be part
+ * of this brief at all.
  */
 export const MOCKUP_STARS = {
   /** **Measured.** Stars per screenful (per {@link MOCKUP_PANEL}). */
@@ -447,28 +533,87 @@ export const MOCKUP_STARS = {
    * not close enough, the same"*, so the threshold is what ships, and the trade
    * is recorded here rather than left for the seventh report to rediscover.
    *
-   * `intensity` is the halo's peak alpha as a fraction of its star's, against the
-   * shipped **0.16**. It is a single soft-falloff disc, not the two flat rings it
-   * replaces, so it costs a quarter of the geometry and paints a third of its
-   * peak on average (`./shapes` `falloffProfile`).
+   * ## What a0-44 corrected, and how it was found
+   *
+   * The developer, in a live match: *"the stars look super WEIRD, none of them
+   * have the bloom effect, and some of these with the lil crosshair looking
+   * things were not in the mockup"* — on the same frame as *"the nebulas look
+   * good though"*. That split is the diagnosis: the nebula numbers here were
+   * measured off the design, and **two of the star numbers were not**, though
+   * both were labelled *Measured* in the file that exists to be the design.
+   *
+   * ```
+   *                     design                       a0-40 shipped
+   *   halo radius       5 + 13×0.48 = 11.24 r        4.30 r      2.61× too small
+   *   spike arm         halo × 0.62 =  6.97 r        5.20 r
+   *   halo peak alpha   0.42×0.48 = 0.2016, ABS      α × 0.48 ⇒ ≈0.24 on a bright star
+   * ```
+   *
+   * **The halo was smaller than the spikes**, so every bloomed star painted its
+   * diffraction cross *outside its own glow* — which is exactly "crosshair
+   * looking things" on stars with "none of them have the bloom effect". In the
+   * design the cross sits well inside a halo 1.6× its length, and reads as a
+   * glowing star with a faint flare.
+   *
+   * The alpha error compounded it. The design's halo is a **wide, faint wash at
+   * an absolute peak** — every bloomed star's halo peaks at 0.2016 whatever its
+   * own alpha — where the build made it a fraction of the star's, so a bright
+   * star painted ~0.24 into a disc a seventh of the intended area. Small and hot
+   * instead of wide and soft.
+   *
+   * ## The rules, so the numbers cannot drift from them again
+   *
+   * Every number below is a value the design *computes*, and each is asserted
+   * against its rule in `backdrop.test.ts` rather than against itself:
+   * {@link haloRadiusOf}, {@link haloPeakAlphaOf}, {@link haloKneeAlphaOf} and
+   * {@link spikeLengthOf}. Asserting that a constant equals the constant you
+   * typed proves nothing about the design, which is how 4.3 and 5.2 passed a
+   * gate for a whole release.
    */
   bloom: {
     rule: 'brightest' as const,
     /** Magnitude above which a star blooms — and gets its spikes. */
     threshold: 0.86,
-    /** Halo peak alpha, as a fraction of the star's own. */
+    /**
+     * The design's `state.intensity` — the one knob its bloom is stated in, and
+     * the multiplier every number below is derived through. Against the shipped
+     * **0.16** (a0-07's `subtle` tier).
+     */
     intensity: 0.48,
-    /** Halo radius, as a multiple of the star's own. */
-    radius: 4.3,
+    /**
+     * **Halo radius, as a multiple of the star's own** — {@link haloRadiusOf} at
+     * `intensity`, i.e. `5 + 13 × 0.48`. It is nearly twice the spike arm, and
+     * that inequality is the whole of a0-44.
+     */
+    radius: 11.24,
+    /**
+     * **Halo peak alpha, absolute** — {@link haloPeakAlphaOf} at `intensity`,
+     * i.e. `0.42 × 0.48`. *Not* a fraction of the star's own alpha: the design
+     * gives every bloomed star the same wash and lets the radius carry the
+     * star's magnitude.
+     */
+    peakAlpha: 0.2016,
+    /**
+     * **The halo's knee** — the design's middle gradient stop, at `0.35` of the
+     * radius and `0.13 × intensity` of alpha. It is the *shape* of the glow, and
+     * it is not `falloffProfile`'s shape: see `./shapes` `haloProfile`, which
+     * carries the measurement that settles which one the design's own p99 wants.
+     */
+    knee: { at: 0.35, alpha: 0.0624 },
   },
   /**
    * **Measured.** The diffraction cross on a bloomed star — the same
    * `magnitude > threshold` population, because a spike and a halo are the same
    * physical event and the design draws them together.
+   *
+   * The design draws the cross from the **halo**, not from the star:
+   * `moveTo(x − halo × 0.62, y)`. So the arm is {@link spikeLengthOf} of the halo
+   * radius, and it is inside the glow by construction — which is the property
+   * a0-44 restored and `backdrop.test.ts` now asserts by name.
    */
   spike: {
-    /** Arm length, as a multiple of the star's radius. */
-    length: 5.2,
+    /** Arm length, as a multiple of the star's radius: `haloRadius × 0.62`. */
+    length: 6.9688,
     /** Stroke width, screen px. */
     width: 0.5,
     /** Stroke alpha, as a fraction of the star's own. */
@@ -670,6 +815,19 @@ export function starAlpha(mag: number): number {
  */
 export function starBlooms(mag: number): boolean {
   return mag > MOCKUP_STARS.bloom.threshold;
+}
+
+/**
+ * **A halo's peak alpha, and it is the same for every bloomed star** (a0-44).
+ *
+ * There is a function here rather than a field read because the *shape* of this
+ * answer is the correction: it takes no magnitude. The design gives every bloomed
+ * star the identical wash and lets the halo's radius carry the star's brightness;
+ * the build made the wash a fraction of the star's own alpha and shrank the
+ * radius, which is small-and-hot where the design is wide-and-soft.
+ */
+export function starHaloAlpha(): number {
+  return MOCKUP_STARS.bloom.peakAlpha;
 }
 
 /** Stars per 1e6 px², the unit `StarLayerSpec.density` is stated in. */

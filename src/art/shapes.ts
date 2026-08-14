@@ -121,7 +121,34 @@ export interface Falloff {
   readonly ry: number;
   /** Rotation of the falloff's axes, radians. */
   readonly angle: number;
+  /**
+   * Which curve the alpha follows from the centre out. Absent is `'smooth'` —
+   * {@link falloffProfile}, the curve every soft body in the art is made of. See
+   * {@link FalloffCurve} for the one exception and why it had to exist.
+   */
+  readonly curve?: FalloffCurve | undefined;
 }
+
+/**
+ * **The two radial curves in the art**, and there are two rather than one for a
+ * reason that is measured rather than aesthetic (a0-44):
+ *
+ *  - `smooth` — {@link falloffProfile}, `(1 − t²)²`. Every soft *body*: every
+ *    nebula blob, and everything a0-39 converted off the four-stop stack.
+ *  - `halo` — {@link haloProfile}, the design preview's own three-stop star
+ *    glow. **Only a bloomed star's halo.**
+ *
+ * A star's glow is not a small nebula and the design does not draw it like one.
+ * A blob is a body with a soft edge, so it wants a curve that is flat in the
+ * middle and lands tangentially; a glow is a *bright core with a wide faint
+ * skirt*, which is what the design's stops paint and what `(1 − t²)²` cannot —
+ * the same disc under `smooth` carries **1.85×** the design's light, most of it
+ * in a plateau the design does not have. At the design's halo radius that is not
+ * a nuance: it misses the design's own measured star p99 (46–53) by half again
+ * (66.9), and matching the curve lands it at 47.9. The run is in
+ * `evidence/a0-44-star-bloom-radius/audit.txt`.
+ */
+export type FalloffCurve = 'smooth' | 'halo';
 
 /** A colour and its opacity. */
 export interface Ink {
@@ -365,6 +392,77 @@ export function falloffProfile(t: number): number {
   return v * v;
 }
 
+/**
+ * **Where the star glow's knee sits**, as a fraction of the halo's radius — the
+ * design preview's middle gradient stop. See {@link haloProfile}.
+ */
+export const HALO_KNEE_AT = 0.35;
+
+/**
+ * **The star glow's value at that knee**, as a fraction of its own peak.
+ *
+ * `13 / 42`, and it is written as that ratio rather than as `0.3095` because it
+ * is exactly what the design's two stops are — `0.13 × intensity` over
+ * `0.42 × intensity` — so the intensity cancels and the *shape* is intensity-free.
+ * `./mockup-reference` carries the two alphas themselves; this is their ratio,
+ * and `backdrop.test.ts` asserts the two agree.
+ */
+export const HALO_KNEE = 13 / 42;
+
+/**
+ * **The star glow's curve** — the design preview's own radial gradient, which is
+ * three stops linearly interpolated:
+ *
+ * ```
+ *   t = 0      1                 (the peak)
+ *   t = 0.35   13/42 = 0.3095    (the knee)
+ *   t = 1      0                 (the rim)
+ * ```
+ *
+ * Linear between them, because that is what `createRadialGradient` paints and the
+ * design preview states its glow as three `addColorStop`s and nothing else.
+ *
+ * ## Why the art now has a second curve (a0-44)
+ *
+ * {@link falloffProfile}'s docstring argues for one curve everywhere, and every
+ * word of it still holds **for a body**. A star's halo is not a body:
+ *
+ * ```
+ *   t        0.10   0.20   0.35   0.50   0.62   0.75   0.90
+ *   design   .803   .605   .310   .238   .181   .119   .048
+ *   smooth   .980   .922   .770   .563   .379   .191   .036
+ * ```
+ *
+ * The design is already down to a third of its peak at `t = 0.35`, where
+ * `(1 − t²)²` is still at three quarters — a glow with a core and a skirt against
+ * a ball with a soft edge. Integrated over the disc that is **0.180 against
+ * 0.333**: the same halo drawn `smooth` carries 1.85× the light. Measured on the
+ * design's own instrument, a field of the design's halos drawn `smooth` reads
+ * p99 **66.9** against the design's stated **46–53**; drawn on this curve it
+ * reads **47.9** (`evidence/a0-44-star-bloom-radius/audit.txt`).
+ *
+ * It costs the two things `falloffProfile` was chosen to avoid, and they are
+ * worth naming rather than discovering later: this curve has a **knot at 0.35**
+ * and it **arrives at the rim with slope**. Both are bounded here in a way they
+ * were not on the four-stop stack a0-39 removed — the steepest slope change is
+ * across `0.0147` of alpha per px on the largest halo in the field against the
+ * stack's `2.6` luma per 6 px, and the rim slope is `0.0036` alpha/px, i.e. under
+ * one code value per pixel on white. They are also, and mainly, **what the design
+ * draws**, and the ruling on this backdrop is that the game matches the design
+ * rather than improves on it.
+ */
+export function haloProfile(t: number): number {
+  if (t <= 0) return 1;
+  if (t >= 1) return 0;
+  if (t <= HALO_KNEE_AT) return 1 + (t / HALO_KNEE_AT) * (HALO_KNEE - 1);
+  return HALO_KNEE * (1 - (t - HALO_KNEE_AT) / (1 - HALO_KNEE_AT));
+}
+
+/** The curve a falloff follows — {@link FalloffCurve}, with `smooth` the default. */
+export function curveProfile(curve: FalloffCurve | undefined): (t: number) => number {
+  return curve === 'halo' ? haloProfile : falloffProfile;
+}
+
 /** Elliptical distance of `(x, y)` from a falloff's centre, in radius units. */
 export function falloffDistance(f: Falloff, x: number, y: number): number {
   const dx = x - f.cx;
@@ -380,19 +478,23 @@ export function falloffDistance(f: Falloff, x: number, y: number): number {
 
 /**
  * The alpha an ink actually paints at `(x, y)`: its own alpha for a flat fill,
- * and its peak alpha shaped by {@link falloffProfile} for a soft one.
+ * and its peak alpha shaped by its falloff's own curve ({@link curveProfile}) for
+ * a soft one.
  *
  * This is the single definition of "how bright is this ink here" for a consumer
  * holding a point in the sprite's own space: the CPU rasterizer and the sky's
  * brightness and overdraw measurements. The two drawing paths — the ramp
- * texture and the SVG review sheets — take {@link falloffProfile} directly,
- * because both work in the falloff's unit space and have no world point to ask
- * about. The shape of the falloff is shared either way, so a picture, a
- * measurement and a frame can never disagree about a gradient.
+ * texture and the SVG review sheets — take the curve itself, because both work
+ * in the falloff's unit space and have no world point to ask about; both pick it
+ * with the same {@link curveProfile}. The shape of the falloff is shared either
+ * way, so a picture, a measurement and a frame can never disagree about a
+ * gradient.
  */
 export function inkAlphaAt(ink: Ink, x: number, y: number): number {
   if (!ink.falloff) return ink.alpha;
-  return ink.alpha * falloffProfile(falloffDistance(ink.falloff, x, y));
+  return (
+    ink.alpha * curveProfile(ink.falloff.curve)(falloffDistance(ink.falloff, x, y))
+  );
 }
 
 /** Mirror a polygon across the x axis (y → −y), reversing winding. */
