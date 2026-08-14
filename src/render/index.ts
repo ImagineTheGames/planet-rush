@@ -87,7 +87,8 @@ import {
   stationVariantFor,
 } from '../art/stations';
 import { stationWreckSprite } from '../art/wrecks';
-import { asteroidArt, asteroidTexture } from '../art/atlas';
+import { asteroidArt, asteroidTexture, oreChunkTexture } from '../art/atlas';
+import { oreChunkSprite } from '../art/asteroids';
 import { shipSprite } from '../art/ships';
 import { turretSprite, shieldSprite, shieldStrength, type TurretState } from '../art/buildings';
 import { shotSprite, type ShotFamily } from '../art/vfx/shots';
@@ -380,10 +381,19 @@ const ROCK_ART_SCALE = 64;
  *  12, so a turret is a 4× minification of its own texture). */
 const TURRET_ART_SCALE = 48;
 
-function makeUnitChunk(): Graphics {
-  // Ore chunk — signal yellow (RESERVED rule: ore, style-guide §2).
-  return new Graphics().circle(0, 0, 1).fill(PALETTE.signalYellow);
-}
+/**
+ * Pixels-per-unit the ore chunk art is rasterised at before the per-frame
+ * `scale.set` back down to `chunk.radius` — the rocks' and turrets' trick, at
+ * the density a chunk needs.
+ *
+ * A chunk's collision radius is 6 world units (`CHUNK.radius`), so it is drawn
+ * about 12.6 px across and is the smallest pooled thing in the game. Baking at
+ * 32 keeps its dark rim (0.09 unit, so ~2.9 texture px) well clear of
+ * `drawSprite`'s half-pixel floor and still minifies ~5×, which is what the mip
+ * chain is for. Four textures at this density are ~67 px square each: the whole
+ * 120-chunk field costs less texture memory than one rock.
+ */
+const CHUNK_ART_SCALE = 32;
 
 // Impact flare radius (world units) at the muzzle flash's hit point. Punchy but small
 // so it reads as a torch bite, not an explosion (style-guide §8 "bright, punchy").
@@ -508,7 +518,12 @@ export class Renderer {
    *  scale is this times the rock's collision radius. Cached per slot rather than
    *  looked up per frame so a 200-rock field reads one array entry each. */
   private readonly asteroidUnits: number[] = [];
-  private readonly chunkPool: GraphicsPool;
+  private readonly chunkPool: SpritePool;
+  /** The `ore:<seed>` look held by each chunk slot, so its texture is swapped
+   *  only when the slot's chunk changes shape — which, since a chunk's look is a
+   *  pure function of its id, is only when the field itself changes. */
+  private readonly chunkKeys: string[] = [];
+  private readonly chunkUnits: number[] = [];
   private readonly muzzlePool: GraphicsPool;
   private readonly impactPool: GraphicsPool;
   private readonly turretPool: SpritePool;
@@ -622,7 +637,7 @@ export class Renderer {
     stage.addChild(this.worldRoot);
 
     this.asteroidPool = new SpritePool(this.asteroidLayer);
-    this.chunkPool = new GraphicsPool(this.chunkLayer, makeUnitChunk);
+    this.chunkPool = new SpritePool(this.chunkLayer);
     this.muzzlePool = new GraphicsPool(this.muzzleLayer, () => new Graphics());
     this.impactPool = new GraphicsPool(this.impactLayer, makeImpactGlow);
     this.turretPool = new SpritePool(this.turretLayer);
@@ -1317,10 +1332,17 @@ export class Renderer {
     this.asteroidPool.hideFrom(asteroids.length);
   }
 
-  /** The ore field (GDD §2.3) — 120 drifting chunks on the §4.3 scene, culled on
-   *  the same rule and by the same index-stable slot as the rocks. A chunk is a
-   *  unit circle scaled by its collision radius, so its art reaches exactly its
-   *  radius and the pad is the slop alone. */
+  /**
+   * The ore field (GDD §2.3) — 120 drifting chunks on the §4.3 scene, culled on
+   * the same rule and by the same index-stable slot as the rocks, and **pooled
+   * through `oreChunkTexture` on the same path** (a0-41).
+   *
+   * It drew a flat `Graphics` disc in signal yellow until a0-41: one circle, no
+   * facet, no rim, no halo — while `oreChunkSprite` and its pooled entry point
+   * had existed since M1 and the renderer had never called either. Four looks
+   * carry the whole field (`chunkId % 4`), so 120 entities cost four textures and
+   * one batch, which is the follow-up a1-10 §6B costed and a1-11 deferred.
+   */
   private drawChunks(chunks: readonly OreChunk[]): void {
     for (let i = 0; i < chunks.length; i++) {
       const c = chunks[i]!;
@@ -1328,10 +1350,25 @@ export class Renderer {
         this.chunkPool.hide(i);
         continue;
       }
-      const g = this.chunkPool.at(i);
-      g.x = c.pos.x;
-      g.y = c.pos.y;
-      g.scale.set(c.radius);
+      const s = this.chunkPool.at(i);
+      // The atlas's own fold, applied here so the slot's look key is cheap to
+      // compare without generating anything — and folded ONCE, so a negative id
+      // cannot key the extent cache off one seed and the texture off another.
+      const seed = ((c.id % 4) + 4) % 4;
+      const key = `ore:${seed}`;
+      if (this.chunkKeys[i] !== key) {
+        const look = this.lookUnits(key, CHUNK_ART_SCALE, () => oreChunkSprite(seed), (size) =>
+          oreChunkTexture(this.textures, seed, size),
+        );
+        s.texture = look.texture;
+        this.chunkUnits[i] = look.units;
+        this.chunkKeys[i] = key;
+      }
+      s.x = c.pos.x;
+      s.y = c.pos.y;
+      // The texture is CHUNK_ART_SCALE px per art unit; divide it back out so unit
+      // radius 1 lands at the chunk's collision radius (the halo overhangs it).
+      s.scale.set(this.chunkUnits[i]! * c.radius);
     }
     this.chunkPool.hideFrom(chunks.length);
   }
