@@ -72,6 +72,45 @@ cp evidence/a0-44-star-bloom-radius/shoot.ts /tmp/a044-main/evidence/a0-44-star-
 | halo falloff | `(1 − t²)²` | the design's three stops |
 | star p99, design panel | 49.41 | 47.88 |
 
+## `goldens/` — the frozen scene in the real game, and why no baseline moved
+
+Four PNGs, all 1280×800, all of the desktop frozen scene (`/?debug=1&freeze=1`),
+taken in this container against the real preview build:
+
+| file | what it is |
+|---|---|
+| `desktop-frozen-live-MAIN.png` | the live game on `main` — a field of sharp four-pointed crosses with no glow on any of them |
+| `desktop-frozen-live-a0-44.png` | the same frame on this branch — the same stars, glowing, with the crosses inside the glows |
+| `desktop-frozen-ACTUAL-a0-44.png` | what Playwright's own harness captures on this branch |
+| `desktop-frozen-COMMITTED-baseline.png` | the baseline `tests/mobile/` holds today |
+
+**The mobile golden suite is green, all 50, with the baselines untouched** — and
+the reason is worth stating as a number rather than as a shrug, because it is the
+second time this backdrop has run into it (a0-18: *"a golden is the wrong
+instrument for this and always was"*).
+
+`toHaveScreenshot` counts a pixel as different when its YIQ delta exceeds
+`35215 × threshold²`; at Playwright's default `threshold: 0.2` that is a
+**per-pixel luma difference of 52.8 of 255**. Nothing fainter is visible to the
+gate at any coverage. Measured on these four frames:
+
+```
+  baseline vs main (live)     pixelmatch 0.830%   (>8 luma: 4.24%)
+  baseline vs this branch     pixelmatch 0.821%   (>8 luma: 11.83%)
+  main vs this branch         pixelmatch 0.000%   (>8 luma: 0.41%)
+```
+
+Two things follow, and only one of them is a0-44's:
+
+1. **This change moves no golden.** `main` vs this branch counts **zero**
+   different pixels by the gate's own rule, so there is nothing to re-baseline —
+   a bloom is a wide, faint wash and every pixel of it is under 52.8.
+2. **Reported, not absorbed:** the committed baseline is holding a **pre-a0-40**
+   frame — sparse stars on the old near-black ground — and passes at 0.830% only
+   because it sits under the 1% ratio. That is a0-40's re-baseline gap, not this
+   brief's, and re-baselining it here would fold another brief's drift into this
+   PR. `desktop-frozen-live-MAIN.png` is the evidence; the call is QA's.
+
 ## What is NOT in these plates
 
 The skies. a0-40's numbers are untouched — *"the nebulas look good though"* — and
