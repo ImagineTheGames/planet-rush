@@ -214,10 +214,9 @@ export function sensorSources(world: World, viewer: PlayerId): SensorSource[] {
 export function teamMembers(world: World, viewer: PlayerId): PlayerId[] {
   const out: PlayerId[] = [viewer];
   for (const s of world.ships) {
-    if (s.id === viewer) continue;
-    if (sameSide(world, viewer, s.id)) out.push(s.id);
+    if (s.id === viewer || !sameSide(world, viewer, s.id)) continue;
+    sortedInsert(out, s.id); // ascending and deduped by construction, not by a sort
   }
-  out.sort((a, b) => a - b);
   return out;
 }
 
