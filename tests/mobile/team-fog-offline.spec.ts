@@ -692,7 +692,7 @@ async function bootFrozen(page: Page, url: string): Promise<void> {
  * and the drawn ones would not. Closing and reopening is the state change that
  * forces an honest redraw, and it is a player's own keystroke.
  */
-async function redrawMinimap(page: Page): Promise<MinimapSeam extends never ? never : ReturnType<MinimapSeam['state']>> {
+async function redrawMinimap(page: Page): Promise<ReturnType<MinimapSeam['state']>> {
   if (await page.evaluate(() => window.__minimapStage!.state().expanded)) {
     await page.keyboard.press('KeyM');
     await settleFrames(page, 4);
