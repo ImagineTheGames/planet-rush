@@ -111,6 +111,40 @@ if (SHARDING && process.env.TEST_WORKER_INDEX === undefined) {
   }
 }
 
+/**
+ * ── NODE MUST NOT STRIP THE TYPES; PLAYWRIGHT MUST TRANSPILE THEM (a0-43) ──
+ *
+ * Node 22.18 turned `--experimental-strip-types` ON by default. Stripping is
+ * *strip-only*: it erases annotations and refuses any TypeScript that has to
+ * EMIT code. A constructor parameter property — `constructor(private readonly
+ * inner: T)`, which also declares and assigns a field — is exactly that, and
+ * `src/render/index.ts:322` is one of many in `src/`. Node claims the `.ts`
+ * before Playwright's babel transform can, and the load dies with
+ * "TypeScript parameter property is not supported in strip-only mode".
+ *
+ * It reads as a spec-specific failure but is not: it fires for ANY spec whose
+ * import graph reaches `@render/index`, and takes the whole shard down at
+ * COLLECTION — every test in it, not just the importer. `team-fog-offline`
+ * (a0-43) is merely the first spec to import `src/ui/minimap` and
+ * `src/ui/lobby`, so shards 1 and 2 went red while 3–6 stayed green.
+ *
+ * CI pins `node-version: 22`, which floats to the latest 22.x — so this landed
+ * on a runner upgrade, with no commit of ours to blame, and reproduces locally
+ * only under `NODE_OPTIONS=--experimental-strip-types` on older 22.x.
+ *
+ * The fix is to hand `.ts` back to Playwright, which transpiles properly —
+ * `--no-experimental-strip-types`, and the LAST such flag on the command line
+ * wins, so it beats an inherited enable. It CANNOT live in this file: Node
+ * parses `NODE_OPTIONS` once, at process start, and the process that loads
+ * this config is the same one that then loads the spec files, so mutating
+ * `process.env` here is already too late for the load that crashes. It is set
+ * in the `test:mobile` npm script instead, which is upstream of the process —
+ * one place, covering CI and local runs alike. The flag has existed since Node
+ * 22.6, so older local Nodes accept it too.
+ *
+ * The alternative — rewriting the parameter properties — is a change to
+ * `src/`, which is not QA's to make.
+ */
 const chromium: NonNullable<PlaywrightTestConfig['use']>['browserName'] = 'chromium';
 
 /**

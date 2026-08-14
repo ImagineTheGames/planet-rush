@@ -9,7 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest",
-    "test:mobile": "playwright test",
+    "test:mobile": "NODE_OPTIONS=\"${NODE_OPTIONS:-} --no-experimental-strip-types\" playwright test",
     "test:perf-budget": "playwright test --config tests/perf/playwright.draw-budget.config.ts",
     "test:perf-frame-time": "playwright test --config tests/perf/playwright.perf.config.ts",
     "test:live": "playwright test --config tests/live/playwright.live.config.ts",

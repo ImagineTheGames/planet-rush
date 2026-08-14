@@ -65,16 +65,42 @@ export const DEFAULT_STALL_MS = 10_000;
  * fails on this wait, naming it — which is the hang signal, distinct from the
  * journey budget (./budgets.ts).
  */
-export async function waitForSimClock(page: Page, timeoutMs = 20_000): Promise<void> {
+export async function waitForSimClock(
+  page: Page,
+  timeoutMs = 20_000,
+  instrument: TickInstrument = 'debug',
+): Promise<void> {
   await page.waitForFunction(
-    () => {
-      const pr = (window as unknown as { __planetRush?: { ticks?: number } }).__planetRush;
-      return typeof pr?.ticks === 'number' && pr.ticks > 0;
+    (source) => {
+      const w = window as unknown as {
+        __planetRush?: { ticks?: number };
+        __pauseStage?: { read(): { simTicks: number } };
+      };
+      const ticks = source === 'pause' ? w.__pauseStage?.read().simTicks : w.__planetRush?.ticks;
+      return typeof ticks === 'number' && ticks > 0;
     },
-    undefined,
+    instrument,
     { timeout: timeoutMs },
   );
 }
+
+/**
+ * Which of the two shipped tick read-outs a wait reads.
+ *
+ * `debug` — `window.__planetRush.ticks`, the ratified `?debug=1` instrument
+ * (src/platform/debug-hook.ts). The default, and what every journey in this
+ * suite has always used.
+ *
+ * `pause` — `window.__pauseStage.read().simTicks`, which reports the SAME
+ * counter but is installed on **both** boots (src/main.ts `installPauseStage`:
+ * *"installed on BOTH boots, unlike the debug stages above"*). It exists here
+ * for the one journey that cannot carry `?debug=1` at all: `?debug=1` is a
+ * single flag that also skips the main menu and the lobby (src/main.ts:969,
+ * :1028), so a test that must walk the REAL lobby has no `__planetRush` to wait
+ * on. Same clock, same fixed steps, same stall discipline — only a different
+ * window onto it.
+ */
+export type TickInstrument = 'debug' | 'pause';
 
 /** What {@link waitForSimTicks} answers with. */
 export interface SimWaitOptions {
@@ -82,6 +108,8 @@ export interface SimWaitOptions {
   readonly stallMs?: number;
   /** Names the wait in a failure ("650 ticks of turret construction"). */
   readonly what?: string;
+  /** Which shipped tick read-out to poll. Defaults to the `?debug=1` one. */
+  readonly instrument?: TickInstrument;
 }
 
 /**
@@ -91,20 +119,35 @@ export interface SimWaitOptions {
  * The poll runs in-page on `requestAnimationFrame`, so the window closes within a
  * frame of hitting the target rather than one CDP round-trip later — polling over
  * the wire overshot to 700+ ticks at ~1 fps (emulation.spec.ts). Throws if the sim
- * stalls (see {@link DEFAULT_STALL_MS}) or if the `?debug=1` tick instrument is
- * not installed at all, which is a boot problem worth naming as one.
+ * stalls (see {@link DEFAULT_STALL_MS}) or if the chosen tick instrument
+ * ({@link TickInstrument}) is not installed at all, which is a boot problem worth
+ * naming as one.
  */
 export async function waitForSimTicks(page: Page, ticks: number, opts: SimWaitOptions = {}): Promise<number> {
   const stallMs = opts.stallMs ?? DEFAULT_STALL_MS;
+  const instrument = opts.instrument ?? 'debug';
   const outcome = await page.evaluate(
-    ({ want, stall }: { want: number; stall: number }) =>
+    ({ want, stall, source }: { want: number; stall: number; source: TickInstrument }) =>
       new Promise<number | string>((resolve) => {
-        const pr = (window as unknown as { __planetRush?: { ticks?: number } }).__planetRush;
-        if (!pr || typeof pr.ticks !== 'number') {
-          resolve('NO INSTRUMENT: window.__planetRush.ticks is absent — was the page loaded with ?debug=1?');
+        const w = window as unknown as {
+          __planetRush?: { ticks?: number };
+          __pauseStage?: { read(): { simTicks: number } };
+        };
+        // One reader per instrument, resolved once — both answer the SAME fixed-step
+        // counter, so everything below this line is identical for either boot.
+        const readTicks =
+          source === 'pause'
+            ? (): number | undefined => w.__pauseStage?.read().simTicks
+            : (): number | undefined => w.__planetRush?.ticks;
+        if (typeof readTicks() !== 'number') {
+          resolve(
+            source === 'pause'
+              ? 'NO INSTRUMENT: window.__pauseStage is absent — is a match actually running?'
+              : 'NO INSTRUMENT: window.__planetRush.ticks is absent — was the page loaded with ?debug=1?',
+          );
           return;
         }
-        const t0 = pr.ticks;
+        const t0 = readTicks() as number;
         let seen = t0;
         let watchdog = 0;
         const arm = (): void => {
@@ -115,7 +158,7 @@ export async function waitForSimTicks(page: Page, ticks: number, opts: SimWaitOp
           );
         };
         const poll = (): void => {
-          const now = pr.ticks as number;
+          const now = readTicks() as number;
           if (now !== seen) {
             seen = now;
             arm(); // progress — the sim is alive, restart the liveness clock
@@ -130,7 +173,7 @@ export async function waitForSimTicks(page: Page, ticks: number, opts: SimWaitOp
         arm();
         requestAnimationFrame(poll);
       }),
-    { want: ticks, stall: stallMs },
+    { want: ticks, stall: stallMs, source: instrument },
   );
 
   if (typeof outcome === 'string') {
