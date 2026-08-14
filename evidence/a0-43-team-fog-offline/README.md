@@ -26,6 +26,7 @@ it never produces it.
 | `lobby-ffa-minimap.png` | the same journey with the MODE press flipped. Same fixed seed, same `octagon`, same eight seats, same seven characters, same point of the match. |
 | `staged-teams-ally-shared.png` | the staged 2v2: the teammate posted across the arena with a rival parked under their sensor, both on the human's map. |
 | `staged-teams-ally-dead.png` | the tick after that teammate's ship dies — their disc and the rival under it are gone; the geography they taught the human is not. |
+| `pre-a0-42-lobby-teams-minimap.png` | **the proof that the proof is worth anything.** The same TEAMS journey, on a build of `origin/main` without a0-42 (`0f2d11b` — the badge is in the corner of the frame). Byte for byte the FFA picture: one ship disc, one station disc, three ore hints. |
 
 ## What the pair measures
 
@@ -94,6 +95,34 @@ the human stay. That is the live/remembered split, across a side.
 The control is the same harness boot with no sides at all (`?debug=1&freeze=1`):
 there is nobody on your side but you, the team's coverage *is* your own disc for
 disc, and no rival is sensed through anybody.
+
+## It fails on the build without a0-42
+
+A proof that passes on the broken build proves nothing — the trap
+`src/platform/radio-seam.test.ts` was written to close. So both tests were run
+against a `vite build` of `origin/main` (`0f2d11b`, a0-42 not merged), served on
+its own port, with no change to the spec:
+
+```
+2 failed
+  [desktop] › offline TEAMS through the real lobby …
+  [desktop] › offline TEAMS, staged …
+```
+
+Act 1 fails on the assertion the whole feature lives in, and with the number that
+says exactly what is missing:
+
+```
+Error: a large area of the arena is revealed to the human in TEAMS
+       that is FOG in the identical FFA match
+Expected: > 40000
+Received: 0
+```
+
+**Zero.** Not "less than the threshold" — on `main` the human's TEAMS minimap and
+their FFA minimap are the same picture, which is the bug this brief exists to rule
+out, reproduced. Act 2 fails earlier and for the plainer reason: `__teamFogStage`
+is not in that bundle at all.
 
 ## Regenerating
 
