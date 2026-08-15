@@ -17,6 +17,8 @@
  * and nothing on this screen may reach a CDN.
  */
 import { describe, it, expect, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   DOOR,
   FONT_URLS,
@@ -703,6 +705,23 @@ describe('the screen ships offline', () => {
       expect(html).not.toContain(host);
     }
     expect(html).not.toContain('react');
+  });
+
+  it('does not so much as NAME a third-party host, in code or in a comment', () => {
+    // The rendered markup being clean is the weaker half of this. The DoD greps
+    // the SOURCE — `grep -qiE 'unpkg|googleapis|gstatic' && exit 1` — because a
+    // hostname sitting in a comment is one careless copy away from being a URL,
+    // and because a screen that has to explain which CDN it does not use has
+    // kept the thing it was told to drop. It shipped failing this once: the
+    // header prose named both hosts while describing their removal.
+    const sources = ['title-gate.ts', 'game-name.ts'].map((file) =>
+      readFileSync(resolve(__dirname, file), 'utf8').toLowerCase(),
+    );
+    for (const source of sources) {
+      for (const host of ['unpkg', 'googleapis', 'gstatic']) {
+        expect(source, `the source names ${host}`).not.toContain(host);
+      }
+    }
   });
 
   it('binds the two ratified faces to the files already in the repo', () => {

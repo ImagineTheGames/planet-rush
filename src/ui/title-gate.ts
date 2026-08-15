@@ -80,9 +80,13 @@
  *    constant and the door never gets re-cut.
  *
  * ── OFFLINE, LIKE EVERYTHING ELSE (GDD §4.3 / §4.8) ─────────────────────────
- * The design file pulls React from `unpkg.com` (viewer scaffolding — zero
- * `createElement`, zero hooks; not load-bearing) and its faces from
- * `fonts.googleapis.com`. Neither survives here. The two faces are the ones
+ * The design file pulls React off a public package CDN (viewer scaffolding —
+ * zero `createElement`, zero hooks; not load-bearing) and its faces off a
+ * third-party font host. Neither survives here, and neither host is so much as
+ * NAMED in this file: the DoD greps the source for them, which is the bluntest
+ * possible way to state "this screen makes no third-party request" and the right
+ * one, since a hostname in a comment is one careless copy away from being a URL.
+ * The two faces are the ones
  * already self-hosted in `public/fonts/`, bound by {@link FONT_FACE_CSS} to the
  * same URLs and the same weight ranges `index.html` declares, so the gate is a
  * duplicate declaration of the shipped faces rather than a competing one.
@@ -627,8 +631,8 @@ export const FONT_URLS = {
 /**
  * The two ratified faces, self-hosted (style-guide §7, GDD §4.3 / §4.8).
  *
- * The design file's `src` values are the design tool's UUID placeholders and its
- * `@font-face` block came with a `preconnect` to `fonts.googleapis.com`. Both
+ * The design file's `src` values are the design tool's UUID placeholders, and its
+ * `@font-face` block came with a `preconnect` to a third-party font host. Both
  * are gone. These declarations repeat `index.html`'s exactly — same family, same
  * weight range, same URL — so they resolve to the already-preloaded files and
  * cost no second download. Oxanium's `200 800` range is not optional: the file's
