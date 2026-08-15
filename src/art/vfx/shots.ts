@@ -83,7 +83,7 @@
  * Each (family, tier) is still one baked {@link SpriteDef}, pooled by
  * `${family}:${tier}` and swapped into a slot only when that slot's shot changes
  * side or rung — the draw-call count does not move. What did move is the quad:
- * the sprite's extent went from 1.48 to {@link SHOT_SPRITE_EXTENT}, so the bloom
+ * the sprite's extent went from 1.48 to 11.67 at the top rung, so the bloom
  * is a much larger transparent rectangle. `evidence/a0-46-pierce-laser-shot/`
  * carries the before/after fill measurement on the §4.3 scene.
  */
@@ -364,11 +364,20 @@ function boltExtent(tier: number): number {
   return Math.ceil(reach * 1e3) / 1e3;
 }
 
-/**
- * The widest extent any bolt declares — the top rung's, since the tail's bloom
- * grows with the rung. **11.67, where the round shot it replaces was 1.48.** A
- * bolt whose centre is a dozen radii off screen can still be painting its tail
- * across the window, which is why the cull tests the drawn reach and not the
- * centre (`../../render/cull` `RENDER_EXTENT.shot`).
+/*
+ * There is deliberately no exported `SHOT_SPRITE_EXTENT` here.
+ *
+ * The widest extent any bolt declares is the top rung's, since the tail's bloom
+ * grows with the rung — **11.67, where the round shot it replaces was 1.48** —
+ * and `RENDER_EXTENT.shot` in `../../render/cull` is that number, rounded up.
+ * Publishing it from this module as well looks like the tidy move and is not:
+ * nothing in production would call it (`RENDER_EXTENT` is a table of literals by
+ * design, so the cull declares its own padding and `cull.test.ts` walks every
+ * family and rung to prove the declaration bounds the art), so it would be an
+ * export only tests read — the shape `tools/dark-matter-scan.mjs` exists to
+ * catch. Worse, the one assertion it enabled was circular: the maximum of a set
+ * is trivially ≥ every member of that set.
+ *
+ * Both tests that care derive the maximum themselves by walking the public
+ * `shotSprite(family, tier).extent`, which is what the cull actually pads by.
  */
-export const SHOT_SPRITE_EXTENT: number = Math.max(...SHOT_TIERS.map(boltExtent));

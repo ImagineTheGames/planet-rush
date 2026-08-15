@@ -37,7 +37,6 @@ import {
   SHOT_FAMILIES,
   SHOT_MAX_TIER,
   SHOT_SIDE_COLOR,
-  SHOT_SPRITE_EXTENT,
   SHOT_TIERS,
   boltGeometry,
   clampShotTier,
@@ -304,17 +303,24 @@ describe('the PIERCE laser bolt', () => {
   });
 
   it('declares an extent that bounds every rung — the number the cull pads by', () => {
+    // Derived here rather than imported: the maximum is only ever read by tests,
+    // and asserting that it is ≥ each of the values it is the maximum OF proves
+    // nothing. What has content is that each sprite's DECLARED extent bounds the
+    // pixels that sprite actually paints — an extent short of the paint clips the
+    // tail against the edge of its own bake — and that the widest is the number
+    // `RENDER_EXTENT.shot` was set from.
+    let widest = 0;
     for (const family of SHOT_FAMILIES) {
       for (const tier of SHOT_TIERS) {
         const def = shotSprite(family, tier);
         const box = paintedBox(def);
-        expect(def.extent).toBeLessThanOrEqual(SHOT_SPRITE_EXTENT);
+        widest = Math.max(widest, def.extent);
         for (const v of [box.x0, box.x1, box.y0, box.y1]) {
           expect(Math.abs(v)).toBeLessThanOrEqual(def.extent);
         }
       }
     }
-    expect(SHOT_SPRITE_EXTENT).toBeCloseTo(11.672, 3);
+    expect(widest).toBeCloseTo(11.672, 3);
   });
 });
 

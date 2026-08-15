@@ -101,7 +101,6 @@
     "src/art/vfx/layer.ts#PARTICLE_TEXTURE_PX": "DARK — the GDD §3.6 particle set; nothing constructs ArtPresenter/VfxLayer (§4.1)",
     "src/art/vfx/shots.ts#SHOT_FAMILIES": "SURFACE — exported for a spec to assert; triaged by pattern (§4.4b)",
     "src/art/vfx/shots.ts#SHOT_TIERS": "SURFACE — exported for a spec to assert; triaged by pattern (§4.4b)",
-    "src/art/vfx/shots.ts#shotTierColor": "SURFACE — exported for a spec to assert; triaged by pattern (§4.4b)",
     "src/art/wrecks.ts#debrisFieldSprite": "SURFACE — exported for a spec to assert; triaged by pattern (§4.4b)",
     "src/bots/ally.ts#ALLY_RESPONSE_RANGE_WIDE": "SURFACE — triaged by pattern, not individually verified (§4.4b)",
     "src/bots/ally.ts#ASSAULT_JOIN_RANGE_WIDE": "SURFACE — exported for a spec to assert; triaged by pattern (§4.4b)",
