@@ -1943,6 +1943,10 @@ async function boot(): Promise<void> {
    *  from the pointer but a stick merely resting where it was does not fight the
    *  cursor for it every frame. */
   let stickSelection: number | null = null;
+  /** Which wheel level the selection above was taken on — `build`, `upgrade`,
+   *  `weapon`, or `closed`. Compared per frame in {@link updateBuildWheel}: an
+   *  index means nothing on a level with different wedges under it (a0-51). */
+  let wheelLevel = 'closed';
 
   /**
    * Point the wheel at whatever is under (x, y) in logical space — the pointer
@@ -1954,16 +1958,33 @@ async function boot(): Promise<void> {
    * second opinion. The hub and everything off the disc select nothing: `null` is
    * "you are pointing at the wheel but not at a wedge", which is exactly what the
    * hub is (`WheelHit.kind === 'hub'` — the BACK affordance, not a purchase).
+   *
+   * **Whichever wheel is on top** (a0-51). This used to return `null` the moment
+   * the upgrade wheel came up, because that wheel had no highlight to feed; it has
+   * one now, and it is the same radial control one level down, so the pointer is
+   * hit-tested against the level that is actually drawn — with the level's own
+   * slot count, exactly as the press route builds it a few lines below. The count
+   * is what decides which wedge an angle falls in, so reading it from anywhere
+   * else is how a highlight and a press come to disagree.
    */
   function updateWheelSelection(x: number, y: number): void {
-    if (!buildWheel.open || buildWheel.panelOpen) {
+    if (!buildWheel.open) {
       wheelSelection = null;
       return;
     }
-    buildWheelLayout.centerX = transform.logicalWidth / 2;
-    buildWheelLayout.centerY = transform.logicalHeight / 2;
-    buildWheelLayout.radius = wheelRadius(transform.logicalWidth, transform.logicalHeight);
-    const hit = hitWheel(x, y, buildWheelLayout);
+    const w = transform.logicalWidth;
+    const h = transform.logicalHeight;
+    const layout = buildWheel.panelOpen ? upgradeWheelLayout : buildWheelLayout;
+    layout.centerX = w / 2;
+    layout.centerY = h / 2;
+    layout.radius = wheelRadius(w, h);
+    // The upgrade wheel's slot count changes with the level (main wheel vs. the
+    // WEAPON sub-wheel). Recomputed here rather than cached, for the reason the
+    // press route recomputes it: this is the pointer path, not the per-frame draw
+    // path GDD §4.3 holds allocation-free, and a stale count is a highlight on the
+    // wrong wedge.
+    if (buildWheel.panelOpen) layout.segments = upgradeWheelSlots(weaponWheelOpen).length;
+    const hit = hitWheel(x, y, layout);
     wheelSelection = hit.kind === 'segment' ? hit.index : null;
   }
   // The open upgrade wheel's hit target — same geometry as the Build wheel, but
@@ -2118,6 +2139,12 @@ async function boot(): Promise<void> {
           hud.pressWheelSegment('upgrade', hit.index);
           wedgeSounded = true;
         } else if (slot?.kind === 'track') {
+          // The finger landing IS a selection (a0-51, the Build wheel's own rule):
+          // on touch there is no hover to have lit the wedge first, so this is the
+          // frame the highlight and the detent arrive on. A press on WEAPON gets
+          // none of this — it changes the level, and the selection belongs to the
+          // level it was taken on.
+          wheelSelection = hit.index;
           // Latch the pressed track; `updateBuildWheel` drains it into the funnel
           // as an `upgradeOrder` on the next tick, exactly like a Build segment.
           pendingUpgrade = slot.track;
@@ -3507,6 +3534,29 @@ async function boot(): Promise<void> {
 
     const confirmPressed = merged.fire && !fireHeld;
     fireHeld = merged.fire;
+
+    // ── THE SELECTION BELONGS TO THE LEVEL IT WAS TAKEN ON (a0-51) ──────────
+    //
+    // One integer, three wheel levels: the Build wheel's five wedges, the upgrade
+    // wheel's four, the WEAPON sub-wheel's two. When the level changes UNDER the
+    // pointer — a wedge opened a screen, a hub tap went back — the index is a
+    // statement about wedges that are no longer on screen, and carrying it over
+    // would light whichever wedge of the new level happens to share its number
+    // without the player pointing at anything. So a level change drops it, and the
+    // next pointer move or press takes a fresh one. (Out of range is already dark:
+    // the models clamp against their own count. This is the case where it is IN
+    // range and still wrong.)
+    const level = !buildWheel.open
+      ? 'closed'
+      : buildWheel.panelOpen
+        ? weaponWheelOpen
+          ? 'weapon'
+          : 'upgrade'
+        : 'build';
+    if (level !== wheelLevel) {
+      wheelLevel = level;
+      wheelSelection = null;
+    }
 
     if (buildWheel.open) {
       buildWheel.aim(merged.thrust.x, merged.thrust.y, WHEEL_ORDER.length);
