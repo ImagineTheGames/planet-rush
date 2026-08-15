@@ -690,11 +690,20 @@ export function gateRootLayoutCss(t: {
   // percent of the box the door actually lives in, and everything below reads
   // them through {@link vw} / {@link vh}.
   const units = `--pr-gate-vw:${t.logicalWidth / 100}px;--pr-gate-vh:${t.logicalHeight / 100}px;`;
-  if (!t.rotated) return `${units}width:100%;height:100%;transform:none;transform-origin:50% 50%;`;
+  // The inset under the prompt, which is the one thing on this screen close
+  // enough to an edge to collide with a home indicator (mobile amendment §1).
+  // Under the lock the LOGICAL bottom is the PHYSICAL left, so the two cases do
+  // not read the same `env()` — a rotated overlay that kept using
+  // `safe-area-inset-bottom` would pad the wrong edge by the wrong amount.
+  const safe = t.rotated
+    ? '--pr-gate-safe-bottom:env(safe-area-inset-left, 0px);'
+    : '--pr-gate-safe-bottom:env(safe-area-inset-bottom, 0px);';
+  if (!t.rotated) return `${units}${safe}width:100%;height:100%;transform:none;transform-origin:50% 50%;`;
   // Rotated: the element is the LOGICAL rect, and `logicalHeight` is the physical
   // width — which is exactly the translation the transform needs.
   return (
     units +
+    safe +
     `width:${t.logicalWidth}px;height:${t.logicalHeight}px;` +
     `transform-origin:0 0;transform:translateX(${t.logicalHeight}px) rotate(90deg);`
   );
@@ -961,7 +970,7 @@ export function titleGateHtml(options: GateHtmlOptions = {}): string {
     '</div>' +
     // The prompt. Register 2 (style-guide §8): procedural, unglamorous, present
     // tense, and it names the action in its first three words.
-    `<div style="position:absolute;z-index:4;left:0;right:0;bottom:max(${vh(3.4)},22px);display:flex;flex-direction:column;align-items:center;gap:9px;` +
+    `<div style="position:absolute;z-index:4;left:0;right:0;bottom:calc(max(${vh(3.4)},22px) + var(--pr-gate-safe-bottom, 0px));display:flex;flex-direction:column;align-items:center;gap:9px;` +
     `opacity:var(--pr-gate-prompt-op);transition:opacity ${TRANSITION.hazard}ms ease-out;pointer-events:none;">` +
     `<div style="display:flex;align-items:center;padding:10px 24px;border:1px solid #515861;background:linear-gradient(180deg,rgba(198,205,214,.1),rgba(198,205,214,0) 50%),linear-gradient(#383e45,#20252c);box-shadow:0 6px 20px rgba(${INK},.75);animation:pr-gate-prompt 2.1s ease-in-out infinite;">` +
     `<span style="font-family:Oxanium,system-ui,sans-serif;font-weight:800;font-size:clamp(10px,${vw(1.2)},13px);letter-spacing:.3em;color:${BONE_WHITE};">${PROMPT}</span>` +

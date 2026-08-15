@@ -1140,6 +1140,24 @@ describe('a phone held portrait', () => {
     expect(portrait.logicalHeight).toBe(390); // …and 390 IS the physical width
   });
 
+  it('reads the safe-area inset off the edge the prompt is actually near', () => {
+    // The prompt is the only thing on this screen close enough to an edge to
+    // meet a home indicator (mobile amendment §1) — and under the lock the
+    // LOGICAL bottom is the PHYSICAL left, so the two orientations do not read
+    // the same `env()`. Keeping `safe-area-inset-bottom` through the rotation
+    // would pad the wrong edge by the wrong amount, which is the kind of thing
+    // that looks fine until it is on a handset with a notch.
+    expect(gateRootLayoutCss(computeRootTransform(1280, 800, false))).toContain(
+      '--pr-gate-safe-bottom:env(safe-area-inset-bottom, 0px)',
+    );
+    expect(gateRootLayoutCss(computeRootTransform(390, 844, true))).toContain(
+      '--pr-gate-safe-bottom:env(safe-area-inset-left, 0px)',
+    );
+    // …and the prompt reads it, with a 0 fallback so an unlaid-out render (or a
+    // browser with no `env()`) is exactly the design's own offset.
+    expect(titleGateHtml()).toContain('var(--pr-gate-safe-bottom, 0px)');
+  });
+
   it('is the identity on a desktop and on a landscape phone', () => {
     for (const t of [computeRootTransform(1280, 800, false), computeRootTransform(844, 390, true)]) {
       expect(t.rotated).toBe(false);
