@@ -64,10 +64,38 @@ export interface LoggedShip {
   readonly eliminated?: boolean;
 }
 
+/**
+ * The slice of an ore-journal event read here (`src/sim/ore-journal` `OreEvent`
+ * satisfies it). Flat scalars already — the log's own `data` shape, which is why
+ * one becomes a line without a translation table (a0-52).
+ */
+export interface LoggedOreEvent {
+  readonly tick: number;
+  readonly player: PlayerId;
+  readonly flow: string;
+  readonly item: string;
+  readonly amount: number;
+  readonly hold: number;
+  readonly bank: number;
+  readonly holdAfter: number;
+  readonly bankAfter: number;
+}
+
 /** The slice of the world read here. `World` (`src/sim`) satisfies it. */
 export interface LoggedWorld {
   readonly tick: number;
   readonly ships: readonly LoggedShip[];
+  /**
+   * The sim's per-movement ore journal (`src/sim/ore-journal`), drained here into
+   * the log. Optional: an offline world built by another lane may keep none, and a
+   * session with no journal simply logs no economy lines.
+   *
+   * Mutable on purpose — this module SPLICES it, which is the drain. A structural
+   * type rather than an import of `drainOreJournal`, for the same reason every
+   * other type in this file is structural: `./playtest-log-attach` stays a leaf
+   * that knows nothing about `../sim`.
+   */
+  readonly oreJournal?: { events: LoggedOreEvent[] };
 }
 
 /**
@@ -246,7 +274,20 @@ export function attachSessionLog(config: AttachConfig): SessionLogHandle {
         for (const event of journal.drain()) log.record('net', event.kind, describeAction(event));
       }
 
-      // 4. Local spawn / death, off the predicted world.
+      // 4. The economy, movement by movement (a0-52). The report this exists for
+      //    — "i had 2 ore and was able to build a turret" — arrived with a log
+      //    that carried no economy events at all, so it had to be answered from
+      //    screenshots and inference. These are the lines that answer it in one
+      //    read: what was bought, at what price, against what balance, at which
+      //    tick, plus every refusal and the overdraft that must never appear.
+      const economy = session.world?.oreJournal;
+      if (economy && economy.events.length > 0) {
+        for (const line of coalesceOre(economy.events.splice(0, economy.events.length))) {
+          log.record('match', line.msg, line.data);
+        }
+      }
+
+      // 5. Local spawn / death, off the predicted world.
       const world = session.world;
       if (world) {
         const ship = world.ships.find((s) => s.id === session.you);
@@ -265,6 +306,77 @@ export function attachSessionLog(config: AttachConfig): SessionLogHandle {
       live = false;
     },
   };
+}
+
+/**
+ * Longest run of identical-flow ore movements folded into one log line. A player
+ * flying a full hold home banks one ore at a time; eight of those are one sentence,
+ * not eight, and the ring is 600 events for a whole session.
+ */
+export const MAX_ORE_RUN = 8;
+
+/** One log line ready to record. */
+interface OreLine {
+  readonly msg: string;
+  readonly data: Record<string, string | number>;
+}
+
+/**
+ * Fold a drained batch of ore events into log lines (a0-52).
+ *
+ * **Every purchase gets its own line, always.** `spent`, `refused` and `overdraft`
+ * are what a report about a purchase is made of, and folding two of them together
+ * would destroy the one thing they are logged for — so they never merge, whatever
+ * they sit next to.
+ *
+ * **The two high-frequency flows fold.** `mined` and `banked` arrive one per chunk
+ * and one per whole ore drained, and a run of them says one thing: the player
+ * mined, then flew home and banked it. A folded line keeps the *first* balance and
+ * the *last* — which is exactly the before/after a reader wants — and carries `n`,
+ * so nothing is hidden: the arithmetic still checks out across the fold.
+ */
+export function coalesceOre(events: readonly LoggedOreEvent[]): readonly OreLine[] {
+  const out: OreLine[] = [];
+  let run: (LoggedOreEvent & { n: number; holdEnd: number; bankEnd: number; total: number }) | null = null;
+  const flush = (): void => {
+    if (!run) return;
+    out.push({
+      msg: run.flow,
+      data: {
+        tick: run.tick,
+        player: run.player,
+        item: run.item,
+        amount: round2(run.total),
+        hold: round2(run.hold),
+        holdAfter: round2(run.holdEnd),
+        bank: round2(run.bank),
+        bankAfter: round2(run.bankEnd),
+        ...(run.n > 1 ? { n: run.n } : {}),
+      },
+    });
+    run = null;
+  };
+  for (const e of events) {
+    const foldable = e.flow === 'mined' || e.flow === 'banked';
+    if (run && foldable && run.flow === e.flow && run.item === e.item && run.player === e.player && run.n < MAX_ORE_RUN) {
+      run.n++;
+      run.total += e.amount;
+      run.holdEnd = e.holdAfter;
+      run.bankEnd = e.bankAfter;
+      continue;
+    }
+    flush();
+    run = { ...e, n: 1, holdEnd: e.holdAfter, bankEnd: e.bankAfter, total: e.amount };
+    if (!foldable) flush();
+  }
+  flush();
+  return out;
+}
+
+/** Ore is whole on the wheel but mining lands fractional; eight decimal places of
+ *  float is noise in a pasted log, not evidence. */
+function round2(v: number): number {
+  return Math.round(v * 100) / 100;
 }
 
 /**

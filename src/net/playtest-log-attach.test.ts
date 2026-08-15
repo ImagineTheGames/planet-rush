@@ -17,8 +17,8 @@
 import { describe, expect, it } from 'vitest';
 import { PlaytestLog, describeEnvironment } from './playtest-log';
 import { ActionJournal } from './action-journal';
-import { attachSessionLog, describeAction, describeSample } from './playtest-log-attach';
-import type { LoggedSession, LoggedWorld } from './playtest-log-attach';
+import { MAX_ORE_RUN, attachSessionLog, describeAction, describeSample } from './playtest-log-attach';
+import type { LoggedOreEvent, LoggedSession, LoggedWorld } from './playtest-log-attach';
 import { ShipClass } from '@shared/types';
 import type { ConnectionState, ServerMessage } from './transport';
 import type { TelemetrySample } from './telemetry';
@@ -348,6 +348,135 @@ describe('match events', () => {
     attachSessionLog({ log, session });
     session.emit({ type: 'matchEnd', winner: 5, tick: 3_600 });
     expect(log.events[0]!.data).toEqual({ winner: 5, tick: 3_600 });
+  });
+});
+
+describe('the economy, movement by movement (a0-52)', () => {
+  /** One ore-journal event, as `src/sim/ore-journal` writes them. */
+  function ore(over: Partial<LoggedOreEvent> = {}): LoggedOreEvent {
+    return {
+      tick: 100,
+      player: 2,
+      flow: 'spent',
+      item: 'turret',
+      amount: 3,
+      hold: 3,
+      bank: 0,
+      holdAfter: 0,
+      bankAfter: 0,
+      ...over,
+    };
+  }
+
+  /** A world carrying a journal, as the predicted world does. */
+  function worldWith(events: LoggedOreEvent[]): LoggedWorld & { oreJournal: { events: LoggedOreEvent[] } } {
+    return { tick: 100, ships: [{ id: 2, alive: true }], oreJournal: { events } };
+  }
+
+  it('answers "what did that turret cost me" in one line', () => {
+    // The whole reason this exists. a0-52's log carried a session start, a webgl
+    // note, two connect lines and eight seconds — nothing that could decide the
+    // report either way. This is the line that decides it.
+    const log = newLog();
+    const world = worldWith([ore({ hold: 5, holdAfter: 2, bank: 1, bankAfter: 1 })]);
+    const session = fakeSession();
+    session.world = world;
+    const handle = attachSessionLog({ log, session });
+
+    handle.poll();
+
+    const spent = log.events.filter((e) => e.msg === 'spent');
+    expect(spent).toHaveLength(1);
+    expect(spent[0]!.data).toEqual({
+      tick: 100,
+      player: 2,
+      item: 'turret',
+      amount: 3,
+      hold: 5,
+      holdAfter: 2,
+      bank: 1,
+      bankAfter: 1,
+    });
+    // Drained by the read, like the action journal: a paste is a timeline, not the
+    // same purchase sixty times a second.
+    handle.poll();
+    expect(log.events.filter((e) => e.msg === 'spent')).toHaveLength(1);
+  });
+
+  it('logs the refusal and the overdraft, each on its own line, never folded', () => {
+    // A purchase line and its counterpart are what a report about a purchase is
+    // made of. Folding two of them together would destroy the only thing they are
+    // logged for, so they never merge — even back to back.
+    const log = newLog();
+    const session = fakeSession();
+    session.world = worldWith([
+      ore({ flow: 'refused', item: 'shield', amount: 5, hold: 2, holdAfter: 2, bank: 0, bankAfter: 0 }),
+      ore({ flow: 'refused', item: 'turret', amount: 3, hold: 2, holdAfter: 2, bank: 0, bankAfter: 0 }),
+      ore({ flow: 'refused', item: 'turret', amount: 3, hold: 2, holdAfter: 2, bank: 0, bankAfter: 0 }),
+      ore({ flow: 'overdraft', item: 'turret', amount: 3, hold: 2, holdAfter: -1, bank: 0, bankAfter: 0 }),
+    ]);
+    attachSessionLog({ log, session }).poll();
+
+    // Two refusals of DIFFERENT things are two lines. The two identical ones are
+    // the log's own repeat-coalescing (`./playtest-log`), which counts rather than
+    // drops them — a distinction this file must not undo by folding first.
+    const refusals = log.events.filter((e) => e.msg === 'refused');
+    expect(refusals.map((e) => e.data?.item)).toEqual(['shield', 'turret']);
+    expect(refusals[1]!.repeat).toBe(2);
+    const overdraft = log.events.find((e) => e.msg === 'overdraft');
+    // The negative balance, in the log, from before the clamp that would have
+    // tidied it into a clean zero (`src/sim/buildings` `spendOre`).
+    expect(overdraft?.data).toMatchObject({ item: 'turret', hold: 2, holdAfter: -1 });
+  });
+
+  it('folds a run of mining and banking, and keeps the arithmetic true across the fold', () => {
+    // A player flying a full hold home banks one ore at a time. Eight of those are
+    // one sentence; the ring is 600 events for a whole session.
+    const events: LoggedOreEvent[] = [];
+    for (let i = 0; i < 4; i++) {
+      events.push(ore({ flow: 'mined', item: 'chunk', amount: 1, hold: i, holdAfter: i + 1, bank: 0, bankAfter: 0 }));
+    }
+    for (let i = 0; i < 4; i++) {
+      events.push(
+        ore({ flow: 'banked', item: 'drain', amount: 1, hold: 4 - i, holdAfter: 3 - i, bank: i, bankAfter: i + 1 }),
+      );
+    }
+    const log = newLog();
+    const session = fakeSession();
+    session.world = worldWith(events);
+    attachSessionLog({ log, session }).poll();
+
+    const mined = log.events.filter((e) => e.msg === 'mined');
+    const banked = log.events.filter((e) => e.msg === 'banked');
+    expect(mined).toHaveLength(1);
+    expect(banked).toHaveLength(1);
+    // First balance in, last balance out, and `n` so nothing is hidden: 0 → 4 in
+    // the hold over four chunks, then 4 → 0 out of it and 0 → 4 into the bank.
+    expect(mined[0]!.data).toMatchObject({ amount: 4, hold: 0, holdAfter: 4, n: 4 });
+    expect(banked[0]!.data).toMatchObject({ amount: 4, hold: 4, holdAfter: 0, bank: 0, bankAfter: 4, n: 4 });
+  });
+
+  it('caps a fold, so one long drain cannot become one unreadable line', () => {
+    const events = Array.from({ length: MAX_ORE_RUN * 2 + 1 }, (_, i) =>
+      ore({ flow: 'mined', item: 'chunk', amount: 1, hold: i, holdAfter: i + 1 }),
+    );
+    const log = newLog();
+    const session = fakeSession();
+    session.world = worldWith(events);
+    attachSessionLog({ log, session }).poll();
+
+    expect(log.events.filter((e) => e.msg === 'mined')).toHaveLength(3);
+  });
+
+  it('logs nothing at all for a world that keeps no journal', () => {
+    // Offline worlds other lanes build carry none, and a session with no economy
+    // must not become a session with no log (`src/sim/ore-journal`).
+    const log = newLog();
+    const session = fakeSession();
+    session.world = { tick: 4, ships: [{ id: 2, alive: true }] };
+    attachSessionLog({ log, session }).poll();
+
+    expect(log.events.filter((e) => e.kind === 'match')).toHaveLength(0);
   });
 });
 
