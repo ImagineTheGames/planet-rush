@@ -117,6 +117,37 @@ substitutes for the DoD, the PR, or QA attestation.
 - **`d7410fe` chore(a0-50): the flag on boots this lane does not own.** 22 sites
   in 22 files, one line each, alone in its own commit so QA and Platform can
   revert it without touching the screen.
+- **`5bececa` test(a0-50): measure the sealed door.** The gate is sampled in
+  `menu-frame-cost.spec.ts`'s title test, against the same live-match yardstick.
+  17.6 s → 24.3 s in-container, both green; `shard-plan` 109 → 144, DERIVED.
+- **`5c53a10` fix(a0-50): the doorway was a hole in the canvas and a lid
+  everywhere else.** **THE FINDING OF THIS PASS.** See below.
+- **`0901349` evidence(a0-50): the door operated, and the failure put back
+  beside it.** `evidence/a0-50-title-gate/` — five beats, `before`/`after`, and a
+  regenerable `shoot.mjs` that fails loudly if the gate does not mount.
+
+### The bug three sessions of green unit tests could not see
+
+**The overlay root was painted `background:#070910`.** The punch is
+`destination-out` on the CANVAS, so it erases the canvas; the root sits behind
+the canvas, inside the overlay, between the doorway and the menu — and the punch
+cannot reach it. The shipped screen showed a **black doorway for the whole of
+beats 2 and 3.** The leaves parted onto nothing.
+
+Three things worth keeping from it:
+
+- **`skyCoversPoint` was right the entire time.** The named test asserts the
+  canvas geometry and the canvas geometry was never wrong. Trap 1 is not *"is
+  the punch a ring"* — it is *"is the doorway a hole ALL THE WAY THROUGH"*, and a
+  canvas predicate cannot answer the second. The new case says so by name.
+- **Sealed is the state anyone would photograph, and sealed is where the leaves
+  cover the defect.** `before-1-sealed.png` and `after-1-sealed.png` are
+  indistinguishable. So is beat 2. Only the frame carrying the claim differs.
+- **Nothing in this repo would have caught it.** Not the unit suite (no DOM), not
+  the goldens (they boot `?gate=0`, and before this brief there was no gate at
+  all). It took loading the built bundle in Chromium and pressing the door. **Do
+  that before claiming this screen works** — it is four minutes and it is the
+  only thing that can see this class of failure.
 
 ## DECISIONS (the CI pass)
 
@@ -134,15 +165,30 @@ substitutes for the DoD, the PR, or QA attestation.
   the existing test rather than added as a third, so the shard grows by one boot
   and one 3 s window instead of a whole test.
 
+## VERIFIED LOCALLY (this pass, in-container, against the real preview build)
+
+- `npx tsc --noEmit` — clean.
+- `npm test -- --run` — 295 files, 5428 tests, all passing (re-run after the last
+  edit is the one that counts; see the final run in the PR).
+- `npm run dark-matter:check` — no new dark exports.
+- `--project=iphone menu-frame-cost.spec.ts` — 2 passed, with the sealed door
+  sampled: the door is inside the same ceiling the menu is.
+- `--project=desktop goldens.spec.ts` — **24 passed, 26 skipped, no rebaseline.**
+  This is the one that mattered: `?gate=0` restores the exact pixels every
+  existing baseline was taken against, so the flag costs QA nothing.
+- Chromium, by hand, on the built bundle — which is what found the black doorway.
+
 ## NEXT
 
-- Push, and watch the shards. The four that failed (2, 3, 4, 5) are exactly the
-  ones carrying a front-door spec; shard 1 and 6 carry `goldens`, which is the
-  one that would fail on PIXELS rather than on a timeout if the flag were wrong.
+- Watch the shards. The four that failed (2, 3, 4, 5) are exactly the ones
+  carrying a front-door spec; 1 and 6 carry `goldens`, which fails on PIXELS
+  rather than on a timeout if the flag is wrong — and desktop `goldens` is green
+  locally.
 - **For QA / the Director, not blocking:** the `?gate=0` opt-out means the
   goldens do not photograph this screen. A golden of the sealed door is worth
   having and belongs in `goldens.spec.ts`, which is QA's — the seam it needs
-  (`window.__titleGate`) does not exist yet either.
+  (`window.__titleGate`) does not exist yet either. `evidence/a0-50-title-gate/`
+  is the interim, and it is regenerable.
 
 **Read this before touching the branch again** (it is the reason this file
 exists). A later session in a fresh lane started from a stale local branch — the
