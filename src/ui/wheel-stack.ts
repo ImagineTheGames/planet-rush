@@ -188,14 +188,23 @@ export function buildWedgeLines(
  * in v0.2.2), it quotes {@link OPENS_SCREEN} where the others quote a price
  * because it opens a screen rather than spending, and it has no ladder of its own
  * to pip.
+ *
+ * `selected` is the Build wheel's own flag, on the wheel behind its arrow (a0-51):
+ * the wedge being pointed at draws its NAME larger by the same
+ * {@link SELECTION_NAME_SCALE}, decided here in the module the fit budget
+ * measures rather than scaled in the view. One control, one rule, at both levels.
  */
-export function upgradeWedgeLines(wedge: UpgradeWedge, m: WheelProfile): readonly WedgeLine[] {
+export function upgradeWedgeLines(
+  wedge: UpgradeWedge,
+  m: WheelProfile,
+  selected = false,
+): readonly WedgeLine[] {
   const lines: WedgeLine[] = [
     {
       slot: 'name',
       text: wrapWedgeName(wedge.label),
       face: 'display',
-      size: m.name,
+      size: selected ? m.name * SELECTION_NAME_SCALE : m.name,
       tracking: DISPLAY_TRACKING.heading,
       lead: WEDGE_LEAD.name,
       gap: m.gapName,

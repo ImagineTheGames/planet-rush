@@ -684,9 +684,9 @@ export class Hud extends Container {
    *  the wheel's DETENT (u16-01) is not a press: nothing was pushed and nothing
    *  was bought, so it has no business travelling through the press driver. */
   private readonly sfx: UiSfx;
-  /** The Build wheel's selected wedge as of the last frame, so a crossing is the
-   *  CHANGE between two frames rather than a flag anybody has to remember to
-   *  clear ({@link ./wheel-selection.detentOnSelection}). */
+  /** The selected wedge as of the last frame, on whichever wheel was on top, so a
+   *  crossing is the CHANGE between two frames rather than a flag anybody has to
+   *  remember to clear ({@link ./wheel-selection.detentOnSelection}). */
   private prevSelection: number | null = null;
   /** A wedge boundary was crossed since the last {@link takeDetent} — drained by
    *  the boot path, which owns the vibration motor (`@platform/haptics`). */
@@ -1813,17 +1813,29 @@ export class Hud extends Container {
       // The wedge the player is pointing at — a mouse hover, a thumb, or a stick,
       // all as one integer (u16-01). The model clamps it and drops it on a shut
       // wheel, so nothing downstream has to.
-      selected: frame.wheelSelection ?? null,
+      //
+      // It belongs to the wheel that is ON TOP, and that is decided here rather
+      // than downstream: with the upgrade wheel in front, the integer is an
+      // UPGRADE wedge's, so handing it to the Build model as well would light a
+      // wedge nobody can see and — worse — tick the detent against the wrong
+      // wheel's affordability (a0-51).
+      selected: (frame.upgradePanelOpen ?? false) ? null : (frame.wheelSelection ?? null),
     };
     const wheel = buildWheelModel(signals);
+    const upgradeOpen = wheel.open && (frame.upgradePanelOpen ?? false);
     const upgrade = upgradeWheelModel({
       // The upgrade wheel only exists behind the Build wheel's arrow (GDD §2.5).
-      open: wheel.open && (frame.upgradePanelOpen ?? false),
+      open: upgradeOpen,
       // ...and the WEAPON sub-wheel only inside that (RATIFIED v0.2.2).
       weaponOpen: (frame.upgradePanelOpen ?? false) && (frame.weaponWheelOpen ?? false),
       shipClass: frame.shipClass ?? ShipClass.Vanguard,
       tiers: frame.upgradeTiers ?? STOCK_TIERS,
       ore: wheel.ore,
+      // The same pointer integer, now that this wheel has a highlight to spend it
+      // on (a0-51). The model clamps it against THIS level's wedge count, so an
+      // index taken on the five-wedge Build wheel goes dark here rather than
+      // lighting a track that happens to share its number.
+      selected: upgradeOpen ? (frame.wheelSelection ?? null) : null,
     });
 
     // Confirmations, derived from the sim's own numbers (field report v0.2.2):
@@ -1871,11 +1883,22 @@ export class Hud extends Container {
     // cannot double-tick. The cue itself is already in the ratified bank
     // (`src/art/audio/ui-cues.ts` — one note, A♭7, undetuned, "a wobbling detent
     // reads as a fault"), so nothing new is synthesised for this.
-    if (detentOnSelection(this.prevSelection, wheel.selected, wheel.segments)) {
+    //
+    // Fired for whichever wheel is on top (a0-51): the Upgrade wheel is the same
+    // radial control one level down, its crossings are the same gesture, and
+    // `detentOnSelection` asks both wheels the same question — is the wedge you
+    // just crossed onto pressable — so a maxed track is as muted as a capped
+    // turret ring. One `prevSelection` for both, because only one wheel is ever
+    // pointed at: the level change itself drops the selection to null, which is a
+    // departure and silent by the same rule.
+    const active = upgrade.open
+      ? { selected: upgrade.selected, wedges: upgrade.wedges }
+      : { selected: wheel.selected, wedges: wheel.segments };
+    if (detentOnSelection(this.prevSelection, active.selected, active.wedges)) {
       this.sfx('detent');
       this.detentPending = true;
     }
-    this.prevSelection = wheel.selected;
+    this.prevSelection = active.selected;
 
     this.wheel.update(wheel, upgrade, frame.time, this.pressFeedback, frame.isTouch ?? false);
     return wheel.open;

@@ -27,11 +27,15 @@
  * so nothing else may cross a wedge face.
  */
 import { describe, it, expect } from 'vitest';
-import { Graphics } from 'pixi.js';
+import { Container, DOMAdapter, Graphics } from 'pixi.js';
 import { wheelMetrics } from '../art/materials';
-import { drawWheelRings, drawWheelSelection, drawWheelSpokes } from './build-wheel-view';
-import { SEGMENT_ARC, WHEEL_ORDER, segmentAngle } from './build-wheel';
+import { BuildWheelView, drawWheelRings, drawWheelSelection, drawWheelSpokes } from './build-wheel-view';
+import { buildWheelModel, SEGMENT_ARC, WHEEL_ORDER, segmentAngle } from './build-wheel';
+import type { BuildWheelSignals } from './build-wheel';
+import { STOCK_TIERS, upgradeWedgeAngle, upgradeWedgeArc, upgradeWheelModel } from './upgrade-wheel';
+import { wheelRadius } from './hud-geometry';
 import { WHEEL_SELECTION } from './instrument';
+import { ShipClass } from '@shared/types';
 
 /** The desktop wheel radius the goldens are taken at, near enough. */
 const R = 235;
@@ -342,6 +346,228 @@ describe('the highlight covers the wedge it is on, and nothing else', () => {
     for (const edge of [between - SEGMENT_ARC / 2, between + SEGMENT_ARC / 2]) {
       const p = { x: Math.cos(edge) * mid, y: Math.sin(edge) * mid };
       expect(Math.min(...segments.map((s) => distanceToSegment(p, s)))).toBeLessThan(1);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The UPGRADE wheel's selection (a0-51) — the wheel that drew none at all
+// ---------------------------------------------------------------------------
+//
+// Everything above measures the highlight as a bare `drawWheelSelection` call:
+// where its ink lands, given an angle and an arc. That is the right question for
+// the layer, and it is blind to the two things the developer actually reported
+// — *"it doesnt have the selection animation or graphics only the top most one
+// has it"*:
+//
+//   1. `drawUpgradeWheel` never called it. The layer was correct and unused, so
+//      the wheel behind UPGRADE SHIP drew no highlight anywhere.
+//   2. The sweep's angles came from the BUILD wheel's five wedges, so even once
+//      drawn the highlight only landed correctly on index 0 — twelve o'clock,
+//      the one angle a fifth-of-a-turn stride and a quarter-turn stride share.
+//
+// Neither is visible in a unit test of the drawing function, so these drive the
+// REAL `BuildWheelView` — its own `update()`, its own models, its own pooled
+// nodes — and read back what the view put in its containers.
+//
+// The view is a Pixi scene graph, which is headless right up to the moment a
+// `Text` is measured: `Text.height` reaches for a 2D canvas that does not exist
+// in a node test. The adapter below is the whole of the workaround — a stub
+// `measureText` — and it is not a mock of anything under test: no assertion here
+// reads a text size, and the wedge stack's own measurements are held to the arc
+// in `hud-geometry.test.ts` against the real metrics.
+
+const stubTextContext = {
+  font: '',
+  measureText(text: string) {
+    return {
+      width: text.length * 7,
+      actualBoundingBoxAscent: 8,
+      actualBoundingBoxDescent: 2,
+      actualBoundingBoxLeft: 0,
+      actualBoundingBoxRight: text.length * 7,
+    };
+  },
+};
+const stubCanvas = { width: 1, height: 1, getContext: () => stubTextContext };
+DOMAdapter.set({
+  ...DOMAdapter.get(),
+  createCanvas: () => stubCanvas as unknown as HTMLCanvasElement,
+} as never);
+
+/** The viewport the two wheels are driven at — a desktop, so the wheel resolves
+ *  the profile the design states its numbers at. */
+const VIEW = { width: 1280, height: 800 };
+
+/** A docked, funded ship: the Build wheel is open, so the Upgrade wheel is
+ *  allowed to be in front of it (GDD §2.5 — it lives behind the arrow). */
+const OPEN_SIGNALS: BuildWheelSignals = {
+  requested: true,
+  docked: true,
+  shipAlive: true,
+  stationAlive: true,
+  cargo: 20,
+  banked: 79,
+  turrets: 0,
+  shields: 0,
+  satellites: 0,
+  coreHp: 60,
+  maxCoreHp: 100,
+};
+
+/** One frame of the real view with the Upgrade wheel in front, pointing at
+ *  `selected` (or at nothing). `time` stays 0 on purpose: with no clock the view
+ *  settles its sweep, which is the frozen-frame path the goldens shoot. */
+function drawUpgrade(selected: number | null): BuildWheelView {
+  const view = new BuildWheelView(VIEW.width, VIEW.height);
+  view.update(
+    buildWheelModel(OPEN_SIGNALS),
+    upgradeWheelModel({
+      open: true,
+      weaponOpen: false,
+      shipClass: ShipClass.Vanguard,
+      tiers: STOCK_TIERS,
+      ore: 99,
+      selected,
+    }),
+    0,
+  );
+  return view;
+}
+
+/** The Graphics layers a wheel group owns directly, in draw order. */
+function graphicsLayers(group: Container): Graphics[] {
+  return group.children.filter((c): c is Graphics => c instanceof Graphics);
+}
+
+/** How much ink each of a group's layers is carrying. */
+function inkPerLayer(group: Container): number[] {
+  return graphicsLayers(group).map((g) => (g.visible ? drawnSegments(g).length : 0));
+}
+
+describe('upgrade wheel draws its selection', () => {
+  const COUNT = 4; // HULL, ENGINE, CARGO, WEAPON — the wheel in the report
+  const ARC = upgradeWedgeArc(COUNT);
+  /** Half a wedge plus the edge bloom's own spread, at THIS wheel's arc. */
+  const REACH =
+    ARC / 2 +
+    ((WHEEL_SELECTION.edgeDegrees / 2) * WHEEL_SELECTION.edgeGlowSpread * Math.PI) / 180 +
+    Math.PI / 180;
+
+  it('emits a highlight layer when the model has a selection, and none when it does not', () => {
+    // The first defect, stated as the difference it makes: exactly one layer of
+    // the upgrade group gains ink when a wedge is pointed at. Before this, none
+    // did — `drawUpgradeWheel` called neither `drawWheelSelection` nor
+    // `selectionOf`, so a model with `selected` set drew precisely the resting
+    // frame.
+    const resting = inkPerLayer(drawUpgrade(null).panelNode);
+    const lit = inkPerLayer(drawUpgrade(2).panelNode);
+    expect(lit.length).toBe(resting.length);
+
+    const gained = lit.map((n, i) => n - (resting[i] ?? 0));
+    expect(gained.filter((d) => d > 0)).toHaveLength(1);
+    expect(gained.filter((d) => d < 0)).toEqual([]);
+  });
+
+  it('marks the pointed-at wedge selected and the rest receded, in the drawn readback', () => {
+    // The wedge treatment — the other half of u16-01, and the half the ?debug=1
+    // seam carries to a live-stage test (`lastUpgradeWedges`).
+    const wedges = drawUpgrade(1).debugUpgradeWedges();
+    expect(wedges).toHaveLength(COUNT);
+    expect(wedges.map((w) => w.selected)).toEqual([false, true, false, false]);
+
+    // …and a resting wheel says nobody is pointing at it, so every existing
+    // baseline of this screen is untouched by this deliverable.
+    expect(drawUpgrade(null).debugUpgradeWedges().map((w) => w.selected)).toEqual([
+      false,
+      false,
+      false,
+      false,
+    ]);
+  });
+
+  it('lands the highlight on EVERY wedge, not only the top one', () => {
+    // The second defect, and the developer's own words. Index 0 is twelve
+    // o'clock on a wheel of any size, so a highlight driven by the Build wheel's
+    // five wedges looked right there and drifted 18° further off per index —
+    // 54° by the last wedge, more than half a wedge away.
+    const resting = inkPerLayer(drawUpgrade(null).panelNode);
+    for (let i = 0; i < COUNT; i++) {
+      const view = drawUpgrade(i);
+      const layers = graphicsLayers(view.panelNode);
+      const index = inkPerLayer(view.panelNode).findIndex((n, j) => n > (resting[j] ?? 0));
+      expect(index, `no highlight was drawn for wedge ${i}`).toBeGreaterThanOrEqual(0);
+
+      const centre = upgradeWedgeAngle(i, COUNT);
+      const strays: string[] = [];
+      for (const seg of drawnSegments(layers[index]!)) {
+        for (const p of samples(seg)) {
+          if (Math.hypot(p.x, p.y) < 1) continue; // a path's own origin draws nothing
+          const off = offCentre(Math.atan2(p.y, p.x), centre);
+          if (off <= REACH) continue;
+          strays.push(`${((off * 180) / Math.PI).toFixed(1)}° off wedge ${i}`);
+        }
+      }
+      expect(strays.slice(0, 4), `the highlight is not on wedge ${i}`).toEqual([]);
+    }
+  });
+
+  it('is drawn at the wheel it is over — the upgrade arc, not the Build wheel\'s', () => {
+    // The highlight's own width is the tell that the arc travelled with it: at
+    // 2π/5 it would be a fifth of a turn wide on a wheel cut into quarters, and
+    // the two edge lines would sit inside the wedge instead of on its spokes.
+    const resting = inkPerLayer(drawUpgrade(null).panelNode);
+    const view = drawUpgrade(1);
+    const layers = graphicsLayers(view.panelNode);
+    const index = inkPerLayer(view.panelNode).findIndex((n, j) => n > (resting[j] ?? 0));
+    const centre = upgradeWedgeAngle(1, COUNT);
+    const r = wheelRadius(VIEW.width, VIEW.height);
+    const m = wheelMetrics(r);
+    const inner = r * m.hub;
+    const mid = inner + (r - inner) / 2;
+
+    const segments = drawnSegments(layers[index]!);
+    for (const boundary of [centre - ARC / 2, centre + ARC / 2]) {
+      const probe = { x: Math.cos(boundary) * mid, y: Math.sin(boundary) * mid };
+      const nearest = Math.min(...segments.map((s) => distanceToSegment(probe, s)));
+      expect(nearest, `no edge line on the upgrade wedge's boundary`).toBeLessThan(1);
+    }
+    // And the Build wheel's boundary, a fifth of a turn out, carries nothing:
+    // that is the same wheel's ink at the wrong wheel's geometry.
+    const wrong = centre + SEGMENT_ARC / 2;
+    const probe = { x: Math.cos(wrong) * mid, y: Math.sin(wrong) * mid };
+    expect(Math.min(...segments.map((s) => distanceToSegment(probe, s)))).toBeGreaterThan(1);
+  });
+
+  it('leaves the Build wheel drawing its own selection, at its own five wedges', () => {
+    // The shared machine is parameterised, not re-pointed: the wheel in front
+    // keeps the geometry it always had.
+    const view = new BuildWheelView(VIEW.width, VIEW.height);
+    const shut = upgradeWheelModel({
+      open: false,
+      weaponOpen: false,
+      shipClass: ShipClass.Vanguard,
+      tiers: STOCK_TIERS,
+      ore: 99,
+    });
+    view.update(buildWheelModel({ ...OPEN_SIGNALS, selected: 3 }), shut, 0);
+    expect(view.debugBuildWedges().map((w) => w.selected)).toEqual([
+      false,
+      false,
+      false,
+      true,
+      false,
+    ]);
+
+    const r = wheelRadius(VIEW.width, VIEW.height);
+    const m = wheelMetrics(r);
+    const inner = r * m.hub;
+    const mid = inner + (r - inner) / 2;
+    const centre = segmentAngle(3);
+    const ink = graphicsLayers(view.wheelNode).flatMap((g) => (g.visible ? drawnSegments(g) : []));
+    for (const boundary of [centre - SEGMENT_ARC / 2, centre + SEGMENT_ARC / 2]) {
+      const probe = { x: Math.cos(boundary) * mid, y: Math.sin(boundary) * mid };
+      expect(Math.min(...ink.map((s) => distanceToSegment(probe, s)))).toBeLessThan(1);
     }
   });
 });

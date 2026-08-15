@@ -148,6 +148,11 @@ export interface DrawnUpgradeWedge {
   readonly kind: UpgradeWedge['kind'];
   readonly track: UpgradeWedge['track'];
   readonly label: string;
+  /** Whether this is the wedge the player is pointing at — the Build wheel's
+   *  {@link DrawnBuildWedge.selected}, on the level behind its arrow (a0-51), read
+   *  back off the descriptor the view actually drew from so a live-stage test can
+   *  assert the highlight followed a real pointer onto a real wedge. */
+  readonly selected: boolean;
   readonly tier: number;
   readonly maxTier: number;
   readonly current: string;
@@ -397,8 +402,22 @@ export class BuildWheelView extends Container {
   private readonly buildSelection = new Graphics();
   private readonly buildClusters = new Container();
   /** The 140 ms sweep between wedges — the design's own transition, and the first
-   *  consumer `PLATE_MOTION.wheelMs` has ever had ({@link ./wheel-selection}). */
-  private readonly selection = new WheelSelection();
+   *  consumer `PLATE_MOTION.wheelMs` has ever had ({@link ./wheel-selection}).
+   *  The Build wheel's; the Upgrade wheel drives {@link upgradeSweep}. */
+  private readonly buildSweep = new WheelSelection();
+  /**
+   * The Upgrade wheel's sweep — the SAME machine, given a different wedge count
+   * (a0-51's guardrail: one radial menu, one selection machine, parameterised;
+   * never a second copy of the logic).
+   *
+   * A second INSTANCE rather than a second implementation, and rather than one
+   * instance re-pointed as the wheels swap: each wheel's highlight belongs to its
+   * own wedges, so the Build wheel's fades out on the wedge it was on while the
+   * Upgrade wheel's arrives on its own, instead of one highlight sliding from a
+   * fifth of a turn to a quarter of one across a wheel change nobody asked to see
+   * animated.
+   */
+  private readonly upgradeSweep = new WheelSelection();
   private readonly buildWedges: WedgeNodes[] = [];
   private readonly buildHubOre: Text;
   private readonly buildHubLabel: Text;
@@ -418,6 +437,10 @@ export class BuildWheelView extends Container {
   // --- Upgrade wheel -------------------------------------------------------
   private readonly upgradeRings = new Graphics();
   private readonly upgradeBodies = new Container();
+  /** The Upgrade wheel's highlight, between its faces and its words for the same
+   *  reason the Build wheel's is (a0-51 — it had neither the layer nor the draw
+   *  call, so the wheel behind the arrow drew no selection at all). */
+  private readonly upgradeSelection = new Graphics();
   private readonly upgradeClusters = new Container();
   private readonly upgradeWedges: WedgeNodes[] = [];
   private readonly upgradeHubOre: Text;
@@ -493,6 +516,7 @@ export class BuildWheelView extends Container {
       this.upgradeHubHit,
       this.upgradeRings,
       this.upgradeBodies,
+      this.upgradeSelection,
       this.upgradeClusters,
       this.upgradeHubOre,
       this.upgradeHubLabel,
@@ -567,13 +591,16 @@ export class BuildWheelView extends Container {
     // The player wants the wheel up iff the model is open; the shared toggle turns
     // that target into a pop and — critically — can never latch shut on it.
     this.toggle.update(wheel.open, dt);
-    // The selection sweep runs off the same clock (u16-01). The model has already
-    // forced `selected` to null on a shut wheel and while the upgrade wheel is in
-    // front, so the highlight fades out with the thing it belongs to rather than
-    // being switched off by a second rule here.
-    this.selection.update(
-      upgrade.open ? null : wheel.selected,
-      wheel.segments.length,
+    // The selection sweeps run off the same clock (u16-01), one per wheel and
+    // each given ITS OWN wedge count — the count decides where a wedge sits, so a
+    // sweep driven by the wrong one lands right only at twelve o'clock (a0-51).
+    // Each wheel is fed `null` while the other is the one on top, so a highlight
+    // fades out with the thing it belongs to rather than being switched off by a
+    // second rule here.
+    this.buildSweep.update(upgrade.open ? null : wheel.selected, wheel.segments.length, dt);
+    this.upgradeSweep.update(
+      upgrade.open ? upgrade.selected : null,
+      upgrade.wedges.length,
       dt,
     );
     // With no time to animate across (a frozen frame, or the very first update),
@@ -581,7 +608,8 @@ export class BuildWheelView extends Container {
     // and so does the sweep.
     if (dt <= 0) {
       this.toggle.settle();
-      this.selection.settle();
+      this.buildSweep.settle();
+      this.upgradeSweep.settle();
     }
     this.visible = this.toggle.visible;
     if (!this.visible) {
@@ -590,7 +618,8 @@ export class BuildWheelView extends Container {
       // A wheel that has finished closing is pointing at nothing, so the next
       // open starts dark rather than re-lighting whatever the pointer last
       // crossed on the way out.
-      this.selection.reset();
+      this.buildSweep.reset();
+      this.upgradeSweep.reset();
       return;
     }
 
@@ -641,9 +670,9 @@ export class BuildWheelView extends Container {
       r,
       inner,
       m,
-      this.selection.angle,
+      this.buildSweep.angle,
       SEGMENT_ARC,
-      this.selection.presence,
+      this.buildSweep.presence,
     );
 
     for (let i = 0; i < model.segments.length; i++) {
@@ -712,11 +741,34 @@ export class BuildWheelView extends Container {
     drawWheelRings(this.upgradeRings, r, hub, m);
     drawWheelSpokes(this.upgradeRings, inner, r, model.wedges.length, m);
 
+    // The highlighted wedge — the same layer, the same routine and the same swept
+    // angle as the Build wheel's, at THIS wheel's arc (a0-51). Before this the
+    // call was simply absent here, so the wheel behind the arrow had no highlight
+    // to be in the wrong place: *"it doesnt have the selection animation or
+    // graphics"*.
+    drawWheelSelection(
+      this.upgradeSelection,
+      r,
+      inner,
+      m,
+      this.upgradeSweep.angle,
+      arc,
+      this.upgradeSweep.presence,
+    );
+
     for (let i = 0; i < model.wedges.length; i++) {
       const wedge = model.wedges[i];
       if (!wedge) continue;
       const nodes = this.wedgeNodes(this.upgradeBodies, this.upgradeClusters, this.upgradeWedges, i);
-      this.drawWedge(nodes, upgradeWedgeDraw(wedge, m), inner, r, arc, m, this.sample(feedback, 'upgrade', i, time));
+      this.drawWedge(
+        nodes,
+        upgradeWedgeDraw(wedge, m, selectionOf(model.selected, i)),
+        inner,
+        r,
+        arc,
+        m,
+        this.sample(feedback, 'upgrade', i, time),
+      );
     }
     this.hideWedgesFrom(this.upgradeWedges, model.wedges.length);
 
@@ -735,10 +787,14 @@ export class BuildWheelView extends Container {
     // Capture what was drawn for the ?debug=1 live-stage seam (a bought tier must
     // re-render here). Rebuilt from the model the view just drew from.
     this.lastUpgradeDrawn = true;
-    this.lastUpgradeWedges = model.wedges.map((w) => {
-      const d = upgradeWedgeDraw(w, m);
+    this.lastUpgradeWedges = model.wedges.map((w, i) => {
+      const d = upgradeWedgeDraw(w, m, selectionOf(model.selected, i));
       return {
         kind: w.kind,
+        // Read off the descriptor the view drew from, exactly as the Build
+        // wheel's is, so a live-stage test can see WHICH wedge lit rather than
+        // re-deriving where the highlight should have gone (a0-51).
+        selected: d.selection === 'selected',
         track: w.track,
         label: w.label,
         tier: w.tier,
@@ -1461,19 +1517,29 @@ function buildSegmentDraw(
  * it opens a screen rather than spending, so it says `OPEN ▸` where the others
  * quote a price — the same words in the same slot as UPGRADE SHIP. BACK is not a
  * wedge on either wheel any more; it lives on the hub (field report v0.2.4).
+ *
+ * ── THE SELECTION IS THIS WHEEL'S TOO (a0-51) ──────────────────────────────
+ * This function used to hard-code `selection: 'none'`, on the argument that
+ * screen 5a is the BUILD wheel and giving this one a highlight by inheritance
+ * would be inventing design. The developer settled it by looking at the shipped
+ * thing — *"build wheel still doesnt have the effects i asked for"* — and they
+ * are right: the two wheels are one control at two levels (style-guide §2.1),
+ * drawn by this one routine, and a control that lights under the pointer on the
+ * page in front and goes dead on the page behind reads as a bug, not as
+ * restraint. The rule is unchanged, and now it is applied at both levels.
  */
-function upgradeWedgeDraw(wedge: UpgradeWedge, m: WheelProfile): WedgeDraw {
+function upgradeWedgeDraw(
+  wedge: UpgradeWedge,
+  m: WheelProfile,
+  selection: WedgeSelection = 'none',
+): WedgeDraw {
   return {
     angle: wedge.angle,
-    lines: upgradeWedgeLines(wedge, m),
+    lines: upgradeWedgeLines(wedge, m, selection === 'selected'),
     cost: wedge.cost,
     ready: wedgeReady(wedge.state),
     costPaint: upgradeCostPaint(wedge),
-    // The upgrade wheel has no selection state of its own. Screen 5a is the BUILD
-    // wheel, and a0-20's finding is about that screen; giving this one a highlight
-    // by inheritance would be inventing design rather than implementing it. The
-    // slot is here so the two wheels keep sharing one drawing routine.
-    selection: 'none',
+    selection,
   };
 }
 
