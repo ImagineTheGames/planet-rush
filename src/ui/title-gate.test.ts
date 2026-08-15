@@ -30,6 +30,7 @@ import {
   SEAL_CAP_MS,
   SEAL_FLOOR_MS,
   TITLE_GATE_ID,
+  TITLE_GATE_ROOT_CSS,
   TRANSITION,
   TitleGate,
   doorBox,
@@ -74,6 +75,10 @@ import {
 const DESKTOP: GateView = { width: 1920, height: 1080 };
 const PHONE: GateView = { width: 844, height: 390 };
 
+/** Floor `#070910` (style-guide §1.1) — the ground this star-field is composited
+ *  over, and the one layer that is allowed to be opaque. */
+const GROUND_HEX = '#070910';
+
 // ---------------------------------------------------------------------------
 // A recording canvas and a recording DOM. There is no jsdom in this repo, and
 // adding one to test a style write would be a poor trade (`../platform/boot-error`
@@ -82,7 +87,7 @@ const PHONE: GateView = { width: 844, height: 390 };
 
 type Op =
   | { readonly op: 'composite'; readonly value: string }
-  | { readonly op: 'fillRect' }
+  | { readonly op: 'fillRect'; readonly fillStyle: string }
   | { readonly op: 'beginPath' }
   | { readonly op: 'moveTo'; readonly x: number; readonly y: number }
   | { readonly op: 'lineTo'; readonly x: number; readonly y: number }
@@ -113,7 +118,9 @@ class FakeContext implements GateContext2D {
     this.ops.push({ op: 'composite', value });
   }
   fillRect(): void {
-    this.ops.push({ op: 'fillRect' });
+    // The style is recorded because the GROUND is a `fillRect`, and which layer
+    // paints the ground is the whole of the root-background trap below.
+    this.ops.push({ op: 'fillRect', fillStyle: typeof this.fillStyle === 'string' ? this.fillStyle : 'gradient' });
   }
   beginPath(): void {
     this.ops.push({ op: 'beginPath' });
@@ -273,6 +280,29 @@ describe('the doorway', () => {
         expect(skyCoversPoint(view, 1, { x: centre.x - openW / 2 + openW * t, y: centre.y })).toBe(false);
       }
     }
+  });
+
+  it('is a hole through the whole overlay, not only through the canvas', () => {
+    // Found in a browser, not in this file, and it is worth saying how: every
+    // assertion above was green while the shipped screen showed a BLACK doorway
+    // for the whole of beats 2 and 3. The punch is `destination-out` on the
+    // canvas, so it erases the canvas — and the overlay root behind it was
+    // painted in the ground colour, which the punch cannot reach. Sealed, the
+    // leaves cover it and the screenshot is perfect; parted, the opening is a
+    // black hole all the way down to the menu it exists to reveal.
+    //
+    // So the ground belongs to the canvas, which is the layer that gets punched,
+    // and every layer of the overlay behind it must be see-through.
+    expect(TITLE_GATE_ROOT_CSS).toContain('background:transparent');
+    for (const opaque of [GROUND_HEX, '#0d1015', '#010204']) {
+      expect(TITLE_GATE_ROOT_CSS.toLowerCase()).not.toContain(opaque);
+    }
+    // …and the canvas really is where the ground is painted, so removing it from
+    // the root did not remove it from the picture.
+    const ctx = new FakeContext();
+    paintSky(ctx, DESKTOP, [], 0, 1, true);
+    const ground = ctx.ops.find((o) => o.op === 'fillRect') as { fillStyle: string } | undefined;
+    expect(ground?.fillStyle.toLowerCase()).toBe(GROUND_HEX);
   });
 
   it('erases the opening rather than painting over it', () => {

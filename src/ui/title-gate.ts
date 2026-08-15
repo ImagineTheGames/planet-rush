@@ -622,6 +622,32 @@ export const TITLE_GATE_DOOR_ID = 'pr-title-gate-door';
 /** The upper leaf's element id — measured to decide when the door is home. */
 export const TITLE_GATE_LEAF_ID = 'pr-title-gate-leaf';
 
+/**
+ * The overlay root's own style — and **it carries no background**, which is
+ * trap 1 one layer further out than the trap is usually written down.
+ *
+ * The punch is a `destination-out` fill on the CANVAS ({@link paintSky}), so it
+ * can only ever erase the canvas. Anything opaque *behind* the canvas and still
+ * inside the overlay survives it — and the overlay is what stands between the
+ * doorway and the Pixi menu the doorway exists to show. A root painted in the
+ * ground colour therefore looks completely correct in a screenshot of the SEALED
+ * door (the leaves cover it) and paints the doorway shut the moment they part:
+ * the frame animates, the hull leaves through the edges, and the opening is a
+ * black hole all the way through. That is exactly the failure the design hit
+ * twice, wearing a different hat, and no unit test of the canvas can see it —
+ * `skyCoversPoint` is right and the picture is still wrong.
+ *
+ * So the ground is the canvas's, painted there and punched there, and the root
+ * is a transparent frame around it.
+ *
+ * `fixed`, not `absolute`: the overlay is measured against the real window
+ * exactly as {@link throughScale} is, and `#app` carries the safe-area padding.
+ */
+export const TITLE_GATE_ROOT_CSS =
+  'position:fixed;inset:0;overflow:hidden;z-index:20;background:transparent;' +
+  'font-family:Oxanium,system-ui,sans-serif;cursor:var(--pr-gate-cursor,pointer);' +
+  'touch-action:none;-webkit-tap-highlight-color:transparent;';
+
 /** The self-hosted faces, byte-identical to `index.html`'s declarations. */
 export const FONT_URLS = {
   audiowide: '/fonts/Audiowide-Regular-latin.woff2',
@@ -1528,12 +1554,7 @@ export function browserGateDom(browser: GateBrowser): GateDom {
     mount(html, on) {
       const el = doc.createElement('div');
       el.id = TITLE_GATE_ID;
-      // `fixed`, not `absolute`: the overlay is measured against the real window
-      // exactly as `throughScale` is, and `#app` carries the safe-area padding.
-      el.style.cssText =
-        `position:fixed;inset:0;overflow:hidden;z-index:20;background:${GROUND};` +
-        'font-family:Oxanium,system-ui,sans-serif;cursor:var(--pr-gate-cursor,pointer);' +
-        'touch-action:none;-webkit-tap-highlight-color:transparent;';
+      el.style.cssText = TITLE_GATE_ROOT_CSS;
       el.innerHTML = html;
       host.appendChild(el);
       root = el;
