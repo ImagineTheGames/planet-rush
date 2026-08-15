@@ -49,6 +49,18 @@
  *    `/status/sound-choices.json`, and a new take filed under a denied letter makes
  *    that record unreadable. The offers are `d`, `e`, `f`, and the slot also carries
  *    a {@link CandidateSlot.fourthOption}: ship the bed off by default.
+ *  - **oreCollect and levelUp (a0-49).** The two slots on the whole board whose
+ *    denial post-dates every offer standing against it — the developer is looking
+ *    at takes they turned down and nothing is queued behind them
+ *    (`docs/sound-denials-outstanding.md` derives that, slot by slot, for all 38
+ *    outstanding denials). Each carries its own reason and neither is the other's:
+ *    `levelUp` is *"sounds too toony, doesn't sound rewarding"* and `oreCollect` is
+ *    *"add a little bit more of sparkle to it, like you've won a prize, but
+ *    subtle... it shouldn't be too long"*. Lettered `d`/`e`/`f` on a0-48's rule.
+ *    The same ledger dispositions a third slot — `xpBarFill`, *"all these sounds
+ *    are mega annoying, we don't need this at all no need for regeneration"* — as a
+ *    **cut**, so it is deliberately NOT re-offered here: three new takes on a sound
+ *    somebody asked to stop hearing is the round this brief exists to prevent.
  *  - **All 40 slots (a0-01b).** The developer pressed **DENY ALL** on every slot on
  *    the board, and the board promises *"generate 3 new options"* on that press. This
  *    file is that generation: `a`, `b`, `c` are new everywhere, in the amended §4.7
@@ -180,7 +192,9 @@ export interface SoundCandidate {
    * not re-offer under that letter: `ambient` was denied on 2026-08-07 and offers
    * `d`/`e`/`f` (a0-48), because a second take filed under `a` would make the
    * standing record unreadable — nobody could tell which take the deny was aimed
-   * at. `./candidates.test.ts` holds that.
+   * at. `oreCollect` and `levelUp` follow it (a0-49). `./candidates.test.ts` holds
+   * the rule as a property over the re-lettered slots rather than as three lists,
+   * so the next denied slot inherits it instead of re-deriving it.
    */
   readonly id: string;
   /** 3-5 word description of the character, for the review page. */
@@ -472,44 +486,90 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     ],
   },
   // The tightest pair in the bank is `oreCollect` / `depositTick` (§8) — *picked a
-  // chunk up* vs *banked a chunk*. Every offer here is kept in the 900–2000 Hz
-  // region and every `depositTick` offer under 700 Hz and under half its level, so
-  // the pair stays separable whichever letters the developer picks, including a
-  // mixed pair.
+  // chunk up* vs *banked a chunk*. Every `depositTick` offer is kept under 700 Hz
+  // and under half this slot's level, so the pair stays separable whichever letters
+  // the developer picks, including a mixed pair. Round 3 widens that gap rather
+  // than closing it: the sparkle below moves this slot *up*, and `depositTick` has
+  // not moved at all.
+  //
+  // ---------------------------------------------------------------------------
+  // ROUND 3 (a0-49, 2026-08-15)
+  // ---------------------------------------------------------------------------
+  //
+  // The developer, denying `a`/`b`/`c` on 2026-08-14, quoted character for
+  // character because a paraphrase of a denial is a new opinion (LESSONS §17):
+  //
+  //   *"add a little bit more of sparkle to it, like you've won a prize, but
+  //   subtle... it shouldn't be too long"*
+  //
+  // Three instructions, and the second and third are the ones that make it hard.
+  //
+  //  - **Sparkle** is the developer's word and it is in tension with the amended
+  //    §4.7 register, so it is taken as **high-frequency detail with a short life**
+  //    — several small bright contacts at the top of the spectrum — and never as a
+  //    glissando or a chime, which are the two retired arcade idioms (§5.3) the
+  //    word could otherwise be read as. Measured: every offer puts >30% of its
+  //    energy above 3 kHz, against 15% / 2% / 24% for the three that were denied.
+  //  - **"But subtle"** qualifies the sparkle, not the cue, so it is held as a
+  //    ceiling on the whole sound rather than on the bright layers: no offer is
+  //    louder in peak or in RMS than the incumbent this slot ships today — the
+  //    sound the developer has in their ear when they say *"add … to it"*.
+  //  - **"It shouldn't be too long"** is a hard bound and not a preference:
+  //    `oreCollect` is `TELL.oreCollect` and fires on every single ore pickup, so a
+  //    tail that is merely pleasant the first time is a tail heard hundreds of
+  //    times a match. Every offer is shorter than the longest denied take (90 ms)
+  //    and less than half the length of the incumbent.
+  //
+  // The 6.5 kHz ceiling is real and it shaped all three: `./synth` clamps a
+  // resonant cutoff to `SVF_MAX_HZ_FRACTION` of the sample rate, so "the top of the
+  // spectrum" in this bank means 3–6.4 kHz, and a first pass written above that
+  // clamp measured *darker* than the takes it was replacing. The three characters
+  // are three ways of spending that band:
+  //
+  //   d  **flake shear** — the snap, and bright chips coming off it. Granular.
+  //   e  **charged intake** — the pull, with an ionised edge riding up the top.
+  //   f  **assay ping** — a dry contact and two narrow high bands reading it back.
   oreCollect: {
     label: "Ore Collect",
     context: "A loose ore chunk is tractored in",
     current: 'oreCollect',
     candidates: [
       {
-        id: 'a',
-        character: "magnetic capture, one hard snap",
+        id: 'd',
+        character: "flake shear, bright chips off the snap",
         spec: {
-          name: 'oreCollect_a_magneticSnap',
+          name: 'oreCollect_d_flakeShear',
           layers: [
-            ...plate('oreCollect_a.snap', 1500, { gain: 0.4, decay: 0.05, ratios: [1, 2.41], q: 8, curve: 6, punch: 0.6, grain: 0.34, seed: 30190 }),
-            swept('oreCollect_a.pull', { wave: 'noise', freq: 300, from: 900, to: 380, q: 2.4, gain: 0.18, attack: 0.0008, hold: 0.004, decay: 0.045, curve: 5, seed: 30193 }),
+            ...plate('oreCollect_d.snap', 1400, { gain: 0.26, decay: 0.04, ratios: [1, 2.41], q: 8, curve: 6, punch: 0.6, grain: 0.34, seed: 30410 }),
+            grains('oreCollect_d.flecks', { freq: 4300, freqEnd: 5600, grain: 0.0032, gain: 0.32, hold: 0.004, decay: 0.055, curve: 4.2, from: 6200, to: 4400, q: 5, hp: 2600, at: 0.01, seed: 30414 }),
+            band('oreCollect_d.glint', 5900, { gain: 0.4, decay: 0.04, q: 10, curve: 4.5, hp: 3000, at: 0.022, seed: 30416 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "servo intake, filter opening",
+        id: 'e',
+        character: "charged intake, an ionised edge",
         spec: {
-          name: 'oreCollect_b_servoIntake',
+          name: 'oreCollect_e_chargedIntake',
           layers: [
-            swept('oreCollect_b.intake', { wave: 'triangle', freq: 460, from: 380, to: 2600, q: 5.5, gain: 0.34, attack: 0.003, hold: 0.012, decay: 0.075, curve: 3.4, noiseMix: 0.22, seed: 30195 }),
-            grains('oreCollect_b.step', { freq: 900, grain: 0.004, gain: 0.14, hold: 0.004, decay: 0.03, curve: 6, from: 2600, q: 3, hp: 500, seed: 30196 }),
+            swept('oreCollect_e.intake', { wave: 'triangle', freq: 520, from: 420, to: 2200, q: 5, gain: 0.08, attack: 0.002, hold: 0.01, decay: 0.05, curve: 3.8, noiseMix: 0.24, seed: 30420 }),
+            swept('oreCollect_e.ion', { wave: 'noise', freq: 3400, from: 2600, to: 6200, q: 7, gain: 0.46, attack: 0.003, hold: 0.006, decay: 0.05, curve: 4, hp: 2600, at: 0.012, seed: 30422 }),
+            grains('oreCollect_e.spark', { freq: 5200, grain: 0.0028, gain: 0.36, hold: 0.003, decay: 0.045, curve: 5, from: 6200, to: 4600, q: 4.5, hp: 3600, at: 0.026, seed: 30424 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "telemetry blip, two narrow bands",
+        id: 'f',
+        character: "assay ping, two high bands reading back",
         spec: {
-          name: 'oreCollect_c_telemetry',
+          name: 'oreCollect_f_assayPing',
           layers: [
-            ...plate('oreCollect_c.blip', 2200, { gain: 0.3, decay: 0.055, ratios: [1, 2.05], q: 12, curve: 6, punch: 0.4, grain: 0.08, edge: 0, seed: 30200 }),
+            grains('oreCollect_f.contact', { freq: 1100, grain: 0.0025, gain: 0.28, hold: 0.003, decay: 0.026, curve: 6, from: 2600, to: 1200, q: 3, hp: 600, seed: 30430 }),
+            // `band` passes very little of what enters it (see `./instrument`), so
+            // a gain near 1 here is a quiet layer, not a hot one: this is the
+            // quietest of the three offers by RMS and by peak.
+            band('oreCollect_f.read0', 3600, { gain: 0.98, decay: 0.05, q: 11, curve: 5, hp: 2000, at: 0.008, seed: 30432 }),
+            band('oreCollect_f.read1', 5700, { gain: 0.88, decay: 0.042, q: 12, curve: 5.5, hp: 3200, at: 0.022, seed: 30433 }),
           ],
         },
       },
@@ -2348,43 +2408,93 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     //
     // None uses a major third either. The interface does not congratulate
     // (§4.7 register 2), and this cue can land on top of a DEFEAT headline.
+    //
+    // -------------------------------------------------------------------------
+    // ROUND 2 (a0-49, 2026-08-15)
+    // -------------------------------------------------------------------------
+    //
+    // The developer, denying `a`/`b`/`c` on 2026-08-14, verbatim:
+    //
+    //   *"sounds too toony, doesn't sound rewarding"*
+    //
+    // Two demands, and the second is the harder one. `a0-01`'s post-mortem already
+    // paid for the lesson behind the first: retiring the arcade oscillator and
+    // reaching for bare sine partials produced *"a glockenspiel… not less toony,
+    // differently toony"* — so **subtracting the toy is not the same as adding the
+    // reward**, and a fourth round of "same gesture, darker" would have been the
+    // same mistake in a different register. Round 1 above is exactly that gesture:
+    // its three takes are an approach and a landing, and what lands is thin.
+    //
+    // **A reward in this register is arrival with mass.** Something moves, and then
+    // it is *seated* — a low body under the landing that is still there afterwards.
+    // That is two numbers rather than an adjective, and both are held in
+    // `./candidates.test.ts` against the takes that were denied:
+    //
+    //   - **mass** — RMS under 200 Hz. Round 2 measures 0.058 / 0.069 / 0.063
+    //     against 0.026 / 0.045 / 0.010 for the three that were called unrewarding.
+    //   - **seated** — how much sound is left in the last 60% of the cue relative
+    //     to the first 40%. Round 2 measures 0.42 / 0.49 / 0.43 against 0.31 /
+    //     0.27 / 0.28. The landing is not the end of the sound any more.
+    //
+    // Neither number may be bought by simply turning the cue up: the whole set
+    // still plays *beneath* the result sting (plan §6.5), and all three sit at
+    // least 20% under `matchEnd` by RMS.
+    //
+    // The three characters are three answers to *what the mass does once it has
+    // landed* — which is the axis a reward lives on, where round 1's axis (what
+    // the excitation is made of) only decided how it arrived:
+    //
+    //   d  **the lock engaging** — it snaps shut. Shortest travel, hardest seat.
+    //   e  **the drive coming online** — it opens. The filter climbs *after* the
+    //      landing, so the cue is still growing when a phrase would have ended.
+    //   f  **the vault** — it rings in a room. Inharmonic contacts arriving
+    //      together over a hydraulic sub; the biggest of the three.
     label: "Level Up",
     context: "The bar completed and the level ticked over — the one moment in the beat allowed to be a reward. Arrival, not fanfare.",
     current: 'levelUp',
     candidates: [
       {
-        id: 'a',
-        character: "a dry arrival, contacts landing",
+        id: 'd',
+        character: "a lock engaging, mass seating hard",
         spec: {
-          name: 'levelUp_a_dryArrival',
+          name: 'levelUp_d_lockEngaging',
           layers: [
-            grains('levelUp_a.approach', { freq: 300, grain: 0.005, gain: 0.2, attack: 0.006, hold: 0.014, decay: 0.06, curve: 2.6, from: 800, to: 3600, q: 3.4, hp: 220, seed: 35200 }),
-            grains('levelUp_a.land', { freq: 900, grain: 0.0022, gain: 0.34, hold: 0.01, decay: 0.16, curve: 5, from: 5200, to: 1800, q: 3.6, hp: 500, at: 0.085, seed: 35201 }),
-            swept('levelUp_a.seat', { wave: 'triangle', freq: 110, from: 300, to: 180, q: 2, gain: 0.2, attack: 0.002, hold: 0.012, decay: 0.2, curve: 4, noiseMix: 0.1, at: 0.085, seed: 35203 }),
+            grains('levelUp_d.travel', { freq: 340, grain: 0.0045, gain: 0.15, attack: 0.005, hold: 0.012, decay: 0.05, curve: 2.8, from: 700, to: 2600, q: 3.2, hp: 200, seed: 35410 }),
+            swept('levelUp_d.seat', { wave: 'triangle', freq: 146.83, freqEnd: 138, from: 2600, to: 640, q: 3.6, gain: 0.34, attack: 0.0015, hold: 0.02, decay: 0.31, curve: 3, punch: 0.6, noiseMix: 0.16, at: 0.09, seed: 35412 }),
+            swept('levelUp_d.mass', { wave: 'sine', freq: 55, from: 200, to: 110, q: 2, gain: 0.22, attack: 0.003, hold: 0.03, decay: 0.29, curve: 2.6, noiseMix: 0.04, at: 0.09, seed: 35413 }),
+            band('levelUp_d.lock', 900, { gain: 0.2, decay: 0.18, q: 9, curve: 4, hp: 300, at: 0.09, seed: 35414 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "pressure seating, weight arriving",
+        id: 'e',
+        character: "a drive coming online, opening",
         spec: {
-          name: 'levelUp_b_pressureSeating',
+          name: 'levelUp_e_driveOnline',
           layers: [
-            swept('levelUp_b.charge', { wave: 'noise', freq: 260, from: 600, to: 2800, q: 4.5, gain: 0.16, attack: 0.008, hold: 0.014, decay: 0.06, curve: 2.4, hp: 180, seed: 35210 }),
-            swept('levelUp_b.seat', { wave: 'triangle', freq: 220, freqEnd: 208, from: 2400, to: 520, q: 3.4, gain: 0.36, attack: 0.002, hold: 0.016, decay: 0.3, curve: 4, punch: 0.5, noiseMix: 0.12, at: 0.085, seed: 35211 }),
-            swept('levelUp_b.sub', { wave: 'sine', freq: 82.41, from: 240, to: 120, q: 2, gain: 0.22, attack: 0.003, hold: 0.012, decay: 0.22, curve: 3.6, noiseMix: 0.05, at: 0.085, seed: 35212 }),
+            swept('levelUp_e.charge', { wave: 'noise', freq: 280, from: 500, to: 3200, q: 4.5, gain: 0.13, attack: 0.012, hold: 0.01, decay: 0.05, curve: 2.2, hp: 200, seed: 35420 }),
+            // The corner climbs 300 → 1900 Hz across the body, *after* the landing.
+            // A filter opening is not a pitch rising (§5.4), which is what keeps
+            // this off the arcade idiom while still being the one cue that grows.
+            swept('levelUp_e.online', { wave: 'triangle', freq: 110, from: 300, to: 1900, q: 3, gain: 0.28, attack: 0.004, hold: 0.05, decay: 0.26, curve: 2.2, noiseMix: 0.14, at: 0.085, seed: 35422 }),
+            swept('levelUp_e.mass', { wave: 'sine', freq: 55, from: 180, q: 1.8, gain: 0.22, attack: 0.004, hold: 0.06, decay: 0.28, curve: 2.4, noiseMix: 0.04, at: 0.085, seed: 35423 }),
+            band('levelUp_e.field', 1240, { gain: 0.2, decay: 0.24, q: 10, curve: 3.4, hp: 700, at: 0.1, seed: 35425 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "a struck plate, one bare fifth",
+        id: 'f',
+        character: "a vault seating, contacts in a room",
         spec: {
-          name: 'levelUp_c_struckPlate',
+          name: 'levelUp_f_vaultSeating',
           layers: [
-            swept('levelUp_c.approach', { wave: 'noise', freq: 320, from: 700, to: 3000, q: 5, gain: 0.13, attack: 0.006, hold: 0.012, decay: 0.06, curve: 2.6, hp: 200, seed: 35220 }),
-            ...plate('levelUp_c.root', 880, { gain: 0.3, decay: 0.32, ratios: [1, 2.41], q: 8, curve: 4, punch: 0.4, grain: 0.22, at: 0.085, seed: 35222 }),
-            ...plate('levelUp_c.fifth', 1318.51, { gain: 0.16, decay: 0.24, ratios: [1], q: 9, curve: 4.5, grain: 0.18, edge: 0, at: 0.085, seed: 35226 }),
+            grains('levelUp_f.approach', { freq: 320, grain: 0.005, gain: 0.13, attack: 0.006, hold: 0.012, decay: 0.05, curve: 2.6, from: 800, to: 3000, q: 3, hp: 220, seed: 35430 }),
+            // 1 · 2.41 · 4.17 over a 330 Hz root: 330 / 795 / 1376 Hz, arriving in
+            // the same instant rather than in sequence. Inharmonic and struck
+            // together is a mechanism closing; spaced out it would be a phrase, and
+            // spaced by a third it would be a congratulation.
+            ...plate('levelUp_f.contacts', 330, { gain: 0.3, decay: 0.3, ratios: [1, 2.41, 4.17], q: 7, curve: 3.4, punch: 0.55, grain: 0.34, at: 0.085, seed: 35432 }),
+            swept('levelUp_f.hydraulic', { wave: 'sine', freq: 61.74, from: 190, to: 100, q: 1.9, gain: 0.24, attack: 0.004, hold: 0.04, decay: 0.3, curve: 2.4, noiseMix: 0.05, at: 0.085, seed: 35438 }),
           ],
         },
       },

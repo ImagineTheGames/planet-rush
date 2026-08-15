@@ -13,6 +13,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import { CANDIDATE_SLOTS, CANDIDATE_SLOT_ORDER } from './candidates';
+import { grains, plate, swept } from './instrument';
 import { isLayered, loops, soundSpec, SOUND_NAMES, type SoundName, type SoundSpec } from './bank';
 import { renderLayered, renderVoice, seamless, peak, rms, type VoiceSpec } from './synth';
 import { XP_FILL_GAIN } from './engine';
@@ -54,6 +55,13 @@ describe('sound-review candidates', () => {
     // a0-48. Denied 2026-08-07 with the deny-all reason, never re-briefed, so the
     // denied bed was still shipping when the developer met it again in play.
     ambient: ['d', 'e', 'f'],
+    // a0-49. The two slots whose denial post-dates every offer standing against
+    // it — see `docs/sound-denials-outstanding.md`, which derives that for all 38
+    // outstanding denials and dispositions each one revoice / cut / superseded.
+    // `oreCollect` denied 2026-08-14 ("more sparkle… but subtle… shouldn't be too
+    // long"), `levelUp` denied 2026-08-14 ("too toony, doesn't sound rewarding").
+    oreCollect: ['d', 'e', 'f'],
+    levelUp: ['d', 'e', 'f'],
   };
 
   it('every slot has exactly three candidates, one letter each, with characters', () => {
@@ -220,7 +228,10 @@ describe('sound-review candidates', () => {
       expect(SLOT_IDS, `${id} is not on the board`).toContain(id);
       const slot = CANDIDATE_SLOTS[id]!;
       expect(slot.current, `${id} points its "current" somewhere else`).toBe(id);
-      expect(slot.candidates.map((c) => c.id)).toEqual(['a', 'b', 'c']);
+      // `levelUp` is on `d`/`e`/`f` since a0-49 — it collected a verdict of its
+      // own on 2026-08-14, so it is no longer one of the four slots the developer
+      // has not seen. The other three are still on their first letters.
+      expect(slot.candidates.map((c) => c.id)).toEqual(RE_LETTERED[id] ?? ['a', 'b', 'c']);
       // Three *characters*, not three takes on one: the labels differ, and so do
       // the spec names the review page prints beside them.
       expect(new Set(slot.candidates.map((c) => c.character)).size).toBe(3);
@@ -314,6 +325,256 @@ describe('sound-review candidates', () => {
           for (const sting of DENIED_STINGS) {
             expect(v.name, `${v.name} is named after ${sting}`).not.toContain(sting);
           }
+        }
+      }
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // The two answered denials (a0-49)
+  // -------------------------------------------------------------------------
+  //
+  // `docs/sound-denials-outstanding.md` dispositions all 38 outstanding denials,
+  // and exactly two of them come out as **revoice**: the slots where the denial
+  // post-dates every offer standing against it. Each carries its own reason, in
+  // the developer's own words, and the two reasons ask for opposite things — so
+  // the offers are held to the words rather than to a house style, and the tests
+  // below are those words turned into numbers. Every bound is measured against
+  // **the takes that were denied**, not against a constant somebody picked: the
+  // only thing that makes a re-offer an answer rather than another guess is that
+  // it moved, in the direction that was asked for, from the thing being rejected.
+  //
+  // A third slot — `xpBarFill` — is dispositioned **cut** in the same ledger
+  // (*"we don't need this at all no need for regeneration"*) and is deliberately
+  // NOT re-offered, which is why it is absent from `RE_LETTERED` above.
+
+  /** RMS of everything under `hz`, one-pole — the same filter `./synth` uses. */
+  const lowBandRms = (buf: Float32Array, hz: number): number => {
+    const a = 1 - Math.exp((-2 * Math.PI * hz) / 44100);
+    let y = 0;
+    let sum = 0;
+    for (let i = 0; i < buf.length; i++) {
+      y += ((buf[i] ?? 0) - y) * a;
+      sum += y * y;
+    }
+    return Math.sqrt(sum / Math.max(1, buf.length));
+  };
+
+  /** Share of total energy above `hz` — "how much of this sound is bright detail". */
+  const brightShare = (buf: Float32Array, hz: number): number => {
+    const a = 1 - Math.exp((-2 * Math.PI * hz) / 44100);
+    let y = 0;
+    let hi = 0;
+    let all = 0;
+    for (let i = 0; i < buf.length; i++) {
+      const x = buf[i] ?? 0;
+      y += (x - y) * a;
+      hi += (x - y) * (x - y);
+      all += x * x;
+    }
+    return all > 0 ? hi / all : 0;
+  };
+
+  /** RMS of the last 60% over the first 40% — is anything left after the landing. */
+  const lateOverEarly = (buf: Float32Array): number => {
+    const split = Math.floor(buf.length * 0.4);
+    const seg = (from: number, to: number): number => {
+      let s = 0;
+      for (let i = from; i < to; i++) s += (buf[i] ?? 0) ** 2;
+      return Math.sqrt(s / Math.max(1, to - from));
+    };
+    return seg(split, buf.length) / Math.max(1e-9, seg(0, split));
+  };
+
+  /** The denied takes for a re-lettered slot, from the commit before the re-offer. */
+  const deniedOf = (slot: string): readonly SoundSpec[] =>
+    DENIED_TAKES[slot]!.map((s) => s as SoundSpec);
+
+  // The takes the developer denied, **inlined** rather than reached for with a
+  // `git show`. They are gone from `./candidates` by design — that is the whole
+  // point of a re-offer — so a test that compared against the file would have
+  // nothing to compare against, and one that shelled out to git would stop
+  // reproducing the day the commit is rewritten. These are copied verbatim from
+  // `candidates.ts` at `334c460`, the tip of `main` when a0-49 opened.
+  const DENIED_TAKES: Readonly<Record<string, readonly SoundSpec[]>> = {
+    oreCollect: [
+      {
+        name: 'oreCollect_a_magneticSnap',
+        layers: [
+          ...plate('oreCollect_a.snap', 1500, { gain: 0.4, decay: 0.05, ratios: [1, 2.41], q: 8, curve: 6, punch: 0.6, grain: 0.34, seed: 30190 }),
+          swept('oreCollect_a.pull', { wave: 'noise', freq: 300, from: 900, to: 380, q: 2.4, gain: 0.18, attack: 0.0008, hold: 0.004, decay: 0.045, curve: 5, seed: 30193 }),
+        ],
+      },
+      {
+        name: 'oreCollect_b_servoIntake',
+        layers: [
+          swept('oreCollect_b.intake', { wave: 'triangle', freq: 460, from: 380, to: 2600, q: 5.5, gain: 0.34, attack: 0.003, hold: 0.012, decay: 0.075, curve: 3.4, noiseMix: 0.22, seed: 30195 }),
+          grains('oreCollect_b.step', { freq: 900, grain: 0.004, gain: 0.14, hold: 0.004, decay: 0.03, curve: 6, from: 2600, q: 3, hp: 500, seed: 30196 }),
+        ],
+      },
+      {
+        name: 'oreCollect_c_telemetry',
+        layers: [
+          ...plate('oreCollect_c.blip', 2200, { gain: 0.3, decay: 0.055, ratios: [1, 2.05], q: 12, curve: 6, punch: 0.4, grain: 0.08, edge: 0, seed: 30200 }),
+        ],
+      },
+    ],
+    levelUp: [
+      {
+        name: 'levelUp_a_dryArrival',
+        layers: [
+          grains('levelUp_a.approach', { freq: 300, grain: 0.005, gain: 0.2, attack: 0.006, hold: 0.014, decay: 0.06, curve: 2.6, from: 800, to: 3600, q: 3.4, hp: 220, seed: 35200 }),
+          grains('levelUp_a.land', { freq: 900, grain: 0.0022, gain: 0.34, hold: 0.01, decay: 0.16, curve: 5, from: 5200, to: 1800, q: 3.6, hp: 500, at: 0.085, seed: 35201 }),
+          swept('levelUp_a.seat', { wave: 'triangle', freq: 110, from: 300, to: 180, q: 2, gain: 0.2, attack: 0.002, hold: 0.012, decay: 0.2, curve: 4, noiseMix: 0.1, at: 0.085, seed: 35203 }),
+        ],
+      },
+      {
+        name: 'levelUp_b_pressureSeating',
+        layers: [
+          swept('levelUp_b.charge', { wave: 'noise', freq: 260, from: 600, to: 2800, q: 4.5, gain: 0.16, attack: 0.008, hold: 0.014, decay: 0.06, curve: 2.4, hp: 180, seed: 35210 }),
+          swept('levelUp_b.seat', { wave: 'triangle', freq: 220, freqEnd: 208, from: 2400, to: 520, q: 3.4, gain: 0.36, attack: 0.002, hold: 0.016, decay: 0.3, curve: 4, punch: 0.5, noiseMix: 0.12, at: 0.085, seed: 35211 }),
+          swept('levelUp_b.sub', { wave: 'sine', freq: 82.41, from: 240, to: 120, q: 2, gain: 0.22, attack: 0.003, hold: 0.012, decay: 0.22, curve: 3.6, noiseMix: 0.05, at: 0.085, seed: 35212 }),
+        ],
+      },
+      {
+        name: 'levelUp_c_struckPlate',
+        layers: [
+          swept('levelUp_c.approach', { wave: 'noise', freq: 320, from: 700, to: 3000, q: 5, gain: 0.13, attack: 0.006, hold: 0.012, decay: 0.06, curve: 2.6, hp: 200, seed: 35220 }),
+          ...plate('levelUp_c.root', 880, { gain: 0.3, decay: 0.32, ratios: [1, 2.41], q: 8, curve: 4, punch: 0.4, grain: 0.22, at: 0.085, seed: 35222 }),
+          ...plate('levelUp_c.fifth', 1318.51, { gain: 0.16, decay: 0.24, ratios: [1], q: 9, curve: 4.5, grain: 0.18, edge: 0, at: 0.085, seed: 35226 }),
+        ],
+      },
+    ],
+  };
+
+  it('re-offers nothing a denied take already was (a0-49)', () => {
+    // The floor under both slots: a re-offer under a fresh letter that renders the
+    // same samples as a take the developer turned down is the denial being served
+    // back with a new label, and the letter rule would then be hiding it rather
+    // than exposing it.
+    for (const slot of ['oreCollect', 'levelUp'] as const) {
+      const denied = deniedOf(slot).map((s) => render(s));
+      for (const c of CANDIDATE_SLOTS[slot]!.candidates) {
+        const buf = render(c.spec);
+        for (const [i, d] of denied.entries()) {
+          expect(
+            buf.length === d.length && buf.every((v, k) => v === d[k]),
+            `${slot}/${c.id} is denied take ${'abc'[i]} under a new letter`,
+          ).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('adds sparkle to `oreCollect` without adding level or length (a0-49)', () => {
+    // *"add a little bit more of sparkle to it, like you've won a prize, but
+    // subtle... it shouldn't be too long"* — three clauses, three bounds.
+    //
+    // SPARKLE is read as high-frequency detail with a short life, and measured as
+    // the share of energy above 3 kHz — a share rather than a level, because
+    // "sparkle" is a character and the next clause is what bounds the level.
+    // 3 kHz and not higher because `./synth` clamps a resonant cutoff to
+    // SVF_MAX_HZ_FRACTION (~6.5 kHz at 44.1 k), so 3–6.4 kHz *is* the top of this
+    // bank's spectrum.
+    const denied = deniedOf('oreCollect').map((s) => render(s));
+    const deniedBrightest = Math.max(...denied.map((b) => brightShare(b, 3000)));
+    const incumbent = render(soundSpec('oreCollect'));
+
+    for (const c of CANDIDATE_SLOTS.oreCollect!.candidates) {
+      const buf = render(c.spec);
+      const where = `oreCollect/${c.id}`;
+      // More sparkle than any of the three that were denied, with room to spare —
+      // not "0.5% brighter than the brightest", which would satisfy a grep and
+      // nobody's ear.
+      expect(brightShare(buf, 3000), `${where} is no brighter than the takes that were denied`).toBeGreaterThan(
+        deniedBrightest * 1.25,
+      );
+      // *"but subtle"* qualifies the sparkle, not the cue, so it binds the whole
+      // sound: adding brightness may not make this louder than the sound the
+      // developer was asking to add sparkle *to*.
+      expect(rms(buf), `${where} is louder than the sound it adds sparkle to`).toBeLessThanOrEqual(rms(incumbent));
+      expect(peak(buf), `${where} peaks over the sound it adds sparkle to`).toBeLessThanOrEqual(peak(incumbent));
+      // *"it shouldn't be too long"* — a hard bound, because `TELL.oreCollect`
+      // fires on every ore pickup. Shorter than the longest take that was denied.
+      expect(buf.length, `${where} is longer than the takes that were denied`).toBeLessThanOrEqual(
+        Math.max(...denied.map((b) => b.length)),
+      );
+    }
+  });
+
+  it('keeps `oreCollect` clear of `depositTick`, which has not moved (a0-49)', () => {
+    // The tightest pair in the bank (§8) — *picked a chunk up* vs *banked a chunk*
+    // — and the one way a re-voice can fail §4.7 while satisfying its own brief is
+    // by colliding two mechanics. The sparkle moves this slot up, so the gap can
+    // only widen; this asserts it did, against every `depositTick` offer, so a
+    // mixed pair of verdicts is safe too.
+    const zcr = (buf: Float32Array): number => {
+      let n = 0;
+      for (let i = 1; i < buf.length; i++) if ((buf[i]! >= 0) !== (buf[i - 1]! >= 0)) n++;
+      return n / Math.max(1, buf.length);
+    };
+    const deposits = [
+      render(soundSpec('depositTick')),
+      ...CANDIDATE_SLOTS.depositTick!.candidates.map((c) => render(c.spec)),
+    ];
+    for (const c of CANDIDATE_SLOTS.oreCollect!.candidates) {
+      const ore = render(c.spec);
+      for (const dep of deposits) {
+        expect(zcr(ore), `oreCollect/${c.id} sits on top of a depositTick voice`).toBeGreaterThan(zcr(dep) * 1.5);
+      }
+    }
+  });
+
+  it('answers `levelUp` with mass and with something left after the landing (a0-49)', () => {
+    // *"sounds too toony, doesn't sound rewarding"*. The first half is already
+    // held by the tone-envelope test above, which every offer on this slot passes.
+    // The second half is the one that needed a number, because a0-01 learnt the
+    // expensive way that removing the toy is not the same as adding the reward —
+    // bare sine partials in place of an arcade oscillator produced *"a
+    // glockenspiel… not less toony, differently toony."*
+    //
+    // A reward in this register is ARRIVAL WITH MASS: a low body under the landing
+    // that is still there afterwards. Two measurements, both against the takes
+    // that were called unrewarding.
+    const denied = deniedOf('levelUp').map((s) => render(s));
+    const deniedMass = Math.max(...denied.map((b) => lowBandRms(b, 200)));
+    const deniedSustain = Math.max(...denied.map((b) => lateOverEarly(b)));
+    const result = rms(render(soundSpec('matchEnd')));
+
+    for (const c of CANDIDATE_SLOTS.levelUp!.candidates) {
+      const buf = render(c.spec);
+      const where = `levelUp/${c.id}`;
+      expect(lowBandRms(buf, 200), `${where} has no more mass than the takes that were denied`).toBeGreaterThan(
+        deniedMass,
+      );
+      expect(lateOverEarly(buf), `${where} is over as soon as it lands, like the takes that were denied`).toBeGreaterThan(
+        deniedSustain,
+      );
+      // …and neither number may be bought by turning the cue up. The XP beat plays
+      // BENEATH the result (plan §6.5), and the margin is stated rather than left
+      // at the edge of the inequality the summary test already checks.
+      expect(rms(buf), `${where} bought its mass with level`).toBeLessThan(result * 0.8);
+    }
+  });
+
+  it('never spells a major third on `levelUp` (a0-49)', () => {
+    // *The interface does not congratulate* (§4.7 register 2), and this cue can
+    // land on top of a DEFEAT headline — so the one interval it may not contain is
+    // the one that reads as a fanfare. Checked on the PITCHED voices only: a
+    // `freq` on a noise voice sets a grain envelope, not a note, and holding noise
+    // to an interval rule would be enforcing music on something that has no pitch.
+    const MAJOR_THIRD = Math.pow(2, 4 / 12);
+    for (const c of CANDIDATE_SLOTS.levelUp!.candidates) {
+      const pitched = voicesOf(c.spec).filter((v) => v.wave !== 'noise' && (v.noiseMix ?? 0) < 0.5);
+      for (const a of pitched) {
+        for (const b of pitched) {
+          if (a === b) continue;
+          let r = Math.max(a.freq, b.freq) / Math.min(a.freq, b.freq);
+          while (r >= 2) r /= 2; // interval class — a tenth congratulates too
+          expect(
+            Math.abs(r - MAJOR_THIRD) / MAJOR_THIRD,
+            `levelUp/${c.id} spells a major third between ${a.name} and ${b.name}`,
+          ).toBeGreaterThan(0.02);
         }
       }
     }
