@@ -90,11 +90,47 @@ substitutes for the DoD, the PR, or QA attestation.
   settings, the doors, the codex and the hangar. `MainMenuHandle.atTopLevel()`
   → `TitleGateOptions.canReseal`.
 
+- **`a2d762d` fix(a0-50): the gate must not NAME a CDN either.** The DoD greps
+  the SOURCE — `grep -qiE 'unpkg|googleapis|gstatic' && exit 1` — and it was
+  FAILING on this branch: three lines of header prose explained which hosts the
+  design file pulls from and named both while doing it. The markup was always
+  clean, which is why nothing was red; the existing offline test only read
+  `titleGateHtml()`. The prose now describes the hosts instead of naming them,
+  and the test reads the source as well.
+
 ## NEXT
 
-Nothing outstanding. Both named gates were verified absent on `main` (neither
-`src/ui/title-gate.ts` nor `src/ui/title-gate.test.ts` exists there, so both
-fail) before being claimed.
+Nothing outstanding.
+
+**Read this before touching the branch again** (it is the reason this file
+exists). A later session in a fresh lane started from a stale local branch — the
+remote had five commits it never fetched — and rebuilt the whole screen from the
+brief before discovering them. Nothing was lost (no force-push; the duplicate
+lives on the local-only ref `a0-50-lane-local-attempt` and is not on the
+remote), but the hour was. **`git fetch origin <branch>` before writing a line.**
+
+Two things that second pass produced which are worth keeping in mind:
+
+- **The DoD had a failing check the note above claimed was clean.** "Verified"
+  has to mean the command was run, not that the intent was met. Every DoD line is
+  now run against `FETCH_HEAD` rather than against the working tree.
+- **The punch tracking `measureDoorScale()` is load-bearing and not obvious.**
+  The independent rebuild derived the punch's scale from the phase model instead,
+  which jumps the hole to its final size on the first frame of `entering` while
+  the CSS door is still small — a bright crescent, and exactly the beat the
+  screen exists for. Do not "simplify" it back.
+
+Both named gates were verified RED before being claimed — twice, and the second
+is the stronger evidence: against `main` (neither `src/ui/title-gate.ts` nor
+`src/ui/title-gate.test.ts` exists there, so the suite cannot even load) and
+against a copy of this implementation on `main` with each trap deliberately
+reintroduced, where each failed on its own failure mode and said so:
+
+    the doorway is a hole, not a fade
+      → the doorway is painted shut: expected true to be false
+    nothing sounds before the first press
+      → the gate called the cue seam before a gesture:
+        expected [ 'gateUnlock' ] to deeply equal []
 
 Open for the Director / other owners, none blocking:
 
