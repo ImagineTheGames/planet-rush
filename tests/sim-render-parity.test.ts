@@ -34,6 +34,7 @@ import { describe, it, expect } from 'vitest';
 import { Container, Graphics } from 'pixi.js';
 import { ShipClass } from '@shared/types';
 import { Renderer } from '@render/index';
+import { RENDER_EXTENT, reachOf } from '@render/cull';
 import { CHUNK, PROJECTILE, SHIELD, TURRET, createWorld, turretMountPos } from '../src/sim';
 import type { OreChunk, Projectile, Shield, Turret, World } from '../src/sim';
 
@@ -153,13 +154,29 @@ function drawnSize(g: Graphics): number {
 /** The parity contract for one collider: a *visible* sprite exists, and its
  *  drawn size is within 2× (either way) of the collision diameter — so a body is
  *  never drawn much smaller than it collides ("hit what you can't see") nor left
- *  off the stage entirely. */
-function expectParity(name: string, g: Graphics | null, collisionRadius: number): void {
+ *  off the stage entirely.
+ *
+ *  `maxSize` overrides the upper bound for the one family whose sprite is not a
+ *  body-sized blob; see {@link expectVisibleAtLeast} and the projectile case. */
+function expectParity(name: string, g: Graphics | null, collisionRadius: number, maxSize?: number): void {
+  expectVisibleAtLeast(name, g, collisionRadius);
+  const diameter = 2 * collisionRadius;
+  const size = drawnSize(g!);
+  const ceiling = maxSize ?? 2 * diameter;
+  const how = maxSize === undefined ? `2× its collision diameter ${diameter}` : `its declared cull reach ${ceiling.toFixed(1)}`;
+  expect(size, `${name}: drawn size ${size.toFixed(1)} exceeds ${how}`).toBeLessThanOrEqual(ceiling);
+}
+
+/** The half of the parity contract this file is **permanent** for: a collider
+ *  has a visible sprite on the stage, and it is not drawn so much smaller than
+ *  it collides that a player can hit what they cannot see. Every family asserts
+ *  this half, unconditionally — the shipped bug was an undrawn collider, and no
+ *  art direction is allowed to relax it. */
+function expectVisibleAtLeast(name: string, g: Graphics | null, collisionRadius: number): void {
   expect(g, `${name}: no visible sprite on stage for a collidable body`).not.toBeNull();
   const diameter = 2 * collisionRadius;
   const size = drawnSize(g!);
   expect(size, `${name}: drawn size ${size.toFixed(1)} is smaller than half its collision diameter ${diameter}`).toBeGreaterThanOrEqual(0.5 * diameter);
-  expect(size, `${name}: drawn size ${size.toFixed(1)} exceeds 2× its collision diameter ${diameter}`).toBeLessThanOrEqual(2 * diameter);
 }
 
 describe('sim/render parity — every collidable entity type is drawn to size', () => {
@@ -231,13 +248,48 @@ describe('sim/render parity — every collidable entity type is drawn to size', 
     }
   });
 
-  it('turret projectiles (GDD §4.1 — pooled shots, same circle test)', () => {
+  /**
+   * The one family whose upper bound is not `2× the collision diameter`, and the
+   * reason is a ratified art ruling rather than a slipped sprite.
+   *
+   * A shot used to be two concentric circles, and a disc drawn at ~1.2 radii sat
+   * inside 2× its collider comfortably. Since a0-46 it is a PIERCE laser bolt:
+   * a blunt head at the collision radius with a trail of light running ~6.8 radii
+   * out behind it, turned onto the direction of travel. The head is the body; the
+   * trail is exhaust, and no one expects to collide with it — the same convention
+   * every laser bolt in every shooter uses.
+   *
+   * Two things follow, and only the second is a change to this file's contract:
+   *
+   *  - **The lower bound is untouched.** `expectVisibleAtLeast` still runs, so the
+   *    shipped bug this file is permanent for — a collider with no sprite, or one
+   *    drawn too small to see — still fails here for projectiles exactly as it
+   *    does for every other family. That half is not negotiable and is not what
+   *    this case relaxes.
+   *  - **The upper bound becomes the cull reach instead of the collider.**
+   *    `2 × collisionRadius` cannot express "a body plus a trail", and the sprite
+   *    bakes into a SQUARE quad (`SpriteDef.extent` is one half-extent), so the
+   *    measured box is the bolt's LENGTH on both axes — 63 units against a
+   *    collision diameter of 8. The ceiling that is actually meaningful for a
+   *    shot is the one the renderer already commits to: `RENDER_EXTENT.shot`, the
+   *    reach `drawShots` culls by. A sprite larger than its own declared reach is
+   *    a real bug — it clips against the screen edge while the cull thinks it is
+   *    safely off — and this assertion catches it, which the old ceiling did not.
+   *
+   * So the ceiling moved from "2× the collider" to "never bigger than what it
+   * told the cull". A regression that doubled the bolt still fails; an undrawn
+   * shot still fails. OWNER (Platform Engineer): this is the one line of your
+   * gate a0-46 changes, and it is called out in the PR for your review.
+   */
+  it('turret projectiles (GDD §4.1 — pooled shots, a body with a trail)', () => {
     const world = worldWithEveryCollidable();
     const shots = layer(render(world), 'shots');
     const live = world.projectiles.filter((p) => p.active);
     expect(live.length).toBeGreaterThan(0);
     for (const p of live) {
-      expectParity(`projectile ${p.id}`, spriteAt(shots, p.pos.x, p.pos.y), p.radius);
+      // The declared cull reach is a half-extent; the drawn size is a diameter.
+      const reach = 2 * reachOf(p.radius, RENDER_EXTENT.shot);
+      expectParity(`projectile ${p.id}`, spriteAt(shots, p.pos.x, p.pos.y), p.radius, reach);
     }
   });
 });
