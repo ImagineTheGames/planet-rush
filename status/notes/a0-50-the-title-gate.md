@@ -98,9 +98,51 @@ substitutes for the DoD, the PR, or QA attestation.
   `titleGateHtml()`. The prose now describes the hosts instead of naming them,
   and the test reads the source as well.
 
+### The CI pass (2026-08-15, a fourth session — the note said "nothing outstanding" and CI said otherwise)
+
+- **`ae608fd` fix(a0-50): triage the doorway invariant.** `dark-matter:check` is
+  a step of the required `Typecheck, test, build` job and it was RED:
+  `skyCoversPoint` is a new export no production code calls. Allowlisted as
+  SURFACE with the verdict in `docs/dark-matter-scan.md` §4.7, because a version
+  production called could only be the paint restated — and the failure it guards
+  is a paint that *looks right*.
+- **`d026851` fix(a0-50): `?gate=0`.** The mobile-emulation shards had never run
+  on this branch (they are skipped while the unit job is red). With the unit job
+  green, four of six shards failed, and structurally: **~30 automated specs walk
+  through the front door on their way somewhere else** — they boot at `/`, read
+  `window.__mainMenu` and click where it says a plate is drawn, and a sealed door
+  takes that click instead. So the screen ships with a narrow off switch read at
+  the mount (`gateEnabled`): it turns off this screen and nothing else, the
+  default is on, and it has to be asked for by name.
+- **`d7410fe` chore(a0-50): the flag on boots this lane does not own.** 22 sites
+  in 22 files, one line each, alone in its own commit so QA and Platform can
+  revert it without touching the screen.
+
+## DECISIONS (the CI pass)
+
+- **`?gate=0`, not `?debug=1`, and not a `navigator.webdriver` sniff.**
+  `?debug=1` skips the whole front of the game — those specs want the real menu,
+  doors and lobby, they just should not have to open a door to reach them. A
+  webdriver check was **rejected outright**: it would make the shipped bundle
+  behave differently under test than in a browser, which is the one thing a
+  browser suite exists to prevent, and it would have hidden this screen from CI
+  permanently rather than visibly.
+- **The gate is measured, not merely excused.** `menu-frame-cost.spec.ts`'s own
+  header states the rule — *a screen added to the set and not added here is a
+  screen that can peg the runner in silence* — so the sealed door is sampled in
+  the same pass as the menu, against the same live-match yardstick. Folded into
+  the existing test rather than added as a third, so the shard grows by one boot
+  and one 3 s window instead of a whole test.
+
 ## NEXT
 
-Nothing outstanding.
+- Push, and watch the shards. The four that failed (2, 3, 4, 5) are exactly the
+  ones carrying a front-door spec; shard 1 and 6 carry `goldens`, which is the
+  one that would fail on PIXELS rather than on a timeout if the flag were wrong.
+- **For QA / the Director, not blocking:** the `?gate=0` opt-out means the
+  goldens do not photograph this screen. A golden of the sealed door is worth
+  having and belongs in `goldens.spec.ts`, which is QA's — the seam it needs
+  (`window.__titleGate`) does not exist yet either.
 
 **Read this before touching the branch again** (it is the reason this file
 exists). A later session in a fresh lane started from a stale local branch — the

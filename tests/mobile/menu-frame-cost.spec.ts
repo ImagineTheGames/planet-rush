@@ -211,18 +211,34 @@ async function pressDoor(page: Page, kind: string): Promise<void> {
   await page.mouse.move(1, 1);
 }
 
-test('the static title screen costs no more per frame than the live match', async ({
+/**
+ * The title screen, and **the door standing in front of it** (a0-50).
+ *
+ * The gate is sampled in the same pass rather than in a test of its own, because
+ * it is the same question about the same screen and it is the only place in this
+ * suite that loads it at all: `?gate=0` is what keeps thirty other specs from
+ * having to open a door, and a screen no harness ever renders is exactly what
+ * this file's header says must not exist.
+ *
+ * It is the one screen here that is **allowed** to spend a frame — it is a door
+ * being operated, and it paints a starfield to do it. So the ceiling is the same
+ * one and for the same reason: the front of the game must not cost more than the
+ * whole running game. The gate goes behind `VfxAutoQuality` in code
+ * (`src/ui/title-gate.ts` `GateQuality`); this is the number that says the floor
+ * is not doing all the work.
+ */
+test('the title screen — and the door in front of it — cost no more per frame than the live match', async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'iphone', 'the phone profile is where fill rate bites');
   budgetTest({
-    work: 'boot to the menu → sample a 3 s frame window → boot the frozen match → sample again → compare medians',
-    measuredSeconds: 14,
+    work: 'boot to the menu → sample a 3 s frame window → boot the sealed door → sample → boot the frozen match → sample → compare medians',
+    measuredSeconds: 20,
   });
 
   // The menu, at rest. Nothing on it animates, so every frame it spends is a
   // frame spent redrawing something that did not change. (`?gate=0`: the title
-  // gate in front of it IS animated, on purpose — it has its own test below.)
+  // gate in front of it IS animated, on purpose — it is sampled next.)
   await page.goto('/?gate=0');
   await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
   await page.waitForFunction(
@@ -232,6 +248,19 @@ test('the static title screen costs no more per frame than the live match', asyn
   );
   await page.waitForTimeout(1000);
   const menuMs = await medianFrameMs(page);
+
+  // The same boot with the door on, left SEALED — which is the expensive state
+  // and the one a player looks at longest. Nothing is pressed: the four beats are
+  // a gesture's business, and audio may not be armed without one.
+  await page.goto('/');
+  await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
+  await page.waitForFunction(
+    () => (window as unknown as { __mainMenu?: { visible: boolean } }).__mainMenu?.visible === true,
+    undefined,
+    { timeout: 20_000 },
+  );
+  await page.waitForTimeout(1000);
+  const gateMs = await medianFrameMs(page);
 
   // The live match in the same page, as the yardstick: a full world, its HUD and
   // its VFX. This is the most the game legitimately asks of a frame.
@@ -246,12 +275,17 @@ test('the static title screen costs no more per frame than the live match', asyn
   const matchMs = await medianFrameMs(page);
 
   expect(matchMs, 'the match sampled a sane frame time to compare against').toBeGreaterThan(0);
+  // Both screens in ONE assertion, so a failure names whichever regressed rather
+  // than stopping at the first — the same reason the three-screen test below
+  // reports its set together.
+  const over = [
+    { screen: 'the static menu', ms: menuMs, why: 'The Gantry/Bone plates are ~170 translucent polygons and something has stopped caching them — see src/ui/screen-cache.ts.' },
+    { screen: 'the sealed title gate', ms: gateMs, why: 'The door paints a starfield every frame and goes behind VfxAutoQuality for it — see src/ui/title-gate.ts.' },
+  ].filter((s) => s.ms / matchMs >= MAX_RATIO);
   expect(
-    menuMs / matchMs,
-    `the static menu costs ${menuMs.toFixed(1)}ms/frame against the live match's ${matchMs.toFixed(1)}ms/frame. ` +
-      'The Gantry/Bone plates are ~170 translucent polygons and something has stopped caching them — ' +
-      'see src/ui/screen-cache.ts.',
-  ).toBeLessThan(MAX_RATIO);
+    over.map((s) => `${s.screen} costs ${s.ms.toFixed(1)}ms/frame. ${s.why}`),
+    `against the live match's ${matchMs.toFixed(1)}ms/frame`,
+  ).toEqual([]);
 });
 
 /**
