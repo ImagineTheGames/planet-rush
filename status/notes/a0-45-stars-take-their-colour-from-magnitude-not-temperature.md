@@ -83,17 +83,39 @@ device-independent default rather than something this container sniffed. The
 baselines are their own commit so they can be dropped alone if CI's renderer
 disagrees.
 
+**`58e3b5b` — both gates, failing on `main` on their merits.** The brief requires
+it and it had been asserted rather than shown. `gates-on-main.ts` runs the two
+assertions against **main's own API** — `starRampColor` paints 3 colours over 6
+magnitudes, its one argument IS the magnitude, and main's cross is 1.20–1.35× its
+halo where the gate needs < 1. Dropping this branch's `backdrop.test.ts` into a
+main worktree also fails, but at `starColorFor is not a function`, which proves
+only that the branch added a symbol.
+
+## DECISIONS (continued)
+
+- **The fail-on-main proof is run against main's API, not by porting the test
+  file.** A missing-symbol `TypeError` is a pass/fail accident of the import
+  graph; the gate is worth something only if the state it refuses is the state
+  that shipped. Both are recorded — the `TypeError` verbatim in the README, and
+  the substantive failure in `gates-on-main.txt`.
+
 ## NEXT
 
-- **Resumed 2026-08-15.** The lane's local branch pointer was sitting on `main`
-  (`12303a0`) while all nine commits of work were already on `origin`; reset to
-  the remote branch rather than rebuilding anything. Nothing was lost — the six
-  "local-only" commits were main's own.
-- **Merged `origin/main` again** (a0-49, sound-only: `src/art/audio/`,
-  `sound-review/`, `docs/`). Clean, and it touches nothing that renders, so the
-  43 re-baselined goldens still describe this tree.
-- `npx tsc --noEmit` green on the merged tree. Full `npm test -- --run` running.
-- Then: push and open the PR with the two Director questions:
+**Everything in the brief is built, committed and pushed. What remains is the PR
+and CI.**
+
+- **Session of 2026-08-15 (second).** Branch had two unpushed commits (the a0-49
+  merge + a note). Pushed fast-forward; `gh auth setup-git` was needed first, git
+  had no credential helper.
+- Re-verified on this tree: `npx tsc --noEmit` **clean**; all six code DoD greps
+  **pass against `origin`**, not just locally. Confirmed the a0-49 merge touches
+  only `src/art/audio/`, `sound-review/`, `docs/` and `evidence/a0-49-*` — nothing
+  that renders, so the 43 re-baselined goldens still describe this tree.
+- Confirmed `tests/mobile/goldens.spec.ts` and the shipped playwright config are
+  byte-identical to `main`: the `maxDiffPixelRatio: 0` re-baseline tolerance was
+  **not** committed. The private config lives in `evidence/`.
+- Full `npm test -- --run` re-run on the merged tree, then open the PR. Body is
+  drafted with the two Director questions:
   **(1)** blue-white starlight vs the beacon ring `#4dc3ff` — ΔE 39.0 on the
   composited pixel, 16.5 on the raw ink, against the studio's ΔE 40 floor;
   **(2)** `peakP99` 46–53 is exactly what a white-topped ramp measures, so either
@@ -101,3 +123,6 @@ disagrees.
   brighter than the `0.42 × 0.48` a0-44 read off it.
   (A third, raised by §1.2 rather than the brief: the amber 22% comes within
   ΔE 25.6 of `oreDeep`, the closest the backdrop has come to RESERVED yellow.)
+- **Note for a future session:** this file exists twice — tracked in the repo at
+  `status/notes/`, and untracked at the absolute `/status/notes/` the brief names.
+  Keep both; the repo copy is the one that survives in git.
