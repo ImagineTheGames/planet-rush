@@ -126,6 +126,30 @@ star — two colour sources on one star, which is the thing a0-45 removes.
 The skies. a0-40's and a0-44's numbers are untouched, and the nebula structure in
 each `before`/`after` pair is identical — that is the check on it.
 
+## The gates, run against `main` — `gates-on-main.txt`
+
+```sh
+git worktree add /tmp/a045-gate origin/main
+ln -sfn "$PWD/node_modules" /tmp/a045-gate/node_modules
+cp evidence/a0-45-star-temperature-colour/gates-on-main.ts /tmp/a045-gate/
+(cd /tmp/a045-gate && npx vite-node gates-on-main.ts)
+```
+
+The brief requires both gates to **fail on `main` today**. Dropping this
+branch's `backdrop.test.ts` into a `main` worktree does fail —
+
+```
+ FAIL  src/art/backdrop.test.ts > colour comes from temperature, not magnitude
+ TypeError: undefined is not a function   ❯ temps.map(starColorFor)
+```
+
+— but it fails at a missing symbol, which proves only that the branch added one.
+So `gates-on-main.ts` runs the same two assertions against **`main`'s own API**
+and shows each failing on its merits: `starRampColor` paints 3 distinct colours
+over 6 magnitudes (so *different magnitude, same temperature* cannot hold), its
+single argument *is* the magnitude, and `main`'s cross sits at 1.20–1.35× the
+halo it is drawn inside where the gate requires < 1.
+
 ## The goldens — `goldens-rebaseline.md`, `golden-delta.txt`
 
 The plates above are the *generator's* output. The golden baselines are the real
