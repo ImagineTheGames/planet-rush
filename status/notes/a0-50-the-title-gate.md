@@ -126,7 +126,13 @@ substitutes for the DoD, the PR, or QA attestation.
   beside it.** `evidence/a0-50-title-gate/` — five beats, `before`/`after`, and a
   regenerable `shoot.mjs` that fails loudly if the gate does not mount.
 
-### The bug three sessions of green unit tests could not see
+- **`0b9832a` fix(a0-50): the door turns with the game.** The landscape lock
+  reaches the overlay: `gateRootLayoutCss` is the CSS spelling of the same
+  `RootTransform` the Pixi root takes, and every `vw`/`vh` on the screen now
+  reads `--pr-gate-vw` / `--pr-gate-vh` — the LOGICAL viewport — because rotating
+  a root does not change what a viewport unit means. Second browser-only find.
+
+### The bugs three sessions of green unit tests could not see
 
 **The overlay root was painted `background:#070910`.** The punch is
 `destination-out` on the CANVAS, so it erases the canvas; the root sits behind
@@ -148,6 +154,15 @@ Three things worth keeping from it:
   all). It took loading the built bundle in Chromium and pressing the door. **Do
   that before claiming this screen works** — it is four minutes and it is the
   only thing that can see this class of failure.
+
+**And then the same four minutes found a second one, on a phone.** A handset held
+portrait gets a game rotated +90°; the DOM overlay did not turn with it. Worse
+than sideways, because rotating a root does not change what `vw` and `vh` mean —
+the lock is `min(148px,17vh)`, portrait `vh` is the LONG side, so the rotor sat
+at its pixel cap while the door shrank under it. Rotor two thirds the height of
+its own door, clearance eating the whole leaf, both words clipped through the
+middle. Fixed in `0b9832a`, and it needs BOTH halves: the transform, and the
+units read against the logical viewport. **The first half alone makes it worse.**
 
 ## DECISIONS (the CI pass)
 
