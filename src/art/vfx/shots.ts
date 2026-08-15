@@ -56,9 +56,17 @@
  *
  * What was approved is a blunt round cap at the FRONT, tapering BACKWARD until it
  * meets the trail's half-width **exactly**, smoothstepped so there is no shoulder
- * at the join. At Mk IV, front to back: `1.470 → 1.251 → 0.769 → 0.287 → 0.068`,
- * and 0.068 is the body's own half-width. That last equality is the point, and it
- * is why {@link taperedHead} takes `hwBack = hw`.
+ * at the join. That last equality is the point, and it is why {@link taperedHead}
+ * takes `hwBack = hw`. At Mk IV the profile runs, front to back:
+ *
+ *     1.470 → 1.257 → 0.787 → 0.317 → 0.104
+ *
+ * and 0.104 is {@link BOLT_BODY_HALF_WIDTH}. (The ruling's own table reads
+ * `1.470 → 1.251 → 0.769 → 0.287 → 0.068` — the same curve with the back width
+ * multiplied by the `Thin` knob a second time, which lands the taper *under* the
+ * trail rather than on it and contradicts the ruling's own "0.104 at every rung".
+ * `make-laser-tiers.ts` passes `hwBack = hw` and is the definition, so that is
+ * what is ported; the difference is 0.036 of a collision radius at the join.)
  *
  * ## 4. A white core, inside a coloured sheath, composited additively
  *
