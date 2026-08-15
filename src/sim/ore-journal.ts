@@ -95,7 +95,16 @@ export interface OreEvent {
    * `'chunk'` (anything tractored in).
    */
   readonly item: string;
-  /** Ore moved, always positive — `flow` says which way. */
+  /**
+   * Ore moved, always positive — `flow` says which way.
+   *
+   * Exact for every flow but one. The atmosphere drain moves a sliver per 60 Hz
+   * tick and is journalled on the WHOLE-ore boundary instead (the courier rule,
+   * `./step`), so a `banked`/`drain` line's `amount` is the whole ore that
+   * crossed since the last line rather than that one tick's sliver. The four
+   * balances below stay exact live readings on every line, which is what a
+   * reader checks; only this number is coalesced, and only for that flow.
+   */
   readonly amount: number;
   /** Hold and bank as this event found them. */
   readonly hold: number;

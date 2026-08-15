@@ -1124,6 +1124,10 @@ function updateDeposits(world: World, dt: number): void {
     // ring in four seconds and tell a reader nothing; one line per whole ore
     // banked is the same rate the player watches fly home, and it keeps the log's
     // banked total exactly the ore that arrived (`./ore-journal`).
+    //
+    // So `amount` is the whole ore that crossed, while the four balances are this
+    // tick's exact live readings — the one place the two are not the same
+    // subtraction, called out on `OreEvent.amount`.
     if (couriers > 0) {
       journalOre(world, {
         tick: world.tick,
