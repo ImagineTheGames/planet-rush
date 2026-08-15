@@ -79,6 +79,7 @@
 import { ShipClass } from '@shared/types';
 import { CARGO_CAP_MAX, SHIP_STATS, UPGRADES } from '../sim/constants';
 import { affordable, costNumeral } from './affordability';
+import { clampSelection, wedgeAngle, wedgeArc } from './wheel-geometry';
 import { hubBack } from './wheel-nav';
 import type { HubBack } from './wheel-nav';
 
@@ -355,18 +356,21 @@ export function tierPips(tier: number, maxTier: number): string {
  */
 export const UPGRADE_WHEEL_ORDER: readonly UpgradeTrack[] = WHEEL_TRACK_ORDER;
 
-/** Angular width of one wedge (radians) for a wheel of `count` wedges. Matches
- *  the Build wheel's construction, so the two wheels feel identical. */
+/** Angular width of one wedge (radians) for a wheel of `count` wedges. It does
+ *  not merely *match* the Build wheel's construction — since a0-51 it IS the
+ *  Build wheel's construction ({@link ./wheel-geometry.wedgeArc}), handed this
+ *  wheel's count instead of five. */
 export function upgradeWedgeArc(count: number): number {
-  return count > 0 ? (2 * Math.PI) / count : 0;
+  return wedgeArc(count);
 }
 
 /** Screen-space angle of a wedge's centre (radians, y-down: `-π/2` is up).
  *  Wedge 0 sits at twelve o'clock and the rest run clockwise — the same
- *  convention the Build wheel's {@link ./build-wheel.segmentAngle} uses, so a
- *  press maps to a wedge the same way on both wheels. */
+ *  convention the Build wheel's {@link ./build-wheel.segmentAngle} uses, from the
+ *  same {@link ./wheel-geometry.wedgeAngle}, so a press maps to a wedge the same
+ *  way on both wheels and the selection sweeps to the same place on both. */
 export function upgradeWedgeAngle(index: number, count: number): number {
-  return -Math.PI / 2 + index * upgradeWedgeArc(count);
+  return wedgeAngle(index, count);
 }
 
 // ---------------------------------------------------------------------------
@@ -510,6 +514,25 @@ export interface UpgradeWheelModel {
    * up (there is no hub to press).
    */
   readonly hubBack: HubBack | null;
+  /**
+   * The wedge the player is pointing at — the Build wheel's `selected` (u16-01,
+   * {@link ./build-wheel.BuildWheelModel.selected}), on the level behind its
+   * arrow. `null` when nothing is pointed at, which is a resting state and not a
+   * missing value.
+   *
+   * It is here for the reason the Build wheel's is on ITS model: every decision
+   * on this control is made in a pure, headless-tested module and the view only
+   * paints. This wheel simply never had the field, so {@link
+   * ../ui/build-wheel-view} had nothing to draw a highlight from and drew none —
+   * half of a0-51 (*"it doesnt have the selection animation or graphics"*).
+   *
+   * Always `null` while the wheel is shut, and always in range **for this
+   * level's wedge count**: the pointer's integer is taken on whichever level is
+   * up, and the WEAPON sub-wheel has fewer wedges than the wheel in front of it,
+   * so an index that was legal a frame ago goes dark rather than lighting a
+   * different track of the same number.
+   */
+  readonly selected: number | null;
 }
 
 /** What the upgrade wheel needs for one frame. */
@@ -524,6 +547,21 @@ export interface UpgradeWheelSignals {
   /** Ore a purchase can draw on — hold plus bank (the Build wheel's
    *  `spendableOre`), so the two wheels agree on what is affordable. */
   readonly ore: number;
+  /**
+   * The wedge the player is pointing at, or `null` for none — the same
+   * device-neutral integer the Build wheel takes (GDD §2.4, u16-01): a mouse
+   * hovering the wheel, a thumb dragging across it and a gamepad stick pushed at
+   * it all arrive here the same way, because it is the same control one level
+   * down.
+   *
+   * Selection is NOT a purchase here either. Pointing at ENGINE lights it; the
+   * press path is untouched by this field, so a cursor crossing an open upgrade
+   * wheel cannot spend a tier.
+   *
+   * Optional and `null` when absent, so a caller that predates a0-51 reads as
+   * "nothing is pointed at" — the resting wheel, drawn exactly as it was.
+   */
+  readonly selected?: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -607,6 +645,10 @@ export function upgradeWheelModel(
     // the top level — it lives behind the Build wheel's arrow — so its back POPS
     // a level: WEAPON → upgrade, upgrade → Build. `null` while shut.
     hubBack: signals.open ? hubBack(signals.weaponOpen ? 'weapon' : 'upgrade') : null,
+    // Clamped against THIS level's wedge count, and dropped on a shut wheel —
+    // exactly what `buildWheelModel` does with the same integer, and the reason
+    // an index taken on the wheel in front cannot light a wedge behind it.
+    selected: signals.open ? clampSelection(signals.selected, count) : null,
   };
 }
 

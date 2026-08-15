@@ -41,8 +41,7 @@
  */
 
 import { PLATE_MOTION } from '../art/materials';
-import { clampSelection, segmentAngle } from './build-wheel';
-import type { WheelSegment } from './build-wheel';
+import { clampSelection, wedgeAngle, WHEEL_TOP } from './wheel-geometry';
 
 // ---------------------------------------------------------------------------
 // The design's own numbers
@@ -123,6 +122,14 @@ export function sweepEase(x: number): number {
 // Which wedge, and when a crossing is worth a sound
 // ---------------------------------------------------------------------------
 
+/** The only thing the detent asks of a wedge: whether it is pressable right now.
+ *  Both wheels' state unions spell that `'ready'` ({@link ./build-wheel.SegmentState},
+ *  {@link ./upgrade-wheel.UpgradeWedgeState}), so it is stated structurally here
+ *  rather than by importing either wheel into the machine that drives both. */
+export interface DetentWedge {
+  readonly state: string;
+}
+
 /**
  * Whether a change of selection should fire the **detent** cue — the handoff's
  * *"Wedge crossed → detent, one note an octave above the click, **muted while
@@ -145,11 +152,17 @@ export function sweepEase(x: number): number {
  * Landing on nothing (`next === null`) is silent. It is not a wedge crossing; it
  * is the pointer leaving, and s6-01 rule 1 — one sound per state change — is not
  * a licence to sound the absence of one.
+ *
+ * The wedges are taken structurally ({@link DetentWedge}) rather than as either
+ * wheel's segment type, because the detent asks one question — *is the thing you
+ * just crossed onto pressable* — and both wheels answer it with the same word.
+ * That is what lets the Upgrade wheel tick on a crossing without this module
+ * learning what an upgrade track is (a0-51).
  */
 export function detentOnSelection(
   prev: number | null,
   next: number | null,
-  segments: readonly Pick<WheelSegment, 'state'>[],
+  segments: readonly DetentWedge[],
 ): boolean {
   if (next === null || next === prev) return false;
   return segments[next]?.state === 'ready';
@@ -187,16 +200,26 @@ export function detentOnSelection(
  * takes the long way round says the opposite. Here the target angle is chosen as
  * the nearest rotational equivalent of the selected wedge, so 4 → 0 on a
  * five-wedge wheel sweeps one arc forward. `wheel-selection.test.ts` pins it.
+ *
+ * ── AND IT SWEEPS TO THE WHEEL IT IS ACTUALLY DRIVING (a0-51) ──────────────
+ * Every angle here comes from {@link ./wheel-geometry.wedgeAngle} and the `count`
+ * {@link update} is given — the same number the wrap already used. It used to
+ * come from the Build wheel's `segmentAngle`, which is 2π/5 per step whatever
+ * wheel is on screen, so on the four-wedge Upgrade wheel the highlight landed a
+ * further 18° short of its wedge for every index past the first. Index 0 is
+ * twelve o'clock at every count, which is why the developer saw *"only the top
+ * most one has it"* and why the test walks every index, not the first.
  */
 export class WheelSelection {
   /** The wedge the model says is selected, after clamping. */
   private _index: number | null = null;
-  /** Where the highlight is drawn, radians. Meaningful only while lit. */
-  private _angle = segmentAngle(0);
+  /** Where the highlight is drawn, radians. Meaningful only while lit. Starts at
+   *  twelve o'clock, which is wedge 0 on a wheel of any size. */
+  private _angle = WHEEL_TOP;
   /** Sweep start, and the target it is easing toward (radians, unwrapped so the
    *  difference between them IS the short way round). */
-  private _from = segmentAngle(0);
-  private _to = segmentAngle(0);
+  private _from = WHEEL_TOP;
+  private _to = WHEEL_TOP;
   /** 0→1 across one sweep. 1 = settled. */
   private _t = 1;
   /** 0→1 fade of the whole highlight. */
@@ -242,7 +265,11 @@ export class WheelSelection {
    * Advance one frame toward `target`.
    *
    * @param target the model's `selected` — already clamped, or clamped here.
-   * @param count  how many wedges the wheel has, so a wrap takes the short way.
+   * @param count  how many wedges the wheel has. It decides BOTH what counts as
+   *               an in-range index and where that index sits, so the highlight
+   *               lands on the wheel it is drawn over: five wedges on the Build
+   *               wheel, four on the Upgrade wheel, two on the WEAPON sub-wheel
+   *               (a0-51 — one machine, parameterised, never a second copy).
    * @param dt     seconds since the last frame. A non-finite or negative `dt`
    *               moves nothing; a huge one (the tab was backgrounded) simply
    *               finishes the sweep, because the clamp below cannot overshoot.
@@ -258,13 +285,13 @@ export class WheelSelection {
         // the wedge it was leaving — and aim at the nearest rotational equivalent
         // of the new wedge, so the move is one notch and never four.
         this._from = this._angle;
-        this._to = nearestEquivalent(segmentAngle(next), this._angle);
+        this._to = nearestEquivalent(wedgeAngle(next, count), this._angle);
         this._t = 0;
       } else if (next !== null) {
         // Nothing was lit: the highlight ARRIVES on the new wedge and fades up
         // there. Sweeping in from a stale angle would animate a move the player
         // never made.
-        this._from = segmentAngle(next);
+        this._from = wedgeAngle(next, count);
         this._to = this._from;
         this._angle = this._from;
         this._t = 1;
@@ -296,7 +323,7 @@ export class WheelSelection {
     this._t = 1;
     this._presence = 0;
     this._crossed = false;
-    this._angle = segmentAngle(0);
+    this._angle = WHEEL_TOP;
     this._from = this._angle;
     this._to = this._angle;
   }

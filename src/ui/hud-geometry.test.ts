@@ -1239,6 +1239,7 @@ describe('an upgrade wedge at 390 px, with its longest values (u7-06)', () => {
     ladder: UpgradeLadder = UPGRADE_LADDER,
     order: readonly UpgradeTrack[] = WHEEL_TRACK_ORDER,
     tiersOver: Record<string, number> = {},
+    selected = false,
   ): void {
     const outer = wheelRadius(vp.width, vp.height);
     const m = wheelMetrics(outer);
@@ -1250,7 +1251,7 @@ describe('an upgrade wedge at 390 px, with its longest values (u7-06)', () => {
         angle: wedge.angle,
         halfArc: Math.PI / count,
       };
-      const lines = upgradeWedgeLines(wedge, m);
+      const lines = upgradeWedgeLines(wedge, m, selected);
       const fit = fitWedgeStack(lines, outer, m, wedge.angle, count);
       const { boxes } = wedgeStackBoxes(scaleName(lines, fit.nameScale), outer, m, wedge.angle, fit.radius);
       for (const box of boxes) {
@@ -1278,6 +1279,20 @@ describe('an upgrade wedge at 390 px, with its longest values (u7-06)', () => {
   for (const { name, vp } of PROFILES) {
     it(`[${name}] still fits when the ladder GROWS by a track (p2-03)`, () => {
       assertUpgradeWedgesFit(vp, GROWN_LADDER, GROWN_ORDER, GROWN_TIERS);
+    });
+  }
+
+  // The selected wedge grows its name 19/17 on THIS wheel too since a0-51, so it
+  // is held to the same budget as the Build wheel's selected name — including at
+  // a grown ladder, where the extra track narrows every wedge and the enlarged
+  // name has the least room it will ever have.
+  for (const { name, vp } of PROFILES) {
+    it(`[${name}] …and still fits when the wedge is SELECTED (a0-51)`, () => {
+      assertUpgradeWedgesFit(vp, UPGRADE_LADDER, WHEEL_TRACK_ORDER, {}, true);
+    });
+
+    it(`[${name}] …selected, on a GROWN ladder — the narrowest wedge it will get`, () => {
+      assertUpgradeWedgesFit(vp, GROWN_LADDER, GROWN_ORDER, GROWN_TIERS, true);
     });
   }
 

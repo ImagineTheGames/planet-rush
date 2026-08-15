@@ -160,6 +160,92 @@ describe('the sweep takes the short way round', () => {
   });
 });
 
+describe('the angles come from the wedge count it is driving (a0-51)', () => {
+  /** The Upgrade wheel as the developer photographed it: four tracks, so a wedge
+   *  is a QUARTER of a turn where the Build wheel's is a fifth. */
+  const UPGRADE_COUNT = 4;
+
+  /** Where wedge `i` of `n` sits, written out longhand rather than imported: the
+   *  bug being pinned is that the driver computed this from the wrong `n`, and a
+   *  test that asks the same helper the code asks cannot see that. */
+  const expected = (i: number, n: number): number => -Math.PI / 2 + (i * (2 * Math.PI)) / n;
+
+  it('lands on EVERY wedge of a four-wedge wheel, not just the top one', () => {
+    // The whole report, in one loop. `-π/2` is twelve o'clock at every count, so
+    // index 0 is the one index where a fifth-of-a-turn stride and a quarter-turn
+    // stride agree — which is exactly why the developer saw *"only the top most
+    // one has it"*, and why this walks all four.
+    for (let i = 0; i < UPGRADE_COUNT; i++) {
+      const s = new WheelSelection();
+      s.update(i, UPGRADE_COUNT, FRAME);
+      s.settle();
+      expect(Math.abs(angleDelta(s.angle, expected(i, UPGRADE_COUNT))), `wedge ${i}`).toBeLessThan(
+        1e-9,
+      );
+    }
+  });
+
+  it('is off by a whole quarter-arc on the last wedge if it reads the Build wheel\'s five', () => {
+    // The size of the old error, stated so a regression cannot be waved through as
+    // rounding: the wheel's own wedge 3 is at 180°, the Build wheel's index 3 at
+    // 126° — 54°, well over half a wedge, so the highlight straddled the wedge
+    // BEFORE the one being pointed at.
+    const s = new WheelSelection();
+    s.update(3, UPGRADE_COUNT, FRAME);
+    s.settle();
+    const drift = angleDelta(s.angle, segmentAngle(3)) * (180 / Math.PI);
+    expect(Math.abs(drift)).toBeCloseTo(54, 6);
+    expect(Math.abs(angleDelta(s.angle, expected(3, UPGRADE_COUNT)))).toBeLessThan(1e-9);
+  });
+
+  it('drives any wheel it is handed — two wedges to eight, every index', () => {
+    // The WEAPON sub-wheel is two wedges and the ladder is data (p2-03 adds
+    // tracks), so "four" is today's number rather than the rule. The rule is that
+    // the machine is parameterised.
+    for (let n = 2; n <= 8; n++) {
+      for (let i = 0; i < n; i++) {
+        const s = new WheelSelection();
+        s.update(i, n, FRAME);
+        s.settle();
+        expect(Math.abs(angleDelta(s.angle, expected(i, n))), `wedge ${i} of ${n}`).toBeLessThan(
+          1e-9,
+        );
+      }
+    }
+  });
+
+  it('sweeps ONE quarter-arc on a four-wedge wrap, not one fifth and not three', () => {
+    // The short-way-round rule, re-measured at a count that is not five: the arc
+    // it may never exceed is this wheel's, so a driver that wrapped correctly in
+    // fifths would fail here rather than pass by luck.
+    const arc = (2 * Math.PI) / UPGRADE_COUNT;
+    const s = new WheelSelection();
+    s.update(UPGRADE_COUNT - 1, UPGRADE_COUNT, FRAME);
+    s.settle();
+    const from = s.angle;
+    let worst = 0;
+    for (let i = 0; i < 40; i++) {
+      s.update(0, UPGRADE_COUNT, 0.005);
+      worst = Math.max(worst, Math.abs(s.angle - from));
+    }
+    expect(worst).toBeLessThanOrEqual(arc + 1e-9);
+    expect(worst).toBeGreaterThan(arc * 0.9);
+    expect(Math.abs(angleDelta(s.angle, expected(0, UPGRADE_COUNT)))).toBeLessThan(1e-9);
+  });
+
+  it('re-targets to the new wheel\'s geometry mid-sweep, not the old wheel\'s', () => {
+    // One instance is only ever given one wheel's count in the shipped view, but
+    // the count is an argument and arguments change: whatever it is given, the
+    // wedge it aims at is that wheel's.
+    const s = new WheelSelection();
+    s.update(1, UPGRADE_COUNT, FRAME);
+    s.settle();
+    s.update(2, UPGRADE_COUNT, 0.04); // mid-sweep
+    s.update(3, UPGRADE_COUNT, 0.2); // …re-aimed, and given time to arrive
+    expect(Math.abs(angleDelta(s.angle, expected(3, UPGRADE_COUNT)))).toBeLessThan(1e-9);
+  });
+});
+
 describe('the highlight appears, moves and leaves without lying about any of it', () => {
   it('arrives ON the wedge and fades up, rather than sweeping in from nowhere', () => {
     // Nothing was lit, so there is no move to animate. A sweep here would draw a

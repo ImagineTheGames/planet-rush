@@ -68,6 +68,8 @@ interface UpgradeWheelStage {
     cost: number | null;
     state: 'ready' | 'unaffordable' | 'maxed';
     summary: WeaponPip[] | null;
+    /** Whether the view drew this wedge as the one being pointed at (a0-51). */
+    selected: boolean;
   }>;
 }
 interface LayoutEntry {
@@ -841,4 +843,117 @@ test('a disabled wedge press red-flashes and changes no sim state (report #3)', 
   expect(bank, 'a rejected press spends nothing').toBe(0);
 
   expect(pageErrors, 'no page errors while pressing a disabled wedge').toEqual([]);
+});
+
+// ---------------------------------------------------------------------------
+// The SELECTION, on the wheel behind the arrow (a0-51)
+// ---------------------------------------------------------------------------
+//
+// The developer, on `c48a893`: *"build wheel still doesnt have the effects i
+// asked for... it doesnt have the selection animation or graphics only the top
+// most one has it"*. Two defects made that one symptom, and both are invisible
+// to a model test:
+//
+//  1. `drawUpgradeWheel` never called `drawWheelSelection` at all, so this wheel
+//     drew no highlight anywhere;
+//  2. the sweep's angles came from the Build wheel's FIVE wedges, so on this
+//     four-wedge wheel only index 0 — twelve o'clock, the one angle every count
+//     shares — would have landed correctly even once it was drawn.
+//
+// Which is why this walks EVERY wedge with a real cursor, through the shipped
+// `pointermove` handler, and reads `selected` back off the descriptors the view
+// actually painted from (`lastUpgradeWedges`). A test that only checked wedge 0
+// would have passed against the broken build.
+
+/** Point a real cursor at wedge `i` of the current upgrade level and wait for the
+ *  client to draw it as selected. Returns the wedges as drawn. */
+async function hoverWedge(
+  page: import('@playwright/test').Page,
+  i: number,
+): Promise<ReturnType<UpgradeWheelStage['wedges']>> {
+  const point = await page.evaluate((idx) => window.__upgradeWheelStage!.wedgePoint(idx), i);
+  expect(point, `the client can locate wedge ${i} on the drawn wheel`).not.toBeNull();
+  // A real mouse on the canvas: `page.mouse.move` fires the same `pointermove`
+  // the desktop route reads, and a thumb dragging across the wheel walks the same
+  // line (GDD §2.4 — one gesture, whatever is making it).
+  await page.mouse.move(point!.x, point!.y);
+  const drawn = await page
+    .waitForFunction(
+      (idx) => {
+        const w = window.__upgradeWheelStage!.wedges();
+        return w.length > 0 && w[idx]?.selected ? w : null;
+      },
+      i,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+  return drawn!;
+}
+
+test('a real cursor lights EVERY upgrade wedge, not just the top one (a0-51)', async ({ page }) => {
+  const pageErrors = await boot(page);
+  await page.evaluate(() => window.__upgradeWheelStage!.openUpgrade(999));
+  await page.waitForFunction(() => window.__upgradeWheelStage!.wedges().length === 4, undefined, {
+    timeout: 20_000,
+  });
+
+  for (let i = 0; i < 4; i++) {
+    const wedges = await hoverWedge(page, i);
+    const lit = wedges.map((w, j) => (w.selected ? j : -1)).filter((j) => j >= 0);
+    expect(lit, `exactly wedge ${i} (${wedges[i]!.label}) is lit, and only it`).toEqual([i]);
+  }
+
+  // A frame for the developer, taken where the loop left the cursor: the LAST
+  // wedge, which is the one the old geometry was furthest from — 54° off, more
+  // than half a wedge. Evidence only, compared against no stored baseline (the
+  // goldens shoot a resting wheel, which this deliverable leaves untouched).
+  await page.screenshot({ path: 'tests/live-stage/a0-51-upgrade-selection-evidence.png' });
+
+  // Off the wheel entirely: the highlight goes with the cursor rather than being
+  // left lit on a wedge the player has walked away from.
+  await page.mouse.move(2, 2);
+  const resting = await page
+    .waitForFunction(
+      () => {
+        const w = window.__upgradeWheelStage!.wedges();
+        return w.length > 0 && w.every((x) => !x.selected) ? w : null;
+      },
+      undefined,
+      { timeout: 20_000 },
+    )
+    .then((h) => h.jsonValue());
+  expect(resting!.map((w) => w.selected)).toEqual([false, false, false, false]);
+
+  expect(pageErrors, 'no page errors pointing at the upgrade wheel').toEqual([]);
+});
+
+test('the WEAPON sub-wheel takes the selection too — same control, two wedges (a0-51)', async ({
+  page,
+}) => {
+  // The sub-wheel is two wedges, so its arc is half a turn: a highlight sized or
+  // placed off any other count would be visibly wrong here, and an index carried
+  // over from the four-wedge level in front would light the wrong track.
+  const pageErrors = await boot(page);
+  await page.evaluate(() => window.__upgradeWheelStage!.openUpgrade(999));
+  await page.waitForFunction(() => window.__upgradeWheelStage!.wedges().length === 4, undefined, {
+    timeout: 20_000,
+  });
+  await page.evaluate(() => window.__upgradeWheelStage!.openWeapon());
+  await page.waitForFunction(() => window.__upgradeWheelStage!.wedges().length === 2, undefined, {
+    timeout: 20_000,
+  });
+
+  for (let i = 0; i < 2; i++) {
+    const wedges = await hoverWedge(page, i);
+    expect(wedges.map((w) => w.label), 'the sub-wheel is the weapon tracks').toEqual([
+      'DAMAGE',
+      'SPEED',
+    ]);
+    expect(
+      wedges.map((w, j) => (w.selected ? j : -1)).filter((j) => j >= 0),
+      `exactly wedge ${i} of the sub-wheel is lit`,
+    ).toEqual([i]);
+  }
+
+  expect(pageErrors, 'no page errors pointing at the weapon sub-wheel').toEqual([]);
 });

@@ -189,6 +189,37 @@ describe('the wedges lay out as a wheel, clockwise from the top (field report)',
   });
 });
 
+describe('the wedge the player is pointing at (a0-51)', () => {
+  it('carries the pointer\'s wedge through, in range', () => {
+    for (let i = 0; i < 4; i++) {
+      expect(upgradeWheelModel(sig({ selected: i })).selected).toBe(i);
+    }
+  });
+
+  it('is null on a shut wheel, whatever the caller last said', () => {
+    // A wheel nobody can see is a wheel nobody is pointing at, so re-opening it
+    // never restores a stale highlight — the Build wheel's own rule.
+    expect(upgradeWheelModel(sig({ open: false, selected: 1 })).selected).toBeNull();
+  });
+
+  it('drops an index this LEVEL has no wedge for', () => {
+    // The one integer is taken on whichever wheel is on top, so a Build-wheel
+    // index 4 can arrive at a four-wedge upgrade wheel, and a main-wheel index 3
+    // at the two-wedge WEAPON sub-wheel. Both go dark rather than lighting a
+    // different track that happens to share the number.
+    expect(upgradeWheelModel(sig({ selected: 4 })).selected).toBeNull();
+    expect(upgradeWheelModel(sig({ weaponOpen: true, selected: 3 })).selected).toBeNull();
+    expect(upgradeWheelModel(sig({ weaponOpen: true, selected: 1 })).selected).toBe(1);
+  });
+
+  it('reads as "nothing pointed at" when the caller does not say', () => {
+    // Every caller that predates this — and the model's own default — draws the
+    // resting wheel, exactly as it did before.
+    expect(upgradeWheelModel(sig()).selected).toBeNull();
+    expect(upgradeWheelModel(sig({ selected: null })).selected).toBeNull();
+  });
+});
+
 describe('every track wedge gives current → next → cost (GDD §2.5)', () => {
   it('prints the stock value as "current" on a fresh ship', () => {
     // The Vanguard is the balance reference: power 10, hull 50, cargo 2, 100%.
