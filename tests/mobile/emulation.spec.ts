@@ -36,6 +36,7 @@ import { test, expect, type Page, type CDPSession } from '@playwright/test';
 import {
   decode,
   count,
+  columnCoverage,
   isPlasma,
   isBlueGlow,
   isBoneGhost,
@@ -44,7 +45,6 @@ import {
   isNonVacuum,
   REGION_FIRE,
   REGION_STRIP_LEFT,
-  REGION_STRIP_MID,
   REGION_FULL,
   type Img,
   type Pred,
@@ -68,6 +68,17 @@ const AFFORDANCE_MIN_PX = 200;
 const GHOST_MIN_PX = 80;
 /** Below this, a region is effectively empty of an affordance (anti-aliasing dust). */
 const ABSENT_MAX_PX = 40;
+/**
+ * Below this FRACTION of a band's columns, whatever is lit is not a CONTINUOUS
+ * STROKE crossing it — see {@link columnCoverage}. Measured in the left stick's
+ * own arc: the ring that is drawn there covers **101/101** columns, one bloomed
+ * a0-45 star **11/101**. Half is the midpoint of that 9× gap.
+ *
+ * Only for continuous strokes — rings, not legends. A row of discrete glyphs
+ * scores far lower (the desktop controls strip: 16/283 = 6% of REGION_STRIP_MID),
+ * so a caller must know it is looking for a stroke before reaching for this.
+ */
+const STROKE_COLUMN_RATIO = 0.5;
 /** The desktop controls strip is plasma+grey text at dpr1 — a lower px bar than
  *  the dpr2.6–3 mobile rings, still far above an empty band. */
 const STRIP_PRESENT_MIN_PX = 100;
@@ -380,7 +391,7 @@ async function useLandscape(page: Page): Promise<void> {
 test('touch: FIRE button + ghost stick render, controls strip is ABSENT', async ({ page }, testInfo) => {
   test.skip(!isTouchProject(testInfo.project.name), 'touch-profile only');
   budgetTest({
-    work: 'landscape boot → 1 s of sim settle → one full-viewport screenshot → three region pixel counts',
+    work: 'landscape boot → 1 s of sim settle → one full-viewport screenshot → three region scans + one registry read',
     measuredSeconds: 9,
   });
 
@@ -409,13 +420,49 @@ test('touch: FIRE button + ghost stick render, controls strip is ABSENT', async 
   // by construction (a `b - r` of 38 versus single digits on a value ramp), but
   // stating the negative is what makes this a test of a0-23 rather than a test
   // that something is drawn there.
-  const stickBlue = count(img, arc!, isBlueGlow);
-  expect(stickBlue.matched, 'the stick zone no longer wears plasma (a0-23)').toBeLessThan(ABSENT_MAX_PX);
+  //
+  // Counted by COLUMN COVERAGE rather than by pixels, because since a0-45 the
+  // sky behind this arc is a two-temperature star field and the design's hot
+  // star is blue-white: a bloomed one landing in the band measures a `b - r` of
+  // 42 where the faint plasma ring `isBlueGlow` exists to catch measures 38.
+  // A blue star and faint plasma are not separable by colour — that is the
+  // finding, not a workaround — so the probe asks the question this band was
+  // shaped for instead. A ring crosses it and lights every column; a star is a
+  // point and lights a tenth of them. Measured here: the Bone ring that IS drawn
+  // covers 101/101 columns, one bloomed star 11/101 (a0-45, blue-probe).
+  const stickBlue = columnCoverage(img, arc!, isBlueGlow);
+  expect(stickBlue.ratio, 'the stick zone no longer wears plasma (a0-23)').toBeLessThan(STROKE_COLUMN_RATIO);
 
   // The desktop controls strip must NOT be drawn on touch — the visible sticks
-  // are the binding legend (GDD §2.2/§2.4). A stray strip would light this band.
-  const strip = count(img, REGION_STRIP_MID, isBlueGlow);
-  expect(strip.matched, 'controls-strip pixels on touch (must be ~0)').toBeLessThan(ABSENT_MAX_PX);
+  // are the binding legend (GDD §2.2/§2.4).
+  //
+  // Asked of the layout REGISTRY, because since a0-45 `REGION_STRIP_MID` can no
+  // longer carry the question. That band shows sky, and the sky is now a blue
+  // star field; measured in it (a0-45 blue-probe, both touch profiles):
+  //
+  //                        isBlueGlow px   max b-r   max b
+  //   sky alone, on touch        352          51      162
+  //   a REAL strip, on desktop    32          28       69
+  //
+  // The stars are ten times the strip's pixels, bluer than it and brighter than
+  // it, and `isPlasma` reads 0 over the real strip — so no threshold and no
+  // predicate orders these two the right way round. The old `< 40` bar is not
+  // merely noisy now, it is *inverted*: it fails on empty sky and would have
+  // passed on the drawn strip it names.
+  //
+  // The registry is exact where the pixels are hopeless, and it is the same
+  // instrument (and the same argument) the desktop test uses in the mirror
+  // direction: main.ts registers `controls-strip` from the code that draws it,
+  // so a strip that reached touch at all would announce itself. The usual caveat
+  // — a registered element can be invisible, which is the M1 miss this suite
+  // exists for — bites a PRESENCE check, not an absence one: for "it is not
+  // there", not registered is the stronger half, and it is the half the sky
+  // cannot touch. What is lost is the ability to catch a strip drawn WITHOUT
+  // registering; that is recorded in a0-45's PR as QA's to weigh.
+  expect(
+    await registeredIds(page),
+    'the desktop controls strip is not on touch (GDD §2.2/§2.4)',
+  ).not.toContain('controls-strip');
 });
 
 // ===========================================================================

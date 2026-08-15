@@ -60,6 +60,15 @@ export const isPlasma: Pred = (r, g, b) => b > 110 && b >= g && g >= r && b - r 
  * Any plasma-tinted blue, including the *faint* idle ghost ring (plasma at
  * alpha 0.18 over vacuum ≈ (25,48,63)). Superset of {@link isPlasma}: catches
  * the barely-there stick zone the M1 miss was about.
+ *
+ * **It also catches a star, and cannot be made not to.** Since a0-45 the sky is
+ * a two-temperature field whose hot branch is blue-white — rgb(160,205,255) at
+ * its bluest — and a bloomed one composited over vacuum lands around (68,86,110),
+ * a `b - r` of 42 against the 38 of the faint plasma this predicate must keep
+ * catching. The star is the bluer of the two. Any threshold tightened enough to
+ * reject it would first reject the ring, so a NEGATIVE assertion over a region
+ * that shows sky must discriminate by shape — see {@link columnCoverage} — and
+ * not by asking this predicate to be more selective than the colours allow.
  */
 export const isBlueGlow: Pred = (r, g, b) => b - r > 20 && g - r > 8 && b > 38;
 
@@ -130,6 +139,51 @@ export function count(img: Img, region: Region, pred: Pred): { matched: number; 
     }
   }
   return { matched, total, ratio: total === 0 ? 0 : matched / total };
+}
+
+/**
+ * Fraction of the region's COLUMNS that contain at least one pixel matching
+ * `pred` — "does this thing cross the band, or merely sit in it".
+ *
+ * The counterpart to {@link count} for a probe aimed at a *continuous stroke*.
+ * A ring drawn through a band lights essentially every column of it; a point —
+ * a star, a spark, a piece of dust — lights a handful however bright it is. So
+ * where `count` answers "how much of this colour is here", this answers "is it
+ * shaped like the thing I am looking for", and a caller that wants the second
+ * question should not be asking the first.
+ *
+ * **Continuous** is load-bearing, and measuring it is not optional. A row of
+ * discrete glyphs is wide but gappy, and scores like a point rather than like a
+ * stroke: the desktop controls strip covers 16/283 = 6% of REGION_STRIP_MID's
+ * columns, *under* the 11% one star scores in the stick arc. Calibrate against
+ * the object the assertion actually names before using this on a new band.
+ *
+ * a0-45 is why it exists. The sky behind the touch affordances became a
+ * two-temperature star field, and the design's hot star is blue-white by
+ * construction — one bloomed star inside the left stick's arc measures a `b - r`
+ * of 42, where the faint plasma ring {@link isBlueGlow} was built to catch
+ * measures 38. No hue or brightness threshold separates a blue star from faint
+ * plasma; they genuinely are the same colour. Their shapes are not alike at all:
+ * measured in that band, the ring covers 101/101 columns and the star 11/101.
+ */
+export function columnCoverage(img: Img, region: Region, pred: Pred): { columns: number; total: number; ratio: number } {
+  const { px0, py0, px1, py1 } = clampRegion(img, region);
+  let columns = 0;
+  for (let x = px0; x < px1; x++) {
+    for (let y = py0; y < py1; y++) {
+      const i = (y * img.width + x) * 4;
+      const r = img.data[i] ?? 0;
+      const g = img.data[i + 1] ?? 0;
+      const b = img.data[i + 2] ?? 0;
+      const a = img.data[i + 3] ?? 0;
+      if (pred(r, g, b, a)) {
+        columns++;
+        break;
+      }
+    }
+  }
+  const total = Math.max(0, px1 - px0);
+  return { columns, total, ratio: total === 0 ? 0 : columns / total };
 }
 
 /**
