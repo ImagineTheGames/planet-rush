@@ -195,7 +195,14 @@ worktree measures **0**.
 - `npx tsc --noEmit` clean; `npm run dark-matter:check` clean; `emulation.spec.ts`
   **7 passed / 5 skipped** on all three profiles (iphone, pixel, desktop) — the
   same counts a0-23 recorded.
-- The QA-file change is its own commit, per the a0-23 precedent.
-- Remaining: push, update the PR body with the finding, and watch CI. Only
-  shards 2 and 3 were red; 1, 4, 5, 6 were green, so nothing outside
-  `emulation.spec.ts` is implicated.
+- The QA-file change is its own commit (`6eb9dda`), per the a0-23 precedent;
+  evidence + note in `a943b7e`.
+- **DONE. CI fully green and PR #424 is MERGED** into `main` as `c48a893`
+  (2026-08-15 17:40 UTC). All six mobile shards pass — including 2/6 and 3/6,
+  the two that were red — plus both perf gates and typecheck/test/build. All six
+  code DoD greps re-verified against `origin`.
+- Nothing is left open on this brief. The three items handed to QA (a strip drawn
+  without registering is no longer caught; `REGION_STRIP_LEFT`'s PRESENT check can
+  be satisfied by sky; `isBlueGlow` is unsafe over any region showing sky) are
+  recorded in the PR body and in `evidence/…/blue-probe/README.md`, and are theirs
+  to weigh — not blockers here.
