@@ -1,0 +1,25 @@
+dock range 160 · TURRET.cost 3 · CARGO tier 1 costs 2
+
+A. 5 ore (2 held, 3 banked) → CARGO upgrade (-2) → TURRET (-3)
+   hold cap 2 — the "2" in the wedge's "2 → 4"
+   ok · cap now 4 — the "→ 4", a CAPACITY, never a balance
+   ok
+   ends: 0 ORE · 1 / 4 BUILT   <-- the second screenshot
+      spent 2 upgrade:cargo · hold 2→0 bank 3→3
+      spent 3 turret · hold 0→0 bank 3→0
+   overdrafts: 0
+
+B. 1 in the hold, 2 in the bank — "i had 2 ore", read off the HUD
+   HUD top-left ORE (bank alone): 2 | wheel hub (hold+bank): 3
+   ok
+   ends: 0 ORE · 1 / 4 BUILT   <-- the same screenshot
+      spent 3 turret · hold 1→0 bank 2→0
+   overdrafts: 0
+
+C. a turret ordered on exactly 2 ore, three ways
+   hold 2 bank 0 -> cannot-afford · wallet now 2/0 · 0 built · overdrafts 0
+      refused 3 turret · hold 2→2 bank 0→0
+   hold 0 bank 2 -> cannot-afford · wallet now 0/2 · 0 built · overdrafts 0
+      refused 3 turret · hold 0→0 bank 2→2
+   hold 1 bank 1 -> cannot-afford · wallet now 1/1 · 0 built · overdrafts 0
+      refused 3 turret · hold 1→1 bank 1→1

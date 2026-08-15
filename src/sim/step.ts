@@ -74,6 +74,7 @@ import { fireShipProjectile, leadAim, updateProjectiles } from './projectiles';
 import { updateMatch } from './match';
 import { updateSensory } from './sensing';
 import { ledgerAdd } from './ore-ledger';
+import { journalOre } from './ore-journal';
 import { SpatialHash } from './spatial-hash';
 import type { Asteroid, OreChunk, MiningStation, Ship, World } from './state';
 import {
@@ -1038,6 +1039,21 @@ function updateChunks(world: World, dt: number): void {
           // all arrive here, so this one counter is every unit a ship ever picks
           // up (`./ore-ledger`), the flow three regressions have lost.
           ledgerAdd(world, 'looted', take);
+          // …and one journal line per arrival (a0-52), so a log can answer "where
+          // did that ore come from" as well as "where did it go". Chunk-keyed, not
+          // tick-keyed: a pickup is an event, not a rate, so this is a handful of
+          // lines a minute rather than 60 a second (`./ore-journal`).
+          journalOre(world, {
+            tick: world.tick,
+            player: target.id,
+            flow: 'mined',
+            item: 'chunk',
+            amount: take,
+            hold: target.cargo - take,
+            bank: target.banked,
+            holdAfter: target.cargo,
+            bankAfter: target.banked,
+          });
           // …and the same `take`, per ship, as the tick's render tell (a0-08): the
           // ore that arrived, not the chunk that was offered, so a PARTIAL take
           // (`room` 1 against a 3-ore chunk) shows as the 1 it was. Accumulated,
@@ -1102,6 +1118,29 @@ function updateDeposits(world: World, dt: number): void {
     // `banked` can never invent or drop a courier at the exact end of a drain.
     const couriers = Math.floor(cargoBefore) - Math.floor(ship.cargo);
     for (let i = 0; i < couriers; i++) spawnDepositFlight(world, ship, station);
+
+    // The journal takes the SAME whole-ore boundary the couriers do (a0-52). The
+    // drain moves a sliver every tick and journalling each one would spend the
+    // ring in four seconds and tell a reader nothing; one line per whole ore
+    // banked is the same rate the player watches fly home, and it keeps the log's
+    // banked total exactly the ore that arrived (`./ore-journal`).
+    //
+    // So `amount` is the whole ore that crossed, while the four balances are this
+    // tick's exact live readings — the one place the two are not the same
+    // subtraction, called out on `OreEvent.amount`.
+    if (couriers > 0) {
+      journalOre(world, {
+        tick: world.tick,
+        player: ship.id,
+        flow: 'banked',
+        item: 'drain',
+        amount: couriers,
+        hold: cargoBefore,
+        bank: ship.banked - moved,
+        holdAfter: ship.cargo,
+        bankAfter: ship.banked,
+      });
+    }
   }
 }
 

@@ -24,8 +24,17 @@
 import { describe, expect, it } from 'vitest';
 import { ShipClass, UpgradeTrack } from '@shared/types';
 import type { Action, PlayerId } from '@shared/types';
-import { TICK_DT, createWorld, shipCargoCap, stockTiers, step } from '../sim';
-import type { UpgradeTiers, World, WorldConfig } from '../sim';
+import {
+  ORE_JOURNAL_CAPACITY,
+  TICK_DT,
+  TURRET,
+  createWorld,
+  shipCargoCap,
+  stockTiers,
+  step,
+  trackSpec,
+} from '../sim';
+import type { MiningStation, UpgradeTiers, World, WorldConfig } from '../sim';
 import { InputQueue } from './input-queue';
 import {
   MAX_LEAD_TICKS,
@@ -36,6 +45,7 @@ import {
   SNAP_THRESHOLD,
   applySnapshot,
 } from './prediction';
+import { DEFAULT_ORDER_TTL_TICKS } from './order-ledger';
 import { LOCAL_SHOT_BASE } from './presentation';
 import { decodeSnapshot, encodeWorldSnapshot } from './snapshot';
 import type { DecodedSnapshot } from './snapshot';
@@ -618,6 +628,200 @@ describe('the wallet on the wire', () => {
     // and bank are summed for the same home-station drain reason as above.)
     const ship = shipOf(client.world);
     expect(ship.cargo + ship.banked).toBeCloseTo(10, 6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A build the server said no to (a0-52)
+// ---------------------------------------------------------------------------
+
+/** The tap, with the id the echo will name it by (`./order-ledger`). */
+const BUILD_ID = 0x2a;
+const TAP: readonly Action[] = [{ type: 'buildOrder', item: 'turret', orderId: BUILD_ID }];
+const IDLE: readonly Action[] = [{ type: 'thrust', dir: { x: 0, y: 0 } }];
+
+/** A client parked on its own station with `hold`/`bank` in the wallet — close
+ *  enough to order, and holding exactly the ore the test wants it to hold. */
+function docked(hold: number, bank: number): { client: PredictedMatch; station: MiningStation } {
+  const world = createWorld(MATCH);
+  const station = world.stations.find((s) => s.owner === LOCAL)!;
+  const ship = shipOf(world);
+  ship.pos = { ...station.pos };
+  ship.vel = { x: 0, y: 0 };
+  ship.cargo = hold;
+  ship.banked = bank;
+  return { client: new PredictedMatch({ world, localPlayer: LOCAL }), station };
+}
+
+/** A snapshot of the client's own world stamped for `tick`: the position
+ *  correction is nil, so what a test sees is the wallet and the order handling. */
+function selfSnapshot(client: PredictedMatch, tick: number): DecodedSnapshot {
+  const world = client.world as World;
+  const held = world.tick;
+  world.tick = tick;
+  const decoded = decodeSnapshot(encodeWorldSnapshot(world));
+  world.tick = held;
+  return decoded;
+}
+
+/** Everything a station has on the ring, standing or still assembling — the
+ *  number the wheel prints as `n / 4 BUILT` (GDD §2.5). */
+const turretsOn = (station: MiningStation): number => station.turrets.length + station.builds.length;
+
+describe('refused build', () => {
+  /**
+   * The whole point of the name: a build authority said NO to must cost the player
+   * **nothing** — not a turret they did not get, and not the ore for it.
+   *
+   * The turret half has been true since the action-echo work
+   * (`./order-prediction.test.ts` "takes a REFUSED order back at once"). The ore
+   * half was not, and a0-52 is what made anyone look. `spendOre` charges on the
+   * tick of the press, in the client's own predicted world; the rollback removed
+   * the ghost and left the charge — and nothing was coming to correct it, because
+   * a refused order does not move the server's wallet and the server stays quiet
+   * about a wallet that has not moved (`server/room.ts` `syncEconomy`). A player
+   * whose press was refused therefore went on holding less ore than they had, on a
+   * wheel that then refused purchases they could afford.
+   *
+   * Note the sign. This is the *opposite* of the developer's report — it makes the
+   * player poorer, not richer — which is exactly why it survived: nobody reports
+   * the ore they never noticed was missing.
+   */
+  it('leaves neither a phantom turret nor missing ore', () => {
+    const { client, station } = docked(0, TURRET.cost);
+
+    client.predict(1, TAP);
+    // Predicted: the ghost is assembling and the client has paid for it.
+    expect(turretsOn(station)).toBe(1);
+    expect(shipOf(client.world).banked).toBe(0);
+
+    // Authority ran the same order and refused it — the ship was not docked on the
+    // tick that actually got simulated, or the wallet was a chunk behind. Its own
+    // wallet never moved, so this echo is the ONLY thing it will say about it.
+    client.settleOrder({ orderId: BUILD_ID, accepted: false, tick: 1 });
+
+    // Neither half survives: no turret...
+    expect(turretsOn(station)).toBe(0);
+    // ...and no missing ore.
+    expect(shipOf(client.world).banked).toBe(TURRET.cost);
+    expect(shipOf(client.world).cargo).toBe(0);
+  });
+
+  it('does not let the next stale statement take the refund back out', () => {
+    // The compounding half. The refund is written to the wallet TRAIL as well as
+    // to the ship, because a statement stamped BEFORE the press is read as
+    // "authority's figure, less whatever this client has spent since"
+    // (`outflowSince`) — and a refunded price that still reads as outflow is
+    // subtracted a second time, one round trip later, by a correction that thinks
+    // it is being careful.
+    const { client } = docked(0, TURRET.cost);
+
+    client.predict(1, IDLE);
+    client.predict(2, TAP);
+    client.predict(3, IDLE);
+    client.settleOrder({ orderId: BUILD_ID, accepted: false, tick: 2 });
+    expect(shipOf(client.world).banked).toBe(TURRET.cost);
+
+    // Authority's word about tick 1 — before the press, and true: it never spent
+    // anything, so it still holds the same 3.
+    client.stageEconomy(wallet(0, TURRET.cost), 1);
+    client.reconcile(selfSnapshot(client, 1), 0);
+
+    expect(shipOf(client.world).cargo + shipOf(client.world).banked).toBeCloseTo(TURRET.cost, 6);
+  });
+
+  it('keeps the ore spent when authority ACCEPTED the order', () => {
+    // The other side, and the one that matters more: a refund that fires on an
+    // accepted order would hand the player a free turret, which is the developer's
+    // report made real by the fix for it. The adopted job takes authority's id and
+    // the wallet stays paid.
+    const { client, station } = docked(0, TURRET.cost);
+
+    client.predict(1, TAP);
+    client.settleOrder({
+      orderId: BUILD_ID,
+      accepted: true,
+      tick: 1,
+      build: { id: 77, remaining: TURRET.buildTime, total: TURRET.buildTime },
+    });
+
+    expect(station.builds.map((j) => j.id)).toEqual([77]);
+    expect(shipOf(client.world).cargo + shipOf(client.world).banked).toBe(0);
+  });
+
+  it('refunds an order that expired unanswered, exactly once', () => {
+    // Silence is treated as a refusal after the TTL (`./order-ledger`), so it takes
+    // the same refund — and the sweep must not pay it twice if a late echo turns up
+    // for an id the ledger has already closed.
+    const { client, station } = docked(0, TURRET.cost);
+
+    client.predict(1, TAP);
+    for (let seq = 2; seq <= DEFAULT_ORDER_TTL_TICKS + 3; seq++) client.predict(seq, IDLE);
+    // A snapshot from just behind the client, so the sweep runs on the clock the
+    // deadline was set against: reconciling against tick 1 from 93 ticks out would
+    // trim the lead instead and never reach the deadline (`trimLead`).
+    const at = client.tick - 1;
+    client.reconcile(selfSnapshot(client, at), at);
+
+    expect(turretsOn(station)).toBe(0);
+    expect(shipOf(client.world).banked).toBe(TURRET.cost);
+
+    // The late echo names an id nothing is waiting on any more: no second refund.
+    expect(client.settleOrder({ orderId: BUILD_ID, accepted: false, tick: 1 })).toBeNull();
+    expect(shipOf(client.world).banked).toBe(TURRET.cost);
+  });
+
+  it('declines to refund rather than guess, when the journal cannot say', () => {
+    // The receipt is read off the sim's ore journal, which is a bounded ring: a
+    // session with nothing draining it sits at capacity, where an append evicts
+    // and the length does not move. There is then no honest way to say what the
+    // order cost — so nothing is refunded, which is exactly the behaviour that
+    // shipped before this fix. Failing this way costs the refund; failing the
+    // other way would hand the player a free turret, which is a0-52 made real.
+    const { client, station } = docked(0, TURRET.cost);
+    const journal = (client.world as World).oreJournal!;
+    // Fill the ring so the spend this tick evicts instead of extending.
+    while (journal.events.length < ORE_JOURNAL_CAPACITY) {
+      journal.events.push({
+        tick: 0,
+        player: LOCAL,
+        flow: 'mined',
+        item: 'chunk',
+        amount: 1,
+        hold: 0,
+        bank: 0,
+        holdAfter: 1,
+        bankAfter: 0,
+      });
+    }
+
+    client.predict(1, TAP);
+    client.settleOrder({ orderId: BUILD_ID, accepted: false, tick: 1 });
+
+    // The turret half is unconditional and still right...
+    expect(turretsOn(station)).toBe(0);
+    // ...and the wallet is left exactly where the old behaviour left it, rather
+    // than credited from a number nobody can vouch for.
+    expect(shipOf(client.world).cargo + shipOf(client.world).banked).toBe(0);
+  });
+
+  it('gives back what a refused SHIP UPGRADE cost, which buys no entity at all', () => {
+    // An upgrade rolls back with no build job to remove — the wallet is the whole
+    // of the rollback, which is why it could go missing without anyone seeing a
+    // ghost disappear.
+    const cost = trackSpec(UpgradeTrack.Cargo).costs[0]!;
+    const { client } = docked(0, cost);
+    const upgrade: readonly Action[] = [
+      { type: 'upgradeOrder', track: UpgradeTrack.Cargo, orderId: BUILD_ID },
+    ];
+
+    client.predict(1, upgrade);
+    expect(shipOf(client.world).banked).toBe(0);
+    expect(shipOf(client.world).tiers[UpgradeTrack.Cargo]).toBe(1);
+
+    client.settleOrder({ orderId: BUILD_ID, accepted: false, tick: 1 });
+
+    expect(shipOf(client.world).banked).toBe(cost);
   });
 });
 

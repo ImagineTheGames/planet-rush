@@ -590,6 +590,39 @@ second statement of the shape, and `title-gate.test.ts` holds it by name — *"t
 doorway is a hole, not a fade"* — asking for the doorway's centre to be uncovered
 and a point on the hull to be covered.
 
+### 4.8 SURFACE — a record whose consumer reads it structurally (a0-52, 2026-08-15)
+
+| Export | Verdict |
+|---|---|
+| `src/sim/ore-journal.ts#drainOreJournal` | SURFACE — production cannot call it, by the consumer's design |
+| `src/sim/ore-journal.ts#oreOverdrafts` | SURFACE — the a0-52 alarm, read by specs and by the evidence probe |
+| `src/sim/ore-journal.ts#oreEventLine` | SURFACE — the shared wording of one ore movement |
+
+a0-52 added a per-movement ore journal to the simulation (`World.oreJournal`) and
+wired it into the playtest log, which is the whole point of it: the developer's
+report — *"i had 2 ore and was able to build a turret"* — arrived with a log that
+carried no economy events, so a question about one purchase had to be answered
+from screenshots. The wiring is live; these three are still dark, and the reason
+is worth writing down because it is not the usual one.
+
+`src/net/playtest-log-attach.ts` is the journal's production consumer, and it
+reads every world through a **structural** `LoggedWorld` rather than importing
+`../sim` — its own stated design, so the module stays a leaf and its tests run in
+node with no simulation in the graph. `drainOreJournal(world: World)` is
+therefore not *callable* from there: a `LoggedWorld` is not a `World`. The log
+drains the ring by splicing the array it was handed, which is the same operation
+one line long.
+
+So this is not unfinished wiring, and it is not the §4.4 "exported for a spec"
+pattern either: it is a record with **two** readers on two sides of a deliberate
+seam, each reaching it the only way its side can. The sim side needs one drain
+and one alarm read rather than one per caller — `src/sim/buildings.test.ts` and
+`evidence/a0-52-ore-underpay/probe.mjs` both go through these, and the second is
+how the report was settled.
+
+**If the seam ever moves** — if `playtest-log-attach` takes an `../sim` import —
+`drainOreJournal` should become its drain and leave this list.
+
 ## 5. Should it gate CI? Yes — and here is the number
 
 **It ships as a gate**, `npm run dark-matter:check`, in the `ci` job. It fails on

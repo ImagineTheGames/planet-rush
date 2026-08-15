@@ -55,10 +55,11 @@ import { areEnemies } from './allegiance';
 import { creditDamage } from './combat-credit';
 import { destroyCore, isCollapsed } from './match';
 import { ledgerAdd } from './ore-ledger';
+import { journalOre } from './ore-journal';
 import { fireTurretProjectile, leadAim } from './projectiles';
 import { advanceRng } from './rng';
 import type { MiningStation, RadarSatellite, Ship, Shield, Turret, World } from './state';
-import { applyPurchasedStats, nextUpgradeCost } from './upgrades';
+import { applyPurchasedStats, nextUpgradeCost, trackSpec } from './upgrades';
 import { dist2, turnToward } from './vec';
 
 // ---------------------------------------------------------------------------
@@ -107,19 +108,83 @@ export function spendableOre(ship: Ship): number {
  * competing uses (GDD §2.5), so spending burns it before touching the safe
  * total — banking then remains a real decision rather than a free upgrade.
  * Returns false and charges nothing if the player cannot afford it.
+ *
+ * Every purchase in the game funnels through here, which makes it the one place
+ * the economy can be *narrated*: `item` names what the ore bought and the whole
+ * movement — refused, spent, or (never) overdrawn — is written to the per-match
+ * journal with the balance either side of it (`./ore-journal`, a0-52). The
+ * parameter defaults, so a caller that does not name its purchase still spends
+ * correctly and simply logs an `unnamed` line.
  */
-export function spendOre(world: World, ship: Ship, cost: number): boolean {
+export function spendOre(world: World, ship: Ship, cost: number, item = 'unnamed'): boolean {
   if (cost <= 0) return true;
-  if (spendableOre(ship) + 1e-9 < cost) return false;
+  const hold = ship.cargo;
+  const bank = ship.banked;
+  if (spendableOre(ship) + 1e-9 < cost) {
+    // The refusal, written down (a0-52). A `spent` line without its `refused`
+    // counterpart cannot answer "the button did nothing" — and the equal
+    // before/after balances on this line ARE the "charges nothing" guarantee,
+    // stated in the log rather than only in this comment.
+    journalOre(world, {
+      tick: world.tick,
+      player: ship.id,
+      flow: 'refused',
+      item,
+      amount: cost,
+      hold,
+      bank,
+      holdAfter: hold,
+      bankAfter: bank,
+    });
+    return false;
+  }
   const fromHold = Math.min(ship.cargo, cost);
   ship.cargo -= fromHold;
   ship.banked -= cost - fromHold;
+  // THE OVERDRAFT CHECK, AND IT IS DELIBERATELY ABOVE THE CLAMP (a0-52).
+  //
+  // The developer reported building a 3-ore turret on 2 ore. The guard eight
+  // lines up is the only thing standing between a purchase and an overdraft, and
+  // the two clamps immediately below would erase the evidence in this same
+  // function: a player who underpaid lands on exactly `0`, which is precisely
+  // what the screenshot showed. So the raw balance is read HERE, while it can
+  // still be negative, and an overdraft is journalled with the real number in it
+  // (`./ore-journal`). Never thrown: a live match must not die of an accounting
+  // fault, and a line in the log the developer already hands back is worth more
+  // than a crash nobody can reproduce. If this line ever appears, a0-52 is real.
+  if (ship.cargo < -1e-9 || ship.banked < -1e-9) {
+    journalOre(world, {
+      tick: world.tick,
+      player: ship.id,
+      flow: 'overdraft',
+      item,
+      amount: cost,
+      hold,
+      bank,
+      holdAfter: ship.cargo,
+      bankAfter: ship.banked,
+    });
+  }
   if (ship.cargo < 1e-9) ship.cargo = 0;
   if (ship.banked < 1e-9) ship.banked = 0;
   // Ore paid out of the economy for good — the one sink every purchase funnels
   // through, so the conservation ledger sees all spending in one place
   // (`./ore-ledger`).
   ledgerAdd(world, 'spent', cost);
+  // …and the same spend, as one readable line: which item, at what price,
+  // against what balance (`./ore-journal`). The ledger's `spent` total says 47
+  // ore went somewhere; this says the turret at tick 11240 cost 3 and left 0.
+  journalOre(world, {
+    tick: world.tick,
+    player: ship.id,
+    flow: 'spent',
+    item,
+    amount: cost,
+    hold,
+    bank,
+    holdAfter: ship.cargo,
+    bankAfter: ship.banked,
+  });
   return true;
 }
 
@@ -317,6 +382,19 @@ export function placeOrder(world: World, ship: Ship, item: BuildItem): OrderResu
       // Hold → bank, all at once (the dock-bank order, vs the atmosphere drain).
       // A transfer within the live economy — recorded for the ledger.
       ledgerAdd(world, 'deposited', ship.cargo);
+      // The wedge's whole hold, as one journal line (a0-52): the drain journals a
+      // line per whole ore, and this is the one press that moves the lot at once.
+      journalOre(world, {
+        tick: world.tick,
+        player: ship.id,
+        flow: 'banked',
+        item: 'bank-order',
+        amount: ship.cargo,
+        hold: ship.cargo,
+        bank: ship.banked,
+        holdAfter: 0,
+        bankAfter: ship.banked + ship.cargo,
+      });
       ship.banked += ship.cargo;
       ship.cargo = 0;
       return 'ok';
@@ -339,7 +417,7 @@ export function placeOrder(world: World, ship: Ship, item: BuildItem): OrderResu
       // No channel, no drain — the affordability check is `spendOre`, so N taps
       // are N independent, individually-checked spends. An empty/short bank is
       // refused loudly, spending nothing (`spendOre` charges only on success).
-      if (!spendOre(world, ship, REPAIR_ORE_COST)) return 'cannot-afford';
+      if (!spendOre(world, ship, REPAIR_ORE_COST, 'repair')) return 'cannot-afford';
       // A core missing less than REPAIR_HP_PER_ORE still costs the full ore and
       // heals to full — the wheel SHOWS the real number, so the choice is
       // informed (p5-08). `repairing` is the repair TELL, lit here and held for
@@ -362,7 +440,7 @@ export function placeOrder(world: World, ship: Ship, item: BuildItem): OrderResu
       if (slot >= 0) {
         // A mount is free: BUILD a new Mk I turret. Construction takes time, so
         // the defense is bought before the attack, not during it (GDD §2.5).
-        if (!spendOre(world, ship, TURRET.cost)) return 'cannot-afford';
+        if (!spendOre(world, ship, TURRET.cost, 'turret')) return 'cannot-afford';
         station.builds.push({
           id: world.nextEntityId++,
           kind: 'turret',
@@ -381,13 +459,13 @@ export function placeOrder(world: World, ship: Ship, item: BuildItem): OrderResu
       if (target === null) return 'cap-reached'; // full ring, every turret maxed
       const cost = turretTierSpec(turretTier(target) + 1).upgradeCost;
       if (cost === null) return 'cap-reached';
-      if (!spendOre(world, ship, cost)) return 'cannot-afford';
+      if (!spendOre(world, ship, cost, `turret-mk${turretTier(target) + 2}`)) return 'cannot-afford';
       applyTurretTier(target, turretTier(target) + 1);
       return 'ok';
     }
     case 'shield': {
       if (shieldCount(station) >= SHIELD.capPerStation) return 'cap-reached';
-      if (!spendOre(world, ship, SHIELD.cost)) return 'cannot-afford';
+      if (!spendOre(world, ship, SHIELD.cost, 'shield')) return 'cannot-afford';
       station.builds.push({
         id: world.nextEntityId++,
         kind: 'shield',
@@ -404,7 +482,7 @@ export function placeOrder(world: World, ship: Ship, item: BuildItem): OrderResu
       // fight, not conjured mid-siege. Queued jobs count against the cap, so a
       // player cannot buy their way past 1 by ordering two on one tick.
       if (satelliteCount(station) >= SATELLITE.capPerStation) return 'cap-reached';
-      if (!spendOre(world, ship, SATELLITE.cost)) return 'cannot-afford';
+      if (!spendOre(world, ship, SATELLITE.cost, 'satellite')) return 'cannot-afford';
       station.builds.push({
         id: world.nextEntityId++,
         kind: 'satellite',
@@ -482,7 +560,7 @@ export function buyUpgrade(world: World, ship: Ship, track: UpgradeTrack): Upgra
 
   const cost = nextUpgradeCost(ship, track);
   if (cost === null) return 'maxed';
-  if (!spendOre(world, ship, cost)) return 'cannot-afford';
+  if (!spendOre(world, ship, cost, `upgrade:${trackSpec(track).label.toLowerCase()}`)) return 'cannot-afford';
 
   ship.tiers[track] += 1;
   applyPurchasedStats(ship);

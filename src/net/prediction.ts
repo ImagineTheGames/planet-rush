@@ -105,6 +105,15 @@ export const MAX_PENDING_INPUTS = 120;
 export const RECONCILE_BLEND_FRAMES = 6;
 
 /**
+ * Most unsettled order receipts kept — what a refused order gives back
+ * (`PredictedMatch.refund`, a0-52). One per outstanding press, and the order
+ * ledger's TTL retires every record it opens within three seconds, so a player
+ * would have to be pressing 20 times a second for this to bind. It exists so the
+ * map is *provably* bounded rather than bounded by another module's good behaviour.
+ */
+export const MAX_OPEN_RECEIPTS = 64;
+
+/**
  * Per-frame fraction of the visual correction offset that survives to the next
  * frame — the exponential-decay multiplier derived from
  * {@link RECONCILE_BLEND_FRAMES} (`e^(-1/N)` ≈ 0.846 at N = 6). Named separately
@@ -360,6 +369,17 @@ export class PredictedMatch {
    * cleared and rebuilt by every rewind.
    */
   private readonly wallet: { tick: Tick; cargo: number; banked: number }[] = [];
+  /**
+   * What each outstanding predicted order actually took out of the wallet — the
+   * receipt a rollback hands back (a0-52; see {@link applyOrderOutcome}).
+   *
+   * Keyed by `OrderId` and populated from the sim's own ore journal on the tick
+   * the order was predicted (`src/sim/ore-journal`), so the hold/bank split is
+   * the one `spendOre` really drew rather than a guess made here. Entries are
+   * removed the moment the order settles either way; the map is bounded by the
+   * ledger's TTL, which retires every record it holds.
+   */
+  private readonly receipts = new Map<number, { cargo: number; banked: number; tick: Tick }>();
   /** Whether authority has ever stated this seat's wallet. Until it has, the wallet
    *  is prediction's outright — the offline/loopback shape, where the sim the client
    *  is running IS authority ({@link holdInflow}). */
@@ -476,8 +496,12 @@ export class PredictedMatch {
     // The hold as this tick found it: what a predicted tick may take out of it is
     // the player's own business, what it puts in is authority's ({@link holdInflow}).
     const holdBefore = this.localShip()?.cargo ?? null;
+    // How much of the sim's ore journal predates this tick, so the spend this tick
+    // makes can be read back off it ({@link receipts}, a0-52).
+    const journalBefore = orders.length > 0 ? (this.world.oreJournal?.events.length ?? 0) : 0;
 
     step(this.world, [{ id: this.local, actions }], this.dt);
+    if (orders.length > 0) this.takeReceipts(orders, journalBefore, tick);
 
     this.holdInflow(holdBefore);
     if ((this.localShip()?.weaponCooldown ?? 0) > cooldownBefore) {
@@ -555,6 +579,100 @@ export class PredictedMatch {
   }
 
   /**
+   * File what this tick's orders actually cost, from the sim's own ore journal
+   * (`src/sim/ore-journal`) — the receipt {@link applyOrderOutcome} hands back
+   * when authority refuses the order (a0-52).
+   *
+   * **Only the unambiguous case is filed**, and that is deliberate. The journal
+   * lists every ore movement of the tick — a chunk arriving, the atmosphere drain,
+   * each spend — and pairing several spends to several orders on one tick would be
+   * a heuristic. A tick carries one order in practice (`predict`'s callers mint one
+   * id per press, and the two order screens are one press each), so exactly one
+   * order plus exactly one spend is attributed and anything else is left alone: the
+   * order still rolls back, it simply refunds nothing, which is today's behaviour
+   * and no worse than it.
+   *
+   * The journal is READ, never drained — the playtest log drains it
+   * (`./playtest-log-attach`), and two readers racing over one ring would leave
+   * each of them with half a match.
+   */
+  private takeReceipts(orders: readonly IdentifiedOrder[], from: number, tick: Tick): void {
+    const events = this.world.oreJournal?.events;
+    if (!events || orders.length !== 1) return;
+    // Two guards, and each covers the other's blind spot. The INDEX says "appended
+    // by the step just run" — but the journal is a bounded ring, and a session with
+    // nothing draining it (no playtest log attached) sits at capacity, where an
+    // append evicts and the length does not move. `Math.min` turns that into an
+    // empty scan rather than a read of somebody else's events. The TICK then says
+    // "and it is this tick's", which is what stops a clock pulled backwards by
+    // `trimLead` from re-using a tick number and collecting a stale receipt.
+    // Failing either way costs the refund, never pays a wrong one — the only
+    // direction this may fail in, since a refund that fires twice is free ore.
+    let spend: { hold: number; bank: number; holdAfter: number; bankAfter: number } | null = null;
+    for (let i = Math.min(from, events.length); i < events.length; i++) {
+      const e = events[i]!;
+      if (e.flow !== 'spent' || e.player !== this.local || e.tick !== this.world.tick) continue;
+      if (spend) return; // two spends on one tick: ambiguous, so nothing is filed
+      spend = e;
+    }
+    if (!spend) return; // refused locally, or an order that spends nothing (BANK)
+    this.receipts.set(orders[0]!.orderId, {
+      cargo: spend.hold - spend.holdAfter,
+      banked: spend.bank - spend.bankAfter,
+      tick,
+    });
+    // Bounded like every other buffer here. The ledger settles or sweeps every
+    // record it opens, so this should never bind; it is the backstop that keeps a
+    // long match from paying for an id that somehow never came back.
+    while (this.receipts.size > MAX_OPEN_RECEIPTS) {
+      const oldest = this.receipts.keys().next();
+      if (oldest.done) break;
+      this.receipts.delete(oldest.value);
+    }
+  }
+
+  /**
+   * Give a refused order's price back — **a rollback that takes the turret away
+   * has to give the ore back with it** (a0-52).
+   *
+   * The rollback below already removes the half-built ghost, which is the visible
+   * half of the truth arriving late. The wallet was the invisible half, and it was
+   * missing: `spendOre` had charged this client on the tick of the press, and
+   * nothing ever put it back. Authority does not close the gap on its own, because
+   * a refused order does not move the server's wallet and *"a wallet that has not
+   * moved sends nothing"* (`server/room.ts` `syncEconomy`) — so the client sat on a
+   * balance short by the price of a thing it never got, until the player happened
+   * to mine again. On a wallet that was already too thin to buy the turret, that is
+   * a build wheel that goes on refusing purchases the player can actually afford.
+   *
+   * Two writes, and both are needed:
+   *
+   *  - **the ship**, so the number on screen is right now rather than eventually;
+   *  - **the trail** ({@link wallet}), by the same delta and from the order's own
+   *    tick, so the refunded price stops reading as outflow. Without this second
+   *    write the very next statement stamped *before* the press would subtract the
+   *    refund straight back out ({@link outflowSince}) and the ore would vanish a
+   *    second time, which is the compounding {@link rebaseWallet} exists to stop.
+   *
+   * The hold is refilled only to its cap and the remainder goes to the bank: the
+   * ore is the player's either way, and a hold that has taken on a chunk since the
+   * press has no room for a full refund. Authority's next statement settles the
+   * split for good.
+   */
+  private refund(orderId: number): void {
+    const receipt = this.receipts.get(orderId);
+    this.receipts.delete(orderId);
+    if (!receipt) return;
+    const ship = this.localShip();
+    if (!ship) return;
+    const toHold = Math.max(0, Math.min(receipt.cargo, ship.cargoCap - ship.cargo));
+    const toBank = receipt.cargo - toHold + receipt.banked;
+    ship.cargo += toHold;
+    ship.banked += toBank;
+    this.rebaseWallet(receipt.tick, toHold, toBank);
+  }
+
+  /**
    * Make the predicted world agree with one settled order.
    *
    *  - **adopt** — the predicted build job *becomes* authority's: it takes the
@@ -576,9 +694,14 @@ export class PredictedMatch {
 
     if (outcome.kind === 'rollback') {
       if (predicted !== null) removeBuild(station, predicted);
+      // …and the price with it: the ore bought nothing, so it comes back
+      // ({@link refund}).
+      this.refund(outcome.order.orderId);
       return;
     }
 
+    // Adopted: the order really was paid for, so the receipt is retired unspent.
+    this.receipts.delete(outcome.order.orderId);
     const build = outcome.echo.build;
     if (!build) return; // an accepted order that spawns nothing — nothing to align
     const kind = buildKindOf(outcome.order.what);
