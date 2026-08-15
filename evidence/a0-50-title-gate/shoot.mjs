@@ -80,6 +80,36 @@ async function pass(page, prefix, lid) {
   }
 }
 
+/**
+ * The landscape lock, on a handset. A phone held PORTRAIT gets a game rotated
+ * +90° so the player turns it, and the overlay takes the same transform — which
+ * it did not until this brief, and the result was unreadable: the lock is sized
+ * off `vh`, and in portrait `vh` is the long side.
+ */
+async function phone(browser, orientation, vp) {
+  const ctx = await browser.newContext({
+    viewport: vp,
+    deviceScaleFactor: 3,
+    isMobile: true,
+    hasTouch: true,
+  });
+  const page = await ctx.newPage();
+  await page.goto(`${BASE}/`, { waitUntil: 'load' });
+  await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
+  await page.waitForFunction(() => window.__mainMenu?.visible === true, undefined, { timeout: 20_000 });
+  await page.evaluate(() => document.fonts?.ready).catch(() => {});
+  await sleep(1500);
+  await page.screenshot({ path: join(OUT, `phone-${orientation}-sealed.png`) });
+
+  const rotated = await page.evaluate(() => window.__mainMenu?.rotated ?? null);
+  await page.touchscreen.tap(vp.width / 2, vp.height / 2);
+  await sleep(1500);
+  await page.screenshot({ path: join(OUT, `phone-${orientation}-parting.png`) });
+  console.log(`phone-${orientation}-*.png  the game root is rotated: ${rotated}`);
+  await ctx.close();
+  return rotated;
+}
+
 async function main() {
   mkdirSync(OUT, { recursive: true });
   const browser = await chromium.launch();
@@ -90,6 +120,9 @@ async function main() {
 
   await pass(page, 'after', false);
   await pass(page, 'before', true);
+
+  const portraitRotated = await phone(browser, 'portrait', { width: 390, height: 844 });
+  const landscapeRotated = await phone(browser, 'landscape', { width: 844, height: 390 });
 
   // …and the flag the harness boots with: no door, and the menu untouched.
   await page.goto(`${BASE}/?gate=0`, { waitUntil: 'load' });
@@ -103,6 +136,10 @@ async function main() {
   await browser.close();
   if (mounted) throw new Error('?gate=0 still mounted the gate');
   if (errors.length) throw new Error('the screen logged errors');
+  // The two phone passes only mean anything if the lock actually engaged on one
+  // of them and stayed out of the way on the other.
+  if (portraitRotated !== true) throw new Error('the landscape lock did not engage in portrait');
+  if (landscapeRotated !== false) throw new Error('the landscape lock engaged on a landscape phone');
 }
 
 await main();

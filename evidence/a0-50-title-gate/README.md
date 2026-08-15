@@ -50,6 +50,30 @@ finding rather than a caveat. It is why this shipped: sealed is the state anyone
 would think to photograph, and sealed is the state where the leaves cover the
 defect.
 
+## The handset — `phone-*`
+
+390×844 and 844×390, dpr 3, touch.
+
+A phone held **portrait** gets a game rotated +90°, so the player turns the
+handset (`src/platform/orientation.ts`, the landscape lock). The gate is DOM and
+does not ride that rotation for free, and it did not take it until this brief:
+`phone-portrait-sealed.png` shows the overlay under the same transform the Pixi
+root takes, and `phone-portrait-parting.png` shows the real menu — PLAY, CODEX,
+SETTINGS, HANGAR — through the opening, in the orientation the game is in.
+
+`phone-landscape-*.png` is the identity case: no rotation, and the same screen
+the desktop gets.
+
+**What it looked like before**, photographed on the same handset: every
+measurement on this screen is viewport-relative, and rotating a root does not
+change what `vw` and `vh` mean. The lock is `min(148px, 17vh)` and in portrait
+`vh` is the LONG side, so the rotor simply sat at its pixel cap while the door
+shrank under it — two thirds the height of the door it is bolted through, a
+clearance that ate the whole leaf, and both words clipped through the middle. The
+fix is two parts, and it needs both: the root takes the lock's transform, and
+every unit on the screen is read against the LOGICAL viewport through
+`--pr-gate-vw` / `--pr-gate-vh` rather than against the physical window.
+
 ### Why no unit test saw it
 
 The punch is `destination-out` on the canvas (`paintSky`), so it erases the

@@ -93,6 +93,11 @@
  */
 
 import { mulberry32 } from '@shared/types';
+// The landscape lock, shared with the Pixi root rather than restated: a portrait
+// handset gets a game rotated +90°, and a door that ignores that is a portrait
+// door in front of a landscape menu (see `gateRootLayoutCss`).
+import { computeRootTransform } from '@platform/orientation';
+import type { RootTransform } from '@platform/orientation';
 import { FLOOR, PALETTE } from '../art/tokens';
 import { GAME_NAME, extraTracking, splitWordmark } from './game-name';
 import type { GateCue, GateSfx } from './sfx';
@@ -506,7 +511,7 @@ function titleFont(track: number): string {
   const size = TITLE.size / 100;
   return (
     'font-family:Audiowide,system-ui,sans-serif;' +
-    `font-size:min(clamp(20px,${(8.2 * size).toFixed(2)}vw,${Math.round(108 * size)}px),${(11.4 * size).toFixed(2)}vh);` +
+    `font-size:min(clamp(20px,${vw(8.2 * size)},${Math.round(108 * size)}px),${vh(11.4 * size)});` +
     'line-height:.92;white-space:nowrap;' +
     `letter-spacing:${track.toFixed(3)}em;` +
     // Letter-spacing adds a trailing space the browser then centres, so the
@@ -644,9 +649,73 @@ export const TITLE_GATE_LEAF_ID = 'pr-title-gate-leaf';
  * exactly as {@link throughScale} is, and `#app` carries the safe-area padding.
  */
 export const TITLE_GATE_ROOT_CSS =
-  'position:fixed;inset:0;overflow:hidden;z-index:20;background:transparent;' +
+  'position:fixed;left:0;top:0;overflow:hidden;z-index:20;background:transparent;' +
   'font-family:Oxanium,system-ui,sans-serif;cursor:var(--pr-gate-cursor,pointer);' +
   'touch-action:none;-webkit-tap-highlight-color:transparent;';
+
+/**
+ * The overlay's half of the **landscape lock** — the rest of it is
+ * `../platform/orientation`, and this is the DOM restatement of the exact same
+ * transform the Pixi root already takes.
+ *
+ * A phone held portrait gets a game rotated +90° so the player turns the handset
+ * (`computeRootTransform`). The gate is DOM, so it does not ride that rotation
+ * for free, and a gate that ignores it is a **portrait door in front of a
+ * landscape menu**: the leaves open onto a menu lying on its side, and — because
+ * every measurement on this screen is viewport-relative — the door itself comes
+ * out wrong on the way there. Photographed on a 390×844 handset: the lock swells
+ * to two thirds of the door's height (it is sized off `vh`, and in portrait `vh`
+ * is the LONG side), the clearance under it eats the whole leaf, and both words
+ * are clipped through the middle. The screen is unreadable, and no test in this
+ * repo can see it — the mobile suite boots `?gate=0`.
+ *
+ * So the overlay is laid out in the LOGICAL (landscape) viewport and rotated onto
+ * the physical one, which is the same trick `src/net/playtest-log-button.ts`
+ * plays for the same reason. `transform-origin:0 0` with `translateX(physW)`
+ * lands the rotated rect exactly on the screen — the CSS spelling of
+ * `RootTransform`'s `{ rotation: π/2, x: physW, y: 0 }`, no gaps.
+ *
+ * Everywhere else — desktop, and any landscape viewport — it is the identity, and
+ * the element is simply the window.
+ */
+export function gateRootLayoutCss(t: {
+  readonly rotated: boolean;
+  readonly logicalWidth: number;
+  readonly logicalHeight: number;
+}): string {
+  // The two units the whole screen is drawn in, pinned to the LOGICAL viewport.
+  // Rotating the root does not change what `vw` and `vh` mean — they are always
+  // the physical window — so a door written in raw viewport units comes out
+  // measured against the wrong sides the moment the lock engages. These are one
+  // percent of the box the door actually lives in, and everything below reads
+  // them through {@link vw} / {@link vh}.
+  const units = `--pr-gate-vw:${t.logicalWidth / 100}px;--pr-gate-vh:${t.logicalHeight / 100}px;`;
+  if (!t.rotated) return `${units}width:100%;height:100%;transform:none;transform-origin:50% 50%;`;
+  // Rotated: the element is the LOGICAL rect, and `logicalHeight` is the physical
+  // width — which is exactly the translation the transform needs.
+  return (
+    units +
+    `width:${t.logicalWidth}px;height:${t.logicalHeight}px;` +
+    `transform-origin:0 0;transform:translateX(${t.logicalHeight}px) rotate(90deg);`
+  );
+}
+
+/**
+ * `n` percent of the logical viewport's WIDTH — `n vw`, measured against the box
+ * the door is laid out in rather than against the physical window.
+ *
+ * The fallback is the raw unit, so an overlay that has not been laid out yet (or
+ * a caller rendering the markup on its own, as the tests do) behaves exactly as
+ * the design file does. See {@link gateRootLayoutCss}.
+ */
+function vw(n: number): string {
+  return `calc(var(--pr-gate-vw, 1vw) * ${Number(n.toFixed(3))})`;
+}
+
+/** `n` percent of the logical viewport's HEIGHT. See {@link vw}. */
+function vh(n: number): string {
+  return `calc(var(--pr-gate-vh, 1vh) * ${Number(n.toFixed(3))})`;
+}
 
 /** The self-hosted faces, byte-identical to `index.html`'s declarations. */
 export const FONT_URLS = {
@@ -689,7 +758,7 @@ const OPENING_CLIP = (() => {
 /** One machined fastener, seated in the jamb ring at `x`/`y` percent. */
 function bolt(x: string, y: string): string {
   return (
-    `<div style="position:absolute;left:${x};top:${y};width:min(19px,1.6vw);aspect-ratio:1;` +
+    `<div style="position:absolute;left:${x};top:${y};width:min(19px,${vw(1.6)});aspect-ratio:1;` +
     'transform:translate(-50%,-50%) scale(var(--pr-gate-bolt-scale));' +
     `transition:transform ${TRANSITION.bolt}ms cubic-bezier(.4,0,.2,1);">` +
     '<div style="width:100%;height:100%;border-radius:50%;background:linear-gradient(160deg,#7e8894,#2d3239);' +
@@ -726,7 +795,7 @@ function flangeScrews(): string {
 function lock(): string {
   const facet = `clip-path:${OPENING_CLIP};`;
   return (
-    '<div style="position:absolute;left:50%;bottom:0;width:min(148px,17vh);aspect-ratio:1;' +
+    `<div style="position:absolute;left:50%;bottom:0;width:min(148px,${vh(17)});aspect-ratio:1;` +
     `transform:translate(-50%,50%) scale(var(--pr-gate-hub-scale));transition:transform ${TRANSITION.hub}ms ease-out;">` +
     // the bored pocket the mechanism is recessed into
     `<div style="position:absolute;inset:-9%;border-radius:50%;background:radial-gradient(circle,#1a1e24 62%,#2b3138 100%);box-shadow:inset 0 3px 7px rgba(${INK},.95), inset 0 -1px 0 rgba(238,242,247,.14), 0 1px 0 rgba(238,242,247,.1);"></div>` +
@@ -810,7 +879,7 @@ function leaf(word: string, track: number, canClip: boolean, upper: boolean): st
     `<div style="position:absolute;left:0;right:0;${edge}:6.5%;height:2px;background:rgba(238,242,247,.26);"></div>` +
     `<div style="position:absolute;left:0;right:0;${edge}:0;height:2.4%;opacity:var(--pr-gate-haz-op);transition:opacity ${TRANSITION.hazard}ms ease-out;background:repeating-linear-gradient(115deg, rgba(${HAZARD},.44) 0 9px, rgba(38,42,49,.94) 9px 18px);"></div>` +
     // the type, struck into the leaf and travelling with it
-    `<div style="position:absolute;left:6%;right:6%;${edge}:calc(min(74px,8.5vh) + ${TITLE.lockGap}%);display:flex;justify-content:center;isolation:isolate;">` +
+    `<div style="position:absolute;left:6%;right:6%;${edge}:calc(min(74px,${vh(8.5)}) + ${TITLE.lockGap}%);display:flex;justify-content:center;isolation:isolate;">` +
     `<span style="${titleCss(track, canClip)}${sheenDelay}">${escapeHtml(word)}</span>` +
     '</div>' +
     '</div>'
@@ -875,7 +944,7 @@ export function titleGateHtml(options: GateHtmlOptions = {}): string {
     // inside the frame's clip, which is why they read as retracting INTO the
     // hull instead of sliding across it.
     `<div id="${TITLE_GATE_DOOR_ID}" style="position:absolute;z-index:3;left:50%;top:50%;` +
-    `width:min(${DOOR.widthOfVw * 100}vw,${DOOR.widthOfVh * 100}vh);aspect-ratio:${DOOR.aspect};` +
+    `width:min(${vw(DOOR.widthOfVw * 100)},${vh(DOOR.widthOfVh * 100)});aspect-ratio:${DOOR.aspect};` +
     'transform:translate(-50%,-50%) scale(var(--pr-gate-door-scale));opacity:var(--pr-gate-door-op);' +
     `transition:transform ${TRANSITION.frame}ms cubic-bezier(.42,0,.5,1), opacity ${TRANSITION.fade}ms linear;pointer-events:none;">` +
     jamb() +
@@ -892,12 +961,12 @@ export function titleGateHtml(options: GateHtmlOptions = {}): string {
     '</div>' +
     // The prompt. Register 2 (style-guide §8): procedural, unglamorous, present
     // tense, and it names the action in its first three words.
-    '<div style="position:absolute;z-index:4;left:0;right:0;bottom:max(3.4vh,22px);display:flex;flex-direction:column;align-items:center;gap:9px;' +
+    `<div style="position:absolute;z-index:4;left:0;right:0;bottom:max(${vh(3.4)},22px);display:flex;flex-direction:column;align-items:center;gap:9px;` +
     `opacity:var(--pr-gate-prompt-op);transition:opacity ${TRANSITION.hazard}ms ease-out;pointer-events:none;">` +
     `<div style="display:flex;align-items:center;padding:10px 24px;border:1px solid #515861;background:linear-gradient(180deg,rgba(198,205,214,.1),rgba(198,205,214,0) 50%),linear-gradient(#383e45,#20252c);box-shadow:0 6px 20px rgba(${INK},.75);animation:pr-gate-prompt 2.1s ease-in-out infinite;">` +
-    `<span style="font-family:Oxanium,system-ui,sans-serif;font-weight:800;font-size:clamp(10px,1.2vw,13px);letter-spacing:.3em;color:${BONE_WHITE};">${PROMPT}</span>` +
+    `<span style="font-family:Oxanium,system-ui,sans-serif;font-weight:800;font-size:clamp(10px,${vw(1.2)},13px);letter-spacing:.3em;color:${BONE_WHITE};">${PROMPT}</span>` +
     '</div>' +
-    `<span style="font-family:Oxanium,system-ui,sans-serif;font-weight:700;font-size:clamp(9px,1vw,11px);letter-spacing:.24em;color:#a5acb4;text-shadow:0 1px 3px rgba(${INK},.9);">${STATUS_LINE}</span>` +
+    `<span style="font-family:Oxanium,system-ui,sans-serif;font-weight:700;font-size:clamp(9px,${vw(1)},11px);letter-spacing:.24em;color:#a5acb4;text-shadow:0 1px 3px rgba(${INK},.9);">${STATUS_LINE}</span>` +
     '</div>'
   );
 }
@@ -1517,6 +1586,13 @@ export interface GateBrowser {
   readonly window: Window & typeof globalThis;
   /** Where the overlay goes: `#app`, above the game canvas. */
   readonly mount: HTMLElement;
+  /**
+   * Is this a touch device — the input to the landscape lock, and the ONLY thing
+   * that decides whether a portrait viewport is a phone held portrait or a
+   * narrow desktop window (`../platform/orientation` `computeRootTransform`).
+   * Defaults to the same read `src/main.ts` makes.
+   */
+  readonly isTouch?: boolean;
 }
 
 /**
@@ -1531,11 +1607,36 @@ export interface GateBrowser {
  */
 export function browserGateDom(browser: GateBrowser): GateDom {
   const { document: doc, window: win, mount: host } = browser;
+  const isTouch =
+    browser.isTouch ?? ('ontouchstart' in win || (win.navigator?.maxTouchPoints ?? 0) > 0);
   let root: HTMLElement | null = null;
   let canvas: HTMLCanvasElement | null = null;
   let door: HTMLElement | null = null;
   let leaf: HTMLElement | null = null;
   let unbind: (() => void)[] = [];
+  /** The gate's own custom properties, kept so a relayout can replay them. */
+  const vars = new Map<string, string>();
+
+  /** The live landscape lock, read from the real window each time it is needed —
+   *  a phone can be turned while this screen is up. */
+  const transform = (): RootTransform =>
+    computeRootTransform(win.innerWidth, win.innerHeight, isTouch);
+
+  /**
+   * Re-lay the overlay for the orientation it is in now. Idempotent, so the
+   * resize listener can call it on every event without measuring anything.
+   *
+   * `cssText` replaces the whole declaration block, custom properties included,
+   * so the gate's own variables are replayed after it. Setting them one property
+   * at a time instead would put the layout in two places — the string the tests
+   * hold and the writes the browser gets — and those are exactly the two that
+   * must not be allowed to disagree.
+   */
+  const applyLayout = (): void => {
+    if (!root) return;
+    root.style.cssText = TITLE_GATE_ROOT_CSS + gateRootLayoutCss(transform());
+    for (const [name, value] of vars) root.style.setProperty(name, value);
+  };
 
   /** A CSS transform's `translateY`/`scale`, read off the live computed style —
    *  which is what "measured, never assumed" means in a browser. */
@@ -1554,10 +1655,10 @@ export function browserGateDom(browser: GateBrowser): GateDom {
     mount(html, on) {
       const el = doc.createElement('div');
       el.id = TITLE_GATE_ID;
-      el.style.cssText = TITLE_GATE_ROOT_CSS;
       el.innerHTML = html;
       host.appendChild(el);
       root = el;
+      applyLayout();
       canvas = el.querySelector<HTMLCanvasElement>(`#${TITLE_GATE_SKY_ID}`);
       door = el.querySelector<HTMLElement>(`#${TITLE_GATE_DOOR_ID}`);
       leaf = el.querySelector<HTMLElement>(`#${TITLE_GATE_LEAF_ID}`);
@@ -1572,7 +1673,13 @@ export function browserGateDom(browser: GateBrowser): GateDom {
           on.escape();
         }
       };
-      const resize = (): void => on.resize();
+      // The lock is re-applied BEFORE the gate re-measures, so `view()` and the
+      // canvas below it agree with the element they are describing on the very
+      // first frame after a flip rather than one frame later.
+      const resize = (): void => {
+        applyLayout();
+        on.resize();
+      };
       el.addEventListener('pointerdown', press);
       win.addEventListener('keydown', key);
       win.addEventListener('resize', resize);
@@ -1592,6 +1699,7 @@ export function browserGateDom(browser: GateBrowser): GateDom {
       leaf = null;
     },
     setVar(name, value) {
+      vars.set(name, value);
       root?.style.setProperty(name, value);
     },
     setVisible(visible) {
@@ -1620,9 +1728,14 @@ export function browserGateDom(browser: GateBrowser): GateDom {
       return m ? Math.abs(m.f) : null;
     },
     view() {
+      // The LOGICAL (landscape) viewport, which is the space the whole screen is
+      // laid out in — `throughScale`, the door box and the punch alike. On a
+      // desktop or a landscape phone it is the window; on a phone held portrait
+      // it is the window with its sides swapped, and the root carries the +90°.
+      const t = transform();
       return {
-        width: win.innerWidth,
-        height: win.innerHeight,
+        width: t.logicalWidth,
+        height: t.logicalHeight,
         dpr: Math.min(2, win.devicePixelRatio || 1),
       };
     },

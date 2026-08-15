@@ -36,6 +36,7 @@ import {
   doorBox,
   fieldAnimates,
   gateEnabled,
+  gateRootLayoutCss,
   gateVars,
   insidePolygon,
   makeStars,
@@ -53,6 +54,7 @@ import {
   type GatePhase,
   type GateView,
 } from './title-gate';
+import { computeRootTransform } from '@platform/orientation';
 import { extraTracking, splitWordmark } from './game-name';
 import type { GateCue } from './sfx';
 // The bank the gate's four beats are slots in — imported so the seam cannot
@@ -1116,6 +1118,63 @@ describe('what is behind the door cannot be operated through it', () => {
 // ---------------------------------------------------------------------------
 // `?gate=0` — THE HARNESS'S WAY PAST A DOOR BUILT TO BE OPERATED
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// THE LANDSCAPE LOCK — THE DOOR TURNS WITH THE GAME
+// ---------------------------------------------------------------------------
+
+describe('a phone held portrait', () => {
+  it('lays the door out in the logical viewport and rotates it, exactly as the game root does', () => {
+    // The lock is not restated here: the same `computeRootTransform` the Pixi
+    // root takes is the input, so the two cannot drift apart. What this asserts
+    // is that the CSS is the faithful spelling of it — `{ rotation: π/2,
+    // x: physW, y: 0 }` — and that `physW` is `logicalHeight`, which is the step
+    // that makes the rotated rect land on the screen with no gaps.
+    const portrait = computeRootTransform(390, 844, true);
+    expect(portrait.rotated).toBe(true);
+    const css = gateRootLayoutCss(portrait);
+    expect(css).toContain('width:844px');
+    expect(css).toContain('height:390px');
+    expect(css).toContain('transform-origin:0 0');
+    expect(css).toContain('translateX(390px) rotate(90deg)');
+    expect(portrait.logicalHeight).toBe(390); // …and 390 IS the physical width
+  });
+
+  it('is the identity on a desktop and on a landscape phone', () => {
+    for (const t of [computeRootTransform(1280, 800, false), computeRootTransform(844, 390, true)]) {
+      expect(t.rotated).toBe(false);
+      const css = gateRootLayoutCss(t);
+      expect(css).toContain('width:100%');
+      expect(css).toContain('height:100%');
+      expect(css).toContain('transform:none');
+    }
+  });
+
+  it('measures the door against the LOGICAL viewport, so the lock cannot swallow it', () => {
+    // The failure this prevents, photographed on a 390x844 handset before the
+    // lock reached the overlay. Two scales meet on this screen and only one of
+    // them is the door: the door is `min(94vw, 136vh)` wide, and the lock is
+    // `min(148px, 17vh)` — a `vh` that is the LONG side in portrait, so the lock
+    // simply sits at its 148px cap while the door shrinks under it. The result
+    // was a rotor two thirds the height of the door it is bolted to, a clearance
+    // (`min(74px, 8.5vh)`) that ate the whole leaf, and both words clipped
+    // through the middle.
+    const LOCK_PX_CAP = 148;
+    const lockSize = (v: GateView): number => Math.min(LOCK_PX_CAP, 0.17 * v.height);
+    const share = (v: GateView): number => lockSize(v) / doorBox(v).height;
+
+    const logical: GateView = { width: 844, height: 390 }; // what the lock hands us
+    const raw: GateView = { width: 390, height: 844 }; // what the window says
+
+    expect(share(raw)).toBeGreaterThan(0.6); // the photographed failure
+    expect(share(logical)).toBeLessThan(0.25); // the door it was designed for
+    // …and the door still fits inside the viewport it is drawn in, which is the
+    // property the whole screen depends on.
+    const box = doorBox(logical);
+    expect(box.width).toBeLessThanOrEqual(logical.width);
+    expect(box.height).toBeLessThanOrEqual(logical.height);
+  });
+});
 
 describe('?gate=0', () => {
   it('is off by default, and has to be asked for by name', () => {
