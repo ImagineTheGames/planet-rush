@@ -118,7 +118,30 @@ export type UiCueName =
   /** A seat filling: one note, stepping up by slot index. */
   | 'join'
   /** RUSH!: five notes climbing, then the confirm's three struck at once and held. */
-  | 'rush';
+  | 'rush'
+  | DoorCueName;
+
+/**
+ * The title gate's four beats (`src/ui/title-gate.ts`, a0-50) — the one screen
+ * in this game whose sound is a **sequence** rather than an answer to a
+ * fingertip.
+ *
+ *  - `gateUnlock` — the opening press. Everything the machine does, in the order
+ *    it does it: the valve cracks, the compartment vents, the lock ratchets
+ *    round its seven detents, and the door's weight moves last.
+ *  - `gateSeated` — we are through, and the room we arrived in has a size.
+ *  - `gateReseal` — `Escape`: two notes stepping down, then the leaves taking up
+ *    their own weight.
+ *  - `gateSealed` — the lock throwing back, and pressure returning.
+ *
+ * They live here, as slots, because the alternative is the one the design file
+ * ships: **a second synthesiser.** The prototype builds `unlock`, `seated`,
+ * `hover`, `confirm` and `select` from scratch in a few hundred lines — and
+ * three of those five were already ratified slots above, so only the door's own
+ * beats are actually new. A second engine would mean two tone contracts and a
+ * `spikes/tone-audit/measure-bank-tone.ts` that measures one of them.
+ */
+export type DoorCueName = 'gateUnlock' | 'gateSeated' | 'gateReseal' | 'gateSealed';
 
 /** Every cue name, in the handoff's own table order. */
 export const UI_CUE_NAMES: readonly UiCueName[] = [
@@ -131,6 +154,26 @@ export const UI_CUE_NAMES: readonly UiCueName[] = [
   'refused',
   'join',
   'rush',
+] as const;
+
+/**
+ * The door's four, kept as their own list rather than appended to the nine.
+ *
+ * **This is not bookkeeping.** Every rule `ui-cues.test.ts` states over
+ * {@link UI_CUE_NAMES} — *back is the only falling cue in the whole set*,
+ * *nothing forward borrows back's note*, *everything resolves but `refused`* —
+ * is a statement about **the interface answering a fingertip**, where a rising
+ * interval means yes and a falling one means backwards. The door is not
+ * answering anything: it is a machine running a sequence, and its pitches are
+ * what a lock and a compartment do, in the order they do them. Folding it into
+ * the nine would either break those rules or quietly weaken them into rules
+ * about a smaller set, which is worse.
+ */
+export const DOOR_CUE_NAMES: readonly DoorCueName[] = [
+  'gateUnlock',
+  'gateSeated',
+  'gateReseal',
+  'gateSealed',
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -188,6 +231,67 @@ export const MINOR_SECOND_ABOVE = 1760;
 
 /** Hover's fixed pitch (A7). Above everything else, so it never competes. */
 export const HOVER_HZ = 3520;
+
+// --- The door's own numbers (a0-50) -----------------------------------------
+
+/**
+ * The lock's ratchet detent (E7).
+ *
+ * Deliberately **not** measured off {@link A_FLAT_6} like everything above it.
+ * The nine cues spell intervals because they are speaking; a detent is a pawl
+ * dropping into a tooth seven times at one fixed pitch, and it means nothing
+ * except *the lock is turning*. Giving it a scale degree would make the ear
+ * listen for a melody in a ratchet.
+ */
+export const RATCHET_HZ = 2637;
+
+/** The ratchet's partials: a hard, thin pair. Metal on metal, not glass. */
+export const RATCHET_PARTIALS: readonly number[] = [1, 4.2];
+
+/** Detents in one throw — the handoff's *"seven detent clicks, not a servo whine"*. */
+export const RATCHET_DETENTS = 7;
+
+/** Seconds between two detents while opening. Slower than the reseal's, because
+ *  the lock is being wound against the pressure rather than falling back. */
+export const RATCHET_GAP_S = 0.098;
+
+/** Seconds between two detents while the lock throws home. */
+export const RATCHET_GAP_HOME_S = 0.086;
+
+/**
+ * **Pressure relief, the cue this screen owns.**
+ *
+ * *"A hiss is not a tone: it is broadband noise whose FILTER falls as the
+ * pressure drops."* Three stages, and the numbers are the handoff's own:
+ *
+ *  1. the valve cracking — 7.6 kHz → 3 kHz over 200 ms
+ *  2. the compartment venting — 4.8 kHz → 620 Hz over 1.7 s
+ *  3. a shorter blast as the leaves break contact, with the sub arriving only
+ *     when the door's weight actually moves
+ *
+ * The fourth entry is the reverse gesture: pressure returning to a compartment
+ * *rises*, because the air is going back in.
+ */
+export const RELIEF = {
+  /** Stage 1: the valve cracks. */
+  crack: { from: 7600, to: 3000, seconds: 0.2, q: 0.8 },
+  /** Stage 2: the compartment vents. The long one — this is the cue's body. */
+  vent: { from: 4800, to: 620, seconds: 1.7, q: 0.5 },
+  /** Stage 3: the leaves breaking contact. */
+  breakaway: { from: 3200, to: 480, seconds: 0.9, q: 0.4 },
+  /** The reseal's answer: pressure coming back, so the filter climbs. */
+  repressurise: { from: 800, to: 2800, seconds: 0.62, q: 0.5 },
+} as const;
+
+/**
+ * The floor under a swept relief stage, Hz.
+ *
+ * The sweep is a *band*, and a band-pass with a falling centre still passes
+ * skirt energy below it. Without this the vent's last half second turns into
+ * rumble competing with the door's sub, which is the one thing on this screen
+ * carrying the sense of weight.
+ */
+export const AIR_FLOOR_HZ = 320;
 
 // --- The detune -------------------------------------------------------------
 
@@ -289,12 +393,30 @@ export interface GlassNote {
 export interface AirNote {
   readonly at: number;
   readonly dur: number;
-  /** High-pass cutoff, Hz. */
+  /** Filter cutoff (or band centre), Hz — where the sweep STARTS. */
   readonly freq: number;
-  /** High-pass Q. */
+  /** Filter Q. */
   readonly q: number;
   readonly gain: number;
   readonly wet: number;
+  /**
+   * Where the filter LANDS, Hz. Omitted on every one of the nine — their air is
+   * a 20 ms transient and a filter has nowhere to go in 20 ms.
+   *
+   * Present, it is what turns a breath into **pressure relief**: the gesture is
+   * the filter falling, not the level. Exponential, because a cutoff is heard in
+   * ratios exactly as a pitch is — and it is not a pitch bend, because there is
+   * no pitch in noise to bend (§4.7's *"no pitch bends"* is about tones).
+   */
+  readonly to?: number;
+  /**
+   * Band-pass the noise instead of high-passing it, over {@link AIR_FLOOR_HZ}.
+   *
+   * A high-pass that falls hands you everything above the cutoff, so a falling
+   * high-pass gets *brighter* as it drops — the opposite of a compartment
+   * emptying. A band that falls is the sound the handoff describes.
+   */
+  readonly band?: boolean;
 }
 
 /**
@@ -354,6 +476,16 @@ function ping(
 
 function air(dur: number, freq: number, gain: number, wet: number, at = 0, q = 0.7): AirNote {
   return { at, dur, freq, q, gain, wet };
+}
+
+/** One stage of {@link RELIEF}: broadband noise whose band falls (or climbs). */
+function relief(
+  stage: { readonly from: number; readonly to: number; readonly seconds: number; readonly q: number },
+  gain: number,
+  wet: number,
+  at = 0,
+): AirNote {
+  return { at, dur: stage.seconds, freq: stage.from, to: stage.to, q: stage.q, gain, wet, band: true };
 }
 
 function sub(f0: number, f1: number, dur: number, gain: number, at = 0): SubNote {
@@ -503,6 +635,109 @@ export const UI_CUES: Readonly<Record<UiCueName, UiCueSpec>> = {
     detuned: true,
     stepped: false,
     shape: 'five notes climbing, then the three confirm notes struck at once and held',
+  },
+
+  // --- The door (a0-50) ----------------------------------------------------
+  //
+  // Same material as the nine — struck glass over one shared room — with the one
+  // thing the interface never needed: broadband noise whose FILTER moves. A door
+  // is the only object in this game that vents.
+
+  /**
+   * Beat 1, and the longest cue in the set at ~2.7 s.
+   *
+   * The order is the machine's, not the edit's: the valve cracks, the
+   * compartment vents underneath everything, the lock ratchets round its seven
+   * detents, it seats on the family's root — and **the sub arrives last**,
+   * because the door's weight does not move until the lock has let go of it.
+   * Playing the weight early is what makes a pressure door read as a sliding
+   * panel.
+   */
+  gateUnlock: {
+    name: 'gateUnlock',
+    notes: [
+      ...Array.from({ length: RATCHET_DETENTS }, (_unused, i) =>
+        ping(RATCHET_HZ, 0.09, 0.036, 0.22, RATCHET_PARTIALS, 0.14 + i * RATCHET_GAP_S, 0.001),
+      ),
+      ping(A_FLAT_6, 0.3, 0.062, 0.36, GLASS_PARTIALS, 0.86),
+    ],
+    air: [
+      relief(RELIEF.crack, 0.11, 0.3),
+      relief(RELIEF.vent, 0.1, 0.45, 0.05),
+      relief(RELIEF.breakaway, 0.075, 0.45, 0.92),
+    ],
+    sub: [sub(116, 48, 0.6, 0.17, 0.94)],
+    detuned: true,
+    stepped: false,
+    shape: 'a valve, a compartment venting, seven detents, and the weight moving last',
+  },
+
+  /**
+   * Beat 4: we are through, and the room we arrived in has a size.
+   *
+   * `purchase`'s three notes — root, fifth, octave — struck **at one instant**
+   * and left to ring at double the wet of anything else in the set. Nothing new
+   * is introduced: it is the arrival the family already spells, held long enough
+   * to be a place rather than an answer.
+   */
+  gateSeated: {
+    name: 'gateSeated',
+    notes: [
+      ping(A_FLAT_6, 0.9, 0.055, 0.5),
+      ping(FIFTH_ABOVE, 0.7, 0.04, 0.5, GLASS_PAIR),
+      ping(OCTAVE_ABOVE, 0.55, 0.03, 0.5, GLASS_PAIR),
+    ],
+    air: [],
+    sub: [],
+    detuned: true,
+    stepped: false,
+    shape: 'the confirm triad struck at once and held in the room',
+  },
+
+  /**
+   * `Escape`, beat 1 in reverse: **`back`'s two notes**, note for note, with the
+   * door's weight under them.
+   *
+   * It is literally the ratified `back` — A♭6 then a fourth below it 50 ms later
+   * — because going back through the door is going back, and rule 3 does not
+   * stop applying because the control is a whole screen. What it adds is the sub
+   * at 0.62 s: not the cue's punctuation but the leaves taking up their own
+   * weight, which happens well after the notes have said what they mean.
+   */
+  gateReseal: {
+    name: 'gateReseal',
+    notes: [
+      ping(A_FLAT_6, 0.2, 0.055, 0.3, GLASS_PAIR),
+      ping(FOURTH_BELOW, 0.26, 0.06, 0.32, GLASS_PARTIALS, 0.05),
+    ],
+    air: [],
+    sub: [sub(128, 54, 0.4, 0.16, 0.62)],
+    detuned: true,
+    stepped: false,
+    shape: "back's falling fourth, with the leaves' weight under it",
+  },
+
+  /**
+   * The lock throwing home, once the leaves are measurably shut.
+   *
+   * The same seven detents, a little faster — a lock falling back is not being
+   * wound against anything — then the one stage of {@link RELIEF} that **climbs**:
+   * pressure returning to a compartment is air going back in. It lands on
+   * `back`'s answering note, so the reseal opens and closes on the same word.
+   */
+  gateSealed: {
+    name: 'gateSealed',
+    notes: [
+      ...Array.from({ length: RATCHET_DETENTS }, (_unused, i) =>
+        ping(RATCHET_HZ, 0.09, 0.032, 0.22, RATCHET_PARTIALS, i * RATCHET_GAP_HOME_S, 0.001),
+      ),
+      ping(FOURTH_BELOW, 0.3, 0.05, 0.28, GLASS_PARTIALS, 0.66),
+    ],
+    air: [relief(RELIEF.repressurise, 0.06, 0.45, 0.62)],
+    sub: [],
+    detuned: true,
+    stepped: false,
+    shape: 'seven detents throwing home, and pressure returning',
   },
 };
 
@@ -703,11 +938,24 @@ function renderGlass(note: GlassNote, rate: number, dry: Float32Array, send: Flo
   }
 }
 
-/** A breath of air: noise through a 2nd-order high-pass, quiet and short. */
+/**
+ * A breath of air: noise through a 2nd-order high-pass, quiet and short.
+ *
+ * With {@link AirNote.to} set it is the other thing this shape can be — pressure
+ * relief, where the *filter* is the gesture. The band's centre is retuned every
+ * {@link SWEEP_BLOCK} samples rather than every sample: the coefficients are
+ * recomputed ~1500 times over a 1.7 s vent instead of 82 000, the state is
+ * carried across the retune so nothing clicks, and 0.7 ms of stair-stepping on a
+ * cutoff is inaudible where the same stepping on a *pitch* would not be.
+ */
 function renderAir(note: AirNote, rate: number, dry: Float32Array, send: Float32Array, rng: Rng): void {
   const start = Math.round(note.at * rate);
   const span = Math.max(1, Math.ceil((note.dur + NOTE_TAIL_S) * rate));
-  const hp = biquad('highpass', note.freq, note.q, rate);
+  const kind = note.band ? 'bandpass' : 'highpass';
+  let filter = biquad(kind, note.freq, note.q, rate);
+  // A falling band still passes skirt energy below itself; the floor is what
+  // keeps a vent's last half second out of the door's sub (AIR_FLOOR_HZ).
+  const floorHp = note.band ? biquad('highpass', AIR_FLOOR_HZ, 0.7, rate) : null;
   const attack = 0.01;
   const ratio = GAIN_FLOOR / Math.max(GAIN_FLOOR, note.gain);
   const fall = Math.max(1 / rate, note.dur - attack);
@@ -715,7 +963,16 @@ function renderAir(note: AirNote, rate: number, dry: Float32Array, send: Float32
     const at = start + i;
     if (at >= dry.length) break;
     const t = i / rate;
-    const filtered = hp.step(rng.next() * 2 - 1);
+    if (note.to !== undefined && i % SWEEP_BLOCK === 0) {
+      // Exponential, like every frequency move in this module: a cutoff is heard
+      // in ratios exactly as a pitch is.
+      const p = Math.min(1, t / Math.max(1e-6, note.dur));
+      const f = note.freq * Math.pow(note.to / note.freq, p);
+      filter = biquad(kind, f, note.q, rate, filter);
+    }
+    const raw = rng.next() * 2 - 1;
+    const banded = filter.step(raw);
+    const filtered = floorHp ? floorHp.step(banded) : banded;
     let env: number;
     if (t < attack) {
       env = GAIN_FLOOR + (note.gain - GAIN_FLOOR) * (t / attack);
@@ -793,9 +1050,25 @@ export function roomImpulse(sampleRate: number = DEFAULT_SAMPLE_RATE, seed = 0x9
 
 interface Biquad {
   step(x: number): number;
+  /** The two-sample history, so a retuned filter can carry it (see {@link SWEEP_BLOCK}). */
+  state(): readonly [number, number, number, number];
 }
 
-function biquad(kind: 'lowpass' | 'highpass', freq: number, q: number, rate: number): Biquad {
+/**
+ * Samples between two retunes of a swept filter.
+ *
+ * 32 at 48 kHz is 0.67 ms — finer than the ear resolves a cutoff moving, and
+ * 2500× cheaper than recomputing four transcendentals per sample.
+ */
+const SWEEP_BLOCK = 32;
+
+function biquad(
+  kind: 'lowpass' | 'highpass' | 'bandpass',
+  freq: number,
+  q: number,
+  rate: number,
+  carry?: Biquad,
+): Biquad {
   const w0 = (2 * Math.PI * Math.max(1, freq)) / rate;
   const cos = Math.cos(w0);
   const alpha = Math.sin(w0) / (2 * Math.max(0.0001, q));
@@ -806,6 +1079,12 @@ function biquad(kind: 'lowpass' | 'highpass', freq: number, q: number, rate: num
     b0 = (1 + cos) / 2;
     b1 = -(1 + cos);
     b2 = b0;
+  } else if (kind === 'bandpass') {
+    // Constant 0 dB peak gain (RBJ) — the same normalisation a Web Audio
+    // `bandpass` node uses, so the offline render matches the node one.
+    b0 = alpha;
+    b1 = 0;
+    b2 = -alpha;
   } else {
     b0 = (1 - cos) / 2;
     b1 = 1 - cos;
@@ -819,10 +1098,14 @@ function biquad(kind: 'lowpass' | 'highpass', freq: number, q: number, rate: num
   const n2 = b2 / a0;
   const d1 = a1 / a0;
   const d2 = a2 / a0;
-  let x1 = 0;
-  let x2 = 0;
-  let y1 = 0;
-  let y2 = 0;
+  // A retuned filter inherits the outgoing one's history: dropping it would
+  // restart the difference equation from silence every 32 samples, which is a
+  // 1.5 kHz buzz laid over the sweep.
+  const [cx1, cx2, cy1, cy2] = carry?.state() ?? [0, 0, 0, 0];
+  let x1 = cx1;
+  let x2 = cx2;
+  let y1 = cy1;
+  let y2 = cy2;
   return {
     step(x: number): number {
       const y = n0 * x + n1 * x1 + n2 * x2 - d1 * y1 - d2 * y2;
@@ -831,6 +1114,9 @@ function biquad(kind: 'lowpass' | 'highpass', freq: number, q: number, rate: num
       y2 = y1;
       y1 = y;
       return y;
+    },
+    state() {
+      return [x1, x2, y1, y2];
     },
   };
 }
@@ -932,14 +1218,20 @@ export class UiCuePlayer {
   }
 
   /**
-   * Render and cache all nine.
+   * Render and cache the nine, and the door's four.
    *
    * Worth doing behind the unlock gesture (`./unlock`): the one place a first-play
    * render is audible is the very first press of the menu, which is the worst
    * possible first impression of a set the developer chose by ear.
+   *
+   * The door's cues are the sharpest case of that, and the reason they are not
+   * left out of this loop for being longer: the gesture that unlocks audio IS
+   * the press that opens the door (`src/ui/title-gate.ts`), so `gateUnlock` is
+   * the very first sound this game is permitted to make.
    */
   preload(): void {
     for (const name of UI_CUE_NAMES) this.buffer(name);
+    for (const name of DOOR_CUE_NAMES) this.buffer(name);
   }
 
   /**
