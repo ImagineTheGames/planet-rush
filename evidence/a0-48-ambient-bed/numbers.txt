@@ -1,0 +1,44 @@
+a0-48 — the ambient bed, measured
+
+sound                                    secs  peak    rms <100Hz  seam
+------------------------------------------------------------------------------
+denied  (main 415f0ea)                   7.40 0.700 0.2460 0.2117 0.0005
+shipped (a0-48)                          9.10 0.303 0.1022 0.0860 0.0001
+offer d — far hull, air with no low end  9.20 0.128 0.0302 0.0083 0.0046
+offer e — a slow tide, only the filters move 9.10 0.176 0.0690 0.0591 0.0006
+offer f — a low room with a slow pulse   11.10 0.266 0.1111 0.0971 0.0006
+
+per layer — `moves` is any of decayCurve / lowPassEnd / bandPass / resonance,
+and `attack` is the fade-in. Both are what `audio.test.ts` gates the bed on.
+
+denied  (main 415f0ea)   (crossfade 0.60s)
+   ambient.bed             sine      moves NO   attack 0.000 <- arrives  ends 8.0s  gain 0.300
+   ambient.detune          sine      moves NO   attack 0.000 <- arrives  ends 8.0s  gain 0.220
+   ambient.fifth           triangle  moves NO   attack 0.000 <- arrives  ends 8.0s  gain 0.120
+   ambient.wash            noise     moves yes  attack 0.000 <- arrives  ends 8.0s  gain 0.085
+
+shipped (a0-48)   (crossfade 0.90s)
+   ambient.floor           sine      moves yes  attack 0.400  ends 10.0s  gain 0.120
+   ambient.drift           sine      moves yes  attack 0.400  ends 10.0s  gain 0.090
+   ambient.air             noise     moves yes  attack 0.500  ends 10.0s  gain 0.095
+   ambient.tide.open       noise     moves yes  attack 2.600  ends 6.5s  gain 0.075
+   ambient.tide.close      noise     moves yes  attack 2.200  ends 9.4s  gain 0.065
+   ambient.tide.band       noise     moves yes  attack 2.000  ends 10.0s  gain 0.150
+
+offer d — far hull, air with no low end   (crossfade 0.80s)
+   ambient_d.air           noise     moves yes  attack 0.600  ends 10.0s  gain 0.090
+   ambient_d.room          noise     moves yes  attack 0.600  ends 10.0s  gain 0.070
+   ambient_d.pass          noise     moves yes  attack 3.000  ends 8.7s  gain 0.100
+
+offer e — a slow tide, only the filters move   (crossfade 0.90s)
+   ambient_e.under         sine      moves yes  attack 0.500  ends 10.0s  gain 0.090
+   ambient_e.rise          noise     moves yes  attack 3.200  ends 7.0s  gain 0.075
+   ambient_e.fall          noise     moves yes  attack 2.800  ends 10.0s  gain 0.065
+   ambient_e.ring          noise     moves yes  attack 2.400  ends 10.0s  gain 0.110
+
+offer f — a low room with a slow pulse   (crossfade 0.90s)
+   ambient_f.low           sine      moves yes  attack 0.500  ends 12.0s  gain 0.130
+   ambient_f.beat          sine      moves yes  attack 0.500  ends 12.0s  gain 0.100
+   ambient_f.metal         noise     moves yes  attack 0.700  ends 12.0s  gain 0.060
+   ambient_f.pulse         noise     moves yes  attack 3.500  ends 10.0s  gain 0.070
+

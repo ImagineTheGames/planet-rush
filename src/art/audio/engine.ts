@@ -156,6 +156,32 @@ export const XP_FILL_RELEASE_S = 0.12;
 export const XP_FILL_DUCK = 0.4;
 export const XP_FILL_DUCK_S = 0.45;
 
+/**
+ * How long the ambient bed takes to reach full level after {@link AudioEngine.start}.
+ *
+ * The bed is the one voice in the mix that is never an event, so it may not have
+ * an onset: {@link AudioGraph.startLoop} opens it at **silence** and this is the
+ * ramp up from there. The bed's own layers fade in as well (`./bank`) — the two
+ * are different jobs, and a0-48 needed both. A voice that begins at full level on
+ * sample zero is a sound that *started*, whatever the mix does above it; a mix
+ * ramp short enough to hear is a sound that *arrived*, whatever the voice does
+ * below it.
+ *
+ * Six seconds, up from 2.5. The developer's report is *"when i press play im
+ * immediately greeted"*, and 2.5 s is comfortably inside the window a player
+ * spends looking at a match that has just opened.
+ *
+ * **Where the ramp starts is a separate question, and it is not settled here.**
+ * `start()` is called from the {@link AudioUnlock} gesture (`../presenter`,
+ * `src/main.ts`), which is the player's *first tap anywhere in the app* — for
+ * most players, the PLAY button on the menu. So the bed does not begin when a
+ * match begins; it begins on the first touch, and a menu that sits for a while
+ * before RUSH! is a menu with the bed already under it. That is arguably the
+ * larger half of "greeted immediately", and moving it means changing who calls
+ * `start()` — outside this module and outside this lane. See the a0-48 note.
+ */
+export const AMBIENT_FADE_IN_S = 6;
+
 /** Options for {@link AudioEngine}. */
 export interface AudioEngineOptions {
   /**
@@ -818,7 +844,7 @@ export class AudioEngine {
     if (this.ambientLoop || !this.graph) return;
     this.ambientLoop = this.graph.startLoop(SOUND.ambient, 0, 'ambient');
     // A long fade in: the bed should arrive without anyone noticing it start.
-    this.ambientLoop.setGain(1, 2.5);
+    this.ambientLoop.setGain(1, AMBIENT_FADE_IN_S);
   }
 }
 
