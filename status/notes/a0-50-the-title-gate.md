@@ -131,6 +131,11 @@ substitutes for the DoD, the PR, or QA attestation.
   `RootTransform` the Pixi root takes, and every `vw`/`vh` on the screen now
   reads `--pr-gate-vw` / `--pr-gate-vh` — the LOGICAL viewport — because rotating
   a root does not change what a viewport unit means. Second browser-only find.
+- **`3375189` fix(a0-50): the prompt clears the home indicator.** And on the edge
+  it is actually near: under the lock the logical bottom is the physical LEFT, so
+  the two orientations publish different `env()`s through
+  `--pr-gate-safe-bottom`. A rotated overlay that kept `safe-area-inset-bottom`
+  would pad the wrong edge — and would look right on every desktop.
 
 ### The bugs three sessions of green unit tests could not see
 
