@@ -4,28 +4,37 @@ Branch `agent/art/a0-45-star-temperature-colour`. Working note; not evidence.
 
 ## BUILT
 
-**`4c70f2e` — the colour half** (an earlier session of mine; verified green on
-this one, `npx tsc --noEmit` clean and 5365 tests passing before I touched it).
+**`4c70f2e` — the colour half.** `starTemperature(rand)` + `starColorFor(temp)`,
+the design's two lines verbatim. `MOCKUP_STARS.ramp` and `starRampColor`
+**deleted** (`minMagnitude: 0.45` with them). The point, the halo and the cross
+all take the star's own colour. `BLOOM_TINTS` removed as redundant, and with it
+`StarInk`, `starInkFor` and `StarLayerSpec.inks` — a layer is a depth, never a
+palette. `compliance.ts` learned `STAR_TEMPERATURE_COLORS` and the rule
+`star-only`. `peakP99` 46–53 → 42–48, re-derived over seeds.
 
-- `starTemperature(rand)` + `starColorFor(temp)`, the design's two lines verbatim.
-- `MOCKUP_STARS.ramp` and `starRampColor` **deleted**; `minMagnitude: 0.45` gone.
-- The halo and the cross take the star's own colour. `BLOOM_TINTS` removed as
-  redundant, and with it `StarInk`, `starInkFor` and `StarLayerSpec.inks`.
-- `compliance.ts` learned `STAR_TEMPERATURE_COLORS` (new rule `star-only`).
-- `peakP99` 46–53 → 42–48, re-derived over seeds.
+**`dbd9fdd` — the spike half.** `spikePeakAlphaOf(intensity)` = `0.22 ×
+intensity` beside `haloPeakAlphaOf`; `starSpikeAlpha()` beside
+`starHaloAlpha()`, and `backdrop.ts` uses it, so `alpha * SPIKE.intensity` is
+gone and `spike.intensity` deleted with it. `spike.width` 0.5 → **0.7**. Two
+named gates in `backdrop.test.ts` (the constants, and the shapes the field
+emits), each with its refusal of `main`'s own numbers.
 
-**The spike half** (this session, uncommitted at time of writing → see NEXT).
+**`6ee36bd` — evidence.** `spike-on-main.ts` reads the cross off
+`starFieldSprite`'s output and runs unchanged on both trees; `shoot.ts` →
+`before/`/`after/`, six panels per tree plus three single-star lenses that are
+the *same* star on both; `audit.ts`, `p99-over-seeds.ts`, `p99-sensitivity.ts`,
+`golden-delta.mjs`.
 
-- `spikePeakAlphaOf(intensity)` = `0.22 × intensity`, beside `haloPeakAlphaOf`.
-- `starSpikeAlpha()` beside `starHaloAlpha()`; `backdrop.ts` uses it, so
-  `alpha * SPIKE.intensity` is gone and `spike.intensity` with it.
-- `spike.width` 0.5 → **0.7** (the design's own `ctx.lineWidth`).
-- Two gates in `backdrop.test.ts`: the a0-44 size test, plus
-  `…spike is dimmer than the halo…` and a field-level sibling.
-- `sky-preview.ts`, the contact sheet, `docs/dark-matter-scan.md` and the
-  allowlist follow.
-- Evidence: `spike-main.txt` / `spike-a0-45.txt`, and `before/` `after/` plates
-  including three single-star lenses that ARE the same star on both trees.
+**`1fe3554` — the contract, and a boot cost.** `style-guide.md` **§1.2** writes
+the carve-out down where §1 lives: the rule, the four hard limits, the two
+Director questions with their numbers. And `STAR_TEMPERATURE_COLORS` stopped
+being a 1e-5 sweep — 105k calls at module load, in the *shipped* bundle
+(verified in `dist/assets/main-*.js`), for a set only the audit reads. Now
+enumerated from the channels' own rounding breakpoints: ~200 evaluations,
+exhaustive by construction, identical 117 colours against a 1e-6 reference.
+
+**Merged `origin/main`** (a0-47 thruster trail, a0-48 ambient bed) before
+re-baselining, so the goldens capture the merged render and not a stale one.
 
 ## DECISIONS
 
@@ -37,33 +46,40 @@ this one, `npx tsc --noEmit` clean and 5365 tests passing before I touched it).
   brief says α 0.55, 5.2× too bright, spike : halo 2.72. That is `α × 0.55` with
   the star at α 1.0; `alpha.max` is 0.5, so `main` actually draws 0.2427–0.2728 —
   **2.30–2.58× the design, 1.20–1.35× its own halo.** Read off `main`'s own
-  generator in a worktree (`spike-main.txt`), not off the formula. The defect,
-  its direction and its fix are exactly as briefed; only the multiplier is
-  smaller, and the inversion (cross brighter than glow) is real.
-- **The p99 instrument is blind to the cross.** `sampleMockup` and `sampleShapes`
+  generator (`spike-main.txt`), not off the formula. The defect, its direction
+  and its fix are exactly as briefed; only the multiplier is smaller, and the
+  inversion (cross brighter than glow) is real.
+- **The p99 instrument is blind to the cross.** `sampleMockup`/`sampleShapes`
   composite fills only, and a spike is a stroke — so re-deriving `peakP99` after
-  the spike change gives byte-identical numbers, and the gate for the spike had
-  to be a relationship assertion rather than a luma one. Recorded on `peakP99`.
+  the spike change gives byte-identical numbers, and the spike's gate had to be a
+  relationship assertion rather than a luma one. Recorded on `peakP99`.
+- **`peakP99` moved DOWN because the deleted ramp's top band was WHITE.** Nothing
+  in the design's sky is white (its stars are Y′ 186–205), so painting the field
+  the design's own colours takes luma off the panel. 46–53 is what a white-topped
+  ramp measures. Not absorbed by re-fitting a derived knob: priced in
+  `p99-sensitivity.ts` (`alpha.max` 0.5 → 1.0 moves it 0.83 of a luma), so only
+  the *measured* halo alpha could, at `0.42 × 0.624` against the preview's stated
+  0.48. That contradiction is the Director's and is in the PR.
 - **Single-star lens plates instead of a0-44's detail crops.** a0-45 shifts every
   seeded stream by two draws per star, so from the *second* star onward the two
   trees are different fields and no crop is like-for-like. A box that draws
   exactly one star is: x, y and magnitude are the first three draws.
-- Rejected: re-fitting a derived knob to put the coloured field back in 46–53.
-  Priced in `p99-sensitivity.ts` — `alpha.max` 0.5 → 1.0 moves it 0.83 of a luma.
-  Only the MEASURED halo alpha could, at `0.42 × 0.624` against the preview's
-  stated 0.48. That contradiction is the Director's and goes in the PR.
+- **The golden re-baseline runs at `maxDiffPixelRatio: 0` on a private port.**
+  The shipped tolerance cannot see this change (a0-44 measured its own halo
+  correction at 0.000% by Playwright's own rule), so a run at 0.01 would rewrite
+  nothing and report success. The tolerance edit is local and reverted; the port
+  is 4245 with `reuseExistingServer: false`, because the lanes share this box and
+  4173 could be serving another lane's bundle. See
+  `evidence/…/goldens-rebaseline.md`.
 
 ## NEXT
 
-- Golden suite running (`tests/mobile/goldens.spec.ts`, 50 baselines) — the
-  three `desktop-sky-*` goldens are literally this backdrop, so a re-baseline is
-  expected. Look at every changed image, then decide re-baseline vs QA hand-off
-  (a0-44's precedent: it moved zero pixels by the gate and left the call to QA;
-  a colour change will not be so quiet).
-- Commit the spike half, write `evidence/…/README.md`, push, open the PR with
-  the two Director questions: **(1)** blue-white starlight vs plasma
-  `#4dc3ff` — raw ink ΔE 16.5, composited star pixel ΔE 39.0, both under the
-  ΔE 40 floor the bloom tints were held to; **(2)** `peakP99` 46–53 is exactly
-  what a white-topped ramp measures, so either the design's own field was
-  measured before `starColor` was applied or its bloom is brighter than
-  `0.42 × 0.48`.
+- Golden run finishing → look at every rewritten frame at size, write each one
+  up in `goldens-rebaseline.md`, run `golden-delta.mjs`, commit.
+- Full `npm test -- --run` and `npx tsc --noEmit` on the merged tree.
+- Push, open the PR with the two Director questions:
+  **(1)** blue-white starlight vs the beacon ring `#4dc3ff` — ΔE 39.0 on the
+  composited pixel, 16.5 on the raw ink, against the studio's ΔE 40 floor;
+  **(2)** `peakP99` 46–53 is exactly what a white-topped ramp measures, so either
+  the design's field was measured before `starColor` was applied or its bloom is
+  brighter than the `0.42 × 0.48` a0-44 read off it.
