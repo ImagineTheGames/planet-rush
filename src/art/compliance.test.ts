@@ -33,6 +33,7 @@ import {
   type World,
 } from '../sim';
 import { ALL_SPRITES, ART_CATALOGUE } from './catalogue';
+import { STAR_TEMPERATURE_COLORS } from './mockup-reference';
 import { turretSilhouetteForTier, turretSprite } from './buildings';
 import {
   beaconRingSprite,
@@ -155,11 +156,45 @@ describe('the RESERVED rule across the whole catalogue (style-guide §2)', () =>
   });
 
   it('uses only allow-listed colours everywhere', () => {
+    // **The one widening, and it is scoped rather than added to the list**
+    // (a0-45). The design's star field colours a star from its temperature, so
+    // its hues are a continuous function rather than members of a set — see
+    // `./compliance` `isStarColor`. They are admitted on the star field and
+    // nowhere else, so this walk has to know about them, and the next test
+    // proves the fence around them holds.
+    let stars = 0;
     for (const def of ALL_SPRITES) {
       for (const color of spriteColors(def)) {
+        if (STAR_TEMPERATURE_COLORS.has(color) && def.name.startsWith('backdrop/')) {
+          stars++;
+          continue;
+        }
         expect(ALLOWED_COLORS.has(color), `${def.name} uses ${hex(color)}`).toBe(true);
       }
     }
+    expect(stars, 'the catalogue carries the star field at all').toBeGreaterThan(0);
+  });
+
+  it('lets a star temperature colour onto the star field and nowhere else', () => {
+    // The fence, both ways. `auditAll` above already passes on the catalogue,
+    // which is the "allowed here" half; this is the half that matters, because a
+    // widening nobody can fail is not a widening, it is a hole. The amber end of
+    // the design's range is ΔE 20.7 from `coreHot` as an ink, which is why it may
+    // not go on a hull.
+    const amber = [...STAR_TEMPERATURE_COLORS].find((c) => ((c >> 16) & 0xff) === 235)!;
+    const onAHull: SpriteDef = {
+      name: 'ship/vanguard/hull',
+      extent: 10,
+      shapes: [{ path: { kind: 'circle', cx: 0, cy: 0, r: 4 }, role: 'material', fill: { color: amber, alpha: 1 } }],
+    };
+    expect(auditSprite(onAHull).map((v) => v.rule)).toContain('star-only');
+    // …and on the sky, which is a backdrop role but not the star field's.
+    const onTheSky: SpriteDef = {
+      ...onAHull,
+      name: 'backdrop/nebula/coalsack/640x360',
+      shapes: [{ ...onAHull.shapes[0]!, role: 'sky' }],
+    };
+    expect(auditSprite(onTheSky).map((v) => v.rule)).toContain('star-only');
   });
 
   it('keeps every entity legible against Vacuum — nothing is painted the background', () => {

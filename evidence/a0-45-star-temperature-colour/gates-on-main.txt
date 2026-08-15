@@ -1,0 +1,31 @@
+the two a0-45 gates, run against `main` (evidence/…/gates-on-main.ts)
+======================================================================
+
+gate 2 — "colour comes from temperature, not magnitude"
+
+  The assertion: DIFFERENT magnitude, SAME temperature ⇒ the SAME colour.
+  `main` has no temperature at all — colour is a function of magnitude:
+
+    mag 0.00   #7e8894
+    mag 0.20   #7e8894
+    mag 0.45   #a5acb4
+    mag 0.80   #ffffff
+    mag 0.86   #ffffff
+    mag 1.00   #ffffff
+
+    3 distinct colours over 6 magnitudes
+    → assertion 2 FAILS: the same star at mag 0.20 and mag 0.80 paints
+      #7e8894 and #ffffff.
+    → assertion 3 FAILS: starRampColor.length = 1, and its one
+      argument IS the magnitude, so the colour cannot help but ramp by it.
+
+gate 1 — "draws a cross whose spike is dimmer than the halo it sits in"
+
+    halo α                 0.2016
+    main's spike α         0.2427–0.2728   (spike-main.txt)
+    spike : halo           1.20–1.35
+    the gate requires      < 1, and the design draws 0.52
+    → FAILS at both ends: the cross is brighter than the glow it sits in,
+      which is the whole of the developer’s "no noticeable bloom".
+
+Both gates fail on `main` on their merits, not on a missing import.

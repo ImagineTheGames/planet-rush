@@ -1,0 +1,59 @@
+golden baselines — HEAD vs this working tree (a0-45)
+====================================================
+
+  gate: a pixel counts when its YIQ delta > 1409 (luma ≈ 52.8/255);
+        the suite fails over maxDiffPixelRatio 1%.
+
+  baseline                                               any px   by gate
+  desktop-build-wheel-desktop-linux.png                  83.44%    0.707%  moved, under the gate
+  desktop-build-wheel-hover-desktop-linux.png            83.37%    0.707%  moved, under the gate
+  desktop-build-wheel-short-desktop-linux.png            83.45%    0.707%  moved, under the gate
+  desktop-codex-desktop-linux.png                         0.02%    0.001%  moved, under the gate
+  desktop-doors-desktop-linux.png                         0.02%    0.000%  moved, under the gate
+  desktop-end-of-match-desktop-linux.png                  0.03%    0.004%  moved, under the gate
+  desktop-frozen-desktop-linux.png                       91.25%    0.771%  moved, under the gate
+  desktop-frozen-teams-desktop-linux.png                 16.35%    0.791%  moved, under the gate
+  desktop-hud-footer-desktop-linux.png                   95.23%    0.366%  moved, under the gate
+  desktop-hud-top-desktop-linux.png                      94.46%    0.632%  moved, under the gate
+  desktop-lobby-desktop-linux.png                         0.02%    0.000%  moved, under the gate
+  desktop-lobby-level-badge-desktop-linux.png             0.00%    0.000%  identical
+  desktop-lobby-teams-desktop-linux.png                   0.02%    0.000%  moved, under the gate
+  desktop-map-select-desktop-linux.png                    0.02%    0.000%  moved, under the gate
+  desktop-pause-confirm-desktop-linux.png                 0.00%    0.000%  identical
+  desktop-pause-desktop-linux.png                         0.00%    0.000%  identical
+  desktop-settings-desktop-linux.png                      1.10%    0.163%  moved, under the gate
+  desktop-ship-select-desktop-linux.png                   0.02%    0.000%  moved, under the gate
+  desktop-sky-coalsack-desktop-linux.png                 93.95%    0.909%  moved, under the gate
+  desktop-sky-deep-ember-desktop-linux.png               16.56%    0.809%  moved, under the gate
+  desktop-sky-plasma-reef-desktop-linux.png              16.39%    0.736%  moved, under the gate
+  desktop-title-desktop-linux.png                         0.18%    0.083%  moved, under the gate
+  desktop-upgrade-wheel-desktop-linux.png                83.34%    0.509%  moved, under the gate
+  desktop-upgrade-wheel-short-desktop-linux.png          83.53%    0.509%  moved, under the gate
+  phone-landscape-build-wheel-iphone-linux.png           80.92%    0.491%  moved, under the gate
+  phone-landscape-build-wheel-touch-iphone-linux.png     80.43%    0.491%  moved, under the gate
+  phone-landscape-codex-iphone-linux.png                  0.06%    0.012%  moved, under the gate
+  phone-landscape-doors-iphone-linux.png                  0.04%    0.007%  moved, under the gate
+  phone-landscape-frozen-iphone-linux.png                88.83%    0.575%  moved, under the gate
+  phone-landscape-frozen-teams-iphone-linux.png          13.95%    0.776%  moved, under the gate
+  phone-landscape-hud-top-iphone-linux.png               90.65%    0.459%  moved, under the gate
+  phone-landscape-lobby-iphone-linux.png                  0.04%    0.007%  moved, under the gate
+  phone-landscape-lobby-level-badge-iphone-linux.png      0.00%    0.000%  identical
+  phone-landscape-lobby-teams-iphone-linux.png            0.04%    0.007%  moved, under the gate
+  phone-landscape-map-select-iphone-linux.png             0.04%    0.005%  moved, under the gate
+  phone-landscape-pause-iphone-linux.png                  0.00%    0.000%  identical
+  phone-landscape-settings-iphone-linux.png               1.16%    0.189%  moved, under the gate
+  phone-landscape-ship-select-iphone-linux.png            0.04%    0.005%  moved, under the gate
+  phone-landscape-thumb-band-iphone-linux.png            87.71%    0.535%  moved, under the gate
+  phone-landscape-title-iphone-linux.png                  0.35%    0.178%  moved, under the gate
+  phone-landscape-upgrade-wheel-iphone-linux.png         81.32%    0.491%  moved, under the gate
+  phone-portrait-build-wheel-iphone-linux.png            81.33%    0.530%  moved, under the gate
+  phone-portrait-codex-iphone-linux.png                   0.06%    0.012%  moved, under the gate
+  phone-portrait-eliminated-iphone-linux.png              0.00%    0.000%  identical
+  phone-portrait-frozen-teams-iphone-linux.png           23.46%    0.774%  moved, under the gate
+  phone-portrait-lobby-iphone-linux.png                   0.04%    0.007%  moved, under the gate
+  phone-portrait-pause-iphone-linux.png                   0.00%    0.000%  identical
+  phone-portrait-settings-iphone-linux.png                1.16%    0.189%  moved, under the gate
+  phone-portrait-title-iphone-linux.png                   0.35%    0.178%  moved, under the gate
+  phone-portrait-upgrade-wheel-iphone-linux.png          81.74%    0.530%  moved, under the gate
+
+  43 of 50 baselines moved at all.

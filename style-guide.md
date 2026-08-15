@@ -69,6 +69,62 @@ the comparison the rule above actually makes. Space is black and the asteroids
 are grey. Do not add rim lighting, a contrast floor, or any other compensation
 for a problem that does not exist.
 
+### 1.2 The star field — a temperature, not a value ramp *(amended 2026-08-15, a0-45 — the design's own `starColor`; `src/art/mockup-reference.ts` `starColorFor`, `src/art/compliance.ts` `isStarColor`)*
+
+The sentence above — *"no seventh material colour enters the game without the
+Director"* — has exactly one exception, and this is it, written down as a
+decision rather than left to be rediscovered as a drift:
+
+> **A star in the backdrop's field is coloured by its own temperature, not by
+> its magnitude.** 78% of the field is blue-white, `rgb(160,205,255)` …
+> `rgb(178,209,233)`; 22% is amber, `rgb(235,201,149)` … `rgb(235,180,95)`.
+> Nothing else in the game may paint any of those colours.
+
+**Why it is here at all.** The star field's colour used to be a **value ramp on
+the magnitude** — dim steel → lit steel → white — and that ramp was derived from
+§1 rather than measured off the design the developer ratified. It was the one
+number in `mockup-reference.ts` taken from somewhere other than the design, in
+the file whose entire job is to *be* the design. Because magnitude is `u^2.35`,
+~78% of the sky sat in the bottom band at Y′ 135: a grey field, with no blue and
+no amber anywhere in it. The developer's fourth report on the star field is about
+exactly that, and the standing ruling is *"the mockup needs to translate to our
+game code in a way that it still looks exactly like the mockup, not close
+enough."* So the design's own two-branch `starColor` ships, and §1 records the
+widening instead of the art quietly absorbing it.
+
+Four hard limits travel with it, in the shape §2.1's do:
+
+1. **The star field only, and it is a set rather than a taste.**
+   `STAR_TEMPERATURE_COLORS` is the *enumerated image* of the design's own
+   function — every colour it can produce and no other. `compliance.ts` admits
+   them on paint role `material` of a `backdrop/` sprite and fails them
+   everywhere else as rule `star-only`, in CI, the same way yellow on a thruster
+   fails. A hull plate in star amber is a red build.
+2. **No RESERVED colour is touched.** Not one of these colours is signal yellow,
+   threat red, a declared shade of either, or a roster identity colour — asserted
+   per colour over the whole set. §2 and §2.2 are unchanged and unweakened.
+3. **A star is dimmer than it was, not brighter.** The old ramp's top band was
+   `WHITE`: its brightest point composited to Y′ 132, and the design's brightest
+   composites to **104**. Every halo stays under the rock body (Y′ 77.4), the
+   darkest large surface the fleet is drawn against, and under its own star.
+4. **It does not travel.** This licenses a temperature colour in the backdrop's
+   star field. It licenses nothing on a hull, a HUD, a menu, a particle, or the
+   sky wash itself.
+
+**Two questions ride with it, and they are the Director's, not Art's.** Both are
+one-line summaries of numbers pinned in `backdrop.test.ts`, which goes red if
+either drifts by a rounding:
+
+- **Blue is a player identity colour, and §1 says structure never takes one.**
+  On the composited pixel the brightest star clears ΔE 40 against all eight
+  roster hues and every signal except the owner beacon ring: **ΔE 39.0** (raw
+  ink 16.5). Size, value, motion and the field's own low alpha are what separate
+  them — not distance on the colour wheel.
+- **The amber 22% is the same question on the warm side.** It clears signal
+  yellow itself by ΔE 60.4, but comes within **ΔE 25.6** of `oreDeep`, the
+  shadowed facet of an ore body. It is the closest anything in the backdrop has
+  ever come to the colour §2 calls a controlled substance.
+
 ---
 
 ## 2. The RESERVED rule (the rule that carries the most weight)

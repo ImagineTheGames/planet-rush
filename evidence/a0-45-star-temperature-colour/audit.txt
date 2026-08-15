@@ -1,0 +1,60 @@
+a0-45 — stars take their colour from magnitude, and the design takes it from temperature
+==========================================================================================
+
+1. the design’s colours, against the magnitude ramp they replace
+   hot  temp  0.55  #b2d1e9  rgb(178,209,233)  Y′ 204.1  C* 16.1
+   hot  temp  1.00  #a0cdff  rgb(160,205,255)  Y′ 199.0  C* 29.3
+   cool temp -0.40  #ebc995  rgb(235,201,149)  Y′ 204.5  C* 30.8
+   cool temp -1.00  #ebb45f  rgb(235,180,95)  Y′ 185.6  C* 51.5
+   ramp mag ≥0.00   #7e8894  rgb(126,136,148)  Y′ 134.7  C* 7.7
+   ramp mag ≥0.45   #a5acb4  rgb(165,172,180)  Y′ 171.1  C* 5.0
+   ramp mag ≥0.80   #ffffff  rgb(255,255,255)  Y′ 255.0  C* 0.0
+   the whole temperature set: 117 distinct colours, Y′ 185.6–204.5
+   the ramp: 3 distinct colours, Y′ 134.7–255.0
+
+2. the field the shipping generator draws (one screenful, all three layers)
+   560 stars: 436 hot (77.9%), 124 cool (22.1%) — the design says 78 / 22
+   99 distinct star colours in one screenful
+   the ramp put 71.1% of the field in its bottom band (hullSteel, Y′ 135.4)
+
+3. peakP99, re-derived on the coloured field (the brief’s step 4)
+   the design’s panel, COLOURED   p99 40.36   mean 11.51   lift 2.43
+   the design’s panel, grey ramp  p99 46.42   mean 12.03   lift 2.94
+   the design’s declared band     46–53
+
+4. the two tensions the brief says to bring back as questions
+   a star’s point paints at α 0.08–0.5 on a disc r 0.4–2.45 px
+   the bluest star  #a0cdff  composites to Y′ 104.1  C* 18.5  (at α 0.5, over the ground)
+   the amberest     #ebb45f  composites to Y′ 97.3  C* 26.9
+   its halo         #a0cdff  peaks at Y′ 47.4 (α 0.2016, absolute)
+
+   ΔE from the composited star pixel (brightest star, α 0.5) to each thing that MEANS something:
+     beacon ring / plasma   #4dc3ff   blue ΔE  39.0   amber ΔE  75.8
+     ore, signal yellow     #f2d24b   blue ΔE  95.4   amber ΔE  60.4
+     oreDeep                #9b8836   blue ΔE  65.1   amber ΔE  25.6
+     coreHot                #f7e28a   blue ΔE  78.5   amber ΔE  52.6
+     threat red             #b23a3a   blue ΔE  67.6   amber ΔE  43.0
+     roster 1               #3d7bff   blue ΔE  59.9   amber ΔE 100.4
+     roster 2               #22d3c5   blue ΔE  55.6   amber ΔE  68.4
+     roster 3               #3dd68c   blue ΔE  77.6   amber ΔE  71.0
+     roster 4               #9b5de5   blue ΔE  67.5   amber ΔE  98.3
+     roster 5               #f15bb5   blue ΔE  69.4   amber ΔE  77.5
+     roster 6               #ff8a3d   blue ΔE  90.5   amber ΔE  54.0
+     roster 7               #dce3ec   blue ΔE  47.4   amber ΔE  57.8
+     roster 8               #5c6ce0   blue ΔE  52.1   amber ΔE  90.8
+
+   …and the INK itself, unfaded, which is what a widened allow-list admits:
+     beacon ring / plasma   #4dc3ff   blue ΔE  16.5   amber ΔE  92.9
+     ore, signal yellow     #f2d24b   blue ΔE  97.2   amber ΔE  23.8
+     oreDeep                #9b8836   blue ΔE  78.3   amber ΔE  24.6
+     coreHot                #f7e28a   blue ΔE  75.2   amber ΔE  20.7
+     threat red             #b23a3a   blue ΔE  85.5   amber ΔE  55.9
+     roster 1               #3d7bff   blue ΔE  57.2   amber ΔE 124.6
+     roster 2               #22d3c5   blue ΔE  48.3   amber ΔE  78.1
+     roster 3               #3dd68c   blue ΔE  76.6   amber ΔE  71.6
+     roster 4               #9b5de5   blue ΔE  68.7   amber ΔE 120.1
+     roster 5               #f15bb5   blue ΔE  72.6   amber ΔE  89.2
+     roster 6               #ff8a3d   blue ΔE  98.0   amber ΔE  30.4
+     roster 7               #dce3ec   blue ΔE  25.7   amber ΔE  58.2
+     roster 8               #5c6ce0   blue ΔE  54.3   amber ΔE 116.0
+
