@@ -72,11 +72,20 @@ re-baselining, so the goldens capture the merged render and not a stale one.
   4173 could be serving another lane's bundle. See
   `evidence/…/goldens-rebaseline.md`.
 
+**`58e6695` / `dcdde68` — the goldens.** 43 of 50 re-baselined at
+`maxDiffPixelRatio: 0` on a private port, every frame opened and read, all 43
+accounted for in `goldens-rebaseline.md`. Nothing is over the shipped gate (max
+0.909% against 1%), which is the point: at 0.01 this change can neither fail a
+golden nor re-baseline one. **Three inherited moves are named**: the build-hash
+watermark, the CODEX subtitle, and a0-30's settings defaults (MANUAL → AUTO-AIM,
+KEYBOARD + MOUSE → TAP COMMANDER) — the last verified in `src/main.ts` as a
+device-independent default rather than something this container sniffed. The
+baselines are their own commit so they can be dropped alone if CI's renderer
+disagrees.
+
 ## NEXT
 
-- Golden run finishing → look at every rewritten frame at size, write each one
-  up in `goldens-rebaseline.md`, run `golden-delta.mjs`, commit.
-- Full `npm test -- --run` and `npx tsc --noEmit` on the merged tree.
+- Full `npm test -- --run` and `npx tsc --noEmit` on the merged tree (running).
 - Push, open the PR with the two Director questions:
   **(1)** blue-white starlight vs the beacon ring `#4dc3ff` — ΔE 39.0 on the
   composited pixel, 16.5 on the raw ink, against the studio's ΔE 40 floor;

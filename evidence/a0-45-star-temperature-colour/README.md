@@ -125,3 +125,14 @@ star — two colour sources on one star, which is the thing a0-45 removes.
 
 The skies. a0-40's and a0-44's numbers are untouched, and the nebula structure in
 each `before`/`after` pair is identical — that is the check on it.
+
+## The goldens — `goldens-rebaseline.md`, `golden-delta.txt`
+
+The plates above are the *generator's* output. The golden baselines are the real
+build's, and 43 of the 50 were rewritten for this change:
+`goldens-rebaseline.md` carries the method (a0-41's — at the shipped
+`maxDiffPixelRatio: 0.01` this change can neither fail a golden nor re-baseline
+one, so the run is at 0 and the tolerance edit is not committed), every rewritten
+frame accounted for, and the three inherited moves that ride along with them.
+`golden-delta.txt` prices all 50 by Playwright's own rule; nothing is over the
+gate. `playwright.a045.config.ts` is the private-port config the run used.
