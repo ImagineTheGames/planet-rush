@@ -1560,70 +1560,176 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
    * It is item 3 on the ranked cut list (GDD §4.9), unlike the SFX and the alarm
    * either side of it, which are mechanics. Built to be cuttable: nothing else
    * in the mix depends on it.
+   *
+   * ## Why it was rebuilt (a0-48, 2026-08-14)
+   *
+   * The developer, on the shipped bed: *"when i press play im immediately greeted
+   * by this background sound that is deep and i dont see it anywhere in the
+   * board... its annoying."* It **is** on the board — slot 26 — and they had
+   * already denied it on 2026-08-07 with the deny-all reason; nothing was briefed
+   * to replace it, so the denied sound was still what shipped. The sentence three
+   * paragraphs up is the requirement it failed, and it is not a matter of taste:
+   * noticed in the first second is the opposite of never noticed twice.
+   *
+   * What it was made of says why. Four layers, every one of them `attack: 0`,
+   * `hold: 8`, `decay: 0` — a bare 55 Hz sine at `gain: 0.3` with a second one
+   * beating against it, a tonal fifth above, and a hiss. Held pitch, no filter
+   * movement anywhere, and full level on sample zero. That is a0-01 round 2's
+   * finding — *"a stack of unfiltered sines with a linear decay is a
+   * glockenspiel"* — applied to a sustained tone: a test tone standing in for a
+   * room. So the rebuild changes what the bed is made of rather than transposing
+   * it, exactly as round 2 did to the struck voices:
+   *
+   *  - **The pitch centre stays at A1 (55 Hz), and shrinks.** The soundtrack is
+   *    written in A minor *against* this note (see `musicBed` below), so moving it
+   *    would re-tune the score by a side effect. It keeps the pitch and loses more
+   *    than half the level: what a player hears as "deep" is this layer, and a bed
+   *    is a place rather than a note.
+   *  - **The tonal fifth is gone.** The spec says *no melody*, and a fifth over the
+   *    root is the one interval in here a listener can name. It is replaced by air.
+   *  - **The movement is in the filters, not in the pitch** — three slow `tide`
+   *    swells whose corners travel while their pitch stands still (`./synth`
+   *    {@link VoiceSpec.lowPassEnd}: a machine losing or gaining energy, which is
+   *    the register §4.7 asks for; a pitch that slid would be the chirp it retires).
+   *    Staggered so their swells overlap rather than breathing together, which is
+   *    what makes fifteen minutes of it survivable.
+   *  - **Nothing arrives.** Every layer fades in. The sustained ones do it inside
+   *    the crossfade (below); the tides swell over two to three seconds each.
+   *
+   * ## The arithmetic, written down so an edit keeps it
+   *
+   *  - **The body is 10 s and every layer ends inside it.** `renderLayered` sizes
+   *    the buffer to the *latest* layer, so a swell that ran past the sustained
+   *    voices would leave a silent gap at the end of every lap. The sustained
+   *    layers are therefore `attack + hold = 10` exactly, and each tide's
+   *    `at + attack + hold + decay ≤ 10`.
+   *  - **A fade-in on a sustained layer must fit inside `crossfade`.** `seamless`
+   *    joins the body's tail onto its head, so a head that is still ramping is
+   *    heard as a dip once per lap — the definition of a bed you notice twice. The
+   *    swells are the layers that fade in slowly, and they are the ones that decay
+   *    away before the seam. `audio.test.ts` holds both halves.
+   *  - **55.0 and 55.2 Hz both complete whole cycles in 10 s** (550 and 552), so
+   *    the two sines and their 0.2 Hz beat — one full beat every 5 s, the "slow
+   *    beat" of the spec, slower than the 0.35 Hz it replaces — are continuous
+   *    across the loop point rather than relying on the crossfade to hide a step.
+   *
+   * The first layer names its filter before its envelope, which is not the field
+   * order the rest of this file uses. That is deliberate and it is the one place
+   * it happens: `ambient.floor` is the voice the complaint was about, so the first
+   * thing it says about itself should be that something was done to it.
+   *
+   * The bed's *arrival* is the other half of the complaint and is not in here:
+   * `./engine` starts this loop at silence and ramps it up over
+   * {@link AMBIENT_FADE_IN_S}. See that constant for where the loop starts, and
+   * the a0-48 note for why "greeted immediately" is partly a placement question.
    */
   [SOUND.ambient]: {
     name: 'ambient',
     loop: true,
-    crossfade: 0.6,
+    crossfade: 0.9,
     layers: [
       {
         spec: {
-          name: 'ambient.bed',
+          name: 'ambient.floor',
           wave: 'sine',
-          attack: 0,
-          hold: 8,
-          decay: 0,
           freq: 55,
-          vibratoDepth: 0.004,
-          vibratoRate: 0.125,
-          gain: 0.3,
+          lowPass: 130,
+          resonance: 1.2,
+          noiseMix: 0.03,
+          attack: 0.4,
+          hold: 9.6,
+          decay: 0,
+          gain: 0.12,
           seed: 0x0d12,
         },
       },
       {
-        // Detuned a hair from the bed: the two drift in and out of phase over
-        // several seconds, which is the whole "slow beat" and costs one voice.
+        // Detuned a fifth of a hertz from the floor: the two drift in and out of
+        // phase over five seconds, which is the whole "slow beat" and costs one
+        // voice. 55.2 Hz is chosen so the beat closes exactly twice per lap.
         spec: {
-          name: 'ambient.detune',
+          name: 'ambient.drift',
           wave: 'sine',
-          attack: 0,
-          hold: 8,
+          freq: 55.2,
+          lowPass: 120,
+          resonance: 1.1,
+          noiseMix: 0.03,
+          attack: 0.4,
+          hold: 9.6,
           decay: 0,
-          freq: 55.35,
-          gain: 0.22,
+          gain: 0.09,
           seed: 0x0d13,
         },
       },
       {
+        // The room the station is in: filtered noise with a hull tone in it, low
+        // enough to read as air rather than as hiss. This is what the retired
+        // tonal fifth was taking up space that belonged to.
         spec: {
-          name: 'ambient.fifth',
-          wave: 'triangle',
-          attack: 0,
-          hold: 8,
-          decay: 0,
-          freq: 82.5,
-          vibratoDepth: 0.003,
-          vibratoRate: 0.0833,
-          lowPass: 700,
-          gain: 0.12,
-          seed: 0x0d14,
-        },
-      },
-      {
-        // Vacuum hiss, way down. Gives the bed an air so it is not a test tone.
-        spec: {
-          name: 'ambient.wash',
+          name: 'ambient.air',
           wave: 'noise',
-          attack: 0,
-          hold: 8,
+          attack: 0.5,
+          hold: 9.5,
           decay: 0,
-          freq: 40,
-          lowPass: 320,
-          resonance: 1.6, // a hull tone in the hiss — a place, not a noise floor
-          highPass: 40,
-          gain: 0.085,
+          freq: 60,
+          lowPass: 240,
+          resonance: 1.8,
+          highPass: 50,
+          gain: 0.095,
           seed: 0x0d15,
         },
+      },
+      // The three tides. Slow swells with the corner travelling across them, each
+      // gone before the next is at full — the movement that keeps the bed from
+      // being a held pitch, at a level where it is felt rather than followed.
+      swept('ambient.tide.open', {
+        wave: 'noise',
+        freq: 90,
+        from: 170,
+        to: 520,
+        q: 2.2,
+        gain: 0.075,
+        attack: 2.6,
+        hold: 0.4,
+        decay: 3.5,
+        curve: 1.6,
+        at: 0,
+        seed: 0x0d16,
+      }),
+      swept('ambient.tide.close', {
+        wave: 'noise',
+        freq: 140,
+        from: 600,
+        to: 190,
+        q: 2.6,
+        gain: 0.065,
+        attack: 2.2,
+        hold: 0.3,
+        decay: 3.5,
+        curve: 1.8,
+        at: 3.4,
+        seed: 0x0d17,
+      }),
+      {
+        // The one narrow band in the bed — a single partial of the hull breathing,
+        // band-passed so it is made of the material rather than of a tone. It
+        // lands last and dies exactly on the loop point.
+        spec: {
+          name: 'ambient.tide.band',
+          wave: 'noise',
+          attack: 2,
+          hold: 0.4,
+          decay: 3,
+          decayCurve: 1.5,
+          freq: 210,
+          lowPass: 300,
+          lowPassEnd: 165,
+          resonance: 6,
+          bandPass: true,
+          gain: 0.15,
+          seed: 0x0d18,
+        },
+        at: 4.6,
       },
     ],
   },

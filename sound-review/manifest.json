@@ -686,24 +686,25 @@
       "current": "previews/ambient/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/ambient/a.wav",
-          "character": "hull grain, distant particulate",
-          "params": "src/art/audio/candidates.ts#ambient.a"
+          "id": "d",
+          "wav": "previews/ambient/d.wav",
+          "character": "far hull, air with no low end",
+          "params": "src/art/audio/candidates.ts#ambient.d"
         },
         {
-          "id": "b",
-          "wav": "previews/ambient/b.wav",
-          "character": "a low pressure swell, slow and deep",
-          "params": "src/art/audio/candidates.ts#ambient.b"
+          "id": "e",
+          "wav": "previews/ambient/e.wav",
+          "character": "a slow tide, only the filters move",
+          "params": "src/art/audio/candidates.ts#ambient.e"
         },
         {
-          "id": "c",
-          "wav": "previews/ambient/c.wav",
-          "character": "resonant hull, one band breathing",
-          "params": "src/art/audio/candidates.ts#ambient.c"
+          "id": "f",
+          "wav": "previews/ambient/f.wav",
+          "character": "a low room with a slow pulse",
+          "params": "src/art/audio/candidates.ts#ambient.f"
         }
-      ]
+      ],
+      "fourthOption": "None of the three: ship the bed OFF by default, with a settings toggle for anyone who wants it. It is item 3 on the GDD §4.9 cut list and nothing else in the mix depends on it, so this is a legitimate verdict rather than a failure — a bed nobody notices and a bed that is absent are close cousins, and one of them cannot annoy anybody. Reply `ambient: off` to take it."
     },
     {
       "id": "musicBed",

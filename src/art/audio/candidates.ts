@@ -41,6 +41,14 @@
  *    `matchEnd`, `musicWin` or `musicLoss` — those are three of the forty the
  *    developer denied, so a satisfying sound taken from them is one that has
  *    already been rejected. Board goes 40 slots → 44.
+ *  - **ambient (a0-48).** The one slot whose denial was never actioned, re-offered
+ *    a week later after the developer met the still-shipping bed in play: *"when i
+ *    press play im immediately greeted by this background sound that is deep…
+ *    its annoying."* Unlike every round above it, this one does **not** re-offer in
+ *    place under `a`/`b`/`c` — those three letters carry a live `deny-all` in
+ *    `/status/sound-choices.json`, and a new take filed under a denied letter makes
+ *    that record unreadable. The offers are `d`, `e`, `f`, and the slot also carries
+ *    a {@link CandidateSlot.fourthOption}: ship the bed off by default.
  *  - **All 40 slots (a0-01b).** The developer pressed **DENY ALL** on every slot on
  *    the board, and the board promises *"generate 3 new options"* on that press. This
  *    file is that generation: `a`, `b`, `c` are new everywhere, in the amended §4.7
@@ -164,7 +172,16 @@ function returns(
 
 /** One candidate voice for a slot: an id, a short character label, and the spec itself. */
 export interface SoundCandidate {
-  /** Stable id within the slot — always 'a' | 'b' | 'c'. */
+  /**
+   * Stable id within the slot — a single letter, and the whole of how a verdict
+   * names an offer (`/status/sound-choices.json` records `{"verdict": "b"}`).
+   *
+   * Usually `a`/`b`/`c`. A slot that carries a **live verdict on a letter** does
+   * not re-offer under that letter: `ambient` was denied on 2026-08-07 and offers
+   * `d`/`e`/`f` (a0-48), because a second take filed under `a` would make the
+   * standing record unreadable — nobody could tell which take the deny was aimed
+   * at. `./candidates.test.ts` holds that.
+   */
   readonly id: string;
   /** 3-5 word description of the character, for the review page. */
   readonly character: string;
@@ -180,8 +197,20 @@ export interface CandidateSlot {
   readonly context: string;
   /** The shipped {@link SoundName} this slot proposes alternatives for (its "current"). */
   readonly current: SoundName;
-  /** Exactly three candidates, ids 'a' | 'b' | 'c'. */
+  /** Exactly three candidates, one letter each ({@link SoundCandidate.id}). */
   readonly candidates: readonly SoundCandidate[];
+  /**
+   * A fourth answer this slot is allowed to come back with, in the developer's
+   * hands rather than this lane's — written through to the review manifest so it
+   * reads on the page beside the three voices.
+   *
+   * Only `ambient` has one (a0-48): the bed is item 3 on the GDD §4.9 ranked cut
+   * list and nothing in the mix depends on it, so *"ship it off by default, with
+   * a toggle"* is a real outcome and not a failure to design one. A slot that is
+   * a **mechanic** — every SFX, the alarm — can never carry this field, because
+   * "cut it" is not on the table for a mechanic (§2.2, §4.9).
+   */
+  readonly fourthOption?: string;
 }
 
 /** The slots, in bank order — the order the review page walks. */
@@ -1468,53 +1497,102 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
   //   c  **wide detuned space** — unisons beating against each other, with metal in
   //      the smear and a room behind it
   //
-  // None of the looping offers names a `lowPassEnd`, for the reason the thruster
-  // comment gives: a filter sweep inside a loop body wraps at the loop rate.
+  // None of the looping offers names a `lowPassEnd` on a **sustained** layer, for
+  // the reason the thruster comment gives: a corner travelling across a loop body
+  // snaps back at the seam, once per lap, forever. `d`–`f` below do sweep — on
+  // voices that have decayed to silence *before* the seam, which is the case the
+  // rule was never about: a gesture that finishes has nothing left to snap.
+  //
+  // ---------------------------------------------------------------------------
+  // ROUND 3, and only on this slot (a0-48, 2026-08-14)
+  // ---------------------------------------------------------------------------
+  //
+  // The developer, on the SHIPPED bed: *"when i press play im immediately greeted
+  // by this background sound that is deep and i dont see it anywhere in the
+  // board... its annoying."* It was on the board — this slot — and they denied it
+  // on 2026-08-07 with the deny-all reason; nothing was briefed to replace it, so
+  // the denied sound was still playing a week later. `./bank` is rebuilt in the
+  // same commit series; these are the offers that let the developer pick by ear.
+  //
+  // **The ids are `d`, `e`, `f` and the denied `a`/`b`/`c` are gone.** A letter is
+  // how a verdict is recorded (`/status/sound-choices.json` holds `{"verdict":
+  // "b"}` per slot), so re-offering under a denied letter makes the record
+  // ambiguous forever: nobody reading it later can tell whether `deny-all` on
+  // 2026-08-07 was aimed at the take that is in the file today. Every other slot
+  // re-offers in place under a/b/c because none of them has a *live* verdict this
+  // one has to be told apart from.
+  //
+  // The axis is not material this time — it is **how much bed there is at all**,
+  // because that is what the complaint is about:
+  //
+  //   d  **almost nothing** — air and a far room, no low end whatsoever. The
+  //      complaint is "deep"; this one answers it by having no depth to notice.
+  //   e  **movement without a note** — no steady level anywhere: overlapping
+  //      swells with the corners travelling, a floor barely there under them.
+  //   f  **a felt low pulse** — keeps a low centre and a slow beat, the incumbent's
+  //      own idea built out of the round-2 instrument instead of held sines.
+  //
+  // **And there is a fourth answer, which is none of them.** The bed is item 3 on
+  // the GDD §4.9 ranked cut list and this file's own note says it was built to be
+  // cuttable — nothing else in the mix depends on it. *Ship it off by default,
+  // with a settings toggle* is a legitimate verdict on this slot, not a failure:
+  // a bed nobody notices and a bed that is absent are close cousins, and one of
+  // them cannot annoy anybody. It is recorded in `sound-review/manifest.json` as
+  // this slot's `fourthOption` so it reads on the review page beside the three,
+  // and it is the developer's call, not this lane's.
   ambient: {
     label: "Ambient Bed",
     context: "The constant background loop during ordinary play — must vanish into the background over ~15 minutes.",
     current: 'ambient',
+    fourthOption:
+      "None of the three: ship the bed OFF by default, with a settings toggle for anyone who wants it. " +
+      "It is item 3 on the GDD §4.9 cut list and nothing else in the mix depends on it, so this is a " +
+      "legitimate verdict rather than a failure — a bed nobody notices and a bed that is absent are " +
+      "close cousins, and one of them cannot annoy anybody. Reply `ambient: off` to take it.",
     candidates: [
       {
-        id: 'a',
-        character: "hull grain, distant particulate",
+        id: 'd',
+        character: "far hull, air with no low end",
         spec: {
-          name: 'ambient_a_hullGrain',
-          loop: true,
-          crossfade: 0.7,
-          layers: [
-            place({ name: 'ambient_a.grit', wave: 'noise', attack: 0, hold: 9, decay: 0, freq: 320, lowPass: 900, resonance: 3.2, gain: 0.24, seed: 33000 }),
-            place({ name: 'ambient_a.dust', wave: 'noise', attack: 0, hold: 9, decay: 0, freq: 140, lowPass: 380, resonance: 2.2, highPass: 90, gain: 0.18, seed: 33001 }),
-            place({ name: 'ambient_a.floor', wave: 'sine', attack: 0, hold: 9, decay: 0, freq: 55, gain: 0.14, seed: 33002 }),
-          ],
-        },
-      },
-      {
-        id: 'b',
-        character: "a low pressure swell, slow and deep",
-        spec: {
-          name: 'ambient_b_pressureSwell',
+          name: 'ambient_d_farHull',
           loop: true,
           crossfade: 0.8,
           layers: [
-            place({ name: 'ambient_b.mass', wave: 'triangle', attack: 0, hold: 10, decay: 0, freq: 55, vibratoDepth: 0.02, vibratoRate: 0.03, noiseMix: 0.08, lowPass: 190, resonance: 2.6, gain: 0.34, seed: 33010 }),
-            place({ name: 'ambient_b.under', wave: 'sine', attack: 0, hold: 10, decay: 0, freq: 41.2, gain: 0.2, seed: 33011 }),
-            place({ name: 'ambient_b.air', wave: 'noise', attack: 0, hold: 10, decay: 0, freq: 30, lowPass: 150, resonance: 1.6, gain: 0.08, seed: 33012 }),
+            place({ name: 'ambient_d.air', wave: 'noise', attack: 0.6, hold: 9.4, decay: 0, freq: 320, lowPass: 900, resonance: 2.2, highPass: 220, gain: 0.09, seed: 33030 }),
+            place({ name: 'ambient_d.room', wave: 'noise', attack: 0.6, hold: 9.4, decay: 0, freq: 90, lowPass: 260, resonance: 2.4, highPass: 120, gain: 0.07, seed: 33031 }),
+            place({ name: 'ambient_d.pass', wave: 'noise', attack: 3, hold: 0.5, decay: 4, decayCurve: 1.4, freq: 480, lowPass: 520, lowPassEnd: 300, resonance: 7, bandPass: true, gain: 0.1, seed: 33032 }, 1.2),
           ],
         },
       },
       {
-        id: 'c',
-        character: "resonant hull, one band breathing",
+        id: 'e',
+        character: "a slow tide, only the filters move",
         spec: {
-          name: 'ambient_c_bandBreathing',
+          name: 'ambient_e_slowTide',
           loop: true,
-          crossfade: 0.7,
+          crossfade: 0.9,
           layers: [
-            place({ name: 'ambient_c.band', wave: 'noise', attack: 0, hold: 9, decay: 0, freq: 220, lowPass: 470, resonance: 10, bandPass: true, gain: 0.4, seed: 33020 }),
-            place({ name: 'ambient_c.beat', wave: 'triangle', attack: 0, hold: 9, decay: 0, freq: 110, vibratoDepth: 0.004, vibratoRate: 0.07, noiseMix: 0.1, lowPass: 620, resonance: 5, gain: 0.2, seed: 33021 }),
-            place({ name: 'ambient_c.beat2', wave: 'triangle', attack: 0, hold: 9, decay: 0, freq: 110.7, noiseMix: 0.1, lowPass: 620, resonance: 5, gain: 0.16, seed: 33022 }),
-            place({ name: 'ambient_c.floor', wave: 'sine', attack: 0, hold: 9, decay: 0, freq: 55, gain: 0.12, seed: 33023 }),
+            place({ name: 'ambient_e.under', wave: 'sine', attack: 0.5, hold: 9.5, decay: 0, freq: 55, noiseMix: 0.02, lowPass: 110, resonance: 1, gain: 0.09, seed: 33040 }),
+            swept('ambient_e.rise', { wave: 'noise', freq: 70, from: 150, to: 700, q: 2, gain: 0.075, attack: 3.2, hold: 0.3, decay: 3.5, curve: 1.5, at: 0, seed: 33041 }),
+            swept('ambient_e.fall', { wave: 'noise', freq: 120, from: 780, to: 170, q: 2.4, gain: 0.065, attack: 2.8, hold: 0.3, decay: 3.6, curve: 1.7, at: 3.3, seed: 33042 }),
+            place({ name: 'ambient_e.ring', wave: 'noise', attack: 2.4, hold: 0.4, decay: 3.2, decayCurve: 1.6, freq: 300, lowPass: 340, lowPassEnd: 200, resonance: 8, bandPass: true, gain: 0.11, seed: 33043 }, 4),
+          ],
+        },
+      },
+      {
+        id: 'f',
+        character: "a low room with a slow pulse",
+        spec: {
+          name: 'ambient_f_lowPulse',
+          loop: true,
+          crossfade: 0.9,
+          layers: [
+            // 55 and 55.25 Hz both close whole cycles in a 12 s body (660 and 663),
+            // so the beat is continuous across the seam instead of stepping there.
+            place({ name: 'ambient_f.low', wave: 'sine', attack: 0.5, hold: 11.5, decay: 0, freq: 55, noiseMix: 0.04, lowPass: 100, resonance: 1.4, gain: 0.13, seed: 33050 }),
+            place({ name: 'ambient_f.beat', wave: 'sine', attack: 0.5, hold: 11.5, decay: 0, freq: 55.25, noiseMix: 0.03, lowPass: 95, resonance: 1.3, gain: 0.1, seed: 33051 }),
+            place({ name: 'ambient_f.metal', wave: 'noise', attack: 0.7, hold: 11.3, decay: 0, freq: 165, lowPass: 210, resonance: 9, bandPass: true, gain: 0.06, seed: 33052 }),
+            swept('ambient_f.pulse', { wave: 'noise', freq: 60, from: 120, to: 260, q: 3, gain: 0.07, attack: 3.5, hold: 0.5, decay: 4, curve: 1.4, at: 2, seed: 33053 }),
           ],
         },
       },

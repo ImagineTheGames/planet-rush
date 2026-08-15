@@ -49,6 +49,7 @@ import {
 } from './context';
 import {
   ALARM_DUCK_S,
+  AMBIENT_FADE_IN_S,
   AudioEngine,
   EARSHOT_FAR,
   EARSHOT_NEAR,
@@ -753,12 +754,18 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
     // them. `noise` is excluded by construction — filtered noise is the register,
     // not a shortcut out of it (s7-01 §5.2).
     //
-    // The exemptions are the six places a pure tone genuinely IS the design: the
+    // The exemptions are the four places a pure tone genuinely IS the design: the
     // sustained drones that run for minutes under everything else. A drone is the
     // opposite of a struck note and grain on one is an artefact, not a texture.
+    //
+    // It used to be six. `ambient.bed` and `ambient.detune` claimed exactly this
+    // exemption — "a player must never notice it twice" — and the developer
+    // noticed the pair in the first second of a match (a0-48). Two bare 55 Hz
+    // sines are a test tone whatever a comment says they are, so the bed was
+    // rebuilt out of the round-2 instrument and neither voice needs the carve-out
+    // any more. The four below are the soundtrack's, and none of them has been
+    // complained about; they stay on the same terms, with the same written reason.
     const SUSTAINED_DRONES: Readonly<Record<string, string>> = {
-      'ambient.bed': 'Cold Vacuum, fifteen minutes long — a player must never notice it twice',
-      'ambient.detune': 'detuned a hair from the bed; the two beating IS the ambience',
       'musicBed.third': 'the minor third that makes the soundtrack an ache and not a pad',
       'musicBed.fifth': 'the drone the theme sits on; anything in it would be heard as a fault',
       'musicDread.clash': 'a semitone beating against the low — the unease, and it costs one voice',
@@ -840,6 +847,70 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
     expect(swept.length, 'no filter sweeps in the bank — the register is not there').toBeGreaterThanOrEqual(20);
     expect(resonant.length, 'nothing in the bank resonates — every filter is flat').toBeGreaterThanOrEqual(40);
     expect(metallic.length, 'no metallic band-pass transients anywhere').toBeGreaterThanOrEqual(8);
+  });
+
+  it('the ambient bed is not a bare held tone', () => {
+    // **The bug report, as a property.** The developer, 2026-08-14: *"when i press
+    // play im immediately greeted by this background sound that is deep and i dont
+    // see it anywhere in the board... its annoying"* — and the bed's own spec, in
+    // `./bank`, is *"this plays for fifteen minutes and must never become something
+    // a player notices twice."* It was noticed in the first second, so the spec is
+    // the requirement that failed, not a matter of taste.
+    //
+    // What failed it is visible in the numbers: four layers of `wave: 'sine'` /
+    // `attack: 0` / `hold: 8` / `decay: 0`, one of them a bare 55 Hz sine. That is
+    // a0-01 round 2's finding — *"a stack of unfiltered sines with a linear decay
+    // is a glockenspiel"* — applied to a sustained tone: held pitch, no movement,
+    // no filter, and an onset at the very first sample.
+    //
+    // Both halves are asserted, because either alone is gameable (LESSONS §26): a
+    // filter with a zero attack still arrives as an event, and a fade-in on a bare
+    // sine is still a test tone. The properties, not a number equal to itself.
+    const spec = soundSpec(SOUND.ambient);
+    expect(isLayered(spec), 'the bed is a single voice — it cannot be a bed').toBe(true);
+    if (!isLayered(spec)) return;
+    const layers = spec.layers;
+    const crossfade = spec.crossfade ?? 0.04;
+
+    for (const { spec: v } of layers) {
+      // Half one: made of something. A bed that is never noticed twice is made of
+      // movement and filtering — the four capabilities `./synth` grew in round 2 —
+      // and not of a pitch being held at a level.
+      const moves =
+        (v.decayCurve ?? 0) > 0 ||
+        (v.lowPassEnd !== undefined && v.lowPassEnd !== v.lowPass) ||
+        v.bandPass === true ||
+        (v.resonance ?? 0) > 0;
+      expect(
+        moves,
+        `ambient/${v.name} is a held pitch: no decayCurve, no lowPassEnd, no bandPass, no resonance`,
+      ).toBe(true);
+
+      // Half two: nothing in it arrives. `attack: 0` starts a voice at full level
+      // on sample zero, which is an *event* — the thing a bed must never be.
+      expect(v.attack, `ambient/${v.name} arrives at full level on its first sample`).toBeGreaterThan(0);
+    }
+
+    // The bed genuinely breathes rather than merely avoiding a click: at least one
+    // voice swells over seconds. A 2 ms click-guard on every layer would satisfy
+    // the clause above and change nothing anybody hears.
+    const swells = layers.filter((l) => l.spec.attack >= 1);
+    expect(swells.length, 'nothing in the bed swells — every attack is a click-guard').toBeGreaterThanOrEqual(1);
+
+    // And a swell is only allowed where it cannot become a pulse once per lap. A
+    // voice still sounding at the body's edges (`decay: 0`) has its head crossfaded
+    // onto its own tail by `synth.seamless`, so an attack longer than that
+    // crossfade is heard as a dip every lap — which is the definition of a bed a
+    // player notices twice. Swells therefore belong to voices that decay away
+    // inside the body; sustained voices get a click-guard and no more.
+    for (const { spec: v } of layers) {
+      if (v.decay > 0) continue;
+      expect(
+        v.attack,
+        `ambient/${v.name} is sustained across the loop seam but fades in over ${v.attack}s — ` +
+          `longer than the ${crossfade}s crossfade, so it dips once per lap`,
+      ).toBeLessThanOrEqual(crossfade);
+    }
   });
 
   it('keeps the shipped mining voice under the tone the developer ratified (s4-01, s7-01)', () => {
@@ -2124,6 +2195,26 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
     // The numbers still run: the alarm state machine is not an audio feature.
     expect(engine.alarm.active).toBe(true);
     expect(engine.playCount).toBe(0);
+    engine.dispose();
+  });
+
+  it('opens the ambient bed at silence and fades it up, so it never arrives (a0-48)', () => {
+    // *"when i press play im immediately greeted by this background sound"* — the
+    // other half of a0-48, and the half that is not in the voice. The bed is the
+    // one loop in the mix that is never an event, so it may not have an onset at
+    // any level: the source starts at gain 0 and is ramped, never assigned.
+    const { ctx, engine } = engineOn({ music: false });
+    const source = ctx.sources.find((s) => s.loop);
+    expect(source, 'the bed did not start at all').toBeDefined();
+    const node = source!.outputs[0] as FakeGain;
+    expect(node.gain.value, 'the bed opens at a level — that is an onset').toBe(0);
+    const ramp = node.gain.events.find((e) => e.kind === 'ramp' && e.value === 1);
+    expect(ramp, 'the bed jumps to full instead of ramping').toBeDefined();
+    // And the ramp is long enough to be a fade rather than a fast open. Asserted
+    // against the constant so the two cannot drift, and against a floor so the
+    // constant cannot be quietly turned back down to something audible as a start.
+    expect(ramp!.time - ctx.currentTime).toBeCloseTo(AMBIENT_FADE_IN_S, 5);
+    expect(AMBIENT_FADE_IN_S, 'a bed that reaches full this fast is heard arriving').toBeGreaterThanOrEqual(4);
     engine.dispose();
   });
 
