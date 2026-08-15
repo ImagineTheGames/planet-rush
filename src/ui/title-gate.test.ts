@@ -34,6 +34,7 @@ import {
   TitleGate,
   doorBox,
   fieldAnimates,
+  gateEnabled,
   gateVars,
   insidePolygon,
   makeStars,
@@ -1079,5 +1080,34 @@ describe('what is behind the door cannot be operated through it', () => {
     dom.advance(GATE_OPEN_STEPS[GATE_OPEN_STEPS.length - 1]!.at);
     dom.listeners?.escape();
     expect(g.current).toBe('returning');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// `?gate=0` — THE HARNESS'S WAY PAST A DOOR BUILT TO BE OPERATED
+// ---------------------------------------------------------------------------
+
+describe('?gate=0', () => {
+  it('is off by default, and has to be asked for by name', () => {
+    // The default is the product: a clean boot gets the door. Every one of these
+    // is a boot a player could make, and none of them may lose it.
+    for (const search of ['', '?', '?debug=1', '?gate=1', '?gate=', '?gates=0', '?ugate=0']) {
+      expect(gateEnabled(search), `"${search}" should still build the door`).toBe(true);
+    }
+    for (const search of ['?gate=0', 'gate=0', '?debug=1&gate=0', '?gate=0&freeze=1']) {
+      expect(gateEnabled(search), `"${search}" should skip the door`).toBe(false);
+    }
+  });
+
+  it('turns off this screen and nothing else', () => {
+    // The narrowness is the point, and it is what separates this from `?debug=1`:
+    // a spec that opts out still boots the real menu, the real doors and the real
+    // lobby — it just does not have to press through a door on the way. So the
+    // flag is read at the MOUNT, not inside the screen, and a gate handed one
+    // behaves exactly as a gate always has.
+    const source = readFileSync(resolve(__dirname, 'title-gate.ts'), 'utf8');
+    const body = source.slice(source.indexOf('export class TitleGate'));
+    expect(body).not.toContain('gateEnabled');
+    expect(body).not.toContain('location.search');
   });
 });

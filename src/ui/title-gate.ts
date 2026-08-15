@@ -1086,6 +1086,39 @@ export interface GateQuality {
   sample(seconds: number): boolean;
 }
 
+// ---------------------------------------------------------------------------
+// 7b. `?gate=0` — the harness's way past a door built to be operated
+// ---------------------------------------------------------------------------
+
+/**
+ * Is the door built on this boot? `?gate=0` says no.
+ *
+ * **Why a screen ships with its own off switch.** A door is a thing a person
+ * operates, and roughly thirty automated specs walk through the front door on
+ * their way somewhere else — the mobile-emulation suite's goldens, the layout
+ * and centering passes, the landscape lock, every live-stage flow. None of them
+ * is about this screen; all of them boot at `/`, read `window.__mainMenu` and
+ * click where it says a plate is drawn. Put a sealed door in front of that and
+ * every one of them presses the door instead, then waits out four beats it was
+ * never told about — on a software-GL runner at ~1 fps, which is where this
+ * suite gates.
+ *
+ * The alternative was teaching thirty specs across four owners to open a door,
+ * paid for on every boot, forever. This is the same bargain `?debug=1` already
+ * strikes for the whole menu, and it is deliberately the *narrow* one: it turns
+ * off this screen and nothing else, so a spec that opts out still boots the real
+ * menu, the real doors and the real lobby.
+ *
+ * **It is not a way to ship the door off.** The default is on, and the flag has
+ * to be asked for by name. What a harness gives up by asking is coverage of this
+ * screen, which is why the gate's own frame cost is measured *with* the door in
+ * `tests/mobile/menu-frame-cost.spec.ts` rather than left to whoever notices.
+ */
+export function gateEnabled(search: string): boolean {
+  const query = search.startsWith('?') ? search.slice(1) : search;
+  return new URLSearchParams(query).get('gate') !== '0';
+}
+
 /** Everything the gate is wired to. */
 export interface TitleGateOptions {
   readonly dom: GateDom;

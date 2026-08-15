@@ -226,9 +226,14 @@ async function measure(page: Page): Promise<Array<FitCase & { drawn: number }>> 
   }, CASES);
 }
 
-/** Boot the clean (non-debug) build and wait for the menu and the fonts. */
+/** Boot the clean (non-debug) build and wait for the menu and the fonts.
+ *
+ *  `?gate=0` because this walks through the front door on its way somewhere
+ *  else, and the title gate (a0-50) is a DOOR — a thing a person operates. The
+ *  flag turns off that screen and nothing else: the menu, the doors and the
+ *  lobby below are the real ones. See `src/ui/title-gate.ts` `gateEnabled`. */
 async function bootMenu(page: Page): Promise<void> {
-  await page.goto('/');
+  await page.goto('/?gate=0');
   await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
   await page.waitForFunction(
     () => {

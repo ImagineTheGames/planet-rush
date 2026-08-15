@@ -325,6 +325,7 @@ import {
   // above it.
   TitleGate,
   browserGateDom,
+  gateEnabled,
 } from './ui';
 import type {
   HudFrame,
@@ -1003,8 +1004,13 @@ async function boot(): Promise<void> {
   //        four slots are the ratified bank's (`art/audio/ui-cues`), not a
   //        second synthesiser: the design file ships one, and two engines would
   //        mean two tone contracts and a tone audit that measures one of them.
+  //      - **`?gate=0` gets no door either**, and for a different reason than
+  //        `?debug=1`: those harnesses DO want the real menu, the real doors and
+  //        the real lobby — they just walk through the front door on their way
+  //        somewhere else, and a door is a thing a person operates. See
+  //        `./ui/title-gate` `gateEnabled` for the whole bargain.
   titleGate =
-    mainMenu && mount
+    mainMenu && mount && gateEnabled(typeof window !== 'undefined' ? window.location.search : '')
       ? new TitleGate({
           dom: browserGateDom({ document, window, mount }),
           sfx: (beat) => {

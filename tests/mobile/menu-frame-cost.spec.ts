@@ -146,9 +146,18 @@ async function matchFrameMs(page: Page): Promise<number> {
   return medianFrameMs(page);
 }
 
-/** Boot clean to the title screen, at rest. */
+/**
+ * Boot clean to the title screen, at rest.
+ *
+ * `?gate=0` — the title gate (a0-50) stands in front of this screen and is a
+ * DOOR, so it is animated by design and would be what a sample here measured.
+ * The flag turns off that screen and nothing else; the menu, the doors and the
+ * lobby below are the real ones. The door's OWN cost is not thereby unmeasured —
+ * it has its own test at the foot of this file, which is what the header's rule
+ * about screens that are not in this set demands.
+ */
 async function bootMenu(page: Page): Promise<void> {
-  await page.goto('/');
+  await page.goto('/?gate=0');
   await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
   await page.waitForFunction(
     () => {
@@ -212,8 +221,9 @@ test('the static title screen costs no more per frame than the live match', asyn
   });
 
   // The menu, at rest. Nothing on it animates, so every frame it spends is a
-  // frame spent redrawing something that did not change.
-  await page.goto('/');
+  // frame spent redrawing something that did not change. (`?gate=0`: the title
+  // gate in front of it IS animated, on purpose — it has its own test below.)
+  await page.goto('/?gate=0');
   await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
   await page.waitForFunction(
     () => (window as unknown as { __mainMenu?: { visible: boolean } }).__mainMenu?.visible === true,

@@ -163,9 +163,14 @@ async function setOrientation(page: Page, mode: 'landscape' | 'portrait'): Promi
 }
 
 /** Boot the real preview build clean (no `?debug=1`, which skips the menu by
- *  contract) and press PLAY — the one and only way to the doors. */
+ *  contract) and press PLAY — the one and only way to the doors.
+ *
+ *  `?gate=0` because this walks through the front door on its way somewhere
+ *  else, and the title gate (a0-50) is a DOOR — a thing a person operates. The
+ *  flag turns off that screen and nothing else: the menu, the doors and the
+ *  lobby below are the real ones. See `src/ui/title-gate.ts` `gateEnabled`. */
 async function pressThroughToDoors(page: Page, projectName: string): Promise<void> {
-  await page.goto('/');
+  await page.goto('/?gate=0');
   await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
   await page.waitForFunction(
     () => {

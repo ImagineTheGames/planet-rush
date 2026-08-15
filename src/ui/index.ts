@@ -46,7 +46,10 @@ export type { ShellLifetime } from './shell-lifetime';
 // `clip-path`, `background-clip:text`, `-webkit-text-stroke` and `drop-shadow()`
 // have no cheap Pixi equivalent, and the doorway punch reveals the real
 // `MainMenuView` rather than a picture of one.
-export { TitleGate, browserGateDom, GAME_NAME } from './title-gate';
+// `gateEnabled` is the `?gate=0` read: the automated harnesses walk through the
+// front door on their way somewhere else, and a door is a thing a person
+// operates (see the function's own note).
+export { TitleGate, browserGateDom, gateEnabled, GAME_NAME } from './title-gate';
 export type { GateDom, GateQuality, TitleGateOptions, GatePhase } from './title-gate';
 
 export { Onboarding, PromptId, oreWasSpent, resolvePromptText } from './onboarding';
