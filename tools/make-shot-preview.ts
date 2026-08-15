@@ -25,7 +25,8 @@ import { shipSprite } from '../src/art/ships';
 import {
   NEBULAE, groundSprite, starFieldSprite, STAR_LAYERS, VOID_SEED, type NebulaId,
 } from '../src/art/backdrop';
-import { SHOT_TIER_COLORS, shotSprite } from '../src/art/vfx/shots';
+import { shotSprite } from '../src/art/vfx/shots';
+import { PALETTE } from '../src/art/palette';
 import { circle, poly, sprite, fill, softFill, type Shape, type SpriteDef } from '../src/art/shapes';
 import { spriteToGroup } from '../src/art/svg';
 import { ShipClass } from '../src/shared/types';
@@ -41,8 +42,9 @@ const W = 900;
 const H = 420;
 const PPU = 1.25;
 
-/** The tier-2 own-shot colour, so every candidate is the same light. */
-const SHOT_COLOR = SHOT_TIER_COLORS.own[1] ?? SHOT_TIER_COLORS.own[0]!;
+/** a0-46 retired the per-rung colour ladder — colour is the SIDE now, so this
+ *  lab's reference colour is simply own fire's plasma (`SHOT_SIDE_COLOR.own`). */
+const SHOT_COLOR = PALETTE.plasma;
 
 // ---------------------------------------------------------------------------
 // Candidates — all authored along +X, unit radius 1 = the collision radius

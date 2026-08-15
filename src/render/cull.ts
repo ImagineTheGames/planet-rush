@@ -148,9 +148,25 @@ export const RENDER_EXTENT = {
   /** `turretSprite` — `max(1.1, muzzle reach + 0.08)`; a firing Mk III is the
    *  widest, because the extent deliberately tracks the muzzle flash. */
   turret: 2.2,
-  /** `shotSprite` — the glow overhangs the collision radius and grows a fifth
-   *  per DAMAGE rung (`shotGlowScale`), so the top rung is the bound. */
-  shot: 1.48,
+  /**
+   * `shotSprite` — **1.48 → 11.68 (a0-46)**, the single largest number in this
+   * table and the one most worth understanding.
+   *
+   * A shot used to be a disc whose glow overhung its collider by half. It is now
+   * a laser bolt: the tip sits 1.43 radii ahead of the projectile's centre and
+   * the tail runs 6.83 radii *behind* it at the top DAMAGE rung, with the
+   * trail's bloom reaching half again past that. So a shot whose CENTRE is a
+   * dozen radii off screen can still be painting its tail across the window, and
+   * culling on the centre — or on the old 1.48 — would chop a bolt off at the
+   * screen edge in the one situation the player is most likely to be watching it:
+   * incoming fire.
+   *
+   * The number is the widest `shotSprite(*, *).extent`, which is the top rung's
+   * (the tail's bloom grows with the rung), and `cull.test.ts` walks every family
+   * and rung against it. It costs a shot near the edge a larger reach test and
+   * nothing else — the layer's expensive dimension is fill, not the cull.
+   */
+  shot: 11.68,
   /** `shipSprite` — the widest hull in the roster (`HULLS[*].extent`). */
   ship: 1.16,
   /** `shieldSprite` — the bubble plus its gauge band. */

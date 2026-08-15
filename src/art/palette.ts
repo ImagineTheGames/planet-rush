@@ -180,13 +180,37 @@ export const DERIVED_RECIPES = {
   plasmaDim: { base: 'plasma', toward: 'vacuum', t: 0.45, why: 'Unpowered energy parts: cold barrel, idle shield ring.' },
   plasmaHot: { base: 'plasma', toward: 'white', t: 0.45, why: 'The hot centre of a torch/muzzle flare.' },
 
+  /**
+   * The laser bolt's hot core (a0-46). Every laser-bolt reference builds a bolt
+   * the same way — a near-white core running the full length inside a saturated
+   * coloured sheath — and it is the core, not the sheath, that makes the shape
+   * read as *light* rather than as a coloured object. So the core is a shade of
+   * plasma so pale it is white with a memory of blue, and it is the SAME core on
+   * both sides: heat has no allegiance, the sheath around it carries that.
+   *
+   * The developer's ruling names `#eaf9ff`. That hex is **not on the ramp** — no
+   * `t` mixes plasma toward white and lands on it, because the ramp moves red and
+   * green together and `#eaf9ff` does not (r would want t≈0.882, g t≈0.90). This
+   * is the nearest stop that a recipe actually reproduces: **one part in 255 of
+   * green** away from the ruling, which is below anything a display shows, and it
+   * is a declared shade rather than a seventh hue (style-guide §1). The literal
+   * would have failed the allow-list audit; matching the hex was not worth
+   * carving an exception into the palette law for a difference nobody can see.
+   */
+  boltCore: { base: 'plasma', toward: 'white', t: 0.88, why: 'The laser bolt’s near-white hot core, inside its coloured sheath (a0-46).' },
+
   // The DAMAGE-tier shot ramp (p11-06): a shooter's weapon tier tints its shot,
   // brightening WITHIN its own family toward white so "how strong" reads at a
-  // glance without spending a reserved hue. `own` fire climbs the plasma family
-  // (energy), `enemy` fire climbs the threat-red family (danger) — the tier tell
-  // never leaves the side's palette and never drifts toward signal yellow. Tier 0
-  // is the family base (plasma / threat red); these are rungs 1–2 (own) and 1–3
-  // (enemy). `own` rung 3 reuses `plasmaHot`, the hottest plasma already declared.
+  // glance without spending a reserved hue.
+  //
+  // **RETIRED FROM THE SHOT BODY (a0-46).** The developer ruled that colour is
+  // the SIDE and never the tier — *"all friendlies should have that same blue and
+  // all enemies red... even in team mode... in ffa its all red obviously"* — so a
+  // bolt is plasma or threat red flat, and the rung is carried by GIRTH at the
+  // head and LENGTH at the tail instead (`../vfx/shots`). These five shades are
+  // kept declared and audited: they are legal stops on their families' ramps, and
+  // the muzzle/impact VFX draw from the same ladders. Nothing tints a shot with
+  // them any more.
   shotOwn1: { base: 'plasma', toward: 'white', t: 0.18, why: 'DAMAGE tier 1, own fire — a hotter plasma shot, still cold energy blue.' },
   shotOwn2: { base: 'plasma', toward: 'white', t: 0.32, why: 'DAMAGE tier 2, own fire — plasma climbing toward the white-hot core.' },
   shotEnemy1: { base: 'threatRed', toward: 'white', t: 0.18, why: 'DAMAGE tier 1, enemy fire — a hotter incoming shot, unmistakably threat red.' },
@@ -223,6 +247,8 @@ export const DERIVED = {
   coreHot: 0xf7e28a,
   plasmaDim: 0x307296,
   plasmaHot: 0x9ddeff,
+
+  boltCore: 0xeaf8ff,
 
   shotOwn1: 0x6dceff,
   shotOwn2: 0x86d6ff,
