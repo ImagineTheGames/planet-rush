@@ -1,0 +1,107 @@
+# a0-50 — the title gate
+
+Branch `agent/ui/a0-50-title-gate`. Working note, not evidence: it never
+substitutes for the DoD, the PR, or QA attestation.
+
+## BUILT
+
+- **`b2171bb` feat(a0-50): the title gate — the menu behind a door that gets
+  operated.** `src/ui/title-gate.ts` (the screen: geometry, the four beats, the
+  title CSS, the markup, the starfield + punch, the DOM seam and its browser
+  adapter), `src/ui/game-name.ts` (`GAME_NAME` and the wordmark split),
+  `src/ui/sfx.ts` (+`GateCue`, `GateSfx`, `NO_GATE_SFX`),
+  `src/ui/title-gate.test.ts` (44 tests, both named gates among them).
+- **`f091f98` feat(a0-50): the door's four cues, as slots in the ratified bank.**
+  `src/art/audio/ui-cues.ts` — `gateUnlock` / `gateSeated` / `gateReseal` /
+  `gateSealed`, plus the swept-filter `AirNote` (`to`, `band`) the pressure
+  relief needs and a `bandpass` in the offline biquad. **Cross-ownership: this
+  commit is deliberately alone**, so Art & Audio can review or revert it without
+  touching the screen.
+- **`482a839` feat(a0-50): put the gate's two canvases behind VfxAutoQuality, and
+  hold the seam.** `TitleGateOptions.quality`, the per-paint reduced read (the
+  doc claimed it and the code sampled once per resize, which on a phone is never
+  during this screen's life), and the tests that hold the cue seam to the slots
+  behind it.
+- **`c685d81` feat(a0-50): mount the gate over the menu, and give it its voice.**
+  `src/main.ts` — the overlay goes into `#app` above the game canvas on a clean
+  boot, `sfx` is `audio.uiCues.play`, `quality` is a `VfxAutoQuality` of its own.
+  Plus the bug the mount found: both screens listen for keys on the same
+  `window` and the menu registered first, so `Enter` behind a closed door booted
+  a match nobody could see. `src/ui/index.ts` exports the screen.
+
+## DECISIONS
+
+- **DOM overlay, never a Pixi port.** `clip-path`, `background-clip:text`,
+  `-webkit-text-stroke` and `drop-shadow()` have no cheap Pixi equivalent, and
+  the port would be a rewrite of a finished screen. The doorway punch reveals
+  the real `MainMenuView`, which is what makes the design's central claim true
+  rather than simulated.
+- **The punch tracks the door's MEASURED scale every frame** — a deviation from
+  the design file, demanded by the design's own reasoning. The prototype could
+  jump the punch to its final size because it had a second identical starfield
+  behind the menu; here the hole reveals the actual menu, so an early punch is
+  the cross-dissolve this screen exists to avoid.
+- **One field, not two.** The design's rear field (behind the menu, never
+  punched) is `MainMenuView`'s own backdrop here. Only the front field — the
+  punched one — is this screen's, and it is the one the invariant is about.
+- **The reduced path drops the twinkle and the drift, NOT the punch.** The
+  handoff's own suggested reduction is "a single field with the punch dropped",
+  which was right for a prototype where dropping the front field changed nothing
+  visible. Here the punch is the only thing making the doorway a hole; dropping
+  it paints the menu shut. So a throttled device gets a still field with ~⅓ the
+  stars, and the frame loop survives at a fixed clock purely to keep the hole
+  tracking the door for the one-and-a-half seconds it grows.
+- **`gateSeated` is not a re-mount.** Through, the overlay goes inert —
+  `visibility:hidden`, `pointer-events:none`, frame loop stopped, zero paint —
+  rather than being removed, because `Escape` reseals and a door that has been
+  taken out of the DOM cannot come back. `dispose()` is the real removal and
+  runs when the menu screen ends. **Rejected:** unmount on beat 4 and rebuild
+  the subtree on `Escape` — a fresh element cannot start a CSS transition from
+  the through-scale without a forced-reflow dance, and that is a new failure
+  mode in exchange for a word.
+- **Four cue slots in the bank, not a second synthesiser.** The design's engine
+  builds `unlock`, `seated`, `hover`, `confirm`, `select` in a few hundred
+  lines. Three of those five were already ratified slots (`hover`, `confirm`/
+  `purchase`, `pick`), so only the door's own beats are new. Two engines would
+  mean two tone contracts and a `measure-bank-tone.ts` that audits one of them.
+- **`UI_CUE_NAMES` still names the handoff's nine.** The door cues are a second
+  list, `DOOR_CUE_NAMES`. That is not bookkeeping: every rule in
+  `ui-cues.test.ts` — back is the only falling cue, nothing borrows back's note,
+  everything resolves but `refused` — is a statement about *the interface
+  answering a fingertip*, and the door is a machine running a sequence. Folding
+  them into one list would either break those rules or quietly weaken them.
+- **Floor `#070910`, not the design's `#010204`.** Same correction a0-40 already
+  made in the play-field; `#010204` is Floor's retired value (style-guide §1.1).
+- **Signal yellow appears once: the hazard stripes** at the leaves' meeting
+  edges, which style-guide §2 names in so many words. The design also paints the
+  lock's open-position index mark in it; that is a machine marking, not a
+  hazard, so it is steel here.
+- **The name is a token.** `GAME_NAME` ships saying what the tab and the
+  manifest already say. Docs and evidence keep saying Planet Rush — they are
+  records of what was true. The rename is a separate decision (it reaches the
+  repo name and the Pages URL, which breaks every evidence link).
+- **The menu asks whether it is blocked; the gate does not swallow.** Keys are
+  the one case the overlay does not solve by existing. `stopImmediatePropagation`
+  in the gate would have worked on the menu and broken something worse: the
+  window's keydown is ALSO what arms audio (`AudioUnlock`, risk 7), so
+  protecting the menu that way costs a keyboard player the sound of the door
+  they just opened. **Rejected**, for that reason.
+- **`Escape` only reseals at the menu's top level.** It already means BACK on
+  settings, the doors, the codex and the hangar. `MainMenuHandle.atTopLevel()`
+  → `TitleGateOptions.canReseal`.
+
+## NEXT
+
+Nothing outstanding. Both named gates were verified absent on `main` (neither
+`src/ui/title-gate.ts` nor `src/ui/title-gate.test.ts` exists there, so both
+fail) before being claimed.
+
+Open for the Director / other owners, none blocking:
+
+- **Art & Audio owns `src/art/audio/ui-cues.ts`.** The four slots are one
+  isolated commit for exactly that reason. The pressure-relief numbers are the
+  handoff's own (7.6k→3k over 200 ms; 4.8k→620 over 1.7 s; a shorter blast as
+  the leaves break contact with the sub arriving only when the weight moves).
+- **`Escape` is the only reseal.** Touch has no `Escape`, so a phone plays the
+  gate once. The design's `RESEAL AIRLOCK` button is a design-tool affordance
+  and shipping it would put UI the brief did not ask for over the real menu.
