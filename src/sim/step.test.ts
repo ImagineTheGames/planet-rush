@@ -62,6 +62,9 @@ function makeShip(over: Partial<Ship> & Pick<Ship, 'id'>): Ship {
     eliminated: over.eliminated ?? false,
     radius: over.radius ?? SHIP_RADIUS,
     firing: over.firing ?? false,
+    // The per-tick tells, on the same terms the real `makeShip` sets them: a
+    // fixture arrives with the trigger and the stick at rest (a0-47).
+    thrust: over.thrust ?? 0,
   };
 }
 
@@ -667,6 +670,46 @@ describe('ship physics (GDD §2.11, §4.1)', () => {
 
     for (let t = 0; t < 600; t++) step(world, []);
     expect(Math.hypot(world.ships[0]!.vel.x, world.ships[0]!.vel.y)).toBeLessThan(1);
+  });
+
+  it('publishes the throttle it applied, and keeps publishing it at top speed', () => {
+    // The a0-47 tell (`Ship.thrust`). It exists because the renderer cannot
+    // recover the engine from the state it produced: at top speed thrust and
+    // drag cancel exactly, so acceleration — the thing the thruster trail used
+    // to infer the throttle from — is ZERO at full stick. This test is the sim
+    // half of `src/art/vfx/observer.test.ts` "still thrusting at top speed".
+    const ship = makeShip({ id: 0, pos: { x: 1000, y: 1000 } });
+    const world = emptyWorld({ ships: [ship] });
+    const push = (x: number, y: number): Inputs => [
+      { id: 0, actions: [{ type: 'thrust', dir: { x, y } }] },
+    ];
+
+    expect(world.ships[0]!.thrust).toBe(0); // a ship at rest is not under power
+    for (let t = 0; t < 600; t++) step(world, push(1, 0));
+
+    const top = SHIP_STATS[ShipClass.Vanguard].speedMul * 260; // BASE_SPEED
+    expect(Math.hypot(world.ships[0]!.vel.x, world.ships[0]!.vel.y)).toBeCloseTo(top, 3);
+    const was = world.ships[0]!.vel.x;
+    step(world, push(1, 0));
+    // Terminal velocity: the acceleration is gone and the engine is not.
+    expect(Math.abs(world.ships[0]!.vel.x - was) * 60).toBeLessThan(1);
+    expect(world.ships[0]!.thrust).toBe(1);
+
+    // Analog: half a stick is half a throttle, not a boolean dressed as one.
+    step(world, push(0.5, 0));
+    expect(world.ships[0]!.thrust).toBeCloseTo(0.5, 6);
+    // The keyboard's diagonal is clamped to the unit disc before it is read.
+    step(world, push(1, 1));
+    expect(world.ships[0]!.thrust).toBeCloseTo(1, 6);
+    // Letting go is a throttle of zero on the very next tick, not a decay.
+    step(world, []);
+    expect(world.ships[0]!.thrust).toBe(0);
+
+    // And a dead ship has no engine, whatever its pilot is still pressing.
+    world.ships[0]!.alive = false;
+    world.ships[0]!.eliminated = true;
+    step(world, push(1, 0));
+    expect(world.ships[0]!.thrust).toBe(0);
   });
 
   it('createWorld spawns one ship per slot, home fields, and a central field', () => {

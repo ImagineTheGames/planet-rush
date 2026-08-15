@@ -45,14 +45,101 @@ describe('sound-review candidates', () => {
     }
   });
 
-  it('every slot has exactly three candidates, ids a/b/c, with characters', () => {
+  // The board promises three options per slot, always. The LETTERS are not part of
+  // that promise and one slot has had to move off them: a letter is the whole of
+  // how a verdict names an offer (`/status/sound-choices.json` records `{"verdict":
+  // "b"}`), so a slot carrying a live deny on `a`/`b`/`c` re-offers under new
+  // letters or its own record stops being readable. See `RE_LETTERED` below.
+  const RE_LETTERED: Readonly<Record<string, readonly string[]>> = {
+    // a0-48. Denied 2026-08-07 with the deny-all reason, never re-briefed, so the
+    // denied bed was still shipping when the developer met it again in play.
+    ambient: ['d', 'e', 'f'],
+  };
+
+  it('every slot has exactly three candidates, one letter each, with characters', () => {
     for (const id of SLOT_IDS) {
       const slot = CANDIDATE_SLOTS[id]!;
-      expect(slot.candidates.map((c) => c.id)).toEqual(['a', 'b', 'c']);
+      expect(slot.candidates.map((c) => c.id), `${id} does not offer three`).toEqual(
+        RE_LETTERED[id] ?? ['a', 'b', 'c'],
+      );
       for (const c of slot.candidates) {
         expect(c.character.trim().length).toBeGreaterThan(0);
       }
     }
+  });
+
+  it('never re-offers under a letter that carries a live verdict (a0-48)', () => {
+    // The property, rather than the list: for any slot that has been re-lettered,
+    // none of its offers may reuse a letter the record already spent. Stated this
+    // way so the next re-offer on the next denied slot inherits the rule instead
+    // of re-deriving it — and so `ambient` cannot quietly drift back onto `a`.
+    for (const [id, letters] of Object.entries(RE_LETTERED)) {
+      const slot = CANDIDATE_SLOTS[id]!;
+      expect(slot, `${id} is re-lettered but not on the board`).toBeDefined();
+      for (const c of slot.candidates) {
+        expect(['a', 'b', 'c'], `${id}/${c.id} re-uses a denied letter`).not.toContain(c.id);
+      }
+      expect(new Set(slot.candidates.map((c) => c.id)).size, `${id} offers a letter twice`).toBe(letters.length);
+      // Three characters, not three takes on one — the same bar every other family
+      // on this board is held to.
+      expect(new Set(slot.candidates.map((c) => c.character)).size).toBe(slot.candidates.length);
+      expect(new Set(slot.candidates.map((c) => c.spec.name)).size).toBe(slot.candidates.length);
+    }
+  });
+
+  it('offers a bed that could not repeat the complaint that re-opened the slot (a0-48)', () => {
+    // The developer's words about the shipped bed were *"deep"* and *"annoying"*,
+    // and the shipped one was four `attack: 0` layers of held pitch. An offer that
+    // arrives at full level on sample zero, or that has nothing done to it, is the
+    // sound that was complained about wearing a new letter — so the offers are held
+    // to the same two properties the shipped bed now is (`./audio.test.ts`, "the
+    // ambient bed is not a bare held tone"), plus the loop-seam rule that stops a
+    // slow fade-in becoming a dip once per lap.
+    for (const c of CANDIDATE_SLOTS.ambient!.candidates) {
+      const spec = c.spec;
+      expect(isLayered(spec), `ambient/${c.id} is a single voice — that is not a bed`).toBe(true);
+      if (!isLayered(spec)) continue;
+      const crossfade = spec.crossfade ?? 0.04;
+      for (const { spec: v } of spec.layers) {
+        const where = `ambient/${c.id} ${v.name}`;
+        const moves =
+          (v.decayCurve ?? 0) > 0 ||
+          (v.lowPassEnd !== undefined && v.lowPassEnd !== v.lowPass) ||
+          v.bandPass === true ||
+          (v.resonance ?? 0) > 0;
+        expect(moves, `${where} is a held pitch with nothing done to it`).toBe(true);
+        expect(v.attack, `${where} arrives at full level on its first sample`).toBeGreaterThan(0);
+        if (v.decay > 0) continue;
+        expect(v.attack, `${where} is sustained across the seam but fades in past the crossfade`).toBeLessThanOrEqual(
+          crossfade,
+        );
+      }
+      // …and one of them genuinely swells, rather than every attack being a
+      // click-guard that satisfies the clause above and changes nothing.
+      expect(
+        spec.layers.some((l) => l.spec.attack >= 1),
+        `ambient/${c.id} has no swell in it`,
+      ).toBe(true);
+      // Quieter than the bed that was called annoying, measured rather than
+      // asserted about: the complaint is a level complaint as much as a voicing one.
+      expect(rms(render(spec)), `ambient/${c.id} is louder than the bed that was denied`).toBeLessThan(
+        rms(render(soundSpec('ambient'))) * 1.35,
+      );
+    }
+  });
+
+  it('names the fourth answer on the one slot that is allowed one (a0-48)', () => {
+    // *"Ship it off by default, with a toggle"* is a legitimate outcome for the
+    // bed — item 3 on the GDD §4.9 cut list, and `./bank` records that nothing
+    // else in the mix depends on it. It is offered rather than taken: the ruling
+    // is the developer's. It is also the ONLY slot that may carry it, because
+    // every other sound on this board is a mechanic and "cut it" is not on the
+    // table for a mechanic (GDD §2.2, §4.9).
+    const offered = SLOT_IDS.filter((id) => CANDIDATE_SLOTS[id]!.fourthOption !== undefined);
+    expect(offered).toEqual(['ambient']);
+    const text = CANDIDATE_SLOTS.ambient!.fourthOption!;
+    expect(text.length, 'the fourth option is asserted rather than argued').toBeGreaterThan(120);
+    expect(text).toContain('§4.9');
   });
 
   it('every candidate renders without a NaN and stays in range', () => {

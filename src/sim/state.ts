@@ -109,6 +109,36 @@ export interface Ship {
    */
   firing: boolean;
   /**
+   * **Throttle tell** — the magnitude, 0..1, of the thrust intent applied to this
+   * ship on this tick: the analog stick's own deflection, after `clampMag` puts
+   * the keyboard's corners on the unit disc. `0` on a tick with no thrust verb,
+   * and `0` while dead.
+   *
+   * It exists for the same reason {@link firing} does, and is published on the
+   * same terms: engine output is an *input*, not a position, and nothing
+   * downstream can recover it from the state tree. The renderer tried — the
+   * thruster trail inferred throttle from acceleration along the nose — and the
+   * developer's report a0-47 is what that costs: *"the ship's rocket and trails
+   * only appear when he's fully stopped and goes to move, but then it stops like
+   * after 1 second."* A ship at top speed is a ship whose thrust and drag cancel
+   * exactly — that is what top speed IS (`integrate`) — so the acceleration is
+   * zero at the one moment the engine is working hardest, and the exhaust cut out
+   * a second into every run. The measurement was not mistuned; it was wrong by
+   * construction, and the only repair is to publish the number.
+   *
+   * Written once per tick in the movement step, for every ship, before
+   * `integrate` spends it — so the tell and the velocity it bought can never
+   * disagree.
+   *
+   * Optional on the same backward-compatible terms as {@link lootTake} (an absent
+   * value reads as "no throttle"), so the `Ship` literals other agents build keep
+   * compiling. It is a pure restatement of this tick's input: the sim never reads
+   * it back to make a decision, so it cannot perturb determinism (GDD §4.8), and
+   * it is not fingerprinted by `hashState` — a replay that thrusted differently
+   * diverges in `vel` on the same tick, which is hashed.
+   */
+  thrust?: number;
+  /**
    * **Loot tell** — ore that entered THIS hold on THIS tick (chunk → cargo), and
    * `0` on every tick nothing arrived. The developer's report a0-08, "sometimes
    * picked up ore from dead ships dont count": no ore was ever lost (the ledger
@@ -822,6 +852,9 @@ function makeShip(spec: PlayerSpec, pos: Vec2): Ship {
     eliminated: false,
     radius: SHIP_RADIUS,
     firing: false,
+    // A ship arrives with the stick at rest; the movement step re-decides it
+    // every tick from that tick's intent (a0-47).
+    thrust: 0,
     // The loot tells start quiet and are re-decided every tick by `updateChunks`
     // (a0-08); the sim's own ships always carry them, foreign literals need not.
     lootTake: 0,
