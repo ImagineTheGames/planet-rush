@@ -198,12 +198,23 @@ units read against the logical viewport. **The first half alone makes it worse.*
   existing baseline was taken against, so the flag costs QA nothing.
 - Chromium, by hand, on the built bundle — which is what found the black doorway.
 
+## THE DoD, RUN — every line, against `FETCH_HEAD` (5efba09)
+
+    npx tsc --noEmit                                    PASS
+    npm test -- --run              295 files, 5435 tests, all passing
+    GAME_NAME in title-gate.ts                          PASS
+    no unpkg|googleapis|gstatic in title-gate.ts        PASS
+    'the doorway is a hole, not a fade' in the spec     PASS
+    'nothing sounds before the first press' in the spec PASS
+    PR #423, zero failing checks                        PASS
+
+**All six mobile shards green**, including the four that were red before this
+pass (2, 3, 4, 5 — every one of them carried a front-door spec) and shard 6,
+whose eight desktop goldens were photographing the closed door. **No golden was
+re-baselined**: `?gate=0` restores the exact pixels they were taken against.
+
 ## NEXT
 
-- Watch the shards. The four that failed (2, 3, 4, 5) are exactly the ones
-  carrying a front-door spec; 1 and 6 carry `goldens`, which fails on PIXELS
-  rather than on a timeout if the flag is wrong — and desktop `goldens` is green
-  locally.
 - **For QA / the Director, not blocking:** the `?gate=0` opt-out means the
   goldens do not photograph this screen. A golden of the sealed door is worth
   having and belongs in `goldens.spec.ts`, which is QA's — the seam it needs
