@@ -70,7 +70,9 @@ export async function openFrontDoor(page: Page, profile: string | null): Promise
     },
     [PROFILE_KEY, profile] as const,
   );
-  await page.goto('/');
+  // `?gate=0` (a0-50): the title gate is a DOOR in front of this screen, opened
+  // by a press over four beats. This capture is about the hangar, not the door.
+  await page.goto('/?gate=0');
   await page.waitForFunction(() => window.__mainMenu?.visible === true);
 }
 

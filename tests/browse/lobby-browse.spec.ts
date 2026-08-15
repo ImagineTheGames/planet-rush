@@ -212,7 +212,12 @@ const doors = async (page: Page): Promise<DoorsSeam> => {
 /** Boot clean, press PLAY, press JOIN — which lands on BROWSE by default. */
 async function pressThroughToBrowse(page: Page): Promise<void> {
   await landscape(page);
-  await page.goto('/');
+  // `?gate=0` (a0-50): the title gate is a DOOR in front of the title screen,
+  // opened by a press over four beats. This spec walks through the front door on
+  // its way somewhere else. The flag turns off that one screen and nothing else —
+  // the menu, the doors and the lobby below are the real ones. See
+  // `src/ui/title-gate.ts` `gateEnabled`.
+  await page.goto('/?gate=0');
   await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
   await page.waitForFunction(
     () => {

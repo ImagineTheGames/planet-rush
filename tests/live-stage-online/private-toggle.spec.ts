@@ -137,7 +137,12 @@ async function bootClient(
   const page = await context.newPage();
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.goto('/', { waitUntil: 'load' });
+  // `?gate=0` (a0-50): the title gate is a DOOR in front of the title screen,
+  // opened by a press over four beats. This spec walks through the front door on
+  // its way somewhere else. The flag turns off that one screen and nothing else —
+  // the menu, the doors and the lobby below are the real ones. See
+  // `src/ui/title-gate.ts` `gateEnabled`.
+  await page.goto('/?gate=0', { waitUntil: 'load' });
   await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
   await page.waitForFunction(() => window.__mainMenu?.visible === true, undefined, { timeout: 30_000 });
 
