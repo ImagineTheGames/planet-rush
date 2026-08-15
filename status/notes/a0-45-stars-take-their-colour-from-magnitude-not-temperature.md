@@ -101,28 +101,27 @@ only that the branch added a symbol.
 
 ## NEXT
 
-**Everything in the brief is built, committed and pushed. What remains is the PR
-and CI.**
+**Everything in the brief is built, committed, pushed and in a PR. What remains
+is CI.**
 
-- **Session of 2026-08-15 (second).** Branch had two unpushed commits (the a0-49
-  merge + a note). Pushed fast-forward; `gh auth setup-git` was needed first, git
-  had no credential helper.
-- Re-verified on this tree: `npx tsc --noEmit` **clean**; all six code DoD greps
-  **pass against `origin`**, not just locally. Confirmed the a0-49 merge touches
-  only `src/art/audio/`, `sound-review/`, `docs/` and `evidence/a0-49-*` — nothing
-  that renders, so the 43 re-baselined goldens still describe this tree.
-- Confirmed `tests/mobile/goldens.spec.ts` and the shipped playwright config are
-  byte-identical to `main`: the `maxDiffPixelRatio: 0` re-baseline tolerance was
-  **not** committed. The private config lives in `evidence/`.
-- Full `npm test -- --run` re-run on the merged tree, then open the PR. Body is
-  drafted with the two Director questions:
-  **(1)** blue-white starlight vs the beacon ring `#4dc3ff` — ΔE 39.0 on the
-  composited pixel, 16.5 on the raw ink, against the studio's ΔE 40 floor;
-  **(2)** `peakP99` 46–53 is exactly what a white-topped ramp measures, so either
-  the design's field was measured before `starColor` was applied or its bloom is
-  brighter than the `0.42 × 0.48` a0-44 read off it.
-  (A third, raised by §1.2 rather than the brief: the amber 22% comes within
-  ΔE 25.6 of `oreDeep`, the closest the backdrop has come to RESERVED yellow.)
+- **Session of 2026-08-15 (third) — the PR is open: [#424](https://github.com/ImagineTheGames/planet-rush/pull/424).**
+  The branch was already complete and pushed; this session verified it and
+  shipped it.
+  - `npx tsc --noEmit` — **clean**.
+  - `npm test -- --run` on the merged tree — **294 files, 5380 tests, all
+    passing**, 656s. This was the one thing the previous session had left
+    unrun.
+  - All six code DoD greps **pass against `origin`**, re-checked.
+  - The before/after plates re-read with my own eyes: `star-1` is amber with the
+    cross now *inside* its glow where `main` drew a hard grey cross over a faint
+    one; `star-2` is the blue-white half of the same; `none.png` is a
+    two-temperature field against `main`'s grey-and-white one. The change is what
+    the brief describes.
+  - PR body carries all three Director questions with their numbers, the
+    `peakP99` re-derivation, the brief's-multiplier-is-2×-high correction, and
+    the golden accounting.
+- **Only CI is left.** If a golden fails on CI's renderer, `dcdde68` is the
+  baselines alone and can be dropped without touching the fix.
 - **Note for a future session:** this file exists twice — tracked in the repo at
   `status/notes/`, and untracked at the absolute `/status/notes/` the brief names.
   Keep both; the repo copy is the one that survives in git.
