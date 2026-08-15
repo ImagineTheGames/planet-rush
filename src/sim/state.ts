@@ -31,6 +31,7 @@ import { getMap } from './maps';
 import { scatterDerelictLoot } from './match';
 import { makeCombatCredit, type CombatCredit } from './combat-credit';
 import { liveOre, makeLedger, type OreLedger } from './ore-ledger';
+import { makeOreJournal, type OreJournal } from './ore-journal';
 import { shipCargoCap, shipMaxHull, stockTiers, type UpgradeTiers } from './upgrades';
 import { spawnHomeFields, spawnWave } from './waves';
 
@@ -740,6 +741,17 @@ export interface World {
    */
   ledger?: OreLedger;
   /**
+   * Per-movement ore journal (`./ore-journal`) — the ledger's nine totals, told as
+   * events: which item, at what price, against what balance, at which tick. The
+   * ledger answers "did the economy conserve"; this answers "what did that ONE
+   * purchase cost me", which is the shape of the report it was added for (a0-52).
+   * Copied into the playtest log so the next one is decided in a single read.
+   *
+   * Optional, bounded, write-only, and outside the determinism fingerprint, for
+   * exactly the reasons {@link ledger} is.
+   */
+  oreJournal?: OreJournal;
+  /**
    * Match-wide combat attribution (`./combat-credit`) — who dealt what damage and
    * who landed which killing blow, indexed by player slot. The information three
    * of the four ratified XP weights are paid from
@@ -1087,6 +1099,9 @@ export function createWorld(config: WorldConfig): World {
     economy,
     match: initialMatch(),
     ledger: makeLedger(),
+    // The per-movement telling of that same accounting (`./ore-journal`), for the
+    // playtest log: which item, at what price, against what balance (a0-52).
+    oreJournal: makeOreJournal(),
     // Combat attribution, one row per seat (`./combat-credit`). Sized from the
     // lobby, not from the ships, because the slot outlives the hull: a shot in
     // flight when its owner dies still credits that owner's seat.

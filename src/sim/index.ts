@@ -30,6 +30,8 @@ export * from './upgrades';
 // `./rng` is re-exported through `./state`, next to the `rngState` it threads.
 export * from './state';
 export * from './ore-ledger';
+// Per-movement ore events — the ledger's totals told as lines, for the playtest log.
+export * from './ore-journal';
 // Write-only combat attribution: who dealt what, who killed whom (progression §1.5).
 export * from './combat-credit';
 // The one match-config model (mode + slots) and its dense compaction to a roster.
