@@ -109,11 +109,19 @@ no regeneration brief against them.
 | `turretFire` | Turret Fire | R1 | 2026-08-07 20:09 | 2026-08-08 (a0-01b `96d5085`) | superseded |
 | `upgradeBought`† | Upgrade Bought | R1 | 2026-08-07 20:09 | 2026-08-08 (a0-01b `5dfc162`) | superseded |
 | `waveArrive`† | Wave Arrive | R1 | 2026-08-07 20:09 | 2026-08-08 (a0-01b `5dfc162`) | superseded |
-| `oreCollect` | Ore Collect | R4 | 2026-08-14 19:17 | 2026-08-08 (a0-01b `f908f8d`) | **revoice** |
-| `levelUp`† | Level Up | R2 | 2026-08-14 19:19 | 2026-08-09 (p1-07 `c1fb32b`) | **revoice** |
+| `oreCollect` | Ore Collect | R4 | 2026-08-14 19:17 | **2026-08-15 (a0-49, `d`/`e`/`f`)** | **revoice — done** |
+| `levelUp`† | Level Up | R2 | 2026-08-14 19:19 | **2026-08-15 (a0-49, `d`/`e`/`f`)** | **revoice — done** |
 | `xpBarFill`† | XP Bar Fill | R3 | 2026-08-14 19:21 | 2026-08-09 (p1-07 `c1fb32b`) | **cut** |
 
 Counted: **35 superseded, 2 revoice, 1 cut.**
+
+The two revoices were made under this brief and are on the board now. **Both rows
+stay in this file**, because the rule at the bottom is that a row leaves only when
+the slot carries a verdict that is not `deny-all` — and neither does yet. What
+changed is that the developer is no longer looking at sounds they turned down: the
+newest offer in each slot now post-dates its denial, which is the same test every
+other row is judged by. The before/after that says the offers actually moved in
+the direction asked for is `evidence/a0-49-revoice/numbers.txt`, regenerable.
 
 ---
 
@@ -122,7 +130,14 @@ Counted: **35 superseded, 2 revoice, 1 cut.**
 The developer's words are *"we don't need this at all no need for regeneration"*.
 Read as written, that is not a brief for a fourth take on a bar-fill bed; it is a
 request to stop making the noise. A sound removed is a sound that cannot annoy
-anybody, and §4.9 already sanctions losing audio, so **cut is the recommendation.**
+anybody, so **cut is the recommendation.**
+
+§4.9 does not merely sanction losing audio in general here — it names this exact
+screen. **Item 3 on the ranked cut list is *"End-of-match summary reduces to a
+plain winner screen (Rematch button stays)"***: the whole sequence this bed plays
+under is already ranked above the line, decided in daylight rather than at 2 a.m.
+on M7. Cutting one loop out of it is a strictly smaller decision than the one the
+GDD has already taken, and it is the only one being proposed.
 
 **What the slot is.** `xpBarFill` is the only *sustained* cue in the end-of-match
 summary set: a loop started when the XP bar begins moving and stopped when it
@@ -196,15 +211,62 @@ bound, not a preference.
 
 Both are re-offered in this brief as **`d`/`e`/`f`**, never as `a`/`b`/`c`.
 
+### What was actually offered, and the number each clause became
+
+There is no house style applied across the two: the reasons ask for opposite
+things, and each slot is held to its own words. Every bound below is resolved
+against **the takes that were denied** rather than against a constant somebody
+picked, because the only thing that makes a re-offer an answer rather than another
+guess is that it moved, in the direction that was asked for, from the thing being
+rejected. Full table: `evidence/a0-49-revoice/numbers.txt`.
+
+| slot | offer | character | the clause it answers, measured |
+|---|---|---|---|
+| `oreCollect` | `d` | flake shear, bright chips off the snap | sparkle 0.370 |
+| | `e` | charged intake, an ionised edge | sparkle 0.309 |
+| | `f` | assay ping, two high bands reading back | sparkle 0.382 |
+| `levelUp` | `d` | a lock engaging, mass seating hard | mass 0.058 · seated 0.42 |
+| | `e` | a drive coming online, opening | mass 0.069 · seated 0.49 |
+| | `f` | a vault seating, contacts in a room | mass 0.063 · seated 0.43 |
+
+- **Sparkle** is the share of energy above 3 kHz. The three denied takes measured
+  0.150 / 0.018 / 0.240. It is a *share* and not a level because "sparkle" is a
+  character while *"but subtle"* is the clause that bounds the level — the two have
+  to be able to move independently or the sentence cannot be satisfied at all.
+  *"But subtle"* is therefore held on the whole cue: no offer is louder in peak or
+  RMS than the incumbent the developer was asking to add sparkle *to*. *"Shouldn't
+  be too long"* is held against the longest denied take (90 ms); all three are
+  under it.
+- **Mass** is absolute RMS under 200 Hz (denied: 0.026 / 0.045 / 0.010) and
+  **seated** is RMS of the last 60% over the first 40% (denied: 0.31 / 0.27 /
+  0.28) — *does it have a body, and is any of it left once it lands.* Neither may
+  be bought by turning the cue up: the XP beat plays beneath the result, so all
+  three sit at least 20% under `matchEnd`.
+
+One thing the 3 kHz crossover is not arbitrary about: `synth.ts` clamps a resonant
+cutoff to `SVF_MAX_HZ_FRACTION` (~6.5 kHz at 44.1 k), so 3–6.4 kHz **is** the top
+of this bank's spectrum. A first pass written above that clamp measured *darker*
+than the takes it was replacing, which is the failure mode of taking "sparkle" to
+mean "put it higher" without reading the instrument.
+
+The one way this could satisfy its own brief and still fail §4.7 is by colliding
+two mechanics — the tightest pair in the bank is `oreCollect` / `depositTick` (§8),
+*picked a chunk up* vs *banked a chunk*, and sparkle moves `oreCollect` straight
+toward it. It moves it the safe way: every new offer is at least 3.5× brighter by
+zero-crossing than every `depositTick` voice, shipped or offered, so a mixed pair
+of verdicts is safe too. `candidates.test.ts` holds that.
+
 ### The letters are the whole of how a verdict names an offer
 
 `/status/sound-choices.json` records a choice as a letter — `{"verdict": "b"}` —
 and nothing else. So re-offering under a letter that already carries a live
 verdict makes that record permanently unreadable: `deny-all` on `a`/`b`/`c` plus
 new offers called `a`/`b`/`c` cannot be told apart from a denial of the new ones.
-a0-48 established the rule on `ambient`; this brief is the second slot to follow
-it and the first to follow it as a *rule* rather than a one-off, so
-`candidates.test.ts` now holds it as a property over a table of re-lettered slots.
+a0-48 established the rule on `ambient`; this brief adds the second and third
+slots to follow it, and is the first to follow it as a *rule* rather than a
+one-off, so `candidates.test.ts` now holds it as a property over a table of
+re-lettered slots — three rows today, and the next denied slot inherits the rule
+by joining the table instead of re-deriving it.
 
 **This is also the fix owed to the other 35 rows, and it is not made here.** The
 a0-01b offers were filed under `a`/`b`/`c`, the same letters the 2026-08-07
