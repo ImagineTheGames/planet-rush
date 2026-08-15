@@ -619,6 +619,15 @@ export class Renderer {
     this.impactLayer.label = 'impacts';
     this.shipLayer.label = 'ships';
     this.shotLayer.label = 'shots';
+    // Shots are LIGHT, and light adds (a0-46). Every laser-bolt reference builds
+    // a bolt as a near-white core inside a saturated sheath composited additively
+    // — that is what makes it read as hot rather than painted, and what makes two
+    // bolts crossing blow out where they overlap instead of one occluding the
+    // other. The layer drew with normal blending while the shot was a flat disc,
+    // where it cost nothing and bought nothing. The SVG lab could only fake this
+    // with alpha, so the game should look *better* than `laser-tiers.html`; if it
+    // looks worse, that is a finding and it comes back before it is tuned away.
+    this.shotLayer.blendMode = 'add';
     this.worldRoot.addChild(
       this.boundaryLayer, // behind everything: the wall the arena is drawn inside
       this.atmosphereLayer, // your home's air, under its station furniture
@@ -1281,8 +1290,16 @@ export class Renderer {
       }
       s.x = p.pos.x;
       s.y = p.pos.y;
+      // **The half that makes it a laser (a0-46).** The bolt is authored pointing
+      // +x, so an unrotated one is a lance pointing east no matter where it is
+      // going — which is not a smaller bug than drawing a ball, it is the same
+      // bug wearing a better shape. A round sprite needed no rotation and this
+      // line did not exist; a directional one is only directional if it is
+      // turned onto the direction it is actually travelling.
+      s.rotation = Math.atan2(p.vel.y, p.vel.x);
       // The texture is SHOT_ART_SCALE px per art unit; divide it back out so unit
-      // radius 1 lands at the shot's collision radius (the glow overhangs it).
+      // radius 1 lands at the shot's collision radius (the bolt overhangs it —
+      // its tail runs ~6.8 radii behind the centre at the top rung).
       s.scale.set(this.shotUnits[i]! * p.radius);
     }
     this.shotPool.hideFrom(world.projectiles.length);

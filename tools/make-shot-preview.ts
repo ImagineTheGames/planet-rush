@@ -25,7 +25,8 @@ import { shipSprite } from '../src/art/ships';
 import {
   NEBULAE, groundSprite, starFieldSprite, STAR_LAYERS, VOID_SEED, type NebulaId,
 } from '../src/art/backdrop';
-import { SHOT_TIER_COLORS, shotSprite } from '../src/art/vfx/shots';
+import { shotSprite } from '../src/art/vfx/shots';
+import { PALETTE } from '../src/art/palette';
 import { circle, poly, sprite, fill, softFill, type Shape, type SpriteDef } from '../src/art/shapes';
 import { spriteToGroup } from '../src/art/svg';
 import { ShipClass } from '../src/shared/types';
@@ -41,8 +42,9 @@ const W = 900;
 const H = 420;
 const PPU = 1.25;
 
-/** The tier-2 own-shot colour, so every candidate is the same light. */
-const SHOT_COLOR = SHOT_TIER_COLORS.own[1] ?? SHOT_TIER_COLORS.own[0]!;
+/** a0-46 retired the per-rung colour ladder — colour is the SIDE now, so this
+ *  lab's reference colour is simply own fire's plasma (`SHOT_SIDE_COLOR.own`). */
+const SHOT_COLOR = PALETTE.plasma;
 
 // ---------------------------------------------------------------------------
 // Candidates — all authored along +X, unit radius 1 = the collision radius
@@ -71,10 +73,16 @@ const glow = (rx: number, ry: number, alpha = 0.30): Shape =>
 const CANDIDATES: Candidate[] = [
   {
     key: 'ball',
-    name: 'BALL — what ships today',
-    note: 'shotSprite(): a soft glow disc at r 1.16 over a bright core at r 0.62. Round, so it carries no direction at all.',
+    // a0-46: this slot used to be "BALL — what ships today", a soft glow disc at
+    // r 1.16 over a bright core at r 0.62. The ball no longer ships — `shotSprite`
+    // IS the picked laser now — so the slot reads what it actually draws, at the
+    // sprite's own extent rather than the disc's. The disc it was comparing
+    // against is gone; this page is kept as the record of how the choice was
+    // framed, and `laser-lab.html` is where the choice itself was made.
+    name: 'SHIPPED — the PIERCE bolt (a0-46)',
+    note: 'shotSprite(): the developer’s pick, as `src/art/vfx/shots.ts` actually bakes it — blunt round head tapering back into a hairline trail, white core inside a plasma sheath. The candidates below are the exploration that led here.',
     def: shotSprite('own', 1),
-    extent: 1.16,
+    extent: shotSprite('own', 1).extent,
   },
   {
     key: 'bolt',

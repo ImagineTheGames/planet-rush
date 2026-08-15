@@ -1,0 +1,25 @@
+a0-46 — shot-layer fill, before and after the laser bolt
+======================================================================
+scene: stressWorld() — 300 seeded projectiles (GDD §4.3)
+
+sprite extent, per DAMAGE rung (unit space; 1 = the collision radius)
+  rung       before      after      quad px @ r=4 (before → after)
+  Mk I        1.000      7.236      9.0² → 63.0²  (×49.0 area)
+  Mk II       1.160      8.833      10.5² → 76.5²  (×53.1 area)
+  Mk III      1.320     10.252      11.5² → 89.0²  (×59.9 area)
+  Mk IV       1.480     11.672      13.0² → 101.0²  (×60.4 area)
+
+desktop 1280×800
+  shots submitted (= this layer's draw-call contribution): 66 → 99, of 300 live
+  rungs on screen (Mk I/II/III/IV): 99/0/0/0
+  quad area   before 5.3k px²    after 392.9k px²
+  OVERDRAW    before 0.0052×   after 0.3837×   (×73.5)
+  ...if every one of them were Mk IV: 0.9862× (1009.9k px²)
+
+phone 844×390
+  shots submitted (= this layer's draw-call contribution): 0 → 0, of 300 live
+  rungs on screen (Mk I/II/III/IV): 0/0/0/0
+  nothing on screen — the §4.3 scene seeds its shots around the eight-station
+  ring, and none fall inside this window from ship 0. No fill either way.
+
+families × rungs baked (the pool, unchanged): 8
