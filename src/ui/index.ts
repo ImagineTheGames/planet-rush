@@ -41,6 +41,14 @@ export type { HudFrame } from './hud';
 export { createShellLifetime } from './shell-lifetime';
 export type { ShellLifetime } from './shell-lifetime';
 
+// THE TITLE GATE (a0-50) — the menu is behind a door, and the door gets
+// operated. A DOM overlay above the game canvas, deliberately NOT a Pixi port:
+// `clip-path`, `background-clip:text`, `-webkit-text-stroke` and `drop-shadow()`
+// have no cheap Pixi equivalent, and the doorway punch reveals the real
+// `MainMenuView` rather than a picture of one.
+export { TitleGate, browserGateDom, GAME_NAME } from './title-gate';
+export type { GateDom, GateQuality, TitleGateOptions, GatePhase } from './title-gate';
+
 export { Onboarding, PromptId, oreWasSpent, resolvePromptText } from './onboarding';
 export type { OnboardingMemory, OnboardingSignals, SpendFacts } from './onboarding';
 // Where a completed prompt is remembered between matches (u15-01): the ONE

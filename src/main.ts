@@ -320,6 +320,11 @@ import {
   createShellLifetime,
   // Onboarding's memory across matches, page loads and EXIT TO MENU (u15-01).
   createProfileOnboardingMemory,
+  // THE TITLE GATE (a0-50) — the door the menu is behind. A DOM overlay, so it
+  // is constructed here rather than added to the Pixi stage like every screen
+  // above it.
+  TitleGate,
+  browserGateDom,
 } from './ui';
 import type {
   HudFrame,
@@ -947,6 +952,10 @@ async function boot(): Promise<void> {
   //     the immediate-match boot they assert against (field report §3, §5). PLAY
   //     is the only path here that reaches `bootOfflineMatch`; SETTINGS reuses
   //     the Day-7 settings screen. The whole screen is `src/ui`'s; this awaits it.
+  // Declared ahead of `frontCtx` because the two know about each other: the menu
+  // asks the gate whether it is shut, and the gate asks the menu whether it is at
+  // its top level (a0-50). Assigned below, once there is a menu to be behind.
+  let titleGate: TitleGate | null = null;
   // The landscape-lock context both front-of-match screens (menu, then lobby)
   // lay out against: they attach to the rotating game root, read the live logical
   // (landscape) viewport, and remap their own taps through it.
@@ -964,15 +973,66 @@ async function boot(): Promise<void> {
     // armed above, so the FIRST tap on this screen resumes the context and every
     // one after it lands on a live mix.
     cue: (kind, index) => audio.cue(kind, index),
+    // The door in front of this screen, while it is shut.
+    blocked: () => titleGate?.modal ?? false,
   };
 
   const mainMenu = flags.debug ? null : openMainMenu(app, platform, frontCtx);
+
+  // --- The title gate (a0-50; `./ui/title-gate`) ----------------------------
+  //     The wordmark is stamped into the leaves of an airlock and the menu is
+  //     GENUINELY behind it: a DOM overlay above the game canvas inside `#app`,
+  //     whose doorway punch reveals the `MainMenuView` built on the line above,
+  //     rather than a picture of one. Four beats — the lock turns, the leaves
+  //     part, the frame grows until its opening clears the screen, and we are
+  //     inside — then the overlay goes inert and the Pixi menu is simply what
+  //     is there. `Escape` reads the same beats backwards.
+  //
+  //     Three things about the wiring are load-bearing:
+  //
+  //      - **`?debug=1` gets no door.** It skips the menu entirely, so there is
+  //        nothing behind the gate to reveal — and every live / live-stage /
+  //        mobile harness and every frozen golden boots straight into a match
+  //        through that flag. A gate there would be a screen the whole suite has
+  //        to learn to press through.
+  //      - **The press is what arms audio.** Browsers block it until a gesture,
+  //        so nothing on this screen may sound on load — and the overlay's own
+  //        `pointerdown` bubbles to the window `AudioUnlock` is armed on, so the
+  //        one press that opens the door is also the one that resumes the mix.
+  //      - **The gate NAMES a beat and `src/art/audio` owns the sound.** The
+  //        four slots are the ratified bank's (`art/audio/ui-cues`), not a
+  //        second synthesiser: the design file ships one, and two engines would
+  //        mean two tone contracts and a tone audit that measures one of them.
+  titleGate =
+    mainMenu && mount
+      ? new TitleGate({
+          dom: browserGateDom({ document, window, mount }),
+          sfx: (beat) => {
+            audio.uiCues?.play(beat);
+          },
+          // `Escape` is BACK on every screen the menu can be on, so the door only
+          // takes it at the top level — a reseal over an open settings panel is
+          // the wrong answer to the same key.
+          canReseal: () => mainMenu.atTopLevel(),
+          // Two full-screen canvases repainting every frame is fine on a desktop
+          // and is exactly what needs a floor on a phone (GDD §4.3, risk 5). Its
+          // OWN reducer, because the match's is constructed on the way into a
+          // world and this screen is what the player sees before there is one.
+          quality: new VfxAutoQuality(),
+        })
+      : null;
+  titleGate?.mount();
   // The doors tell `boot()` WHICH game to run: an offline `LocalLoopback` (PLAY SOLO,
   // and the ?debug=1 harness boot) or a live online session a CREATE / JOIN opened
   // and the server WELCOMED us into (M10). Either way the lobby comes next — the
   // ratified flow puts one lobby between every door and every match — and only after
   // RUSH! does a world exist (GDD §4.2).
   const launch: LaunchPlan = mainMenu ? await mainMenu.untilPlay() : { kind: 'offline' };
+  // PLAY has been pressed: the menu is leaving, so the door that was in front of
+  // it goes with it — listeners, timers and frame loop and all. Until now it has
+  // stayed mounted-but-inert rather than removed, because `Escape` reseals and a
+  // door taken out of the DOM cannot come back.
+  titleGate?.dispose();
   // `let`, because a room can still turn out not to need a server: if RUSH! finds
   // the host alone, the lobby releases the room and this is dropped so the match
   // boots on `LocalLoopback` (a0-11, `src/net/local-revert`).
@@ -6957,6 +7017,11 @@ interface MainMenuHandle {
    *  moves it — without any `?debug=1` seam. Reads live bindings each call, so a
    *  rematch that rebuilds the world is tracked with no re-bind. */
   bindMatch(read: () => { scheme: ControlScheme; shipPos: { x: number; y: number } | null }): void;
+  /** Is the menu on its TOP level — not in settings, the doors, the codex or the
+   *  hangar? The title gate asks before taking `Escape` for a reseal, because on
+   *  every one of those screens `Escape` already means BACK and a door closing
+   *  over an open settings panel is the wrong answer to the same key (a0-50). */
+  atTopLevel(): boolean;
 }
 
 /** The landscape-lock context `boot()` hands the menu so it lays out in the same
@@ -6988,6 +7053,21 @@ interface MenuContext {
    * pick, a detent, a back) and the audio module decides everything else.
    */
   cue(kind: AudioCue, index?: number): void;
+  /**
+   * Is something MODAL in front of this screen — the title gate, sealed
+   * (a0-50)?
+   *
+   * The door is a DOM overlay, so it already takes every pointer: it covers the
+   * canvas the menu listens on. Keys are the case that does not solve itself,
+   * because both screens listen on the same `window` and the menu registered
+   * first — so `Enter` behind a closed door booted a match nobody could see.
+   *
+   * It is answered here rather than fixed with `stopImmediatePropagation` in the
+   * gate, because the window's keydown is ALSO what arms audio (`AudioUnlock`,
+   * risk 7): swallowing the event to protect the menu would have cost a keyboard
+   * player the sound of the door they just opened.
+   */
+  blocked?(): boolean;
 }
 
 /** One menu control as the landscape-lock seam reports it: its logical rect (for
@@ -9057,6 +9137,10 @@ function openMainMenu(
   }
 
   function onKeyDown(e: KeyboardEvent): void {
+    // A door is in front of this screen and it is shut (a0-50). The menu is
+    // there — that is the whole point of the gate — but nothing on it is
+    // reachable, so nothing on it may act.
+    if (ctx.blocked?.()) return;
     if (screen === 'online') {
       // A desktop player types the code on a real keyboard; the same rule as the
       // pad (`typeEntryCode` drops anything not in the ambiguity-free alphabet).
@@ -9237,6 +9321,7 @@ function openMainMenu(
     bindMatch: (read) => {
       matchReader = read;
     },
+    atTopLevel: () => screen === 'menu',
   };
 }
 

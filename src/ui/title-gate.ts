@@ -1111,6 +1111,16 @@ export interface TitleGateOptions {
   readonly quality?: GateQuality;
   /** Whether `background-clip:text` is available (trap 4). */
   readonly canClip?: boolean;
+  /**
+   * May `Escape` reseal right now?
+   *
+   * On every screen the menu can be on — settings, the doors, the codex, the
+   * hangar — `Escape` already means BACK, and a door closing over an open
+   * settings panel is the wrong answer to the same key. The host is the only
+   * thing that knows which screen is up, so the host answers. Absent, the gate
+   * assumes it may (which is what a test and a standalone preview want).
+   */
+  readonly canReseal?: () => boolean;
   /** Called the moment we are through — the menu takes the screen from here. */
   readonly onThrough?: () => void;
   /** Called when a reseal has finished and the door is locked again. */
@@ -1165,6 +1175,24 @@ export class TitleGate {
   /** Where the door is. */
   get current(): GatePhase {
     return this.phase;
+  }
+
+  /**
+   * Is the door in front of the screen and shut?
+   *
+   * The overlay already takes every POINTER — it covers the canvas the menu
+   * listens on. Keys are the case that does not solve itself: both screens
+   * listen on the same `window` and the menu registered first, so `Enter` behind
+   * a closed door booted a match nobody could see. The host reads this and
+   * ignores input while it is true.
+   *
+   * It is answered rather than enforced with `stopImmediatePropagation`, because
+   * the window's keydown is ALSO what arms audio (`../art/audio/unlock`, risk 7)
+   * — swallowing the event to protect the menu would cost a keyboard player the
+   * sound of the door they just opened.
+   */
+  get modal(): boolean {
+    return this.mounted && this.phase !== 'open';
   }
 
   /**
@@ -1225,6 +1253,7 @@ export class TitleGate {
    */
   reseal(): void {
     if (this.phase === 'locked' || this.phase === 'closing' || this.phase === 'returning') return;
+    if (!(this.opts.canReseal?.() ?? true)) return;
     this.clearTimers();
     this.dom.setVisible(true);
     this.sfx('gateReseal');

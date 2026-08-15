@@ -1002,3 +1002,63 @@ function snapshotField(dom: FakeDom, ms: number): string {
   dom.tick(ms);
   return JSON.stringify(dom.ctx.ops.filter((o) => o.op === 'arc'));
 }
+
+// ---------------------------------------------------------------------------
+// THE DOOR IS MODAL, AND ESCAPE IS NOT ALWAYS THE DOOR'S
+// ---------------------------------------------------------------------------
+
+describe('what is behind the door cannot be operated through it', () => {
+  it('reports itself modal until we are through, and never again', () => {
+    const dom = new FakeDom();
+    const g = gate(dom);
+    // Not mounted is not modal: nothing is in front of anything.
+    expect(g.modal).toBe(false);
+
+    g.mount();
+    expect(g.modal).toBe(true);
+    g.press();
+    for (const step of GATE_OPEN_STEPS) {
+      dom.advance(step.at);
+      expect(g.modal).toBe(step.phase !== 'open');
+    }
+    expect(g.current).toBe('open');
+    expect(g.modal).toBe(false);
+
+    // …and modal again the moment the door starts coming back, because the menu
+    // is once more behind something.
+    g.reseal();
+    expect(g.modal).toBe(true);
+
+    g.dispose();
+    expect(g.modal).toBe(false);
+  });
+
+  it('leaves Escape alone on a screen where it already means BACK', () => {
+    let atTopLevel = false;
+    const dom = new FakeDom();
+    const g = new TitleGate({ dom, canReseal: () => atTopLevel });
+    g.mount();
+    g.press();
+    dom.advance(GATE_OPEN_STEPS[GATE_OPEN_STEPS.length - 1]!.at);
+    expect(g.current).toBe('open');
+
+    // Settings is open behind the gate: Escape is that screen's BACK, and a door
+    // closing over an open panel is the wrong answer to the same key.
+    dom.listeners?.escape();
+    expect(g.current).toBe('open');
+
+    atTopLevel = true;
+    dom.listeners?.escape();
+    expect(g.current).toBe('returning');
+  });
+
+  it('still reseals with no host opinion at all', () => {
+    const dom = new FakeDom();
+    const g = gate(dom);
+    g.mount();
+    g.press();
+    dom.advance(GATE_OPEN_STEPS[GATE_OPEN_STEPS.length - 1]!.at);
+    dom.listeners?.escape();
+    expect(g.current).toBe('returning');
+  });
+});
