@@ -73,10 +73,16 @@ const glow = (rx: number, ry: number, alpha = 0.30): Shape =>
 const CANDIDATES: Candidate[] = [
   {
     key: 'ball',
-    name: 'BALL — what ships today',
-    note: 'shotSprite(): a soft glow disc at r 1.16 over a bright core at r 0.62. Round, so it carries no direction at all.',
+    // a0-46: this slot used to be "BALL — what ships today", a soft glow disc at
+    // r 1.16 over a bright core at r 0.62. The ball no longer ships — `shotSprite`
+    // IS the picked laser now — so the slot reads what it actually draws, at the
+    // sprite's own extent rather than the disc's. The disc it was comparing
+    // against is gone; this page is kept as the record of how the choice was
+    // framed, and `laser-lab.html` is where the choice itself was made.
+    name: 'SHIPPED — the PIERCE bolt (a0-46)',
+    note: 'shotSprite(): the developer’s pick, as `src/art/vfx/shots.ts` actually bakes it — blunt round head tapering back into a hairline trail, white core inside a plasma sheath. The candidates below are the exploration that led here.',
     def: shotSprite('own', 1),
-    extent: 1.16,
+    extent: shotSprite('own', 1).extent,
   },
   {
     key: 'bolt',
