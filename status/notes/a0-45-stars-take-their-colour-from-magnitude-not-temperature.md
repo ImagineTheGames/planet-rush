@@ -120,8 +120,82 @@ is CI.**
   - PR body carries all three Director questions with their numbers, the
     `peakP99` re-derivation, the brief's-multiplier-is-2×-high correction, and
     the golden accounting.
-- **Only CI is left.** If a golden fails on CI's renderer, `dcdde68` is the
-  baselines alone and can be dropped without touching the fix.
 - **Note for a future session:** this file exists twice — tracked in the repo at
   `status/notes/`, and untracked at the absolute `/status/notes/` the brief names.
   Keep both; the repo copy is the one that survives in git.
+
+## SESSION OF 2026-08-15 (fourth) — CI answered, and the answer was the Director question
+
+**No golden failed.** What failed is a0-23's negative assertion, on **both touch
+profiles** (shards 2/6 `pixel` = 79 px, 3/6 `iphone` = 94 px, bar `< 40`):
+
+```
+the stick zone no longer wears plasma (a0-23)
+expect(received).toBeLessThan(expected)   Expected: < 40   Received: 79
+```
+
+**This is the brief's own question, answered by a machine instead of by eye.**
+The brief asked whether *"a blue star at luma ~200 can be confused with a
+friendly marker at a glance"*. It can: the repo's own plasma detector cannot tell
+them apart, and it is not close.
+
+- `isBlueGlow` is `b - r > 20 && g - r > 8 && b > 38` (`tests/mobile/pixels.ts`).
+- The faint plasma ring it exists to catch is (25,48,63) — **`b - r` 38**.
+- A bloomed hot star composited over vacuum is (68,86,110) — **`b - r` 42**.
+- **The star is the bluer of the two.** No threshold rejects the star without
+  first rejecting the ring.
+
+**Proved by reading the pixels, not by reasoning.** `evidence/…/blue-probe/`
+reproduces the failing sample exactly (same boot, same screenshot, same
+`affordanceArcRegion`) and prints every match. The 79 are **one star**: an
+11×10 px radially-symmetric disc, `isPlasma` 0, colours running (34,43,56) →
+(107,121,139). Solving the composite against vacuum gives alpha 0.374 / 0.370 /
+0.380 from the r/g/b channels independently — three decimals of agreement with
+`rgb(160,205,255)`, the design's hot star at t=1. The same probe on a `main`
+worktree measures **0**.
+
+## DECISIONS (fourth session)
+
+- **The fix goes in QA's probe, not in the sky.** Precedent is exact and is the
+  same brief this assertion is named after: `dfd3304` *"test(a0-23): QA's touch
+  probe was keyed on the plasma this brief removes"* changed both `pixels.ts` and
+  `emulation.spec.ts` when an art change invalidated the predicate — *"the probe
+  encoded the old look, so it had to move with it"* — and landed it as **a commit
+  of its own** because they are QA's files. Same shape here. Desaturating the sky
+  to satisfy a test is precisely what this brief exists to undo.
+- **Assertion 1, the stick arc: shape, not colour — measured, not assumed.** The
+  arc band was chosen (a0-23) because it is *almost entirely ring*. So a ring
+  crosses it and a star sits in it. Measured in that band on the Bone ring that is
+  actually drawn — the same geometry the plasma ring had — coverage is **101/101
+  columns**; one bloomed star is **11/101**. `columnCoverage()` in `pixels.ts`,
+  threshold `STROKE_COLUMN_RATIO = 0.5`, the midpoint of a 9× gap.
+- **Assertion 2, `REGION_STRIP_MID`: the probe reversed me twice, and that is
+  why it was run.** First draft converted it to `columnCoverage` too — it passed
+  the suite and was **wrong**: a strip is a row of glyphs, not a stroke, and a
+  real one covers 16/283 = **6%** of that band's columns, *below* a single star's
+  11%. Reverting it to the original pixel count then went **red at 352** — so
+  a0-45 had broken this assertion as well, and CI never said so because the arc
+  above it failed first and masked it.
+- **That band cannot carry a colour assertion at all any more.** Sky alone: 352
+  px, max `b-r` 51, max `b` 162. A real strip: 32 px, 28, 69. `isPlasma` is 0 over
+  both. The sky is more of it, bluer than it and brighter than it — so the old
+  `< 40` bar is not noisy, it is **inverted**: it fails on empty sky and would
+  have passed on the drawn strip it names. Moved to the **layout registry**
+  (`controls-strip` is published by the code that draws it; present on desktop,
+  absent on touch) — exact where the pixels are hopeless, and the same instrument
+  the desktop test already uses in the mirror direction. Cost, stated in the PR:
+  it can no longer catch a strip drawn *without* registering.
+- **The desktop strip PRESENT check was left alone** (`REGION_STRIP_LEFT`,
+  `> 100 px`). Stars can only push a *present* check further past its bar, so the
+  risk there is a false pass, not a false fail — a real weakness, but the opposite
+  failure mode, and not this brief's to change.
+
+## NEXT (fourth session)
+
+- `npx tsc --noEmit` clean; `npm run dark-matter:check` clean; `emulation.spec.ts`
+  **7 passed / 5 skipped** on all three profiles (iphone, pixel, desktop) — the
+  same counts a0-23 recorded.
+- The QA-file change is its own commit, per the a0-23 precedent.
+- Remaining: push, update the PR body with the finding, and watch CI. Only
+  shards 2 and 3 were red; 1, 4, 5, 6 were green, so nothing outside
+  `emulation.spec.ts` is implicated.
