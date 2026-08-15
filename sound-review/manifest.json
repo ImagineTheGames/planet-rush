@@ -114,22 +114,22 @@
       "current": "previews/oreCollect/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/oreCollect/a.wav",
-          "character": "magnetic capture, one hard snap",
-          "params": "src/art/audio/candidates.ts#oreCollect.a"
+          "id": "d",
+          "wav": "previews/oreCollect/d.wav",
+          "character": "flake shear, bright chips off the snap",
+          "params": "src/art/audio/candidates.ts#oreCollect.d"
         },
         {
-          "id": "b",
-          "wav": "previews/oreCollect/b.wav",
-          "character": "servo intake, filter opening",
-          "params": "src/art/audio/candidates.ts#oreCollect.b"
+          "id": "e",
+          "wav": "previews/oreCollect/e.wav",
+          "character": "charged intake, an ionised edge",
+          "params": "src/art/audio/candidates.ts#oreCollect.e"
         },
         {
-          "id": "c",
-          "wav": "previews/oreCollect/c.wav",
-          "character": "telemetry blip, two narrow bands",
-          "params": "src/art/audio/candidates.ts#oreCollect.c"
+          "id": "f",
+          "wav": "previews/oreCollect/f.wav",
+          "character": "assay ping, two high bands reading back",
+          "params": "src/art/audio/candidates.ts#oreCollect.f"
         }
       ]
     },
@@ -1103,22 +1103,22 @@
       "current": "previews/levelUp/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/levelUp/a.wav",
-          "character": "a dry arrival, contacts landing",
-          "params": "src/art/audio/candidates.ts#levelUp.a"
+          "id": "d",
+          "wav": "previews/levelUp/d.wav",
+          "character": "a lock engaging, mass seating hard",
+          "params": "src/art/audio/candidates.ts#levelUp.d"
         },
         {
-          "id": "b",
-          "wav": "previews/levelUp/b.wav",
-          "character": "pressure seating, weight arriving",
-          "params": "src/art/audio/candidates.ts#levelUp.b"
+          "id": "e",
+          "wav": "previews/levelUp/e.wav",
+          "character": "a drive coming online, opening",
+          "params": "src/art/audio/candidates.ts#levelUp.e"
         },
         {
-          "id": "c",
-          "wav": "previews/levelUp/c.wav",
-          "character": "a struck plate, one bare fifth",
-          "params": "src/art/audio/candidates.ts#levelUp.c"
+          "id": "f",
+          "wav": "previews/levelUp/f.wav",
+          "character": "a vault seating, contacts in a room",
+          "params": "src/art/audio/candidates.ts#levelUp.f"
         }
       ]
     },

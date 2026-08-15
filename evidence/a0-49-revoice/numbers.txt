@@ -1,0 +1,72 @@
+a0-49 — the two revoices, measured
+
+`<200Hz` is absolute RMS (mass); `>3kHz` is a SHARE of total energy (sparkle);
+`late/early` is RMS of the last 60% over the first 40% (is anything left after it lands).
+
+=== oreCollect — denied 2026-08-14
+    "add a little bit more of sparkle to it, like you've won a prize, but subtle... it shouldn't be too long"
+
+sound                                          secs   peak   rms     <200Hz   >3kHz   late/early
+------------------------------------------------------------------------------------------------
+incumbent (bank, unchanged)                     0.142  0.298  0.0530   0.0096   0.091  0.174
+denied a — oreCollect_a_magneticSnap            0.052  0.448  0.0570   0.0105   0.150  0.069
+denied b — oreCollect_b_servoIntake             0.090  0.487  0.1222   0.0469   0.018  0.070
+denied c — oreCollect_c_telemetry               0.057  0.286  0.0426   0.0038   0.240  0.068
+offer d — flake shear, bright chips off the snap  0.070  0.269  0.0493   0.0043   0.370  0.222
+offer e — charged intake, an ionised edge       0.075  0.244  0.0522   0.0094   0.309  0.480
+offer f — assay ping, two high bands reading back  0.066  0.226  0.0377   0.0029   0.382  0.372
+
+=== levelUp — denied 2026-08-14
+    "sounds too toony, doesn't sound rewarding"
+
+sound                                          secs   peak   rms     <200Hz   >3kHz   late/early
+------------------------------------------------------------------------------------------------
+incumbent (bank, unchanged)                     0.430  0.386  0.0462   0.0221   0.059  0.252
+denied a — levelUp_a_dryArrival                 0.299  0.503  0.0574   0.0263   0.265  0.314
+denied b — levelUp_b_pressureSeating            0.403  0.455  0.0585   0.0454   0.009  0.271
+denied c — levelUp_c_struckPlate                0.407  0.391  0.0460   0.0096   0.067  0.278
+offer d — a lock engaging, mass seating hard    0.421  0.454  0.0652   0.0577   0.008  0.417
+offer e — a drive coming online, opening        0.429  0.361  0.0751   0.0689   0.002  0.485
+offer f — a vault seating, contacts in a room   0.429  0.368  0.0736   0.0627   0.004  0.430
+
+=== the bounds these are held to, resolved
+
+oreCollect  sparkle  > 0.300  (1.25x the brightest denied take, 0.240)
+            level    <= rms 0.0530 / peak 0.298  (the incumbent it adds sparkle TO)
+            length   <= 0.090s  (the longest denied take)
+              d: sparkle 0.370  rms 0.0493  peak 0.269  0.070s
+              e: sparkle 0.309  rms 0.0522  peak 0.244  0.075s
+              f: sparkle 0.382  rms 0.0377  peak 0.226  0.066s
+
+levelUp     mass     > 0.0454  (the heaviest denied take)
+            seated   > 0.314  (the longest-ringing denied take)
+            level    < 0.0774  (0.8x matchEnd — the XP beat plays BENEATH the result)
+              d: mass 0.0577  seated 0.417  rms 0.0652
+              e: mass 0.0689  seated 0.485  rms 0.0751
+              f: mass 0.0627  seated 0.430  rms 0.0736
+
+=== the pair that must not collide: oreCollect vs depositTick (§8)
+
+zero-crossing rate — the proxy `audio.test.ts` separates the bank with. The sparkle
+moves oreCollect UP and depositTick has not moved, so the gap can only widen.
+
+  oreCollect/d  zcr 0.2326
+  oreCollect/e  zcr 0.1898
+  oreCollect/f  zcr 0.2486
+  depositTick (bank) zcr 0.0247
+  depositTick/a zcr 0.0249
+  depositTick/b zcr 0.0087
+  depositTick/c zcr 0.0539
+
+=== what was NOT regenerated, and why
+
+xpBarFill  denied 2026-08-14 — "all these sounds are mega annoying, we don't need
+           this at all no need for regeneration". Dispositioned CUT, not revoiced:
+           three new takes on a sound somebody asked to stop hearing is the round
+           this brief exists to prevent. The proposal and its cost are in
+           docs/sound-denials-outstanding.md; the bed still plays.
+the 35 R1 rows  superseded by a0-01b on 2026-08-08, the day after the deny-all.
+           The work is not missing, it is invisible — it was filed under the same
+           letters the denial had just spent. Nothing owed but a listen.
+the music six   a decision ("does this game want music at all right now"), not a
+           batch. Six regenerated tracks nobody asked for is worse than none.
