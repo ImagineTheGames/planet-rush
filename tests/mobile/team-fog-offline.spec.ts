@@ -71,6 +71,20 @@
  * evidence and where a full-frame decode costs 1.0 MP instead of a phone's 2.96
  * (tests/mobile/shot-budget.ts).
  */
+/*
+ * ── a0-50: `?gate=0` on the clean boot below ────────────────────────────────
+ * OWNED BY QA, EDITED BY THE UI ENGINEER — one line, and it drops cleanly.
+ *
+ * The title gate is a DOOR in front of the title screen: the wordmark is stamped
+ * into the leaves of an airlock and it is opened by a press, over four beats.
+ * This spec walks through the front door on its way somewhere else, so without
+ * the flag its first click lands on the door instead of on the menu.
+ *
+ * `?gate=0` turns off that screen and NOTHING else — the menu, the doors and the
+ * lobby below are the real ones, exactly as they were. It is deliberately much
+ * narrower than `?debug=1`, which skips the whole front of the game. The read is
+ * `src/ui/title-gate.ts` `gateEnabled`, and its doc carries the reasoning.
+ */
 import { test, expect, type Page, type TestInfo } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -360,7 +374,7 @@ async function bootLobbyMatch(page: Page, mode: 'ffa' | 'teams'): Promise<{
    *  from a count that has already been running. */
   firstTick: number;
 }> {
-  await page.goto('/', { waitUntil: 'load' });
+  await page.goto('/?gate=0', { waitUntil: 'load' });
   await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
 
   await page.waitForFunction(() => (window.__mainMenu?.controls.length ?? 0) > 0, undefined, { timeout: 20_000 });
