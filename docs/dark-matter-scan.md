@@ -532,6 +532,28 @@ alone, so it is not in the bundle — and it is deliberately unreachable from
 `main.ts`, exactly like the `evidence/` scripts in §4.4(a). It needs no entry
 point; if `roleOf()` ever grows a *dev-surface* bucket, this belongs in it.
 
+### 4.7 SURFACE — an invariant that must not be the code it checks (a0-50, 2026-08-15)
+
+| Export | Verdict |
+|---|---|
+| `src/ui/title-gate.ts#skyCoversPoint` | SURFACE — the doorway invariant, stated as a question CI can ask |
+
+The title gate's central claim is that **the doorway is a real hole, not a fade**:
+the starfield in front of the menu comes out as a *ring*, so the one place the
+interior shows is the opening. Production paints that hole — `paintSky` fills
+`openingPolygon` with `destination-out` — and `skyCoversPoint` asks the inverse
+question of the same geometry: *did a point survive the punch?*
+
+It is the §4.6 shape rather than the §4.4 one, and the distinction is the reason
+it is not simply wired up. A version production called would have to be the paint
+restated, and the failure this guards is exactly a paint that looks right:
+`clip-path` on a filled element yields a SOLID shape instead of a ring, which
+paints the doorway shut while the door still animates and the screenshot still
+passes. That happened **twice during design**. So the predicate is deliberately a
+second statement of the shape, and `title-gate.test.ts` holds it by name — *"the
+doorway is a hole, not a fade"* — asking for the doorway's centre to be uncovered
+and a point on the hull to be covered.
+
 ## 5. Should it gate CI? Yes — and here is the number
 
 **It ships as a gate**, `npm run dark-matter:check`, in the `ci` job. It fails on

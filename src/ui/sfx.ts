@@ -43,10 +43,49 @@
  * already mixed and already used by three other selections in the game. */
 export type UiCue = 'press' | 'confirm' | 'reject' | 'detent';
 
+/**
+ * The four beats of the title gate (`./title-gate`, a0-50) — the one screen in
+ * the game whose sound is a *sequence* rather than an answer to a fingertip.
+ *
+ *  - `gateUnlock` — the opening press. Everything the machine does, in the order
+ *    it does it: the valve cracks, the compartment vents, the lock ratchets
+ *    round its seven detents, and the door's weight moves last.
+ *  - `gateSeated` — we are through, and the room we arrived in has a size.
+ *  - `gateReseal` — `Escape`: two notes stepping down, then the leaves taking up
+ *    their own weight.
+ *  - `gateSealed` — the lock throwing back, and pressure returning.
+ *
+ * They are cues like any other: **the UI names the event and the audio module
+ * owns the sound.** That is the whole reason they are here rather than in the
+ * screen — the design's prototype carries its own synthesiser, and a second
+ * engine would mean a second tone contract and an audit
+ * (`spikes/tone-audit/measure-bank-tone.ts`) that measures one of them.
+ *
+ * `gateUnlock` is also the gesture that ARMS audio: browsers block it until a
+ * press, so it is the first sound this game is permitted to make, and nothing
+ * on the title screen may sound before it (`./title-gate.test.ts`).
+ *
+ * Deliberately **not** folded into {@link UiCue}. That union is the vocabulary
+ * `PressFeedback` speaks — a press, a confirm, a refusal, a detent — and every
+ * control in the game routes through it; widening it would put four cues no
+ * control can raise in front of every call site (and in the middle of the
+ * press-counter `src/main.ts` keeps). One screen, one seam: {@link GateSfx}.
+ */
+export type GateCue = 'gateUnlock' | 'gateSeated' | 'gateReseal' | 'gateSealed';
+
 /** The narrow seam a UI control calls to make a sound. The audio module decides
  *  the rest (sound, volume, ducking); the UI only names the event. */
 export type UiSfx = (cue: UiCue) => void;
 
+/** The title gate's half of {@link UiSfx} — the same seam, narrowed to the four
+ *  cues that screen raises, so a host can wire it without widening anything. */
+export type GateSfx = (cue: GateCue) => void;
+
 /** The silent seam — used when no audio module is wired (Node, the QA harness,
  *  a headless unit test), so a control is byte-for-byte unchanged when muted. */
 export const NO_UI_SFX: UiSfx = () => {};
+
+/** {@link NO_UI_SFX} for the gate's seam — the title screen is byte-for-byte
+ *  unchanged when no audio module is wired, which is also the state every unit
+ *  test mounts it in. */
+export const NO_GATE_SFX: GateSfx = () => {};

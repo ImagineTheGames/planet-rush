@@ -91,7 +91,12 @@ test('a clean boot lands on the main menu; PLAY opens the doors, PLAY SOLO the l
   page.on('pageerror', (e) => pageErrors.push(String(e)));
 
   // A CLEAN boot — no ?debug=1. This is the exact path the field report walked.
-  await page.goto('/', { waitUntil: 'load' });
+  // `?gate=0` (a0-50): the title gate is a DOOR in front of the title screen,
+  // opened by a press over four beats. This spec walks through the front door on
+  // its way somewhere else. The flag turns off that one screen and nothing else —
+  // the menu, the doors and the lobby below are the real ones. See
+  // `src/ui/title-gate.ts` `gateEnabled`.
+  await page.goto('/?gate=0', { waitUntil: 'load' });
   await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
 
   // The menu seam installs during boot; wait for it before reading it.
@@ -236,7 +241,12 @@ async function switchToTapCommanderThroughSettings(page: Page, press: Press): Pr
   const pageErrors: string[] = [];
   page.on('pageerror', (e) => pageErrors.push(String(e)));
 
-  await page.goto('/', { waitUntil: 'load' });
+  // `?gate=0` (a0-50): the title gate is a DOOR in front of the title screen,
+  // opened by a press over four beats. This spec walks through the front door on
+  // its way somewhere else. The flag turns off that one screen and nothing else —
+  // the menu, the doors and the lobby below are the real ones. See
+  // `src/ui/title-gate.ts` `gateEnabled`.
+  await page.goto('/?gate=0', { waitUntil: 'load' });
   await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
   await page.waitForFunction(() => typeof window.__mainMenu?.play === 'function', undefined, {
     timeout: 20_000,

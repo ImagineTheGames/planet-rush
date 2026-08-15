@@ -141,7 +141,14 @@ export const MEASURED_SECONDS: Readonly<Record<string, number>> = {
   'iphone|campaign-door.spec.ts': 139,
   'desktop|upgrade-wheel-gantry.spec.ts': 133,
   'pixel|campaign-door.spec.ts': 114,
-  'iphone|menu-frame-cost.spec.ts': 109,
+  // +35 s for a0-50's third sample in the title test: the title gate stands in
+  // front of the menu and is a DOOR, so `?gate=0` takes it out of the menu's
+  // number and the sealed door gets a boot and a 3 s window of its own. DERIVED,
+  // not measured on the runner — +6 s in-container (14 → 20 measured) × the 5.9
+  // software-GL factor this suite measured for itself (./budgets.ts). Replace it
+  // from the first green run that shards it; the table's own rule is that a spec
+  // which grows and is never re-measured makes its shard the slow one.
+  'iphone|menu-frame-cost.spec.ts': 144,
   'iphone|slot-state.spec.ts': 106,
   'pixel|landscape-lock.spec.ts': 104,
   'pixel|slot-state.spec.ts': 94,
