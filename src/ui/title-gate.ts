@@ -1073,6 +1073,15 @@ export interface GateDom {
   cancelTimer(handle: number): void;
 }
 
+/**
+ * The one method the gate needs off `VfxAutoQuality`: feed it a frame's elapsed
+ * seconds, get back whether reduce-VFX is engaged. Structural, so the screen
+ * unit-tests against three lines and the platform passes the real reducer.
+ */
+export interface GateQuality {
+  sample(seconds: number): boolean;
+}
+
 /** Everything the gate is wired to. */
 export interface TitleGateOptions {
   readonly dom: GateDom;
@@ -1082,9 +1091,24 @@ export interface TitleGateOptions {
    * mount** — the opening press is what arms audio (trap 5).
    */
   readonly sfx?: GateSfx;
-  /** Whether `VfxAutoQuality` has throttled this device (GDD §4.3). Read per
-   *  paint, so a device that recovers gets its field back. */
+  /**
+   * Whether this device is already known to be throttled — a setting, a debug
+   * flag, a host that has measured before. Read **per paint**, so a device that
+   * recovers gets its field back.
+   */
   readonly reduced?: () => boolean;
+  /**
+   * The auto-reducer this screen goes behind (GDD §4.3, risk 5) — structurally
+   * `../platform/vfx-quality` `VfxAutoQuality`.
+   *
+   * The gate feeds it **its own** frame deltas rather than reading a shared
+   * instance, because on a clean boot there is not one yet: the match's reducer
+   * is constructed on the way into a world, and this screen is what the player
+   * is looking at before there is a world. Two full-screen canvases repainting
+   * every frame is fine on a desktop and is exactly the thing that needs a floor
+   * on a phone, so the floor is the same class, sampled on the same signal.
+   */
+  readonly quality?: GateQuality;
   /** Whether `background-clip:text` is available (trap 4). */
   readonly canClip?: boolean;
   /** Called the moment we are through — the menu takes the screen from here. */
@@ -1118,8 +1142,19 @@ export class TitleGate {
   private readonly timers: number[] = [];
   /** Frames spent waiting for the leaves to come home — see {@link pollSeal}. */
   private sealFrames = 0;
-  /** Set once the field has been laid out for the current viewport. */
-  private reducedAt = false;
+  /**
+   * Whether reduce-VFX is engaged **right now**. Two different things read it,
+   * and they are not the same read:
+   *
+   *  - the **star count** is fixed at {@link resize}, because rebuilding the
+   *    field mid-flight would pop half the sky out of existence in one frame;
+   *  - the **clock** is read per paint ({@link fieldAnimates}), so a device that
+   *    drops below the floor sheds the twinkle immediately, and one that
+   *    recovers gets it back.
+   */
+  private reducedNow = false;
+  /** The previous frame's timestamp, so the reducer is fed real deltas. */
+  private lastFrameMs: number | null = null;
 
   constructor(options: TitleGateOptions) {
     this.opts = options;
@@ -1203,10 +1238,13 @@ export class TitleGate {
    *  from the window, so a resize must recompute it. */
   resize(): void {
     if (!this.mounted) return;
+    // A host that already knows (a setting, a debug flag) is honoured before the
+    // first frame; the reducer's own verdict can only arrive after one.
+    this.reducedNow = this.reducedNow || (this.opts.reduced?.() ?? false);
     const v = this.dom.view();
     this.viewport = { width: v.width, height: v.height };
-    this.reducedAt = this.opts.reduced?.() ?? false;
-    this.stars = makeStars(this.viewport, this.reducedAt);
+    // The star COUNT is fixed here and only here — see `reducedNow`.
+    this.stars = makeStars(this.viewport, this.reducedNow);
     this.ctx = this.dom.sky(this.viewport, v.dpr);
     // Sizing a canvas clears it, so paint here rather than waiting on a frame:
     // the field must be complete on the first one.
@@ -1218,9 +1256,25 @@ export class TitleGate {
    *  line either way. */
   tick(ms: number): void {
     if (!this.mounted) return;
+    this.sampleQuality(ms);
     if (this.phase === 'closing') this.pollSeal();
     if (this.phase === 'open') return;
     this.paint(ms);
+  }
+
+  /**
+   * Feed the auto-reducer this frame's elapsed seconds and take its verdict.
+   *
+   * The first frame has no previous one to measure against, so it samples
+   * nothing: a delta computed from zero is a 0 fps frame, and three of those
+   * would engage the reducer on a machine that had not yet drawn anything.
+   */
+  private sampleQuality(ms: number): void {
+    const previous = this.lastFrameMs;
+    this.lastFrameMs = ms;
+    const measured =
+      previous !== null && ms > previous ? (this.opts.quality?.sample((ms - previous) / 1000) ?? false) : false;
+    this.reducedNow = measured || (this.opts.reduced?.() ?? false);
   }
 
   // --- the beats ----------------------------------------------------------
@@ -1303,7 +1357,7 @@ export class TitleGate {
     // A throttled device gets a STILL field: the twinkle and the drift are the
     // only things a frozen clock costs, and they are the only things on this
     // screen that are decoration. See {@link fieldAnimates} for what is not.
-    const clock = fieldAnimates(this.reducedAt, this.phase) ? ms : 0;
+    const clock = fieldAnimates(this.reducedNow, this.phase) ? ms : 0;
     paintSky(g, this.viewport, this.stars, clock, scale, this.phase !== 'open');
   }
 
@@ -1325,6 +1379,7 @@ export class TitleGate {
   }
 
   private stopLoop(): void {
+    this.lastFrameMs = null; // a reseal must not measure the time we spent through
     if (this.raf === null) return;
     this.dom.cancelFrame(this.raf);
     this.raf = null;

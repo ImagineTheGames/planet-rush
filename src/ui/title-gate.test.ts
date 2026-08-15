@@ -51,6 +51,20 @@ import {
 } from './title-gate';
 import { extraTracking, splitWordmark } from './game-name';
 import type { GateCue } from './sfx';
+// The bank the gate's four beats are slots in — imported so the seam cannot
+// dangle: a `GateCue` with no `UI_CUES` entry is a beat of the door that is
+// silent, and it would be silent in a passing render.
+import {
+  A_FLAT_6,
+  DOOR_CUE_NAMES,
+  FIFTH_ABOVE,
+  FOURTH_BELOW,
+  OCTAVE_ABOVE,
+  RATCHET_DETENTS,
+  RATCHET_HZ,
+  UI_CUES,
+  renderUiCue,
+} from '../art/audio/ui-cues';
 
 /** A desktop and a phone — the two viewports whose binding dimension differs,
  *  which is the whole reason `throughScale` is measured rather than fixed. */
@@ -70,7 +84,7 @@ type Op =
   | { readonly op: 'moveTo'; readonly x: number; readonly y: number }
   | { readonly op: 'lineTo'; readonly x: number; readonly y: number }
   | { readonly op: 'closePath' }
-  | { readonly op: 'arc' }
+  | { readonly op: 'arc'; readonly x: number; readonly y: number; readonly r: number }
   | { readonly op: 'fill'; readonly composite: string }
   | { readonly op: 'save' }
   | { readonly op: 'restore' };
@@ -110,8 +124,8 @@ class FakeContext implements GateContext2D {
   lineTo(x: number, y: number): void {
     this.ops.push({ op: 'lineTo', x, y });
   }
-  arc(): void {
-    this.ops.push({ op: 'arc' });
+  arc(x: number, y: number, r: number): void {
+    this.ops.push({ op: 'arc', x, y, r });
   }
   fill(): void {
     this.ops.push({ op: 'fill', composite: this.composite });
@@ -837,3 +851,154 @@ describe('the geometry itself', () => {
     expect(insidePolygon(poly, { x: 0, y: 0 })).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// NO SECOND SYNTHESISER
+// ---------------------------------------------------------------------------
+
+describe('the door names cues; the audio module owns the sound', () => {
+  /**
+   * The seam is only worth having if there is something behind it. The design
+   * file ships a few-hundred-line cue engine of its own, and the whole reason
+   * this screen does not is that a second engine means two tone contracts and a
+   * `spikes/tone-audit/measure-bank-tone.ts` that measures one of them.
+   *
+   * So: every `GateCue` this screen can raise is a real slot in the ratified
+   * bank, and the two lists are the same list. A cue added on one side and
+   * forgotten on the other is a beat of the door that plays nothing.
+   */
+  it('has a bank slot for every cue it can raise, and no cue for a slot it cannot', () => {
+    const raised: GateCue[] = ['gateUnlock', 'gateSeated', 'gateReseal', 'gateSealed'];
+    expect([...DOOR_CUE_NAMES].sort()).toEqual([...raised].sort());
+    for (const name of DOOR_CUE_NAMES) expect(UI_CUES[name].name).toBe(name);
+  });
+
+  it('builds the door out of the same instrument as the rest of the interface', () => {
+    // Struck glass over one shared room, and the family's own root — not a
+    // parallel palette that happens to be next door in the file.
+    expect(UI_CUES.gateSeated.notes.map((n) => n.f)).toEqual([A_FLAT_6, FIFTH_ABOVE, OCTAVE_ABOVE]);
+    expect(UI_CUES.gateSeated.notes.every((n) => n.at === 0)).toBe(true);
+    // Going back through the door is going backwards, and rule 3 does not stop
+    // applying because the control is a whole screen.
+    expect(UI_CUES.gateReseal.notes.map((n) => n.f)).toEqual([A_FLAT_6, FOURTH_BELOW]);
+    // Every press varies a little, one factor for the whole cue so the intervals
+    // stay exact (the handoff's own line).
+    for (const name of DOOR_CUE_NAMES) expect(UI_CUES[name].detuned).toBe(true);
+  });
+
+  it('makes pressure relief a FILTER that falls, not a tone', () => {
+    // "A hiss is not a tone: it is broadband noise whose FILTER falls as the
+    // pressure drops." Three stages on the way out, one climbing on the way back.
+    const relief = UI_CUES.gateUnlock.air;
+    expect(relief).toHaveLength(3);
+    for (const stage of relief) {
+      expect(stage.band).toBe(true);
+      expect(stage.to).toBeDefined();
+      expect(stage.to!).toBeLessThan(stage.freq); // falling: the compartment empties
+    }
+    expect(relief[0]!.freq).toBe(7600);
+    expect(relief[0]!.to).toBe(3000);
+    expect(relief[0]!.dur).toBeCloseTo(0.2, 6);
+    expect(relief[1]!.freq).toBe(4800);
+    expect(relief[1]!.to).toBe(620);
+    expect(relief[1]!.dur).toBeCloseTo(1.7, 6);
+
+    // Pressure RETURNING climbs, because the air is going back in.
+    const back = UI_CUES.gateSealed.air[0]!;
+    expect(back.to!).toBeGreaterThan(back.freq);
+  });
+
+  it('moves the door’s weight only once the lock has let go of it', () => {
+    // The sub is the door's mass. Playing it early is what makes a pressure door
+    // read as a sliding panel — so it arrives after the last ratchet detent.
+    const detents = UI_CUES.gateUnlock.notes.filter((n) => n.f === RATCHET_HZ);
+    expect(detents).toHaveLength(RATCHET_DETENTS);
+    const lastDetent = Math.max(...detents.map((n) => n.at));
+    const weight = UI_CUES.gateUnlock.sub[0]!;
+    expect(weight.at).toBeGreaterThan(lastDetent);
+  });
+
+  it('renders every door cue to finite samples inside the set’s own level band', () => {
+    for (const name of DOOR_CUE_NAMES) {
+      const { dry, send } = renderUiCue(UI_CUES[name], 48000);
+      let peak = 0;
+      for (const v of dry) {
+        expect(Number.isFinite(v)).toBe(true);
+        peak = Math.max(peak, Math.abs(v));
+      }
+      // Audible, and nowhere near the clamp — the same 0.03–0.30 band the nine
+      // ratified cues occupy, so the door does not shout over the interface.
+      expect(peak, `${name} peak`).toBeGreaterThan(0.03);
+      expect(peak, `${name} peak`).toBeLessThan(0.3);
+      expect(send.length).toBe(dry.length);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE PHONE'S FLOOR
+// ---------------------------------------------------------------------------
+
+describe('two full-screen canvases go behind the auto-reducer (GDD §4.3, risk 5)', () => {
+  it('feeds the reducer real frame deltas, and never a first frame with no previous one', () => {
+    const seen: number[] = [];
+    const dom = new FakeDom();
+    const g = new TitleGate({ dom, quality: { sample: (s) => (seen.push(s), false) } });
+    g.mount();
+    // The first frame has nothing to measure against: a delta computed from zero
+    // is a 0 fps frame, and three of those would engage the reducer on a machine
+    // that had not yet drawn anything.
+    dom.tick(1000);
+    expect(seen).toEqual([]);
+    dom.tick(1016);
+    dom.tick(1032);
+    expect(seen).toEqual([0.016, 0.016]);
+  });
+
+  it('sheds the twinkle the moment the reducer engages, and gives it back', () => {
+    let engaged = false;
+    const dom = new FakeDom();
+    const g = new TitleGate({ dom, quality: { sample: () => engaged } });
+    g.mount();
+    dom.tick(16);
+    dom.tick(32);
+    // Two identical clocks would be indistinguishable, so the assertion is on
+    // the field: a still one draws every star at the same place every frame.
+    const moving = [snapshotField(dom, 100), snapshotField(dom, 400)];
+    expect(moving[0]).not.toEqual(moving[1]);
+
+    engaged = true;
+    const still = [snapshotField(dom, 700), snapshotField(dom, 1000)];
+    expect(still[0]).toEqual(still[1]);
+
+    engaged = false;
+    const again = [snapshotField(dom, 1300), snapshotField(dom, 1600)];
+    expect(again[0]).not.toEqual(again[1]);
+  });
+
+  it('does not carry the time spent through into the reseal as one slow frame', () => {
+    const seen: number[] = [];
+    const dom = new FakeDom();
+    const g = new TitleGate({ dom, quality: { sample: (s) => (seen.push(s), false) } });
+    g.mount();
+    dom.tick(16);
+    dom.tick(32);
+    g.press();
+    dom.advance(GATE_OPEN_STEPS[GATE_OPEN_STEPS.length - 1]!.at);
+    expect(g.current).toBe('open'); // the loop stopped here
+    seen.length = 0;
+    g.reseal();
+    // A minute on the menu is not a 60-second frame.
+    dom.tick(62_000);
+    expect(seen).toEqual([]);
+    dom.tick(62_016);
+    expect(seen).toEqual([0.016]);
+  });
+});
+
+/** The stars this frame landed on, so "still" and "drifting" are comparable. */
+function snapshotField(dom: FakeDom, ms: number): string {
+  dom.ctx.ops.length = 0;
+  dom.tick(ms);
+  return JSON.stringify(dom.ctx.ops.filter((o) => o.op === 'arc'));
+}
