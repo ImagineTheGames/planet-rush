@@ -15,17 +15,21 @@
 
 import { describe, it, expect } from 'vitest';
 import type { Action, BuildItem } from '@shared/types';
-import { ShipClass } from '@shared/types';
+import { ShipClass, UpgradeTrack } from '@shared/types';
 import { createWorld, step, type Inputs } from './index';
 import {
+  buyUpgrade,
   damageStation,
   isDocked,
   placeOrder,
+  spendableOre,
   updateStations,
   stationOf,
   stationTargetRadius,
   shieldPool,
   spendOre,
+  satelliteCount,
+  shieldCount,
   turretCount,
   turretMountPos,
   turretTier,
@@ -39,12 +43,15 @@ import {
   REPAIR_HP_PER_ORE,
   REPAIR_ORE_COST,
   REPAIR_TELL_HOLD,
+  SATELLITE,
   SHIELD,
   SHIP_RADIUS,
   TICK_DT,
   TURRET,
 } from './constants';
-import { shipCargoCap, shipMaxHull, shipWeaponDamage, stockTiers } from './upgrades';
+import { shipCargoCap, shipMaxHull, shipWeaponDamage, stockTiers, trackSpec } from './upgrades';
+import { drainOreJournal, makeOreJournal, oreEventLine, oreOverdrafts } from './ore-journal';
+import { makeLedger } from './ore-ledger';
 import type { MiningStation, Projectile, Shield, Ship, Turret, World } from './state';
 
 // --- builders --------------------------------------------------------------
@@ -152,6 +159,13 @@ function makeWorld(over: Partial<World> = {}): World {
     // puts in it, so the wave metronome cannot drop asteroids into a siege
     // fixture. The collapse phase needs all five waves and so never opens here.
     asteroidsPerWave: over.asteroidsPerWave ?? 0,
+    // Every fixture keeps an ore journal (a0-52), so any test can read what a
+    // press did to the wallet — and so the overdraft alarm is armed everywhere
+    // rather than only where a test remembered to arm it (`./ore-journal`).
+    oreJournal: over.oreJournal ?? makeOreJournal(),
+    // …and an ore ledger, so a fixture can check the narrative against the
+    // conservation totals it must agree with (`./ore-ledger`).
+    ledger: over.ledger ?? makeLedger(),
     match: over.match ?? {
       phase: 'live',
       wavesSpawned: 0,
@@ -279,6 +293,292 @@ describe('the wheel is validated by the sim, never trusted (GDD §2.5)', () => {
     expect(ship.cargo).toBe(0);
     expect(ship.banked).toBe(3);
     expect(placeOrder(world, ship, 'bank')).toBe('nothing-to-bank');
+  });
+});
+
+// --- 2b. the wallet cannot be overdrawn (a0-52) ------------------------------
+
+/**
+ * The developer's report, 2026-08-15, build c48a893: *"i had 2 ore and was able
+ * to build a turret."* `TURRET.cost` is 3.
+ *
+ * These are the tests that decide it in the simulation. They matter more than
+ * their size suggests, because of what `spendOre` does two lines after it
+ * spends: it clamps a balance below `1e-9` to zero. An underpay and a legal
+ * purchase that empties the wallet therefore end on the SAME number — exactly
+ * `0`, which is what the screenshot after the build shows — so "the player had
+ * 0 afterwards" is evidence of nothing at all, and the only place the two can
+ * still be told apart is *before* that clamp.
+ *
+ * So every assertion below is written against the balance the guard left, never
+ * the balance the clamp tidied: the exact `cost - 1` is asserted to be exactly
+ * `cost - 1` afterwards, and `oreOverdrafts` reads the pre-clamp alarm the spend
+ * path now writes (`./ore-journal`).
+ */
+describe('the wallet cannot be overdrawn (a0-52)', () => {
+  /** Every purchase that has a price, and what it costs. BANK is absent: it moves
+   *  ore rather than spending it, so there is no underpay to attempt. */
+  const priced: readonly { item: BuildItem; cost: number }[] = [
+    { item: 'turret', cost: TURRET.cost },
+    { item: 'shield', cost: SHIELD.cost },
+    { item: 'satellite', cost: SATELLITE.cost },
+    { item: 'repair', cost: REPAIR_ORE_COST },
+  ];
+
+  /** A docked ship at its own living station, with a hurt core so REPAIR has
+   *  something to heal, and a wallet split however the caller asks. */
+  function docked(hold: number, bank: number): { world: World; ship: Ship; station: MiningStation } {
+    const ship = makeShip({ id: 0, pos: at(50, 0), cargo: hold, banked: bank });
+    const station = makeStation({ id: 0, owner: 0, coreHp: CORE_HP / 2 });
+    const world = makeWorld({ ships: [ship], stations: [station] });
+    return { world, ship, station };
+  }
+
+  it('never leaves a negative balance', () => {
+    for (const { item, cost } of priced) {
+      // Three ways to hold `cost - 1`, because `spendOre` draws hold-first and a
+      // bug that overdraws the BANK is invisible to a ship that keeps its ore in
+      // the hold. A fractional split is in there too: ore lands fractional off a
+      // mining chip, and the boundary is where an epsilon would hide.
+      const wallets: readonly [number, number][] = [
+        [cost - 1, 0],
+        [0, cost - 1],
+        [(cost - 1) / 2, (cost - 1) / 2],
+      ];
+      for (const [hold, bank] of wallets) {
+        const { world, ship, station } = docked(hold, bank);
+        const turrets = turretCount(station);
+        const shields = shieldCount(station);
+        const satellites = satelliteCount(station);
+        const coreHp = station.coreHp;
+
+        expect(placeOrder(world, ship, item)).toBe('cannot-afford');
+
+        // The wallet, exactly as it was — asserted on the raw numbers, which is
+        // the assertion the clamp would have hidden had anything been taken.
+        expect(ship.cargo).toBe(hold);
+        expect(ship.banked).toBe(bank);
+        expect(spendableOre(ship)).toBe(cost - 1);
+        // Nothing was built, upgraded or healed on the way out.
+        expect(turretCount(station)).toBe(turrets);
+        expect(shieldCount(station)).toBe(shields);
+        expect(satelliteCount(station)).toBe(satellites);
+        expect(station.coreHp).toBe(coreHp);
+        expect(station.builds).toHaveLength(0);
+        // And the pre-clamp alarm never fired (`./ore-journal`).
+        expect(oreOverdrafts(world)).toEqual([]);
+        // The refusal is on the record — the line that answers "the button did
+        // nothing" in a playtest log, with the balance proving it charged zero.
+        const refusals = drainOreJournal(world).filter((e) => e.flow === 'refused');
+        expect(refusals).toHaveLength(1);
+        expect(refusals[0]!.item).toBe(item);
+        expect(refusals[0]!.hold).toBe(refusals[0]!.holdAfter);
+        expect(refusals[0]!.bank).toBe(refusals[0]!.bankAfter);
+      }
+    }
+  });
+
+  it('sells at exactly the cost, and the wallet lands on a true zero', () => {
+    // The other side of the same boundary, and the reason `cost - 1` above is the
+    // right probe rather than `cost - 0.5`: the last ore in the bank DOES spend
+    // (`src/ui/affordability.ts`, the v0.2.2 field-report rule). A build that
+    // empties the wallet is legal, and it is what the a0-52 screenshot shows.
+    const { world, ship, station } = docked(1, TURRET.cost - 1);
+
+    expect(placeOrder(world, ship, 'turret')).toBe('ok');
+
+    expect(ship.cargo).toBe(0);
+    expect(ship.banked).toBe(0);
+    expect(turretCount(station)).toBe(1);
+    expect(oreOverdrafts(world)).toEqual([]);
+    const spends = drainOreJournal(world).filter((e) => e.flow === 'spent');
+    expect(spends).toHaveLength(1);
+    expect(oreEventLine(spends[0]!)).toBe('spent 3 turret · hold 1→0 bank 2→0');
+  });
+
+  it('charges the ship upgrade through the same guard the wheel goes through', () => {
+    // `buyUpgrade` lives in this file rather than `./upgrades` precisely so it
+    // pays through `spendOre` — the check that would otherwise be hand-copied,
+    // and the first place an underpay could hide if it were not.
+    const cost = trackSpec(UpgradeTrack.Cargo).costs[0]!;
+    const { world, ship } = docked(cost - 1, 0);
+
+    expect(buyUpgrade(world, ship, UpgradeTrack.Cargo)).toBe('cannot-afford');
+    expect(ship.cargo).toBe(cost - 1);
+    expect(ship.tiers[UpgradeTrack.Cargo]).toBe(0);
+    expect(oreOverdrafts(world)).toEqual([]);
+  });
+
+  it('makes the second purchase on a tick see what the first one spent', () => {
+    // Brief item 3: an upgrade and a build placed on the SAME tick both call
+    // `spendOre`, and the second must read the wallet the first left rather than
+    // a snapshot taken before it. `step` runs orders then upgrades (its own fixed
+    // order, GDD §4.8), so with exactly one turret's worth of ore the turret wins
+    // and the upgrade is refused — never both.
+    const ship = makeShip({ id: 0, pos: at(50, 0), banked: TURRET.cost });
+    const station = makeStation({ id: 0, owner: 0 });
+    const world = makeWorld({ ships: [ship], stations: [station] });
+
+    step(world, [
+      {
+        id: 0,
+        actions: [
+          { type: 'buildOrder', item: 'turret' },
+          { type: 'upgradeOrder', track: UpgradeTrack.Cargo },
+        ],
+      },
+    ]);
+
+    expect(turretCount(station)).toBe(1);
+    expect(ship.tiers[UpgradeTrack.Cargo]).toBe(0);
+    expect(ship.cargo).toBe(0);
+    expect(ship.banked).toBe(0);
+    expect(oreOverdrafts(world)).toEqual([]);
+  });
+
+  it('holds through a whole match of presses on a wallet kept deliberately thin', () => {
+    // The unit tests above probe the boundary the report names. This one hunts
+    // for a path that never touches it: a real `createWorld` match, four seats
+    // pressing every priced wedge and every upgrade track on overlapping
+    // metronomes, flying and firing the whole time — with the wallet swept down
+    // to a hair under a turret every so often, so the presses land ON the
+    // affordability edge for 20 seconds of match rather than 3 ticks of fixture.
+    const cfg = {
+      seed: 0xa052,
+      players: [
+        { id: 0, shipClass: ShipClass.Vanguard },
+        { id: 1, shipClass: ShipClass.Interceptor },
+        { id: 2, shipClass: ShipClass.Hauler },
+        { id: 3, shipClass: ShipClass.Vanguard },
+      ],
+      asteroidCount: 24,
+    } as const;
+    const world = createWorld(cfg);
+    // Drained every tick: the journal is a bounded ring by design, and 1200 ticks
+    // of this script writes far more than it holds. The invariant is read off the
+    // world before each drain; the events are kept here for the sanity check.
+    const seen: { flow: string; item: string }[] = [];
+
+    const tracks = [UpgradeTrack.Power, UpgradeTrack.Engine, UpgradeTrack.Cargo, UpgradeTrack.Hull];
+    for (let tick = 1; tick <= 1200; tick++) {
+      const inputs: Inputs = cfg.players.map((p) => {
+        const actions: Action[] = [
+          { type: 'thrust', dir: { x: Math.sin(tick * 0.03 + p.id), y: Math.cos(tick * 0.05 + p.id) } },
+          { type: 'fire', active: true, auto: true },
+        ];
+        // Every priced wedge, on four different beats, so two can land on one
+        // tick and the same-tick case above is exercised at scale as well.
+        if ((tick + p.id) % 7 === 0) actions.push(orderAction('turret'));
+        if ((tick + p.id) % 11 === 0) actions.push(orderAction('shield'));
+        if ((tick + p.id) % 13 === 0) actions.push(orderAction('satellite'));
+        if ((tick + p.id) % 5 === 0) actions.push(orderAction('repair'));
+        if ((tick + p.id) % 17 === 0) actions.push(orderAction('bank'));
+        if ((tick + p.id) % 19 === 0) {
+          actions.push({ type: 'upgradeOrder', track: tracks[(tick + p.id) % tracks.length]! });
+        }
+        return { id: p.id, actions };
+      });
+      step(world, inputs);
+
+      // Keep every wallet on the edge: a hair under a turret, in whichever
+      // bucket the tick picks, so the next press has to be refused correctly
+      // rather than trivially afforded.
+      if (tick % 40 === 0) {
+        for (const ship of world.ships) {
+          const short = TURRET.cost - 0.25;
+          if (tick % 80 === 0) {
+            ship.cargo = Math.min(short, ship.cargoCap);
+            ship.banked = 0;
+          } else {
+            ship.cargo = 0;
+            ship.banked = short;
+          }
+        }
+      }
+
+      // The invariant, every tick: nobody is in debt, and nobody ever was —
+      // `oreOverdrafts` is the pre-clamp reading, so it catches the overdraft the
+      // clamp would have tidied into a clean zero.
+      for (const ship of world.ships) {
+        expect(ship.cargo).toBeGreaterThanOrEqual(0);
+        expect(ship.banked).toBeGreaterThanOrEqual(0);
+      }
+      expect(oreOverdrafts(world)).toEqual([]);
+      for (const e of drainOreJournal(world)) seen.push({ flow: e.flow, item: e.item });
+    }
+
+    // Sanity: the script really did buy things and really did get refused, or the
+    // invariant above held over a match where nothing was ever spent.
+    expect(seen.some((e) => e.flow === 'spent' && e.item === 'turret')).toBe(true);
+    expect(seen.some((e) => e.flow === 'refused')).toBe(true);
+  });
+});
+
+// --- 2c. the legal sequence behind the a0-52 screenshots ---------------------
+
+/**
+ * The innocent explanation, run as a simulation rather than argued.
+ *
+ * a0-52 came with two screenshots: an Upgrade wheel with `4` in the hub and a
+ * CARGO wedge reading `2 → 4` at cost `2`, and — after the build — a Build wheel
+ * hub reading `0 ORE` with `1 / 4 BUILT`. The claim attached to them is *"i had 2
+ * ore and was able to build a turret."*
+ *
+ * `2 → 4` is the cargo CAPACITY stat, not a wallet. So the whole sequence is
+ * legal, and this test is that sequence: it ends on the exact pair of readouts
+ * the screenshots show, with every ore accounted for and no rule bent.
+ */
+describe('the a0-52 sequence, simulated (GDD §2.5)', () => {
+  it('reaches 0 ORE and 1 / 4 BUILT with every ore paid for', () => {
+    const cargoCost = trackSpec(UpgradeTrack.Cargo).costs[0]!;
+    expect(cargoCost).toBe(2); // the `2` under the CARGO wedge
+    expect(TURRET.cost).toBe(3);
+
+    const ship = makeShip({ id: 0, pos: at(50, 0), cargo: 5, banked: 0 });
+    const station = makeStation({ id: 0, owner: 0 });
+    const world = makeWorld({ ships: [ship], stations: [station] });
+    // The hold the wedge advertises widening: 2 slots, becoming 4.
+    expect(ship.cargoCap).toBe(2);
+
+    expect(buyUpgrade(world, ship, UpgradeTrack.Cargo)).toBe('ok');
+    expect(ship.cargoCap).toBe(4); // the `→ 4` — a capacity, never a balance
+    expect(spendableOre(ship)).toBe(3);
+
+    expect(placeOrder(world, ship, 'turret')).toBe('ok');
+
+    // The second screenshot, exactly: the hub's hold+bank at zero, one turret on
+    // the ring (queued construction counts, GDD §2.5).
+    expect(spendableOre(ship)).toBe(0);
+    expect(turretCount(station)).toBe(1);
+    // 5 ore in, 5 ore out, and the journal says which line bought what — the
+    // whole point of a0-52's second half. Read against the ledger's total so the
+    // narrative and the accounting cannot disagree.
+    const events = drainOreJournal(world);
+    expect(events.filter((e) => e.flow === 'spent').map(oreEventLine)).toEqual([
+      'spent 2 upgrade:cargo · hold 5→3 bank 0→0',
+      'spent 3 turret · hold 3→0 bank 0→0',
+    ]);
+    expect(world.ledger?.spent).toBe(5);
+    expect(oreOverdrafts(world)).toEqual([]);
+  });
+
+  it('reads 2 in the top-left ORE while the wheel hub reads 3 — the same claim, legally', () => {
+    // The OTHER reading of "i had 2 ore", and the one that needs no misread stat
+    // at all. The top-left `ORE` readout is the BANK ALONE (GDD §2.2, flagged in
+    // a0-03: "the Build wheel's hub prints hold + bank under a caption that also
+    // reads ORE, so the two can differ on screen at once"). A player with 1 in the
+    // hold and 2 in the bank is looking at a `2` and holding a spendable 3 — and
+    // the turret they buy for 3 is the turret the sim sells them.
+    const ship = makeShip({ id: 0, pos: at(50, 0), cargo: 1, banked: 2 });
+    const station = makeStation({ id: 0, owner: 0 });
+    const world = makeWorld({ ships: [ship], stations: [station] });
+
+    expect(ship.banked).toBe(2); // what the HUD says
+    expect(spendableOre(ship)).toBe(3); // what the hub says, and what the sim spends
+    expect(placeOrder(world, ship, 'turret')).toBe('ok');
+    expect(spendableOre(ship)).toBe(0);
+    expect(turretCount(station)).toBe(1);
+    expect(oreOverdrafts(world)).toEqual([]);
   });
 });
 
