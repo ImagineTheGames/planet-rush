@@ -85,10 +85,19 @@ disagrees.
 
 ## NEXT
 
-- Full `npm test -- --run` and `npx tsc --noEmit` on the merged tree (running).
-- Push, open the PR with the two Director questions:
+- **Resumed 2026-08-15.** The lane's local branch pointer was sitting on `main`
+  (`12303a0`) while all nine commits of work were already on `origin`; reset to
+  the remote branch rather than rebuilding anything. Nothing was lost — the six
+  "local-only" commits were main's own.
+- **Merged `origin/main` again** (a0-49, sound-only: `src/art/audio/`,
+  `sound-review/`, `docs/`). Clean, and it touches nothing that renders, so the
+  43 re-baselined goldens still describe this tree.
+- `npx tsc --noEmit` green on the merged tree. Full `npm test -- --run` running.
+- Then: push and open the PR with the two Director questions:
   **(1)** blue-white starlight vs the beacon ring `#4dc3ff` — ΔE 39.0 on the
   composited pixel, 16.5 on the raw ink, against the studio's ΔE 40 floor;
   **(2)** `peakP99` 46–53 is exactly what a white-topped ramp measures, so either
   the design's field was measured before `starColor` was applied or its bloom is
   brighter than the `0.42 × 0.48` a0-44 read off it.
+  (A third, raised by §1.2 rather than the brief: the amber 22% comes within
+  ΔE 25.6 of `oreDeep`, the closest the backdrop has come to RESERVED yellow.)
