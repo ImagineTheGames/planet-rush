@@ -24,7 +24,16 @@
 import { describe, expect, it } from 'vitest';
 import { ShipClass, UpgradeTrack } from '@shared/types';
 import type { Action, PlayerId } from '@shared/types';
-import { TICK_DT, TURRET, createWorld, shipCargoCap, stockTiers, step, trackSpec } from '../sim';
+import {
+  ORE_JOURNAL_CAPACITY,
+  TICK_DT,
+  TURRET,
+  createWorld,
+  shipCargoCap,
+  stockTiers,
+  step,
+  trackSpec,
+} from '../sim';
 import type { MiningStation, UpgradeTiers, World, WorldConfig } from '../sim';
 import { InputQueue } from './input-queue';
 import {
@@ -760,6 +769,40 @@ describe('refused build', () => {
     // The late echo names an id nothing is waiting on any more: no second refund.
     expect(client.settleOrder({ orderId: BUILD_ID, accepted: false, tick: 1 })).toBeNull();
     expect(shipOf(client.world).banked).toBe(TURRET.cost);
+  });
+
+  it('declines to refund rather than guess, when the journal cannot say', () => {
+    // The receipt is read off the sim's ore journal, which is a bounded ring: a
+    // session with nothing draining it sits at capacity, where an append evicts
+    // and the length does not move. There is then no honest way to say what the
+    // order cost — so nothing is refunded, which is exactly the behaviour that
+    // shipped before this fix. Failing this way costs the refund; failing the
+    // other way would hand the player a free turret, which is a0-52 made real.
+    const { client, station } = docked(0, TURRET.cost);
+    const journal = (client.world as World).oreJournal!;
+    // Fill the ring so the spend this tick evicts instead of extending.
+    while (journal.events.length < ORE_JOURNAL_CAPACITY) {
+      journal.events.push({
+        tick: 0,
+        player: LOCAL,
+        flow: 'mined',
+        item: 'chunk',
+        amount: 1,
+        hold: 0,
+        bank: 0,
+        holdAfter: 1,
+        bankAfter: 0,
+      });
+    }
+
+    client.predict(1, TAP);
+    client.settleOrder({ orderId: BUILD_ID, accepted: false, tick: 1 });
+
+    // The turret half is unconditional and still right...
+    expect(turretsOn(station)).toBe(0);
+    // ...and the wallet is left exactly where the old behaviour left it, rather
+    // than credited from a number nobody can vouch for.
+    expect(shipOf(client.world).cargo + shipOf(client.world).banked).toBe(0);
   });
 
   it('gives back what a refused SHIP UPGRADE cost, which buys no entity at all', () => {

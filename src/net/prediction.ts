@@ -599,10 +599,19 @@ export class PredictedMatch {
   private takeReceipts(orders: readonly IdentifiedOrder[], from: number, tick: Tick): void {
     const events = this.world.oreJournal?.events;
     if (!events || orders.length !== 1) return;
+    // Two guards, and each covers the other's blind spot. The INDEX says "appended
+    // by the step just run" — but the journal is a bounded ring, and a session with
+    // nothing draining it (no playtest log attached) sits at capacity, where an
+    // append evicts and the length does not move. `Math.min` turns that into an
+    // empty scan rather than a read of somebody else's events. The TICK then says
+    // "and it is this tick's", which is what stops a clock pulled backwards by
+    // `trimLead` from re-using a tick number and collecting a stale receipt.
+    // Failing either way costs the refund, never pays a wrong one — the only
+    // direction this may fail in, since a refund that fires twice is free ore.
     let spend: { hold: number; bank: number; holdAfter: number; bankAfter: number } | null = null;
-    for (let i = from; i < events.length; i++) {
+    for (let i = Math.min(from, events.length); i < events.length; i++) {
       const e = events[i]!;
-      if (e.flow !== 'spent' || e.player !== this.local) continue;
+      if (e.flow !== 'spent' || e.player !== this.local || e.tick !== this.world.tick) continue;
       if (spend) return; // two spends on one tick: ambiguous, so nothing is filed
       spend = e;
     }
