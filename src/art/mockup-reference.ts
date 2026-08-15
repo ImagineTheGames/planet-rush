@@ -1114,21 +1114,43 @@ export function starColorFor(temp: number): number {
  * as strict as it was — a hand-edited hex on a star still fails, because it is
  * either a colour this function produces or it is not.
  *
- * **Why sampling is exhaustive and not an approximation.** Each branch is a
- * rounding of a linear function, so the colour is piecewise constant in `t`, and
- * the shortest piece is set by how close two rounding breakpoints from different
- * channels can come. Hot's are at `(n+½)/40`, `(n+½)/10` and `(n+½)/50`, whose
- * closest distinct pair is `½/200 = 0.0025` apart; cool's are at `(n+½)/35` and
- * `(n+½)/90`, closest `½/630 ≈ 0.00079`. At a step of 1e-5 the coarsest of those
- * gets 79 samples, so no piece can be stepped over.
+ * **Why this is exhaustive by construction, and not a fine-enough sample.** Each
+ * branch is a rounding of a linear function, so the colour is *piecewise
+ * constant* in `t` and the pieces are bounded by the channels' own rounding
+ * breakpoints — `(n+½)/40`, `(n+½)/10`, `(n+½)/50` for the hot branch, `(n+½)/35`
+ * and `(n+½)/90` for the cool. Enumerating those breakpoints and reading the
+ * colour at the midpoint of every piece between them therefore visits each piece
+ * exactly once and cannot step over one: there is no interval left to step over.
+ * (`Math.round` is half-**up**, so the colour *at* a breakpoint is the piece above
+ * it, which its own midpoint already carries.)
+ *
+ * It was a 1e-5 sweep until the boot cost was measured: 105,000 evaluations, in a
+ * module `./backdrop` imports, running at load in the shipped bundle for a set
+ * only the audit ever reads. This is ~200 evaluations and the same 117 colours —
+ * `backdrop.test.ts` holds them against the field the generator actually paints.
  */
 export const STAR_TEMPERATURE_COLORS: ReadonlySet<number> = (() => {
   const out = new Set<number>();
   const t = MOCKUP_STARS.temperature;
-  const STEP = 1e-5;
-  for (let u = t.hot.min; u <= t.hot.max; u += STEP) out.add(starColorFor(u));
-  out.add(starColorFor(t.hot.max));
-  for (let k = t.cool.min; k <= t.cool.max; k += STEP) out.add(starColorFor(-k));
-  out.add(starColorFor(-t.cool.max));
+
+  /** Every colour `color` takes over `[lo, hi]`, given its breakpoint scales. */
+  const pieces = (lo: number, hi: number, scales: readonly number[], color: (x: number) => number) => {
+    const cuts = new Set<number>([lo, hi]);
+    for (const s of scales) {
+      // The breakpoints of `Math.round(s·x)` are at `(n+½)/s`; walk the ones that
+      // land strictly inside the domain.
+      for (let n = Math.floor(s * lo - 0.5); n <= Math.ceil(s * hi - 0.5); n++) {
+        const x = (n + 0.5) / s;
+        if (x > lo && x < hi) cuts.add(x);
+      }
+    }
+    const sorted = [...cuts].sort((a, b) => a - b);
+    for (let i = 0; i < sorted.length - 1; i++) out.add(color((sorted[i]! + sorted[i + 1]!) / 2));
+    out.add(color(lo));
+    out.add(color(hi));
+  };
+
+  pieces(t.hot.min, t.hot.max, [40, 10, 50], (u) => starColorFor(u));
+  pieces(t.cool.min, t.cool.max, [35, 90], (k) => starColorFor(-k));
   return out;
 })();

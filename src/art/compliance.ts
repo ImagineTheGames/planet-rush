@@ -73,7 +73,7 @@ export interface Violation {
  * design's star field (a0-45; `./mockup-reference` `starColorFor`).
  *
  * A star's colour comes from its temperature, continuously: 78% of the field
- * blue-white and 22% amber, ~80 distinct hexes between them, none of which is one
+ * blue-white and 22% amber, 117 distinct hexes between them, none of which is one
  * of the six or a declared shade of one. The allow-list therefore has to admit
  * them, and the honest way to do that is to admit **exactly the set the design's
  * own function can produce** — enumerated from that function, not typed out — so
