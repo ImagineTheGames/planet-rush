@@ -74,8 +74,14 @@
 import type { BuildItem } from '@shared/types';
 import { REPAIR_HP_PER_ORE, REPAIR_ORE_COST, SATELLITE, SHIELD, TURRET } from '../sim/constants';
 import { affordable, costNumeral } from './affordability';
+import { clampSelection, wedgeAngle, wedgeArc } from './wheel-geometry';
 import { hubBack } from './wheel-nav';
 import type { HubBack } from './wheel-nav';
+
+/** The wedge-index guard, re-exported from where it is now stated: it is the same
+ *  question on both wheels ({@link ./wheel-geometry}), and this module keeps the
+ *  name every caller already imports. */
+export { clampSelection } from './wheel-geometry';
 
 // ---------------------------------------------------------------------------
 // Segment identity
@@ -201,35 +207,23 @@ export const WHEEL_ORDER: readonly WheelSegmentId[] = [
   'upgrade',
 ];
 
-/** Angular width of one segment (radians). Five segments fill the circle. */
-export const SEGMENT_ARC = (2 * Math.PI) / WHEEL_ORDER.length;
+/**
+ * Angular width of one segment (radians). Five segments fill the circle.
+ *
+ * This wheel's own count, applied to the shared rule ({@link ./wheel-geometry}).
+ * The constant is the *Build wheel's* fifth of a turn and nothing else's — the
+ * Upgrade wheel lays out in quarters — which is why anything that draws or sweeps
+ * across BOTH wheels takes the count as an argument rather than reading this
+ * (a0-51: a selection machine that read it stepped in fifths on a wheel of four,
+ * and only index 0, twelve o'clock on every wheel, looked right).
+ */
+export const SEGMENT_ARC = wedgeArc(WHEEL_ORDER.length);
 
 /** Screen-space angle of a segment's centre (radians, y-down: `-π/2` is up).
- *  Segment 0 sits at twelve o'clock and the rest run clockwise. */
+ *  Segment 0 sits at twelve o'clock and the rest run clockwise — this wheel's
+ *  five wedges through the shared {@link ./wheel-geometry.wedgeAngle}. */
 export function segmentAngle(index: number): number {
-  return -Math.PI / 2 + index * SEGMENT_ARC;
-}
-
-/**
- * A wedge index this wheel can honour, or `null` — the guard on
- * {@link BuildWheelModel.selected}.
- *
- * `null` is a real, resting state and not a missing value: on desktop it is "the
- * pointer is not over the wheel", on touch it is "no thumb is down", on a gamepad
- * it is "the stick has not been pushed". The design's prototype opens with
- * `sel: 0` because it is a prototype and something has to be lit; a live wheel
- * that opens with TURRET pre-selected is claiming a choice the player has not
- * made — and on a gamepad the confirm button is then one press away from acting
- * on it, which would turn "the wheel came up" into "you bought a turret".
- *
- * Anything that is not an in-range integer is `null` rather than clamped to an
- * end: a caller with an off-by-one would otherwise light its neighbour, and a
- * highlight on the wrong wedge is worse than no highlight.
- */
-export function clampSelection(index: number | null | undefined, count: number): number | null {
-  if (index === null || index === undefined) return null;
-  if (!Number.isInteger(index) || index < 0 || index >= count) return null;
-  return index;
+  return wedgeAngle(index, WHEEL_ORDER.length);
 }
 
 /**
