@@ -77,10 +77,10 @@ this brief, with the reason in the note).
 | bankOre | done | conveyor stop / vault seat / falling bands / counted-and-filed |
 | upgradeBought | done | brightest *in this family* means bandwidth, not a chime — no arpeggio, no major third |
 | depositTick | done | the station materials at a tenth of the size; fires in bursts, so all four stay tiny |
-| pressTick | todo |  |
-| purchaseConfirm | todo |  |
-| rejectBuzz | todo |  |
-| minimapPing | todo |  |
+| pressTick | done | four kinds of restraint, not four events — no returns anywhere in this family |
+| purchaseConfirm | done | two rising beats kept; §8 margin over buildComplete held across all sixteen pairings (×1.33) |
+| rejectBuzz | done | a stop, not a raspberry; sits ×1.86 above the coreHit family at worst (§8) |
+| minimapPing | done | it locates, never alarms — nothing repeats, nothing rises |
 | waveArrive | todo |  |
 | collapseBegin | todo |  |
 | matchEnd | todo |  |

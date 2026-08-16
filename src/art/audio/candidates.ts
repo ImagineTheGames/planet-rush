@@ -895,7 +895,7 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
           name: 'coreHit_e_coolantSurge',
           layers: [
             swept('coreHit_e.hit', { wave: 'triangle', freq: 88, freqEnd: 62, from: 420, to: 150, q: 3, gain: 0.42, attack: 0.002, hold: 0.018, decay: 0.22, curve: 3.2, punch: 0.6, noiseMix: 0.18, seed: 60180 }),
-            grains('coreHit_e.surge', { freq: 260, freqEnd: 130, grain: 0.006, gain: 0.3, hold: 0.04, decay: 0.3, curve: 2.6, from: 780, to: 200, q: 2.6, at: 0.03, seed: 60182 }),
+            grains('coreHit_e.surge', { freq: 170, freqEnd: 96, grain: 0.008, gain: 0.3, hold: 0.04, decay: 0.3, curve: 2.6, from: 400, to: 130, q: 2.6, at: 0.03, seed: 60182 }),
           ],
         },
       },
@@ -905,8 +905,8 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'coreHit_f_frameLoad',
           layers: [
-            swept('coreHit_f.strike', { wave: 'noise', freq: 170, freqEnd: 70, from: 800, to: 190, q: 2.4, gain: 0.4, attack: 0.003, hold: 0.024, decay: 0.26, curve: 2.8, punch: 0.55, seed: 60190 }),
-            swept('coreHit_f.frame', { wave: 'triangle', freq: 132, freqEnd: 118, from: 520, to: 260, q: 5.5, gain: 0.3, attack: 0.03, hold: 0.05, decay: 0.32, curve: 2.2, noiseMix: 0.24, at: 0.04, seed: 60192 }),
+            swept('coreHit_f.strike', { wave: 'noise', freq: 130, freqEnd: 60, from: 480, to: 140, q: 2.4, gain: 0.42, attack: 0.003, hold: 0.024, decay: 0.26, curve: 2.8, punch: 0.55, seed: 60190 }),
+            swept('coreHit_f.frame', { wave: 'triangle', freq: 118, freqEnd: 104, from: 320, to: 170, q: 5.5, gain: 0.32, attack: 0.03, hold: 0.05, decay: 0.32, curve: 2.2, noiseMix: 0.2, at: 0.04, seed: 60192 }),
           ],
         },
       },
@@ -1243,7 +1243,11 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
   // §8's `buildComplete` / `purchaseConfirm` watch runs through here: those two
   // fire seconds apart off one wheel press. This family stays *low and seated* —
   // an assembly finishing — where the interface family's confirmations stay short
-  // and narrow. Neither reaches for the other's register.
+  // and narrow. With four offers each that is sixteen pairings rather than one, so
+  // the margin is held on the whole set: `buildComplete` tops out at 468 Hz of
+  // centroid proxy (d 468 · e 380 · f 350 · g 305) and `purchaseConfirm` bottoms
+  // out at 624 (d 1784 · e 624 · f 1397 · g 1813) — worst pairing ×1.33, against
+  // the ×1.23 the census measured on the pair that ships today.
   buildPlaced: {
     label: "Build Placed",
     context: "A turret/build is placed and starts building — ore spent, a latch not a fanfare.",
@@ -1305,9 +1309,9 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'buildComplete_d_stepperRun',
           layers: [
-            grains('buildComplete_d.s0', { freq: 340, grain: 0.004, gain: 0.28, hold: 0.008, decay: 0.05, curve: 5, from: 1300, to: 520, q: 3, hp: 160, seed: 60570 }),
-            grains('buildComplete_d.s1', { freq: 430, grain: 0.004, gain: 0.3, hold: 0.008, decay: 0.055, curve: 5, from: 1600, to: 620, q: 3, hp: 180, at: 0.075, seed: 60572 }),
-            grains('buildComplete_d.s2', { freq: 540, grain: 0.004, gain: 0.32, hold: 0.012, decay: 0.1, curve: 4.5, from: 2000, to: 760, q: 3.2, hp: 200, at: 0.15, seed: 60574 }),
+            grains('buildComplete_d.s0', { freq: 260, grain: 0.005, gain: 0.3, hold: 0.008, decay: 0.05, curve: 5, from: 700, to: 300, q: 3, hp: 110, seed: 60570 }),
+            grains('buildComplete_d.s1', { freq: 300, grain: 0.005, gain: 0.32, hold: 0.008, decay: 0.055, curve: 5, from: 700, to: 320, q: 3, hp: 120, at: 0.075, seed: 60572 }),
+            grains('buildComplete_d.s2', { freq: 415, grain: 0.0048, gain: 0.34, hold: 0.012, decay: 0.1, curve: 4.5, from: 820, to: 380, q: 3.2, hp: 120, at: 0.15, seed: 60574 }),
           ],
         },
       },
@@ -2174,7 +2178,7 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       },
     ],
   },
-  // === THE INTERFACE FALLBACKS (a0-01b) =====================================
+  // === THE INTERFACE FALLBACKS (a0-60) ======================================
   //
   // **Read §7.6 before judging these by ear in the running game.** Since s6-01
   // the app routes `press`, `confirm`, `reject`, `hover`, `detent`, `back`,
@@ -2184,54 +2188,68 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
   // developer hears clicking around the build, and a reviewer expecting the
   // opposite will conclude nothing changed.
   //
-  // At interface scale the three tools are the same three, shrunk to a few tens
-  // of milliseconds, and one of them loses a limb: no offer in this family gets
-  // `returns`. A tail on a 28 ms tick is not space, it is smear, and on a phone
-  // speaker it is the difference between a click and a thud.
+  // At interface scale the sweep's materials are the same materials, shrunk to a
+  // few tens of milliseconds, and one of them loses a limb: no offer in this
+  // family gets `returns`. A tail on a 28 ms tick is not space, it is smear, and
+  // on a phone speaker it is the difference between a click and a thud. This is
+  // also the family where "modern/sci-fi" is *least* about adding anything —
+  // §4.7 register 2 is that the interface does not congratulate, so the four are
+  // four kinds of restraint rather than four kinds of event:
   //
-  //   a  a **dry contact** — grains, no tone, nothing rings
-  //   b  a **damped pip** — a low body behind a closing corner, felt not heard
-  //   c  a **narrow band** — one resonant partial, machine-clean
+  //   d  a **capacitive contact** — a fingertip on glass read by a machine.
+  //      Granular, no tone, nothing rings.
+  //   e  a **damped actuator** — a small body with the corner closing over it.
+  //      Felt more than heard; the only offers with anything low in them.
+  //   f  a **filtered band** — one resonant partial, clean, gone before it rings.
+  //   g  **the smallest thing that still reads** — the offer for a developer who
+  //      wants the interface quieter, not different.
   //
   // §8's `rejectBuzz` / `coreHit` pair runs through here — *your buy was refused*
   // against *your reactor is taking damage* — and §7.6's own note says re-voicing
-  // reject upward is what protects it. Every offer below sits above 300 Hz of
+  // reject upward is what protects it. Every reject offer sits above 300 Hz of
   // spectral centre; the fight family's core offers all sit under 250.
   pressTick: {
-    // §7.6 asks for the ratified family root, A♭6 = 1661 Hz, so the fallback and
-    // the real `pick` cue agree instead of diverging. All three are built on it
-    // or an octave under it.
     label: "Press Tick",
     context: "A wheel wedge / menu control was pressed — the lightest possible click, heard dozens of times a match.",
     current: 'pressTick',
     candidates: [
       {
-        id: 'a',
-        character: "a dry contact, no tone in it",
+        id: 'd',
+        character: "a capacitive contact, no tone",
         spec: {
-          name: 'pressTick_a_dryContact',
+          name: 'pressTick_d_capacitive',
           layers: [
-            grains('pressTick_a.contact', { freq: 1661, freqEnd: 1200, grain: 0.002, gain: 0.26, hold: 0.004, decay: 0.02, curve: 5, from: 5200, to: 2200, q: 2.8, hp: 700, seed: 34000 }),
+            grains('pressTick_d.touch', { freq: 1350, grain: 0.0018, gain: 0.24, hold: 0.002, decay: 0.018, curve: 7, from: 3600, to: 1500, q: 2.8, hp: 700, seed: 60770 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "a damped pip, felt more than heard",
+        id: 'e',
+        character: "a damped actuator, felt not heard",
         spec: {
-          name: 'pressTick_b_dampedPip',
+          name: 'pressTick_e_dampedActuator',
           layers: [
-            swept('pressTick_b.pip', { wave: 'triangle', freq: 830, from: 2400, to: 700, q: 3.2, gain: 0.2, attack: 0.0006, hold: 0.003, decay: 0.022, curve: 5, noiseMix: 0.2, seed: 34010 }),
+            swept('pressTick_e.press', { wave: 'sine', freq: 300, from: 900, to: 340, q: 2.6, gain: 0.28, attack: 0.0015, hold: 0.003, decay: 0.024, curve: 6, noiseMix: 0.2, seed: 60780 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "one narrow band at the family root",
+        id: 'f',
+        character: "one filtered band, machine-clean",
         spec: {
-          name: 'pressTick_c_familyRoot',
+          name: 'pressTick_f_filteredBand',
           layers: [
-            band('pressTick_c.root', 1661, { gain: 0.95, decay: 0.024, q: 5, curve: 6, seed: 34020 }),
+            band('pressTick_f.band', 1050, { gain: 0.42, decay: 0.022, q: 6, curve: 6.5, seed: 60790 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "the smallest click that still reads",
+        spec: {
+          name: 'pressTick_g_smallest',
+          layers: [
+            band('pressTick_g.click', 1650, { gain: 0.3, decay: 0.012, q: 3.5, curve: 8, hp: 800, seed: 60800 }),
           ],
         },
       },
@@ -2242,36 +2260,50 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     context: "A purchase or repair committed — a rising two-beat 'done'.",
     current: 'purchaseConfirm',
     candidates: [
+      // Two beats, rising, in all four — that shape is the message (*committed*)
+      // and the sweep is not re-deciding it. §8 keeps this clear of
+      // `buildComplete`, which fires seconds later off the same press: that one
+      // is low and seated, these stay short and narrow.
       {
-        id: 'a',
-        character: "two dry contacts, rising",
+        id: 'd',
+        character: "two capacitive contacts, rising",
         spec: {
-          name: 'purchaseConfirm_a_dryContacts',
+          name: 'purchaseConfirm_d_twoContacts',
           layers: [
-            grains('purchaseConfirm_a.n0', { freq: 620, freqEnd: 500, grain: 0.004, gain: 0.28, hold: 0.012, decay: 0.05, curve: 5, from: 2600, to: 1100, q: 3.2, hp: 320, seed: 34030 }),
-            grains('purchaseConfirm_a.n1', { freq: 930, freqEnd: 740, grain: 0.003, gain: 0.26, hold: 0.016, decay: 0.1, curve: 4.5, from: 3600, to: 1500, q: 3.4, hp: 420, at: 0.045, seed: 34031 }),
+            grains('purchaseConfirm_d.c0', { freq: 1050, grain: 0.0022, gain: 0.26, hold: 0.003, decay: 0.026, curve: 6, from: 3000, to: 1200, q: 3, hp: 500, seed: 60810 }),
+            grains('purchaseConfirm_d.c1', { freq: 1400, grain: 0.002, gain: 0.3, hold: 0.004, decay: 0.04, curve: 5.5, from: 3800, to: 1500, q: 3.2, hp: 620, at: 0.055, seed: 60812 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "a low seat, the buy landing",
+        id: 'e',
+        character: "the buy landing, damped and low",
         spec: {
-          name: 'purchaseConfirm_b_buyLanding',
+          name: 'purchaseConfirm_e_buyLands',
           layers: [
-            swept('purchaseConfirm_b.n0', { wave: 'triangle', freq: 330, from: 1400, to: 480, q: 3.6, gain: 0.28, attack: 0.002, hold: 0.02, decay: 0.06, curve: 4, noiseMix: 0.16, seed: 34040 }),
-            swept('purchaseConfirm_b.n1', { wave: 'triangle', freq: 440, from: 1700, to: 560, q: 3.8, gain: 0.32, attack: 0.002, hold: 0.026, decay: 0.13, curve: 3.4, punch: 0.3, noiseMix: 0.12, at: 0.05, seed: 34041 }),
+            swept('purchaseConfirm_e.b0', { wave: 'triangle', freq: 587, from: 1700, to: 760, q: 3.2, gain: 0.3, attack: 0.002, hold: 0.006, decay: 0.03, curve: 5, noiseMix: 0.18, seed: 60820 }),
+            swept('purchaseConfirm_e.b1', { wave: 'triangle', freq: 784, from: 2200, to: 980, q: 3.4, gain: 0.34, attack: 0.002, hold: 0.008, decay: 0.06, curve: 4.2, noiseMix: 0.16, at: 0.055, seed: 60822 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "two narrow bands, a fourth apart",
+        id: 'f',
+        character: "two bands, a fourth apart",
         spec: {
-          name: 'purchaseConfirm_c_bandsFourth',
+          name: 'purchaseConfirm_f_fourthApart',
           layers: [
-            band('purchaseConfirm_c.n0', 587, { gain: 0.44, decay: 0.05, q: 6.5, curve: 5.5, seed: 34050 }),
-            ...plate('purchaseConfirm_c.n1', 784, { gain: 0.28, decay: 0.13, ratios: [1, 2.41], q: 8, curve: 4.5, grain: 0.2, edge: 0.6, at: 0.045, seed: 34052 }),
+            band('purchaseConfirm_f.b0', 880, { gain: 0.5, decay: 0.035, q: 7, curve: 6, seed: 60830 }),
+            band('purchaseConfirm_f.b1', 1175, { gain: 0.54, decay: 0.07, q: 7.5, curve: 5, at: 0.055, seed: 60832 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "done, in one contact",
+        spec: {
+          name: 'purchaseConfirm_g_doneOnce',
+          layers: [
+            band('purchaseConfirm_g.done', 1240, { gain: 0.46, decay: 0.05, q: 6.5, curve: 5.5, punch: 0.3, seed: 60840 }),
           ],
         },
       },
@@ -2282,39 +2314,50 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     context: "A buy the player can't afford — a low, flat, faintly gritty 'nope' that falls a little and stops.",
     current: 'rejectBuzz',
     candidates: [
-      // §7.6: two notes a **minor second** apart resolving nowhere — the ratified
-      // `refused` shape, so the fallback carries the same meaning as the real cue.
-      // All three keep the interval and the "goes nowhere"; the material differs.
+      // A refusal is a *stop*, not a raspberry: nothing here buzzes at an audible
+      // rate, nothing wobbles, and every offer falls a little and ends. The §8
+      // job is to stay legibly above `coreHit` — measured rather than asserted,
+      // on the zero-crossing centroid proxy: these four sit at 1035 / 366 / 1009
+      // / 838 Hz against the core family's 64 / 197 / 166 / 64, so the *worst* of
+      // the sixteen pairings clears ×1.86 where §8 asks for ×1.12.
       {
-        id: 'a',
-        character: "grit refusal, dry and flat",
+        id: 'd',
+        character: "a dry refusal, grit and stop",
         spec: {
-          name: 'rejectBuzz_a_gritRefusal',
+          name: 'rejectBuzz_d_dryRefusal',
           layers: [
-            grains('rejectBuzz_a.n0', { freq: 440, freqEnd: 400, grain: 0.0055, gain: 0.34, hold: 0.03, decay: 0.05, curve: 3.4, from: 1500, to: 900, q: 2.8, hp: 200, seed: 34060 }),
-            grains('rejectBuzz_a.n1', { freq: 415.3, freqEnd: 380, grain: 0.006, gain: 0.32, hold: 0.04, decay: 0.06, curve: 3, from: 1300, to: 760, q: 2.8, hp: 190, at: 0.055, seed: 34061 }),
+            grains('rejectBuzz_d.grit', { freq: 480, freqEnd: 400, grain: 0.0035, gain: 0.32, hold: 0.02, decay: 0.07, curve: 4.5, from: 1500, to: 620, q: 3, hp: 260, seed: 60850 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "a blocked thud, nothing opens",
+        id: 'e',
+        character: "blocked: the corner shuts",
         spec: {
-          name: 'rejectBuzz_b_blockedThud',
+          name: 'rejectBuzz_e_blocked',
           layers: [
-            swept('rejectBuzz_b.n0', { wave: 'triangle', freq: 466.16, from: 1700, to: 640, q: 3, gain: 0.34, attack: 0.002, hold: 0.03, decay: 0.05, curve: 3.6, punch: 0.3, noiseMix: 0.2, seed: 34070 }),
-            swept('rejectBuzz_b.n1', { wave: 'triangle', freq: 440, from: 1450, to: 540, q: 3, gain: 0.32, attack: 0.002, hold: 0.04, decay: 0.07, curve: 3, noiseMix: 0.22, at: 0.055, seed: 34071 }),
+            swept('rejectBuzz_e.block', { wave: 'triangle', freq: 372, freqEnd: 330, from: 1300, to: 420, q: 3.4, gain: 0.34, attack: 0.003, hold: 0.03, decay: 0.06, curve: 4.5, noiseMix: 0.26, seed: 60860 }),
           ],
         },
       },
       {
-        id: 'c',
+        id: 'f',
         character: "two bands a semitone apart, unresolved",
         spec: {
-          name: 'rejectBuzz_c_semitoneBands',
+          name: 'rejectBuzz_f_semitone',
           layers: [
-            band('rejectBuzz_c.n0', 523.25, { gain: 0.95, decay: 0.06, q: 5, curve: 4.5, attack: 0.002, hold: 0.02, seed: 34080 }),
-            band('rejectBuzz_c.n1', 493.88, { gain: 0.92, decay: 0.09, q: 5.2, curve: 4, attack: 0.002, hold: 0.02, at: 0.055, seed: 34081 }),
+            band('rejectBuzz_f.b0', 690, { gain: 0.5, decay: 0.09, q: 6.5, curve: 4.5, attack: 0.003, hold: 0.014, seed: 60870 }),
+            band('rejectBuzz_f.b1', 730, { gain: 0.46, decay: 0.08, q: 6.5, curve: 4.5, attack: 0.004, hold: 0.012, at: 0.006, seed: 60872 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "no, said quietly, once",
+        spec: {
+          name: 'rejectBuzz_g_quietNo',
+          layers: [
+            swept('rejectBuzz_g.no', { wave: 'noise', freq: 604, from: 1100, to: 520, q: 3, gain: 0.3, attack: 0.004, hold: 0.02, decay: 0.05, curve: 5, hp: 300, seed: 60880 }),
           ],
         },
       },
@@ -2484,39 +2527,54 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     // and this cue is raised for the minimap **toggle**, so the sound is live and
     // the label is not. Renaming a `SoundName` is a bank change and this brief does
     // not make those — but the board prints the context, so the context says it.
+    //
+    // The one hard rule on the slot: it locates, it never alarms. So no offer
+    // repeats, none of them rises, and none of them is loud enough to be read as
+    // a warning if it happens to fire while the alarm is up.
     label: "Minimap Ping",
     context: "The minimap toggle (the ping mechanic itself was cut) — it locates; it must never read as an alarm.",
     current: 'minimapPing',
     candidates: [
       {
-        id: 'a',
-        character: "a grained sweep, sonar through dust",
+        id: 'd',
+        character: "a swept return through dust",
         spec: {
-          name: 'minimapPing_a_dustSonar',
+          name: 'minimapPing_d_dustReturn',
           layers: [
-            grains('minimapPing_a.sweep', { freq: 600, freqEnd: 1150, grain: 0.004, gain: 0.3, attack: 0.004, hold: 0.05, decay: 0.24, curve: 3, from: 1500, to: 4000, q: 3.2, hp: 320, seed: 34150 }),
+            grains('minimapPing_d.sweep', { freq: 700, freqEnd: 1000, grain: 0.0032, gain: 0.28, attack: 0.004, hold: 0.04, decay: 0.2, curve: 3.2, from: 1700, to: 3400, q: 3, hp: 380, seed: 60890 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "a round pulse returning, low and soft",
+        id: 'e',
+        character: "a soft pulse going out and back",
         spec: {
-          name: 'minimapPing_b_returningPulse',
+          name: 'minimapPing_e_outAndBack',
           layers: [
-            swept('minimapPing_b.out', { wave: 'triangle', freq: 392, from: 700, to: 2200, q: 3.6, gain: 0.42, attack: 0.006, hold: 0.04, decay: 0.08, curve: 2.6, noiseMix: 0.12, seed: 34160 }),
-            swept('minimapPing_b.back', { wave: 'triangle', freq: 294, from: 1800, to: 520, q: 3.4, gain: 0.4, attack: 0.006, hold: 0.03, decay: 0.2, curve: 3, noiseMix: 0.1, at: 0.1, seed: 34161 }),
+            swept('minimapPing_e.out', { wave: 'triangle', freq: 440, from: 800, to: 2000, q: 3.4, gain: 0.36, attack: 0.005, hold: 0.03, decay: 0.07, curve: 2.8, noiseMix: 0.14, seed: 60900 }),
+            swept('minimapPing_e.back', { wave: 'triangle', freq: 330, from: 1500, to: 480, q: 3.2, gain: 0.34, attack: 0.006, hold: 0.024, decay: 0.17, curve: 3.2, noiseMix: 0.12, at: 0.095, seed: 60902 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "two narrow bands, a sonar return",
+        id: 'f',
+        character: "one band opening a map",
         spec: {
-          name: 'minimapPing_c_sonarReturn',
+          name: 'minimapPing_f_mapBand',
           layers: [
-            band('minimapPing_c.out', 1760, { gain: 0.95, decay: 0.11, q: 5.5, curve: 4.5, attack: 0.003, hold: 0.014, seed: 34170 }),
-            band('minimapPing_c.back', 1175, { gain: 0.8, decay: 0.18, q: 6, curve: 4, attack: 0.004, hold: 0.014, at: 0.09, seed: 34171 }),
+            band('minimapPing_f.open', 1480, { gain: 0.8, decay: 0.09, q: 6, curve: 4.8, attack: 0.003, hold: 0.012, seed: 60910 }),
+            band('minimapPing_f.under', 990, { gain: 0.5, decay: 0.14, q: 7, curve: 4.2, attack: 0.004, hold: 0.01, at: 0.02, seed: 60912 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "a display coming up, barely",
+        spec: {
+          name: 'minimapPing_g_displayUp',
+          layers: [
+            swept('minimapPing_g.up', { wave: 'noise', freq: 900, from: 1400, to: 2600, q: 4, gain: 0.26, attack: 0.006, hold: 0.02, decay: 0.09, curve: 3.4, hp: 600, seed: 60920 }),
+            band('minimapPing_g.mark', 1320, { gain: 0.34, decay: 0.06, q: 7.5, curve: 5, at: 0.03, seed: 60922 }),
           ],
         },
       },

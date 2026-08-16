@@ -965,22 +965,28 @@
       "current": "previews/pressTick/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/pressTick/a.wav",
-          "character": "a dry contact, no tone in it",
-          "params": "src/art/audio/candidates.ts#pressTick.a"
+          "id": "d",
+          "wav": "previews/pressTick/d.wav",
+          "character": "a capacitive contact, no tone",
+          "params": "src/art/audio/candidates.ts#pressTick.d"
         },
         {
-          "id": "b",
-          "wav": "previews/pressTick/b.wav",
-          "character": "a damped pip, felt more than heard",
-          "params": "src/art/audio/candidates.ts#pressTick.b"
+          "id": "e",
+          "wav": "previews/pressTick/e.wav",
+          "character": "a damped actuator, felt not heard",
+          "params": "src/art/audio/candidates.ts#pressTick.e"
         },
         {
-          "id": "c",
-          "wav": "previews/pressTick/c.wav",
-          "character": "one narrow band at the family root",
-          "params": "src/art/audio/candidates.ts#pressTick.c"
+          "id": "f",
+          "wav": "previews/pressTick/f.wav",
+          "character": "one filtered band, machine-clean",
+          "params": "src/art/audio/candidates.ts#pressTick.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/pressTick/g.wav",
+          "character": "the smallest click that still reads",
+          "params": "src/art/audio/candidates.ts#pressTick.g"
         }
       ]
     },
@@ -991,22 +997,28 @@
       "current": "previews/purchaseConfirm/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/purchaseConfirm/a.wav",
-          "character": "two dry contacts, rising",
-          "params": "src/art/audio/candidates.ts#purchaseConfirm.a"
+          "id": "d",
+          "wav": "previews/purchaseConfirm/d.wav",
+          "character": "two capacitive contacts, rising",
+          "params": "src/art/audio/candidates.ts#purchaseConfirm.d"
         },
         {
-          "id": "b",
-          "wav": "previews/purchaseConfirm/b.wav",
-          "character": "a low seat, the buy landing",
-          "params": "src/art/audio/candidates.ts#purchaseConfirm.b"
+          "id": "e",
+          "wav": "previews/purchaseConfirm/e.wav",
+          "character": "the buy landing, damped and low",
+          "params": "src/art/audio/candidates.ts#purchaseConfirm.e"
         },
         {
-          "id": "c",
-          "wav": "previews/purchaseConfirm/c.wav",
-          "character": "two narrow bands, a fourth apart",
-          "params": "src/art/audio/candidates.ts#purchaseConfirm.c"
+          "id": "f",
+          "wav": "previews/purchaseConfirm/f.wav",
+          "character": "two bands, a fourth apart",
+          "params": "src/art/audio/candidates.ts#purchaseConfirm.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/purchaseConfirm/g.wav",
+          "character": "done, in one contact",
+          "params": "src/art/audio/candidates.ts#purchaseConfirm.g"
         }
       ]
     },
@@ -1017,22 +1029,28 @@
       "current": "previews/rejectBuzz/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/rejectBuzz/a.wav",
-          "character": "grit refusal, dry and flat",
-          "params": "src/art/audio/candidates.ts#rejectBuzz.a"
+          "id": "d",
+          "wav": "previews/rejectBuzz/d.wav",
+          "character": "a dry refusal, grit and stop",
+          "params": "src/art/audio/candidates.ts#rejectBuzz.d"
         },
         {
-          "id": "b",
-          "wav": "previews/rejectBuzz/b.wav",
-          "character": "a blocked thud, nothing opens",
-          "params": "src/art/audio/candidates.ts#rejectBuzz.b"
+          "id": "e",
+          "wav": "previews/rejectBuzz/e.wav",
+          "character": "blocked: the corner shuts",
+          "params": "src/art/audio/candidates.ts#rejectBuzz.e"
         },
         {
-          "id": "c",
-          "wav": "previews/rejectBuzz/c.wav",
+          "id": "f",
+          "wav": "previews/rejectBuzz/f.wav",
           "character": "two bands a semitone apart, unresolved",
-          "params": "src/art/audio/candidates.ts#rejectBuzz.c"
+          "params": "src/art/audio/candidates.ts#rejectBuzz.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/rejectBuzz/g.wav",
+          "character": "no, said quietly, once",
+          "params": "src/art/audio/candidates.ts#rejectBuzz.g"
         }
       ]
     },
@@ -1139,22 +1157,28 @@
       "current": "previews/minimapPing/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/minimapPing/a.wav",
-          "character": "a grained sweep, sonar through dust",
-          "params": "src/art/audio/candidates.ts#minimapPing.a"
+          "id": "d",
+          "wav": "previews/minimapPing/d.wav",
+          "character": "a swept return through dust",
+          "params": "src/art/audio/candidates.ts#minimapPing.d"
         },
         {
-          "id": "b",
-          "wav": "previews/minimapPing/b.wav",
-          "character": "a round pulse returning, low and soft",
-          "params": "src/art/audio/candidates.ts#minimapPing.b"
+          "id": "e",
+          "wav": "previews/minimapPing/e.wav",
+          "character": "a soft pulse going out and back",
+          "params": "src/art/audio/candidates.ts#minimapPing.e"
         },
         {
-          "id": "c",
-          "wav": "previews/minimapPing/c.wav",
-          "character": "two narrow bands, a sonar return",
-          "params": "src/art/audio/candidates.ts#minimapPing.c"
+          "id": "f",
+          "wav": "previews/minimapPing/f.wav",
+          "character": "one band opening a map",
+          "params": "src/art/audio/candidates.ts#minimapPing.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/minimapPing/g.wav",
+          "character": "a display coming up, barely",
+          "params": "src/art/audio/candidates.ts#minimapPing.g"
         }
       ]
     },
