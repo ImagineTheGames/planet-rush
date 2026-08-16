@@ -1,0 +1,140 @@
+a0-55 — the station-death sting, through the hush. MEASURED.
+
+  sound      stationDeath (1.320 s rendered at 44100 Hz)
+  hush       cut 0.12 s → 3 s silent → 0.9 s back (UNCHANGED by this brief)
+  before     sting → sfx bus → duck → master   (multiplied by the hush)
+  after      sting → master                    (summed past the duck — a0-55)
+
+Per 50 ms window. `rms`/`peak` are of the fall as it reaches the destination;
+`mix` is what any OTHER voice is multiplied by in the same window (the duck).
+
+window (s)      mix     before rms   after rms    before peak  after peak
+--------------------------------------------------------------------------
+0.00–0.05    1.000    0.287009     0.341508     0.5780       0.7234
+0.05–0.10    0.583    0.153504     0.327573     0.4333       0.7429
+0.10–0.15    0.167    0.030488     0.332690     0.1201       0.8965
+0.15–0.20    0.000    0.000000     0.314714     0.0000       0.7104
+0.20–0.25    0.000    0.000000     0.287902     0.0000       0.6595
+0.25–0.30    0.000    0.000000     0.268137     0.0000       0.5245
+0.30–0.35    0.000    0.000000     0.235786     0.0000       0.4994
+0.35–0.40    0.000    0.000000     0.209745     0.0000       0.4929
+0.40–0.45    0.000    0.000000     0.200658     0.0000       0.4596
+0.45–0.50    0.000    0.000000     0.165560     0.0000       0.4060
+0.50–0.55    0.000    0.000000     0.176720     0.0000       0.4153
+0.55–0.60    0.000    0.000000     0.173845     0.0000       0.3487
+0.60–0.65    0.000    0.000000     0.122067     0.0000       0.2729
+0.65–0.70    0.000    0.000000     0.108564     0.0000       0.2765
+0.70–0.75    0.000    0.000000     0.096644     0.0000       0.2551
+0.75–0.80    0.000    0.000000     0.084973     0.0000       0.1778
+0.80–0.85    0.000    0.000000     0.078468     0.0000       0.1724
+0.85–0.90    0.000    0.000000     0.060955     0.0000       0.1168
+0.90–0.95    0.000    0.000000     0.053393     0.0000       0.1234
+0.95–1.00    0.000    0.000000     0.046039     0.0000       0.1050
+1.00–1.05    0.000    0.000000     0.041168     0.0000       0.0873
+1.05–1.10    0.000    0.000000     0.027837     0.0000       0.0577
+1.10–1.15    0.000    0.000000     0.022673     0.0000       0.0475
+1.15–1.20    0.000    0.000000     0.015373     0.0000       0.0311
+1.20–1.25    0.000    0.000000     0.010693     0.0000       0.0274
+1.25–1.30    0.000    0.000000     0.004734     0.0000       0.0130
+1.30–1.32    0.000    0.000000     0.000605     0.0000       0.0017
+
+The headline
+------------
+  the fall runs for                      1.319 s
+  the cut reaches zero at                0.120 s
+  BEFORE: audible until                  0.133 s  (10.1% of its own length)
+  AFTER:  audible until                  1.319 s  (100.0% — nothing multiplies it but master)
+  energy of the fall that arrived, BEFORE 12.2%
+  energy of the fall that arrived, AFTER  100.0%
+  energy that lives PAST the cut          70.1%  ← what the player was losing
+
+So the reported bug, in one number: the developer heard the first
+12.2% of the game's most serious sound and then nothing.
+
+The envelope, drawn — each row is 25 ms, the bar is that row's PEAK scaled to
+the fall's own peak over 28 characters, and `·` is anything under a 56th of it.
+-------------------------------------------------------------------------------
+           t   BEFORE (through the duck)      AFTER (past it)
+       0.000   ██████████████████             ███████████████████
+       0.025   ██████████████████             ███████████████████████
+       0.050   ██████████████                 ███████████████████████
+       0.075   ████████                       █████████████████████
+       0.100   ████                           ██████████████████████  ← the cut completes here
+       0.125   █                              ████████████████████████████
+       0.150   ·                              ██████████████████████
+       0.175   ·                              ██████████████████████
+       0.200   ·                              █████████████████████
+       0.225   ·                              █████████████████
+       0.250   ·                              ████████████████
+       0.275   ·                              ████████████████
+       0.300   ·                              ████████████████
+       0.325   ·                              ████████████████
+       0.350   ·                              ███████████████
+       0.375   ·                              ████████████
+       0.400   ·                              ██████████████
+       0.425   ·                              ██████████████
+       0.450   ·                              █████████████
+       0.475   ·                              ████████
+       0.500   ·                              █████████████
+       0.525   ·                              ███████████
+       0.550   ·                              ███████████
+       0.575   ·                              ███████████
+       0.600   ·                              █████████
+       0.625   ·                              ███████
+       0.650   ·                              ███████
+       0.675   ·                              █████████
+       0.700   ·                              ████████
+       0.725   ·                              █████
+       0.750   ·                              ██████
+       0.775   ·                              █████
+       0.800   ·                              █████
+       0.825   ·                              █████
+       0.850   ·                              ████
+       0.875   ·                              ████
+       0.900   ·                              ████
+       0.925   ·                              ████
+       0.950   ·                              ███
+       0.975   ·                              ███
+       1.000   ·                              ███
+       1.025   ·                              ███
+       1.050   ·                              ██
+       1.075   ·                              ██
+       1.100   ·                              █
+       1.125   ·                              █
+       1.150   ·                              █
+       1.175   ·                              █
+       1.200   ·                              █
+       1.225   ·                              ·
+       1.250   ·                              ·
+       1.275   ·                              ·
+       1.300   ·                              ·
+
+Read the left column top to bottom: that is the bug. It is the same sound as
+the right column for four rows, and then it is a dead channel for a second and
+a third while the mix around it is also at zero — three seconds of silence that
+began mid-sting instead of after it. GDD §4.7 asks for the quiet to land ON TOP
+OF the fall; the right column is a sound running out under a silence, which is
+the picture the design describes ("nobody jokes for three seconds").
+
+What the quiet still does (the other half of the claim)
+------------------------------------------------------
+  `mix` above is the multiplier every other voice gets, and it is 0.000 from
+  0.12 s onward — the alarm, the ambience, the soundtrack, the UI cues, all of
+  it. The exemption is one voice wide. `src/art/audio/engine.test.ts` asserts
+  the same thing structurally (nothing else starts, and the four buses measure
+  zero to the destination while the sting does not), and
+  `src/art/vfx/death-moment.test.ts` pins the three numbers so a later pass
+  cannot restore the old behaviour by moving the cut or trimming the quiet.
+
+By ear
+------
+  fall-before.wav / fall-after.wav   the sting alone, on each routing.
+  room-before.wav / room-after.wav   the moment in context: half a second of
+                                     match, a home dying, the quiet, and the
+                                     match coming back. The bed is identical
+                                     in both — ducked, as it should be. The
+                                     only difference is whether the fall is
+                                     ducked with it.
+  Written by this script; no binary audio ships in `src/` (GDD §3.6 — every
+  sound in the game is synthesized at runtime, and these are evidence, not
+  assets).
