@@ -144,14 +144,36 @@ export const RUSH_LABEL = 'RUSH!';
  */
 export const LOBBY_TITLE = 'CREW MUSTER';
 /**
- * `CLAIM`, not `ROOM` (GDD §4.7 register 2; sweep doc §3 "lobby ROOM → CLAIM").
- * u7-03 extracted this string out of the view and, forking from before the
- * sweep, carried the pre-sweep word up with it — so the merge restores the
- * ratified noun into u7-03's constant rather than reverting the extraction.
- * The room *code* stays a code: the noun above it moved, the code did not
- * (see `lobby-entry.ts` ENTRY_ERRORS, and r1-01's `CLAIM CODE` keypad fix).
+ * The word over the four-character code in the header beam — `JOIN CODE`.
+ *
+ * **It used to read `CLAIM` (a0-61).** The sweep put the fiction's noun here
+ * (GDD §4.7 register 2; sweep doc §3 "lobby ROOM → CLAIM") and the developer
+ * read the shipped screen back to us: *"we still have words like 'claim', no
+ * player is going to know what that means, just put it in everyday game terms
+ * like Visibility - Public … and Join Code instead of claim"* (2026-08-16).
+ *
+ * That is §4.7's own clarity rule landing on §4.7's own vocabulary table, and
+ * the table already conceded the ground: *"the room-code **noun** stays 'code'
+ * — see the clarity rule."* `CLAIM` alone over `753P` names the code with a
+ * word from our domain model and nothing else, so the clause the rule is
+ * written for applies exactly — *"a word a first-time player has to learn
+ * before they can act is a bug"*, and *"if the flavour word and the plain word
+ * compete on comprehension, the plain word ships."* Every game the player has
+ * met calls this a join code.
+ *
+ * The rename is of the **string**, not of the model: {@link RoomCode}, `claim`
+ * as a target kind, the wire and the session model are untouched, and the
+ * fiction keeps the word everywhere it is theme rather than chrome — notably
+ * `./end-of-match` `CLAIM HELD` / `CLAIM LOST`, which §4.7's accessibility
+ * clause governs and which this change deliberately leaves alone.
+ *
+ * It is measured, not eyeballed: `JOIN CODE` is 80px of 11px Oxanium at the
+ * phone's frame scale against a 113px cluster ({@link ROOM_CODE_WIDTH}), so the
+ * wider word still clears the box the shorter one sat in — the view draws this
+ * one with no `fitLabel` behind it, so fitting outright is the requirement.
+ * `./lobby-flow.test.ts` holds the measurement.
  */
-export const LOBBY_EYEBROW = 'CLAIM';
+export const LOBBY_EYEBROW = 'JOIN CODE';
 
 /** Seconds the RUSH countdown runs for. Long enough to put a thumb back on the
  *  stick, short enough that nobody reads it twice. TUNABLE */
@@ -499,6 +521,42 @@ export const CLAIM_LABELS: Readonly<Record<'public' | 'private', string>> = {
 /** The word the CLAIM control is showing right now. */
 export function claimLabel(listed: boolean): string {
   return listed ? CLAIM_LABELS.public : CLAIM_LABELS.private;
+}
+
+/**
+ * …and the noun in front of it — `VISIBILITY`, where the chip read `CLAIM` until
+ * a0-61.
+ *
+ * The developer, on the shipped lobby chrome: *"just put it in everyday game
+ * terms like Visibility - Public"* (2026-08-16). The value words were never the
+ * problem — PUBLIC and PRIVATE are as plain as words get, and they are what the
+ * wire already means. The **noun** was: `CLAIM · PUBLIC` asks the player to know
+ * that a claim is the room they are standing in before it can tell them anything
+ * about who may walk into it. `VISIBILITY · PUBLIC` says what the control does
+ * with no fiction in the way, which is GDD §4.7's clarity rule outranking its own
+ * vocabulary table — the same rule the sibling {@link LOBBY_EYEBROW} moved under.
+ *
+ * **The identifiers stay `claim`.** The target kind, the toggle, the model field
+ * and the wire's `listed` are all untouched: this is what the chip *says*, not
+ * what the code calls it (the a0-61 brief's line — *"a copy change, not a
+ * refactor"*).
+ *
+ * The composed string lives here rather than in the view for this file's standing
+ * reason — *"a string typed into a draw call is a string nobody can find"* — and
+ * because it is now the widest label on the control strip, which is a thing a
+ * test has to be able to measure. `VISIBILITY · PRIVATE` is 160px of 11px
+ * Audiowide against a 104–163px chip across the profile matrix, so on the
+ * narrowest phones `./lobby-view` `fitLabel` scales it exactly as it already
+ * scales its neighbour `YIELD · STANDARD` (144px); on the three viewports the
+ * goldens are taken at it keeps ≥90% of its type. Never wrapped and never
+ * clipped — the chip is one line, and `fitLabel` is what makes that true.
+ */
+export const CLAIM_CHIP_NOUN = 'VISIBILITY';
+
+/** The whole label on the visibility chip — `VISIBILITY · PUBLIC` /
+ *  `VISIBILITY · PRIVATE` ({@link CLAIM_CHIP_NOUN}). */
+export function claimChipLabel(listed: boolean): string {
+  return `${CLAIM_CHIP_NOUN} · ${claimLabel(listed)}`;
 }
 
 /**
@@ -2280,7 +2338,8 @@ export interface LobbyModel {
   readonly mode: MatchMode;
   /** The ore abundance — the row drawn as SCARCE / STANDARD / RICH (ratified p11). */
   readonly abundance: Abundance;
-  /** PUBLIC / PRIVATE — the word on the CLAIM chip (a0-35, {@link claimLabel}). */
+  /** PUBLIC / PRIVATE — the value on the visibility chip, which reads
+   *  `VISIBILITY · PUBLIC` in full (a0-35; a0-61, {@link claimChipLabel}). */
   readonly listed: boolean;
   /** Whether that chip is on the strip at all — creator-only and online-only
    *  ({@link showsClaimControl}). The layout takes the same answer, so the strip

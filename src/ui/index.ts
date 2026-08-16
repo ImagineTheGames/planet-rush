@@ -401,6 +401,7 @@ export {
   botDifficulties,
   canStart,
   castForEmptySeat,
+  claimChipLabel,
   claimLabel,
   classLocked,
   colorName,

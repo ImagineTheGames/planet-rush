@@ -20,11 +20,11 @@
  * THE WALK, WHICH IS THE BRIEF'S EVIDENCE
  * ---------------------------------------------------------------------------
  *   the host (a PHONE, held in landscape — the developer hosts from one)
- *     PLAY → CREATE ROOM → the lobby, showing `CLAIM · PUBLIC`
+ *     PLAY → CREATE ROOM → the lobby, showing `VISIBILITY · PUBLIC` (a0-61)
  *   the guest (a PC)
  *     PLAY → JOIN → BROWSE → the room is a ROW → press its JOIN → in the room
  *   the host
- *     presses CLAIM → the chip reads `CLAIM · PRIVATE`
+ *     presses the chip → it reads `VISIBILITY · PRIVATE`
  *   the allocator
  *     `GET /rooms` no longer carries it — **absent from the payload**, not
  *     greyed and not filtered on the far side
@@ -36,7 +36,7 @@
  *
  * WHAT WOULD FAIL HERE THAT PASSES EVERYWHERE ELSE
  * ---------------------------------------------------------------------------
- *  - a CLAIM chip that is laid out but never drawn, or drawn off the phone's
+ *  - a visibility chip that is laid out but never drawn, or drawn off the phone's
  *    short axis (the seam reports the rect it drew, and the screenshot is the
  *    human check beside it);
  *  - a toggle whose value never leaves the client — the lobby saying PRIVATE
@@ -116,7 +116,7 @@ interface Client {
 
 /** The developer's own device, and the one the report came from: a phone. Its
  *  viewport is portrait and the app's landscape lock rotates the whole scene, so
- *  what the screenshot shows — and what the CLAIM chip has to fit on — is a
+ *  what the screenshot shows — and what the visibility chip has to fit on — is a
  *  390px-short-axis LANDSCAPE screen. */
 const IPHONE = { width: 390, height: 844, dpr: 3, touch: true } as const;
 const PC = { width: 1280, height: 800, dpr: 1, touch: false } as const;
@@ -238,7 +238,7 @@ test('a host can make the room PRIVATE: the list drops it, the code still opens 
 
     // **The button the developer could not find.** Drawn, with a word on it, and
     // on the ratified default: PUBLIC (a0-26 D1).
-    expect(opened.claim, 'the CLAIM chip is drawn, and says PUBLIC').toBe('PUBLIC');
+    expect(opened.claim, 'the visibility chip is drawn, and says PUBLIC').toBe('PUBLIC');
     expect(opened.chip.width, 'the chip has width on a 390px phone').toBeGreaterThan(0);
     expect(opened.chip.height, '…and height').toBeGreaterThan(0);
     await host.page.screenshot({ path: 'tests/live-stage-online/private-toggle-host-public-evidence.png' });
@@ -291,9 +291,9 @@ test('a host can make the room PRIVATE: the list drops it, the code still opens 
     });
     expect(joined.room, 'the JOIN button put the guest in the room it named — no code typed').toBe(code);
     expect(joined.isHost, 'a joiner is not the host').toBe(false);
-    // A guest gets no CLAIM chip: the room never tells them whether it is listed,
+    // A guest gets no visibility chip: the room never tells them whether it is listed,
     // and a chip that could only show their own default would be inventing a fact.
-    expect(joined.claim, 'no CLAIM chip on a guest’s roster').toBeNull();
+    expect(joined.claim, 'no visibility chip on a guest’s roster').toBeNull();
     await host.page.waitForFunction(() => window.__lobby?.humanCount === 2, undefined, {
       timeout: 30_000,
     });
@@ -307,7 +307,7 @@ test('a host can make the room PRIVATE: the list drops it, the code still opens 
       timeout: 30_000,
     });
 
-    // --- 3. The host presses CLAIM. A real press, on the drawn chip. ---------
+    // --- 3. The host presses the chip. A real press, on the drawn one. ------
     const chip = await host.page.evaluate(() => window.__lobby!.claimControl.physicalCenter);
     await host.press({ x: chip.x, y: chip.y });
     await host.page.waitForFunction(() => window.__lobby?.claim === 'PRIVATE', undefined, {
