@@ -1390,6 +1390,21 @@ under it did not. Trust the measured table, not the prose around it.)*
     session, and one of them was wrong. A claim without a figure in it is not
     thereby a soft claim — *"contested space is worth more"* is a testable
     statement about where ore lands, and it took 50 seconds of compute to test.
+  - **Full local suite, run TWICE this session, before and after the commit:**
+    both `1 failed | 5543 passed (5544)`, `1 failed | 300 passed (301)` files,
+    676 s and 664 s. The one failure is the standing blocker — `unstuck` seed 15,
+    `foreman` slot 2, **133.5 s at (1204,1195)** while `'haul'` — byte-identical
+    to sessions three through seventeen. `tsc --noEmit` exits 0. Both remote DoD
+    greps pass against `FETCH_HEAD`. PR check buckets unchanged: the only `fail`
+    is `Typecheck, test, build` (two duplicate workflow runs of it, not two
+    failures); perf gate passes, Playwright shards pending.
+  - **Escalated once, on the fourteenth/fifteenth/seventeenth sessions' test** —
+    would acting on the stale text waste work? Yes: the GDD told the balance crew
+    the extra ore lands in the asteroid field, so anyone tuning against it would
+    budget the circulation into the wrong part of the map, and *"interception
+    beats hauling"* points a designer at haulers when the measured effect is a
+    defender's buff near stations. Posted one short correction comment and added
+    the table to the PR **body**. Did not repost the blocker ask.
   - **What a nineteenth session should NOT do.** Everything in the twelfth through
     seventeenth lists still holds, plus: do not re-measure the spatial
     distribution — the table is in `docs/design-amendments.md` → *Where the ore
