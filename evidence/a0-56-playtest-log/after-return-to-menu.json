@@ -1,0 +1,139 @@
+{
+  "schema": "planet-rush.playtest-log",
+  "version": 1,
+  "summary": "Planet Rush playtest log — build 3758871* (2026-08-16T02:40:46.271Z) · session 2026-08-16T02:41:26.875Z · desktop 1280x800 · net 4g · coverage match · covers 0.0s–22.8s · planet-rush.playtest-log/1",
+  "coverage": "match",
+  "span": {
+    "fromMs": 0,
+    "toMs": 22842
+  },
+  "restored": 5,
+  "env": {
+    "build": "3758871*",
+    "sha": "3758871",
+    "buildTime": "2026-08-16T02:40:46.271Z",
+    "dirty": true,
+    "startedAt": "2026-08-16T02:41:26.875Z",
+    "formFactor": "desktop",
+    "viewport": "1280x800",
+    "touch": false,
+    "connection": "4g"
+  },
+  "durationMs": 22842,
+  "capacity": 600,
+  "dropped": 0,
+  "events": [
+    {
+      "at": 0,
+      "kind": "session",
+      "msg": "session start",
+      "data": {
+        "build": "3758871*",
+        "sha": "3758871",
+        "buildTime": "2026-08-16T02:40:46.271Z",
+        "dirty": true,
+        "startedAt": "2026-08-16T02:41:26.875Z",
+        "form": "desktop",
+        "viewport": "1280x800",
+        "touch": false,
+        "connection": "4g",
+        "schema": "planet-rush.playtest-log/1"
+      }
+    },
+    {
+      "at": 20,
+      "kind": "note",
+      "msg": "Planet Rush build 3758871* built 2026-08-16T02:40:46.271Z"
+    },
+    {
+      "at": 29,
+      "kind": "note",
+      "msg": "webgl",
+      "data": {
+        "api": "webgl2"
+      }
+    },
+    {
+      "at": 160,
+      "kind": "match",
+      "msg": "match start",
+      "data": {
+        "online": false,
+        "map": "octagon",
+        "ship": "vanguard",
+        "mode": "ffa",
+        "seat": 0,
+        "seats": 8
+      }
+    },
+    {
+      "at": 15245,
+      "kind": "match",
+      "msg": "exit to menu",
+      "data": {
+        "tick": 376
+      }
+    },
+    {
+      "at": 16040,
+      "kind": "session",
+      "msg": "restored after reload",
+      "data": {
+        "events": 5,
+        "dropped": 0,
+        "gapMs": 795
+      }
+    },
+    {
+      "at": 16040,
+      "kind": "session",
+      "msg": "session start",
+      "data": {
+        "build": "3758871*",
+        "sha": "3758871",
+        "buildTime": "2026-08-16T02:40:46.271Z",
+        "dirty": true,
+        "startedAt": "2026-08-16T02:41:26.875Z",
+        "form": "desktop",
+        "viewport": "1280x800",
+        "touch": false,
+        "connection": "4g",
+        "schema": "planet-rush.playtest-log/1"
+      }
+    },
+    {
+      "at": 16040,
+      "kind": "note",
+      "msg": "Planet Rush build 3758871* built 2026-08-16T02:40:46.271Z"
+    },
+    {
+      "at": 16047,
+      "kind": "note",
+      "msg": "webgl",
+      "data": {
+        "api": "webgl2"
+      }
+    },
+    {
+      "at": 16211,
+      "kind": "connect",
+      "msg": "front door idle",
+      "data": {
+        "screen": "home"
+      }
+    },
+    {
+      "at": 22842,
+      "kind": "match",
+      "msg": "match start",
+      "data": {
+        "online": false,
+        "map": "octagon",
+        "ship": "vanguard",
+        "mode": "teams",
+        "seat": 0,
+        "seats": 8
+      }
+    }
+  ]
+}

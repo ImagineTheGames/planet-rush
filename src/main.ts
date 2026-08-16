@@ -418,6 +418,8 @@ import {
   installDownloadLogButton,
   installErrorCapture,
   installPlaytestLog,
+  // Where the log goes when the page does (a0-56).
+  browserPlaytestLogStore,
   playtestLog,
   showDownloadLog,
   // Your own ping, one mono line above the build stamp (ratified developer).
@@ -689,7 +691,30 @@ async function boot(): Promise<void> {
   //
   //     Unconditional, not behind ?debug=1: a playtest bug that reproduces once must
   //     not require the developer to have guessed beforehand that logging was needed.
-  const playtest = installPlaytestLog({ env: describeEnvironment(describePage()) });
+  //
+  //     And it now OUTLIVES THE PAGE (a0-56). It used to be a module-level singleton
+  //     and nothing else, so BACK TO MENU — a `location` change — killed it and a
+  //     fresh log booted in its place: the developer exported a match and got the
+  //     boot sequence of the page that replaced it (*"it said i never left the main
+  //     menu but i was in the pause menu in the middle of a match"*), and the
+  //     Director believed the file over the person. `sessionStorage` is the exact
+  //     lifetime a playtest session has — through a reload, gone with the tab — and
+  //     `null` where a browser will not give us one, which is simply the old
+  //     memory-only behaviour.
+  const playtest = installPlaytestLog({
+    env: describeEnvironment(describePage()),
+    store: browserPlaytestLogStore(),
+  });
+  // Writes are throttled off the frame budget, so the last quarter second of a
+  // session is in memory and not in storage when the page goes away — which is
+  // precisely the quarter second the developer is reporting. `pagehide` is the one
+  // event that fires for a reload, a same-tab navigation AND a tab being closed;
+  // `visibilitychange` is the backstop for mobile Safari, which can discard a
+  // backgrounded tab without ever firing the first.
+  window.addEventListener('pagehide', () => playtest.flush());
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') playtest.flush();
+  });
   // Console capture wraps `console.error`/`warn` (always forwarding to the real one)
   // and listens for uncaught errors — the console a phone has no way to show.
   installConsoleCapture({ log: playtest, origin: pageOrigin() });
@@ -1250,6 +1275,20 @@ async function boot(): Promise<void> {
   // local `LocalLoopback` (GDD §4.2). Offline, `bootMatch` builds the loopback.
   let match: ClientMatch = onlineSession ? onlineMatchAdapter(onlineSession) : bootMatch(matchSeed);
   let world = match.world;
+  // THE LINE THAT MAKES `coverage` TRUE OF A SOLO MATCH (a0-56). Every other match
+  // event in this client is filed by `attachSessionLog`, which only ever runs for an
+  // ONLINE session — so an offline match recorded nothing match-scoped at all, and a
+  // log of a whole solo game would have exported as `boot-only`, which is the same
+  // lie in the opposite direction. A match exists here on both paths, so this is
+  // where the timeline is told.
+  playtest.recordMatch('match start', {
+    online: onlineSession !== null,
+    map: chosenMapId,
+    ship: chosenShipClass,
+    mode: chosenTeams ? 'teams' : 'ffa',
+    seat: LOCAL_PLAYER,
+    seats: world.ships.length,
+  });
 
   /**
    * The difficulty each seat's opposition is SCORED at (plan §1.3b), for the
@@ -2995,6 +3034,10 @@ async function boot(): Promise<void> {
       startSpectate();
     } else if (kind === 'menu') {
       audio.cue('back');
+      // Same as the pause menu's LEAVE: the tail of the match reaches storage
+      // before the page that holds it does (a0-56).
+      playtest.recordMatch('exit to menu', { tick: world.tick, from: 'end screen' });
+      playtest.flush();
       window.location.reload();
     }
   }
@@ -3209,6 +3252,10 @@ async function boot(): Promise<void> {
    *  from a harness boot (which otherwise skips it), preserving the app's base path. */
   function exitToMenu(): void {
     match.close();
+    // On the timeline BEFORE the page goes, so the log of the next page load opens
+    // with the reason this one ended rather than with an unexplained seam (a0-56).
+    playtest.recordMatch('exit to menu', { tick: world.tick });
+    playtest.flush();
     const menuUrl = window.location.origin + window.location.pathname;
     window.location.assign(menuUrl);
   }
@@ -11049,11 +11096,16 @@ function presentBootFailure(err: unknown): void {
       dom: document,
       content,
       onRetry: () => {
+        // RETRY is a reload, and a reload used to be where the log of the failure
+        // went (a0-56). Flushed first, so the next page load opens with the error
+        // that sent the developer here rather than with a clean boot sequence.
         if (content.kind !== 'no-webgl') {
+          playtestLog().flush();
           window.location.reload();
           return true;
         }
         if (!probeWebGl().ok) return false; // still no GL — say so, don't reload
+        playtestLog().flush();
         window.location.reload();
         return true;
       },
