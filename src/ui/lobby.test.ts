@@ -29,6 +29,7 @@ import {
   ABUNDANCE_CYCLE,
   ABUNDANCE_LABELS,
   CLAIM_LABELS,
+  claimChipLabel,
   claimLabel,
   CLASS_ORDER,
   CLASS_OPTIONS,
@@ -1960,6 +1961,16 @@ describe('the CLAIM control — PUBLIC / PRIVATE (a0-35, a0-26 D1)', () => {
     expect(claimLabel(lobbyModel(priv).listed)).toBe('PRIVATE');
     // …and back, because an opt-out a host cannot undo is a trap.
     expect(toggleClaim(priv).listed).toBe(true);
+  });
+
+  it('is labelled VISIBILITY on the chip, not with our own word (a0-61)', () => {
+    // The developer, on the shipped chrome: *"just put it in everyday game terms
+    // like Visibility - Public"*. The two VALUE words never moved — they are what
+    // the wire already means — so this is the whole of the change, and
+    // `./lobby-flow.test.ts` is where it is measured against the chip it rides.
+    expect(claimChipLabel(true)).toBe('VISIBILITY · PUBLIC');
+    expect(claimChipLabel(false)).toBe('VISIBILITY · PRIVATE');
+    expect(claimChipLabel(lobbyModel(toggleClaim(lobby())).listed)).toBe('VISIBILITY · PRIVATE');
   });
 
   it('refuses a GUEST, a lobby past RUSH!, and an OFFLINE room — identically', () => {

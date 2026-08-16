@@ -1372,7 +1372,9 @@ describe('the CLAIM chip (a0-35)', () => {
       const strip = [
         { label: 'MODE', rect: layout.modeToggle, kind: 'mode' },
         { label: 'YIELD', rect: layout.abundance, kind: 'abundance' },
-        { label: 'CLAIM', rect: layout.claim, kind: 'claim' },
+        // …drawn as `VISIBILITY · PUBLIC` since a0-61; the target kind, and this
+        // file's own vocabulary for it, are unchanged.
+        { label: 'VISIBILITY', rect: layout.claim, kind: 'claim' },
       ] as const;
       for (const { label, rect, kind } of strip) {
         // Inside the safe content box, like every other rect on this screen.
