@@ -77,6 +77,30 @@
  * lineup hashes differently — are untouched and still the thing that stops a
  * team-aware path from hiding behind a number.
  *
+ * ### Re-baselined a third time, 2026-08-16 (a0-59) — same bar, same day
+ *
+ * Gameplay lane, flagged for the Bot Engineer. a0-58 and a0-59 landed hours apart
+ * and this branch is stacked on that one, so these numbers move twice in one day.
+ * The bar is met the same way: *"A destroyed ship drops EVERYTHING: the half-burn
+ * ore sink is withdrawn"* in `docs/design-amendments.md`, ratified off the
+ * developer's *"destroyed ships should drop all their ore, no more 1/2 the ore
+ * stuff"*. `DEATH_ORE_DROP_FRACTION` goes 0.5 → 1.
+ *
+ * This is a bigger world-move than a0-58's, not a smaller one. Every ship death in
+ * an eight-bot match now lays down twice the chunks in the same ring, so the field
+ * a bot perceives, the pickups it makes and the ore it spends all diverge from the
+ * first kill onward. There is no honest way to hold a state hash across it.
+ *
+ * | Seed | Post-a0-58 | Post-a0-59 |
+ * |---|---|---|
+ * | 20260806 | `f31d2c3b` | `f290517f` |
+ * | 7 | `2400ba7e` | `b8c73690` |
+ * | 991 | `b891918a` | `84fd2ef2` |
+ *
+ * **Rule 3 is unweakened here too**, for exactly the reasons the paragraph above
+ * gives: the two non-hash cases are untouched, and nothing in this change is
+ * mode-aware at all — it is one constant in `src/sim/constants.ts`.
+ *
  * The last case is the one that stops this file from being vacuous: it asserts
  * the harness can build a team world *at all*, and that the same lineup on two
  * sides hashes differently. Without it, a `botLobby` that quietly dropped the
@@ -107,15 +131,17 @@ const SECONDS = 180;
  * for the old values and the reasoning).
  *
  * re-measured again on `agent/gameplay/a0-58-whole-ore-only` when every ore mint
- * became whole (a0-58 — the module note carries both moves and both reasons).
+ * became whole (a0-58), and once more on
+ * `agent/gameplay/a0-59-full-death-drop` when a destroyed ship began dropping its
+ * whole hold (a0-59 — the module note carries all three moves and their reasons).
  *
  * **Do not re-baseline these.** The only thing that has ever earned it is a
  * ratified amendment in `docs/design-amendments.md`.
  */
 const GOLDEN: readonly (readonly [seed: number, hash: string])[] = [
-  [20260806, 'f31d2c3b'],
-  [7, '2400ba7e'],
-  [991, 'b891918a'],
+  [20260806, 'f290517f'],
+  [7, 'b8c73690'],
+  [991, '84fd2ef2'],
 ];
 
 /** One eight-bot match, the shipped cast, the offline lobby's own roster path. */
