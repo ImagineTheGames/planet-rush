@@ -1281,14 +1281,18 @@ async function boot(): Promise<void> {
   // log of a whole solo game would have exported as `boot-only`, which is the same
   // lie in the opposite direction. A match exists here on both paths, so this is
   // where the timeline is told.
-  playtest.recordMatch('match start', {
-    online: onlineSession !== null,
-    map: chosenMapId,
-    ship: chosenShipClass,
-    mode: chosenTeams ? 'teams' : 'ffa',
-    seat: LOCAL_PLAYER,
-    seats: world.ships.length,
-  });
+  function recordMatchStart(reason: 'boot' | 'rematch'): void {
+    playtest.recordMatch('match start', {
+      reason,
+      online: onlineSession !== null,
+      map: chosenMapId,
+      ship: chosenShipClass,
+      mode: chosenTeams ? 'teams' : 'ffa',
+      seat: LOCAL_PLAYER,
+      seats: world.ships.length,
+    });
+  }
+  recordMatchStart('boot');
 
   /**
    * The difficulty each seat's opposition is SCORED at (plan §1.3b), for the
@@ -3082,6 +3086,10 @@ async function boot(): Promise<void> {
     matchSeed += 1;
     match = bootMatch(matchSeed);
     world = match.world;
+    // A rematch is a second match in one page load, and the log has to be able to
+    // tell the two apart — otherwise a report about "the second game" reads against
+    // the first one's timeline (a0-56).
+    recordMatchStart('rematch');
     rebuildNameTable();
     // A new match is a new tally and a new summary: the observer is rebuilt on the
     // fresh world, and the banked sequence is dropped so the NEXT teardown writes
