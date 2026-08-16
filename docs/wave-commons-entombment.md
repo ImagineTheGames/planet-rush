@@ -141,6 +141,48 @@ clearance it buys shrinks with the ring. The required gap exceeds the
 `sectorWidth × 0.45` clamp long before the corridor opens, and the ring is
 oversubscribed regardless.
 
+**And the p14 escape hatch cannot repair it — measured, not reasoned.** This is
+the last knob in the gameplay lane, and the obvious one to reach for: the sim
+already carries a ratified anti-wedge mechanic (`WEDGE_SLIDE_SPEED`,
+`WEDGE_SLIDE_KICK`, `WEDGE_SLIDE_RUN_S`, `WEDGE_CONTACT_S` in
+`src/sim/constants.ts`; `updateWedgeEscape` in `src/sim/step.ts`) whose whole
+job is that no ship stays wedged against anything, and whose doc-comment
+promised a ship "can never *stay* pinned". So: is it simply failing to fire at
+seed 15, and is this a one-constant tune after all?
+
+**No. It fires on 98.4% of ticks and is already at full stretch.** Instrumented
+over the 12600 ticks of the seed-15 wedge (slot 2, t = 600–810), reading
+`Ship.wedgeContactS` / `Ship.wedgeSlide` off the live world:
+
+| measure | value |
+|---|---|
+| ticks in contact with rock | 12599 / 12600 |
+| ticks with the hatch armed and sliding | **12402 (98.4%)** |
+| distinct slide directions used | **4 — the entire quarter-turn search, cycling** |
+| mean hull speed through the wedge | **68.7 u/s** |
+| clearance to nearest rock surface | −2.6 u to **+5.5 u**, against `SHIP_RADIUS` 16 |
+
+Three things follow. The hull is **not motionless** — it is at cruise speed the
+whole 133.5 s, which is why `unstuck` measures *displacement* and not speed. The
+hatch is **not failing**; it runs its complete bounded search — tangent, outward
+along the normal, other tangent, inward — over and over, exactly as designed. And
+the search cannot succeed, because the pocket's most generous clearance is 5.5 u
+for a 16 u hull: **there is no direction with an exit.** A larger
+`WEDGE_SLIDE_KICK` or a longer `WEDGE_SLIDE_RUN_S` reaches the wall sooner and
+changes nothing else.
+
+The hatch beats *pinning against a surface* — one body, open space behind. It
+cannot beat *enclosure*. Its search is over directions; it cannot make space. The
+false guarantee has been struck from `src/sim/constants.ts` and `src/sim/step.ts`
+(a0-59, comment-only) so the next reader is not sent down this path, since the
+in-file promise was itself the argument for taking it.
+
+**With this, every knob inside the gameplay lane is measured and exhausted.**
+Placement (arithmetic), `commonsHoleFraction` (at its ceiling, wrong knob),
+`commonsSpokeGap` (angular, clamped), and now the escape hatch (firing, saturated,
+no exit). What remains is the three costed candidates below, and every one of them
+is a design ruling.
+
 ---
 
 ## Candidates, costed

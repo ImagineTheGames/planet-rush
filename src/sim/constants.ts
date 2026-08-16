@@ -1420,12 +1420,34 @@ export const SHIP_ASTEROID_RESTITUTION: Tunable<number> = 0.8;
  * itself, off the sim's own ground truth, for EVERY ship (bot or human) and
  * EVERY solid body. When a ship is in contact with a body, pressing inward, and
  * has been reduced to near-stillness by that contact, the sim gives it a
- * tangential slide along the surface — it can never *stay* pinned, whatever
- * heading its pilot keeps asking for. It slides around/off the rim and its
+ * tangential slide along the surface. It slides around/off the rim and its
  * steering re-approaches from open space (the report's "nudge tangentially,
  * re-approach"). This is the physics floor; a bot keeping its arrival points
  * outside a body (`safeAnchorRadius`, `./anchors`) is the behavioural fix that
  * stops the ship ever reaching this state — belt and braces.
+ *
+ * **The scope of that floor, measured (a0-59). This comment used to promise a
+ * ship "can never *stay* pinned, whatever heading its pilot keeps asking for".
+ * That is false, and it is false in a way worth stating precisely, because it
+ * is exactly what talks the next agent into tuning `WEDGE_SLIDE_*` at a bug the
+ * knob cannot reach.** The hatch defeats *pinning against a surface* — a hull
+ * pressed on one body with open space behind it. It cannot defeat *enclosure*:
+ * a hull sealed inside a pocket smaller than its own escape needs has no exit
+ * for any tangent to find, and the hatch's search is over directions, not over
+ * space it can make.
+ *
+ * Instrumented on the standing failure (`tests/harness/unstuck.test.ts` seed 15,
+ * slot 2, wedged 133.5 s at the map centre; `docs/wave-commons-entombment.md`):
+ * across the 12600 ticks of the wedge the hull is in contact on **12599**, has
+ * the hatch armed and sliding on **12402 (98.4%)**, cycles all **four** of the
+ * quarter-turn directions below — the entire bounded search, over and over —
+ * and averages **68.7 u/s** doing it. It is not motionless and the hatch is not
+ * failing to fire; it is at full stretch. The most open the hull's clearance to
+ * any rock surface ever gets, anywhere in that pocket, is **5.5 u** against a
+ * `SHIP_RADIUS` of 16. There is no direction with an exit, so a bigger
+ * `WEDGE_SLIDE_KICK` or a longer `WEDGE_SLIDE_RUN_S` only reaches the wall
+ * sooner. That defect is map geometry (the commons ring is oversubscribed with
+ * rock 3.66× at wave 5) and it is fixed there or not at all.
  */
 
 /**

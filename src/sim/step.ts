@@ -251,8 +251,10 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
   // 5. Ship-vs-asteroid and ship-vs-station reflection (GDD §4.1), then the
   //    persistent-grind escape hatch (developer report p14): a hull pressed into
   //    a body and held near-still by it accrues grind-time; once it crosses
-  //    `WEDGE_CONTACT_S` it is slid off the rim so it can never stay pinned. The
-  //    contact accumulator is reused across ships to keep the loop allocation-free.
+  //    `WEDGE_CONTACT_S` it is slid off the rim. (Off a *rim*: the hatch beats
+  //    pinning against a surface, not enclosure inside a pocket too small to
+  //    leave — measured, a0-59, see `WEDGE_SLIDE_SPEED`'s comment.) The contact
+  //    accumulator is reused across ships to keep the loop allocation-free.
   const contact: WedgeContact = { pressedIn: false, nx: 0, ny: 0 };
   for (const ship of world.ships) {
     if (!ship.alive) continue;
