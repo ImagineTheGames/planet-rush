@@ -1647,41 +1647,71 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     ],
   },
   stationDeath: {
+    // **Re-voiced last, and by translation.** Two reasons, both on the record:
+    // a0-55 was moving this sound's routing while the sweep ran (`./bank`'s own
+    // note calls it the most serious sound in the game, and the previous re-voice
+    // deliberately left it alone), and §7.4 says any change here is a developer
+    // question rather than a re-voice. So the four offers are not four ideas —
+    // they are the SHIPPED beat rebuilt in the sweep's materials, and the thing
+    // being chosen is how much of it there is:
+    //
+    //   d  the shipped three layers — fall, crust, toll — rebuilt on the round-2
+    //      instrument. The closest thing to "the same sound, cleanly made".
+    //   e  the **crust** carrying it: the structure closing on itself, the fall
+    //      underneath rather than in front.
+    //   f  the **toll** carrying it, detuned, with the room it happened in.
+    //   g  the fall **alone**. One layer. Nothing answers it.
+    //
+    // What none of them do: resolve, sparkle, or run long. Every offer ends
+    // inside the shipped 1.32 s longest-tail invariant, because three seconds of
+    // silence (§4.7) start when this stops and a longer tail eats them.
     label: "MiningStation Death",
     context: "A station dies (GDD §4.7) — the most serious sound in the game; then three seconds of silence.",
     current: 'stationDeath',
     candidates: [
       {
-        id: 'a',
-        character: "the floor going out, everything letting go",
+        id: 'd',
+        character: "the shipped fall, cleanly made",
         spec: {
-          name: 'stationDeath_a_floorGone',
+          name: 'stationDeath_d_cleanFall',
           layers: [
-            swept('stationDeath_a.fall', { wave: 'sine', freq: 205, freqEnd: 33, from: 800, to: 90, q: 1.8, gain: 0.4, attack: 0.01, hold: 0.2, decay: 1.08, curve: 1.5, punch: 0.4, noiseMix: 0.06, seed: 32180 }),
-            grains('stationDeath_a.letGo', { freq: 300, freqEnd: 70, grain: 0.055, gain: 0.28, attack: 0.02, hold: 0.3, decay: 1.0, curve: 1.4, from: 1100, to: 180, q: 2.2, seed: 32181 }),
+            swept('stationDeath_d.fall', { wave: 'sine', freq: 205, freqEnd: 34, from: 620, to: 90, q: 1.8, gain: 0.4, attack: 0.01, hold: 0.2, decay: 1.08, curve: 1.5, punch: 0.4, noiseMix: 0.05, seed: 61340 }),
+            swept('stationDeath_d.crust', { wave: 'noise', freq: 175, freqEnd: 46, from: 780, to: 150, q: 2, gain: 0.26, attack: 0.02, hold: 0.28, decay: 0.98, curve: 1.4, at: 0.01, seed: 61342 }),
+            swept('stationDeath_d.toll', { wave: 'triangle', freq: 98, freqEnd: 92, from: 400, to: 140, q: 2.6, gain: 0.26, attack: 0.006, hold: 0.02, decay: 0.92, curve: 2.2, noiseMix: 0.06, at: 0.12, seed: 61344 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "pressure loss, a long fall with no bottom",
+        id: 'e',
+        character: "the structure closing on itself",
         spec: {
-          name: 'stationDeath_b_noBottom',
+          name: 'stationDeath_e_structureCloses',
           layers: [
-            swept('stationDeath_b.loss', { wave: 'noise', freq: 170, freqEnd: 30, from: 700, to: 80, q: 2, gain: 0.46, attack: 0.03, hold: 0.28, decay: 1.05, curve: 1.4, seed: 32190 }),
-            swept('stationDeath_b.sub', { wave: 'sine', freq: 74, freqEnd: 29, from: 190, to: 70, q: 1.6, gain: 0.34, attack: 0.02, hold: 0.24, decay: 1.06, curve: 1.5, punch: 0.3, seed: 32191 }),
+            swept('stationDeath_e.crust', { wave: 'noise', freq: 190, freqEnd: 40, from: 900, to: 110, q: 2.4, gain: 0.44, attack: 0.03, hold: 0.3, decay: 0.98, curve: 1.4, seed: 61350 }),
+            grains('stationDeath_e.give', { freq: 240, freqEnd: 62, grain: 0.019, gain: 0.24, attack: 0.03, hold: 0.3, decay: 0.92, curve: 1.4, from: 800, to: 150, q: 2.2, at: 0.05, seed: 61352 }),
+            swept('stationDeath_e.under', { wave: 'sine', freq: 82, freqEnd: 30, from: 200, to: 70, q: 1.6, gain: 0.3, attack: 0.02, hold: 0.24, decay: 1.04, curve: 1.5, seed: 61354 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "one detuned resonance, leaving the room",
+        id: 'f',
+        character: "one detuned toll, and the room",
         spec: {
-          name: 'stationDeath_c_leavingRoom',
+          name: 'stationDeath_f_tollAndRoom',
           layers: [
-            swept('stationDeath_c.toll', { wave: 'triangle', freq: 104, freqEnd: 88, from: 460, to: 130, q: 3.4, gain: 0.68, attack: 0.006, hold: 0.02, decay: 1.2, curve: 1.9, noiseMix: 0.08, seed: 32200 }),
-            swept('stationDeath_c.beat', { wave: 'triangle', freq: 105.6, freqEnd: 89.2, from: 420, to: 120, q: 3.2, gain: 0.5, attack: 0.008, hold: 0.02, decay: 1.18, curve: 1.9, noiseMix: 0.07, at: 0.01, seed: 32201 }),
-            ...returns('stationDeath_c.room', { freq: 210, gain: 0.26, decay: 0.5, from: 500, to: 150, at: 0.24, gap: 0.26, count: 2, seed: 32203 }),
+            swept('stationDeath_f.toll', { wave: 'triangle', freq: 98, freqEnd: 86, from: 420, to: 120, q: 3.4, gain: 0.62, attack: 0.006, hold: 0.02, decay: 1.1, curve: 1.9, noiseMix: 0.08, seed: 61360 }),
+            swept('stationDeath_f.beat', { wave: 'triangle', freq: 99.4, freqEnd: 87.2, from: 390, to: 112, q: 3.2, gain: 0.46, attack: 0.008, hold: 0.02, decay: 1.08, curve: 1.9, noiseMix: 0.07, at: 0.01, seed: 61362 }),
+            ...returns('stationDeath_f.room', { freq: 190, gain: 0.22, decay: 0.46, from: 460, to: 140, at: 0.22, gap: 0.26, count: 2, seed: 61364 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "the fall alone, nothing answering",
+        spec: {
+          name: 'stationDeath_g_fallAlone',
+          layers: [
+            swept('stationDeath_g.fall', { wave: 'sine', freq: 196, freqEnd: 31, from: 560, to: 80, q: 2, gain: 0.5, attack: 0.012, hold: 0.22, decay: 1.06, curve: 1.5, punch: 0.4, noiseMix: 0.08, seed: 61370 }),
           ],
         },
       },
@@ -1862,6 +1892,27 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
             place({ name: 'ambient_f.beat', wave: 'sine', attack: 0.5, hold: 11.5, decay: 0, freq: 55.25, noiseMix: 0.03, lowPass: 95, resonance: 1.3, gain: 0.1, seed: 33051 }),
             place({ name: 'ambient_f.metal', wave: 'noise', attack: 0.7, hold: 11.3, decay: 0, freq: 165, lowPass: 210, resonance: 9, bandPass: true, gain: 0.06, seed: 33052 }),
             swept('ambient_f.pulse', { wave: 'noise', freq: 60, from: 120, to: 260, q: 3, gain: 0.07, attack: 3.5, hold: 0.5, decay: 4, curve: 1.4, at: 2, seed: 33053 }),
+          ],
+        },
+      },
+      // a0-60 adds a FOURTH offer rather than re-voicing this slot, and the
+      // difference matters: `d`/`e`/`f` post-date the 2026-08-07 deny-all (they
+      // were written for it, under a0-48) and carry no verdict of their own.
+      // Replacing an un-judged offer is not answering a denial, it is destroying
+      // review work — so the three stand and this one joins them, which is what
+      // brings the slot to the sweep's four. It is the far end of a0-48's own
+      // axis, *how much bed there is at all*: less than `d`, and audibly so.
+      {
+        id: 'g',
+        character: "one slow breath, and no floor at all",
+        spec: {
+          name: 'ambient_g_oneBreath',
+          loop: true,
+          crossfade: 0.9,
+          layers: [
+            place({ name: 'ambient_g.air', wave: 'noise', attack: 0.6, hold: 11.4, decay: 0, freq: 280, lowPass: 820, resonance: 2.2, highPass: 240, gain: 0.07, seed: 61330 }),
+            place({ name: 'ambient_g.trace', wave: 'noise', attack: 0.7, hold: 11.3, decay: 0, freq: 190, lowPass: 240, resonance: 9, bandPass: true, gain: 0.05, seed: 61331 }),
+            swept('ambient_g.breath', { wave: 'noise', freq: 100, from: 210, to: 560, q: 2.4, gain: 0.06, attack: 3.6, hold: 0.4, decay: 4.2, curve: 1.4, at: 1.5, seed: 61332 }),
           ],
         },
       },

@@ -716,22 +716,28 @@
       "current": "previews/stationDeath/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/stationDeath/a.wav",
-          "character": "the floor going out, everything letting go",
-          "params": "src/art/audio/candidates.ts#stationDeath.a"
+          "id": "d",
+          "wav": "previews/stationDeath/d.wav",
+          "character": "the shipped fall, cleanly made",
+          "params": "src/art/audio/candidates.ts#stationDeath.d"
         },
         {
-          "id": "b",
-          "wav": "previews/stationDeath/b.wav",
-          "character": "pressure loss, a long fall with no bottom",
-          "params": "src/art/audio/candidates.ts#stationDeath.b"
+          "id": "e",
+          "wav": "previews/stationDeath/e.wav",
+          "character": "the structure closing on itself",
+          "params": "src/art/audio/candidates.ts#stationDeath.e"
         },
         {
-          "id": "c",
-          "wav": "previews/stationDeath/c.wav",
-          "character": "one detuned resonance, leaving the room",
-          "params": "src/art/audio/candidates.ts#stationDeath.c"
+          "id": "f",
+          "wav": "previews/stationDeath/f.wav",
+          "character": "one detuned toll, and the room",
+          "params": "src/art/audio/candidates.ts#stationDeath.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/stationDeath/g.wav",
+          "character": "the fall alone, nothing answering",
+          "params": "src/art/audio/candidates.ts#stationDeath.g"
         }
       ]
     },
@@ -822,6 +828,12 @@
           "wav": "previews/ambient/f.wav",
           "character": "a low room with a slow pulse",
           "params": "src/art/audio/candidates.ts#ambient.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/ambient/g.wav",
+          "character": "one slow breath, and no floor at all",
+          "params": "src/art/audio/candidates.ts#ambient.g"
         }
       ],
       "fourthOption": "None of the three: ship the bed OFF by default, with a settings toggle for anyone who wants it. It is item 3 on the GDD §4.9 cut list and nothing else in the mix depends on it, so this is a legitimate verdict rather than a failure — a bed nobody notices and a bed that is absent are close cousins, and one of them cannot annoy anybody. Reply `ambient: off` to take it."

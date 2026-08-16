@@ -85,8 +85,8 @@ this brief, with the reason in the note).
 | collapseBegin | done | tectonic shift / atmosphere leaving / hull strain / one long fall — slow, low, no event |
 | matchEnd | done | a resolution, not a victory — it plays on a loss too, so nothing here congratulates |
 | alarm | done | saw and rising minor third kept on all four (§5.1, §2.2 — legibility outranks register); one-shots |
-| stationDeath | todo |  |
-| ambient | todo |  |
+| stationDeath | done | last, and by translation (§7.4, a0-55): the shipped beat in the sweep's materials, choosing how much of it there is |
+| ambient | done | a0-48 already answered this denial with `d`/`e`/`f`; a0-60 adds `g` (the far end of that axis) rather than destroying un-judged offers |
 | musicBed | done | ion field / magnetic mass / cathedral metal / almost-nothing — texture before melody |
 | musicPulse | done | the heartbeat, four ways; no sustained layer sweeps a corner across the loop seam |
 | musicTheme | done | same riff, same key (§7.5) — the instrument is the offer, seven notes at the shipped times |

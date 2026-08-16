@@ -54,7 +54,9 @@ describe('sound-review candidates', () => {
   const RE_LETTERED: Readonly<Record<string, readonly string[]>> = {
     // a0-48. Denied 2026-08-07 with the deny-all reason, never re-briefed, so the
     // denied bed was still shipping when the developer met it again in play.
-    ambient: ['d', 'e', 'f'],
+    // a0-60 added `g` rather than replacing the three: they post-date the denial
+    // and carry no verdict, so re-voicing them would destroy un-judged work.
+    ambient: ['d', 'e', 'f', 'g'],
     // a0-49. The two slots whose denial post-dates every offer standing against
     // it — see `docs/sound-denials-outstanding.md`, which derives that for all 38
     // outstanding denials and dispositions each one revoice / cut / superseded.
