@@ -210,6 +210,22 @@ export interface SoundCandidate {
    * so the next denied slot inherits it instead of re-deriving it.
    */
   readonly id: string;
+  /**
+   * The slot this candidate belongs to, stated rather than implied by where it
+   * sits in {@link CANDIDATE_SLOTS}.
+   *
+   * A verdict is a **pair** — `/status/sound-choices.json` records a slot and a
+   * letter — so a candidate handed to anything on its own currently cannot say
+   * what half of that pair it is. It is also a guard: this file is 2 500 lines of
+   * near-identical blocks, and the cheapest mistake to make in it is to paste a
+   * take under the wrong heading, where nothing would catch it and the developer
+   * would be offered a sound for some other event. `sound-review/render.ts`
+   * throws on a mismatch and `./candidates.test.ts` asserts it.
+   *
+   * Optional because the forty slots that predate it do not carry one; new and
+   * re-offered takes state it (`xpSettle`, a0-57).
+   */
+  readonly slot?: string;
   /** 3-5 word description of the character, for the review page. */
   readonly character: string;
   /** The synth param set — the same shape as a shipped bank entry. */
@@ -2629,6 +2645,7 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     candidates: [
       {
         id: 'd',
+        slot: 'xpSettle',
         character: "a measure poured into a cell, topping off",
         spec: {
           name: 'xpSettle_d_deposit',
@@ -2641,6 +2658,7 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       },
       {
         id: 'e',
+        slot: 'xpSettle',
         character: "a credit recorded, two damped partials",
         spec: {
           name: 'xpSettle_e_credit',
@@ -2653,6 +2671,7 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       },
       {
         id: 'f',
+        slot: 'xpSettle',
         character: "an uptake, the corner opening as it takes",
         spec: {
           name: 'xpSettle_f_uptake',
@@ -2665,6 +2684,7 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       },
       {
         id: 'g',
+        slot: 'xpSettle',
         character: "a small bright prize over a warm body",
         spec: {
           name: 'xpSettle_g_prize',
@@ -2681,6 +2701,7 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     denied: [
       {
         id: 'a',
+        slot: 'xpSettle',
         character: "a dry stop, one contact",
         deniedAt: '2026-08-16T02:29:03Z',
         reason: "none of these sound like sounds for XP collection",
@@ -2693,6 +2714,7 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       },
       {
         id: 'b',
+        slot: 'xpSettle',
         character: "a damped seat, closing",
         deniedAt: '2026-08-16T02:29:03Z',
         reason: "none of these sound like sounds for XP collection",
@@ -2705,6 +2727,7 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       },
       {
         id: 'c',
+        slot: 'xpSettle',
         character: "one low band, ringing out",
         deniedAt: '2026-08-16T02:29:03Z',
         reason: "none of these sound like sounds for XP collection",

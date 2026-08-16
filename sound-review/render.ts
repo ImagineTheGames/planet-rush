@@ -174,6 +174,16 @@ for (const slotId of CANDIDATE_SLOT_ORDER) {
   const slot = CANDIDATE_SLOTS[slotId];
   if (!slot) throw new Error(`slot ${slotId} in order but not in CANDIDATE_SLOTS`);
 
+  // A take that names a slot must name THIS one. The failure it catches is a
+  // block pasted under the wrong heading in a 2 500-line file of near-identical
+  // blocks — which would render a sound for some other event onto this slot's
+  // play button, and nothing downstream would notice (a0-57).
+  for (const c of [...slot.candidates, ...(slot.denied ?? [])]) {
+    if (c.slot !== undefined && c.slot !== slotId) {
+      throw new Error(`candidate ${slotId}/${c.id} claims slot ${c.slot}`);
+    }
+  }
+
   const currentWav = writePreview(slotId, 'current', soundSpec(slot.current as SoundName));
 
   const candidates: ManifestCandidate[] = slot.candidates.map((c) => ({

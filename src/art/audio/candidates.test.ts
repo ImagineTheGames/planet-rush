@@ -39,6 +39,18 @@ describe('sound-review candidates', () => {
     expect(SLOT_IDS.length).toBeGreaterThanOrEqual(8); // the DoD floor; we ship the full bank
   });
 
+  it('no take names a slot other than the one it sits in', () => {
+    // The back-pointer is a guard, not decoration: pasting a block under the wrong
+    // heading in this file is the cheap mistake, and it would offer the developer
+    // a sound for some other event with nothing downstream to catch it (a0-57).
+    for (const id of SLOT_IDS) {
+      const slot = CANDIDATE_SLOTS[id]!;
+      for (const c of [...slot.candidates, ...(slot.denied ?? [])]) {
+        if (c.slot !== undefined) expect(c.slot, `${id}/${c.id} claims another slot`).toBe(id);
+      }
+    }
+  });
+
   it('every slot points its "current" at a real shipped sound', () => {
     const names = new Set<SoundName>(SOUND_NAMES);
     for (const id of SLOT_IDS) {
