@@ -98,6 +98,12 @@ been looked at (deaths, by the whole ore the ship was carrying, 24 seeds):
 | chunks dropped under 0.5 | 0 | **0** | 1 | 1 | 2 | 2 | 3 | 3 | 4 |
 | chunks dropped under 1 | 0 | **1** | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
 
+**Internal cross-check.** Applying `floor(hold × 0.5 / CHUNK.ore)` to `main`'s own
+histogram row predicts **448** ore dropped — exactly the 448 the ledger reported,
+from a completely separate code path. The hold sampling and the drop model agree to
+the unit, so neither is a mis-read instrument (the failure mode that produced five
+wrong numbers in `docs/wave-commons-entombment.md`'s history).
+
 **Ships die nearly empty.** 71 % of deaths on `main` carry no ore at all and a
 further 16 % carry a single unit — the hold is a thing you fill and then run home
 with, so it is empty most of the time a fight can find it. Any rule keyed to the
