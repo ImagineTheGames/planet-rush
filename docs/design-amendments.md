@@ -110,6 +110,48 @@ the field diverges from the first kill onward.
 What those fixtures actually guard — that no team-aware path is reachable in FFA —
 is untouched and still asserted by their own non-hash cases.
 
+### Stale half-drop prose in four other lanes' files — flagged here, not edited
+
+The sweep this amendment required (`DEATH_ORE_DROP_FRACTION`, "half", §2.3) is
+clean in `src/sim/` and `docs/` — every claim there was corrected in the same
+commits as the constant. It is **not** clean outside them. Four comments in files
+this lane does not own still tell the reader a dead ship burns half its hold:
+
+| Site | Says | Owner |
+|---|---|---|
+| `src/bots/hard.ts:214` | *"a dead ship drops half its hold to the player who just earned it (GDD §2.7)"* | Bot |
+| `src/net/transport.ts:661` | *"a ship can die on authority (half its hold lost, GDD §2.3)"* | Netcode |
+| `src/net/ore-authority.test.ts:452, :469` | *"half the hold bursts as debris"*; *"Half the hold to the field, half destroyed with the ship"* | Netcode |
+| `src/main.ts:4555` | *"…respawnTimer set, half the hold dropped"* | App shell |
+
+**None of them is a failing test and none is a behaviour bug** — that is exactly
+why they are easy to miss and worth writing down. The `ore-authority` case is a
+test whose *comments* are false while its assertions (`loose > 0`, residual
+conserved) still hold and still earn their keep. The others are doc-comments.
+They are left untouched because `src/bots/`, `src/net/` and the app shell are not
+this lane's to edit, and a stale comment is not the kind of red that justifies
+reaching across a boundary — the determinism goldens above were, and that is the
+line between the two.
+
+Two notes for whoever picks them up, so the fix is a one-liner and not a session:
+
+- **`hard.ts`'s retreat rationale survives the amendment and gets stronger.** It
+  breaks off at 20% hull *because dying costs the hold*; at a fraction of 1 the
+  whole hold now lands in front of whoever earned the kill, so the incentive it
+  encodes is larger than when it was written. The comment needs the word "half"
+  changed. The behaviour does not need review. (Its *other* clause — "to the
+  player who just earned it" — is loose in both builds: the drop goes to the
+  **field**, and `ore-authority.test.ts` asserts in so many words that the killer
+  is handed nothing. Pre-existing, not a0-59's doing.)
+- **`transport.ts`'s "half its hold lost" was already wrong before a0-59**, in a
+  way the amendment does not so much change as expose. `killShip` sets
+  `ship.cargo = 0` unconditionally (`src/sim/damage.ts`), so a death has always
+  cost the pilot the *entire* hold; the fraction only ever governed how much of it
+  came back as field chunks. The divergent-death drift that passage is actually
+  documenting is therefore about the whole hold, not half of it, and always was —
+  it is a slightly *bigger* accounting hole than the comment claims, on both
+  builds.
+
 ### What did NOT change
 
 - **Banked ore.** Still never lost to a ship death (GDD §2.7). The cost of dying is
