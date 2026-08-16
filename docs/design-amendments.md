@@ -625,6 +625,12 @@ taken. In particular **a kill never gives you what the victim was holding** — 
 their hold is destroyed with the hull (GDD §2.3, working as designed) — and if the
 expectation is otherwise, that is a rules change and needs saying out loud.
 
+> **Answered 2026-08-16 (a0-59).** It was said out loud: *"destroyed ships should
+> drop all their ore, no more 1/2 the ore stuff"*. The second of the three balance
+> questions this entry left open is now settled the other way —
+> `DEATH_ORE_DROP_FRACTION` is **1**, and a kill does give you what the victim was
+> holding. The other two (`cargoCap`, ignoring the cap on pickup) are still open.
+
 ---
 
 ## The lobby picks the CHARACTER. Difficulty is shown, not chosen.

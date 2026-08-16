@@ -1093,7 +1093,7 @@ engine):
 | Deep Reach | `TRACTOR.range` 120→140 | +reach, −`TRACTOR.accel` (chunks drift in slower) |
 | Fast Unload | `DEPOSIT.drainRate` 2→3 | +deposit speed, −`DEPOSIT_RANGE` (must hug the planet) |
 | Rich Veins | `MINING_YIELD_PER_HIT` +10% | +mine, −`SHIP_WEAPON` range (shorter gun) |
-| Ore Miser | `DEATH_ORE_DROP_FRACTION` 0.5→0.4 | keep more on death, −`BASE_SPEED` (slower haul) |
+| Ore Miser | `DEATH_ORE_DROP_FRACTION` 1→0.85 | keep more on death, −`BASE_SPEED` (slower haul). *Baseline restated 2026-08-16 (a0-59): the constant is 1, not the 0.5 this row was drafted against, so the perk now claws back from a total drop.* |
 | Reinforced Hold | `CARGO_CAP_MAX` 8→9 | +1 slot, −`BASE_ACCEL` (heavier) |
 | Excavator's Grit | `SHIP_STATS.excavator.hull` +10% | +hull, −turn rate |
 
@@ -1113,7 +1113,7 @@ Eight nodes, each a lateral nudge:
 |---|---|---|
 | Tractor Reach | `TRACTOR.range` 120→145 | +reach, −`TRACTOR.accel` |
 | Quick Deposit | `DEPOSIT.drainRate` 2→2.6 | +drain, −`DEPOSIT_RANGE` 256→224 |
-| Scavenger | loot-on-contact radius (`CHUNK` pickup) | +pickup, −`DEATH_ORE_DROP_FRACTION` gain: you drop more |
+| Scavenger | loot-on-contact radius (`CHUNK` pickup) | +pickup, −`DEATH_ORE_DROP_FRACTION` gain: you drop more. *Dead as drafted since a0-59 — the fraction is 1 and cannot go up, so this downside needs a different cost.* |
 | Fast Respawn | `RESPAWN_S` 5→4 | −respawn, −`SPAWN_PROTECTION_S` 10→8 (up sooner, exposed sooner) |
 | Long Shield | `SPAWN_PROTECTION_S` 10→13 | +invuln window, +`RESPAWN_S` 5→6 (slower back) |
 | Scout Sensors | `SENSOR_RANGE` 180→220 | see enemy HP sooner, −own damage-ring range (they see you sooner too) |

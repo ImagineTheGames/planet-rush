@@ -433,7 +433,7 @@ testable, so each row below is checked against the thing a player would look at.
 | Hold fire on a rock; the same projectile chips it; chunks tractor in by proximity | **SHIPPED** | `src/sim/projectiles.ts:276`, `:367`; proximity tractor `src/sim/step.ts:296`, `:749`. |
 | Hold starts at 2 and grows only with cargo upgrades | **SHIPPED** | `CARGO_BASE = 2`, `CARGO_PER_TIER = 2`, `CARGO_CAP_MAX = 8` — `src/sim/constants.ts:71–77`. |
 | A full hold refuses chunks; they stay where they are for anyone | **SHIPPED** | `src/sim/step.ts:749` (*"a full hold exerts no pull"*), `:950`. |
-| Death drops half the hold where you exploded | **SHIPPED** | `DEATH_ORE_DROP_FRACTION = 0.5` `src/sim/constants.ts:981`. |
+| Death drops **the whole hold** where you exploded | **SHIPPED** | `DEATH_ORE_DROP_FRACTION = 1` `src/sim/constants.ts`. Was `0.5` until **2026-08-16 (a0-59)** — the developer withdrew the half-burn ore sink ("destroyed ships should drop all their ore, no more 1/2 the ore stuff"); GDD §2.3/§2.7/§2.8 amended to match. |
 | **Banking is by flying into your own collection field**, ~4× radius, 2 ore/s, stops on leaving | **SHIPPED** | `DEPOSIT.drainRate = 2` `src/sim/constants.ts:1584`; `DEPOSIT_RANGE` drawn at `src/render/index.ts:969`. |
 | Ore chunks visibly courier ship→station, one per unit banked | **SHIPPED** | `src/sim/step.ts:291–297`, `:926`. |
 | The wheel's BANK segment dumps the hold in one tap | **SHIPPED** | `src/ui/build-wheel.ts:193`. |
