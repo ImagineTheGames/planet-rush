@@ -402,9 +402,20 @@ export function spawnWave(world: World, count: number = world.asteroidsPerWave):
   // Root cause is not placement: wave 5 needs `24 × 2 × 34` = 1632 u of rock arc
   // on a 446 u circumference — 3.66× oversubscribed — so no angular or radial
   // rearrangement admits a corridor, and raising `commonsHoleFraction` (tried
-  // twice) cannot either. The knobs that would are late-wave rock size or count,
-  // which are design calls; see the defect report. DO NOT "fix" this by widening
-  // `commonsSpokeGap` or `commonsHoleFraction`.
+  // twice) cannot either. DO NOT "fix" this by widening `commonsSpokeGap` or
+  // `commonsHoleFraction`.
+  //
+  // THE KNOB THAT WORKS IS ROCK SIZE, NOT ROCK COUNT — measured on 9 seeds against
+  // the reachability check in `./waves.test.ts` (a0-59, fifteenth session; tables in
+  // the defect report). `sectorRocks` floors at one rock per sector, so an 8-player
+  // wave cannot drop below 8 rocks — still 1.22× the wave-5 circumference before a
+  // ship corridor — and every count taper leaves wave 5 sealed on 9/9. That floor is
+  // the `N`-fold fairness symmetry, so it is not a floor anyone may lower. Size alone
+  // needs a 6.7× cut; `WAVE.lastRadiusFraction` 0.25 → 0.50 together with a 2× size
+  // cut opens 9/9 at both waves and still closes the field 2× over the match. All of
+  // those are field-balance calls, not gameplay repairs — see the report and Q-6.
+  // Note both knobs are ore-neutral: `drawCanon` scales ore to `waveOre` regardless
+  // of radius or count, measured identical to the cent in every arm.
   //
   // AND DO NOT "fix" IT BY ADDING `+ ASTEROID.maxRadius` TO `innerRadius` BELOW,
   // tempting as that is — it is the one edit that makes the eye mean what its name

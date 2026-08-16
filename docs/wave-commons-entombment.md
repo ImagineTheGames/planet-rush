@@ -48,6 +48,15 @@ severe** than this document previously said.
 Earlier revisions said wave 5 throughout; that was the limit of the instrument,
 not of the defect.
 
+A third correction, from the fifteenth session, this one to the *remedy* rather
+than the defect: **a fix exists that keeps GDD §2.3's shrinking ring, and the
+variant this document recommended for eleven sessions does not work at all.**
+Measured against the flood-fill oracle — `lastRadiusFraction = 0.50` together with
+a 2× late-wave rock-size cut opens the centre on 9/9 seeds at both waves, while
+cutting rock *count* leaves wave 5 sealed on 9/9 at every value it can take. See
+[Candidate fixes, measured](#candidate-fixes-measured). The decision is still the
+Director's — both knobs are balance — but the menu it is chosen from was wrong.
+
 The two clearance guarantees the code documents — the radial "clear eye" and the
 angular "clear launch spoke" — are **both void at wave 5**, and the spoke guarantee
 is already broken at wave 3.
@@ -160,6 +169,33 @@ Run on the shipped 8-slot field, waves 1–5, nine seeds:
 **9 of 9 seal at wave 4. 0 of 9 seal at wave 3.** This is structural, not
 probabilistic: it is not that some seeds are unlucky, it is that the wave-4 ring
 closes the centre on every board the generator can produce.
+
+### It is not an 8-player artefact — wave 5 seals at every lobby size
+
+*(Fifteenth session. Every measurement above this line, in every session, was taken
+on the shipped 8-slot cast. That left an obvious question nobody had asked: is this
+a full-lobby problem?)* Same flood fill, same nine seeds, lobby sizes 2 to 8:
+
+| players | sectors | rocks/wave | sealed @ w4 | sealed @ w5 |
+|---|---|---|---|---|
+| 2 | 2 | 20 | 0/9 | **9/9** |
+| 3 | 3 | 21 | 5/9 | **9/9** |
+| 4 | 4 | 20 | 2/9 | **9/9** |
+| 5 | 5 | 20 | 8/9 | **9/9** |
+| 6 | 6 | 18 | 6/9 | **9/9** |
+| 8 | 8 | 24 | 9/9 | **9/9** |
+
+**Wave 5 seals the centre on 9 of 9 seeds at every lobby size from 2 to 8.** The
+field radius does not scale with the player count (307.2 u throughout) and neither
+does the wave's rock budget, so the wave-5 ring is oversubscribed 2.7–3.7× whatever
+the lobby holds. A solo-with-bots match is as sealed as a full eight.
+
+**The wave-4 onset, by contrast, *is* lobby-dependent** — 0/9 at two players,
+9/9 at eight — because more sectors means more rocks spread more evenly around a
+ring that is still wide enough for the count to matter. So the fourteenth session's
+"the seal closes at wave 4" is right for a full lobby and too strong for a small
+one; at 2–4 players the trap usually opens at wave 5 instead. Neither reading
+changes the defect: **wave 5 is unconditional.**
 
 ### Why a whole wave of it was invisible
 
@@ -366,14 +402,21 @@ in-file promise was itself the argument for taking it.
 **With this, every knob inside the gameplay lane is measured and exhausted.**
 Placement (arithmetic), `commonsHoleFraction` (at its ceiling, wrong knob),
 `commonsSpokeGap` (angular, clamped), and now the escape hatch (firing, saturated,
-no exit). What remains is the three costed candidates below, and every one of them
-is a design ruling.
+no exit). What remains is the candidates below, and every one of them is a design
+ruling — the knobs that work are `WAVE.lastRadiusFraction` and `ASTEROID`'s radii,
+which are field balance, not gameplay repair. They are now measured rather than
+estimated: see [Candidate fixes, measured](#candidate-fixes-measured).
 
 ---
 
-## Candidates, costed
+## Candidates, costed — now MEASURED, and two of these costings were wrong
 
-None is taken. Each needs a design ruling.
+None is taken. Each needs a design ruling. **Everything below the first candidate
+was re-costed in a0-59's fifteenth session against the flood-fill oracle** rather
+than against arithmetic; see *Candidate fixes, measured* immediately after. Two
+conclusions this section carried for eleven sessions do not survive that:
+candidate 1 is **not** a non-starter, and candidate 2's preferred *count* variant
+**cannot work at all** in a full lobby.
 
 > **Before reading these, read the measured warning in *A second-order bug in the
 > same file* below.** There is a fourth thing one could do — reserve the commons
@@ -382,22 +425,46 @@ None is taken. Each needs a design ruling.
 > here and it is the one that must not be made alone.
 
 **1 · Widen the final wave's ring (`WAVE.lastRadiusFraction`, currently 0.25).**
-**Recommend against — it is a non-starter, not a trade-off.** Passability needs a
-ring mid radius of ~276 u out of a 307 u field, i.e. `lastRadiusFraction ≈ 0.90`
-against wave 1's own 1.00. All five waves would land in the same annulus. This does
-not weaken GDD §2.3's shrinking ring, it **deletes** it.
+**Was "recommend against — a non-starter". That was wrong, and only because it was
+costed with the rock size held at its shipped value.** Alone, it is indeed hopeless:
+passability at full-size rocks needs a ring mid radius of ~276 u out of a 307 u
+field, i.e. `lastRadiusFraction ≈ 0.90` against wave 1's own 1.00, which would land
+all five waves in one annulus and *delete* GDD §2.3's shrinking ring rather than
+weaken it. **But the two knobs multiply** — the ring radius a given rock arc needs
+is proportional to that arc — so halving late-wave rock radius halves the ring
+radius required. Measured, `lastRadiusFraction = 0.50` **with** a 2× late-wave size
+cut opens the centre on 9/9 seeds at both waves 4 and 5, and still closes the field
+2× across the match (discs 307 → 269 → 230 → 192 → 154 u). See the frontier table.
 
-**2 · Cut late-wave rock size or count. The only knob with real travel.**
+**2 · Cut late-wave rock size or count.**
 The ring is oversubscribed 3.66×, so passability needs the rock arc down ~4×:
 either `ASTEROID.maxRadius` tapered with `waveRadiusFraction`, or `sectorRocks`
-falling as the ring closes. Both keep GDD §2.3's ring closing in.
-- Costs GDD §5.5's "a payout the player can judge" — rock size reads as ore — and
-  changes the field's late-match visual texture.
-- **The count variant is likely cheaper than the size variant**, because the wave's
-  fixed ore budget absorbs it: fewer rocks carrying the same `WAVE_ORE` makes the
-  survivors richer, which is the trade `asteroidCount` already documents.
-- Moves goldens (`ffa-parity`, `FFA_GOLDEN`) by construction.
-- **This is the one to brief.**
+falling as the ring closes. Both keep GDD §2.3's ring closing in. **Measured, these
+two are not interchangeable and the note's preference was backwards:**
+- **Count cannot do it, at any value, in a full lobby.** `sectorRocks` floors at
+  `Math.max(1, …)` — one rock per sector — so at 8 players the wave cannot go below
+  **8 rocks**, which is still **1.22×** the wave-5 circumference before a ship
+  corridor is even asked for. Flood-filled: a count taper proportional to the ring
+  leaves wave 5 sealed on **9/9** seeds, and a flat halving leaves it sealed on
+  **9/9**. The floor is set by the `N`-fold symmetry that is a *fairness*
+  invariant, so it is not a floor one may lower.
+- **Size alone can do it, but only at a severe cut.** Wave 4 opens on 9/9 at a
+  gentle 2× cut; wave 5 needs **6.7×** (`s ≈ 0.15`), which makes late rocks
+  ~3–7 u in radius — smaller than the ore chunks they emit (`CHUNK.radius` 6) and
+  under half a hull. That is the version that really does cost GDD §5.5's "a payout
+  the player can judge", and it is why the *combination* in candidate 1 is the
+  cheaper route to the same place.
+- **The ore-budget argument that motivated the count preference is real but does
+  not discriminate**: measured, *every* arm — count taper, size taper, both, and
+  the ring widening — delivers **exactly** the same field ore (400.00 per seed at
+  wave 5, against baseline 400.00), because `drawCanon` scales ore to `oreBudget`
+  independently of both radius and count. Ore-neutrality is a property of the
+  spawner, not of the count knob, so it is not a reason to prefer count.
+- Costs GDD §5.5's "a payout the player can judge" — rock size reads as ore, and an
+  ore-neutral size cut means a wave-5 rock is as rich as a wave-1 rock at a quarter
+  the area — and changes the field's late-match visual texture.
+- Moves goldens (`ffa-parity`, `FFA_GOLDEN`) by construction, and far more broadly
+  than a0-59 does: it reshapes the late field on every board.
 
 **3 · Eject any live ship a landing wave would entomb.**
 Rock positions untouched, so `FIELD_YIELD` and the `N`-fold fairness symmetry are
@@ -417,6 +484,117 @@ both exact. Cheapest of the three and the only one that changes no field design.
   sits ~8 u from centre in a 19.3 u free pocket with a 16 u hull — it overlaps
   nothing. It is sealed *behind* a ~90 u annulus, not pinned inside rock. An
   overlap-triggered version would not fire.
+
+---
+
+## Candidate fixes, measured
+
+*(a0-59, fifteenth session. Every candidate above had been costed by arithmetic;
+none had ever been run. This section runs them against the flood-fill oracle —
+`centreCanEscape` from `src/sim/waves.test.ts`, which asks whether a route out of
+the centre exists at all — on 9 seeds (1, 7, 15, 17, 23, 42, 142, 146, 991), 8
+players, waves 1–5. Cells are **seeds sealed out of 9**, so `0/9` is a full fix.
+Total probe cost: ~25 s per arm set. The probe was scratch, run under
+`tests/harness/`, and deleted; `git status -- src/ tests/` was verified empty
+afterwards. No shipped value was changed to obtain any of this — rock size and the
+ring fraction were varied by mutating the constant objects at runtime inside the
+probe, and the count by setting `world.asteroidsPerWave`, which `spawnWave` already
+reads as a parameter.)*
+
+**Baseline, for reference: sealed at wave 4 on 9/9 and at wave 5 on 9/9.**
+
+### Cutting rock count — does not work
+
+| arm (waves ≥ 2) | rocks at wave 5 | sealed @ w4 | sealed @ w5 |
+|---|---|---|---|
+| baseline | 24 | 9/9 | **9/9** |
+| count ∝ ring radius | 8 | 3/9 | **9/9** |
+| count × 0.75 flat | 16 | 7/9 | **9/9** |
+| count × 0.50 flat | 8 | 6/9 | **9/9** |
+| count ÷ 3 **and** size ∝ ring | 8 | 0/9 | 3/9 |
+
+The count knob bottoms out before passability and the arithmetic says why: with
+`sectors = 8`, `sectorRocks = Math.max(1, …)` floors the wave at 8 rocks, whose
+mean arc is 8 × 68 = 544 u on a 446 u circumference — **1.22× oversubscribed at the
+floor**, before any ship corridor. Only the last row opens wave 5 at all, and it
+does so by borrowing the size knob.
+
+*Lobby-size caveat, measured.* That floor is `sectors` rocks, so the count knob has
+travel in small lobbies and none in full ones: floor oversubscription is 0.30× at
+2 players, 0.61× at 4, 0.91× at 6 and 1.22× at 8. A count-only fix would therefore
+repair small lobbies and leave full ones sealed — the wrong way round. (The floor
+arms themselves were only flood-filled at 8 players; the smaller figures are the
+arc arithmetic.)
+
+### Cutting rock size — works, but alone it needs a severe cut
+
+Radius scale applied to waves 4–5 only:
+
+| size scale | max radius | sealed @ w4 | sealed @ w5 |
+|---|---|---|---|
+| 1.00 (shipped) | 46 u | 9/9 | 9/9 |
+| 0.50 | 23 u | **0/9** | 9/9 |
+| 0.30 | 14 u | **0/9** | 9/9 |
+| 0.25 | 11.5 u | **0/9** | 4/9 |
+| 0.20 | 9 u | **0/9** | 2/9 |
+| 0.15 | 7 u | **0/9** | **0/9** |
+
+Note `0.25` — that is exactly "constant angular occupancy", rock radius scaled with
+the ring — and it still leaves 4/9 sealed. **Holding the rock arc at a constant
+fraction of the circumference is not enough, because the hull is not scaled**: the
+ship stays 16 u while the ring shrinks 4×, so the corridor's share of the
+circumference grows as the ring closes. Any size taper that actually opens wave 5
+has to be *super*-proportional.
+
+### The two knobs together — the frontier
+
+`WAVE.lastRadiusFraction` (rows) against the late-wave size scale (columns), as
+`sealed@w4 / sealed@w5` out of 9:
+
+| `lastRadiusFraction` | size 1.0 | size 0.7 | size 0.5 |
+|---|---|---|---|
+| 0.25 (shipped) | 9/9 · 9/9 | 4/9 · 9/9 | 0/9 · 9/9 |
+| 0.30 | 8/9 · 9/9 | 1/9 · 9/9 | 0/9 · 9/9 |
+| 0.35 | 6/9 · 9/9 | 0/9 · 9/9 | 0/9 · 5/9 |
+| 0.40 | 6/9 · 9/9 | 0/9 · 6/9 | 0/9 · 1/9 |
+| 0.50 | 0/9 · 6/9 | 0/9 · 1/9 | **0/9 · 0/9** |
+
+**`lastRadiusFraction = 0.50` with a 2× late-wave rock-size cut fully opens the
+centre on 9/9 seeds at both waves.** Neither knob reaches that alone at anything
+like those settings — 0.50 alone leaves wave 5 sealed on 6/9, and a 2× size cut
+alone leaves it sealed on 9/9.
+
+What that combination costs, stated plainly so it is read as a change:
+
+- **GDD §2.3's shrinking ring survives, weakened.** Discs go 307 → 269 → 230 → 192
+  → 154 u; every wave still lands closer than the last and the field still closes
+  2× across the match. This is a real reduction in the mechanic's reach, and it is
+  a design call — but it is not the "all five waves in one annulus" that made
+  `lastRadiusFraction ≈ 0.90` a non-starter.
+- **GDD §5.5's readable payout is dented.** Late rocks halve in radius while
+  carrying the same ore, so size stops reading as ore *across* waves: a wave-5 rock
+  is as rich as a wave-1 rock at a quarter the area.
+- **Field ore is untouched — measured, not argued.** 400.00 per seed in every arm,
+  identical to baseline, at every setting of both knobs.
+- **Goldens move broadly** (`ffa-parity`, `FFA_GOLDEN`), and the late field changes
+  on every board, not on the ~1.25% of seeds the wedge gate sees.
+
+### The cheap partial, if the full fix is too much change
+
+**A 2× late-wave size cut alone, with `lastRadiusFraction` untouched, opens wave 4
+on 9/9 seeds** and leaves wave 5 sealed. That is not a full repair, but wave 4 is
+where **24 of the 28** measured catches happen and it is the wave a ship is caught
+in *invisibly* — so this removes most of the incidence and shrinks the remaining
+exposure to the last window of the match. One knob, one direction, no change to the
+ring geometry.
+
+### What this does not settle
+
+Which trade the game wants. Rock size reads as ore (§5.5) and the closing ring is
+the mechanic (§2.3); both knobs are TUNABLE and both are the balance crew's, not
+this lane's. **The point of this section is that the menu was wrong, not that the
+choice is made** — a fix exists that keeps the shrinking ring, and the variant this
+report recommended for eleven sessions (cut the count) does not work at all.
 
 ---
 

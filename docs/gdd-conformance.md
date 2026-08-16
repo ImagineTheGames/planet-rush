@@ -779,9 +779,10 @@ landing, **18 chewed their way out within 30–120 s**, 5 died first, and 1 (see
 wave cycle and a helpless ship*, not a lost match. **Frequent, near-invisible, and
 survivable** — rather than rare and fatal, which is what this question said before.
 
-**Nothing about the ask changes.** The fix set is identical and every option is
-still a design call; only the size and shape of the problem are now measured
-correctly.
+**Nothing about the ask changes** — every option is still a design call, and the
+scheduling half below is untouched. *(The fix set itself did move a session later:
+see the costed candidates, where the options were measured rather than estimated
+and two of the three answers changed.)*
 
 **Why it needs you and not an engineer.** Everything inside the gameplay lane is
 measured and exhausted. No rearrangement of the rocks can work — a 3.66×
@@ -796,21 +797,62 @@ four-direction search at 68.7 u/s, and still cannot get out**, because the
 pocket's widest clearance is 5.5 u for a 16 u hull. The hatch defeats *pinning*
 against a surface; it cannot defeat *enclosure*, and no knob makes space.
 
-**The three candidates, costed.** *(1)* **Widen the last ring**
-(`WAVE.lastRadiusFraction`) — passability needs ≈ **0.90** against wave 1's 1.00,
-which lands wave 5 on top of wave 1 and **deletes** §2.3's shrinking ring. Named
-only to rule it out. *(2)* **Taper late-wave rock size or count** — the only knob
-with real travel; keeps the ring closing in; costs §5.5's "a payout the player can
-judge" (rock size reads as ore) and changes the field's texture. The *count*
-variant is likely cheaper, because the wave's fixed ore budget makes the survivors
-richer on its own. **My recommendation.** *(3)* **Eject a live ship a landing wave
-would entomb** — touches no rock, so `FIELD_YIELD` and the field's symmetry stay
-exact; but it is a new sim rule, and it treats the symptom, since the centre stays
-sealed for anyone who flies in *after* the wave (observed: seed 23 slot 2 escapes,
-then is sealed again two minutes later). **Re-costed:** this used to be sold as
-"almost no golden moves, because it fires on ~1.25% of seeds". At the true
-incidence it must arm at **wave 4** and fires on **most matches**, displacing a
-ship each time — so it moves goldens broadly and is itself a balance change.
+**The candidates — now measured, and my previous recommendation was wrong.**
+*(Fifteenth session, 2026-08-16. Every option here had been costed by arithmetic
+and none had ever been run. Running them against the reachability oracle, on 9
+seeds, changed two of the three answers. Tables in the report.)*
+
+*(1)* **Widen the last ring (`WAVE.lastRadiusFraction`, now 0.25).** I said ≈ 0.90
+was needed and ruled this out as deleting §2.3's shrinking ring. **That was costed
+with the rocks left at full size, and the two knobs multiply** — the ring radius a
+given rock arc needs is proportional to that arc. Measured: **`lastRadiusFraction
+= 0.50` together with a 2× late-wave rock-size cut opens the centre on 9/9 seeds at
+both waves 4 and 5**, and the field still closes 2× across the match (discs
+307 → 269 → 230 → 192 → 154 u). Every wave still lands closer than the last, so
+§2.3's mechanic is weakened, not deleted. **This combination is my recommendation
+now.**
+
+*(2)* **Taper late-wave rock size or count.** These are not interchangeable and I
+had the preference backwards. **Count cannot do it at all in a full lobby**:
+`sectorRocks` floors at one rock per sector, so an 8-player wave cannot go below 8
+rocks, still **1.22×** the wave-5 circumference before a ship corridor — flood
+filled, a proportional count taper and a flat halving both leave wave 5 sealed on
+**9/9**. The floor is set by the `N`-fold symmetry that is a fairness invariant, so
+it cannot be lowered. **Size alone works but needs a 6.7× cut** (max radius 46 → 7 u,
+smaller than the ore chunks the rock emits) — which is why pairing it with (1) is
+cheaper than either alone. And the ore-budget argument I used to prefer count
+**does not discriminate**: measured, every arm delivers *exactly* the same field ore
+(400.00 per seed, identical to baseline), because the spawner scales ore to the
+wave budget independently of both radius and count.
+
+*(3)* **Eject a live ship a landing wave would entomb** — touches no rock, so
+`FIELD_YIELD` and the field's symmetry stay exact; but it is a new sim rule, and it
+treats the symptom, since the centre stays sealed for anyone who flies in *after*
+the wave (observed: seed 23 slot 2 escapes, then is sealed again two minutes later).
+**Re-costed:** this used to be sold as "almost no golden moves, because it fires on
+~1.25% of seeds". At the true incidence it must arm at **wave 4** and fires on
+**most matches**, displacing a ship each time — so it moves goldens broadly and is
+itself a balance change.
+
+**If the full fix is more change than you want, there is a cheap partial.** A 2×
+late-wave rock-size cut *alone*, ring geometry untouched, **opens wave 4 on 9/9
+seeds** and leaves wave 5 sealed. Wave 4 is where 24 of the 28 measured catches
+happen and it is the wave where a ship is caught *invisibly*, so one knob in one
+direction removes most of the incidence and confines the rest to the last window of
+the match.
+
+**What none of this settles is the trade**, which is why it is still yours: rock
+size reads as ore (§5.5) and the closing ring is the mechanic (§2.3). Both knobs
+are TUNABLE and both are field balance. The point of the re-measurement is that the
+menu you were choosing from was wrong — a fix exists that keeps the shrinking ring,
+and the variant I recommended for eleven sessions does not work.
+
+**It is also not an 8-player problem.** Every measurement before this session was
+taken on the shipped 8-slot cast. Measured across lobby sizes 2–8, **wave 5 seals
+the centre on 9 of 9 seeds at every size** — the field radius and the wave's rock
+budget do not scale with the player count. The wave-4 onset *is* lobby-dependent
+(0/9 sealed at two players, 9/9 at eight), so in a small lobby the trap usually
+starts at wave 5 instead. A solo-with-bots match is as sealed as a full eight.
 
 **One warning, because it is the edit anyone would reach for first.** There is a
 fourth-looking option — reserve the commons eye by rock **body** instead of
