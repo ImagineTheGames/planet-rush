@@ -90,7 +90,8 @@ its station's owner. You are threading a value down a call that already has it.
 - **`ledgerAdd` no-ops on a world without a ledger** — copy that. Hand-built `World` literals in
   net, bot and render fixtures must keep working untouched.
 - **Optional parameters, not a new function.** A parallel `damageShipBy()` would fork the two
-  things that must agree exactly about spawn protection, the half-hold drop and the respawn
+  things that must agree exactly about spawn protection, the death ore drop (the **whole** hold
+  since a0-59, 2026-08-16 — this line read "the half-hold drop") and the respawn
   clock (`damage.ts`'s own header says why).
 
 ## Definition of Done

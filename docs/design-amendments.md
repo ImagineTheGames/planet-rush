@@ -172,6 +172,59 @@ Two notes for whoever picks them up, so the fix is a one-liner and not a session
   it is a slightly *bigger* accounting hole than the comment claims, on both
   builds.
 
+### A fifth lane nobody had swept: `src/progression/`
+
+The sweep above widened from `src/sim/` to `docs/`, `content/`, then to `src/bots/`,
+`src/net/` and the app shell. It never reached **`src/progression/`**, which is
+neither this lane's nor in the flagged set above, and which carries three more
+half-drop sites — plus two of its own briefs in `docs/`, which *are* in this
+brief's stated sweep scope and are therefore fixed here.
+
+| Site | Says | Owner | Action |
+|---|---|---|---|
+| `src/progression/accrual.test.ts:287` | test **named** *"does not read the half-hold sink at a death as ore spent"*, with an inline *"half dropped, half destroyed with the hull"* | UI (p1-04) | flagged |
+| `src/progression/accrual.ts:109` | `oreUsed` doc-comment — *"The half-hold sink at a ship death …"* | UI | flagged |
+| `src/progression/accrual.ts:454` | *"Across a ship death it is the half-hold sink (GDD §2.3)"* | UI | flagged |
+| `docs/briefs/pr-04-accrual-and-xp.md:76` | brief test 5 — *"The half-hold sink at a ship death does not appear in `oreUsed`"* | — | **fixed** |
+| `docs/briefs/pr-02-attribution-hook.md:93` | *"…spawn protection, the half-hold drop and the respawn clock"* | — | **fixed** |
+
+`src/progression/accrual.test.ts` is owned by the UI Engineer (its own header says
+so), so the three code sites are flagged, not edited — the same line drawn for the
+four above. **All 15 of its tests pass**, verified on this branch: the rule they
+pin (`oreUsed` counts a drop in hold+bank only while hull *and* home live, so a
+death is excluded) is independent of the fraction and is correct on both builds.
+Only the naming is stale — and a *test name* asserting the half-hold sink is the
+strongest form of the hazard this document exists to prevent, because it reads as
+a specification.
+
+### The consequence nobody had named: ore-mined XP no longer converges
+
+`oreMined` is Σ positive Δ`ship.cargo`, and `accrual.ts:100` is explicit that this
+counts **mined and scavenged alike** ("ore is ore", GDD §2.7, plan §1.1) —
+deliberate, and not something a0-59 changes. What a0-59 changes is the *magnitude*,
+and it changes it in kind rather than degree.
+
+Measured end-to-end on this branch (mint 2 ore into a hold, kill the ship, fly a
+second ship onto the drop and let the real tractor collect):
+
+| | minted | dropped | scavenged | total `oreMined` credited |
+|---|---|---|---|---|
+| one death→scavenge cycle at fraction **1** | 2 | 2 | 2 | **4 — a 2.0× credit ratio** |
+
+One mined unit is credited once to the miner, then again in full to each scavenger
+after each death. At fraction `f` the credit for one minted unit is the geometric
+series `1/(1−f)`: at **0.5** it converged to a hard ceiling of **2.0×** however many
+times the ore changed hands. At **1** there is no decay — each death→scavenge cycle
+adds a **full** `1.0×`, so the total is `1 + k` in cycles `k` and is bounded only by
+match length and hold size, not by the ore actually minted.
+
+This is not a sim bug and the ore ledger is untouched: the *field* conserves ore
+exactly, tick by tick, on both builds. It is the **progression metric** built on top
+of it that loses its bound. Nobody has to act on it today — p1-04's XP weights are
+not shipped balance — but the balance crew should have it before they tune ore-mined
+XP against a contested board, because a kill-and-rescavenge loop is now a
+repeatable, lossless XP source and at `f = 0.5` it provably was not.
+
 ### What did NOT change
 
 - **Banked ore.** Still never lost to a ship death (GDD §2.7). The cost of dying is

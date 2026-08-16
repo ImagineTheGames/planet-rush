@@ -73,7 +73,11 @@ Put that sentence in the code comment beside the constant, or it gets "corrected
    never multiplied — it has no opponent.
 4. **Respawns are not travel.** A death-and-respawn does not add the distance from the wreck to
    the home station.
-5. **Death is not a purchase.** The half-hold sink at a ship death does not appear in `oreUsed`.
+5. **Death is not a purchase.** The hold a ship loses at death does not appear in `oreUsed`.
+   *(Amended 2026-08-16, a0-59 — this read "the half-hold sink at a ship death". There is no
+   sink: `DEATH_ORE_DROP_FRACTION` is `1`, so the whole hold drops to the field, and `killShip`
+   zeroes `cargo` unconditionally either way. The requirement is unchanged and now has no
+   exception to carve out — nothing is destroyed with the hull.)*
 6. **Determinism of the total.** The same finished world produces the same XP total on every
    run — no `Date.now()`, no iteration-order dependence.
 7. **Online, the authoritative world is observed.** A fixture with a mispredicted-then-reconciled
