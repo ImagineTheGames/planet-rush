@@ -115,9 +115,13 @@ and `oreResidual` proves the books balance each tick. Against it:
 - An enemy parked hull-to-hull on a loaded ship for four seconds takes nothing:
   `looted`, `deposited` and `spent` all stay at zero, and the hold reads 2 on
   every one of 240 ticks.
-- On death, half the hold bursts as debris **into the field**, not to the killer,
-  who is handed exactly nothing. Whoever reaches it first gets it, like any
-  loose chunk.
+- On death, the hold bursts as debris **into the field**, not to the killer, who
+  is handed exactly nothing. Whoever reaches it first gets it, like any loose
+  chunk. *(Amended 2026-08-16, a0-59 — this read "half the hold" when written;
+  `DEATH_ORE_DROP_FRACTION` is now 1, so the whole hold reaches the field. The
+  finding is unaffected: the point is that the drop goes to the FIELD and not to
+  the killer, and that is unchanged. It does mean twice as much ore is in the
+  contested-pickup case this document describes.)*
 
 ### What it looked like instead
 

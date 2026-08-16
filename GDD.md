@@ -105,14 +105,57 @@ Two elements of this HUD are *mechanics, not polish*, and are specified here so 
 
 Asteroids visibly crack as they're mined and burst into ore chunks that drift toward nearby ships.
 
-### 2.3 Core loop *(amended 2026-07-27 — projectile mining, atmosphere deposits; **amended 2026-08-08 — a pickup, and a pickup REFUSED, must both be visible; no rule changed**; see `docs/design-amendments.md`)*
+### 2.3 Core loop *(amended 2026-07-27 — projectile mining, atmosphere deposits; **amended 2026-08-08 — a pickup, and a pickup REFUSED, must both be visible; no rule changed**; **amended 2026-08-16 — ore is minted in WHOLE units everywhere, a0-58**; **amended 2026-08-16 — a destroyed ship drops its ENTIRE hold: the half-burn sink is withdrawn by the developer, a0-59**; see `docs/design-amendments.md`)*
 
-1. **Mine.** Fly to the asteroid field and hold fire on an asteroid. **The same projectile that bites a hull chips a rock into ore chunks** (amended) — one weapon, one trigger, and whatever the shot reaches first decides which payload applies — chunks tractor-collected automatically by proximity. Your hold starts small — 2 ore — and grows only if you buy cargo upgrades; when it's full, chunks stay where they are for anyone. You decide how full to run: dart home early or risk hauling a full hold. Die and you drop half your hold where you exploded.
+1. **Mine.** Fly to the asteroid field and hold fire on an asteroid. **The same projectile that bites a hull chips a rock into ore chunks** (amended) — one weapon, one trigger, and whatever the shot reaches first decides which payload applies — chunks tractor-collected automatically by proximity. Your hold starts small — 2 ore — and grows only if you buy cargo upgrades; when it's full, chunks stay where they are for anyone. You decide how full to run: dart home early or risk hauling a full hold. Die and you drop **your whole hold** where you exploded *(amended 2026-08-16 — see below)*.
 2. **Spend.** Fly home and convert ore into defenses, repairs, or ship upgrades — or bank it. **You bank simply by flying into your own station's collection field** (amended): while your ship is inside that radius, the hold drains steadily into the safe banked total — no docking, no parking — and stops the instant you leave; ore chunks visibly courier from ship to station, one per unit banked. Docking closer still opens the Build & Upgrade wheel, whose BANK segment dumps the whole hold in one tap. Banked ore is safe; held ore is not.
 3. **Fight.** Besiege rival facilities or intercept enemy miners in the contested field.
 4. **The clock ticks.** The field's total yield is finite. Ore arrives in five timed **asteroid waves** — surges of the collapsing belt, named in full on the HUD so no player has to guess what is being counted — each spawning closer to the map center than the last, pulling every surviving player into a smaller and smaller contested space. After the final wave the claim closes in — **collapse phase** — no shield regeneration, no repair, no new ore. The match cannot stalemate; the ruleset guarantees an ending.
 
-**Picking ore up has to be visible — including when it fails (amended 2026-08-08, a0-08).** The developer reported "sometimes picked up ore from dead ships dont count". The ore ledger (§2.7) proved nothing was ever lost — the economy conserved exactly through every reproduction — so the rules above are all working. What was missing was any *tell*: three different outcomes of the same kill looked identical from the cockpit. An **empty** hold takes the whole drop, but into the hold, so the prominent banked readout correctly does not move. A **full** hold takes nothing at all: it exerts no tractor pull and refuses the chunk in silence, and since the base hold is 2 that is normal play, not an edge case. **One free slot** takes one ore and leaves the rest floating — a partial take that looks exactly like a whole one. The rule is therefore: *ore arriving in the hold must read as ore arriving somewhere, and a hold too full to accept a pickup must say so at the moment it costs the player one.* The simulation publishes both as per-tick tells (`Ship.lootTake`, `Ship.lootBlocked`); how they are drawn is §2.2's. **No mechanic moved:** the hold cap, the half-drop, and the full-hold refusal are unchanged and remain §2.8 balance questions.
+**Picking ore up has to be visible — including when it fails (amended 2026-08-08, a0-08).** The developer reported "sometimes picked up ore from dead ships dont count". The ore ledger (§2.7) proved nothing was ever lost — the economy conserved exactly through every reproduction — so the rules above are all working. What was missing was any *tell*: three different outcomes of the same kill looked identical from the cockpit. An **empty** hold takes the whole drop, but into the hold, so the prominent banked readout correctly does not move. A **full** hold takes nothing at all: it exerts no tractor pull and refuses the chunk in silence, and since the base hold is 2 that is normal play, not an edge case. **One free slot** takes one ore and leaves the rest floating — a partial take that looks exactly like a whole one. The rule is therefore: *ore arriving in the hold must read as ore arriving somewhere, and a hold too full to accept a pickup must say so at the moment it costs the player one.* The simulation publishes both as per-tick tells (`Ship.lootTake`, `Ship.lootBlocked`); how they are drawn is §2.2's. **No mechanic moved:** the hold cap, the death drop, and the full-hold refusal are unchanged and remain §2.8 balance questions. *(That drop was the half-drop when this was written; it became the whole hold on 2026-08-16 — next paragraph.)*
+
+**A destroyed ship drops EVERYTHING (amended 2026-08-16, a0-59).** The developer:
+
+> *"destroyed ships should drop all their ore, no more 1/2 the ore stuff"*
+
+`DEATH_ORE_DROP_FRACTION` is **1**. The half of the hold that used to be destroyed
+with the hull was one of this economy's ore sinks and it is **withdrawn** — that is
+ratified design being overruled by the person it belongs to, recorded here so the
+document and the constant do not disagree. The consequence is deliberate and worth
+naming, and **measured** rather than estimated (24 full matches on both builds):
+**a kill returns 4.8× more ore to the field than it did on the shipped build**, so
+contested space is worth more — measured, **79 % of a death's ore now reaches a
+pilot who is not the one who lost it** (was 71 %), and only 5 % is left lying (was
+10 %). Two qualifications, both measured and both against the intuition: that
+space is **the station ring, not the asteroid field** — 92.5 % of death-drop ore
+lands outside the field on both builds — and the pilot most likely to collect it is
+**the owner of the nearest station**, so this reads closer to a defender's buff
+than to interception beating hauling. The 2× this paragraph
+used to claim is the change against *this document's* old rule; the shipped
+half-drop actually returned only **30.3 %** of a dead hold, because a0-58's
+whole-chunk floor lands on a hold-at-death distribution in which 71 % of deaths
+carry no ore and 16 % carry exactly one — a hold of 1 dropped nothing at all.
+Collapse circulates more ore (+34 % looted) but holds barely more (loose ore +16 %),
+and mining moved +4 %, so §2.8's mint budget stands. Banked ore is still never lost to a
+ship death (§2.7). The `deathLoss` ledger bucket stays — at zero for an ordinary
+death — because it remains the sink for anything a drop cannot lay down, and a
+ledger with no sink for a flow cannot conserve the day that flow returns.
+
+**Ore is a countable thing (amended 2026-08-16, a0-58).** Every mint is a whole
+`CHUNK.ore` unit and nothing finer: a hold shows pips and a cost is a whole number,
+so a half-unit is ore the player owns and no readout can print. Whatever is too
+fine to mint is recorded as a sink (`deathLoss`, `capLoss`, `dust`) rather than
+laid on the field. This is kept even though a0-59's whole-hold drop leaves it
+nothing to round today — `DEATH_ORE_DROP_FRACTION` is TUNABLE, and it moving off 1
+re-creates the remainder at once (measured: 283 of the 396 ore that died, over six
+matches at `0.5`).
+
+*(Corrected 2026-08-16: this named the chunk size as a second trigger, and it is
+not one. `CHUNK.ore` is TUNABLE too, but a0-58 quantised every boundary a hold has,
+so a hold is always a whole number of chunks and a whole-hold drop divides exactly
+at any chunk size — 0.00 burned across 2,358 deaths at chunk sizes 1, 2 and 3. What
+the chunk size does is scale what the floor destroys once the FRACTION is off 1.
+`docs/design-amendments.md` → **The sink, MEASURED**.)*
 
 The loop is a triangle — mine / defend / attack — and every death, upgrade, and turret shifts where a player should be on it. That decision, made every few seconds with one ship, is the game.
 
@@ -187,9 +230,9 @@ The board's hardest question, answered as design rather than tuning:
 
 The intended shape: attacking an occupied station is a mistake, pulling the owner away (or waiting for the alarm to go unanswered) is the skill, and the endgame belongs to whoever managed the clock best.
 
-### 2.7 Death, respawn, and debris *(amended 2026-07-27 — lootable derelicts, ore conservation; see `docs/design-amendments.md` and `docs/variable-slots-plan.md`)*
+### 2.7 Death, respawn, and debris *(amended 2026-07-27 — lootable derelicts, ore conservation; **amended 2026-08-16 — a ship death drops the WHOLE hold, a0-59; every mint is a whole ore unit, a0-58**; see `docs/design-amendments.md` and `docs/variable-slots-plan.md`)*
 
-Respawning is **free and fast** (5 seconds at your home station, upgrades intact) — the cost of dying is *time and position*: half your held ore drops where you exploded, and you respawn far from wherever you were needed. Banked ore is never lost to a ship death.
+Respawning is **free and fast** (5 seconds at your home station, upgrades intact) — the cost of dying is *time and position*: **all** of your held ore drops where you exploded *(amended 2026-08-16, a0-59 — it was half; the developer withdrew the burn, and §2.3 records what that does to the economy)*, and you respawn far from wherever you were needed. Banked ore is never lost to a ship death.
 
 When a station's reactor is destroyed, its owner is eliminated and gets an immediate **Rematch** button (plus spectate if they want to watch). **This holds in Teams** *(amended 2026-08-05 — see §1)*: a player whose own reactor dies is out even while their side plays on, so a 2v2 can become two ships against one while both sides still hold a reactor. The dead station leaves a **wreck** that persists for the rest of the match, surrounded by ore-laden debris that *anyone* can scavenge — funded by the dead player's own banked fortune, so the thing they were saving becomes the thing their killers fight over. Small cargo holds mean nobody hauls a dead player's fortune away in one trip — wreck sites stay contested, and fights over a fresh wreck are a feature, not a bug.
 
@@ -221,6 +264,8 @@ These are starting values, not commitments — they exist so the Gameplay Engine
 | Field yield | Total ore per match, in 5 asteroid waves, each closer to center | ~400 |
 | Asteroid wave interval | Metronome of the match | ~150 s |
 | Respawn | Free; time is the cost | 5 s |
+| Death ore drop | Fraction of the **held** hold left as debris where you died (§2.3, §2.7). **Amended 2026-08-16 (a0-59)** from `0.5` — developer: *"destroyed ships should drop all their ore, no more 1/2 the ore stuff"*. The unshed half was an ore sink; withdrawing it returns **4.8× the ore to the field per kill** (measured, 24 matches, both builds — not the 2× first estimated: the shipped half-drop returned only 30.3 % of a dead hold once a0-58's whole-chunk floor is counted). The yield and collapse numbers in this table nevertheless still stand — mining moved +4 % and total live ore −0.8 %, because the withdrawn sink was absorbed by construction spending rather than accumulating. Banked ore is unaffected. | 1 |
+| Ore chunk unit | The indivisible unit every mint emits (`CHUNK.ore`, **new to this table 2026-08-16, a0-58**): a death drop, a wreck ring and a chipped rock all lay down whole multiples of it, and anything finer is recorded as a sink rather than becoming ore no readout can print. | 1 |
 | ~~Sensor range~~ | **Retired 2026-08-07 (a0-05).** Was: distance at which an enemy station's damage ring becomes visible (~2× shield radius = 180). Station health is always visible (§2.2), so this gated nothing and is deleted rather than left as a dead knob — a `0` would still read as tunable, and restoring 180 would silently reinstate a withdrawn design. Not to be confused with the three **minimap coverage** radii below, which are a different mechanic and unaffected. | — |
 | Ship sensor (minimap) | A ship's own local fog-of-war coverage disc (§2.6 radar) | 520 |
 | Station sensor (minimap) | A station's short local coverage disc | 300 |

@@ -887,3 +887,75 @@ describe('upgrades persist through respawn (GDD §2.5, §2.7)', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// 7. A hold ceiling only ever rises — the ledger's one unguarded sink (a0-59)
+// ---------------------------------------------------------------------------
+
+/**
+ * `refreshDerivedStats` and `applyPurchasedStats` clamp `cargo` down to `cargoCap`
+ * when a ceiling lands under a loaded hold (`./upgrades`). That clamp is the ONE
+ * ore-destroying path in `src/sim/` that writes no ledger bucket: every other sink
+ * names itself — `spent`, `deathLoss`, `capLoss`, `dust` (`./ore-ledger`).
+ *
+ * MEASURED, 2026-08-16 (a0-59, twentieth session), on a real `createWorld`: taking
+ * a loaded ship's cap from 8 to 3 destroyed 5 ore and moved `oreResidual` by
+ * exactly −5, with `spent`/`deathLoss`/`capLoss`/`dust` all still zero. It is a
+ * black hole of exactly the class the ledger exists to catch (`./ore-ledger`
+ * header, the p2c loot-regression pattern) — the difference being that this one
+ * has never fired.
+ *
+ * It is harmless today for one reason only: within a match a cap never falls.
+ * `shipClass` is never written after world-build, `tiers` is only ever `+= 1`
+ * (`./buildings` `buyUpgrade`), and the ladder adds off a non-negative base — so
+ * the clamp's precondition cannot arise, and conservation holds exactly. Note
+ * `tierOf` already contemplates the other half of this scenario a few lines up: it
+ * clamps a tier a shortened ladder left stranded, so the stat is not `NaN`. The
+ * ore that the same retune would silently eat has no such guard.
+ *
+ * So an unwritten invariant is holding an unaccounted sink shut, and it is written
+ * down here. If this test ever goes red — a class swap, a tier reset, a shortened
+ * ladder, a cargo debuff — the clamp has been ARMED. The fix is to give it a
+ * ledger bucket before landing that feature, not to relax this test.
+ * LESSONS §26: assert the relationship, not today's value.
+ */
+describe('a hold ceiling only ever rises (a0-59)', () => {
+  it('derives a cap that is non-decreasing in tier, for every class', () => {
+    for (const shipClass of ALL_CLASSES) {
+      let prev = -Infinity;
+      for (let tier = 0; tier <= maxTier(UpgradeTrack.Cargo); tier++) {
+        const cap = shipCargoCap({ shipClass, tiers: { ...stockTiers(), [UpgradeTrack.Cargo]: tier } });
+        expect(cap, `${shipClass} cap fell from tier ${tier - 1} to ${tier}`).toBeGreaterThanOrEqual(prev);
+        prev = cap;
+      }
+    }
+  });
+
+  it('loses no ore climbing the cargo ladder with a full hold', () => {
+    const spec = UPGRADES[UpgradeTrack.Cargo];
+    const total = spec.costs.reduce((n, c) => n + c, 0);
+
+    for (const shipClass of ALL_CLASSES) {
+      const { world, ship } = dockedWorld(shipClass, total);
+      // A FULL hold is the case a clamp would eat: anything under the ceiling
+      // survives a ceiling drop untouched and would prove nothing.
+      ship.cargo = ship.cargoCap;
+      const startingOre = ship.cargo + ship.banked;
+      let cap = ship.cargoCap;
+
+      for (let tier = 0; tier < spec.costs.length; tier++) {
+        expect(buyUpgrade(world, ship, UpgradeTrack.Cargo)).toBe('ok');
+        expect(ship.cargoCap, `${shipClass}: cap fell buying tier ${tier + 1}`).toBeGreaterThanOrEqual(cap);
+        expect(ship.cargo, `${shipClass}: hold above its own ceiling`).toBeLessThanOrEqual(ship.cargoCap);
+        cap = ship.cargoCap;
+      }
+
+      // Every unit is still on the ship or accounted as spent — nothing was
+      // clamped into nowhere. This is `oreResidual` stated without a ledger.
+      expect(
+        ship.cargo + ship.banked + oreSpentOnUpgrades(ship),
+        `${shipClass}: ore vanished off the books at the cargo clamp`,
+      ).toBeCloseTo(startingOre, 9);
+    }
+  });
+});

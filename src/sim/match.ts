@@ -152,9 +152,9 @@ function eliminate(world: World, station: MiningStation, by?: PlayerId): void {
   world.match.eliminated.push(station.owner);
   station.deathTime = world.time;
 
-  // The owner is out (GDD §2.7): their ship dies where it stands — shedding
-  // half its hold like any death — and it never respawns. The Rematch button is
-  // the UI's answer to this flag.
+  // The owner is out (GDD §2.7): their ship dies where it stands — shedding its
+  // whole hold like any death (a0-59; it was half until 2026-08-16) — and it never
+  // respawns. The Rematch button is the UI's answer to this flag.
   //
   // Deliberately NOT credited as a ship kill, even when a player took the core:
   // a "ship destroyed" is a killing blow landed on a hull, and this hull was not

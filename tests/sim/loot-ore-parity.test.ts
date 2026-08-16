@@ -52,8 +52,10 @@ function looseOre(world: World): number {
 
 /** A killed rival's death-drop, with our collector (slot 0) parked right on top
  *  of the debris ring, empty hold, ready to tractor. The dead ship is slot 1;
- *  its half-hold has just burst into a ring of plain chunks (no `deposit` flag),
- *  exactly as a bot's death would leave them. */
+ *  its hold has just burst into a ring of plain chunks (no `deposit` flag),
+ *  exactly as a bot's death would leave them. All of it since a0-59 — this file
+ *  reads the amount off `DEATH_ORE_DROP_FRACTION`, so it measures the parity and
+ *  not the fraction. */
 function deathDrop(botCargo: number): {
   world: World;
   collector: Ship;
@@ -63,7 +65,7 @@ function deathDrop(botCargo: number): {
   const world = createWorld({ seed: 7, players: PLAYERS });
   const bot = world.ships[1]!;
   bot.cargo = botCargo;
-  killShip(world, bot); // rings its half-hold into world.chunks
+  killShip(world, bot); // rings its hold into world.chunks
 
   const drops = world.chunks.filter((c) => !c.deposit);
   const dropped = looseOre(world);
@@ -90,9 +92,11 @@ function parkInHomeAtmosphere(world: World, ship: Ship): void {
 // --- death-drop loot is ore -------------------------------------------------
 
 describe('death-drop loot is ore the moment it enters the hold', () => {
-  it('drops exactly half the dead ship’s hold as plain, tractorable chunks', () => {
+  it('drops the ratified share of the dead ship’s hold as plain, tractorable chunks', () => {
     const { drops, dropped } = deathDrop(4);
-    // Half of 4 = 2 ore, and it is ordinary loot: nothing is flagged a courier.
+    // All 4 since a0-59 (it was half, 2, before 2026-08-16) — and it is ordinary
+    // loot either way: nothing is flagged a courier. Read off the constant, which
+    // is what makes this a statement about PROVENANCE and not about the fraction.
     expect(dropped).toBeCloseTo(4 * DEATH_ORE_DROP_FRACTION, 9);
     expect(drops.every((c) => !c.deposit)).toBe(true);
     expect(drops.length).toBeGreaterThan(0);
@@ -141,7 +145,9 @@ describe('death-drop loot is ore the moment it enters the hold', () => {
   });
 
   it('conserves ore across kill → drop → tractor → deposit', () => {
-    const { world, collector, dropped } = deathDrop(6); // 3 ore of loot
+    // A hold sized so its drop is 3 ore whatever the fraction is — the case needs
+    // a loot pile that fits in one bay, not a particular number of ore.
+    const { world, collector, dropped } = deathDrop(3 / DEATH_ORE_DROP_FRACTION);
     expect(dropped).toBeCloseTo(3, 9);
     expect(collector.cargoCap).toBeGreaterThanOrEqual(dropped); // fits in one hold
 

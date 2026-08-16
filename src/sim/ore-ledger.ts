@@ -68,7 +68,24 @@ export interface OreLedger {
   spent: number;
   /** The share of a hold destroyed rather than dropped when a ship dies
    *  (`killShip`: `1 − DEATH_ORE_DROP_FRACTION` of the hold, plus — since a0-58 —
-   *  the sub-chunk remainder the drop could not mint as whole `CHUNK.ore` pieces). */
+   *  the sub-chunk remainder the drop could not mint as whole `CHUNK.ore` pieces).
+   *
+   *  **Normally 0 since a0-59** (2026-08-16): the developer withdrew the half-burn
+   *  and a destroyed ship now drops its entire hold, so `1 − 1 = 0` and a whole
+   *  hold leaves no remainder. The bucket is deliberately NOT retired. It is the
+   *  named sink for anything a drop cannot lay down, both terms above are driven
+   *  off TUNABLE constants, and a ledger with no sink for a flow cannot conserve
+   *  the day that flow returns — a zero term costs nothing, an absent one costs
+   *  the invariant.
+   *
+   *  **That last sentence is measured, not argued** (2026-08-16). Six full natural
+   *  matches per arm, `DEATH_ORE_DROP_FRACTION` × `CHUNK.ore` swept over
+   *  {1, 0.5} × {1, 2, 3}: this bucket carries **283 of the 396 ore that died** at
+   *  a fraction of `0.5` — a live term, not a hypothetical — and the residual stays
+   *  under **6.3e-13** in all six arms, sink present. It is the fraction alone that
+   *  arms it (0.00 burned across 2358 deaths at all three chunk sizes at `1`), so a
+   *  future tune of `CHUNK.ore` cannot reach it, and a future tune of the fraction
+   *  reaches it immediately. Method: `docs/design-amendments.md`. */
   deathLoss: number;
   /** Banked ore a wreck could not lay down as debris, lost with the station
    *  (`scatterWreckDebris`): the excess beyond `WRECK.maxDebrisChunks`, and — since

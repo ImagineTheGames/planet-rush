@@ -433,11 +433,11 @@ testable, so each row below is checked against the thing a player would look at.
 | Hold fire on a rock; the same projectile chips it; chunks tractor in by proximity | **SHIPPED** | `src/sim/projectiles.ts:276`, `:367`; proximity tractor `src/sim/step.ts:296`, `:749`. |
 | Hold starts at 2 and grows only with cargo upgrades | **SHIPPED** | `CARGO_BASE = 2`, `CARGO_PER_TIER = 2`, `CARGO_CAP_MAX = 8` — `src/sim/constants.ts:71–77`. |
 | A full hold refuses chunks; they stay where they are for anyone | **SHIPPED** | `src/sim/step.ts:749` (*"a full hold exerts no pull"*), `:950`. |
-| Death drops half the hold where you exploded | **SHIPPED** | `DEATH_ORE_DROP_FRACTION = 0.5` `src/sim/constants.ts:981`. |
+| Death drops **the whole hold** where you exploded | **SHIPPED** | `DEATH_ORE_DROP_FRACTION = 1` `src/sim/constants.ts`. Was `0.5` until **2026-08-16 (a0-59)** — the developer withdrew the half-burn ore sink ("destroyed ships should drop all their ore, no more 1/2 the ore stuff"); GDD §2.3/§2.7/§2.8 amended to match. |
 | **Banking is by flying into your own collection field**, ~4× radius, 2 ore/s, stops on leaving | **SHIPPED** | `DEPOSIT.drainRate = 2` `src/sim/constants.ts:1584`; `DEPOSIT_RANGE` drawn at `src/render/index.ts:969`. |
 | Ore chunks visibly courier ship→station, one per unit banked | **SHIPPED** | `src/sim/step.ts:291–297`, `:926`. |
 | The wheel's BANK segment dumps the hold in one tap | **SHIPPED** | `src/ui/build-wheel.ts:193`. |
-| Five timed waves, each closer to centre; after the last, collapse | **SHIPPED** | `src/sim/waves.ts:366`; `src/sim/buildings.ts:511`. |
+| Five timed waves, each closer to centre; after the last, collapse | **SHIPPED** | `src/sim/waves.ts:366`; `src/sim/buildings.ts:511`. **The claim is delivered, and the defect it used to carry is fixed (a0-65, Q-6 withdrawn).** Until 2026-08-16 the late waves sealed the map centre — a ship, bot or human, caught there when wave 4 landed could not leave by any route — on **100 seeds out of 100**, because 24 rocks of radius 22–46 cannot form a passable ring at the 77 u the field closed to. `WAVE.lastRadiusFraction` 0.25 → 0.5 plus the `ringSizeScale()` arc taper in `src/sim/waves.ts` opens it: **0/100 sealed**, with the field still closing 2× across the match and every wave still landing closer than the last. Pinned by `src/sim/waves.test.ts`, which now asserts the invariant rather than characterising the defect; measurements in `docs/wave-commons-entombment.md`. |
 | **A pickup and a pickup REFUSED must both be visible** (2026-08-08, a0-08) | **SHIPPED** | `Ship.lootTake` / `Ship.lootBlocked` published per tick — `src/sim/step.ts:922–923`, set at `:950` and `:988`. |
 
 ### §2.4 Controls and actions *(12 claims: 12 SHIPPED)*
@@ -494,7 +494,7 @@ testable, so each row below is checked against the thing a player would look at.
 | Claim | Verdict | Evidence |
 |---|---|---|
 | Respawn free and fast — 5 s at home, upgrades intact | **SHIPPED** | `RESPAWN_S = 5` `src/sim/constants.ts:961`. |
-| Half the held ore drops where you exploded; banked ore is never lost | **SHIPPED** | `src/sim/constants.ts:981`. |
+| **All** the held ore drops where you exploded; banked ore is never lost | **SHIPPED** | `DEATH_ORE_DROP_FRACTION = 1` `src/sim/constants.ts`. Read "half" until **2026-08-16 (a0-59)** — the same ruling the §2.3 row above records; §2.7's prose was amended with it and this row was not. Banked ore was never at risk and is unchanged (`killShip`, `src/sim/damage.ts`). |
 | Reactor death eliminates the owner and offers **Rematch** plus **spectate** | **SHIPPED** | `src/main.ts:1441–1462`, `:2686`, `rematch()` `:2723`. |
 | This holds in Teams — out even while your side plays on | **SHIPPED** | `src/sim/match.ts:142`. |
 | A wreck persists all match, surrounded by scavengable, owner-funded debris | **SHIPPED** | `src/sim/state.ts:456`, `:1073`. |
@@ -527,6 +527,67 @@ Checked row by row against `src/sim/constants.ts`. **Every live number matches.*
 | Minimap radii | 520 / 300 / 900 | `:1026`, `:1034`, `:1089` | **SHIPPED** |
 | Auto-aim arc `TUNABLE` | 2π | `:1099` | **PARTIAL** — G-13, unreferenced |
 | **Ore abundance table** (SCARCE ×0.55/×0.75/×1.2 default · STANDARD ×1 · RICH ×1.6/×1.25/×0.75) | — | `src/sim/match-config.ts` + measured in `tests/reports/abundance-spread-a0-17.md` | **SHIPPED** |
+
+**a0-59 and the two mint-budget rows above.** `DEATH_ORE_DROP_FRACTION` went
+0.5 → 1 on 2026-08-16, which withdrew one of the economy's ore sinks, so the
+obvious worry is that `FIELD_YIELD` and the abundance table were tuned against a
+build that no longer exists. **Measured on 24 full matches on both builds, they
+were not materially invalidated:** ore cut out of rock moved **+4 %**, total live
+ore **−0.8 %**, and loose ore on the field **+14 %** (+16 % during collapse). What
+changed sharply is *throughput*, not stock — a kill returns **4.8×** more ore than
+it does on the pre-a0-59 build, and the 1031 ore that used to burn at deaths was
+absorbed almost exactly by a +970 rise in construction spending. `a0-17`'s
+abundance spread therefore still stands; the numbers most worth a re-measure are
+§2.8's passive-match and mined-out bounds, and the expected movement is small.
+Full table and method: `docs/design-amendments.md` → *What this does to the
+economy — MEASURED, not estimated*.
+
+**Where that extra ore lands, which is not where the amendment used to say.**
+Measured on 12 full matches on both builds: **92.5 % of death-drop ore falls
+outside the asteroid field** (median death 639 u from centre against a ~307 u
+field radius) — on `main` too, so this is an inherited description error rather
+than an a0-59 effect. What a0-59 does change is who ends up with it: the share
+reaching a pilot other than the one who lost it rises **70.9 % → 79.4 %**, ore left
+uncollected falls **9.5 % → 5.3 %**, and of the ore that changes hands the share
+taken by the **nearest station's owner** rises 36.2 % → 45.2 %. Anyone budgeting
+the extra circulation into the field belt should budget it onto the station ring
+instead, and should read a0-59 as closer to a defender's buff than to a buff to
+intercepting haulers. Table, caveats and the tagger's 97 % coverage:
+`docs/design-amendments.md` → *Where the ore actually lands*.
+
+**Which of these two TUNABLEs is the dangerous one — measured, and it is not the
+one the sim's own comments named.** `DEATH_ORE_DROP_FRACTION` and `CHUNK.ore` were
+swept together over {1, 0.5} × {1, 2, 3}, six full natural matches per arm. Three
+results for anyone tuning either. (a) **`CHUNK.ore` is safe to tune on the
+death-drop path**: 0.00 ore burned across 2,358 deaths at chunk sizes 1, 2 and 3,
+because a0-58 made every hold an exact multiple of the chunk size, so a whole-hold
+drop divides exactly whatever the chunk is. (b) **The fraction is the knob that
+arms the burn**, and it is a big term the moment it moves — 283 of the 396 ore that
+died, at `main`'s 0.5. (c) **They interact, which nothing had recorded:** the chunk
+size scales what the floor destroys *once the fraction is off 1*, because a hold of
+a single chunk always returns nothing at 0.5 and a chunk is `CHUNK.ore` ore. At
+0.5 × 3 that reaches **100 % of everything that died**. So a future "put the half
+back" tune costs progressively more ore as `CHUNK.ore` rises, and the two must be
+re-tuned together rather than independently. The ore ledger conserves exactly in
+all six arms (residual ≤ 6.3e-13). Method and table: `docs/design-amendments.md`
+→ *The sink, MEASURED*; pinned by `src/sim/damage.test.ts`.
+
+**One ore-destroying path in `src/sim/` is NOT on the ledger, and a balance tune is
+what would arm it.** Every sink names itself — `spent`, `deathLoss`, `capLoss`,
+`dust` — except the `cargo > cargoCap` clamp in `src/sim/upgrades.ts`, which
+destroys the ore above a lowered ceiling and records nothing. Measured: dropping a
+loaded ship's cap 8 → 3 destroyed 5 ore and moved `oreResidual` by exactly −5 with
+every sink bucket still zero. **It has never fired and cannot fire as the sim
+stands** — a cap never falls within a match (`shipClass` is never rewritten,
+`tiers` only increments, the ladder adds off a non-negative base) — so conservation
+is exact today. It matters here because the things that would arm it are all
+balance calls: shortening the cargo ladder (`UPGRADES[Cargo].steps`), a cargo
+debuff, a mid-match class swap, or a tier reset. **Anyone making one of those
+should give the clamp a ledger bucket in the same change.** The invariant is now
+pinned by `src/sim/upgrades.test.ts` → *a hold ceiling only ever rises*, which goes
+red exactly when it is armed. Detail, including the netcode-side reachability that
+is flagged to that lane: `docs/design-amendments.md` → *The sink's OTHER advertised
+flow does not exist*.
 
 ### §2.9 AI opponents *(10 claims: 10 SHIPPED)*
 
@@ -693,7 +754,11 @@ Nothing has been cut, which is the point of checking.
 
 ## 7. QUESTIONS FOR THE DEVELOPER
 
-Only a human can settle these. Each is a decision, not a bug.
+Only a human can settle these. Each is a decision, not a bug. **Q-6** was the one
+deliberate exception — a measured defect held here because its every remaining fix
+looked like a design call — and it is now **withdrawn**: a0-65 showed the
+direction was forced by arithmetic rather than chosen, and fixed it. It is kept
+below, struck through, because the reasoning is worth not repeating.
 
 **Q-1 · What is a home called, in fiction?** §0 names **FACILITY** as a *working
 placeholder* and asks you to pick from FACILITY / RIG / STATION / OUTPOST. The
@@ -741,6 +806,182 @@ every screen looks, so `tests/mobile/goldens.spec.ts` re-baselines wholesale.
 That is a real cost and it is worth naming before it is spent. **Confirm you want
 the ratified faces shipped** (they are §5.6, so my assumption is yes), and QA
 should schedule the re-baseline in the same pass rather than after it.
+
+**Q-6 · ~~The late waves seal the map centre and entomb whoever is standing in
+it. Which of the three fixes do you want, and does a0-59 wait for it?~~
+WITHDRAWN — FIXED in a0-65, no ruling needed.** *(Raised 2026-08-16 by a0-59 /
+PR #436; incidence and onset corrected 2026-08-16 after measuring enclosure
+directly; closed 2026-08-16 by a0-65, commit `eff9443`.)*
+
+> **Resolution.** Candidate (1) below was taken, with the size taper *derived*
+> from the ring's circumference rather than a flat 2× cut, so waves 1–3 are placed
+> exactly as before. `WAVE.lastRadiusFraction` 0.25 → 0.5 plus `ringSizeScale()`
+> in `src/sim/waves.ts`. **Sealed on 100/100 seeds before, 0/100 after.**
+>
+> This never needed a Director ruling in the end: the *direction* was forced by
+> arithmetic — 24 rocks of radius 22–46 form a closed ring at any radius below
+> ~250 u, so a field closing to 77 u entombs by construction — and the only taste
+> call left was how much closure to keep. The shipped values keep 2× (307 u →
+> 154 u) against the old 4×. Ore is unmoved and the `N`-fold fairness symmetry is
+> untouched. Full write-up: `docs/wave-commons-entombment.md`.
+>
+> Note also that the incidence figure below ("16 of 24 seeds") measured how often
+> a *bot happened to be standing* in the trap. The geometry was sealing on **every
+> seed**.
+
+The question as it stood, kept for the reasoning:
+
+This is a **live defect on `main`**, not a regression: from wave 2 onward the
+commons ring carries more rock than its circumference can hold, and by wave 5 it
+is **3.66× oversubscribed** — 1632 u of rock arc on a 446 u ring. It closes to
+71 u from the map centre and seals the disc inside as a solid annulus with a
+**19.3 u** free pocket; `SHIP_RADIUS` is **16**. **A human player is caught
+exactly as a bot is.**
+
+**Two numbers in the original version of this question were wrong, and both moved
+against us.** They were measured through `tests/harness/unstuck.test.ts`, which
+detects a ship held in a *small* space — not a ship that *cannot get out*.
+Measuring enclosure directly (flood-fill of free configuration space, now pinned
+by `src/sim/waves.test.ts`):
+
+- **The seal closes at wave 4, not wave 5** — on **9 of 9** seeds measured, with
+  none sealed at wave 3. It is structural, not luck. Wave 5 merely shrinks the
+  sealed cell from 68–108 u to 4–24 u, which is the first point anything in CI
+  can see it.
+- **Incidence is 16 of 24 seeds, not ~1.25%.** On the standing gate's own seeds, a
+  ship is sealed in on two thirds of matches. The ~1.25% figure is the rate at
+  which the trap gets *loud enough to turn a build red*; it was being read as the
+  rate at which it happens.
+
+**One number moved in our favour, and it should be weighed too.** The ring is
+minable, so the seal is usually temporary: of 24 ships sealed at the wave-4
+landing, **18 chewed their way out within 30–120 s**, 5 died first, and 1 (seed
+15) was still sealed four minutes on. So the per-incident cost is *a lost half a
+wave cycle and a helpless ship*, not a lost match. **Frequent, near-invisible, and
+survivable** — rather than rare and fatal, which is what this question said before.
+
+**Nothing about the ask changes** — every option is still a design call, and the
+scheduling half below is untouched. *(The fix set itself did move a session later:
+see the costed candidates, where the options were measured rather than estimated
+and two of the three answers changed.)*
+
+**Why it needs you and not an engineer.** Everything inside the gameplay lane is
+measured and exhausted. No rearrangement of the rocks can work — a 3.66×
+oversubscribed ring has no corridor at any angle or radius, since passability
+needs `R ≥ 276 u` and the ring is at 71 u. `commonsHoleFraction` is at the end of
+its travel and was never the right knob. `commonsSpokeGap` is an *angular*
+constant, so the linear corridor it promises shrinks with the ring — 84.6 u at
+wave 1, **21.2 u at wave 5** against the 62 u its own doc-comment claimed, a
+false promise now struck. And the sim's own ratified anti-wedge mechanic (the p14
+escape hatch) **fires on 98.4% of the wedge's ticks, cycles its entire
+four-direction search at 68.7 u/s, and still cannot get out**, because the
+pocket's widest clearance is 5.5 u for a 16 u hull. The hatch defeats *pinning*
+against a surface; it cannot defeat *enclosure*, and no knob makes space.
+
+**The candidates — now measured, and my previous recommendation was wrong.**
+*(Fifteenth session, 2026-08-16. Every option here had been costed by arithmetic
+and none had ever been run. Running them against the reachability oracle, on 9
+seeds, changed two of the three answers. Tables in the report.)*
+
+*(1)* **Widen the last ring (`WAVE.lastRadiusFraction`, now 0.25).** I said ≈ 0.90
+was needed and ruled this out as deleting §2.3's shrinking ring. **That was costed
+with the rocks left at full size, and the two knobs multiply** — the ring radius a
+given rock arc needs is proportional to that arc. Measured: **`lastRadiusFraction
+= 0.50` together with a 2× late-wave rock-size cut opens the centre on 9/9 seeds at
+both waves 4 and 5**, and the field still closes 2× across the match (discs
+307 → 269 → 230 → 192 → 154 u). Every wave still lands closer than the last, so
+§2.3's mechanic is weakened, not deleted. **This combination is my recommendation
+now.**
+
+*(2)* **Taper late-wave rock size or count.** These are not interchangeable and I
+had the preference backwards. **Count cannot do it at all in a full lobby**:
+`sectorRocks` floors at one rock per sector, so an 8-player wave cannot go below 8
+rocks, still **1.22×** the wave-5 circumference before a ship corridor — flood
+filled, a proportional count taper and a flat halving both leave wave 5 sealed on
+**9/9**. The floor is set by the `N`-fold symmetry that is a fairness invariant, so
+it cannot be lowered. **Size alone works but needs a 6.7× cut** (max radius 46 → 7 u,
+smaller than the ore chunks the rock emits) — which is why pairing it with (1) is
+cheaper than either alone. And the ore-budget argument I used to prefer count
+**does not discriminate**: measured, every arm delivers *exactly* the same field ore
+(400.00 per seed, identical to baseline), because the spawner scales ore to the
+wave budget independently of both radius and count.
+
+*(3)* **Eject a live ship a landing wave would entomb** — touches no rock, so
+`FIELD_YIELD` and the field's symmetry stay exact; but it is a new sim rule, and it
+treats the symptom, since the centre stays sealed for anyone who flies in *after*
+the wave (observed: seed 23 slot 2 escapes, then is sealed again two minutes later).
+**Re-costed:** this used to be sold as "almost no golden moves, because it fires on
+~1.25% of seeds". At the true incidence it must arm at **wave 4** and fires on
+**most matches**, displacing a ship each time — so it moves goldens broadly and is
+itself a balance change.
+
+**If the full fix is more change than you want, there is a cheap partial.** A 2×
+late-wave rock-size cut *alone*, ring geometry untouched, **opens wave 4 on 9/9
+seeds** and leaves wave 5 sealed. Wave 4 is where 24 of the 28 measured catches
+happen and it is the wave where a ship is caught *invisibly*, so one knob in one
+direction removes most of the incidence and confines the rest to the last window of
+the match.
+
+**What none of this settles is the trade**, which is why it is still yours: rock
+size reads as ore (§5.5) and the closing ring is the mechanic (§2.3). Both knobs
+are TUNABLE and both are field balance. The point of the re-measurement is that the
+menu you were choosing from was wrong — a fix exists that keeps the shrinking ring,
+and the variant I recommended for eleven sessions does not work.
+
+**It is also not an 8-player problem.** Every measurement before this session was
+taken on the shipped 8-slot cast. Measured across lobby sizes 2–8, **wave 5 seals
+the centre on 9 of 9 seeds at every size** — the field radius and the wave's rock
+budget do not scale with the player count. The wave-4 onset *is* lobby-dependent
+(0/9 sealed at two players, 9/9 at eight), so in a small lobby the trap usually
+starts at wave 5 instead. A solo-with-bots match is as sealed as a full eight.
+
+**One warning, because it is the edit anyone would reach for first.** There is a
+fourth-looking option — reserve the commons eye by rock **body** instead of
+**centre**, correcting a genuine inconsistency with the launch pocket 90 lines
+above in the same file. **Measured, both arms: it turns the red gate green while
+leaving the ring 360/360 sealed.** It doubles the free pocket (21.6 → 42.1 u) and
+opens *zero* escape bearings; the worst wedge at seed 15 falls 133.5 s → 2.7 s
+purely because `unstuck.test.ts` re-anchors once a hull moves 8 u, and a ship in a
+42 u sealed cell clears that. The player is still entombed — in a slightly larger
+cell — and the only instrument that detects it has been switched off. The
+correction is still worth making, but it must land **with** candidate 2, never
+before it, and a green `unstuck` must not be the evidence that the trap is gone.
+**There is now a second instrument that this edit cannot fool:**
+`src/sim/waves.test.ts` measures reachability rather than cell size, and still
+reports the centre sealed under the correction. If the two ever disagree — wedge
+gate green, reachability still sealed — the reachability check is the one telling
+the truth.
+
+**And the scheduling half, which is the part actually blocking work.** a0-59 is a
+one-constant developer ruling ("destroyed ships should drop all their ore") that
+**neither caused this nor worsens it** — its entire behavioural delta against
+`main` is that one constant, verified mechanically. But it re-rolls *which* seeds
+hit the trap, and seed 15 lands inside the 24 that `tests/harness/unstuck.test.ts`
+draws, so PR #436 is red on a defect it did not introduce while `main` is green on
+the same defect purely by luck. **Land a0-59 and brief the wave trap separately,
+or hold a0-59 behind the fix.** Either is fine; the PR cannot settle it itself.
+
+**This was framed as a binary for ten sessions, and it is not one.** Everything
+above — this question, the defect report, and the detector that pins it — was
+written on PR #436 and is currently held behind a ruling that is not about it.
+Measured (sixteenth session), the branch splits cleanly: `src/sim/waves.test.ts`,
+`docs/wave-commons-entombment.md` and the comment-only corrections in `waves.ts`
+and `step.ts` carry **no** dependence on the constant. Checked out into a detached
+worktree at `origin/main` they typecheck clean and **`npx vitest run src/sim`
+passes 376/376**, with the reachability test reporting the identical verdicts it
+gives on the branch — escapable through wave 3, sealed at waves 4 and 5. Only
+`damage.test.ts`, `loot-tell.test.ts` and the re-measured goldens are genuinely
+a0-59-dependent.
+
+So there is a **third option, and it costs nothing**: land the evidence half on
+`main` now, whichever way the constant goes, and decide a0-59 on its own merits
+afterwards. The detector is green on `main` *because it characterises a defect
+`main` has* — which is also the cleanest proof yet that a0-59 did not cause this,
+needing no seed sampling at all. Holding a0-59 is a defensible call; holding the
+measurement of a live `main` defect along with it is an accident, and this is the
+note saying so. File list, verified, in the report's *"This report does not depend
+on a0-59"* section. The gameplay lane cannot execute the split — its brief permits
+exactly one pushed branch.
 
 ---
 

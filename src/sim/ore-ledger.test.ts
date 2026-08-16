@@ -11,8 +11,10 @@
  *     developer was still losing ore, which is exactly why the second law exists.
  *
  *  2. **Countability (a0-58).** Ore that conserves can still be unreadable. A
- *     death drop used to split a half-hold into whole chunks *plus a remainder* —
- *     3 ore shed one chunk of 1 and one of 0.5 — and the ledger balanced on it
+ *     death drop used to split its share of the hold into whole chunks *plus a
+ *     remainder* — under the half-drop then in force, 3 ore shed one chunk of 1
+ *     and one of 0.5 (a0-59 has since taken the fraction to 1, which removes that
+ *     particular half but not the rule) — and the ledger balanced on it
  *     perfectly. But `Math.floor` guards every readout the player has (the hold
  *     pips, the build wheel's hub, the upgrade wheel), so a 0.5 in a hold is ore
  *     you own, can spend toward, and are told nothing about: *"their ore's don't
@@ -149,10 +151,12 @@ describe('the death drop pays the sink what it cannot mint (a0-58)', () => {
       expect(dropped + burnt, `hold ${hold}: dropped + deathLoss`).toBeCloseTo(hold, 12);
       expect(victim.cargo).toBe(0);
 
-      // …and the sink is the only place the remainder can be. Half the hold was
-      // always burnt (GDD §2.3); the sub-chunk remainder now joins it there.
-      const half = hold * DEATH_ORE_DROP_FRACTION;
-      expect(dropped, `hold ${hold}: never more than the ratified half`).toBeLessThanOrEqual(half + 1e-9);
+      // …and the sink is the only place anything undropped can be. Since a0-59 the
+      // whole hold is owed to the field, so for a hold that divides this bound is
+      // tight and `burnt` is 0. Written against the constant rather than the value:
+      // it is the same line that held the old half-drop honest, and it is TUNABLE.
+      const owed = hold * DEATH_ORE_DROP_FRACTION;
+      expect(dropped, `hold ${hold}: never more than the drop is owed`).toBeLessThanOrEqual(owed + 1e-9);
       expect(burnt, `hold ${hold}`).toBeCloseTo(hold - dropped, 12);
 
       // The books still balance against the world itself, not just against

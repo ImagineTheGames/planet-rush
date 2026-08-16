@@ -79,7 +79,8 @@ export interface Ship {
    *  derived per read (the renderer's hull bar and the netcode both want it);
    *  written only by `./upgrades`, so it can never disagree with `tiers`. */
   maxHull: number;
-  /** Ore currently held. Lost (half) on death; capped by `cargoCap` (GDD §2.3). */
+  /** Ore currently held. Dropped as debris on death — the WHOLE hold since a0-59
+   *  (`DEATH_ORE_DROP_FRACTION`); capped by `cargoCap` (GDD §2.3). */
   cargo: number;
   /** Hold capacity in ore. Class base, +2 per upgrade tier, cap 8 (GDD §2.8).
    *  Stored on the same terms as `maxHull`. */

@@ -8,6 +8,610 @@ half of these amendments; this file is the human-readable why.
 
 ---
 
+## The commons closes to a RING, not onto the centre — the field must never entomb
+
+**Date:** 2026-08-16 · branch `agent/gameplay/a0-59-full-death-drop` (a0-65)
+**Ratified by:** no ruling required — see "Why this is not a balance call" below
+**Amends:** GDD §2.3's Outer Drift, in degree only. `WAVE.lastRadiusFraction`
+**0.25 → 0.5**, plus a new derived rock-size taper (`ringSizeScale()` in
+`src/sim/waves.ts`, allowance `WAVE.ringCorridorAllowance` = 1.7). The field still
+closes over the match and every wave still lands strictly closer in than the last;
+it closes **2× instead of 4×**, and waves 4–5 carry smaller rocks. **Nothing else
+moves:** the wave ore budget, the `N`-fold fairness symmetry, the wave schedule
+and the collapse rules are all untouched.
+
+### What was wrong
+
+The late waves **sealed the map centre**. A ship — bot or human — standing near
+the centre when wave 4 landed could not leave it by any route for the rest of the
+match, at full throttle, with the sim's own anti-wedge escape hatch firing on 98%
+of ticks and unable to help, because the hatch defeats *pinning against a surface*
+and this is *enclosure*.
+
+Measured by flood fill of free configuration space (`src/sim/waves.test.ts`):
+**sealed on 100 seeds out of 100** before the fix, at wave 4 on 96 of them.
+**0 / 100** after.
+
+### Why this is not a balance call, though it moves a balance knob
+
+The direction was forced by arithmetic rather than chosen. The commons is a ring,
+and a ring has a circumference: at `lastRadiusFraction` 0.25 the final wave's ring
+had radius 65 u — circumference 410 u — while the 24 rocks stamped onto it need
+`24 × 2 × 34` = 1632 u of arc before anyone asks for a ship-wide corridor as well.
+24 rocks of radius 22–46 form a closed ring at **any** radius below ~250 u, so a
+field that closes to 77 u entombs by construction, on every seed, forever. There
+was no value of the placement knobs — hole fraction, spoke gap, band width, rock
+count — that opened it; all were measured and all re-sealed.
+
+What remained a taste call was only *how much closure to keep*, and the shipped
+values keep the most that geometry allows while staying open with margin.
+
+This was queued as **Q-6** in `docs/gdd-conformance.md` for a Director ruling
+across many sessions. Q-6 is withdrawn, not answered.
+
+### The cost, stated for the balance crew
+
+- **Ore: unmoved.** `drawCanon` scales rock ore to the wave budget independently
+  of radius, so the taper carries the same ore in smaller, denser rocks.
+- **Fairness: untouched.** Both parts reshape the one drawn sector that is stamped
+  `N`-fold, so the commons stays rotationally symmetric.
+- **The Outer Drift is weaker:** final ring 76.8 u → 153.6 u at 8 players. The
+  endgame commons is a wider band and players converge less tightly.
+- **Late rocks are smaller:** wave 4 ×0.905, wave 5 ×0.565 (mean radius 31 → 28
+  and 37 → 21, against a `SHIP_RADIUS` of 16). Waves 1–3 are placed exactly as
+  before.
+
+Full report and the rejected candidates: `docs/wave-commons-entombment.md`.
+
+---
+
+## A destroyed ship drops EVERYTHING: the half-burn ore sink is withdrawn
+
+**Date:** 2026-08-16 · branch `agent/gameplay/a0-59-full-death-drop`
+**Ratified by:** Developer (Reinaldo) — the rule is his and this overrules the GDD
+**Amends:** GDD §2.3, §2.7 and §2.8 — `DEATH_ORE_DROP_FRACTION` **0.5 → 1**. A
+destroyed ship leaves its entire hold on the field; the half that used to be
+destroyed with the hull is no longer destroyed at all. **Nothing else moves:**
+banked ore is still never lost to a ship death, `CHUNK.ore` is still 1, the drop is
+still minted in whole chunks (a0-58), and `deathLoss` is still a live ledger sink.
+
+### The ratification, verbatim
+
+> "destroyed ships should drop all their ore, no more 1/2 the ore stuff"
+
+### This overturns ratified design, deliberately
+
+GDD §2.3 has carried the half-burn since M1, and it was not decoration: it was one
+of the economy's **three ore sinks** (`spent`, `deathLoss`, `capLoss`, plus `dust`
+since a0-58), and the one that made a loaded hold a genuine risk rather than a
+transfer. That is real ratified design being overruled by the person it belongs to,
+which is his call and needs no defending here.
+
+What it does need is **recording**, which is what this entry is for. A constant that
+silently contradicts the design document is how the next agent "restores" it in
+good faith six weeks from now — and the half-drop is written into §2.3's numbered
+loop, §2.7's opening sentence and §2.8's table, so three separate readers would
+have found three separate reasons to put the 0.5 back. All three are amended in the
+same commit as the constant.
+
+### What this does to the economy — MEASURED, not estimated
+
+> **The headline number in this section used to read "every kill now returns twice
+> the ore to the field." That was asserted, never measured, and it is too low by
+> about 2.4×. Measured against the shipped build, a kill returns 4.8× more ore.
+> See "The 2× was against design intent, not against the build" below for why both
+> numbers are true and which one the balance crew needs.**
+
+**Method.** 24 seeds (1–24), full natural eight-slot matches run to their own
+ending on *both real builds* — this branch, and a detached `git worktree` at
+`origin/main` (`221a2b1`), so neither arm is a constant flipped by hand. The ore
+ledger is read at the final tick; the hold each ship carried is sampled the tick
+it dies; loose-on-field ore is summed over `world.chunks` every tick and split by
+`world.match.phase`. Both probes were scratch files under `tests/harness/`, run
+and deleted — `git status -- src/ tests/` verified empty afterwards.
+
+| quantity, summed over 24 matches | `main` (0.5) | a0-59 (1) | change |
+|---|---|---|---|
+| **death-drop ore that reached the field** | **448** | **2156** | **4.81×** |
+| effective share of a dead hold that returns | **30.3 %** | 100 % | 3.30× |
+| ore at risk (Σ hold carried at the instant of death) | 1479 | 2156 | 1.46× |
+| deaths | 2977 | 3368 | 1.13× |
+| `deathLoss` (burned with the hull) | 1031 | **0** | −100 % |
+| `spent` (construction — the surviving sink) | 3835 | 4805 | +25 % |
+| `looted` | 5165 | 6917 | +34 % |
+| `deposited` (banked) | 3306 | 4200 | +27 % |
+| `mined` (ore cut out of rock) | 4100 | 4267 | +4 % |
+| wreck debris — fraction-independent, the control | 1661 | 1763 | +6 % |
+| mean total live ore (rock + loose + holds + banks) | 230.45 | 228.64 | **−0.8 %** |
+| mean loose ore on the field | 8.23 | 9.38 | +14 % |
+| mean loose ore **during the collapse phase** | 19.93 | 23.13 | +16 % |
+| mean ore riding in hulls | 2.78 | 3.33 | +20 % |
+
+#### The 2× was against design intent, not against the build
+
+Both framings are honest and they differ by 1.65×, so the distinction matters to
+anyone budgeting for this:
+
+- **Against the GDD's ratified rule, a0-59 is exactly 2×.** Before a0-58, `killShip`
+  laid down `held × 0.5` with no rounding at all, so a dead hold returned exactly
+  half. That is the number §2.3 was written against.
+- **Against the build that is on `main` today, it is 3.3× on a fixed population of
+  deaths, and 4.8× once the economy responds.** a0-58 made the drop mint whole
+  `CHUNK.ore` pieces, and that floor lands on a hold-at-death distribution that is
+  overwhelmingly small: of 2977 deaths on `main`, **2128 carried nothing at all and
+  470 carried exactly 1 ore** — and `floor(1 × 0.5 / 1)` is **zero chunks**. A ship
+  dying with one ore on `main` today drops *nothing*. So the shipped half-drop was
+  never a half: it returned **30.3 %** of the ore that died. a0-59 takes that to
+  100 %, and the richer field then puts 1.46× more ore at risk per death, which is
+  where the last factor comes from.
+
+The hold-at-death distribution, which is the load-bearing evidence and had never
+been looked at (deaths, by the whole ore the ship was carrying, 24 seeds):
+
+| hold at death | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|---|---|
+| `main` (0.5) | 2128 | 470 | 218 | 101 | 39 | 12 | 9 | 0 | 0 |
+| a0-59 (1) | 2195 | 608 | 297 | 155 | 86 | 19 | 7 | 0 | 1 |
+| chunks dropped under 0.5 | 0 | **0** | 1 | 1 | 2 | 2 | 3 | 3 | 4 |
+| chunks dropped under 1 | 0 | **1** | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+
+**Internal cross-check.** Applying `floor(hold × 0.5 / CHUNK.ore)` to `main`'s own
+histogram row predicts **448** ore dropped — exactly the 448 the ledger reported,
+from a completely separate code path. The hold sampling and the drop model agree to
+the unit, so neither is a mis-read instrument (the failure mode that produced five
+wrong numbers in `docs/wave-commons-entombment.md`'s history).
+
+**Ships die nearly empty.** 71 % of deaths on `main` carry no ore at all and a
+further 16 % carry a single unit — the hold is a thing you fill and then run home
+with, so it is empty most of the time a fight can find it. Any rule keyed to the
+hold at the moment of death is therefore decided by the 0-and-1 buckets, not by the
+full-hold case everyone reasons about.
+
+This is not a criticism of a0-58 — the floor is correct and is deliberately kept
+(see below). It is the reason the "twice" figure understates the shipped delta, and
+nobody would find it without running both builds.
+
+#### What actually moved, and what did not
+
+- **Total ore in the economy did NOT rise.** Mean live ore is flat within 1 %
+  (230.45 → 228.64). The 1031 ore that used to burn at deaths did not become 1031
+  extra ore in play — it was absorbed almost exactly by a **+970 rise in `spent`**.
+  The sink did not disappear; **it migrated from an invisible sink to a
+  player-facing one.** Ore now leaves the economy because somebody chose to buy
+  something, instead of because somebody died.
+- **The field's standing puddle of loose ore is up only ~14 %**, and ~16 % during
+  collapse — not double, and nowhere near 4.8×. The 4.8× is *throughput*: chunks
+  are dropped far more often and picked up nearly as fast. Anyone budgeting for
+  "the map will be carpeted at collapse" should budget +16 %, not +100 %.
+- **Mining barely moved (+4 %).** The extra ore in circulation is recycled, not
+  newly cut, so `FIELD_YIELD` and the abundance table are doing the same job they
+  were tuned to do. This is the most reassuring number in the table.
+- **Ore now moves faster through every stage:** looted +34 %, banked +27 %, built
+  +25 %, deaths +13 %. The economy runs hotter without holding more.
+
+Concretely, and stated for the balance crew rather than buried:
+
+- **Contested space is worth more — but not the space this sentence used to
+  name.** A fight used to burn most of whatever the loser was carrying — 69.7 % of
+  it, once a0-58's floor is counted; now every ore either pilot held survives the
+  exchange and lies there for whoever holds the ground afterwards. That much is
+  confirmed and now measured (**79.4 % of a death's ore reaches a pilot who is not
+  the one who lost it**, up from 70.9 %). What is *not* true, on either build, is
+  the "fight in the asteroid field" this bullet used to open with: **92.5 % of
+  death-drop ore lands outside the field entirely.** See *Where the ore actually
+  lands* below.
+- **Killing a *lightly* loaded miner is what changed most, not the fat hauler.**
+  This is the opposite of the intuition and it falls straight out of the floor. A
+  hold of 8 dropped 4 chunks before and drops 8 now: a clean 2×. A hold of 1
+  dropped **nothing** before and drops 1 now: an infinite ratio. Because 470 of
+  `main`'s 2977 deaths carried exactly 1 ore, while a full hold of 8 was carried
+  into death **zero** times on `main` and once on this branch across all 24 seeds,
+  the aggregate is dominated by the small holds. **The fat
+  hauler's death was always the one that paid; a0-59 is mostly a buff to killing
+  everyone else.** Interception is up across the board, but the *marginal* value of
+  hunting a full hold specifically rose the least of any hold size.
+- **Collapse: circulation is up sharply, standing stock is not.** The field-yield
+  figure (~400, times the abundance multiplier) is a *mint* budget and it is
+  untouched — and measured, mining moved only +4 %, so `FIELD_YIELD` and the
+  abundance table are still doing the job they were tuned for. What rose is the
+  rate ore changes hands (+34 % looted), not the amount lying about: loose ore
+  during collapse is **+16 %**. §2.8's passive-match and mined-out bounds are worth
+  a re-measure, but the expected movement is small.
+- **The sink did not thin out — it moved.** `deathLoss` is now **0** for an
+  ordinary death, and `spent` rose by +970 against the 1031 that used to burn:
+  within 6 % of a straight swap. The brake on the ore supply is now almost entirely
+  *what players choose to buy*, which is a **visible, player-controlled** sink
+  where the old one was invisible and involuntary. That is arguably the most
+  interesting consequence of the ruling and it was not predicted anywhere.
+
+That is the intended consequence — the developer asked for it — and it is a
+balance change, not a bug fix.
+
+#### Where the ore actually lands — MEASURED (a0-59, eighteenth session)
+
+The paragraph above says *contested space is worth more* and GDD §2.3's amendment
+adds *interception beats hauling*. Both are claims about **place** — they assume
+the ore lands where the fight was and falls to whoever holds that ground — and
+neither had been measured. The aggregate (4.8×) says how much ore a death returns;
+it says nothing about where it goes or who ends up with it.
+
+Measured on 12 seeds, full natural eight-slot matches run to their own ending, on
+**both real builds** (this branch, and a detached worktree at `origin/main`
+`221a2b1` — neither arm is a hand-flipped constant). Every chunk a death lays down
+is tagged at spawn and followed until a ship takes it; the taker is the ship whose
+`lootTake` fired nearest the chunk that tick.
+
+| | `main` (0.5) | a0-59 (1) |
+|---|---|---|
+| deaths carrying ore | 401 | 639 |
+| death-drop ore tracked | 199 | 1153 |
+| **share landing INSIDE the asteroid field** | **10.6 %** | **7.5 %** |
+| median death distance from map centre | 621.6 u | 639.0 u |
+| — against a field radius of | ~307 u | ~307 u |
+| **recovered by someone OTHER than the dead pilot** | **70.9 %** | **79.4 %** |
+| recovered by the dead pilot themself | 19.6 % | 15.4 % |
+| never recovered at all | 9.5 % | 5.3 % |
+| of the "by other" share, taken by the **nearest station's owner** | 36.2 % | 45.2 % |
+
+**1. The ore does not land in the asteroid field, and never did.** On both builds
+roughly nine tenths of it falls *outside* the field radius, on the station ring —
+median 639 u from centre against a ~307 u field. The "a fight in the asteroid
+field" framing was inherited, not measured, and it is wrong about place on `main`
+too. This is a description error a0-59 did not introduce and does not fix; it is
+corrected here because the balance crew will otherwise budget the extra ore into
+the wrong part of the map.
+
+**2. "Contested space is worth more" survives, in its strongest form.** The ore
+genuinely changes hands and does so more than before: the share reaching a pilot
+other than the one who lost it rises 70.9 % → **79.4 %**, the dead pilot recovers
+less of their own (19.6 % → 15.4 %), and far less is left lying (9.5 % → **5.3 %**).
+This is the one claim in that paragraph that is both true and now evidenced.
+
+**3. "Interception beats hauling" is the weakest of the four claims, and reads
+closer to a defender's buff.** Of the ore that changes hands, the share taken by
+the owner of the *nearest home station* rises 36.2 % → **45.2 %** — dying on
+somebody's approach hands them your hold on their doorstep. Combined with the
+hold-at-death histogram above (a full hold of 8 was carried into death **zero**
+times on `main` across 24 seeds), what a0-59 pays out is **combat attrition near
+stations, not intercepted cargo**. The ore a0-59 adds that did not exist before —
+the holds of 1 that `main`'s floor minted as nothing — is the most extreme case of
+all: **1.9 %** of it lands in the field.
+
+**Caveats, stated rather than buried.**
+- The tagger caught **97.2 %** (a0-59) and **97.1 %** (`main`) of the exact drop
+  predicted by `floor(hold × fraction / CHUNK.ore)` per death. The ~3 % missed is
+  chunks tractored in the same tick they spawn — which are disproportionately the
+  *killer's*, so the "recovered by other" share above is a **floor**, not a
+  ceiling.
+- Self-calibrating control: on `main`, 227 deaths carried exactly 1 ore and must
+  drop nothing (`floor(1 × 0.5) = 0`). The tagger attributed **1** ore to them — a
+  false-positive rate of ~0.4 % of deaths, which is the noise floor on every figure
+  in the table.
+- **"Near an enemy home" is partly geometric and is NOT claimed as a finding.**
+  Eight stations on a 768 u ring sit ~588 u apart, so any point on that ring is
+  within ~294 u of some station before anyone dies there. The two robust numbers —
+  the in-field share and the recovery split — have no such confound; the
+  raw "305 u from the nearest enemy home" figure does, and is not load-bearing
+  anywhere above. (LESSONS: do not read an instrument's verdict as the thing
+  itself — the failure mode behind five wrong numbers in
+  `docs/wave-commons-entombment.md`'s history.)
+
+### `deathLoss` is kept, at zero, on purpose
+
+The bucket is **not** deleted. It remains the sink for anything undropped: the
+sub-`CHUNK.ore` quantisation leftover (a0-58), and any future ore that leaves a
+hold without reaching the field. A ledger with no sink for a flow cannot stay
+conserved the day that flow reappears, and `expectedLiveOre` subtracts it either
+way — a zero term costs nothing and an absent term costs the invariant.
+
+### The sink, MEASURED — and the trigger was named wrong (nineteenth session)
+
+The paragraph above is the DoD's reasoning, and for eighteen sessions it was
+*reasoning*: nobody had ever made the flow reappear and checked that the ledger
+survived it. Doing so took one sweep — `DEATH_ORE_DROP_FRACTION` × `CHUNK.ore`
+over {1, 0.5} × {1, 2, 3}, six full natural eight-slot matches per arm run to
+their own ending, residual sampled every tick, ~4,700 deaths in all. The fraction
+arms are a real file edit and were restored exactly (`git diff -- src/` empty);
+the chunk arms mutate `CHUNK.ore` at runtime, which works because `as const` is
+compile-time only.
+
+| fraction | `CHUNK.ore` | ore at death | `deathLoss` | share burned | max residual |
+|---|---|---|---|---|---|
+| **1** (shipped) | 1 | 526 | **0.00** | **0 %** | 6.8e-13 |
+| **1** | 2 | 486 | **0.00** | **0 %** | 4.5e-13 |
+| **1** | 3 | 99 | **0.00** | **0 %** | 8.2e-13 |
+| 0.5 (`main`) | 1 | 396 | **283** | **71.5 %** | 5.1e-13 |
+| 0.5 | 2 | 336 | 274 | 81.5 % | 6.3e-13 |
+| 0.5 | 3 | 78 | **78** | **100 %** | 5.7e-13 |
+
+**Two things it settles and one it corrects.**
+
+1. **The sink is load-bearing, not decorative.** At `main`'s fraction it carries
+   283 of the 396 ore that died. Deleting it — which "it is always 0 now" invites —
+   opens a hole of that size the instant anyone tunes the fraction back.
+2. **Conservation holds in every arm**, residual ≤ 6.3e-13 against a 1e-6
+   tolerance, sink present. The DoD's claim is now evidenced.
+3. **`CHUNK.ore` does not arm the sink, and this file said it did.** Measured
+   0.00 burned across 2,358 deaths at chunk sizes 1, 2 *and* 3. The reason is
+   structural rather than lucky: a0-58 quantised **every** boundary a hold has —
+   the tractor takes `room` floored to whole `CHUNK.ore` (`step.ts`), the drain
+   returns `k · CHUNK.ore` (`dueThisTick`), and all four mint sites emit exactly
+   `CHUNK.ore` — so `cargo` is always an exact multiple of the chunk size (pinned
+   across all three paths by `ore-ledger.test.ts`, *"cargo is never a non-multiple
+   of CHUNK.ore"*). A whole-hold drop therefore divides exactly at any chunk size.
+   The algebra: for a hold of `n` chunks, `deathLoss / held = (n − ⌊n·f⌋) / n`, in
+   which the chunk size **cancels**.
+
+**Why the correction matters in both directions.** Against this branch: the guard
+rests on **one** knob, not the two it claimed, so it is less exercised than
+advertised. For the balance crew: `CHUNK.ore` is therefore **safe to tune** on this
+path — it cannot open a death-drop leak. But the two knobs *interact*, and that had
+never been named: the chunk size scales what the floor destroys **once the fraction
+is off 1**. At `0.5` a hold of a single chunk returns nothing at all, and a chunk is
+`CHUNK.ore` ore — which is why the 0.5 × 3 arm burns **100 %** of everything that
+died. A half-drop at a bigger chunk is a *total* burn for any hold under two chunks.
+
+Pinned by `src/sim/damage.test.ts`, *'the sink is armed by the fraction alone —
+CHUNK.ore cannot re-arm it'*, which asserts the cancellation across chunk sizes 1–4
+and therefore still passes at a fraction of 0.5 (verified) — the relationship, not
+today's value.
+
+*Independent cross-check of the seventeenth session:* the 0.5 × 1 arm returns
+**28.5 %** of a dead hold on these six seeds against the **30.3 %** measured over
+24 seeds there, on different seeds and a different instrument.
+
+### a0-58's whole-ore invariant is kept, and this is the point
+
+This brief mostly *dissolves* the case that motivated a0-58: at a fraction of 1 the
+drop equals the hold, and a whole hold divides into whole chunks with nothing over,
+so no remainder piece is ever minted. The rounding still runs; it subtracts zero.
+
+It stays anyway. `DEATH_ORE_DROP_FRACTION` is TUNABLE, and the fraction returning to
+anything but 1 re-creates the remainder in a single edit — measured above, at 283
+ore over six matches. The invariant is what makes that edit safe instead of a silent
+leak, and deleting a guard because today's value happens to make it a no-op is
+precisely the failure four star-bloom rounds paid to learn (LESSONS §26: assert the
+relationship, not today's value). `src/sim/damage.test.ts` gates both rules in one
+file for the same reason.
+
+*(This paragraph used to add "or `CHUNK.ore` moving off 1" as a second trigger.
+It is not one — see the measured section above.)*
+
+### The sink's OTHER advertised flow does not exist — and auditing that found a flow with no sink at all (twentieth session)
+
+The DoD's reason for keeping `deathLoss` names two things it is the sink for: *"a
+quantisation leftover, ore lost out of bounds"*. The nineteenth session measured the
+first. The second was never checked, and it is **not a mechanic this sim has.**
+
+There is no world bound that destroys ore. Chunks drift under `CHUNK.drag` and are
+removed on exactly one condition — being emptied by a tractor
+(`src/sim/step.ts`, `chunks.filter(c => c.amount > 1e-9)`); asteroids are removed
+only once `chipAsteroid` has drained the sub-chunk tail into `dust`; and nothing
+anywhere culls ore by position. The claim had propagated into one repo site
+(`src/sim/damage.test.ts`), which is corrected. A guard advertising a flow that
+cannot happen is the mirror of the `CHUNK.ore` error above: it invites the next
+agent to trust the guard for a reason that is not real, or to hunt a leak that
+is not there.
+
+**The audit that answered it is the finding.** Asking "which flows destroy ore, and
+is each one named?" meant enumerating every ore-destroying path in `src/sim/` and
+checking it against the ledger's four sinks. All of them name themselves — except
+one.
+
+`refreshDerivedStats` and `applyPurchasedStats` (`src/sim/upgrades.ts`) clamp
+`cargo` down to `cargoCap` when a ceiling lands under a loaded hold, and write **no
+ledger bucket**. Measured on a real `createWorld`, one loaded ship:
+
+| | value |
+|---|---|
+| cargo cap before → after | 8 → 3 |
+| ore destroyed by the clamp | **5** |
+| change in `oreResidual` | **−5** |
+| `spent` / `deathLoss` / `capLoss` / `dust` | **0 / 0 / 0 / 0** |
+
+That is a black hole of precisely the class this ledger exists to catch (the p2c
+loot-regression pattern in `src/sim/ore-ledger.ts`'s header) — with the crucial
+difference that **it has never fired.** A cap cannot fall within a match as the sim
+stands: `shipClass` is never written after world-build, `tiers` is only ever `+= 1`
+(`buyUpgrade`), and the ladder adds off a non-negative base. So conservation holds
+exactly today, which is why nineteen sessions of ledger work never saw it.
+
+*One caveat, so this is not overclaimed.* Two float-hygiene floors also destroy ore
+without a bucket — `if (ship.cargo < 1e-9) ship.cargo = 0` in `spendOre`
+(`src/sim/buildings.ts`) and in the atmosphere drain (`src/sim/step.ts`). They are
+**bounded by 1e-9 per event** against a conservation tolerance of 1e-6, they exist
+to stop a rounding tail showing as a non-zero hold, and `src/sim/ore-journal.ts`
+already names them. They are not sinks in any meaningful sense; the cargo clamp,
+which can destroy whole units, is. Every other path is accounted: `spendOre` →
+`spent`, `killShip` → `dropped` + `deathLoss`, `scatterWreckDebris` → `dropped` +
+`capLoss`, `chipAsteroid` → `dust`, the drain and the bank order → `deposited`, and
+an eliminated player's bank is passed *into* the wreck scatter rather than dropped
+on the floor (`destroyCore`, `src/sim/match.ts`).
+
+**Not fixed, deliberately.** `refreshDerivedStats(ship)` is world-free by design —
+it is called on hand-built loadouts, including from `src/net/prediction.ts`, which
+is not this lane's — so accounting there means threading a `world` through a
+signature another lane consumes. That is unratified scope on a path that cannot
+currently leak. What is in scope is making the invariant that holds it shut
+*visible*: it is now pinned by **`src/sim/upgrades.test.ts` → *a hold ceiling only
+ever rises***. Verified as a real detector, not decoration — shortening the cargo
+ladder so a cap falls turns it red naming the relationship (*"cap fell from tier 2
+to 3"*), and the constant was restored with `git diff` verified empty.
+
+Two things for whoever does arm it. `tierOf` (`src/sim/upgrades.ts`) already
+contemplates half of this scenario — it clamps a tier a shortened ladder stranded,
+so the stat is not `NaN` — but the ore the same retune eats has no such guard. And
+the Netcode lane has already met the clamp from the other side:
+`src/net/lifecycle.test.ts`'s `parkForBanking` warns that over-filling a fixture
+"does not test a big deposit, it tests the clamp, and the ore above the line
+vanishes at the first snapshot", because `applyPlayerEconomy` writes
+`ship.cargo = economy.held` and then calls `refreshDerivedStats`. On a client whose
+build does not know a track (tiers "ignored rather than invented"), a smaller
+derived cap silently eats the difference. That is a prediction-side divergence
+rather than authoritative ore loss, and it is **flagged, not touched** — `src/net/`
+is not this lane's.
+
+### Determinism goldens re-measured
+
+The same three fixtures a0-58 moved move again — they pin absolute state hashes of
+a simulation, and this is a simulation rule change. Each says re-baselining
+requires a ratified amendment recorded in this file; this entry is that. They are
+flagged to their owners in the PR and moved in their own commits, old values kept:
+
+| Fixture | Owner | Was (a0-58) | Is (a0-59) |
+|---|---|---|---|
+| `src/bots/ffa-parity.test.ts` seed 20260806 | Bot | `f31d2c3b` | `f290517f` |
+| `src/bots/ffa-parity.test.ts` seed 7 | Bot | `2400ba7e` | `b8c73690` |
+| `src/bots/ffa-parity.test.ts` seed 991 | Bot | `b891918a` | `84fd2ef2` |
+| `tests/net/online-radio.test.ts` `FFA_GOLDEN` | Netcode | `c5ad2324` | `53aa6f97` |
+
+This is the **second** move in a day for all four — a0-58 moved them hours earlier
+and this branch is stacked on it. That is two ratified amendments, not a loosening
+of the bar: each fixture's own rule is "a ratified developer amendment recorded in
+this file", and both entries are in this file. The move is larger than a0-58's, not
+smaller: every ship death in an eight-bot match now lays down twice the chunks, so
+the field diverges from the first kill onward.
+
+What those fixtures actually guard — that no team-aware path is reachable in FFA —
+is untouched and still asserted by their own non-hash cases.
+
+### Two the sweep missed, in this lane's own scope — found late, fixed
+
+The paragraph below used to open *"the sweep is clean in `src/sim/` and `docs/`"*.
+It was not, and the two it missed are worth naming rather than quietly correcting,
+because both survived a `DEATH_ORE_DROP_FRACTION` grep for the same reason: **they
+say "half" without naming the constant**, so only a prose sweep finds them.
+
+| Site | Said | Why it survived |
+|---|---|---|
+| `docs/gdd-conformance.md`, the **§2.7** table | *"Half the held ore drops where you exploded"* — verdict **SHIPPED**, evidence `constants.ts:981` | The **§2.3** row two tables up *was* corrected, and §2.7's GDD prose was amended too; only this conformance row was left. Its line reference was stale as well — the constant is at `:1032`. |
+| `content/codex/codex-systems.json`, `sys-collection-field` | *"…risk hauling a fat hold through contested space where a death spills **half** of it"* | The sweep corrected `sys-death-debris`, the entry *about* death, and its pinned numeric fact. This sentence is in the entry about **banking**, and no test pins body prose. |
+
+The conformance one is the more serious of the two by some way. It is not a stale
+comment — it is a **conformance table certifying, as SHIPPED, a behaviour the
+shipped code does not have**, in the exact document a future agent consults to ask
+"what does this build actually do?" A row like that does not merely fail to record
+the ruling; it is affirmative in-repo evidence for reverting it. The codex one is
+smaller but is **player-facing**: it told the player, in the game, that they lose
+half a hold on death, which is now simply untrue.
+
+Both are fixed. Neither moves code, a constant, or a golden.
+
+### Stale half-drop prose in four other lanes' files — flagged here, not edited
+
+Outside `src/sim/`, `docs/` and `content/`, four comments in files this lane does
+not own still tell the reader a dead ship burns half its hold:
+
+| Site | Says | Owner |
+|---|---|---|
+| `src/bots/hard.ts:214` | *"a dead ship drops half its hold to the player who just earned it (GDD §2.7)"* | Bot |
+| `src/net/transport.ts:661` | *"a ship can die on authority (half its hold lost, GDD §2.3)"* | Netcode |
+| `src/net/ore-authority.test.ts:452, :469` | *"half the hold bursts as debris"*; *"Half the hold to the field, half destroyed with the ship"* | Netcode |
+| `src/main.ts:4555` | *"…respawnTimer set, half the hold dropped"* | App shell |
+
+**None of them is a failing test and none is a behaviour bug** — that is exactly
+why they are easy to miss and worth writing down. The `ore-authority` case is a
+test whose *comments* are false while its assertions (`loose > 0`, residual
+conserved) still hold and still earn their keep. The others are doc-comments.
+They are left untouched because `src/bots/`, `src/net/` and the app shell are not
+this lane's to edit, and a stale comment is not the kind of red that justifies
+reaching across a boundary — the determinism goldens above were, and that is the
+line between the two.
+
+Two notes for whoever picks them up, so the fix is a one-liner and not a session:
+
+- **`hard.ts`'s retreat rationale survives the amendment and gets stronger.** It
+  breaks off at 20% hull *because dying costs the hold*; at a fraction of 1 the
+  whole hold now lands in front of whoever earned the kill, so the incentive it
+  encodes is larger than when it was written. The comment needs the word "half"
+  changed. The behaviour does not need review. (Its *other* clause — "to the
+  player who just earned it" — is loose in both builds: the drop goes to the
+  **field**, and `ore-authority.test.ts` asserts in so many words that the killer
+  is handed nothing. Pre-existing, not a0-59's doing.)
+- **`transport.ts`'s "half its hold lost" was already wrong before a0-59**, in a
+  way the amendment does not so much change as expose. `killShip` sets
+  `ship.cargo = 0` unconditionally (`src/sim/damage.ts`), so a death has always
+  cost the pilot the *entire* hold; the fraction only ever governed how much of it
+  came back as field chunks. The divergent-death drift that passage is actually
+  documenting is therefore about the whole hold, not half of it, and always was —
+  it is a slightly *bigger* accounting hole than the comment claims, on both
+  builds.
+
+### A fifth lane nobody had swept: `src/progression/`
+
+The sweep above widened from `src/sim/` to `docs/`, `content/`, then to `src/bots/`,
+`src/net/` and the app shell. It never reached **`src/progression/`**, which is
+neither this lane's nor in the flagged set above, and which carries three more
+half-drop sites — plus two of its own briefs in `docs/`, which *are* in this
+brief's stated sweep scope and are therefore fixed here.
+
+| Site | Says | Owner | Action |
+|---|---|---|---|
+| `src/progression/accrual.test.ts:287` | test **named** *"does not read the half-hold sink at a death as ore spent"*, with an inline *"half dropped, half destroyed with the hull"* | UI (p1-04) | flagged |
+| `src/progression/accrual.ts:109` | `oreUsed` doc-comment — *"The half-hold sink at a ship death …"* | UI | flagged |
+| `src/progression/accrual.ts:454` | *"Across a ship death it is the half-hold sink (GDD §2.3)"* | UI | flagged |
+| `spikes/progression/measure-ratified-xp.ts:303` | *"a drop across a death is the half-hold sink, which is not \"ore used\""* — the spike `accrual.ts` was derived from | UI / spike | flagged |
+| `evidence/images/boards/index.json`, scene 9 caption | *"But **half your hold** is now loose in space for anyone."* — an art review board describing the mechanic | Art (a2-08) | flagged |
+| `docs/briefs/pr-04-accrual-and-xp.md:76` | brief test 5 — *"The half-hold sink at a ship death does not appear in `oreUsed`"* | — | **fixed** |
+| `docs/briefs/pr-02-attribution-hook.md:93` | *"…spawn protection, the half-hold drop and the respawn clock"* | — | **fixed** |
+
+`src/progression/accrual.test.ts` is owned by the UI Engineer (its own header says
+so), so those code sites are flagged, not edited — the same line drawn for the
+four above. **The sweep is now closed on both axes and is recorded here as such:**
+identifier (`DEATH_ORE_DROP_FRACTION`), English prose (`half`, `half-hold`,
+`ore sink`, `half-burn`), and numeric forms (`50%`, `one-half`, `halved`,
+`0.5 of the hold` — all clean), run over the **whole repo** rather than the
+directories the brief names. Nine stale sites exist in total, across six lanes;
+all nine are tabled here or above, and every one of them is a comment, a test
+name, a spike or a caption — **none is a failing test and none is a behaviour
+bug.** **All 15 of its tests pass**, verified on this branch: the rule they
+pin (`oreUsed` counts a drop in hold+bank only while hull *and* home live, so a
+death is excluded) is independent of the fraction and is correct on both builds.
+Only the naming is stale — and a *test name* asserting the half-hold sink is the
+strongest form of the hazard this document exists to prevent, because it reads as
+a specification.
+
+### The consequence nobody had named: ore-mined XP no longer converges
+
+`oreMined` is Σ positive Δ`ship.cargo`, and `accrual.ts:100` is explicit that this
+counts **mined and scavenged alike** ("ore is ore", GDD §2.7, plan §1.1) —
+deliberate, and not something a0-59 changes. What a0-59 changes is the *magnitude*,
+and it changes it in kind rather than degree.
+
+Measured end-to-end on this branch (mint 2 ore into a hold, kill the ship, fly a
+second ship onto the drop and let the real tractor collect):
+
+| | minted | dropped | scavenged | total `oreMined` credited |
+|---|---|---|---|---|
+| one death→scavenge cycle at fraction **1** | 2 | 2 | 2 | **4 — a 2.0× credit ratio** |
+
+One mined unit is credited once to the miner, then again in full to each scavenger
+after each death. At fraction `f` the credit for one minted unit is the geometric
+series `1/(1−f)`: at **0.5** it converged to a hard ceiling of **2.0×** however many
+times the ore changed hands. At **1** there is no decay — each death→scavenge cycle
+adds a **full** `1.0×`, so the total is `1 + k` in cycles `k` and is bounded only by
+match length and hold size, not by the ore actually minted.
+
+This is not a sim bug and the ore ledger is untouched: the *field* conserves ore
+exactly, tick by tick, on both builds. It is the **progression metric** built on top
+of it that loses its bound. Nobody has to act on it today — p1-04's XP weights are
+not shipped balance — but the balance crew should have it before they tune ore-mined
+XP against a contested board, because a kill-and-rescavenge loop is now a
+repeatable, lossless XP source and at `f = 0.5` it provably was not.
+
+### What did NOT change
+
+- **Banked ore.** Still never lost to a ship death (GDD §2.7). The cost of dying is
+  time and position; a0-59 makes it *less* than that, not more.
+- **The wreck.** A dead **station**'s debris field is funded by the owner's bank
+  and capped by `WRECK.maxDebrisChunks` (`capLoss`); that is a different rule and
+  is untouched.
+- **Whole-ore minting, the hold cap, the full-hold refusal, the drain rate, the
+  chunk size.** All as a0-58 left them.
+- **The wire, the hash schema, and `Ship`.** Nothing added to any of them.
+
+---
+
 ## Ore is a countable thing: every mint is WHOLE, and a hold can never hold half of one
 
 **Date:** 2026-08-16 · branch `agent/gameplay/a0-58-whole-ore-only`
@@ -17,6 +621,11 @@ atmosphere drain banks *a whole ore at a time* at the same `2 ore/s`, and the
 conservation list gains one named sink (`dust`). **No rate, cost, cap, fraction or
 capacity changes**: `DEATH_ORE_DROP_FRACTION` is still 0.5, `DEPOSIT.drainRate` is
 still 2, `CHUNK.ore` is still 1 and still TUNABLE.
+
+> **Superseded in part, same day — see a0-59 above.** `DEATH_ORE_DROP_FRACTION` is
+> **1** as of 2026-08-16: the developer withdrew the half-drop hours after this
+> entry landed. Everything else here stands, and the whole-ore invariant this entry
+> exists for is deliberately kept — it is what makes the fraction safe to tune.
 
 ### The ratification, verbatim
 
@@ -110,7 +719,10 @@ invariant and named the other one here.
 ### What did NOT change
 
 - **The half-drop.** `DEATH_ORE_DROP_FRACTION` is untouched; half a hold still
-  drops, now rounded down to what the ring can mint whole.
+  drops, now rounded down to what the ring can mint whole. *(**Overturned the same
+  day by a0-59** — the fraction is 1 and the whole hold drops. The rounding this
+  bullet describes is unchanged and still runs; it simply has nothing to round on
+  the shipped numbers.)*
 - **The drain rate.** `DEPOSIT.drainRate` is untouched, and the metronome cannot
   outrun it — the boundaries belong to the world, so no dwell pattern banks faster
   than `drainRate`. What phase costs is at most one boundary's wait on arrival.
@@ -508,6 +1120,12 @@ decision with no ratification. They are listed in the PR body as questions, not
 taken. In particular **a kill never gives you what the victim was holding** — half
 their hold is destroyed with the hull (GDD §2.3, working as designed) — and if the
 expectation is otherwise, that is a rules change and needs saying out loud.
+
+> **Answered 2026-08-16 (a0-59).** It was said out loud: *"destroyed ships should
+> drop all their ore, no more 1/2 the ore stuff"*. The second of the three balance
+> questions this entry left open is now settled the other way —
+> `DEATH_ORE_DROP_FRACTION` is **1**, and a kill does give you what the victim was
+> holding. The other two (`cargoCap`, ignoring the cap on pickup) are still open.
 
 ---
 

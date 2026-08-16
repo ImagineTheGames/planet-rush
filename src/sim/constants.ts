@@ -536,9 +536,45 @@ export const WAVE = {
   asteroidsPerWave: 20,
   /** Wave 1's scatter disc, as a fraction of the base field radius. */
   firstRadiusFraction: 1.0,
-  /** The final wave's scatter disc, same units. Strictly smaller than the
-   *  first: the shrinking ring *is* the mechanic. */
-  lastRadiusFraction: 0.25,
+  /**
+   * The final wave's scatter disc, same units. Strictly smaller than the
+   * first: the shrinking ring *is* the mechanic.
+   *
+   * **0.5 since 2026-08-16 (a0-65); it was 0.25, and 0.25 entombed the map
+   * centre on 100 seeds out of 100.** The commons is a ring of
+   * `asteroidsPerWave` rocks of radius `ASTEROID.minRadius..maxRadius`, and a
+   * ring has a circumference. At 0.25 the final wave's rocks were drawn onto a
+   * ring of radius 65 u — circumference 410 u — while the 24 rocks stamped onto
+   * it need 24 × 2 × 34 = 1632 u of arc before a single ship-wide corridor is
+   * asked for. The wave could not be a ring at that radius; it could only be a
+   * solid plug over the centre. Measured by flood fill of free configuration
+   * space (`./waves.test.ts`): the centre sealed at wave 4 on 96 of 100 seeds
+   * and at wave 3 or 5 on the rest — **every seed, not a rare one** — and a
+   * hull caught inside was entombed for the rest of the match (the standing
+   * `tests/harness/unstuck.test.ts` gate, seed 15: 133.5 s pinned).
+   *
+   * 0.5 is the smallest value that, together with the ring-corridor size taper
+   * below, leaves the centre escapable on 100 of 100 seeds with margin. The
+   * mechanic survives: the field still closes 2× over the match (307 u → 154 u
+   * at 8 players), every wave still lands strictly closer in than the last, and
+   * the wave ore is untouched — `drawCanon` scales ore to the wave budget
+   * independently of radius or rock size, so this is geometry only, not economy.
+   * TUNABLE
+   */
+  lastRadiusFraction: 0.5,
+  /**
+   * How much rock arc a wave's ring may carry, as a multiple of its own
+   * circumference, before `./waves`'s `ringSizeScale` starts shrinking the rocks.
+   *
+   * Above 1.0 because rocks are scattered across a *band* (`[inner, disc]`), not
+   * a wire: they stagger radially, so a ring can be oversubscribed on paper and
+   * still be woven through. 1.7 is calibrated against the flood fill rather than
+   * derived — the centre stays escapable on 100/100 seeds at 1.6 and 1.7, and
+   * fails on 9 of 24 at 1.8, so this sits one step inside the measured cliff.
+   * Raising it un-tapers the late waves and re-seals the centre; lowering it
+   * shrinks late rocks further for no measured gain. TUNABLE
+   */
+  ringCorridorAllowance: 1.7,
 } as const;
 
 /**
@@ -587,18 +623,42 @@ export const RESOURCE_FIELD = {
    *  the centre — GDD §2.3's whole "pulled into a smaller and smaller contested
    *  space" — could be **sealed** by a full ring of body-radius rocks it could not
    *  squeeze past (the harness caught a bot rattling >100 s inside one, the
-   *  `unstuck` invariant). A bigger eye pushes the innermost ring out to a radius
-   *  whose circumference actually admits a ship-wide gap, so the centre still
-   *  draws players in but never traps them; the 50-seed soak's worst wedge fell
-   *  from ~13 s to ~4 s, back in the honest detect-and-escape band. It is strictly
-   *  MORE clearance than 0.75 — the launch-corridor guarantee above only gets
-   *  stronger — and costs the fairness invariant nothing (still `N`-fold
-   *  symmetric, still the same `WAVE_ORE`). TUNABLE */
+   *  `unstuck` invariant). ~~A bigger eye pushes the innermost ring out to a
+   *  radius whose circumference actually admits a ship-wide gap, so the centre
+   *  still draws players in but never traps them~~ — **that claim is FALSE and is
+   *  corrected below (a0-59).** The 50-seed soak's worst wedge really did fall
+   *  from ~13 s to ~4 s, and the raise is strictly MORE clearance than 0.75 and
+   *  costs the fairness invariant nothing (still `N`-fold symmetric, still the
+   *  same `WAVE_ORE`) — but it did NOT make the innermost ring passable.
+   *
+   *  **MEASURED, a0-59 (2026-08-16). Do not raise this further expecting a fix;
+   *  it was never the right knob.** At wave 5 the ring needs `24 × 2 × 34` =
+   *  1632 u of rock arc and its circumference is 446 u — **3.66× oversubscribed**
+   *  (and >1× from wave 2 on). One ship-wide corridor plus all 24 rocks needs a
+   *  ring radius of **276 u**; wave 5's sits at **71 u**. This fraction is bounded
+   *  by 1.0 and tops out at 77 u, so no value of it — and no rearrangement of the
+   *  rocks, angular or radial — can open a corridor. All 0.75 → 0.85 did was grow
+   *  the genuinely-free eye from ~10 u to **19.3 u**, which is why the wedge got
+   *  shorter (a ship rattles in a bigger pocket and sometimes escapes inside the
+   *  12 s limit) but never went away: `unstuck` still catches it on ~1.25% of
+   *  seeds, on `main` as well as off it. The knobs with real travel are late-wave
+   *  rock SIZE or COUNT; both are design calls (GDD §5.5 ties rock size to a
+   *  payout the player can judge), so this is briefed separately rather than
+   *  tuned here — see `docs/wave-commons-entombment.md` for the measured
+   *  geometry, the incidence on `main`, and the three costed candidates. TUNABLE */
   commonsHoleFraction: 0.85,
   /** Angular clearance (radians) kept around every station spoke WITHIN the
    *  commons: a wave's rocks sit only in `[gap, sectorWidth − gap]` of their
    *  `2π/N` sector, so no rock lands on a launch corridor. Clamped below
-   *  `sectorWidth/2` for small lobbies so the band never inverts. TUNABLE */
+   *  `sectorWidth/2` for small lobbies so the band never inverts.
+   *
+   *  **Caveat measured in a0-59: this is an ANGLE, so the linear clearance it buys
+   *  scales with the ring it is applied to** — `eye × sin(gap)` is 84.6 u at wave 1
+   *  but only **21.2 u at wave 5**, against the `SHIP_RADIUS + ASTEROID.maxRadius`
+   *  = 62 u that `commonsHoleFraction`'s note above promises. The guarantee is
+   *  already broken at wave 3 (52.9 u). Widening this constant cannot repair it:
+   *  the required gap exceeds the `sectorWidth × 0.45` clamp long before the
+   *  corridor opens, and the ring is oversubscribed with rock anyway. TUNABLE */
   commonsSpokeGap: 0.33,
   /** Canonical rocks per home field (before the `N`-fold stamp). TUNABLE */
   homeCount: 3,
@@ -983,8 +1043,54 @@ export const WRECK = {
   maxDebrisChunks: 40,
 } as const;
 
-/** Fraction of held ore dropped as debris on ship death (GDD §2.3, §2.7). TUNABLE */
-export const DEATH_ORE_DROP_FRACTION: Tunable<number> = 0.5;
+/**
+ * Fraction of held ore dropped as debris on ship death (GDD §2.3, §2.7).
+ *
+ * **1 since 2026-08-16 (a0-59), by developer ruling** — *"destroyed ships should
+ * drop all their ore, no more 1/2 the ore stuff"*. It was `0.5` from M1, and the
+ * unshed half was a real ore sink in the ratified design; the developer withdrew
+ * that sink, so the whole hold now reaches the field. GDD §2.3/§2.7/§2.8 are
+ * amended to match (`docs/design-amendments.md`) — the doc and the constant do not
+ * disagree, because a constant that silently contradicts the design doc is how the
+ * next agent "restores" it.
+ *
+ * What this does to the economy, stated so the balance crew reads it as a change
+ * rather than discovering it — and **measured** on 24 full matches on both builds,
+ * because the estimate that used to sit here ("twice the ore") was too low by
+ * ~2.4×. A kill returns **4.8× more ore** than it does on the pre-a0-59 build, not
+ * 2×: the 2× is against the GDD's rule, but the *shipped* half-drop returned only
+ * **30.3 %** of a dead hold, because a0-58's whole-chunk floor meets a
+ * hold-at-death distribution in which 71 % of deaths carry nothing and 16 % carry
+ * exactly 1 ore — and `floor(1 × 0.5 / 1)` is zero chunks. Total ore in play is
+ * nevertheless flat (−0.8 %) and mining moved +4 %: the sink did not vanish, it
+ * **migrated to `spent`** (+970 against the 1031 that used to burn). Intended.
+ * Full table and method: `docs/design-amendments.md`.
+ *
+ * Where it lands, measured separately and also against the intuition: **92.5 % of
+ * death-drop ore falls outside the asteroid field**, on the station ring — on the
+ * pre-a0-59 build too, so that part is an inherited description error and not this
+ * ruling's doing. What the ruling moves is who ends up with it: ore reaching a
+ * pilot other than the one who lost it 70.9 % → **79.4 %**, ore never collected
+ * 9.5 % → **5.3 %**, and of the ore that changes hands the share taken by the
+ * nearest station's owner 36.2 % → 45.2 %. Closer to a defender's buff than to a
+ * buff to intercepting haulers.
+ *
+ * Still TUNABLE, and still not assumed to be 1 anywhere: `killShip` mints whole
+ * `CHUNK.ore` pieces and sinks the sub-chunk remainder (a0-58), which is a no-op
+ * at `1` with a whole hold and the thing that keeps the ledger honest the moment
+ * this moves off `1`. Assert the relationship, not today's value (LESSONS §26).
+ *
+ * **This knob arms that sink; `CHUNK.ore` does not** — a claim this comment made
+ * until it was measured (2026-08-16). Holds are exact multiples of `CHUNK.ore` by
+ * a0-58's construction, so a whole-hold drop divides exactly at every chunk size:
+ * 0.00 ore burned across 2358 deaths at `CHUNK.ore` 1, 2 and 3, against 283 of 396
+ * burned on the same seeds at a fraction of `0.5`. So conservation rests on ONE
+ * knob, not two, and `CHUNK.ore` is safe to tune on this path. What the chunk size
+ * does is scale the damage once THIS leaves `1`: at `0.5` a hold of a single chunk
+ * returns nothing at all, and that chunk is `CHUNK.ore` ore — so the ore a
+ * half-drop silently destroys grows with the chunk. TUNABLE
+ */
+export const DEATH_ORE_DROP_FRACTION: Tunable<number> = 1;
 
 // `SENSOR_RANGE` — RETIRED 2026-08-07 (a0-05, GDD §2.2/§2.8 amended).
 //
@@ -1375,12 +1481,34 @@ export const SHIP_ASTEROID_RESTITUTION: Tunable<number> = 0.8;
  * itself, off the sim's own ground truth, for EVERY ship (bot or human) and
  * EVERY solid body. When a ship is in contact with a body, pressing inward, and
  * has been reduced to near-stillness by that contact, the sim gives it a
- * tangential slide along the surface — it can never *stay* pinned, whatever
- * heading its pilot keeps asking for. It slides around/off the rim and its
+ * tangential slide along the surface. It slides around/off the rim and its
  * steering re-approaches from open space (the report's "nudge tangentially,
  * re-approach"). This is the physics floor; a bot keeping its arrival points
  * outside a body (`safeAnchorRadius`, `./anchors`) is the behavioural fix that
  * stops the ship ever reaching this state — belt and braces.
+ *
+ * **The scope of that floor, measured (a0-59). This comment used to promise a
+ * ship "can never *stay* pinned, whatever heading its pilot keeps asking for".
+ * That is false, and it is false in a way worth stating precisely, because it
+ * is exactly what talks the next agent into tuning `WEDGE_SLIDE_*` at a bug the
+ * knob cannot reach.** The hatch defeats *pinning against a surface* — a hull
+ * pressed on one body with open space behind it. It cannot defeat *enclosure*:
+ * a hull sealed inside a pocket smaller than its own escape needs has no exit
+ * for any tangent to find, and the hatch's search is over directions, not over
+ * space it can make.
+ *
+ * Instrumented on the standing failure (`tests/harness/unstuck.test.ts` seed 15,
+ * slot 2, wedged 133.5 s at the map centre; `docs/wave-commons-entombment.md`):
+ * across the 12600 ticks of the wedge the hull is in contact on **12599**, has
+ * the hatch armed and sliding on **12402 (98.4%)**, cycles all **four** of the
+ * quarter-turn directions below — the entire bounded search, over and over —
+ * and averages **68.7 u/s** doing it. It is not motionless and the hatch is not
+ * failing to fire; it is at full stretch. The most open the hull's clearance to
+ * any rock surface ever gets, anywhere in that pocket, is **5.5 u** against a
+ * `SHIP_RADIUS` of 16. There is no direction with an exit, so a bigger
+ * `WEDGE_SLIDE_KICK` or a longer `WEDGE_SLIDE_RUN_S` only reaches the wall
+ * sooner. That defect is map geometry (the commons ring is oversubscribed with
+ * rock 3.66× at wave 5) and it is fixed there or not at all.
  */
 
 /**

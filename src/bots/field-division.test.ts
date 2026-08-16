@@ -622,10 +622,31 @@ describe('two economies stop doing one economy\'s work', () => {
     // same match. With both Stage 3 mechanisms the ally figure lands at 8.0% /
     // 8.4% against a control of 7.2% / 7.4%: the ratio closes from ~2× to ~1.1×.
     //
-    // Pooled over three seeds here rather than run on one, for the reason
-    // `./ally-defence.test.ts` records: two builds do not produce the same match
-    // with a small difference, they produce different matches.
-    const runs = [11, 23, 37].map((s) => contention(s, 300));
+    // Pooled over a 1–24 seed SCAN rather than a handful, for the reason
+    // `./ally-defence.test.ts` records at length: two builds do not produce the
+    // same match with a small difference, they produce different matches.
+    //
+    // **It used to be three seeds — 11, 23, 37 — and that was the defect**, the
+    // same one `./ally-defence.test.ts` records fixing when it went from one seed
+    // to eight. Three is not a sample of this quantity. Per seed the ally/foe
+    // ratio ranges **0.04 to 3.8** on unmodified code (foe-contention rates near
+    // zero make individual ratios explode), so which three matches you happen to
+    // draw decides the answer. Measured on the a0-59 build, pooling seeds 1..n:
+    //
+    //   n=3 1.20 · n=6 1.61 · n=8 1.89 · n=12 1.67 · n=16 1.41 · n=24 **1.19**
+    //
+    // — it is still wandering at n=12 and settles by n=20. Ratio-of-totals and
+    // mean-of-ratios agree at every n to within 0.1, so this is genuine
+    // match-to-match variance and not an estimator artifact. Twenty-four
+    // 300-second runs cost a few seconds, which is `./ally-defence.test.ts`'s
+    // own bargain: cheap, for an assertion that means what it says.
+    //
+    // A plain 1..24 scan rather than a chosen set, deliberately: a hand-picked
+    // list is exactly how three seeds came to flatter this measurement.
+    //
+    // **The threshold below is untouched at 1.6.** Widening the pool strengthens
+    // the instrument; it does not lower the bar.
+    const runs = Array.from({ length: 24 }, (_, i) => i + 1).map((s) => contention(s, 300));
     const ally = runs.reduce((a, r) => a + r.ally, 0) / runs.length;
     const foe = runs.reduce((a, r) => a + r.foe, 0) / runs.length;
 

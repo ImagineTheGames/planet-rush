@@ -32,7 +32,7 @@
       "title": "The collection field — banking without docking",
       "category": "systems",
       "summary": "Fly into your own station's field and your hold drains into the safe banked total.",
-      "body": "Held ore is not safe; banked ore is. You bank simply by flying into your own station's collection field — the ring of space around it — and while your ship sits inside that radius the hold drains steadily into your banked total, one chunk visibly couriering from ship to station per unit banked. Leave the ring and it stops. No docking, no parking, no button. Docking closer still opens the Build & Upgrade wheel, whose BANK segment dumps the whole hold in a single tap for a pilot in a hurry. The choice the drain forces is how full to run: dart home early and safe, or risk hauling a fat hold through contested space where a death spills half of it.",
+      "body": "Held ore is not safe; banked ore is. You bank simply by flying into your own station's collection field — the ring of space around it — and while your ship sits inside that radius the hold drains steadily into your banked total, one chunk visibly couriering from ship to station per unit banked. Leave the ring and it stops. No docking, no parking, no button. Docking closer still opens the Build & Upgrade wheel, whose BANK segment dumps the whole hold in a single tap for a pilot in a hurry. The choice the drain forces is how full to run: dart home early and safe, or risk hauling a fat hold through contested space where a death spills all of it.",
       "tags": ["banking", "economy", "collection-field"],
       "see_also": ["sys-ore-economy", "sys-death-debris"],
       "facts": [
@@ -158,13 +158,13 @@
       "id": "sys-death-debris",
       "title": "Death, respawn, and the wreck",
       "category": "systems",
-      "summary": "Ships die cheap; you drop half your hold and respawn in five seconds — stations do not.",
-      "body": "Dying in a ship is cheap: you respawn at your home station in five seconds with every upgrade intact, so the cost of death is time and position, not progress. But you drop half your held ore where you exploded — banked ore is never touched — so a full hold is a gamble and a fresh spill is a scramble. Stations are the opposite of cheap. When a core dies its wreck persists for the whole match, ringed by ore-laden debris funded by the dead player's own banked fortune, so the thing they were hoarding becomes the thing their killers fight over. Small holds mean nobody hauls a dead rival's fortune away in one trip, so wreck sites stay contested — a feature, not a bug. On the compass and diamond maps at small player counts, the empty home slots are seeded as derelicts: unowned abandoned rigs carrying a scavengeable ore field from the opening whistle. They are nobody's enemy and take no siege damage — just contested loot.",
+      "summary": "Ships die cheap; you drop your whole hold and respawn in five seconds — stations do not.",
+      "body": "Dying in a ship is cheap: you respawn at your home station in five seconds with every upgrade intact, so the cost of death is time and position, not progress. But you drop every ore you were holding where you exploded — banked ore is never touched — so a full hold is a gamble and a fresh spill is a scramble, and killing a loaded miner hands the field everything they were carrying. Stations are the opposite of cheap. When a core dies its wreck persists for the whole match, ringed by ore-laden debris funded by the dead player's own banked fortune, so the thing they were hoarding becomes the thing their killers fight over. Small holds mean nobody hauls a dead rival's fortune away in one trip, so wreck sites stay contested — a feature, not a bug. On the compass and diamond maps at small player counts, the empty home slots are seeded as derelicts: unowned abandoned rigs carrying a scavengeable ore field from the opening whistle. They are nobody's enemy and take no siege damage — just contested loot.",
       "tags": ["death", "respawn", "wreck", "derelict", "loot"],
       "see_also": ["sys-collection-field", "strat-wrecks", "sys-spawn-protection"],
       "facts": [
         { "label": "Respawn time", "value": 5, "unit": "s", "constant": "RESPAWN_S" },
-        { "label": "Fraction of held ore dropped on death", "value": 0.5, "unit": "fraction", "constant": "DEATH_ORE_DROP_FRACTION" }
+        { "label": "Fraction of held ore dropped on death", "value": 1, "unit": "fraction", "constant": "DEATH_ORE_DROP_FRACTION" }
       ]
     },
     {

@@ -70,7 +70,27 @@ const SLOTS = 8;
 /** The seat the human flies. Slot-position fairness is p8's question, already
  *  pinned there; one seat keeps this sweep affordable. */
 const HUMAN = 3;
-const SEEDS = Array.from({ length: 10 }, (_, i) => i + 1);
+/**
+ * The seeds every sweep pools over.
+ *
+ * **Widened 10 → 24 on 2026-08-16 (a0-59, Gameplay lane — flagged for the Bot
+ * Engineer).** Ten was not a sample of the A/B gate at the foot of this file. On
+ * the a0-59 build the shipped-roster arm read **1.146** at ten seeds and **0.971**
+ * at twenty-four — a swing far larger than the ±10% the gate is trying to resolve,
+ * and on the wrong side of it. The pre-a0-59 build moves the same way (0.876 at
+ * twenty-four), so this is the estimator settling, not a build difference.
+ *
+ * That is the same defect `src/bots/ally-defence.test.ts` records fixing when it
+ * went from one seed to eight, for the same recorded reason: two builds do not
+ * produce the same match with a small difference, they produce entirely different
+ * matches, so a small pool measures the draw and not the trend. **No threshold
+ * below was touched** — 0.12 and 1.1 are exactly as ratified; only the sample they
+ * are computed from got big enough to mean them.
+ *
+ * It costs about a minute of CI (41s → 100s for this file). That is
+ * `ally-defence`'s own bargain: cheap, for an assertion that means what it says.
+ */
+const SEEDS = Array.from({ length: 24 }, (_, i) => i + 1);
 /** Sim seconds per match. Long enough to clear spawn protection, run several ore
  *  waves, and let the cast go looking for fights. */
 const MATCH_SECS = 180;

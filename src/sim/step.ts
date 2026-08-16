@@ -251,8 +251,10 @@ export function step(world: World, inputs: Inputs, dt: number = TICK_DT): World 
   // 5. Ship-vs-asteroid and ship-vs-station reflection (GDD §4.1), then the
   //    persistent-grind escape hatch (developer report p14): a hull pressed into
   //    a body and held near-still by it accrues grind-time; once it crosses
-  //    `WEDGE_CONTACT_S` it is slid off the rim so it can never stay pinned. The
-  //    contact accumulator is reused across ships to keep the loop allocation-free.
+  //    `WEDGE_CONTACT_S` it is slid off the rim. (Off a *rim*: the hatch beats
+  //    pinning against a surface, not enclosure inside a pocket too small to
+  //    leave — measured, a0-59, see `WEDGE_SLIDE_SPEED`'s comment.) The contact
+  //    accumulator is reused across ships to keep the loop allocation-free.
   const contact: WedgeContact = { pressedIn: false, nx: 0, ny: 0 };
   for (const ship of world.ships) {
     if (!ship.alive) continue;
@@ -971,7 +973,7 @@ function targetPos(world: World, hit: AimTarget): Vec2 {
 // so mining, combat, and the "you cannot shoot through things" rule all fall out
 // of the one collision. Ore chunk drift + the proximity tractor stay below.
 
-// Ship damage, death, and the half-hold ore drop live in `./damage`, shared
+// Ship damage, death, and the whole-hold ore drop live in `./damage`, shared
 // with turret fire (`./buildings`) so both killers agree exactly (GDD §2.7).
 
 // ---------------------------------------------------------------------------
@@ -1277,8 +1279,8 @@ function updateDepositFlight(chunk: OreChunk, dt: number): void {
  * can quietly cost a player a tier they paid for (GDD §2.5).
  *
  * The bank is never lost to a ship death either, so the cost of dying stays
- * exactly what the design says it is: time, position, and the half-hold already
- * dropped as debris where you exploded (`killShip`).
+ * exactly what the design says it is: time, position, and the hold already dropped
+ * as debris where you exploded (`killShip` — all of it since a0-59, GDD §2.3).
  */
 function respawn(ship: Ship): void {
   ship.alive = true;

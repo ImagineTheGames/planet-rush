@@ -343,6 +343,23 @@ export interface DerivedStatsTarget extends ShipLoadout {
  * "upgrades persist through respawn" (GDD §2.5) structural rather than a promise
  * that respawn merely doesn't break: the ceilings are re-derived from the tiers
  * the player still owns.
+ *
+ * THE CARGO CLAMP DESTROYS ORE AND WRITES NO LEDGER BUCKET (noted a0-59,
+ * 2026-08-16). It is the only ore-destroying path in `src/sim/` that does not name
+ * itself in `./ore-ledger` — `spent`, `deathLoss`, `capLoss` and `dust` are the
+ * whole of the accounted set. Measured on a real world: dropping a loaded ship's
+ * cap from 8 to 3 destroyed 5 ore and moved `oreResidual` by exactly −5 with every
+ * sink bucket still zero.
+ *
+ * It has never fired, and cannot fire as the sim stands: a cap never falls within
+ * a match (`shipClass` is never written after world-build, `tiers` only ever
+ * `+= 1` in `./buildings`, and the ladder adds off a non-negative base). That
+ * unwritten invariant is what holds the hole shut, so it is now pinned by
+ * `./upgrades.test.ts` — *a hold ceiling only ever rises*. If that test goes red,
+ * ore has started vanishing off the books: give this clamp a ledger bucket before
+ * landing whatever armed it. Note the signature is deliberately world-free, so
+ * accounting here needs a `world` threaded in — which is why this is recorded
+ * rather than quietly patched.
  */
 export function refreshDerivedStats(ship: DerivedStatsTarget): void {
   ship.maxHull = shipMaxHull(ship);

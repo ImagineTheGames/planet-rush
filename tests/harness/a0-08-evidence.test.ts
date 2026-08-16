@@ -22,7 +22,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ShipClass } from '../../src/shared/types';
-import { TICK_DT, createWorld, damageShip, expectedLiveOre, liveOre, oreResidual, refreshDerivedStats, step } from '../../src/sim';
+import { DEATH_ORE_DROP_FRACTION, TICK_DT, createWorld, damageShip, expectedLiveOre, liveOre, oreResidual, step } from '../../src/sim';
 import type { PlayerSpec, Ship, World } from '../../src/sim';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -60,10 +60,12 @@ function stage(looterCargo: number): { world: World; victim: Ship; looter: Ship 
   looter.vel = { x: 0, y: 0 };
   victim.spawnProtect = 0;
   looter.spawnProtect = 0;
-  // A victim with one bought cargo tier: hold 4, so the half-drop is 2 and the
-  // partial case has something to be partial about (GDD §2.5).
-  victim.tiers.cargo = 1;
-  refreshDerivedStats(victim);
+  // The victim needs a drop of more than one chunk, so the partial case has
+  // something to be partial about. The base hold of 2 is enough since a0-59
+  // (2026-08-16): a destroyed ship drops ALL of it. Under the old half-drop this
+  // ship had to buy a cargo tier to shed 2, and the tier is dropped here rather
+  // than kept, so that the looter's hold is the only thing that varies between
+  // runs A, B and C — which is the whole point of the three-way comparison.
   // Holds filled rock → cargo, which conserves `liveOre` exactly: the residual
   // printed on every line below is honest from the first frame.
   fill(world, victim, victim.cargoCap);
@@ -98,7 +100,7 @@ function run(title: string, looterCargo: number): Run {
   const dropped = world.chunks.reduce((s, c) => s + c.amount, 0);
   lines.push(frame(world, looter, 'KILL'));
   lines.push(
-    `           the victim held ${victim.cargoCap} · DEATH_ORE_DROP_FRACTION=0.5 · ` +
+    `           the victim held ${victim.cargoCap} · DEATH_ORE_DROP_FRACTION=${DEATH_ORE_DROP_FRACTION} · ` +
       `${dropped} dropped as ${world.chunks.length} chunks, ${world.ledger!.deathLoss} destroyed with the hull (GDD §2.3)`,
   );
 
