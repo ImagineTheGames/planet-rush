@@ -494,7 +494,7 @@ testable, so each row below is checked against the thing a player would look at.
 | Claim | Verdict | Evidence |
 |---|---|---|
 | Respawn free and fast — 5 s at home, upgrades intact | **SHIPPED** | `RESPAWN_S = 5` `src/sim/constants.ts:961`. |
-| Half the held ore drops where you exploded; banked ore is never lost | **SHIPPED** | `src/sim/constants.ts:981`. |
+| **All** the held ore drops where you exploded; banked ore is never lost | **SHIPPED** | `DEATH_ORE_DROP_FRACTION = 1` `src/sim/constants.ts`. Read "half" until **2026-08-16 (a0-59)** — the same ruling the §2.3 row above records; §2.7's prose was amended with it and this row was not. Banked ore was never at risk and is unchanged (`killShip`, `src/sim/damage.ts`). |
 | Reactor death eliminates the owner and offers **Rematch** plus **spectate** | **SHIPPED** | `src/main.ts:1441–1462`, `:2686`, `rematch()` `:2723`. |
 | This holds in Teams — out even while your side plays on | **SHIPPED** | `src/sim/match.ts:142`. |
 | A wreck persists all match, surrounded by scavengable, owner-funded debris | **SHIPPED** | `src/sim/state.ts:456`, `:1073`. |

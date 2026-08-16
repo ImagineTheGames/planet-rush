@@ -110,12 +110,32 @@ the field diverges from the first kill onward.
 What those fixtures actually guard — that no team-aware path is reachable in FFA —
 is untouched and still asserted by their own non-hash cases.
 
+### Two the sweep missed, in this lane's own scope — found late, fixed
+
+The paragraph below used to open *"the sweep is clean in `src/sim/` and `docs/`"*.
+It was not, and the two it missed are worth naming rather than quietly correcting,
+because both survived a `DEATH_ORE_DROP_FRACTION` grep for the same reason: **they
+say "half" without naming the constant**, so only a prose sweep finds them.
+
+| Site | Said | Why it survived |
+|---|---|---|
+| `docs/gdd-conformance.md`, the **§2.7** table | *"Half the held ore drops where you exploded"* — verdict **SHIPPED**, evidence `constants.ts:981` | The **§2.3** row two tables up *was* corrected, and §2.7's GDD prose was amended too; only this conformance row was left. Its line reference was stale as well — the constant is at `:1032`. |
+| `content/codex/codex-systems.json`, `sys-collection-field` | *"…risk hauling a fat hold through contested space where a death spills **half** of it"* | The sweep corrected `sys-death-debris`, the entry *about* death, and its pinned numeric fact. This sentence is in the entry about **banking**, and no test pins body prose. |
+
+The conformance one is the more serious of the two by some way. It is not a stale
+comment — it is a **conformance table certifying, as SHIPPED, a behaviour the
+shipped code does not have**, in the exact document a future agent consults to ask
+"what does this build actually do?" A row like that does not merely fail to record
+the ruling; it is affirmative in-repo evidence for reverting it. The codex one is
+smaller but is **player-facing**: it told the player, in the game, that they lose
+half a hold on death, which is now simply untrue.
+
+Both are fixed. Neither moves code, a constant, or a golden.
+
 ### Stale half-drop prose in four other lanes' files — flagged here, not edited
 
-The sweep this amendment required (`DEATH_ORE_DROP_FRACTION`, "half", §2.3) is
-clean in `src/sim/` and `docs/` — every claim there was corrected in the same
-commits as the constant. It is **not** clean outside them. Four comments in files
-this lane does not own still tell the reader a dead ship burns half its hold:
+Outside `src/sim/`, `docs/` and `content/`, four comments in files this lane does
+not own still tell the reader a dead ship burns half its hold:
 
 | Site | Says | Owner |
 |---|---|---|

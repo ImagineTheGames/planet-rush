@@ -32,7 +32,7 @@
       "title": "The collection field — banking without docking",
       "category": "systems",
       "summary": "Fly into your own station's field and your hold drains into the safe banked total.",
-      "body": "Held ore is not safe; banked ore is. You bank simply by flying into your own station's collection field — the ring of space around it — and while your ship sits inside that radius the hold drains steadily into your banked total, one chunk visibly couriering from ship to station per unit banked. Leave the ring and it stops. No docking, no parking, no button. Docking closer still opens the Build & Upgrade wheel, whose BANK segment dumps the whole hold in a single tap for a pilot in a hurry. The choice the drain forces is how full to run: dart home early and safe, or risk hauling a fat hold through contested space where a death spills half of it.",
+      "body": "Held ore is not safe; banked ore is. You bank simply by flying into your own station's collection field — the ring of space around it — and while your ship sits inside that radius the hold drains steadily into your banked total, one chunk visibly couriering from ship to station per unit banked. Leave the ring and it stops. No docking, no parking, no button. Docking closer still opens the Build & Upgrade wheel, whose BANK segment dumps the whole hold in a single tap for a pilot in a hurry. The choice the drain forces is how full to run: dart home early and safe, or risk hauling a fat hold through contested space where a death spills all of it.",
       "tags": ["banking", "economy", "collection-field"],
       "see_also": ["sys-ore-economy", "sys-death-debris"],
       "facts": [
