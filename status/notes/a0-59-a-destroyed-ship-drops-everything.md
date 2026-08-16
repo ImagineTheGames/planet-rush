@@ -86,6 +86,17 @@ Consequences to know:
   *"entombed for the rest of the match"* was too strong and is corrected too.
   **No value moves.**
 
+- `4e4907c` **test(a0-59)** — `src/sim/damage.test.ts`, *'the sink is armed by the
+  fraction alone — `CHUNK.ore` cannot re-arm it'*. The DoD's REASON for keeping
+  `deathLoss` — "a ledger with no sink cannot stay conserved when one reappears" —
+  measured for the first time in nineteen sessions, and the trigger it names is
+  wrong. Asserts the cancellation across chunk sizes 1–4, so it survives a fraction
+  tune (verified at 0.5). See the nineteenth session in NEXT.
+- `8eb0c43` **docs(a0-59)** — the measurement, and the five stale copies of the
+  wrong claim: `src/sim/damage.ts` (×2), `constants.ts`, `ore-ledger.ts`,
+  `GDD.md` §2.3, `docs/design-amendments.md`, `docs/gdd-conformance.md` §2.8.
+  **All three sim files comment-only.** No value moves.
+
 **Verified green, not re-done, on 2026-08-16 (third session):** `npx tsc --noEmit`
 exits 0; the constant is `1`; `drops the whole hold` is present and exact; CI's own
 log for `96bfe7e` reads **299 of 300 test files passed**, the single failure being
@@ -96,16 +107,26 @@ log for `96bfe7e` reads **299 of 300 test files passed**, the single failure bei
 
 **Kept a0-58's whole-ore invariant, which this brief mostly dissolves.** At a
 fraction of 1 the drop equals the hold and a whole hold divides into whole chunks
-with nothing over, so the rounding subtracts zero today. It stays because both
+with nothing over, so the rounding subtracts zero today. It stays because
+`DEATH_ORE_DROP_FRACTION` is TUNABLE and moving it off 1 re-mints the remainder in
+one edit — **measured, nineteenth session: 283 of the 396 ore that died, at 0.5.**
+LESSONS §26 — assert the relationship, not today's value. **Do not delete the
+`pieces = Math.floor(...)` split because it currently rounds nothing.**
+
+**CORRECTED, nineteenth session:** this decision used to say *"both
 `DEATH_ORE_DROP_FRACTION` and `CHUNK.ore` are TUNABLE and either one moving off 1
-re-mints the remainder in one edit. LESSONS §26 — assert the relationship, not
-today's value. **Do not delete the `pieces = Math.floor(...)` split because it
-currently rounds nothing.**
+re-mints the remainder"*. **`CHUNK.ore` does not** — holds are whole chunks by
+a0-58's construction, so a whole-hold drop divides exactly at any chunk size
+(0.00 burned across 2,358 deaths at chunk sizes 1, 2, 3). The guard rests on ONE
+knob. What the chunk size does is scale the burn *once the fraction is off 1*.
 
 **Kept `deathLoss`, now 0 for an ordinary death.** Explicitly required by the DoD.
 It is the sink for anything undropped (quantisation leftover, ore lost out of
 bounds) and `expectedLiveOre` subtracts it either way; a zero term costs nothing,
-an absent term costs the conservation law.
+an absent term costs the conservation law. **The DoD's reason for this is now
+measured rather than assumed** (nineteenth session): with the sink present the
+ledger conserves in all six arms of a fraction × chunk-size sweep, residual
+≤ 6.3e-13, while the sink itself carries a live 283-ore term at a fraction of 0.5.
 
 **Rejected: touching `killShip`'s logic.** The one-line constant is the whole
 mechanical change. Anything else would be scope the developer did not ask for.
@@ -1409,6 +1430,111 @@ under it did not. Trust the measured table, not the prose around it.)*
     seventeenth lists still holds, plus: do not re-measure the spatial
     distribution — the table is in `docs/design-amendments.md` → *Where the ore
     actually lands*, run on both real builds with a self-calibrated tagger.
+    **The only thing still missing is the ruling.**
+
+- **2026-08-16, nineteenth session — what this one actually did.** Two commits,
+  **`4e4907c`** (a new test — the first behavioural addition since the fourteenth
+  session) and **`8eb0c43`** (comment-only sim edits + docs). The shipped a0-59
+  work is untouched and the blocker is unchanged in every particular. This session
+  followed the seventeenth and eighteenth sessions' lesson a third time: the
+  blocker is settled, so the question is what my **own DoD** asserts that nobody
+  has checked.
+  - **Re-verified, nothing redone:** local `HEAD` == `origin/…` == `3aebee0` at
+    start, `main` still `221a2b1` and **0 commits ahead**, `tsc --noEmit` exits 0,
+    the constant is `1` at `constants.ts:1048`, `drops the whole hold` at
+    `damage.test.ts:83`, both remote DoD greps pass against `FETCH_HEAD`. PR #436
+    open, UNSTABLE, **still no Director ruling** — six comments, all mine, zero
+    reviews. Did not escalate a seventh time. Did **not** re-measure the wedge, the
+    geometry, enclosure, the candidate fixes, separability, the economy aggregate
+    or the spatial distribution; sessions 12–18 say stop and they are right.
+  - **The finding: the DoD's stated reason for keeping `deathLoss` had never been
+    tested, and the reason as written names the wrong knob.** The DoD requires the
+    sink be kept because *"a ledger with no sink cannot stay conserved when one
+    reappears"*. For eighteen sessions that was reasoning. **Nobody had ever made
+    the flow reappear.**
+  - **Measured** — `DEATH_ORE_DROP_FRACTION` × `CHUNK.ore` swept over
+    {1, 0.5} × {1, 2, 3}, six full natural eight-slot matches per arm run to their
+    own ending, conservation residual sampled every tick, ~4,700 deaths in all.
+
+    | fraction | `CHUNK.ore` | ore at death | `deathLoss` | burned | max residual |
+    |---|---|---|---|---|---|
+    | **1** (shipped) | 1 | 526 | **0.00** | **0 %** | 6.8e-13 |
+    | **1** | 2 | 486 | **0.00** | **0 %** | 4.5e-13 |
+    | **1** | 3 | 99 | **0.00** | **0 %** | 8.2e-13 |
+    | 0.5 (`main`) | 1 | 396 | **283** | **71.5 %** | 5.1e-13 |
+    | 0.5 | 2 | 336 | 274 | 81.5 % | 6.3e-13 |
+    | 0.5 | 3 | 78 | **78** | **100 %** | 5.7e-13 |
+
+  - **Two things confirmed, one corrected.**
+    1. **The sink is load-bearing, not decorative** — 283 of the 396 ore that died,
+       at `main`'s fraction. Deleting it (which "it is always 0 now" invites) opens
+       a hole that size the instant anyone tunes the fraction back.
+    2. **Conservation holds in every arm**, residual ≤ 6.3e-13 against a 1e-6
+       tolerance. The DoD's claim is now evidenced rather than argued.
+    3. **`CHUNK.ore` does NOT arm the sink — and five places in the repo said it
+       did**, including `GDD.md` §2.3 and my own `constants.ts`/`damage.ts`
+       comments. 0.00 burned across **2,358 deaths** at chunk sizes 1, 2 and 3.
+       Structural, not lucky: a0-58 quantised *every* boundary a hold has — the
+       tractor floors `room` to whole `CHUNK.ore` (`step.ts`), the drain returns
+       `k · CHUNK.ore` (`dueThisTick`), all four mint sites emit exactly
+       `CHUNK.ore` — so `cargo` is always an exact multiple of the chunk size
+       (already pinned by `ore-ledger.test.ts:282`, across all three hold paths).
+       A whole-hold drop divides exactly at any chunk size. The algebra: for a hold
+       of `n` chunks, `deathLoss / held = (n − ⌊n·f⌋) / n`, and the chunk size
+       **cancels**.
+  - **Why the correction is worth a commit — it errs in BOTH directions.** Against
+    my own case: the guard the DoD insists on rests on **one** knob, not the two it
+    advertised, so it is less exercised than claimed. Reported anyway, same as the
+    fourteenth session's severity correction. For the balance crew: `CHUNK.ore` is
+    therefore **safe to tune** on this path.
+  - **And it hid a real interaction nobody had named.** The chunk size scales what
+    the floor destroys **once the fraction is off 1** — a hold of a single chunk
+    always returns nothing at 0.5, and a chunk is `CHUNK.ore` ore. Hence the
+    0.5 × 3 arm burning **100 %** of everything that died. So a future "put the
+    half back" costs progressively more ore as `CHUNK.ore` rises, and **the two
+    must be re-tuned together, not independently.** In `gdd-conformance.md` §2.8
+    where the balance crew already looks (session 11's lesson).
+  - **`4e4907c` — the new test, `'the sink is armed by the fraction alone —
+    CHUNK.ore cannot re-arm it'`** (`src/sim/damage.test.ts`). Asserts the
+    **cancellation** across chunk sizes 1–4, not today's zero — so it still passes
+    at a fraction of 0.5, **verified** by flipping the constant and running it
+    (`drops the whole hold` fails there, correctly, because its value is the point;
+    the new one passes). The value statement is kept separate and explicit, on the
+    same footing. This is LESSONS §26 applied to the correction itself.
+  - **`8eb0c43` — the five stale copies corrected**: `src/sim/damage.ts` (×2),
+    `src/sim/damage.test.ts`, `src/sim/constants.ts`, `GDD.md` §2.3, plus the
+    measurement into `docs/design-amendments.md` (*The sink, MEASURED*),
+    `docs/gdd-conformance.md` §2.8 and the `deathLoss` doc-comment in
+    `src/sim/ore-ledger.ts`. **All three sim files COMMENT-ONLY** — `git diff -U0`
+    over each, filtered of comment and blank lines, is empty.
+  - *Cross-check of the seventeenth session, unplanned:* the 0.5 × 1 arm returns
+    **28.5 %** of a dead hold on these six seeds, against **30.3 %** measured over
+    24 seeds there — different seeds, different instrument, same answer.
+  - **Method.** The `CHUNK.ore` arms mutate the constant object at runtime
+    (session 15's trick — `as const` is compile-time only, not `Object.freeze`);
+    only the fraction arms need a file edit, and `git diff -- src/` was verified
+    **empty** after each restore. Scratch probe under `tests/harness/` (twelfth
+    session's trap: vitest's `include` silently ignores the repo root),
+    **deleted**, `git status -- src/ tests/` verified empty.
+  - **The lesson, continuing the series.** Sessions 8/9/11/13/14/15/16/17/18
+    learned *sweep the English*, *sweep every directory*, *link the finding where
+    people look*, *a gate's threshold is a definition not a detector*, *do not read
+    an instrument's verdict as the thing itself*, *measure the remedy to the same
+    standard as the defect*, *check whether a blocker actually blocks what you
+    parked behind it*, *a blocker pulls attention off your own deliverable*, and
+    *audit ALL of your deliverable, not the one number that felt quantitative*.
+    This one is the next layer down: **audit the DoD's REASONS, not just its
+    checkboxes.** Every box was ticked and verified nineteen times. But "keep
+    `deathLoss`, because a ledger with no sink cannot conserve when one reappears"
+    is a *falsifiable claim*, not an instruction — and the version of it written
+    into five files named the wrong knob. A requirement's rationale is testable
+    exactly like its requirement, and it is the rationale a future agent reasons
+    from when they decide whether the guard still earns its place.
+  - **What a twentieth session should NOT do.** Everything in the twelfth through
+    eighteenth lists still holds, plus: do not re-sweep the sink — the table is in
+    `docs/design-amendments.md` → *The sink, MEASURED*, and the relationship is now
+    pinned by a committed test that runs in milliseconds, so re-run
+    `npx vitest run src/sim/damage.test.ts` instead of re-measuring anything.
     **The only thing still missing is the ruling.**
 
 ## BLOCKERS
