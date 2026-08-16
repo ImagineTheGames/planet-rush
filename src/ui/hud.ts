@@ -61,7 +61,9 @@ import type { OnboardingMemory, SpendFacts } from './onboarding';
 import type { ControlScheme } from './settings';
 import { computeWaveClock, formatClock } from './wave-clock';
 import { oreHudModel, oreFlashOn } from './ore-hud';
-import { oreHoldModel } from './ore-hold';
+import { oreHoldModel, ORE_HOLD_PIP, ORE_HOLD_SHIP_GAP } from './ore-hold';
+import { LootTellLatch } from './loot-tell';
+import type { DrawnLootTell } from './loot-tell';
 import { OreHoldView } from './ore-hold-view';
 import type { DrawnOreHold } from './ore-hold-view';
 import { controlsStripView, showControlsStrip } from './controls-strip';
@@ -196,6 +198,10 @@ const TYPE = {
   respawn: 24,
   /** A floating ore cost travelling to the bank. */
   costFloat: 18,
+  /** The partial-pickup line under the hold pips — `HOLD FULL · 1 LEFT` (a0-54).
+   *  Eyebrow-sized: it is a one-second footnote to the pip row above it, not a
+   *  readout of its own, and `hudType`'s 11px floor keeps it legible on a phone. */
+  lootTell: 12,
 } as const;
 
 /** The accent tick's height beside a prompt, as a fraction of the panel. */
@@ -324,6 +330,30 @@ export interface HudFrame {
    *  GDD §2.5) ⇒ "in combat" for the own-ship bar, matching the enemy rule.
    *  Default false. */
   readonly shipFiring?: boolean;
+  /**
+   * Ore that ARRIVED in the local ship's hold on this tick — the sim's
+   * `Ship.lootTake` (a0-08). Default 0.
+   *
+   * A ONE-TICK pulse, like {@link shipFiring}: the sim clears it at the top of
+   * every chunk step, and this frame's feed carries whatever the last step left.
+   * The HUD latches it ({@link ./loot-tell} `LootTellLatch`) so a pulse survives
+   * long enough to read, but a frame that ran two sim steps only ever sees the
+   * second — a partial take on the first is lost. That is the same sampling every
+   * per-tick tell in this feed has had since M1, and it is a dropped *tell*, never
+   * dropped ore: the hold, the pips and the ledger are all standing state.
+   */
+  readonly lootTake?: number;
+  /**
+   * Ore that was OFFERED to the local ship's hold on the same tick — the sim's
+   * `Ship.lootOffered` (a0-54), the full amount of every chunk that touched it
+   * before the hold's cap clipped the take. Default 0.
+   *
+   * The take is PARTIAL exactly when this exceeds {@link lootTake}, which is the
+   * one fact the HUD had no way to state: the player who "picked up two and only
+   * one registered" was reading a correct `+1` with nothing beside it to say a
+   * second ore had been on offer and their hold was full.
+   */
+  readonly lootOffered?: number;
   /** The hull the player picked in the lobby (GDD §2.11) — the upgrade panel's
    *  stat baseline. Default Vanguard, the onboarding default. */
   readonly shipClass?: ShipClass;
@@ -472,6 +502,13 @@ const NO_TEAMS: TeamTable = [];
  *  floats above where the ship sits (screen centre), CSS px. */
 const DEFAULT_SHIP_SCREEN_RADIUS = 14;
 
+/** Clearance between the hold pip row and the partial-pickup line under it, CSS
+ *  px (a0-54). Unscaled, exactly like the row's own {@link ORE_HOLD_SHIP_GAP}, so
+ *  the pair keeps one spacing rule between them at every frame size. */
+const LOOT_TELL_ROW_GAP = 5;
+/** Gap between the tell's muted reason and its ore-yellow count, CSS px. */
+const LOOT_TELL_WORD_GAP = 5;
+
 /** A mutable {@link Combatant} — the single own-ship record the HUD synthesises
  *  and overwrites in place each frame, so folding the local ship into the
  *  health-bar model allocates nothing after warm-up (GDD §4.3). */
@@ -545,6 +582,20 @@ export class Hud extends Container {
   /** The strip rows resolved for this frame — captured for the ?debug=1 live-stage
    *  seam so a test can assert the contextual Build legend on the real client. */
   private lastStripRows: readonly StripRow[] = [];
+
+  // --- Partial-pickup tell (at the ship, under the hold pips; a0-54) -------
+  //     One line, one second: the reason a pickup came up short, at the moment
+  //     it costs the player ore. The decision and the timing are pure
+  //     ({@link ./loot-tell}); these two Texts are only the paint.
+  private readonly lootTellGroup = new Container();
+  /** `HOLD FULL ·` — the reason, in the muted chrome tone (./chrome). */
+  private readonly lootTellReason: Text;
+  /** `1 LEFT` — an ore count, so it is ore yellow (style-guide §2). */
+  private readonly lootTellCount: Text;
+  private readonly lootTell = new LootTellLatch();
+  /** The line drawn this frame, or null — the ?debug=1 live-stage seam and
+   *  `hud.test.ts` read it back through {@link debugLootTell}. */
+  private lootTellDrawn: DrawnLootTell | null = null;
 
   // --- Onboarding prompt (bottom band, under the wheel) -------------------
   private readonly promptGroup = new Container();
@@ -750,6 +801,21 @@ export class Hud extends Container {
     this.oreGroup.x = PAD;
     this.oreGroup.y = PAD;
 
+    // The partial-pickup line (a0-54), in the SAME grammar as the readout above:
+    // a muted word for what happened, an ore-yellow numeral for the ore. The
+    // top-left says `ORE` in ./chrome's muted tone over a yellow total; this says
+    // `HOLD FULL ·` in that same tone beside a yellow `1 LEFT`. It is not a new
+    // tell language — it is the ore readout's, spoken at the ship.
+    //
+    // Yellow on the count is the RESERVED rule as written, not an exception to it
+    // (style-guide §2 allows "the ore HUD squares and banked total"): `1 LEFT` is
+    // a count of ore, and the ore it counts is genuinely still out there. The
+    // reason half takes no yellow at all — it is a word, not a quantity.
+    this.lootTellReason = this.makeText('', FONT_HEADING, TYPE.lootTell, TEXT_MUTED, 'normal', 'eyebrow');
+    this.lootTellCount = this.makeText('', FONT_NUMERAL, TYPE.lootTell, PALETTE.signalYellow, 'bold', 'name');
+    this.lootTellGroup.addChild(this.lootTellReason, this.lootTellCount);
+    this.lootTellGroup.visible = false;
+
     // Wave clock: three stacked, centre-anchored lines. All three take the `name`
     // tier — the wave is a proper noun and the two clocks are VALUES, which is
     // exactly what that tier is for. `eyebrow` was tried and rejected on
@@ -818,6 +884,10 @@ export class Hud extends Container {
       // entity's bar cluster (field request v0.2.1) — under all HUD chrome.
       this.nameplates,
       this.oreHold,
+      // The partial-pickup line hangs off the bottom of that pip row and is the
+      // same kind of thing — a ship-local status float — so it draws in the same
+      // band, over the world and under every piece of corner chrome (a0-54).
+      this.lootTellGroup,
       this.oreGroup,
       this.waveGroup,
       this.stationGroup,
@@ -912,6 +982,8 @@ export class Hud extends Container {
     set(this.stationLabel, TYPE.eyebrow, 'eyebrow');
     set(this.coreLabel, TYPE.coreValue, 'name');
     set(this.promptText, TYPE.prompt, 'label');
+    set(this.lootTellReason, TYPE.lootTell, 'eyebrow');
+    set(this.lootTellCount, TYPE.lootTell, 'name');
     set(this.respawnText, TYPE.respawn, 'label');
 
     // The ore cluster's two lines re-stack at the scaled sizes, so the leading
@@ -926,6 +998,7 @@ export class Hud extends Container {
   update(frame: HudFrame): void {
     this.frameTime = frame.time;
     this.updateOre(frame);
+    this.updateLootTell(frame);
     // The alarm runs first now, because three things downstream read its verdict:
     // the onboarding prompt is chosen by it (GDD §2.10's under-attack prompt) and
     // the own-ship health bar is forced on by it during a siege (field request
@@ -1070,6 +1143,93 @@ export class Hud extends Container {
    *  reads this to prove a drawn indicator tracks the ship with the right count. */
   debugOreHold(): DrawnOreHold | null {
     return this.oreHold.debugHold();
+  }
+
+  // --- The partial-pickup tell (a0-54) -------------------------------------
+
+  /**
+   * `HOLD FULL · 1 LEFT`, at the ship, for a second — on a PARTIAL take and on
+   * nothing else.
+   *
+   * The developer, 2026-08-16: *"I'm picking up two, but it only registers as one
+   * on my cargo."* Everything under that sentence was already correct — the hold
+   * caps the take at `min(chunk.amount, room)`, the remainder stays in the chunk
+   * for anyone (GDD §2.3), and the ledger records only what arrived — and none of
+   * it was ever said. `lootOffered` (a0-54) is the number that makes it sayable,
+   * and this is the one place it is spent.
+   *
+   * Three things it deliberately is not:
+   *
+   *  - **Not a second full-hold flash.** The pip row already flashes when the hold
+   *    is full ({@link ./ore-hud} `oreFlashOn`, drawn by {@link ./ore-hold-view}),
+   *    and a partial take always ends with a full hold — `take` is clipped by
+   *    `room`, so `cargo` lands exactly on `cargoCap` — which means that flash is
+   *    already firing on this frame. Checked, per the brief. This line adds the
+   *    REASON and nothing else; a second flash on the same fact is what was asked
+   *    against.
+   *  - **Not a per-pickup receipt.** A take that fits says nothing. The tell for a
+   *    pickup that worked is the pips filling; a line on every chunk is a line the
+   *    player learns to stop reading, and then it is not there when it matters.
+   *  - **Not a tutorial.** Onboarding's "Hold full" lesson (GDD §2.10) fires once,
+   *    early, on its own trigger, and is untouched by this — the two never share a
+   *    frame's worth of attention because this one is four words under the ship.
+   *
+   * Placed against the hold pips rather than against the ship: it hangs one gap
+   * below the row {@link ./ore-hold} draws, from the same ship radius, so the pips
+   * and their footnote read as one cluster however the ship is sized. Culled whole
+   * if it would spill off the canvas, which is what keeps its `full` registration
+   * honest (the discipline {@link ./ore-hold-view} uses for the row above it).
+   */
+  private updateLootTell(frame: HudFrame): void {
+    // Latch first, read second: the sim's tells are one tick wide, and the latch
+    // is what turns that pulse into something a player has time to read.
+    this.lootTell.note(frame.lootTake ?? 0, frame.lootOffered ?? 0, frame.time);
+    const tell = this.lootTell.read(frame.time);
+    if (!tell) {
+      this.lootTellDrawn = null;
+      this.lootTellGroup.visible = false;
+      return;
+    }
+
+    const m = this.metrics;
+    // The separator rides the muted half: it is punctuation between a word and a
+    // number, and punctuation is chrome, never ore (style-guide §2).
+    this.lootTellReason.text = `${tell.reason} ·`;
+    this.lootTellCount.text = tell.count;
+
+    const gap = hudSpace(LOOT_TELL_WORD_GAP, m);
+    const reasonW = this.lootTellReason.width;
+    const width = reasonW + gap + this.lootTellCount.width;
+    const height = Math.max(this.lootTellReason.height, this.lootTellCount.height);
+    this.lootTellReason.x = -width / 2;
+    this.lootTellReason.y = 0;
+    this.lootTellCount.x = -width / 2 + reasonW + gap;
+    this.lootTellCount.y = 0;
+
+    // Under the hold pip row, from the same ship radius and the same unscaled
+    // clearances the row itself uses — so the two never drift apart.
+    const radius = frame.shipRadius ?? DEFAULT_SHIP_SCREEN_RADIUS;
+    const x = this.screenWidth / 2;
+    const y = this.screenHeight / 2 + radius + ORE_HOLD_SHIP_GAP + ORE_HOLD_PIP + LOOT_TELL_ROW_GAP;
+    if (x - width / 2 < 0 || y < 0 || x + width / 2 > this.screenWidth || y + height > this.screenHeight) {
+      this.lootTellDrawn = null;
+      this.lootTellGroup.visible = false;
+      return;
+    }
+
+    this.lootTellGroup.x = x;
+    this.lootTellGroup.y = y;
+    this.lootTellGroup.alpha = tell.alpha;
+    this.lootTellGroup.visible = true;
+    this.lootTellDrawn = tell;
+  }
+
+  /** The partial-pickup line drawn this frame, or null when none is up — the
+   *  ?debug=1 live-stage seam and `hud.test.ts` read it back, so "the HUD said
+   *  so" is an assertion rather than a screenshot someone has to catch in the
+   *  one second it is on screen. */
+  debugLootTell(): DrawnLootTell | null {
+    return this.lootTellDrawn;
   }
 
   // --- Wave clock ----------------------------------------------------------
@@ -2245,6 +2405,10 @@ export class Hud extends Container {
     // node is null otherwise), and sized to the hub ring so it is thumb-sized.
     const hubBack = this.wheel.hubBackNode;
     if (hubBack) push('wheel-hub-back', 'center', 0, hubBack);
+    // The partial-pickup line: ship-local, so `full` like the bars, the hold pips
+    // and the alarm arrow. Registered only on the frames it is actually up —
+    // `shown()` covers that, since the group is hidden the rest of the time.
+    push('loot-tell', 'full', 0, this.lootTellGroup);
     push('alarm-frame', 'full', 0, this.alarmFrame);
     if (this.arrowDrawn) push('alarm-arrow', 'full', 0, this.alarmArrow);
     push('onboarding', 'full', PAD, this.promptGroup);
