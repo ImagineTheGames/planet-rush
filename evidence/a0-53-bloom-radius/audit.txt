@@ -1,0 +1,146 @@
+a0-53 — the star bloom, measured in rendered pixels
+====================================================================
+
+Every number is measured off a committed frame in ./frames, at the camera
+offset the client published: (-1328, -800). The design side is
+haloRadiusOf(BLOOM.intensity) — the preview's own rad*(5+13*inten) — scaled
+by the radius of the very star being measured, so neither side of the ratio
+is a constant agreeing with itself.
+
+THE DESIGN
+----------
+  BLOOM.intensity            0.48
+  haloRadiusOf(intensity)    11.24   = 5 + 13 x 0.48
+  BLOOM.radius               11.24   (agrees; NOT moved by this brief)
+  haloPeakAlphaOf(intensity) 0.20159999999999997   = 0.42 x 0.48
+  starHaloAlpha()            0.2016
+  halo curve                 three stops, knee 0.3095 of peak at t=0.35
+  star radius range          0.4 .. 2.45 px
+  bloom threshold            magnitude > 0.86
+  => a bloomed star's own r  (2.1630, 2.45]
+  => its halo radius         (24.31, 27.54] px
+  spike arm                  6.9688 x r  = 0.62 of the halo
+
+  The design gradient, as a fraction of its peak (haloProfile):
+    t         0.10   0.20   0.35   0.50   0.62   0.75   0.90   1.00
+    value    0.803  0.605  0.310  0.238  0.181  0.119  0.048  0.000
+
+  A ratio ABOVE 1 in the shipped table is not a wide halo: it is a star whose
+  surroundings are world content (a rock edge, a station arc) that the clean-
+  sky filter did not catch, so its light never comes back to ground. They are
+  left in rather than hand-dropped; the median is what the gate reads, and the
+  five uncontaminated stars agree with it at 0.666-0.695.
+
+  What that last row costs the measurement: past t=0.9 the design itself
+  carries under 5% of its peak, which over Floor is under one 8-bit code
+  value. A CORRECTLY drawn halo therefore measures a few per cent short of
+  its geometry, and every ratio below is read with that floor in mind.
+
+THE SHIPPED CLIENT (dist/, built by vite.config.ts)
+---------------------------------------------------
+  frame desktop-frozen-octagon.png  1280x800
+  deep  (1057,455)  star r 2.308   design  25.95 px   drawn  33 px   ratio 1.272
+  deep  ( 565, 58)  star r 2.269   design  25.51 px   drawn  17 px   ratio 0.666
+  deep  ( 601,244)  star r 2.212   design  24.87 px   drawn  17 px   ratio 0.684
+  mid   ( 596,593)  star r 2.235   design  25.12 px   drawn  17 px   ratio 0.677
+  mid   ( 712,673)  star r 2.448   design  27.52 px   drawn  19 px   ratio 0.690
+  mid   (1091,442)  star r 2.431   design  27.33 px   drawn  19 px   ratio 0.695
+  mid   ( 694,716)  star r 2.287   design  25.71 px   drawn  42 px   ratio 1.634
+  drawn/design: n=7  min 0.666  median 0.690  max 1.634
+
+REFERENCE - the real src/render Renderer, production-bundled
+------------------------------------------------------------
+  frame renderer-probe.png  1280x800
+  deep  ( 734,734)  star r 2.350   design  26.42 px   drawn  24 px   ratio 0.908
+  deep  ( 873,739)  star r 2.384   design  26.80 px   drawn  24 px   ratio 0.896
+  deep  (1191,687)  star r 2.227   design  25.03 px   drawn  22 px   ratio 0.879
+  deep  ( 565, 58)  star r 2.269   design  25.51 px   drawn  23 px   ratio 0.902
+  deep  ( 601,244)  star r 2.212   design  24.87 px   drawn  22 px   ratio 0.885
+  mid   ( 596,593)  star r 2.235   design  25.12 px   drawn  23 px   ratio 0.915
+  mid   ( 712,673)  star r 2.448   design  27.52 px   drawn  25 px   ratio 0.908
+  mid   (1091,442)  star r 2.431   design  27.33 px   drawn  25 px   ratio 0.915
+  drawn/design: n=8  min 0.879  median 0.908  max 0.915
+
+REFERENCE - VoidBackdrop through its own API, production-bundled
+----------------------------------------------------------------
+  frame prod-field-probe.png  1280x800
+  deep  (1057,455)  star r 2.308   design  25.95 px   drawn  24 px   ratio 0.925
+  deep  ( 734,734)  star r 2.350   design  26.42 px   drawn  24 px   ratio 0.908
+  deep  ( 873,739)  star r 2.384   design  26.80 px   drawn  24 px   ratio 0.896
+  deep  (1191,687)  star r 2.227   design  25.03 px   drawn  22 px   ratio 0.879
+  deep  ( 565, 58)  star r 2.269   design  25.51 px   drawn  23 px   ratio 0.902
+  deep  ( 601,244)  star r 2.212   design  24.87 px   drawn  22 px   ratio 0.885
+  mid   ( 596,593)  star r 2.235   design  25.12 px   drawn  23 px   ratio 0.915
+  mid   ( 712,673)  star r 2.448   design  27.52 px   drawn  25 px   ratio 0.908
+  mid   (1091,442)  star r 2.431   design  27.33 px   drawn  25 px   ratio 0.915
+  drawn/design: n=9  min 0.879  median 0.908  max 0.925
+
+REFERENCE - VoidBackdrop through its own API, dev server
+--------------------------------------------------------
+  frame field-offset0-at-game-offset.png  1280x800
+  deep  (1057,455)  star r 2.308   design  25.95 px   drawn  24 px   ratio 0.925
+  deep  ( 734,734)  star r 2.350   design  26.42 px   drawn  24 px   ratio 0.908
+  deep  ( 873,739)  star r 2.384   design  26.80 px   drawn  24 px   ratio 0.896
+  deep  (1191,687)  star r 2.227   design  25.03 px   drawn  22 px   ratio 0.879
+  deep  ( 565, 58)  star r 2.269   design  25.51 px   drawn  23 px   ratio 0.902
+  deep  ( 601,244)  star r 2.212   design  24.87 px   drawn  22 px   ratio 0.885
+  mid   ( 596,593)  star r 2.235   design  25.12 px   drawn  23 px   ratio 0.915
+  mid   ( 712,673)  star r 2.448   design  27.52 px   drawn  25 px   ratio 0.908
+  mid   (1091,442)  star r 2.431   design  27.33 px   drawn  25 px   ratio 0.915
+  drawn/design: n=9  min 0.879  median 0.908  max 0.925
+
+CONTROL - the SAME index.html, built by the probe config
+--------------------------------------------------------
+  frame prod-real-index-probeconfig.png  1280x800
+  deep  ( 873,739)  star r 2.384   design  26.80 px   drawn  39 px   ratio 1.455
+  deep  ( 565, 58)  star r 2.269   design  25.51 px   drawn  23 px   ratio 0.902
+  deep  ( 601,244)  star r 2.212   design  24.87 px   drawn  22 px   ratio 0.885
+  mid   ( 596,593)  star r 2.235   design  25.12 px   drawn  23 px   ratio 0.915
+  mid   (1091,442)  star r 2.431   design  27.33 px   drawn  25 px   ratio 0.915
+  drawn/design: n=5  min 0.885  median 0.915  max 1.455
+
+CONTROL - the booted client with the void soloed
+------------------------------------------------
+  frame game-solo-void.png  1280x800
+  deep  (1057,455)  star r 2.308   design  25.95 px   drawn  24 px   ratio 0.925
+  deep  ( 734,734)  star r 2.350   design  26.42 px   drawn  24 px   ratio 0.908
+  deep  ( 873,739)  star r 2.384   design  26.80 px   drawn  24 px   ratio 0.896
+  deep  (1191,687)  star r 2.227   design  25.03 px   drawn  22 px   ratio 0.879
+  deep  ( 565, 58)  star r 2.269   design  25.51 px   drawn  23 px   ratio 0.902
+  deep  ( 601,244)  star r 2.212   design  24.87 px   drawn  22 px   ratio 0.885
+  mid   ( 596,593)  star r 2.235   design  25.12 px   drawn  23 px   ratio 0.915
+  mid   ( 712,673)  star r 2.448   design  27.52 px   drawn  25 px   ratio 0.908
+  mid   (1091,442)  star r 2.431   design  27.33 px   drawn  25 px   ratio 0.915
+  drawn/design: n=9  min 0.879  median 0.908  max 0.925
+
+CONTROL - the bundled app booted from a page without the font faces
+-------------------------------------------------------------------
+  frame prod-app-clean.png  1280x800
+  deep  ( 565, 58)  star r 2.269   design  25.51 px   drawn  23 px   ratio 0.902
+  deep  ( 601,244)  star r 2.212   design  24.87 px   drawn  22 px   ratio 0.885
+  mid   ( 596,593)  star r 2.235   design  25.12 px   drawn  23 px   ratio 0.915
+  mid   (1091,442)  star r 2.431   design  27.33 px   drawn  25 px   ratio 0.915
+  drawn/design: n=4  min 0.885  median 0.915  max 0.915
+
+CONTROL - index.html verbatim, in the probe bundle
+--------------------------------------------------
+  frame prod-index-asis.png  1280x800
+  deep  ( 873,739)  star r 2.384   design  26.80 px   drawn  39 px   ratio 1.455
+  deep  ( 565, 58)  star r 2.269   design  25.51 px   drawn  23 px   ratio 0.902
+  deep  ( 601,244)  star r 2.212   design  24.87 px   drawn  22 px   ratio 0.885
+  mid   ( 596,593)  star r 2.235   design  25.12 px   drawn  23 px   ratio 0.915
+  mid   (1091,442)  star r 2.431   design  27.33 px   drawn  25 px   ratio 0.915
+  drawn/design: n=5  min 0.885  median 0.915  max 1.455
+
+THE ONE-FALLOFF CONTROL (no star, no neighbours, no 8-bit floor to speak of)
+---------------------------------------------------------------------------
+  A single circle, peak alpha 1, painted by the production drawSprite through
+  the production falloffRamp and rampMatrix:
+    ramp-halo-40.png       declared rx   40 px   drawn   39 px   ratio 0.9750
+    ramp-halo-80.png       declared rx   80 px   drawn   79 px   ratio 0.9875
+    ramp-halo-120.png      declared rx  120 px   drawn  119 px   ratio 0.9917
+    ramp-smooth-120.png    declared rx  120 px   drawn  117 px   ratio 0.9750
+
+  So the fill pipeline is exact: the ramp maps t to d/haloR and the halo
+  reaches zero at the rim the shape declared. The defect was never here.
+
