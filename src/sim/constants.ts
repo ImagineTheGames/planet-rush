@@ -587,18 +587,41 @@ export const RESOURCE_FIELD = {
    *  the centre — GDD §2.3's whole "pulled into a smaller and smaller contested
    *  space" — could be **sealed** by a full ring of body-radius rocks it could not
    *  squeeze past (the harness caught a bot rattling >100 s inside one, the
-   *  `unstuck` invariant). A bigger eye pushes the innermost ring out to a radius
-   *  whose circumference actually admits a ship-wide gap, so the centre still
-   *  draws players in but never traps them; the 50-seed soak's worst wedge fell
-   *  from ~13 s to ~4 s, back in the honest detect-and-escape band. It is strictly
-   *  MORE clearance than 0.75 — the launch-corridor guarantee above only gets
-   *  stronger — and costs the fairness invariant nothing (still `N`-fold
-   *  symmetric, still the same `WAVE_ORE`). TUNABLE */
+   *  `unstuck` invariant). ~~A bigger eye pushes the innermost ring out to a
+   *  radius whose circumference actually admits a ship-wide gap, so the centre
+   *  still draws players in but never traps them~~ — **that claim is FALSE and is
+   *  corrected below (a0-59).** The 50-seed soak's worst wedge really did fall
+   *  from ~13 s to ~4 s, and the raise is strictly MORE clearance than 0.75 and
+   *  costs the fairness invariant nothing (still `N`-fold symmetric, still the
+   *  same `WAVE_ORE`) — but it did NOT make the innermost ring passable.
+   *
+   *  **MEASURED, a0-59 (2026-08-16). Do not raise this further expecting a fix;
+   *  it was never the right knob.** At wave 5 the ring needs `24 × 2 × 34` =
+   *  1632 u of rock arc and its circumference is 446 u — **3.66× oversubscribed**
+   *  (and >1× from wave 2 on). One ship-wide corridor plus all 24 rocks needs a
+   *  ring radius of **276 u**; wave 5's sits at **71 u**. This fraction is bounded
+   *  by 1.0 and tops out at 77 u, so no value of it — and no rearrangement of the
+   *  rocks, angular or radial — can open a corridor. All 0.75 → 0.85 did was grow
+   *  the genuinely-free eye from ~10 u to **19.3 u**, which is why the wedge got
+   *  shorter (a ship rattles in a bigger pocket and sometimes escapes inside the
+   *  12 s limit) but never went away: `unstuck` still catches it on ~1.25% of
+   *  seeds, on `main` as well as off it. The knobs with real travel are late-wave
+   *  rock SIZE or COUNT; both are design calls (GDD §5.5 ties rock size to a
+   *  payout the player can judge), so this is briefed separately rather than
+   *  tuned here. TUNABLE */
   commonsHoleFraction: 0.85,
   /** Angular clearance (radians) kept around every station spoke WITHIN the
    *  commons: a wave's rocks sit only in `[gap, sectorWidth − gap]` of their
    *  `2π/N` sector, so no rock lands on a launch corridor. Clamped below
-   *  `sectorWidth/2` for small lobbies so the band never inverts. TUNABLE */
+   *  `sectorWidth/2` for small lobbies so the band never inverts.
+   *
+   *  **Caveat measured in a0-59: this is an ANGLE, so the linear clearance it buys
+   *  scales with the ring it is applied to** — `eye × sin(gap)` is 84.6 u at wave 1
+   *  but only **21.2 u at wave 5**, against the `SHIP_RADIUS + ASTEROID.maxRadius`
+   *  = 62 u that `commonsHoleFraction`'s note above promises. The guarantee is
+   *  already broken at wave 3 (52.9 u). Widening this constant cannot repair it:
+   *  the required gap exceeds the `sectorWidth × 0.45` clamp long before the
+   *  corridor opens, and the ring is oversubscribed with rock anyway. TUNABLE */
   commonsSpokeGap: 0.33,
   /** Canonical rocks per home field (before the `N`-fold stamp). TUNABLE */
   homeCount: 3,
