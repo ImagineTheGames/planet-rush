@@ -53,6 +53,13 @@ Consequences to know:
   can shift. Done because that false claim is load-bearing: it is precisely what
   talks the next agent into raising the fraction a third time.
 
+- `6b6cab1` **docs(a0-59)** — commits the fourth session's note edits, which had
+  been left in the working tree uncommitted.
+- `95a8fb1` **docs(a0-59)** — `docs/wave-commons-entombment.md`, the wave trap
+  written up as its own defect report so it outlives PR #436, plus a one-line
+  comment in `constants.ts` pointing `commonsHoleFraction` at it (it already
+  claimed the trap was "briefed separately"; now that is true). **No value moves.**
+
 **Verified green, not re-done, on 2026-08-16 (third session):** `npx tsc --noEmit`
 exits 0; the constant is `1`; `drops the whole hold` is present and exact; CI's own
 log for `96bfe7e` reads **299 of 300 test files passed**, the single failure being
@@ -372,6 +379,30 @@ under it did not. Trust the measured table, not the prose around it.)*
   "**0.90, a non-starter that deletes the shrinking ring**", and candidate 2
   (rock size/count) is now the one to brief. **The ruling being asked for is
   unchanged; the reasoning under it is now correct and measured.**
+
+- **2026-08-16, fifth session — what this one actually did.** Re-verified the
+  shipped work again (nothing redone): local `HEAD` == `origin/…` == `faa756b` at
+  start, `tsc --noEmit` exits 0, constant is `1`, `drops the whole hold` present,
+  both remote DoD greps pass against `FETCH_HEAD`, `main` still `43236fb`, PR #436
+  open with **no Director ruling yet** (zero comments, zero reviews). Re-ran
+  `unstuck`: still exactly seed 15, `foreman` slot 2, **133.5 s at (1204,1195)** —
+  identical to sessions three and four.
+  **Independently re-derived the wave-5 geometry** rather than trusting the note,
+  because the note itself records getting it wrong twice. It reproduces: 446 u
+  circumference, 1632 u of rock arc, **3.66× oversubscribed by rock alone**
+  (3.9× including a ship corridor), `freeEye` 19.3 u against a 16 u hull,
+  `spokeClear` 21.2 u against the 62 u promised, `rMinPassable` 276–280 u
+  depending on whether the corridor's flanking rocks are sized at mean or max
+  radius. **The "no in-lane fix" conclusion is now confirmed by a second
+  independent derivation.**
+  The one new thing: committed the fourth session's uncommitted note edits, and
+  **lifted the wave trap out of the PR body into `docs/wave-commons-entombment.md`**
+  — a standalone defect report (geometry, 200-seed incidence on both builds, three
+  costed candidates, the eye-by-centre second-order bug, repro, and the four wrong
+  diagnoses). The note had said "brief the wave trap separately" for two sessions
+  and nobody had written the brief; a PR body dies with its PR, and this defect is
+  live on `main`. **This is a docs deliverable, not a fix — the blocker is
+  unchanged and still needs the same ruling.**
 
 ## BLOCKERS
 
