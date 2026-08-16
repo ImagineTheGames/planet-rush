@@ -358,22 +358,28 @@
       "current": "previews/shipExplode/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/shipExplode/a.wav",
-          "character": "hull rupture, debris scattering",
-          "params": "src/art/audio/candidates.ts#shipExplode.a"
+          "id": "d",
+          "wav": "previews/shipExplode/d.wav",
+          "character": "ion wash, exhaust torn open",
+          "params": "src/art/audio/candidates.ts#shipExplode.d"
         },
         {
-          "id": "b",
-          "wav": "previews/shipExplode/b.wav",
-          "character": "pressure blast, air dumping out",
-          "params": "src/art/audio/candidates.ts#shipExplode.b"
+          "id": "e",
+          "wav": "previews/shipExplode/e.wav",
+          "character": "inertial failure, weight going out",
+          "params": "src/art/audio/candidates.ts#shipExplode.e"
         },
         {
-          "id": "c",
-          "wav": "previews/shipExplode/c.wav",
-          "character": "containment breach, shear and room",
-          "params": "src/art/audio/candidates.ts#shipExplode.c"
+          "id": "f",
+          "wav": "previews/shipExplode/f.wav",
+          "character": "containment failing, room answering",
+          "params": "src/art/audio/candidates.ts#shipExplode.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/shipExplode/g.wav",
+          "character": "one failure, over immediately",
+          "params": "src/art/audio/candidates.ts#shipExplode.g"
         }
       ]
     },
@@ -384,22 +390,28 @@
       "current": "previews/shipSpawn/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/shipSpawn/a.wav",
-          "character": "drive spooling into a contact",
-          "params": "src/art/audio/candidates.ts#shipSpawn.a"
+          "id": "d",
+          "wav": "previews/shipSpawn/d.wav",
+          "character": "ion wash settling into place",
+          "params": "src/art/audio/candidates.ts#shipSpawn.d"
         },
         {
-          "id": "b",
-          "wav": "previews/shipSpawn/b.wav",
-          "character": "mass arriving, pressure seating",
-          "params": "src/art/audio/candidates.ts#shipSpawn.b"
+          "id": "e",
+          "wav": "previews/shipSpawn/e.wav",
+          "character": "mass arriving and seating",
+          "params": "src/art/audio/candidates.ts#shipSpawn.e"
         },
         {
-          "id": "c",
-          "wav": "previews/shipSpawn/c.wav",
-          "character": "field forming, band closing on a note",
-          "params": "src/art/audio/candidates.ts#shipSpawn.c"
+          "id": "f",
+          "wav": "previews/shipSpawn/f.wav",
+          "character": "containment closing on the hull",
+          "params": "src/art/audio/candidates.ts#shipSpawn.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/shipSpawn/g.wav",
+          "character": "clamps release, and it is there",
+          "params": "src/art/audio/candidates.ts#shipSpawn.g"
         }
       ]
     },
@@ -410,22 +422,28 @@
       "current": "previews/spawnPulse/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/spawnPulse/a.wav",
-          "character": "field grain, a soft particulate tick",
-          "params": "src/art/audio/candidates.ts#spawnPulse.a"
+          "id": "d",
+          "wav": "previews/spawnPulse/d.wav",
+          "character": "field grain, soft and particulate",
+          "params": "src/art/audio/candidates.ts#spawnPulse.d"
         },
         {
-          "id": "b",
-          "wav": "previews/spawnPulse/b.wav",
-          "character": "a low bubble pip, pressure holding",
-          "params": "src/art/audio/candidates.ts#spawnPulse.b"
+          "id": "e",
+          "wav": "previews/spawnPulse/e.wav",
+          "character": "a held-pressure pip, low",
+          "params": "src/art/audio/candidates.ts#spawnPulse.e"
         },
         {
-          "id": "c",
-          "wav": "previews/spawnPulse/c.wav",
-          "character": "a thin band shimmering, barely there",
-          "params": "src/art/audio/candidates.ts#spawnPulse.c"
+          "id": "f",
+          "wav": "previews/spawnPulse/f.wav",
+          "character": "the field skin, one damped band",
+          "params": "src/art/audio/candidates.ts#spawnPulse.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/spawnPulse/g.wav",
+          "character": "barely a sound, a breath of it",
+          "params": "src/art/audio/candidates.ts#spawnPulse.g"
         }
       ]
     },
@@ -436,22 +454,28 @@
       "current": "previews/thruster/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/thruster/a.wav",
-          "character": "plasma drive, particulate and dry",
-          "params": "src/art/audio/candidates.ts#thruster.a"
+          "id": "d",
+          "wav": "previews/thruster/d.wav",
+          "character": "ion wash, fine grain and hiss",
+          "params": "src/art/audio/candidates.ts#thruster.d"
         },
         {
-          "id": "b",
-          "wav": "previews/thruster/b.wav",
-          "character": "reaction mass, low pressure roar",
-          "params": "src/art/audio/candidates.ts#thruster.b"
+          "id": "e",
+          "wav": "previews/thruster/e.wav",
+          "character": "inertial mass, low and pressurised",
+          "params": "src/art/audio/candidates.ts#thruster.e"
         },
         {
-          "id": "c",
-          "wav": "previews/thruster/c.wav",
-          "character": "induction turbine, one narrow band",
-          "params": "src/art/audio/candidates.ts#thruster.c"
+          "id": "f",
+          "wav": "previews/thruster/f.wav",
+          "character": "containment hum, two narrow bands",
+          "params": "src/art/audio/candidates.ts#thruster.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/thruster/g.wav",
+          "character": "hardware only, a quiet running machine",
+          "params": "src/art/audio/candidates.ts#thruster.g"
         }
       ]
     },
@@ -1009,22 +1033,28 @@
       "current": "previews/respawnBeep/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/respawnBeep/a.wav",
-          "character": "a dry clock contact, no ring",
-          "params": "src/art/audio/candidates.ts#respawnBeep.a"
+          "id": "d",
+          "wav": "previews/respawnBeep/d.wav",
+          "character": "escapement contact, dry",
+          "params": "src/art/audio/candidates.ts#respawnBeep.d"
         },
         {
-          "id": "b",
-          "wav": "previews/respawnBeep/b.wav",
-          "character": "a countdown pip with weight in it",
-          "params": "src/art/audio/candidates.ts#respawnBeep.b"
+          "id": "e",
+          "wav": "previews/respawnBeep/e.wav",
+          "character": "a seated pip, weight behind it",
+          "params": "src/art/audio/candidates.ts#respawnBeep.e"
         },
         {
-          "id": "c",
-          "wav": "previews/respawnBeep/c.wav",
-          "character": "a narrow band tone, machine-clean",
-          "params": "src/art/audio/candidates.ts#respawnBeep.c"
+          "id": "f",
+          "wav": "previews/respawnBeep/f.wav",
+          "character": "one narrow band, instrument-clean",
+          "params": "src/art/audio/candidates.ts#respawnBeep.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/respawnBeep/g.wav",
+          "character": "a relay closing, and nothing else",
+          "params": "src/art/audio/candidates.ts#respawnBeep.g"
         }
       ]
     },
@@ -1035,22 +1065,28 @@
       "current": "previews/respawnGo/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/respawnGo/a.wav",
-          "character": "release into a dry contact",
-          "params": "src/art/audio/candidates.ts#respawnGo.a"
+          "id": "d",
+          "wav": "previews/respawnGo/d.wav",
+          "character": "ion wash releasing, dry top",
+          "params": "src/art/audio/candidates.ts#respawnGo.d"
         },
         {
-          "id": "b",
-          "wav": "previews/respawnGo/b.wav",
-          "character": "pressure dumping, mass leaving",
-          "params": "src/art/audio/candidates.ts#respawnGo.b"
+          "id": "e",
+          "wav": "previews/respawnGo/e.wav",
+          "character": "catapult mass, pressure leaving",
+          "params": "src/art/audio/candidates.ts#respawnGo.e"
         },
         {
-          "id": "c",
-          "wav": "previews/respawnGo/c.wav",
-          "character": "a band sweeping open, launch clear",
-          "params": "src/art/audio/candidates.ts#respawnGo.c"
+          "id": "f",
+          "wav": "previews/respawnGo/f.wav",
+          "character": "containment opening, band clearing",
+          "params": "src/art/audio/candidates.ts#respawnGo.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/respawnGo/g.wav",
+          "character": "launch clamps let go, once",
+          "params": "src/art/audio/candidates.ts#respawnGo.g"
         }
       ]
     },

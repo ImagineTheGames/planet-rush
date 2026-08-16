@@ -64,12 +64,12 @@ this brief, with the reason in the note).
 | shieldDown | done | the ×6.9 fall kept in all four; they differ in what is falling |
 | coreHit | done | four dull, low and closing — no sparkle within reach of a home |
 | turretDown | done | mount release / vessel empty / cell arc / it just stops |
-| shipExplode | todo |  |
-| shipSpawn | todo |  |
-| spawnPulse | todo |  |
-| thruster | todo |  |
-| respawnBeep | todo |  |
-| respawnGo | todo |  |
+| shipExplode | done | ion wash / inertial failure / containment fail / one failure — no sparkle layer in any of them (§7.2) |
+| shipSpawn | done | arrival as settle, seat, containment close, clamp release |
+| spawnPulse | done | four that stay a *field* — soft, particulate, low, and quiet enough to stop noticing |
+| thruster | done | four loop materials; none sweeps a corner inside the body (that wraps to a 2.5 Hz wobble) |
+| respawnBeep | done | four that stay a *clock* — hard, narrow, above spawnPulse (§8 pair) |
+| respawnGo | done | the launch as release, catapult, opening band, clamps letting go |
 | holdFull | todo |  |
 | buildPlaced | todo |  |
 | buildComplete | todo |  |

@@ -97,6 +97,7 @@ describe('sound-review candidates', () => {
     // shipped: a row that says `done` is a promise of four offers under letters
     // the record has not already spent, and this is where that promise is kept.
     expect(REVOICE_MANIFEST.size, 'the manifest does not list the thirty-five').toBe(35);
+    expect(REVOICED.length, 'the DoD floor is eight re-voiced slots').toBeGreaterThanOrEqual(8);
     for (const id of REVOICED) {
       const slot = CANDIDATE_SLOTS[id];
       expect(slot, `${id} is marked done but is not on the board`).toBeDefined();

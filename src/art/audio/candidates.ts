@@ -959,67 +959,82 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       },
     ],
   },
-  // === SHIP (a0-01b) ========================================================
+  // === SHIP (a0-60) =========================================================
   //
   // A hull is a machine with a drive in it, and these four slots are that machine
-  // arriving, holding, and coming apart. The three offers are three propulsion
-  // technologies rather than three sizes of one bang:
+  // arriving, holding, and coming apart. The denied set offered three propulsion
+  // technologies; the re-voice offers four ways for the *hardware* to be audible,
+  // which is the thing "modern/sci-fi" asks for and "retro/toony" never has:
   //
-  //   a  a **plasma drive** — granular, particulate, the sound of matter being
-  //      thrown; dry, no ring anywhere in it
-  //   b  **reaction mass** — pneumatic weight, a low body under a closing filter
-  //   c  a **containment field** — a narrow resonant band that forms or fails,
-  //      the only one of the three with metal in it, and the only one with a room
+  //   d  **ion wash** — particulate exhaust, high-passed, dry. Matter leaving at
+  //      speed. Nothing in it rings and nothing in it is a tone.
+  //   e  **inertial mass** — a low body under a closing corner. Weight, and the
+  //      pressure that moved it; the only offers with anything under 100 Hz.
+  //   f  **magnetic containment** — narrow resonant bands forming or failing.
+  //      Metal, damped rather than left to ring, and the only one with a room.
+  //   g  **hardware only** — relays, clamps, contacts. The restrained offer: the
+  //      event stated once, no debris, no tail, nothing added for excitement.
   //
-  // `shipExplode`'s `context` used to read *"firework: bang then sparkle"* — a
-  // direct quote of the retired §4.7 paragraph, printed on the board next to the
-  // play button. §7.2 of `docs/audio-revoice-spec.md` retires that layer by name
-  // (*"explosions are fireworks implemented — delete it"*), so the line goes too:
-  // a description the offers deliberately contradict is worse than no description.
+  // `shipExplode` has no sparkle layer in any of the four. §7.2 of
+  // `docs/audio-revoice-spec.md` retires the firework by name, and a bang that
+  // ends in glitter is the single most retro thing this bank could still do.
   //
   // §8 guards `respawnBeep` / `spawnPulse` — the countdown against the protection
-  // tick — at ×1.20 of centroid, the second-tightest pair in the bank. They are
-  // deliberately given different metaphors here and in the interface family: this
-  // one is a **field** (soft, particulate, low), that one is a **clock** (hard,
-  // narrow, high). Measured at the bottom of the family, not assumed.
+  // tick — at ×1.20 of centroid, the second-tightest pair in the bank. Four offers
+  // each is sixteen possible pairings, so the margin is held on the *whole set*
+  // rather than on the pair that happens to be shipping: every `spawnPulse` offer
+  // stays a **field** (soft, particulate, low) and every `respawnBeep` offer a
+  // **clock** (hard, narrow, above it). Measured as zero-crossing rate, the same
+  // cheap centroid proxy `./audio.test.ts` uses — spawnPulse tops out at 0.030
+  // (d 0.030 · e 0.008 · f 0.027 · g 0.022) and respawnBeep bottoms out at 0.040
+  // (d 0.143 · e 0.040 · f 0.080 · g 0.118), so the *worst* pairing clears ×1.34.
   shipExplode: {
     label: "Ship Explosion",
     context: "A ship blows up — a pressure failure, over quickly. No sparkle (§4.7).",
     current: 'shipExplode',
     candidates: [
       {
-        id: 'a',
-        character: "hull rupture, debris scattering",
+        id: 'd',
+        character: "ion wash, exhaust torn open",
         spec: {
-          name: 'shipExplode_a_hullRupture',
+          name: 'shipExplode_d_ionWash',
           layers: [
-            swept('shipExplode_a.front', { wave: 'noise', freq: 260, freqEnd: 66, from: 1700, to: 240, q: 2.8, gain: 0.34, attack: 0.001, hold: 0.03, decay: 0.3, curve: 3, punch: 0.8, seed: 31000 }),
-            band('shipExplode_a.shear', 1450, { gain: 0.3, decay: 0.05, q: 5, curve: 6, punch: 0.5, at: 0.006, seed: 31001 }),
-            grains('shipExplode_a.debris', { freq: 560, freqEnd: 200, grain: 0.011, gain: 0.32, hold: 0.05, decay: 0.42, curve: 3, from: 2400, to: 560, q: 3, hp: 220, at: 0.04, seed: 31002 }),
+            grains('shipExplode_d.wash', { freq: 900, freqEnd: 240, grain: 0.0022, gain: 0.3, hold: 0.04, decay: 0.36, curve: 3, punch: 0.5, from: 4800, to: 480, q: 3, hp: 320, seed: 60250 }),
+            swept('shipExplode_d.front', { wave: 'noise', freq: 300, freqEnd: 90, from: 1500, to: 260, q: 2.6, gain: 0.26, attack: 0.001, hold: 0.02, decay: 0.22, curve: 3.4, punch: 0.6, seed: 60252 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "pressure blast, air dumping out",
+        id: 'e',
+        character: "inertial failure, weight going out",
         spec: {
-          name: 'shipExplode_b_pressureBlast',
+          name: 'shipExplode_e_inertialFailure',
           layers: [
-            swept('shipExplode_b.blast', { wave: 'noise', freq: 210, freqEnd: 48, from: 1500, to: 160, q: 2.2, gain: 0.32, attack: 0.002, hold: 0.05, decay: 0.42, curve: 2.4, punch: 0.7, seed: 31010 }),
-            swept('shipExplode_b.sub', { wave: 'sine', freq: 66, freqEnd: 38, from: 180, q: 1.8, gain: 0.24, attack: 0.003, hold: 0.03, decay: 0.36, curve: 2.2, seed: 31011 }),
-            grains('shipExplode_b.vent', { freq: 780, freqEnd: 300, grain: 0.004, gain: 0.24, hold: 0.06, decay: 0.34, curve: 2.8, from: 2200, to: 500, q: 2.8, hp: 300, at: 0.02, seed: 31012 }),
+            swept('shipExplode_e.blast', { wave: 'noise', freq: 190, freqEnd: 52, from: 1300, to: 150, q: 2.2, gain: 0.34, attack: 0.002, hold: 0.04, decay: 0.4, curve: 2.5, punch: 0.75, seed: 60260 }),
+            swept('shipExplode_e.mass', { wave: 'sine', freq: 58, freqEnd: 34, from: 160, q: 1.7, gain: 0.28, attack: 0.004, hold: 0.04, decay: 0.34, curve: 2.2, at: 0.01, seed: 60262 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "containment breach, shear and room",
+        id: 'f',
+        character: "containment failing, room answering",
         spec: {
-          name: 'shipExplode_c_containmentBreach',
+          name: 'shipExplode_f_containmentFail',
           layers: [
-            band('shipExplode_c.tear', 2600, { gain: 0.78, decay: 0.05, q: 7, curve: 7, punch: 0.8, seed: 31020 }),
-            swept('shipExplode_c.field', { wave: 'triangle', freq: 420, freqEnd: 150, from: 3800, to: 380, q: 6, gain: 0.62, attack: 0.001, hold: 0.02, decay: 0.3, curve: 3.4, noiseMix: 0.35, at: 0.004, seed: 31021 }),
-            ...returns('shipExplode_c.room', { freq: 700, gain: 0.34, decay: 0.26, from: 2000, to: 500, at: 0.12, gap: 0.14, count: 3, seed: 31023 }),
+            band('shipExplode_f.tear', 2200, { gain: 0.7, decay: 0.045, q: 8, curve: 7, punch: 0.8, seed: 60270 }),
+            swept('shipExplode_f.collapse', { wave: 'triangle', freq: 380, freqEnd: 120, from: 3000, to: 300, q: 6.5, gain: 0.5, attack: 0.001, hold: 0.02, decay: 0.26, curve: 3.6, noiseMix: 0.4, at: 0.005, seed: 60272 }),
+            ...returns('shipExplode_f.room', { freq: 640, gain: 0.28, decay: 0.24, from: 1800, to: 460, at: 0.11, gap: 0.13, count: 3, seed: 60274 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "one failure, over immediately",
+        spec: {
+          name: 'shipExplode_g_oneFailure',
+          layers: [
+            swept('shipExplode_g.fail', { wave: 'noise', freq: 340, freqEnd: 100, from: 2200, to: 300, q: 3.2, gain: 0.42, attack: 0.0008, hold: 0.02, decay: 0.16, curve: 4.5, punch: 0.8, seed: 60280 }),
+            band('shipExplode_g.hull', 480, { gain: 0.3, decay: 0.08, q: 4.5, curve: 6, at: 0.02, seed: 60282 }),
           ],
         },
       },
@@ -1031,36 +1046,47 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     current: 'shipSpawn',
     candidates: [
       {
-        id: 'a',
-        character: "drive spooling into a contact",
+        id: 'd',
+        character: "ion wash settling into place",
         spec: {
-          name: 'shipSpawn_a_driveSpool',
+          name: 'shipSpawn_d_ionSettle',
           layers: [
-            grains('shipSpawn_a.spool', { freq: 240, freqEnd: 460, grain: 0.006, gain: 0.3, hold: 0.06, decay: 0.14, curve: 2, from: 700, to: 2800, q: 3.4, hp: 140, seed: 31030 }),
-            ...plate('shipSpawn_a.arrive', 520, { gain: 0.34, decay: 0.2, ratios: [1, 2.41], q: 6, curve: 5, grain: 0.36, at: 0.19, seed: 31032 }),
+            grains('shipSpawn_d.wash', { freq: 380, freqEnd: 700, grain: 0.0028, gain: 0.3, hold: 0.06, decay: 0.12, curve: 2.2, from: 900, to: 3200, q: 3, hp: 260, seed: 60290 }),
+            grains('shipSpawn_d.settle', { freq: 640, freqEnd: 420, grain: 0.0035, gain: 0.32, hold: 0.02, decay: 0.13, curve: 4.5, from: 2600, to: 900, q: 3.6, hp: 300, at: 0.18, seed: 60292 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "mass arriving, pressure seating",
+        id: 'e',
+        character: "mass arriving and seating",
         spec: {
-          name: 'shipSpawn_b_massArrive',
+          name: 'shipSpawn_e_massSeat',
           layers: [
-            swept('shipSpawn_b.approach', { wave: 'noise', freq: 150, freqEnd: 190, from: 400, to: 1700, q: 2.6, gain: 0.3, attack: 0.03, hold: 0.06, decay: 0.1, curve: 2, seed: 31040 }),
-            swept('shipSpawn_b.seat', { wave: 'sine', freq: 96, freqEnd: 72, from: 300, to: 120, q: 2.2, gain: 0.4, attack: 0.002, hold: 0.024, decay: 0.2, curve: 3, punch: 0.6, noiseMix: 0.14, at: 0.2, seed: 31042 }),
+            swept('shipSpawn_e.approach', { wave: 'noise', freq: 140, freqEnd: 175, from: 340, to: 1400, q: 2.4, gain: 0.28, attack: 0.035, hold: 0.05, decay: 0.09, curve: 2, seed: 60300 }),
+            swept('shipSpawn_e.seat', { wave: 'sine', freq: 88, freqEnd: 66, from: 280, to: 110, q: 2.2, gain: 0.42, attack: 0.002, hold: 0.022, decay: 0.18, curve: 3.2, punch: 0.6, noiseMix: 0.12, at: 0.19, seed: 60302 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "field forming, band closing on a note",
+        id: 'f',
+        character: "containment closing on the hull",
         spec: {
-          name: 'shipSpawn_c_fieldForm',
+          name: 'shipSpawn_f_containmentClose',
           layers: [
-            swept('shipSpawn_c.form', { wave: 'triangle', freq: 330, from: 600, to: 4200, q: 8, gain: 0.42, attack: 0.04, hold: 0.05, decay: 0.09, curve: 2, noiseMix: 0.22, seed: 31050 }),
-            band('shipSpawn_c.lock', 1240, { gain: 0.8, decay: 0.16, q: 9, curve: 5.5, punch: 0.5, at: 0.18, seed: 31052 }),
-            band('shipSpawn_c.ring', 830, { gain: 0.55, decay: 0.24, q: 11, curve: 4.5, at: 0.185, seed: 31053 }),
+            swept('shipSpawn_f.close', { wave: 'triangle', freq: 294, from: 520, to: 3400, q: 7.5, gain: 0.4, attack: 0.04, hold: 0.04, decay: 0.08, curve: 2.2, noiseMix: 0.24, seed: 60310 }),
+            band('shipSpawn_f.lock', 1120, { gain: 0.72, decay: 0.12, q: 8.5, curve: 6, punch: 0.5, at: 0.17, seed: 60312 }),
+            band('shipSpawn_f.hold', 700, { gain: 0.5, decay: 0.18, q: 10, curve: 5, at: 0.175, seed: 60313 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "clamps release, and it is there",
+        spec: {
+          name: 'shipSpawn_g_clampRelease',
+          layers: [
+            band('shipSpawn_g.clamp', 820, { gain: 0.44, decay: 0.05, q: 5.5, curve: 6.5, punch: 0.5, seed: 60320 }),
+            swept('shipSpawn_g.push', { wave: 'sine', freq: 130, from: 340, to: 170, q: 2.4, gain: 0.3, attack: 0.006, hold: 0.02, decay: 0.14, curve: 3.4, noiseMix: 0.16, at: 0.05, seed: 60322 }),
           ],
         },
       },
@@ -1071,33 +1097,46 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     context: "Quiet repeating tick during 10s of spawn protection",
     current: 'spawnPulse',
     candidates: [
+      // All four stay a **field**, and stay quiet: this repeats every second for
+      // ten seconds over a player who has just died, so the offer that wins is
+      // the one that is easiest to stop noticing, not the one that reads best once.
       {
-        id: 'a',
-        character: "field grain, a soft particulate tick",
+        id: 'd',
+        character: "field grain, soft and particulate",
         spec: {
-          name: 'spawnPulse_a_fieldGrain',
+          name: 'spawnPulse_d_fieldGrain',
           layers: [
-            grains('spawnPulse_a.grain', { freq: 700, freqEnd: 520, grain: 0.004, gain: 0.2, hold: 0.012, decay: 0.08, curve: 4, from: 1600, to: 800, q: 3, hp: 240, seed: 31060 }),
+            grains('spawnPulse_d.grain', { freq: 380, freqEnd: 290, grain: 0.005, gain: 0.19, hold: 0.014, decay: 0.09, curve: 4, from: 900, to: 460, q: 2.8, hp: 140, seed: 60330 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "a low bubble pip, pressure holding",
+        id: 'e',
+        character: "a held-pressure pip, low",
         spec: {
-          name: 'spawnPulse_b_bubblePip',
+          name: 'spawnPulse_e_pressurePip',
           layers: [
-            swept('spawnPulse_b.pip', { wave: 'sine', freq: 210, from: 700, to: 260, q: 3.2, gain: 0.22, attack: 0.004, hold: 0.014, decay: 0.1, curve: 3.4, noiseMix: 0.12, seed: 31070 }),
+            swept('spawnPulse_e.pip', { wave: 'sine', freq: 176, from: 560, to: 210, q: 3, gain: 0.21, attack: 0.005, hold: 0.016, decay: 0.11, curve: 3.2, noiseMix: 0.1, seed: 60340 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "a thin band shimmering, barely there",
+        id: 'f',
+        character: "the field skin, one damped band",
         spec: {
-          name: 'spawnPulse_c_thinBand',
+          name: 'spawnPulse_f_skinBand',
           layers: [
-            band('spawnPulse_c.skin', 1560, { gain: 0.62, decay: 0.11, q: 7, curve: 5, attack: 0.003, hold: 0.006, seed: 31080 }),
+            band('spawnPulse_f.skin', 430, { gain: 0.52, decay: 0.11, q: 7, curve: 5.5, attack: 0.004, hold: 0.006, seed: 60350 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "barely a sound, a breath of it",
+        spec: {
+          name: 'spawnPulse_g_breath',
+          layers: [
+            swept('spawnPulse_g.breath', { wave: 'noise', freq: 300, from: 620, to: 340, q: 2.2, gain: 0.17, attack: 0.008, hold: 0.02, decay: 0.12, curve: 3, hp: 110, seed: 60360 }),
           ],
         },
       },
@@ -1109,46 +1148,60 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     current: 'thruster',
     candidates: [
       // A loop has no envelope to carry character — `hold` runs flat and `decay`
-      // is zero, which is what `./candidates.test.ts` checks for. So all three
-      // are made of *material* instead: the grain rate, the corner, the Q. None
-      // of them names a `lowPassEnd`: a filter sweep inside a loop body wraps
-      // into a 2.5 Hz wobble at the loop rate, which is a helicopter, not a drive.
+      // is zero, which is what `./candidates.test.ts` checks for. So all four are
+      // made of *material* instead: the grain rate, the corner, the Q. None of
+      // them names a `lowPassEnd`: a filter sweep inside a loop body wraps into a
+      // 2.5 Hz wobble at the loop rate, which is a helicopter, not a drive.
       {
-        id: 'a',
-        character: "plasma drive, particulate and dry",
+        id: 'd',
+        character: "ion wash, fine grain and hiss",
         spec: {
-          name: 'thruster_a_plasmaDrive',
+          name: 'thruster_d_ionWash',
           loop: true,
           crossfade: 0.04,
           layers: [
-            grains('thruster_a.plasma', { freq: 190, freqEnd: 190, grain: 0.0025, gain: 0.34, attack: 0, hold: 0.4, decay: 0, from: 2200, q: 2.4, hp: 90, seed: 31090 }),
-            place({ name: 'thruster_a.core', wave: 'noise', attack: 0, hold: 0.4, decay: 0, freq: 74, lowPass: 300, resonance: 1.6, gain: 0.2, seed: 31091 }),
+            grains('thruster_d.wash', { freq: 260, freqEnd: 260, grain: 0.0018, gain: 0.3, attack: 0, hold: 0.4, decay: 0, from: 3000, q: 2.2, hp: 220, seed: 60370 }),
+            place({ name: 'thruster_d.duct', wave: 'noise', attack: 0, hold: 0.4, decay: 0, freq: 96, lowPass: 380, resonance: 1.8, gain: 0.17, seed: 60371 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "reaction mass, low pressure roar",
+        id: 'e',
+        character: "inertial mass, low and pressurised",
         spec: {
-          name: 'thruster_b_reactionMass',
+          name: 'thruster_e_inertialMass',
           loop: true,
           crossfade: 0.04,
           layers: [
-            place({ name: 'thruster_b.roar', wave: 'noise', attack: 0, hold: 0.4, decay: 0, freq: 120, lowPass: 520, resonance: 2.8, gain: 0.36, seed: 31100 }),
-            place({ name: 'thruster_b.mass', wave: 'sine', attack: 0, hold: 0.4, decay: 0, freq: 52, noiseMix: 0.18, lowPass: 200, resonance: 1.4, gain: 0.24, seed: 31101 }),
+            place({ name: 'thruster_e.mass', wave: 'sine', attack: 0, hold: 0.4, decay: 0, freq: 46, noiseMix: 0.2, lowPass: 180, resonance: 1.6, gain: 0.3, seed: 60380 }),
+            place({ name: 'thruster_e.press', wave: 'noise', attack: 0, hold: 0.4, decay: 0, freq: 135, lowPass: 600, resonance: 2.6, gain: 0.28, seed: 60381 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "induction turbine, one narrow band",
+        id: 'f',
+        character: "containment hum, two narrow bands",
         spec: {
-          name: 'thruster_c_inductionTurbine',
+          name: 'thruster_f_containmentHum',
           loop: true,
           crossfade: 0.04,
           layers: [
-            place({ name: 'thruster_c.turbine', wave: 'noise', attack: 0, hold: 0.4, decay: 0, freq: 430, lowPass: 1450, resonance: 9, bandPass: true, gain: 0.6, seed: 31110 }),
-            place({ name: 'thruster_c.stator', wave: 'triangle', attack: 0, hold: 0.4, decay: 0, freq: 145, noiseMix: 0.3, lowPass: 900, resonance: 4, gain: 0.3, seed: 31111 }),
+            place({ name: 'thruster_f.b0', wave: 'noise', attack: 0, hold: 0.4, decay: 0, freq: 360, lowPass: 1200, resonance: 8.5, bandPass: true, gain: 0.55, seed: 60390 }),
+            place({ name: 'thruster_f.b1', wave: 'noise', attack: 0, hold: 0.4, decay: 0, freq: 540, lowPass: 1800, resonance: 10, bandPass: true, gain: 0.34, seed: 60391 }),
+            place({ name: 'thruster_f.floor', wave: 'triangle', attack: 0, hold: 0.4, decay: 0, freq: 90, noiseMix: 0.24, lowPass: 340, resonance: 3, gain: 0.2, seed: 60392 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "hardware only, a quiet running machine",
+        spec: {
+          name: 'thruster_g_runningMachine',
+          loop: true,
+          crossfade: 0.04,
+          layers: [
+            place({ name: 'thruster_g.run', wave: 'noise', attack: 0, hold: 0.4, decay: 0, freq: 155, lowPass: 700, resonance: 3.4, highPass: 70, gain: 0.24, seed: 60400 }),
+            place({ name: 'thruster_g.rotor', wave: 'triangle', attack: 0, hold: 0.4, decay: 0, freq: 62, noiseMix: 0.3, lowPass: 240, resonance: 2.2, gain: 0.18, seed: 60401 }),
           ],
         },
       },
@@ -2234,40 +2287,55 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
   respawnBeep: {
     // §8 guards this against `spawnPulse` at ×1.20 of centroid — the respawn
     // countdown against the spawn-protection tick, two quiet repeating sounds a
-    // dead player hears back to back. They are given opposite metaphors on
-    // purpose: spawnPulse is a **field** (soft, particulate, low) and this is a
-    // **clock** (hard, narrow, and above it on every offer).
+    // dead player hears back to back. They keep opposite metaphors through the
+    // a0-60 sweep: spawnPulse is a **field** (soft, particulate, low) and every
+    // offer here is a **clock** (hard, narrow, and above it).
+    //
+    // What "not retro" means for a countdown specifically: no musical interval
+    // between the beeps and the launch, and no rise across the count. A retro
+    // countdown climbs a scale; a machine counting down repeats one contact and
+    // then stops.
     label: "Respawn Beep",
     context: "A tick of the respawn countdown — one clean mid beep a second, deliberately plain, a clock.",
     current: 'respawnBeep',
     candidates: [
       {
-        id: 'a',
-        character: "a dry clock contact, no ring",
+        id: 'd',
+        character: "escapement contact, dry",
         spec: {
-          name: 'respawnBeep_a_clockContact',
+          name: 'respawnBeep_d_escapement',
           layers: [
-            grains('respawnBeep_a.tick', { freq: 1100, freqEnd: 880, grain: 0.0025, gain: 0.3, hold: 0.02, decay: 0.06, curve: 4.5, from: 3800, to: 1600, q: 3, hp: 500, seed: 34090 }),
+            grains('respawnBeep_d.tick', { freq: 1250, freqEnd: 1050, grain: 0.0022, gain: 0.29, hold: 0.016, decay: 0.05, curve: 5, from: 4200, to: 1800, q: 3.2, hp: 620, seed: 60410 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "a countdown pip with weight in it",
+        id: 'e',
+        character: "a seated pip, weight behind it",
         spec: {
-          name: 'respawnBeep_b_weightedPip',
+          name: 'respawnBeep_e_seatedPip',
           layers: [
-            swept('respawnBeep_b.pip', { wave: 'triangle', freq: 587, from: 2000, to: 760, q: 3.6, gain: 0.3, attack: 0.003, hold: 0.026, decay: 0.07, curve: 3.6, punch: 0.3, noiseMix: 0.14, seed: 34100 }),
+            swept('respawnBeep_e.pip', { wave: 'triangle', freq: 880, from: 2800, to: 1150, q: 3.4, gain: 0.27, attack: 0.003, hold: 0.022, decay: 0.06, curve: 4, punch: 0.3, noiseMix: 0.16, seed: 60420 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "a narrow band tone, machine-clean",
+        id: 'f',
+        character: "one narrow band, instrument-clean",
         spec: {
-          name: 'respawnBeep_c_machineClean',
+          name: 'respawnBeep_f_narrowBand',
           layers: [
-            band('respawnBeep_c.tone', 880, { gain: 0.95, decay: 0.09, q: 5.5, curve: 4.5, attack: 0.003, hold: 0.02, seed: 34110 }),
+            band('respawnBeep_f.tone', 1150, { gain: 0.9, decay: 0.075, q: 6.5, curve: 5, attack: 0.003, hold: 0.018, seed: 60430 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "a relay closing, and nothing else",
+        spec: {
+          name: 'respawnBeep_g_relayClose',
+          layers: [
+            band('respawnBeep_g.close', 1450, { gain: 0.6, decay: 0.03, q: 4.5, curve: 7, punch: 0.4, hp: 500, seed: 60440 }),
           ],
         },
       },
@@ -2279,35 +2347,46 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     current: 'respawnGo',
     candidates: [
       {
-        id: 'a',
-        character: "release into a dry contact",
+        id: 'd',
+        character: "ion wash releasing, dry top",
         spec: {
-          name: 'respawnGo_a_releaseContact',
+          name: 'respawnGo_d_washRelease',
           layers: [
-            grains('respawnGo_a.release', { freq: 520, freqEnd: 900, grain: 0.0035, gain: 0.3, hold: 0.03, decay: 0.05, curve: 3, from: 1400, to: 4200, q: 3, hp: 300, seed: 34120 }),
-            grains('respawnGo_a.top', { freq: 1200, freqEnd: 950, grain: 0.003, gain: 0.28, hold: 0.016, decay: 0.11, curve: 4, from: 4400, to: 1800, q: 3.4, hp: 550, at: 0.1, seed: 34121 }),
+            grains('respawnGo_d.release', { freq: 600, freqEnd: 1000, grain: 0.0026, gain: 0.3, hold: 0.03, decay: 0.05, curve: 3, from: 1600, to: 4400, q: 3, hp: 340, seed: 60450 }),
+            grains('respawnGo_d.top', { freq: 1400, freqEnd: 1050, grain: 0.0024, gain: 0.28, hold: 0.014, decay: 0.1, curve: 4.5, from: 4600, to: 1900, q: 3.6, hp: 700, at: 0.09, seed: 60452 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "pressure dumping, mass leaving",
+        id: 'e',
+        character: "catapult mass, pressure leaving",
         spec: {
-          name: 'respawnGo_b_massLeaving',
+          name: 'respawnGo_e_catapultMass',
           layers: [
-            swept('respawnGo_b.dump', { wave: 'noise', freq: 200, freqEnd: 320, from: 500, to: 2400, q: 2.6, gain: 0.3, attack: 0.006, hold: 0.04, decay: 0.06, curve: 2.6, seed: 34130 }),
-            swept('respawnGo_b.body', { wave: 'triangle', freq: 262, from: 900, to: 380, q: 3.4, gain: 0.36, attack: 0.003, hold: 0.03, decay: 0.14, curve: 3, punch: 0.4, noiseMix: 0.14, at: 0.09, seed: 34131 }),
+            swept('respawnGo_e.push', { wave: 'noise', freq: 180, freqEnd: 300, from: 420, to: 2200, q: 2.4, gain: 0.3, attack: 0.005, hold: 0.035, decay: 0.055, curve: 2.6, seed: 60460 }),
+            swept('respawnGo_e.body', { wave: 'triangle', freq: 220, from: 800, to: 340, q: 3.2, gain: 0.36, attack: 0.003, hold: 0.028, decay: 0.13, curve: 3.2, punch: 0.45, noiseMix: 0.16, at: 0.085, seed: 60462 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "a band sweeping open, launch clear",
+        id: 'f',
+        character: "containment opening, band clearing",
         spec: {
-          name: 'respawnGo_c_bandOpening',
+          name: 'respawnGo_f_containmentOpen',
           layers: [
-            swept('respawnGo_c.open', { wave: 'noise', freq: 440, from: 700, to: 4600, q: 8, gain: 0.42, attack: 0.005, hold: 0.04, decay: 0.06, curve: 2.6, seed: 34140 }),
-            ...plate('respawnGo_c.clear', 1046, { gain: 0.4, decay: 0.14, ratios: [1, 2.41], q: 9, curve: 4.5, grain: 0.18, edge: 0.7, at: 0.1, seed: 34142 }),
+            swept('respawnGo_f.open', { wave: 'noise', freq: 500, from: 800, to: 4400, q: 7.5, gain: 0.4, attack: 0.005, hold: 0.035, decay: 0.055, curve: 2.8, seed: 60470 }),
+            band('respawnGo_f.clear', 1320, { gain: 0.66, decay: 0.13, q: 8, curve: 5, punch: 0.4, at: 0.095, seed: 60472 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "launch clamps let go, once",
+        spec: {
+          name: 'respawnGo_g_clampsLetGo',
+          layers: [
+            band('respawnGo_g.let', 1080, { gain: 0.55, decay: 0.035, q: 5, curve: 6.5, punch: 0.5, seed: 60480 }),
+            swept('respawnGo_g.away', { wave: 'sine', freq: 150, freqEnd: 210, from: 400, to: 900, q: 2.6, gain: 0.3, attack: 0.004, hold: 0.02, decay: 0.09, curve: 3, noiseMix: 0.18, at: 0.03, seed: 60482 }),
           ],
         },
       },
