@@ -601,6 +601,18 @@ under it did not. Trust the measured table, not the prose around it.)*
     two that are in this brief's stated sweep scope** (`docs/`):
     `docs/briefs/pr-04-accrual-and-xp.md:76` (brief test 5) and
     `docs/briefs/pr-02-attribution-hook.md:93`.
+  - **Two more found by the same widening, also flagged:**
+    `spikes/progression/measure-ratified-xp.ts:303` (the spike `accrual.ts` was
+    derived from, same "half-hold sink" phrasing) and
+    `evidence/images/boards/index.json` scene 9's caption — *"But **half your
+    hold** is now loose in space for anyone"*, an **art review board** describing
+    the mechanic (a2-08, Art's file). **Nine stale sites now exist in total across
+    six lanes** — bots, net, app shell, progression, spikes, art — all tabled in
+    `docs/design-amendments.md`, none of them a failing test or a behaviour bug.
+  - **The sweep is now CLOSED on all three axes**, and says so in the amendment:
+    identifier, English prose, and numeric forms (`50%`, `one-half`, `halved`,
+    `0.5 of the hold` — all clean), run over the **whole repo**. A tenth session
+    should not need to sweep again; if it does, the recipe is in the amendment.
   - **How it was found, which is the transferable part again.** The eighth session
     learned "sweep the English, not just the identifier". This one adds the other
     axis: **sweep every directory, not just the ones the DoD names.** The grep that

@@ -185,12 +185,21 @@ brief's stated sweep scope and are therefore fixed here.
 | `src/progression/accrual.test.ts:287` | test **named** *"does not read the half-hold sink at a death as ore spent"*, with an inline *"half dropped, half destroyed with the hull"* | UI (p1-04) | flagged |
 | `src/progression/accrual.ts:109` | `oreUsed` doc-comment — *"The half-hold sink at a ship death …"* | UI | flagged |
 | `src/progression/accrual.ts:454` | *"Across a ship death it is the half-hold sink (GDD §2.3)"* | UI | flagged |
+| `spikes/progression/measure-ratified-xp.ts:303` | *"a drop across a death is the half-hold sink, which is not \"ore used\""* — the spike `accrual.ts` was derived from | UI / spike | flagged |
+| `evidence/images/boards/index.json`, scene 9 caption | *"But **half your hold** is now loose in space for anyone."* — an art review board describing the mechanic | Art (a2-08) | flagged |
 | `docs/briefs/pr-04-accrual-and-xp.md:76` | brief test 5 — *"The half-hold sink at a ship death does not appear in `oreUsed`"* | — | **fixed** |
 | `docs/briefs/pr-02-attribution-hook.md:93` | *"…spawn protection, the half-hold drop and the respawn clock"* | — | **fixed** |
 
 `src/progression/accrual.test.ts` is owned by the UI Engineer (its own header says
-so), so the three code sites are flagged, not edited — the same line drawn for the
-four above. **All 15 of its tests pass**, verified on this branch: the rule they
+so), so those code sites are flagged, not edited — the same line drawn for the
+four above. **The sweep is now closed on both axes and is recorded here as such:**
+identifier (`DEATH_ORE_DROP_FRACTION`), English prose (`half`, `half-hold`,
+`ore sink`, `half-burn`), and numeric forms (`50%`, `one-half`, `halved`,
+`0.5 of the hold` — all clean), run over the **whole repo** rather than the
+directories the brief names. Nine stale sites exist in total, across six lanes;
+all nine are tabled here or above, and every one of them is a comment, a test
+name, a spike or a caption — **none is a failing test and none is a behaviour
+bug.** **All 15 of its tests pass**, verified on this branch: the rule they
 pin (`oreUsed` counts a drop in hold+bank only while hull *and* home live, so a
 death is excluded) is independent of the fraction and is correct on both builds.
 Only the naming is stale — and a *test name* asserting the half-hold sink is the
