@@ -452,6 +452,42 @@ under it did not. Trust the measured table, not the prose around it.)*
     history. **Edit the repo copy, then `cp` it to `/status` — never the reverse
     without diffing first.**
 
+- **2026-08-16, seventh session — what this one actually did.** One new finding,
+  committed; everything else was re-verification that found no drift.
+  - **Re-verified, nothing redone:** local `HEAD` == `origin/…` == `42392ac` at
+    start, `main` still `221a2b1` and **0 commits ahead of this branch** (the sixth
+    session's merge still current), `tsc --noEmit` exits 0, constant is `1`,
+    `drops the whole hold` present at `damage.test.ts:83`, both remote DoD greps
+    pass against `FETCH_HEAD`. PR #436 still open, still **no Director ruling** —
+    the sixth session's escalation comment is the only comment and has no reply.
+    Did **not** re-measure the wedge or re-derive the geometry: three independent
+    derivations agree and the note says stop. Did not escalate a second time —
+    one unanswered ping is a signal, two is noise.
+  - **`742d12c` docs(a0-59) — the new finding. The DoD's half-drop sweep is
+    scoped to `src/sim/` and `docs/`, and both are clean; widening it past that
+    scope found four stale comments that six sessions had missed**, all in files
+    this lane may not edit: `src/bots/hard.ts:214`, `src/net/transport.ts:661`,
+    `src/net/ore-authority.test.ts:452` and `:469`, `src/main.ts:4555`. Each still
+    says a dead ship burns half its hold. **None fails CI** — the `ore-authority`
+    one is a test whose *assertions* still pass (`loose > 0`, residual conserved)
+    while its *comments* lie — which is exactly why they survived, and exactly the
+    hazard the amendment exists to prevent: prose arguing, in-repo, for putting
+    the 0.5 back. Recorded in `docs/design-amendments.md` with the site, the quote
+    and the owner for each. **Docs only; no code, no constant, no golden.**
+  - **Left them unedited on purpose.** `src/bots/`, `src/net/` and the app shell
+    are not this lane's. The line: the determinism goldens were *failing tests* a
+    sim rule change necessarily moved, which justified reaching across a boundary
+    in flagged commits; a stale comment is not. Flag, do not fix.
+  - **Two things found while checking them, useful to whoever fixes them.**
+    (a) `hard.ts`'s retreat rationale **survives and strengthens** under a0-59 —
+    it breaks off at 20% hull because dying costs the hold, and the hold now lands
+    whole in front of the killer. Comment needs one word; behaviour needs no
+    review. (b) **`transport.ts`'s "half its hold lost" was already wrong before
+    a0-59.** `killShip` sets `ship.cargo = 0` *unconditionally*, so a death has
+    always cost the pilot the entire hold — the fraction only ever governed how
+    much came back as field chunks. The divergent-death drift that passage
+    documents is a bigger accounting hole than it claims, on both builds.
+
 ## BLOCKERS
 
 One: the `unstuck` wedge above — `tests/harness/unstuck.test.ts` is the only red
