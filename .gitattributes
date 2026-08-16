@@ -1,0 +1,25 @@
+# Line endings are part of the build contract (a0-64).
+#
+# Several tests compare a committed artifact, read off disk, against a string
+# built in memory — which always uses "\n":
+#
+#   src/art/preview.test.ts   assets/preview/sprite-sheet.svg vs buildContactSheet()
+#   tests/codex/tone-mirror.test.ts   GDD.md sliced at literal "\n\n" markers
+#
+# Without this file, checkout line endings are decided by whatever `core.autocrlf`
+# the cloning machine happens to carry. A CRLF checkout rewrites every one of those
+# committed bytes on its way to disk, so the comparison can never match and main
+# goes red on a tree that is byte-for-byte correct in the repository. Pinning LF on
+# checkout makes the working tree agree with the index on every machine.
+#
+# Every text blob in this repo is already LF, so this changes no committed content.
+* text=auto eol=lf
+
+# Binary assets: never inspected, never converted.
+*.png binary
+*.wav binary
+*.woff2 binary
+
+# The one committed text file with mixed endings. Left exactly as it is so a fresh
+# clone does not report it as modified; it is a captured probe log, not source.
+evidence/images/probe-online-live-recheck2-m10.txt -text
