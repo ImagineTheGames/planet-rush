@@ -84,10 +84,75 @@ jobs:
         with:
           path: dist
 
+  # --- The subpath gate: the shipped artifact, at the shipped PATH (a0-66). ---
+  #
+  # `verify-live` below is the last thing between a broken deploy and the
+  # developer's phone, and on 2026-08-16 it caught a real one: the client asked
+  # for `https://imaginethegames.github.io/fonts/*.woff2` — no `/planet-rush/` —
+  # and got two 404s. It caught it AFTER the deploy, so the price was 14 merges
+  # during which the last good build kept serving, and the developer noticed
+  # before the studio did, twice.
+  #
+  # Nothing pre-merge could have seen it, for one structural reason: EVERY other
+  # server in this repository serves the game at `/`. vite dev, vite preview, the
+  # mobile suite, the rest of live-stage — origin and base are the same string in
+  # all of them, so a root-absolute URL written as a TypeScript string literal
+  # (which Vite does not rewrite; see src/platform/asset-url.ts) resolves fine
+  # everywhere except the one place that matters.
+  #
+  # This job is that missing server: `vite preview --base /planet-rush/` on the
+  # ordinary `base: './'` build — the same bytes Pages receives, at the path Pages
+  # serves them from — booted twice, with every same-origin request accounted for
+  # and the app-shell worker required to take control. `deploy` needs it, so this
+  # class of bug now fails a PR instead of a deploy.
+  #
+  # Runs on every push, like the merge gate and the perf gate and unlike the
+  # mobile suite: it is ~25 s of test behind the build, and it must not be
+  # `if:`-gated to PRs/main, because `deploy` depends on it and a SKIPPED
+  # dependency skips the dependent — which would silently stop v* tags shipping.
+  subpath-boot:
+    name: Boot from the deploy subpath
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - id: pw
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      # The same VITE_ALLOCATOR_URL the shipped build is given, so the bundle
+      # under test is the bundle that deploys and the online menu does not fail
+      # closed inside this boot.
+      - run: npm run test:subpath
+        env:
+          VITE_ALLOCATOR_URL: https://planet-rush-allocator.fly.dev
+
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-subpath
+          path: playwright-report/
+          retention-days: 7
+
   # --- Publish the built client to GitHub Pages. ------------------------
   deploy:
     name: Deploy to GitHub Pages
-    needs: ci
+    # `subpath-boot` joins `ci` here so a base-path regression can never reach
+    # the live URL again (a0-66). Both run on every push, so neither can be
+    # skipped out from under this job.
+    needs: [ci, subpath-boot]
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
