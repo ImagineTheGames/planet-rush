@@ -30,6 +30,23 @@
  * being fixed rather than a beat being held. The alarm is not exempt — during
  * these three seconds nothing plays, which is the entire point.
  *
+ * **The one exemption, and why it is not a hole (a0-55).** *One* sound is outside
+ * this: the death fall that the quiet is a response to. §4.7 orders the beat —
+ * the sound, **then** the quiet — so the quiet lands *on top of* the fall rather
+ * than replacing it, and a 1.1 s sting multiplied to zero 0.12 s in was heard by
+ * the developer as the audio breaking. That exemption is a piece of *routing* and
+ * lives entirely in `../audio/graph` (the `sting` node, summed past the duck):
+ * nothing here is conditional, this class still returns one number, and the three
+ * seconds it holds are unchanged. What it costs the picture above is one voice
+ * running out under the silence — which is the picture the design describes.
+ *
+ * **The timing invariant that fix rests on.** {@link DeathMoment.gain} is exactly
+ * 1 at the instant of {@link DeathMoment.trigger} and only falls as `update` is
+ * handed time, so the sting always *starts* at full level: the cut does not begin
+ * before the death it holds. `death-moment.test.ts` pins that, and the three
+ * numbers below, so a later optimisation cannot restore the old behaviour by
+ * moving the cut earlier or shortening the quiet.
+ *
  * Overlapping deaths **refresh** rather than stack: two stations dying a second
  * apart is one long quiet, not six seconds of it.
  */

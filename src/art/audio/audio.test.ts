@@ -1340,11 +1340,16 @@ describe('the mix (`./graph`) — built headless', () => {
     const ctx = new FakeAudioContext();
     const graph = new AudioGraph(ctx);
 
-    expect(ctx.gains).toHaveLength(6); // duck, master, and the four buses
-    expect((graph.duck as FakeGain).outputs).toEqual([ctx.destination]);
-    expect((graph.master as FakeGain).outputs).toEqual([graph.duck]);
+    expect(ctx.gains).toHaveLength(7); // master, duck, the four buses, and the sting
+    // buses → duck → master → destination, with the death sting summing into
+    // master past the duck: the one path the three-second hush does not multiply
+    // (a0-55, GDD §4.7 — the quiet lands ON TOP OF the fall). `engine.test.ts`
+    // holds the audible half of that; this is the wiring it rests on.
+    expect((graph.master as FakeGain).outputs).toEqual([ctx.destination]);
+    expect((graph.duck as FakeGain).outputs).toEqual([graph.master]);
+    expect((graph.sting as FakeGain).outputs).toEqual([graph.master]);
     for (const bus of Object.values(graph.buses)) {
-      expect((bus as FakeGain).outputs).toEqual([graph.master]);
+      expect((bus as FakeGain).outputs).toEqual([graph.duck]);
     }
     expect(graph.master.gain.value).toBe(MIX_DEFAULTS.master);
     expect(graph.buses.ambient.gain.value).toBe(MIX_DEFAULTS.ambient);
@@ -1502,6 +1507,7 @@ describe('the mix (`./graph`) — built headless', () => {
     graph.dispose();
     expect((graph.master as FakeGain).disconnected).toBe(1);
     expect((graph.duck as FakeGain).disconnected).toBe(1);
+    expect((graph.sting as FakeGain).disconnected).toBe(1);
     expect(graph.play(SOUND.rockCrack)).toBe(false);
   });
 });

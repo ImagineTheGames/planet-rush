@@ -642,9 +642,17 @@ describe('the mix — the cue set hangs where the hush can reach it', () => {
     expect(reaches(graph.buses.sfx, graph.duck)).toBe(true);
     expect(reaches(engine.uiCues!.room!, graph.duck)).toBe(true);
     engine.cue('press');
+    // Two nodes are downstream of the duck and so cannot reach it — `master`,
+    // which is the player's volume, and `sting`, the station-death fall's own
+    // path around the quiet (a0-55, `./graph`). Nothing the CUE SET builds is
+    // allowed to be either: a glass note that found its way onto the sting path
+    // would play through the three seconds, which is the leak this test exists
+    // to catch.
+    const downstream: AudioNodeLike[] = [graph.duck, graph.master, graph.sting];
     for (const gain of ctx.gains) {
       if (gain.outputs.length === 0) continue;
-      expect(reaches(gain, graph.duck) || gain === graph.duck).toBe(true);
+      if (downstream.includes(gain)) continue;
+      expect(reaches(gain, graph.duck)).toBe(true);
     }
   });
 });
