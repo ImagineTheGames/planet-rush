@@ -8,6 +8,63 @@ half of these amendments; this file is the human-readable why.
 
 ---
 
+## The commons closes to a RING, not onto the centre — the field must never entomb
+
+**Date:** 2026-08-16 · branch `agent/gameplay/a0-59-full-death-drop` (a0-65)
+**Ratified by:** no ruling required — see "Why this is not a balance call" below
+**Amends:** GDD §2.3's Outer Drift, in degree only. `WAVE.lastRadiusFraction`
+**0.25 → 0.5**, plus a new derived rock-size taper (`ringSizeScale()` in
+`src/sim/waves.ts`, allowance `WAVE.ringCorridorAllowance` = 1.7). The field still
+closes over the match and every wave still lands strictly closer in than the last;
+it closes **2× instead of 4×**, and waves 4–5 carry smaller rocks. **Nothing else
+moves:** the wave ore budget, the `N`-fold fairness symmetry, the wave schedule
+and the collapse rules are all untouched.
+
+### What was wrong
+
+The late waves **sealed the map centre**. A ship — bot or human — standing near
+the centre when wave 4 landed could not leave it by any route for the rest of the
+match, at full throttle, with the sim's own anti-wedge escape hatch firing on 98%
+of ticks and unable to help, because the hatch defeats *pinning against a surface*
+and this is *enclosure*.
+
+Measured by flood fill of free configuration space (`src/sim/waves.test.ts`):
+**sealed on 100 seeds out of 100** before the fix, at wave 4 on 96 of them.
+**0 / 100** after.
+
+### Why this is not a balance call, though it moves a balance knob
+
+The direction was forced by arithmetic rather than chosen. The commons is a ring,
+and a ring has a circumference: at `lastRadiusFraction` 0.25 the final wave's ring
+had radius 65 u — circumference 410 u — while the 24 rocks stamped onto it need
+`24 × 2 × 34` = 1632 u of arc before anyone asks for a ship-wide corridor as well.
+24 rocks of radius 22–46 form a closed ring at **any** radius below ~250 u, so a
+field that closes to 77 u entombs by construction, on every seed, forever. There
+was no value of the placement knobs — hole fraction, spoke gap, band width, rock
+count — that opened it; all were measured and all re-sealed.
+
+What remained a taste call was only *how much closure to keep*, and the shipped
+values keep the most that geometry allows while staying open with margin.
+
+This was queued as **Q-6** in `docs/gdd-conformance.md` for a Director ruling
+across many sessions. Q-6 is withdrawn, not answered.
+
+### The cost, stated for the balance crew
+
+- **Ore: unmoved.** `drawCanon` scales rock ore to the wave budget independently
+  of radius, so the taper carries the same ore in smaller, denser rocks.
+- **Fairness: untouched.** Both parts reshape the one drawn sector that is stamped
+  `N`-fold, so the commons stays rotationally symmetric.
+- **The Outer Drift is weaker:** final ring 76.8 u → 153.6 u at 8 players. The
+  endgame commons is a wider band and players converge less tightly.
+- **Late rocks are smaller:** wave 4 ×0.905, wave 5 ×0.565 (mean radius 31 → 28
+  and 37 → 21, against a `SHIP_RADIUS` of 16). Waves 1–3 are placed exactly as
+  before.
+
+Full report and the rejected candidates: `docs/wave-commons-entombment.md`.
+
+---
+
 ## A destroyed ship drops EVERYTHING: the half-burn ore sink is withdrawn
 
 **Date:** 2026-08-16 · branch `agent/gameplay/a0-59-full-death-drop`

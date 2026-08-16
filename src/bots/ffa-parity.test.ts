@@ -101,6 +101,31 @@
  * gives: the two non-hash cases are untouched, and nothing in this change is
  * mode-aware at all — it is one constant in `src/sim/constants.ts`.
  *
+ * ### Re-baselined a fourth time, 2026-08-16 (a0-65) — the map itself moved
+ *
+ * Gameplay lane, flagged for the Bot Engineer. This one is not an economy change
+ * at all: the commons wave geometry was **entombing ships at the map centre** on
+ * 100 seeds out of 100, and a0-65 fixed it. `WAVE.lastRadiusFraction` 0.25 → 0.5
+ * plus a derived rock-size taper (`ringSizeScale()` in `src/sim/waves.ts`).
+ * Amendment: *"The commons closes to a RING, not onto the centre — the field must
+ * never entomb"* in `docs/design-amendments.md`; full report in
+ * `docs/wave-commons-entombment.md`.
+ *
+ * This moves the asteroid field every bot flies through, so it is the largest
+ * world-move of the four: every rock's radius and position on waves 4–5 differs,
+ * and waves 1–3 differ in where later waves sit relative to them. There is no
+ * honest way to hold a state hash across a changed map.
+ *
+ * | Seed | Post-a0-59 | Post-a0-65 |
+ * |---|---|---|
+ * | 20260806 | `f290517f` | `b02582c0` |
+ * | 7 | `b8c73690` | `52475e8b` |
+ * | 991 | `84fd2ef2` | `6bc0291a` |
+ *
+ * **Rule 3 is again unweakened**: the two non-hash cases are untouched, and
+ * nothing in a0-65 is mode-aware — it is map geometry, identical in FFA and in
+ * teams.
+ *
  * The last case is the one that stops this file from being vacuous: it asserts
  * the harness can build a team world *at all*, and that the same lineup on two
  * sides hashes differently. Without it, a `botLobby` that quietly dropped the
@@ -131,17 +156,18 @@ const SECONDS = 180;
  * for the old values and the reasoning).
  *
  * re-measured again on `agent/gameplay/a0-58-whole-ore-only` when every ore mint
- * became whole (a0-58), and once more on
- * `agent/gameplay/a0-59-full-death-drop` when a destroyed ship began dropping its
- * whole hold (a0-59 — the module note carries all three moves and their reasons).
+ * became whole (a0-58), once more on `agent/gameplay/a0-59-full-death-drop` when a
+ * destroyed ship began dropping its whole hold (a0-59), and a fourth time on the
+ * same branch when a0-65 reshaped the commons waves so they stop entombing ships
+ * at the map centre — the module note carries all four moves and their reasons.
  *
  * **Do not re-baseline these.** The only thing that has ever earned it is a
  * ratified amendment in `docs/design-amendments.md`.
  */
 const GOLDEN: readonly (readonly [seed: number, hash: string])[] = [
-  [20260806, 'f290517f'],
-  [7, 'b8c73690'],
-  [991, '84fd2ef2'],
+  [20260806, 'b02582c0'],
+  [7, '52475e8b'],
+  [991, '6bc0291a'],
 ];
 
 /** One eight-bot match, the shipped cast, the offline lobby's own roster path. */
