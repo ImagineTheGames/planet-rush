@@ -334,6 +334,16 @@ export interface PersistedPlaytestLog {
   readonly savedAt: number;
   /** Events evicted by the ring across the whole session, reloads included. */
   readonly dropped: number;
+  /**
+   * Whether the session had seen a match by the time of the write.
+   *
+   * Persisted rather than re-derived from `events`, for the same reason
+   * {@link PlaytestLog.coverage} is a flag rather than a scan: a long session can
+   * evict the very match events that set it, and a reload must not be where a log
+   * forgets it had a match. Absent in a blob written by an older build, which then
+   * falls back to what the restored events themselves say.
+   */
+  readonly sawMatch: boolean;
   readonly events: readonly PlaytestLogEvent[];
 }
 
@@ -379,6 +389,7 @@ export function parsePersistedLog(text: string | null, now: number): PersistedPl
     startMs,
     savedAt: typeof blob.savedAt === 'number' && Number.isFinite(blob.savedAt) ? blob.savedAt : startMs,
     dropped: typeof blob.dropped === 'number' && Number.isFinite(blob.dropped) ? Math.max(0, Math.floor(blob.dropped)) : 0,
+    sawMatch: blob.sawMatch === true || events.some((e) => e.kind === 'match'),
     events,
   };
 }
@@ -559,10 +570,10 @@ export class PlaytestLog {
     // …and the header says when the session — not this page load — began, so the
     // one absolute instant in the file still anchors `at: 0`.
     this.environment = { ...this.environment, startedAt: restored.startedAt };
-    for (const event of restored.events) {
-      this.ring.push(event);
-      if (event.kind === 'match') this.sawMatch = true;
-    }
+    for (const event of restored.events) this.ring.push(event);
+    // Carried as a FLAG, not re-derived: the previous page load may have evicted the
+    // match events that set it, and a reload is not where a log forgets it had one.
+    this.sawMatch = restored.sawMatch;
     // Evictions carry too: a session that has dropped 40 events across two page
     // loads has dropped 40, and the export must keep saying so.
     this.evicted = restored.dropped;
@@ -771,6 +782,7 @@ export class PlaytestLog {
           startMs: this.startMs,
           savedAt: now,
           dropped: this.evicted,
+          sawMatch: this.sawMatch,
           events: this.ring,
         }),
       );

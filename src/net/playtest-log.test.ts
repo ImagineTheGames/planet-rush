@@ -480,6 +480,24 @@ describe('PlaytestLog — persistence across a page reload (a0-56)', () => {
     expect(second.coverage).toBe('boot-only');
   });
 
+  it('carries "there was a match" across a reload that evicted the proof', () => {
+    // The nastiest version of the a0-56 lie: a long session whose match has scrolled
+    // out of the ring, reloaded. Deriving coverage from the restored events alone
+    // would report `boot-only` for a session that plainly had a match in it.
+    const store = memoryPlaytestLogStore();
+    const c = clock();
+    const first = new PlaytestLog({ env: ENV, capacity: 3, now: c.now, store });
+    first.recordMatch('matchStart');
+    for (let i = 0; i < 10; i++) first.record('note', `n${i}`);
+    first.flush();
+    expect(first.events.some((e) => e.kind === 'match')).toBe(false);
+
+    const second = new PlaytestLog({ env: ENV, capacity: 3, now: c.now, store });
+    expect(second.events.some((e) => e.kind === 'match')).toBe(false);
+    expect(second.coverage).toBe('match');
+    expect(second.snapshot().coverage).toBe('match');
+  });
+
   it('remembers a match that the ring has since evicted', () => {
     // Coverage is a fact about what was RECORDED, not about what is still held: a
     // long session must not lose the answer to "was there a match?" to its own
@@ -583,6 +601,7 @@ describe('parsePersistedLog — a stored log is untrusted input', () => {
       startMs: 1_000,
       savedAt: 9_000,
       dropped: 2,
+      sawMatch: true,
       events: [{ at: 5, kind: 'match', msg: 'matchStart' }],
       ...overrides,
     });
@@ -593,6 +612,14 @@ describe('parsePersistedLog — a stored log is untrusted input', () => {
     expect(parsed.events).toHaveLength(1);
     expect(parsed.dropped).toBe(2);
     expect(parsed.startMs).toBe(1_000);
+    expect(parsed.sawMatch).toBe(true);
+  });
+
+  it('falls back to the events for a blob written before sawMatch existed', () => {
+    expect(parsePersistedLog(stored({ sawMatch: undefined }), NOW)!.sawMatch).toBe(true);
+    expect(
+      parsePersistedLog(stored({ sawMatch: undefined, events: [{ at: 1, kind: 'note', msg: 'n' }] }), NOW)!.sawMatch,
+    ).toBe(false);
   });
 
   it('is null for nothing, for garbage, and for another schema or version', () => {
