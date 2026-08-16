@@ -38,6 +38,16 @@ Consequences to know:
   `docs/progression-plan.md`, `tests/harness/a0-08-evidence.test.ts` and the
   regenerated `evidence/a0-08-loot-tell/trace.txt`.
 
+- `9d52dc6` **docs(a0-59)** — the wedge A/B re-measured on 200 seeds, both arms,
+  replacing a table that did not reproduce. See BLOCKED. Nothing in the shipped
+  code changed; this commit is the evidence the Director's ruling rests on.
+
+**Verified green, not re-done, on 2026-08-16 (third session):** `npx tsc --noEmit`
+exits 0; the constant is `1`; `drops the whole hold` is present and exact; CI's own
+log for `96bfe7e` reads **299 of 300 test files passed**, the single failure being
+`tests/harness/unstuck.test.ts` at seed 15. Both remote DoD greps pass against
+`FETCH_HEAD`.
+
 ## DECISIONS
 
 **Kept a0-58's whole-ore invariant, which this brief mostly dissolves.** At a
