@@ -1116,7 +1116,82 @@ under it did not. Trust the measured table, not the prose around it.)*
     tracker again. **The only thing still missing is the ruling**, and it is now
     queued in four places with a measured menu attached.
 
+- **2026-08-16, sixteenth session — what this one actually did.** One commit,
+  **`966c1d9`**. The shipped a0-59 work is untouched and the blocker's *ask* is
+  unchanged — but it is no longer a binary, and that is the finding.
+  - **Re-verified, nothing redone:** local `HEAD` == `origin/…` == `49e272a` at
+    start, `main` still `221a2b1` and **0 commits ahead**, `tsc --noEmit` exits 0,
+    the constant is `1` at `constants.ts:1032`, `drops the whole hold` at
+    `damage.test.ts:83`, both remote DoD greps pass against `FETCH_HEAD`. PR #436
+    open, UNSTABLE, the only `fail` bucket is `Typecheck, test, build` (two
+    duplicate workflow runs of it, not two failures). **Still no Director ruling**
+    — three comments, all mine, zero reviews. Did not escalate a fourth time on
+    the same ask; the new finding went into the PR **body**, the report and Q-6.
+  - **Did not re-measure the wedge, the geometry, enclosure, or the candidate
+    fixes.** All four are settled and pinned; sessions 12–15 say stop and they are
+    right.
+  - **`966c1d9` — the finding: sixteen sessions of measurement are coupled to a
+    ruling that is not about them, and nobody had checked whether the coupling is
+    real.** Everything this lane found about the wave trap — the defect report, the
+    detector, Q-6 — lives on PR #436. If the ruling is *"hold a0-59"*, all of it is
+    held too and the trap goes back to being invisible on `main`, where it is live
+    right now. That is not a decision anyone made; it is an accident of where the
+    work happened to be written.
+  - **Measured, both directions.** *(a)* Flipped the constant to `main`'s `0.5` on
+    this tree: `src/sim/waves.test.ts` passes **unchanged**, while
+    `damage.test.ts` and `loot-tell.test.ts` fail — that is the line between the
+    separable half and the a0-59-dependent half, drawn by measurement rather than
+    by reading the diff. Constant restored; `git diff -- src/` verified **empty**.
+    *(b)* Then against **actual `main`**, which removes the inference entirely: a
+    detached worktree at `origin/main` (`221a2b1`), the four candidate files
+    checked into it → `git diff -U0` over `waves.ts`/`step.ts` filtered of comments
+    is **empty**, `tsc --noEmit` exits **0**, and **`npx vitest run src/sim` passes
+    376/376** with `waves.test.ts` reporting the *identical* verdicts (escapable
+    through wave 3, sealed at waves 4 and 5, seeds 1/15/42). Worktree removed with
+    `git worktree remove`, never `git clean`.
+  - **Separable:** `src/sim/waves.test.ts`, `docs/wave-commons-entombment.md`, the
+    comment-only edits in `waves.ts` and `step.ts`, Q-6 and the §2.3 row in
+    `docs/gdd-conformance.md`. **Not separable:** `damage.test.ts`,
+    `loot-tell.test.ts`, the re-measured `ffa-parity` / `online-radio` goldens, and
+    the constant itself. `constants.ts` is mixed — its comments separate, its one
+    line does not.
+  - **A second, stronger proof fell out of it.** The detector is green on `main`
+    **because it characterises a defect `main` has**. That is a cleaner
+    demonstration that a0-59 did not cause the trap than the 200-seed wedge A/B —
+    it needs no seed sampling and no argument about which 24 seeds a gate happens
+    to draw. Worth reaching for first if the question is ever re-litigated.
+  - **Recorded, not executed.** The split needs a second branch and this brief
+    permits exactly one pushed branch, so the verified file list is written down
+    instead — `docs/wave-commons-entombment.md` → *"This report does not depend on
+    a0-59"*, and the scheduling half of Q-6. Flagged in the PR body too.
+  - **No value moves.** `git diff -U0 -- src/` filtered of comment and blank lines
+    is **empty**; `tsc --noEmit` exits 0; 53 sim tests green.
+  - **The lesson, continuing the series.** Sessions 8/9/11/13/14/15 learned *sweep
+    the English*, *sweep every directory*, *link the finding where people look*,
+    *a gate's threshold is a definition not a detector*, *do not read an
+    instrument's verdict as the thing itself*, and *measure the remedy to the same
+    standard as the defect*. This one is about the container rather than the
+    content: **check whether a blocker actually blocks what you have parked behind
+    it.** Fifteen sessions accepted "a0-59 is blocked, therefore this work waits"
+    without ever testing the *therefore*. The dependency was assumed from where the
+    files sat, and it took four minutes to disprove.
+  - **What a seventeenth session should NOT do.** Everything in the twelfth
+    through fifteenth lists still holds, plus: do not re-run the separability
+    check — it is measured on both `main`'s constant value and actual `main`, and
+    the file list is committed. **The only thing still missing is the ruling.**
+
 ## BLOCKERS
+
+*(**SIXTEENTH session, 2026-08-16: the ask is unchanged, but it is NOT A BINARY
+and has been written as one for ten sessions. Measured — on `main`'s constant
+value and then in a detached worktree at actual `main` — the trap evidence carries
+no dependence on a0-59: `src/sim/waves.test.ts`,
+`docs/wave-commons-entombment.md` and the comment-only `waves.ts`/`step.ts` edits
+typecheck clean on `main` and pass `npx vitest run src/sim` 376/376, with the
+detector giving identical verdicts. So the evidence half can land whichever way
+the constant goes, and holding it alongside a0-59 is an accident rather than a
+decision. Third option and the verified file list: `docs/wave-commons-entombment.md`
+→ *This report does not depend on a0-59*, and the scheduling half of Q-6.**)*
 
 *(**FIFTEENTH session, 2026-08-16: the ask is still unchanged, but the MENU
 attached to it is not. Every candidate fix below had been costed by arithmetic and
