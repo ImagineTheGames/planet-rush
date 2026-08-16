@@ -219,6 +219,12 @@ is a design ruling.
 
 None is taken. Each needs a design ruling.
 
+> **Before reading these, read the measured warning in *A second-order bug in the
+> same file* below.** There is a fourth thing one could do — reserve the commons
+> eye by rock body, correcting a real inconsistency — and it turns the red gate
+> **green while leaving the ring 360/360 sealed**. It is the cleanest-looking edit
+> here and it is the one that must not be made alone.
+
 **1 · Widen the final wave's ring (`WAVE.lastRadiusFraction`, currently 0.25).**
 **Recommend against — it is a non-starter, not a trade-off.** Passability needs a
 ring mid radius of ~276 u out of a 307 u field, i.e. `lastRadiusFraction ≈ 0.90`
@@ -274,6 +280,69 @@ only 19.3 u of actually-free space. **Correcting it alone does not open a corrid
 — the ring is oversubscribed either way — but it is the same class of mistake, it
 makes the constant mean what its name says, and it belongs in whichever brief takes
 candidate 2. It moves rock positions, so it moves goldens.
+
+### MEASURED, and it is a trap: this correction MASKS the gate
+
+*(Thirteenth session, 2026-08-16. The paragraph above was reasoned; this is
+measured, and it turns a tidy-looking cleanup into the most dangerous edit in this
+file.)*
+
+Applying exactly that one-term correction —
+
+```ts
+const innerRadius = discRadius * RESOURCE_FIELD.commonsHoleFraction + ASTEROID.maxRadius;
+```
+
+— and running the gate's own `worstWedge` probe verbatim at both values:
+
+| build | free pocket (seed 15) | escape bearings blocked | `unstuck` seed 15 |
+|---|---|---|---|
+| shipped | 21.6 u | **360 / 360** | **133.5 s — RED** |
+| eye reserved by body | 42.1 u | **360 / 360** | **2.7 s — GREEN** |
+
+Worst wedge across all four decisive seeds falls to 2.4–2.7 s, under both
+`WEDGE_LIMIT_S` (12 s) and the file's own worst-transient canary. **The only red
+check on PR #436 goes green.**
+
+**The ship is no less entombed.** The ring is 100 % sealed on *both* builds — not
+one of 360 bearings admits a `SHIP_RADIUS` hull out of the commons, before or
+after. The correction doubles the pocket (21.6 → 42.1 u) and opens **zero** exits.
+What changes is only that the hull's centre can now roam ~26 u instead of ~5.6 u,
+and `unstuck.test.ts:107` **re-anchors** whenever a hull travels more than
+`WEDGE_R = 8` from its anchor. Above that threshold the gate stops accumulating
+held time. The trap becomes invisible to the instrument while getting slightly
+worse for the player: a bigger sealed pocket to cruise around inside, for the rest
+of the match.
+
+That is the whole mechanism, and it is worth stating plainly because it is
+counter-intuitive: **`WEDGE_R = 8` is not a measure of confinement, it is a
+measure of confinement *tighter than 8 u*.** A ship sealed in a 42 u cell is
+entombed and reads as healthy.
+
+Method, so it can be re-run: one line flipped on this tree, both arms measured,
+then reverted — `git diff -- src/` empty afterwards, which is the proof the
+restore was exact. Solidity is measured off the *field*, not off a ship, precisely
+because changing the geometry re-rolls the match: under the correction slot 2 is
+simply somewhere else when wave 5 lands (min radius 137 u, never at the centre),
+so any ship-tracking measurement compares two different matches and answers
+nothing. Ray-cast: for each of 360 bearings from the map centre, require
+perpendicular clearance `> rock.radius + SHIP_RADIUS` against every rock along the
+path out to 300 u.
+
+Two caveats on the numbers, stated rather than smoothed over. This ray-cast is
+**stricter than the 232–304/360 figures in the incidence table above** — it demands
+whole-path clearance for a 16 u hull against the *cumulative* field (81 rocks
+inside 260 u by wave 5), where the earlier metric looked at wave 5's own ring. Both
+say sealed; only this one says *completely*. And the probe reproduces the earlier
+free-pocket figure exactly — 21.6 u at seed 15, matching the measured pocket at the
+top of this document — which is what validates it against known ground truth.
+
+**Consequence for whoever takes this brief: do not take this correction as the
+fix, and do not let a green `unstuck` be the evidence that the trap is gone.** It
+is still worth making — the constant should mean what its name says — but it must
+land *with* candidate 2, never before it, and the gate must not be the thing that
+certifies it. On its own it is a change that deletes the only instrument currently
+detecting a live, player-affecting defect.
 
 ---
 

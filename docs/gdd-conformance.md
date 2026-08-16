@@ -784,6 +784,18 @@ would entomb** — touches no rock, so `FIELD_YIELD` and the field's symmetry st
 exact and almost no golden moves; but it is a new sim rule, and it treats the
 symptom, since the centre stays sealed for anyone who flies in *after* the wave.
 
+**One warning, because it is the edit anyone would reach for first.** There is a
+fourth-looking option — reserve the commons eye by rock **body** instead of
+**centre**, correcting a genuine inconsistency with the launch pocket 90 lines
+above in the same file. **Measured, both arms: it turns the red gate green while
+leaving the ring 360/360 sealed.** It doubles the free pocket (21.6 → 42.1 u) and
+opens *zero* escape bearings; the worst wedge at seed 15 falls 133.5 s → 2.7 s
+purely because `unstuck.test.ts` re-anchors once a hull moves 8 u, and a ship in a
+42 u sealed cell clears that. The player is still entombed — in a slightly larger
+cell — and the only instrument that detects it has been switched off. The
+correction is still worth making, but it must land **with** candidate 2, never
+before it, and a green `unstuck` must not be the evidence that the trap is gone.
+
 **And the scheduling half, which is the part actually blocking work.** a0-59 is a
 one-constant developer ruling ("destroyed ships should drop all their ore") that
 **neither caused this nor worsens it** — its entire behavioural delta against

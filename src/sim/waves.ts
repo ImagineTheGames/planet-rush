@@ -406,6 +406,16 @@ export function spawnWave(world: World, count: number = world.asteroidsPerWave):
   // which are design calls; see the defect report. DO NOT "fix" this by widening
   // `commonsSpokeGap` or `commonsHoleFraction`.
   //
+  // AND DO NOT "fix" IT BY ADDING `+ ASTEROID.maxRadius` TO `innerRadius` BELOW,
+  // tempting as that is — it is the one edit that makes the eye mean what its name
+  // says, and on its own it is a GATE MASK. Measured both arms (a0-59, thirteenth
+  // session): it doubles the free pocket, 21.6 u → 42.1 u, and opens ZERO of 360
+  // escape bearings — the ring stays 100% sealed. What it does is lift the hull's
+  // roaming radius above `unstuck.test.ts`'s `WEDGE_R = 8` re-anchor threshold, so
+  // the standing wedge gate stops seeing the trap: seed 15 falls 133.5 s → 2.7 s
+  // and CI goes green while the player stays entombed in a bigger cell. Make this
+  // correction only TOGETHER WITH the rock size/count fix, never before it.
+  //
   // Both are pure `N`-fold-symmetric reshapes of one drawn sector, so the commons
   // stays symmetric and carries the same `WAVE_ORE` — the fairness invariant is
   // untouched (`resource-fairness.test.ts`).
