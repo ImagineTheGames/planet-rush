@@ -151,10 +151,12 @@ describe('the death drop pays the sink what it cannot mint (a0-58)', () => {
       expect(dropped + burnt, `hold ${hold}: dropped + deathLoss`).toBeCloseTo(hold, 12);
       expect(victim.cargo).toBe(0);
 
-      // …and the sink is the only place the remainder can be. Half the hold was
-      // always burnt (GDD §2.3); the sub-chunk remainder now joins it there.
-      const half = hold * DEATH_ORE_DROP_FRACTION;
-      expect(dropped, `hold ${hold}: never more than the ratified half`).toBeLessThanOrEqual(half + 1e-9);
+      // …and the sink is the only place anything undropped can be. Since a0-59 the
+      // whole hold is owed to the field, so for a hold that divides this bound is
+      // tight and `burnt` is 0. Written against the constant rather than the value:
+      // it is the same line that held the old half-drop honest, and it is TUNABLE.
+      const owed = hold * DEATH_ORE_DROP_FRACTION;
+      expect(dropped, `hold ${hold}: never more than the drop is owed`).toBeLessThanOrEqual(owed + 1e-9);
       expect(burnt, `hold ${hold}`).toBeCloseTo(hold - dropped, 12);
 
       // The books still balance against the world itself, not just against
