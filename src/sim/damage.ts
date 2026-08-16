@@ -56,10 +56,18 @@ export function damageShip(world: World, target: Ship, amount: number, by?: Play
  * The drop is still minted in **whole `CHUNK.ore` units and nothing else**
  * (a0-58), and the sub-chunk remainder still burns with the ship in `deathLoss`.
  * At today's numbers that path is dead — a whole hold times `1` divides exactly —
- * and it is kept precisely because both numbers are TUNABLE: the fraction moving
- * off `1`, or `CHUNK.ore` moving off `1`, re-creates the remainder in one edit.
- * See the comment on the split below for why a fraction in a hold is a bug and not
- * an accounting nicety.
+ * and it is kept because `DEATH_ORE_DROP_FRACTION` is TUNABLE and the day it
+ * leaves `1` the remainder is back in one edit. See the comment on the split below
+ * for why a fraction in a hold is a bug and not an accounting nicety.
+ *
+ * **`CHUNK.ore` is NOT the other half of that, though this file used to say it
+ * was (corrected 2026-08-16, measured).** a0-58 quantised every boundary a hold
+ * has, so `cargo` is always an exact multiple of `CHUNK.ore`; a drop of the whole
+ * hold therefore divides exactly at ANY chunk size, and `deathLoss` stays empty at
+ * all of them. What the chunk size does is set how much the floor destroys ONCE the
+ * fraction is off `1` — at `0.5` a one-chunk hold burns entirely, and a chunk is
+ * `CHUNK.ore` ore. The two knobs are not symmetric: one arms the sink, the other
+ * scales its bite. `./damage.test.ts`, 'the sink is armed by the fraction alone'.
  *
  * `by` credits the killing blow to one slot, never split (§1.5 trap 5). The slot
  * is the accounting key rather than the hull, so a shot that outlives its owner's
@@ -93,12 +101,16 @@ export function killShip(world: World, ship: Ship, by?: PlayerId): void {
   // a0-59 took the fraction to 1, which DISSOLVES today's instance of that: `drop`
   // is the whole hold, and a whole hold divides into whole chunks with nothing
   // over, so `deathLoss` is 0 for an ordinary death and every ore the pilot carried
-  // reaches the field. The floor stays anyway. `DEATH_ORE_DROP_FRACTION` and
-  // `CHUNK.ore` are BOTH tunable, and either one moving off 1 re-mints the
-  // remainder immediately — this is the invariant that makes that safe, not a
-  // reaction to a value (LESSONS §26: assert the relationship, not today's number).
-  // Deleting it because it currently subtracts zero is how the 0.5 comes back as a
-  // silent leak instead of a tuning decision.
+  // reaches the field. The floor stays anyway. `DEATH_ORE_DROP_FRACTION` is TUNABLE
+  // and moving it off 1 re-mints the remainder immediately — this is the invariant
+  // that makes that safe, not a reaction to a value (LESSONS §26: assert the
+  // relationship, not today's number). Deleting it because it currently subtracts
+  // zero is how the 0.5 comes back as a silent leak instead of a tuning decision.
+  //
+  // (This used to name `CHUNK.ore` as a second trigger. It is not one: holds are
+  // whole chunks by a0-58's construction, so `drop = held` divides exactly at every
+  // chunk size — measured 0.00 burned across 2358 deaths at `CHUNK.ore` 1, 2 and 3.
+  // The chunk size scales what the floor destroys once the FRACTION is off 1.)
   //
   // Driven off `CHUNK.ore` throughout, never the literal 1: it is TUNABLE, and the
   // day it moves this must still emit chunk-sized pieces.

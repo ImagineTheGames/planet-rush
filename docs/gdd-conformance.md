@@ -555,6 +555,23 @@ instead, and should read a0-59 as closer to a defender's buff than to a buff to
 intercepting haulers. Table, caveats and the tagger's 97 % coverage:
 `docs/design-amendments.md` → *Where the ore actually lands*.
 
+**Which of these two TUNABLEs is the dangerous one — measured, and it is not the
+one the sim's own comments named.** `DEATH_ORE_DROP_FRACTION` and `CHUNK.ore` were
+swept together over {1, 0.5} × {1, 2, 3}, six full natural matches per arm. Three
+results for anyone tuning either. (a) **`CHUNK.ore` is safe to tune on the
+death-drop path**: 0.00 ore burned across 2,358 deaths at chunk sizes 1, 2 and 3,
+because a0-58 made every hold an exact multiple of the chunk size, so a whole-hold
+drop divides exactly whatever the chunk is. (b) **The fraction is the knob that
+arms the burn**, and it is a big term the moment it moves — 283 of the 396 ore that
+died, at `main`'s 0.5. (c) **They interact, which nothing had recorded:** the chunk
+size scales what the floor destroys *once the fraction is off 1*, because a hold of
+a single chunk always returns nothing at 0.5 and a chunk is `CHUNK.ore` ore. At
+0.5 × 3 that reaches **100 % of everything that died**. So a future "put the half
+back" tune costs progressively more ore as `CHUNK.ore` rises, and the two must be
+re-tuned together rather than independently. The ore ledger conserves exactly in
+all six arms (residual ≤ 6.3e-13). Method and table: `docs/design-amendments.md`
+→ *The sink, MEASURED*; pinned by `src/sim/damage.test.ts`.
+
 ### §2.9 AI opponents *(10 claims: 10 SHIPPED)*
 
 | Claim | Verdict | Evidence |

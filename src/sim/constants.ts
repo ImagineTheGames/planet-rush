@@ -1042,8 +1042,17 @@ export const WRECK = {
  * Still TUNABLE, and still not assumed to be 1 anywhere: `killShip` mints whole
  * `CHUNK.ore` pieces and sinks the sub-chunk remainder (a0-58), which is a no-op
  * at `1` with a whole hold and the thing that keeps the ledger honest the moment
- * this moves off `1` — or `CHUNK.ore` moves off `1`. Assert the relationship, not
- * today's value (LESSONS §26). TUNABLE
+ * this moves off `1`. Assert the relationship, not today's value (LESSONS §26).
+ *
+ * **This knob arms that sink; `CHUNK.ore` does not** — a claim this comment made
+ * until it was measured (2026-08-16). Holds are exact multiples of `CHUNK.ore` by
+ * a0-58's construction, so a whole-hold drop divides exactly at every chunk size:
+ * 0.00 ore burned across 2358 deaths at `CHUNK.ore` 1, 2 and 3, against 283 of 396
+ * burned on the same seeds at a fraction of `0.5`. So conservation rests on ONE
+ * knob, not two, and `CHUNK.ore` is safe to tune on this path. What the chunk size
+ * does is scale the damage once THIS leaves `1`: at `0.5` a hold of a single chunk
+ * returns nothing at all, and that chunk is `CHUNK.ore` ore — so the ore a
+ * half-drop silently destroys grows with the chunk. TUNABLE
  */
 export const DEATH_ORE_DROP_FRACTION: Tunable<number> = 1;
 

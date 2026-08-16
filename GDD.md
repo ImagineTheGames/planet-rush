@@ -146,8 +146,16 @@ ledger with no sink for a flow cannot conserve the day that flow returns.
 so a half-unit is ore the player owns and no readout can print. Whatever is too
 fine to mint is recorded as a sink (`deathLoss`, `capLoss`, `dust`) rather than
 laid on the field. This is kept even though a0-59's whole-hold drop leaves it
-nothing to round today — both the fraction and the chunk size are TUNABLE, and
-either one moving re-creates the remainder at once.
+nothing to round today — `DEATH_ORE_DROP_FRACTION` is TUNABLE, and it moving off 1
+re-creates the remainder at once (measured: 283 of the 396 ore that died, over six
+matches at `0.5`).
+
+*(Corrected 2026-08-16: this named the chunk size as a second trigger, and it is
+not one. `CHUNK.ore` is TUNABLE too, but a0-58 quantised every boundary a hold has,
+so a hold is always a whole number of chunks and a whole-hold drop divides exactly
+at any chunk size — 0.00 burned across 2,358 deaths at chunk sizes 1, 2 and 3. What
+the chunk size does is scale what the floor destroys once the FRACTION is off 1.
+`docs/design-amendments.md` → **The sink, MEASURED**.)*
 
 The loop is a triangle — mine / defend / attack — and every death, upgrade, and turret shifts where a player should be on it. That decision, made every few seconds with one ship, is the game.
 

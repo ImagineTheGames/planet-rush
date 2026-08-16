@@ -247,19 +247,78 @@ hold without reaching the field. A ledger with no sink for a flow cannot stay
 conserved the day that flow reappears, and `expectedLiveOre` subtracts it either
 way — a zero term costs nothing and an absent term costs the invariant.
 
+### The sink, MEASURED — and the trigger was named wrong (nineteenth session)
+
+The paragraph above is the DoD's reasoning, and for eighteen sessions it was
+*reasoning*: nobody had ever made the flow reappear and checked that the ledger
+survived it. Doing so took one sweep — `DEATH_ORE_DROP_FRACTION` × `CHUNK.ore`
+over {1, 0.5} × {1, 2, 3}, six full natural eight-slot matches per arm run to
+their own ending, residual sampled every tick, ~4,700 deaths in all. The fraction
+arms are a real file edit and were restored exactly (`git diff -- src/` empty);
+the chunk arms mutate `CHUNK.ore` at runtime, which works because `as const` is
+compile-time only.
+
+| fraction | `CHUNK.ore` | ore at death | `deathLoss` | share burned | max residual |
+|---|---|---|---|---|---|
+| **1** (shipped) | 1 | 526 | **0.00** | **0 %** | 6.8e-13 |
+| **1** | 2 | 486 | **0.00** | **0 %** | 4.5e-13 |
+| **1** | 3 | 99 | **0.00** | **0 %** | 8.2e-13 |
+| 0.5 (`main`) | 1 | 396 | **283** | **71.5 %** | 5.1e-13 |
+| 0.5 | 2 | 336 | 274 | 81.5 % | 6.3e-13 |
+| 0.5 | 3 | 78 | **78** | **100 %** | 5.7e-13 |
+
+**Two things it settles and one it corrects.**
+
+1. **The sink is load-bearing, not decorative.** At `main`'s fraction it carries
+   283 of the 396 ore that died. Deleting it — which "it is always 0 now" invites —
+   opens a hole of that size the instant anyone tunes the fraction back.
+2. **Conservation holds in every arm**, residual ≤ 6.3e-13 against a 1e-6
+   tolerance, sink present. The DoD's claim is now evidenced.
+3. **`CHUNK.ore` does not arm the sink, and this file said it did.** Measured
+   0.00 burned across 2,358 deaths at chunk sizes 1, 2 *and* 3. The reason is
+   structural rather than lucky: a0-58 quantised **every** boundary a hold has —
+   the tractor takes `room` floored to whole `CHUNK.ore` (`step.ts`), the drain
+   returns `k · CHUNK.ore` (`dueThisTick`), and all four mint sites emit exactly
+   `CHUNK.ore` — so `cargo` is always an exact multiple of the chunk size (pinned
+   across all three paths by `ore-ledger.test.ts`, *"cargo is never a non-multiple
+   of CHUNK.ore"*). A whole-hold drop therefore divides exactly at any chunk size.
+   The algebra: for a hold of `n` chunks, `deathLoss / held = (n − ⌊n·f⌋) / n`, in
+   which the chunk size **cancels**.
+
+**Why the correction matters in both directions.** Against this branch: the guard
+rests on **one** knob, not the two it claimed, so it is less exercised than
+advertised. For the balance crew: `CHUNK.ore` is therefore **safe to tune** on this
+path — it cannot open a death-drop leak. But the two knobs *interact*, and that had
+never been named: the chunk size scales what the floor destroys **once the fraction
+is off 1**. At `0.5` a hold of a single chunk returns nothing at all, and a chunk is
+`CHUNK.ore` ore — which is why the 0.5 × 3 arm burns **100 %** of everything that
+died. A half-drop at a bigger chunk is a *total* burn for any hold under two chunks.
+
+Pinned by `src/sim/damage.test.ts`, *'the sink is armed by the fraction alone —
+CHUNK.ore cannot re-arm it'*, which asserts the cancellation across chunk sizes 1–4
+and therefore still passes at a fraction of 0.5 (verified) — the relationship, not
+today's value.
+
+*Independent cross-check of the seventeenth session:* the 0.5 × 1 arm returns
+**28.5 %** of a dead hold on these six seeds against the **30.3 %** measured over
+24 seeds there, on different seeds and a different instrument.
+
 ### a0-58's whole-ore invariant is kept, and this is the point
 
 This brief mostly *dissolves* the case that motivated a0-58: at a fraction of 1 the
 drop equals the hold, and a whole hold divides into whole chunks with nothing over,
 so no remainder piece is ever minted. The rounding still runs; it subtracts zero.
 
-It stays anyway. `DEATH_ORE_DROP_FRACTION` and `CHUNK.ore` are **both** TUNABLE,
-and the fraction returning to anything but 1 — or `CHUNK.ore` moving off 1 —
-re-creates the remainder in a single edit. The invariant is what makes that edit
-safe instead of a silent leak, and deleting a guard because today's value happens
-to make it a no-op is precisely the failure four star-bloom rounds paid to learn
-(LESSONS §26: assert the relationship, not today's value). `src/sim/damage.test.ts`
-gates both rules in one file for the same reason.
+It stays anyway. `DEATH_ORE_DROP_FRACTION` is TUNABLE, and the fraction returning to
+anything but 1 re-creates the remainder in a single edit — measured above, at 283
+ore over six matches. The invariant is what makes that edit safe instead of a silent
+leak, and deleting a guard because today's value happens to make it a no-op is
+precisely the failure four star-bloom rounds paid to learn (LESSONS §26: assert the
+relationship, not today's value). `src/sim/damage.test.ts` gates both rules in one
+file for the same reason.
+
+*(This paragraph used to add "or `CHUNK.ore` moving off 1" as a second trigger.
+It is not one — see the measured section above.)*
 
 ### Determinism goldens re-measured
 
