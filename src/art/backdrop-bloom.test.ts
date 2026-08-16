@@ -56,17 +56,22 @@
  * build. Nothing here weakens an a0-18 assertion — the file only gains.
  */
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { PNG } from 'pngjs';
 import { describe, expect, it } from 'vitest';
 import { Container, Graphics } from 'pixi.js';
 import {
   BLOOM,
   SPIKE,
   STAR_LAYERS,
+  VOID_SEED,
   VoidBackdrop,
   coverSpan,
+  starFieldSprite,
   type MapId,
 } from './backdrop';
-import { MOCKUP_STARS, STAR_TEMPERATURE_COLORS } from './mockup-reference';
+import { MOCKUP_STARS, STAR_TEMPERATURE_COLORS, haloRadiusOf } from './mockup-reference';
 import { hex } from './palette';
 
 /**
@@ -485,5 +490,229 @@ describe('nothing downstream may take the bloom back off the stage', () => {
         expect(bloomedOf(submittedStars(gfx)).length, `${arena}/${key} blooms`).toBeGreaterThan(0);
       }
     }
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// a0-53 — measured off the shipped frame
+// ---------------------------------------------------------------------------
+//
+// **Every bloom assertion above this line — and every one in `backdrop.test.ts`
+// — measures the MODEL.** They read the shapes `starFieldSprite` authors, or the
+// instructions the live `Graphics` submits, and check those against the design's
+// own rules. That is the right instrument for "did the halo reach the stage",
+// and it is why four rounds of green tests have coexisted with a developer
+// opening the game and seeing the wrong thing:
+//
+//   a0-22  the bloom's colour        measured, correct, still reported
+//   a0-44  the halo radius vs spike  measured, correct, still reported
+//   a0-45  the halo vs spike alpha   measured, correct, still reported
+//   a0-53  the radius, again
+//
+// a0-53 measured the **lit pixel** instead, and the break is past every one of
+// those instruments. LESSONS §26 says assert relationships rather than values;
+// this block is the other half of it — assert them on **the artefact the player
+// is looking at**, in pixels.
+//
+// ## The frames
+//
+// Both are real renders, committed under `evidence/a0-53-bloom-radius/frames/`
+// so the gate and the audit measure the same bytes, and both are captured with
+// QA's own frozen boot (`?debug=1&freeze=1`, desktop 1280×800 at dpr 1 — which
+// is `octagon`, and therefore sky NONE: ground and stars, nothing else):
+//
+//  · `renderer-probe.png` — the whole real `src/render` `Renderer`, driven as
+//    `src/main.ts` drives it, built by the app's own Vite production pipeline
+//    (`evidence/a0-53-bloom-radius/vite.probe.config.ts`). **This is the frame
+//    the art is responsible for**, and the one this file gates.
+//  · `desktop-frozen-octagon.png` — the shipped client, from `dist/`.
+//
+// The camera offset each was drawn at is captured beside it, so the frames can
+// be REGISTERED: the same `starFieldSprite` call in this process names every
+// star in them, and each measured blob is compared with the radius IT declared
+// rather than with a population average.
+//
+// ## The two `it`s, and why the second is `it.fails`
+//
+// The art draws the design's radius: measured 24–30 px against a declared
+// 24.3–27.5, in a dev build and in a production bundle, through `VoidBackdrop`
+// alone and through the whole `Renderer`. **The shipped bundle draws the same
+// stars at 17–19 px**, and the cause is not in `src/art/`: the identical
+// `index.html`, from the identical source, built with a different Vite config
+// draws it correctly (`evidence/a0-53-bloom-radius/audit.txt`). It is a
+// bundling/scene-composition fragility in how the sky's thousands of gradient
+// fills get batched, and every candidate fix inside Art's own files — a render
+// group on the void, grouping the halos into one contiguous run, dropping the
+// ramp's mipmaps — was tried against the shipped bundle and measured as NOT
+// fixing it.
+//
+// So the second assertion is recorded as `it.fails`: the measurement runs in CI
+// every time, and the day the bundle stops eating the outer band this test goes
+// RED and has to be flipped to `it`. That is deliberate. A skipped test says
+// nothing; this one says exactly what is wrong and notices when it stops being
+// wrong.
+
+describe('measured off the shipped frame', () => {
+  const FRAMES = join(__dirname, '../../evidence/a0-53-bloom-radius/frames');
+  /** The frozen desktop golden's viewport, and `octagon`'s arena (`WORLD_SIZE`). */
+  const SHOT = { w: 1280, h: 800 };
+  const ARENA = { w: 2400, h: 2400 };
+  /** The camera offset both frames were drawn at (`shipScreen − shipWorld`). */
+  const OFFSET = { x: -1328, y: -800 };
+
+  interface Frame {
+    readonly width: number;
+    readonly height: number;
+    readonly data: Uint8Array;
+  }
+
+  const frame = (file: string): Frame => PNG.sync.read(readFileSync(join(FRAMES, file))) as unknown as Frame;
+
+  const lumaOf = (img: Frame, x: number, y: number): number => {
+    if (x < 0 || y < 0 || x >= img.width || y >= img.height) return NaN;
+    const i = (y * img.width + x) * 4;
+    return 0.2126 * img.data[i]! + 0.7152 * img.data[i + 1]! + 0.0722 * img.data[i + 2]!;
+  };
+
+  /** Median light on the ring of radius `r`. A median, so the four diffraction
+   *  arms — a few per cent of any ring — cannot set the answer, and neither can
+   *  one stray texel. */
+  const ring = (img: Frame, cx: number, cy: number, r: number): number => {
+    const s: number[] = [];
+    const n = Math.max(8, Math.ceil(2 * Math.PI * r * 3));
+    for (let k = 0; k < n; k++) {
+      const a = (2 * Math.PI * k) / n;
+      const v = lumaOf(img, Math.round(cx + r * Math.cos(a)), Math.round(cy + r * Math.sin(a)));
+      if (!Number.isNaN(v)) s.push(v);
+    }
+    s.sort((a, b) => a - b);
+    return s[s.length >> 1] ?? NaN;
+  };
+
+  interface Bloom {
+    readonly sx: number;
+    readonly sy: number;
+    /** The star's OWN radius — what the design's rule scales. */
+    readonly starR: number;
+    readonly layer: string;
+  }
+
+  /** Every bloomed star in the frame, registered: the same `starFieldSprite`
+   *  call the client made, placed by the camera offset it drew at. */
+  const registered = (): { blooms: Bloom[]; points: { x: number; y: number; r: number }[] } => {
+    const blooms: Bloom[] = [];
+    const points: { x: number; y: number; r: number }[] = [];
+    for (const spec of STAR_LAYERS) {
+      const w = coverSpan(spec.parallax, SHOT.w, ARENA.w);
+      const h = coverSpan(spec.parallax, SHOT.h, ARENA.h);
+      const px = SHOT.w / 2 + OFFSET.x * spec.parallax;
+      const py = SHOT.h / 2 + OFFSET.y * spec.parallax;
+      const halos: { cx: number; cy: number }[] = [];
+      for (const s of starFieldSprite(spec, VOID_SEED, w, h).shapes) {
+        if (s.path.kind !== 'circle') continue;
+        if (s.fill?.falloff) halos.push({ cx: s.path.cx, cy: s.path.cy });
+        else points.push({ x: px + s.path.cx, y: py + s.path.cy, r: s.path.r });
+      }
+      // A halo and its star point share a centre, so the point is what says how
+      // big the star that owns this halo is.
+      for (const halo of halos) {
+        const pt = points.find((p) => p.x === px + halo.cx && p.y === py + halo.cy);
+        if (pt) blooms.push({ sx: pt.x, sy: pt.y, starR: pt.r, layer: spec.key });
+      }
+    }
+    return { blooms, points };
+  };
+
+  /**
+   * Drawn-versus-designed for every bloom the frame lets you measure.
+   *
+   * A bloom is only measurable where the frame around it is EMPTY SKY, and the
+   * two disqualifiers are asked of the two different sources: another star close
+   * enough to add its own light is a MODEL question, and anything that is not
+   * the backdrop at all — a rock, the station, the HUD — is a PIXEL question,
+   * asked by requiring the annulus beyond this star's own reach to be at ground.
+   */
+  const ratios = (img: Frame): { ratio: number; b: Bloom; drawn: number; design: number }[] => {
+    const { blooms, points } = registered();
+    const ground = lumaOf(img, 2, 2);
+    const out: { ratio: number; b: Bloom; drawn: number; design: number }[] = [];
+    for (const b of blooms) {
+      if (b.sx < 50 || b.sy < 50 || b.sx > SHOT.w - 50 || b.sy > SHOT.h - 50) continue;
+      let crowded = false;
+      for (const o of blooms) if (o !== b && Math.hypot(o.sx - b.sx, o.sy - b.sy) < 32) crowded = true;
+      for (const p of points) {
+        if (p.r < 1.2) continue; // a faint star adds under one code value
+        const d = Math.hypot(p.x - b.sx, p.y - b.sy);
+        if (d > 0.01 && d < 32) crowded = true;
+      }
+      if (crowded) continue;
+
+      // ── THE DESIGN SIDE IS A RULE, NOT A NUMBER ANYONE TYPED ──────────────
+      // `5 + 13 × intensity` is the design preview's own line, scaled by the
+      // radius of the very star being measured. `BLOOM.radius` is never read
+      // here, so this cannot be satisfied by a constant agreeing with itself —
+      // which is exactly how 4.3 passed a gate for a whole release (a0-44).
+      const design = haloRadiusOf(BLOOM.intensity) * b.starR;
+
+      let clean = true;
+      for (let r = Math.ceil(design * 1.15); r <= Math.ceil(design * 2); r++) {
+        if (!(ring(img, b.sx, b.sy, r) - ground < 1.0)) clean = false;
+      }
+      if (!clean) continue;
+
+      let drawn = 0;
+      for (let r = 1; r <= Math.ceil(design * 1.6); r++) {
+        if (ring(img, b.sx, b.sy, r) - ground > 0.6) drawn = r;
+      }
+      out.push({ ratio: drawn / design, b, drawn, design });
+    }
+    return out;
+  };
+
+  const median = (a: number[]): number => [...a].sort((x, y) => x - y)[a.length >> 1]!;
+
+  /**
+   * The floor is the 8-bit frame, not slack. Past `t = 0.9` the design's own
+   * gradient carries under 5% of its peak, which over Floor is under one code
+   * value — so a CORRECTLY drawn halo measures a few per cent short of its
+   * geometry. Measured across every correct reference: per-star **0.879–0.925**,
+   * field median **0.908**. The shipped bundle measures per-star **0.666** and a
+   * field median of **0.690**. The bars sit in the gap, near enough the middle
+   * that neither a stray texel nor a Chromium version moves the answer:
+   * a correct field clears them by 0.08 and the defect misses by 0.13.
+   */
+  const PER_STAR = 0.8;
+  const FIELD = 0.85;
+
+  it('the art draws the design radius, in pixels of a real frame', () => {
+    const img = frame('renderer-probe.png');
+    expect(img.width, 'the reference is the frozen desktop shot').toBe(SHOT.w);
+    expect(img.height).toBe(SHOT.h);
+
+    const rows = ratios(img);
+    expect(rows.length, 'the frame carries measurable blooms on clean sky').toBeGreaterThanOrEqual(4);
+    for (const r of rows) {
+      expect(
+        r.ratio,
+        `${r.b.layer} bloom at (${Math.round(r.b.sx)},${Math.round(r.b.sy)}): drawn ${r.drawn}px against the design's ${r.design.toFixed(2)}px`,
+      ).toBeGreaterThan(PER_STAR);
+    }
+    const m = median(rows.map((r) => r.ratio));
+    expect(m, 'the field as a whole draws the design radius').toBeGreaterThan(FIELD);
+    // "Not close enough, the same" cuts both ways: a halo that overshot the
+    // design would be just as wrong as one that fell short.
+    expect(m, 'and does not exceed it').toBeLessThan(1.15);
+  });
+
+  // KNOWN RED — see the block comment above. The shipped bundle draws these same
+  // stars at 17–19 px against a declared 24.3–27.5. The cause is outside
+  // `src/art/` (the identical source, built with a different Vite config, is
+  // correct), so this is recorded rather than silenced: when the bundle stops
+  // eating the halo's outer band this goes red and must become a plain `it`.
+  it.fails('...and so does the shipped bundle — KNOWN RED, cause is outside src/art', () => {
+    const rows = ratios(frame('desktop-frozen-octagon.png'));
+    expect(rows.length).toBeGreaterThanOrEqual(4);
+    expect(median(rows.map((r) => r.ratio))).toBeGreaterThan(FIELD);
   });
 });
