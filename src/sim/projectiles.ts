@@ -361,7 +361,8 @@ function ownerShip(world: World, owner: PlayerId): Ship | null {
  * ore is drawn down (never below zero, so total-ore-per-asteroid is exactly the
  * ratified `ore`), the crack stage advances across its three thresholds
  * (GDD §5.5), and whole chunks are emitted from a fractional buffer, drifting
- * toward the miner. The rock is removed at end of step by `./step` once its ore
+ * toward the miner. **Whole** is the whole of it since a0-58: a rock's sub-chunk
+ * tail is dust, never a fractional chunk (see the exhaustion branch below). The rock is removed at end of step by `./step` once its ore
  * hits zero — collision indices stay stable within the tick (GDD §4.8).
  */
 function chipAsteroid(world: World, a: Asteroid, toward: Ship | null, yieldAmount: number): void {
@@ -380,7 +381,24 @@ function chipAsteroid(world: World, a: Asteroid, toward: Ship | null, yieldAmoun
   if (a.ore <= 1e-9) {
     a.ore = 0;
     if (a.mineBuffer > 1e-9) {
-      spawnMinedChunk(world, a, toward, a.mineBuffer);
+      // THE TAIL IS DUST, NOT A FRACTIONAL CHUNK (a0-58).
+      //
+      // A rock's ore is *scaled* at world build to hit an exact field yield
+      // (`./waves` `drawCanon`), so it is almost never a whole number: mine one out
+      // and the last scrap in the buffer — 0.37, say — used to be spawned as a
+      // chunk of its own. That chunk collects like any other and lands 0.37 in a
+      // hold, where the pips, the wheel and every cost floor it away; worse, it
+      // leaves the hold a fraction off a whole, so the NEXT pickup is refused for
+      // want of a full slot and the player is told nothing. Mined ore was never
+      // "always whole" — this is the same fraction the death drop mints, on the
+      // path a player takes far more often.
+      //
+      // So the sub-chunk tail is destroyed at the rock and recorded as `dust`
+      // (`./ore-ledger`) — under `CHUNK.ore` of ore per rock, accounted rather than
+      // silently dropped, so conservation still holds EXACTLY. Whole chunks are
+      // already emitted by the loop above, which is driven off `CHUNK.ore` and not
+      // the literal 1 (it is TUNABLE).
+      ledgerAdd(world, 'dust', a.mineBuffer);
       a.mineBuffer = 0;
     }
   }

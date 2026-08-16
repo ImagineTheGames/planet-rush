@@ -760,7 +760,15 @@ function acquireAimTarget(world: World, ship: Ship): AimTarget | null {
  * about when a rock stops being worth mining.
  */
 function holdFull(ship: Ship): boolean {
-  return ship.cargoCap - ship.cargo <= 1e-9;
+  // FULL MEANS "NO ROOM FOR A WHOLE ORE" (a0-58). Ore arrives in `CHUNK.ore`
+  // units and a hold takes them whole or not at all, so a hold with less than one
+  // chunk of room can never accept anything again and is full in every sense the
+  // player can act on. On the shipped numbers this is the SAME predicate it has
+  // always been — cargo and cap are both whole multiples of `CHUNK.ore`, so
+  // `room < CHUNK.ore` is exactly `room === 0` — and it only differs on a hold
+  // carrying a sub-chunk sliver (the atmosphere drain can leave one), where the
+  // old test said "room!" and the tractor then pulled a chunk it could not take.
+  return ship.cargoCap - ship.cargo < CHUNK.ore;
 }
 
 /** The ratified arc is the whole circle (GDD §2.4, `AUTO_AIM_ARC` = 2π), and at
@@ -1031,7 +1039,15 @@ function updateChunks(world: World, dt: number): void {
     if (target) {
       const rr = target.radius + chunk.radius;
       if (dist2(chunk.pos, target.pos) <= rr * rr) {
-        const room = target.cargoCap - target.cargo;
+        // Room measured in WHOLE ore (a0-58): a hold accepts `CHUNK.ore` units and
+        // never a slice of one, so a hold with 0.4 of a slot free takes nothing
+        // and leaves the chunk whole for anyone. Ore is a countable thing on both
+        // sides of this line — every mint emits whole chunks (`damage.ts`,
+        // `match.ts`, `projectiles.ts`), and this is the only place ore enters a
+        // hold, so `cargo` can hold no fraction that a pip cannot show. No epsilon
+        // is needed or wanted: cap and cargo are small whole multiples of
+        // `CHUNK.ore`, and that subtraction is exact in binary.
+        const room = Math.floor((target.cargoCap - target.cargo) / CHUNK.ore) * CHUNK.ore;
         if (room > 0) {
           // What the chunk PUT ON OFFER, read before the take spends it — the
           // number a0-54 found missing. `take` is capped by `room`, so the two
@@ -1086,8 +1102,38 @@ function updateChunks(world: World, dt: number): void {
 // ---------------------------------------------------------------------------
 
 /**
+ * Whole `CHUNK.ore` the atmosphere drain pays out on this tick — the metronome the
+ * hold steps to (a0-58).
+ *
+ * `DEPOSIT.drainRate` ore per second, quantised to whole ore, read off the world
+ * clock rather than off a per-ship accumulator. That is a deliberate choice and it
+ * is about the wire: a per-ship counter is simulation state a snapshot would have
+ * to carry, and the one seam it must survive — a client rewinding to authority and
+ * replaying (`src/net/prediction`) — is not this lane's to change. `world.time` is
+ * already restored with the rest of the clock on every rewind, so a payout derived
+ * from it replays identically on both sides with nothing added to the wire.
+ *
+ * It cannot outrun the ratified rate: boundaries land `drainRate` times a second
+ * for the whole world, so no dwell pattern banks faster than the rate, and a ship
+ * that sits in its own atmosphere banks at exactly the rate. What phase costs is at
+ * most one boundary's wait on arrival — against the 1/30th-of-an-ore sliver the old
+ * payout left in the hold, that is the trade this brief exists to make.
+ */
+function dueThisTick(world: World, dt: number): number {
+  const perOre = DEPOSIT.drainRate / CHUNK.ore;
+  // Both edges of this tick's window, so a boundary is counted once and never
+  // twice however `world.time` was advanced. The epsilon is not decoration: thirty
+  // accumulated sixtieths land on 0.49999999999999994, and without it a boundary
+  // that falls exactly on a tick edge — which at 60 Hz and 2 ore/s is EVERY
+  // boundary — would slip a tick and run the ratified rate ~3% slow.
+  const edge = (t: number) => Math.floor(t * perOre + 1e-9);
+  return (edge(world.time) - edge(world.time - dt)) * CHUNK.ore;
+}
+
+/**
  * While a ship is inside its own living station's atmosphere (`DEPOSIT_RANGE`),
- * drain its hold into the safe banked total at `DEPOSIT.drainRate` and, for each
+ * drain its hold into the safe banked total at `DEPOSIT.drainRate` — in whole
+ * `CHUNK.ore` units since a0-58, a hold being a countable thing — and, for each
  * WHOLE unit of ore that leaves the hold, spin off exactly one courier chunk that
  * flies ship→station to show it. Leave the atmosphere (or empty the hold, or lose
  * the station) and the drain simply stops the next tick — the transfer is readable
@@ -1099,9 +1145,9 @@ function updateChunks(world: World, dt: number): void {
  * chunks flying home always total the ore that actually moved — never more (field
  * report p8: the atmosphere drain used to spawn couriers on a free-running time
  * cadence, ~3 per ore at `drainRate`, so the developer saw "more ore flying than
- * you hold"). Deterministic: the spawn count is a pure function of the hold's
- * integer boundary crossings, the courier's heading is pure geometry, and no RNG
- * is drawn.
+ * you hold"). Deterministic: the spawn count is a pure function of the whole ore
+ * this tick actually moved, the courier's heading is pure geometry, and no RNG is
+ * drawn.
  */
 function updateDeposits(world: World, dt: number): void {
   for (const ship of world.ships) {
@@ -1112,9 +1158,25 @@ function updateDeposits(world: World, dt: number): void {
     const station = stationOf(world, ship.id);
     if (!station || !station.alive || !inAtmosphere(ship, station)) continue;
 
-    // Smooth, authoritative transfer hold → bank (GDD §2.3: banked ore is safe).
+    // Authoritative transfer hold → bank (GDD §2.3: banked ore is safe), paid out
+    // in WHOLE `CHUNK.ore` (a0-58). The rate is untouched — `DEPOSIT.drainRate`
+    // still buys `drainRate` ore every second — but the hold hands over countable
+    // ore rather than a thirtieth of a unit per tick.
+    //
+    // Why the granularity had to move: a pilot who clips their own atmosphere for
+    // a third of a second used to come out holding 1.6 of a 2 slot. That hold shows
+    // ONE pip, cannot accept another chunk (there is no whole slot free), and is
+    // carrying 0.6 of an ore that no pip, no cost and no wheel numeral in the game
+    // can render — the same invisible remainder the death drop used to mint, made
+    // by the one path that touches a hold every match. The couriers below were
+    // already keyed to whole units, so nothing the player watches changed cadence;
+    // what changed is that the hold and the bank now step together.
+    //
+    // `Math.min(cargo, …)` is what scrubs a sliver out of a foreign hold: 0.6 held
+    // against a whole unit due banks the 0.6 and lands on exactly 0.
+    const moved = Math.min(ship.cargo, dueThisTick(world, dt));
+    if (moved <= 0) continue; // no boundary this tick: no transfer, no courier, no line.
     const cargoBefore = ship.cargo;
-    const moved = Math.min(ship.cargo, DEPOSIT.drainRate * dt);
     ship.cargo -= moved;
     ship.banked += moved;
     if (ship.cargo < 1e-9) ship.cargo = 0;
@@ -1123,12 +1185,13 @@ function updateDeposits(world: World, dt: number): void {
     ledgerAdd(world, 'deposited', moved);
 
     // The telegraph, CONSERVED: exactly one courier per whole unit that left the
-    // hold this tick. Summed across a drain this equals the whole ore banked — the
+    // hold this tick — which since a0-58 is every unit that left it, the hold
+    // having no fractional payouts left to smear between two sprites. Summed across a drain this equals the whole ore banked — the
     // single unit-keyed spawner that replaces the old rate-based emitter (field
-    // report p8). Keyed to the HOLD's integer boundaries (which the terminal
-    // `= 0` snaps cleanly) rather than the bank's running total, so float drift in
-    // `banked` can never invent or drop a courier at the exact end of a drain.
-    const couriers = Math.floor(cargoBefore) - Math.floor(ship.cargo);
+    // report p8). Keyed to what the HOLD actually handed over this tick, never to
+    // the bank's running total, so float drift in `banked` can never invent or drop
+    // a courier at the exact end of a drain.
+    const couriers = Math.floor(moved / CHUNK.ore);
     for (let i = 0; i < couriers; i++) spawnDepositFlight(world, ship, station);
 
     // The journal takes the SAME whole-ore boundary the couriers do (a0-52). The

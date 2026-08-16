@@ -80,8 +80,20 @@ const CONTROL_SECONDS = 60;
  * move": a served free-for-all runs the same match, tick for tick, with the team
  * channel in the room. A red here is a team-aware path reachable in FFA, and the
  * fix is to remove it (`src/bots/ffa-parity.test.ts`, rule 3).
+ *
+ * **`c37926e2` → `c5ad2324`, 2026-08-16, a0-58 (Gameplay lane — flagged for the
+ * Netcode Engineer).** The one thing the paragraph above cannot mean is "the
+ * simulation may never change again", and this is the first sim rule to land since
+ * this number was written. a0-58 makes ore countable — every mint emits whole
+ * `CHUNK.ore`, a hold moves in whole ore — so chunk counts and positions differ
+ * from the first mined rock onward, in Teams and FFA alike, for reasons that have
+ * nothing to do with a radio. What this literal is actually guarding is untouched
+ * and still asserted: the three seats above still read `radio === null` at t0 and
+ * a minute in, `send` on a null channel still draws no random number, and the new
+ * value is stable across runs (measured twice). Re-baselined rather than reverted
+ * for that reason only; a red here for any *other* reason still means revert.
  */
-const FFA_GOLDEN = 'c37926e2';
+const FFA_GOLDEN = 'c5ad2324';
 
 /** A socket the room can write to. This file asserts on the room's own state and
  *  on its bots, never on what a client was told, so nothing is kept. */

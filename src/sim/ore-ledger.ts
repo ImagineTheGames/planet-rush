@@ -37,7 +37,7 @@ import type { World } from './state';
  * Cumulative ore accounting for one match. Sources add ore to the live economy,
  * sinks remove it, and the transfers move it between live buckets without changing
  * the total. Conservation (see {@link expectedLiveOre}): at every tick,
- *   liveOre === seeded + injected + debrisFloor − spent − deathLoss − capLoss.
+ *   liveOre === seeded + injected + debrisFloor − spent − deathLoss − capLoss − dust.
  */
 export interface OreLedger {
   // --- Sources: ore entering the live economy ---
@@ -67,10 +67,21 @@ export interface OreLedger {
   /** Ore paid for upgrades, buildings and repairs (`spendOre`). */
   spent: number;
   /** The share of a hold destroyed rather than dropped when a ship dies
-   *  (`killShip`: `1 − DEATH_ORE_DROP_FRACTION` of the hold). */
+   *  (`killShip`: `1 − DEATH_ORE_DROP_FRACTION` of the hold, plus — since a0-58 —
+   *  the sub-chunk remainder the drop could not mint as whole `CHUNK.ore` pieces). */
   deathLoss: number;
-  /** Banked ore beyond a wreck's debris cap, lost with the station (`scatterWreck`). */
+  /** Banked ore a wreck could not lay down as debris, lost with the station
+   *  (`scatterWreckDebris`): the excess beyond `WRECK.maxDebrisChunks`, and — since
+   *  a0-58 — the sub-chunk remainder below one whole `CHUNK.ore` piece. */
   capLoss: number;
+  /** Ore too fine to become a chunk, destroyed where it was mined (a0-58): the
+   *  sub-`CHUNK.ore` tail left in an asteroid's `mineBuffer` when the rock runs
+   *  out. Rock ore is scaled to hit an exact field yield, so a rock rarely holds a
+   *  whole number of ore and its last scrap cannot be minted as a whole chunk —
+   *  and a fractional chunk is ore a hold can hold but no readout can show
+   *  (`chipAsteroid`). Recorded rather than silently dropped, so the residual
+   *  below stays exactly zero. */
+  dust: number;
 }
 
 /** A fresh, all-zero ledger. */
@@ -86,6 +97,7 @@ export function makeLedger(): OreLedger {
     spent: 0,
     deathLoss: 0,
     capLoss: 0,
+    dust: 0,
   };
 }
 
@@ -121,7 +133,7 @@ export function liveOre(world: World): number {
  *  has leaked off the ledger. */
 export function expectedLiveOre(world: World): number {
   const l = world.ledger ?? makeLedger();
-  return l.seeded + l.injected + l.debrisFloor - l.spent - l.deathLoss - l.capLoss;
+  return l.seeded + l.injected + l.debrisFloor - l.spent - l.deathLoss - l.capLoss - l.dust;
 }
 
 /** The conservation residual — 0 (within float tolerance) iff the economy

@@ -48,6 +48,11 @@ export function damageShip(world: World, target: Ship, amount: number, by?: Play
  * (GDD §2.3, §2.7). Banked ore is untouched — the cost of dying is time and
  * position, never the bank.
  *
+ * The drop is minted in **whole `CHUNK.ore` units and nothing else** (a0-58): a
+ * half-hold that does not divide evenly sheds what it can and burns the sub-chunk
+ * remainder with the ship. See the comment on the split below for why a fraction
+ * in a hold is a bug and not an accounting nicety.
+ *
  * `by` credits the killing blow to one slot, never split (§1.5 trap 5). The slot
  * is the accounting key rather than the hull, so a shot that outlives its owner's
  * ship still pays that owner — including a player already eliminated from the
@@ -66,27 +71,38 @@ export function killShip(world: World, ship: Ship, by?: PlayerId): void {
   const held = ship.cargo;
   const drop = held * DEATH_ORE_DROP_FRACTION;
   ship.cargo = 0;
-  if (drop <= 1e-9) {
-    // Nothing worth dropping: the whole (tiny) hold is destroyed with the ship.
-    ledgerAdd(world, 'deathLoss', held);
-    return;
-  }
-  // The unshed half is destroyed with the ship — a real sink (GDD §2.3). Recorded
-  // before the drop so the ledger sees the full hold leave the economy: half to
-  // chunks (`dropped`, below), half gone (`deathLoss`).
-  ledgerAdd(world, 'deathLoss', held - drop);
-  ledgerAdd(world, 'dropped', drop);
 
-  // Scatter debris in a deterministic ring (no RNG needed — angle by index). Ore
-  // is split into whole CHUNK.ore pieces plus one remainder, so the pieces sum to
-  // `drop` EXACTLY for any chunk size — never the `/1` shortcut that would mint or
-  // burn ore the day CHUNK.ore is tuned off 1 (it is TUNABLE).
-  const whole = Math.floor(drop / CHUNK.ore);
-  const remainder = drop - whole * CHUNK.ore;
-  const pieces = whole + (remainder > 1e-9 ? 1 : 0);
+  // WHOLE CHUNKS ONLY, AND THE REMAINDER BURNS WITH THE SHIP (a0-58).
+  //
+  // Half of an odd hold is a half: 3 ore drops 1.5. That used to be laid down as
+  // one `CHUNK.ore` piece plus one of 0.5 — an exact split, and the ledger balanced
+  // on it — but a 0.5 that reaches a hold is ore the player owns and NO readout can
+  // show: the hold is pips, a cost is a whole number, the wheel prints integers, so
+  // all three floor it away. Collect one and the hold reads unchanged; collect the
+  // matching second and it jumps by a whole, which is precisely the developer's
+  // *"their ore's don't always count when picked up"* (2026-08-16).
+  //
+  // Ore is a countable thing, so a drop mints countable things. The sub-chunk
+  // remainder is destroyed with the ship instead, in `deathLoss` — the sink half
+  // this hold is ALREADY going to by design (GDD §2.3) — so the ledger still
+  // conserves EXACTLY and the economy loses nothing it was not already losing. The
+  // fix is at the mint and not in the HUD on purpose: `Math.floor` in three
+  // readouts is the messenger; a hold that can contain 1.5 is the message.
+  //
+  // Driven off `CHUNK.ore` throughout, never the literal 1: it is TUNABLE, and the
+  // day it moves this must still emit chunk-sized pieces.
+  const pieces = Math.floor(drop / CHUNK.ore);
+  const scattered = pieces * CHUNK.ore;
+  // The unshed half AND the sub-chunk remainder are destroyed with the ship — one
+  // real sink (GDD §2.3). Recorded before the drop so the ledger sees the whole
+  // hold leave the economy: `scattered` to chunks, everything else gone.
+  ledgerAdd(world, 'deathLoss', held - scattered);
+  if (pieces <= 0) return; // nothing whole to drop: the hold went down with the hull.
+  ledgerAdd(world, 'dropped', scattered);
+
+  // Scatter debris in a deterministic ring (no RNG needed — angle by index).
   for (let i = 0; i < pieces; i++) {
-    const amount = i < whole ? CHUNK.ore : remainder;
-    const theta = (2 * Math.PI * i) / Math.max(1, pieces);
+    const theta = (2 * Math.PI * i) / pieces;
     const dx = Math.cos(theta);
     const dy = Math.sin(theta);
     world.chunks.push({
@@ -96,7 +112,7 @@ export function killShip(world: World, ship: Ship, by?: PlayerId): void {
         y: clampToMargin(ship.pos.y + dy * (ship.radius + CHUNK.radius), CHUNK.radius, world.bounds.height),
       },
       vel: { x: dx * CHUNK.ejectSpeed, y: dy * CHUNK.ejectSpeed },
-      amount,
+      amount: CHUNK.ore,
       radius: CHUNK.radius,
     });
   }
