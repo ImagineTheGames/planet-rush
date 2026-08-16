@@ -94,6 +94,16 @@ this brief, with the reason in the note).
 | musicWin | done | lands into the three-second quiet, so it never shouts — no fanfare in any of them |
 | musicLoss | done | all four fall and none resolves; all inside the 1.32 s longest-tail invariant (§8) |
 
+### Level parity across a slot's four
+
+An A/B is only a choice if the four offers arrive at comparable level — a
+band-passed voice passes very little of what enters it, so a `band`-built offer
+written at the same `gain` as a granular one lands 4-6× quieter and reads on the
+board as *the quiet one* rather than as a different character. Every re-voiced
+slot was measured and levelled after the fact: no offer now sits below 45% of its
+slot's median peak, and none above 1.8× it. The one thing deliberately left
+uneven is `spawnPulse`, which is quiet on purpose against the rest of the bank.
+
 35 rows. `candidates.test.ts` (`every re-voiced slot offers a fresh set`) reads
 this table and holds every `done` row to the two promises above — four offers, and
 none of them under a denied letter — so the test cannot drift from what shipped.

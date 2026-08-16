@@ -618,9 +618,9 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'holdFull_f_loadCell',
           layers: [
-            band('holdFull_f.read0', 740, { gain: 0.66, decay: 0.09, q: 8, curve: 5, attack: 0.002, hold: 0.008, seed: 60510 }),
-            band('holdFull_f.read1', 990, { gain: 0.7, decay: 0.14, q: 9, curve: 4.5, attack: 0.002, hold: 0.01, at: 0.145, seed: 60512 }),
-            grains('holdFull_f.meter', { freq: 300, grain: 0.006, gain: 0.16, hold: 0.02, decay: 0.1, curve: 4, from: 1100, to: 500, q: 2.6, at: 0.02, seed: 60514 }),
+            band('holdFull_f.read0', 740, { gain: 0.972, decay: 0.09, q: 8, curve: 5, attack: 0.002, hold: 0.008, seed: 60510 }),
+            band('holdFull_f.read1', 990, { gain: 1.0, decay: 0.14, q: 9, curve: 4.5, attack: 0.002, hold: 0.01, at: 0.145, seed: 60512 }),
+            grains('holdFull_f.meter', { freq: 300, grain: 0.006, gain: 0.236, hold: 0.02, decay: 0.1, curve: 4, from: 1100, to: 500, q: 2.6, at: 0.02, seed: 60514 }),
           ],
         },
       },
@@ -630,8 +630,8 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'holdFull_g_saysSoTwice',
           layers: [
-            band('holdFull_g.one', 640, { gain: 0.5, decay: 0.045, q: 5, curve: 6.5, punch: 0.35, seed: 60520 }),
-            band('holdFull_g.two', 640, { gain: 0.5, decay: 0.075, q: 5, curve: 6, punch: 0.35, at: 0.13, seed: 60522 }),
+            band('holdFull_g.one', 640, { gain: 0.912, decay: 0.045, q: 5, curve: 6.5, punch: 0.35, seed: 60520 }),
+            band('holdFull_g.two', 640, { gain: 0.912, decay: 0.075, q: 5, curve: 6, punch: 0.35, at: 0.13, seed: 60522 }),
           ],
         },
       },
@@ -675,8 +675,8 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'turretFire_d_railContact',
           layers: [
-            band('turretFire_d.contact', 2050, { gain: 0.5, decay: 0.022, q: 7, curve: 7, punch: 0.7, seed: 60010 }),
-            swept('turretFire_d.eddy', { wave: 'triangle', freq: 205, from: 1600, to: 300, q: 5, gain: 0.3, attack: 0.0006, hold: 0.004, decay: 0.05, curve: 6.5, noiseMix: 0.34, seed: 60012 }),
+            band('turretFire_d.contact', 2050, { gain: 0.728, decay: 0.022, q: 7, curve: 7, punch: 0.7, seed: 60010 }),
+            swept('turretFire_d.eddy', { wave: 'triangle', freq: 205, from: 1600, to: 300, q: 5, gain: 0.437, attack: 0.0006, hold: 0.004, decay: 0.05, curve: 6.5, noiseMix: 0.34, seed: 60012 }),
           ],
         },
       },
@@ -686,8 +686,8 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'turretFire_e_compressedVent',
           layers: [
-            swept('turretFire_e.body', { wave: 'sine', freq: 96, from: 300, to: 130, q: 2.2, gain: 0.4, attack: 0.001, hold: 0.01, decay: 0.08, curve: 5, punch: 0.75, noiseMix: 0.14, seed: 60020 }),
-            grains('turretFire_e.gas', { freq: 1150, freqEnd: 700, grain: 0.0024, gain: 0.44, hold: 0.006, decay: 0.07, curve: 4.5, from: 4600, to: 1100, q: 3.2, hp: 700, at: 0.003, seed: 60022 }),
+            swept('turretFire_e.body', { wave: 'sine', freq: 96, from: 300, to: 130, q: 2.2, gain: 0.208, attack: 0.001, hold: 0.01, decay: 0.08, curve: 5, punch: 0.75, noiseMix: 0.14, seed: 60020 }),
+            grains('turretFire_e.gas', { freq: 1150, freqEnd: 700, grain: 0.0024, gain: 0.229, hold: 0.006, decay: 0.07, curve: 4.5, from: 4600, to: 1100, q: 3.2, hp: 700, at: 0.003, seed: 60022 }),
           ],
         },
       },
@@ -697,8 +697,8 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'turretFire_f_capacitorBloom',
           layers: [
-            band('turretFire_f.bloom', 3100, { gain: 0.6, decay: 0.038, q: 10, curve: 5.5, punch: 0.5, hp: 1200, seed: 60030 }),
-            band('turretFire_f.damp', 1250, { gain: 0.34, decay: 0.026, q: 4, curve: 8, seed: 60032 }),
+            band('turretFire_f.bloom', 3100, { gain: 1.0, decay: 0.038, q: 10, curve: 5.5, punch: 0.5, hp: 1200, seed: 60030 }),
+            band('turretFire_f.damp', 1250, { gain: 0.741, decay: 0.026, q: 4, curve: 8, seed: 60032 }),
           ],
         },
       },
@@ -796,8 +796,8 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'shieldHit_f_bubbleBloom',
           layers: [
-            band('shieldHit_f.bloom', 2450, { gain: 0.5, decay: 0.17, q: 11, curve: 4.2, punch: 0.4, hp: 900, seed: 60110 }),
-            band('shieldHit_f.under', 980, { gain: 0.3, decay: 0.1, q: 7, curve: 5, at: 0.004, seed: 60112 }),
+            band('shieldHit_f.bloom', 2450, { gain: 0.967, decay: 0.17, q: 11, curve: 4.2, punch: 0.4, hp: 900, seed: 60110 }),
+            band('shieldHit_f.under', 980, { gain: 0.58, decay: 0.1, q: 7, curve: 5, at: 0.004, seed: 60112 }),
           ],
         },
       },
@@ -827,8 +827,8 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'shieldDown_d_latticeUnwind',
           layers: [
-            swept('shieldDown_d.unwind', { wave: 'triangle', freq: 1280, freqEnd: 186, from: 4200, to: 700, q: 9, gain: 0.4, attack: 0.002, hold: 0.018, decay: 0.4, curve: 2.8, noiseMix: 0.16, hp: 260, seed: 60130 }),
-            band('shieldDown_d.let', 2200, { gain: 0.4, decay: 0.04, q: 8, curve: 6, punch: 0.45, seed: 60132 }),
+            swept('shieldDown_d.unwind', { wave: 'triangle', freq: 1280, freqEnd: 186, from: 4200, to: 700, q: 9, gain: 0.592, attack: 0.002, hold: 0.018, decay: 0.4, curve: 2.8, noiseMix: 0.16, hp: 260, seed: 60130 }),
+            band('shieldDown_d.let', 2200, { gain: 0.592, decay: 0.04, q: 8, curve: 6, punch: 0.45, seed: 60132 }),
           ],
         },
       },
@@ -860,8 +860,8 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'shieldDown_g_dampedDrop',
           layers: [
-            swept('shieldDown_g.drop', { wave: 'triangle', freq: 760, freqEnd: 150, from: 1900, to: 420, q: 4, gain: 0.38, attack: 0.002, hold: 0.012, decay: 0.22, curve: 3.6, noiseMix: 0.22, seed: 60160 }),
-            band('shieldDown_g.settle', 380, { gain: 0.26, decay: 0.1, q: 4.5, curve: 5, at: 0.09, seed: 60162 }),
+            swept('shieldDown_g.drop', { wave: 'triangle', freq: 760, freqEnd: 150, from: 1900, to: 420, q: 4, gain: 0.671, attack: 0.002, hold: 0.012, decay: 0.22, curve: 3.6, noiseMix: 0.22, seed: 60160 }),
+            band('shieldDown_g.settle', 380, { gain: 0.459, decay: 0.1, q: 4.5, curve: 5, at: 0.09, seed: 60162 }),
           ],
         },
       },
@@ -944,8 +944,8 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'turretDown_e_vesselEmpty',
           layers: [
-            swept('turretDown_e.rupture', { wave: 'noise', freq: 700, freqEnd: 160, from: 3200, to: 380, q: 3, gain: 0.44, attack: 0.001, hold: 0.03, decay: 0.3, curve: 3, punch: 0.6, seed: 60220 }),
-            swept('turretDown_e.sink', { wave: 'sine', freq: 82, from: 210, to: 110, q: 1.9, gain: 0.28, attack: 0.004, hold: 0.03, decay: 0.28, curve: 2.6, at: 0.06, seed: 60222 }),
+            swept('turretDown_e.rupture', { wave: 'noise', freq: 700, freqEnd: 160, from: 3200, to: 380, q: 3, gain: 0.251, attack: 0.001, hold: 0.03, decay: 0.3, curve: 3, punch: 0.6, seed: 60220 }),
+            swept('turretDown_e.sink', { wave: 'sine', freq: 82, from: 210, to: 110, q: 1.9, gain: 0.159, attack: 0.004, hold: 0.03, decay: 0.28, curve: 2.6, at: 0.06, seed: 60222 }),
           ],
         },
       },
@@ -1036,9 +1036,9 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'shipExplode_f_containmentFail',
           layers: [
-            band('shipExplode_f.tear', 2200, { gain: 0.7, decay: 0.045, q: 8, curve: 7, punch: 0.8, seed: 60270 }),
-            swept('shipExplode_f.collapse', { wave: 'triangle', freq: 380, freqEnd: 120, from: 3000, to: 300, q: 6.5, gain: 0.5, attack: 0.001, hold: 0.02, decay: 0.26, curve: 3.6, noiseMix: 0.4, at: 0.005, seed: 60272 }),
-            ...returns('shipExplode_f.room', { freq: 640, gain: 0.28, decay: 0.24, from: 1800, to: 460, at: 0.11, gap: 0.13, count: 3, seed: 60274 }),
+            band('shipExplode_f.tear', 2200, { gain: 1.0, decay: 0.045, q: 8, curve: 7, punch: 0.8, seed: 60270 }),
+            swept('shipExplode_f.collapse', { wave: 'triangle', freq: 380, freqEnd: 120, from: 3000, to: 300, q: 6.5, gain: 0.842, attack: 0.001, hold: 0.02, decay: 0.26, curve: 3.6, noiseMix: 0.4, at: 0.005, seed: 60272 }),
+            ...returns('shipExplode_f.room', { freq: 640, gain: 0.471, decay: 0.24, from: 1800, to: 460, at: 0.11, gap: 0.13, count: 3, seed: 60274 }),
           ],
         },
       },
@@ -1077,8 +1077,8 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'shipSpawn_e_massSeat',
           layers: [
-            swept('shipSpawn_e.approach', { wave: 'noise', freq: 140, freqEnd: 175, from: 340, to: 1400, q: 2.4, gain: 0.28, attack: 0.035, hold: 0.05, decay: 0.09, curve: 2, seed: 60300 }),
-            swept('shipSpawn_e.seat', { wave: 'sine', freq: 88, freqEnd: 66, from: 280, to: 110, q: 2.2, gain: 0.42, attack: 0.002, hold: 0.022, decay: 0.18, curve: 3.2, punch: 0.6, noiseMix: 0.12, at: 0.19, seed: 60302 }),
+            swept('shipSpawn_e.approach', { wave: 'noise', freq: 140, freqEnd: 175, from: 340, to: 1400, q: 2.4, gain: 0.184, attack: 0.035, hold: 0.05, decay: 0.09, curve: 2, seed: 60300 }),
+            swept('shipSpawn_e.seat', { wave: 'sine', freq: 88, freqEnd: 66, from: 280, to: 110, q: 2.2, gain: 0.275, attack: 0.002, hold: 0.022, decay: 0.18, curve: 3.2, punch: 0.6, noiseMix: 0.12, at: 0.19, seed: 60302 }),
           ],
         },
       },
@@ -1270,8 +1270,8 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'buildPlaced_e_vacuumSeat',
           layers: [
-            swept('buildPlaced_e.take', { wave: 'noise', freq: 300, from: 1400, to: 380, q: 2.8, gain: 0.32, attack: 0.004, hold: 0.02, decay: 0.09, curve: 3.4, seed: 60540 }),
-            swept('buildPlaced_e.rest', { wave: 'sine', freq: 84, from: 240, to: 110, q: 2.2, gain: 0.4, attack: 0.002, hold: 0.02, decay: 0.14, curve: 3.6, punch: 0.5, noiseMix: 0.12, at: 0.055, seed: 60542 }),
+            swept('buildPlaced_e.take', { wave: 'noise', freq: 300, from: 1400, to: 380, q: 2.8, gain: 0.206, attack: 0.004, hold: 0.02, decay: 0.09, curve: 3.4, seed: 60540 }),
+            swept('buildPlaced_e.rest', { wave: 'sine', freq: 84, from: 240, to: 110, q: 2.2, gain: 0.257, attack: 0.002, hold: 0.02, decay: 0.14, curve: 3.6, punch: 0.5, noiseMix: 0.12, at: 0.055, seed: 60542 }),
           ],
         },
       },
@@ -1281,8 +1281,8 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'buildPlaced_f_weldQuench',
           layers: [
-            band('buildPlaced_f.weld', 880, { gain: 0.62, decay: 0.05, q: 9, curve: 6, punch: 0.5, seed: 60550 }),
-            band('buildPlaced_f.quench', 520, { gain: 0.4, decay: 0.075, q: 6, curve: 5.5, at: 0.03, seed: 60552 }),
+            band('buildPlaced_f.weld', 880, { gain: 1.0, decay: 0.05, q: 9, curve: 6, punch: 0.5, seed: 60550 }),
+            band('buildPlaced_f.quench', 520, { gain: 0.964, decay: 0.075, q: 6, curve: 5.5, at: 0.03, seed: 60552 }),
           ],
         },
       },
@@ -1292,7 +1292,7 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'buildPlaced_g_oneLatch',
           layers: [
-            band('buildPlaced_g.latch', 560, { gain: 0.48, decay: 0.045, q: 5, curve: 6.5, punch: 0.45, seed: 60560 }),
+            band('buildPlaced_g.latch', 560, { gain: 1.0, decay: 0.045, q: 5, curve: 6.5, punch: 0.45, seed: 60560 }),
           ],
         },
       },
@@ -1381,7 +1381,7 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'repairTick_f_spotWeld',
           layers: [
-            band('repairTick_f.spot', 760, { gain: 0.5, decay: 0.04, q: 7, curve: 6, punch: 0.35, seed: 60630 }),
+            band('repairTick_f.spot', 760, { gain: 1, decay: 0.04, q: 4.5, curve: 6, punch: 0.35, seed: 60630 }),
           ],
         },
       },
@@ -1391,7 +1391,7 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'repairTick_g_quietest',
           layers: [
-            band('repairTick_g.tick', 440, { gain: 0.34, decay: 0.028, q: 4, curve: 7, seed: 60640 }),
+            band('repairTick_g.tick', 440, { gain: 0.9, decay: 0.028, q: 3.2, curve: 7, seed: 60640 }),
           ],
         },
       },
@@ -1430,8 +1430,8 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'bankOre_f_fallingBands',
           layers: [
-            band('bankOre_f.b0', 620, { gain: 0.6, decay: 0.08, q: 7.5, curve: 5, punch: 0.35, seed: 60670 }),
-            band('bankOre_f.b1', 415, { gain: 0.56, decay: 0.17, q: 8, curve: 4.5, at: 0.075, seed: 60672 }),
+            band('bankOre_f.b0', 620, { gain: 1.0, decay: 0.08, q: 4.65, curve: 5, punch: 0.35, seed: 60670 }),
+            band('bankOre_f.b1', 415, { gain: 1.0, decay: 0.17, q: 4.96, curve: 4.5, at: 0.075, seed: 60672 }),
           ],
         },
       },
@@ -1488,9 +1488,9 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'upgradeBought_f_threeWelds',
           layers: [
-            band('upgradeBought_f.w0', 700, { gain: 0.56, decay: 0.06, q: 8, curve: 5.5, punch: 0.35, seed: 60710 }),
-            band('upgradeBought_f.w1', 880, { gain: 0.58, decay: 0.07, q: 8.5, curve: 5, punch: 0.35, at: 0.075, seed: 60712 }),
-            band('upgradeBought_f.w2', 1100, { gain: 0.62, decay: 0.19, q: 9.5, curve: 4.2, punch: 0.35, at: 0.15, seed: 60714 }),
+            band('upgradeBought_f.w0', 700, { gain: 1.0, decay: 0.06, q: 8, curve: 5.5, punch: 0.35, seed: 60710 }),
+            band('upgradeBought_f.w1', 880, { gain: 1.0, decay: 0.07, q: 8.5, curve: 5, punch: 0.35, at: 0.075, seed: 60712 }),
+            band('upgradeBought_f.w2', 1100, { gain: 1.0, decay: 0.19, q: 9.5, curve: 4.2, punch: 0.35, at: 0.15, seed: 60714 }),
           ],
         },
       },
@@ -1577,9 +1577,9 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'waveArrive_f_hullBands',
           layers: [
-            band('waveArrive_f.h0', 147, { gain: 0.62, decay: 0.34, q: 9, curve: 2.6, attack: 0.03, hold: 0.16, seed: 60950 }),
-            band('waveArrive_f.h1', 220, { gain: 0.6, decay: 0.42, q: 9.5, curve: 2.4, attack: 0.03, hold: 0.14, at: 0.18, seed: 60952 }),
-            ...returns('waveArrive_f.room', { freq: 260, gain: 0.14, decay: 0.34, from: 700, to: 240, at: 0.4, gap: 0.2, count: 2, seed: 60954 }),
+            band('waveArrive_f.h0', 147, { gain: 1.0, decay: 0.34, q: 9, curve: 2.6, attack: 0.03, hold: 0.16, seed: 60950 }),
+            band('waveArrive_f.h1', 220, { gain: 1.0, decay: 0.42, q: 9.5, curve: 2.4, attack: 0.03, hold: 0.14, at: 0.18, seed: 60952 }),
+            ...returns('waveArrive_f.room', { freq: 260, gain: 0.42, decay: 0.34, from: 700, to: 240, at: 0.4, gap: 0.2, count: 2, seed: 60954 }),
           ],
         },
       },
@@ -1640,7 +1640,7 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'collapseBegin_g_oneFall',
           layers: [
-            swept('collapseBegin_g.fall', { wave: 'triangle', freq: 98, freqEnd: 44, from: 420, to: 110, q: 3, gain: 0.46, attack: 0.5, hold: 0.7, decay: 1.4, curve: 1.4, noiseMix: 0.16, seed: 61000 }),
+            swept('collapseBegin_g.fall', { wave: 'triangle', freq: 98, freqEnd: 44, from: 420, to: 110, q: 3, gain: 0.696, attack: 0.5, hold: 0.7, decay: 1.4, curve: 1.4, noiseMix: 0.16, seed: 61000 }),
           ],
         },
       },
@@ -1755,9 +1755,9 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'matchEnd_f_openBands',
           layers: [
-            band('matchEnd_f.n0', 294, { gain: 0.44, decay: 0.3, q: 9, curve: 3.4, attack: 0.005, hold: 0.02, seed: 61030 }),
-            band('matchEnd_f.n1', 440, { gain: 0.42, decay: 0.5, q: 10, curve: 3, attack: 0.005, hold: 0.02, at: 0.14, seed: 61032 }),
-            ...returns('matchEnd_f.room', { freq: 400, gain: 0.16, decay: 0.34, from: 1100, to: 340, at: 0.4, gap: 0.22, count: 2, seed: 61034 }),
+            band('matchEnd_f.n0', 294, { gain: 1.0, decay: 0.3, q: 9, curve: 3.4, attack: 0.005, hold: 0.02, seed: 61030 }),
+            band('matchEnd_f.n1', 440, { gain: 1.0, decay: 0.5, q: 10, curve: 3, attack: 0.005, hold: 0.02, at: 0.14, seed: 61032 }),
+            ...returns('matchEnd_f.room', { freq: 400, gain: 0.409, decay: 0.34, from: 1100, to: 340, at: 0.4, gap: 0.22, count: 2, seed: 61034 }),
           ],
         },
       },
@@ -2044,9 +2044,9 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
           loop: true,
           crossfade: 0.03,
           layers: [
-            place({ name: 'musicPulse_f.floor', wave: 'triangle', attack: 0, hold: 0.8, decay: 0, freq: 55, noiseMix: 0.05, lowPass: 210, resonance: 2.4, gain: 0.1, seed: 61150 }),
-            band('musicPulse_f.t0', 520, { gain: 0.86, decay: 0.11, q: 6, curve: 5, attack: 0.002, seed: 61152 }),
-            band('musicPulse_f.t1', 392, { gain: 0.74, decay: 0.18, q: 7, curve: 4.4, attack: 0.002, at: 0.19, seed: 61154 }),
+            place({ name: 'musicPulse_f.floor', wave: 'triangle', attack: 0, hold: 0.8, decay: 0, freq: 55, noiseMix: 0.05, lowPass: 210, resonance: 2.4, gain: 0.16, seed: 61150 }),
+            band('musicPulse_f.t0', 520, { gain: 1.0, decay: 0.11, q: 6, curve: 5, attack: 0.002, seed: 61152 }),
+            band('musicPulse_f.t1', 392, { gain: 1.0, decay: 0.18, q: 7, curve: 4.4, attack: 0.002, at: 0.19, seed: 61154 }),
           ],
         },
       },
@@ -2122,14 +2122,14 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
           loop: true,
           crossfade: 0.08,
           layers: [
-            place({ name: 'musicTheme_f.pad', wave: 'noise', attack: 0, hold: 4, decay: 0, freq: 110, lowPass: 320, resonance: 9, bandPass: true, gain: 0.2, seed: 61190 }),
-            band('musicTheme_f.n0', 220, { gain: 0.6, decay: 0.35, q: 10, curve: 3.6, attack: 0.003, hold: 0.008, seed: 61191 }),
-            band('musicTheme_f.n1', 261.63, { gain: 0.6, decay: 0.35, q: 10, curve: 3.6, attack: 0.003, hold: 0.008, at: 0.5, seed: 61192 }),
-            band('musicTheme_f.n2', 329.63, { gain: 0.6, decay: 0.42, q: 10.5, curve: 3.6, attack: 0.003, hold: 0.008, at: 1, seed: 61193 }),
-            band('musicTheme_f.n3', 293.66, { gain: 0.58, decay: 0.48, q: 10.5, curve: 3.6, attack: 0.003, hold: 0.008, at: 1.5, seed: 61194 }),
-            band('musicTheme_f.n4', 261.63, { gain: 0.58, decay: 0.48, q: 10, curve: 3.6, attack: 0.003, hold: 0.008, at: 2.1, seed: 61195 }),
-            band('musicTheme_f.n5', 220, { gain: 0.56, decay: 0.8, q: 10, curve: 3.4, attack: 0.004, hold: 0.01, at: 2.7, seed: 61196 }),
-            band('musicTheme_f.n6', 164.81, { gain: 0.56, decay: 0.64, q: 9.5, curve: 3.4, attack: 0.004, hold: 0.012, at: 3.3, seed: 61197 }),
+            place({ name: 'musicTheme_f.pad', wave: 'noise', attack: 0, hold: 4, decay: 0, freq: 110, lowPass: 320, resonance: 9, bandPass: true, gain: 0.37, seed: 61190 }),
+            band('musicTheme_f.n0', 220, { gain: 1.0, decay: 0.35, q: 10, curve: 3.6, attack: 0.003, hold: 0.008, seed: 61191 }),
+            band('musicTheme_f.n1', 261.63, { gain: 1.0, decay: 0.35, q: 10, curve: 3.6, attack: 0.003, hold: 0.008, at: 0.5, seed: 61192 }),
+            band('musicTheme_f.n2', 329.63, { gain: 1.0, decay: 0.42, q: 10.5, curve: 3.6, attack: 0.003, hold: 0.008, at: 1, seed: 61193 }),
+            band('musicTheme_f.n3', 293.66, { gain: 1.0, decay: 0.48, q: 10.5, curve: 3.6, attack: 0.003, hold: 0.008, at: 1.5, seed: 61194 }),
+            band('musicTheme_f.n4', 261.63, { gain: 1.0, decay: 0.48, q: 10, curve: 3.6, attack: 0.003, hold: 0.008, at: 2.1, seed: 61195 }),
+            band('musicTheme_f.n5', 220, { gain: 1.0, decay: 0.8, q: 10, curve: 3.4, attack: 0.004, hold: 0.01, at: 2.7, seed: 61196 }),
+            band('musicTheme_f.n6', 164.81, { gain: 1.0, decay: 0.64, q: 9.5, curve: 3.4, attack: 0.004, hold: 0.012, at: 3.3, seed: 61197 }),
           ],
         },
       },
@@ -2255,10 +2255,10 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'musicWin_f_cathedralOpen',
           layers: [
-            band('musicWin_f.n0', 392, { gain: 0.46, decay: 0.14, q: 8.5, curve: 4.5, attack: 0.003, hold: 0.01, seed: 61270 }),
-            band('musicWin_f.n1', 587.33, { gain: 0.44, decay: 0.2, q: 9, curve: 4.2, attack: 0.003, hold: 0.01, at: 0.13, seed: 61272 }),
-            band('musicWin_f.n2', 784, { gain: 0.44, decay: 0.46, q: 9.5, curve: 3.8, attack: 0.003, hold: 0.012, at: 0.27, seed: 61274 }),
-            ...returns('musicWin_f.room', { freq: 620, gain: 0.14, decay: 0.3, from: 1600, to: 520, at: 0.55, gap: 0.22, count: 2, seed: 61276 }),
+            band('musicWin_f.n0', 392, { gain: 0.953, decay: 0.14, q: 8.5, curve: 4.5, attack: 0.003, hold: 0.01, seed: 61270 }),
+            band('musicWin_f.n1', 587.33, { gain: 0.911, decay: 0.2, q: 9, curve: 4.2, attack: 0.003, hold: 0.01, at: 0.13, seed: 61272 }),
+            band('musicWin_f.n2', 784, { gain: 0.911, decay: 0.46, q: 9.5, curve: 3.8, attack: 0.003, hold: 0.012, at: 0.27, seed: 61274 }),
+            ...returns('musicWin_f.room', { freq: 620, gain: 0.29, decay: 0.3, from: 1600, to: 520, at: 0.55, gap: 0.22, count: 2, seed: 61276 }),
           ],
         },
       },
@@ -2314,9 +2314,9 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'musicLoss_f_emptyToll',
           layers: [
-            band('musicLoss_f.toll', 146.83, { gain: 0.66, decay: 0.6, q: 8.5, curve: 2.8, attack: 0.006, hold: 0.02, seed: 61310 }),
-            band('musicLoss_f.beat', 148.9, { gain: 0.5, decay: 0.58, q: 8.5, curve: 2.8, attack: 0.008, hold: 0.02, at: 0.014, seed: 61312 }),
-            ...returns('musicLoss_f.room', { freq: 280, gain: 0.16, decay: 0.3, from: 640, to: 220, at: 0.42, gap: 0.3, count: 2, seed: 61314 }),
+            band('musicLoss_f.toll', 146.83, { gain: 1.0, decay: 0.6, q: 8.5, curve: 2.8, attack: 0.006, hold: 0.02, seed: 61310 }),
+            band('musicLoss_f.beat', 148.9, { gain: 0.902, decay: 0.58, q: 8.5, curve: 2.8, attack: 0.008, hold: 0.02, at: 0.014, seed: 61312 }),
+            ...returns('musicLoss_f.room', { freq: 280, gain: 0.289, decay: 0.3, from: 640, to: 220, at: 0.42, gap: 0.3, count: 2, seed: 61314 }),
           ],
         },
       },
@@ -2403,7 +2403,7 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'pressTick_g_smallest',
           layers: [
-            band('pressTick_g.click', 1650, { gain: 0.3, decay: 0.012, q: 3.5, curve: 8, hp: 800, seed: 60800 }),
+            band('pressTick_g.click', 1650, { gain: 0.627, decay: 0.012, q: 3.5, curve: 8, hp: 800, seed: 60800 }),
           ],
         },
       },
@@ -2446,8 +2446,8 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'purchaseConfirm_f_fourthApart',
           layers: [
-            band('purchaseConfirm_f.b0', 880, { gain: 0.5, decay: 0.035, q: 7, curve: 6, seed: 60830 }),
-            band('purchaseConfirm_f.b1', 1175, { gain: 0.54, decay: 0.07, q: 7.5, curve: 5, at: 0.055, seed: 60832 }),
+            band('purchaseConfirm_f.b0', 880, { gain: 0.895, decay: 0.035, q: 7, curve: 6, seed: 60830 }),
+            band('purchaseConfirm_f.b1', 1175, { gain: 0.966, decay: 0.07, q: 7.5, curve: 5, at: 0.055, seed: 60832 }),
           ],
         },
       },
@@ -2500,8 +2500,8 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'rejectBuzz_f_semitone',
           layers: [
-            band('rejectBuzz_f.b0', 690, { gain: 0.5, decay: 0.09, q: 6.5, curve: 4.5, attack: 0.003, hold: 0.014, seed: 60870 }),
-            band('rejectBuzz_f.b1', 730, { gain: 0.46, decay: 0.08, q: 6.5, curve: 4.5, attack: 0.004, hold: 0.012, at: 0.006, seed: 60872 }),
+            band('rejectBuzz_f.b0', 690, { gain: 0.763, decay: 0.09, q: 6.5, curve: 4.5, attack: 0.003, hold: 0.014, seed: 60870 }),
+            band('rejectBuzz_f.b1', 730, { gain: 0.702, decay: 0.08, q: 6.5, curve: 4.5, attack: 0.004, hold: 0.012, at: 0.006, seed: 60872 }),
           ],
         },
       },
@@ -2552,7 +2552,7 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'depositTick_f_quenchedBand',
           layers: [
-            band('depositTick_f.band', 580, { gain: 0.4, decay: 0.038, q: 6.5, curve: 6, seed: 60750 }),
+            band('depositTick_f.band', 580, { gain: 1, decay: 0.038, q: 4.5, curve: 6, seed: 60750 }),
           ],
         },
       },
@@ -2589,7 +2589,7 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
         spec: {
           name: 'respawnBeep_d_escapement',
           layers: [
-            grains('respawnBeep_d.tick', { freq: 1250, freqEnd: 1050, grain: 0.0022, gain: 0.29, hold: 0.016, decay: 0.05, curve: 5, from: 4200, to: 1800, q: 3.2, hp: 620, seed: 60410 }),
+            grains('respawnBeep_d.tick', { freq: 1250, freqEnd: 1050, grain: 0.0022, gain: 0.206, hold: 0.016, decay: 0.05, curve: 5, from: 4200, to: 1800, q: 3.2, hp: 620, seed: 60410 }),
           ],
         },
       },
