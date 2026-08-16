@@ -278,16 +278,22 @@ console.log('opaque black a correctly premultiplied ramp reads back rgb = a.');
 console.log('');
 const good = ramp('ramp-good.json');
 const bad = ramp('ramp-bad.json');
+const fixed = ramp('ramp-fixed.json');
 if (good && bad) {
-  console.log('  texel   authored   read back (correct order)   read back (the collapse)   a^2/255');
+  console.log('  texel   authored   BEFORE, lucky order   BEFORE, the collapse   a^2/255   AFTER THE FIX');
   for (let i = 0; i < good.rows.length; i++) {
     const a = good.rows[i]!.authored[0]!;
     console.log(
       `  ${good.rows[i]!.texel.padStart(5)}   ${String(a).padStart(8)}   ` +
-        `${String(good.rows[i]!.readBack[0]).padStart(24)}   ` +
-        `${String(bad.rows[i]!.readBack[0]).padStart(23)}   ${((a * a) / 255).toFixed(1).padStart(7)}`,
+        `${String(good.rows[i]!.readBack[0]).padStart(19)}   ` +
+        `${String(bad.rows[i]!.readBack[0]).padStart(20)}   ${((a * a) / 255).toFixed(1).padStart(7)}   ` +
+        `${String(fixed?.rows[i]?.readBack[0] ?? 'n/a').padStart(13)}`,
     );
   }
+  console.log('');
+  console.log('  The last column is the SAME boot order as the collapse, on the fixed build.');
+  console.log('  (Its "authored" cell is blank in the raw json because the ramp is a canvas');
+  console.log('  source there and its resource is no longer a typed array — which is the fix.)');
   console.log('');
   console.log('  The collapsed column IS a^2/255 to the code value. The ramp is premultiplied');
   console.log('  TWICE, so every soft fill paints f^2 where the design says f, and the halo');

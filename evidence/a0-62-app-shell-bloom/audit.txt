@@ -134,14 +134,18 @@ probe-ramp.mjs paints the falloff ramp 1:1 over opaque black through the
 client's own renderer and reads the pixels back, in both boot orders. Over
 opaque black a correctly premultiplied ramp reads back rgb = a.
 
-  texel   authored   read back (correct order)   read back (the collapse)   a^2/255
-    +10        203                        203                       161     161.6
-    +20        154                        154                        93      93.0
-    +40         68                         68                        18      18.1
-    +60         58                         58                        13      13.2
-    +80         21                         21                         1       1.7
-   +100          3                          3                         0       0.0
-   +110          0                          0                         0       0.0
+  texel   authored   BEFORE, lucky order   BEFORE, the collapse   a^2/255   AFTER THE FIX
+    +10        203                   203                    161     161.6             203
+    +20        154                   154                     93      93.0             154
+    +40         68                    68                     18      18.1              68
+    +60         58                    58                     13      13.2              58
+    +80         21                    21                      1       1.7              21
+   +100          3                     3                      0       0.0               3
+   +110          0                     0                      0       0.0               0
+
+  The last column is the SAME boot order as the collapse, on the fixed build.
+  (Its "authored" cell is blank in the raw json because the ramp is a canvas
+  source there and its resource is no longer a typed array — which is the fix.)
 
   The collapsed column IS a^2/255 to the code value. The ramp is premultiplied
   TWICE, so every soft fill paints f^2 where the design says f, and the halo

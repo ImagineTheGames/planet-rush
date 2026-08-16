@@ -30,7 +30,7 @@ const arg = (n, d) => {
 };
 const PORT = Number(arg('port', '4262'));
 const WAITSEL = process.argv.includes('--waitsel');
-const TAG = WAITSEL ? 'bad' : 'good';
+const TAG = arg('tag', WAITSEL ? 'bad' : 'good');
 
 const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
