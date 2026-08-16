@@ -20,10 +20,13 @@
  * ship in `deathLoss`.
  *
  * At today's values the second rule subtracts nothing: a whole hold times `1` is a
- * whole number of chunks. **It is gated anyway.** Both numbers are TUNABLE, and
- * either one moving off `1` re-creates the remainder in a single edit — the
+ * whole number of chunks. **It is gated anyway.** `DEATH_ORE_DROP_FRACTION` is
+ * TUNABLE and moving it off `1` re-creates the remainder in a single edit — the
  * invariant is what makes that safe, which is the "assert the relationship, not
- * today's value" rule four star-bloom rounds paid for (LESSONS §26). Every
+ * today's value" rule four star-bloom rounds paid for (LESSONS §26). (`CHUNK.ore`
+ * is TUNABLE too but does NOT arm the remainder — holds are whole chunks by
+ * a0-58's construction, so the drop divides exactly at every chunk size. Measured;
+ * see 'the sink is armed by the fraction alone' below.) Every
  * assertion below is therefore written against `CHUNK.ore` and
  * `DEATH_ORE_DROP_FRACTION`, never against the literal 1 — except
  * `drops the whole hold`, which is the one place the ruling's *value* is the
@@ -157,9 +160,10 @@ describe('a death drop mints countable ore (a0-58)', () => {
   it('a hold too small to shed one whole chunk drops nothing and goes down with the hull', () => {
     // UNREACHABLE IN PLAY TODAY, AND GATED ANYWAY. At `DEATH_ORE_DROP_FRACTION = 1`
     // with whole-ore holds (a0-58) no drop lands under a chunk, so this hold is
-    // written by hand. The branch is the floor under both tunables: the day the
-    // fraction leaves 1, or `CHUNK.ore` leaves 1, this is the case that decides
-    // whether the leftover becomes a chunk nobody can read or a recorded sink.
+    // written by hand. The branch is the floor under the FRACTION: the day it
+    // leaves 1, this is the case that decides whether the leftover becomes a chunk
+    // nobody can read or a recorded sink. (It is not `CHUNK.ore` that arms it —
+    // see 'the sink is armed by the fraction alone' below, which measures that.)
     const scrap = CHUNK.ore / 2;
     const { world, victim } = staged(scrap);
     killShip(world, victim);
@@ -168,6 +172,71 @@ describe('a death drop mints countable ore (a0-58)', () => {
     // Sunk, not vanished — the ledger is the difference between the two.
     expect(world.ledger!.deathLoss).toBeCloseTo(scrap, 9);
     expect(world.ledger!.dropped).toBe(0);
+  });
+
+  it('the sink is armed by the fraction alone — CHUNK.ore cannot re-arm it', () => {
+    // MEASURED 2026-08-16 (a0-59), and it corrects what this file, `./damage.ts`
+    // and `./constants.ts` all used to say: that the remainder returns "the day
+    // the fraction leaves `1`, OR `CHUNK.ore` leaves `1`". Only the first half is
+    // true, and which knob is the dangerous one is exactly what a tuner needs.
+    //
+    // a0-58 quantised every boundary a hold has — the tractor takes `room`
+    // floored to whole `CHUNK.ore` (`./step.ts`), the drain hands back
+    // `k * CHUNK.ore` (`dueThisTick`), and all four mint sites emit exactly
+    // `CHUNK.ore` — so `cargo` is an exact multiple of `CHUNK.ore` at all times
+    // (pinned across all three hold paths by `./ore-ledger.test.ts`, "cargo is
+    // never a non-multiple of CHUNK.ore"). Write a hold of `n` chunks and the
+    // arithmetic falls out: `deathLoss / held` is `(n − floor(n·f)) / n`, in which
+    // the chunk size cancels. The sink's share is a function of the FRACTION and
+    // the hold's size in chunks, and of nothing else.
+    //
+    // Confirmed in play as well as on paper, six full natural matches per arm:
+    // `CHUNK.ore` at 1, 2 and 3 burned 0.00 ore across 2358 deaths at the shipped
+    // fraction, while the same seeds at a fraction of 0.5 burned 283 of the 396
+    // ore that died. Table and method in `docs/design-amendments.md`.
+    const original = CHUNK.ore;
+    try {
+      // The baseline the other chunk sizes must reproduce, keyed by hold-in-chunks.
+      const baseline = new Map<number, { pieces: number; sunkShare: number }>();
+      for (const chunkOre of [1, 2, 3, 4]) {
+        (CHUNK as { ore: number }).ore = chunkOre;
+        for (let n = 1; n <= 9; n++) {
+          // A hold is always a whole number of chunks — that is a0-58's invariant,
+          // not an assumption this test is making for convenience.
+          const held = n * chunkOre;
+          const { world, victim } = staged(held);
+          killShip(world, victim);
+
+          const { dropped, deathLoss } = world.ledger!;
+          const where = `CHUNK.ore ${chunkOre}, ${n} chunks`;
+          // The books still close, at every chunk size.
+          expect(dropped + deathLoss, `${where}: ledger`).toBeCloseTo(held, 9);
+          expect(dropped, `${where}: on the field`).toBeCloseTo(onField(world), 9);
+
+          const observed = { pieces: world.chunks.length, sunkShare: deathLoss / held };
+          const first = baseline.get(n);
+          if (!first) {
+            baseline.set(n, observed);
+          } else {
+            // THE RELATIONSHIP: same hold measured in chunks, same outcome — the
+            // chunk size cancels out of both the piece count and the sink's share.
+            expect(observed.pieces, `${where}: pieces vs CHUNK.ore 1`).toBe(first.pieces);
+            expect(observed.sunkShare, `${where}: sunk share vs CHUNK.ore 1`).toBeCloseTo(first.sunkShare, 9);
+          }
+        }
+      }
+      // …and THE VALUE, stated separately because today's fraction is a ruling and
+      // not a relationship: at `1` that share is zero at every chunk size, so a
+      // whole hold reaches the field however big a chunk is made.
+      if (DEATH_ORE_DROP_FRACTION === 1) {
+        for (const [n, { pieces, sunkShare }] of baseline) {
+          expect(sunkShare, `${n} chunks: nothing burns at the shipped fraction`).toBe(0);
+          expect(pieces, `${n} chunks: every chunk of the hold reaches the field`).toBe(n);
+        }
+      }
+    } finally {
+      (CHUNK as { ore: number }).ore = original;
+    }
   });
 
   it('holds the same line when the kill comes through damage, not a direct call', () => {
