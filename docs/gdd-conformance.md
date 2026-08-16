@@ -572,6 +572,23 @@ re-tuned together rather than independently. The ore ledger conserves exactly in
 all six arms (residual ≤ 6.3e-13). Method and table: `docs/design-amendments.md`
 → *The sink, MEASURED*; pinned by `src/sim/damage.test.ts`.
 
+**One ore-destroying path in `src/sim/` is NOT on the ledger, and a balance tune is
+what would arm it.** Every sink names itself — `spent`, `deathLoss`, `capLoss`,
+`dust` — except the `cargo > cargoCap` clamp in `src/sim/upgrades.ts`, which
+destroys the ore above a lowered ceiling and records nothing. Measured: dropping a
+loaded ship's cap 8 → 3 destroyed 5 ore and moved `oreResidual` by exactly −5 with
+every sink bucket still zero. **It has never fired and cannot fire as the sim
+stands** — a cap never falls within a match (`shipClass` is never rewritten,
+`tiers` only increments, the ladder adds off a non-negative base) — so conservation
+is exact today. It matters here because the things that would arm it are all
+balance calls: shortening the cargo ladder (`UPGRADES[Cargo].steps`), a cargo
+debuff, a mid-match class swap, or a tier reset. **Anyone making one of those
+should give the clamp a ledger bucket in the same change.** The invariant is now
+pinned by `src/sim/upgrades.test.ts` → *a hold ceiling only ever rises*, which goes
+red exactly when it is armed. Detail, including the netcode-side reachability that
+is flagged to that lane: `docs/design-amendments.md` → *The sink's OTHER advertised
+flow does not exist*.
+
 ### §2.9 AI opponents *(10 claims: 10 SHIPPED)*
 
 | Claim | Verdict | Evidence |

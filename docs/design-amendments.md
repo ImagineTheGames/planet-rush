@@ -320,6 +320,68 @@ file for the same reason.
 *(This paragraph used to add "or `CHUNK.ore` moving off 1" as a second trigger.
 It is not one — see the measured section above.)*
 
+### The sink's OTHER advertised flow does not exist — and auditing that found a flow with no sink at all (twentieth session)
+
+The DoD's reason for keeping `deathLoss` names two things it is the sink for: *"a
+quantisation leftover, ore lost out of bounds"*. The nineteenth session measured the
+first. The second was never checked, and it is **not a mechanic this sim has.**
+
+There is no world bound that destroys ore. Chunks drift under `CHUNK.drag` and are
+removed on exactly one condition — being emptied by a tractor
+(`src/sim/step.ts`, `chunks.filter(c => c.amount > 1e-9)`); asteroids are removed
+only once `chipAsteroid` has drained the sub-chunk tail into `dust`; and nothing
+anywhere culls ore by position. The claim had propagated into one repo site
+(`src/sim/damage.test.ts`), which is corrected. A guard advertising a flow that
+cannot happen is the mirror of the `CHUNK.ore` error above: it invites the next
+agent to trust the guard for a reason that is not real, or to hunt a leak that
+is not there.
+
+**The audit that answered it is the finding.** Asking "which flows destroy ore, and
+is each one named?" meant enumerating every ore-destroying path in `src/sim/` and
+checking it against the ledger's four sinks. All of them name themselves — except
+one.
+
+`refreshDerivedStats` and `applyPurchasedStats` (`src/sim/upgrades.ts`) clamp
+`cargo` down to `cargoCap` when a ceiling lands under a loaded hold, and write **no
+ledger bucket**. Measured on a real `createWorld`, one loaded ship:
+
+| | value |
+|---|---|
+| cargo cap before → after | 8 → 3 |
+| ore destroyed by the clamp | **5** |
+| change in `oreResidual` | **−5** |
+| `spent` / `deathLoss` / `capLoss` / `dust` | **0 / 0 / 0 / 0** |
+
+That is a black hole of precisely the class this ledger exists to catch (the p2c
+loot-regression pattern in `src/sim/ore-ledger.ts`'s header) — with the crucial
+difference that **it has never fired.** A cap cannot fall within a match as the sim
+stands: `shipClass` is never written after world-build, `tiers` is only ever `+= 1`
+(`buyUpgrade`), and the ladder adds off a non-negative base. So conservation holds
+exactly today, which is why nineteen sessions of ledger work never saw it.
+
+**Not fixed, deliberately.** `refreshDerivedStats(ship)` is world-free by design —
+it is called on hand-built loadouts, including from `src/net/prediction.ts`, which
+is not this lane's — so accounting there means threading a `world` through a
+signature another lane consumes. That is unratified scope on a path that cannot
+currently leak. What is in scope is making the invariant that holds it shut
+*visible*: it is now pinned by **`src/sim/upgrades.test.ts` → *a hold ceiling only
+ever rises***. Verified as a real detector, not decoration — shortening the cargo
+ladder so a cap falls turns it red naming the relationship (*"cap fell from tier 2
+to 3"*), and the constant was restored with `git diff` verified empty.
+
+Two things for whoever does arm it. `tierOf` (`src/sim/upgrades.ts`) already
+contemplates half of this scenario — it clamps a tier a shortened ladder stranded,
+so the stat is not `NaN` — but the ore the same retune eats has no such guard. And
+the Netcode lane has already met the clamp from the other side:
+`src/net/lifecycle.test.ts`'s `parkForBanking` warns that over-filling a fixture
+"does not test a big deposit, it tests the clamp, and the ore above the line
+vanishes at the first snapshot", because `applyPlayerEconomy` writes
+`ship.cargo = economy.held` and then calls `refreshDerivedStats`. On a client whose
+build does not know a track (tiers "ignored rather than invented"), a smaller
+derived cap silently eats the difference. That is a prediction-side divergence
+rather than authoritative ore loss, and it is **flagged, not touched** — `src/net/`
+is not this lane's.
+
 ### Determinism goldens re-measured
 
 The same three fixtures a0-58 moved move again — they pin absolute state hashes of

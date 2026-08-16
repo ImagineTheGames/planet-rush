@@ -104,9 +104,18 @@ describe('a destroyed ship drops everything (a0-59)', () => {
 
   it('the ledger still balances: dropped + deathLoss is the hold that died', () => {
     // `deathLoss` survives the ruling at 0. It is NOT deleted: it remains the sink
-    // for anything undropped — a quantisation leftover, ore lost out of bounds —
-    // and a ledger with no sink cannot stay conserved the day one reappears. This
-    // is the relationship the constant is allowed to move underneath.
+    // for whatever a drop cannot lay down — today only the sub-chunk quantisation
+    // leftover — and a ledger with no sink cannot stay conserved the day one
+    // reappears. This is the relationship the constant is allowed to move under.
+    //
+    // This comment used to add "ore lost out of bounds" as a second flow, carried
+    // over from the a0-59 brief. THERE IS NO SUCH FLOW (checked 2026-08-16): the
+    // sim has no world bound that destroys ore. Chunks drift under `CHUNK.drag`
+    // and are removed on one condition only — being emptied by a tractor
+    // (`./step`) — asteroids only once `chipAsteroid` has drained the tail into
+    // `dust`, and nothing anywhere culls ore by position. Named here because a
+    // sink advertising a flow the sim does not have invites the next agent to go
+    // looking for the leak, or to trust a guard for a reason that is not real.
     for (const hold of HOLDS) {
       const { world, victim } = staged(hold);
       killShip(world, victim);
