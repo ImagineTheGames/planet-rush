@@ -13,12 +13,58 @@
  * not yet implemented` in the console). It launches Chromium with WebGL switched
  * off and asserts the player gets the FRIENDLY screen — that day's failure is now
  * a permanently tested path, not a story.
+ *
+ * ── WHAT a0-66 CHANGED, 2026-08-16 (Platform Engineer) ──────────────────────
+ * Two things, and NEITHER is a loosened assertion. This check went red on the
+ * merge of a0-50 (the title gate) and stayed red for 14 merges, which is 14
+ * merges of "the last good build keeps serving".
+ *
+ *  1. `toHaveCount(1)` had DRIFTED. The client mounts two canvases now and both
+ *     belong: the Pixi game canvas, and the title gate's own sky canvas inside
+ *     the DOM overlay it mounts above it (`src/ui/title-gate.ts`, a0-50 — the
+ *     doorway punch reveals the REAL menu, which is why the gate is an overlay
+ *     and not a Pixi port). A count is the wrong shape for that: `2` is only
+ *     right if it is those exact two. So the check now names them — see
+ *     {@link EXPECTED_CANVASES}. `.first()` would have gone green in one line
+ *     and this gate is the last thing between a broken deploy and the
+ *     developer's phone; a third canvas, a canvas that moved out of `#app`, or
+ *     a title gate that stopped mounting all still fail here.
+ *
+ *  2. The file's own headline — *"the first visit installs the service worker,
+ *     the second is served THROUGH it"* — was not true and had not been true for
+ *     a long time. `boot()` registered the worker after `await
+ *     mainMenu.untilPlay()`, so it only ever ran for a player already in a
+ *     match: on the live deploy, `getRegistrations()` was `[]` after 10 s and
+ *     `controller` was `null` on the reload. The registration moved to the top
+ *     of `boot()` (`@platform/service-worker`), and visit 2 now ASSERTS a
+ *     controller, so this scenario can never quietly stop exercising the
+ *     incident it was written for again.
  */
-import { test, expect, chromium } from '@playwright/test';
+import { test, expect, chromium, type Page } from '@playwright/test';
 
 const LIVE_URL = process.env.LIVE_URL ?? 'https://imaginethegames.github.io/planet-rush/';
 
-async function bootOnce(page: import('@playwright/test').Page, label: string) {
+/**
+ * Every canvas the booted client is allowed to have, named, in DOM order.
+ *
+ * `parentId > id` — an empty `id` is a canvas with none, which is how Pixi mounts
+ * the game canvas. Compared as a whole list, so this is an exhaustive statement
+ * about the page and not a "contains" check:
+ *
+ *  - `app > ` — the Pixi game canvas, a direct child of `#app` (`src/main.ts`).
+ *  - `pr-title-gate > pr-title-gate-sky` — the title gate's star field, inside
+ *    the DOM overlay it mounts above the game canvas (`src/ui/title-gate.ts`).
+ */
+const EXPECTED_CANVASES = ['app > ', 'pr-title-gate > pr-title-gate-sky'] as const;
+
+/** Every `<canvas>` on the page as `parentId > id`, in DOM order. */
+function canvasRoll(page: Page): Promise<string[]> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll('canvas')].map((c) => `${c.parentElement?.id ?? '(detached)'} > ${c.id}`),
+  );
+}
+
+async function bootOnce(page: Page, label: string) {
   const pageErrors: string[] = [];
   const failedRequests: string[] = [];
   page.on('pageerror', (e) => pageErrors.push(String(e)));
@@ -34,17 +80,52 @@ async function bootOnce(page: import('@playwright/test').Page, label: string) {
   expect(pageErrors, `${label}: page errors`).toEqual([]);
   expect(failedRequests, `${label}: failed same-origin requests`).toEqual([]);
 
-  const canvas = page.locator('canvas');
-  await expect(canvas, `${label}: canvas mounts`).toHaveCount(1);
-  const box = await canvas.boundingBox();
+  // Polled rather than read once: the gate's overlay is mounted during boot, so a
+  // slow runner must be allowed to arrive at the right page — but only at THIS
+  // page. Any other set of canvases is a failure, however long it waits.
+  await expect
+    .poll(() => canvasRoll(page), { message: `${label}: canvas mounts`, timeout: 15_000 })
+    .toEqual([...EXPECTED_CANVASES]);
+
+  // Size is asserted on the GAME canvas specifically — `#app > canvas` is the
+  // Pixi one; the gate's sky lives a level deeper and is not what has to draw the
+  // world. A zero-sized game canvas is the black screen with the lights on.
+  const box = await page.locator('#app > canvas').boundingBox();
   expect(box && box.width > 100 && box.height > 100, `${label}: canvas has size`).toBe(true);
+}
+
+/** Wait for the app-shell worker to reach `activated`, and say so when it never
+ *  does — the state the whole two-visit shape of this test depends on. */
+async function awaitActiveWorker(page: Page): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(async () => {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          return regs.map((r) => r.active?.state ?? r.installing?.state ?? 'none');
+        }),
+      {
+        message:
+          'visit 1: the service worker installs — without it "visit 2, through the worker" tests nothing',
+        timeout: 20_000,
+      },
+    )
+    .toContain('activated');
 }
 
 test('live deploy boots — fresh visit, then through the service worker', async ({ page }) => {
   await bootOnce(page, 'visit 1 (fresh)');
+  await awaitActiveWorker(page);
+
   // Second navigation: the just-installed service worker now controls fetches —
   // the code path that served a stale index in the incident.
   await bootOnce(page, 'visit 2 (via service worker)');
+
+  // …and it really did. `controller` is non-null only when THIS document was
+  // served by the worker, which is the difference between running the incident's
+  // code path and merely loading the page a second time (a0-66).
+  const controller = await page.evaluate(() => navigator.serviceWorker.controller?.scriptURL ?? null);
+  expect(controller, 'visit 2 was served THROUGH the service worker').toContain('sw.js');
 });
 
 // ---------------------------------------------------------------------------

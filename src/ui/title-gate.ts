@@ -98,6 +98,7 @@ import { mulberry32 } from '@shared/types';
 // door in front of a landscape menu (see `gateRootLayoutCss`).
 import { computeRootTransform } from '@platform/orientation';
 import type { RootTransform } from '@platform/orientation';
+import { assetUrl } from '@platform/asset-url';
 import { FLOOR, PALETTE } from '../art/tokens';
 import { GAME_NAME, extraTracking, splitWordmark } from './game-name';
 import type { GateCue, GateSfx } from './sfx';
@@ -726,10 +727,31 @@ function vh(n: number): string {
   return `calc(var(--pr-gate-vh, 1vh) * ${Number(n.toFixed(3))})`;
 }
 
-/** The self-hosted faces, byte-identical to `index.html`'s declarations. */
+/**
+ * The self-hosted faces, resolved against the base this bundle was built for.
+ *
+ * ── WHY NOT THE BARE `/fonts/…` THESE WERE (a0-66, 2026-08-16) ──────────────
+ * `index.html` spells these root-absolute and that is correct THERE: Vite sees an
+ * HTML asset reference and rewrites it to `./fonts/…` for the deploy base. It
+ * does NOT rewrite string literals in TypeScript, so the same spelling here was
+ * emitted verbatim and resolved against the ORIGIN at runtime:
+ *
+ *     https://imaginethegames.github.io/fonts/Oxanium-Variable-latin.woff2   404
+ *
+ * — while the deploy lives at `/planet-rush/`. It cannot be seen locally, because
+ * `vite dev` and `vite preview` serve at `/` where origin and base are the same
+ * string; it took the post-deploy live gate to catch it, twice, on every merge
+ * since a0-50. `assetUrl` is the same idiom `src/main.ts` already uses to
+ * register the service worker, named and unit-tested.
+ *
+ * The declarations still match `index.html`'s BYTE FOR BYTE where it counts —
+ * same family, same weight range, same file — so they resolve to the
+ * already-preloaded downloads and cost no second request. Only the base does the
+ * work it always should have.
+ */
 export const FONT_URLS = {
-  audiowide: '/fonts/Audiowide-Regular-latin.woff2',
-  oxanium: '/fonts/Oxanium-Variable-latin.woff2',
+  audiowide: assetUrl('/fonts/Audiowide-Regular-latin.woff2'),
+  oxanium: assetUrl('/fonts/Oxanium-Variable-latin.woff2'),
 } as const;
 
 /**

@@ -14,6 +14,7 @@
     "test:perf-frame-time": "playwright test --config tests/perf/playwright.perf.config.ts",
     "test:live": "playwright test --config tests/live/playwright.live.config.ts",
     "test:live-stage": "playwright test --config tests/live-stage/playwright.config.ts",
+    "test:subpath": "playwright test --config tests/live-stage/playwright.subpath.config.ts",
     "test:pin": "node tests/net/live-pin.probe.mjs --local 6",
     "test:connect-evidence": "playwright test --config tests/live-stage/playwright.connect-trace.config.ts",
     "test:link-loss-evidence": "playwright test --config tests/live-stage/playwright.link-loss.config.ts",
