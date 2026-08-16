@@ -652,22 +652,28 @@
       "current": "previews/waveArrive/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/waveArrive/a.wav",
-          "character": "two horn blasts, air-driven and grained",
-          "params": "src/art/audio/candidates.ts#waveArrive.a"
+          "id": "d",
+          "wav": "previews/waveArrive/d.wav",
+          "character": "two horns with tectonic weight under them",
+          "params": "src/art/audio/candidates.ts#waveArrive.d"
         },
         {
-          "id": "b",
-          "wav": "previews/waveArrive/b.wav",
-          "character": "twin pressure horns, mass behind them",
-          "params": "src/art/audio/candidates.ts#waveArrive.b"
+          "id": "e",
+          "wav": "previews/waveArrive/e.wav",
+          "character": "two air-driven horns, no tone edge",
+          "params": "src/art/audio/candidates.ts#waveArrive.e"
         },
         {
-          "id": "c",
-          "wav": "previews/waveArrive/c.wav",
-          "character": "two swept bands, siren metal",
-          "params": "src/art/audio/candidates.ts#waveArrive.c"
+          "id": "f",
+          "wav": "previews/waveArrive/f.wav",
+          "character": "two bands inside a hull, room behind",
+          "params": "src/art/audio/candidates.ts#waveArrive.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/waveArrive/g.wav",
+          "character": "the two notes, and nothing else",
+          "params": "src/art/audio/candidates.ts#waveArrive.g"
         }
       ]
     },
@@ -678,22 +684,28 @@
       "current": "previews/collapseBegin/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/collapseBegin/a.wav",
-          "character": "structure grinding, grains under load",
-          "params": "src/art/audio/candidates.ts#collapseBegin.a"
+          "id": "d",
+          "wav": "previews/collapseBegin/d.wav",
+          "character": "tectonic shift, weight moving slowly",
+          "params": "src/art/audio/candidates.ts#collapseBegin.d"
         },
         {
-          "id": "b",
-          "wav": "previews/collapseBegin/b.wav",
-          "character": "pressure dropping, a long low swallow",
-          "params": "src/art/audio/candidates.ts#collapseBegin.b"
+          "id": "e",
+          "wav": "previews/collapseBegin/e.wav",
+          "character": "atmosphere leaving, a long draw",
+          "params": "src/art/audio/candidates.ts#collapseBegin.e"
         },
         {
-          "id": "c",
-          "wav": "previews/collapseBegin/c.wav",
-          "character": "resonance opening, metal under strain",
-          "params": "src/art/audio/candidates.ts#collapseBegin.c"
+          "id": "f",
+          "wav": "previews/collapseBegin/f.wav",
+          "character": "the hull resonating, strain rising",
+          "params": "src/art/audio/candidates.ts#collapseBegin.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/collapseBegin/g.wav",
+          "character": "one long fall, nothing added",
+          "params": "src/art/audio/candidates.ts#collapseBegin.g"
         }
       ]
     },
@@ -730,22 +742,28 @@
       "current": "previews/matchEnd/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/matchEnd/a.wav",
-          "character": "three dry contacts, rising and settling",
-          "params": "src/art/audio/candidates.ts#matchEnd.a"
+          "id": "d",
+          "wav": "previews/matchEnd/d.wav",
+          "character": "three weighted contacts coming to rest",
+          "params": "src/art/audio/candidates.ts#matchEnd.d"
         },
         {
-          "id": "b",
-          "wav": "previews/matchEnd/b.wav",
-          "character": "a low swell coming to rest",
-          "params": "src/art/audio/candidates.ts#matchEnd.b"
+          "id": "e",
+          "wav": "previews/matchEnd/e.wav",
+          "character": "air settling, the field going quiet",
+          "params": "src/art/audio/candidates.ts#matchEnd.e"
         },
         {
-          "id": "c",
-          "wav": "previews/matchEnd/c.wav",
-          "character": "wide bands opening, metal resolving",
-          "params": "src/art/audio/candidates.ts#matchEnd.c"
+          "id": "f",
+          "wav": "previews/matchEnd/f.wav",
+          "character": "two bands opening in a big room",
+          "params": "src/art/audio/candidates.ts#matchEnd.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/matchEnd/g.wav",
+          "character": "over: one low note, allowed to end",
+          "params": "src/art/audio/candidates.ts#matchEnd.g"
         }
       ]
     },
@@ -756,22 +774,28 @@
       "current": "previews/alarm/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/alarm/a.wav",
-          "character": "klaxon with grain in it, driven hard",
-          "params": "src/art/audio/candidates.ts#alarm.a"
+          "id": "d",
+          "wav": "previews/alarm/d.wav",
+          "character": "klaxon with a tectonic body under it",
+          "params": "src/art/audio/candidates.ts#alarm.d"
         },
         {
-          "id": "b",
-          "wav": "previews/alarm/b.wav",
-          "character": "pressure siren, a horn body under the tone",
-          "params": "src/art/audio/candidates.ts#alarm.b"
+          "id": "e",
+          "wav": "previews/alarm/e.wav",
+          "character": "klaxon driven by air, grain in the tone",
+          "params": "src/art/audio/candidates.ts#alarm.e"
         },
         {
-          "id": "c",
-          "wav": "previews/alarm/c.wav",
-          "character": "swept band klaxon, metal in the corner",
-          "params": "src/art/audio/candidates.ts#alarm.c"
+          "id": "f",
+          "wav": "previews/alarm/f.wav",
+          "character": "klaxon in a hull, bands ringing with it",
+          "params": "src/art/audio/candidates.ts#alarm.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/alarm/g.wav",
+          "character": "the two notes, loud, and nothing around them",
+          "params": "src/art/audio/candidates.ts#alarm.g"
         }
       ]
     },

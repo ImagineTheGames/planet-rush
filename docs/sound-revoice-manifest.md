@@ -81,10 +81,10 @@ this brief, with the reason in the note).
 | purchaseConfirm | done | two rising beats kept; §8 margin over buildComplete held across all sixteen pairings (×1.33) |
 | rejectBuzz | done | a stop, not a raspberry; sits ×1.86 above the coreHit family at worst (§8) |
 | minimapPing | done | it locates, never alarms — nothing repeats, nothing rises |
-| waveArrive | todo |  |
-| collapseBegin | todo |  |
-| matchEnd | todo |  |
-| alarm | todo |  |
+| waveArrive | done | the two low notes and the 0.18 s gap kept (§7.4); four things making the horn |
+| collapseBegin | done | tectonic shift / atmosphere leaving / hull strain / one long fall — slow, low, no event |
+| matchEnd | done | a resolution, not a victory — it plays on a loss too, so nothing here congratulates |
+| alarm | done | saw and rising minor third kept on all four (§5.1, §2.2 — legibility outranks register); one-shots |
 | stationDeath | todo |  |
 | ambient | todo |  |
 | musicBed | todo |  |
