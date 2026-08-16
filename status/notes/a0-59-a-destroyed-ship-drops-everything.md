@@ -574,9 +574,63 @@ under it did not. Trust the measured table, not the prose around it.)*
     the "is a0-59 safe" half of the question outright, leaving only "who fixes the
     wave trap, and when".
 
+- **2026-08-16, ninth session — what this one actually did.** One new finding,
+  committed as **`b7edd1c`**; the blocker is untouched and unchanged.
+  - **Re-verified, nothing redone:** local `HEAD` == `origin/…` == `4e4c33d` at
+    start, `main` still `221a2b1` and **0 commits ahead**, `tsc --noEmit` exits 0,
+    the constant is `1` at `constants.ts:1032`, `drops the whole hold` present at
+    `damage.test.ts:83`, both remote DoD greps pass against `FETCH_HEAD`. PR #436
+    still open, `mergeStateStatus` UNSTABLE, **still no Director ruling** — the
+    sixth session's escalation comment is still the only comment and still has no
+    reply. **Did not escalate again** (a third ping is noise) and did **not**
+    re-measure the wedge or re-derive the geometry — three derivations agree.
+  - **`b7edd1c` — the finding: a fifth lane nobody had swept, `src/progression/`.**
+    The sweep went `src/sim/` → `docs/` → `content/` → (seventh session)
+    `src/bots/`, `src/net/`, `src/main.ts`. It never reached `src/progression/`,
+    which is neither this lane's nor in the flagged set. Three sites there:
+    `accrual.ts:109` and `:454` (doc/inline comments), and — worst —
+    `accrual.test.ts:287`, a test **named** *"does not read the half-hold sink at a
+    death as ore spent"* with an inline *"half dropped, half destroyed with the
+    hull"*. Verified all **15 of its tests pass**: the rule it pins (`oreUsed`
+    counts a hold+bank drop only while hull *and* home live, so a death is
+    excluded) is fraction-independent and correct on both builds. Only the naming
+    is stale — but a stale **test name** reads as a specification, which is the
+    strongest form of the hazard the amendment exists to prevent.
+  - **Flagged, not edited** — `src/progression/accrual.test.ts`'s own header says
+    OWNER: UI Engineer. Same line as the seventh session's four sites. **Fixed the
+    two that are in this brief's stated sweep scope** (`docs/`):
+    `docs/briefs/pr-04-accrual-and-xp.md:76` (brief test 5) and
+    `docs/briefs/pr-02-attribution-hook.md:93`.
+  - **How it was found, which is the transferable part again.** The eighth session
+    learned "sweep the English, not just the identifier". This one adds the other
+    axis: **sweep every directory, not just the ones the DoD names.** The grep that
+    caught it was `grep -rniE '(half[- ]?hold|hold[- ]?half|ore sink|half[- ]?burn)'`
+    over **`src/` whole**, not `src/sim/`. Also swept numeric forms (`50%`,
+    `one-half`, `halved`, `0.5 of the hold`) — those came back clean, so that axis
+    is now closed too.
+  - **The consequence nobody had named — measured, not reasoned.** `oreMined` is
+    Σ positive Δ`cargo` and counts scavenged ore alike ("ore is ore", GDD §2.7,
+    `accrual.ts:100`) — deliberate, not a0-59's doing. But the credit for one
+    minted unit is the series **`1/(1−f)`**: at `f = 0.5` it converged to a hard
+    **2.0× ceiling** however often the ore changed hands; at `f = 1` there is **no
+    decay**, so each death→scavenge cycle adds a full `1.0×` and the total is
+    `1 + k` in cycles — bounded by match length and hold size, not by ore minted.
+    Probed end-to-end with the real sim and the real tractor (mint 2, kill, fly a
+    second ship onto the drop): **2 minted, 2 dropped, 2 scavenged, 4 credited —
+    2.0× for a single cycle.** The scratch probe was deleted, not committed.
+    **The ore ledger is untouched and the field still conserves exactly on both
+    builds** — it is the progression *metric* on top that loses its bound. Not an
+    action item (p1-04's XP weights are not shipped balance); it is for the balance
+    crew before they tune ore-mined XP, because a kill-and-rescavenge loop is now a
+    repeatable lossless XP source and at 0.5 it provably was not.
+  - **No code, no constant, no golden.** `tsc --noEmit` exits 0; **110 tests green**
+    across `src/progression`, `damage`, `ore-ledger`, `match`. Checked that no test
+    pins the content of the two edited briefs (the files that mention them cite
+    them in comments only).
+
 ## BLOCKERS
 
-*(Still current as of the eighth session, 2026-08-16. Unchanged in substance since
+*(Still current as of the ninth session, 2026-08-16. Unchanged in substance since
 the third; re-confirmed against CI's own log each session since.)*
 
 One: the `unstuck` wedge above — `tests/harness/unstuck.test.ts` is the only red
