@@ -58,12 +58,12 @@ this brief, with the reason in the note).
 
 | slot | status | note |
 |---|---|---|
-| turretFire | todo |  |
-| shotImpact | todo |  |
-| shieldHit | todo |  |
-| shieldDown | todo |  |
-| coreHit | todo |  |
-| turretDown | todo |  |
+| turretFire | done | rail contact / compressed vent / capacitor bloom / damped hardware — `d`-`g`, nothing slides in pitch |
+| shotImpact | done | absorber tick / spall / ferrite knock / charge dump — `d`-`g`, all under 60 ms |
+| shieldHit | done | four that ring, so the §2.2 shield-vs-core grammar survives the sweep |
+| shieldDown | done | the ×6.9 fall kept in all four; they differ in what is falling |
+| coreHit | done | four dull, low and closing — no sparkle within reach of a home |
+| turretDown | done | mount release / vessel empty / cell arc / it just stops |
 | shipExplode | todo |  |
 | shipSpawn | todo |  |
 | spawnPulse | todo |  |

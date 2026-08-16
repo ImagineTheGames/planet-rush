@@ -622,46 +622,79 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       },
     ],
   },
-  // The single most arcade voice in the denied bank was a duty-swept square with a
-  // four-to-one downward sweep — a 1980s laser. None of these three slides in
-  // pitch at all: what moves in every one of them is the filter, which is a
-  // machine losing or gaining energy rather than a cartoon falling over (§5.4).
+  // === FIGHT (a0-60) ========================================================
+  //
+  // The `deny-all` of 2026-08-07 was aimed at a register, not at six sounds, so
+  // the re-voice is a new set of *machines* rather than new settings on the ones
+  // that were turned down. Denied letters `a`/`b`/`c` come off the board (the
+  // a0-48 rule: a letter is how a verdict names an offer) and git carries them.
+  //
+  // "Modern/sci-fi, not retro/toony" for a weapon means the hardware is audible
+  // and the cartoon is not: the transient is a contact or a discharge, the body
+  // is short and damped, and NOTHING slides in pitch — a filter corner moving
+  // over a fixed pitch is a machine gaining or losing energy, where a pitch
+  // slide inside a 60 ms voice is the 1980s laser §5.4 retires. The four:
+  //
+  //   d  **magnetic launch** — rail contact: a dry snap and an eddy that is gone
+  //      before it can ring. The one with no air and no tone in it.
+  //   e  **compressed vent** — pneumatic: a low body, and gas leaving under
+  //      pressure. Granular, wide, the only one with weight low down.
+  //   f  **capacitor bloom** — a narrow band blooming at its corner and damped
+  //      immediately. Metal, but damped metal: it is stopped, not left to ring.
+  //   g  **damped hardware** — the restrained one. Mechanical contact with the
+  //      body taken out from under it; shortest and quietest of the four, and
+  //      the offer to pick if the answer to "too toony" is "less of everything".
+  //
+  // §8's shield/core grammar survives the sweep unchanged: every `shieldHit`
+  // offer keeps a ring and every `coreHit` offer stays dull, low and closing, so
+  // a besieged player still hears which layer is being eaten (§2.2) in all
+  // sixteen combinations rather than in the three that happened to be on offer.
   turretFire: {
     label: "Turret Fire",
     context: "Your turret or ship fires a shot.",
     current: 'turretFire',
     candidates: [
       {
-        id: 'a',
-        character: "coil discharge, corner snapping open",
+        id: 'd',
+        character: "rail contact, dry snap and eddy",
         spec: {
-          name: 'turretFire_a_coilDischarge',
+          name: 'turretFire_d_railContact',
           layers: [
-            swept('turretFire_a.charge', { wave: 'noise', freq: 700, from: 400, to: 4200, q: 8, gain: 0.85, attack: 0.004, hold: 0.004, decay: 0.045, curve: 6, hp: 300, seed: 30330 }),
-            swept('turretFire_a.body', { wave: 'triangle', freq: 145, from: 2200, to: 380, q: 4.5, gain: 0.4, attack: 0.0008, hold: 0.006, decay: 0.075, curve: 5.5, punch: 0.7, noiseMix: 0.28, seed: 30332 }),
+            band('turretFire_d.contact', 2050, { gain: 0.5, decay: 0.022, q: 7, curve: 7, punch: 0.7, seed: 60010 }),
+            swept('turretFire_d.eddy', { wave: 'triangle', freq: 205, from: 1600, to: 300, q: 5, gain: 0.3, attack: 0.0006, hold: 0.004, decay: 0.05, curve: 6.5, noiseMix: 0.34, seed: 60012 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "gas-driven slug, breech and air",
+        id: 'e',
+        character: "compressed vent, body and gas",
         spec: {
-          name: 'turretFire_b_gasSlug',
+          name: 'turretFire_e_compressedVent',
           layers: [
-            swept('turretFire_b.breech', { wave: 'sine', freq: 74, from: 240, to: 110, q: 2.4, gain: 0.42, attack: 0.001, hold: 0.012, decay: 0.1, curve: 4.5, punch: 0.8, noiseMix: 0.16, seed: 30340 }),
-            grains('turretFire_b.gas', { freq: 820, freqEnd: 560, grain: 0.003, gain: 0.5, hold: 0.008, decay: 0.09, curve: 4, from: 3800, to: 1300, q: 3, hp: 620, at: 0.004, seed: 30342 }),
+            swept('turretFire_e.body', { wave: 'sine', freq: 96, from: 300, to: 130, q: 2.2, gain: 0.4, attack: 0.001, hold: 0.01, decay: 0.08, curve: 5, punch: 0.75, noiseMix: 0.14, seed: 60020 }),
+            grains('turretFire_e.gas', { freq: 1150, freqEnd: 700, grain: 0.0024, gain: 0.44, hold: 0.006, decay: 0.07, curve: 4.5, from: 4600, to: 1100, q: 3.2, hp: 700, at: 0.003, seed: 60022 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "particle lance, thin band and hiss",
+        id: 'f',
+        character: "capacitor bloom, damped at once",
         spec: {
-          name: 'turretFire_c_particleLance',
+          name: 'turretFire_f_capacitorBloom',
           layers: [
-            band('turretFire_c.lance', 2400, { gain: 0.55, decay: 0.05, q: 9, curve: 6, punch: 0.6, seed: 30350 }),
-            swept('turretFire_c.hiss', { wave: 'noise', freq: 1800, from: 4200, to: 1200, q: 3.6, gain: 0.6, attack: 0.001, hold: 0.006, decay: 0.07, curve: 5, hp: 900, seed: 30351 }),
-            swept('turretFire_c.kick', { wave: 'sine', freq: 120, from: 260, q: 2, gain: 0.2, attack: 0.001, hold: 0.004, decay: 0.05, curve: 5, seed: 30352 }),
+            band('turretFire_f.bloom', 3100, { gain: 0.6, decay: 0.038, q: 10, curve: 5.5, punch: 0.5, hp: 1200, seed: 60030 }),
+            band('turretFire_f.damp', 1250, { gain: 0.34, decay: 0.026, q: 4, curve: 8, seed: 60032 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "damped hardware, mechanism only",
+        spec: {
+          name: 'turretFire_g_dampedHardware',
+          layers: [
+            grains('turretFire_g.action', { freq: 620, grain: 0.0032, gain: 0.34, hold: 0.003, decay: 0.03, curve: 7, punch: 0.5, from: 2600, to: 900, q: 3, hp: 260, seed: 60040 }),
+            band('turretFire_g.seat', 430, { gain: 0.26, decay: 0.03, q: 3.5, curve: 7, seed: 60042 }),
           ],
         },
       },
@@ -673,129 +706,156 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     current: 'shotImpact',
     candidates: [
       {
-        id: 'a',
-        character: "hard contact tick, no body",
+        id: 'd',
+        character: "absorber tick, hull taking it",
         spec: {
-          name: 'shotImpact_a_contactTick',
+          name: 'shotImpact_d_absorberTick',
           layers: [
-            ...plate('shotImpact_a.tick', 1900, { gain: 0.4, decay: 0.028, ratios: [1, 2.41], q: 7, curve: 7, punch: 0.7, grain: 0.4, seed: 30360 }),
-            band('shotImpact_a.edge', 4400, { gain: 0.4, decay: 0.018, q: 8, curve: 8, seed: 30364 }),
+            band('shotImpact_d.tick', 1750, { gain: 0.42, decay: 0.016, q: 6, curve: 8, punch: 0.6, seed: 60050 }),
+            swept('shotImpact_d.absorb', { wave: 'sine', freq: 150, from: 420, to: 150, q: 2.4, gain: 0.3, attack: 0.0008, hold: 0.005, decay: 0.045, curve: 6, seed: 60052 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "dull thump into structure",
+        id: 'e',
+        character: "spall, micro debris off plate",
         spec: {
-          name: 'shotImpact_b_structureThump',
+          name: 'shotImpact_e_spall',
           layers: [
-            swept('shotImpact_b.thump', { wave: 'sine', freq: 130, freqEnd: 105, from: 480, to: 210, q: 2.6, gain: 0.44, attack: 0.0008, hold: 0.008, decay: 0.07, curve: 5.5, punch: 0.7, noiseMix: 0.2, seed: 30365 }),
-            band('shotImpact_b.contact', 1500, { gain: 0.3, decay: 0.02, q: 5, curve: 8, seed: 30366 }),
+            grains('shotImpact_e.spall', { freq: 3100, freqEnd: 2400, grain: 0.0018, gain: 0.5, hold: 0.003, decay: 0.038, curve: 6, punch: 0.55, from: 6300, to: 2600, q: 3.4, hp: 1800, seed: 60060 }),
+            band('shotImpact_e.plate', 900, { gain: 0.24, decay: 0.02, q: 4, curve: 8, seed: 60062 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "spray of grit off the hull",
+        id: 'f',
+        character: "ferrite knock, two damped partials",
         spec: {
-          name: 'shotImpact_c_gritSpray',
+          name: 'shotImpact_f_ferriteKnock',
           layers: [
-            grains('shotImpact_c.spray', { freq: 2600, freqEnd: 1900, grain: 0.002, gain: 0.55, hold: 0.004, decay: 0.055, curve: 5, punch: 0.5, from: 7400, to: 3200, q: 3, hp: 2200, seed: 30370 }),
+            ...plate('shotImpact_f.knock', 1180, { gain: 0.34, decay: 0.03, ratios: [1, 2.41], q: 6, curve: 7, punch: 0.6, grain: 0.42, edge: 0.6, seed: 60070 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "charge dump, corner slamming shut",
+        spec: {
+          name: 'shotImpact_g_chargeDump',
+          layers: [
+            swept('shotImpact_g.dump', { wave: 'noise', freq: 640, from: 5200, to: 380, q: 4.5, gain: 0.5, attack: 0.0006, hold: 0.004, decay: 0.05, curve: 7, punch: 0.5, hp: 200, seed: 60080 }),
           ],
         },
       },
     ],
   },
-  // §8's most important pair mechanically is `shieldHit` / `coreHit` — §2.2's
-  // grammar is *shields redden and die before the reactor begins to fill*, and a
-  // besieged player has to hear which layer is being eaten. So every shield offer
-  // here rings and every core offer below is dull, low and closing: the two slots
-  // are separated by material, not just by pitch, in all nine combinations.
   shieldHit: {
     label: "Shield Hit",
     context: "A shield absorbs a hit — struck bell, not broken.",
     current: 'shieldHit',
     candidates: [
       {
-        id: 'a',
-        character: "field skin ringing, tight",
+        id: 'd',
+        character: "lattice ring, struck and held",
         spec: {
-          name: 'shieldHit_a_fieldSkin',
+          name: 'shieldHit_d_latticeRing',
           layers: [
-            ...plate('shieldHit_a.skin', 1550, { gain: 0.36, decay: 0.26, ratios: [1, 2.41, 4.17], q: 9, curve: 4, punch: 0.4, grain: 0.22, seed: 30380 }),
+            ...plate('shieldHit_d.lattice', 1320, { gain: 0.34, decay: 0.22, ratios: [1, 2.14, 3.63], q: 10, curve: 3.6, punch: 0.35, grain: 0.18, seed: 60090 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "absorbed pressure, elastic give",
+        id: 'e',
+        character: "absorption wash, pressure taken",
         spec: {
-          name: 'shieldHit_b_elasticGive',
+          name: 'shieldHit_e_absorptionWash',
           layers: [
-            swept('shieldHit_b.give', { wave: 'triangle', freq: 520, freqEnd: 470, from: 900, to: 2600, q: 6, gain: 0.4, attack: 0.003, hold: 0.02, decay: 0.2, curve: 3.2, noiseMix: 0.18, vib: [0.012, 11], seed: 30390 }),
-            swept('shieldHit_b.load', { wave: 'sine', freq: 175, from: 400, to: 220, q: 2.4, gain: 0.24, attack: 0.002, hold: 0.01, decay: 0.12, curve: 4, seed: 30392 }),
+            swept('shieldHit_e.wash', { wave: 'noise', freq: 1250, from: 1400, to: 3000, q: 5.5, gain: 0.46, attack: 0.004, hold: 0.02, decay: 0.19, curve: 3.4, hp: 600, seed: 60100 }),
+            band('shieldHit_e.skin', 1900, { gain: 0.3, decay: 0.15, q: 9, curve: 4, attack: 0.002, seed: 60102 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "static discharge across the bubble",
+        id: 'f',
+        character: "capacitor bloom over the bubble",
         spec: {
-          name: 'shieldHit_c_staticDischarge',
+          name: 'shieldHit_f_bubbleBloom',
           layers: [
-            grains('shieldHit_c.static', { freq: 1700, freqEnd: 1500, grain: 0.0045, gain: 0.55, hold: 0.012, decay: 0.2, curve: 4, from: 3600, to: 1600, q: 4, hp: 800, seed: 30400 }),
-            band('shieldHit_c.ring', 2300, { gain: 0.34, decay: 0.16, q: 11, curve: 4.5, seed: 30402 }),
+            band('shieldHit_f.bloom', 2450, { gain: 0.5, decay: 0.17, q: 11, curve: 4.2, punch: 0.4, hp: 900, seed: 60110 }),
+            band('shieldHit_f.under', 980, { gain: 0.3, decay: 0.1, q: 7, curve: 5, at: 0.004, seed: 60112 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "damped tick, the field barely notices",
+        spec: {
+          name: 'shieldHit_g_dampedTick',
+          layers: [
+            grains('shieldHit_g.contact', { freq: 1650, grain: 0.0035, gain: 0.34, hold: 0.004, decay: 0.06, curve: 6, from: 3600, to: 1500, q: 4, hp: 900, seed: 60120 }),
+            band('shieldHit_g.trace', 2150, { gain: 0.26, decay: 0.09, q: 10, curve: 5, at: 0.006, seed: 60122 }),
           ],
         },
       },
     ],
   },
-  // The ×6.9 fall stays in all three — a bubble failing IS a collapse, and §5.4
-  // exempts it by construction. What differs is what is falling.
+  // The ×6.9 fall stays in every offer — a bubble failing IS a collapse, and
+  // §5.4 exempts it by construction. What the four differ in is what is falling.
   shieldDown: {
     label: "Shield Down",
     context: "A shield's bubble fails and falls.",
     current: 'shieldDown',
     candidates: [
       {
-        id: 'a',
-        character: "field collapsing, resonance closing",
+        id: 'd',
+        character: "lattice unwinding, band walking down",
         spec: {
-          name: 'shieldDown_a_fieldCollapse',
+          name: 'shieldDown_d_latticeUnwind',
           layers: [
-            swept('shieldDown_a.fall', { wave: 'triangle', freq: 1450, freqEnd: 210, from: 4800, to: 900, q: 10, gain: 0.44, attack: 0.003, hold: 0.02, decay: 0.44, curve: 2.6, noiseMix: 0.12, hp: 300, seed: 30410 }),
-            band('shieldDown_a.snap', 2600, { gain: 0.45, decay: 0.05, q: 7, curve: 6, punch: 0.5, seed: 30412 }),
+            swept('shieldDown_d.unwind', { wave: 'triangle', freq: 1280, freqEnd: 186, from: 4200, to: 700, q: 9, gain: 0.4, attack: 0.002, hold: 0.018, decay: 0.4, curve: 2.8, noiseMix: 0.16, hp: 260, seed: 60130 }),
+            band('shieldDown_d.let', 2200, { gain: 0.4, decay: 0.04, q: 8, curve: 6, punch: 0.45, seed: 60132 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "pressure loss, air dumping out",
+        id: 'e',
+        character: "vent to vacuum, air then nothing",
         spec: {
-          name: 'shieldDown_b_pressureLoss',
+          name: 'shieldDown_e_ventToVacuum',
           layers: [
-            swept('shieldDown_b.dump', { wave: 'noise', freq: 700, freqEnd: 110, from: 2600, to: 220, q: 2.4, gain: 0.44, attack: 0.002, hold: 0.04, decay: 0.42, curve: 2.4, punch: 0.5, seed: 30420 }),
-            swept('shieldDown_b.sub', { wave: 'sine', freq: 90, freqEnd: 52, from: 200, q: 1.8, gain: 0.26, attack: 0.006, hold: 0.03, decay: 0.3, curve: 2.2, at: 0.05, seed: 30422 }),
+            grains('shieldDown_e.vent', { freq: 1100, freqEnd: 180, grain: 0.0022, gain: 0.46, hold: 0.03, decay: 0.36, curve: 2.8, punch: 0.4, from: 3800, to: 340, q: 2.8, hp: 220, seed: 60140 }),
+            swept('shieldDown_e.floor', { wave: 'sine', freq: 84, freqEnd: 48, from: 190, q: 1.8, gain: 0.24, attack: 0.008, hold: 0.02, decay: 0.26, curve: 2.4, at: 0.04, seed: 60142 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "ionised skin tearing, room behind it",
+        id: 'f',
+        character: "capacitor discharging, room behind",
         spec: {
-          name: 'shieldDown_c_skinTear',
+          name: 'shieldDown_f_dischargeRoom',
           layers: [
-            grains('shieldDown_c.tear', { freq: 1500, freqEnd: 260, grain: 0.006, gain: 0.5, hold: 0.03, decay: 0.34, curve: 3, from: 4200, to: 600, q: 3.4, hp: 400, seed: 30430 }),
-            ...returns('shieldDown_c.room', { freq: 500, gain: 0.16, decay: 0.26, from: 1600, to: 500, at: 0.12, gap: 0.13, count: 2, seed: 30433 }),
+            swept('shieldDown_f.arc', { wave: 'noise', freq: 1600, freqEnd: 300, from: 5000, to: 800, q: 7, gain: 0.44, attack: 0.001, hold: 0.02, decay: 0.3, curve: 3.2, punch: 0.5, hp: 500, seed: 60150 }),
+            ...returns('shieldDown_f.room', { freq: 620, gain: 0.15, decay: 0.24, from: 1800, to: 560, at: 0.11, gap: 0.12, count: 2, seed: 60153 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "damped drop, one stage, no drama",
+        spec: {
+          name: 'shieldDown_g_dampedDrop',
+          layers: [
+            swept('shieldDown_g.drop', { wave: 'triangle', freq: 760, freqEnd: 150, from: 1900, to: 420, q: 4, gain: 0.38, attack: 0.002, hold: 0.012, decay: 0.22, curve: 3.6, noiseMix: 0.22, seed: 60160 }),
+            band('shieldDown_g.settle', 380, { gain: 0.26, decay: 0.1, q: 4.5, curve: 5, at: 0.09, seed: 60162 }),
           ],
         },
       },
     ],
   },
   // One of the two sounds homes get, and the ache depends on it (§7.2): SERIOUS,
-  // low, dropping, no sparkle anywhere near it. All three are dull by
+  // low, dropping, no sparkle anywhere near it. All four are dull by
   // construction — nothing above 1 kHz survives more than 40 ms in any of them —
-  // and all three keep clear of `rejectBuzz`, the §8 pair that reads as *your buy
+  // and all four keep clear of `rejectBuzz`, the §8 pair that reads as *your buy
   // was refused* against *your reactor is being eaten*.
   coreHit: {
     label: "Core Hit",
@@ -803,36 +863,45 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     current: 'coreHit',
     candidates: [
       {
-        id: 'a',
-        character: "reactor slug, deep and closing",
+        id: 'd',
+        character: "containment knock, deep and short",
         spec: {
-          name: 'coreHit_a_reactorSlug',
+          name: 'coreHit_d_containmentKnock',
           layers: [
-            swept('coreHit_a.slug', { wave: 'sine', freq: 112, freqEnd: 44, from: 300, to: 96, q: 2.6, gain: 0.5, attack: 0.002, hold: 0.024, decay: 0.3, curve: 2.6, punch: 0.7, noiseMix: 0.1, seed: 30440 }),
-            swept('coreHit_a.tear', { wave: 'noise', freq: 230, freqEnd: 100, from: 700, to: 200, q: 2.4, gain: 0.2, attack: 0.001, hold: 0.01, decay: 0.16, curve: 4, seed: 30442 }),
+            swept('coreHit_d.knock', { wave: 'sine', freq: 96, freqEnd: 58, from: 260, to: 92, q: 2.8, gain: 0.5, attack: 0.0015, hold: 0.02, decay: 0.24, curve: 3, punch: 0.7, noiseMix: 0.08, seed: 60170 }),
+            band('coreHit_d.shell', 210, { gain: 0.3, decay: 0.12, q: 4, curve: 5, at: 0.006, seed: 60172 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "structural groan under the hit",
+        id: 'e',
+        character: "coolant surge under the hit",
         spec: {
-          name: 'coreHit_b_structuralGroan',
+          name: 'coreHit_e_coolantSurge',
           layers: [
-            swept('coreHit_b.hit', { wave: 'triangle', freq: 108, freqEnd: 74, from: 600, to: 200, q: 3.4, gain: 0.44, attack: 0.002, hold: 0.02, decay: 0.26, curve: 3, punch: 0.6, noiseMix: 0.22, seed: 30450 }),
-            swept('coreHit_b.groan', { wave: 'triangle', freq: 168, freqEnd: 140, from: 620, to: 330, q: 6, gain: 0.32, attack: 0.02, hold: 0.06, decay: 0.34, curve: 2.2, noiseMix: 0.2, vib: [0.02, 5], at: 0.05, seed: 30452 }),
+            swept('coreHit_e.hit', { wave: 'triangle', freq: 88, freqEnd: 62, from: 420, to: 150, q: 3, gain: 0.42, attack: 0.002, hold: 0.018, decay: 0.22, curve: 3.2, punch: 0.6, noiseMix: 0.18, seed: 60180 }),
+            grains('coreHit_e.surge', { freq: 260, freqEnd: 130, grain: 0.006, gain: 0.3, hold: 0.04, decay: 0.3, curve: 2.6, from: 780, to: 200, q: 2.6, at: 0.03, seed: 60182 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "distant concussion, room answering",
+        id: 'f',
+        character: "load transferring through the frame",
         spec: {
-          name: 'coreHit_c_distantConcussion',
+          name: 'coreHit_f_frameLoad',
           layers: [
-            swept('coreHit_c.front', { wave: 'noise', freq: 190, freqEnd: 62, from: 900, to: 180, q: 2.2, gain: 0.42, attack: 0.004, hold: 0.03, decay: 0.28, curve: 2.6, punch: 0.5, seed: 30460 }),
-            swept('coreHit_c.sub', { wave: 'sine', freq: 62, freqEnd: 46, from: 160, q: 1.8, gain: 0.28, attack: 0.006, hold: 0.02, decay: 0.24, curve: 2.4, seed: 30462 }),
-            ...returns('coreHit_c.room', { freq: 220, gain: 0.14, decay: 0.22, from: 600, to: 220, at: 0.1, gap: 0.12, count: 2, seed: 30464 }),
+            swept('coreHit_f.strike', { wave: 'noise', freq: 170, freqEnd: 70, from: 800, to: 190, q: 2.4, gain: 0.4, attack: 0.003, hold: 0.024, decay: 0.26, curve: 2.8, punch: 0.55, seed: 60190 }),
+            swept('coreHit_f.frame', { wave: 'triangle', freq: 132, freqEnd: 118, from: 520, to: 260, q: 5.5, gain: 0.3, attack: 0.03, hold: 0.05, decay: 0.32, curve: 2.2, noiseMix: 0.24, at: 0.04, seed: 60192 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "one dull mass, nothing after it",
+        spec: {
+          name: 'coreHit_g_dullMass',
+          layers: [
+            swept('coreHit_g.mass', { wave: 'sine', freq: 74, freqEnd: 50, from: 200, to: 84, q: 2, gain: 0.52, attack: 0.003, hold: 0.03, decay: 0.2, curve: 3.4, punch: 0.5, noiseMix: 0.06, seed: 60200 }),
           ],
         },
       },
@@ -844,37 +913,47 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     current: 'turretDown',
     candidates: [
       {
-        id: 'a',
-        character: "mount shearing, metal letting go",
+        id: 'd',
+        character: "rail mount letting go, dry",
         spec: {
-          name: 'turretDown_a_mountShear',
+          name: 'turretDown_d_mountRelease',
           layers: [
-            swept('turretDown_a.shear', { wave: 'noise', freq: 420, freqEnd: 130, from: 3000, to: 420, q: 3.4, gain: 0.34, attack: 0.001, hold: 0.02, decay: 0.28, curve: 3.4, punch: 0.7, seed: 30470 }),
-            ...plate('turretDown_a.mount', 640, { gain: 0.3, decay: 0.22, ratios: [1, 2.41], q: 7, curve: 4.5, at: 0.05, seed: 30472 }),
+            band('turretDown_d.snap', 1150, { gain: 0.44, decay: 0.04, q: 6, curve: 6.5, punch: 0.7, seed: 60210 }),
+            grains('turretDown_d.slide', { freq: 520, freqEnd: 200, grain: 0.004, gain: 0.36, hold: 0.02, decay: 0.24, curve: 3.4, from: 2400, to: 460, q: 3, hp: 180, at: 0.02, seed: 60212 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "collapse onto the deck, weight down",
+        id: 'e',
+        character: "pressure vessel emptying out",
         spec: {
-          name: 'turretDown_b_deckCollapse',
+          name: 'turretDown_e_vesselEmpty',
           layers: [
-            swept('turretDown_b.fall', { wave: 'noise', freq: 260, freqEnd: 70, from: 1600, to: 260, q: 2.6, gain: 0.42, attack: 0.002, hold: 0.03, decay: 0.34, curve: 2.8, punch: 0.6, seed: 30480 }),
-            swept('turretDown_b.deck', { wave: 'sine', freq: 74, from: 200, to: 120, q: 2, gain: 0.3, attack: 0.002, hold: 0.02, decay: 0.26, curve: 3, at: 0.08, seed: 30482 }),
-            grains('turretDown_b.debris', { freq: 300, freqEnd: 190, grain: 0.03, gain: 0.22, hold: 0.04, decay: 0.24, curve: 3.4, from: 1400, to: 420, q: 2.6, hp: 160, at: 0.1, seed: 30483 }),
+            swept('turretDown_e.rupture', { wave: 'noise', freq: 700, freqEnd: 160, from: 3200, to: 380, q: 3, gain: 0.44, attack: 0.001, hold: 0.03, decay: 0.3, curve: 3, punch: 0.6, seed: 60220 }),
+            swept('turretDown_e.sink', { wave: 'sine', freq: 82, from: 210, to: 110, q: 1.9, gain: 0.28, attack: 0.004, hold: 0.03, decay: 0.28, curve: 2.6, at: 0.06, seed: 60222 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "power cell venting, then quiet",
+        id: 'f',
+        character: "cell arcing out, damped metal",
         spec: {
-          name: 'turretDown_c_cellVent',
+          name: 'turretDown_f_cellArc',
           layers: [
-            band('turretDown_c.rupture', 1400, { gain: 0.44, decay: 0.05, q: 6, curve: 6, punch: 0.7, seed: 30490 }),
-            grains('turretDown_c.vent', { freq: 900, freqEnd: 380, grain: 0.0035, gain: 0.55, hold: 0.05, decay: 0.3, curve: 3, from: 3400, to: 700, q: 3.6, hp: 500, at: 0.01, seed: 30491 }),
-            ...returns('turretDown_c.room', { freq: 380, gain: 0.12, decay: 0.2, from: 1200, to: 400, at: 0.16, gap: 0.12, count: 2, seed: 30493 }),
+            band('turretDown_f.arc', 1850, { gain: 0.5, decay: 0.07, q: 9, curve: 5, punch: 0.6, hp: 700, seed: 60230 }),
+            ...plate('turretDown_f.hull', 520, { gain: 0.3, decay: 0.2, ratios: [1, 2.14], q: 6, curve: 4.5, grain: 0.34, edge: 0, at: 0.03, seed: 60232 }),
+            ...returns('turretDown_f.room', { freq: 420, gain: 0.11, decay: 0.2, from: 1200, to: 380, at: 0.15, gap: 0.12, count: 2, seed: 60236 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "it stops working, and drops",
+        spec: {
+          name: 'turretDown_g_stopsWorking',
+          layers: [
+            swept('turretDown_g.stall', { wave: 'triangle', freq: 240, freqEnd: 96, from: 1100, to: 260, q: 4, gain: 0.36, attack: 0.002, hold: 0.02, decay: 0.2, curve: 3.6, noiseMix: 0.26, seed: 60240 }),
+            swept('turretDown_g.deck', { wave: 'sine', freq: 70, from: 180, to: 100, q: 2, gain: 0.3, attack: 0.002, hold: 0.02, decay: 0.18, curve: 3.4, at: 0.11, seed: 60242 }),
           ],
         },
       },

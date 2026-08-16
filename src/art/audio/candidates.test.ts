@@ -64,9 +64,67 @@ describe('sound-review candidates', () => {
     levelUp: ['d', 'e', 'f'],
   };
 
-  it('every slot has exactly three candidates, one letter each, with characters', () => {
+  /**
+   * The a0-60 sweep's status of record, **read** rather than restated here.
+   *
+   * `docs/sound-revoice-manifest.md` is what the developer and the next brief look
+   * at; a copy of it in this file would be a second truth that drifts the first
+   * time a row moves. So the table is parsed: `| <slot> | <status> | <note> |`.
+   */
+  const REVOICE_MANIFEST: ReadonlyMap<string, string> = (() => {
+    const rows = new Map<string, string>();
+    for (const line of readFileSync('docs/sound-revoice-manifest.md', 'utf8').split('\n')) {
+      const m = /^\|\s*([A-Za-z]+)\s*\|\s*(todo|done|held)\s*\|/i.exec(line);
+      if (m) rows.set(m[1]!, m[2]!.toLowerCase());
+    }
+    return rows;
+  })();
+
+  /** The slots the sweep has actually landed — the only rows this file holds to the new bar. */
+  const REVOICED: readonly string[] = [...REVOICE_MANIFEST].filter(([, s]) => s === 'done').map(([id]) => id);
+
+  /**
+   * The letters the 2026-08-07 `deny-all` was recorded against, on all 35 slots.
+   *
+   * The verdict names an offer by its letter and nothing else, so these three are
+   * spent: an offer filed under one of them is a sound the developer has already
+   * turned down wearing the same name as its replacement.
+   */
+  const DENIED_IDS: readonly string[] = ['a', 'b', 'c'];
+
+  it('every re-voiced slot offers a fresh set', () => {
+    // The a0-60 bar, driven off the manifest so the test cannot drift from what
+    // shipped: a row that says `done` is a promise of four offers under letters
+    // the record has not already spent, and this is where that promise is kept.
+    expect(REVOICE_MANIFEST.size, 'the manifest does not list the thirty-five').toBe(35);
+    for (const id of REVOICED) {
+      const slot = CANDIDATE_SLOTS[id];
+      expect(slot, `${id} is marked done but is not on the board`).toBeDefined();
+      if (!slot) continue;
+      expect(slot.candidates.length, `${id} is marked done with fewer than four offers`).toBeGreaterThanOrEqual(4);
+      for (const c of slot.candidates) {
+        expect(DENIED_IDS, `${id}/${c.id} re-offers under a denied letter`).not.toContain(c.id);
+      }
+      // Four *characters*, not four takes on one — the same bar the board has
+      // always been held to, applied to the wider set.
+      expect(new Set(slot.candidates.map((c) => c.id)).size, `${id} offers a letter twice`).toBe(
+        slot.candidates.length,
+      );
+      expect(new Set(slot.candidates.map((c) => c.character)).size).toBe(slot.candidates.length);
+      expect(new Set(slot.candidates.map((c) => c.spec.name)).size).toBe(slot.candidates.length);
+      for (const c of slot.candidates) expect(c.character.trim().length).toBeGreaterThan(0);
+    }
+    // A `todo` row is a slot still wearing the theme that was denied — it must
+    // still be *on the board*, so the next brief has something to pick up.
+    for (const [id, status] of REVOICE_MANIFEST) {
+      if (status === 'todo') expect(CANDIDATE_SLOTS[id], `${id} is owed but missing`).toBeDefined();
+    }
+  });
+
+  it('every slot offers a full set of candidates, one letter each, with characters', () => {
     for (const id of SLOT_IDS) {
       const slot = CANDIDATE_SLOTS[id]!;
+      if (REVOICE_MANIFEST.get(id) === 'done') continue; // held to the wider bar above
       expect(slot.candidates.map((c) => c.id), `${id} does not offer three`).toEqual(
         RE_LETTERED[id] ?? ['a', 'b', 'c'],
       );
