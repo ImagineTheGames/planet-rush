@@ -62,14 +62,23 @@ describe('sound-review candidates', () => {
     // long"), `levelUp` denied 2026-08-14 ("too toony, doesn't sound rewarding").
     oreCollect: ['d', 'e', 'f'],
     levelUp: ['d', 'e', 'f'],
+    // a0-57. Denied 2026-08-16 with a CATEGORY reason — *"none of these sound
+    // like sounds for XP collection"* — so the re-offer is four readings of the
+    // event rather than three takes on the denied family. Four letters, not
+    // three: the board's promise is "options", and the count is not what a
+    // verdict names.
+    xpSettle: ['d', 'e', 'f', 'g'],
   };
 
-  it('every slot has exactly three candidates, one letter each, with characters', () => {
+  it('every slot offers its letters, one each, with characters', () => {
     for (const id of SLOT_IDS) {
       const slot = CANDIDATE_SLOTS[id]!;
-      expect(slot.candidates.map((c) => c.id), `${id} does not offer three`).toEqual(
+      // Three on every slot that has never been re-lettered; the re-lettered ones
+      // declare their own letters above (`xpSettle` offers four, a0-57).
+      expect(slot.candidates.map((c) => c.id), `${id} does not offer its letters`).toEqual(
         RE_LETTERED[id] ?? ['a', 'b', 'c'],
       );
+      expect(slot.candidates.length, `${id} offers fewer than three`).toBeGreaterThanOrEqual(3);
       for (const c of slot.candidates) {
         expect(c.character.trim().length).toBeGreaterThan(0);
       }
@@ -223,7 +232,7 @@ describe('sound-review candidates', () => {
   const voicesOf = (spec: SoundSpec): readonly VoiceSpec[] =>
     isLayered(spec) ? spec.layers.map((l) => l.spec) : [spec as VoiceSpec];
 
-  it('offers the four summary slots on the board, three characters each', () => {
+  it('offers the four summary slots on the board, a character each', () => {
     for (const id of SUMMARY_SLOTS) {
       expect(SLOT_IDS, `${id} is not on the board`).toContain(id);
       const slot = CANDIDATE_SLOTS[id]!;
@@ -232,10 +241,10 @@ describe('sound-review candidates', () => {
       // own on 2026-08-14, so it is no longer one of the four slots the developer
       // has not seen. The other three are still on their first letters.
       expect(slot.candidates.map((c) => c.id)).toEqual(RE_LETTERED[id] ?? ['a', 'b', 'c']);
-      // Three *characters*, not three takes on one: the labels differ, and so do
-      // the spec names the review page prints beside them.
-      expect(new Set(slot.candidates.map((c) => c.character)).size).toBe(3);
-      expect(new Set(slot.candidates.map((c) => c.spec.name)).size).toBe(3);
+      // As many *characters* as there are offers, not N takes on one: the labels
+      // differ, and so do the spec names the review page prints beside them.
+      expect(new Set(slot.candidates.map((c) => c.character)).size).toBe(slot.candidates.length);
+      expect(new Set(slot.candidates.map((c) => c.spec.name)).size).toBe(slot.candidates.length);
     }
   });
 
@@ -386,9 +395,26 @@ describe('sound-review candidates', () => {
     return seg(split, buf.length) / Math.max(1e-9, seg(0, split));
   };
 
-  /** The denied takes for a re-lettered slot, from the commit before the re-offer. */
-  const deniedOf = (slot: string): readonly SoundSpec[] =>
-    DENIED_TAKES[slot]!.map((s) => s as SoundSpec);
+  /**
+   * The denied takes for a re-lettered slot.
+   *
+   * Two sources, and the second is the one that should win from here on: a0-49
+   * inlined its two slots' takes into `DENIED_TAKES` below, while a0-57 keeps
+   * `xpSettle`'s **in `./candidates`** under {@link CandidateSlot.denied}, where
+   * the board can render them too. Prefer the file; fall back to the inline copy.
+   */
+  const deniedOf = (slot: string): readonly SoundSpec[] => {
+    const archived = CANDIDATE_SLOTS[slot]?.denied;
+    if (archived && archived.length > 0) return archived.map((d) => d.spec);
+    return DENIED_TAKES[slot]!.map((s) => s as SoundSpec);
+  };
+
+  /** The letters those takes were filed under, in the same order — for failure messages. */
+  const deniedIds = (slot: string): readonly string[] => {
+    const archived = CANDIDATE_SLOTS[slot]?.denied;
+    if (archived && archived.length > 0) return archived.map((d) => d.id);
+    return ['a', 'b', 'c'];
+  };
 
   // The takes the developer denied, **inlined** rather than reached for with a
   // `git show`. They are gone from `./candidates` by design — that is the whole
@@ -452,14 +478,14 @@ describe('sound-review candidates', () => {
     // same samples as a take the developer turned down is the denial being served
     // back with a new label, and the letter rule would then be hiding it rather
     // than exposing it.
-    for (const slot of ['oreCollect', 'levelUp'] as const) {
+    for (const slot of ['oreCollect', 'levelUp', 'xpSettle'] as const) {
       const denied = deniedOf(slot).map((s) => render(s));
       for (const c of CANDIDATE_SLOTS[slot]!.candidates) {
         const buf = render(c.spec);
         for (const [i, d] of denied.entries()) {
           expect(
             buf.length === d.length && buf.every((v, k) => v === d[k]),
-            `${slot}/${c.id} is denied take ${'abc'[i]} under a new letter`,
+            `${slot}/${c.id} is denied take ${deniedIds(slot)[i]} under a new letter`,
           ).toBe(false);
         }
       }
@@ -557,14 +583,18 @@ describe('sound-review candidates', () => {
     }
   });
 
-  it('never spells a major third on `levelUp` (a0-49)', () => {
+  it('never spells a major third on `levelUp` or `xpSettle` (a0-49, a0-57)', () => {
     // *The interface does not congratulate* (§4.7 register 2), and this cue can
     // land on top of a DEFEAT headline — so the one interval it may not contain is
     // the one that reads as a fanfare. Checked on the PITCHED voices only: a
     // `freq` on a noise voice sets a grain envelope, not a note, and holding noise
     // to an interval rule would be enforcing music on something that has no pitch.
+    //
+    // a0-57 extends it to `xpSettle`, which lands one beat later on the same
+    // screen and is being rebuilt WARM — and warmth is the direction that reaches
+    // for a fanfare by accident. `e` is deliberately a fifth for that reason.
     const MAJOR_THIRD = Math.pow(2, 4 / 12);
-    for (const c of CANDIDATE_SLOTS.levelUp!.candidates) {
+    for (const c of [...CANDIDATE_SLOTS.levelUp!.candidates, ...CANDIDATE_SLOTS.xpSettle!.candidates]) {
       const pitched = voicesOf(c.spec).filter((v) => v.wave !== 'noise' && (v.noiseMix ?? 0) < 0.5);
       for (const a of pitched) {
         for (const b of pitched) {
@@ -573,10 +603,136 @@ describe('sound-review candidates', () => {
           while (r >= 2) r /= 2; // interval class — a tenth congratulates too
           expect(
             Math.abs(r - MAJOR_THIRD) / MAJOR_THIRD,
-            `levelUp/${c.id} spells a major third between ${a.name} and ${b.name}`,
+            `${c.spec.name} spells a major third between ${a.name} and ${b.name}`,
           ).toBeGreaterThan(0.02);
         }
       }
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // The category denial (a0-57)
+  // -------------------------------------------------------------------------
+  //
+  // On 2026-08-16T02:29:03Z all three `xpSettle` takes were denied together, with
+  // one reason: *"none of these sound like sounds for XP collection"*. That is a
+  // different kind of verdict from every one above it. `rockChip` was *"almost
+  // there, but lower in tone"* — a note on execution, answerable by moving a
+  // number. This one says the object is the wrong object, and the only thing that
+  // answers it is a different object.
+  //
+  // So the bounds below are not "better than what was denied" on the axis the
+  // developer named — they never named one. They are the diagnosis, held as code:
+  // all three denied takes voiced a MACHINE COMING TO REST, and all three share
+  // the measurable signature of one. A gain is **warm and bright at once** and
+  // **leaves something behind**; a stop is one or the other and is over on
+  // arrival. Every figure is measured against the takes that were denied, in the
+  // a0-49 idiom, so the bar moves with the record rather than with a constant
+  // somebody picked.
+  //
+  // The `denied` archive on the slot is what makes that possible, and it is the
+  // point of the field: a re-offer that cannot be measured against what it
+  // replaces is another guess.
+
+  /** RMS of everything above `hz` — how much bright detail is actually THERE. */
+  const hiBandRms = (buf: Float32Array, hz: number): number => {
+    const a = 1 - Math.exp((-2 * Math.PI * hz) / 44100);
+    let y = 0;
+    let sum = 0;
+    for (let i = 0; i < buf.length; i++) {
+      const x = buf[i] ?? 0;
+      y += (x - y) * a;
+      sum += (x - y) * (x - y);
+    }
+    return Math.sqrt(sum / Math.max(1, buf.length));
+  };
+
+  it('keeps the denied `xpSettle` takes on the slot, verbatim and unofferable (a0-57)', () => {
+    const slot = CANDIDATE_SLOTS.xpSettle!;
+    const denied = slot.denied ?? [];
+    expect(denied.map((d) => d.id), 'the denied takes are gone from the slot').toEqual(['a', 'b', 'c']);
+    const offered = new Set(slot.candidates.map((c) => c.id));
+    for (const d of denied) {
+      // A verdict names an offer by its letter and nothing else, so a denied take
+      // sharing a letter with a live one would make the record unreadable in the
+      // exact way `RE_LETTERED` exists to prevent — now from the other side.
+      expect(offered.has(d.id), `xpSettle/${d.id} is both denied and on offer`).toBe(false);
+      // The reason is quoted, not summarised: a0-57 exists because a paraphrase
+      // of this denial ("make them better") produced twenty minutes of nothing.
+      expect(d.reason).toBe('none of these sound like sounds for XP collection');
+      expect(d.deniedAt).toBe('2026-08-16T02:29:03Z');
+    }
+  });
+
+  it('answers the `xpSettle` denial with warmth AND brightness, which no denied take had (a0-57)', () => {
+    const denied = deniedOf('xpSettle').map((b) => render(b));
+    // 3 kHz is the top of this bank's usable spectrum (`./synth` clamps a resonant
+    // cutoff to SVF_MAX_HZ_FRACTION, ~6.5 kHz at 44.1 k), and 200 Hz is where the
+    // body a player feels rather than hears begins — the same two corners a0-49
+    // measured `oreCollect`'s sparkle and `levelUp`'s mass at.
+    const hi = (b: Float32Array): number => hiBandRms(b, 3000);
+    const low = (b: Float32Array): number => lowBandRms(b, 200);
+    const HI_FLOOR = Math.max(...denied.map(hi)) * 1.08;
+    const LOW_FLOOR = Math.max(...denied.map(low)) * 1.08;
+
+    // The conjunction is the whole finding, so it is asserted rather than assumed:
+    // each denied take clears AT MOST ONE of the two floors. `a` was bright and
+    // thin, `b` was warm and dull, `c` was neither. None of them was a gain.
+    for (const [i, b] of denied.entries()) {
+      const both = hi(b) > HI_FLOOR && low(b) > LOW_FLOOR;
+      expect(both, `denied take ${deniedIds('xpSettle')[i]} was already warm and bright — the diagnosis is wrong`).toBe(
+        false,
+      );
+    }
+
+    for (const c of CANDIDATE_SLOTS.xpSettle!.candidates) {
+      const buf = render(c.spec);
+      const where = `xpSettle/${c.id}`;
+      expect(hi(buf), `${where} has no more bright detail than the takes that were denied`).toBeGreaterThan(HI_FLOOR);
+      expect(low(buf), `${where} has no more warm body than the takes that were denied`).toBeGreaterThan(LOW_FLOOR);
+      // And a stop is one gesture. Every denied take was a single layer; a sound
+      // that is warm and bright at once cannot be, and saying so keeps a future
+      // edit from satisfying the two figures with one clever voice.
+      expect(isLayered(c.spec) && c.spec.layers.length >= 3, `${where} is not built as a gain`).toBe(true);
+    }
+  });
+
+  it('leaves something behind after an `xpSettle` lands, unlike a full stop (a0-57)', () => {
+    // The other half of the diagnosis. The denied trio measure 0.10 / 0.12 / 0.10
+    // late-over-early — the lowest figures on the board, and the sound of a thing
+    // ending rather than resolving. A resolution has a remainder. The margin is
+    // half again rather than a hair, because this is the axis the denial is about.
+    const denied = deniedOf('xpSettle').map((b) => render(b));
+    const FLOOR = Math.max(...denied.map((b) => lateOverEarly(b))) * 1.5;
+    for (const c of CANDIDATE_SLOTS.xpSettle!.candidates) {
+      expect(
+        lateOverEarly(render(c.spec)),
+        `xpSettle/${c.id} is over as soon as it lands, like the takes that were denied`,
+      ).toBeGreaterThan(FLOOR);
+    }
+  });
+
+  it('buys none of it with level, and none of it with length (a0-57)', () => {
+    // The failure mode of "warmer and brighter" is "louder", and the developer did
+    // not complain about the level — so the takes that were denied are the ceiling
+    // on both loudness figures, and the re-offer has to find its character inside
+    // them. The length bound is the brief's own: the cue fires at the end of every
+    // match, so it may not ask for attention twice.
+    const denied = deniedOf('xpSettle').map((b) => render(b));
+    const RMS_CEILING = Math.max(...denied.map((b) => rms(b)));
+    const PEAK_CEILING = Math.max(...denied.map((b) => peak(b)));
+    // It also lands UNDER the beat it follows (plan §6.5): `levelUp` is the last
+    // thing the player heard, and the settle sits beneath it rather than answering
+    // it. Measured against the quietest `levelUp` offer, so a mixed pair of
+    // verdicts is safe.
+    const quietestLevelUp = Math.min(...CANDIDATE_SLOTS.levelUp!.candidates.map((c) => rms(render(c.spec))));
+    for (const c of CANDIDATE_SLOTS.xpSettle!.candidates) {
+      const buf = render(c.spec);
+      const where = `xpSettle/${c.id}`;
+      expect(rms(buf), `${where} bought its warmth with level`).toBeLessThanOrEqual(RMS_CEILING);
+      expect(peak(buf), `${where} bought its brightness with level`).toBeLessThanOrEqual(PEAK_CEILING);
+      expect(rms(buf), `${where} would play over the beat it follows`).toBeLessThan(quietestLevelUp * 0.6);
+      expect(buf.length / 44100, `${where} asks for attention twice`).toBeLessThanOrEqual(0.3);
     }
   });
 

@@ -61,6 +61,19 @@
  *    are mega annoying, we don't need this at all no need for regeneration"* — as a
  *    **cut**, so it is deliberately NOT re-offered here: three new takes on a sound
  *    somebody asked to stop hearing is the round this brief exists to prevent.
+ *  - **xpSettle (a0-57).** The first **category** denial on the board: all three
+ *    takes turned down on 2026-08-16 with *"none of these sound like sounds for XP
+ *    collection"* — not "make them better", but "these are not sounds for the thing
+ *    this slot is for". Twenty minutes then passed with the board unchanged and the
+ *    developer in front of it (*"im still staring at a sound board with no
+ *    regenerated options"*), which is the failure a0-49 built `denied_without_work`
+ *    into `/api/sounds` to detect and which nothing was dispatching on. The re-offer
+ *    is **four** takes rather than three — the letters `d`–`g` on a0-48's rule — and
+ *    it does not tune the denied family: it re-reads the event (XP landing and being
+ *    yours) and offers four different readings of what a collection sound IS. It is
+ *    also the first slot to keep its denied takes **in this file**, under
+ *    {@link CandidateSlot.denied}, rendered to `previews/xpSettle/denied-*.wav` so
+ *    the board can play the re-offer against the thing it replaces.
  *  - **All 40 slots (a0-01b).** The developer pressed **DENY ALL** on every slot on
  *    the board, and the board promises *"generate 3 new options"* on that press. This
  *    file is that generation: `a`, `b`, `c` are new everywhere, in the amended §4.7
@@ -211,7 +224,14 @@ export interface CandidateSlot {
   readonly context: string;
   /** The shipped {@link SoundName} this slot proposes alternatives for (its "current"). */
   readonly current: SoundName;
-  /** Exactly three candidates, one letter each ({@link SoundCandidate.id}). */
+  /**
+   * The live offers, one letter each ({@link SoundCandidate.id}).
+   *
+   * Three on every slot the board has always promised three of. `xpSettle` offers
+   * **four** (a0-57): its denial was a category rejection rather than a note on
+   * execution, so the round needs enough spread to find out which reading of the
+   * event is the right one, and a fourth letter is cheaper than a fourth round.
+   */
   readonly candidates: readonly SoundCandidate[];
   /**
    * A fourth answer this slot is allowed to come back with, in the developer's
@@ -225,6 +245,39 @@ export interface CandidateSlot {
    * "cut it" is not on the table for a mechanic (§2.2, §4.9).
    */
   readonly fourthOption?: string;
+  /**
+   * The takes this slot has already had turned down, kept where the offer is.
+   *
+   * A re-offer replaces {@link candidates}, so before a0-57 the only copy of a
+   * denied take was in git — and the two things a denial is *for* both need it
+   * present: comparing the new offer against what was rejected, and reading, a
+   * month later, what the rejection was actually aimed at. a0-49 solved that for
+   * `oreCollect` and `levelUp` by inlining the denied specs into
+   * `./candidates.test.ts`, which gets the tests what they need but leaves the
+   * board — the thing the developer is looking at — with no way to play the take
+   * beside its replacement.
+   *
+   * So a denied take stays here, out of `candidates` (it is not on offer and a
+   * verdict may not land on it) and rendered to `previews/<slot>/denied-<id>.wav`
+   * by `sound-review/render.ts`. Letters are never reused: a `denied` entry and a
+   * live offer can never share an id, which `./candidates.test.ts` asserts.
+   */
+  readonly denied?: readonly DeniedTake[];
+}
+
+/**
+ * A take that was denied: the offer as it stood, plus the verdict against it.
+ *
+ * The reason is quoted **verbatim** and the timestamp is the one the review page
+ * recorded, because a paraphrase of a denial is the thing that produces the next
+ * denial — a0-57 exists because *"none of these sound like sounds for XP
+ * collection"* had been read as "make them better" rather than as what it says.
+ */
+export interface DeniedTake extends SoundCandidate {
+  /** ISO timestamp the verdict was recorded on the review page. */
+  readonly deniedAt: string;
+  /** The developer's reason, word for word. Never paraphrased, never summarised. */
+  readonly reason: string;
 }
 
 /** The slots, in bank order — the order the review page walks. */
@@ -2501,17 +2554,136 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     ],
   },
   xpSettle: {
-    // The full stop, and the smallest job in the set: *the screen has finished
-    // moving and your input means something again*. All three resolve DOWNWARD
-    // and none of them rings for long — a settle that ends higher than it began
-    // is a question, and a settle with a tail is still the screen talking.
+    // ------------------------------------------------------------------------
+    // a0-57. Denied 2026-08-16T02:29:03Z, all three, with one reason:
+    //   *"none of these sound like sounds for XP collection"*
+    // ------------------------------------------------------------------------
+    //
+    // Read as written, that is a CATEGORY rejection: not "these are not good
+    // enough", but "these are not sounds for the thing this slot is for". No
+    // amount of refining an object that is the wrong object produces the right
+    // one, so this round does not tune `a`/`b`/`c` — it starts again from the
+    // event.
+    //
+    // **What the previous three were voicing.** The slot's own note above them
+    // read *"the full stop… the screen has finished moving and your input means
+    // something again"*, and all three answered that sentence faithfully: a dry
+    // stop, a damped seat, a low band ringing out. Three ways for a MACHINE TO
+    // COME TO REST. That is a real event — it is just not this one. The player
+    // is not being told the screen is idle; they are being told that XP they
+    // earned has landed and is theirs. Punctuation was designed where a
+    // transaction was asked for.
+    //
+    // The mistake is visible in the numbers, and it is the same mistake three
+    // times, which is why one denial covered all three:
+    //
+    // | denied take | >3 kHz rms | <200 Hz rms | left after the landing |
+    // |---|---|---|---|
+    // | `a` dry stop     | 0.0059 | 0.0071 | 0.10 |
+    // | `b` damped seat  | 0.0020 | 0.0183 | 0.12 |
+    // | `c` low band     | 0.0017 | 0.0071 | 0.10 |
+    //
+    // Every one of them is a single layer; every one of them has EITHER a bright
+    // detail OR a warm body, never both; and every one is over the instant it
+    // arrives (the lowest late-over-early figures on the whole board). A gain is
+    // warm and bright at once and leaves something behind — that is what makes it
+    // read as *something was added* rather than as *something stopped*. The four
+    // offers below are all held to both halves at once, measured against the
+    // takes that were denied (`./candidates.test.ts`), and none of them is a
+    // single layer.
+    //
+    // **Four readings of "sounds like XP collection", not four voicings of one.**
+    // The brief's bar is that two candidates may not survive the same criticism,
+    // so each one is a different answer to what collecting XP *is*:
+    //
+    //   d  **the deposit** — a measured quantity poured into a store and topping
+    //      off. Collection as ACCRUAL: fine granular material arriving, a warm
+    //      cell taking it, a body holding at its new level.
+    //   e  **the credit** — two damped partials a fifth apart, struck together
+    //      under a contact. Collection as a RECORD: the amount is acknowledged
+    //      once and filed. A fifth and not a third — the interface does not
+    //      congratulate (§4.7 register 2), and this cue can land on a defeat.
+    //   f  **the uptake** — the corner OPENS across the body instead of closing,
+    //      over a sub that arrives with it. Collection as the TOTAL RISING. This
+    //      is the one that deliberately breaks the previous round's self-imposed
+    //      rule that a settle must resolve downward or it "is a question" — that
+    //      rule is the reason all three denied takes are terminations, and it was
+    //      this lane's, not the developer's. If `f` is the one that reads, the
+    //      rule was the defect.
+    //   g  **the prize** — three narrow bands high up, quiet and short, over a
+    //      warm low body. Collection as a SMALL BRIGHT REWARD, in the developer's
+    //      own words for this family: *"like you've won a prize, but subtle"*
+    //      (2026-08-14, on `oreCollect`) — the nearest thing on record to a
+    //      positive statement of what a collection sound is supposed to do.
+    //
+    // **What is held constant across all four**, so the choice is about character
+    // and nothing else: none is louder in rms or in peak than the loudest take
+    // that was denied (brightness and warmth bought with level would be a
+    // different offer, not a better one); all four stay under 0.3 s, well inside
+    // the skip bound; and all four sit far beneath both the result sting and the
+    // `levelUp` beat they follow, so the settle never competes with the pickup
+    // ahead of it.
     label: "XP Settle",
-    context: "The end of the sequence — everything holds at its final value and the buttons take focus. Quiet: the full stop.",
+    context: "Earned XP lands and is yours — the number has stopped moving and the total is final. Small and warm: the arrival of something already won.",
     current: 'xpSettle',
     candidates: [
       {
+        id: 'd',
+        character: "a measure poured into a cell, topping off",
+        spec: {
+          name: 'xpSettle_d_deposit',
+          layers: [
+            grains('xpSettle_d.pour', { freq: 760, freqEnd: 520, grain: 0.0035, gain: 0.098, attack: 0.004, hold: 0.012, decay: 0.07, curve: 2.6, from: 4600, to: 1500, q: 3, hp: 500, seed: 35340 }),
+            band('xpSettle_d.cell', 392, { gain: 0.054, decay: 0.2, q: 7, curve: 3.2, attack: 0.004, hold: 0.012, at: 0.028, seed: 35342 }),
+            swept('xpSettle_d.hold', { wave: 'sine', freq: 98, from: 260, to: 380, q: 1.8, gain: 0.082, attack: 0.008, hold: 0.04, decay: 0.2, curve: 2.4, noiseMix: 0.05, at: 0.028, seed: 35344 }),
+          ],
+        },
+      },
+      {
+        id: 'e',
+        character: "a credit recorded, two damped partials",
+        spec: {
+          name: 'xpSettle_e_credit',
+          layers: [
+            band('xpSettle_e.contact', 4400, { gain: 0.32, decay: 0.055, q: 3, curve: 5, punch: 0.5, hp: 1500, seed: 35350 }),
+            ...plate('xpSettle_e.credit', 330, { gain: 0.057, decay: 0.17, ratios: [1, 1.5], q: 6, curve: 3.2, grain: 0.36, edge: 0, at: 0.012, seed: 35352 }),
+            swept('xpSettle_e.ledger', { wave: 'sine', freq: 110, from: 300, to: 200, q: 1.8, gain: 0.072, attack: 0.006, hold: 0.05, decay: 0.19, curve: 2.4, noiseMix: 0.05, at: 0.012, seed: 35358 }),
+          ],
+        },
+      },
+      {
+        id: 'f',
+        character: "an uptake, the corner opening as it takes",
+        spec: {
+          name: 'xpSettle_f_uptake',
+          layers: [
+            swept('xpSettle_f.air', { wave: 'noise', freq: 300, from: 2400, to: 5600, q: 3.2, gain: 0.125, attack: 0.01, hold: 0.012, decay: 0.06, curve: 2.2, hp: 1400, seed: 35360 }),
+            swept('xpSettle_f.take', { wave: 'triangle', freq: 174.61, from: 320, to: 1500, q: 2.8, gain: 0.029, attack: 0.006, hold: 0.03, decay: 0.18, curve: 2.4, noiseMix: 0.16, at: 0.02, seed: 35362 }),
+            swept('xpSettle_f.store', { wave: 'sine', freq: 87.31, from: 240, q: 1.7, gain: 0.068, attack: 0.008, hold: 0.05, decay: 0.2, curve: 2.4, noiseMix: 0.04, at: 0.02, seed: 35364 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "a small bright prize over a warm body",
+        spec: {
+          name: 'xpSettle_g_prize',
+          layers: [
+            band('xpSettle_g.s0', 3300, { gain: 0.4, decay: 0.11, q: 8, curve: 4, hp: 1200, seed: 35370 }),
+            band('xpSettle_g.s1', 4870, { gain: 0.31, decay: 0.09, q: 9, curve: 4.5, hp: 1600, at: 0.01, seed: 35372 }),
+            band('xpSettle_g.s2', 5900, { gain: 0.22, decay: 0.07, q: 10, curve: 5, hp: 2000, at: 0.018, seed: 35374 }),
+            swept('xpSettle_g.warm', { wave: 'triangle', freq: 146.83, from: 700, to: 300, q: 2.2, gain: 0.043, attack: 0.005, hold: 0.03, decay: 0.2, curve: 2.6, noiseMix: 0.12, seed: 35376 }),
+            swept('xpSettle_g.body', { wave: 'sine', freq: 73.42, from: 220, q: 1.7, gain: 0.063, attack: 0.006, hold: 0.05, decay: 0.19, curve: 2.4, noiseMix: 0.04, seed: 35378 }),
+          ],
+        },
+      },
+    ],
+    denied: [
+      {
         id: 'a',
         character: "a dry stop, one contact",
+        deniedAt: '2026-08-16T02:29:03Z',
+        reason: "none of these sound like sounds for XP collection",
         spec: {
           name: 'xpSettle_a_dryStop',
           layers: [
@@ -2522,6 +2694,8 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       {
         id: 'b',
         character: "a damped seat, closing",
+        deniedAt: '2026-08-16T02:29:03Z',
+        reason: "none of these sound like sounds for XP collection",
         spec: {
           name: 'xpSettle_b_dampedSeat',
           layers: [
@@ -2532,6 +2706,8 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       {
         id: 'c',
         character: "one low band, ringing out",
+        deniedAt: '2026-08-16T02:29:03Z',
+        reason: "none of these sound like sounds for XP collection",
         spec: {
           name: 'xpSettle_c_lowBand',
           layers: [

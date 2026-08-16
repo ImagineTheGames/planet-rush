@@ -128,12 +128,23 @@ interface ManifestCandidate {
   character: string;
   params: string;
 }
+interface ManifestDenied extends ManifestCandidate {
+  deniedAt: string;
+  reason: string;
+}
 interface ManifestSlot {
   id: string;
   label: string;
   context: string;
   current: string | null;
   candidates: ManifestCandidate[];
+  /**
+   * Takes this slot has already had turned down, rendered beside the live offers
+   * so the board can play a re-offer against the thing it replaces (a0-57). NOT
+   * candidates: no verdict may land on one, so they are a separate list and their
+   * wavs are written under a `denied-` prefix that no letter can collide with.
+   */
+  denied?: ManifestDenied[];
   /**
    * A fourth answer the slot is allowed to come back with, when it has one — the
    * `ambient` bed's "ship it off by default" (a0-48). Written through from
@@ -172,12 +183,22 @@ for (const slotId of CANDIDATE_SLOT_ORDER) {
     params: `src/art/audio/candidates.ts#${slotId}.${c.id}`,
   }));
 
+  const denied: ManifestDenied[] = (slot.denied ?? []).map((d) => ({
+    id: d.id,
+    wav: writePreview(slotId, `denied-${d.id}`, d.spec),
+    character: d.character,
+    params: `src/art/audio/candidates.ts#${slotId}.denied.${d.id}`,
+    deniedAt: d.deniedAt,
+    reason: d.reason,
+  }));
+
   slots.push({
     id: slotId,
     label: slot.label,
     context: slot.context,
     current: currentWav,
     candidates,
+    ...(denied.length === 0 ? {} : { denied }),
     ...(slot.fourthOption === undefined ? {} : { fourthOption: slot.fourthOption }),
   });
 }
@@ -194,7 +215,11 @@ const manifest = {
 writeFileSync(resolve(HERE, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 
 const nCand = slots.reduce((a, s) => a + s.candidates.length, 0);
-console.log(`rendered ${slots.length} slots, ${nCand} candidates + ${slots.length} current previews`);
+const nDenied = slots.reduce((a, s) => a + (s.denied?.length ?? 0), 0);
+console.log(
+  `rendered ${slots.length} slots, ${nCand} candidates + ${slots.length} current previews` +
+    (nDenied === 0 ? '' : ` + ${nDenied} denied takes kept for comparison`),
+);
 console.log(`peak across all previews: ${maxPeak.toFixed(3)}`);
 if (hot.length) {
   console.log(`WARNING hot previews (peak > 0.95):\n  ${hot.join('\n  ')}`);
