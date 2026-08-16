@@ -90,6 +90,11 @@ function bankFromRock(world: World, ship: Ship, n: number): void {
   ship.cargo = 0;
 }
 
+/** Ore loose on the map — real chunks only, never the cosmetic couriers. */
+function looseOre(world: World): number {
+  return world.chunks.reduce((sum, c) => sum + (c.deposit ? 0 : c.amount), 0);
+}
+
 /** A copy of the ledger, for before/after arithmetic. */
 function snapshot(world: World): OreLedger {
   return { ...(world.ledger ?? makeLedger()) };
@@ -131,6 +136,7 @@ describe('the death drop pays the sink what it cannot mint (a0-58)', () => {
       const { world, victim } = staged();
       fillFromRock(world, victim, hold);
       const before = snapshot(world);
+      const onTheMapBefore = looseOre(world);
 
       killShip(world, victim);
 
@@ -150,9 +156,8 @@ describe('the death drop pays the sink what it cannot mint (a0-58)', () => {
       expect(burnt, `hold ${hold}`).toBeCloseTo(hold - dropped, 12);
 
       // The books still balance against the world itself, not just against
-      // themselves: the chunks on the map are exactly the `dropped` total.
-      const onTheMap = world.chunks.reduce((sum, c) => sum + (c.deposit ? 0 : c.amount), 0);
-      expect(onTheMap, `hold ${hold}`).toBeCloseTo(before.dropped + dropped - before.dropped, 9);
+      // themselves: the ore this kill put on the map is exactly what it booked.
+      expect(looseOre(world) - onTheMapBefore, `hold ${hold}: on the map`).toBeCloseTo(dropped, 9);
       expect(Math.abs(oreResidual(world)), `hold ${hold}: residual`).toBeLessThan(1e-9);
     }
   });
