@@ -983,8 +983,29 @@ export const WRECK = {
   maxDebrisChunks: 40,
 } as const;
 
-/** Fraction of held ore dropped as debris on ship death (GDD §2.3, §2.7). TUNABLE */
-export const DEATH_ORE_DROP_FRACTION: Tunable<number> = 0.5;
+/**
+ * Fraction of held ore dropped as debris on ship death (GDD §2.3, §2.7).
+ *
+ * **1 since 2026-08-16 (a0-59), by developer ruling** — *"destroyed ships should
+ * drop all their ore, no more 1/2 the ore stuff"*. It was `0.5` from M1, and the
+ * unshed half was a real ore sink in the ratified design; the developer withdrew
+ * that sink, so the whole hold now reaches the field. GDD §2.3/§2.7/§2.8 are
+ * amended to match (`docs/design-amendments.md`) — the doc and the constant do not
+ * disagree, because a constant that silently contradicts the design doc is how the
+ * next agent "restores" it.
+ *
+ * What this does to the economy, stated so the balance crew reads it as a change
+ * rather than discovering it: **every kill now returns twice the ore to the
+ * field.** Contested space is worth more, ganking a loaded miner pays double, and
+ * the collapse phase circulates more ore than §2.8's numbers assumed. Intended.
+ *
+ * Still TUNABLE, and still not assumed to be 1 anywhere: `killShip` mints whole
+ * `CHUNK.ore` pieces and sinks the sub-chunk remainder (a0-58), which is a no-op
+ * at `1` with a whole hold and the thing that keeps the ledger honest the moment
+ * this moves off `1` — or `CHUNK.ore` moves off `1`. Assert the relationship, not
+ * today's value (LESSONS §26). TUNABLE
+ */
+export const DEATH_ORE_DROP_FRACTION: Tunable<number> = 1;
 
 // `SENSOR_RANGE` — RETIRED 2026-08-07 (a0-05, GDD §2.2/§2.8 amended).
 //

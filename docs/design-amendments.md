@@ -8,6 +8,114 @@ half of these amendments; this file is the human-readable why.
 
 ---
 
+## A destroyed ship drops EVERYTHING: the half-burn ore sink is withdrawn
+
+**Date:** 2026-08-16 · branch `agent/gameplay/a0-59-full-death-drop`
+**Ratified by:** Developer (Reinaldo) — the rule is his and this overrules the GDD
+**Amends:** GDD §2.3, §2.7 and §2.8 — `DEATH_ORE_DROP_FRACTION` **0.5 → 1**. A
+destroyed ship leaves its entire hold on the field; the half that used to be
+destroyed with the hull is no longer destroyed at all. **Nothing else moves:**
+banked ore is still never lost to a ship death, `CHUNK.ore` is still 1, the drop is
+still minted in whole chunks (a0-58), and `deathLoss` is still a live ledger sink.
+
+### The ratification, verbatim
+
+> "destroyed ships should drop all their ore, no more 1/2 the ore stuff"
+
+### This overturns ratified design, deliberately
+
+GDD §2.3 has carried the half-burn since M1, and it was not decoration: it was one
+of the economy's **three ore sinks** (`spent`, `deathLoss`, `capLoss`, plus `dust`
+since a0-58), and the one that made a loaded hold a genuine risk rather than a
+transfer. That is real ratified design being overruled by the person it belongs to,
+which is his call and needs no defending here.
+
+What it does need is **recording**, which is what this entry is for. A constant that
+silently contradicts the design document is how the next agent "restores" it in
+good faith six weeks from now — and the half-drop is written into §2.3's numbered
+loop, §2.7's opening sentence and §2.8's table, so three separate readers would
+have found three separate reasons to put the 0.5 back. All three are amended in the
+same commit as the constant.
+
+### What this does to the economy — read it as a change, do not discover it
+
+**Every kill now returns twice the ore to the field.** Concretely, and stated for
+the balance crew rather than buried:
+
+- **Contested space is worth more.** A fight in the asteroid field used to burn
+  half of whatever the loser was carrying; now every ore either pilot held survives
+  the exchange and lies there for whoever holds the ground afterwards.
+- **Ganking a loaded miner pays double.** The full-hold hauler was already the
+  juiciest target in the game (GDD §2.3: *"dart home early or risk hauling a full
+  hold"*). The reward for catching one just doubled while the risk of hauling did
+  not change, so the risk/reward on running a full hold has moved **against**
+  hauling and **toward** interception.
+- **Collapse circulates more ore than §2.8's numbers assumed.** The field-yield
+  figure (~400, times the abundance multiplier) is a *mint* budget, and it is
+  untouched — but ore that used to leave the economy at every death now stays in
+  it, so the quantity actually in play late is higher than the tuning behind
+  `FIELD_YIELD`, the abundance table and the collapse timings was measured against.
+  The passive-match and mined-out bounds in §2.8 are the two that most deserve a
+  re-measure.
+- **The sink side of the ledger thins out.** `deathLoss` is now **0** for an
+  ordinary death. `spent` becomes the economy's dominant sink, which means the
+  brake on the ore supply is now almost entirely *what players choose to buy*.
+
+That is the intended consequence — the developer asked for it — and it is a
+balance change, not a bug fix.
+
+### `deathLoss` is kept, at zero, on purpose
+
+The bucket is **not** deleted. It remains the sink for anything undropped: the
+sub-`CHUNK.ore` quantisation leftover (a0-58), and any future ore that leaves a
+hold without reaching the field. A ledger with no sink for a flow cannot stay
+conserved the day that flow reappears, and `expectedLiveOre` subtracts it either
+way — a zero term costs nothing and an absent term costs the invariant.
+
+### a0-58's whole-ore invariant is kept, and this is the point
+
+This brief mostly *dissolves* the case that motivated a0-58: at a fraction of 1 the
+drop equals the hold, and a whole hold divides into whole chunks with nothing over,
+so no remainder piece is ever minted. The rounding still runs; it subtracts zero.
+
+It stays anyway. `DEATH_ORE_DROP_FRACTION` and `CHUNK.ore` are **both** TUNABLE,
+and the fraction returning to anything but 1 — or `CHUNK.ore` moving off 1 —
+re-creates the remainder in a single edit. The invariant is what makes that edit
+safe instead of a silent leak, and deleting a guard because today's value happens
+to make it a no-op is precisely the failure four star-bloom rounds paid to learn
+(LESSONS §26: assert the relationship, not today's value). `src/sim/damage.test.ts`
+gates both rules in one file for the same reason.
+
+### Determinism goldens re-measured
+
+The same three fixtures a0-58 moved move again — they pin absolute state hashes of
+a simulation, and this is a simulation rule change. Each says re-baselining
+requires a ratified amendment recorded in this file; this entry is that. They are
+flagged to their owners in the PR and moved in their own commits, old values kept:
+
+| Fixture | Owner | Was (a0-58) | Is (a0-59) |
+|---|---|---|---|
+| `src/bots/ffa-parity.test.ts` seed 20260806 | Bot | `f31d2c3b` | *(see commit)* |
+| `src/bots/ffa-parity.test.ts` seed 7 | Bot | `2400ba7e` | *(see commit)* |
+| `src/bots/ffa-parity.test.ts` seed 991 | Bot | `b891918a` | *(see commit)* |
+| `tests/net/online-radio.test.ts` `FFA_GOLDEN` | Netcode | `c5ad2324` | *(see commit)* |
+
+What those fixtures actually guard — that no team-aware path is reachable in FFA —
+is untouched and still asserted by their own non-hash cases.
+
+### What did NOT change
+
+- **Banked ore.** Still never lost to a ship death (GDD §2.7). The cost of dying is
+  time and position; a0-59 makes it *less* than that, not more.
+- **The wreck.** A dead **station**'s debris field is funded by the owner's bank
+  and capped by `WRECK.maxDebrisChunks` (`capLoss`); that is a different rule and
+  is untouched.
+- **Whole-ore minting, the hold cap, the full-hold refusal, the drain rate, the
+  chunk size.** All as a0-58 left them.
+- **The wire, the hash schema, and `Ship`.** Nothing added to any of them.
+
+---
+
 ## Ore is a countable thing: every mint is WHOLE, and a hold can never hold half of one
 
 **Date:** 2026-08-16 · branch `agent/gameplay/a0-58-whole-ore-only`
@@ -17,6 +125,11 @@ atmosphere drain banks *a whole ore at a time* at the same `2 ore/s`, and the
 conservation list gains one named sink (`dust`). **No rate, cost, cap, fraction or
 capacity changes**: `DEATH_ORE_DROP_FRACTION` is still 0.5, `DEPOSIT.drainRate` is
 still 2, `CHUNK.ore` is still 1 and still TUNABLE.
+
+> **Superseded in part, same day — see a0-59 above.** `DEATH_ORE_DROP_FRACTION` is
+> **1** as of 2026-08-16: the developer withdrew the half-drop hours after this
+> entry landed. Everything else here stands, and the whole-ore invariant this entry
+> exists for is deliberately kept — it is what makes the fraction safe to tune.
 
 ### The ratification, verbatim
 
@@ -110,7 +223,10 @@ invariant and named the other one here.
 ### What did NOT change
 
 - **The half-drop.** `DEATH_ORE_DROP_FRACTION` is untouched; half a hold still
-  drops, now rounded down to what the ring can mint whole.
+  drops, now rounded down to what the ring can mint whole. *(**Overturned the same
+  day by a0-59** — the fraction is 1 and the whole hold drops. The rounding this
+  bullet describes is unchanged and still runs; it simply has nothing to round on
+  the shipped numbers.)*
 - **The drain rate.** `DEPOSIT.drainRate` is untouched, and the metronome cannot
   outrun it — the boundaries belong to the world, so no dwell pattern banks faster
   than `drainRate`. What phase costs is at most one boundary's wait on arrival.

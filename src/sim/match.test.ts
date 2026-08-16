@@ -27,6 +27,7 @@ import {
 import {
   COLLAPSE_CORE_DECAY,
   CORE_HP,
+  DEATH_ORE_DROP_FRACTION,
   FIELD_YIELD,
   STATION,
   REPAIR_HP_PER_ORE,
@@ -428,10 +429,17 @@ describe('elimination and the wreck (GDD §2.7)', () => {
 
     damageStation(world, wreck, 5);
 
-    // The bank funds the debris field (plus the floor), and the half-hold drops
-    // where the ship exploded — the two halves of GDD §2.7's payout.
+    // The bank funds the debris field (plus the floor), and the WHOLE hold drops
+    // where the ship exploded — the two halves of GDD §2.7's payout. The hold half
+    // was `held / 2` until 2026-08-16 (a0-59): the developer withdrew the burn, so
+    // an eliminated player's ship contributes everything it was carrying too.
+    // Driven off `DEATH_ORE_DROP_FRACTION` rather than restating today's value —
+    // it is TUNABLE and this assertion is about the PAYOUT, not the number.
     expect(victim.banked).toBe(0);
-    expect(oreInWorld(world)).toBeCloseTo(bank + WRECK.baseDebrisOre + held / 2, 9);
+    expect(oreInWorld(world)).toBeCloseTo(
+      bank + WRECK.baseDebrisOre + held * DEATH_ORE_DROP_FRACTION,
+      9,
+    );
 
     // Debris sits on a ring around the wreck, not inside it.
     const nearWreck = world.chunks.filter(
@@ -459,7 +467,7 @@ describe('elimination and the wreck (GDD §2.7)', () => {
 // --- 3. death and respawn (GDD §2.7) --------------------------------------
 
 describe('death and respawn (GDD §2.7)', () => {
-  it('respawns in 5 s with upgrades intact, having dropped half the hold', () => {
+  it('respawns in 5 s with upgrades intact, having dropped the whole hold', () => {
     // A player who has bought a hull tier and a cargo tier. The upgrade state is
     // `tiers`, and respawn *re-derives* the ceilings from it rather than trusting
     // the stored numbers — which is what makes "upgrades intact" structural
@@ -484,8 +492,13 @@ describe('death and respawn (GDD §2.7)', () => {
     damageShip(world, ship, 4);
     expect(ship.alive).toBe(false);
     expect(ship.respawnTimer).toBeCloseTo(RESPAWN_S, 9);
-    // Half the hold drops as debris where it exploded; the bank is untouched.
-    expect(world.chunks.reduce((n, c) => n + c.amount, 0)).toBeCloseTo(2, 9);
+    // The hold drops as debris where it exploded; the bank is untouched. All 4 of
+    // it since a0-59 (it was 2 under the half-drop) — read off the constant, which
+    // is TUNABLE, so this pins the RULE and not this week's fraction.
+    expect(world.chunks.reduce((n, c) => n + c.amount, 0)).toBeCloseTo(
+      4 * DEATH_ORE_DROP_FRACTION,
+      9,
+    );
     expect(ship.banked).toBe(7);
 
     // Not a tick early…

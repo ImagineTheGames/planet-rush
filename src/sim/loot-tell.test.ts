@@ -26,7 +26,6 @@ import { TICK_DT, createWorld, step } from './index';
 import { damageShip } from './damage';
 import { oreResidual } from './ore-ledger';
 import { TRACTOR } from './constants';
-import { refreshDerivedStats } from './upgrades';
 import type { PlayerSpec, Ship, World } from './state';
 
 /** A two-ship world with the pair parked mid-arena, clear of any atmosphere
@@ -47,13 +46,16 @@ function stagedKill(looterCargo: number): { world: World; victim: Ship; looter: 
   victim.spawnProtect = 0;
   looter.spawnProtect = 0;
 
-  // Give the VICTIM a bought cargo tier (GDD §2.5: +2 per tier), so its hold is 4
-  // and the half-drop is 2 chunks rather than 1. A drop of one indivisible ore
-  // cannot show a partial take, and a partial take is one of the four things the
-  // report could have been. Tiers are match state, so this is a legitimate ship.
-  victim.tiers.cargo = 1;
-  refreshDerivedStats(victim);
-  expect(victim.cargoCap).toBe(4);
+  // The VICTIM needs a drop of more than one chunk: a drop of one indivisible ore
+  // cannot show a PARTIAL take, and a partial take is one of the four things the
+  // report could have been. The base hold of 2 is now enough, because a destroyed
+  // ship drops all of it (a0-59, GDD §2.3 amended) — under the old half-drop this
+  // ship had to buy a cargo tier to shed 2. Base hold on both hulls also keeps A
+  // honest: "an empty hold takes the WHOLE drop" is only a statement about the
+  // hold when the hold can hold it, and a wreck that now sheds twice what it used
+  // to can out-size its looter, which is a real consequence of a0-59 and not this
+  // file's subject.
+  expect(victim.cargoCap).toBe(2);
 
   // Fill the holds from the rock field rather than out of thin air: ore moves
   // asteroid → cargo, which conserves `liveOre` exactly, so the ledger stays

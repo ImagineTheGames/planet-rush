@@ -1,22 +1,33 @@
 /**
- * src/sim/damage.test.ts — what a death drop is allowed to mint.
+ * src/sim/damage.test.ts — what a death drop is allowed to mint, and how much.
  * OWNER: Gameplay Engineer.
  *
- * The developer, 2026-08-16: *"its super easy to reproduce this ore bug, its
- * usually from blown up ships, their ore's don't always count when picked up"*.
- * That detail is the diagnosis. `killShip` sheds half the hold, and half of an odd
- * hold is a half: a ship dying on 3 ore dropped one chunk of 1 and one of **0.5**.
- * The split was exact and the ledger balanced on it — but every ore readout in the
- * game floors, so collecting that 0.5 moved a hold from 1 to 1.5 and showed 1. The
- * ore was genuinely there and the player was genuinely told nothing; collect a
- * second half and it jumps by a whole, which is why it *"doesn't always"* count.
+ * TWO RULES MEET IN `killShip`, AND THIS FILE GATES BOTH.
  *
- * Ore is a countable thing. A hold shows pips, a cost is a whole number, a wheel
- * prints integers, and no amount of UI can honestly render half a pip — so the fix
- * is at the mint: a death drop emits whole `CHUNK.ore` units and nothing else, and
- * the sub-chunk remainder burns with the ship in `deathLoss`, the sink half this
- * hold was already going to by design (GDD §2.3). `DEATH_ORE_DROP_FRACTION` is
- * untouched; it is ratified.
+ * **How much (a0-59, 2026-08-16).** The developer: *"destroyed ships should drop
+ * all their ore, no more 1/2 the ore stuff"*. `DEATH_ORE_DROP_FRACTION` is `1`, so
+ * a destroyed ship leaves its entire hold on the field. This overturns GDD §2.3's
+ * half-burn — a ratified ore sink — deliberately and by the person it belongs to;
+ * the GDD is amended to match (`docs/design-amendments.md`) so the doc and the
+ * constant cannot disagree.
+ *
+ * **In what units (a0-58, 2026-08-16).** The developer, on the same day: *"its
+ * super easy to reproduce this ore bug, its usually from blown up ships, their
+ * ore's don't always count when picked up"*. A drop that minted a 0.5 handed the
+ * player ore no readout could show — the hold is pips, a cost is a whole number,
+ * the wheel prints integers, so all three floor it away. So a drop mints whole
+ * `CHUNK.ore` units and nothing else, and any sub-chunk remainder burns with the
+ * ship in `deathLoss`.
+ *
+ * At today's values the second rule subtracts nothing: a whole hold times `1` is a
+ * whole number of chunks. **It is gated anyway.** Both numbers are TUNABLE, and
+ * either one moving off `1` re-creates the remainder in a single edit — the
+ * invariant is what makes that safe, which is the "assert the relationship, not
+ * today's value" rule four star-bloom rounds paid for (LESSONS §26). Every
+ * assertion below is therefore written against `CHUNK.ore` and
+ * `DEATH_ORE_DROP_FRACTION`, never against the literal 1 — except
+ * `drops the whole hold`, which is the one place the ruling's *value* is the
+ * point and is asserted as such.
  *
  * The ledger half of this — that the rounding MOVES ore into the sink rather than
  * destroying or minting it — is `./ore-ledger.test.ts`. The whole-ore invariant
@@ -39,7 +50,7 @@ const PLAYERS: readonly PlayerSpec[] = [
  *  confuse the chunk list — the cockpit moment the report describes, minus the
  *  cockpit. `cargo` is written directly and deliberately above `cargoCap` in the
  *  larger cases: the hold ceiling is 8 today (GDD §2.8) and this is a statement
- *  about the SPLIT, which must hold for any hold a future cargo tier allows. */
+ *  about the DROP, which must hold for any hold a future cargo tier allows. */
 function staged(hold: number): { world: World; victim: Ship } {
   const world = createWorld({ seed: 5, players: PLAYERS });
   const victim = world.ships[0]!;
@@ -48,7 +59,14 @@ function staged(hold: number): { world: World; victim: Ship } {
   victim.spawnProtect = 0;
   victim.cargo = hold;
   world.chunks.length = 0; // any derelict debris the map laid out is not this test's
+  world.ledger!.dropped = 0;
+  world.ledger!.deathLoss = 0;
   return { world, victim };
+}
+
+/** Ore actually lying on the field after the kill. */
+function onField(world: World): number {
+  return world.chunks.reduce((sum, c) => sum + c.amount, 0);
 }
 
 /** How many whole `CHUNK.ore` pieces a hold of `hold` should shed. */
@@ -58,9 +76,54 @@ function expectedPieces(hold: number): number {
 
 /** The holds under test: 1 through 9 chunks. In `CHUNK.ore` units rather than the
  *  literal 1 — the chunk size is TUNABLE (GDD §2.8), and a test written against
- *  the literal passes for the wrong reason the day it moves. The odd holds are the
- *  point: those are the ones whose half does not divide. */
+ *  the literal passes for the wrong reason the day it moves. */
 const HOLDS = Array.from({ length: 9 }, (_, i) => (i + 1) * CHUNK.ore);
+
+describe('a destroyed ship drops everything (a0-59)', () => {
+  it('drops the whole hold', () => {
+    // THE RULING, stated as the developer stated it: a ship dying with N ore
+    // leaves chunks summing to exactly N, for N = 1 through 9. Nothing is held
+    // back, nothing burns with the hull, and the arithmetic is `toBe`-exact
+    // rather than approximate — a whole hold of whole chunks has no rounding to
+    // forgive, and a test that tolerated 1e-9 here would tolerate a fraction
+    // creeping back in.
+    for (let n = 1; n <= 9; n++) {
+      const { world, victim } = staged(n);
+      killShip(world, victim);
+
+      expect(onField(world), `hold ${n}: the field total`).toBe(n);
+      expect(victim.cargo, `hold ${n}: the hold is emptied, not halved`).toBe(0);
+      expect(world.ledger!.dropped, `hold ${n}: ledger 'dropped'`).toBe(n);
+      // The half-burn is gone: an ordinary death sinks NOTHING (GDD §2.3, amended).
+      expect(world.ledger!.deathLoss, `hold ${n}: nothing burns with the hull`).toBe(0);
+    }
+  });
+
+  it('the ledger still balances: dropped + deathLoss is the hold that died', () => {
+    // `deathLoss` survives the ruling at 0. It is NOT deleted: it remains the sink
+    // for anything undropped — a quantisation leftover, ore lost out of bounds —
+    // and a ledger with no sink cannot stay conserved the day one reappears. This
+    // is the relationship the constant is allowed to move underneath.
+    for (const hold of HOLDS) {
+      const { world, victim } = staged(hold);
+      killShip(world, victim);
+
+      const { dropped, deathLoss } = world.ledger!;
+      expect(dropped + deathLoss, `hold ${hold}`).toBeCloseTo(hold, 9);
+      expect(dropped, `hold ${hold}`).toBeCloseTo(onField(world), 9);
+      expect(deathLoss, `hold ${hold}`).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('banked ore is untouched — the cost of dying is time and position', () => {
+    // GDD §2.7 is NOT amended here. a0-59 moved the held-ore fraction only; the
+    // bank was never at risk and still is not.
+    const { world, victim } = staged(4 * CHUNK.ore);
+    victim.banked = 7;
+    killShip(world, victim);
+    expect(victim.banked).toBe(7);
+  });
+});
 
 describe('a death drop mints countable ore (a0-58)', () => {
   it('a death drop never mints a fraction', () => {
@@ -79,49 +142,47 @@ describe('a death drop mints countable ore (a0-58)', () => {
     }
   });
 
-  it('sheds every whole chunk half the hold can pay for, and no more', () => {
+  it('sheds every whole chunk the drop can pay for, and no more', () => {
     for (const hold of HOLDS) {
       const { world, victim } = staged(hold);
       killShip(world, victim);
 
       expect(world.chunks.length, `hold ${hold}`).toBe(expectedPieces(hold));
-      const dropped = world.chunks.reduce((sum, c) => sum + c.amount, 0);
-      // Never more than the ratified half — the rounding only ever goes down.
-      expect(dropped, `hold ${hold}`).toBeLessThanOrEqual(hold * DEATH_ORE_DROP_FRACTION + 1e-9);
-      expect(dropped, `hold ${hold}`).toBeCloseTo(expectedPieces(hold) * CHUNK.ore, 9);
+      // Never more than the ratified drop — the rounding only ever goes down.
+      expect(onField(world), `hold ${hold}`).toBeLessThanOrEqual(hold * DEATH_ORE_DROP_FRACTION + 1e-9);
+      expect(onField(world), `hold ${hold}`).toBeCloseTo(expectedPieces(hold) * CHUNK.ore, 9);
     }
   });
 
   it('a hold too small to shed one whole chunk drops nothing and goes down with the hull', () => {
-    // Half of one chunk is half a chunk: there is nothing whole to leave behind,
-    // so the wreck is bare rather than sprinkled with ore nobody can collect.
-    const { world, victim } = staged(CHUNK.ore);
+    // UNREACHABLE IN PLAY TODAY, AND GATED ANYWAY. At `DEATH_ORE_DROP_FRACTION = 1`
+    // with whole-ore holds (a0-58) no drop lands under a chunk, so this hold is
+    // written by hand. The branch is the floor under both tunables: the day the
+    // fraction leaves 1, or `CHUNK.ore` leaves 1, this is the case that decides
+    // whether the leftover becomes a chunk nobody can read or a recorded sink.
+    const scrap = CHUNK.ore / 2;
+    const { world, victim } = staged(scrap);
     killShip(world, victim);
     expect(world.chunks).toHaveLength(0);
     expect(victim.cargo).toBe(0);
-  });
-
-  it('the half-drop itself is unchanged — an even hold still sheds exactly half', () => {
-    // The ratified rule (GDD §2.3, §2.7) is what it always was. a0-58 rounds the
-    // pieces; it does not touch DEATH_ORE_DROP_FRACTION.
-    const hold = 4 * CHUNK.ore;
-    const { world, victim } = staged(hold);
-    killShip(world, victim);
-    const dropped = world.chunks.reduce((sum, c) => sum + c.amount, 0);
-    expect(dropped).toBeCloseTo(hold * DEATH_ORE_DROP_FRACTION, 9);
+    // Sunk, not vanished — the ledger is the difference between the two.
+    expect(world.ledger!.deathLoss).toBeCloseTo(scrap, 9);
+    expect(world.ledger!.dropped).toBe(0);
   });
 
   it('holds the same line when the kill comes through damage, not a direct call', () => {
     // `damageShip` is the path every real death takes — a ship weapon shot and a
-    // turret's pooled shot both land here (`./projectiles`, `./buildings`), so the
-    // rounding cannot come back through a second door.
-    const { world, victim } = staged(3 * CHUNK.ore);
+    // turret's pooled shot both land here (`./projectiles`, `./buildings`), so
+    // neither rule can come back through a second door.
+    const hold = 3 * CHUNK.ore;
+    const { world, victim } = staged(hold);
     damageShip(world, victim, victim.hull + 999, 1);
     expect(victim.alive).toBe(false);
     for (const chunk of world.chunks) {
       expect(chunk.amount).toBeCloseTo(CHUNK.ore, 9);
     }
-    expect(world.chunks.length).toBe(expectedPieces(3 * CHUNK.ore));
+    expect(world.chunks.length).toBe(expectedPieces(hold));
+    expect(onField(world)).toBeCloseTo(hold * DEATH_ORE_DROP_FRACTION, 9);
   });
 
   it('scatters its ring deterministically — the same kill twice, chunk for chunk', () => {
