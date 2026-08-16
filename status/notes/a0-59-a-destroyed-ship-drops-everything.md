@@ -703,10 +703,70 @@ under it did not. Trust the measured table, not the prose around it.)*
     filtered of comment and blank lines, is **empty**; `tsc --noEmit` exits 0;
     damage / ore-ledger / match / loot-tell green (51 tests).
 
+- **2026-08-16, eleventh session — what this one actually did.** One new finding,
+  committed as **`92e788c`**. The shipped work is untouched and the blocker is
+  unchanged.
+  - **Re-verified, nothing redone:** local `HEAD` == `origin/…` == `e97756d` at
+    start, `main` still `221a2b1` and **0 commits ahead**, `tsc --noEmit` exits 0,
+    the constant is `1` at `constants.ts:1032`, `drops the whole hold` at
+    `damage.test.ts:83`, both remote DoD greps pass against `FETCH_HEAD`. PR #436
+    open, `mergeStateStatus` UNSTABLE, **still no Director ruling** — the sixth
+    session's comment is still the only one and still has no reply. Pulled the
+    check list: the *only* `fail` bucket is `Typecheck, test, build`; the perf
+    gate and the Playwright shards that have reported are green. Did **not**
+    re-derive the geometry or re-measure the wedge (four derivations agree now,
+    counting the doc's own), and did **not** escalate again on the PR.
+  - **`92e788c` — the finding: the defect report was unlinked from the gap
+    register.** `docs/wave-commons-entombment.md` had exactly two inbound
+    references in the whole repo, both sim doc-comments (`waves.ts:392`,
+    `constants.ts:611`/`:1440`). It was absent from **`docs/gdd-conformance.md`**,
+    which is the repo's authoritative "what does the build actually deliver"
+    report — a ranked gap list, a milestone table, a per-section claim audit and
+    a **§7 QUESTIONS FOR THE DEVELOPER** queue. A live, measured,
+    player-affecting defect on `main` was in none of it.
+  - **Two edits, both minimal.** (a) §2.3's row *"Five timed waves, each closer to
+    centre; after the last, collapse"* read as an unqualified **SHIPPED**. It now
+    carries the defect and the pointer. **Verdict deliberately left SHIPPED** —
+    the waves do land, each closer, and collapse does follow, so this is *not* a
+    gap against §2.3's claim, and regrading it PARTIAL would be its own error and
+    would break the section's `9 claims: 9 SHIPPED` count. The row says why it is
+    graded that way. (b) **Q-6** added to §7, stating both halves of the ask:
+    which of the three costed fixes, and does a0-59 wait for it. Also amended §7's
+    preamble, which promised *"a decision, not a bug"*, to name Q-6 as the
+    deliberate exception rather than silently contradict itself. Added a
+    **Where the decision is queued** line to the entombment doc so the two are
+    mutually discoverable.
+  - **Why this and not another ping.** The reasoning sessions 7–10 used to decline
+    re-escalating still holds — a second unanswered comment is noise. But it left
+    a gap nobody had named: the analysis lived in a **PR body** (dies with the PR,
+    notifies nobody when edited), one **PR comment** (notifies once, already
+    spent), and an **unlinked doc**. §7 is a standing, named, Director-facing
+    queue that already contains four open questions in exactly this shape, and it
+    outlives PR #436 either way. That is a channel, not a repetition.
+  - **Every figure in Q-6 was cross-checked against the committed report**, not
+    retyped from this note — 3.66×, 1632 u on 446 u, `R ≥ 276`, 19.3 u pocket,
+    5.5 u max clearance, 98.4%, 68.7 u/s, seeds 142/146/147 vs 15/142, ~1.25%.
+    All present and matching in `docs/wave-commons-entombment.md`. *(Watch one
+    coincidence: `68.7` is both the mean hull speed and wave 2's `eye` column.)*
+  - **The transferable lesson, continuing the sweep series.** Sessions 8 and 9
+    learned *sweep the English, not just the identifier* and *sweep every
+    directory, not just the ones the DoD names*. This one adds the third:
+    **a finding is not delivered until it is linked from where people look.**
+    Writing the standalone report (fifth session) was necessary and not
+    sufficient — for six sessions it sat in a directory of fifty files with no
+    inbound link from any index, which is functionally the same as the PR body it
+    was rescued from.
+  - **No code, no constant, no test, no golden.** `git diff --numstat` is
+    `docs/gdd-conformance.md` alone for the commit; `tsc --noEmit` exits 0. No
+    test pins either edited section (`tests/codex/tone-mirror.test.ts` and the
+    perf gates cite G-4/G-5/T-4 in comments only, none of which moved).
+
 ## BLOCKERS
 
-*(Still current as of the tenth session, 2026-08-16. Unchanged in substance since
-the third; re-confirmed against CI's own log each session since.)*
+*(Still current as of the eleventh session, 2026-08-16. Unchanged in substance
+since the third; re-confirmed against CI's own log each session since. The ask is
+now also queued as **Q-6** in `docs/gdd-conformance.md` §7, which outlives PR
+#436.)*
 
 One: the `unstuck` wedge above — `tests/harness/unstuck.test.ts` is the only red
 test, and it is the only thing keeping the PR's "Typecheck, test, build" check

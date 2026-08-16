@@ -4,6 +4,10 @@
 every fix that works is a balance/design call.
 **Owner of the code:** Gameplay (`src/sim/waves.ts`, `src/sim/constants.ts`).
 **Owner of the decision:** Director — this doc exists to make that decision cheap.
+**Where the decision is queued:** `docs/gdd-conformance.md` **Q-6** (§7, QUESTIONS
+FOR THE DEVELOPER), which states the ask in one screen and links back here for the
+measurements. §2.3's wave row there carries the defect too, so the gap register
+does not certify this mechanic without it.
 **Found by:** `tests/harness/unstuck.test.ts`, during a0-59 (PR #436).
 
 > This was written out of a0-59's PR body so it outlives that PR. a0-59 is a
