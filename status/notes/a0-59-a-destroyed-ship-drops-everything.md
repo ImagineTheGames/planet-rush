@@ -60,6 +60,22 @@ Consequences to know:
   comment in `constants.ts` pointing `commonsHoleFraction` at it (it already
   claimed the trap was "briefed separately"; now that is true). **No value moves.**
 
+- `0970edb` **test(a0-59)** — `src/sim/waves.test.ts`, the first test file
+  `waves.ts` has ever had. Flood-fills free configuration space from the map
+  centre to ask whether a route out exists at all. Pins: escapable through wave 3,
+  **sealed at waves 4 and 5** (seeds 1/15/42). Runs in 1.9 s. It is the one
+  instrument the eye-by-body gate mask cannot fool — verified by applying that
+  edit and watching this stay sealed while `unstuck` goes green. New test file
+  only; **no sim code, no constant, no golden.**
+- `633a862` **docs(a0-59)** — the onset/incidence/severity corrections that test
+  produced, into `docs/wave-commons-entombment.md`, `docs/gdd-conformance.md`
+  (Q-6 and the §2.3 row) and a **comment-only** block in `src/sim/waves.ts`.
+  Headline: the seal closes at **wave 4** (9/9 seeds) and catches a ship on
+  **16 of 24 seeds**, against the `~1.25%` that was really the wedge gate's
+  detection rate — but 18 of 24 caught ships mine out within 30–120 s, so
+  *"entombed for the rest of the match"* was too strong and is corrected too.
+  **No value moves.**
+
 **Verified green, not re-done, on 2026-08-16 (third session):** `npx tsc --noEmit`
 exits 0; the constant is `1`; `drops the whole hold` is present and exact; CI's own
 log for `96bfe7e` reads **299 of 300 test files passed**, the single failure being
@@ -115,6 +131,30 @@ for `commonsSpokeGap`, which is an angle and so silently weakens as the ring
 shrinks. Zero behavioural risk — every changed line starts with `*`, `tsc` clean,
 no golden can move — so this does not touch the "no unratified sim change" line the
 rest of this note holds.
+
+**Wrote a test that ASSERTS THE DEFECT, on purpose (`0970edb`, fourteenth
+session).** `src/sim/waves.test.ts` expects the map centre to be sealed at waves 4
+and 5. That is deliberate and the alternatives are worse. Asserting the *desired*
+property (centre stays escapable) means committing a permanently-red test, which
+CI teaches everyone to ignore. Asserting nothing leaves the situation as it was:
+the only instrument that sees a live player-affecting defect is a Bot-lane wedge
+gate that the tidiest in-lane edit switches off silently. A characterisation test
+is the honest third option — it says "this is what the build does today", it goes
+red exactly when someone changes it, and its failure message says in as many words
+that red-in-that-direction is the fix landing and to update the report and Q-6
+with it rather than repair the test. **Do not "fix" this test by flipping its
+expectation without reading `docs/wave-commons-entombment.md` first.**
+
+**Broke the standing "re-verify, do not re-measure" rule once, deliberately
+(fourteenth session).** Sessions 12 and 13 both close by telling the next session
+not to re-measure, and that was right for what they meant: re-confirming a settled
+figure. It did not cover this. Every number in thirteen sessions was taken through
+`unstuck`'s wedge probe, and the thirteenth session's own lesson was that a gate's
+threshold is a definition rather than a detector — which nobody had then acted on.
+Measuring *enclosure* instead of *wedging* was a first measurement, not a repeat,
+and it moved the onset by a wave and the incidence by 16×. **The rule to carry
+forward is narrower than "do not re-measure": do not re-run a measurement, but do
+question what the existing measurements were actually of.**
 
 ## CROSS-LANE FALLOUT (the part that took the time)
 
@@ -887,7 +927,111 @@ under it did not. Trust the measured table, not the prose around it.)*
     both arms, recorded), and do not re-check the issue tracker. **The only thing
     still missing is the ruling.**
 
+- **2026-08-16, fourteenth session — what this one actually did.** Two commits,
+  **`0970edb`** (a new test) and **`633a862`** (docs + a comment-only sim edit).
+  The shipped a0-59 work is untouched; the blocker is unchanged in its ask but its
+  numbers moved a lot.
+  - **Re-verified, nothing redone:** local `HEAD` == `origin/…` == `fb5563f` at
+    start, `main` still `221a2b1` and **0 commits ahead**, `tsc --noEmit` exits 0,
+    the constant is `1` at `constants.ts:1032`, `drops the whole hold` at
+    `damage.test.ts:83`, both remote DoD greps pass against `FETCH_HEAD`. PR #436
+    open, UNSTABLE, **still no Director ruling** — the sixth session's comment is
+    still the only one, still no reply. Did not escalate again. Re-ran the eighth
+    session's one-liner: the whole behavioural sim delta is still **exactly the one
+    constant line**. Ran `unstuck` locally: still seed 15, `foreman` slot 2,
+    **133.5 s at (1204,1195)**, identical to sessions three through thirteen. CI's
+    log was again unavailable (`gh` refuses logs while the run is `in_progress`),
+    and there are now **two** failing check entries of the same name — two
+    duplicate workflow runs of `Typecheck, test, build`, not a second failure.
+  - **I broke the "do not re-measure" rule deliberately, and it was right to.**
+    The rule is sound for re-confirming a settled number. This was not that: the
+    thirteenth session's lesson was *"a gate's threshold is a definition, not a
+    detector — measure the defect independently of the gate"*, and nobody had ever
+    done that. Every number in thirteen sessions came through `unstuck`'s wedge
+    probe. Measuring **enclosure** instead of **wedging** moved two headline
+    figures and added a third.
+  - **`0970edb` — `src/sim/waves.test.ts`, the first test `waves.ts` has ever
+    had.** 475 lines of this lane's placement code; the only coverage was
+    `match.test.ts` §4, which pins *containment* (each wave lands inside its own
+    disc) and is silent on *passability* — which is where the defect is. The new
+    file flood-fills free **configuration** space from the map centre and asks
+    whether the component reaches past the field edge: a real "is there a route
+    out", admitting any weaving path, where a ray-cast only answers for straight
+    lines. Two characterisation tests, seeds 1/15/42, 1.9 s.
+    **Verified it cannot be masked:** applying the eye-by-body edit — the one the
+    thirteenth session measured turning seed 15 from 133.5 s RED to 2.7 s GREEN —
+    leaves this test still reporting sealed on all three seeds. It asks whether
+    the ship can get *out*, not whether it has room to move. `git diff -- src/`
+    verified empty after the arm, as always.
+  - **`633a862` — the numbers, and two of them were wrong in the same way.**
+    1. **The seal closes at WAVE 4, not wave 5.** 9 of 9 seeds sealed at wave 4;
+       0 of 9 at wave 3. Structural, not probabilistic. Wave 5 only shrinks the
+       cell from 68–108 u across to **4–24 u**, which is the first point a
+       *cell-size* detector can see it. For a whole wave an entombed ship flies
+       around a roomy cell looking perfectly healthy. The report's own
+       `t=570 wave 4 … free` trace, which has sat there since the second session,
+       was the gate's verdict and not the ship's state — slot 2 was already sealed
+       inside a 73 u cell at that instant.
+    2. **Incidence is 16 of 24 seeds, not ~1.25%.** (28 of 46 ship-snapshots
+       free-and-inside the commons at a late-wave landing; 24 of the 28 at wave 4.)
+       The gate reds on **one** of those 24. So `~1.25%` was always the rate at
+       which the defect *becomes visible to CI* and has been read for twelve
+       sessions as the rate at which it happens. Retitled and fenced rather than
+       deleted — it is still the correct number for "how often does this turn a
+       build red", which is what it is used for.
+    3. **Severity moves the OTHER way, and I reported it because it weakens my own
+       case.** The ring is minable rock, so the seal is usually temporary: of the
+       24 ships sealed at the wave-4 landing, **18 chewed out within 30–120 s**, 5
+       died first, and 1 (seed 15) was still sealed at +240 s. *"Entombed for the
+       rest of the match"* was too strong and is corrected everywhere it appeared,
+       including my own text from earlier sessions. Net: **frequent,
+       near-invisible and survivable** rather than rare and fatal.
+  - **Two things nobody had seen.** A **second trap shape**: seed 17 slot 3 sealed
+    into an *annular* pocket at 147–157 u, never near the centre — a centre-only
+    fix misses it, and the oversubscription argument predicts it. And **re-entry is
+    real**: seed 23 slot 2 escapes by +120 s and is sealed again by +240 s, which
+    is candidate 3's known weakness made concrete rather than hypothetical.
+  - **Candidate 3 re-costed, and it is no longer the cheap one.** It was sold as
+    "fires only on the ~1.25% of seeds … so almost no golden moves". At the true
+    incidence it must arm at **wave 4** and fires on **most matches**, displacing a
+    ship each time — it moves goldens broadly and is a balance change in itself.
+    Corrected in both the report and Q-6.
+  - **A methodological trap worth keeping.** Respawned ships stand at their home
+    station 768 u out, which any enclosure test reads as *free* — so counting
+    "free" naively scores a **death as an escape** and inflates 18/24 to 21/24.
+    Discount any ship that showed dead before it showed free. Likewise: a ship
+    *overlapping* a rock is transient contact, not enclosure; 11 snapshots had to
+    be excluded on that basis or the incidence reads 39 instead of 28.
+  - **Where it all landed.** `docs/wave-commons-entombment.md` (onset, incidence,
+    persistence, the two new observations, a repro section pointing at the 2-second
+    test rather than the 200-seed sweep, and a fifth entry in the diagnostic
+    history); `docs/gdd-conformance.md` **Q-6** and the §2.3 wave row;
+    `src/sim/waves.ts` **comment-only** (`git diff -U0` filtered of comment and
+    blank lines is empty, `tsc` clean, no value moves).
+  - **The lesson, continuing the series.** Sessions 8/9/11/13 learned *sweep the
+    English*, *sweep every directory*, *link the finding where people look*, and
+    *a gate's threshold is a definition, not a detector*. This one is the direct
+    consequence of the last: **all five wrong numbers in this defect's history came
+    from reading an instrument's verdict as the thing itself** — centre-to-centre
+    distance for hull clearance, adjacent-pair spacing for passability, a wedge
+    threshold for entombment. Written into the report's diagnostic history so the
+    sixth one is caught earlier.
+  - **What a fifteenth session should NOT do.** Everything in the twelfth and
+    thirteenth sessions' lists still holds. Do not re-measure enclosure — it is
+    pinned by a committed 2-second test now, so run `npx vitest run
+    src/sim/waves.test.ts` instead of re-deriving anything. **The only thing still
+    missing is the ruling.**
+
 ## BLOCKERS
+
+*(**FOURTEENTH session, 2026-08-16: the ask is unchanged, but the defect is
+bigger and quieter than every prior version of this section said. The seal closes
+at WAVE 4, not wave 5, on 9 of 9 seeds; a ship is caught on 16 of 24 seeds, not
+~1.25% — that figure was the wedge gate's DETECTION rate all along. Against that,
+the seal is usually temporary: 18 of 24 caught ships mine out inside 30–120 s.
+There is now a committed detector that measures enclosure directly and cannot be
+masked by widening the cage — `src/sim/waves.test.ts`, 2 seconds. Prefer it to
+every measurement recipe below.**)*
 
 *(Still current as of the THIRTEENTH session, 2026-08-16. Unchanged in substance
 since the third; re-confirmed each session since. **One hazard added by the
