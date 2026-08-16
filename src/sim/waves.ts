@@ -415,6 +415,17 @@ export function spawnWave(world: World, count: number = world.asteroidsPerWave):
   // the standing wedge gate stops seeing the trap: seed 15 falls 133.5 s → 2.7 s
   // and CI goes green while the player stays entombed in a bigger cell. Make this
   // correction only TOGETHER WITH the rock size/count fix, never before it.
+  // `src/sim/waves.test.ts` is the check this edit CANNOT fool — it measures
+  // whether the centre can be reached, not how much room the hull has, and still
+  // reports sealed under the correction. Trust it over a green `unstuck`.
+  //
+  // AND NOTE THE SEAL CLOSES AT WAVE 4, not wave 5 — 9 of 9 seeds measured, none
+  // sealed at wave 3 (a0-59, fourteenth session; flood fill of free configuration
+  // space, so any weaving path counts, not just a radial ray). Wave 5 only shrinks
+  // the sealed cell from 68–108 u across to 4–24 u, which is where a wedge
+  // detector first notices. Everything written above about "wave 5" is where the
+  // trap becomes VISIBLE; wave 4 is where it starts. A ship is caught on 16 of 24
+  // seeds — most mine their way out in 30–120 s, since the ring is minable rock.
   //
   // Both are pure `N`-fold-symmetric reshapes of one drawn sector, so the commons
   // stays symmetric and carries the same `WAVE_ORE` — the fairness invariant is

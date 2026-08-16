@@ -437,7 +437,7 @@ testable, so each row below is checked against the thing a player would look at.
 | **Banking is by flying into your own collection field**, ~4× radius, 2 ore/s, stops on leaving | **SHIPPED** | `DEPOSIT.drainRate = 2` `src/sim/constants.ts:1584`; `DEPOSIT_RANGE` drawn at `src/render/index.ts:969`. |
 | Ore chunks visibly courier ship→station, one per unit banked | **SHIPPED** | `src/sim/step.ts:291–297`, `:926`. |
 | The wheel's BANK segment dumps the hold in one tap | **SHIPPED** | `src/ui/build-wheel.ts:193`. |
-| Five timed waves, each closer to centre; after the last, collapse | **SHIPPED** | `src/sim/waves.ts:366`; `src/sim/buildings.ts:511`. **The claim is delivered; the delivery has a known defect — see Q-6.** By wave 5 the ring is oversubscribed with rock **3.66×**, closes to 71 u and seals the map centre behind a solid annulus with a 19.3 u free pocket, against a `SHIP_RADIUS` of 16: any ship — bot or human — standing there when it lands is entombed for the match. Open on `main` at ~1.25% of seeds. Measured in `docs/wave-commons-entombment.md`. Graded SHIPPED rather than PARTIAL deliberately: the waves *do* land, each closer than the last, and collapse *does* follow, so this is not a gap against §2.3's claim — it is a defect in a shipped mechanic, and the honest place for it is Q-6. |
+| Five timed waves, each closer to centre; after the last, collapse | **SHIPPED** | `src/sim/waves.ts:366`; `src/sim/buildings.ts:511`. **The claim is delivered; the delivery has a known defect — see Q-6.** By wave 5 the ring is oversubscribed with rock **3.66×**, closes to 71 u and seals the map centre behind a solid annulus with a 19.3 u free pocket, against a `SHIP_RADIUS` of 16. The seal actually closes at **wave 4** (9 of 9 seeds measured) and catches a ship — bot or human — on **16 of 24 seeds**; most mine their way out in 30–120 s, one of 24 was still sealed after four minutes. Open on `main`. Measured in `docs/wave-commons-entombment.md`; pinned by `src/sim/waves.test.ts`. Graded SHIPPED rather than PARTIAL deliberately: the waves *do* land, each closer than the last, and collapse *does* follow, so this is not a gap against §2.3's claim — it is a defect in a shipped mechanic, and the honest place for it is Q-6. |
 | **A pickup and a pickup REFUSED must both be visible** (2026-08-08, a0-08) | **SHIPPED** | `Ship.lootTake` / `Ship.lootBlocked` published per tick — `src/sim/step.ts:922–923`, set at `:950` and `:988`. |
 
 ### §2.4 Controls and actions *(12 claims: 12 SHIPPED)*
@@ -744,20 +744,44 @@ That is a real cost and it is worth naming before it is spent. **Confirm you wan
 the ratified faces shipped** (they are §5.6, so my assumption is yes), and QA
 should schedule the re-baseline in the same pass rather than after it.
 
-**Q-6 · Wave 5 seals the map centre and entombs whoever is standing in it. Which
-of the three fixes do you want, and does a0-59 wait for it?** *(Raised
-2026-08-16 by a0-59 / PR #436. Full report, with the measurements behind every
+**Q-6 · The late waves seal the map centre and entomb whoever is standing in it.
+Which of the three fixes do you want, and does a0-59 wait for it?** *(Raised
+2026-08-16 by a0-59 / PR #436; incidence and onset corrected 2026-08-16 after
+measuring enclosure directly. Full report, with the measurements behind every
 number here: `docs/wave-commons-entombment.md`.)*
 
 This is a **live defect on `main`**, not a regression: from wave 2 onward the
 commons ring carries more rock than its circumference can hold, and by wave 5 it
 is **3.66× oversubscribed** — 1632 u of rock arc on a 446 u ring. It closes to
 71 u from the map centre and seals the disc inside as a solid annulus with a
-**19.3 u** free pocket; `SHIP_RADIUS` is **16**. A ship caught there is entombed
-for the rest of the match, at full throttle, and **a human player is caught
-exactly as a bot is**. Incidence is **~1.25% of seeds** (measured both arms over
-200 seeds: 3/200 on `main`, at seeds 142/146/147; 2/200 on a0-59's branch, at 15
-and 142 — indistinguishable, and every instance at or beside the map centre).
+**19.3 u** free pocket; `SHIP_RADIUS` is **16**. **A human player is caught
+exactly as a bot is.**
+
+**Two numbers in the original version of this question were wrong, and both moved
+against us.** They were measured through `tests/harness/unstuck.test.ts`, which
+detects a ship held in a *small* space — not a ship that *cannot get out*.
+Measuring enclosure directly (flood-fill of free configuration space, now pinned
+by `src/sim/waves.test.ts`):
+
+- **The seal closes at wave 4, not wave 5** — on **9 of 9** seeds measured, with
+  none sealed at wave 3. It is structural, not luck. Wave 5 merely shrinks the
+  sealed cell from 68–108 u to 4–24 u, which is the first point anything in CI
+  can see it.
+- **Incidence is 16 of 24 seeds, not ~1.25%.** On the standing gate's own seeds, a
+  ship is sealed in on two thirds of matches. The ~1.25% figure is the rate at
+  which the trap gets *loud enough to turn a build red*; it was being read as the
+  rate at which it happens.
+
+**One number moved in our favour, and it should be weighed too.** The ring is
+minable, so the seal is usually temporary: of 24 ships sealed at the wave-4
+landing, **18 chewed their way out within 30–120 s**, 5 died first, and 1 (seed
+15) was still sealed four minutes on. So the per-incident cost is *a lost half a
+wave cycle and a helpless ship*, not a lost match. **Frequent, near-invisible, and
+survivable** — rather than rare and fatal, which is what this question said before.
+
+**Nothing about the ask changes.** The fix set is identical and every option is
+still a design call; only the size and shape of the problem are now measured
+correctly.
 
 **Why it needs you and not an engineer.** Everything inside the gameplay lane is
 measured and exhausted. No rearrangement of the rocks can work — a 3.66×
@@ -781,8 +805,12 @@ judge" (rock size reads as ore) and changes the field's texture. The *count*
 variant is likely cheaper, because the wave's fixed ore budget makes the survivors
 richer on its own. **My recommendation.** *(3)* **Eject a live ship a landing wave
 would entomb** — touches no rock, so `FIELD_YIELD` and the field's symmetry stay
-exact and almost no golden moves; but it is a new sim rule, and it treats the
-symptom, since the centre stays sealed for anyone who flies in *after* the wave.
+exact; but it is a new sim rule, and it treats the symptom, since the centre stays
+sealed for anyone who flies in *after* the wave (observed: seed 23 slot 2 escapes,
+then is sealed again two minutes later). **Re-costed:** this used to be sold as
+"almost no golden moves, because it fires on ~1.25% of seeds". At the true
+incidence it must arm at **wave 4** and fires on **most matches**, displacing a
+ship each time — so it moves goldens broadly and is itself a balance change.
 
 **One warning, because it is the edit anyone would reach for first.** There is a
 fourth-looking option — reserve the commons eye by rock **body** instead of
@@ -795,6 +823,11 @@ purely because `unstuck.test.ts` re-anchors once a hull moves 8 u, and a ship in
 cell — and the only instrument that detects it has been switched off. The
 correction is still worth making, but it must land **with** candidate 2, never
 before it, and a green `unstuck` must not be the evidence that the trap is gone.
+**There is now a second instrument that this edit cannot fool:**
+`src/sim/waves.test.ts` measures reachability rather than cell size, and still
+reports the centre sealed under the correction. If the two ever disagree — wedge
+gate green, reachability still sealed — the reachability check is the one telling
+the truth.
 
 **And the scheduling half, which is the part actually blocking work.** a0-59 is a
 one-constant developer ruling ("destroyed ships should drop all their ore") that

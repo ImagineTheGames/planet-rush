@@ -9,6 +9,9 @@ FOR THE DEVELOPER), which states the ask in one screen and links back here for t
 measurements. §2.3's wave row there carries the defect too, so the gap register
 does not certify this mechanic without it.
 **Found by:** `tests/harness/unstuck.test.ts`, during a0-59 (PR #436).
+**Pinned by:** `src/sim/waves.test.ts` — a direct reachability check that, unlike
+the wedge gate, cannot be masked by widening the cage. See
+[The trap starts at wave 4](#the-trap-starts-at-wave-4-and-nothing-in-ci-can-see-it-there).
 
 > This was written out of a0-59's PR body so it outlives that PR. a0-59 is a
 > one-constant developer ruling that neither caused this nor worsened it; it is
@@ -22,9 +25,28 @@ From wave 2 onward the commons ring carries more rock than its own circumference
 can hold, and by wave 5 it is **3.66× oversubscribed**. The ring closes to 71 u
 from the map centre and seals the disc inside it: a solid annulus of overlapping
 asteroids with a free pocket of **19.3 u** at its middle. `SHIP_RADIUS` is **16**.
-Any ship standing near the centre when wave 5 lands is entombed for the rest of the
-match — at full throttle, with nowhere to go. **This applies to a human player
-exactly as it applies to a bot.**
+Any ship standing near the centre when the late waves land is entombed — at full
+throttle, with nowhere to go. **This applies to a human player exactly as it
+applies to a bot.**
+
+Two corrections to what this document used to claim, both measured in the
+fourteenth session and both important to the ruling:
+
+- **The seal closes at wave 4, not wave 5**, on every seed measured. Wave 5 is
+  only where it becomes *visible*: it shrinks the sealed cell from 68–108 u across
+  to 4–24 u, which is the first point a wedge detector can see it. For a whole
+  wave beforehand an entombed ship flies around a roomy cell looking healthy.
+- **It is usually not "for the rest of the match."** The ring is minable rock, and
+  a trapped ship normally chews its way out in 30–120 s. The cost is a large slice
+  of a wave cycle, not the match — but the tail is long (seed 15 is still sealed
+  four minutes on) and the ship is helpless while it lasts.
+
+Both are in [The trap starts at wave 4](#the-trap-starts-at-wave-4-and-nothing-in-ci-can-see-it-there).
+Net: the defect is **much more frequent, much less visible, and less individually
+severe** than this document previously said.
+
+Earlier revisions said wave 5 throughout; that was the limit of the instrument,
+not of the defect.
 
 The two clearance guarantees the code documents — the radial "clear eye" and the
 angular "clear launch spoke" — are **both void at wave 5**, and the spoke guarantee
@@ -98,9 +120,143 @@ Per-seed, at the instant wave 5 lands:
 
 Every seed measured puts a rock trap at the exact centre of the board from wave 5.
 
+**Read the `wave 4 … free` row above with care.** "Free" there is the *wedge
+probe's* verdict — the ship was not held inside `WEDGE_R = 8`, so the gate called
+it fine. It was not fine: measured below, slot 2 was **already sealed in** at that
+instant, inside a cell reaching 73 u. The row records the moment the instrument
+went blind, not the moment the ship was still free.
+
 ---
 
-## Incidence: ~1.25% of seeds, and it is on `main`
+## The trap starts at wave 4, and nothing in CI can see it there
+
+*(Fourteenth session, 2026-08-16. This is the first measurement of **enclosure**
+rather than of wedging, and it moves the start of the defect one wave earlier.)*
+
+Every earlier measurement in this document — including the ray-cast in
+[the masking section](#measured-and-it-is-a-trap-this-correction-masks-the-gate) —
+asked whether a *straight line* leaves the centre. That is a necessary condition
+for escape, not a sufficient one: a ship could in principle weave out through
+gaps no radial ray finds. The test that settles it is a flood fill of free
+**configuration space** — the set of positions a hull centre may legally occupy,
+i.e. further than `rock.radius + SHIP_RADIUS` from every rock centre. If the
+connected component containing the map centre never reaches past the field edge,
+there is no route out at all, for any path, at any speed, with any steering.
+
+Run on the shipped 8-slot field, waves 1–5, nine seeds:
+
+| seed | w1 | w2 | w3 | w4 | w5 |
+|---|---|---|---|---|---|
+| 1 | open | open | open | **SEALED** (cell ≤102 u) | **SEALED** (≤17 u) |
+| 7 | open | open | open | **SEALED** (≤68 u) | **SEALED** (≤12 u) |
+| 15 | open | open | open | **SEALED** (≤73 u) | **SEALED** (≤6 u) |
+| 42 | open | open | open | **SEALED** (≤82 u) | **SEALED** (≤22 u) |
+| 142 | open | open | open | **SEALED** (≤108 u) | **SEALED** (≤4 u) |
+| 146 | open | open | open | **SEALED** (≤77 u) | **SEALED** (≤24 u) |
+| 147 | open | open | open | **SEALED** (≤72 u) | **SEALED** (≤6 u) |
+| 991 | open | open | open | **SEALED** (≤74 u) | **SEALED** (≤24 u) |
+| 2024 | open | open | open | **SEALED** (≤70 u) | **SEALED** (≤13 u) |
+
+**9 of 9 seal at wave 4. 0 of 9 seal at wave 3.** This is structural, not
+probabilistic: it is not that some seeds are unlucky, it is that the wave-4 ring
+closes the centre on every board the generator can produce.
+
+### Why a whole wave of it was invisible
+
+`tests/harness/unstuck.test.ts` flags a bot held within `WEDGE_R = 8` of one spot
+while asking to travel. That is a **cell-size proxy**, and it fails in both
+directions here:
+
+- **It cannot fire at wave 4 at all.** The sealed cell is 68–108 u across. A ship
+  in it flies freely, re-anchors constantly, and never accumulates held time. It
+  is entombed and reads as healthy.
+- **Anything that enlarges the cell reads to it as a fix.** That is exactly the
+  masking result already recorded below for the eye-by-body correction.
+
+So the wedge gate does not measure entombment. It measures entombment *in a cell
+small enough to look like wedging*, which is a strictly later and strictly rarer
+event.
+
+**A second instrument now exists: `src/sim/waves.test.ts`.** It pins this table's
+two claims (escapable through wave 3; sealed at waves 4 and 5, seeds 1/15/42) and
+is immune to the mask — applying the eye-by-body edit leaves it reporting sealed,
+because it asks whether the ship can get *out*, not whether it has room to move.
+It is a characterisation test: **if it goes red because the centre is escapable
+again, that is the fix landing**, and this document and Q-6 should be updated with
+it rather than the test being repaired.
+
+### How often a ship is actually caught
+
+Enclosure at the instant a late wave lands, over the standing gate's own 24 seeds,
+shipped 8-slot bot cast, full matches:
+
+| | |
+|---|---|
+| seeds with ≥1 ship entombed | **16 / 24** |
+| ship-snapshots entombed | **28 of 46** free-and-inside the commons at a w4/w5 landing |
+| of those catches, at wave 4 | **24 of 28** |
+| excluded as transient rock contact | 11 (overlapping a rock is not enclosure) |
+
+Two things follow.
+
+**The wedge gate sees roughly one affected seed in sixteen.** It reds on seed 15
+alone out of these 24; a ship is actually sealed in on 16 of them. The `~1.25%`
+figure in the next section is the rate at which this defect *becomes visible to
+CI*, and it has been read throughout this document as though it were the rate at
+which it happens. It is not.
+
+**Nearly every catch is the central pocket, but not quite all.** 27 of the 28 have
+a cell reaching the map centre. The exception — seed 17, slot 3, at 146 u out,
+cell 147–157 u — is a ship sealed into an **annular pocket between two rings**,
+never near the centre at all. The oversubscription argument predicts this (a ring
+that cannot admit a corridor cannot be crossed from either side), but it had not
+been observed before, and a fix aimed only at the centre would not catch it.
+
+### How long they stay caught — the seal is permeable, and this lowers the severity
+
+Tracking all 24 ships sealed at the wave-4 landing, re-running the enclosure test
+at +30 s, +60 s, +120 s and +240 s:
+
+| outcome by +240 s | ships |
+|---|---|
+| got out alive | **18 / 24** |
+| died while still sealed (or died and respawned out) | 5 / 24 |
+| **still sealed** | **1 / 24** — seed 15, the one the gate catches |
+
+Escapes cluster early: 8 by +30 s, 5 more by +60 s, 2 by +120 s, 3 by +240 s.
+
+**A sealed ship cannot change component by flying**, so an escape means the field
+itself changed — the ring is minable rock and it gets chewed open, by the trapped
+ship or by anyone working that ring. That is a deduction from the geometry, not a
+separate measurement: no path exists at +0 s and one exists at +60 s, and only
+mining removes rock.
+
+So the honest severity is **"a lost 30–120 s and a helpless ship", not "out of the
+match"** — with a long tail, since seed 15 is still sealed after four minutes and
+holds the wedge for 133.5 s of it. This is a real reduction in the per-incident
+cost, and it should be weighed against the much higher incidence above rather than
+read on its own.
+
+> **Methodological caveat, because the raw traces mislead.** Ships respawn, and a
+> respawned ship stands at its home station 768 u out, which the enclosure test
+> reads as free. Counting "free" naively scores a death as an escape — it inflates
+> the escape count from 18 to 21 of 24. The table above discounts any ship that
+> showed as dead before it showed as free. Anyone re-running this must do the same.
+
+One trace is worth singling out: **seed 23, slot 2 escapes by +120 s and is sealed
+again by +240 s.** Re-entry is not hypothetical, which is the concrete form of
+candidate 3's known weakness — ejecting ships at the landing instant does nothing
+for whoever flies in afterwards.
+
+---
+
+## Incidence: ~1.25% of seeds *is the gate's detection rate*, not the defect's
+
+> **Read this section for what it is.** Everything below is measured *through the
+> wedge probe*, so it describes when the trap is loud enough for CI to notice, not
+> when it happens. The rates here are ~1/16 of the entombment rate measured above.
+> They are still the right numbers for the question "how often does this turn a
+> build red", which is what they are used for.
 
 200 seeds, both arms, run through a verbatim copy of `unstuck`'s own `worstWedge`
 probe (`WEDGE_R = 8`, `WEDGE_LIMIT_S = 12`, 20-minute cap):
@@ -245,9 +401,14 @@ falling as the ring closes. Both keep GDD §2.3's ring closing in.
 
 **3 · Eject any live ship a landing wave would entomb.**
 Rock positions untouched, so `FIELD_YIELD` and the `N`-fold fairness symmetry are
-both exact, and because it fires only on the ~1.25% of seeds where a ship is
-actually caught it moves almost no goldens. Cheapest of the three and the only one
-that changes no field design.
+both exact. Cheapest of the three and the only one that changes no field design.
+- **Re-costed, and it is no longer cheap on goldens.** This bullet used to read
+  "fires only on the ~1.25% of seeds … so it moves almost no goldens". That was
+  the *gate's* detection rate. Measured, a ship is actually entombed on **16 of 24
+  seeds**, and the trigger must arm at **wave 4**, so this rule fires on most
+  matches and displaces a ship in each. It moves goldens broadly, and it changes
+  late-game positioning on two thirds of boards — a balance effect in its own
+  right, not a quiet safety net.
 - Against it: it is a **new sim rule** (a wave displacing a ship), and it treats the
   symptom — with the ring 3.66× oversubscribed the centre stays a sealed pocket for
   anyone who flies in *after* the wave lands. It only stops someone being sealed in
@@ -311,8 +472,13 @@ What changes is only that the hull's centre can now roam ~26 u instead of ~5.6 u
 and `unstuck.test.ts:107` **re-anchors** whenever a hull travels more than
 `WEDGE_R = 8` from its anchor. Above that threshold the gate stops accumulating
 held time. The trap becomes invisible to the instrument while getting slightly
-worse for the player: a bigger sealed pocket to cruise around inside, for the rest
-of the match.
+worse for the player: a bigger sealed pocket to cruise around inside.
+
+**There is now a check this edit cannot fool.** `src/sim/waves.test.ts` measures
+reachability rather than cell size, and applying the correction above leaves it
+reporting **sealed** on all three of its seeds while `unstuck` goes green. If this
+edit is ever made, that divergence — one gate green, the other still red-flagging
+the seal — is the signal to read this document rather than to celebrate.
 
 That is the whole mechanism, and it is worth stating plainly because it is
 counter-intuitive: **`WEDGE_R = 8` is not a measure of confinement, it is a
@@ -368,6 +534,25 @@ where it started.
 The geometry table needs no match run at all — instantiate the world as shown
 above.
 
+**The enclosure results are the cheapest of the lot**, and they are the ones that
+matter most, so they are worth re-running rather than trusted:
+
+```
+npx vitest run src/sim/waves.test.ts     # ~2 s: escapable through w3, sealed at w4/w5
+```
+
+That file's `centreCanEscape` is the whole instrument — flood-fill free
+configuration space, ask whether the centre's component reaches past the field
+edge. Both other numbers in this section reuse it: the 9-seed table by calling it
+per wave, and the 16/24 incidence by starting the fill at each live ship's
+position during a real match (via `runHeadlessMatch`'s `onTick`) rather than at
+the centre. Neither needs new geometry — just the same fill from a different
+seed cell.
+
+Validate any re-implementation against two anchors before believing it: it must
+report the centre **open at wave 3** (a fill that always says "sealed" is the
+easy bug), and it must reproduce the **19.3 u** free eye at wave 5 on seed 15.
+
 ---
 
 ## Diagnostic history, so it is not re-walked
@@ -383,7 +568,19 @@ dead end:
    whole-circumference one (`R ≥ 276`).
 4. An A/B claiming a0-59 made the wedge ~50% *more* likely; on 200 seeds it is
    marginally less. The seeds behind the original table did not reproduce.
+5. **"The trap starts at wave 5, and hits ~1.25% of seeds."** Both wrong, and
+   wrong the same way: every measurement up to the thirteenth session was taken
+   through `unstuck.test.ts`'s wedge probe, which detects *small cells*, not
+   *enclosure*. Measuring enclosure directly moves the onset to wave 4 and the
+   incidence to 16 of 24 seeds. The defect was always this size; the instrument
+   only ever showed its tip.
 
-The conclusion "no in-lane fix" survived all four. The numbers under it did not.
+The conclusion "no in-lane fix" survived all five. The numbers under it did not.
 **Trust the measured table; re-measure before trusting any prose about it — including
 this sentence.**
+
+The recurring lesson, now five for five: **every wrong number here came from
+reading an instrument's verdict as the thing itself** — centre-to-centre distance
+for hull clearance, adjacent-pair spacing for passability, a wedge threshold for
+entombment. Before quoting a figure from this document, check what was actually
+measured to produce it.
