@@ -9,10 +9,10 @@ Chromium actually saved.
 ## WITH the fix (`after-return-to-menu.json`)
 
 ```
-file          planet-rush-log-3758871-20260816-024126.json
-summary       Planet Rush playtest log — build 3758871* (2026-08-16T02:40:46.271Z) · session 2026-08-16T02:41:26.875Z · desktop 1280x800 · net 4g · coverage match · covers 0.0s–22.8s · planet-rush.playtest-log/1
+file          planet-rush-log-da45657-20260816-031038.json
+summary       Planet Rush playtest log — build da45657 (2026-08-16T03:09:57.441Z) · session 2026-08-16T03:10:38.844Z · desktop 1280x800 · net 4g · coverage match · covers 0.0s–25.9s · planet-rush.playtest-log/1
 coverage      match
-span          0ms – 22842ms   (durationMs 22842)
+span          0ms – 25906ms   (durationMs 25906)
 restored      5
 events        11   dropped 0   capacity 600
 by kind       {"session":3,"note":4,"match":3,"connect":1}
@@ -24,24 +24,24 @@ First ten lines of the timeline:
 
 ```
       0ms  session session start
-     20ms  note    Planet Rush build 3758871* built 2026-08-16T02:40:46.271Z
+     19ms  note    Planet Rush build da45657 built 2026-08-16T03:09:57.441Z
      29ms  note    webgl
-    160ms  match   match start
-  15245ms  match   exit to menu
-  16040ms  session restored after reload
-  16040ms  session session start
-  16040ms  note    Planet Rush build 3758871* built 2026-08-16T02:40:46.271Z
-  16047ms  note    webgl
-  16211ms  connect front door idle
+    153ms  match   match start
+  17416ms  match   exit to menu
+  18364ms  session restored after reload
+  18364ms  session session start
+  18365ms  note    Planet Rush build da45657 built 2026-08-16T03:09:57.441Z
+  18374ms  note    webgl
+  18549ms  connect front door idle
 ```
 
 ## WITHOUT persistence — the client as it shipped (`without-persistence.json`)
 
 ```
-file          planet-rush-log-3758871-20260816-024219.json
-summary       Planet Rush playtest log — build 3758871* (2026-08-16T02:40:46.271Z) · session 2026-08-16T02:42:19.874Z · desktop 1280x800 · net 4g · coverage match · covers 0.0s–7.1s · planet-rush.playtest-log/1
+file          planet-rush-log-da45657-20260816-031135.json
+summary       Planet Rush playtest log — build da45657 (2026-08-16T03:09:57.441Z) · session 2026-08-16T03:11:35.914Z · desktop 1280x800 · net 4g · coverage match · covers 0.0s–7.0s · planet-rush.playtest-log/1
 coverage      match
-span          0ms – 7137ms   (durationMs 7137)
+span          0ms – 7002ms   (durationMs 7002)
 restored      0
 events        5   dropped 0   capacity 600
 by kind       {"session":1,"note":2,"connect":1,"match":1}
@@ -53,9 +53,9 @@ First ten lines of the timeline:
 
 ```
       0ms  session session start
-      0ms  note    Planet Rush build 3758871* built 2026-08-16T02:40:46.271Z
-      9ms  note    webgl
+      0ms  note    Planet Rush build da45657 built 2026-08-16T03:09:57.441Z
+      8ms  note    webgl
     175ms  connect front door idle
-   7137ms  match   match start
+   7002ms  match   match start
 ```
 

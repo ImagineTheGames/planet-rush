@@ -1,25 +1,25 @@
 {
   "schema": "planet-rush.playtest-log",
   "version": 1,
-  "summary": "Planet Rush playtest log — build 3758871* (2026-08-16T02:40:46.271Z) · session 2026-08-16T02:41:26.875Z · desktop 1280x800 · net 4g · coverage match · covers 0.0s–22.8s · planet-rush.playtest-log/1",
+  "summary": "Planet Rush playtest log — build da45657 (2026-08-16T03:09:57.441Z) · session 2026-08-16T03:10:38.844Z · desktop 1280x800 · net 4g · coverage match · covers 0.0s–25.9s · planet-rush.playtest-log/1",
   "coverage": "match",
   "span": {
     "fromMs": 0,
-    "toMs": 22842
+    "toMs": 25906
   },
   "restored": 5,
   "env": {
-    "build": "3758871*",
-    "sha": "3758871",
-    "buildTime": "2026-08-16T02:40:46.271Z",
-    "dirty": true,
-    "startedAt": "2026-08-16T02:41:26.875Z",
+    "build": "da45657",
+    "sha": "da45657",
+    "buildTime": "2026-08-16T03:09:57.441Z",
+    "dirty": false,
+    "startedAt": "2026-08-16T03:10:38.844Z",
     "formFactor": "desktop",
     "viewport": "1280x800",
     "touch": false,
     "connection": "4g"
   },
-  "durationMs": 22842,
+  "durationMs": 25906,
   "capacity": 600,
   "dropped": 0,
   "events": [
@@ -28,11 +28,11 @@
       "kind": "session",
       "msg": "session start",
       "data": {
-        "build": "3758871*",
-        "sha": "3758871",
-        "buildTime": "2026-08-16T02:40:46.271Z",
-        "dirty": true,
-        "startedAt": "2026-08-16T02:41:26.875Z",
+        "build": "da45657",
+        "sha": "da45657",
+        "buildTime": "2026-08-16T03:09:57.441Z",
+        "dirty": false,
+        "startedAt": "2026-08-16T03:10:38.844Z",
         "form": "desktop",
         "viewport": "1280x800",
         "touch": false,
@@ -41,9 +41,9 @@
       }
     },
     {
-      "at": 20,
+      "at": 19,
       "kind": "note",
-      "msg": "Planet Rush build 3758871* built 2026-08-16T02:40:46.271Z"
+      "msg": "Planet Rush build da45657 built 2026-08-16T03:09:57.441Z"
     },
     {
       "at": 29,
@@ -54,10 +54,11 @@
       }
     },
     {
-      "at": 160,
+      "at": 153,
       "kind": "match",
       "msg": "match start",
       "data": {
+        "reason": "boot",
         "online": false,
         "map": "octagon",
         "ship": "vanguard",
@@ -67,33 +68,33 @@
       }
     },
     {
-      "at": 15245,
+      "at": 17416,
       "kind": "match",
       "msg": "exit to menu",
       "data": {
-        "tick": 376
+        "tick": 362
       }
     },
     {
-      "at": 16040,
+      "at": 18364,
       "kind": "session",
       "msg": "restored after reload",
       "data": {
         "events": 5,
         "dropped": 0,
-        "gapMs": 795
+        "gapMs": 948
       }
     },
     {
-      "at": 16040,
+      "at": 18364,
       "kind": "session",
       "msg": "session start",
       "data": {
-        "build": "3758871*",
-        "sha": "3758871",
-        "buildTime": "2026-08-16T02:40:46.271Z",
-        "dirty": true,
-        "startedAt": "2026-08-16T02:41:26.875Z",
+        "build": "da45657",
+        "sha": "da45657",
+        "buildTime": "2026-08-16T03:09:57.441Z",
+        "dirty": false,
+        "startedAt": "2026-08-16T03:10:38.844Z",
         "form": "desktop",
         "viewport": "1280x800",
         "touch": false,
@@ -102,12 +103,12 @@
       }
     },
     {
-      "at": 16040,
+      "at": 18365,
       "kind": "note",
-      "msg": "Planet Rush build 3758871* built 2026-08-16T02:40:46.271Z"
+      "msg": "Planet Rush build da45657 built 2026-08-16T03:09:57.441Z"
     },
     {
-      "at": 16047,
+      "at": 18374,
       "kind": "note",
       "msg": "webgl",
       "data": {
@@ -115,7 +116,7 @@
       }
     },
     {
-      "at": 16211,
+      "at": 18549,
       "kind": "connect",
       "msg": "front door idle",
       "data": {
@@ -123,10 +124,11 @@
       }
     },
     {
-      "at": 22842,
+      "at": 25906,
       "kind": "match",
       "msg": "match start",
       "data": {
+        "reason": "boot",
         "online": false,
         "map": "octagon",
         "ship": "vanguard",

@@ -44,23 +44,23 @@ The first match is still in the file, and it is still where it happened:
 
 ```
       0ms  session session start
-     20ms  note    Planet Rush build 3758871* built 2026-08-16T02:40:46.271Z
+     19ms  note    Planet Rush build da45657 built 2026-08-16T03:09:57.441Z
      29ms  note    webgl
-    160ms  match   match start             ← the first match
-  15245ms  match   exit to menu            ← LEAVE, on the timeline
-  16040ms  session restored after reload   { events: 5, dropped: 0, gapMs: … }
-  16040ms  session session start           ← the page that replaced it
-  16211ms  connect front door idle
+    153ms  match   match start             ← the first match
+  17416ms  match   exit to menu            ← LEAVE, on the timeline
+  18364ms  session restored after reload   { events: 5, dropped: 0, gapMs: … }
+  18364ms  session session start           ← the page that replaced it
+  18549ms  connect front door idle
   …        match   match start             ← the second match
 ```
 
 Read the two properties the brief names off those numbers: the carried events keep
-the instants they happened at (`160ms`, `15245ms` — not rewritten to "now"), and the
+the instants they happened at (`153ms`, `17416ms` — not rewritten to "now"), and the
 new page load's events **follow** them on the same axis rather than restarting at
 zero. The seam is named rather than hidden: `restored after reload` says how much
 came back and how long the reload cost.
 
-**`without-persistence.json` — 5 events, `restored: 0`.** Fifteen seconds of match,
+**`without-persistence.json` — 5 events, `restored: 0`.** Seventeen seconds of match,
 gone. What is left is the boot sequence of the page that replaced it — session start,
 the build note, the webgl probe, `front door idle` — which is the fingerprint of both
 logs the developer actually sent. `dropped: 0`, a valid schema, and a confident
