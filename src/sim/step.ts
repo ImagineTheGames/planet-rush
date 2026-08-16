@@ -760,7 +760,15 @@ function acquireAimTarget(world: World, ship: Ship): AimTarget | null {
  * about when a rock stops being worth mining.
  */
 function holdFull(ship: Ship): boolean {
-  return ship.cargoCap - ship.cargo <= 1e-9;
+  // FULL MEANS "NO ROOM FOR A WHOLE ORE" (a0-58). Ore arrives in `CHUNK.ore`
+  // units and a hold takes them whole or not at all, so a hold with less than one
+  // chunk of room can never accept anything again and is full in every sense the
+  // player can act on. On the shipped numbers this is the SAME predicate it has
+  // always been — cargo and cap are both whole multiples of `CHUNK.ore`, so
+  // `room < CHUNK.ore` is exactly `room === 0` — and it only differs on a hold
+  // carrying a sub-chunk sliver (the atmosphere drain can leave one), where the
+  // old test said "room!" and the tractor then pulled a chunk it could not take.
+  return ship.cargoCap - ship.cargo < CHUNK.ore;
 }
 
 /** The ratified arc is the whole circle (GDD §2.4, `AUTO_AIM_ARC` = 2π), and at
@@ -1031,7 +1039,15 @@ function updateChunks(world: World, dt: number): void {
     if (target) {
       const rr = target.radius + chunk.radius;
       if (dist2(chunk.pos, target.pos) <= rr * rr) {
-        const room = target.cargoCap - target.cargo;
+        // Room measured in WHOLE ore (a0-58): a hold accepts `CHUNK.ore` units and
+        // never a slice of one, so a hold with 0.4 of a slot free takes nothing
+        // and leaves the chunk whole for anyone. Ore is a countable thing on both
+        // sides of this line — every mint emits whole chunks (`damage.ts`,
+        // `match.ts`, `projectiles.ts`), and this is the only place ore enters a
+        // hold, so `cargo` can hold no fraction that a pip cannot show. No epsilon
+        // is needed or wanted: cap and cargo are small whole multiples of
+        // `CHUNK.ore`, and that subtraction is exact in binary.
+        const room = Math.floor((target.cargoCap - target.cargo) / CHUNK.ore) * CHUNK.ore;
         if (room > 0) {
           // What the chunk PUT ON OFFER, read before the take spends it — the
           // number a0-54 found missing. `take` is capped by `room`, so the two
