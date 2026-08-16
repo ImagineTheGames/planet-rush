@@ -75,6 +75,63 @@ and collapse numbers were tuned with a sink that no longer exists. Stated as a
 change in the amendment and the PR body; measuring it is QA's call, not this
 lane's.
 
+## CROSS-LANE FALLOUT (the part that took the time)
+
+A ratified sim change reshuffles every simulated match, and four tests outside
+this lane went red. Three were sampling; one is a real defect.
+
+1. **Determinism goldens** — `src/bots/ffa-parity.test.ts` (3 seeds) and
+   `tests/net/online-radio.test.ts` `FFA_GOLDEN`. Expected: they pin absolute
+   state hashes. Re-measured in their own flagged commits, old values kept, on the
+   bar each file sets for itself (a ratified amendment in
+   `docs/design-amendments.md`). Same four a0-58 moved hours earlier.
+2. **`src/bots/field-division.test.ts`** rock contention — pooled over 3 seeds,
+   read 2.16 against a bar of 1.6. Per seed the ratio ranges **0.04–3.8**. Pooled
+   1..24 it reads 1.19. Widened the pool to a 1..24 scan; **threshold untouched**.
+   *Finding for the Bot Engineer:* on the PRE-a0-59 build the shipped 3 seeds read
+   1.22 but seeds 1..24 read **1.74** — over the bar. §1.6's "closes to ~1.1×"
+   claim is weaker than its seeds suggest, independent of this branch.
+3. **`tests/harness/player-aggression.test.ts`** p15 A/B — pooled over 10 seeds,
+   read 1.146 against a bar of 1.1. At 24 seeds: 0.971 here, 0.876 on the base.
+   Widened 10 → 24; **thresholds untouched**. Costs 41s → 100s.
+4. **`tests/harness/unstuck.test.ts` — NOT FIXED, NOT SAMPLING. See BLOCKED.**
+
+## BLOCKED — one item, and it is not this lane's to decide
+
+`tests/harness/unstuck.test.ts` "keeps every bot under 12s pinned across 24
+shipped-cast matches" fails on this branch at **seed 15**: `foreman` (slot 2)
+wedged **133.5 s** at (1204,1195) while `'haul'`, at full throttle.
+
+**It is a genuine bot defect, and a0-59 exposed it rather than caused it.**
+Instrumented at t=605–620 s on that seed, the bot is:
+
+- at the exact **map centre** of a 2400×2400 board, alone — **no obstacle at
+  all**: nearest asteroid 123 u, nearest other ship 288 u, nearest station 861 u,
+  **zero chunks within 150 u** (4 on the whole map);
+- moving *fast* — |v| 30–92 u/s — with its velocity direction flipping every few
+  ticks: it is flying **tight circles**, roughly a 13×9 u box, for 133 s;
+- `lastThrust = 1.00`, `lastBehavior = 'haul'`, cargo 3/4, phase `live`.
+
+So the three-layer unstuck fix (`src/bots/{tree,behaviors,steering}.ts`) does not
+recover a steering limit cycle **in open space**. `STUCK_PROGRESS` is 24 u and the
+orbit stays inside ~16 u of any anchor, so `stuckFor` should accrue and the escape
+run should fire — it either does not fire or the escape run re-enters the cycle.
+That is `src/bots/`, which this lane must never touch, and it is behaviour, not a
+fixture.
+
+**Rate, measured.** Base build (a0-58 tip): **0 wedges in 120 seeds** scanned
+(1..24 shipped + 25..120), larger scan running. a0-59: **1 in 96** (seed 15 only).
+1/96 vs 0/120 does not establish that a0-59 raised the rate (Fisher p≈0.44) — it
+is most consistent with a **rare latent trap** that the shipped 24-seed set
+happens to miss on one build and hit on the other.
+
+**Why it is not resolvable here.** The two honest exits are (a) fix the steering
+limit cycle in `src/bots/`, which is out of ownership and is a substantive
+behaviour change, or (b) weaken a standing class-killer invariant, which would be
+wrong at any time and especially to land an unrelated constant. Widening the seed
+pool — the fix for items 2 and 3 — makes this one *worse*, not better. Repro:
+`npx vitest run tests/harness/unstuck.test.ts` on this branch.
+
 ## NEXT
 
 - Determinism goldens: `src/bots/ffa-parity.test.ts` (3 seeds) and
@@ -87,4 +144,4 @@ lane's.
 
 ## BLOCKERS
 
-None.
+One: the `unstuck` wedge above. Everything else in the DoD is done and green.
