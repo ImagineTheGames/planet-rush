@@ -96,56 +96,59 @@ this lane went red. Three were sampling; one is a real defect.
    Widened 10 → 24; **thresholds untouched**. Costs 41s → 100s.
 4. **`tests/harness/unstuck.test.ts` — NOT FIXED, NOT SAMPLING. See BLOCKED.**
 
-## BLOCKED — one item, and it is not this lane's to decide
+## BLOCKED — one item: wave 5 entombs ships at the map centre
 
-`tests/harness/unstuck.test.ts` "keeps every bot under 12s pinned across 24
-shipped-cast matches" fails on this branch at **seed 15**: `foreman` (slot 2)
-wedged **133.5 s** at (1204,1195) while `'haul'`, at full throttle.
+`tests/harness/unstuck.test.ts` fails at **seed 15**: `foreman` (slot 2) wedged
+**133.5 s** at (1204,1195) while `'haul'`. 5531/5532 tests pass; `tsc`, the
+dark-matter gate and `vite build` are green.
 
-**It is a genuine bot defect, and a0-59 exposed it rather than caused it.** It is
-the v0.2.2 field report's own bug class: a hull pinned against bodies at full
-throttle. Hull-surface clearance to the four nearest rocks, seed 15 slot 2:
+**Root cause — and it is NOT a bot bug.** Tracking slot 2 vs rocks near centre:
 
 ```
-t=580 pos=(1136,1212)   0.2   7.8  11.4  21.7   <- clipping, still escaping
-t=590 pos=(1228,1124)  23.3  27.2  33.3  33.9   <- free
-t=600 pos=(1208,1203)  -2.6   0.0   0.1   6.0   <- enters the clump
-t=610 pos=(1196,1204)  -0.0   0.0   3.5   3.6   <- wedged
-t=620 pos=(1201,1194)  -0.0   0.6   2.9   4.3
-t=640 pos=(1206,1199)   0.0   0.9   2.6   4.7
+t=570  wave 4    0 rocks near centre   slot 2  39u from centre   free
+t=600  wave 5   24 rocks near centre   slot 2   8u from centre   WEDGED
+t=810  wave 5   23 rocks near centre   slot 2   6u from centre   still wedged
 ```
 
-From t≈600 it is **in contact with 3–4 asteroids at once** in a dense clump at the
-exact map centre (late waves spawn closer to centre by design, §2.3) and never
-gets out: `lastThrust = 1.00`, `lastBehavior = 'haul'`, cargo 3/4, phase `live`,
-133 s. Before t=600 the escape run *was* working — it clipped rocks repeatedly and
-got clear each time.
+Wave 5 lays **24 asteroids of r=45.4 on a 67 u ring around the map centre**,
+overlapping each other by up to **79.3 u**. The annulus 21.6 u → 112 u is solid
+rock and the disc inside is a **sealed pocket of radius 21.6 u**. Hull is ~12 u.
+The ship was at the centre when the wave landed and is entombed. The "13×9 u box
+it orbits" is the pocket.
 
-**Mechanism.** While wedged, the nearest-body pick alternates on a fixed rhythm:
-over one 120-tick sample, **26 flips across 7 distinct bodies**, cycling 7 ticks on
-rock `4882` and 3 on rock `4879`. `go()` curves the committed escape heading
-through `dodge` around whichever body is nearest *this* tick, so with two rocks
-straddling the lane the escape is re-steered back and forth and never outlasts the
-thing it is escaping. `src/bots/behaviors.ts`'s own comment anticipates exactly
-this in a dense central cluster. That is `src/bots/`, which this lane must never
-touch, and it is behaviour, not a fixture.
+Systematic, every seed measured — free-pocket radius / ring solidity at wave 5:
+seed 1 → 32.1 u, 232/360 blocked · seed 7 → 27.7 u, 264/360 · seed 15 → 21.6 u,
+**304/360** · seed 42 → 35.9 u, 200/360 · seed 991 → 38.1 u, 192/360. **A human
+player caught at the centre would be entombed the same way.**
 
-*(An earlier reading in this note said "no obstacle at all" — that measured
-centre-to-centre distance under a range filter and was wrong. Surface clearance is
-the number above.)*
+**a0-59 did not cause it.** The central geometry is byte-identical on the base
+(same positions, radii, overlap; only entity ids differ). Wedge rates:
 
-**Rate, measured.** Base build (a0-58 tip): **0 wedges in 120 seeds** scanned
-(1..24 shipped + 25..120), larger scan running. a0-59: **1 in 96** (seed 15 only).
-1/96 vs 0/120 does not establish that a0-59 raised the rate (Fisher p≈0.44) — it
-is most consistent with a **rare latent trap** that the shipped 24-seed set
-happens to miss on one build and hit on the other.
+| build | wedges | seeds |
+|---|---|---|
+| a0-58 tip | 3 (seeds 142, 146, 147) | 280 |
+| this branch | 1 (seed 15) | 96 |
 
-**Why it is not resolvable here.** The two honest exits are (a) fix the steering
-limit cycle in `src/bots/`, which is out of ownership and is a substantive
-behaviour change, or (b) weaken a standing class-killer invariant, which would be
-wrong at any time and especially to land an unrelated constant. Widening the seed
-pool — the fix for items 2 and 3 — makes this one *worse*, not better. Repro:
-`npx vitest run tests/harness/unstuck.test.ts` on this branch.
+≈1.1% vs ≈1.0% — statistically identical, all four at the map centre. The gate
+samples 24 seeds, so at ~1% it is a coin flip on any sim change. Third
+under-powered standing gate this branch turned up; the only one sitting on a real
+bug.
+
+**Why not fixed here.** `src/sim/waves.ts` IS this lane's file, so the bug is
+mine — but the fix is a placement rule ("a wave must not spawn rock overlapping a
+live ship"), and placement is pinned by two ratified invariants: exact
+`FIELD_YIELD` at every N, and per-station fairness by construction. That is the
+trade a0-58 flagged and declined. It needs its own brief and ratification;
+folding it into a one-constant developer ruling is exactly the scope creep to
+avoid. **Director call:** land a0-59 and brief the wave trap separately, or hold
+a0-59 behind it.
+
+Repro: `npx vitest run tests/harness/unstuck.test.ts` here (seed 15), or seeds
+142/146/147 on `main`.
+
+*(Diagnosed wrong twice before this: "steering limit cycle in open space" — I had
+measured centre-to-centre, not hull clearance — then a `dodge` oscillation between
+two rocks. Both were symptoms of the pocket. Trust the numbers above.)*
 
 ## NEXT
 
