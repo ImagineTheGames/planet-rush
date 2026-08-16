@@ -109,6 +109,7 @@ import { levelForXp } from './progression/curve';
 import type { Difficulty } from './bots';
 import { FullscreenLifecycle } from '@platform/fullscreen';
 import { InstallPromptController } from '@platform/install-prompt';
+import { registerServiceWorker } from '@platform/service-worker';
 import { writeAffordanceRects } from '@platform/touch-visuals';
 import type { TouchAffordanceRects } from '@platform/touch-visuals';
 import {
@@ -722,6 +723,17 @@ async function boot(): Promise<void> {
   // And the one affordance that gets the log out: hidden until a screen offers it
   // (the pause menu, or an error screen — see `syncDownloadLog` and `failOnline`).
   installDownloadLogButton({ dom: document, log: playtest });
+
+  // --- The app-shell service worker (GDD §4.1). HERE, not at the bottom of this
+  //     function, and that placement is the whole fix (a0-66): `boot()` parks on
+  //     `await mainMenu.untilPlay()` a few hundred lines below, so a registration
+  //     written after it ran only for a player who had already started a match —
+  //     never for someone who just opened the URL. Measured on the live deploy:
+  //     no registration after 10 s, no controller on the reload. Which also meant
+  //     the post-deploy gate's "second visit, through the service worker" had
+  //     quietly stopped going through one. Best-effort and deferred to `load`;
+  //     see `@platform/service-worker` for why it is safe to actually turn on.
+  registerServiceWorker(window, navigator);
 
   // --- Build identity → the log's env (ratified, M10 §3). The badge string and
   //     the log header are ONE string: whenever the identity changes — a welcome
@@ -6600,13 +6612,9 @@ async function boot(): Promise<void> {
   (window as unknown as { __planetRushInstall?: InstallPromptController }).__planetRushInstall =
     installPrompt;
 
-  // Register the service worker (PWA app-shell caching, GDD §4.1). Optional and
-  // best-effort — mobile-browser play survives without it (§4.9).
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {
-      /* offline install is a nice-to-have; never block boot on it */
-    });
-  }
+  // (The service worker used to be registered HERE. It is now at the top of
+  // `boot()` — a0-66: everything below `await mainMenu.untilPlay()` runs only
+  // once a match is live, so a fresh visitor never installed the worker at all.)
 }
 
 // --- Layout anchors (declared regions; ratified vocabulary — see
