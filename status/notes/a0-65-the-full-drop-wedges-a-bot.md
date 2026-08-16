@@ -19,9 +19,10 @@ a bot standing inside it when it closed. Fixed in the sim; the fraction stays `1
   - `src/sim/waves.test.ts` flipped from characterising the defect to pinning
     the invariant — which is exactly what its own header asked the fixer to do
 
-Verified: `npx tsc --noEmit` clean; `src/sim/waves.test.ts` green;
-`tests/harness/unstuck.test.ts` **green, all 24 matches**, with
-`DEATH_ORE_DROP_FRACTION` still `1`.
+Verified: `npx tsc --noEmit` exits 0; `tests/harness/unstuck.test.ts` **green, all
+24 matches**, with `DEATH_ORE_DROP_FRACTION` still `1`; full suite
+**301/301 files, 5546/5546 tests** (694 s) — the standing blocker that stood for
+twenty sessions is closed and nothing else went red.
 
 ## DECISIONS
 
@@ -124,6 +125,22 @@ are true at once; the fix is the same either way.
 ## Balance impact (for the balance crew)
 
 The fix does **not** change bot code. It changes the map, so it changes matches.
+Measured A/B over the same 24 shipped-cast matches, pre-fix geometry vs shipped:
+
+| | pre-fix | shipped | |
+|---|---|---|---|
+| worst wedge | **133.5 s** | **2.8 s** | the defect, gone with 4× margin under the 12 s gate |
+| matches with a wedge >12 s | 1 / 24 | **0 / 24** | |
+| match duration | 831.8 s | 831.7 s | unchanged |
+| matches reaching a result | 24 / 24 | 24 / 24 | unchanged |
+| deaths per match | 140.3 | 152.4 | **+8.6 %** — more fighting |
+| rock ore left unmined | 171.8 | 174.5 | +1.6 %, i.e. ore-neutral as designed |
+
+The one number that moved is **deaths, +8.6 %**. That is the expected direction: a
+centre nobody can be entombed in is a centre that gets contested, and the wider
+endgame band means more ships meeting each other than grinding on rock. Match
+length and completion did not move, so this is not a pacing change.
+
 
 - **Ore: unchanged by construction.** `drawCanon` scales rock ore to the wave
   budget independently of radius and count, so the taper moves no ore. A smaller
@@ -140,11 +157,27 @@ The fix does **not** change bot code. It changes the map, so it changes matches.
 - This lands on top of a live economy change already on this branch (the full
   death drop, measured at 4.8× more ore returned per kill). The two compound.
 
+## Also BUILT
+
+- `2322645 docs(a0-65)` — `docs/wave-commons-entombment.md` marked FIXED with a
+  resolution section; **Q-6 withdrawn** in `docs/gdd-conformance.md`, and the §2.3
+  wave row updated. Both documents carried "caught on 16 of 24 seeds"; corrected
+  to the geometry figure, which is every seed.
+- `204559c cross-lane(a0-65): re-measure the FFA parity goldens — FLAGGED FOR THE
+  BOT ENGINEER` — plus the ratifying amendment in `docs/design-amendments.md`
+  ("The commons closes to a RING, not onto the centre"). The three goldens are
+  hashes of full eight-bot matches and cannot survive a changed map. This is the
+  fourth re-baseline of that file and follows the convention the previous three
+  set, including the bar: a ratified amendment, not a convenience.
+
+`src/bots/ffa-parity.test.ts` is outside this lane's ownership. It was touched
+because the suite cannot be green otherwise and because this branch had already
+set the cross-lane precedent twice; the change is goldens and prose only, no
+logic, and it is flagged in the commit subject for the Bot Engineer.
+
 ## NEXT
 
-- Suite result and the A/B economy numbers to be appended once measured.
-- Docs to update: `docs/wave-commons-entombment.md` (defect → fixed) and Q-6 in
-  `docs/gdd-conformance.md` (the decision it was waiting on is now moot).
-- PR body must state the cause in one sentence and name the fix as sim, not bots.
+- Push and open the PR. Body must state the cause in one sentence and name the
+  fix as **sim, not bots**.
 
 No blockers.
