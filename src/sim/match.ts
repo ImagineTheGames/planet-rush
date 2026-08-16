@@ -199,10 +199,20 @@ function shipOwnedBy(world: World, owner: PlayerId) {
  */
 function scatterWreckDebris(world: World, station: MiningStation, ore: number): void {
   if (ore <= 1e-9) return;
-  const whole = Math.min(Math.floor(ore / CHUNK.ore), WRECK.maxDebrisChunks);
-  const remainder = whole < WRECK.maxDebrisChunks ? ore - whole * CHUNK.ore : 0;
-  const pieces = whole + (remainder > 1e-9 ? 1 : 0);
-  if (pieces <= 0) return;
+  // WHOLE CHUNKS ONLY (a0-58), on the same rule as a ship's death drop
+  // (`damage.ts` `killShip`): a wreck lays down `CHUNK.ore` pieces and never a
+  // slice of one. A dead player's bank is not a whole number — the atmosphere
+  // drain moves it a sliver at a time — so this ring used to end in a remainder
+  // chunk of, say, 0.62, which is ore no hold pip, no cost and no wheel numeral
+  // can show once it is collected. What the ring cannot express in whole pieces
+  // dies with the station, exactly as the over-cap excess below already does.
+  const pieces = Math.min(Math.floor(ore / CHUNK.ore), WRECK.maxDebrisChunks);
+  if (pieces <= 0) {
+    // Less than one chunk's worth of fortune: the whole of it goes down with the
+    // station rather than becoming a fraction nobody can read.
+    ledgerAdd(world, 'capLoss', ore);
+    return;
+  }
 
   const ring = station.radius + WRECK.debrisRingOffset;
   for (let i = 0; i < pieces; i++) {
@@ -218,15 +228,16 @@ function scatterWreckDebris(world: World, station: MiningStation, ore: number): 
         y: clampToMargin(station.pos.y + dy * ring, CHUNK.radius, world.bounds.height),
       },
       vel: { x: dx * CHUNK.ejectSpeed, y: dy * CHUNK.ejectSpeed },
-      amount: i < whole ? CHUNK.ore : remainder,
+      amount: CHUNK.ore,
       radius: CHUNK.radius,
     });
   }
 
   // Ledger: the chunks laid down are `dropped` ore (loot on the map); anything the
-  // `maxDebrisChunks` cap refused to scatter died with the station — a real sink
+  // `maxDebrisChunks` cap refused to scatter — and the sub-chunk remainder the ring
+  // cannot mint as a whole piece (a0-58) — died with the station, a real sink
   // (`capLoss`), so a hoarder's over-cap fortune is accounted, not silently gone.
-  const scattered = whole * CHUNK.ore + (remainder > 1e-9 ? remainder : 0);
+  const scattered = pieces * CHUNK.ore;
   ledgerAdd(world, 'dropped', scattered);
   ledgerAdd(world, 'capLoss', ore - scattered);
 }
