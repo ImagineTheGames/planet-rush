@@ -23,7 +23,10 @@
  *  - **The hush.** `DeathMoment.gain` goes onto the duck node every frame, and
  *    one-shots are skipped outright while it is zero. That is the tone
  *    contract's three seconds (GDD §4.7) as two lines of code, in the one place
- *    they cannot be optimised away by someone tidying the mixer.
+ *    they cannot be optimised away by someone tidying the mixer. **One voice is
+ *    exempt: the death fall itself** (`./graph` `sting`), because §4.7 orders the
+ *    beat — the sound, *then* the quiet on top of it — and a sting cut off after
+ *    a tenth of itself reads as the audio breaking (a0-55).
  *  - **The alarm** (`./alarm`), fed only by damage against the local player's
  *    own home — a mechanic, not a notification (GDD §2.2). It sounds **once per
  *    engagement** and does not repeat while the siege lasts (developer, s9-01);
@@ -65,7 +68,7 @@ import {
 import { UiCuePlayer, type UiCuePlayerOptions } from './ui-cues';
 import { SustainedVoice } from './weapons';
 import type { AudioContextLike } from './context';
-import { AudioGraph, type Bus, type LoopHandle, type MixOptions, type Spatial } from './graph';
+import { AudioGraph, type LoopHandle, type MixOptions, type Route, type Spatial } from './graph';
 import { HERE, place, R_NEAR, R_FAR, type Placement } from './spatial';
 import { MusicDirector, MusicScore, type MusicDirectorOptions } from './music';
 
@@ -508,11 +511,16 @@ export class AudioEngine {
 
         // --- The one serious thing -----------------------------------------
         case TELL.stationDeath:
-          // Fire the sound *before* triggering the hush, so the fall is what
-          // the quiet lands on top of rather than being cut off by it. The one
-          // serious thing is a sting, not a located hit: full and centred, heard
-          // wherever on the map a home dies (ratified a3-03).
-          this.flat(SOUND.stationDeath, 1);
+          // Onto the hush-exempt path, so the fall is what the quiet lands on top
+          // of rather than being cut off by it (GDD §4.7). Firing before
+          // `trigger()` is not enough on its own and never was: the hush reaches
+          // zero 0.12 s later and would multiply this bus with the rest, leaving
+          // a tenth of a 1.1 s sound and then nothing — *"when stations die all
+          // audio cuts off you dont hear like an explosion effect"* (developer,
+          // a0-55). The ROUTING is the fix; the ordering is still right, so both
+          // stay. The one serious thing is a sting, not a located hit: full and
+          // centred, heard wherever on the map a home dies (ratified a3-03).
+          this.flat(SOUND.stationDeath, 1, 'sting');
           if (this.ownsDeath) this.death.trigger();
           // Silence on the same SIDE the alarm rings for (developer report s5):
           // an alarm still ringing over a dead home tells the player to defend
@@ -751,18 +759,25 @@ export class AudioEngine {
    * klaxon (the death fall, the wave horn, the match-end fanfare). Still obeys the
    * three-second hush like everything else (GDD §4.7).
    *
-   * @param bus Which bus to sum into. The under-attack alarm keeps its own
+   * @param bus Where to sum it. The under-attack alarm keeps its own bus
    *   (`./graph` — a mechanic that stays audible over everything else, §2.2, and
-   *   one the SFX slider does not turn down); everything else is `sfx`.
+   *   one the SFX slider does not turn down); the station-death fall takes the
+   *   hush-exempt `sting` path (a0-55); everything else is `sfx`.
    * @param rate Playback rate. Defaults to the mix's deterministic pitch jitter,
    *   which is what keeps a repeated sound from sounding cheap — but the alarm
    *   passes 1: an emergency signal that drifts in pitch is a worse signal, and
    *   §2.2's "unmistakable" is the same two tones every time.
    */
-  private flat(sound: SoundName, level: number, bus: Bus = 'sfx', rate?: number): boolean {
+  private flat(sound: SoundName, level: number, bus: Route = 'sfx', rate?: number): boolean {
     const graph = this.graph;
     if (!graph) return false;
-    if (this.death.gain <= HUSHED) {
+    // The hush gate, and its one exemption. Routing the death fall around the
+    // duck node would be theatre if this gate then refused to start it, and the
+    // case it refuses is real: a second home dying inside the first one's quiet
+    // (they refresh rather than stack, `../vfx/death-moment`) would be a station
+    // destroyed in total silence — the exact bug a0-55 is fixing, one death
+    // later. Every other sound, the alarm included, still dies into the quiet.
+    if (bus !== 'sting' && this.death.gain <= HUSHED) {
       this.skipped++;
       return false;
     }

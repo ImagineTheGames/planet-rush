@@ -8,15 +8,32 @@
  *
  * ```
  *   sfx ─────┐
- *   alarm ───┼──► master ──► duck ──► destination
- *   ambient ─┘                 ▲
- *                              └── the station-death hush (../vfx/death-moment)
+ *   alarm ───┼──► duck ──┬──► master ──► destination
+ *   ambient ─┤       ▲   │
+ *   music ───┘       │   │
+ *                    │   │
+ *   sting ───────────┼───┘   (the death fall — the ONE path around the duck)
+ *                    └── the station-death hush (../vfx/death-moment)
  * ```
  *
  * **Why the duck is its own node.** The tone contract's three seconds of quiet
  * multiply the *whole* mix, alarm included — "audio drops out … nobody jokes"
- * (GDD §4.7). Putting it downstream of master means it cannot be routed around
- * by accident, and it leaves `master` free to be the player's volume setting.
+ * (GDD §4.7). Keeping it a node of its own means it cannot be routed around by
+ * accident, and it leaves `master` free to be the player's volume setting —
+ * everything, the exempt sting included, still passes through that.
+ *
+ * **Why one path goes around it (a0-55).** §4.7 orders the beat: the death
+ * sound, *then* the quiet — "the quiet lands on top of the fall." The fall is
+ * 1.1 s long and the cut is 0.12 s, so a death sting summed into `sfx` is
+ * multiplied to zero after a tenth of itself, which is what the developer heard
+ * as *"when stations die all audio cuts off you dont hear like an explosion
+ * effect."* Ordering the `play()` call before `DeathMoment.trigger()` cannot fix
+ * that — the two are on the same bus a frame apart. So {@link AudioGraph.sting}
+ * sums into `master` directly: the player's volume still applies, the SFX slider
+ * and the alarm duck still apply (it rides the `sfx` bus's exact level), and the
+ * hush alone does not. One sound left in an empty room, which is the picture the
+ * design asks for. It is a routing exemption for a single voice, not a bypass:
+ * `../vfx/death-moment` is unchanged, and every other sound still dies into it.
  *
  * **Why three buses.** They are the three things a player or the game turns down
  * independently: the ambient loop is cuttable (GDD §4.9 item 3), the alarm is a
@@ -54,8 +71,18 @@ import {
 import { LP_BYPASS_HZ } from './spatial';
 import { DEFAULT_SAMPLE_RATE, renderLayered, renderVoice, seamless } from './synth';
 
-/** The four buses. */
+/** The four buses — the four things a player or the game turns down. */
 export type Bus = 'sfx' | 'alarm' | 'ambient' | 'music';
+
+/**
+ * Where a one-shot is summed: one of the four buses, or `sting` — the single
+ * path the station-death hush does not multiply (a0-55, see the module doc).
+ *
+ * It is a *routing* target, not a bus: it has no slider and no duck of its own
+ * because it rides `sfx`'s (`setBus` / `setBusDuck` push both), so a player who
+ * turns the SFX down turns the death fall down with it.
+ */
+export type Route = Bus | 'sting';
 
 /** Options for {@link AudioGraph}. */
 export interface MixOptions {
@@ -127,9 +154,18 @@ export class AudioGraph {
   readonly ctx: AudioContextLike;
   /** Everything sums here; this is the player's volume. */
   readonly master: GainNodeLike;
-  /** Downstream of master: the station-death hush multiplies the whole mix. */
+  /** Upstream of master: the station-death hush multiplies the whole mix. */
   readonly duck: GainNodeLike;
   readonly buses: Readonly<Record<Bus, GainNodeLike>>;
+  /**
+   * The hush-exempt path (a0-55): summed into {@link master} rather than into
+   * {@link duck}, so the death fall runs its 1.1 s tail while the three seconds
+   * of quiet take everything else away underneath it (GDD §4.7).
+   *
+   * Its gain tracks the `sfx` bus's exactly — level and alarm duck both — so the
+   * only thing it is exempt from is the hush.
+   */
+  readonly sting: GainNodeLike;
 
   private readonly buffers = new Map<string, AudioBufferLike>();
   private readonly voices: Voice[] = [];
@@ -155,13 +191,13 @@ export class AudioGraph {
     this.repeatGap = Math.max(0, options.repeatGap ?? MIX_DEFAULTS.repeatGap);
     this.rng = mulberry32((options.seed ?? 0x50a17e5) >>> 0);
 
-    this.duck = ctx.createGain();
-    this.duck.gain.value = 1;
-    this.duck.connect(ctx.destination);
-
     this.master = ctx.createGain();
     this.master.gain.value = clamp01(options.master ?? MIX_DEFAULTS.master);
-    this.master.connect(this.duck);
+    this.master.connect(ctx.destination);
+
+    this.duck = ctx.createGain();
+    this.duck.gain.value = 1;
+    this.duck.connect(this.master);
 
     this.base = {
       sfx: clamp01(options.sfx ?? MIX_DEFAULTS.sfx),
@@ -175,6 +211,11 @@ export class AudioGraph {
       ambient: this.bus(this.base.ambient),
       music: this.bus(this.base.music),
     };
+    // Around the duck, into master. Same level as `sfx` (see `applyBus`), so the
+    // exemption is from the hush and from nothing else.
+    this.sting = ctx.createGain();
+    this.sting.gain.value = this.base.sfx;
+    this.sting.connect(this.master);
   }
 
   /** Sample rate the bank is rendered at — the context's own, so nothing resamples. */
@@ -222,7 +263,7 @@ export class AudioGraph {
    */
   setBus(bus: Bus, value: number, seconds = 0.05): void {
     this.base[bus] = clamp01(value);
-    ramp(this.buses[bus].gain, this.base[bus] * this.busDuck[bus], this.ctx.currentTime, seconds);
+    this.applyBus(bus, seconds);
   }
 
   /**
@@ -232,7 +273,7 @@ export class AudioGraph {
    */
   setBusDuck(bus: Bus, factor: number, seconds = 0.3): void {
     this.busDuck[bus] = clamp01(factor);
-    ramp(this.buses[bus].gain, this.base[bus] * this.busDuck[bus], this.ctx.currentTime, seconds);
+    this.applyBus(bus, seconds);
   }
 
   /** A bus's current base (player) level, before the alarm duck. */
@@ -247,6 +288,10 @@ export class AudioGraph {
    * rather than ramped because the moment already *is* a ramp — a shaped one,
    * with a fast cut and a slow return — and ramping a ramp would round off the
    * exact shape the tone contract asks for.
+   *
+   * "Whole mix" is now precisely four buses: {@link sting} is around it by
+   * design, because the sound the quiet lands on top of cannot be a sound the
+   * quiet has already cut (a0-55, GDD §4.7).
    */
   setDuck(value: number): void {
     this.duck.gain.value = clamp01(value);
@@ -267,12 +312,13 @@ export class AudioGraph {
    *
    * @param gain  Level 0..1 over the bank's own; scale it with the tell's magnitude.
    * @param rate  Playback rate. 1 is as rendered; {@link jitter} adds variety.
-   * @param bus   Which bus to sum into. Default `sfx`.
+   * @param bus   Where to sum it: a bus, or `sting` for the one path the
+   *   station-death hush does not multiply ({@link Route}). Default `sfx`.
    * @param spatial Where it is relative to the listener (`../spatial`) — a panner
    *   is inserted only when it is off-centre, a lowpass only when it muffles, so a
    *   centred near sound (and every UI cue) still costs a single gain node.
    */
-  play(name: SoundName, gain = 1, rate = 1, bus: Bus = 'sfx', spatial?: Spatial): boolean {
+  play(name: SoundName, gain = 1, rate = 1, bus: Route = 'sfx', spatial?: Spatial): boolean {
     if (!this.live) return false;
     const now = this.ctx.currentTime;
     this.prune();
@@ -295,13 +341,14 @@ export class AudioGraph {
     node.gain.value = level;
     // Off-centre → through a panner into the bus; centred → straight in. The pan
     // is the audible half of "hear every single thing on the map" (a3-03).
+    const target = this.route(bus);
     if (spatial && spatial.pan !== 0) {
       const panner = this.ctx.createStereoPanner();
       panner.pan.value = clampPan(spatial.pan);
       node.connect(panner);
-      panner.connect(this.buses[bus]);
+      panner.connect(target);
     } else {
-      node.connect(this.buses[bus]);
+      node.connect(target);
     }
 
     const source = this.ctx.createBufferSource();
@@ -377,6 +424,7 @@ export class AudioGraph {
     }
     this.voices.length = 0;
     for (const bus of Object.values(this.buses)) bus.disconnect();
+    this.sting.disconnect();
     this.master.disconnect();
     this.duck.disconnect();
   }
@@ -394,8 +442,30 @@ export class AudioGraph {
   private bus(gain: number): GainNodeLike {
     const node = this.ctx.createGain();
     node.gain.value = gain;
-    node.connect(this.master);
+    node.connect(this.duck);
     return node;
+  }
+
+  /** The node a {@link Route} sums into — a bus, or the hush-exempt sting path. */
+  private route(to: Route): GainNodeLike {
+    return to === 'sting' ? this.sting : this.buses[to];
+  }
+
+  /**
+   * Push a bus's `base × duck` onto its gain — and, for `sfx`, onto the sting
+   * path with it.
+   *
+   * The mirroring is the whole reason {@link sting} is not a fifth bus with its
+   * own slider: the death fall is an SFX, so it has to move when the player moves
+   * the SFX slider and when the alarm ducks the SFX (`./engine` syncAlarm). The
+   * exemption it gets is from the hush — one node, one reason — and computing
+   * both levels in one place is what stops the two drifting apart later.
+   */
+  private applyBus(bus: Bus, seconds: number): void {
+    const value = this.base[bus] * this.busDuck[bus];
+    const now = this.ctx.currentTime;
+    ramp(this.buses[bus].gain, value, now, seconds);
+    if (bus === 'sfx') ramp(this.sting.gain, value, now, seconds);
   }
 
   /**
