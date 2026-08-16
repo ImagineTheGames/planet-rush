@@ -173,71 +173,114 @@ high, and the direction was wrong too.
    24-seed draw over a 1.25% defect passes ~74% of the time, so roughly **one sim
    change in four** turns this gate red without causing anything — not "two thirds."
 
-**Why not fixed here — and now with the arithmetic, not just the principle.**
-`src/sim/waves.ts` IS this lane's file, so the bug is mine. But there is **no
-repositioning fix inside the wave's own disc**, and that is provable from the
-shipped constants rather than a judgement call:
+**Why not fixed here — the arithmetic, now MEASURED off the shipped constants
+rather than hand-computed. (2026-08-16, fourth session. This replaces a weaker
+and partly wrong version of this section; two of its inputs were off.)**
 
-- `fieldRadius = ringRadius × commonsRadiusFraction ≈ 773 × 0.4 ≈ 309 u`.
-- Wave 5's disc: `309 × WAVE.lastRadiusFraction (0.25) ≈ 77 u`. Its eye:
-  `77 × commonsHoleFraction (0.85) ≈ 66 u`, so rock **centres** sit in 66–77 u.
-- `sectorRocks = round(20 / 8) = 3`, stamped ×8 = **24 rocks**, each
-  `ASTEROID.radius ∈ [22, 46]`.
-- Adjacent sector clumps are 45° apart; at r ≈ 71 u that is an arc of **55.8 u**.
-  Two mean-size rocks need 68 u of centre separation just to not overlap, and
-  **92 u** for a 12 u-hull ship to fit between them (116 u at `maxRadius`).
-- Solving `2πR/8 ≥ 92` gives **R ≥ 117 u** — and the wave's entire disc is 77 u.
+`src/sim/waves.ts` IS this lane's file, so the bug is mine. There is **no
+repositioning fix at all** — not radial, not angular — and it is provable.
+Measured by instantiating the real world (`createWorld`, seed 15, the shipped
+8-slot cast) and reading `waveRadiusFraction` / `RESOURCE_FIELD` / `ASTEROID`
+directly, rather than from remembered numbers:
 
-So the innermost ring would have to sit at 1.5–1.9× the radius of the disc it is
-drawn in. **`commonsHoleFraction` cannot deliver that: it is a fraction of the
-disc and is bounded by 1.0, which tops out at 77 u.** That knob is already at the
-end of its travel — its own comment records it being raised 0.75 → 0.85 for
-*exactly this bug* ("could be **sealed** by a full ring of body-radius rocks it
-could not squeeze past ... the `unstuck` invariant"), and my 200-seed numbers are
-what that fix left behind: reduced, not removed.
+```
+fieldRadius=307.2  sectors=8  sectorWidth=45.00deg  gap=0.330rad (clamp 0.353)
+asteroidsPerWave=20  sectorRocks=3  total=24  ASTEROID r=[22,46] mean=34  SHIP_RADIUS=16
 
-The knobs that could actually fix it are `WAVE.lastRadiusFraction` (stop the rings
-closing so far in — but "the shrinking ring *is* the mechanic", GDD §2.3),
-`ASTEROID.maxRadius` (smaller rock, but GDD §5.5 ties rock size to a payout the
-player can judge), or the per-wave rock count. **All three are balance/design
-calls, not gameplay-lane repairs**, and folding one into a one-constant developer
-ruling is exactly the scope creep to avoid. **Director call:** land a0-59 and brief
-the wave trap separately, or hold a0-59 behind it.
+wave  disc    eye(centres)  freeEye  ringMid  circum  arcNeeded  oversub  spokeClear
+ 1    307.2      261.1       215.1    284.2    1785     1632      0.91x      84.6
+ 2    249.6      212.2       166.2    230.9    1451     1632      1.13x      68.7
+ 3    192.0      163.2       117.2    177.6    1116     1632      1.46x      52.9
+ 4    134.4      114.2        68.2    124.3     781     1632      2.09x      37.0
+ 5     76.8       65.3        19.3     71.0     446     1632      3.66x      21.2
+                                                     needSpokeClear=62   rMinPassable=276
+```
+
+Two corrections to what this note used to say. **`SHIP_RADIUS` is 16, not the
+"~12 u hull" quoted above** — every clearance requirement is 8 u larger than the
+old arithmetic assumed. And **the binding constraint is not adjacent-pair
+spacing.** The old note solved `2πR/8 ≥ 92` for one pair of neighbours and got
+`R ≥ 117 u`. The real requirement is that all 24 rocks *plus one ship-wide
+corridor* fit around the whole circumference: `(24 × 68 + 2 × (16+34)) / 2π`
+= **`R ≥ 276 u`**. Wave 5's ring sits at **71 u**. It is short by **3.9×**, not
+the 1.5–1.9× the old note claimed.
+
+**The commons ring is oversubscribed by construction from wave 2 onward.** Wave
+5 needs 1632 u of rock arc on a 446 u circumference — **3.66× more rock than the
+ring can hold**. No angular or radial rearrangement fits 1632 u of rock into
+446 u of ring. That kills every "just place them better" fix outright, including
+the one this note previously left open.
+
+**And the launch-corridor guarantee is angular, so it evaporates as the disc
+shrinks.** `commonsSpokeGap` is a fixed **0.33 rad**; the linear clearance it
+buys is `eye × sin(gap)`, which scales with the ring. It is 84.6 u at wave 1 and
+**21.2 u at wave 5**, against the `SHIP_RADIUS + ASTEROID.maxRadius` = **62 u**
+the constant's own doc-comment promises ("so the innermost ring rock clears a
+launching ship's path by more than a ship+rock radius"). **That promise is
+already broken at wave 3** (52.9 u) and is off by 3× at wave 5. Both documented
+corridor guarantees — the radial eye and the angular spoke — are void at wave 5.
+
+This also explains the residual rate precisely. `commonsHoleFraction`'s
+0.75 → 0.85 raise was made for *exactly this bug*, and its comment claims it
+"pushes the innermost ring out to a radius whose circumference actually admits a
+ship-wide gap." **That claim is false** — 276 u is needed and 71 u is delivered;
+the raise never touched oversubscription. All it did was grow `freeEye` from
+~10 u to **19.3 u**, which is why the wedge got *shorter* (a ship rattles in a
+bigger pocket and sometimes escapes inside 12 s) but never went away. The
+19.3 u free eye is also the measured ~21.6 u pocket at seed 15 — same number,
+confirming the pocket IS `eye − rock body`.
+
+So `commonsHoleFraction` is not merely at the end of its travel; it was never
+the right knob. The knobs that could actually fix it are `WAVE.lastRadiusFraction`
+(stop the rings closing so far in — but "the shrinking ring *is* the mechanic",
+GDD §2.3), `ASTEROID.maxRadius` / rock size, or the per-wave rock count. **All
+three are balance/design calls, not gameplay-lane repairs**, and folding one into
+a one-constant developer ruling is exactly the scope creep to avoid. **Director
+call:** land a0-59 and brief the wave trap separately, or hold a0-59 behind it.
 
 Note also a second-order fact worth the Director's attention: the eye is reserved
 by rock **centre**, while the launch pocket 90 lines above in the same file is
 reserved by rock **body** (`pocketOuterR = ringR − ringR×SPAWN_CLEAR_POCKET −
 ASTEROID.maxRadius`, commented "keeps the whole rock out of the pocket, not just
-its centre"). The commons omits that `− maxRadius` term, which is why a 66 u eye
-leaves only ~20 u of actually-free space. Correcting that alone does not open a
-corridor — see the arithmetic above — but it is the same class of mistake and
-belongs in the same brief.
+its centre"). The commons omits that `− maxRadius` term, which is why a 65.3 u
+eye leaves only 19.3 u of actually-free space. Correcting that alone does not
+open a corridor — the ring is 3.66× oversubscribed either way — but it is the
+same class of mistake and belongs in the same brief.
 
 Three candidates for whoever takes that brief, re-costed against the arithmetic
 above. None is taken here.
 
-1. **Widen the final wave's ring — `WAVE.lastRadiusFraction` 0.25 → ~0.44.** The
-   only knob that makes the ring geometrically passable (`R ≥ 117 u` needs a disc
-   of ≥ 137 u, i.e. ≥ 0.44 × fieldRadius). Costs no ratified invariant — ore per
-   rock is untouched so `FIELD_YIELD` holds exactly, and it is still one sector
-   stamped `N` times so fairness holds — but it **directly weakens GDD §2.3's
-   shrinking ring**, which is the mechanic the section is about. A designer call,
-   not an engineering one.
-2. **Shrink late-wave rock.** Drop `ASTEROID.maxRadius` for the last wave, or taper
-   it with `waveRadiusFraction`. Opens the corridor at the current ring radius and
-   keeps the ring closing in. Costs GDD §5.5's "a payout the player can judge" —
-   rock size reads as ore — and changes the field's whole visual texture.
+1. **Widen the final wave's ring — `WAVE.lastRadiusFraction`.** ~~0.25 → ~0.44~~
+   **Re-costed and now much worse than this note used to say.** Passability needs
+   `R ≥ 276 u`, so the ring's *mid* radius must reach 276 of a 307 u field: that
+   is `lastRadiusFraction ≈ 0.90`, against wave 1's own 1.00. **Wave 5 would have
+   to land essentially on top of wave 1.** This does not weaken GDD §2.3's
+   shrinking ring, it **deletes** it — all five waves would land in the same
+   annulus. On the corrected arithmetic this option is not a designer trade-off,
+   it is a non-starter, and it should not be offered as one.
+2. **Cut late-wave rock size or count — the only knob with real travel.** The
+   ring is oversubscribed 3.66×, so passability needs the rock arc down by ~4×:
+   `ASTEROID.maxRadius` tapered with `waveRadiusFraction`, or `sectorRocks`
+   falling as the ring closes (fewer, and the wave's fixed ore budget makes the
+   survivors richer — `asteroidCount` already documents exactly that trade).
+   Either keeps GDD §2.3's ring closing in. Costs GDD §5.5's "a payout the player
+   can judge" — rock size reads as ore — and changes the field's visual texture.
+   **This is the one to brief**, and the count variant is likely cheaper than the
+   size variant because the ore budget absorbs it.
 3. **Eject any live ship a landing wave would entomb.** Rock positions untouched,
    so `FIELD_YIELD` and `N`-fold symmetry are both exact and — because it only
    fires on the ~1.25% of seeds where a ship is actually caught — it moves almost
-   no goldens. It is the cheapest of the three and the only one that changes no
-   field design. Against it: it is a new sim rule (a wave displacing a ship), and
-   it treats the symptom — the centre stays a trap for anyone who flies in after
-   the wave lands, it just stops sealing someone in at the instant of landing.
+   no goldens. Cheapest of the three and the only one that changes no field
+   design. Against it: it is a new sim rule (a wave displacing a ship), and it
+   treats the symptom — with the ring 3.66× oversubscribed the centre stays a
+   sealed pocket for anyone who flies in *after* the wave lands; it only stops
+   someone being sealed in at the instant of landing.
    **Note the earlier draft of this option was overlap-triggered and would not have
-   fired**: at seed 15 the ship sits ~8 u from centre in a ~20 u free pocket with a
-   ~12 u hull, so it overlaps nothing — it is sealed *behind* a 90 u annulus, not
-   pinned inside rock. The trigger has to be "no escape route", not "overlaps rock".
+   fired**: at seed 15 the ship sits ~8 u from centre in a 19.3 u free pocket with
+   a 16 u hull radius, so it overlaps nothing — it is sealed *behind* a ~90 u
+   annulus, not pinned inside rock. The trigger has to be "no escape route", not
+   "overlaps rock". (Note how tight that is: a 16 u hull in a 19.3 u pocket has
+   3 u of slack. The ship is very nearly a press-fit at the moment the wave lands.)
 
 Repro, both arms, on this tree (the only difference between the builds is the one
 constant): `npx vitest run tests/harness/unstuck.test.ts` fails here at seed 15.
@@ -245,9 +288,19 @@ For `main`'s sim, flip `DEATH_ORE_DROP_FRACTION` back to `0.5` and probe seeds
 **142, 146, 147** — seeds 1–48 are clean on `main`, which is the whole reason the
 24-seed gate is green there.
 
-*(Diagnosed wrong twice before this: "steering limit cycle in open space" — I had
-measured centre-to-centre, not hull clearance — then a `dodge` oscillation between
-two rocks. Both were symptoms of the pocket. Trust the numbers above.)*
+The geometry table above is reproduced by instantiating the shipped world and
+reading the constants — `createWorld({ seed: 15, players: botLobby(fillEmptySlots([],
+MATCH_SLOTS)) })`, then `world.fieldRadius`, `world.asteroidsPerWave`,
+`world.stations.length`, and `waveRadiusFraction(n)` for n = 1..5. It needs no
+match to be run, so it is seconds, not the 200-seed hours.
+
+*(Diagnosed wrong three times before this: "steering limit cycle in open space" —
+I had measured centre-to-centre, not hull clearance — then a `dodge` oscillation
+between two rocks; both were symptoms of the pocket. Then the pocket was
+root-caused correctly but **mis-costed**: a 12 u hull instead of the real 16, and
+an adjacent-pair spacing bound (`R ≥ 117`) instead of the whole-circumference one
+(`R ≥ 276`). The conclusion "no in-lane fix" survived all three; the numbers
+under it did not. Trust the measured table, not the prose around it.)*
 
 ## NEXT
 
@@ -275,6 +328,26 @@ two rocks. Both were symptoms of the pocket. Trust the numbers above.)*
   the Director toward the wrong reason for the right decision. Also added the
   arithmetic proving no in-disc repositioning fix exists. The blocker itself is
   unchanged and still needs the same ruling.
+- **2026-08-16, fourth session — what this one actually did.** Re-verified the
+  shipped work again (nothing redone): `tsc --noEmit` exits 0, constant is `1`,
+  `drops the whole hold` present at `damage.test.ts:83`, both remote DoD greps
+  pass against `FETCH_HEAD`, local `HEAD` == `origin/…` == `4df48a5`, `main` has
+  not moved (`43236fb`). Re-ran `unstuck` — still exactly seed 15, `foreman`
+  slot 2, **133.5 s at (1204,1195)**, byte-identical to the third session's
+  report. The work of this session was **the wave-trap arithmetic being wrong** —
+  the same failure mode as last session, one level down. Measured the geometry off
+  the shipped constants instead of recomputing it by hand and found two errors:
+  `SHIP_RADIUS` is **16, not 12**, and the passability bound is
+  whole-circumference (**`R ≥ 276 u`**), not adjacent-pair (`R ≥ 117 u`). Also
+  found the mechanism nobody had named: the commons ring is **oversubscribed with
+  rock 3.66×** at wave 5 (and >1× from wave 2 on), and `commonsSpokeGap` is an
+  *angular* constant so the linear launch corridor it guarantees shrinks with the
+  ring — 84.6 u at wave 1, **21.2 u at wave 5 against the 62 u its own doc-comment
+  promises**. Consequences: no placement fix of any kind can exist, candidate 1
+  (`lastRadiusFraction`) is re-costed from "0.44, a designer trade-off" to
+  "**0.90, a non-starter that deletes the shrinking ring**", and candidate 2
+  (rock size/count) is now the one to brief. **The ruling being asked for is
+  unchanged; the reasoning under it is now correct and measured.**
 
 ## BLOCKERS
 
@@ -292,10 +365,13 @@ moves into the trap — falls inside.
 
 **a0-59 does not increase the defect rate.** That is the fact that decides this: a
 one-constant developer ruling is being held behind a trap it did not create, does
-not worsen, and cannot fix without a design change to GDD §2.3's shrinking ring
-(the arithmetic is in BLOCKED — `commonsHoleFraction` is bounded by 1.0 and would
-need to be ~1.9). So the choice is **who fixes the wave trap, and when**, not "is
-a0-59 safe". Land a0-59 and brief the wave trap separately, or hold it.
+not worsen, and cannot fix without a design change. The fourth session's measured
+geometry makes the "cannot fix" part stronger than it was: the commons ring is
+**3.66× oversubscribed with rock** at wave 5, so no rearrangement of any kind
+fits, and the one knob that would make it passable (`lastRadiusFraction` ≈ 0.90)
+would land wave 5 on top of wave 1 and delete GDD §2.3's shrinking ring outright.
+So the choice is **who fixes the wave trap, and when**, not "is a0-59 safe".
+Land a0-59 and brief the wave trap separately, or hold it.
 
 What I deliberately did NOT do, and why, so the next session does not redo it:
 
