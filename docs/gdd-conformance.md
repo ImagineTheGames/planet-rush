@@ -437,7 +437,7 @@ testable, so each row below is checked against the thing a player would look at.
 | **Banking is by flying into your own collection field**, ~4× radius, 2 ore/s, stops on leaving | **SHIPPED** | `DEPOSIT.drainRate = 2` `src/sim/constants.ts:1584`; `DEPOSIT_RANGE` drawn at `src/render/index.ts:969`. |
 | Ore chunks visibly courier ship→station, one per unit banked | **SHIPPED** | `src/sim/step.ts:291–297`, `:926`. |
 | The wheel's BANK segment dumps the hold in one tap | **SHIPPED** | `src/ui/build-wheel.ts:193`. |
-| Five timed waves, each closer to centre; after the last, collapse | **SHIPPED** | `src/sim/waves.ts:366`; `src/sim/buildings.ts:511`. |
+| Five timed waves, each closer to centre; after the last, collapse | **SHIPPED** | `src/sim/waves.ts:366`; `src/sim/buildings.ts:511`. **The claim is delivered; the delivery has a known defect — see Q-6.** By wave 5 the ring is oversubscribed with rock **3.66×**, closes to 71 u and seals the map centre behind a solid annulus with a 19.3 u free pocket, against a `SHIP_RADIUS` of 16: any ship — bot or human — standing there when it lands is entombed for the match. Open on `main` at ~1.25% of seeds. Measured in `docs/wave-commons-entombment.md`. Graded SHIPPED rather than PARTIAL deliberately: the waves *do* land, each closer than the last, and collapse *does* follow, so this is not a gap against §2.3's claim — it is a defect in a shipped mechanic, and the honest place for it is Q-6. |
 | **A pickup and a pickup REFUSED must both be visible** (2026-08-08, a0-08) | **SHIPPED** | `Ship.lootTake` / `Ship.lootBlocked` published per tick — `src/sim/step.ts:922–923`, set at `:950` and `:988`. |
 
 ### §2.4 Controls and actions *(12 claims: 12 SHIPPED)*
@@ -693,7 +693,9 @@ Nothing has been cut, which is the point of checking.
 
 ## 7. QUESTIONS FOR THE DEVELOPER
 
-Only a human can settle these. Each is a decision, not a bug.
+Only a human can settle these. Each is a decision, not a bug — with one
+deliberate exception, **Q-6**, which is a measured defect whose every remaining
+fix is a design call, so the decision is yours even though the bug is real.
 
 **Q-1 · What is a home called, in fiction?** §0 names **FACILITY** as a *working
 placeholder* and asks you to pick from FACILITY / RIG / STATION / OUTPOST. The
@@ -741,6 +743,55 @@ every screen looks, so `tests/mobile/goldens.spec.ts` re-baselines wholesale.
 That is a real cost and it is worth naming before it is spent. **Confirm you want
 the ratified faces shipped** (they are §5.6, so my assumption is yes), and QA
 should schedule the re-baseline in the same pass rather than after it.
+
+**Q-6 · Wave 5 seals the map centre and entombs whoever is standing in it. Which
+of the three fixes do you want, and does a0-59 wait for it?** *(Raised
+2026-08-16 by a0-59 / PR #436. Full report, with the measurements behind every
+number here: `docs/wave-commons-entombment.md`.)*
+
+This is a **live defect on `main`**, not a regression: from wave 2 onward the
+commons ring carries more rock than its circumference can hold, and by wave 5 it
+is **3.66× oversubscribed** — 1632 u of rock arc on a 446 u ring. It closes to
+71 u from the map centre and seals the disc inside as a solid annulus with a
+**19.3 u** free pocket; `SHIP_RADIUS` is **16**. A ship caught there is entombed
+for the rest of the match, at full throttle, and **a human player is caught
+exactly as a bot is**. Incidence is **~1.25% of seeds** (measured both arms over
+200 seeds: 3/200 on `main`, at seeds 142/146/147; 2/200 on a0-59's branch, at 15
+and 142 — indistinguishable, and every instance at or beside the map centre).
+
+**Why it needs you and not an engineer.** Everything inside the gameplay lane is
+measured and exhausted. No rearrangement of the rocks can work — a 3.66×
+oversubscribed ring has no corridor at any angle or radius, since passability
+needs `R ≥ 276 u` and the ring is at 71 u. `commonsHoleFraction` is at the end of
+its travel and was never the right knob. `commonsSpokeGap` is an *angular*
+constant, so the linear corridor it promises shrinks with the ring — 84.6 u at
+wave 1, **21.2 u at wave 5** against the 62 u its own doc-comment claimed, a
+false promise now struck. And the sim's own ratified anti-wedge mechanic (the p14
+escape hatch) **fires on 98.4% of the wedge's ticks, cycles its entire
+four-direction search at 68.7 u/s, and still cannot get out**, because the
+pocket's widest clearance is 5.5 u for a 16 u hull. The hatch defeats *pinning*
+against a surface; it cannot defeat *enclosure*, and no knob makes space.
+
+**The three candidates, costed.** *(1)* **Widen the last ring**
+(`WAVE.lastRadiusFraction`) — passability needs ≈ **0.90** against wave 1's 1.00,
+which lands wave 5 on top of wave 1 and **deletes** §2.3's shrinking ring. Named
+only to rule it out. *(2)* **Taper late-wave rock size or count** — the only knob
+with real travel; keeps the ring closing in; costs §5.5's "a payout the player can
+judge" (rock size reads as ore) and changes the field's texture. The *count*
+variant is likely cheaper, because the wave's fixed ore budget makes the survivors
+richer on its own. **My recommendation.** *(3)* **Eject a live ship a landing wave
+would entomb** — touches no rock, so `FIELD_YIELD` and the field's symmetry stay
+exact and almost no golden moves; but it is a new sim rule, and it treats the
+symptom, since the centre stays sealed for anyone who flies in *after* the wave.
+
+**And the scheduling half, which is the part actually blocking work.** a0-59 is a
+one-constant developer ruling ("destroyed ships should drop all their ore") that
+**neither caused this nor worsens it** — its entire behavioural delta against
+`main` is that one constant, verified mechanically. But it re-rolls *which* seeds
+hit the trap, and seed 15 lands inside the 24 that `tests/harness/unstuck.test.ts`
+draws, so PR #436 is red on a defect it did not introduce while `main` is green on
+the same defect purely by luck. **Land a0-59 and brief the wave trap separately,
+or hold a0-59 behind the fix.** Either is fine; the PR cannot settle it itself.
 
 ---
 
