@@ -640,9 +640,72 @@ under it did not. Trust the measured table, not the prose around it.)*
     pins the content of the two edited briefs (the files that mention them cite
     them in comments only).
 
+- **2026-08-16, tenth session — what this one actually did.** One new finding,
+  committed as **`6c34929`**, and it is the one that closes the lane's side of the
+  blocker.
+  - **Re-verified, nothing redone:** local `HEAD` == `origin/…` == `8222a18` at
+    start, `main` still `221a2b1` and **0 commits ahead**, `tsc --noEmit` exits 0,
+    the constant is `1` at `constants.ts:1032`, `drops the whole hold` at
+    `damage.test.ts:83`, both remote DoD greps pass against `FETCH_HEAD`. PR #436
+    open, `mergeStateStatus` UNSTABLE, **still no Director ruling** — the sixth
+    session's escalation comment is still the only comment, still no reply. Did not
+    escalate a fourth time. Did **not** re-derive the wave geometry (three
+    derivations agree; the note says stop).
+    *Gotcha worth keeping:* `git fetch -q origin main` **overwrites `FETCH_HEAD`**,
+    so running it between the two DoD greps makes them fail against `main`. Fetch
+    the branch immediately before each grep, as the DoD lines themselves do.
+  - **`6c34929` sim(a0-59) — COMMENT-ONLY. The finding: the sim carries a ratified
+    anti-wedge mechanic that ten sessions of this note never mentioned, and it is
+    in THIS lane.** `WEDGE_SLIDE_SPEED` / `WEDGE_SLIDE_KICK` / `WEDGE_SLIDE_RUN_S` /
+    `WEDGE_CONTACT_S` (`constants.ts`) and `updateWedgeEscape` (`step.ts`), from
+    developer report p14 — "no ship stays wedged against anything", made in the
+    collision response for every ship and every body. Its doc-comment promised a
+    ship **"can never *stay* pinned, whatever heading its pilot keeps asking for"**.
+    That is a lane-owned knob with a standing guarantee, sitting directly on top of
+    the standing failure, and the honest question was whether the blocker was a
+    one-constant tune after all.
+  - **It is not. Measured over the 12600 ticks of the seed-15 wedge** (slot 2,
+    t = 600–810), reading `Ship.wedgeContactS` / `Ship.wedgeSlide` off the live
+    world with a scratch probe (run, read, **deleted — not committed**):
+
+    | measure | value |
+    |---|---|
+    | ticks in contact with rock | 12599 / 12600 |
+    | ticks armed and sliding | **12402 (98.4%)** |
+    | distinct slide directions | **4 — the whole quarter-turn search, cycling** |
+    | mean hull speed | **68.7 u/s** |
+    | clearance to nearest rock surface | −2.6 u … **+5.5 u**, vs `SHIP_RADIUS` 16 |
+
+    Three consequences. The hull is **not motionless** — it is at cruise for the
+    full 133.5 s, which is exactly why the gate measures *displacement* and not
+    speed, and it retires the intuition that a wedged ship is a stopped ship. The
+    hatch is **not failing to fire**; it runs its complete bounded search — tangent,
+    outward along the normal, other tangent, inward — over and over, as designed.
+    And it **cannot succeed**: max clearance 5.5 u for a 16 u hull means no
+    direction has an exit, so a bigger `WEDGE_SLIDE_KICK` or longer
+    `WEDGE_SLIDE_RUN_S` only reaches the wall sooner.
+  - **The distinction to carry forward: the hatch beats *pinning* (one body, open
+    space behind); it cannot beat *enclosure*. Its search is over directions — it
+    cannot make space.** Struck the false guarantee from `constants.ts` and
+    `step.ts` and wrote the measurement into `docs/wave-commons-entombment.md`,
+    because the in-file promise was itself the argument for spending a session on
+    the knob — the same failure mode as the corridor guarantees corrected in
+    `faa756b` and `3855f6c`, and now the third instance of it in this lane.
+  - **With this, every knob inside the gameplay lane is measured and exhausted:**
+    placement (arithmetic — 3.66× oversubscribed), `commonsHoleFraction` (at its
+    ceiling, and never the right knob), `commonsSpokeGap` (angular, clamped), and
+    the p14 escape hatch (firing, saturated, no exit). **There is nothing left in
+    this lane to try.** That is a strictly stronger statement than previous sessions
+    could make — they had ruled out placement; this one rules out the mechanic whose
+    stated job was to catch precisely this. The remaining candidates are all design
+    rulings, unchanged.
+  - **No code, no constant, no golden.** `git diff -U0` over both sim files,
+    filtered of comment and blank lines, is **empty**; `tsc --noEmit` exits 0;
+    damage / ore-ledger / match / loot-tell green (51 tests).
+
 ## BLOCKERS
 
-*(Still current as of the ninth session, 2026-08-16. Unchanged in substance since
+*(Still current as of the tenth session, 2026-08-16. Unchanged in substance since
 the third; re-confirmed against CI's own log each session since.)*
 
 One: the `unstuck` wedge above — `tests/harness/unstuck.test.ts` is the only red
@@ -666,6 +729,16 @@ fits, and the one knob that would make it passable (`lastRadiusFraction` ≈ 0.9
 would land wave 5 on top of wave 1 and delete GDD §2.3's shrinking ring outright.
 So the choice is **who fixes the wave trap, and when**, not "is a0-59 safe".
 Land a0-59 and brief the wave trap separately, or hold it.
+
+**The tenth session closes the last in-lane avenue** (`6c34929`): the sim's own
+ratified anti-wedge mechanic — the p14 escape hatch, whose stated job is that no
+ship ever stays wedged — **fires on 98.4% of the wedge's ticks, cycles its entire
+four-direction search, moves the hull at 68.7 u/s, and still cannot get out**,
+because the pocket's widest clearance is 5.5 u for a 16 u hull. It defeats pinning
+against a surface; it cannot defeat enclosure. Every knob in this lane is now
+measured and exhausted — placement, `commonsHoleFraction`, `commonsSpokeGap`, the
+hatch. **Nothing remains that is not a design ruling**, which is the same ask as
+before, now with no unexplored alternative left standing behind it.
 
 What I deliberately did NOT do, and why, so the next session does not redo it:
 
