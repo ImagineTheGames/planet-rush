@@ -52,8 +52,10 @@ function looseOre(world: World): number {
 
 /** A killed rival's death-drop, with our collector (slot 0) parked right on top
  *  of the debris ring, empty hold, ready to tractor. The dead ship is slot 1;
- *  its half-hold has just burst into a ring of plain chunks (no `deposit` flag),
- *  exactly as a bot's death would leave them. */
+ *  its hold has just burst into a ring of plain chunks (no `deposit` flag),
+ *  exactly as a bot's death would leave them. All of it since a0-59 — this file
+ *  reads the amount off `DEATH_ORE_DROP_FRACTION`, so it measures the parity and
+ *  not the fraction. */
 function deathDrop(botCargo: number): {
   world: World;
   collector: Ship;
@@ -63,7 +65,7 @@ function deathDrop(botCargo: number): {
   const world = createWorld({ seed: 7, players: PLAYERS });
   const bot = world.ships[1]!;
   bot.cargo = botCargo;
-  killShip(world, bot); // rings its half-hold into world.chunks
+  killShip(world, bot); // rings its hold into world.chunks
 
   const drops = world.chunks.filter((c) => !c.deposit);
   const dropped = looseOre(world);

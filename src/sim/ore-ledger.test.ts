@@ -11,8 +11,10 @@
  *     developer was still losing ore, which is exactly why the second law exists.
  *
  *  2. **Countability (a0-58).** Ore that conserves can still be unreadable. A
- *     death drop used to split a half-hold into whole chunks *plus a remainder* —
- *     3 ore shed one chunk of 1 and one of 0.5 — and the ledger balanced on it
+ *     death drop used to split its share of the hold into whole chunks *plus a
+ *     remainder* — under the half-drop then in force, 3 ore shed one chunk of 1
+ *     and one of 0.5 (a0-59 has since taken the fraction to 1, which removes that
+ *     particular half but not the rule) — and the ledger balanced on it
  *     perfectly. But `Math.floor` guards every readout the player has (the hold
  *     pips, the build wheel's hub, the upgrade wheel), so a 0.5 in a hold is ore
  *     you own, can spend toward, and are told nothing about: *"their ore's don't
