@@ -819,10 +819,81 @@ under it did not. Trust the measured table, not the prose around it.)*
     missing is the ruling itself**, and it is queued in three places (PR #436 body,
     one PR comment, `docs/gdd-conformance.md` §7 Q-6). Re-verify, do not re-measure.
 
+- **2026-08-16, thirteenth session — what this one actually did.** One new
+  finding, committed as **`5081dab`**, and it is a *hazard* rather than another
+  measurement of the same thing. The shipped work is untouched.
+  - **Re-verified, nothing redone:** local `HEAD` == `origin/…` == `3601c43` at
+    start, `main` still `221a2b1`, `tsc --noEmit` exits 0, the constant is `1`,
+    `drops the whole hold` present, both remote DoD greps pass against
+    `FETCH_HEAD`. PR #436 open, UNSTABLE, **still no Director ruling** — the
+    sixth session's comment is still the only one, still no reply. Re-ran the
+    eighth session's one-liner: the whole behavioural sim delta is still **exactly
+    the one constant line**. The only `fail` bucket is `Typecheck, test, build`.
+    Did not escalate again.
+  - **Checked one channel nobody had, and closed it: the repo has ZERO GitHub
+    issues**, open or closed. The issue tracker is not a convention this project
+    uses, so filing the wave trap there would invent one rather than reach anyone.
+    Q-6 remains the right queue. *A fourteenth session need not re-check this.*
+  - **`5081dab` — the finding: the "obvious" in-lane fix is a gate mask.** The
+    defect report has flagged the commons eye-by-**centre** bug since the fourth
+    session as *"the same class of mistake, worth folding in"*, and reasoned that
+    correcting it *"does not open a corridor"*. That was right and badly
+    understated. **Measured, both arms** — `innerRadius + ASTEROID.maxRadius`:
+
+    | build | free pocket (seed 15) | escape bearings blocked | `unstuck` seed 15 |
+    |---|---|---|---|
+    | shipped | 21.6 u | **360/360** | **133.5 s — RED** |
+    | eye by body | 42.1 u | **360/360** | **2.7 s — GREEN** |
+
+    The ring is **100% sealed on both builds**; the correction opens **zero**
+    exits. It doubles the pocket, which lifts the hull's roaming radius above
+    `unstuck.test.ts:107`'s `WEDGE_R = 8` **re-anchor** threshold — so the gate
+    stops accumulating held time. **PR #436's only red check goes green while the
+    player stays entombed in a bigger cell.** Worst wedge on all four decisive
+    seeds falls to 2.4–2.7 s, under the file's own transient canary too.
+  - **Why this mattered enough to break the "do not re-measure" rule.** It is not
+    a re-measurement — it is the first measurement of a *candidate fix*, and it is
+    the edit anyone would reach for first: it is one term, it corrects a real
+    inconsistency with `pocketOuterR` 90 lines up, it is in this lane, and it
+    turns the PR green. A future session would have made it for the right reason
+    and shipped a change that **deletes the only instrument detecting a live
+    player-affecting defect**. Warned at the point of edit in `src/sim/waves.ts`,
+    in the defect report, and in Q-6.
+  - **The transferable lesson, continuing the series.** Sessions 8/9/11 learned
+    *sweep the English*, *sweep every directory*, *link the finding where people
+    look*. This one adds: **a gate's threshold is a definition, not a detector.**
+    `WEDGE_R = 8` does not measure confinement — it measures confinement *tighter
+    than 8 u*. Anything that enlarges the cell past the threshold reads as a fix.
+    Before proposing a change that turns a red gate green, measure the *defect*
+    independently of the gate, or you cannot tell repair from erasure.
+  - **Method worth reusing.** Measure solidity off the **field**, never off a
+    ship: changing geometry re-rolls the match (under the correction slot 2 is
+    137 u from centre when wave 5 lands, never trapped at all), so ship-tracking
+    silently compares two different matches and answers nothing. Ray-cast 360
+    bearings from centre, requiring perpendicular clearance
+    `> rock.radius + SHIP_RADIUS` against every rock out to 300 u. The probe
+    reproduces the known **21.6 u** pocket at seed 15, which is what validates it.
+    *(This ray-cast is stricter than the 232–304/360 figures in the incidence
+    table — whole-path against the cumulative 81-rock field, not wave 5's ring
+    alone. Both say sealed; only this one says completely. Not a contradiction,
+    and it is written down as such in the report.)*
+  - **No value moves.** `git diff -U0 -- src/` filtered of comment and blank lines
+    is **empty**; `tsc --noEmit` exits 0; damage / ore-ledger / match / loot-tell
+    green (51 tests). All four scratch probes deleted, not committed, and
+    `git diff -- src/` verified empty after **each** arm — that empty diff is the
+    proof the restore was exact and is worth checking rather than assuming.
+  - **What a fourteenth session should NOT do.** Everything in the twelfth
+    session's list still holds, plus: do not re-measure the eye-by-body arm (done,
+    both arms, recorded), and do not re-check the issue tracker. **The only thing
+    still missing is the ruling.**
+
 ## BLOCKERS
 
-*(Still current as of the twelfth session, 2026-08-16. Unchanged in substance
-since the third; re-confirmed each session since. The ask is now also queued as
+*(Still current as of the THIRTEENTH session, 2026-08-16. Unchanged in substance
+since the third; re-confirmed each session since. **One hazard added by the
+thirteenth session: the tidiest-looking in-lane fix — reserving the commons eye by
+rock body — turns this PR's only red check GREEN while leaving the ring 360/360
+sealed. Do not mistake it for a repair; see `5081dab`.** The ask is now also queued as
 **Q-6** in `docs/gdd-conformance.md` §7, which outlives PR #436. The A/B beneath
 it is no longer a single measurement — the twelfth session reproduced both arms
 from scratch on the four decisive seeds and every figure matched exactly.)*
