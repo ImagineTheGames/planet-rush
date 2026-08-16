@@ -140,22 +140,28 @@
       "current": "previews/holdFull/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/holdFull/a.wav",
-          "character": "two clamps closing, rising",
-          "params": "src/art/audio/candidates.ts#holdFull.a"
+          "id": "d",
+          "wav": "previews/holdFull/d.wav",
+          "character": "hopper at its stop, twice, dry",
+          "params": "src/art/audio/candidates.ts#holdFull.d"
         },
         {
-          "id": "b",
-          "wav": "previews/holdFull/b.wav",
-          "character": "twin pressure horns, insistent",
-          "params": "src/art/audio/candidates.ts#holdFull.b"
+          "id": "e",
+          "wav": "previews/holdFull/e.wav",
+          "character": "seal taking all it can, twice",
+          "params": "src/art/audio/candidates.ts#holdFull.e"
         },
         {
-          "id": "c",
-          "wav": "previews/holdFull/c.wav",
-          "character": "thin band swept up, twice, no strike",
-          "params": "src/art/audio/candidates.ts#holdFull.c"
+          "id": "f",
+          "wav": "previews/holdFull/f.wav",
+          "character": "load cell reading out, two bands",
+          "params": "src/art/audio/candidates.ts#holdFull.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/holdFull/g.wav",
+          "character": "it says so twice and stops",
+          "params": "src/art/audio/candidates.ts#holdFull.g"
         }
       ]
     },
@@ -486,22 +492,28 @@
       "current": "previews/buildPlaced/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/buildPlaced/a.wav",
-          "character": "ratchet teeth, a dry stepped bite",
-          "params": "src/art/audio/candidates.ts#buildPlaced.a"
+          "id": "d",
+          "wav": "previews/buildPlaced/d.wav",
+          "character": "stepper travel into a stop",
+          "params": "src/art/audio/candidates.ts#buildPlaced.d"
         },
         {
-          "id": "b",
-          "wav": "previews/buildPlaced/b.wav",
-          "character": "clamp seating under load, weight down",
-          "params": "src/art/audio/candidates.ts#buildPlaced.b"
+          "id": "e",
+          "wav": "previews/buildPlaced/e.wav",
+          "character": "vacuum taking up, weight resting",
+          "params": "src/art/audio/candidates.ts#buildPlaced.e"
         },
         {
-          "id": "c",
-          "wav": "previews/buildPlaced/c.wav",
-          "character": "magnetic lock, one narrow band shutting",
-          "params": "src/art/audio/candidates.ts#buildPlaced.c"
+          "id": "f",
+          "wav": "previews/buildPlaced/f.wav",
+          "character": "weld struck and quenched",
+          "params": "src/art/audio/candidates.ts#buildPlaced.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/buildPlaced/g.wav",
+          "character": "one latch, and that is all",
+          "params": "src/art/audio/candidates.ts#buildPlaced.g"
         }
       ]
     },
@@ -512,22 +524,28 @@
       "current": "previews/buildComplete/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/buildComplete/a.wav",
-          "character": "assembly settling, three dry contacts",
-          "params": "src/art/audio/candidates.ts#buildComplete.a"
+          "id": "d",
+          "wav": "previews/buildComplete/d.wav",
+          "character": "three stepper contacts, rising, dry",
+          "params": "src/art/audio/candidates.ts#buildComplete.d"
         },
         {
-          "id": "b",
-          "wav": "previews/buildComplete/b.wav",
-          "character": "pressure system coming up to seat",
-          "params": "src/art/audio/candidates.ts#buildComplete.b"
+          "id": "e",
+          "wav": "previews/buildComplete/e.wav",
+          "character": "system coming up to pressure",
+          "params": "src/art/audio/candidates.ts#buildComplete.e"
         },
         {
-          "id": "c",
-          "wav": "previews/buildComplete/c.wav",
-          "character": "two bands locking, a fifth apart",
-          "params": "src/art/audio/candidates.ts#buildComplete.c"
+          "id": "f",
+          "wav": "previews/buildComplete/f.wav",
+          "character": "two welds, the second holding",
+          "params": "src/art/audio/candidates.ts#buildComplete.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/buildComplete/g.wav",
+          "character": "done: one seated contact",
+          "params": "src/art/audio/candidates.ts#buildComplete.g"
         }
       ]
     },
@@ -538,22 +556,28 @@
       "current": "previews/repairTick/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/repairTick/a.wav",
-          "character": "weld grain, dry and stepped",
-          "params": "src/art/audio/candidates.ts#repairTick.a"
+          "id": "d",
+          "wav": "previews/repairTick/d.wav",
+          "character": "stepper pip, one small travel",
+          "params": "src/art/audio/candidates.ts#repairTick.d"
         },
         {
-          "id": "b",
-          "wav": "previews/repairTick/b.wav",
-          "character": "sealant press, low and closing",
-          "params": "src/art/audio/candidates.ts#repairTick.b"
+          "id": "e",
+          "wav": "previews/repairTick/e.wav",
+          "character": "sealant taking, low and short",
+          "params": "src/art/audio/candidates.ts#repairTick.e"
         },
         {
-          "id": "c",
-          "wav": "previews/repairTick/c.wav",
-          "character": "servo pip, one narrow band",
-          "params": "src/art/audio/candidates.ts#repairTick.c"
+          "id": "f",
+          "wav": "previews/repairTick/f.wav",
+          "character": "spot weld, quenched at once",
+          "params": "src/art/audio/candidates.ts#repairTick.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/repairTick/g.wav",
+          "character": "the quietest tick that still reads",
+          "params": "src/art/audio/candidates.ts#repairTick.g"
         }
       ]
     },
@@ -564,22 +588,28 @@
       "current": "previews/bankOre/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/bankOre/a.wav",
-          "character": "hopper drop, gravel settling",
-          "params": "src/art/audio/candidates.ts#bankOre.a"
+          "id": "d",
+          "wav": "previews/bankOre/d.wav",
+          "character": "conveyor stop, gravel settling",
+          "params": "src/art/audio/candidates.ts#bankOre.d"
         },
         {
-          "id": "b",
-          "wav": "previews/bankOre/b.wav",
-          "character": "vault clamp, low seat",
-          "params": "src/art/audio/candidates.ts#bankOre.b"
+          "id": "e",
+          "wav": "previews/bankOre/e.wav",
+          "character": "vault seating, mass coming down",
+          "params": "src/art/audio/candidates.ts#bankOre.e"
         },
         {
-          "id": "c",
-          "wav": "previews/bankOre/c.wav",
-          "character": "two filtered tones, falling to rest",
-          "params": "src/art/audio/candidates.ts#bankOre.c"
+          "id": "f",
+          "wav": "previews/bankOre/f.wav",
+          "character": "two bands falling to rest",
+          "params": "src/art/audio/candidates.ts#bankOre.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/bankOre/g.wav",
+          "character": "counted, filed, nothing more",
+          "params": "src/art/audio/candidates.ts#bankOre.g"
         }
       ]
     },
@@ -590,22 +620,28 @@
       "current": "previews/upgradeBought/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/upgradeBought/a.wav",
-          "character": "three dry contacts rising, no shine",
-          "params": "src/art/audio/candidates.ts#upgradeBought.a"
+          "id": "d",
+          "wav": "previews/upgradeBought/d.wav",
+          "character": "three stepper contacts, no shine",
+          "params": "src/art/audio/candidates.ts#upgradeBought.d"
         },
         {
-          "id": "b",
-          "wav": "previews/upgradeBought/b.wav",
-          "character": "pressure lifting into a seat, sub under it",
-          "params": "src/art/audio/candidates.ts#upgradeBought.b"
+          "id": "e",
+          "wav": "previews/upgradeBought/e.wav",
+          "character": "pressure lifting, sub under it",
+          "params": "src/art/audio/candidates.ts#upgradeBought.e"
         },
         {
-          "id": "c",
-          "wav": "previews/upgradeBought/c.wav",
-          "character": "three narrow bands rising, metal ringing",
-          "params": "src/art/audio/candidates.ts#upgradeBought.c"
+          "id": "f",
+          "wav": "previews/upgradeBought/f.wav",
+          "character": "three welds rising, each quenched",
+          "params": "src/art/audio/candidates.ts#upgradeBought.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/upgradeBought/g.wav",
+          "character": "up one step, said once",
+          "params": "src/art/audio/candidates.ts#upgradeBought.g"
         }
       ]
     },
@@ -1007,22 +1043,28 @@
       "current": "previews/depositTick/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/depositTick/a.wav",
-          "character": "soft magnetic tick, dry",
-          "params": "src/art/audio/candidates.ts#depositTick.a"
+          "id": "d",
+          "wav": "previews/depositTick/d.wav",
+          "character": "a stepper contact, very small",
+          "params": "src/art/audio/candidates.ts#depositTick.d"
         },
         {
-          "id": "b",
-          "wav": "previews/depositTick/b.wav",
-          "character": "muted felt thud, no edge",
-          "params": "src/art/audio/candidates.ts#depositTick.b"
+          "id": "e",
+          "wav": "previews/depositTick/e.wav",
+          "character": "a vacuum take, no edge on it",
+          "params": "src/art/audio/candidates.ts#depositTick.e"
         },
         {
-          "id": "c",
-          "wav": "previews/depositTick/c.wav",
-          "character": "thin air tick, breath of one chunk",
-          "params": "src/art/audio/candidates.ts#depositTick.c"
+          "id": "f",
+          "wav": "previews/depositTick/f.wav",
+          "character": "a quenched band, one partial",
+          "params": "src/art/audio/candidates.ts#depositTick.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/depositTick/g.wav",
+          "character": "air moving, and a chunk arriving",
+          "params": "src/art/audio/candidates.ts#depositTick.g"
         }
       ]
     },

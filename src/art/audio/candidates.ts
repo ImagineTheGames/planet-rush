@@ -575,48 +575,63 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       },
     ],
   },
-  // The two-note insistence is the tell — that is what says *stop mining, fly
-  // home* rather than *you picked something up* — so all three keep two events
-  // and keep the interval. What changes is what is making them: a is struck
-  // steel with a mass under it, b is two pressure horns, c is a thin band swept
-  // upward twice, which is the only one of the three with no strike in it at all.
+  // The two-event insistence is the tell — that is what says *stop mining, fly
+  // home* rather than *you picked something up* — so all four keep two events and
+  // keep the gap. What changes is what is making them. The denied set answered
+  // "hold full" with struck steel, pressure horns and a swept band; the re-voice
+  // answers it with the machine that is actually full: a hopper that has hit its
+  // stop (`d`), a seal that has taken all it can (`e`), a load cell reading out
+  // (`f`), and a system that simply says so twice and stops (`g`).
   holdFull: {
     label: "Cargo Hold Full",
     context: "Cargo hold reaches capacity — signals 'fly home'",
     current: 'holdFull',
     candidates: [
       {
-        id: 'a',
-        character: "two clamps closing, rising",
+        id: 'd',
+        character: "hopper at its stop, twice, dry",
         spec: {
-          name: 'holdFull_a_clamps',
+          name: 'holdFull_d_hopperStop',
           layers: [
-            ...plate('holdFull_a.one', 700, { gain: 0.34, decay: 0.1, ratios: [1, 2.41], q: 7, curve: 5, punch: 0.5, seed: 30210 }),
-            swept('holdFull_a.oneMass', { wave: 'sine', freq: 120, from: 300, to: 170, q: 2.2, gain: 0.3, attack: 0.001, hold: 0.008, decay: 0.09, curve: 4.5, noiseMix: 0.12, seed: 30213 }),
-            ...plate('holdFull_a.two', 1050, { gain: 0.34, decay: 0.16, ratios: [1, 2.41], q: 8, curve: 5, punch: 0.5, at: 0.13, seed: 30215 }),
-            swept('holdFull_a.twoMass', { wave: 'sine', freq: 150, from: 340, to: 190, q: 2.2, gain: 0.3, attack: 0.001, hold: 0.008, decay: 0.11, curve: 4.5, noiseMix: 0.12, at: 0.13, seed: 30218 }),
+            grains('holdFull_d.one', { freq: 480, grain: 0.0035, gain: 0.34, hold: 0.008, decay: 0.07, curve: 5, punch: 0.5, from: 2000, to: 700, q: 3.2, hp: 220, seed: 60490 }),
+            band('holdFull_d.oneStop', 360, { gain: 0.3, decay: 0.06, q: 4, curve: 6, at: 0.008, seed: 60492 }),
+            grains('holdFull_d.two', { freq: 560, grain: 0.0035, gain: 0.36, hold: 0.01, decay: 0.11, curve: 4.5, punch: 0.5, from: 2400, to: 800, q: 3.2, hp: 240, at: 0.14, seed: 60494 }),
+            band('holdFull_d.twoStop', 420, { gain: 0.32, decay: 0.09, q: 4.5, curve: 5.5, at: 0.148, seed: 60496 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "twin pressure horns, insistent",
+        id: 'e',
+        character: "seal taking all it can, twice",
         spec: {
-          name: 'holdFull_b_pressureHorns',
+          name: 'holdFull_e_sealFull',
           layers: [
-            swept('holdFull_b.one', { wave: 'triangle', freq: 350, from: 500, to: 1400, q: 4.5, gain: 0.36, attack: 0.006, hold: 0.05, decay: 0.09, curve: 3, noiseMix: 0.16, seed: 30220 }),
-            swept('holdFull_b.two', { wave: 'triangle', freq: 525, from: 700, to: 1800, q: 4.5, gain: 0.36, attack: 0.006, hold: 0.05, decay: 0.14, curve: 3, noiseMix: 0.16, at: 0.15, seed: 30221 }),
+            swept('holdFull_e.one', { wave: 'triangle', freq: 260, from: 700, to: 320, q: 3.6, gain: 0.34, attack: 0.005, hold: 0.03, decay: 0.09, curve: 3.4, noiseMix: 0.2, seed: 60500 }),
+            swept('holdFull_e.two', { wave: 'triangle', freq: 330, from: 880, to: 380, q: 3.6, gain: 0.36, attack: 0.005, hold: 0.035, decay: 0.14, curve: 3.2, noiseMix: 0.2, at: 0.15, seed: 60502 }),
+            swept('holdFull_e.mass', { wave: 'sine', freq: 88, from: 240, to: 120, q: 2, gain: 0.26, attack: 0.004, hold: 0.02, decay: 0.16, curve: 3, at: 0.15, seed: 60504 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "thin band swept up, twice, no strike",
+        id: 'f',
+        character: "load cell reading out, two bands",
         spec: {
-          name: 'holdFull_c_sweptBand',
+          name: 'holdFull_f_loadCell',
           layers: [
-            swept('holdFull_c.one', { wave: 'noise', freq: 1500, from: 900, to: 3400, q: 8, gain: 0.9, attack: 0.005, hold: 0.02, decay: 0.08, curve: 3.4, hp: 700, seed: 30230 }),
-            swept('holdFull_c.two', { wave: 'noise', freq: 1800, from: 1100, to: 4200, q: 8, gain: 0.9, attack: 0.005, hold: 0.02, decay: 0.12, curve: 3.4, hp: 800, at: 0.12, seed: 30232 }),
+            band('holdFull_f.read0', 740, { gain: 0.66, decay: 0.09, q: 8, curve: 5, attack: 0.002, hold: 0.008, seed: 60510 }),
+            band('holdFull_f.read1', 990, { gain: 0.7, decay: 0.14, q: 9, curve: 4.5, attack: 0.002, hold: 0.01, at: 0.145, seed: 60512 }),
+            grains('holdFull_f.meter', { freq: 300, grain: 0.006, gain: 0.16, hold: 0.02, decay: 0.1, curve: 4, from: 1100, to: 500, q: 2.6, at: 0.02, seed: 60514 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "it says so twice and stops",
+        spec: {
+          name: 'holdFull_g_saysSoTwice',
+          layers: [
+            band('holdFull_g.one', 640, { gain: 0.5, decay: 0.045, q: 5, curve: 6.5, punch: 0.35, seed: 60520 }),
+            band('holdFull_g.two', 640, { gain: 0.5, decay: 0.075, q: 5, curve: 6, punch: 0.35, at: 0.13, seed: 60522 }),
           ],
         },
       },
@@ -1207,15 +1222,23 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       },
     ],
   },
-  // === STATION / SPEND (a0-01b) =============================================
+  // === STATION / SPEND (a0-60) ==============================================
   //
-  // Ore leaving your hold and coming back as structure. The register here is
-  // *assembly*, not reward — §7.3's own line for `buildPlaced` is "a latch, not
-  // a fanfare", and it generalises across the family. Three shop-floor machines:
+  // Ore leaving your hold and coming back as structure. The register is
+  // *assembly*, not reward — §7.3's own line for `buildPlaced` is "a latch, not a
+  // fanfare", and it generalises across the family. That line is also the whole
+  // of what went wrong with the denied set in one phrase: a fanfare is the retro
+  // idiom, and a shop floor is the modern one. Four machines:
   //
-  //   a  **ratchet and teeth** — stepped dry contact, mechanical, nothing rings
-  //   b  a **hydraulic seat** — pressure released into weight coming to rest
-  //   c  a **magnetic lock** — narrow bands closing, the only offers with metal
+  //   d  **stepper drive** — an electric actuator moving in steps. Fine grain,
+  //      dry, no ring anywhere; the sound of a mechanism doing its travel.
+  //   e  **vacuum seat** — suction taking up, then the weight coming to rest.
+  //      Low, pneumatic, the only offers with mass under them.
+  //   f  **induction weld** — a band heated and then quenched. Metal, but metal
+  //      that is *stopped*: the ring is cut off rather than left to decay out.
+  //   g  **plain confirmation** — the restrained one. One damped contact that
+  //      means "it worked" and adds no commentary. The answer to "too toony"
+  //      that is simply less sound.
   //
   // §8's `buildComplete` / `purchaseConfirm` watch runs through here: those two
   // fire seconds apart off one wheel press. This family stays *low and seated* —
@@ -1227,35 +1250,45 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     current: 'buildPlaced',
     candidates: [
       {
-        id: 'a',
-        character: "ratchet teeth, a dry stepped bite",
+        id: 'd',
+        character: "stepper travel into a stop",
         spec: {
-          name: 'buildPlaced_a_ratchetTeeth',
+          name: 'buildPlaced_d_stepperStop',
           layers: [
-            grains('buildPlaced_a.teeth', { freq: 520, freqEnd: 300, grain: 0.012, gain: 0.4, hold: 0.02, decay: 0.1, curve: 4.5, from: 2600, to: 900, q: 3.2, hp: 200, punch: 0.5, seed: 32000 }),
-            band('buildPlaced_a.pawl', 380, { gain: 0.3, decay: 0.06, q: 4, curve: 5, at: 0.03, seed: 32001 }),
+            grains('buildPlaced_d.travel', { freq: 420, freqEnd: 340, grain: 0.0055, gain: 0.32, hold: 0.02, decay: 0.07, curve: 4, from: 1700, to: 620, q: 3, hp: 180, seed: 60530 }),
+            band('buildPlaced_d.stop', 300, { gain: 0.34, decay: 0.06, q: 4.5, curve: 6, punch: 0.4, at: 0.05, seed: 60532 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "clamp seating under load, weight down",
+        id: 'e',
+        character: "vacuum taking up, weight resting",
         spec: {
-          name: 'buildPlaced_b_clampSeat',
+          name: 'buildPlaced_e_vacuumSeat',
           layers: [
-            swept('buildPlaced_b.clamp', { wave: 'noise', freq: 260, freqEnd: 130, from: 1600, to: 300, q: 2.8, gain: 0.36, attack: 0.001, hold: 0.02, decay: 0.09, curve: 4, punch: 0.6, seed: 32010 }),
-            swept('buildPlaced_b.seat', { wave: 'sine', freq: 104, freqEnd: 86, from: 300, to: 150, q: 2.4, gain: 0.42, attack: 0.002, hold: 0.024, decay: 0.11, curve: 3.4, noiseMix: 0.14, at: 0.035, seed: 32011 }),
+            swept('buildPlaced_e.take', { wave: 'noise', freq: 300, from: 1400, to: 380, q: 2.8, gain: 0.32, attack: 0.004, hold: 0.02, decay: 0.09, curve: 3.4, seed: 60540 }),
+            swept('buildPlaced_e.rest', { wave: 'sine', freq: 84, from: 240, to: 110, q: 2.2, gain: 0.4, attack: 0.002, hold: 0.02, decay: 0.14, curve: 3.6, punch: 0.5, noiseMix: 0.12, at: 0.055, seed: 60542 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "magnetic lock, one narrow band shutting",
+        id: 'f',
+        character: "weld struck and quenched",
         spec: {
-          name: 'buildPlaced_c_magneticLock',
+          name: 'buildPlaced_f_weldQuench',
           layers: [
-            band('buildPlaced_c.approach', 1150, { gain: 0.4, decay: 0.03, q: 6, curve: 6, punch: 0.6, seed: 32020 }),
-            ...plate('buildPlaced_c.lock', 470, { gain: 0.44, decay: 0.13, ratios: [1, 2.41], q: 8, curve: 5, grain: 0.26, at: 0.025, seed: 32022 }),
+            band('buildPlaced_f.weld', 880, { gain: 0.62, decay: 0.05, q: 9, curve: 6, punch: 0.5, seed: 60550 }),
+            band('buildPlaced_f.quench', 520, { gain: 0.4, decay: 0.075, q: 6, curve: 5.5, at: 0.03, seed: 60552 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "one latch, and that is all",
+        spec: {
+          name: 'buildPlaced_g_oneLatch',
+          layers: [
+            band('buildPlaced_g.latch', 560, { gain: 0.48, decay: 0.045, q: 5, curve: 6.5, punch: 0.45, seed: 60560 }),
           ],
         },
       },
@@ -1267,77 +1300,94 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     current: 'buildComplete',
     candidates: [
       {
-        id: 'a',
-        character: "assembly settling, three dry contacts",
+        id: 'd',
+        character: "three stepper contacts, rising, dry",
         spec: {
-          name: 'buildComplete_a_assemblySettle',
+          name: 'buildComplete_d_stepperRun',
           layers: [
-            grains('buildComplete_a.s0', { freq: 420, freqEnd: 340, grain: 0.008, gain: 0.34, hold: 0.015, decay: 0.07, curve: 5, from: 1800, to: 800, q: 3.4, hp: 180, seed: 32030 }),
-            grains('buildComplete_a.s1', { freq: 540, freqEnd: 430, grain: 0.008, gain: 0.32, hold: 0.015, decay: 0.08, curve: 5, from: 2200, to: 950, q: 3.4, hp: 180, at: 0.075, seed: 32031 }),
-            grains('buildComplete_a.s2', { freq: 660, freqEnd: 520, grain: 0.007, gain: 0.3, hold: 0.02, decay: 0.16, curve: 4, from: 2600, to: 1100, q: 3.6, hp: 200, at: 0.15, seed: 32032 }),
+            grains('buildComplete_d.s0', { freq: 340, grain: 0.004, gain: 0.28, hold: 0.008, decay: 0.05, curve: 5, from: 1300, to: 520, q: 3, hp: 160, seed: 60570 }),
+            grains('buildComplete_d.s1', { freq: 430, grain: 0.004, gain: 0.3, hold: 0.008, decay: 0.055, curve: 5, from: 1600, to: 620, q: 3, hp: 180, at: 0.075, seed: 60572 }),
+            grains('buildComplete_d.s2', { freq: 540, grain: 0.004, gain: 0.32, hold: 0.012, decay: 0.1, curve: 4.5, from: 2000, to: 760, q: 3.2, hp: 200, at: 0.15, seed: 60574 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "pressure system coming up to seat",
+        id: 'e',
+        character: "system coming up to pressure",
         spec: {
-          name: 'buildComplete_b_pressureSeat',
+          name: 'buildComplete_e_upToPressure',
           layers: [
-            swept('buildComplete_b.rise', { wave: 'triangle', freq: 196, from: 340, to: 1500, q: 3.6, gain: 0.34, attack: 0.02, hold: 0.09, decay: 0.06, curve: 2.4, noiseMix: 0.18, seed: 32040 }),
-            swept('buildComplete_b.seat', { wave: 'triangle', freq: 294, from: 1400, to: 520, q: 4.2, gain: 0.4, attack: 0.004, hold: 0.03, decay: 0.24, curve: 3, punch: 0.4, noiseMix: 0.12, at: 0.14, seed: 32041 }),
+            swept('buildComplete_e.rise', { wave: 'noise', freq: 220, freqEnd: 300, from: 380, to: 1500, q: 3, gain: 0.3, attack: 0.03, hold: 0.08, decay: 0.06, curve: 2.4, seed: 60580 }),
+            swept('buildComplete_e.seat', { wave: 'sine', freq: 104, freqEnd: 88, from: 300, to: 140, q: 2.4, gain: 0.42, attack: 0.003, hold: 0.024, decay: 0.2, curve: 3.2, punch: 0.5, noiseMix: 0.12, at: 0.17, seed: 60582 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "two bands locking, a fifth apart",
+        id: 'f',
+        character: "two welds, the second holding",
         spec: {
-          name: 'buildComplete_c_bandsLock',
+          name: 'buildComplete_f_twoWelds',
           layers: [
-            band('buildComplete_c.n0', 392, { gain: 0.92, decay: 0.14, q: 6.5, curve: 4.5, attack: 0.002, seed: 32050 }),
-            ...plate('buildComplete_c.n1', 588, { gain: 0.5, decay: 0.26, ratios: [1, 2.41], q: 7, curve: 4, grain: 0.24, edge: 0.8, at: 0.11, seed: 32052 }),
+            band('buildComplete_f.w0', 660, { gain: 0.6, decay: 0.06, q: 8, curve: 5.5, punch: 0.4, seed: 60590 }),
+            band('buildComplete_f.w1', 880, { gain: 0.64, decay: 0.16, q: 9.5, curve: 4.5, punch: 0.35, at: 0.13, seed: 60592 }),
+            swept('buildComplete_f.hold', { wave: 'triangle', freq: 220, from: 620, to: 300, q: 4, gain: 0.22, attack: 0.006, hold: 0.03, decay: 0.16, curve: 3, noiseMix: 0.2, at: 0.13, seed: 60594 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "done: one seated contact",
+        spec: {
+          name: 'buildComplete_g_done',
+          layers: [
+            swept('buildComplete_g.done', { wave: 'triangle', freq: 300, from: 900, to: 380, q: 4.2, gain: 0.38, attack: 0.004, hold: 0.03, decay: 0.13, curve: 3.6, punch: 0.35, noiseMix: 0.18, seed: 60600 }),
           ],
         },
       },
     ],
   },
   repairTick: {
-    // §7.3: the old context here — "noticed mostly when it stops" — described the
-    // retired repair *channel*, which a hit could interrupt. Repair has been a
-    // discrete purchase since §2.5 was amended (2026-07-27); nothing interrupts it,
-    // so the line was describing a mechanic that no longer exists.
     label: "Repair Tick",
     context: "A soft tick as a repair purchase is applied to a structure.",
     current: 'repairTick',
     candidates: [
       {
-        id: 'a',
-        character: "weld grain, dry and stepped",
+        id: 'd',
+        character: "stepper pip, one small travel",
         spec: {
-          name: 'repairTick_a_weldGrain',
+          name: 'repairTick_d_stepperPip',
           layers: [
-            grains('repairTick_a.weld', { freq: 480, freqEnd: 360, grain: 0.0035, gain: 0.26, hold: 0.014, decay: 0.09, curve: 4, from: 1900, to: 700, q: 3, hp: 200, seed: 32060 }),
+            grains('repairTick_d.step', { freq: 520, grain: 0.003, gain: 0.24, hold: 0.004, decay: 0.035, curve: 5.5, from: 1500, to: 620, q: 3, hp: 240, seed: 60610 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "sealant press, low and closing",
+        id: 'e',
+        character: "sealant taking, low and short",
         spec: {
-          name: 'repairTick_b_sealantPress',
+          name: 'repairTick_e_sealantTake',
           layers: [
-            swept('repairTick_b.press', { wave: 'triangle', freq: 168, from: 900, to: 240, q: 3.4, gain: 0.3, attack: 0.004, hold: 0.02, decay: 0.1, curve: 3.4, noiseMix: 0.2, seed: 32070 }),
+            swept('repairTick_e.take', { wave: 'sine', freq: 176, from: 520, to: 220, q: 2.6, gain: 0.26, attack: 0.002, hold: 0.006, decay: 0.05, curve: 4.5, noiseMix: 0.16, seed: 60620 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "servo pip, one narrow band",
+        id: 'f',
+        character: "spot weld, quenched at once",
         spec: {
-          name: 'repairTick_c_servoPip',
+          name: 'repairTick_f_spotWeld',
           layers: [
-            band('repairTick_c.pip', 940, { gain: 0.85, decay: 0.1, q: 9, curve: 5, attack: 0.002, hold: 0.005, seed: 32080 }),
+            band('repairTick_f.spot', 760, { gain: 0.5, decay: 0.04, q: 7, curve: 6, punch: 0.35, seed: 60630 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "the quietest tick that still reads",
+        spec: {
+          name: 'repairTick_g_quietest',
+          layers: [
+            band('repairTick_g.tick', 440, { gain: 0.34, decay: 0.028, q: 4, curve: 7, seed: 60640 }),
           ],
         },
       },
@@ -1349,35 +1399,46 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     current: 'bankOre',
     candidates: [
       {
-        id: 'a',
-        character: "hopper drop, gravel settling",
+        id: 'd',
+        character: "conveyor stop, gravel settling",
         spec: {
-          name: 'bankOre_a_hopper',
+          name: 'bankOre_d_conveyorStop',
           layers: [
-            band('bankOre_a.drop', 560, { gain: 0.34, decay: 0.07, q: 5, curve: 5.5, punch: 0.6, seed: 30240 }),
-            grains('bankOre_a.gravel', { freq: 240, freqEnd: 170, grain: 0.014, gain: 0.22, hold: 0.02, decay: 0.19, curve: 3.6, from: 1400, to: 420, q: 2.6, hp: 120, at: 0.03, seed: 30241 }),
+            grains('bankOre_d.pour', { freq: 500, freqEnd: 300, grain: 0.0035, gain: 0.34, hold: 0.03, decay: 0.16, curve: 3.2, from: 2200, to: 560, q: 2.8, hp: 200, seed: 60650 }),
+            band('bankOre_d.stop', 260, { gain: 0.3, decay: 0.09, q: 4, curve: 5.5, at: 0.09, seed: 60652 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "vault clamp, low seat",
+        id: 'e',
+        character: "vault seating, mass coming down",
         spec: {
-          name: 'bankOre_b_vaultClamp',
+          name: 'bankOre_e_vaultSeat',
           layers: [
-            swept('bankOre_b.clamp', { wave: 'triangle', freq: 220, freqEnd: 180, from: 1600, to: 320, q: 3.6, gain: 0.42, attack: 0.0015, hold: 0.012, decay: 0.13, curve: 4.5, punch: 0.5, noiseMix: 0.2, seed: 30250 }),
-            swept('bankOre_b.seat', { wave: 'sine', freq: 88, from: 200, q: 2, gain: 0.24, attack: 0.003, hold: 0.014, decay: 0.16, curve: 3, at: 0.07, seed: 30252 }),
+            swept('bankOre_e.drop', { wave: 'sine', freq: 150, freqEnd: 92, from: 460, to: 160, q: 2.4, gain: 0.42, attack: 0.002, hold: 0.02, decay: 0.18, curve: 3.4, punch: 0.55, noiseMix: 0.12, seed: 60660 }),
+            swept('bankOre_e.settle', { wave: 'noise', freq: 210, from: 700, to: 260, q: 2.6, gain: 0.22, attack: 0.006, hold: 0.02, decay: 0.14, curve: 3, at: 0.06, seed: 60662 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "two filtered tones, falling to rest",
+        id: 'f',
+        character: "two bands falling to rest",
         spec: {
-          name: 'bankOre_c_fallingPair',
+          name: 'bankOre_f_fallingBands',
           layers: [
-            ...plate('bankOre_c.high', 780, { gain: 0.28, decay: 0.12, ratios: [1, 2.41], q: 9, curve: 5, punch: 0.4, seed: 30260 }),
-            ...plate('bankOre_c.low', 520, { gain: 0.28, decay: 0.24, ratios: [1, 2.41], q: 9, curve: 4.5, at: 0.09, seed: 30263 }),
+            band('bankOre_f.b0', 620, { gain: 0.6, decay: 0.08, q: 7.5, curve: 5, punch: 0.35, seed: 60670 }),
+            band('bankOre_f.b1', 415, { gain: 0.56, decay: 0.17, q: 8, curve: 4.5, at: 0.075, seed: 60672 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "counted, filed, nothing more",
+        spec: {
+          name: 'bankOre_g_counted',
+          layers: [
+            grains('bankOre_g.count', { freq: 380, grain: 0.0045, gain: 0.26, hold: 0.008, decay: 0.06, curve: 5, from: 1200, to: 460, q: 2.8, hp: 150, seed: 60680 }),
+            swept('bankOre_g.file', { wave: 'sine', freq: 110, from: 300, to: 140, q: 2, gain: 0.3, attack: 0.003, hold: 0.014, decay: 0.1, curve: 3.6, at: 0.045, seed: 60682 }),
           ],
         },
       },
@@ -1388,43 +1449,55 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     context: "An upgrade purchased — the brightest confirmation in the bank.",
     current: 'upgradeBought',
     candidates: [
-      // §7.3 asks for **three notes rising** here and it is kept in all three, so
-      // what the developer is choosing is only the material carrying them. The
-      // old offers were an `arpMul` arpeggio, a bell stack and a saw glissando —
-      // three names for "sparkle", which §4.7 as amended retires by name.
+      // "The brightest confirmation in the bank" is a ranking inside this family,
+      // not permission to sparkle: §4.7 register 2 is that the interface does not
+      // congratulate. So brightness here is *bandwidth* — a higher corner, a
+      // narrower band, a faster contact — and never a chime, an arpeggio or a
+      // major third. All four are three rising events, because what the player is
+      // being told is that a thing went UP.
       {
-        id: 'a',
-        character: "three dry contacts rising, no shine",
+        id: 'd',
+        character: "three stepper contacts, no shine",
         spec: {
-          name: 'upgradeBought_a_dryContacts',
+          name: 'upgradeBought_d_threeSteps',
           layers: [
-            grains('upgradeBought_a.n0', { freq: 560, freqEnd: 440, grain: 0.005, gain: 0.34, hold: 0.014, decay: 0.08, curve: 5, from: 2400, to: 900, q: 3.4, hp: 240, seed: 32090 }),
-            grains('upgradeBought_a.n1', { freq: 740, freqEnd: 580, grain: 0.005, gain: 0.32, hold: 0.014, decay: 0.09, curve: 5, from: 3000, to: 1100, q: 3.4, hp: 260, at: 0.08, seed: 32091 }),
-            grains('upgradeBought_a.n2', { freq: 980, freqEnd: 760, grain: 0.004, gain: 0.3, hold: 0.02, decay: 0.2, curve: 4, from: 3800, to: 1400, q: 3.6, hp: 300, at: 0.16, seed: 32092 }),
+            grains('upgradeBought_d.s0', { freq: 620, grain: 0.0035, gain: 0.3, hold: 0.006, decay: 0.045, curve: 5, from: 2200, to: 800, q: 3.2, hp: 300, seed: 60690 }),
+            grains('upgradeBought_d.s1', { freq: 780, grain: 0.0032, gain: 0.32, hold: 0.006, decay: 0.05, curve: 5, from: 2800, to: 950, q: 3.2, hp: 340, at: 0.07, seed: 60692 }),
+            grains('upgradeBought_d.s2', { freq: 980, grain: 0.003, gain: 0.34, hold: 0.01, decay: 0.11, curve: 4.5, from: 3400, to: 1200, q: 3.4, hp: 400, at: 0.14, seed: 60694 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "pressure lifting into a seat, sub under it",
+        id: 'e',
+        character: "pressure lifting, sub under it",
         spec: {
-          name: 'upgradeBought_b_pressureLift',
+          name: 'upgradeBought_e_pressureLift',
           layers: [
-            swept('upgradeBought_b.lift', { wave: 'triangle', freq: 262, from: 420, to: 2600, q: 4, gain: 0.34, attack: 0.02, hold: 0.13, decay: 0.05, curve: 2.4, noiseMix: 0.16, seed: 32100 }),
-            swept('upgradeBought_b.seat', { wave: 'triangle', freq: 392, from: 2400, to: 700, q: 4.4, gain: 0.4, attack: 0.004, hold: 0.03, decay: 0.24, curve: 3, punch: 0.4, noiseMix: 0.12, at: 0.17, seed: 32101 }),
-            swept('upgradeBought_b.sub', { wave: 'sine', freq: 98, from: 260, q: 1.8, gain: 0.22, attack: 0.006, hold: 0.05, decay: 0.2, curve: 2.6, at: 0.02, seed: 32102 }),
+            swept('upgradeBought_e.lift', { wave: 'triangle', freq: 330, freqEnd: 392, from: 700, to: 2600, q: 4.5, gain: 0.36, attack: 0.02, hold: 0.07, decay: 0.1, curve: 2.6, noiseMix: 0.16, seed: 60700 }),
+            swept('upgradeBought_e.seat', { wave: 'sine', freq: 98, from: 280, to: 140, q: 2.2, gain: 0.34, attack: 0.003, hold: 0.03, decay: 0.2, curve: 3, punch: 0.45, at: 0.15, seed: 60702 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "three narrow bands rising, metal ringing",
+        id: 'f',
+        character: "three welds rising, each quenched",
         spec: {
-          name: 'upgradeBought_c_bandsRising',
+          name: 'upgradeBought_f_threeWelds',
           layers: [
-            band('upgradeBought_c.n0', 523, { gain: 0.42, decay: 0.1, q: 10, curve: 5, attack: 0.002, seed: 32110 }),
-            band('upgradeBought_c.n1', 698, { gain: 0.4, decay: 0.12, q: 10.5, curve: 4.6, attack: 0.002, at: 0.08, seed: 32111 }),
-            ...plate('upgradeBought_c.n2', 880, { gain: 0.46, decay: 0.28, ratios: [1, 2.41], q: 11, curve: 4, grain: 0.2, edge: 0.7, at: 0.16, seed: 32113 }),
+            band('upgradeBought_f.w0', 700, { gain: 0.56, decay: 0.06, q: 8, curve: 5.5, punch: 0.35, seed: 60710 }),
+            band('upgradeBought_f.w1', 880, { gain: 0.58, decay: 0.07, q: 8.5, curve: 5, punch: 0.35, at: 0.075, seed: 60712 }),
+            band('upgradeBought_f.w2', 1100, { gain: 0.62, decay: 0.19, q: 9.5, curve: 4.2, punch: 0.35, at: 0.15, seed: 60714 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "up one step, said once",
+        spec: {
+          name: 'upgradeBought_g_upOneStep',
+          layers: [
+            swept('upgradeBought_g.step', { wave: 'triangle', freq: 392, from: 1100, to: 480, q: 4.4, gain: 0.38, attack: 0.004, hold: 0.03, decay: 0.15, curve: 3.4, punch: 0.35, noiseMix: 0.16, seed: 60720 }),
+            band('upgradeBought_g.mark', 784, { gain: 0.4, decay: 0.09, q: 7, curve: 5, at: 0.09, seed: 60722 }),
           ],
         },
       },
@@ -2248,37 +2321,51 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     ],
   },
   depositTick: {
+    // One tick per chunk on a deposit flight, so this fires in bursts and the
+    // ranking that matters is which offer disappears best. All four are the
+    // station family's materials at a tenth of the size: a stepper contact, a
+    // vacuum take, a quenched band, and one that is barely there at all.
     label: "Deposit Tick",
     context: "One ore chunk settling into the bank on a deposit flight — soft & falling, one tick per chunk.",
     current: 'depositTick',
     candidates: [
       {
-        id: 'a',
-        character: "soft magnetic tick, dry",
+        id: 'd',
+        character: "a stepper contact, very small",
         spec: {
-          name: 'depositTick_a_magneticTick',
+          name: 'depositTick_d_smallStep',
           layers: [
-            ...plate('depositTick_a.tick', 520, { gain: 0.17, decay: 0.045, ratios: [1, 2.41], q: 7, curve: 6, punch: 0.35, edge: 0.5, seed: 30270 }),
+            grains('depositTick_d.step', { freq: 440, grain: 0.0028, gain: 0.2, hold: 0.003, decay: 0.032, curve: 6, from: 1300, to: 520, q: 2.8, hp: 200, seed: 60730 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "muted felt thud, no edge",
+        id: 'e',
+        character: "a vacuum take, no edge on it",
         spec: {
-          name: 'depositTick_b_feltThud',
+          name: 'depositTick_e_vacuumTake',
           layers: [
-            swept('depositTick_b.thud', { wave: 'sine', freq: 210, freqEnd: 170, from: 420, to: 220, q: 2.2, gain: 0.24, attack: 0.002, hold: 0.006, decay: 0.06, curve: 4.5, noiseMix: 0.14, seed: 30275 }),
+            swept('depositTick_e.take', { wave: 'sine', freq: 190, freqEnd: 160, from: 400, to: 200, q: 2.2, gain: 0.22, attack: 0.003, hold: 0.005, decay: 0.05, curve: 4.5, noiseMix: 0.16, seed: 60740 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "thin air tick, breath of one chunk",
+        id: 'f',
+        character: "a quenched band, one partial",
         spec: {
-          name: 'depositTick_c_airTick',
+          name: 'depositTick_f_quenchedBand',
           layers: [
-            grains('depositTick_c.air', { freq: 620, grain: 0.0035, gain: 0.5, hold: 0.003, decay: 0.05, curve: 5, from: 1600, to: 700, q: 2.4, hp: 520, seed: 30280 }),
+            band('depositTick_f.band', 580, { gain: 0.4, decay: 0.038, q: 6.5, curve: 6, seed: 60750 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "air moving, and a chunk arriving",
+        spec: {
+          name: 'depositTick_g_airArrive',
+          layers: [
+            grains('depositTick_g.air', { freq: 700, grain: 0.0022, gain: 0.34, hold: 0.002, decay: 0.04, curve: 5.5, from: 1800, to: 760, q: 2.4, hp: 460, seed: 60760 }),
           ],
         },
       },

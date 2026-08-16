@@ -70,13 +70,13 @@ this brief, with the reason in the note).
 | thruster | done | four loop materials; none sweeps a corner inside the body (that wraps to a 2.5 Hz wobble) |
 | respawnBeep | done | four that stay a *clock* — hard, narrow, above spawnPulse (§8 pair) |
 | respawnGo | done | the launch as release, catapult, opening band, clamps letting go |
-| holdFull | todo |  |
-| buildPlaced | todo |  |
-| buildComplete | todo |  |
-| repairTick | todo |  |
-| bankOre | todo |  |
-| upgradeBought | todo |  |
-| depositTick | todo |  |
+| holdFull | done | the two-event insistence kept; four machines that are *full* — hopper stop, seal, load cell, said-twice |
+| buildPlaced | done | stepper travel / vacuum seat / weld quench / one latch — a latch, never a fanfare (§7.3) |
+| buildComplete | done | three rising contacts, four ways; stays low and seated, clear of purchaseConfirm (§8) |
+| repairTick | done | four small ones — the ranking that matters is which disappears best |
+| bankOre | done | conveyor stop / vault seat / falling bands / counted-and-filed |
+| upgradeBought | done | brightest *in this family* means bandwidth, not a chime — no arpeggio, no major third |
+| depositTick | done | the station materials at a tenth of the size; fires in bursts, so all four stay tiny |
 | pressTick | todo |  |
 | purchaseConfirm | todo |  |
 | rejectBuzz | todo |  |
