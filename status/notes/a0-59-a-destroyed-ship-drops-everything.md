@@ -761,12 +761,71 @@ under it did not. Trust the measured table, not the prose around it.)*
     test pins either edited section (`tests/codex/tone-mirror.test.ts` and the
     perf gates cite G-4/G-5/T-4 in comments only, none of which moved).
 
+- **2026-08-16, twelfth session — what this one actually did.** One new finding,
+  committed as **`a50a300`**. The shipped work is untouched and the blocker is
+  unchanged.
+  - **Re-verified, nothing redone:** local `HEAD` == `origin/…` == `9dced54` at
+    start, `main` still `221a2b1` and **0 commits ahead** (so the sixth session's
+    merge is still current and the A/B is not stale), `tsc --noEmit` exits 0, the
+    constant is `1` at `constants.ts:1032`, `drops the whole hold` at
+    `damage.test.ts:83`, both remote DoD greps pass against `FETCH_HEAD`. PR #436
+    open, UNSTABLE, **still no Director ruling** — the sixth session's comment is
+    still the only one, still no reply. Did not escalate again. Re-ran the
+    one-liner from the eighth session: the whole behavioural sim delta is still
+    **exactly the one constant line**.
+  - Ran `unstuck` locally: still seed 15, `foreman` slot 2, **133.5 s at
+    (1204,1195)**. CI's log was unavailable this session (`gh` refuses logs while
+    the run is `in_progress`), so the local run is the evidence — identical to
+    sessions three through eleven. The *only* `fail` bucket on the PR is
+    `Typecheck, test, build`; perf gate and the reported Playwright shards pass.
+  - **`a50a300` — the finding: the decisive A/B had been measured exactly once,
+    and never independently confirmed.** Everything the Director is being asked to
+    rule on reduces to one claim — *`main` carries the entombment defect and a0-59
+    does not worsen it* — and that claim rested entirely on the third session's
+    200-seed sweep. The third session also records that the table it *replaced*
+    was wrong, so a single unconfirmed measurement was the weakest link in the
+    whole argument. **Confirmed it, and cheaply:** the claim is about *which named
+    seeds wedge on which build*, which is four matches per arm, not two hundred.
+    Copied `worstWedge` verbatim, ran seeds 15/142/146/147 at both values of the
+    constant. **Every figure reproduces to the tenth of a second and the unit of
+    position** — 0.5: 142 (40.9 s), 146 (58.8 s), 147 (95.9 s), 15 clean; 1: 15
+    (133.5 s), 142 (12.3 s), 146/147 clean. The sweep is now corroborated rather
+    than merely asserted.
+  - **The new observation, which is the part worth keeping.** The *behaviours*
+    differ across the two arms — `haul` vs `defend`, `last-stand`, `fix-base` —
+    while the *positions* do not (every wedge at or beside 1200,1200). **The trap
+    is indifferent to what the ship was trying to do.** It catches whatever is at
+    the centre when wave 5 lands, regardless of intent. That is the cleanest
+    single piece of evidence that this is map geometry and not bot logic, and it
+    is stronger than the geometry derivation because it needs no arithmetic to
+    read. Written into the report.
+  - **Also recorded a trap that cost time:** vitest's `include` is
+    `tests/**/*.test.ts, src/**/*.test.ts`, so a scratch probe at the repo root is
+    **silently reported as "No test files found"** rather than as an error. Put
+    scratch probes under `tests/harness/`.
+  - **The 0.5 arm needs a real edit** — `Tunable<T> = T`, so the constant is a
+    plain `const` and cannot be overridden at runtime. Flip it, measure, flip it
+    back; `git diff` over `src/` must return empty afterwards (it does — that
+    empty diff is itself the proof the restore was exact, and is worth checking
+    rather than assuming).
+  - **No code, no constant, no test, no golden.** `git diff --numstat` for the
+    commit is `docs/wave-commons-entombment.md` alone; `tsc --noEmit` exits 0;
+    damage / ore-ledger / match / loot-tell green (51 tests). The scratch probe
+    was deleted, not committed.
+  - **What a thirteenth session should NOT do.** The A/B is now measured twice
+    independently and agrees; the geometry is derived four times and agrees; the
+    sweep is closed on all three axes and every in-lane knob is exhausted. There
+    is no measurement left that would change the ask. **The only thing still
+    missing is the ruling itself**, and it is queued in three places (PR #436 body,
+    one PR comment, `docs/gdd-conformance.md` §7 Q-6). Re-verify, do not re-measure.
+
 ## BLOCKERS
 
-*(Still current as of the eleventh session, 2026-08-16. Unchanged in substance
-since the third; re-confirmed against CI's own log each session since. The ask is
-now also queued as **Q-6** in `docs/gdd-conformance.md` §7, which outlives PR
-#436.)*
+*(Still current as of the twelfth session, 2026-08-16. Unchanged in substance
+since the third; re-confirmed each session since. The ask is now also queued as
+**Q-6** in `docs/gdd-conformance.md` §7, which outlives PR #436. The A/B beneath
+it is no longer a single measurement — the twelfth session reproduced both arms
+from scratch on the four decisive seeds and every figure matched exactly.)*
 
 One: the `unstuck` wedge above — `tests/harness/unstuck.test.ts` is the only red
 test, and it is the only thing keeping the PR's "Typecheck, test, build" check
