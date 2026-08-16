@@ -488,7 +488,68 @@ under it did not. Trust the measured table, not the prose around it.)*
     much came back as field chunks. The divergent-death drift that passage
     documents is a bigger accounting hole than it claims, on both builds.
 
+- **2026-08-16, eighth session — what this one actually did.** One new finding,
+  committed; the blocker is untouched and unchanged.
+  - **Re-verified from scratch, trusting nothing in this note:** local `HEAD` ==
+    `origin/…` == `b250ff2` at start, `main` still `221a2b1` and **0 commits ahead**
+    (the sixth session's merge still current), `tsc --noEmit` exits 0, the constant
+    is `1` at `constants.ts:1032`, `drops the whole hold` present at
+    `damage.test.ts:83` and exact (N = 1..9, `toBe`, `deathLoss === 0`), both remote
+    DoD greps pass against `FETCH_HEAD`. Pulled CI's own log for `b250ff2`:
+    **1 failed | 5541 passed (5542)**, the single failure `unstuck` seed 15,
+    `foreman` slot 2, **133.5 s at (1204,1195)** — byte-identical to sessions three
+    through six. PR #436 still open, still **no Director ruling**; the sixth
+    session's escalation comment is still the only comment and still has no reply.
+  - **Did NOT re-measure the wedge or re-derive the geometry.** Three independent
+    derivations agree and the note says stop. Did not escalate a second time —
+    the seventh session's reasoning holds: one unanswered ping is a signal, two is
+    noise. The new finding below is not about the blocker, so it went into the PR
+    **body**, not a comment.
+  - **`6e19eea` docs(a0-59) — the new finding. The sweep was NOT clean in this
+    lane's own scope, and had been recorded as clean since the second session.**
+    Two sites still asserted the half-drop:
+    1. **`docs/gdd-conformance.md`, the §2.7 table** — *"Half the held ore drops
+       where you exploded"*, verdict **SHIPPED**, evidence `constants.ts:981`. The
+       **§2.3** row two tables up was corrected in `586f479` and GDD §2.7's own
+       prose was amended with it; only this row was left behind. Its line reference
+       was stale as well (`:981` → `:1032`).
+    2. **`content/codex/codex-systems.json`, `sys-collection-field`** — *"…risk
+       hauling a fat hold through contested space where a death spills **half** of
+       it."* `586f479` corrected `sys-death-debris`, the entry *about* death, and
+       its pinned numeric fact; this sentence is in the entry about **banking**.
+       Player-facing copy, and now simply untrue.
+  - **Why both survived seven sessions, which is the transferable part.** Every
+    prior sweep was anchored on the identifier — `grep DEATH_ORE_DROP_FRACTION`,
+    which finds nothing here because **neither site names the constant**. Both say
+    "half" in prose about a *different* subject (a conformance verdict; a banking
+    tip), so a topic-anchored search misses them too. **A constant sweep has to be
+    run twice: once on the identifier, once on the English.** The grep that finally
+    caught them: `grep -rniE "drops? (half|all)|half (the|its|your) (held )?(hold|
+    ore)|whole hold|entire hold" docs/ content/ GDD.md` with the known-good
+    amendment lines filtered out, then eyeballing every remaining `half` in
+    `src/sim/ docs/ content/ GDD.md tests/` (about 30 hits, all unrelated geometry
+    half-widths and "the other half of the answer" idioms — the scope is now
+    genuinely clean, checked line by line rather than asserted).
+  - **The conformance row is the more serious of the two by some way**, and worth
+    naming as a class. It is not a stale comment — it is a **conformance table
+    certifying, as SHIPPED, a behaviour the shipped code does not have**, in the
+    one document a future agent opens to ask "what does this build actually do?"
+    That is not a failure to record the ruling; it is affirmative in-repo evidence
+    *for reverting it*, which is exactly the hazard the brief names ("a constant
+    that silently contradicts the design doc is how the next agent restores it").
+    The four flagged out-of-lane comments are a weaker version of the same thing.
+  - `docs/design-amendments.md`'s sweep section now **records both rather than
+    quietly absorbing them** — the paragraph that opened *"the sweep is clean in
+    `src/sim/` and `docs/`"* was false and is corrected in place, with the failure
+    mode written down so the next sweep of any constant looks for the prose too.
+  - **No code, no constant, no golden.** `tsc` clean; codex, damage, ore-ledger,
+    match, loot-tell and loot-ore-parity green (130 tests); full suite re-run
+    after the commit and unchanged apart from the standing `unstuck` failure.
+
 ## BLOCKERS
+
+*(Still current as of the eighth session, 2026-08-16. Unchanged in substance since
+the third; re-confirmed against CI's own log each session since.)*
 
 One: the `unstuck` wedge above — `tests/harness/unstuck.test.ts` is the only red
 test, and it is the only thing keeping the PR's "Typecheck, test, build" check
