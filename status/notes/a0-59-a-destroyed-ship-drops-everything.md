@@ -122,19 +122,30 @@ seed 1 → 32.1 u, 232/360 blocked · seed 7 → 27.7 u, 264/360 · seed 15 → 
 player caught at the centre would be entombed the same way.**
 
 **a0-59 did not cause it.** The central geometry is byte-identical on the base
-(same positions, radii, overlap; only entity ids differ). Wedge rates:
+(same positions, radii, overlap; only entity ids differ).
 
-| build | wedges | seeds |
-|---|---|---|
-| a0-58 tip | 3 (seeds 142, 146, 147) | 280 |
-| this branch | 1 (seed 15) | 96 |
+**RE-MEASURED 2026-08-16 on a COMMON seed pool — and the earlier rate in this note
+was wrong, low by 4–6×.** The two builds differ by exactly one constant now that
+a0-58 has merged to `main`, so the A/B is that constant flipped on this tree and
+the same seeds 1–48 run through `unstuck`'s own wedge probe both ways:
 
-≈1.1% vs ≈1.0% — statistically identical. All four sit inside wave 5's central
-structure (which spans 21.6–112 u from centre): three in the pocket at
-(1202,1193), (1198,1193), (1204,1195), one at (1200,1308), 108 u out and inside
-the solid annulus. The gate samples 24 seeds, so at ~1% it is a coin flip on any
-sim change. Third under-powered standing gate this branch turned up; the only one
-sitting on a real bug.
+| build | wedges in seeds 1–48 | which | rate |
+|---|---|---|---|
+| `main` (fraction 0.5) | 2 | 30, 40 | 4.2% |
+| this branch (fraction 1) | 3 | 15, 23, 40 | 6.3% |
+
+**Seed 40 wedges on BOTH.** Every wedge in both columns sits within ~30 u of the
+map centre (1200,1200) — (1192,1202), (1183,1213), (1203,1192), (1188,1223),
+(1197,1223) — i.e. inside wave 5's central structure, on both builds. Spot-checked
+the earlier note's seeds too: at 0.5, seeds 142/146/147 all wedge (57.6 s / 58.8 s
+/ 176.2 s) and seed 15 is clean at 2.6 s; at 1, seed 15 wedges 223.8 s.
+
+**What that changes: `main` passes this gate by luck, not by being correct.** The
+defect fires on ~1 seed in 20; the gate draws 24 seeds and asserts zero. Seeds 30
+and 40 are simply outside the draw on `main`. At that rate roughly two thirds of
+*any* sim change — this one, the next one — will turn the gate red without causing
+anything. Third under-powered standing gate this branch turned up, and the only
+one sitting on a real bug.
 
 **Why not fixed here.** `src/sim/waves.ts` IS this lane's file, so the bug is
 mine — but the fix is a placement rule ("a wave must not spawn rock overlapping a
@@ -145,15 +156,28 @@ folding it into a one-constant developer ruling is exactly the scope creep to
 avoid. **Director call:** land a0-59 and brief the wave trap separately, or hold
 a0-59 behind it.
 
-Candidate for whoever takes that brief — the only option found that touches
-NEITHER ratified invariant: leave rock placement alone and **eject any live ship a
-landing wave would overlap**. Positions, `FIELD_YIELD` and fairness all untouched,
-and entombment becomes impossible because being there when the wave lands is the
-only way into the pocket. Still a new sim rule, still moves every golden, still
-needs ratification — but far smaller than re-planning wave placement.
+Two candidates for whoever takes that brief. Both leave `FIELD_YIELD` and
+per-station fairness alone; both are new sim rules that move every golden and need
+ratification, and neither is taken here.
 
-Repro: `npx vitest run tests/harness/unstuck.test.ts` here (seed 15), or seeds
-142/146/147 on `main`.
+1. **Eject any live ship a landing wave would overlap.** Rock positions untouched.
+   **Caveat found on re-measure — this may not actually cover the observed case.**
+   At seed 15 the ship sits ~8 u from centre inside a free pocket of ~21.6 u with a
+   hull of ~12 u, so it reaches ~20 u and may overlap NOTHING: it is not pinned
+   *inside* rock, it is sealed *behind* a 90 u-thick annulus. An overlap-triggered
+   eject would never fire. Verify the overlap before building on this.
+2. **Floor the wave's inner hole at a ship-passable radius.** `spawnWave` already
+   keeps "a clear eye" (`RESOURCE_FIELD.commonsHoleFraction` of the wave's disc),
+   but the eye scales with the disc, so by wave 5 it is ~21.6 u — a pocket, not a
+   corridor. Clamping `innerRadius` to a floor wide enough for a hull to leave
+   changes only the radius rocks are drawn at: ore per rock is untouched so the
+   yield invariant holds, and it is the same N-fold-symmetric reshape the existing
+   hole and spoke-gap already are, so fairness holds. This is the smaller change of
+   the two and the one that matches how the trap actually works.
+
+Repro: `npx vitest run tests/harness/unstuck.test.ts` here (seed 15). On `main`'s
+sim — flip the constant back to 0.5 on this tree — seeds 30 and 40 in the 1–48 pool,
+or 142/146/147.
 
 *(Diagnosed wrong twice before this: "steering limit cycle in open space" — I had
 measured centre-to-centre, not hull clearance — then a `dodge` oscillation between
@@ -168,7 +192,22 @@ two rocks. Both were symptoms of the pocket. Trust the numbers above.)*
   commits, flagged in the PR to Bot and Netcode, old values kept, exactly as a0-58
   did it. Status: see the commits after `586f479`.
 - Full `npx vitest --run` and `npx tsc --noEmit` green before the PR opens.
+- **2026-08-16, this session:** a0-58 has since MERGED (PR #433, `main` @ `43236fb`),
+  so the stacked base in the BASE section above has resolved — `origin/main` merged
+  in at `3090cbd`, and `git diff main..HEAD` is now this brief's delta alone. The
+  only sim difference between `main` and this branch is the one constant, which is
+  what made the clean A/B in BLOCKED possible. PR **#436** is open.
 
 ## BLOCKERS
 
-One: the `unstuck` wedge above. Everything else in the DoD is done and green.
+One: the `unstuck` wedge above — `tests/harness/unstuck.test.ts` is the only red
+test, and it is the only thing keeping the PR's "Typecheck, test, build" check
+red. `tsc --noEmit` is clean; everything else in the DoD is done and verified.
+
+The re-measure above is the part a Director needs: the wedge is a **pre-existing
+map-geometry defect on `main`**, at 4.2% of seeds there against 6.3% here, with
+seed 40 wedging on both and every instance at the map centre. `main` passes the
+gate because its two bad seeds fall outside the 24 it draws. So the choice is not
+"is a0-59 safe" — it is **who fixes the wave trap, and when**, and holding a
+one-constant developer ruling behind an unratified sim-geometry change is the
+worse of the two. Land a0-59 and brief the wave trap separately, or hold it.
