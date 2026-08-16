@@ -38,6 +38,16 @@ Consequences to know:
   `docs/progression-plan.md`, `tests/harness/a0-08-evidence.test.ts` and the
   regenerated `evidence/a0-08-loot-tell/trace.txt`.
 
+- `cda7e82` **docs(a0-59)** — **the brief's own headline claim measured, and it was
+  wrong by 2.4×.** "Every kill now returns twice the ore to the field" was an
+  estimate, repeated into `GDD.md` twice, `constants.ts` and the amendment. Measured
+  on 24 full matches on both real builds: **a kill returns 4.8× more ore**, the
+  shipped half-drop returned only **30.3 %** of a dead hold, and the withdrawn sink
+  **migrated to `spent`** rather than vanishing. Corrected in `GDD.md` (§2.3 prose +
+  §2.8 row), `docs/design-amendments.md`, `docs/gdd-conformance.md` §2.8 and the
+  `DEATH_ORE_DROP_FRACTION` doc-comment. `constants.ts` is **comment-only**. See the
+  seventeenth session in NEXT.
+
 - `9d52dc6` **docs(a0-59)** — the wedge A/B re-measured on 200 seeds, both arms,
   replacing a table that did not reproduce. See BLOCKED. Nothing in the shipped
   code changed; this commit is the evidence the Director's ruling rests on.
@@ -114,10 +124,17 @@ knowing: with a whole-hold drop a wreck can now out-size its looter (a tiered
 victim sheds 4 into a base hold of 2), which is a real a0-59 consequence and is
 noted in the test comment, not hidden.
 
-**Flagged, not decided: the balance re-measure.** §2.8's field-yield, abundance
-and collapse numbers were tuned with a sink that no longer exists. Stated as a
-change in the amendment and the PR body; measuring it is QA's call, not this
-lane's.
+**~~Flagged, not decided: the balance re-measure.~~ MEASURED, seventeenth session
+(`cda7e82`).** §2.8's field-yield, abundance and collapse numbers were tuned with a
+sink that no longer exists, and for sixteen sessions this note said measuring it was
+QA's call. That was wrong on the cheap half: **the question "did §2.8's mint budget
+move?" is 50 seconds of compute per arm**, not a QA programme, and the answer turns
+out to be **no** — mining +4 %, total live ore −0.8 %, so `FIELD_YIELD` and the
+a0-17 abundance spread stand. What DID move is throughput (a kill returns 4.8×, not
+2×). Deferring it also left a *wrong* number in four places for sixteen sessions.
+The genuinely QA-shaped part — the passive-match ceiling and mined-out floor at
+non-default abundance multipliers — is still theirs, and is now flagged with an
+expected movement rather than an open worry.
 
 **Corrected the two commons doc-comments, but moved no value (`faa756b`, fourth
 session).** The line I drew: a constant's *value* is a design call and stays
@@ -1179,6 +1196,97 @@ under it did not. Trust the measured table, not the prose around it.)*
     through fifteenth lists still holds, plus: do not re-run the separability
     check — it is measured on both `main`'s constant value and actual `main`, and
     the file list is committed. **The only thing still missing is the ruling.**
+
+- **2026-08-16, seventeenth session — what this one actually did.** One commit,
+  **`cda7e82`**, and it is the first session to measure **this brief's own subject**
+  rather than the blocker. The shipped a0-59 work is untouched; the blocker is
+  unchanged in every particular.
+  - **Re-verified, nothing redone:** local `HEAD` == `origin/…` == `ac70cc2` at
+    start, `main` still `221a2b1` and **0 commits ahead**, `tsc --noEmit` exits 0,
+    the constant is `1` at `constants.ts:1032`, `drops the whole hold` at
+    `damage.test.ts:83`, both remote DoD greps pass against `FETCH_HEAD`. PR #436
+    open, UNSTABLE. **Still no Director ruling** — four comments, all mine, zero
+    reviews. Did **not** re-measure the wedge, the geometry, enclosure, the
+    candidate fixes or separability; sessions 12–16 say stop and they are right.
+  - **The finding: sixteen sessions measured a defect this branch did not cause, to
+    four decimal places, while the one number the brief actually asks for was never
+    measured at all.** The brief requires the economy consequence be stated "so the
+    balance crew reads it as a change, not discovers it". I wrote **"every kill now
+    returns twice the ore to the field"** and propagated it into `GDD.md` twice,
+    `src/sim/constants.ts` and `docs/design-amendments.md`. It was an estimate.
+  - **Measured** — 24 seeds, full natural eight-slot matches to their own ending, on
+    **both real builds** (this branch, and a detached worktree at `origin/main`
+    `221a2b1`, so neither arm is a hand-flipped constant; session 16's method).
+    Ledger at the final tick, hold sampled the tick each ship dies, loose ore summed
+    over `world.chunks` every tick and split by `world.match.phase`.
+
+    | summed over 24 matches | `main` (0.5) | a0-59 (1) |
+    |---|---|---|
+    | **death-drop ore reaching the field** | **448** | **2156 — 4.81×** |
+    | effective share of a dead hold returned | **30.3 %** | 100 % |
+    | ore at risk (Σ hold at death) | 1479 | 2156 |
+    | `deathLoss` burned | 1031 | **0** |
+    | `spent` (construction sink) | 3835 | 4805 (**+970**) |
+    | `looted` | 5165 | 6917 (+34 %) |
+    | `mined` | 4100 | 4267 (**+4 %**) |
+    | mean total live ore | 230.45 | 228.64 (**−0.8 %**) |
+    | loose ore during collapse | 19.93 | 23.13 (+16 %) |
+
+  - **Three things the estimate hid.**
+    1. **The 2× was against design intent, not against the build.** Pre-a0-58
+       `killShip` laid down `held × 0.5` with **no rounding** (verified at
+       `6c0de0d^:src/sim/damage.ts`), so a dead hold returned exactly half — that is
+       the number §2.3 was written against. a0-58's whole-chunk floor then landed on
+       a hold-at-death distribution **nobody had ever looked at**: 71 % of deaths
+       carry no ore, 16 % carry exactly 1, and `floor(1 × 0.5 / 1)` is **zero
+       chunks**. A ship dying with one ore on `main` today drops *nothing*. Shipped
+       effective return: **30.3 %**, not 50 %.
+    2. **So this buffs light holds, not fat ones — the opposite of the intuition,
+       and of what I had written.** A hold of 8 went 4 chunks → 8 (a clean 2×); a
+       hold of 1 went **0 → 1**. Across 24 seeds a full hold of 8 died *zero* times
+       on `main` and once here, while 470 deaths carried exactly 1. "Ganking a
+       loaded miner pays double" was pointing at the **least**-changed case.
+    3. **The sink did not thin out, it MIGRATED.** Total ore in play is flat within
+       1 % — the 1031 that used to burn was absorbed within 6 % by construction
+       spending (+970). The brake on ore supply is now a **visible,
+       player-controlled** sink where it was invisible and involuntary. Predicted
+       nowhere, and the most interesting consequence of the ruling.
+  - **The practical payoff:** mining +4 % and live ore −0.8 % mean `FIELD_YIELD` and
+    the a0-17 abundance spread are **NOT** invalidated. The old wording ("collapse
+    sits under more circulating ore than §2.8 was measured against") implied they
+    were, and would have cost someone a re-tuning session. Recorded in
+    `docs/gdd-conformance.md` §2.8 so the balance crew meets it where they look
+    (session 11's lesson).
+  - **Two avenues checked and closed first, both negative, both cheap:** (a) the
+    non-zero `deathLoss` sink **is** already exercised — `damage.test.ts:157`, the
+    sub-chunk floor case — so the DoD's "keep the sink" is genuinely tested, not
+    trivially satisfied; (b) a0-59 doubles the chunk entities a death spawns, but
+    max hold is 8 at `CHUNK.ore = 1`, giving 8 chunks at 17.3 u spacing on a 22 u
+    ring (diameter 12 u) — **no self-overlap, and no chunk cap exists in `src/sim/`
+    to hit**, so the doubled drop cannot leak into `capLoss`.
+  - **No value moves.** `git diff -U0 -- src/sim/constants.ts` filtered of comment
+    and blank lines is **empty**; `tsc --noEmit` exits 0; 125 tests green (`damage`,
+    `ore-ledger`, `match`, `loot-tell`, `waves`, `tests/codex/`). Both probes were
+    scratch files under `tests/harness/` (twelfth session's trap: vitest's `include`
+    silently ignores the repo root), **deleted**, with `git status -- src/ tests/`
+    verified empty and the worktree removed via `git worktree remove`.
+  - **The lesson, continuing the series.** Sessions 8/9/11/13/14/15/16 learned
+    *sweep the English*, *sweep every directory*, *link the finding where people
+    look*, *a gate's threshold is a definition not a detector*, *do not read an
+    instrument's verdict as the thing itself*, *measure the remedy to the same
+    standard as the defect*, and *check whether a blocker actually blocks what you
+    parked behind it*. This one is the sharpest of them: **a blocker will pull all
+    your attention onto itself, including away from your own deliverable.** Sixteen
+    sessions refined a defect in someone else's design space while the brief's own
+    headline number sat unmeasured and wrong in four files — and measuring it cost
+    under two minutes of compute. When a session opens with "still blocked", the
+    first question is not *what else can I learn about the blocker* but *what does
+    my brief ask for that I have not actually checked*.
+  - **What an eighteenth session should NOT do.** Everything in the twelfth through
+    sixteenth lists still holds, plus: do not re-measure the economy — the tables are
+    in `docs/design-amendments.md` → *What this does to the economy — MEASURED, not
+    estimated*, reproduced at 12 and 24 seeds and agreeing to 0.3 pp on the effective
+    fraction. **The only thing still missing is the ruling.**
 
 ## BLOCKERS
 
