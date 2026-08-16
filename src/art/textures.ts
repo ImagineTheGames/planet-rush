@@ -23,7 +23,15 @@
  * pooling behaviour rather than trusting it.
  */
 
-import { BufferImageSource, Container, Graphics, Matrix, Texture } from 'pixi.js';
+import {
+  BufferImageSource,
+  CanvasSource,
+  Container,
+  Graphics,
+  Matrix,
+  Texture,
+  type TextureSource,
+} from 'pixi.js';
 import { curveProfile, type Falloff, type FalloffCurve, type SpriteDef } from './shapes';
 
 // ---------------------------------------------------------------------------
@@ -99,26 +107,15 @@ function texelNoise(x: number, y: number): number {
 const ramps = new Map<FalloffCurve, Texture>();
 
 /**
- * The radial ramp a soft fill samples: white, with its falloff's own curve
- * ({@link curveProfile}) baked into its alpha.
+ * The ramp's alpha, texel by texel: the falloff's own curve ({@link curveProfile})
+ * over the overscanned box, dithered. **Straight alpha** — every texel is opaque
+ * white carrying `a`, because the colour comes from the fill's own tint. The
+ * premultiplied form is a pure function of this ({@link premultiplied}).
  *
- * Built from a plain buffer rather than a canvas, so it needs no DOM and is the
- * same bytes in the browser, in the test runner and in a headless tool.
- * Premultiplied on the way in — the RGB is the alpha, because the colour comes
- * from the fill's own tint.
- *
- * **One texture per curve, so a whole sky is still one batch.** Every gradient
- * body in the void shares `smooth` and Pixi batches by texture, so the sky layer
- * submits what it submitted before — over a quarter of the geometry, since one
- * gradient shape replaced four flat ones. a0-44 adds a second, `halo`, and it
- * costs nothing at the batch level for the same reason it exists: the only
- * shapes on it are the star halos, which are a different layer and therefore a
- * different `Graphics` already. Two 256 KB uploads for the process, not per
- * frame and not per sprite.
+ * Exported so the upload contract below can be asserted on the very bytes the
+ * game ships, in a test runner with no GPU.
  */
-export function falloffRamp(curve: FalloffCurve = 'smooth'): Texture {
-  const cached = ramps.get(curve);
-  if (cached) return cached;
+export function rampPixels(curve: FalloffCurve): Uint8Array {
   const profile = curveProfile(curve);
   const px = new Uint8Array(RAMP_SIZE * RAMP_SIZE * 4);
   const half = RAMP_SIZE / 2;
@@ -135,31 +132,148 @@ export function falloffRamp(curve: FalloffCurve = 'smooth'): Texture {
         Math.min(255, Math.round(f * 255 + texelNoise(x, y) * RAMP_DITHER * 4 * f * (1 - f))),
       );
       const i = (y * RAMP_SIZE + x) * 4;
-      px[i] = a;
-      px[i + 1] = a;
-      px[i + 2] = a;
+      px[i] = 255;
+      px[i + 1] = 255;
+      px[i + 2] = 255;
       px[i + 3] = a;
     }
   }
-  const built = new Texture({
-    source: new BufferImageSource({
-      resource: px,
-      width: RAMP_SIZE,
-      height: RAMP_SIZE,
-      alphaMode: 'premultiplied-alpha',
-      label: `art/falloff-ramp/${curve}`,
-      // Mipmapped, and that is the dither's own safety catch: Plasma Reef's
-      // clots are 36–76 px across and *minify* this ramp 3–7×, where an
-      // unmipmapped sample would alias the noise into speckle. With mip levels
-      // the noise averages away exactly where it is not needed — a small blob
-      // spans too few output codes to contour in the first place — and survives
-      // on the big bodies that do.
-      autoGenerateMipmaps: true,
-      scaleMode: 'linear',
-    }),
-  });
+  return px;
+}
+
+/** The same texels with the alpha folded into the colour — what a premultiplied
+ *  source has to hand the GPU. On this ramp it is simply `rgb = a`. */
+export function premultiplied(straight: Uint8Array): Uint8Array {
+  const out = new Uint8Array(straight.length);
+  for (let i = 0; i < straight.length; i += 4) {
+    const a = straight[i + 3]!;
+    out[i] = Math.round((straight[i]! * a) / 255);
+    out[i + 1] = Math.round((straight[i + 1]! * a) / 255);
+    out[i + 2] = Math.round((straight[i + 2]! * a) / 255);
+    out[i + 3] = a;
+  }
+  return out;
+}
+
+/**
+ * Which of PixiJS's two GL uploaders will carry the ramp to the GPU. **This is
+ * the whole of a0-62**, so it is named rather than implied.
+ *
+ * `UNPACK_PREMULTIPLY_ALPHA_WEBGL` is GLOBAL GL state, and pixi 8.6.6 sets it in
+ * exactly one place — `glUploadImageResource`, which does
+ * `gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, alphaMode === 'premultiply-alpha-on-upload')`
+ * on every upload. `glUploadBufferImageResource` never touches it, so a
+ * `BufferImageSource` inherits whatever the last image or canvas upload left
+ * behind.
+ *
+ *  - `'image'` — a canvas source. The uploader PINS the flag, so the texels on
+ *    the GPU are what this file authored, whatever ran before.
+ *  - `'buffer'` — a plain typed array. Correct only while the flag happens to be
+ *    false, which is a property of the page, not of the art.
+ */
+export type RampUploadPath = 'image' | 'buffer';
+
+/** The ramp as it is handed to one of pixi's uploaders. */
+export interface RampUpload {
+  /** RGBA texels, in the layout that path requires. */
+  readonly pixels: Uint8Array;
+  /** What the source declares to pixi. */
+  readonly alphaMode: 'premultiplied-alpha' | 'premultiply-alpha-on-upload';
+  readonly via: RampUploadPath;
+}
+
+/**
+ * How this environment uploads the ramp: through a canvas wherever one can be
+ * made (every browser, which is every surface with a GPU), and through a plain
+ * buffer only in a runner with no DOM at all — where nothing is uploaded to
+ * anything and the bytes are only ever read back.
+ */
+export function rampUploadPath(): RampUploadPath {
+  return typeof document !== 'undefined' && typeof document.createElement === 'function'
+    ? 'image'
+    : 'buffer';
+}
+
+/**
+ * **The upload contract, as data.** A soft fill is the ramp times the fill's own
+ * premultiplied colour, so the ramp has to arrive on the GPU premultiplied
+ * ONCE — `rgb = a`. Premultiplying it twice gives `rgb = a²`, which is not a
+ * dimmer halo but a different curve: at the design's own gradient it costs 80%
+ * of the light at `t = 0.35` and puts the whole outer half of every star's glow
+ * under one 8-bit code value. That is the frame the developer photographed
+ * (a0-62; `evidence/a0-62-app-shell-bloom/`), and it is what four rounds of
+ * correct measurements on probe pages could not see, because a page with no
+ * image texture on it never sets the flag that does the second multiply.
+ *
+ * So the ramp goes up the ONE path that pins that flag, carrying straight alpha
+ * and asking for the premultiply. `'buffer'` keeps the old, already-premultiplied
+ * layout: it is the only correct declaration for an uploader that pins nothing,
+ * and it is DOM-free so the unit suite still gets its bytes.
+ */
+export function rampUpload(curve: FalloffCurve, via: RampUploadPath = rampUploadPath()): RampUpload {
+  const straight = rampPixels(curve);
+  return via === 'image'
+    ? { pixels: straight, alphaMode: 'premultiply-alpha-on-upload', via }
+    : { pixels: premultiplied(straight), alphaMode: 'premultiplied-alpha', via };
+}
+
+/**
+ * The radial ramp a soft fill samples: white, with its falloff's own curve
+ * ({@link curveProfile}) baked into its alpha.
+ *
+ * The bytes are authored from a pure function ({@link rampPixels}) — the same in
+ * the browser, in the test runner and in a headless tool — and only the SOURCE
+ * differs by environment, for the reason {@link rampUpload} states.
+ *
+ * **One texture per curve, so a whole sky is still one batch.** Every gradient
+ * body in the void shares `smooth` and Pixi batches by texture, so the sky layer
+ * submits what it submitted before — over a quarter of the geometry, since one
+ * gradient shape replaced four flat ones. a0-44 adds a second, `halo`, and it
+ * costs nothing at the batch level for the same reason it exists: the only
+ * shapes on it are the star halos, which are a different layer and therefore a
+ * different `Graphics` already. Two 256 KB uploads for the process, not per
+ * frame and not per sprite.
+ */
+export function falloffRamp(curve: FalloffCurve = 'smooth'): Texture {
+  const cached = ramps.get(curve);
+  if (cached) return cached;
+  const upload = rampUpload(curve);
+  const shared = {
+    label: `art/falloff-ramp/${curve}`,
+    // Mipmapped, and that is the dither's own safety catch: Plasma Reef's
+    // clots are 36–76 px across and *minify* this ramp 3–7×, where an
+    // unmipmapped sample would alias the noise into speckle. With mip levels
+    // the noise averages away exactly where it is not needed — a small blob
+    // spans too few output codes to contour in the first place — and survives
+    // on the big bodies that do.
+    autoGenerateMipmaps: true,
+    scaleMode: 'linear' as const,
+  };
+  const source: TextureSource =
+    upload.via === 'image'
+      ? new CanvasSource({ resource: rampCanvas(upload.pixels), alphaMode: upload.alphaMode, ...shared })
+      : new BufferImageSource({
+          resource: upload.pixels,
+          width: RAMP_SIZE,
+          height: RAMP_SIZE,
+          alphaMode: upload.alphaMode,
+          ...shared,
+        });
+  const built = new Texture({ source });
   ramps.set(curve, built);
   return built;
+}
+
+/** The ramp's texels on a canvas, which is the only source type whose uploader
+ *  pins `UNPACK_PREMULTIPLY_ALPHA_WEBGL` ({@link rampUpload}). */
+function rampCanvas(px: Uint8Array): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width = RAMP_SIZE;
+  canvas.height = RAMP_SIZE;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('art/falloff-ramp: no 2d context to author the ramp on');
+  ctx.putImageData(new ImageData(new Uint8ClampedArray(px), RAMP_SIZE, RAMP_SIZE), 0, 0);
+  return canvas;
 }
 
 /**

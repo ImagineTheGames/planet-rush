@@ -72,6 +72,14 @@ import {
   type MapId,
 } from './backdrop';
 import { MOCKUP_STARS, STAR_TEMPERATURE_COLORS, haloRadiusOf } from './mockup-reference';
+import {
+  falloffRamp,
+  premultiplied,
+  rampPixels,
+  rampUpload,
+  rampUploadPath,
+  type RampUpload,
+} from './textures';
 import { hex } from './palette';
 
 /**
@@ -714,5 +722,161 @@ describe('measured off the shipped frame', () => {
     const rows = ratios(frame('desktop-frozen-octagon.png'));
     expect(rows.length).toBeGreaterThanOrEqual(4);
     expect(median(rows.map((r) => r.ratio))).toBeGreaterThan(FIELD);
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// a0-62 — the ramp's trip to the GPU
+// ---------------------------------------------------------------------------
+//
+// **Every test above this line, and every frame a0-22/44/45/53 measured, ran on
+// a page with no image texture on it.** That is not a detail about the harness;
+// it is the whole bug, and it is why five rounds of green measurements coexisted
+// with a developer photographing stars that have *"no glowing bloom"* at all.
+//
+// `UNPACK_PREMULTIPLY_ALPHA_WEBGL` is GLOBAL GL state. pixi 8.6.6 sets it in
+// exactly one place — `glUploadImageResource`, which does
+// `gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, alphaMode === 'premultiply-alpha-on-upload')`
+// on every image or canvas upload — and `glUploadBufferImageResource` never
+// touches it. The falloff ramp was a `BufferImageSource` carrying ALREADY
+// premultiplied texels, so it inherited whatever the last upload left behind:
+//
+//   · a page with fonts and atlases (the game) leaves the flag TRUE, and the
+//     ramp is premultiplied a SECOND time — `rgb = a²/255`;
+//   · a page with none (`field-probe`, `renderer-probe`, `sky-preview`, this
+//     runner) leaves it FALSE, and the ramp is correct.
+//
+// Measured off the GPU of the running client, not argued: authored 203 arrives
+// as 161, 154 as 93, 68 as 18 — `a²/255` to the code value
+// (`evidence/a0-62-app-shell-bloom/audit.txt`, `probe-ramp.mjs`). Squaring is not
+// a dimmer halo, it is a different curve: it takes 80% of the light out at
+// `t = 0.35` and puts the whole outer half of every star's glow under one 8-bit
+// code value, while leaving the point and the diffraction cross — flat fill and
+// stroke, neither of which samples the ramp — untouched. That is the
+// developer's photograph.
+//
+// ## Why this block is named for the resolution
+//
+// The brief that found this asked for a gate named `at the resolution the app
+// bakes at`, on the hypothesis that `src/main.ts`'s `resolution: dpr` /
+// `Math.min(dpr, 2)` was the variable. **It is not** — the app shell was driven
+// at deviceScaleFactor 1, 1.5, 2 and 3 and all four collapse identically
+// (audit.txt). The name is kept because it is the handle a sixth round will
+// look for, and because what it now gates is the same question asked properly:
+// what the app's own upload does to the ramp, rather than what a probe's does.
+//
+// ## Why this is not a tautology
+//
+// The model below is pixi's upload rule, and it is anchored to the numbers
+// measured off the GPU rather than to itself: the FIRST assertion replays the
+// old arrangement and requires it to reproduce 203→161, 154→93, 68→18. A model
+// that could not produce the defect could not gate the fix either.
+
+describe('the ramp reaches the GPU premultiplied ONCE (a0-62)', () => {
+  /**
+   * pixi 8.6.6's GL upload, as its two uploaders actually behave.
+   *
+   *  - `image` (`glUploadImageResource`) PINS `UNPACK_PREMULTIPLY_ALPHA_WEBGL`
+   *    from the source's own `alphaMode`, every upload, so what came before
+   *    cannot reach it.
+   *  - `buffer` (`glUploadBufferImageResource`) never calls `pixelStorei` at
+   *    all, so it uploads under whatever flag the page happened to leave set.
+   */
+  const uploaded = (u: RampUpload, flagBefore: boolean): Uint8Array => {
+    const premultiplyOnUpload =
+      u.via === 'image' ? u.alphaMode === 'premultiply-alpha-on-upload' : flagBefore;
+    const out = Uint8Array.from(u.pixels);
+    if (!premultiplyOnUpload) return out;
+    for (let i = 0; i < out.length; i += 4) {
+      const a = out[i + 3]!;
+      out[i] = Math.round((out[i]! * a) / 255);
+      out[i + 1] = Math.round((out[i + 1]! * a) / 255);
+      out[i + 2] = Math.round((out[i + 2]! * a) / 255);
+    }
+    return out;
+  };
+
+  /** The ramp is 256², so its centre row runs from the core out past the rim. */
+  const RAMP_SIZE = 256;
+  const texel = (px: Uint8Array, out: number): [number, number] => {
+    const i = ((RAMP_SIZE / 2) * RAMP_SIZE + RAMP_SIZE / 2 + out) * 4;
+    return [px[i]!, px[i + 3]!];
+  };
+
+  it('reproduces the collapse the GPU read-back measured, so the model can gate it', () => {
+    // The arrangement this brief replaced: already-premultiplied texels through
+    // the uploader that pins nothing, on a page whose fonts left the flag true.
+    const old = {
+      pixels: premultiplied(rampPixels('halo')),
+      alphaMode: 'premultiplied-alpha',
+      via: 'buffer',
+    } as const satisfies RampUpload;
+
+    const gpu = uploaded(old, true);
+    // The three texels probe-ramp.mjs read back off the running client. The
+    // authored value is whatever the design's curve puts there; the assertion is
+    // that the model turns it into the number the GPU actually held.
+    for (const out of [10, 20, 40, 60, 80]) {
+      const [, authored] = texel(old.pixels, out);
+      const [rgb] = texel(gpu, out);
+      expect(rgb, `texel +${out}: authored ${authored} collapses to a²/255`).toBe(
+        Math.round((authored * authored) / 255),
+      );
+    }
+    // …and that IS a collapse, not a rounding: at the design's own knee the
+    // halo keeps under a third of the light it was authored with.
+    const [rgb] = texel(gpu, 40);
+    const [, authored] = texel(old.pixels, 40);
+    expect(rgb / authored, 'the knee of the halo keeps under a third of its ink').toBeLessThan(0.35);
+  });
+
+  it('at the resolution the app bakes at', () => {
+    // The app is not this runner: it bakes with `resolution: window.devicePixelRatio`
+    // and it has fonts, atlases and a build badge on the page, so by the time the
+    // sky is drawn the premultiply flag is whatever those left set. This asserts
+    // the ramp is right under BOTH — which is the only way a page's texture
+    // schedule can stop being able to change what a star looks like.
+    for (const curve of ['smooth', 'halo'] as const) {
+      const design = premultiplied(rampPixels(curve));
+      // What a browser gets. `rampUploadPath()` is 'buffer' in this DOM-free
+      // runner, so the browser's path is named explicitly rather than sampled.
+      const upload = rampUpload(curve, 'image');
+
+      for (const flagBefore of [false, true]) {
+        const gpu = uploaded(upload, flagBefore);
+        for (const out of [0, 10, 20, 40, 60, 80, 100, 120]) {
+          const [wantRgb, wantA] = texel(design, out);
+          const [gotRgb, gotA] = texel(gpu, out);
+          expect(
+            gotRgb,
+            `${curve} texel +${out}, flag ${flagBefore} before the upload: ` +
+              `rgb ${gotRgb} against the design's ${wantRgb}`,
+          ).toBeCloseTo(wantRgb, -0.4);
+          expect(gotA, `${curve} texel +${out}: alpha is untouched by the flag`).toBe(wantA);
+        }
+      }
+    }
+  });
+
+  it('keeps the ramp on a source type whose uploader pins the flag', () => {
+    // The assertion above is about bytes; this one is about the door they go
+    // through, because straight-alpha bytes on the uploader that pins NOTHING
+    // would be the same bug the other way round.
+    expect(rampUpload('halo', 'image').alphaMode, 'a browser asks for the premultiply').toBe(
+      'premultiply-alpha-on-upload',
+    );
+    expect(rampUploadPath(), 'a DOM-free runner has no canvas and no GPU').toBe('buffer');
+    // …and the buffer fallback is still self-consistent: premultiplied texels
+    // declared as premultiplied, which is the only correct pairing for an
+    // uploader that pins nothing.
+    const fallback = rampUpload('halo', 'buffer');
+    expect(fallback.alphaMode).toBe('premultiplied-alpha');
+    expect(Array.from(fallback.pixels.slice(0, 4))).toEqual(
+      Array.from(premultiplied(rampPixels('halo')).slice(0, 4)),
+    );
+    // The texture this runner actually builds agrees with the descriptor, so the
+    // two cannot drift apart unnoticed.
+    expect((falloffRamp('halo').source as { alphaMode?: string }).alphaMode).toBe(fallback.alphaMode);
   });
 });
