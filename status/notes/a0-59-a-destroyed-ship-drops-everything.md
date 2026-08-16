@@ -543,8 +543,36 @@ under it did not. Trust the measured table, not the prose around it.)*
     `src/sim/` and `docs/`"* was false and is corrected in place, with the failure
     mode written down so the next sweep of any constant looks for the prose too.
   - **No code, no constant, no golden.** `tsc` clean; codex, damage, ore-ledger,
-    match, loot-tell and loot-ore-parity green (130 tests); full suite re-run
-    after the commit and unchanged apart from the standing `unstuck` failure.
+    match, loot-tell and loot-ore-parity green (130 tests). `src/ui/codex.test.ts`
+    checked specifically (41 tests) because the codex edit is content the UI
+    renders — no test and no Playwright golden pins codex body prose. **Full local
+    suite after the commit: `1 failed | 5541 passed (5542)`, 658 s** — the one
+    failure is the standing `unstuck` seed 15. **CI on `9786f7b` agrees exactly:
+    `1 failed | 5541 passed (5542)`, same single test.** Nothing this session
+    touched moved a number.
+  - **Independently re-verified the fact the Director's decision rests on**, since
+    it is asserted all over this note and had never been checked mechanically:
+    *the branch's entire behavioural sim delta against `main` is the one constant.*
+    Seven non-test sim files differ (`match.ts`, `state.ts`, `step.ts`,
+    `ore-ledger.ts`, `waves.ts`, `damage.ts`, `constants.ts`), and filtering their
+    diff of comment lines and blank lines leaves **exactly two lines in the whole
+    branch**:
+
+    ```
+    $ for f in src/sim/{match,state,step,ore-ledger,waves,damage,constants}.ts; do
+        git diff origin/main...HEAD -U0 -- "$f" | grep -E '^[+-]' \
+          | grep -vE '^(\+\+\+|---)' | grep -vE '^[+-]\s*(\*|//|/\*)' | grep -vE '^[+-]\s*$'
+      done
+    -export const DEATH_ORE_DROP_FRACTION: Tunable<number> = 0.5;
+    +export const DEATH_ORE_DROP_FRACTION: Tunable<number> = 1;
+    ```
+
+    That is the whole of it. Every other sim change on this branch — including the
+    three comment-only commits `faa756b`, `3855f6c` and the `waves.ts` corridor
+    correction — is provably prose. **Re-run this one-liner instead of re-reading
+    the note** if a future session doubts the A/B; it takes a second and it settles
+    the "is a0-59 safe" half of the question outright, leaving only "who fixes the
+    wave trap, and when".
 
 ## BLOCKERS
 
