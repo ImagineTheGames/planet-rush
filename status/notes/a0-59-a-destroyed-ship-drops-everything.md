@@ -1550,8 +1550,9 @@ under it did not. Trust the measured table, not the prose around it.)*
     `npx vitest run src/sim/damage.test.ts` instead of re-measuring anything.
     **The only thing still missing is the ruling.**
 
-- **2026-08-16, twentieth session — what this one actually did.** Two commits,
-  **`ac91b61`** (a new test) and **`9e64251`** (comment-only sim edits + docs). The
+- **2026-08-16, twentieth session — what this one actually did.** Four commits:
+  **`ac91b61`** (a new test), **`9e64251`** (comment-only sim edits + docs),
+  **`13382d8`** (a fence on my own claim) and **`a5533fb`** (this note). The
   shipped a0-59 work is untouched and the blocker is unchanged in every particular.
   This session followed the seventeenth–nineteenth sessions' lesson a fourth time:
   the blocker is settled, so the question is what my own brief/DoD asserts that
@@ -1656,6 +1657,27 @@ under it did not. Trust the measured table, not the prose around it.)*
     ore, and is each one named?" is a two-minute enumeration, and it turned up a
     sink the ledger has never accounted for, in this lane's own file, that nineteen
     sessions of conservation work walked past.
+  - **Fenced my own claim rather than leaving it absolute (`13382d8`).** "Every
+    ore-destroying path names itself except the clamp" was very slightly false: two
+    float-hygiene floors (`cargo < 1e-9 → 0`, in `spendOre` and the atmosphere
+    drain) also write no bucket. They are bounded by **1e-9 per event** against a
+    **1e-6** tolerance, exist to stop a rounding tail showing as a non-zero hold,
+    and `ore-journal.ts` already names them — float hygiene, not sinks. The
+    difference that matters is that the cargo clamp destroys **whole units**. The
+    full accounted set is enumerated beside it: `spendOre` → `spent`, `killShip` →
+    `dropped` + `deathLoss`, `scatterWreckDebris` → `dropped` + `capLoss`,
+    `chipAsteroid` → `dust`, drain and bank order → `deposited`, and an eliminated
+    player's bank is passed *into* the wreck scatter rather than dropped
+    (`destroyCore`). This lane's history is overclaimed numbers; an absolute that is
+    99 % true is how the next one starts.
+  - **Full local suite on the committed tree: `1 failed | 5546 passed (5547)`,
+    `1 failed | 300 passed (301)` files, 664 s.** The one failure is the standing
+    blocker — `unstuck` seed 15, `foreman` slot 2, **133.5 s at (1204,1195)** while
+    `'haul'` — byte-identical to sessions three through nineteen. `tsc --noEmit`
+    exits 0. Both remote DoD greps pass against `FETCH_HEAD`. (Counts are +2 tests
+    against the nineteenth session's 5544/5545: exactly the two added here, no
+    drift.) PR body updated with the finding and the corrected run counts — the
+    stale line there still read 5536/5537.
   - **What a twenty-first session should NOT do.** Everything in the twelfth through
     nineteenth lists still holds, plus: do not re-measure the cargo clamp — the
     table is in `docs/design-amendments.md` → *The sink's OTHER advertised flow does
