@@ -122,6 +122,32 @@ passes ~74% of the time, so roughly **one sim change in four** will turn
 `unstuck.test.ts` red without having caused anything. Until this is fixed, a red
 `unstuck` should be checked against this doc before it is treated as a regression.
 
+### Independently confirmed on the five named seeds — four minutes, not four hours
+
+The table above cost a 200-seed sweep on both arms. Confirming it does not: the
+claim it carries is *which named seeds wedge on which build*, and that is four
+matches per arm. Re-run from scratch, both arms, on the same tree with the one
+constant flipped — every figure reproduces **to the tenth of a second and the unit
+of position**:
+
+| seed | `main` (0.5) | a0-59 (1) |
+|---|---|---|
+| 15  | clean — 2.5 s | **WEDGED 133.5 s** @1204,1195 `foreman` s2 `haul` |
+| 142 | **WEDGED 40.9 s** @1202,1193 `foreman` s2 `defend` | **WEDGED 12.3 s** @1205,1204 `patch` s3 `cornered-fight` |
+| 146 | **WEDGED 58.8 s** @1200,1308 `foreman` s2 `last-stand` | clean — 3.2 s |
+| 147 | **WEDGED 95.9 s** @1198,1193 `patch` s3 `fix-base` | clean — 2.4 s |
+
+Note the *behaviours* differ across the arms (`haul` vs `defend`, `last-stand`,
+`fix-base`) while the *positions* do not. The trap is indifferent to what the ship
+was trying to do; it is a property of the map, and any ship that is at the centre
+when wave 5 lands is caught regardless of intent. That is the strongest single
+piece of evidence that this is geometry and not bot logic.
+
+**This is the cheap check.** Anyone doubting the headline — *`main` carries this
+defect and a0-59 does not worsen it* — should run these four seeds on both arms
+rather than re-run the sweep or re-read this document. The recipe is in
+[Repro](#repro).
+
 ---
 
 ## Why there is no placement fix
@@ -261,7 +287,17 @@ For `main`'s sim, set `DEATH_ORE_DROP_FRACTION` back to `0.5` and probe seeds
 **142, 146, 147**; seeds 1–48 are clean on `main`, which is the whole reason its
 24-seed gate is green.
 
-The geometry table needs no match run — instantiate the world as shown above.
+To reproduce the whole A/B in about four minutes rather than re-running the sweep:
+copy `worstWedge` out of `tests/harness/unstuck.test.ts` verbatim into a scratch
+file **under `tests/` or `src/`** (vitest's `include` is `tests/**/*.test.ts,
+src/**/*.test.ts` — a probe at the repo root is silently collected as *no test
+files found*), loop it over seeds `[15, 142, 146, 147]`, and run it once at each
+value of the constant. Expected output is the per-seed table above. Delete the
+scratch file and restore the constant afterwards — `git status` must come back to
+where it started.
+
+The geometry table needs no match run at all — instantiate the world as shown
+above.
 
 ---
 
