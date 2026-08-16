@@ -87,12 +87,12 @@ this brief, with the reason in the note).
 | alarm | done | saw and rising minor third kept on all four (§5.1, §2.2 — legibility outranks register); one-shots |
 | stationDeath | todo |  |
 | ambient | todo |  |
-| musicBed | todo |  |
-| musicPulse | todo |  |
-| musicTheme | todo |  |
-| musicDread | todo |  |
-| musicWin | todo |  |
-| musicLoss | todo |  |
+| musicBed | done | ion field / magnetic mass / cathedral metal / almost-nothing — texture before melody |
+| musicPulse | done | the heartbeat, four ways; no sustained layer sweeps a corner across the loop seam |
+| musicTheme | done | same riff, same key (§7.5) — the instrument is the offer, seven notes at the shipped times |
+| musicDread | done | no melody, no resolution; the four differ in what is thinning |
+| musicWin | done | lands into the three-second quiet, so it never shouts — no fanfare in any of them |
+| musicLoss | done | all four fall and none resolves; all inside the 1.32 s longest-tail invariant (§8) |
 
 35 rows. `candidates.test.ts` (`every re-voiced slot offers a fresh set`) reads
 this table and holds every `done` row to the two promises above — four offers, and

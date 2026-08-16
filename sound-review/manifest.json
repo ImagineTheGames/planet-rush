@@ -833,22 +833,28 @@
       "current": "previews/musicBed/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/musicBed/a.wav",
-          "character": "granular bed, texture under an open fifth",
-          "params": "src/art/audio/candidates.ts#musicBed.a"
+          "id": "d",
+          "wav": "previews/musicBed/d.wav",
+          "character": "ion field, air with no floor under it",
+          "params": "src/art/audio/candidates.ts#musicBed.d"
         },
         {
-          "id": "b",
-          "wav": "previews/musicBed/b.wav",
-          "character": "filtered analogue triad, low and seated",
-          "params": "src/art/audio/candidates.ts#musicBed.b"
+          "id": "e",
+          "wav": "previews/musicBed/e.wav",
+          "character": "magnetic mass, two unisons beating",
+          "params": "src/art/audio/candidates.ts#musicBed.e"
         },
         {
-          "id": "c",
-          "wav": "previews/musicBed/c.wav",
-          "character": "wide detuned space, unisons beating",
-          "params": "src/art/audio/candidates.ts#musicBed.c"
+          "id": "f",
+          "wav": "previews/musicBed/f.wav",
+          "character": "cathedral metal, inharmonic and wide",
+          "params": "src/art/audio/candidates.ts#musicBed.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/musicBed/g.wav",
+          "character": "almost nothing, two quiet layers",
+          "params": "src/art/audio/candidates.ts#musicBed.g"
         }
       ]
     },
@@ -859,22 +865,28 @@
       "current": "previews/musicPulse/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/musicPulse/a.wav",
-          "character": "a dry contact pulse, machine-timed",
-          "params": "src/art/audio/candidates.ts#musicPulse.a"
+          "id": "d",
+          "wav": "previews/musicPulse/d.wav",
+          "character": "ion field with a grain pulse in it",
+          "params": "src/art/audio/candidates.ts#musicPulse.d"
         },
         {
-          "id": "b",
-          "wav": "previews/musicPulse/b.wav",
-          "character": "a low pressure thud, a room under it",
-          "params": "src/art/audio/candidates.ts#musicPulse.b"
+          "id": "e",
+          "wav": "previews/musicPulse/e.wav",
+          "character": "magnetic thud, mass under a corner",
+          "params": "src/art/audio/candidates.ts#musicPulse.e"
         },
         {
-          "id": "c",
-          "wav": "previews/musicPulse/c.wav",
-          "character": "a narrow band pip, doubling",
-          "params": "src/art/audio/candidates.ts#musicPulse.c"
+          "id": "f",
+          "wav": "previews/musicPulse/f.wav",
+          "character": "two bands tolling in a space",
+          "params": "src/art/audio/candidates.ts#musicPulse.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/musicPulse/g.wav",
+          "character": "a heartbeat, and no scenery",
+          "params": "src/art/audio/candidates.ts#musicPulse.g"
         }
       ]
     },
@@ -885,22 +897,28 @@
       "current": "previews/musicTheme/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/musicTheme/a.wav",
-          "character": "the riff as grained plucks, no sustain",
-          "params": "src/art/audio/candidates.ts#musicTheme.a"
+          "id": "d",
+          "wav": "previews/musicTheme/d.wav",
+          "character": "the riff as ion bursts, no body",
+          "params": "src/art/audio/candidates.ts#musicTheme.d"
         },
         {
-          "id": "b",
-          "wav": "previews/musicTheme/b.wav",
-          "character": "the riff on filtered analogue, corner closing",
-          "params": "src/art/audio/candidates.ts#musicTheme.b"
+          "id": "e",
+          "wav": "previews/musicTheme/e.wav",
+          "character": "the riff on magnetic mass, corners closing",
+          "params": "src/art/audio/candidates.ts#musicTheme.e"
         },
         {
-          "id": "c",
-          "wav": "previews/musicTheme/c.wav",
-          "character": "the riff in detuned metal, space behind it",
-          "params": "src/art/audio/candidates.ts#musicTheme.c"
+          "id": "f",
+          "wav": "previews/musicTheme/f.wav",
+          "character": "the riff struck on cathedral bands",
+          "params": "src/art/audio/candidates.ts#musicTheme.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/musicTheme/g.wav",
+          "character": "the riff, quietly, with nothing behind it",
+          "params": "src/art/audio/candidates.ts#musicTheme.g"
         }
       ]
     },
@@ -911,22 +929,28 @@
       "current": "previews/musicDread/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/musicDread/a.wav",
-          "character": "a grinding grain bed, no pitch centre",
-          "params": "src/art/audio/candidates.ts#musicDread.a"
+          "id": "d",
+          "wav": "previews/musicDread/d.wav",
+          "character": "ion field thinning out, high and empty",
+          "params": "src/art/audio/candidates.ts#musicDread.d"
         },
         {
-          "id": "b",
-          "wav": "previews/musicDread/b.wav",
-          "character": "sub rumble with pressure in the room",
-          "params": "src/art/audio/candidates.ts#musicDread.b"
+          "id": "e",
+          "wav": "previews/musicDread/e.wav",
+          "character": "magnetic rumble, unisons grinding",
+          "params": "src/art/audio/candidates.ts#musicDread.e"
         },
         {
-          "id": "c",
-          "wav": "previews/musicDread/c.wav",
-          "character": "detuned unisons beating, metal in the smear",
-          "params": "src/art/audio/candidates.ts#musicDread.c"
+          "id": "f",
+          "wav": "previews/musicDread/f.wav",
+          "character": "cathedral bands, nothing resolving",
+          "params": "src/art/audio/candidates.ts#musicDread.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/musicDread/g.wav",
+          "character": "one low layer, and the room emptying",
+          "params": "src/art/audio/candidates.ts#musicDread.g"
         }
       ]
     },
@@ -937,22 +961,28 @@
       "current": "previews/musicWin/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/musicWin/a.wav",
-          "character": "three dry hits rising, no shine",
-          "params": "src/art/audio/candidates.ts#musicWin.a"
+          "id": "d",
+          "wav": "previews/musicWin/d.wav",
+          "character": "ion bursts rising, thin and dry",
+          "params": "src/art/audio/candidates.ts#musicWin.d"
         },
         {
-          "id": "b",
-          "wav": "previews/musicWin/b.wav",
-          "character": "a low swell lifting, weight behind it",
-          "params": "src/art/audio/candidates.ts#musicWin.b"
+          "id": "e",
+          "wav": "previews/musicWin/e.wav",
+          "character": "magnetic lift, weight arriving",
+          "params": "src/art/audio/candidates.ts#musicWin.e"
         },
         {
-          "id": "c",
-          "wav": "previews/musicWin/c.wav",
-          "character": "bands opening, metal ringing out",
-          "params": "src/art/audio/candidates.ts#musicWin.c"
+          "id": "f",
+          "wav": "previews/musicWin/f.wav",
+          "character": "cathedral bands opening, one room",
+          "params": "src/art/audio/candidates.ts#musicWin.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/musicWin/g.wav",
+          "character": "won: two notes and a floor",
+          "params": "src/art/audio/candidates.ts#musicWin.g"
         }
       ]
     },
@@ -963,22 +993,28 @@
       "current": "previews/musicLoss/current.wav",
       "candidates": [
         {
-          "id": "a",
-          "wav": "previews/musicLoss/a.wav",
-          "character": "a grained fall, everything letting go",
-          "params": "src/art/audio/candidates.ts#musicLoss.a"
+          "id": "d",
+          "wav": "previews/musicLoss/d.wav",
+          "character": "ion field falling away to nothing",
+          "params": "src/art/audio/candidates.ts#musicLoss.d"
         },
         {
-          "id": "b",
-          "wav": "previews/musicLoss/b.wav",
-          "character": "a low descent, pressure leaving",
-          "params": "src/art/audio/candidates.ts#musicLoss.b"
+          "id": "e",
+          "wav": "previews/musicLoss/e.wav",
+          "character": "magnetic descent, mass settling low",
+          "params": "src/art/audio/candidates.ts#musicLoss.e"
         },
         {
-          "id": "c",
-          "wav": "previews/musicLoss/c.wav",
-          "character": "one detuned toll, unresolved",
-          "params": "src/art/audio/candidates.ts#musicLoss.c"
+          "id": "f",
+          "wav": "previews/musicLoss/f.wav",
+          "character": "one band tolling in an empty room",
+          "params": "src/art/audio/candidates.ts#musicLoss.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/musicLoss/g.wav",
+          "character": "lost: one note, going down and stopping",
+          "params": "src/art/audio/candidates.ts#musicLoss.g"
         }
       ]
     },

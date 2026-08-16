@@ -1867,52 +1867,86 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       },
     ],
   },
+  // --- The soundtrack, re-voiced (a0-60) ------------------------------------
+  //
+  // Six slots that play for a whole match, so nothing here is allowed to be an
+  // event: no attack anyone can point at, no melody in the beds, nothing a player
+  // notices twice. "Modern/sci-fi" for music is the thinnest of all the family
+  // readings and also the most literal — **texture before melody**. A retro
+  // soundtrack is a tune played by an oscillator; this one is material that
+  // happens to be in a key. The four:
+  //
+  //   d  **ion field** — high-passed particulate air. No low end at all, no pitch
+  //      centre to hum back, nothing to get tired of.
+  //   e  **magnetic mass** — a low body behind a resonant corner, with unisons
+  //      beating slowly against each other. Weight, and almost no top.
+  //   f  **cathedral metal** — narrow inharmonic bands in a large space, written
+  //      as late layers because `./synth` will not grow a reverb.
+  //   g  **almost nothing** — two layers, quiet, low. The offer for a developer
+  //      whose answer to the whole soundtrack is "less of it".
+  //
+  // No looping offer names a `lowPassEnd` on a **sustained** layer: a corner
+  // travelling across a loop body snaps back at the seam, once per lap, forever.
+  // Voices that decay to silence before the seam may sweep — a gesture that has
+  // finished has nothing left to snap.
   musicBed: {
     label: "Music Bed — Calm",
     context: "Mining / building with no active threat — the calm foundation drone.",
     current: 'musicBed',
     candidates: [
       {
-        id: 'a',
-        character: "granular bed, texture under an open fifth",
+        id: 'd',
+        character: "ion field, air with no floor under it",
         spec: {
-          name: 'musicBed_a_granularBed',
+          name: 'musicBed_d_ionField',
           loop: true,
           crossfade: 0.5,
           layers: [
-            place({ name: 'musicBed_a.texture', wave: 'noise', attack: 0, hold: 7, decay: 0, freq: 430, lowPass: 1300, resonance: 3.4, highPass: 140, gain: 0.26, seed: 33030 }),
-            place({ name: 'musicBed_a.grain', wave: 'noise', attack: 0, hold: 7, decay: 0, freq: 165, lowPass: 640, resonance: 4.2, gain: 0.2, seed: 33031 }),
-            place({ name: 'musicBed_a.root', wave: 'triangle', attack: 0, hold: 7, decay: 0, freq: 55, noiseMix: 0.06, lowPass: 260, resonance: 2, gain: 0.2, seed: 33032 }),
-            place({ name: 'musicBed_a.fifth', wave: 'sine', attack: 0, hold: 7, decay: 0, freq: 82.41, gain: 0.12, seed: 33033 }),
+            place({ name: 'musicBed_d.air', wave: 'noise', attack: 0, hold: 7, decay: 0, freq: 620, lowPass: 1900, resonance: 3, highPass: 400, gain: 0.22, seed: 61090 }),
+            place({ name: 'musicBed_d.upper', wave: 'noise', attack: 0, hold: 7, decay: 0, freq: 1150, lowPass: 3000, resonance: 4.5, highPass: 700, gain: 0.14, seed: 61091 }),
+            place({ name: 'musicBed_d.trace', wave: 'triangle', attack: 0, hold: 7, decay: 0, freq: 330, noiseMix: 0.3, lowPass: 900, resonance: 5, gain: 0.1, seed: 61092 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "filtered analogue triad, low and seated",
+        id: 'e',
+        character: "magnetic mass, two unisons beating",
         spec: {
-          name: 'musicBed_b_filteredAnalogue',
+          name: 'musicBed_e_magneticMass',
           loop: true,
           crossfade: 0.6,
           layers: [
-            place({ name: 'musicBed_b.root', wave: 'triangle', attack: 0, hold: 8, decay: 0, freq: 55, vibratoDepth: 0.004, vibratoRate: 0.09, noiseMix: 0.05, lowPass: 155, resonance: 3.6, gain: 0.4, seed: 33040 }),
-            place({ name: 'musicBed_b.third', wave: 'triangle', attack: 0, hold: 8, decay: 0, freq: 65.41, noiseMix: 0.05, lowPass: 150, resonance: 3.2, gain: 0.26, seed: 33041 }),
-            place({ name: 'musicBed_b.fifth', wave: 'sine', attack: 0, hold: 8, decay: 0, freq: 82.41, lowPass: 160, resonance: 2.4, gain: 0.18, seed: 33042 }),
+            place({ name: 'musicBed_e.u0', wave: 'triangle', attack: 0, hold: 8, decay: 0, freq: 55, noiseMix: 0.06, lowPass: 170, resonance: 4, gain: 0.38, seed: 61100 }),
+            place({ name: 'musicBed_e.u1', wave: 'triangle', attack: 0, hold: 8, decay: 0, freq: 55.3, noiseMix: 0.06, lowPass: 170, resonance: 4, gain: 0.3, seed: 61101 }),
+            place({ name: 'musicBed_e.corner', wave: 'noise', attack: 0, hold: 8, decay: 0, freq: 190, lowPass: 420, resonance: 6, gain: 0.16, seed: 61102 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "wide detuned space, unisons beating",
+        id: 'f',
+        character: "cathedral metal, inharmonic and wide",
         spec: {
-          name: 'musicBed_c_detunedSpace',
+          name: 'musicBed_f_cathedralMetal',
           loop: true,
           crossfade: 0.6,
           layers: [
-            place({ name: 'musicBed_c.u0', wave: 'triangle', attack: 0, hold: 8, decay: 0, freq: 110, noiseMix: 0.07, lowPass: 720, resonance: 6, gain: 0.26, seed: 33050 }),
-            place({ name: 'musicBed_c.u1', wave: 'triangle', attack: 0, hold: 8, decay: 0, freq: 110.8, noiseMix: 0.07, lowPass: 700, resonance: 6, gain: 0.24, seed: 33051 }),
-            place({ name: 'musicBed_c.u2', wave: 'sine', attack: 0, hold: 8, decay: 0, freq: 164.81, vibratoDepth: 0.003, vibratoRate: 0.05, lowPass: 900, resonance: 4, gain: 0.16, seed: 33052 }),
-            place({ name: 'musicBed_c.floor', wave: 'sine', attack: 0, hold: 8, decay: 0, freq: 55, gain: 0.16, seed: 33053 }),
+            place({ name: 'musicBed_f.b0', wave: 'noise', attack: 0, hold: 8, decay: 0, freq: 110, lowPass: 300, resonance: 10, bandPass: true, gain: 0.42, seed: 61110 }),
+            place({ name: 'musicBed_f.b1', wave: 'noise', attack: 0, hold: 8, decay: 0, freq: 265, lowPass: 700, resonance: 11, bandPass: true, gain: 0.3, seed: 61111 }),
+            place({ name: 'musicBed_f.b2', wave: 'noise', attack: 0, hold: 8, decay: 0, freq: 459, lowPass: 1200, resonance: 12, bandPass: true, gain: 0.2, seed: 61112 }),
+            place({ name: 'musicBed_f.floor', wave: 'sine', attack: 0, hold: 8, decay: 0, freq: 55, gain: 0.14, seed: 61113 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "almost nothing, two quiet layers",
+        spec: {
+          name: 'musicBed_g_almostNothing',
+          loop: true,
+          crossfade: 0.6,
+          layers: [
+            place({ name: 'musicBed_g.low', wave: 'sine', attack: 0, hold: 8, decay: 0, freq: 55, noiseMix: 0.04, lowPass: 140, resonance: 2, gain: 0.2, seed: 61120 }),
+            place({ name: 'musicBed_g.air', wave: 'noise', attack: 0, hold: 8, decay: 0, freq: 380, lowPass: 900, resonance: 2.6, highPass: 220, gain: 0.08, seed: 61121 }),
           ],
         },
       },
@@ -1924,44 +1958,57 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     current: 'musicPulse',
     candidates: [
       {
-        id: 'a',
-        character: "a dry contact pulse, machine-timed",
+        id: 'd',
+        character: "ion field with a grain pulse in it",
         spec: {
-          name: 'musicPulse_a_contactPulse',
+          name: 'musicPulse_d_ionPulse',
           loop: true,
           crossfade: 0.04,
           layers: [
-            place({ name: 'musicPulse_a.floor', wave: 'noise', attack: 0, hold: 0.75, decay: 0, freq: 90, lowPass: 280, resonance: 2.4, gain: 0.1, seed: 33060 }),
-            grains('musicPulse_a.hit', { freq: 340, freqEnd: 190, grain: 0.008, gain: 0.34, attack: 0.002, hold: 0.02, decay: 0.16, curve: 4, from: 1500, q: 3, hp: 110, punch: 0.5, seed: 33061 }),
-            grains('musicPulse_a.tail', { freq: 210, freqEnd: 140, grain: 0.022, gain: 0.16, attack: 0.004, hold: 0.03, decay: 0.3, curve: 3, from: 700, q: 2.6, at: 0.06, seed: 33062 }),
+            place({ name: 'musicPulse_d.field', wave: 'noise', attack: 0, hold: 0.75, decay: 0, freq: 520, lowPass: 1600, resonance: 3, highPass: 300, gain: 0.1, seed: 61130 }),
+            grains('musicPulse_d.hit', { freq: 420, freqEnd: 260, grain: 0.0035, gain: 0.3, attack: 0.002, hold: 0.02, decay: 0.15, curve: 4, from: 2400, to: 800, q: 3.2, hp: 240, punch: 0.5, seed: 61132 }),
+            grains('musicPulse_d.echo', { freq: 300, freqEnd: 200, grain: 0.008, gain: 0.14, attack: 0.004, hold: 0.02, decay: 0.26, curve: 3, from: 1200, to: 460, q: 2.8, hp: 180, at: 0.07, seed: 61134 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "a low pressure thud, a room under it",
+        id: 'e',
+        character: "magnetic thud, mass under a corner",
         spec: {
-          name: 'musicPulse_b_pressureThud',
+          name: 'musicPulse_e_magneticThud',
           loop: true,
           crossfade: 0.05,
           layers: [
-            place({ name: 'musicPulse_b.floor', wave: 'sine', attack: 0, hold: 1, decay: 0, freq: 55, noiseMix: 0.04, lowPass: 200, resonance: 2, gain: 0.1, seed: 33070 }),
-            swept('musicPulse_b.thud', { wave: 'sine', freq: 104, freqEnd: 44, from: 320, to: 110, q: 2.4, gain: 0.38, attack: 0.004, hold: 0.02, decay: 0.34, curve: 2.8, punch: 0.6, seed: 33071 }),
-            swept('musicPulse_b.room', { wave: 'noise', freq: 130, freqEnd: 80, from: 420, to: 160, q: 1.8, gain: 0.14, attack: 0.02, hold: 0.04, decay: 0.4, curve: 2, at: 0.09, seed: 33072 }),
+            place({ name: 'musicPulse_e.floor', wave: 'sine', attack: 0, hold: 1, decay: 0, freq: 49, noiseMix: 0.04, lowPass: 170, resonance: 2, gain: 0.1, seed: 61140 }),
+            swept('musicPulse_e.thud', { wave: 'sine', freq: 96, freqEnd: 41, from: 300, to: 96, q: 2.6, gain: 0.4, attack: 0.004, hold: 0.02, decay: 0.32, curve: 2.8, punch: 0.6, seed: 61142 }),
+            swept('musicPulse_e.after', { wave: 'triangle', freq: 74, freqEnd: 62, from: 260, to: 130, q: 3.4, gain: 0.16, attack: 0.02, hold: 0.04, decay: 0.36, curve: 2.2, noiseMix: 0.1, at: 0.1, seed: 61144 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "a narrow band pip, doubling",
+        id: 'f',
+        character: "two bands tolling in a space",
         spec: {
-          name: 'musicPulse_c_bandPip',
+          name: 'musicPulse_f_tollingBands',
           loop: true,
           crossfade: 0.03,
           layers: [
-            place({ name: 'musicPulse_c.floor', wave: 'triangle', attack: 0, hold: 0.8, decay: 0, freq: 55, noiseMix: 0.05, lowPass: 240, resonance: 2.2, gain: 0.1, seed: 33080 }),
-            band('musicPulse_c.p0', 620, { gain: 0.92, decay: 0.1, q: 5.5, curve: 5, attack: 0.002, seed: 33081 }),
-            band('musicPulse_c.p1', 465, { gain: 0.8, decay: 0.16, q: 6, curve: 4.5, attack: 0.002, at: 0.19, seed: 33082 }),
+            place({ name: 'musicPulse_f.floor', wave: 'triangle', attack: 0, hold: 0.8, decay: 0, freq: 55, noiseMix: 0.05, lowPass: 210, resonance: 2.4, gain: 0.1, seed: 61150 }),
+            band('musicPulse_f.t0', 520, { gain: 0.86, decay: 0.11, q: 6, curve: 5, attack: 0.002, seed: 61152 }),
+            band('musicPulse_f.t1', 392, { gain: 0.74, decay: 0.18, q: 7, curve: 4.4, attack: 0.002, at: 0.19, seed: 61154 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "a heartbeat, and no scenery",
+        spec: {
+          name: 'musicPulse_g_bareHeartbeat',
+          loop: true,
+          crossfade: 0.04,
+          layers: [
+            place({ name: 'musicPulse_g.floor', wave: 'sine', attack: 0, hold: 0.9, decay: 0, freq: 55, lowPass: 160, resonance: 1.8, gain: 0.08, seed: 61160 }),
+            swept('musicPulse_g.beat', { wave: 'sine', freq: 80, freqEnd: 55, from: 220, to: 90, q: 2, gain: 0.34, attack: 0.005, hold: 0.02, decay: 0.28, curve: 3, punch: 0.4, seed: 61162 }),
           ],
         },
       },
@@ -1969,9 +2016,9 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
   },
   musicTheme: {
     // §7.5 re-voices this slot and says what to keep: *"same riff, same key"*. So
-    // all three offers sound the shipped seven notes — A3 C4 E4 D4 C4 A3 E3 — at
+    // all four offers sound the shipped seven notes — A3 C4 E4 D4 C4 A3 E3 — at
     // the shipped times, and the ONLY thing the developer is choosing between is
-    // what is playing them. That is the whole thesis of the round in one slot:
+    // what is playing them. That is the whole thesis of the sweep in one slot:
     // round 1 changed the oscillator under this riff and the developer heard the
     // same music. The instrument is the offer.
     label: "Music Theme — Siege",
@@ -1979,60 +2026,78 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     current: 'musicTheme',
     candidates: [
       {
-        id: 'a',
-        character: "the riff as grained plucks, no sustain",
+        id: 'd',
+        character: "the riff as ion bursts, no body",
         spec: {
-          name: 'musicTheme_a_grainedPlucks',
+          name: 'musicTheme_d_ionBursts',
           loop: true,
           crossfade: 0.08,
           layers: [
-            place({ name: 'musicTheme_a.pad', wave: 'noise', attack: 0, hold: 4, decay: 0, freq: 220, lowPass: 700, resonance: 3.6, highPass: 90, gain: 0.14, seed: 33090 }),
-            grains('musicTheme_a.n0', { freq: 220, freqEnd: 176, grain: 0.007, gain: 0.21, attack: 0.003, hold: 0.03, decay: 0.3, curve: 3.6, from: 1500, q: 3.4, hp: 150, seed: 33091 }),
-            grains('musicTheme_a.n1', { freq: 261.63, freqEnd: 209, grain: 0.007, gain: 0.21, attack: 0.003, hold: 0.03, decay: 0.3, curve: 3.6, from: 1700, q: 3.4, hp: 170, at: 0.5, seed: 33092 }),
-            grains('musicTheme_a.n2', { freq: 329.63, freqEnd: 264, grain: 0.006, gain: 0.21, attack: 0.003, hold: 0.035, decay: 0.36, curve: 3.6, from: 2100, q: 3.4, hp: 200, at: 1, seed: 33093 }),
-            grains('musicTheme_a.n3', { freq: 293.66, freqEnd: 235, grain: 0.006, gain: 0.196, attack: 0.003, hold: 0.035, decay: 0.42, curve: 3.6, from: 1900, q: 3.4, hp: 190, at: 1.5, seed: 33094 }),
-            grains('musicTheme_a.n4', { freq: 261.63, freqEnd: 209, grain: 0.007, gain: 0.196, attack: 0.003, hold: 0.035, decay: 0.42, curve: 3.6, from: 1700, q: 3.4, hp: 170, at: 2.1, seed: 33095 }),
-            grains('musicTheme_a.n5', { freq: 220, freqEnd: 176, grain: 0.007, gain: 0.182, attack: 0.004, hold: 0.05, decay: 0.7, curve: 3.4, from: 1500, q: 3.4, hp: 150, at: 2.7, seed: 33096 }),
-            grains('musicTheme_a.n6', { freq: 164.81, freqEnd: 132, grain: 0.009, gain: 0.182, attack: 0.004, hold: 0.07, decay: 0.56, curve: 3.4, from: 1100, q: 3.2, hp: 110, at: 3.3, seed: 33097 }),
+            place({ name: 'musicTheme_d.field', wave: 'noise', attack: 0, hold: 4, decay: 0, freq: 700, lowPass: 2000, resonance: 3.2, highPass: 420, gain: 0.11, seed: 61170 }),
+            grains('musicTheme_d.n0', { freq: 220, grain: 0.0032, gain: 0.2, attack: 0.003, hold: 0.02, decay: 0.3, curve: 4, from: 2200, to: 900, q: 4, hp: 380, seed: 61171 }),
+            grains('musicTheme_d.n1', { freq: 261.63, grain: 0.003, gain: 0.2, attack: 0.003, hold: 0.02, decay: 0.3, curve: 4, from: 2500, to: 1000, q: 4, hp: 420, at: 0.5, seed: 61172 }),
+            grains('musicTheme_d.n2', { freq: 329.63, grain: 0.0028, gain: 0.2, attack: 0.003, hold: 0.024, decay: 0.36, curve: 4, from: 3000, to: 1200, q: 4, hp: 500, at: 1, seed: 61173 }),
+            grains('musicTheme_d.n3', { freq: 293.66, grain: 0.0028, gain: 0.19, attack: 0.003, hold: 0.024, decay: 0.42, curve: 4, from: 2800, to: 1100, q: 4, hp: 460, at: 1.5, seed: 61174 }),
+            grains('musicTheme_d.n4', { freq: 261.63, grain: 0.003, gain: 0.19, attack: 0.003, hold: 0.024, decay: 0.42, curve: 4, from: 2500, to: 1000, q: 4, hp: 420, at: 2.1, seed: 61175 }),
+            grains('musicTheme_d.n5', { freq: 220, grain: 0.0032, gain: 0.18, attack: 0.004, hold: 0.03, decay: 0.7, curve: 3.6, from: 2200, to: 900, q: 4, hp: 380, at: 2.7, seed: 61176 }),
+            grains('musicTheme_d.n6', { freq: 164.81, grain: 0.0036, gain: 0.18, attack: 0.004, hold: 0.04, decay: 0.56, curve: 3.6, from: 1700, to: 700, q: 4, hp: 300, at: 3.3, seed: 61177 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "the riff on filtered analogue, corner closing",
+        id: 'e',
+        character: "the riff on magnetic mass, corners closing",
         spec: {
-          name: 'musicTheme_b_filteredAnalogue',
+          name: 'musicTheme_e_magneticMass',
           loop: true,
           crossfade: 0.08,
           layers: [
-            place({ name: 'musicTheme_b.pad', wave: 'triangle', attack: 0, hold: 4, decay: 0, freq: 110, noiseMix: 0.05, lowPass: 260, resonance: 3, gain: 0.18, seed: 33100 }),
-            swept('musicTheme_b.n0', { wave: 'triangle', freq: 220, from: 2625, to: 380, q: 5.5, gain: 0.3, attack: 0.004, hold: 0.028, decay: 0.352, curve: 3.6, noiseMix: 0.1, seed: 33101 }),
-            swept('musicTheme_b.n1', { wave: 'triangle', freq: 261.63, from: 2975, to: 430, q: 5.5, gain: 0.3, attack: 0.004, hold: 0.028, decay: 0.352, curve: 3.6, noiseMix: 0.1, at: 0.5, seed: 33102 }),
-            swept('musicTheme_b.n2', { wave: 'triangle', freq: 329.63, from: 3675, to: 540, q: 5.5, gain: 0.3, attack: 0.004, hold: 0.035, decay: 0.416, curve: 3.6, noiseMix: 0.1, at: 1, seed: 33103 }),
-            swept('musicTheme_b.n3', { wave: 'triangle', freq: 293.66, from: 3325, to: 480, q: 5.5, gain: 0.29, attack: 0.004, hold: 0.035, decay: 0.48, curve: 3.6, noiseMix: 0.1, at: 1.5, seed: 33104 }),
-            swept('musicTheme_b.n4', { wave: 'triangle', freq: 261.63, from: 2975, to: 430, q: 5.5, gain: 0.29, attack: 0.004, hold: 0.035, decay: 0.48, curve: 3.6, noiseMix: 0.1, at: 2.1, seed: 33105 }),
-            swept('musicTheme_b.n5', { wave: 'triangle', freq: 220, from: 2625, to: 380, q: 5.5, gain: 0.28, attack: 0.006, hold: 0.049, decay: 0.8, curve: 3.6, noiseMix: 0.1, at: 2.7, seed: 33106 }),
-            swept('musicTheme_b.n6', { wave: 'triangle', freq: 164.81, from: 1925, to: 300, q: 5.5, gain: 0.28, attack: 0.006, hold: 0.07, decay: 0.64, curve: 3.6, noiseMix: 0.1, at: 3.3, seed: 33107 }),
+            place({ name: 'musicTheme_e.pad', wave: 'triangle', attack: 0, hold: 4, decay: 0, freq: 55, noiseMix: 0.05, lowPass: 180, resonance: 3.4, gain: 0.16, seed: 61180 }),
+            swept('musicTheme_e.n0', { wave: 'triangle', freq: 220, from: 1500, to: 300, q: 4.5, gain: 0.3, attack: 0.005, hold: 0.03, decay: 0.35, curve: 3.4, noiseMix: 0.16, seed: 61181 }),
+            swept('musicTheme_e.n1', { wave: 'triangle', freq: 261.63, from: 1750, to: 340, q: 4.5, gain: 0.3, attack: 0.005, hold: 0.03, decay: 0.35, curve: 3.4, noiseMix: 0.16, at: 0.5, seed: 61182 }),
+            swept('musicTheme_e.n2', { wave: 'triangle', freq: 329.63, from: 2200, to: 420, q: 4.5, gain: 0.3, attack: 0.005, hold: 0.035, decay: 0.42, curve: 3.4, noiseMix: 0.16, at: 1, seed: 61183 }),
+            swept('musicTheme_e.n3', { wave: 'triangle', freq: 293.66, from: 1950, to: 380, q: 4.5, gain: 0.29, attack: 0.005, hold: 0.035, decay: 0.48, curve: 3.4, noiseMix: 0.16, at: 1.5, seed: 61184 }),
+            swept('musicTheme_e.n4', { wave: 'triangle', freq: 261.63, from: 1750, to: 340, q: 4.5, gain: 0.29, attack: 0.005, hold: 0.035, decay: 0.48, curve: 3.4, noiseMix: 0.16, at: 2.1, seed: 61185 }),
+            swept('musicTheme_e.n5', { wave: 'triangle', freq: 220, from: 1500, to: 300, q: 4.5, gain: 0.28, attack: 0.006, hold: 0.05, decay: 0.8, curve: 3.4, noiseMix: 0.16, at: 2.7, seed: 61186 }),
+            swept('musicTheme_e.n6', { wave: 'triangle', freq: 164.81, from: 1150, to: 240, q: 4.5, gain: 0.28, attack: 0.006, hold: 0.07, decay: 0.64, curve: 3.4, noiseMix: 0.16, at: 3.3, seed: 61187 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "the riff in detuned metal, space behind it",
+        id: 'f',
+        character: "the riff struck on cathedral bands",
         spec: {
-          name: 'musicTheme_c_detunedMetal',
+          name: 'musicTheme_f_cathedralBands',
           loop: true,
           crossfade: 0.08,
           layers: [
-            place({ name: 'musicTheme_c.pad', wave: 'triangle', attack: 0, hold: 4, decay: 0, freq: 110, noiseMix: 0.08, lowPass: 800, resonance: 5.5, gain: 0.14, seed: 33110 }),
-            place({ name: 'musicTheme_c.pad2', wave: 'triangle', attack: 0, hold: 4, decay: 0, freq: 110.6, noiseMix: 0.08, lowPass: 800, resonance: 5.5, gain: 0.12, seed: 33111 }),
-            ...plate('musicTheme_c.n0', 220, { gain: 0.3, decay: 0.352, ratios: [1, 2.41], q: 8, curve: 3.6, grain: 0.22, edge: 0.5, seed: 33112 }),
-            ...plate('musicTheme_c.n1', 261.63, { gain: 0.3, decay: 0.352, ratios: [1, 2.41], q: 8, curve: 3.6, grain: 0.22, edge: 0.5, at: 0.5, seed: 33115 }),
-            ...plate('musicTheme_c.n2', 329.63, { gain: 0.3, decay: 0.416, ratios: [1, 2.41], q: 8, curve: 3.6, grain: 0.22, edge: 0.5, at: 1, seed: 33118 }),
-            ...plate('musicTheme_c.n3', 293.66, { gain: 0.29, decay: 0.48, ratios: [1, 2.41], q: 8, curve: 3.6, grain: 0.22, edge: 0.5, at: 1.5, seed: 33121 }),
-            ...plate('musicTheme_c.n4', 261.63, { gain: 0.29, decay: 0.48, ratios: [1, 2.41], q: 8, curve: 3.6, grain: 0.22, edge: 0.5, at: 2.1, seed: 33124 }),
-            ...plate('musicTheme_c.n5', 220, { gain: 0.28, decay: 0.8, ratios: [1, 2.41], q: 8, curve: 3.4, grain: 0.22, edge: 0.5, at: 2.7, seed: 33127 }),
-            ...plate('musicTheme_c.n6', 164.81, { gain: 0.28, decay: 0.64, ratios: [1, 2.41], q: 8, curve: 3.4, grain: 0.22, edge: 0.5, at: 3.3, seed: 33130 }),
+            place({ name: 'musicTheme_f.pad', wave: 'noise', attack: 0, hold: 4, decay: 0, freq: 110, lowPass: 320, resonance: 9, bandPass: true, gain: 0.2, seed: 61190 }),
+            band('musicTheme_f.n0', 220, { gain: 0.6, decay: 0.35, q: 10, curve: 3.6, attack: 0.003, hold: 0.008, seed: 61191 }),
+            band('musicTheme_f.n1', 261.63, { gain: 0.6, decay: 0.35, q: 10, curve: 3.6, attack: 0.003, hold: 0.008, at: 0.5, seed: 61192 }),
+            band('musicTheme_f.n2', 329.63, { gain: 0.6, decay: 0.42, q: 10.5, curve: 3.6, attack: 0.003, hold: 0.008, at: 1, seed: 61193 }),
+            band('musicTheme_f.n3', 293.66, { gain: 0.58, decay: 0.48, q: 10.5, curve: 3.6, attack: 0.003, hold: 0.008, at: 1.5, seed: 61194 }),
+            band('musicTheme_f.n4', 261.63, { gain: 0.58, decay: 0.48, q: 10, curve: 3.6, attack: 0.003, hold: 0.008, at: 2.1, seed: 61195 }),
+            band('musicTheme_f.n5', 220, { gain: 0.56, decay: 0.8, q: 10, curve: 3.4, attack: 0.004, hold: 0.01, at: 2.7, seed: 61196 }),
+            band('musicTheme_f.n6', 164.81, { gain: 0.56, decay: 0.64, q: 9.5, curve: 3.4, attack: 0.004, hold: 0.012, at: 3.3, seed: 61197 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "the riff, quietly, with nothing behind it",
+        spec: {
+          name: 'musicTheme_g_bareRiff',
+          loop: true,
+          crossfade: 0.08,
+          layers: [
+            place({ name: 'musicTheme_g.floor', wave: 'sine', attack: 0, hold: 4, decay: 0, freq: 55, lowPass: 150, resonance: 1.8, gain: 0.1, seed: 61200 }),
+            swept('musicTheme_g.n0', { wave: 'sine', freq: 220, from: 700, to: 260, q: 2.6, gain: 0.24, attack: 0.006, hold: 0.03, decay: 0.35, curve: 3.4, noiseMix: 0.08, seed: 61201 }),
+            swept('musicTheme_g.n1', { wave: 'sine', freq: 261.63, from: 820, to: 300, q: 2.6, gain: 0.24, attack: 0.006, hold: 0.03, decay: 0.35, curve: 3.4, noiseMix: 0.08, at: 0.5, seed: 61202 }),
+            swept('musicTheme_g.n2', { wave: 'sine', freq: 329.63, from: 1000, to: 380, q: 2.6, gain: 0.24, attack: 0.006, hold: 0.035, decay: 0.42, curve: 3.4, noiseMix: 0.08, at: 1, seed: 61203 }),
+            swept('musicTheme_g.n3', { wave: 'sine', freq: 293.66, from: 900, to: 340, q: 2.6, gain: 0.23, attack: 0.006, hold: 0.035, decay: 0.48, curve: 3.4, noiseMix: 0.08, at: 1.5, seed: 61204 }),
+            swept('musicTheme_g.n4', { wave: 'sine', freq: 261.63, from: 820, to: 300, q: 2.6, gain: 0.23, attack: 0.006, hold: 0.035, decay: 0.48, curve: 3.4, noiseMix: 0.08, at: 2.1, seed: 61205 }),
+            swept('musicTheme_g.n5', { wave: 'sine', freq: 220, from: 700, to: 260, q: 2.6, gain: 0.22, attack: 0.008, hold: 0.05, decay: 0.8, curve: 3.4, noiseMix: 0.08, at: 2.7, seed: 61206 }),
+            swept('musicTheme_g.n6', { wave: 'sine', freq: 164.81, from: 560, to: 210, q: 2.6, gain: 0.22, attack: 0.008, hold: 0.07, decay: 0.64, curve: 3.4, noiseMix: 0.08, at: 3.3, seed: 61207 }),
           ],
         },
       },
@@ -2044,45 +2109,58 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     current: 'musicDread',
     candidates: [
       {
-        id: 'a',
-        character: "a grinding grain bed, no pitch centre",
+        id: 'd',
+        character: "ion field thinning out, high and empty",
         spec: {
-          name: 'musicDread_a_grindingGrain',
+          name: 'musicDread_d_thinField',
           loop: true,
           crossfade: 0.4,
           layers: [
-            place({ name: 'musicDread_a.grind', wave: 'noise', attack: 0, hold: 6, decay: 0, freq: 260, lowPass: 820, resonance: 3.8, highPass: 110, gain: 0.3, seed: 33140 }),
-            place({ name: 'musicDread_a.scrape', wave: 'noise', attack: 0, hold: 6, decay: 0, freq: 96, lowPass: 340, resonance: 4.4, gain: 0.24, seed: 33141 }),
-            place({ name: 'musicDread_a.floor', wave: 'sine', attack: 0, hold: 6, decay: 0, freq: 41.2, gain: 0.18, seed: 33142 }),
+            place({ name: 'musicDread_d.field', wave: 'noise', attack: 0, hold: 6, decay: 0, freq: 480, lowPass: 1500, resonance: 4, highPass: 320, gain: 0.24, seed: 61210 }),
+            place({ name: 'musicDread_d.upper', wave: 'noise', attack: 0, hold: 6, decay: 0, freq: 1300, lowPass: 3200, resonance: 5.5, highPass: 900, gain: 0.12, seed: 61211 }),
+            place({ name: 'musicDread_d.trace', wave: 'triangle', attack: 0, hold: 6, decay: 0, freq: 246.94, noiseMix: 0.34, lowPass: 800, resonance: 6, gain: 0.09, seed: 61212 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "sub rumble with pressure in the room",
+        id: 'e',
+        character: "magnetic rumble, unisons grinding",
         spec: {
-          name: 'musicDread_b_pressureRumble',
+          name: 'musicDread_e_magneticRumble',
           loop: true,
           crossfade: 0.5,
           layers: [
-            place({ name: 'musicDread_b.rumble', wave: 'triangle', attack: 0, hold: 7, decay: 0, freq: 41.2, noiseMix: 0.1, lowPass: 130, resonance: 4, gain: 0.44, seed: 33150 }),
-            place({ name: 'musicDread_b.beat', wave: 'sine', attack: 0, hold: 7, decay: 0, freq: 41.55, lowPass: 130, resonance: 2.6, gain: 0.28, seed: 33151 }),
-            place({ name: 'musicDread_b.sub', wave: 'sine', attack: 0, hold: 7, decay: 0, freq: 30.9, gain: 0.2, seed: 33152 }),
+            place({ name: 'musicDread_e.u0', wave: 'triangle', attack: 0, hold: 7, decay: 0, freq: 41.2, noiseMix: 0.12, lowPass: 125, resonance: 4.2, gain: 0.42, seed: 61220 }),
+            place({ name: 'musicDread_e.u1', wave: 'triangle', attack: 0, hold: 7, decay: 0, freq: 41.75, noiseMix: 0.12, lowPass: 125, resonance: 4.2, gain: 0.3, seed: 61221 }),
+            place({ name: 'musicDread_e.press', wave: 'noise', attack: 0, hold: 7, decay: 0, freq: 130, lowPass: 300, resonance: 5, gain: 0.16, seed: 61222 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "detuned unisons beating, metal in the smear",
+        id: 'f',
+        character: "cathedral bands, nothing resolving",
         spec: {
-          name: 'musicDread_c_metalSmear',
+          name: 'musicDread_f_cathedralDread',
           loop: true,
           crossfade: 0.45,
           layers: [
-            place({ name: 'musicDread_c.band', wave: 'noise', attack: 0, hold: 6, decay: 0, freq: 165, lowPass: 400, resonance: 11, bandPass: true, gain: 0.4, seed: 33160 }),
-            place({ name: 'musicDread_c.u0', wave: 'triangle', attack: 0, hold: 6, decay: 0, freq: 82.41, noiseMix: 0.08, lowPass: 560, resonance: 6, gain: 0.24, seed: 33161 }),
-            place({ name: 'musicDread_c.u1', wave: 'triangle', attack: 0, hold: 6, decay: 0, freq: 87.31, noiseMix: 0.08, lowPass: 560, resonance: 6, gain: 0.22, seed: 33162 }),
-            place({ name: 'musicDread_c.floor', wave: 'sine', attack: 0, hold: 6, decay: 0, freq: 27.5, gain: 0.14, seed: 33163 }),
+            place({ name: 'musicDread_f.b0', wave: 'noise', attack: 0, hold: 6, decay: 0, freq: 82.41, lowPass: 240, resonance: 11, bandPass: true, gain: 0.42, seed: 61230 }),
+            place({ name: 'musicDread_f.b1', wave: 'noise', attack: 0, hold: 6, decay: 0, freq: 198, lowPass: 520, resonance: 12, bandPass: true, gain: 0.28, seed: 61231 }),
+            place({ name: 'musicDread_f.b2', wave: 'noise', attack: 0, hold: 6, decay: 0, freq: 343, lowPass: 900, resonance: 12, bandPass: true, gain: 0.18, seed: 61232 }),
+            place({ name: 'musicDread_f.floor', wave: 'sine', attack: 0, hold: 6, decay: 0, freq: 27.5, gain: 0.14, seed: 61233 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "one low layer, and the room emptying",
+        spec: {
+          name: 'musicDread_g_oneLayer',
+          loop: true,
+          crossfade: 0.5,
+          layers: [
+            place({ name: 'musicDread_g.low', wave: 'sine', attack: 0, hold: 7, decay: 0, freq: 36.71, noiseMix: 0.06, lowPass: 110, resonance: 2.2, gain: 0.34, seed: 61240 }),
+            place({ name: 'musicDread_g.air', wave: 'noise', attack: 0, hold: 7, decay: 0, freq: 300, lowPass: 700, resonance: 2.4, highPass: 180, gain: 0.07, seed: 61241 }),
           ],
         },
       },
@@ -2093,46 +2171,61 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     context: "Match won (after the three-second quiet) — one-shot, rising major arpeggio.",
     current: 'musicWin',
     candidates: [
+      // It lands after the three seconds of silence (§4.7), so it arrives into
+      // nothing and does not have to shout. No offer here is a fanfare: the rise
+      // is carried by the corner and by level, not by an arpeggio getting louder.
       {
-        id: 'a',
-        character: "three dry hits rising, no shine",
+        id: 'd',
+        character: "ion bursts rising, thin and dry",
         spec: {
-          name: 'musicWin_a_dryHits',
+          name: 'musicWin_d_ionRise',
           layers: [
-            grains('musicWin_a.n0', { freq: 440, freqEnd: 350, grain: 0.006, gain: 0.34, attack: 0.005, hold: 0.06, decay: 0.14, curve: 4, from: 2200, to: 900, q: 3.4, hp: 300, seed: 33170 }),
-            grains('musicWin_a.n1', { freq: 554.37, freqEnd: 440, grain: 0.005, gain: 0.32, attack: 0.005, hold: 0.06, decay: 0.16, curve: 4, from: 2800, to: 1150, q: 3.4, hp: 380, at: 0.12, seed: 33171 }),
-            grains('musicWin_a.n2', { freq: 659.25, freqEnd: 520, grain: 0.005, gain: 0.3, attack: 0.005, hold: 0.09, decay: 0.5, curve: 3.4, from: 3300, to: 1350, q: 3.6, hp: 440, at: 0.26, seed: 33172 }),
+            grains('musicWin_d.n0', { freq: 440, grain: 0.0032, gain: 0.32, attack: 0.004, hold: 0.05, decay: 0.13, curve: 4, from: 2600, to: 1000, q: 3.6, hp: 420, seed: 61250 }),
+            grains('musicWin_d.n1', { freq: 587.33, grain: 0.003, gain: 0.3, attack: 0.004, hold: 0.05, decay: 0.16, curve: 4, from: 3200, to: 1300, q: 3.6, hp: 520, at: 0.12, seed: 61252 }),
+            grains('musicWin_d.n2', { freq: 880, grain: 0.0026, gain: 0.28, attack: 0.004, hold: 0.08, decay: 0.46, curve: 3.4, from: 4200, to: 1700, q: 3.8, hp: 700, at: 0.26, seed: 61254 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "a low swell lifting, weight behind it",
+        id: 'e',
+        character: "magnetic lift, weight arriving",
         spec: {
-          name: 'musicWin_b_lowSwell',
+          name: 'musicWin_e_magneticLift',
           layers: [
-            swept('musicWin_b.lift', { wave: 'triangle', freq: 220, from: 400, to: 2200, q: 4, gain: 0.36, attack: 0.03, hold: 0.16, decay: 0.1, curve: 2.4, noiseMix: 0.12, seed: 33180 }),
-            swept('musicWin_b.top', { wave: 'triangle', freq: 330, from: 2000, to: 620, q: 4.4, gain: 0.4, attack: 0.006, hold: 0.06, decay: 0.5, curve: 2.8, punch: 0.4, noiseMix: 0.1, at: 0.28, seed: 33181 }),
-            swept('musicWin_b.floor', { wave: 'sine', freq: 110, from: 300, q: 1.8, gain: 0.24, attack: 0.01, hold: 0.1, decay: 0.44, curve: 2.4, at: 0.04, seed: 33182 }),
+            swept('musicWin_e.lift', { wave: 'triangle', freq: 220, from: 340, to: 1800, q: 4, gain: 0.36, attack: 0.03, hold: 0.15, decay: 0.1, curve: 2.4, noiseMix: 0.14, seed: 61260 }),
+            swept('musicWin_e.land', { wave: 'triangle', freq: 293.66, from: 1700, to: 520, q: 4.4, gain: 0.4, attack: 0.006, hold: 0.06, decay: 0.5, curve: 2.8, punch: 0.4, noiseMix: 0.12, at: 0.28, seed: 61262 }),
+            swept('musicWin_e.floor', { wave: 'sine', freq: 73.42, from: 240, q: 1.8, gain: 0.26, attack: 0.012, hold: 0.1, decay: 0.44, curve: 2.4, at: 0.04, seed: 61264 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "bands opening, metal ringing out",
+        id: 'f',
+        character: "cathedral bands opening, one room",
         spec: {
-          name: 'musicWin_c_bandsOpening',
+          name: 'musicWin_f_cathedralOpen',
           layers: [
-            band('musicWin_c.n0', 440, { gain: 0.46, decay: 0.14, q: 8, curve: 4.5, attack: 0.003, hold: 0.01, seed: 33190 }),
-            band('musicWin_c.n1', 554.37, { gain: 0.44, decay: 0.18, q: 8.5, curve: 4.2, attack: 0.003, hold: 0.01, at: 0.12, seed: 33191 }),
-            ...plate('musicWin_c.n2', 659.25, { gain: 0.46, decay: 0.56, ratios: [1, 2.41], q: 9, curve: 3.6, grain: 0.18, edge: 0.6, at: 0.26, seed: 33193 }),
+            band('musicWin_f.n0', 392, { gain: 0.46, decay: 0.14, q: 8.5, curve: 4.5, attack: 0.003, hold: 0.01, seed: 61270 }),
+            band('musicWin_f.n1', 587.33, { gain: 0.44, decay: 0.2, q: 9, curve: 4.2, attack: 0.003, hold: 0.01, at: 0.13, seed: 61272 }),
+            band('musicWin_f.n2', 784, { gain: 0.44, decay: 0.46, q: 9.5, curve: 3.8, attack: 0.003, hold: 0.012, at: 0.27, seed: 61274 }),
+            ...returns('musicWin_f.room', { freq: 620, gain: 0.14, decay: 0.3, from: 1600, to: 520, at: 0.55, gap: 0.22, count: 2, seed: 61276 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "won: two notes and a floor",
+        spec: {
+          name: 'musicWin_g_twoNotes',
+          layers: [
+            swept('musicWin_g.n0', { wave: 'sine', freq: 293.66, from: 900, to: 400, q: 2.6, gain: 0.34, attack: 0.006, hold: 0.05, decay: 0.16, curve: 3.2, noiseMix: 0.08, seed: 61280 }),
+            swept('musicWin_g.n1', { wave: 'sine', freq: 440, from: 1300, to: 560, q: 2.6, gain: 0.34, attack: 0.006, hold: 0.07, decay: 0.5, curve: 2.8, noiseMix: 0.08, at: 0.2, seed: 61282 }),
           ],
         },
       },
     ],
   },
   musicLoss: {
-    // *"The one thing in the soundtrack allowed to be sad"* (§7.5). All three fall
+    // *"The one thing in the soundtrack allowed to be sad"* (§7.5). All four fall
     // and none of them lands anywhere: no offer here resolves to its root, and no
     // offer runs past the shipped 1.32 s longest-tail invariant (§8) — a winner
     // has to be promotable into the bank without breaking the beat it protects.
@@ -2141,38 +2234,48 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     current: 'musicLoss',
     candidates: [
       {
-        id: 'a',
-        character: "a grained fall, everything letting go",
+        id: 'd',
+        character: "ion field falling away to nothing",
         spec: {
-          name: 'musicLoss_a_grainedFall',
+          name: 'musicLoss_d_fieldFalls',
           layers: [
-            grains('musicLoss_a.n0', { freq: 220, freqEnd: 186, grain: 0.012, gain: 0.32, attack: 0.012, hold: 0.14, decay: 0.2, curve: 3, from: 1000, to: 560, q: 3, hp: 90, seed: 33200 }),
-            grains('musicLoss_a.n1', { freq: 174.61, freqEnd: 148, grain: 0.014, gain: 0.3, attack: 0.014, hold: 0.14, decay: 0.24, curve: 2.8, from: 800, to: 440, q: 3, hp: 70, at: 0.3, seed: 33201 }),
-            grains('musicLoss_a.n2', { freq: 130.81, freqEnd: 108, grain: 0.018, gain: 0.28, attack: 0.016, hold: 0.16, decay: 0.5, curve: 2.4, from: 600, to: 300, q: 2.8, hp: 55, at: 0.62, seed: 33202 }),
+            grains('musicLoss_d.n0', { freq: 220, grain: 0.0035, gain: 0.3, attack: 0.012, hold: 0.12, decay: 0.2, curve: 3, from: 1700, to: 700, q: 3.4, hp: 260, seed: 61290 }),
+            grains('musicLoss_d.n1', { freq: 174.61, grain: 0.004, gain: 0.28, attack: 0.014, hold: 0.12, decay: 0.24, curve: 2.8, from: 1300, to: 520, q: 3.2, hp: 190, at: 0.3, seed: 61292 }),
+            grains('musicLoss_d.n2', { freq: 130.81, grain: 0.005, gain: 0.26, attack: 0.016, hold: 0.14, decay: 0.5, curve: 2.4, from: 950, to: 340, q: 3, hp: 130, at: 0.62, seed: 61294 }),
           ],
         },
       },
       {
-        id: 'b',
-        character: "a low descent, pressure leaving",
+        id: 'e',
+        character: "magnetic descent, mass settling low",
         spec: {
-          name: 'musicLoss_b_pressureLeaving',
+          name: 'musicLoss_e_magneticDescent',
           layers: [
-            swept('musicLoss_b.n0', { wave: 'triangle', freq: 164.81, freqEnd: 155.56, from: 560, to: 230, q: 4, gain: 0.34, attack: 0.014, hold: 0.14, decay: 0.22, curve: 2.6, noiseMix: 0.1, seed: 33210 }),
-            swept('musicLoss_b.n1', { wave: 'triangle', freq: 123.47, freqEnd: 116.54, from: 400, to: 170, q: 4, gain: 0.34, attack: 0.016, hold: 0.14, decay: 0.26, curve: 2.4, noiseMix: 0.1, at: 0.3, seed: 33211 }),
-            swept('musicLoss_b.n2', { wave: 'sine', freq: 82.41, freqEnd: 73.42, from: 200, to: 88, q: 2.6, gain: 0.38, attack: 0.02, hold: 0.16, decay: 0.52, curve: 2, noiseMix: 0.06, at: 0.62, seed: 33212 }),
+            swept('musicLoss_e.n0', { wave: 'triangle', freq: 155.56, freqEnd: 146.83, from: 480, to: 200, q: 4.2, gain: 0.34, attack: 0.014, hold: 0.13, decay: 0.22, curve: 2.6, noiseMix: 0.12, seed: 61300 }),
+            swept('musicLoss_e.n1', { wave: 'triangle', freq: 116.54, freqEnd: 110, from: 360, to: 150, q: 4.2, gain: 0.34, attack: 0.016, hold: 0.13, decay: 0.26, curve: 2.4, noiseMix: 0.12, at: 0.3, seed: 61302 }),
+            swept('musicLoss_e.n2', { wave: 'sine', freq: 77.78, freqEnd: 69.3, from: 190, to: 84, q: 2.6, gain: 0.38, attack: 0.02, hold: 0.15, decay: 0.5, curve: 2, noiseMix: 0.06, at: 0.62, seed: 61304 }),
           ],
         },
       },
       {
-        id: 'c',
-        character: "one detuned toll, unresolved",
+        id: 'f',
+        character: "one band tolling in an empty room",
         spec: {
-          name: 'musicLoss_c_detunedToll',
+          name: 'musicLoss_f_emptyToll',
           layers: [
-            swept('musicLoss_c.toll', { wave: 'triangle', freq: 146.83, freqEnd: 138, from: 760, to: 260, q: 5, gain: 0.54, attack: 0.008, hold: 0.03, decay: 0.62, curve: 2.6, noiseMix: 0.12, seed: 33220 }),
-            swept('musicLoss_c.beat', { wave: 'triangle', freq: 148.6, freqEnd: 139.6, from: 720, to: 250, q: 5, gain: 0.4, attack: 0.01, hold: 0.03, decay: 0.6, curve: 2.6, noiseMix: 0.12, at: 0.012, seed: 33221 }),
-            ...returns('musicLoss_c.room', { freq: 300, gain: 0.18, decay: 0.3, from: 700, to: 240, at: 0.42, gap: 0.3, count: 2, seed: 33223 }),
+            band('musicLoss_f.toll', 146.83, { gain: 0.66, decay: 0.6, q: 8.5, curve: 2.8, attack: 0.006, hold: 0.02, seed: 61310 }),
+            band('musicLoss_f.beat', 148.9, { gain: 0.5, decay: 0.58, q: 8.5, curve: 2.8, attack: 0.008, hold: 0.02, at: 0.014, seed: 61312 }),
+            ...returns('musicLoss_f.room', { freq: 280, gain: 0.16, decay: 0.3, from: 640, to: 220, at: 0.42, gap: 0.3, count: 2, seed: 61314 }),
+          ],
+        },
+      },
+      {
+        id: 'g',
+        character: "lost: one note, going down and stopping",
+        spec: {
+          name: 'musicLoss_g_oneNoteDown',
+          layers: [
+            swept('musicLoss_g.down', { wave: 'triangle', freq: 130.81, freqEnd: 98, from: 420, to: 140, q: 3, gain: 0.42, attack: 0.02, hold: 0.16, decay: 0.6, curve: 2.2, noiseMix: 0.1, seed: 61320 }),
           ],
         },
       },
