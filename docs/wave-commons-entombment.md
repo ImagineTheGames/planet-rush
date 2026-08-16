@@ -1,17 +1,64 @@
 # The commons ring entombs ships at the map centre
 
-**Status:** open defect on `main`. Root-caused and measured; **not fixed**, because
-every fix that works is a balance/design call.
+**Status: FIXED in a0-65** (2026-08-16), commit `eff9443`, in the sim. Everything
+below the resolution section is the investigation that led there and is kept for
+the measurements; read the resolution first, because several of the conclusions
+below were superseded by it.
 **Owner of the code:** Gameplay (`src/sim/waves.ts`, `src/sim/constants.ts`).
-**Owner of the decision:** Director — this doc exists to make that decision cheap.
-**Where the decision is queued:** `docs/gdd-conformance.md` **Q-6** (§7, QUESTIONS
-FOR THE DEVELOPER), which states the ask in one screen and links back here for the
-measurements. §2.3's wave row there carries the defect too, so the gap register
-does not certify this mechanic without it.
 **Found by:** `tests/harness/unstuck.test.ts`, during a0-59 (PR #436).
 **Pinned by:** `src/sim/waves.test.ts` — a direct reachability check that, unlike
-the wedge gate, cannot be masked by widening the cage. See
-[The trap starts at wave 4](#the-trap-starts-at-wave-4-and-nothing-in-ci-can-see-it-there).
+the wedge gate, cannot be masked by widening the cage. It now asserts the
+invariant (escapable after every wave) rather than characterising the defect.
+
+---
+
+## Resolution (a0-65)
+
+**The centre is escapable after every wave, on 100 seeds out of 100.** Before the
+fix it was sealed on **100 of 100** — at wave 4 on 96 of them. The earlier
+estimate in this document that a ship is caught "on 16 of 24 seeds" was measuring
+how often a *bot happened to be standing there*; the geometry itself was sealing
+on every single seed.
+
+The fix is two parts, in `src/sim/constants.ts` and `src/sim/waves.ts`:
+
+1. **`WAVE.lastRadiusFraction` 0.25 → 0.5** — the final ring needs a
+   circumference to spend. Alone: still sealed on 23 of 24.
+2. **`ringSizeScale()` in `waves.ts`** — a wave's rocks shrink when its own ring
+   cannot carry their arc, derived from the ring circumference rather than tuned
+   per wave, so it self-adjusts to player count and lobby size. Alone: still
+   sealed, because at radius 65 u the rocks must become 2 u pebbles to fit and
+   the taper floors first.
+
+Together: **0 / 100 sealed.**
+
+This document recommended `lastRadiusFraction = 0.50` plus a 2× rock-size cut
+(fifteenth session), and that recommendation was correct in direction. The shipped
+version differs in making the size cut *derived* rather than a flat 2×, which
+leaves waves 1–3 placed exactly as before instead of shrinking the whole match's
+rock.
+
+Not a balance/design call in the end, or rather: the *direction* was forced by
+arithmetic, not chosen. 24 rocks of radius 22–46 form a closed ring at any radius
+below ~250 u, so a field that closes below that is entombing by construction. What
+remained a taste call was only how much closure to keep, and the shipped values
+keep 2× (307 u → 154 u) against the old 4×.
+
+Costs, for the record: the Outer Drift is weaker (2× rather than 4×), and wave 4/5
+rocks are smaller (×0.905 and ×0.565; mean radius 31 → 28 and 37 → 21, against a
+`SHIP_RADIUS` of 16, so still readable). Ore is unmoved — `drawCanon` scales ore
+to the wave budget independently of radius — and the `N`-fold fairness symmetry is
+untouched, both parts being reshapes of the one drawn sector.
+
+**On the causation question this defect was argued over for many sessions:** the
+entombment is pure map geometry and is present identically at
+`DEATH_ORE_DROP_FRACTION` 0.5 and 1 — `waves.test.ts` steps the world with no
+inputs, so no ship dies and that constant never executes. What the full death drop
+changed is only *which seeds* put a bot inside the trap when it closed, which is
+why `unstuck.test.ts` was green on `main` and red on the a0-59 branch while the
+underlying defect was on both. Both statements are true at once.
+
+---
 
 > This was written out of a0-59's PR body so it outlives that PR. a0-59 is a
 > one-constant developer ruling that neither caused this nor worsened it; it is

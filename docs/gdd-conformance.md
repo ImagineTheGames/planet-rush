@@ -437,7 +437,7 @@ testable, so each row below is checked against the thing a player would look at.
 | **Banking is by flying into your own collection field**, ~4× radius, 2 ore/s, stops on leaving | **SHIPPED** | `DEPOSIT.drainRate = 2` `src/sim/constants.ts:1584`; `DEPOSIT_RANGE` drawn at `src/render/index.ts:969`. |
 | Ore chunks visibly courier ship→station, one per unit banked | **SHIPPED** | `src/sim/step.ts:291–297`, `:926`. |
 | The wheel's BANK segment dumps the hold in one tap | **SHIPPED** | `src/ui/build-wheel.ts:193`. |
-| Five timed waves, each closer to centre; after the last, collapse | **SHIPPED** | `src/sim/waves.ts:366`; `src/sim/buildings.ts:511`. **The claim is delivered; the delivery has a known defect — see Q-6.** By wave 5 the ring is oversubscribed with rock **3.66×**, closes to 71 u and seals the map centre behind a solid annulus with a 19.3 u free pocket, against a `SHIP_RADIUS` of 16. The seal actually closes at **wave 4** (9 of 9 seeds measured) and catches a ship — bot or human — on **16 of 24 seeds**; most mine their way out in 30–120 s, one of 24 was still sealed after four minutes. Open on `main`. Measured in `docs/wave-commons-entombment.md`; pinned by `src/sim/waves.test.ts`. Graded SHIPPED rather than PARTIAL deliberately: the waves *do* land, each closer than the last, and collapse *does* follow, so this is not a gap against §2.3's claim — it is a defect in a shipped mechanic, and the honest place for it is Q-6. |
+| Five timed waves, each closer to centre; after the last, collapse | **SHIPPED** | `src/sim/waves.ts:366`; `src/sim/buildings.ts:511`. **The claim is delivered, and the defect it used to carry is fixed (a0-65, Q-6 withdrawn).** Until 2026-08-16 the late waves sealed the map centre — a ship, bot or human, caught there when wave 4 landed could not leave by any route — on **100 seeds out of 100**, because 24 rocks of radius 22–46 cannot form a passable ring at the 77 u the field closed to. `WAVE.lastRadiusFraction` 0.25 → 0.5 plus the `ringSizeScale()` arc taper in `src/sim/waves.ts` opens it: **0/100 sealed**, with the field still closing 2× across the match and every wave still landing closer than the last. Pinned by `src/sim/waves.test.ts`, which now asserts the invariant rather than characterising the defect; measurements in `docs/wave-commons-entombment.md`. |
 | **A pickup and a pickup REFUSED must both be visible** (2026-08-08, a0-08) | **SHIPPED** | `Ship.lootTake` / `Ship.lootBlocked` published per tick — `src/sim/step.ts:922–923`, set at `:950` and `:988`. |
 
 ### §2.4 Controls and actions *(12 claims: 12 SHIPPED)*
@@ -754,9 +754,11 @@ Nothing has been cut, which is the point of checking.
 
 ## 7. QUESTIONS FOR THE DEVELOPER
 
-Only a human can settle these. Each is a decision, not a bug — with one
-deliberate exception, **Q-6**, which is a measured defect whose every remaining
-fix is a design call, so the decision is yours even though the bug is real.
+Only a human can settle these. Each is a decision, not a bug. **Q-6** was the one
+deliberate exception — a measured defect held here because its every remaining fix
+looked like a design call — and it is now **withdrawn**: a0-65 showed the
+direction was forced by arithmetic rather than chosen, and fixed it. It is kept
+below, struck through, because the reasoning is worth not repeating.
 
 **Q-1 · What is a home called, in fiction?** §0 names **FACILITY** as a *working
 placeholder* and asks you to pick from FACILITY / RIG / STATION / OUTPOST. The
@@ -805,11 +807,29 @@ That is a real cost and it is worth naming before it is spent. **Confirm you wan
 the ratified faces shipped** (they are §5.6, so my assumption is yes), and QA
 should schedule the re-baseline in the same pass rather than after it.
 
-**Q-6 · The late waves seal the map centre and entomb whoever is standing in it.
-Which of the three fixes do you want, and does a0-59 wait for it?** *(Raised
-2026-08-16 by a0-59 / PR #436; incidence and onset corrected 2026-08-16 after
-measuring enclosure directly. Full report, with the measurements behind every
-number here: `docs/wave-commons-entombment.md`.)*
+**Q-6 · ~~The late waves seal the map centre and entomb whoever is standing in
+it. Which of the three fixes do you want, and does a0-59 wait for it?~~
+WITHDRAWN — FIXED in a0-65, no ruling needed.** *(Raised 2026-08-16 by a0-59 /
+PR #436; incidence and onset corrected 2026-08-16 after measuring enclosure
+directly; closed 2026-08-16 by a0-65, commit `eff9443`.)*
+
+> **Resolution.** Candidate (1) below was taken, with the size taper *derived*
+> from the ring's circumference rather than a flat 2× cut, so waves 1–3 are placed
+> exactly as before. `WAVE.lastRadiusFraction` 0.25 → 0.5 plus `ringSizeScale()`
+> in `src/sim/waves.ts`. **Sealed on 100/100 seeds before, 0/100 after.**
+>
+> This never needed a Director ruling in the end: the *direction* was forced by
+> arithmetic — 24 rocks of radius 22–46 form a closed ring at any radius below
+> ~250 u, so a field closing to 77 u entombs by construction — and the only taste
+> call left was how much closure to keep. The shipped values keep 2× (307 u →
+> 154 u) against the old 4×. Ore is unmoved and the `N`-fold fairness symmetry is
+> untouched. Full write-up: `docs/wave-commons-entombment.md`.
+>
+> Note also that the incidence figure below ("16 of 24 seeds") measured how often
+> a *bot happened to be standing* in the trap. The geometry was sealing on **every
+> seed**.
+
+The question as it stood, kept for the reasoning:
 
 This is a **live defect on `main`**, not a regression: from wave 2 onward the
 commons ring carries more rock than its circumference can hold, and by wave 5 it
