@@ -42,6 +42,17 @@ Consequences to know:
   replacing a table that did not reproduce. See BLOCKED. Nothing in the shipped
   code changed; this commit is the evidence the Director's ruling rests on.
 
+- `dc952e9` **docs(a0-59)** — the wave-trap *geometry* re-measured off the shipped
+  constants, replacing a hand-computed version with two wrong inputs. See BLOCKED
+  for the table. Shipped code unchanged.
+- `faa756b` **sim(a0-59)** — **comment-only**, `src/sim/constants.ts`. Corrects a
+  provably false guarantee in `commonsHoleFraction`'s doc-comment ("a radius whose
+  circumference actually admits a ship-wide gap" — it does not; 276 u needed,
+  71 u delivered) and records the angular-scaling caveat on `commonsSpokeGap`.
+  **No value moves**; every changed line is a comment line, `tsc` clean, no golden
+  can shift. Done because that false claim is load-bearing: it is precisely what
+  talks the next agent into raising the fraction a third time.
+
 **Verified green, not re-done, on 2026-08-16 (third session):** `npx tsc --noEmit`
 exits 0; the constant is `1`; `drops the whole hold` is present and exact; CI's own
 log for `96bfe7e` reads **299 of 300 test files passed**, the single failure being
@@ -84,6 +95,19 @@ noted in the test comment, not hidden.
 and collapse numbers were tuned with a sink that no longer exists. Stated as a
 change in the amendment and the PR body; measuring it is QA's call, not this
 lane's.
+
+**Corrected the two commons doc-comments, but moved no value (`faa756b`, fourth
+session).** The line I drew: a constant's *value* is a design call and stays
+untouched; a constant's *doc-comment stating a falsehood about the geometry* is an
+engineering defect in my own file and I fixed it. `commonsHoleFraction` claimed its
+raise made the innermost ring's circumference "actually admit a ship-wide gap" —
+measured, it needs 276 u and delivers 71 u. Leaving that in place is not neutral:
+it is an argument, written in the file, for raising the fraction a third time, and
+it would have cost the next agent a session before they measured anything. Same
+for `commonsSpokeGap`, which is an angle and so silently weakens as the ring
+shrinks. Zero behavioural risk — every changed line starts with `*`, `tsc` clean,
+no golden can move — so this does not touch the "no unratified sim change" line the
+rest of this note holds.
 
 ## CROSS-LANE FALLOUT (the part that took the time)
 
