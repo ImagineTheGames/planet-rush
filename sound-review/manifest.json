@@ -1125,26 +1125,58 @@
     {
       "id": "xpSettle",
       "label": "XP Settle",
-      "context": "The end of the sequence — everything holds at its final value and the buttons take focus. Quiet: the full stop.",
+      "context": "Earned XP lands and is yours — the number has stopped moving and the total is final. Small and warm: the arrival of something already won.",
       "current": "previews/xpSettle/current.wav",
       "candidates": [
         {
+          "id": "d",
+          "wav": "previews/xpSettle/d.wav",
+          "character": "a measure poured into a cell, topping off",
+          "params": "src/art/audio/candidates.ts#xpSettle.d"
+        },
+        {
+          "id": "e",
+          "wav": "previews/xpSettle/e.wav",
+          "character": "a credit recorded, two damped partials",
+          "params": "src/art/audio/candidates.ts#xpSettle.e"
+        },
+        {
+          "id": "f",
+          "wav": "previews/xpSettle/f.wav",
+          "character": "an uptake, the corner opening as it takes",
+          "params": "src/art/audio/candidates.ts#xpSettle.f"
+        },
+        {
+          "id": "g",
+          "wav": "previews/xpSettle/g.wav",
+          "character": "a small bright prize over a warm body",
+          "params": "src/art/audio/candidates.ts#xpSettle.g"
+        }
+      ],
+      "denied": [
+        {
           "id": "a",
-          "wav": "previews/xpSettle/a.wav",
+          "wav": "previews/xpSettle/denied-a.wav",
           "character": "a dry stop, one contact",
-          "params": "src/art/audio/candidates.ts#xpSettle.a"
+          "params": "src/art/audio/candidates.ts#xpSettle.denied.a",
+          "deniedAt": "2026-08-16T02:29:03Z",
+          "reason": "none of these sound like sounds for XP collection"
         },
         {
           "id": "b",
-          "wav": "previews/xpSettle/b.wav",
+          "wav": "previews/xpSettle/denied-b.wav",
           "character": "a damped seat, closing",
-          "params": "src/art/audio/candidates.ts#xpSettle.b"
+          "params": "src/art/audio/candidates.ts#xpSettle.denied.b",
+          "deniedAt": "2026-08-16T02:29:03Z",
+          "reason": "none of these sound like sounds for XP collection"
         },
         {
           "id": "c",
-          "wav": "previews/xpSettle/c.wav",
+          "wav": "previews/xpSettle/denied-c.wav",
           "character": "one low band, ringing out",
-          "params": "src/art/audio/candidates.ts#xpSettle.c"
+          "params": "src/art/audio/candidates.ts#xpSettle.denied.c",
+          "deniedAt": "2026-08-16T02:29:03Z",
+          "reason": "none of these sound like sounds for XP collection"
         }
       ]
     }
