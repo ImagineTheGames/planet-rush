@@ -1295,6 +1295,107 @@ under it did not. Trust the measured table, not the prose around it.)*
     estimated*, reproduced at 12 and 24 seeds and agreeing to 0.3 pp on the effective
     fraction. **The only thing still missing is the ruling.**
 
+- **2026-08-16, eighteenth session — what this one actually did.** One commit,
+  **`0996300`**. The shipped a0-59 work is untouched and the blocker is unchanged
+  in every particular. This session followed the seventeenth's lesson a second
+  time: the blocker is settled, so the question is what my *own brief* asserts
+  that nobody has checked.
+  - **Re-verified, nothing redone:** local `HEAD` == `origin/…` == `676c35c` at
+    start, `main` still `221a2b1`, `tsc --noEmit` exits 0, the constant is `1` at
+    `constants.ts:1039`, `drops the whole hold` at `damage.test.ts:83`, both
+    remote DoD greps pass against `FETCH_HEAD`. PR #436 open, UNSTABLE, **still no
+    Director ruling** — five comments, all mine, zero reviews. Did not escalate a
+    sixth time. Did **not** re-measure the wedge, the geometry, enclosure, the
+    candidate fixes, separability, or the economy aggregate; sessions 12–17 say
+    stop and they are right.
+  - **The finding: the brief's economy paragraph makes FOUR claims and session 17
+    measured one.** The other three are about **place** — *"contested space is
+    worth more"*, *"interception beats hauling"*, *"ganking a loaded miner pays
+    double"* — and place had never been measured at all. The 4.8× says how much
+    ore a death returns; it says nothing about **where it goes or who ends up with
+    it**, and both of those were stated as fact in `GDD.md` (the ratified design
+    doc), `docs/design-amendments.md` and the constant's doc-comment.
+  - **Measured** — 12 seeds, full natural eight-slot matches to their own ending,
+    both real builds (this branch, and a detached worktree at `origin/main`
+    `221a2b1`; session 16's method, so neither arm is a hand-flipped constant).
+    Every chunk a death lays down is tagged at spawn and followed until a ship
+    takes it; the taker is the ship whose `lootTake` fired nearest that tick.
+
+    | | `main` (0.5) | a0-59 (1) |
+    |---|---|---|
+    | deaths carrying ore | 401 | 639 |
+    | death-drop ore tracked | 199 | 1153 |
+    | **share landing INSIDE the asteroid field** | **10.6 %** | **7.5 %** |
+    | median death distance from centre (field r ≈ 307 u) | 621.6 u | 639.0 u |
+    | **recovered by someone OTHER than the dead pilot** | **70.9 %** | **79.4 %** |
+    | recovered by the dead pilot themself | 19.6 % | 15.4 % |
+    | never recovered | 9.5 % | 5.3 % |
+    | of "by other", taken by the **nearest station's owner** | 36.2 % | 45.2 % |
+
+  - **Three results, and one of them corrects the GDD.**
+    1. **The ore does not land in the asteroid field, and never did.** ~90 % falls
+       outside the field radius on **both** builds, on the station ring. The
+       amendment's opening — *"A fight in the asteroid field used to burn most of
+       whatever the loser was carrying"* — is wrong about place, was wrong about
+       place on `main` too, and would have had the balance crew budgeting the
+       extra circulation into the wrong part of the map. Inherited error, not
+       a0-59's doing; corrected because it is mine to correct.
+    2. **"Contested space is worth more" SURVIVES, in its strongest form.** The
+       ore really does change hands and more than before: 70.9 % → **79.4 %** to
+       someone other than the loser, uncollected 9.5 % → **5.3 %**. First evidence
+       this claim has ever had. Reported even though it confirms me.
+    3. **"Interception beats hauling" is the weakest of the four and reads closer
+       to a DEFENDER'S BUFF.** Of the ore that changes hands, the nearest
+       station-owner's share rises 36.2 % → **45.2 %** — die on somebody's
+       approach and you hand them your hold on their doorstep. With session 17's
+       fat hauler already the least-changed case, what a0-59 pays out is **combat
+       attrition near stations, not intercepted cargo**. The ore a0-59 *adds* (the
+       holds of 1 `main`'s floor minted as nothing) is the extreme case: **1.9 %**
+       of it lands in the field.
+  - **Rigour, because this lane's history is wrong numbers.** The tagger was
+    validated against `floor(hold × fraction / CHUNK.ore)` summed per death:
+    **97.2 %** coverage here, **97.1 %** on `main` — consistent across arms, so the
+    comparison is sound. The ~3 % missed is chunks tractored the same tick they
+    spawn, which are disproportionately **the killer's**, so the "by other" share
+    is a **floor, not a ceiling**. Self-calibrating control: `main`'s 227 held=1
+    deaths must drop exactly nothing, and the tagger attributed **1** ore to them —
+    a ~0.4 % false-positive rate, the noise floor on every figure above.
+  - **Explicitly NOT claimed: the "305 u from the nearest enemy home" figure.**
+    Eight stations on a 768 u ring sit ~588 u apart, so any point on that ring is
+    within ~294 u of *some* station before anyone dies there. It is a geometric
+    artefact, it is nowhere load-bearing, and it is fenced as such in the doc —
+    the fourteenth session's lesson applied to my own new instrument rather than
+    to somebody else's.
+  - **Where it landed:** `GDD.md` §2.3's amendment prose, `docs/design-amendments.md`
+    (new subsection *Where the ore actually lands*, with the table, the three
+    results and the caveats), `docs/gdd-conformance.md` §2.8 beside session 17's
+    mint-budget note (session 11's lesson — put it where the balance crew looks),
+    and the `DEATH_ORE_DROP_FRACTION` doc-comment. **`constants.ts` is
+    COMMENT-ONLY**: `git diff -U0` filtered of comment and blank lines is empty,
+    `tsc --noEmit` exits 0, no golden can move.
+  - **No code, no constant, no test, no golden.** Probe was a scratch file under
+    `tests/harness/` (twelfth session's trap: vitest's `include` silently ignores
+    the repo root), **deleted**, `git status -- src/ tests/` verified empty, and
+    the worktree removed with `git worktree remove` — never `git clean`.
+  - **The lesson, continuing the series.** Sessions 8/9/11/13/14/15/16/17 learned
+    *sweep the English*, *sweep every directory*, *link the finding where people
+    look*, *a gate's threshold is a definition not a detector*, *do not read an
+    instrument's verdict as the thing itself*, *measure the remedy to the same
+    standard as the defect*, *check whether a blocker actually blocks what you
+    parked behind it*, and *a blocker pulls attention off your own deliverable*.
+    This one is the seventeenth's second half: **once you turn back to your own
+    deliverable, audit ALL of it, not the one number that felt quantitative.**
+    Session 17 measured the claim with a multiplier in it and stopped; the three
+    claims in the same sentence with no number attached sat unmeasured for another
+    session, and one of them was wrong. A claim without a figure in it is not
+    thereby a soft claim — *"contested space is worth more"* is a testable
+    statement about where ore lands, and it took 50 seconds of compute to test.
+  - **What a nineteenth session should NOT do.** Everything in the twelfth through
+    seventeenth lists still holds, plus: do not re-measure the spatial
+    distribution — the table is in `docs/design-amendments.md` → *Where the ore
+    actually lands*, run on both real builds with a self-calibrated tagger.
+    **The only thing still missing is the ruling.**
+
 ## BLOCKERS
 
 *(**SIXTEENTH session, 2026-08-16: the ask is unchanged, but it is NOT A BINARY
