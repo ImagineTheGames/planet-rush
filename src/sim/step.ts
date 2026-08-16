@@ -1119,6 +1119,35 @@ function updateChunks(world: World, dt: number): void {
  * integer boundary crossings, the courier's heading is pure geometry, and no RNG
  * is drawn.
  */
+/**
+ * Whole `CHUNK.ore` the atmosphere drain pays out on this tick — the metronome the
+ * hold steps to (a0-58).
+ *
+ * `DEPOSIT.drainRate` ore per second, quantised to whole ore, read off the world
+ * clock rather than off a per-ship accumulator. That is a deliberate choice and it
+ * is about the wire: a per-ship counter is simulation state a snapshot would have
+ * to carry, and the one seam it must survive — a client rewinding to authority and
+ * replaying (`src/net/prediction`) — is not this lane's to change. `world.time` is
+ * already restored with the rest of the clock on every rewind, so a payout derived
+ * from it replays identically on both sides with nothing added to the wire.
+ *
+ * It cannot outrun the ratified rate: boundaries land `drainRate` times a second
+ * for the whole world, so no dwell pattern banks faster than the rate, and a ship
+ * that sits in its own atmosphere banks at exactly the rate. What phase costs is at
+ * most one boundary's wait on arrival — against the 1/30th-of-an-ore sliver the old
+ * payout left in the hold, that is the trade this brief exists to make.
+ */
+function dueThisTick(world: World, dt: number): number {
+  const perOre = DEPOSIT.drainRate / CHUNK.ore;
+  // Both edges of this tick's window, so a boundary is counted once and never
+  // twice however `world.time` was advanced. The epsilon is not decoration: thirty
+  // accumulated sixtieths land on 0.49999999999999994, and without it a boundary
+  // that falls exactly on a tick edge — which at 60 Hz and 2 ore/s is EVERY
+  // boundary — would slip a tick and run the ratified rate ~3% slow.
+  const edge = (t: number) => Math.floor(t * perOre + 1e-9);
+  return (edge(world.time) - edge(world.time - dt)) * CHUNK.ore;
+}
+
 function updateDeposits(world: World, dt: number): void {
   for (const ship of world.ships) {
     if (!ship.alive || ship.cargo <= 1e-9) continue;
@@ -1142,18 +1171,10 @@ function updateDeposits(world: World, dt: number): void {
     // already keyed to whole units, so nothing the player watches changed cadence;
     // what changed is that the hold and the bank now step together.
     //
-    // `Math.min(cargo, …)` is what scrubs a legacy sliver out: a hold on 0.6 with a
-    // whole unit due banks the 0.6 and lands on exactly 0.
-    //
-    // The epsilon is not decoration: `drainRate * dt` is 1/30th of an ore and thirty
-    // of those sum to 0.9999999999999999, so a bare floor would hold the unit back
-    // a whole tick every time and quietly run the ratified rate ~3% slow. It cannot
-    // mint — `moved` is capped by the hold, and progress is not ore.
+    // `Math.min(cargo, …)` is what scrubs a sliver out of a foreign hold: 0.6 held
+    // against a whole unit due banks the 0.6 and lands on exactly 0.
     const cargoBefore = ship.cargo;
-    const progress = (ship.depositProgress ?? 0) + DEPOSIT.drainRate * dt;
-    const due = Math.floor(progress / CHUNK.ore + 1e-9) * CHUNK.ore;
-    const moved = Math.min(ship.cargo, due);
-    ship.depositProgress = Math.max(0, progress - moved);
+    const moved = Math.min(ship.cargo, dueThisTick(world, dt));
     ship.cargo -= moved;
     ship.banked += moved;
     if (ship.cargo < 1e-9) ship.cargo = 0;

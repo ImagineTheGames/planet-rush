@@ -103,13 +103,24 @@ describe('auto-deposit while docked at your own station', () => {
     // rate is read over the window that earns one unit rather than off a single
     // tick's 1/30th. A hold that can sit on 1.6 is a hold showing one pip while
     // holding ore no readout in the game can render.
-    stepFor(world, TICKS_PER_ORE - 1);
-    expect(ship.cargo).toBe(before); // earned, not yet paid: nothing fractional moves
-    expect(ship.banked).toBe(0);
-
-    step(world, []); // the tick the unit is due
-    expect(ship.cargo).toBeCloseTo(before - CHUNK.ore, 9);
-    expect(ship.banked).toBeCloseTo(CHUNK.ore, 9);
+    //
+    // Two windows, so this reads the RATE and not one lucky boundary: exactly one
+    // whole ore per window, and never a fraction in between.
+    for (let unit = 1; unit <= 2; unit++) {
+      const bankedBefore = ship.banked;
+      let moves = 0;
+      for (let i = 0; i < TICKS_PER_ORE; i++) {
+        const cargoBefore = ship.cargo;
+        step(world, []);
+        if (ship.cargo !== cargoBefore) {
+          moves++;
+          expect(cargoBefore - ship.cargo, 'the hold moves a whole ore or not at all').toBeCloseTo(CHUNK.ore, 9);
+        }
+      }
+      expect(moves, `window ${unit}: exactly one payout`).toBe(1);
+      expect(ship.banked - bankedBefore).toBeCloseTo(CHUNK.ore, 9);
+    }
+    expect(ship.cargo).toBeCloseTo(before - 2 * CHUNK.ore, 9);
     // Ore is moved, never minted: hold + bank is exactly what the hold held.
     expect(realOre(ship)).toBeCloseTo(before, 9);
   });
@@ -162,17 +173,12 @@ describe('the drain runs on atmosphere presence alone', () => {
     expect(ship.cargo).toBe(total); // untouched: not in the atmosphere yet
     expect(ship.banked).toBe(0);
 
-    // Cross the boundary; the very next tick the drain is running. What it earns
-    // that tick is `drainRate * TICK_DT` of PROGRESS toward the next whole ore
-    // (a0-58) — the hold itself moves when a whole unit is due, and this is the
-    // assertion that says the clock started on the crossing tick and not later.
+    // Cross the boundary and the drain is running from that tick: the first whole
+    // ore lands within one payout window (a0-58 — the hold moves in whole
+    // `CHUNK.ore`, on the world clock's metronome), and it is exactly one.
     ship.pos = { x: station.pos.x + DEPOSIT_RANGE - 1, y: station.pos.y };
     expect(inAtmosphere(ship, station)).toBe(true);
-    step(world, []);
-    expect(ship.depositProgress).toBeCloseTo(DEPOSIT.drainRate * TICK_DT, 9);
-
-    // …and it pays out on time: one whole ore, one window after the crossing.
-    stepFor(world, TICKS_PER_ORE - 1);
+    stepFor(world, TICKS_PER_ORE);
     expect(ship.cargo).toBeCloseTo(total - CHUNK.ore, 9);
     expect(ship.banked).toBeCloseTo(CHUNK.ore, 9);
     expect(realOre(ship)).toBeCloseTo(total, 9);
