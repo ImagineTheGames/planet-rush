@@ -86,6 +86,26 @@ export interface Ship {
   cargoCap: number;
   /** Banked ore — safe, never lost to ship death (GDD §2.3). */
   banked: number;
+  /**
+   * Seconds-worth of atmosphere drain earned but not yet paid out, in ore
+   * (`step.ts` `updateDeposits`). **It is not ore** — it is the drain's progress
+   * toward the next whole `CHUNK.ore`, so `liveOre` neither counts it nor should:
+   * the ore it is working on is still sitting in `cargo`.
+   *
+   * It exists because a hold moves in WHOLE ore (a0-58). The drain runs at
+   * `DEPOSIT.drainRate`, which at a 60 Hz tick is 1/30th of an ore per step, and
+   * paying that out directly left the hold on 1.6 of a 2 slot the moment a pilot
+   * clipped their own atmosphere — a hold showing one pip, unable to accept
+   * another chunk, and holding ore no readout in the game can render. The rate is
+   * unchanged and ratified (GDD §2.3, §2.8); only the granularity of the payout
+   * moved, and the couriers were already whole-unit keyed.
+   *
+   * Carried across an interruption on purpose: leave the atmosphere mid-unit and
+   * the progress waits on the ship rather than being spent for nothing. Optional
+   * on the same backward-compatible terms as the loot tells — a foreign world's
+   * ship literal that omits it reads as zero.
+   */
+  depositProgress?: number;
   /** false while dead and waiting to respawn. */
   alive: boolean;
   /** Seconds until respawn (0 when alive). */
@@ -883,6 +903,7 @@ function makeShip(spec: PlayerSpec, pos: Vec2): Ship {
     cargo: 0,
     cargoCap: shipCargoCap(loadout),
     banked: STARTING_ORE,
+    depositProgress: 0,
     alive: true,
     respawnTimer: 0,
     spawnProtect: SPAWN_PROTECTION_S,

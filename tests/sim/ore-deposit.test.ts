@@ -27,6 +27,7 @@
 import { describe, it, expect } from 'vitest';
 import { ShipClass } from '@shared/types';
 import {
+  CHUNK,
   DEPOSIT,
   DEPOSIT_RANGE,
   STATION,
@@ -73,6 +74,23 @@ function realOre(ship: Ship): number {
   return ship.cargo + ship.banked;
 }
 
+/**
+ * Ticks the drain needs to earn one whole `CHUNK.ore` — the granularity a hold
+ * moves at since a0-58, and the window every rate pin below is taken over.
+ *
+ * Derived from the tunables, never typed as 30: `DEPOSIT.drainRate` and
+ * `CHUNK.ore` are both TUNABLE, and a test that hardcodes the tick count passes
+ * for the wrong reason the day either moves. The epsilon matches the sim's own —
+ * thirty accumulated thirtieths land a hair under 1, and both sides must agree
+ * that the unit is due on the thirtieth tick rather than the thirty-first.
+ */
+const TICKS_PER_ORE = Math.ceil(CHUNK.ore / (DEPOSIT.drainRate * TICK_DT) - 1e-9);
+
+/** Step `n` ticks with no input. */
+function stepFor(world: World, n: number): void {
+  for (let i = 0; i < n; i++) step(world, []);
+}
+
 // --- the drain -------------------------------------------------------------
 
 describe('auto-deposit while docked at your own station', () => {
@@ -80,10 +98,18 @@ describe('auto-deposit while docked at your own station', () => {
     const { world, ship } = stagedAtHome(2);
     const before = ship.cargo;
 
-    step(world, []); // one tick, no input
+    // A WHOLE ORE AT A TIME (a0-58). The rate is unchanged and still the pin —
+    // `drainRate` ore per second — but the hold hands over countable ore, so the
+    // rate is read over the window that earns one unit rather than off a single
+    // tick's 1/30th. A hold that can sit on 1.6 is a hold showing one pip while
+    // holding ore no readout in the game can render.
+    stepFor(world, TICKS_PER_ORE - 1);
+    expect(ship.cargo).toBe(before); // earned, not yet paid: nothing fractional moves
+    expect(ship.banked).toBe(0);
 
-    expect(ship.cargo).toBeCloseTo(before - DEPOSIT.drainRate * TICK_DT, 9);
-    expect(ship.banked).toBeCloseTo(DEPOSIT.drainRate * TICK_DT, 9);
+    step(world, []); // the tick the unit is due
+    expect(ship.cargo).toBeCloseTo(before - CHUNK.ore, 9);
+    expect(ship.banked).toBeCloseTo(CHUNK.ore, 9);
     // Ore is moved, never minted: hold + bank is exactly what the hold held.
     expect(realOre(ship)).toBeCloseTo(before, 9);
   });
@@ -136,11 +162,19 @@ describe('the drain runs on atmosphere presence alone', () => {
     expect(ship.cargo).toBe(total); // untouched: not in the atmosphere yet
     expect(ship.banked).toBe(0);
 
-    // Cross the boundary; the very next tick drains.
+    // Cross the boundary; the very next tick the drain is running. What it earns
+    // that tick is `drainRate * TICK_DT` of PROGRESS toward the next whole ore
+    // (a0-58) — the hold itself moves when a whole unit is due, and this is the
+    // assertion that says the clock started on the crossing tick and not later.
     ship.pos = { x: station.pos.x + DEPOSIT_RANGE - 1, y: station.pos.y };
     expect(inAtmosphere(ship, station)).toBe(true);
     step(world, []);
-    expect(ship.cargo).toBeCloseTo(total - DEPOSIT.drainRate * TICK_DT, 9);
+    expect(ship.depositProgress).toBeCloseTo(DEPOSIT.drainRate * TICK_DT, 9);
+
+    // …and it pays out on time: one whole ore, one window after the crossing.
+    stepFor(world, TICKS_PER_ORE - 1);
+    expect(ship.cargo).toBeCloseTo(total - CHUNK.ore, 9);
+    expect(ship.banked).toBeCloseTo(CHUNK.ore, 9);
     expect(realOre(ship)).toBeCloseTo(total, 9);
   });
 
@@ -156,7 +190,7 @@ describe('the drain runs on atmosphere presence alone', () => {
     expect(isDocked(ship, station)).toBe(false);
     expect(inAtmosphere(ship, station)).toBe(true);
 
-    step(world, []);
+    stepFor(world, TICKS_PER_ORE);
     expect(ship.cargo).toBeLessThan(before); // drained despite undocked + moving
   });
 
@@ -168,8 +202,8 @@ describe('the drain runs on atmosphere presence alone', () => {
     ship.pos = { x: station.pos.x + DEPOSIT_RANGE, y: station.pos.y };
     expect(inAtmosphere(ship, station)).toBe(true);
 
-    step(world, []);
-    expect(ship.cargo).toBeCloseTo(before - DEPOSIT.drainRate * TICK_DT, 9);
+    stepFor(world, TICKS_PER_ORE);
+    expect(ship.cargo).toBeCloseTo(before - CHUNK.ore, 9);
   });
 });
 
@@ -180,7 +214,7 @@ describe('the drain is interruptible', () => {
     const { world, ship } = stagedAtHome(2);
     const station = stationOf(world, 0)!;
 
-    step(world, []); // drain a little
+    stepFor(world, TICKS_PER_ORE); // drain one whole ore (a0-58: the hold's granularity)
     const banked = ship.banked;
     const cargo = ship.cargo;
     expect(cargo).toBeLessThan(2);

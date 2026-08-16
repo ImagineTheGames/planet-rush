@@ -1128,12 +1128,36 @@ function updateDeposits(world: World, dt: number): void {
     const station = stationOf(world, ship.id);
     if (!station || !station.alive || !inAtmosphere(ship, station)) continue;
 
-    // Smooth, authoritative transfer hold → bank (GDD §2.3: banked ore is safe).
+    // Authoritative transfer hold → bank (GDD §2.3: banked ore is safe), paid out
+    // in WHOLE `CHUNK.ore` (a0-58). The rate is untouched — `DEPOSIT.drainRate`
+    // still buys `drainRate` ore every second, accrued in `depositProgress` — but
+    // the hold hands over countable ore, never 1/30th of a unit per tick.
+    //
+    // Why the granularity had to move: a pilot who clips their own atmosphere for
+    // a third of a second used to come out holding 1.6 of a 2 slot. That hold shows
+    // ONE pip, cannot accept another chunk (there is no whole slot free), and is
+    // carrying 0.6 of an ore that no pip, no cost and no wheel numeral in the game
+    // can render — the same invisible remainder the death drop used to mint, made
+    // by the one path that touches a hold every match. The couriers below were
+    // already keyed to whole units, so nothing the player watches changed cadence;
+    // what changed is that the hold and the bank now step together.
+    //
+    // `Math.min(cargo, …)` is what scrubs a legacy sliver out: a hold on 0.6 with a
+    // whole unit due banks the 0.6 and lands on exactly 0.
+    //
+    // The epsilon is not decoration: `drainRate * dt` is 1/30th of an ore and thirty
+    // of those sum to 0.9999999999999999, so a bare floor would hold the unit back
+    // a whole tick every time and quietly run the ratified rate ~3% slow. It cannot
+    // mint — `moved` is capped by the hold, and progress is not ore.
     const cargoBefore = ship.cargo;
-    const moved = Math.min(ship.cargo, DEPOSIT.drainRate * dt);
+    const progress = (ship.depositProgress ?? 0) + DEPOSIT.drainRate * dt;
+    const due = Math.floor(progress / CHUNK.ore + 1e-9) * CHUNK.ore;
+    const moved = Math.min(ship.cargo, due);
+    ship.depositProgress = Math.max(0, progress - moved);
     ship.cargo -= moved;
     ship.banked += moved;
     if (ship.cargo < 1e-9) ship.cargo = 0;
+    if (moved <= 0) continue; // nothing whole earned yet: no transfer, no courier, no line.
     // Hold → bank: a transfer within the live economy (conserved), recorded so the
     // ledger can attribute where banked ore came from (`./ore-ledger`).
     ledgerAdd(world, 'deposited', moved);
@@ -1144,7 +1168,7 @@ function updateDeposits(world: World, dt: number): void {
     // report p8). Keyed to the HOLD's integer boundaries (which the terminal
     // `= 0` snaps cleanly) rather than the bank's running total, so float drift in
     // `banked` can never invent or drop a courier at the exact end of a drain.
-    const couriers = Math.floor(cargoBefore) - Math.floor(ship.cargo);
+    const couriers = Math.floor(moved / CHUNK.ore);
     for (let i = 0; i < couriers; i++) spawnDepositFlight(world, ship, station);
 
     // The journal takes the SAME whole-ore boundary the couriers do (a0-52). The
