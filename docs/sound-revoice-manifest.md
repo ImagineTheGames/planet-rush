@@ -1,0 +1,109 @@
+# Sound re-voice manifest — the thirty-five slots under the 2026-08-07 denial
+
+OWNER: Sound Agent (a0-60). **Status of record for the sweep.** A row moves to
+`done` in the same commit that lands the slot's new offers, so a reader of the PR
+knows what is finished without listening to thirty-five files, and the next brief
+knows exactly where to start.
+
+## What the denial was
+
+`/status/sound-choices.json`, `2026-08-07T20:09:00.145Z`, `deny-all` on 35 slots,
+recorded on the developer's behalf, verbatim:
+
+> still have all the old sounds i said i didnt want there, we need to deny all of
+> those sounds at once and make new ones that match the new theme (modern/sci-fi
+> and not retro/toony)
+
+Nine days later the board was unchanged except for two slots (`levelUp` and
+`oreCollect`, a0-49), and the developer found it that way themselves:
+
+> im still staring at a sound board with no regenerated options
+
+## The rules this sweep works under
+
+1. **New letters.** Every one of these 35 slots carries a live `deny-all` on the
+   offers lettered `a`/`b`/`c`. A letter is the whole of how a verdict names an
+   offer (`{"verdict": "b"}`), so a new take filed under a denied letter makes the
+   standing record unreadable — the a0-48 rule. Re-voiced slots therefore offer
+   **`d`/`e`/`f`/`g`** and the denied `a`/`b`/`c` come off the board. Git carries
+   the denied takes; the page does not.
+2. **Four offers, not three.** The board's old promise was three. This brief
+   raises it to four for a re-voiced slot: the denial was of a whole register, so
+   a wider spread is what makes the next verdict a choice rather than a re-run.
+3. **`levelUp` and `oreCollect` are not touched.** They were re-voiced under a0-49
+   and survived review under this exact ruling. They are the reference for the
+   family, not work.
+4. **`stationDeath` goes last** and is a *translation* of its existing shape, not a
+   replacement: it is the most serious sound in the game and its routing was being
+   fixed under a0-55 (`bank.ts:32`).
+
+## What "modern/sci-fi, not retro/toony" means, per family
+
+Written per family rather than once, so the next denial can be specific:
+
+| family | what the register means here |
+|---|---|
+| combat | energy handled by hardware — a coil discharging, a driver venting, a field shedding. Transient first, body second, nothing rings like a bell |
+| ship / flight | mass and plasma, not cartoon rockets. Particulate texture, filters that open and close over a fixed pitch, no pitch chirps |
+| build / economy | shop-floor assembly: contact, pressure, seating. A latch, never a fanfare (§7.3) |
+| interface | short, articulate, damped. One partial or one dry contact, gone in 30-60 ms; the interface does not congratulate (§4.7) |
+| clock / state | structure under load. Low bodies, long filters, room behind them; the seriousness is in the mass, not in the volume |
+| music / ambient | texture before melody. Beds are filtered material and beating unisons; stings are one gesture, not a tune |
+
+## The slots
+
+`status` is one of `todo` (owed) / `done` (four fresh offers on the board with
+rendered previews, denied set removed) / `held` (deliberately not re-voiced under
+this brief, with the reason in the note).
+
+| slot | status | note |
+|---|---|---|
+| turretFire | done | rail contact / compressed vent / capacitor bloom / damped hardware — `d`-`g`, nothing slides in pitch |
+| shotImpact | done | absorber tick / spall / ferrite knock / charge dump — `d`-`g`, all under 60 ms |
+| shieldHit | done | four that ring, so the §2.2 shield-vs-core grammar survives the sweep |
+| shieldDown | done | the ×6.9 fall kept in all four; they differ in what is falling |
+| coreHit | done | four dull, low and closing — no sparkle within reach of a home |
+| turretDown | done | mount release / vessel empty / cell arc / it just stops |
+| shipExplode | done | ion wash / inertial failure / containment fail / one failure — no sparkle layer in any of them (§7.2) |
+| shipSpawn | done | arrival as settle, seat, containment close, clamp release |
+| spawnPulse | done | four that stay a *field* — soft, particulate, low, and quiet enough to stop noticing |
+| thruster | done | four loop materials; none sweeps a corner inside the body (that wraps to a 2.5 Hz wobble) |
+| respawnBeep | done | four that stay a *clock* — hard, narrow, above spawnPulse (§8 pair) |
+| respawnGo | done | the launch as release, catapult, opening band, clamps letting go |
+| holdFull | done | the two-event insistence kept; four machines that are *full* — hopper stop, seal, load cell, said-twice |
+| buildPlaced | done | stepper travel / vacuum seat / weld quench / one latch — a latch, never a fanfare (§7.3) |
+| buildComplete | done | three rising contacts, four ways; stays low and seated, clear of purchaseConfirm (§8) |
+| repairTick | done | four small ones — the ranking that matters is which disappears best |
+| bankOre | done | conveyor stop / vault seat / falling bands / counted-and-filed |
+| upgradeBought | done | brightest *in this family* means bandwidth, not a chime — no arpeggio, no major third |
+| depositTick | done | the station materials at a tenth of the size; fires in bursts, so all four stay tiny |
+| pressTick | done | four kinds of restraint, not four events — no returns anywhere in this family |
+| purchaseConfirm | done | two rising beats kept; §8 margin over buildComplete held across all sixteen pairings (×1.33) |
+| rejectBuzz | done | a stop, not a raspberry; sits ×1.86 above the coreHit family at worst (§8) |
+| minimapPing | done | it locates, never alarms — nothing repeats, nothing rises |
+| waveArrive | done | the two low notes and the 0.18 s gap kept (§7.4); four things making the horn |
+| collapseBegin | done | tectonic shift / atmosphere leaving / hull strain / one long fall — slow, low, no event |
+| matchEnd | done | a resolution, not a victory — it plays on a loss too, so nothing here congratulates |
+| alarm | done | saw and rising minor third kept on all four (§5.1, §2.2 — legibility outranks register); one-shots |
+| stationDeath | done | last, and by translation (§7.4, a0-55): the shipped beat in the sweep's materials, choosing how much of it there is |
+| ambient | done | a0-48 already answered this denial with `d`/`e`/`f`; a0-60 adds `g` (the far end of that axis) rather than destroying un-judged offers |
+| musicBed | done | ion field / magnetic mass / cathedral metal / almost-nothing — texture before melody |
+| musicPulse | done | the heartbeat, four ways; no sustained layer sweeps a corner across the loop seam |
+| musicTheme | done | same riff, same key (§7.5) — the instrument is the offer, seven notes at the shipped times |
+| musicDread | done | no melody, no resolution; the four differ in what is thinning |
+| musicWin | done | lands into the three-second quiet, so it never shouts — no fanfare in any of them |
+| musicLoss | done | all four fall and none resolves; all inside the 1.32 s longest-tail invariant (§8) |
+
+### Level parity across a slot's four
+
+An A/B is only a choice if the four offers arrive at comparable level — a
+band-passed voice passes very little of what enters it, so a `band`-built offer
+written at the same `gain` as a granular one lands 4-6× quieter and reads on the
+board as *the quiet one* rather than as a different character. Every re-voiced
+slot was measured and levelled after the fact: no offer now sits below 45% of its
+slot's median peak, and none above 1.8× it. The one thing deliberately left
+uneven is `spawnPulse`, which is quiet on purpose against the rest of the bank.
+
+35 rows. `candidates.test.ts` (`every re-voiced slot offers a fresh set`) reads
+this table and holds every `done` row to the two promises above — four offers, and
+none of them under a denied letter — so the test cannot drift from what shipped.
