@@ -129,10 +129,12 @@ player caught at the centre would be entombed the same way.**
 | a0-58 tip | 3 (seeds 142, 146, 147) | 280 |
 | this branch | 1 (seed 15) | 96 |
 
-≈1.1% vs ≈1.0% — statistically identical, all four at the map centre. The gate
-samples 24 seeds, so at ~1% it is a coin flip on any sim change. Third
-under-powered standing gate this branch turned up; the only one sitting on a real
-bug.
+≈1.1% vs ≈1.0% — statistically identical. All four sit inside wave 5's central
+structure (which spans 21.6–112 u from centre): three in the pocket at
+(1202,1193), (1198,1193), (1204,1195), one at (1200,1308), 108 u out and inside
+the solid annulus. The gate samples 24 seeds, so at ~1% it is a coin flip on any
+sim change. Third under-powered standing gate this branch turned up; the only one
+sitting on a real bug.
 
 **Why not fixed here.** `src/sim/waves.ts` IS this lane's file, so the bug is
 mine — but the fix is a placement rule ("a wave must not spawn rock overlapping a
@@ -142,6 +144,13 @@ trade a0-58 flagged and declined. It needs its own brief and ratification;
 folding it into a one-constant developer ruling is exactly the scope creep to
 avoid. **Director call:** land a0-59 and brief the wave trap separately, or hold
 a0-59 behind it.
+
+Candidate for whoever takes that brief — the only option found that touches
+NEITHER ratified invariant: leave rock placement alone and **eject any live ship a
+landing wave would overlap**. Positions, `FIELD_YIELD` and fairness all untouched,
+and entombment becomes impossible because being there when the wave lands is the
+only way into the pocket. Still a new sim rule, still moves every golden, still
+needs ratification — but far smaller than re-planning wave placement.
 
 Repro: `npx vitest run tests/harness/unstuck.test.ts` here (seed 15), or seeds
 142/146/147 on `main`.
