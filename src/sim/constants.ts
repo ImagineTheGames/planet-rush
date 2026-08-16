@@ -1019,9 +1019,16 @@ export const WRECK = {
  * next agent "restores" it.
  *
  * What this does to the economy, stated so the balance crew reads it as a change
- * rather than discovering it: **every kill now returns twice the ore to the
- * field.** Contested space is worth more, ganking a loaded miner pays double, and
- * the collapse phase circulates more ore than §2.8's numbers assumed. Intended.
+ * rather than discovering it — and **measured** on 24 full matches on both builds,
+ * because the estimate that used to sit here ("twice the ore") was too low by
+ * ~2.4×. A kill returns **4.8× more ore** than it does on the pre-a0-59 build, not
+ * 2×: the 2× is against the GDD's rule, but the *shipped* half-drop returned only
+ * **30.3 %** of a dead hold, because a0-58's whole-chunk floor meets a
+ * hold-at-death distribution in which 71 % of deaths carry nothing and 16 % carry
+ * exactly 1 ore — and `floor(1 × 0.5 / 1)` is zero chunks. Total ore in play is
+ * nevertheless flat (−0.8 %) and mining moved +4 %: the sink did not vanish, it
+ * **migrated to `spent`** (+970 against the 1031 that used to burn). Intended.
+ * Full table and method: `docs/design-amendments.md`.
  *
  * Still TUNABLE, and still not assumed to be 1 anywhere: `killShip` mints whole
  * `CHUNK.ore` pieces and sinks the sub-chunk remainder (a0-58), which is a no-op

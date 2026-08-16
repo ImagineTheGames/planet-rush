@@ -528,6 +528,20 @@ Checked row by row against `src/sim/constants.ts`. **Every live number matches.*
 | Auto-aim arc `TUNABLE` | 2π | `:1099` | **PARTIAL** — G-13, unreferenced |
 | **Ore abundance table** (SCARCE ×0.55/×0.75/×1.2 default · STANDARD ×1 · RICH ×1.6/×1.25/×0.75) | — | `src/sim/match-config.ts` + measured in `tests/reports/abundance-spread-a0-17.md` | **SHIPPED** |
 
+**a0-59 and the two mint-budget rows above.** `DEATH_ORE_DROP_FRACTION` went
+0.5 → 1 on 2026-08-16, which withdrew one of the economy's ore sinks, so the
+obvious worry is that `FIELD_YIELD` and the abundance table were tuned against a
+build that no longer exists. **Measured on 24 full matches on both builds, they
+were not materially invalidated:** ore cut out of rock moved **+4 %**, total live
+ore **−0.8 %**, and loose ore on the field **+14 %** (+16 % during collapse). What
+changed sharply is *throughput*, not stock — a kill returns **4.8×** more ore than
+it does on the pre-a0-59 build, and the 1031 ore that used to burn at deaths was
+absorbed almost exactly by a +970 rise in construction spending. `a0-17`'s
+abundance spread therefore still stands; the numbers most worth a re-measure are
+§2.8's passive-match and mined-out bounds, and the expected movement is small.
+Full table and method: `docs/design-amendments.md` → *What this does to the
+economy — MEASURED, not estimated*.
+
 ### §2.9 AI opponents *(10 claims: 10 SHIPPED)*
 
 | Claim | Verdict | Evidence |

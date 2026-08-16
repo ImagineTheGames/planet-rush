@@ -122,9 +122,15 @@ Asteroids visibly crack as they're mined and burst into ore chunks that drift to
 with the hull was one of this economy's ore sinks and it is **withdrawn** — that is
 ratified design being overruled by the person it belongs to, recorded here so the
 document and the constant do not disagree. The consequence is deliberate and worth
-naming: **every kill now returns twice the ore to the field**, so contested space is
-worth more, ganking a loaded miner pays double, and collapse phase circulates more
-ore than §2.8's numbers were measured against. Banked ore is still never lost to a
+naming, and **measured** rather than estimated (24 full matches on both builds):
+**a kill returns 4.8× more ore to the field than it did on the shipped build**, so
+contested space is worth more and interception beats hauling. The 2× this paragraph
+used to claim is the change against *this document's* old rule; the shipped
+half-drop actually returned only **30.3 %** of a dead hold, because a0-58's
+whole-chunk floor lands on a hold-at-death distribution in which 71 % of deaths
+carry no ore and 16 % carry exactly one — a hold of 1 dropped nothing at all.
+Collapse circulates more ore (+34 % looted) but holds barely more (loose ore +16 %),
+and mining moved +4 %, so §2.8's mint budget stands. Banked ore is still never lost to a
 ship death (§2.7). The `deathLoss` ledger bucket stays — at zero for an ordinary
 death — because it remains the sink for anything a drop cannot lay down, and a
 ledger with no sink for a flow cannot conserve the day that flow returns.
@@ -244,7 +250,7 @@ These are starting values, not commitments — they exist so the Gameplay Engine
 | Field yield | Total ore per match, in 5 asteroid waves, each closer to center | ~400 |
 | Asteroid wave interval | Metronome of the match | ~150 s |
 | Respawn | Free; time is the cost | 5 s |
-| Death ore drop | Fraction of the **held** hold left as debris where you died (§2.3, §2.7). **Amended 2026-08-16 (a0-59)** from `0.5` — developer: *"destroyed ships should drop all their ore, no more 1/2 the ore stuff"*. The unshed half was an ore sink; withdrawing it returns twice the ore to the field per kill, so the yield and collapse numbers in this table now sit under more circulating ore than they were measured against. Banked ore is unaffected. | 1 |
+| Death ore drop | Fraction of the **held** hold left as debris where you died (§2.3, §2.7). **Amended 2026-08-16 (a0-59)** from `0.5` — developer: *"destroyed ships should drop all their ore, no more 1/2 the ore stuff"*. The unshed half was an ore sink; withdrawing it returns **4.8× the ore to the field per kill** (measured, 24 matches, both builds — not the 2× first estimated: the shipped half-drop returned only 30.3 % of a dead hold once a0-58's whole-chunk floor is counted). The yield and collapse numbers in this table nevertheless still stand — mining moved +4 % and total live ore −0.8 %, because the withdrawn sink was absorbed by construction spending rather than accumulating. Banked ore is unaffected. | 1 |
 | Ore chunk unit | The indivisible unit every mint emits (`CHUNK.ore`, **new to this table 2026-08-16, a0-58**): a death drop, a wreck ring and a chipped rock all lay down whole multiples of it, and anything finer is recorded as a sink rather than becoming ore no readout can print. | 1 |
 | ~~Sensor range~~ | **Retired 2026-08-07 (a0-05).** Was: distance at which an enemy station's damage ring becomes visible (~2× shield radius = 180). Station health is always visible (§2.2), so this gated nothing and is deleted rather than left as a dead knob — a `0` would still read as tunable, and restoring 180 would silently reinstate a withdrawn design. Not to be confused with the three **minimap coverage** radii below, which are a different mechanic and unaffected. | — |
 | Ship sensor (minimap) | A ship's own local fog-of-war coverage disc (§2.6 radar) | 520 |

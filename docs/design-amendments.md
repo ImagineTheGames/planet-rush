@@ -37,29 +37,124 @@ loop, §2.7's opening sentence and §2.8's table, so three separate readers woul
 have found three separate reasons to put the 0.5 back. All three are amended in the
 same commit as the constant.
 
-### What this does to the economy — read it as a change, do not discover it
+### What this does to the economy — MEASURED, not estimated
 
-**Every kill now returns twice the ore to the field.** Concretely, and stated for
-the balance crew rather than buried:
+> **The headline number in this section used to read "every kill now returns twice
+> the ore to the field." That was asserted, never measured, and it is too low by
+> about 2.4×. Measured against the shipped build, a kill returns 4.8× more ore.
+> See "The 2× was against design intent, not against the build" below for why both
+> numbers are true and which one the balance crew needs.**
+
+**Method.** 24 seeds (1–24), full natural eight-slot matches run to their own
+ending on *both real builds* — this branch, and a detached `git worktree` at
+`origin/main` (`221a2b1`), so neither arm is a constant flipped by hand. The ore
+ledger is read at the final tick; the hold each ship carried is sampled the tick
+it dies; loose-on-field ore is summed over `world.chunks` every tick and split by
+`world.match.phase`. Both probes were scratch files under `tests/harness/`, run
+and deleted — `git status -- src/ tests/` verified empty afterwards.
+
+| quantity, summed over 24 matches | `main` (0.5) | a0-59 (1) | change |
+|---|---|---|---|
+| **death-drop ore that reached the field** | **448** | **2156** | **4.81×** |
+| effective share of a dead hold that returns | **30.3 %** | 100 % | 3.30× |
+| ore at risk (Σ hold carried at the instant of death) | 1479 | 2156 | 1.46× |
+| deaths | 2977 | 3368 | 1.13× |
+| `deathLoss` (burned with the hull) | 1031 | **0** | −100 % |
+| `spent` (construction — the surviving sink) | 3835 | 4805 | +25 % |
+| `looted` | 5165 | 6917 | +34 % |
+| `deposited` (banked) | 3306 | 4200 | +27 % |
+| `mined` (ore cut out of rock) | 4100 | 4267 | +4 % |
+| wreck debris — fraction-independent, the control | 1661 | 1763 | +6 % |
+| mean total live ore (rock + loose + holds + banks) | 230.45 | 228.64 | **−0.8 %** |
+| mean loose ore on the field | 8.23 | 9.38 | +14 % |
+| mean loose ore **during the collapse phase** | 19.93 | 23.13 | +16 % |
+| mean ore riding in hulls | 2.78 | 3.33 | +20 % |
+
+#### The 2× was against design intent, not against the build
+
+Both framings are honest and they differ by 1.65×, so the distinction matters to
+anyone budgeting for this:
+
+- **Against the GDD's ratified rule, a0-59 is exactly 2×.** Before a0-58, `killShip`
+  laid down `held × 0.5` with no rounding at all, so a dead hold returned exactly
+  half. That is the number §2.3 was written against.
+- **Against the build that is on `main` today, it is 3.3× on a fixed population of
+  deaths, and 4.8× once the economy responds.** a0-58 made the drop mint whole
+  `CHUNK.ore` pieces, and that floor lands on a hold-at-death distribution that is
+  overwhelmingly small: of 2977 deaths on `main`, **2128 carried nothing at all and
+  470 carried exactly 1 ore** — and `floor(1 × 0.5 / 1)` is **zero chunks**. A ship
+  dying with one ore on `main` today drops *nothing*. So the shipped half-drop was
+  never a half: it returned **30.3 %** of the ore that died. a0-59 takes that to
+  100 %, and the richer field then puts 1.46× more ore at risk per death, which is
+  where the last factor comes from.
+
+The hold-at-death distribution, which is the load-bearing evidence and had never
+been looked at (deaths, by the whole ore the ship was carrying, 24 seeds):
+
+| hold at death | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|---|---|
+| `main` (0.5) | 2128 | 470 | 218 | 101 | 39 | 12 | 9 | 0 | 0 |
+| a0-59 (1) | 2195 | 608 | 297 | 155 | 86 | 19 | 7 | 0 | 1 |
+| chunks dropped under 0.5 | 0 | **0** | 1 | 1 | 2 | 2 | 3 | 3 | 4 |
+| chunks dropped under 1 | 0 | **1** | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+
+**Ships die nearly empty.** 71 % of deaths on `main` carry no ore at all and a
+further 16 % carry a single unit — the hold is a thing you fill and then run home
+with, so it is empty most of the time a fight can find it. Any rule keyed to the
+hold at the moment of death is therefore decided by the 0-and-1 buckets, not by the
+full-hold case everyone reasons about.
+
+This is not a criticism of a0-58 — the floor is correct and is deliberately kept
+(see below). It is the reason the "twice" figure understates the shipped delta, and
+nobody would find it without running both builds.
+
+#### What actually moved, and what did not
+
+- **Total ore in the economy did NOT rise.** Mean live ore is flat within 1 %
+  (230.45 → 228.64). The 1031 ore that used to burn at deaths did not become 1031
+  extra ore in play — it was absorbed almost exactly by a **+970 rise in `spent`**.
+  The sink did not disappear; **it migrated from an invisible sink to a
+  player-facing one.** Ore now leaves the economy because somebody chose to buy
+  something, instead of because somebody died.
+- **The field's standing puddle of loose ore is up only ~14 %**, and ~16 % during
+  collapse — not double, and nowhere near 4.8×. The 4.8× is *throughput*: chunks
+  are dropped far more often and picked up nearly as fast. Anyone budgeting for
+  "the map will be carpeted at collapse" should budget +16 %, not +100 %.
+- **Mining barely moved (+4 %).** The extra ore in circulation is recycled, not
+  newly cut, so `FIELD_YIELD` and the abundance table are doing the same job they
+  were tuned to do. This is the most reassuring number in the table.
+- **Ore now moves faster through every stage:** looted +34 %, banked +27 %, built
+  +25 %, deaths +13 %. The economy runs hotter without holding more.
+
+Concretely, and stated for the balance crew rather than buried:
 
 - **Contested space is worth more.** A fight in the asteroid field used to burn
-  half of whatever the loser was carrying; now every ore either pilot held survives
-  the exchange and lies there for whoever holds the ground afterwards.
-- **Ganking a loaded miner pays double.** The full-hold hauler was already the
-  juiciest target in the game (GDD §2.3: *"dart home early or risk hauling a full
-  hold"*). The reward for catching one just doubled while the risk of hauling did
-  not change, so the risk/reward on running a full hold has moved **against**
-  hauling and **toward** interception.
-- **Collapse circulates more ore than §2.8's numbers assumed.** The field-yield
-  figure (~400, times the abundance multiplier) is a *mint* budget, and it is
-  untouched — but ore that used to leave the economy at every death now stays in
-  it, so the quantity actually in play late is higher than the tuning behind
-  `FIELD_YIELD`, the abundance table and the collapse timings was measured against.
-  The passive-match and mined-out bounds in §2.8 are the two that most deserve a
-  re-measure.
-- **The sink side of the ledger thins out.** `deathLoss` is now **0** for an
-  ordinary death. `spent` becomes the economy's dominant sink, which means the
-  brake on the ore supply is now almost entirely *what players choose to buy*.
+  most of whatever the loser was carrying — 69.7 % of it, once a0-58's floor is
+  counted; now every ore either pilot held survives the exchange and lies there for
+  whoever holds the ground afterwards.
+- **Killing a *lightly* loaded miner is what changed most, not the fat hauler.**
+  This is the opposite of the intuition and it falls straight out of the floor. A
+  hold of 8 dropped 4 chunks before and drops 8 now: a clean 2×. A hold of 1
+  dropped **nothing** before and drops 1 now: an infinite ratio. Because 470 of
+  `main`'s 2977 deaths carried exactly 1 ore, while a full hold of 8 was carried
+  into death **zero** times on `main` and once on this branch across all 24 seeds,
+  the aggregate is dominated by the small holds. **The fat
+  hauler's death was always the one that paid; a0-59 is mostly a buff to killing
+  everyone else.** Interception is up across the board, but the *marginal* value of
+  hunting a full hold specifically rose the least of any hold size.
+- **Collapse: circulation is up sharply, standing stock is not.** The field-yield
+  figure (~400, times the abundance multiplier) is a *mint* budget and it is
+  untouched — and measured, mining moved only +4 %, so `FIELD_YIELD` and the
+  abundance table are still doing the job they were tuned for. What rose is the
+  rate ore changes hands (+34 % looted), not the amount lying about: loose ore
+  during collapse is **+16 %**. §2.8's passive-match and mined-out bounds are worth
+  a re-measure, but the expected movement is small.
+- **The sink did not thin out — it moved.** `deathLoss` is now **0** for an
+  ordinary death, and `spent` rose by +970 against the 1031 that used to burn:
+  within 6 % of a straight swap. The brake on the ore supply is now almost entirely
+  *what players choose to buy*, which is a **visible, player-controlled** sink
+  where the old one was invisible and involuntary. That is arguably the most
+  interesting consequence of the ruling and it was not predicted anywhere.
 
 That is the intended consequence — the developer asked for it — and it is a
 balance change, not a bug fix.
