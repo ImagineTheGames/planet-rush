@@ -47,16 +47,26 @@ import { MAP_SELECT_GUEST_HINT, mapSelectModel } from './map-select';
 import { xpToReach } from '../progression/curve';
 import { DOOR_ORDER, ENTRY_COMING_SOON, ENTRY_ERRORS, KEYPAD_KEYS } from './lobby-entry';
 import {
+  ABUNDANCE_LABELS,
   CLASS_ORDER,
   DEFAULT_SHIP_CLASS,
+  LOBBY_EYEBROW,
   MODE_LABELS,
   RUSH_COUNTDOWN_SECONDS,
   SEAT_STATE_CYCLE,
+  claimChipLabel,
+  claimLabel,
   seatStateCycle,
   lobbyModel,
 } from './lobby';
 import type { LobbyState, SeatOccupant } from './lobby';
 import { lobbyHitTest, lobbyLayout } from './lobby-geometry';
+// a0-61's copy check measures rather than eyeballs: the view's own type sizes and
+// pad, and the repo's real per-glyph advances (a0-32's `./font-metrics`).
+import { EYEBROW_PX, STATE_LABEL_PAD, TOGGLE_PX } from './lobby-view';
+import { frameMetrics, plateTypeSize, typeSize, TRACKING } from '../art/materials';
+import type { FrameMetrics } from '../art/materials';
+import { textWidth } from './font-metrics';
 import type { LobbyLayout, LobbyTarget } from './lobby-geometry';
 import type { MatchMode } from '../sim/match-config';
 import type { Rect } from '@platform/layout-registry';
@@ -128,6 +138,39 @@ function inLobbyVia(door: 'solo' | 'create' | 'join', you = 0, host = you): Flow
   }
   return flowConnected(state, you, { host }).state;
 }
+
+/**
+ * The viewports a0-61's copy check measures the lobby chrome at.
+ *
+ * `./lobby-geometry.test.ts`'s own matrix, verbatim in its intent: both
+ * orientations of the two handsets the goldens run on, the iPad, and the two
+ * stress profiles below them. Planet Rush is landscape-locked
+ * (`src/platform/orientation.ts`), so a phone held in portrait hands the menus
+ * the WIDE logical viewport — which means the portrait entries here are the ones
+ * a rotating device passes through, and the landscape entries are what it
+ * settles on. Both have to fit.
+ */
+const COPY_FIT_PROFILES = [
+  { name: 'iphone/portrait', vp: { width: 390, height: 844 }, touch: true },
+  { name: 'iphone/landscape', vp: { width: 844, height: 390 }, touch: true },
+  { name: 'pixel/portrait', vp: { width: 412, height: 915 }, touch: true },
+  { name: 'pixel/landscape', vp: { width: 915, height: 412 }, touch: true },
+  { name: 'ipad/portrait', vp: { width: 820, height: 1180 }, touch: true },
+  { name: 'iphone-se/portrait', vp: { width: 375, height: 667 }, touch: true },
+  { name: 'iphone-se/landscape', vp: { width: 667, height: 375 }, touch: true },
+  { name: 'small/portrait', vp: { width: 320, height: 568 }, touch: true },
+  { name: 'small/landscape', vp: { width: 568, height: 320 }, touch: true },
+  { name: 'desktop', vp: { width: 1280, height: 800 }, touch: false },
+  { name: 'desktop/wide', vp: { width: 1920, height: 1080 }, touch: false },
+] as const;
+
+/** …and the three a baseline image is actually taken at (`tests/mobile`
+ *  `DEVICE_MATRIX`), in the orientation the lock hands the menus. */
+const GOLDEN_PROFILES = [
+  { name: 'iphone', vp: { width: 844, height: 390 }, touch: true },
+  { name: 'pixel', vp: { width: 915, height: 412 }, touch: true },
+  { name: 'desktop', vp: { width: 1280, height: 800 }, touch: false },
+] as const;
 
 /** A `lobbyState` broadcast: `count` seats, with `humans` of them seated. */
 function slots(count: number, humans: number[]): LobbySlot[] {
@@ -428,6 +471,131 @@ describe('the room tells the server what it chose', () => {
     const tapped = flowTapLobby(offline, { kind: 'claim' });
     expect(tapped.state).toBe(offline);
     expect(tapped.effects).toEqual([]);
+  });
+
+  /**
+   * a0-61 — the two labels the developer read back to us off a screenshot of the
+   * lobby chrome:
+   *
+   * > *"we still have words like 'claim', no player is going to know what that
+   * > means, just put it in everyday game terms like Visibility - Public … and
+   * > Join Code instead of claim"* (2026-08-16)
+   *
+   * `CLAIM` over `753P` and `CLAIM · PUBLIC` beside the MODE and YIELD chips were
+   * both our domain model leaking onto the screen. This test is here so a later
+   * copy sweep cannot quietly put it back: GDD §4.7 register 2 still lists
+   * **claim** as the word to reach for, and the only thing standing between that
+   * table and these two controls is §4.7's own clarity rule — *"if the flavour
+   * word and the plain word compete on comprehension, the plain word ships"*, and
+   * the table's own concession that *"the room-code noun stays 'code'."*
+   *
+   * It asserts three things, in the order they would bite:
+   *
+   *  1. **The words.** Driven through the flow the client drives, so it is the
+   *     lobby a CREATE actually opens that is being read, not a constant.
+   *  2. **Neither control says "claim" any more** — the regression itself.
+   *  3. **They still fit.** `JOIN CODE` is 84% wider than `CLAIM` and
+   *     `VISIBILITY · PRIVATE` 36% wider than `CLAIM · PRIVATE`, and a label that
+   *     overruns its chrome is a golden failure rather than a cosmetic one
+   *     (a0-32). Measured with the repo's own font metrics, not eyeballed.
+   *
+   * What it deliberately does NOT touch: `./end-of-match`'s `CLAIM HELD` /
+   * `CLAIM LOST` / `You took the claim.`, which are theme rather than chrome and
+   * are governed by §4.7's accessibility clause — a question for the developer,
+   * not a thing to infer from a note about the lobby.
+   */
+  it('says what it does in words a player already knows', () => {
+    const online = inLobbyVia('create', 0, 0);
+    const model = lobbyModel(online.lobby!);
+
+    // 1. The room code is a JOIN CODE. Every game the player has met calls it
+    //    that; `RoomCode` is what our type is called, which is not the same thing.
+    expect(LOBBY_EYEBROW).toBe('JOIN CODE');
+    // …and the code under it is still the code the door resolved (rule 1), which
+    // is the fact the eyebrow is naming.
+    expect(model.room).toBe(online.lobby!.room);
+
+    // 2. The visibility chip says what it controls. PUBLIC / PRIVATE were never
+    //    the problem — the noun in front of them was.
+    expect(model.showClaim).toBe(true);
+    expect(claimChipLabel(model.listed)).toBe('VISIBILITY · PUBLIC');
+    const priv = flowTapLobby(online, { kind: 'claim' }).state;
+    expect(claimChipLabel(lobbyModel(priv.lobby!).listed)).toBe('VISIBILITY · PRIVATE');
+    // …and the value half is untouched, because it is also the word the wire and
+    // the browser already use.
+    expect(claimLabel(true)).toBe('PUBLIC');
+    expect(claimLabel(false)).toBe('PRIVATE');
+
+    // 3. The regression, stated as the developer stated it: no player-facing
+    //    string on either control contains our word.
+    for (const shown of [LOBBY_EYEBROW, claimChipLabel(true), claimChipLabel(false)]) {
+      expect(shown.toUpperCase(), `"${shown}" still says CLAIM`).not.toContain('CLAIM');
+    }
+
+    // --- and they fit ------------------------------------------------------
+    //
+    // The eyebrow and the chip fail differently, so they are checked
+    // differently. The eyebrow is drawn with NO `fitLabel` behind it
+    // (`./lobby-view` drawHeader): it is right-anchored on the header beam's
+    // trailing edge, so a word too wide for the code cluster does not shrink, it
+    // walks left into `CREW MUSTER`. It therefore has to fit outright.
+    const EYEBROW = (m: FrameMetrics) => ({
+      face: 'body' as const,
+      size: typeSize(EYEBROW_PX, m),
+      tracking: TRACKING.eyebrow,
+    });
+    // The chip DOES have `fitLabel`, and one line with no word wrap, so it can
+    // neither clip nor reflow — what it can do is shrink, and past a point that
+    // is the same failure by another name. `TYPE_MIN` is the ratified floor for
+    // type the frame scales; a label the chip has to squeeze is already under it,
+    // so the bar here is the one the strip already meets with the longest label
+    // it shipped before this change.
+    const CHIP = (m: FrameMetrics) => ({
+      face: 'heading' as const,
+      size: plateTypeSize(TOGGLE_PX, m),
+      tracking: TRACKING.label,
+    });
+    const shrink = (text: string, room: number, m: FrameMetrics) =>
+      Math.min(1, room / textWidth(text, CHIP(m)));
+
+    for (const { name, vp, touch } of COPY_FIT_PROFILES) {
+      const layout = lobbyLayout(vp, { isTouch: touch, claim: true });
+      const m = frameMetrics(vp.width, vp.height);
+
+      // The cluster the eyebrow is right-aligned into. It clears it on every
+      // profile — 80px of the 113px a phone allots, 85px of a desktop's 132.
+      expect(
+        textWidth(LOBBY_EYEBROW, EYEBROW(m)),
+        `${name}: "${LOBBY_EYEBROW}" overruns the ${layout.roomCode.width}px code cluster`,
+      ).toBeLessThanOrEqual(layout.roomCode.width);
+
+      // The chip, at its longest word (PRIVATE is the wider value).
+      const longest = claimChipLabel(false);
+      const room = layout.claim.width - 2 * STATE_LABEL_PAD;
+      expect(room, `${name}: the chip has room`).toBeGreaterThan(0);
+      // Never clipped: `fitLabel` scales, so the drawn width is the room or less.
+      expect(textWidth(longest, CHIP(m)) * shrink(longest, room, m)).toBeLessThanOrEqual(room);
+      // Never reflowed: it is one line, and `makeText` sets no `wordWrap`.
+      expect(longest).not.toContain('\n');
+      // …and it is not asking the strip for a squeeze far outside the one the
+      // strip already grants `YIELD · STANDARD`, the longest label it shipped
+      // with. Within a tenth: the new noun is four characters longer, and this
+      // number is the price of them, stated rather than discovered in a golden.
+      expect(
+        shrink(longest, room, m),
+        `${name}: VISIBILITY squeezes far harder than YIELD does`,
+      ).toBeGreaterThan(shrink(`YIELD · ${ABUNDANCE_LABELS.standard}`, room, m) - 0.1);
+    }
+
+    // On the three viewports the goldens are actually taken at, it barely
+    // squeezes at all — the phones are landscape-locked, so the menus get the
+    // WIDE logical viewport and the chip gets nearly all of its type.
+    for (const { name, vp, touch } of GOLDEN_PROFILES) {
+      const layout = lobbyLayout(vp, { isTouch: touch, claim: true });
+      const m = frameMetrics(vp.width, vp.height);
+      const room = layout.claim.width - 2 * STATE_LABEL_PAD;
+      expect(shrink(claimChipLabel(false), room, m), `${name}: chip type`).toBeGreaterThan(0.9);
+    }
   });
 
   it('refuses every variable-match control from a guest', () => {

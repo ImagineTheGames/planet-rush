@@ -79,7 +79,7 @@ import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-r
 import { PALETTE } from '@render/index';
 import {
   ABUNDANCE_LABELS,
-  claimLabel,
+  claimChipLabel,
   DIFFICULTY_LABELS,
   LOBBY_EYEBROW,
   LOBBY_TITLE,
@@ -120,9 +120,9 @@ import { pingFits } from '../net/ping';
 // and this file's own local copy drifting from it is what a1-01 found on the CI
 // runner. Nothing below re-declares one.
 
-/** `CREW MUSTER` in the header beam, and `CLAIM` above the code. */
+/** `CREW MUSTER` in the header beam, and `JOIN CODE` above the code (a0-61). */
 const HEADING_PX = 22;
-const EYEBROW_PX = 12;
+export const EYEBROW_PX = 12;
 /** The room code itself — the number a classroom reads off one screen. */
 const CODE_PX = 26;
 /** A roster row: the P-number, the player's name, its second line. */
@@ -131,7 +131,10 @@ const NAME_PX = 15;
 const DETAIL_PX = 12;
 /** The word on a row's own controls, and on the MODE / ORE chips above them. */
 const ROW_LABEL_PX = 12;
-const TOGGLE_PX = 13;
+/** …and on the three control-strip chips. Exported since a0-61 so
+ *  `./lobby-flow.test.ts` can measure the longest of them against the box it is
+ *  drawn into instead of restating the number and letting it drift (a0-32). */
+export const TOGGLE_PX = 13;
 /** The footer beam's two plates and the hint between them. */
 const ACTION_PX = 20;
 const HINT_PX = 12;
@@ -145,7 +148,7 @@ const TEAM_CHIP_LABEL_PAD = 6;
 /** …and the same for the leading STATE control's word (u5). Tighter than the team
  *  chip's, because `CLOSED` is the longest word on the narrowest control on this
  *  screen and it should reach full size on every row the layout really produces. */
-const STATE_LABEL_PAD = 4;
+export const STATE_LABEL_PAD = 4;
 
 /** Inset a summary card's eyebrow keeps from its strip's leading edge (u10-01).
  *  The word is left-aligned rather than centred, because it labels the card under
@@ -1173,15 +1176,21 @@ export class LobbyView extends Container {
       enabled,
       m,
     );
-    // …and the room's own visibility beside them (a0-35): CLAIM · PUBLIC /
+    // …and the room's own visibility beside them (a0-35): VISIBILITY · PUBLIC /
     // PRIVATE, in the same chip, the same face and the same two Bone shades as
     // its neighbours, because it is the same kind of control. It is drawn only
     // where it was laid out — a zero-extent rect hides its own label — so a guest
     // and an offline lobby see the strip that shipped.
+    //
+    // The label is composed in `./lobby` ({@link claimChipLabel}) rather than
+    // here: a0-61 replaced the noun on this chip and the string a test has to
+    // read must not be one that only exists inside a draw call. It is also the
+    // longest label on the strip, which `drawToggle`'s `fitLabel` handles the
+    // same way it already handles `YIELD · STANDARD`.
     this.drawToggle(
       this.claimText,
       this.layout.claim,
-      `CLAIM · ${claimLabel(model.listed)}`,
+      claimChipLabel(model.listed),
       enabled,
       m,
     );

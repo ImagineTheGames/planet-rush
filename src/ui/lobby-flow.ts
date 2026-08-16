@@ -49,7 +49,10 @@
  *     lobby opens on and the code the `join` carries. There is exactly one
  *     place a code is minted ({@link ./lobby} `makeRoomCode`, seeded) and the
  *     flow never invents a second one — a lobby whose title disagreed with the
- *     room the socket is in would send a classroom to the wrong match.
+ *     room the socket is in would send a classroom to the wrong match. On
+ *     screen that one code is labelled **JOIN CODE** (a0-61, {@link ./lobby}
+ *     `LOBBY_EYEBROW`); `RoomCode` is what the type is called and `roomCode` is
+ *     what the target is called, and neither of those is a word a player reads.
  *  2. **The countdown is real, and it is the host's.** RUSH! starts a local
  *     count that everyone watching the host's screen can read; the
  *     `startMatch` message is sent when that count reaches **zero**, not when
@@ -624,7 +627,10 @@ export function flowTapLobby(state: FlowState, target: LobbyTarget): FlowResult 
       // SCARCE → STANDARD → RICH (ratified p11). Locked with the hull at RUSH!.
       return withLobby(state, cycleAbundance(lobby));
     case 'claim':
-      // PUBLIC ⇄ PRIVATE — who may FIND this room (a0-35). Refused from a guest,
+      // PUBLIC ⇄ PRIVATE — who may FIND this room (a0-35). The chip it comes from
+      // says `VISIBILITY · PUBLIC` since a0-61; the target kind is still `claim`,
+      // because the developer's note was about the words on the screen and not
+      // about the model underneath them. Refused from a guest,
       // after RUSH! and offline, all three in `./lobby`, so a tap this flow cannot
       // honour returns the identical lobby and costs the wire nothing. It is not
       // match config and never reaches `lobbyMatchConfig`: it changes who can walk
@@ -640,9 +646,10 @@ export function flowTapLobby(state: FlowState, target: LobbyTarget): FlowResult 
       return started === lobby ? rest(state) : rest({ ...state, lobby: started });
     }
     case 'roomCode':
-      // The code is a label, not a control. It is hit-testable so the caller can
-      // offer copy-to-clipboard (a DOM affordance UI does not own); ignoring it
-      // here means a tap on it never disturbs the roster.
+      // The JOIN CODE (a0-61 — the eyebrow over it says exactly that). The code is
+      // a label, not a control. It is hit-testable so the caller can offer
+      // copy-to-clipboard (a DOM affordance UI does not own); ignoring it here
+      // means a tap on it never disturbs the roster.
       return rest(state);
     case 'leave': {
       // BACK — leave the lobby (u2 menu-back). Backing out of a room returns to the
