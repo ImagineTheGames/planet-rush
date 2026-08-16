@@ -623,6 +623,42 @@ how the report was settled.
 **If the seam ever moves** — if `playtest-log-attach` takes an `../sim` import —
 `drainOreJournal` should become its drain and leave this list.
 
+### 4.9 SURFACE — the double that stages the failure (a0-56, 2026-08-16)
+
+| Export | Verdict |
+|---|---|
+| `src/net/playtest-log-store.ts#memoryPlaytestLogStore` | SURFACE — production must NOT call it; it is the reload, staged |
+
+a0-56 fixed a playtest log that lost the match it existed to record: the session
+log lived in a module-level singleton, returning to the menu from the pause menu
+called `window.location.reload()`, and the singleton died with the page. Both logs
+the developer sent had the same fingerprint — five events, `dropped: 0`, the boot
+sequence and nothing else — and the Director believed them over the developer.
+
+The fix persists the ring to `sessionStorage` behind an injected
+`PlaytestLogStore`. The production seam is `browserPlaytestLogStore()`, wired in
+`src/main.ts`; `memoryPlaytestLogStore()` is its in-memory double, and the reason
+it is dark is the reason it must stay dark: **a memory store dies with the page**,
+which is precisely the bug. A production caller would reintroduce a0-56 with a
+green test suite watching.
+
+What it buys is the one thing a DOM-free spec cannot otherwise stage. A reload
+destroys the singleton and *keeps* the storage; `playtest-log.test.ts` reproduces
+exactly that pair — `resetPlaytestLog()` with the same store still held — and then
+asserts the restored events carry their **original** timestamps. Without the
+double there is no way to hold the two halves apart in node.
+
+It sits in production source rather than in a spec because two specs need the same
+double (`playtest-log.test.ts` and `playtest-log-store.test.ts`), and importing one
+`.test.ts` from another re-registers its suites in the importer. `roleOf()` has no
+third category between `test` and `prod` for a file under `src/`, so a shared
+fixture there is dark by construction — which is the honest reading, not a
+loophole: the scan is right that nothing ships calling this, and that is the
+requirement.
+
+**If a fake store ever gains a production caller** — an offline/replay mode, say —
+it stops being this and becomes wiring, and this row should fail again.
+
 ## 5. Should it gate CI? Yes — and here is the number
 
 **It ships as a gate**, `npm run dark-matter:check`, in the `ci` job. It fails on
