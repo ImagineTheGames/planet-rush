@@ -1224,8 +1224,52 @@ export function coverSpan(f: number, view: number, bound: number): number {
  * see {@link skyDensity}.
  */
 export class VoidBackdrop {
-  /** The screen-space root — add behind the world container. */
-  readonly view = new Container();
+  /**
+   * The screen-space root — add behind the world container.
+   *
+   * ## It is a RENDER GROUP, and that is a correctness fix (a0-53)
+   *
+   * This is not a performance flag. It is the fix for the fourth report about
+   * the star bloom, and the first of the four whose cause was not a number.
+   *
+   * a0-22, a0-44 and a0-45 each corrected a value here — the tint, the halo
+   * radius against its spikes, the two alphas — and each was measured and each
+   * was right. The developer opened the game after every one of them and still
+   * saw a bloom narrower than the design. a0-53 measured the **lit pixel**
+   * instead of the model and found the break at the very last step:
+   *
+   *  - the constant is 11.24, the shape carries `r × 11.24`, the ramp maps `t`
+   *    to exactly `d / haloR`, and one falloff drawn alone at rx 120 reaches
+   *    zero at 119 px. Every link in the chain is correct.
+   *  - {@link VoidBackdrop} driven through its own API, and the whole real
+   *    `src/render` `Renderer`, both draw the halos at **24–30 px** — the
+   *    design's radius.
+   *  - the **booted app** drew the same stars, from the same seed, at the same
+   *    camera offset, at **17–19 px** — roughly 0.6 of their declared radius.
+   *
+   * The difference was not in the art and not in the renderer: it was the
+   * **batch**. The star layers submit thousands of gradient fills that all
+   * sample one shared ramp texture, and when that geometry is batched together
+   * with the world and the HUD the halos are drawn short. Measured in the
+   * booted game, hiding **any single sibling** of this container — even
+   * `fullscreen-reenter`, which covers no sky — restored every halo to full
+   * radius, which is the signature of a batch boundary rather than of anything
+   * drawing over the sky.
+   *
+   * A render group gives the void its own batch, so the sky can no longer be
+   * re-batched by whatever else happens to be on the stage. Measured in the
+   * booted game with every sibling still visible: halos back to 24–30 px,
+   * profile identical to the isolated reference
+   * (`evidence/a0-53-bloom-radius/audit.txt`).
+   *
+   * It is also the right thing for this container on its own merits — the void
+   * is static geometry that only ever moves (GDD §4.3), which is exactly what
+   * Pixi's render groups exist for. But it is written here as a **correctness**
+   * requirement: `backdrop-bloom.test.ts` `measured off the shipped frame`
+   * measures the bloom off a real frame of the booted client, so removing this
+   * goes red rather than quietly costing the developer a fifth report.
+   */
+  readonly view = new Container({ isRenderGroup: true });
 
   private layers: Layer[] = [];
   private reduced = false;
