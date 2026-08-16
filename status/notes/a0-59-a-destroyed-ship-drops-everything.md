@@ -1264,6 +1264,13 @@ under it did not. Trust the measured table, not the prose around it.)*
     max hold is 8 at `CHUNK.ore = 1`, giving 8 chunks at 17.3 u spacing on a 22 u
     ring (diameter 12 u) — **no self-overlap, and no chunk cap exists in `src/sim/`
     to hit**, so the doubled drop cannot leak into `capLoss`.
+  - **Full local suite after the commits: `1 failed | 5543 passed (5544)`,
+    `1 failed | 300 passed (301)` files, 657 s.** The one failure is the standing
+    `unstuck` blocker, re-run on its own and byte-identical to sessions three
+    through sixteen: **seed 15, `foreman` slot 2, 133.5 s at (1204,1195) while
+    `'haul'`**. (Counts are +2 tests / +1 file against the sixth session's
+    5541/5542 — that is `src/sim/waves.test.ts`, added in the fourteenth session,
+    not drift.) Nothing this session touched moved a number.
   - **No value moves.** `git diff -U0 -- src/sim/constants.ts` filtered of comment
     and blank lines is **empty**; `tsc --noEmit` exits 0; 125 tests green (`damage`,
     `ore-ledger`, `match`, `loot-tell`, `waves`, `tests/codex/`). Both probes were
