@@ -1030,6 +1030,15 @@ export const WRECK = {
  * **migrated to `spent`** (+970 against the 1031 that used to burn). Intended.
  * Full table and method: `docs/design-amendments.md`.
  *
+ * Where it lands, measured separately and also against the intuition: **92.5 % of
+ * death-drop ore falls outside the asteroid field**, on the station ring — on the
+ * pre-a0-59 build too, so that part is an inherited description error and not this
+ * ruling's doing. What the ruling moves is who ends up with it: ore reaching a
+ * pilot other than the one who lost it 70.9 % → **79.4 %**, ore never collected
+ * 9.5 % → **5.3 %**, and of the ore that changes hands the share taken by the
+ * nearest station's owner 36.2 % → 45.2 %. Closer to a defender's buff than to a
+ * buff to intercepting haulers.
+ *
  * Still TUNABLE, and still not assumed to be 1 anywhere: `killShip` mints whole
  * `CHUNK.ore` pieces and sinks the sub-chunk remainder (a0-58), which is a no-op
  * at `1` with a whole hold and the thing that keeps the ledger honest the moment

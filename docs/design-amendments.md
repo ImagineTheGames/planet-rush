@@ -134,10 +134,15 @@ nobody would find it without running both builds.
 
 Concretely, and stated for the balance crew rather than buried:
 
-- **Contested space is worth more.** A fight in the asteroid field used to burn
-  most of whatever the loser was carrying — 69.7 % of it, once a0-58's floor is
-  counted; now every ore either pilot held survives the exchange and lies there for
-  whoever holds the ground afterwards.
+- **Contested space is worth more — but not the space this sentence used to
+  name.** A fight used to burn most of whatever the loser was carrying — 69.7 % of
+  it, once a0-58's floor is counted; now every ore either pilot held survives the
+  exchange and lies there for whoever holds the ground afterwards. That much is
+  confirmed and now measured (**79.4 % of a death's ore reaches a pilot who is not
+  the one who lost it**, up from 70.9 %). What is *not* true, on either build, is
+  the "fight in the asteroid field" this bullet used to open with: **92.5 % of
+  death-drop ore lands outside the field entirely.** See *Where the ore actually
+  lands* below.
 - **Killing a *lightly* loaded miner is what changed most, not the fat hauler.**
   This is the opposite of the intuition and it falls straight out of the floor. A
   hold of 8 dropped 4 chunks before and drops 8 now: a clean 2×. A hold of 1
@@ -164,6 +169,75 @@ Concretely, and stated for the balance crew rather than buried:
 
 That is the intended consequence — the developer asked for it — and it is a
 balance change, not a bug fix.
+
+#### Where the ore actually lands — MEASURED (a0-59, eighteenth session)
+
+The paragraph above says *contested space is worth more* and GDD §2.3's amendment
+adds *interception beats hauling*. Both are claims about **place** — they assume
+the ore lands where the fight was and falls to whoever holds that ground — and
+neither had been measured. The aggregate (4.8×) says how much ore a death returns;
+it says nothing about where it goes or who ends up with it.
+
+Measured on 12 seeds, full natural eight-slot matches run to their own ending, on
+**both real builds** (this branch, and a detached worktree at `origin/main`
+`221a2b1` — neither arm is a hand-flipped constant). Every chunk a death lays down
+is tagged at spawn and followed until a ship takes it; the taker is the ship whose
+`lootTake` fired nearest the chunk that tick.
+
+| | `main` (0.5) | a0-59 (1) |
+|---|---|---|
+| deaths carrying ore | 401 | 639 |
+| death-drop ore tracked | 199 | 1153 |
+| **share landing INSIDE the asteroid field** | **10.6 %** | **7.5 %** |
+| median death distance from map centre | 621.6 u | 639.0 u |
+| — against a field radius of | ~307 u | ~307 u |
+| **recovered by someone OTHER than the dead pilot** | **70.9 %** | **79.4 %** |
+| recovered by the dead pilot themself | 19.6 % | 15.4 % |
+| never recovered at all | 9.5 % | 5.3 % |
+| of the "by other" share, taken by the **nearest station's owner** | 36.2 % | 45.2 % |
+
+**1. The ore does not land in the asteroid field, and never did.** On both builds
+roughly nine tenths of it falls *outside* the field radius, on the station ring —
+median 639 u from centre against a ~307 u field. The "a fight in the asteroid
+field" framing was inherited, not measured, and it is wrong about place on `main`
+too. This is a description error a0-59 did not introduce and does not fix; it is
+corrected here because the balance crew will otherwise budget the extra ore into
+the wrong part of the map.
+
+**2. "Contested space is worth more" survives, in its strongest form.** The ore
+genuinely changes hands and does so more than before: the share reaching a pilot
+other than the one who lost it rises 70.9 % → **79.4 %**, the dead pilot recovers
+less of their own (19.6 % → 15.4 %), and far less is left lying (9.5 % → **5.3 %**).
+This is the one claim in that paragraph that is both true and now evidenced.
+
+**3. "Interception beats hauling" is the weakest of the four claims, and reads
+closer to a defender's buff.** Of the ore that changes hands, the share taken by
+the owner of the *nearest home station* rises 36.2 % → **45.2 %** — dying on
+somebody's approach hands them your hold on their doorstep. Combined with the
+hold-at-death histogram above (a full hold of 8 was carried into death **zero**
+times on `main` across 24 seeds), what a0-59 pays out is **combat attrition near
+stations, not intercepted cargo**. The ore a0-59 adds that did not exist before —
+the holds of 1 that `main`'s floor minted as nothing — is the most extreme case of
+all: **1.9 %** of it lands in the field.
+
+**Caveats, stated rather than buried.**
+- The tagger caught **97.2 %** (a0-59) and **97.1 %** (`main`) of the exact drop
+  predicted by `floor(hold × fraction / CHUNK.ore)` per death. The ~3 % missed is
+  chunks tractored in the same tick they spawn — which are disproportionately the
+  *killer's*, so the "recovered by other" share above is a **floor**, not a
+  ceiling.
+- Self-calibrating control: on `main`, 227 deaths carried exactly 1 ore and must
+  drop nothing (`floor(1 × 0.5) = 0`). The tagger attributed **1** ore to them — a
+  false-positive rate of ~0.4 % of deaths, which is the noise floor on every figure
+  in the table.
+- **"Near an enemy home" is partly geometric and is NOT claimed as a finding.**
+  Eight stations on a 768 u ring sit ~588 u apart, so any point on that ring is
+  within ~294 u of some station before anyone dies there. The two robust numbers —
+  the in-field share and the recovery split — have no such confound; the
+  raw "305 u from the nearest enemy home" figure does, and is not load-bearing
+  anywhere above. (LESSONS: do not read an instrument's verdict as the thing
+  itself — the failure mode behind five wrong numbers in
+  `docs/wave-commons-entombment.md`'s history.)
 
 ### `deathLoss` is kept, at zero, on purpose
 

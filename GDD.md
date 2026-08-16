@@ -124,7 +124,13 @@ ratified design being overruled by the person it belongs to, recorded here so th
 document and the constant do not disagree. The consequence is deliberate and worth
 naming, and **measured** rather than estimated (24 full matches on both builds):
 **a kill returns 4.8× more ore to the field than it did on the shipped build**, so
-contested space is worth more and interception beats hauling. The 2× this paragraph
+contested space is worth more — measured, **79 % of a death's ore now reaches a
+pilot who is not the one who lost it** (was 71 %), and only 5 % is left lying (was
+10 %). Two qualifications, both measured and both against the intuition: that
+space is **the station ring, not the asteroid field** — 92.5 % of death-drop ore
+lands outside the field on both builds — and the pilot most likely to collect it is
+**the owner of the nearest station**, so this reads closer to a defender's buff
+than to interception beating hauling. The 2× this paragraph
 used to claim is the change against *this document's* old rule; the shipped
 half-drop actually returned only **30.3 %** of a dead hold, because a0-58's
 whole-chunk floor lands on a hold-at-death distribution in which 71 % of deaths

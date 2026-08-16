@@ -542,6 +542,19 @@ abundance spread therefore still stands; the numbers most worth a re-measure are
 Full table and method: `docs/design-amendments.md` → *What this does to the
 economy — MEASURED, not estimated*.
 
+**Where that extra ore lands, which is not where the amendment used to say.**
+Measured on 12 full matches on both builds: **92.5 % of death-drop ore falls
+outside the asteroid field** (median death 639 u from centre against a ~307 u
+field radius) — on `main` too, so this is an inherited description error rather
+than an a0-59 effect. What a0-59 does change is who ends up with it: the share
+reaching a pilot other than the one who lost it rises **70.9 % → 79.4 %**, ore left
+uncollected falls **9.5 % → 5.3 %**, and of the ore that changes hands the share
+taken by the **nearest station's owner** rises 36.2 % → 45.2 %. Anyone budgeting
+the extra circulation into the field belt should budget it onto the station ring
+instead, and should read a0-59 as closer to a defender's buff than to a buff to
+intercepting haulers. Table, caveats and the tagger's 97 % coverage:
+`docs/design-amendments.md` → *Where the ore actually lands*.
+
 ### §2.9 AI opponents *(10 claims: 10 SHIPPED)*
 
 | Claim | Verdict | Evidence |
