@@ -978,6 +978,7 @@ function updateChunks(world: World, dt: number): void {
   // that earned it. Write-only signalling: nothing below reads them back.
   for (const ship of world.ships) {
     ship.lootTake = 0;
+    ship.lootOffered = 0;
     ship.lootBlocked = false;
   }
   for (const chunk of world.chunks) {
@@ -1032,7 +1033,11 @@ function updateChunks(world: World, dt: number): void {
       if (dist2(chunk.pos, target.pos) <= rr * rr) {
         const room = target.cargoCap - target.cargo;
         if (room > 0) {
-          const take = Math.min(chunk.amount, room);
+          // What the chunk PUT ON OFFER, read before the take spends it — the
+          // number a0-54 found missing. `take` is capped by `room`, so the two
+          // differ exactly when the hold could not accept the whole chunk.
+          const offered = chunk.amount;
+          const take = Math.min(offered, room);
           target.cargo += take;
           chunk.amount -= take;
           // Chunk → hold: the LOOT step. Mined ore, a death drop, wreck debris —
@@ -1059,6 +1064,13 @@ function updateChunks(world: World, dt: number): void {
           // (`room` 1 against a 3-ore chunk) shows as the 1 it was. Accumulated,
           // because two chunks can land in one hold on one tick.
           target.lootTake = (target.lootTake ?? 0) + take;
+          // …and, beside it, what was OFFERED (a0-54). The take alone cannot be
+          // read: `+1` over a 2-ore chunk and `+1` over a 1-ore chunk are the same
+          // tell, and the developer read the first as a miscount. Accumulated on
+          // the same terms, so a tick that lands two chunks compares two sums —
+          // `lootOffered > lootTake` is the whole partial-take test, and the HUD
+          // says so at the ship (`src/ui/loot-tell.ts`).
+          target.lootOffered = (target.lootOffered ?? 0) + offered;
         }
       }
     }
