@@ -404,6 +404,54 @@ under it did not. Trust the measured table, not the prose around it.)*
   live on `main`. **This is a docs deliverable, not a fix — the blocker is
   unchanged and still needs the same ruling.**
 
+- **2026-08-16, sixth session — what this one actually did.** Three things, none
+  of them a re-measurement of the blocker (the fifth session already re-derived it
+  independently and it reproduced; a sixth pass would be waste).
+  1. **Brought the branch up to date with `main`**, which had moved 10 commits
+     (`43236fb` → `221a2b1`: a0-61 ui, a0-62 app-shell bloom, a0-63 explosion lab).
+     Merged at `3773f95`. **`git diff HEAD...origin/main -- src/sim src/shared` is
+     empty** — none of the three touched this lane, so the A/B in BLOCKED still
+     stands unchanged and no re-measure was needed. *Note for whoever hits this
+     next:* the merge aborts on untracked `evidence/a0-62-app-shell-bloom/audit.ts`
+     left in the shared workspace by the art lane. Do **not** `git clean`; back the
+     file up (I put it in `/tmp/a0-62-untracked-backup/`) and merge — `main`'s
+     tracked copy is authoritative now that a0-62 has landed.
+  2. **`3855f6c` sim(a0-59) — COMMENT-ONLY.** The fourth session corrected the two
+     false corridor guarantees in `constants.ts` but **missed the third copy of the
+     same claim, in `src/sim/waves.ts` itself** — the commons placement comment, at
+     the point of edit, which is the one an agent actually reads before touching
+     this code. It said *"Sized so the innermost ring rock clears a ship's straight
+     path by more than a ship+rock radius (`inner·sin(gap)` ≈ 74 u)"*. False: 62 u
+     is required, 21.2 u is delivered at wave 5, and the promise is already missed
+     at wave 3. Also recorded there now: the eye is reserved by rock **centre**
+     (unlike `pocketOuterR` 90 lines up, which subtracts `ASTEROID.maxRadius` and
+     says so), and the 3.66× oversubscription that makes every placement fix
+     impossible. `git diff -U0` filtered of comment lines is **empty**; `tsc`
+     clean; no golden can move. Same rationale as `faa756b`.
+  3. **Re-derived the geometry table before writing that comment**, from
+     `createWorld(seed 15, 8-slot cast)` + `waveRadiusFraction` / `RESOURCE_FIELD`
+     / `ASTEROID`, rather than copying it out of this note. **It reproduces to the
+     digit** — 3.66× oversubscribed at wave 5, `freeEye` 19.3 u against
+     `SHIP_RADIUS` 16, `spokeClear` 21.2 u against `needSpokeClear` 62,
+     `rMinPassable` 276. Third independent derivation, same answer. **The geometry
+     is settled — stop re-deriving it.**
+  - **Full suite re-run after the merge: `1 failed | 5541 passed (5542)`,
+    `1 failed | 299 passed (300)` files, 673 s.** The one failure is `unstuck`
+    seed 15, `foreman` slot 2, **133.5 s at (1204,1195)** — identical to sessions
+    three, four and five. `tsc --noEmit` exits 0. Both remote DoD greps pass
+    against `FETCH_HEAD`.
+  - **Escalated once, deliberately.** PR #436 had **zero comments and zero reviews**
+    after five sessions. The whole analysis lives in the PR *body*, and editing a
+    body notifies nobody. Posted exactly one short comment naming the two options.
+    Did not repost the analysis — it is already in the body and in
+    `docs/wave-commons-entombment.md`.
+  - **Trap for the next session, found the hard way:** `/status/notes/…` and the
+    repo's `status/notes/…` are **two separate files, not a symlink**, and
+    `/status`'s copy was a session stale (missing the fifth session's entries).
+    Editing `/status` and copying it over the repo copy silently deleted committed
+    history. **Edit the repo copy, then `cp` it to `/status` — never the reverse
+    without diffing first.**
+
 ## BLOCKERS
 
 One: the `unstuck` wedge above — `tests/harness/unstuck.test.ts` is the only red
