@@ -5,29 +5,30 @@
  * `waves.ts` places every commons asteroid and had no test file of its own; the
  * only coverage was `match.test.ts` §4, which pins CONTAINMENT (each wave lands
  * inside its own shrinking disc) and says nothing about PASSABILITY. This file
- * pins passability, because the build has a live defect there.
+ * pins passability.
  *
- * ## What this file pins, and why it asserts a defect on purpose
+ * ## What this file pins
  *
- * The late commons waves seal the map centre: a ship at the centre when wave 4
- * lands cannot leave, by any route, for the rest of the match. That is measured,
- * structural, and currently SHIPPED — see `docs/wave-commons-entombment.md` for
- * the geometry (wave 5's ring is 3.66x oversubscribed with rock, so no placement
- * fix exists) and `docs/gdd-conformance.md` §7 Q-6 for the decision it is
- * waiting on. Fixing it means changing late-wave rock size or count, which is a
- * balance call this lane cannot make unilaterally.
+ * **A ship at the map centre can always leave it.** The late commons waves used
+ * to seal the centre — a ship caught there when wave 4 landed could not get out,
+ * by any route, for the rest of the match, on 100 seeds out of 100 — and this
+ * file was written as a CHARACTERISATION test asserting that defect while it was
+ * shipped. a0-65 fixed it (`WAVE.lastRadiusFraction` 0.25 → 0.5 plus
+ * `ringSizeScale` in `./waves`), so the expectation is now the invariant it
+ * always should have been: escapable after every wave, not sealed after wave 4.
+ * The geometry, the measurement and the rejected fixes are in
+ * `docs/wave-commons-entombment.md`.
  *
- * So this is a CHARACTERISATION test: it asserts what the build does today, not
- * what it should do. If it goes red because the centre is now escapable, that is
- * probably GOOD NEWS — someone fixed the trap. Update this file, the defect
- * report, and Q-6 together; do not "repair" the test in isolation.
+ * If this goes red, the trap is back. It is a real defect, not a stale
+ * expectation — do not "repair" it by relaxing the assertion.
  *
  * ## Why it measures reachability rather than reusing the wedge gate
  *
  * `tests/harness/unstuck.test.ts` is the only other instrument that sees this
  * defect, and it sees it by accident: it flags a bot that stays within
  * `WEDGE_R = 8` of one spot while asking to travel. That is a proxy, and it
- * under-reports the trap in two ways this file does not.
+ * under-reported the trap in two ways this file does not — which is why a green
+ * wedge gate is not evidence that the centre is open.
  *
  *   - It only fires once wave 5 shrinks the sealed cell to a few tens of units.
  *     At wave 4 the cell is 68-108 u across, so an entombed ship flies around
@@ -44,20 +45,19 @@
  * hull centre may legally occupy — so it admits any weaving path, not just the
  * straight lines a ray cast can see.
  *
- * ## This file has no dependence on the a0-59 branch it was written on
+ * ## This file has no dependence on the ore-drop change it was written beside
  *
  * It steps the world with no inputs, so no ship ever dies and
- * `DEATH_ORE_DROP_FRACTION` — the whole of a0-59 — never executes. Verified, not
- * assumed: checked out into a detached worktree at `origin/main` it typechecks
- * clean and passes with the identical verdicts (`npx vitest run src/sim` →
- * 376/376). It is green on `main` *because it characterises a defect `main` has*.
- * Cherry-pick it out whenever the trap is briefed; it does not need PR #436.
+ * `DEATH_ORE_DROP_FRACTION` — the whole of a0-59 — never executes. That is what
+ * makes it the honest instrument for this trap: the entombment is pure map
+ * geometry, present identically at a drop fraction of 0.5 and of 1, and the
+ * measurement here cannot be confounded by the economy change on the same branch.
  */
 
 import { describe, expect, it } from 'vitest';
 import { ShipClass } from '@shared/types';
 import { createWorld, step } from './index';
-import { SHIP_RADIUS } from './constants';
+import { SHIP_RADIUS, WAVE_COUNT } from './constants';
 import type { World } from './state';
 
 /** A cast big enough to make the commons its shipped shape: the sector count —
@@ -146,37 +146,30 @@ function escapableByWave(seed: number, upTo: number): boolean[] {
   return out;
 }
 
-// Includes seed 15 — the seed the standing wedge gate fails on, and the one
-// every measurement in the defect report is anchored to.
-const SEEDS = [1, 15, 42];
+// Includes seed 15 — the seed the standing wedge gate failed on, and the one
+// every measurement in the defect report is anchored to. The rest spread the
+// draw; the taper is uniform per wave, so a handful of seeds is a real sample.
+const SEEDS = [1, 7, 15, 23, 42];
 
 describe('commons waves: reachability of the map centre', () => {
-  it('leaves the centre escapable through wave 3', () => {
+  it('leaves the centre escapable after every wave', () => {
     for (const seed of SEEDS) {
-      const byWave = escapableByWave(seed, 3);
+      const byWave = escapableByWave(seed, WAVE_COUNT);
       expect(
         byWave,
-        `seed ${seed}: the centre should still have a route out through wave 3 ` +
-          `(got ${JSON.stringify(byWave)}). If this is red, the trap has moved EARLIER ` +
-          `than wave 4 — re-measure docs/wave-commons-entombment.md before anything else.`,
-      ).toEqual([true, true, true]);
-    }
-  });
-
-  it('seals the centre from wave 4 onward — KNOWN DEFECT, see docs/wave-commons-entombment.md', () => {
-    for (const seed of SEEDS) {
-      const byWave = escapableByWave(seed, 5);
-      expect(
-        byWave.slice(3),
-        `seed ${seed}: expected the map centre to be SEALED after waves 4 and 5 ` +
-          `(got ${JSON.stringify(byWave)} for waves 1..5).\n` +
-          `If the centre is escapable again, the entombment defect may be FIXED — that is ` +
-          `good news, not a broken test. Update this expectation, docs/wave-commons-entombment.md, ` +
-          `and Q-6 in docs/gdd-conformance.md together.\n` +
-          `If instead you widened the eye or the spoke gap and the wedge gate went green, ` +
-          `note that this check is deliberately blind to cell SIZE: a bigger sealed pocket ` +
-          `is not an exit.`,
-      ).toEqual([false, false]);
+        `seed ${seed}: a ship at the map centre must have a route out after EVERY ` +
+          `wave, and after wave ${byWave.indexOf(false) + 1} it does not ` +
+          `(got ${JSON.stringify(byWave)} for waves 1..${WAVE_COUNT}).\n` +
+          `This is the entombment trap coming back (docs/wave-commons-entombment.md). ` +
+          `The two things holding it open are WAVE.lastRadiusFraction — the final ring ` +
+          `needs a circumference to spend — and ringSizeScale in waves.ts, which shrinks ` +
+          `a wave's rocks when its own ring cannot carry them. Check both before ` +
+          `anything else; lowering the first or raising WAVE.ringCorridorAllowance ` +
+          `re-seals the centre.\n` +
+          `Note this check is deliberately blind to cell SIZE: it asks whether the ship ` +
+          `can get OUT, not whether it has room to move, so a bigger sealed pocket does ` +
+          `not satisfy it and neither does a green tests/harness/unstuck.test.ts.`,
+      ).toEqual(new Array(WAVE_COUNT).fill(true));
     }
   });
 });

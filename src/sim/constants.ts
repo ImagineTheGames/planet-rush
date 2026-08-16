@@ -536,9 +536,45 @@ export const WAVE = {
   asteroidsPerWave: 20,
   /** Wave 1's scatter disc, as a fraction of the base field radius. */
   firstRadiusFraction: 1.0,
-  /** The final wave's scatter disc, same units. Strictly smaller than the
-   *  first: the shrinking ring *is* the mechanic. */
-  lastRadiusFraction: 0.25,
+  /**
+   * The final wave's scatter disc, same units. Strictly smaller than the
+   * first: the shrinking ring *is* the mechanic.
+   *
+   * **0.5 since 2026-08-16 (a0-65); it was 0.25, and 0.25 entombed the map
+   * centre on 100 seeds out of 100.** The commons is a ring of
+   * `asteroidsPerWave` rocks of radius `ASTEROID.minRadius..maxRadius`, and a
+   * ring has a circumference. At 0.25 the final wave's rocks were drawn onto a
+   * ring of radius 65 u — circumference 410 u — while the 24 rocks stamped onto
+   * it need 24 × 2 × 34 = 1632 u of arc before a single ship-wide corridor is
+   * asked for. The wave could not be a ring at that radius; it could only be a
+   * solid plug over the centre. Measured by flood fill of free configuration
+   * space (`./waves.test.ts`): the centre sealed at wave 4 on 96 of 100 seeds
+   * and at wave 3 or 5 on the rest — **every seed, not a rare one** — and a
+   * hull caught inside was entombed for the rest of the match (the standing
+   * `tests/harness/unstuck.test.ts` gate, seed 15: 133.5 s pinned).
+   *
+   * 0.5 is the smallest value that, together with the ring-corridor size taper
+   * below, leaves the centre escapable on 100 of 100 seeds with margin. The
+   * mechanic survives: the field still closes 2× over the match (307 u → 154 u
+   * at 8 players), every wave still lands strictly closer in than the last, and
+   * the wave ore is untouched — `drawCanon` scales ore to the wave budget
+   * independently of radius or rock size, so this is geometry only, not economy.
+   * TUNABLE
+   */
+  lastRadiusFraction: 0.5,
+  /**
+   * How much rock arc a wave's ring may carry, as a multiple of its own
+   * circumference, before `./waves`'s `ringSizeScale` starts shrinking the rocks.
+   *
+   * Above 1.0 because rocks are scattered across a *band* (`[inner, disc]`), not
+   * a wire: they stagger radially, so a ring can be oversubscribed on paper and
+   * still be woven through. 1.7 is calibrated against the flood fill rather than
+   * derived — the centre stays escapable on 100/100 seeds at 1.6 and 1.7, and
+   * fails on 9 of 24 at 1.8, so this sits one step inside the measured cliff.
+   * Raising it un-tapers the late waves and re-seals the centre; lowering it
+   * shrinks late rocks further for no measured gain. TUNABLE
+   */
+  ringCorridorAllowance: 1.7,
 } as const;
 
 /**

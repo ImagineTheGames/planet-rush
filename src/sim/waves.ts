@@ -61,7 +61,9 @@ import {
   ASTEROID,
   FIELD_YIELD,
   RESOURCE_FIELD,
+  SHIP_RADIUS,
   SPAWN_CLEAR_POCKET,
+  WAVE,
   WAVE_COUNT,
   clampToMargin,
   homeFieldOreFor,
@@ -223,6 +225,45 @@ function drawCanon(
   }
   return { rocks, rng };
 }
+
+/**
+ * How much to shrink a wave's rocks so the ring they land on still has a
+ * ship-wide corridor through it — `1` when they already fit, which is every wave
+ * whose ring is roomy enough and therefore the early waves on every shipped map.
+ *
+ * A wave is `sectors` copies of one drawn sector stamped around the centre, so
+ * the arc its rocks demand is `sectors × Σ 2r`, and what the ring has to spend is
+ * its own circumference times {@link WAVE.ringCorridorAllowance} (above 1 because
+ * the rocks are scattered across a band and stagger radially rather than sitting
+ * on a wire). One ship-wide corridor per sector is reserved off the top and is
+ * NOT scaled — shrinking the rocks must never be allowed to pay for itself by
+ * eating the very gap it exists to open — so the scale is taken over the arc that
+ * remains on each side.
+ *
+ * Ore is untouched: `drawCanon` has already scaled it to the wave budget, and
+ * this only moves radii. A late rock is smaller and correspondingly richer.
+ *
+ * Uniform across the wave rather than per-rock, because the `N`-fold symmetry is
+ * a ratified fairness invariant: every stamp of the sector must stay congruent.
+ */
+function ringSizeScale(
+  rocks: readonly CanonRock[],
+  sectors: number,
+  innerRadius: number,
+): number {
+  if (rocks.length === 0 || innerRadius <= 0) return 1;
+  // A hull needs its own width plus a margin to fly through without grinding.
+  const corridor = sectors * (2 * SHIP_RADIUS + SHIP_RADIUS);
+  const rockArc = rocks.reduce((sum, r) => sum + 2 * r.radius, 0) * sectors;
+  const budget = WAVE.ringCorridorAllowance * 2 * Math.PI * innerRadius;
+  if (rockArc + corridor <= budget) return 1;
+  // Never below a floor: a wave of dust is not a wave, and a ring this tight is
+  // a `lastRadiusFraction` problem that a size taper cannot be asked to solve.
+  return Math.max(MIN_RING_SIZE_SCALE, (budget - corridor) / rockArc);
+}
+
+/** Floor for {@link ringSizeScale} — see its note. */
+const MIN_RING_SIZE_SCALE = 0.25;
 
 // ---------------------------------------------------------------------------
 // Home fields — the identical per-station neighbourhoods (invariant §1)
@@ -388,59 +429,53 @@ export function spawnWave(world: World, count: number = world.asteroidsPerWave):
   //     to the centre before its window even opens, so the whole spoke must be
   //     clear, not just a pocket.
   //
-  // NEITHER SHAPE HOLDS ON THE LATE WAVES, and this comment used to claim both
-  // did. Measured off these constants in a0-59 (`docs/wave-commons-entombment.md`,
-  // reproduced from `waveRadiusFraction` + `RESOURCE_FIELD` + `ASTEROID`):
-  //   – The eye is reserved by rock CENTRE, not body — unlike `pocketOuterR` ~90
-  //     lines up, which subtracts `ASTEROID.maxRadius` and says so. The actually
-  //     free eye is `eye − maxRadius`: 215 u at wave 1 but 19.3 u at wave 5,
-  //     against a 16 u `SHIP_RADIUS`. That is a sealed pocket, not an open centre.
-  //   – The spoke gap is an ANGLE, so the linear clearance it buys shrinks with
-  //     the ring: `eye·sin(gap)` is 84.6 u at wave 1 and 21.2 u at wave 5, against
-  //     the `SHIP_RADIUS + ASTEROID.maxRadius` = 62 u this comment used to promise
-  //     ("≈ 74 u"). The promise is already broken at wave 3 (52.9 u).
-  // Root cause is not placement: wave 5 needs `24 × 2 × 34` = 1632 u of rock arc
-  // on a 446 u circumference — 3.66× oversubscribed — so no angular or radial
-  // rearrangement admits a corridor, and raising `commonsHoleFraction` (tried
-  // twice) cannot either. DO NOT "fix" this by widening `commonsSpokeGap` or
-  // `commonsHoleFraction`.
+  // NEITHER SHAPE HELD ON THE LATE WAVES until a0-65, and both are load-bearing:
+  // a ring of rock with no corridor through it does not merely crowd the centre,
+  // it **entombs** whatever is standing there. Measured by flood fill of free
+  // configuration space (`./waves.test.ts`, so any weaving path counts, not just a
+  // radial ray) on the pre-a0-65 constants: the centre sealed on **100 seeds out
+  // of 100**, at wave 4 on 96 of them. A hull caught inside was there for the rest
+  // of the match — `tests/harness/unstuck.test.ts` seed 15, 133.5 s pinned at
+  // (1204,1195), which is the arena centre to within a hull's width.
   //
-  // THE KNOB THAT WORKS IS ROCK SIZE, NOT ROCK COUNT — measured on 9 seeds against
-  // the reachability check in `./waves.test.ts` (a0-59, fifteenth session; tables in
-  // the defect report). `sectorRocks` floors at one rock per sector, so an 8-player
-  // wave cannot drop below 8 rocks — still 1.22× the wave-5 circumference before a
-  // ship corridor — and every count taper leaves wave 5 sealed on 9/9. That floor is
-  // the `N`-fold fairness symmetry, so it is not a floor anyone may lower. Size alone
-  // needs a 6.7× cut; `WAVE.lastRadiusFraction` 0.25 → 0.50 together with a 2× size
-  // cut opens 9/9 at both waves and still closes the field 2× over the match. All of
-  // those are field-balance calls, not gameplay repairs — see the report and Q-6.
-  // Note both knobs are ore-neutral: `drawCanon` scales ore to `waveOre` regardless
-  // of radius or count, measured identical to the cent in every arm.
+  // The cause is arc, and it is arithmetic rather than tuning. The rocks land on a
+  // ring, and a ring has a circumference. At `lastRadiusFraction` 0.25 the final
+  // wave's ring had radius 65 u — circumference 410 u — while the 24 rocks stamped
+  // onto it need `24 × 2 × 34` = 1632 u of arc before anyone asks for a ship-wide
+  // corridor as well. No placement rule can fit that, so the wave stopped being a
+  // ring and became a plug. Two things follow, and they are why the knobs that
+  // look right are not:
+  //   – `commonsHoleFraction` and `commonsSpokeGap` cannot help. The hole is a
+  //     fraction of a disc that is itself shrinking, and the spoke gap is an
+  //     ANGLE, so the linear clearance it buys shrinks with the ring
+  //     (`eye·sin(gap)`: 84.6 u at wave 1, 21.2 u at wave 5). Both were measured
+  //     and both re-sealed; raising the hole fraction was tried twice.
+  //   – `+ ASTEROID.maxRadius` on `innerRadius` — making the eye mean what its
+  //     name says — is a GATE MASK on its own. It doubles the free pocket
+  //     (21.6 u → 42.1 u) and opens ZERO escape bearings, but lifts the hull's
+  //     roaming radius above `unstuck.test.ts`'s `WEDGE_R = 8`, so seed 15 falls
+  //     133.5 s → 2.7 s and CI goes green while the player stays entombed in a
+  //     bigger cell. `./waves.test.ts` is the check that edit cannot fool: it
+  //     measures whether the centre can be REACHED, not how much room the hull
+  //     has. Trust it over a green `unstuck`.
   //
-  // AND DO NOT "fix" IT BY ADDING `+ ASTEROID.maxRadius` TO `innerRadius` BELOW,
-  // tempting as that is — it is the one edit that makes the eye mean what its name
-  // says, and on its own it is a GATE MASK. Measured both arms (a0-59, thirteenth
-  // session): it doubles the free pocket, 21.6 u → 42.1 u, and opens ZERO of 360
-  // escape bearings — the ring stays 100% sealed. What it does is lift the hull's
-  // roaming radius above `unstuck.test.ts`'s `WEDGE_R = 8` re-anchor threshold, so
-  // the standing wedge gate stops seeing the trap: seed 15 falls 133.5 s → 2.7 s
-  // and CI goes green while the player stays entombed in a bigger cell. Make this
-  // correction only TOGETHER WITH the rock size/count fix, never before it.
-  // `src/sim/waves.test.ts` is the check this edit CANNOT fool — it measures
-  // whether the centre can be reached, not how much room the hull has, and still
-  // reports sealed under the correction. Trust it over a green `unstuck`.
+  // So the fix is the two things that actually change the arc, and it is in two
+  // parts because neither alone is enough (both measured on 100 seeds):
+  //   1. `WAVE.lastRadiusFraction` 0.25 → 0.5, so the final ring has a
+  //      circumference to spend. Alone: still sealed on 23 of 24.
+  //   2. `ringSizeScale` below, so a wave's rocks shrink when its own ring cannot
+  //      carry them. Alone: still sealed, because at radius 65 the rocks have to
+  //      become 2 u pebbles to fit and the taper bottoms out first.
+  // Together: escapable on 100/100, and the mechanic survives — the field still
+  // closes 2× over the match, every wave still lands strictly closer in than the
+  // last, and waves 1–3 are placed exactly as they were before a0-65.
   //
-  // AND NOTE THE SEAL CLOSES AT WAVE 4, not wave 5 — 9 of 9 seeds measured, none
-  // sealed at wave 3 (a0-59, fourteenth session; flood fill of free configuration
-  // space, so any weaving path counts, not just a radial ray). Wave 5 only shrinks
-  // the sealed cell from 68–108 u across to 4–24 u, which is where a wedge
-  // detector first notices. Everything written above about "wave 5" is where the
-  // trap becomes VISIBLE; wave 4 is where it starts. A ship is caught on 16 of 24
-  // seeds — most mine their way out in 30–120 s, since the ring is minable rock.
-  //
-  // Both are pure `N`-fold-symmetric reshapes of one drawn sector, so the commons
-  // stays symmetric and carries the same `WAVE_ORE` — the fairness invariant is
-  // untouched (`resource-fairness.test.ts`).
+  // Both parts are ore-neutral: `drawCanon` scales ore to `waveOre` regardless of
+  // radius, so a smaller late rock carries the same ore in a denser package and
+  // the economy does not move. And both are pure `N`-fold-symmetric reshapes of
+  // one drawn sector, so the commons stays symmetric and carries the same
+  // `WAVE_ORE` — the fairness invariant is untouched
+  // (`resource-fairness.test.ts`). See `docs/wave-commons-entombment.md`.
   const gap = Math.min(RESOURCE_FIELD.commonsSpokeGap, sectorWidth * 0.45);
   const innerRadius = discRadius * RESOURCE_FIELD.commonsHoleFraction;
 
@@ -460,10 +495,17 @@ export function spawnWave(world: World, count: number = world.asteroidsPerWave):
   );
   world.rngState = rng;
 
+  // Fit the drawn rocks to the ring they are about to be stamped onto. Applied
+  // after the draw so the RNG stream — and therefore every other seeded thing in
+  // the match — is byte-identical whether or not the taper bites.
+  const sizeScale = ringSizeScale(rocks, sectors, innerRadius);
+  const fitted =
+    sizeScale === 1 ? rocks : rocks.map((r) => ({ ...r, radius: r.radius * sizeScale }));
+
   const rockBefore = totalRockOre(world);
   for (let j = 0; j < sectors; j++) {
     const rot = j * sectorWidth;
-    for (const rock of rocks) stampRock(world, cx, cy, rot, rock, null);
+    for (const rock of fitted) stampRock(world, cx, cy, rot, rock, null);
   }
   // A wave adds rock to the live economy — record the exact ore delivered so the
   // conservation ledger balances this source (`./ore-ledger`). The opening wave
