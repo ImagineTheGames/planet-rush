@@ -92,8 +92,20 @@ const CONTROL_SECONDS = 60;
  * a minute in, `send` on a null channel still draws no random number, and the new
  * value is stable across runs (measured twice). Re-baselined rather than reverted
  * for that reason only; a red here for any *other* reason still means revert.
+ *
+ * **`c5ad2324` → `53aa6f97`, 2026-08-16, a0-59 (Gameplay lane — flagged for the
+ * Netcode Engineer).** Twice in one day, because a0-59 is stacked on a0-58 and the
+ * developer ruled on the death drop hours after the mint. `DEATH_ORE_DROP_FRACTION`
+ * goes 0.5 → 1 — *"destroyed ships should drop all their ore, no more 1/2 the ore
+ * stuff"* — recorded as *"A destroyed ship drops EVERYTHING"* in
+ * `docs/design-amendments.md`. Every death in the control match now lays down twice
+ * the chunks, so the field diverges from the first kill onward, in Teams and FFA
+ * alike, again for reasons with nothing to do with a radio. Everything this literal
+ * guards is untouched and still asserted, and the new value was measured twice.
+ * Same rule as above: re-baselined for this reason only; any *other* red still
+ * means revert.
  */
-const FFA_GOLDEN = 'c5ad2324';
+const FFA_GOLDEN = '53aa6f97';
 
 /** A socket the room can write to. This file asserts on the room's own state and
  *  on its bots, never on what a client was told, so nothing is kept. */

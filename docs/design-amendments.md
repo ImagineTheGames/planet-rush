@@ -95,10 +95,17 @@ flagged to their owners in the PR and moved in their own commits, old values kep
 
 | Fixture | Owner | Was (a0-58) | Is (a0-59) |
 |---|---|---|---|
-| `src/bots/ffa-parity.test.ts` seed 20260806 | Bot | `f31d2c3b` | *(see commit)* |
-| `src/bots/ffa-parity.test.ts` seed 7 | Bot | `2400ba7e` | *(see commit)* |
-| `src/bots/ffa-parity.test.ts` seed 991 | Bot | `b891918a` | *(see commit)* |
-| `tests/net/online-radio.test.ts` `FFA_GOLDEN` | Netcode | `c5ad2324` | *(see commit)* |
+| `src/bots/ffa-parity.test.ts` seed 20260806 | Bot | `f31d2c3b` | `f290517f` |
+| `src/bots/ffa-parity.test.ts` seed 7 | Bot | `2400ba7e` | `b8c73690` |
+| `src/bots/ffa-parity.test.ts` seed 991 | Bot | `b891918a` | `84fd2ef2` |
+| `tests/net/online-radio.test.ts` `FFA_GOLDEN` | Netcode | `c5ad2324` | `53aa6f97` |
+
+This is the **second** move in a day for all four — a0-58 moved them hours earlier
+and this branch is stacked on it. That is two ratified amendments, not a loosening
+of the bar: each fixture's own rule is "a ratified developer amendment recorded in
+this file", and both entries are in this file. The move is larger than a0-58's, not
+smaller: every ship death in an eight-bot match now lays down twice the chunks, so
+the field diverges from the first kill onward.
 
 What those fixtures actually guard — that no team-aware path is reachable in FFA —
 is untouched and still asserted by their own non-hash cases.
