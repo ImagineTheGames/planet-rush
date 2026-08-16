@@ -97,6 +97,19 @@ Consequences to know:
   `GDD.md` §2.3, `docs/design-amendments.md`, `docs/gdd-conformance.md` §2.8.
   **All three sim files comment-only.** No value moves.
 
+- `ac91b61` **test(a0-59)** — `src/sim/upgrades.test.ts`, *'a hold ceiling only ever
+  rises'*. The `cargo > cargoCap` clamp in `refreshDerivedStats` /
+  `applyPurchasedStats` is **the one ore-destroying path in `src/sim/` that writes
+  no ledger bucket** (measured: cap 8 → 3 destroys 5 ore, `oreResidual` −5, all four
+  sinks still 0). It has never fired — a cap cannot fall within a match — so an
+  *unwritten* invariant was holding an *unaccounted* sink shut. This pins it, and is
+  verified to go red when the ladder is shortened. See the twentieth session in NEXT.
+- `9e64251` **docs(a0-59)** — the DoD's second `deathLoss` flow, *"ore lost out of
+  bounds"*, **is not a mechanic this sim has**; corrected at the one site it reached
+  (`damage.test.ts`). Plus the clamp audit into `src/sim/upgrades.ts`,
+  `docs/design-amendments.md` and `docs/gdd-conformance.md` §2.8. **Both sim files
+  comment-only.** No value moves.
+
 **Verified green, not re-done, on 2026-08-16 (third session):** `npx tsc --noEmit`
 exits 0; the constant is `1`; `drops the whole hold` is present and exact; CI's own
 log for `96bfe7e` reads **299 of 300 test files passed**, the single failure being
@@ -1536,6 +1549,119 @@ under it did not. Trust the measured table, not the prose around it.)*
     pinned by a committed test that runs in milliseconds, so re-run
     `npx vitest run src/sim/damage.test.ts` instead of re-measuring anything.
     **The only thing still missing is the ruling.**
+
+- **2026-08-16, twentieth session — what this one actually did.** Two commits,
+  **`ac91b61`** (a new test) and **`9e64251`** (comment-only sim edits + docs). The
+  shipped a0-59 work is untouched and the blocker is unchanged in every particular.
+  This session followed the seventeenth–nineteenth sessions' lesson a fourth time:
+  the blocker is settled, so the question is what my own brief/DoD asserts that
+  nobody has checked.
+  - **Re-verified, nothing redone:** local `HEAD` == `origin/…` == `ff04513` at
+    start, `main` still `221a2b1` and **0 commits ahead**, `tsc --noEmit` exits 0,
+    the constant is `1` at `constants.ts:1057`, `drops the whole hold` at
+    `damage.test.ts:86`, both remote DoD greps pass against `FETCH_HEAD`. PR #436
+    open, UNSTABLE, the only `fail` bucket is `Typecheck, test, build` (two
+    duplicate workflow runs of it, not two failures); perf gate and the reported
+    Playwright shard pass. **Still no Director ruling** — seven comments, all mine,
+    zero reviews. Did not escalate an eighth time. Did **not** re-measure the wedge,
+    the geometry, enclosure, the candidate fixes, separability, the economy
+    aggregate, the spatial distribution or the sink sweep; sessions 12–19 say stop
+    and they are right.
+  - **Also verified for the first time, and it holds: the DoD's LAST bullet is
+    byte-exact.** The developer's sentence is quoted verbatim — no smart quotes, no
+    `½` for `1/2` — at `GDD.md:119` and `docs/design-amendments.md:23`, matching the
+    brief character for character. Nineteen sessions asserted this bullet was done;
+    none had actually compared the strings.
+  - **The finding: the DoD names TWO flows for `deathLoss` and only one exists.**
+    The sink is kept as cover for *"a quantisation leftover, ore lost out of
+    bounds"*. Session 19 measured the first. The second is **not a mechanic this sim
+    has**: there is no world bound that destroys ore, chunks are removed on exactly
+    one condition (emptied by a tractor — `step.ts` `chunks.filter(c => c.amount >
+    1e-9)`), asteroids only after `chipAsteroid` drains the sub-chunk tail into
+    `dust`, and **nothing anywhere culls ore by position**. It had propagated into
+    one repo site (`damage.test.ts`), now corrected. Same shape as session 19's
+    `CHUNK.ore` error: a guard advertising a flow that cannot happen invites the
+    next agent either to trust it for a reason that is not real, or to hunt a leak
+    that is not there.
+  - **The audit that answered it is the real finding: every ore-destroying path in
+    `src/sim/` names itself in the ledger EXCEPT one.** `refreshDerivedStats` /
+    `applyPurchasedStats` (`src/sim/upgrades.ts`) clamp `cargo` down to `cargoCap`
+    when a ceiling lands under a loaded hold, and write **no bucket**. Measured on a
+    real `createWorld`, one loaded ship:
+
+    | | value |
+    |---|---|
+    | cargo cap before → after | 8 → 3 |
+    | ore destroyed by the clamp | **5** |
+    | change in `oreResidual` | **−5** |
+    | `spent` / `deathLoss` / `capLoss` / `dust` | **0 / 0 / 0 / 0** |
+
+    A black hole of exactly the class `ore-ledger.ts`'s header exists to catch (the
+    p2c loot-regression pattern) — **except that it has never fired.** A cap cannot
+    fall within a match as the sim stands: `shipClass` is never written after
+    world-build (grepped: zero writes in `src/sim/`), `tiers` is only ever `+= 1`
+    (`buyUpgrade`), and the ladder adds off a non-negative base. That is why
+    nineteen sessions of ledger work never saw it.
+  - **`ac91b61` — the new test, `'a hold ceiling only ever rises (a0-59)'`**
+    (`src/sim/upgrades.test.ts`, 2 tests, 42 in the file now). An **unwritten**
+    invariant was holding an **unaccounted** sink shut; this writes it down.
+    Asserts the cap is non-decreasing in tier for every class, and that climbing the
+    whole cargo ladder with a **full** hold loses no ore
+    (`cargo + banked + oreSpentOnUpgrades` conserved — `oreResidual` stated without
+    needing a ledger, since that file's `makeWorld` has none). **Verified as a real
+    detector, not decoration:** shortening the ladder so a cap falls turns it red
+    naming the *relationship* (*"interceptor cap fell from tier 2 to 3"*), where the
+    two pre-existing tests that also go red fail on their pinned *values*. Constant
+    restored, `git diff --stat -- src/sim/constants.ts` verified empty.
+  - **Not fixed, deliberately, and this is the line.** `refreshDerivedStats(ship)`
+    is **world-free by design** — called on hand-built loadouts, including from
+    `src/net/prediction.ts` — so ledgering it means threading a `world` through a
+    signature **another lane consumes**. Unratified scope on a path that cannot
+    currently leak. Flag the sink, pin the invariant, leave the signature alone.
+  - **Two things found for whoever does arm it.** (a) `tierOf` already contemplates
+    half of this scenario a few lines up — it clamps a tier a shortened ladder
+    stranded so the stat is not `NaN` — but the **ore** the same retune eats has no
+    such guard. (b) **The Netcode lane has already met this clamp from the other
+    side and wrote it down**: `src/net/lifecycle.test.ts`'s `parkForBanking` warns
+    that over-filling a fixture *"does not test a big deposit, it tests the clamp,
+    and the ore above the line vanishes at the first snapshot"*, because
+    `applyPlayerEconomy` sets `ship.cargo = economy.held` then calls
+    `refreshDerivedStats`. On a client whose build does not know a track (tiers
+    *"ignored rather than invented"*), the smaller derived cap eats the difference.
+    Prediction-side divergence, not authoritative ore loss — **flagged, not
+    touched**; `src/net/` is not this lane's.
+  - **Where it landed:** `src/sim/upgrades.ts` (**comment-only**, at the clamp, the
+    line an agent actually reads before editing), `src/sim/damage.test.ts`
+    (**comment-only**, the out-of-bounds correction), `docs/design-amendments.md`
+    (*The sink's OTHER advertised flow does not exist*), and
+    `docs/gdd-conformance.md` **§2.8** — because everything that would arm the clamp
+    is a **balance call** (shortening `UPGRADES[Cargo].steps`, a cargo debuff, a
+    mid-match class swap, a tier reset), so it belongs where the balance crew
+    already reads the sink notes (session 11's lesson).
+  - **No value moves.** `git diff -U0` over both sim files, filtered of comment and
+    blank lines, is **empty**; `tsc --noEmit` exits 0. Scratch probe under
+    `tests/harness/` (twelfth session's trap: vitest's `include` silently ignores
+    the repo root), **deleted**, `git status -- src/ tests/` verified clean.
+  - **The lesson, continuing the series.** Sessions 8/9/11/13/14/15/16/17/18/19
+    learned *sweep the English*, *sweep every directory*, *link the finding where
+    people look*, *a gate's threshold is a definition not a detector*, *do not read
+    an instrument's verdict as the thing itself*, *measure the remedy to the same
+    standard as the defect*, *check whether a blocker actually blocks what you
+    parked behind it*, *a blocker pulls attention off your own deliverable*, *audit
+    ALL of your deliverable*, and *audit the DoD's reasons, not just its
+    checkboxes*. This one is that last one carried one step further: **a rationale
+    names a set, and the set is checkable both ways.** Session 19 asked whether the
+    two named triggers were real and found one was not. The complementary question —
+    *is anything MISSING from the set?* — is the one that pays: "which flows destroy
+    ore, and is each one named?" is a two-minute enumeration, and it turned up a
+    sink the ledger has never accounted for, in this lane's own file, that nineteen
+    sessions of conservation work walked past.
+  - **What a twenty-first session should NOT do.** Everything in the twelfth through
+    nineteenth lists still holds, plus: do not re-measure the cargo clamp — the
+    table is in `docs/design-amendments.md` → *The sink's OTHER advertised flow does
+    not exist*, and the invariant that keeps it shut is pinned by a committed test
+    that runs in milliseconds (`npx vitest run src/sim/upgrades.test.ts`). Do not
+    re-check the verbatim quote. **The only thing still missing is the ruling.**
 
 ## BLOCKERS
 
