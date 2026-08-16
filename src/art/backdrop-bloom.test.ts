@@ -555,11 +555,18 @@ describe('nothing downstream may take the bloom back off the stage', () => {
 // ramp's mipmaps — was tried against the shipped bundle and measured as NOT
 // fixing it.
 //
-// So the second assertion is recorded as `it.fails`: the measurement runs in CI
-// every time, and the day the bundle stops eating the outer band this test goes
-// RED and has to be flipped to `it`. That is deliberate. A skipped test says
-// nothing; this one says exactly what is wrong and notices when it stops being
-// wrong.
+// So the second assertion was recorded as `it.fails`, with the instruction that
+// the day the bundle stopped eating the outer band it had to become a plain
+// `it`. **a0-62 is that day, and the paragraph above it is wrong in one place:
+// the cause was NOT outside `src/art/`.** The falloff ramp reached the GPU
+// premultiplied twice, so every soft fill painted `f²`, and a0-53's control
+// ("the identical index.html, built by the probe config, is correct") does not
+// reproduce — that bundle measures 0.690 today as well. What made a probe
+// correct and the game wrong was never the build: it was that a probe page
+// uploads no image texture, and `UNPACK_PREMULTIPLY_ALPHA_WEBGL` is global GL
+// state (./textures `rampUpload`; `evidence/a0-62-app-shell-bloom/`). The
+// second `it` now measures the shipped bundle at the same viewport, boot and
+// camera offset, and passes.
 
 describe('measured off the shipped frame', () => {
   const FRAMES = join(__dirname, '../../evidence/a0-53-bloom-radius/frames');
@@ -576,6 +583,10 @@ describe('measured off the shipped frame', () => {
   }
 
   const frame = (file: string): Frame => PNG.sync.read(readFileSync(join(FRAMES, file))) as unknown as Frame;
+  /** a0-62's frames — the same viewport, boot and camera offset, one build later. */
+  const A0_62 = join(__dirname, '../../evidence/a0-62-app-shell-bloom/frames');
+  const frame62 = (file: string): Frame =>
+    PNG.sync.read(readFileSync(join(A0_62, file))) as unknown as Frame;
 
   const lumaOf = (img: Frame, x: number, y: number): number => {
     if (x < 0 || y < 0 || x >= img.width || y >= img.height) return NaN;
@@ -713,15 +724,35 @@ describe('measured off the shipped frame', () => {
     expect(m, 'and does not exceed it').toBeLessThan(1.15);
   });
 
-  // KNOWN RED — see the block comment above. The shipped bundle draws these same
-  // stars at 17–19 px against a declared 24.3–27.5. The cause is outside
-  // `src/art/` (the identical source, built with a different Vite config, is
-  // correct), so this is recorded rather than silenced: when the bundle stops
-  // eating the halo's outer band this goes red and must become a plain `it`.
-  it.fails('...and so does the shipped bundle — KNOWN RED, cause is outside src/art', () => {
-    const rows = ratios(frame('desktop-frozen-octagon.png'));
-    expect(rows.length).toBeGreaterThanOrEqual(4);
-    expect(median(rows.map((r) => r.ratio))).toBeGreaterThan(FIELD);
+  /**
+   * **This was `it.fails`, and a0-62 flipped it.**
+   *
+   * a0-53 recorded it KNOWN RED with the instruction that *"the day the bundle
+   * stops eating the halo's outer band this goes red and must become a plain
+   * `it`"*. That day is a0-62: the shipped client drew these stars at 17–19 px
+   * because the falloff ramp reached the GPU premultiplied twice, so every soft
+   * fill painted `f²` (`./textures` `rampUpload`;
+   * `evidence/a0-62-app-shell-bloom/`). a0-53's diagnosis — "the cause is
+   * outside `src/art/`" — was wrong, and its own control does not reproduce: the
+   * identical `index.html` built by the probe config measures 0.690 today too.
+   *
+   * The frame is a0-62's, captured from the shipped bundle at the same viewport,
+   * the same frozen boot and the same camera offset as a0-53's. a0-53's
+   * `desktop-frozen-octagon.png` stays where it is, unmeasured by this file now,
+   * as the historical record of what the defect looked like.
+   */
+  it('...and so does the shipped bundle', () => {
+    const rows = ratios(frame62('fixed-dpr1.png'));
+    expect(rows.length, 'the shipped frame carries measurable blooms on clean sky').toBeGreaterThanOrEqual(4);
+    for (const r of rows) {
+      expect(
+        r.ratio,
+        `${r.b.layer} bloom at (${Math.round(r.b.sx)},${Math.round(r.b.sy)}): drawn ${r.drawn}px against the design's ${r.design.toFixed(2)}px`,
+      ).toBeGreaterThan(PER_STAR);
+    }
+    expect(median(rows.map((r) => r.ratio)), 'the shipped field draws the design radius').toBeGreaterThan(
+      FIELD,
+    );
   });
 });
 
