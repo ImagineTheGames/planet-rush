@@ -43,6 +43,15 @@
  * The measurement is a flood fill of free CONFIGURATION space — the positions a
  * hull centre may legally occupy — so it admits any weaving path, not just the
  * straight lines a ray cast can see.
+ *
+ * ## This file has no dependence on the a0-59 branch it was written on
+ *
+ * It steps the world with no inputs, so no ship ever dies and
+ * `DEATH_ORE_DROP_FRACTION` — the whole of a0-59 — never executes. Verified, not
+ * assumed: checked out into a detached worktree at `origin/main` it typechecks
+ * clean and passes with the identical verdicts (`npx vitest run src/sim` →
+ * 376/376). It is green on `main` *because it characterises a defect `main` has*.
+ * Cherry-pick it out whenever the trap is briefed; it does not need PR #436.
  */
 
 import { describe, expect, it } from 'vitest';

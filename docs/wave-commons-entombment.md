@@ -690,6 +690,57 @@ detecting a live, player-affecting defect.
 
 ---
 
+## This report does not depend on a0-59, and can land on `main` today
+
+Everything above was found while a0-59 (`DEATH_ORE_DROP_FRACTION` 0.5 → 1) sat
+blocked, so it all lives on that branch. **None of it depends on that constant**,
+and the distinction matters: if the ruling is *"hold a0-59"*, this report, its
+detector and its Q-6 entry are held with it, and the trap goes back to being
+invisible on `main` — where it is live right now.
+
+Measured rather than argued (a0-59 sixteenth session), because the branch is
+mixed and the split is not obvious by inspection:
+
+| artefact | on `main`'s sim | separable? |
+|---|---|---|
+| `src/sim/waves.test.ts` | **2/2 pass**, same verdicts, 1.9 s | **yes** |
+| `docs/wave-commons-entombment.md` (this file) | prose, new file | **yes** |
+| `src/sim/waves.ts`, `src/sim/step.ts` | comment-only vs `main` | **yes** |
+| `docs/gdd-conformance.md` Q-6 + the §2.3 wave row | prose | **yes** |
+| `src/sim/constants.ts` | *mixed* — comments separable, the constant is the ruling | partial |
+| `src/sim/damage.test.ts`, `src/sim/loot-tell.test.ts` | **fail** at 0.5 — they assert the ruling | **no** |
+| `ffa-parity` / `online-radio` goldens | re-measured *for* the ruling | **no** |
+
+How it was checked, so it is not taken on trust. A detached worktree at
+`origin/main` (`221a2b1`), the four separable files checked out into it, then:
+
+- `git diff -U0` over `waves.ts` and `step.ts`, filtered of comment and blank
+  lines → **empty**. They carry no behaviour.
+- `npx tsc --noEmit` → **exit 0**.
+- `npx vitest run src/sim` → **376 passed (21 files)**, `waves.test.ts` among them
+  reporting the centre escapable through wave 3 and **sealed at waves 4 and 5** on
+  seeds 1/15/42 — the identical verdicts it gives on the a0-59 branch.
+
+So the detector is not merely compatible with `main`; it is **green on `main`
+today**, and green *because it characterises a defect `main` has*. That is the
+cleanest available proof that the trap is not a0-59's doing — stronger than the
+200-seed wedge A/B, because it needs no seed sampling and no argument about which
+seeds a gate happens to draw.
+
+**The consequence for the decision.** The ask in Q-6 was framed as a binary —
+land a0-59 and brief the trap, or hold a0-59 behind it. It is not a binary. The
+evidence half can be landed on its own whichever way the constant goes, and it
+costs nothing to do so: two new files that conflict with nothing, two comment-only
+edits, and a 2-second test that passes on `main` unmodified. Doing that first
+makes the a0-59 ruling genuinely independent of this defect instead of entangled
+with it, and — more to the point — it stops sixteen sessions of measurement being
+discarded by a decision that was never about them.
+
+This lane cannot execute that split itself: its brief permits exactly one pushed
+branch. Whoever can, this is the file list, verified.
+
+---
+
 ## Repro
 
 ```

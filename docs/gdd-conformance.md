@@ -880,6 +880,28 @@ draws, so PR #436 is red on a defect it did not introduce while `main` is green 
 the same defect purely by luck. **Land a0-59 and brief the wave trap separately,
 or hold a0-59 behind the fix.** Either is fine; the PR cannot settle it itself.
 
+**This was framed as a binary for ten sessions, and it is not one.** Everything
+above — this question, the defect report, and the detector that pins it — was
+written on PR #436 and is currently held behind a ruling that is not about it.
+Measured (sixteenth session), the branch splits cleanly: `src/sim/waves.test.ts`,
+`docs/wave-commons-entombment.md` and the comment-only corrections in `waves.ts`
+and `step.ts` carry **no** dependence on the constant. Checked out into a detached
+worktree at `origin/main` they typecheck clean and **`npx vitest run src/sim`
+passes 376/376**, with the reachability test reporting the identical verdicts it
+gives on the branch — escapable through wave 3, sealed at waves 4 and 5. Only
+`damage.test.ts`, `loot-tell.test.ts` and the re-measured goldens are genuinely
+a0-59-dependent.
+
+So there is a **third option, and it costs nothing**: land the evidence half on
+`main` now, whichever way the constant goes, and decide a0-59 on its own merits
+afterwards. The detector is green on `main` *because it characterises a defect
+`main` has* — which is also the cleanest proof yet that a0-59 did not cause this,
+needing no seed sampling at all. Holding a0-59 is a defensible call; holding the
+measurement of a live `main` defect along with it is an accident, and this is the
+note saying so. File list, verified, in the report's *"This report does not depend
+on a0-59"* section. The gameplay lane cannot execute the split — its brief permits
+exactly one pushed branch.
+
 ---
 
 ## 8. Task breakdown — needs-ordered, with TDD steps
