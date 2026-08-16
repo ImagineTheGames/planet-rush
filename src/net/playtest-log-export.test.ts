@@ -15,6 +15,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PlaytestLog, describeEnvironment } from './playtest-log';
+import type { PlaytestLogExport } from './playtest-log';
 import { downloadPlaytestLog, playtestLogFilename } from './playtest-log-export';
 
 /** The slice of a share payload these tests read back. */
@@ -258,5 +259,97 @@ describe('local-only', () => {
       save: (name) => void seen.push(`file:${name}`),
     });
     expect(seen).toEqual([`file:${playtestLogFilename(log.env)}`]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// a0-56 — an exported log must say what it does NOT contain
+// ---------------------------------------------------------------------------
+
+describe('the exported log declares its coverage (a0-56)', () => {
+  /** Export a log through the real download path and read the payload back. */
+  async function exported(log: PlaytestLog): Promise<PlaytestLogExport> {
+    const save = vi.fn();
+    const result = await downloadPlaytestLog({ log, share: null, save });
+    expect(result.ok).toBe(true);
+    return JSON.parse(save.mock.calls[0]![1] as string) as PlaytestLogExport;
+  }
+
+  /**
+   * THE TEST THIS BRIEF EXISTS FOR, at the export end.
+   *
+   * Two logs were sent on 2026-08-15/16 to explain a bug hit *in a match*, and both
+   * carried the same five events: session start, the build note, the webgl probe,
+   * `front door idle`, `regions`. The boot sequence and nothing else. Neither was
+   * distinguishable from a good capture — same schema version, `dropped: 0` (nothing
+   * overflowed, because nothing happened), a confident summary naming the build and
+   * the viewport. The Director read one and reported that the session never left the
+   * home screen, over the developer's own account of being mid-match.
+   *
+   * So the export has to say it, in a field a reader can check in one look.
+   */
+  it('a log with no match says so', async () => {
+    // The exact fingerprint of the two logs that were sent: the boot sequence.
+    const bootOnly = newLog();
+    bootOnly.recordNote('build 3d7cc6a');
+    bootOnly.recordNote('webgl', { api: 'webgl2' });
+    bootOnly.recordConnect('front door idle', { door: 'none' });
+    bootOnly.recordConnect('regions', { count: 3 });
+
+    const payload = await exported(bootOnly);
+
+    // 1. The field. One read answers "can this file be asked a gameplay question?".
+    expect(payload.coverage).toBe('boot-only');
+    // 2. And the summary line — the part a human and a Director actually read —
+    //    says it in words rather than leaving them to count event kinds.
+    expect(payload.summary).toContain('BOOT-ONLY');
+    expect(payload.summary).toContain('no match in this log');
+    // 3. With the window it is a claim about, so "boot-only" comes with a span
+    //    rather than being a bare adjective.
+    expect(payload.span.fromMs).toBe(0);
+    expect(payload.span.toMs).toBe(payload.durationMs);
+    // 4. Everything that made the empty log look valid is still true of it — which
+    //    is the point: none of these fields could ever have told them apart.
+    expect(payload.dropped).toBe(0);
+    expect(payload.events).toHaveLength(5);
+  });
+
+  it('and a log containing the match does not', async () => {
+    const withMatch = newLog();
+    withMatch.recordNote('build 3d7cc6a');
+    withMatch.recordConnect('front door idle', { door: 'none' });
+    withMatch.recordMatch('matchStart', { tick: 0 });
+    withMatch.record('match', 'ore banked', { ore: 2, balance: 2 });
+    withMatch.recordMatch('death', { tick: 5_400 });
+
+    const payload = await exported(withMatch);
+
+    expect(payload.coverage).toBe('match');
+    expect(payload.summary).toContain('coverage match');
+    expect(payload.summary).not.toContain('BOOT-ONLY');
+  });
+
+  it('is derived from what was recorded, never from how long the session ran', async () => {
+    // A nine-minute session spent entirely on the front door is boot-only; a match
+    // that fell over four seconds in is not. Duration cannot tell them apart, which
+    // is why it is not what the field is made of.
+    const c = { t: 0 };
+    const long = new PlaytestLog({ env: newLog().env, now: () => c.t });
+    long.recordSessionStart();
+    c.t = 9 * 60_000;
+    long.recordConnect('front door idle', { door: 'none' });
+
+    const short = new PlaytestLog({ env: newLog().env, now: () => c.t });
+    short.recordMatch('matchStart', { tick: 0 });
+
+    expect((await exported(long)).coverage).toBe('boot-only');
+    expect((await exported(long)).durationMs).toBe(9 * 60_000);
+    expect((await exported(short)).coverage).toBe('match');
+  });
+
+  it('names how much of the file came back across a reload', async () => {
+    // `restored: 0` on a session that never reloaded, and a number on one that did —
+    // so "the carry worked" is a fact in the file, not an inference from timestamps.
+    expect((await exported(newLog())).restored).toBe(0);
   });
 });

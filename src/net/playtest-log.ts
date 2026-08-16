@@ -10,7 +10,9 @@
  * that missing middle: one **bounded, local-only, structured** record of a session,
  * exported with a single tap and pasted into chat.
  *
- * Five properties the brief fixes, and this file is where four of them live:
+ * Six properties this log promises, and this file is where five of them live — the
+ * first four from the M10 brief, the last two from a0-56, the day a log answered a
+ * mid-match question with a boot sequence and was believed:
  *
  *  1. **Bounded.** Memory is a budget, so the log is a ring: {@link PlaytestLog}
  *     keeps at most {@link PLAYTEST_LOG_CAPACITY} events and counts what it evicted
@@ -27,11 +29,28 @@
  *  4. **Versioned.** The export carries {@link PLAYTEST_LOG_SCHEMA} and
  *     {@link PLAYTEST_LOG_VERSION}, so a log pasted three weeks from now can still
  *     be read against the shape it was written in (brief §5).
+ *  5. **Survives a reload.** The log used to live only in a module-level singleton,
+ *     so the page reload behind BACK TO MENU killed it and a fresh one booted in
+ *     its place — and the developer's report *"it said i never left the main menu
+ *     but i was in the pause menu in the middle of a match"* was answered by a log
+ *     that had been alive for eight seconds (a0-56). Events are now mirrored into
+ *     an injected {@link PlaytestLogStore} (`./playtest-log-store` wraps
+ *     `sessionStorage`: survives a reload, dies with the tab — a playtest session's
+ *     exact lifetime) and adopted back on boot, **verbatim**, with the session's
+ *     clock rebased onto the original start so a restored timeline reads as one
+ *     continuous session rather than two overlapping ones.
+ *  6. **Honest about what it does NOT contain.** A boot-only log used to be
+ *     indistinguishable from a whole session's: same schema, `dropped: 0`, the same
+ *     confident summary line. {@link PlaytestLogExport.coverage} is the field that
+ *     tells them apart in one read — `'match'` only when a match-scoped event was
+ *     actually recorded, `'boot-only'` otherwise — and the summary line says it too,
+ *     because the summary is what a reader reads first (a0-56).
  *
- * The fifth — **local-only** — is a property of what this file *does not have*: no
- * `fetch`, no socket, no storage. Nothing here can send anything anywhere. Export
- * is a deliberate gesture the developer makes (`./playtest-log-export`), never an
- * upload (brief §3).
+ * **Local-only** is a property of what this file *does not have*: no `fetch`, no
+ * socket, no endpoint. Nothing here can send anything anywhere — the one storage
+ * seam is a *local* mirror of what is already in memory, injected like the clock, and
+ * this module still touches no browser global. Export is a deliberate gesture the
+ * developer makes (`./playtest-log-export`), never an upload (brief §3).
  *
  * **No ambient anything**, like the rest of `src/net`: the wall clock is injected,
  * the build identity and the device description are passed in (the browser probing
@@ -72,6 +91,29 @@ export const MAX_VALUE_CHARS = 160;
 
 /** Most `data` keys kept per event, so one caller cannot spend the whole budget. */
 export const MAX_DATA_KEYS = 12;
+
+/**
+ * Shortest gap between two writes to the {@link PlaytestLogStore}, ms.
+ *
+ * A synchronous `sessionStorage.setItem` of the whole ring is tens of KB of
+ * serialization on the main thread, and the log is fed from inside a 60 Hz frame
+ * (per-second telemetry, every ore movement, every console warn). Writing on every
+ * event would put that cost in the frame budget this team is measured on, so writes
+ * are throttled and the loser is at most a quarter second of tail — which
+ * {@link PlaytestLog.flush} then buys back at the moments that actually matter (the
+ * page going away, an export being taken).
+ */
+export const PLAYTEST_LOG_WRITE_INTERVAL_MS = 250;
+
+/**
+ * Oldest persisted log still adopted, ms. `sessionStorage` already dies with the
+ * tab, so this is not a retention policy — it is a **sanity check on the clock**:
+ * a restored origin that is in the future, or half a day back, means the wall clock
+ * moved under us (a resumed laptop, a corrected NTP offset) and rebasing onto it
+ * would stamp every new event with a nonsense `at`. A log that cannot be placed on
+ * a timeline is dropped rather than believed.
+ */
+export const MAX_RESTORE_AGE_MS = 12 * 60 * 60 * 1000;
 
 // ---------------------------------------------------------------------------
 // Events
@@ -243,8 +285,168 @@ export function describeEnvironment(probe: EnvironmentProbe = {}): PlaytestLogEn
 }
 
 // ---------------------------------------------------------------------------
+// Persistence — the seam that carries a log across a page reload (a0-56)
+// ---------------------------------------------------------------------------
+
+/**
+ * Somewhere a string survives a page reload.
+ *
+ * Deliberately the dumbest possible seam — two methods, strings in and out, no
+ * knowledge of what a log is — for three reasons:
+ *
+ *  1. **Neither method may throw.** A log that crashes the client is strictly worse
+ *     than a log that forgets: private mode denies `sessionStorage` on access, and a
+ *     full quota throws on write. An implementation catches its own failures and
+ *     reports the write one as `false`; nothing here propagates into the game.
+ *  2. **The parsing stays in this module**, where it is pure, versioned and testable
+ *     in node — so a corrupt or stale blob is rejected by the same code in every
+ *     environment rather than by whatever the storage wrapper happened to do.
+ *  3. **No browser global crosses this line.** `sessionStorage` lives in
+ *     `./playtest-log-store`; this file still runs in node with nothing stubbed.
+ */
+export interface PlaytestLogStore {
+  /** Whatever a previous page load left, or `null` when there is nothing (or when
+   *  reading is not permitted). Never throws. */
+  read(): string | null;
+  /** Persist `text`. Returns `false` when it could not (quota, private mode), which
+   *  is the log's cue to stop trying and say so on the timeline. Never throws. */
+  write(text: string): boolean;
+}
+
+/**
+ * The blob a {@link PlaytestLogStore} holds: the ring, its eviction count, and the
+ * two numbers that let a later page load put the events back on **one** timeline —
+ * the session's original start as an instant (`startedAt`, for the header) and as a
+ * clock reading (`startMs`, the origin every `at` is measured from).
+ *
+ * Versioned by the same schema id as the export, so a blob written by an older build
+ * that a browser tab kept alive across a deploy is discarded rather than
+ * misinterpreted.
+ */
+export interface PersistedPlaytestLog {
+  readonly schema: typeof PLAYTEST_LOG_SCHEMA;
+  readonly version: number;
+  /** ISO instant of the ORIGINAL session start — the one before any reload. */
+  readonly startedAt: string;
+  /** Clock reading of that same instant; every event's `at` is relative to it. */
+  readonly startMs: number;
+  /** Clock reading at the moment of the write, for the staleness check. */
+  readonly savedAt: number;
+  /** Events evicted by the ring across the whole session, reloads included. */
+  readonly dropped: number;
+  readonly events: readonly PlaytestLogEvent[];
+}
+
+/** Serialize the ring for a {@link PlaytestLogStore}. Pure. */
+export function serializePersistedLog(log: PersistedPlaytestLog): string {
+  return JSON.stringify(log);
+}
+
+/**
+ * Read a persisted log back, or `null` when there is nothing usable. **Total**: a
+ * blob that is absent, unparseable, from another schema or version, or anchored to a
+ * clock this session cannot reconcile with (see {@link MAX_RESTORE_AGE_MS}) reads as
+ * "no previous session", never as an exception and never as a half-restored timeline.
+ * Individual malformed events are dropped and the rest kept — losing one line is
+ * better than losing the match around it.
+ */
+export function parsePersistedLog(text: string | null, now: number): PersistedPlaytestLog | null {
+  if (typeof text !== 'string' || text.length === 0) return null;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (typeof raw !== 'object' || raw === null) return null;
+  const blob = raw as Partial<PersistedPlaytestLog>;
+  if (blob.schema !== PLAYTEST_LOG_SCHEMA || blob.version !== PLAYTEST_LOG_VERSION) return null;
+  const startMs = blob.startMs;
+  if (typeof startMs !== 'number' || !Number.isFinite(startMs)) return null;
+  // The clock must be able to place it: not in the future, not half a day back.
+  const age = now - startMs;
+  if (age < 0 || age > MAX_RESTORE_AGE_MS) return null;
+  if (!Array.isArray(blob.events)) return null;
+  const events: PlaytestLogEvent[] = [];
+  for (const candidate of blob.events) {
+    const event = validEvent(candidate);
+    if (event) events.push(event);
+  }
+  return {
+    schema: PLAYTEST_LOG_SCHEMA,
+    version: PLAYTEST_LOG_VERSION,
+    startedAt: typeof blob.startedAt === 'string' && blob.startedAt.length > 0 ? blob.startedAt : UNKNOWN,
+    startMs,
+    savedAt: typeof blob.savedAt === 'number' && Number.isFinite(blob.savedAt) ? blob.savedAt : startMs,
+    dropped: typeof blob.dropped === 'number' && Number.isFinite(blob.dropped) ? Math.max(0, Math.floor(blob.dropped)) : 0,
+    events,
+  };
+}
+
+/** The event kinds, as a runtime set — a persisted blob is untrusted input, and a
+ *  `kind` outside the union would break every `grep` and every reader downstream. */
+const EVENT_KINDS: ReadonlySet<string> = new Set<PlaytestEventKind>([
+  'session',
+  'connect',
+  'net',
+  'match',
+  'error',
+  'note',
+]);
+
+/** One restored event, rebuilt field by field, or null if it is not one. Rebuilt
+ *  rather than passed through so nothing a blob invented rides along into the ring. */
+function validEvent(candidate: unknown): PlaytestLogEvent | null {
+  if (typeof candidate !== 'object' || candidate === null) return null;
+  const e = candidate as Partial<PlaytestLogEvent>;
+  if (typeof e.at !== 'number' || !Number.isFinite(e.at) || e.at < 0) return null;
+  if (typeof e.kind !== 'string' || !EVENT_KINDS.has(e.kind)) return null;
+  if (typeof e.msg !== 'string') return null;
+  const data = e.data !== undefined && typeof e.data === 'object' && e.data !== null ? cleanData(e.data) : undefined;
+  const repeat = typeof e.repeat === 'number' && Number.isFinite(e.repeat) && e.repeat > 1 ? Math.floor(e.repeat) : undefined;
+  const lastAt = repeat !== undefined && typeof e.lastAt === 'number' && Number.isFinite(e.lastAt) ? Math.max(0, Math.round(e.lastAt)) : undefined;
+  return {
+    at: Math.max(0, Math.round(e.at)),
+    kind: e.kind,
+    msg: truncate(e.msg, MAX_MESSAGE_CHARS),
+    ...(data !== undefined ? { data } : {}),
+    ...(repeat !== undefined ? { repeat } : {}),
+    ...(lastAt !== undefined ? { lastAt } : {}),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // The export shape — brief §5's "stable, versioned" payload
 // ---------------------------------------------------------------------------
+
+/**
+ * What a log can answer, in one field (a0-56).
+ *
+ * The failure this exists for: two exported logs, both schema-valid, both
+ * `dropped: 0`, both carrying a confident summary line naming the build and the
+ * viewport — and both containing five events of boot sequence and no match at all.
+ * The Director read one of them and reported back that the session never left the
+ * home screen, over the developer's own account of being in the pause menu mid-match.
+ * Nothing in the file said "this log began after your match did".
+ *
+ *  - `'match'`     — at least one match-scoped event is in this log. It can be asked
+ *    a gameplay question.
+ *  - `'boot-only'` — it cannot. Whatever else is in here, the match is not.
+ *
+ * Derived from what was **recorded**, never from the duration: a nine-minute session
+ * that spent all nine minutes on the front door is boot-only, and a match that
+ * crashed four seconds in is not.
+ */
+export type PlaytestLogCoverage = 'boot-only' | 'match';
+
+/** The stretch of session an export covers, in the same ms-since-start units its
+ *  events carry — so `coverage` comes with the window it is a claim about. */
+export interface PlaytestLogSpan {
+  /** Oldest retained event's `at`. Non-zero when the ring has evicted its start. */
+  readonly fromMs: number;
+  /** Newest retained event's `at` (its `lastAt` where it coalesced). */
+  readonly toMs: number;
+}
 
 /**
  * Exactly what a DOWNLOAD LOG produces (as JSON). Field order is deliberate: `summary`
@@ -255,6 +457,13 @@ export interface PlaytestLogExport {
   readonly version: number;
   /** The self-describing first line (brief §4) — also readable on its own. */
   readonly summary: string;
+  /** Whether this file can answer a gameplay question at all (a0-56). */
+  readonly coverage: PlaytestLogCoverage;
+  /** The window {@link coverage} is a claim about. */
+  readonly span: PlaytestLogSpan;
+  /** How many of these events were carried across a page reload (a0-56). Zero on a
+   *  session that never reloaded; non-zero is the proof the carry worked. */
+  readonly restored: number;
   readonly env: PlaytestLogEnvironment;
   /** Ms of session covered by this export (the newest event's `at`). */
   readonly durationMs: number;
@@ -278,6 +487,14 @@ export interface PlaytestLogConfig {
   readonly now?: () => number;
   /** Ring size. Defaults to {@link PLAYTEST_LOG_CAPACITY}. */
   readonly capacity?: number;
+  /**
+   * Where the ring is mirrored so it survives a page reload (a0-56). Absent or
+   * `null` — the default — is exactly today's behaviour: memory only, nothing
+   * restored, nothing written. `boot()` passes the `sessionStorage` one
+   * (`./playtest-log-store`); the pre-boot fallback log deliberately does not, since
+   * {@link installPlaytestLog} adopts its events moments later anyway.
+   */
+  readonly store?: PlaytestLogStore | null;
 }
 
 /**
@@ -299,6 +516,24 @@ export class PlaytestLog {
   /** Coalescing key of the newest entry (`kind|msg|data`), for repeat detection. */
   private lastKey = '';
   private environment: PlaytestLogEnvironment;
+  private readonly store: PlaytestLogStore | null;
+  /** True once a match-scoped event has been seen — the whole basis of
+   *  {@link PlaytestLogExport.coverage}, and it survives a reload with the events. */
+  private sawMatch = false;
+  /** How many events came back from storage — reported, so "it carried" is a number
+   *  in the file and not an inference from the timestamps. */
+  private restoredCount = 0;
+  /** Clock reading of the last successful write, for the throttle. `-Infinity` so
+   *  the first recorded event writes immediately rather than a quarter second late. */
+  private lastWriteMs = Number.NEGATIVE_INFINITY;
+  /** An event has been recorded since the last write. {@link flush} is what turns
+   *  this back into a write when the page is about to go away. */
+  private pendingWrite = false;
+  /** Set when the store refused a write. Storage that failed once (private mode,
+   *  a full quota) fails every time, and retrying it per event would spend the frame
+   *  budget on a `try`/`catch` — so the log gives up, says so once on the timeline,
+   *  and carries on doing everything else it does. */
+  private storeFailed = false;
 
   constructor(config: PlaytestLogConfig = {}) {
     this.clock = config.now ?? ((): number => Date.now());
@@ -306,7 +541,41 @@ export class PlaytestLog {
     // one: it looks like "nothing happened". One event is the floor.
     this.cap = Math.max(1, Math.floor(config.capacity ?? PLAYTEST_LOG_CAPACITY));
     this.environment = config.env ?? describeEnvironment();
-    this.startMs = this.clock();
+    this.store = config.store ?? null;
+    const now = this.clock();
+    const restored = this.store ? parsePersistedLog(safeRead(this.store), now) : null;
+    if (!restored) {
+      this.startMs = now;
+      return;
+    }
+    // ── A reload is not a new session (a0-56) ──────────────────────────────
+    // The clock is rebased onto the ORIGINAL start, which is the only arrangement
+    // where both halves of the promise hold at once: every restored event keeps the
+    // exact `at` it was stamped with (verbatim, never rewritten to "now"), and
+    // everything this page load records lands AFTER it on the same axis. Rebasing
+    // instead of re-stamping is why a restored timeline reads as one continuous
+    // session rather than two that both start at zero.
+    this.startMs = restored.startMs;
+    // …and the header says when the session — not this page load — began, so the
+    // one absolute instant in the file still anchors `at: 0`.
+    this.environment = { ...this.environment, startedAt: restored.startedAt };
+    for (const event of restored.events) {
+      this.ring.push(event);
+      if (event.kind === 'match') this.sawMatch = true;
+    }
+    // Evictions carry too: a session that has dropped 40 events across two page
+    // loads has dropped 40, and the export must keep saying so.
+    this.evicted = restored.dropped;
+    this.trim();
+    // Counted AFTER the trim, so the number is what actually came back and not what
+    // was offered — a restore bigger than the ring is honest about being clipped.
+    this.restoredCount = this.ring.length;
+    this.record('session', 'restored after reload', {
+      events: this.restoredCount,
+      dropped: restored.dropped,
+      // The gap the reload itself cost, so a reader can see the seam.
+      gapMs: Math.max(0, Math.round(now - restored.savedAt)),
+    });
   }
 
   /** The session's identity — the export header, and the one place a reader looks
@@ -360,6 +629,7 @@ export class PlaytestLog {
         repeat: (last.repeat ?? 1) + 1,
         lastAt: at,
       };
+      this.persist();
       return;
     }
 
@@ -369,11 +639,14 @@ export class PlaytestLog {
       msg: text,
       ...(clean !== undefined ? { data: clean } : {}),
     });
+    // The one bit `coverage` is made of. Set here rather than computed at export
+    // time so it survives the ring evicting the match events that set it — a
+    // twenty-minute session whose early match has scrolled out of a 600-slot ring
+    // still knows it had one.
+    if (kind === 'match') this.sawMatch = true;
     this.lastKey = key;
-    while (this.ring.length > this.cap) {
-      this.ring.shift();
-      this.evicted++;
-    }
+    this.trim();
+    this.persist();
   }
 
   /** The session's opening lines: which build, on what device, over what network.
@@ -422,16 +695,92 @@ export class PlaytestLog {
    * the described one — re-`record`ing them would re-stamp their timestamps to
    * "now" and quietly rewrite the timeline. Bounded by the same ring.
    */
-  adopt(event: PlaytestLogEvent): void {
-    this.ring.push(event);
+  adopt(event: PlaytestLogEvent, offsetMs = 0): void {
+    // `offsetMs` translates between two logs' origins; it does NOT re-stamp. The
+    // event's absolute instant is preserved exactly — only the origin it is measured
+    // from changes, which is what a restored log's rebased clock requires (a0-56).
+    // Clamped at zero: an event that predates the destination log's origin is at its
+    // very beginning, and a negative `at` is not a point on any timeline.
+    const shifted =
+      offsetMs === 0
+        ? event
+        : {
+            ...event,
+            at: Math.max(0, Math.round(event.at + offsetMs)),
+            ...(event.lastAt !== undefined ? { lastAt: Math.max(0, Math.round(event.lastAt + offsetMs)) } : {}),
+          };
+    this.ring.push(shifted);
+    if (shifted.kind === 'match') this.sawMatch = true;
     // An adopted event is never the coalescing partner of the next recorded one:
     // clearing the key keeps a carried-over line from absorbing a fresh occurrence
     // and mis-stating when it happened.
     this.lastKey = '';
+    this.trim();
+    this.persist();
+  }
+
+  /**
+   * Write the ring to the {@link PlaytestLogStore} now, ignoring the throttle.
+   *
+   * Called at the two moments the tail of the log is about to become the only part
+   * that matters: the page going away (`pagehide` — a reload, a navigation to the
+   * menu, a tab closing) and an export being taken. Everywhere else the throttle is
+   * the right trade; here, a quarter second of missing tail is the last quarter
+   * second before the thing the developer is reporting.
+   *
+   * A no-op with no store, with nothing new since the last write, or once storage
+   * has refused one. Never throws.
+   */
+  flush(): void {
+    if (this.pendingWrite) this.persist(true);
+  }
+
+  /** Bring the ring back inside its budget, counting what that cost. */
+  private trim(): void {
     while (this.ring.length > this.cap) {
       this.ring.shift();
       this.evicted++;
     }
+  }
+
+  /**
+   * Mirror the ring into storage, at most once every
+   * {@link PLAYTEST_LOG_WRITE_INTERVAL_MS} unless forced.
+   *
+   * Everything about this is defensive. The store cannot throw by contract, and is
+   * wrapped anyway; a refused write disables persistence for the rest of the session
+   * and files ONE line saying so — because the alternative is the a0-56 failure in a
+   * new coat, a log that quietly lacks half a session and looks complete.
+   */
+  private persist(force = false): void {
+    if (!this.store || this.storeFailed) return;
+    const now = this.clock();
+    if (!force && now - this.lastWriteMs < PLAYTEST_LOG_WRITE_INTERVAL_MS) {
+      this.pendingWrite = true;
+      return;
+    }
+    this.pendingWrite = false;
+    this.lastWriteMs = now;
+    let ok = false;
+    try {
+      ok = this.store.write(
+        serializePersistedLog({
+          schema: PLAYTEST_LOG_SCHEMA,
+          version: PLAYTEST_LOG_VERSION,
+          startedAt: this.environment.startedAt,
+          startMs: this.startMs,
+          savedAt: now,
+          dropped: this.evicted,
+          events: this.ring,
+        }),
+      );
+    } catch {
+      ok = false; // A store is contracted not to throw; a broken one still may not win.
+    }
+    if (ok) return;
+    // Set BEFORE recording, or the note below re-enters this method forever.
+    this.storeFailed = true;
+    this.record('session', 'log persistence unavailable', { events: this.ring.length });
   }
 
   // --- Reading ------------------------------------------------------------
@@ -451,6 +800,34 @@ export class PlaytestLog {
     return this.cap;
   }
 
+  /** The clock reading every event's `at` is measured from. On a restored log this
+   *  is the ORIGINAL session's origin, not this page load's — which is what lets a
+   *  caller translate another log's events onto this one's axis ({@link adopt}). */
+  get startedAtMs(): number {
+    return this.startMs;
+  }
+
+  /** Whether this log contains a match at all (a0-56). The one field that separates
+   *  "the session did nothing" from "this file was opened after the fact". */
+  get coverage(): PlaytestLogCoverage {
+    return this.sawMatch ? 'match' : 'boot-only';
+  }
+
+  /** How many events were carried in from a previous page load. */
+  get restored(): number {
+    return this.restoredCount;
+  }
+
+  /** The window this log's events actually cover. */
+  get span(): PlaytestLogSpan {
+    const oldest = this.ring[0];
+    const newest = this.ring[this.ring.length - 1];
+    return {
+      fromMs: oldest ? oldest.at : 0,
+      toMs: newest ? (newest.lastAt ?? newest.at) : 0,
+    };
+  }
+
   /**
    * The self-describing first line (brief §4). Build sha (with the dirty marker the
    * badge uses), the session's date, the form factor and viewport, and the
@@ -465,8 +842,22 @@ export class PlaytestLog {
       ` · session ${this.env.startedAt}` +
       ` · ${this.env.formFactor} ${this.env.viewport}${this.env.touch ? ' touch' : ''}` +
       ` · net ${this.env.connection}` +
+      // a0-56: the coverage marker rides in the summary, not only in the payload,
+      // because the summary is the line a reader (and a Director) reads first — and
+      // the last two logs read confidently while containing no match at all.
+      ` · ${this.coverageLine()}` +
       ` · ${PLAYTEST_LOG_SCHEMA}/${PLAYTEST_LOG_VERSION}`
     );
+  }
+
+  /** The coverage clause of {@link summaryLine}, in words rather than in a field
+   *  name: what this log covers, and — when it covers no match — what that means. */
+  coverageLine(): string {
+    const { fromMs, toMs } = this.span;
+    const window = `covers ${formatSeconds(fromMs)}–${formatSeconds(toMs)}`;
+    return this.sawMatch
+      ? `coverage match · ${window}`
+      : `coverage BOOT-ONLY (no match in this log — it cannot answer a gameplay question) · ${window}`;
   }
 
   /** The whole export payload — the stable, versioned shape a paste carries. */
@@ -476,6 +867,11 @@ export class PlaytestLog {
       schema: PLAYTEST_LOG_SCHEMA,
       version: PLAYTEST_LOG_VERSION,
       summary: this.summaryLine(),
+      // Third and fourth, right under the summary: whether this file can answer a
+      // gameplay question, and over what window (a0-56).
+      coverage: this.coverage,
+      span: this.span,
+      restored: this.restoredCount,
       env: this.env,
       durationMs: newest ? (newest.lastAt ?? newest.at) : 0,
       capacity: this.cap,
@@ -487,6 +883,10 @@ export class PlaytestLog {
   /** The export as JSON text — what the downloaded file carries.
    *  Indented by two: a human is the first reader of this. */
   toJson(): string {
+    // An export is one of the two moments the tail matters (see {@link flush}): the
+    // developer is exporting BECAUSE something just happened, and a page that
+    // reloads a second later must not lose the last quarter second of it.
+    this.flush();
     return JSON.stringify(this.snapshot(), null, 2);
   }
 }
@@ -517,17 +917,41 @@ export function playtestLog(): PlaytestLog {
  */
 export function installPlaytestLog(config: PlaytestLogConfig = {}): PlaytestLog {
   const previous = shared;
+  // The constructor is what restores a previous PAGE LOAD's events from
+  // `config.store`, and it does so before this line returns — so they are already
+  // under the session start below, oldest first, on the rebased clock (a0-56).
   const log = new PlaytestLog(config);
   log.recordSessionStart();
   // Verbatim, not re-recorded: an adopted event keeps the instant it happened at,
-  // so carrying the pre-boot log over does not rewrite its timeline to "now".
-  if (previous) for (const event of previous.events) log.adopt(event);
+  // so carrying the pre-boot log over does not rewrite its timeline to "now". The
+  // offset is a change of ORIGIN, not of instant: the fallback log measured its
+  // events from its own construction, and a restored log's origin is an earlier
+  // session's start, so without this the pre-boot lines would land at the very
+  // beginning of a timeline they belong at the end of.
+  if (previous) {
+    // Two logs only share an axis if they share a clock. The fallback log uses the
+    // ambient `Date.now`; a caller injecting its own (every test, and any harness
+    // driving a fixed clock) does not — and a shift computed across two unrelated
+    // timebases is an arbitrarily large number, not a translation. Anything outside
+    // the window a restore is allowed to span means the two origins are not
+    // comparable, so the events are adopted flat, exactly as they were before a0-56.
+    const raw = previous.startedAtMs - log.startedAtMs;
+    const offset = Number.isFinite(raw) && Math.abs(raw) <= MAX_RESTORE_AGE_MS ? raw : 0;
+    for (const event of previous.events) log.adopt(event, offset);
+  }
   shared = log;
   return log;
 }
 
-/** Drop the shared instance — for tests, so one spec's events cannot leak into
- *  the next one's assertions. */
+/**
+ * Drop the shared instance.
+ *
+ * For tests, so one spec's events cannot leak into the next one's assertions — and,
+ * with a {@link PlaytestLogStore} left intact around it, this is also **how a reload
+ * is simulated**: the singleton dies exactly as it does when the page goes away, and
+ * the next {@link installPlaytestLog} has nothing but storage to rebuild from
+ * (a0-56, `playtest-log.test.ts` "survives a reload").
+ */
 export function resetPlaytestLog(): void {
   shared = null;
 }
@@ -535,6 +959,21 @@ export function resetPlaytestLog(): void {
 // ---------------------------------------------------------------------------
 // Internals
 // ---------------------------------------------------------------------------
+
+/** Read a store without trusting it to honour its own contract. */
+function safeRead(store: PlaytestLogStore): string | null {
+  try {
+    return store.read();
+  } catch {
+    return null;
+  }
+}
+
+/** `312400` → `312.4s`. One decimal: a log's timeline is read in seconds, and the
+ *  ms live in the events themselves. */
+function formatSeconds(ms: number): string {
+  return `${(Math.max(0, ms) / 1000).toFixed(1)}s`;
+}
 
 function nonEmpty(s: string | undefined): string | undefined {
   if (typeof s !== 'string') return undefined;

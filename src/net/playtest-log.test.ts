@@ -16,18 +16,22 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   MAX_DATA_KEYS,
   MAX_MESSAGE_CHARS,
+  MAX_RESTORE_AGE_MS,
   PLAYTEST_LOG_SCHEMA,
   PLAYTEST_LOG_VERSION,
+  PLAYTEST_LOG_WRITE_INTERVAL_MS,
   PlaytestLog,
   TABLET_MIN_SHORT_EDGE,
   classifyFormFactor,
   describeEnvironment,
   installPlaytestLog,
   normalizeConnectionType,
+  parsePersistedLog,
   playtestLog,
   resetPlaytestLog,
 } from './playtest-log';
-import type { PlaytestLogEnvironment } from './playtest-log';
+import type { PlaytestLogEnvironment, PlaytestLogStore } from './playtest-log';
+import { memoryPlaytestLogStore, playtestLogStore } from './playtest-log-store';
 
 /** A fixed session identity, so a summary line is an exact string. */
 const ENV: PlaytestLogEnvironment = {
@@ -154,9 +158,23 @@ describe('PlaytestLog — the export shape', () => {
     expect(snapshot.schema).toBe(PLAYTEST_LOG_SCHEMA);
     expect(snapshot.version).toBe(PLAYTEST_LOG_VERSION);
     // The stable top-level shape. Adding a field is a compatible change; this asserts
-    // the set so a REMOVAL or a rename cannot happen silently.
+    // the set so a REMOVAL or a rename cannot happen silently. `coverage`, `span` and
+    // `restored` joined it in a0-56 — the three fields that separate "this session
+    // did nothing" from "this file was opened after the match it was meant to hold".
     expect(Object.keys(snapshot).sort()).toEqual(
-      ['capacity', 'dropped', 'durationMs', 'env', 'events', 'schema', 'summary', 'version'].sort(),
+      [
+        'capacity',
+        'coverage',
+        'dropped',
+        'durationMs',
+        'env',
+        'events',
+        'restored',
+        'schema',
+        'span',
+        'summary',
+        'version',
+      ].sort(),
     );
   });
 
@@ -344,5 +362,282 @@ describe('the shared log', () => {
     expect(start.data!['sha']).toBe('1a2b3c4');
     expect(start.data!['build']).toBe('1a2b3c4');
     expect(start.data!['schema']).toBe(`${PLAYTEST_LOG_SCHEMA}/${PLAYTEST_LOG_VERSION}`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// a0-56 — the log has to survive the reload that BACK TO MENU performs
+// ---------------------------------------------------------------------------
+
+describe('PlaytestLog — persistence across a page reload (a0-56)', () => {
+  /**
+   * THE TEST THIS BRIEF EXISTS FOR.
+   *
+   * The developer exported a log to explain a bug they hit in a match and the file
+   * said the session never left the main menu — *"because it said i never left the
+   * main menu but i was in the pause menu in the middle of a match"*. It said that
+   * because returning to the menu reloads the page, the log was a module-level
+   * singleton, and the singleton died with the page: what got exported was the boot
+   * sequence of the page that came AFTER the match.
+   *
+   * A reload, reproduced exactly: `resetPlaytestLog()` drops the singleton the way
+   * the page going away does, the store survives it the way `sessionStorage` does,
+   * and the next boot has nothing but that store to rebuild from.
+   */
+  it('survives a reload', () => {
+    const store = memoryPlaytestLogStore();
+    const c = clock(500_000);
+
+    // --- Page load 1: a session that got into a match. ---------------------
+    const first = installPlaytestLog({ env: ENV, now: c.now, store });
+    c.tick(4_000);
+    first.recordNote('front door idle');
+    c.tick(20_000);
+    first.recordMatch('matchStart', { tick: 0 });
+    c.tick(90_000);
+    first.recordMatch('death', { tick: 5_400 });
+    first.flush();
+
+    const before = first.events.map((e) => ({ at: e.at, msg: e.msg }));
+    expect(before.map((e) => e.msg)).toEqual(['session start', 'front door idle', 'matchStart', 'death']);
+    expect(before.map((e) => e.at)).toEqual([0, 4_000, 24_000, 114_000]);
+
+    // --- BACK TO MENU: `window.location.reload()`. -------------------------
+    // The singleton dies with the page; the store does not.
+    c.tick(1_200);
+    resetPlaytestLog();
+
+    // --- Page load 2: boot again, same tab. --------------------------------
+    const second = installPlaytestLog({ env: ENV, now: c.now, store });
+    c.tick(3_000);
+    second.recordNote('back on the menu');
+
+    const msgs = second.events.map((e) => e.msg);
+    // 1. The match is still in the log. This is the whole brief.
+    expect(msgs).toContain('matchStart');
+    expect(msgs).toContain('death');
+    expect(second.restored).toBe(4);
+    expect(second.coverage).toBe('match');
+
+    // 2. Verbatim: every carried event keeps the instant it happened at, so the
+    //    restored timeline is not rewritten to "now".
+    for (const { at, msg } of before) {
+      expect(second.events.find((e) => e.msg === msg)!.at).toBe(at);
+    }
+
+    // 3. And this session's events FOLLOW them — later on the same axis, and later
+    //    in the array, because a reload is a seam in a session and not a new one.
+    const carried = second.events.slice(0, before.length).map((e) => e.msg);
+    expect(carried).toEqual(before.map((e) => e.msg));
+    const restoreNote = second.events[before.length]!;
+    expect(restoreNote.msg).toBe('restored after reload');
+    expect(restoreNote.at).toBe(115_200);
+    expect(restoreNote.data!['events']).toBe(4);
+    const fresh = second.events.slice(before.length);
+    expect(fresh.map((e) => e.msg)).toEqual(['restored after reload', 'session start', 'back on the menu']);
+    for (const event of fresh) expect(event.at).toBeGreaterThan(114_000);
+    expect(second.events.find((e) => e.msg === 'back on the menu')!.at).toBe(118_200);
+
+    // 4. The header still anchors `at: 0` — it names the session's start, not the
+    //    reload's, or every restored timestamp above would be measured from nothing.
+    expect(second.env.startedAt).toBe(ENV.startedAt);
+  });
+
+  it('respects the ring across the reload, and counts what it dropped', () => {
+    const store = memoryPlaytestLogStore();
+    const c = clock();
+    const first = new PlaytestLog({ env: ENV, capacity: 10, now: c.now, store });
+    for (let i = 0; i < 25; i++) {
+      c.tick(10);
+      first.record('note', `n${i}`);
+    }
+    first.flush();
+    expect(first.dropped).toBe(15);
+
+    // The restore is bounded by the SAME ring: a long session degrades honestly
+    // rather than restoring a heap it then has to evict silently.
+    const second = new PlaytestLog({ env: ENV, capacity: 4, now: c.now, store });
+    expect(second.events).toHaveLength(4);
+    // Four of the ten came back into a ring of four; the restore note then evicted
+    // the oldest of them, like any other recorded event would.
+    expect(second.restored).toBe(4);
+    expect(second.events.filter((e) => e.msg.startsWith('n'))).toHaveLength(3);
+    // 15 already dropped, plus the 6 the smaller ring could not take, plus the one
+    // the restore note itself pushed out.
+    expect(second.dropped).toBe(15 + 6 + 1);
+    expect(second.snapshot().dropped).toBe(second.dropped);
+  });
+
+  it('leaves a reloaded log able to say it never saw a match', () => {
+    const store = memoryPlaytestLogStore();
+    const c = clock();
+    const first = new PlaytestLog({ env: ENV, now: c.now, store });
+    first.recordNote('front door idle');
+    first.flush();
+
+    const second = new PlaytestLog({ env: ENV, now: c.now, store });
+    expect(second.restored).toBe(1);
+    expect(second.coverage).toBe('boot-only');
+  });
+
+  it('remembers a match that the ring has since evicted', () => {
+    // Coverage is a fact about what was RECORDED, not about what is still held: a
+    // long session must not lose the answer to "was there a match?" to its own
+    // budget, or the a0-56 failure returns for sessions that are too long instead
+    // of too short.
+    const log = new PlaytestLog({ env: ENV, capacity: 3 });
+    log.recordMatch('matchStart');
+    for (let i = 0; i < 10; i++) log.record('note', `n${i}`);
+
+    expect(log.events.some((e) => e.kind === 'match')).toBe(false);
+    expect(log.coverage).toBe('match');
+  });
+
+  it('writes at most once per interval, and flush buys back the tail', () => {
+    // The log is fed from inside a 60 Hz frame; a synchronous storage write per
+    // event is a frame-budget cost this team is measured on.
+    const writes: string[] = [];
+    const store: PlaytestLogStore = {
+      read: () => null,
+      write: (text) => {
+        writes.push(text);
+        return true;
+      },
+    };
+    const c = clock();
+    const log = new PlaytestLog({ env: ENV, now: c.now, store });
+
+    log.record('note', 'first'); // immediate — nothing has been written yet
+    expect(writes).toHaveLength(1);
+    for (let i = 0; i < 50; i++) log.record('note', `burst ${i}`);
+    expect(writes).toHaveLength(1); // …and the burst rides inside the interval
+
+    c.tick(PLAYTEST_LOG_WRITE_INTERVAL_MS);
+    log.record('note', 'after the interval');
+    expect(writes).toHaveLength(2);
+
+    // The tail: recorded inside the interval, so unwritten — until the page is
+    // about to go away and `flush()` spends the write.
+    log.record('note', 'the last thing before the reload');
+    expect(writes).toHaveLength(2);
+    log.flush();
+    expect(writes).toHaveLength(3);
+    expect(writes[2]).toContain('the last thing before the reload');
+    log.flush(); // nothing new to say
+    expect(writes).toHaveLength(3);
+  });
+
+  it('degrades to memory-only when storage refuses, and says so on the timeline', () => {
+    // Private mode and a full quota both throw out of `setItem`. A log that crashes
+    // the client is worse than a log that forgets.
+    let attempts = 0;
+    const storage = {
+      getItem: (): string | null => null,
+      setItem: (): void => {
+        attempts++;
+        throw new Error('QuotaExceededError');
+      },
+      removeItem: (): void => {},
+    };
+    const log = new PlaytestLog({ env: ENV, store: playtestLogStore(storage) });
+
+    expect(() => log.record('note', 'a line')).not.toThrow();
+    expect(log.events.map((e) => e.msg)).toEqual(['a line', 'log persistence unavailable']);
+    // Storage that failed once fails every time: it is not retried per event, and
+    // the failure note does not recurse into another attempt.
+    for (let i = 0; i < 20; i++) log.record('note', `n${i}`);
+    expect(attempts).toBe(1);
+    expect(log.events.filter((e) => e.msg === 'log persistence unavailable')).toHaveLength(1);
+  });
+
+  it('never throws out of a store that breaks its own contract', () => {
+    const hostile: PlaytestLogStore = {
+      read: (): string | null => {
+        throw new Error('SecurityError');
+      },
+      write: (): boolean => {
+        throw new Error('SecurityError');
+      },
+    };
+    const log = new PlaytestLog({ env: ENV, store: hostile });
+    expect(() => log.record('note', 'a line')).not.toThrow();
+    expect(() => log.flush()).not.toThrow();
+    expect(log.events[0]!.msg).toBe('a line');
+  });
+
+  it('is memory-only by default, exactly as it was before a0-56', () => {
+    const log = new PlaytestLog({ env: ENV });
+    log.record('note', 'a line');
+    expect(log.restored).toBe(0);
+    expect(() => log.flush()).not.toThrow();
+  });
+});
+
+describe('parsePersistedLog — a stored log is untrusted input', () => {
+  const NOW = 10_000;
+  function stored(overrides: Record<string, unknown> = {}): string {
+    return JSON.stringify({
+      schema: PLAYTEST_LOG_SCHEMA,
+      version: PLAYTEST_LOG_VERSION,
+      startedAt: ENV.startedAt,
+      startMs: 1_000,
+      savedAt: 9_000,
+      dropped: 2,
+      events: [{ at: 5, kind: 'match', msg: 'matchStart' }],
+      ...overrides,
+    });
+  }
+
+  it('reads back what it wrote', () => {
+    const parsed = parsePersistedLog(stored(), NOW)!;
+    expect(parsed.events).toHaveLength(1);
+    expect(parsed.dropped).toBe(2);
+    expect(parsed.startMs).toBe(1_000);
+  });
+
+  it('is null for nothing, for garbage, and for another schema or version', () => {
+    expect(parsePersistedLog(null, NOW)).toBeNull();
+    expect(parsePersistedLog('', NOW)).toBeNull();
+    expect(parsePersistedLog('{not json', NOW)).toBeNull();
+    expect(parsePersistedLog('"a string"', NOW)).toBeNull();
+    expect(parsePersistedLog(stored({ schema: 'something.else' }), NOW)).toBeNull();
+    expect(parsePersistedLog(stored({ version: PLAYTEST_LOG_VERSION + 1 }), NOW)).toBeNull();
+    expect(parsePersistedLog(stored({ events: 'not an array' }), NOW)).toBeNull();
+  });
+
+  it('refuses an origin this clock cannot place, rather than rebasing onto it', () => {
+    // A resumed laptop, a corrected NTP offset: every new event would be stamped
+    // from a nonsense origin, and a timeline nobody can read is worse than none.
+    expect(parsePersistedLog(stored({ startMs: NOW + 60_000 }), NOW)).toBeNull();
+    expect(parsePersistedLog(stored({ startMs: NOW - MAX_RESTORE_AGE_MS - 1 }), NOW)).toBeNull();
+    expect(parsePersistedLog(stored({ startMs: 'yesterday' }), NOW)).toBeNull();
+    expect(parsePersistedLog(stored({ startMs: NOW - MAX_RESTORE_AGE_MS + 1 }), NOW)).not.toBeNull();
+  });
+
+  it('drops a malformed event and keeps the session around it', () => {
+    const parsed = parsePersistedLog(
+      stored({
+        events: [
+          { at: 1, kind: 'match', msg: 'matchStart' },
+          { at: 'soon', kind: 'match', msg: 'bad at' },
+          { at: 2, kind: 'invented', msg: 'bad kind' },
+          null,
+          { at: 3, kind: 'note', msg: 'kept' },
+        ],
+      }),
+      NOW,
+    )!;
+    expect(parsed.events.map((e) => e.msg)).toEqual(['matchStart', 'kept']);
+  });
+
+  it('rebuilds an event field by field, so nothing a blob invented rides along', () => {
+    const parsed = parsePersistedLog(
+      stored({ events: [{ at: 1.6, kind: 'note', msg: 'n', data: { a: 1, deep: { b: 2 } }, evil: 'x' }] }),
+      NOW,
+    )!;
+    const event = parsed.events[0]! as unknown as Record<string, unknown>;
+    expect(Object.keys(event).sort()).toEqual(['at', 'data', 'kind', 'msg']);
+    expect(event['at']).toBe(2); // rounded onto the integer grid every `at` uses
+    expect((event['data'] as Record<string, unknown>)['deep']).toBe('[object]');
   });
 });
