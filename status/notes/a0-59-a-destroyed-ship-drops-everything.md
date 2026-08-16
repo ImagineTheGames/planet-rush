@@ -102,22 +102,37 @@ this lane went red. Three were sampling; one is a real defect.
 shipped-cast matches" fails on this branch at **seed 15**: `foreman` (slot 2)
 wedged **133.5 s** at (1204,1195) while `'haul'`, at full throttle.
 
-**It is a genuine bot defect, and a0-59 exposed it rather than caused it.**
-Instrumented at t=605–620 s on that seed, the bot is:
+**It is a genuine bot defect, and a0-59 exposed it rather than caused it.** It is
+the v0.2.2 field report's own bug class: a hull pinned against bodies at full
+throttle. Hull-surface clearance to the four nearest rocks, seed 15 slot 2:
 
-- at the exact **map centre** of a 2400×2400 board, alone — **no obstacle at
-  all**: nearest asteroid 123 u, nearest other ship 288 u, nearest station 861 u,
-  **zero chunks within 150 u** (4 on the whole map);
-- moving *fast* — |v| 30–92 u/s — with its velocity direction flipping every few
-  ticks: it is flying **tight circles**, roughly a 13×9 u box, for 133 s;
-- `lastThrust = 1.00`, `lastBehavior = 'haul'`, cargo 3/4, phase `live`.
+```
+t=580 pos=(1136,1212)   0.2   7.8  11.4  21.7   <- clipping, still escaping
+t=590 pos=(1228,1124)  23.3  27.2  33.3  33.9   <- free
+t=600 pos=(1208,1203)  -2.6   0.0   0.1   6.0   <- enters the clump
+t=610 pos=(1196,1204)  -0.0   0.0   3.5   3.6   <- wedged
+t=620 pos=(1201,1194)  -0.0   0.6   2.9   4.3
+t=640 pos=(1206,1199)   0.0   0.9   2.6   4.7
+```
 
-So the three-layer unstuck fix (`src/bots/{tree,behaviors,steering}.ts`) does not
-recover a steering limit cycle **in open space**. `STUCK_PROGRESS` is 24 u and the
-orbit stays inside ~16 u of any anchor, so `stuckFor` should accrue and the escape
-run should fire — it either does not fire or the escape run re-enters the cycle.
-That is `src/bots/`, which this lane must never touch, and it is behaviour, not a
-fixture.
+From t≈600 it is **in contact with 3–4 asteroids at once** in a dense clump at the
+exact map centre (late waves spawn closer to centre by design, §2.3) and never
+gets out: `lastThrust = 1.00`, `lastBehavior = 'haul'`, cargo 3/4, phase `live`,
+133 s. Before t=600 the escape run *was* working — it clipped rocks repeatedly and
+got clear each time.
+
+**Mechanism.** While wedged, the nearest-body pick alternates on a fixed rhythm:
+over one 120-tick sample, **26 flips across 7 distinct bodies**, cycling 7 ticks on
+rock `4882` and 3 on rock `4879`. `go()` curves the committed escape heading
+through `dodge` around whichever body is nearest *this* tick, so with two rocks
+straddling the lane the escape is re-steered back and forth and never outlasts the
+thing it is escaping. `src/bots/behaviors.ts`'s own comment anticipates exactly
+this in a dense central cluster. That is `src/bots/`, which this lane must never
+touch, and it is behaviour, not a fixture.
+
+*(An earlier reading in this note said "no obstacle at all" — that measured
+centre-to-centre distance under a range filter and was wrong. Surface clearance is
+the number above.)*
 
 **Rate, measured.** Base build (a0-58 tip): **0 wedges in 120 seeds** scanned
 (1..24 shipped + 25..120), larger scan running. a0-59: **1 in 96** (seed 15 only).
