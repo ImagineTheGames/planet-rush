@@ -115,6 +115,15 @@ no regeneration brief against them.
 
 Counted: **35 superseded, 2 revoice, 1 cut.**
 
+> **Update, a0-60 (2026-08-16).** *Superseded* was the correct mechanical reading
+> — the a0-01b offers do post-date the denial — and it was still not what the
+> developer was looking at: *"im still staring at a sound board with no
+> regenerated options."* The 35 rows above were re-voiced under new letters in the
+> a0-60 sweep, slot by slot, and `docs/sound-revoice-manifest.md` is the status of
+> record for that. The lesson for this ledger is that **superseded is not a
+> disposition a lane can close a denial with**: an offer standing behind a
+> deny-all still reads as the denied board until the denied letters come *off* it.
+
 The two revoices were made under this brief and are on the board now. **Both rows
 stay in this file**, because the rule at the bottom is that a row leaves only when
 the slot carries a verdict that is not `deny-all` — and neither does yet. What
