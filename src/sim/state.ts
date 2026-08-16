@@ -157,6 +157,31 @@ export interface Ship {
    */
   lootTake?: number;
   /**
+   * **Offered-ore tell** — the ore that was ON OFFER to this hold on this tick:
+   * the full amount of every chunk that touched it, before the hold's cap decided
+   * how much of it could be accepted. Written beside {@link lootTake} in the same
+   * accumulate, so the pair reads as one fact: `lootOffered` was there,
+   * `lootTake` arrived, and **the take was PARTIAL exactly when
+   * `lootOffered > lootTake`.**
+   *
+   * It exists because {@link lootTake} alone cannot be read (a0-54). The
+   * developer, 2026-08-16: *"I'm picking up two, but it only registers as one on
+   * my cargo."* The accounting was right — a hold with room for 1 takes 1 of a
+   * 2-ore chunk and leaves 1 floating, GDD §2.3 as ratified, and the remainder
+   * stays in the chunk — but `+1` drawn over a 2-ore chunk is indistinguishable
+   * from a miscount when nothing on screen says what was offered. This is the
+   * missing half of that sentence, and the only thing the HUD's partial-take tell
+   * needs (`src/ui/loot-tell.ts`).
+   *
+   * Reset to `0` for every ship at the top of the chunk step beside
+   * {@link lootTake} — the one chunk → cargo path there is — so it can never
+   * outlive the tick that earned it, and absent reads as "nothing offered". A
+   * pure restatement of ore the sim already moved: nothing reads it back to make
+   * a decision, so it cannot perturb determinism (GDD §4.8), and `hashState` does
+   * not fingerprint it.
+   */
+  lootOffered?: number;
+  /**
    * **Full-hold tell** — true when this ship's hold has no room AND real loose ore
    * (never a deposit courier) sits within `TRACTOR.range` of it: the ore it would
    * be pulling in if it could. This is the frame in the a0-08 report — floating
@@ -870,6 +895,7 @@ function makeShip(spec: PlayerSpec, pos: Vec2): Ship {
     // The loot tells start quiet and are re-decided every tick by `updateChunks`
     // (a0-08); the sim's own ships always carry them, foreign literals need not.
     lootTake: 0,
+    lootOffered: 0,
     lootBlocked: false,
     weaponCooldown: 0,
     wedgeContactS: 0,

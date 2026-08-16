@@ -3713,6 +3713,15 @@ async function boot(): Promise<void> {
     hudFrame.maxHull = ship.maxHull;
     hudFrame.shipRadius = ship.radius;
     hudFrame.shipFiring = ship.firing;
+    // The two loot tells, straight off the ship (a0-08, a0-54) — OWNED BY
+    // PLATFORM, EDITED BY THE UI ENGINEER, two lines, and they drop cleanly.
+    // `lootTake` is the ore that arrived this tick and `lootOffered` what was on
+    // offer before the hold's cap clipped it; the HUD says `HOLD FULL · 1 LEFT`
+    // when the second exceeds the first, which is the answer to "I'm picking up
+    // two, but it only registers as one" (src/ui/loot-tell.ts). Per-tick pulses
+    // sampled per frame, exactly like `shipFiring` above.
+    hudFrame.lootTake = ship.lootTake ?? 0;
+    hudFrame.lootOffered = ship.lootOffered ?? 0;
   }
 
   /**
