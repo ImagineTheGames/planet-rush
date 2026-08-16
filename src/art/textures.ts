@@ -237,7 +237,11 @@ export function rampUpload(curve: FalloffCurve, via: RampUploadPath = rampUpload
 export function falloffRamp(curve: FalloffCurve = 'smooth'): Texture {
   const cached = ramps.get(curve);
   if (cached) return cached;
-  const upload = rampUpload(curve);
+  // The canvas is asked for FIRST and the path follows it, rather than the other
+  // way round: a runtime that has a `document` but no 2d context (a bare jsdom)
+  // must degrade to the buffer, not throw on the way to drawing a star.
+  const canvas = rampUploadPath() === 'image' ? rampCanvas() : null;
+  const upload = rampUpload(curve, canvas ? 'image' : 'buffer');
   const shared = {
     label: `art/falloff-ramp/${curve}`,
     // Mipmapped, and that is the dither's own safety catch: Plasma Reef's
@@ -250,8 +254,8 @@ export function falloffRamp(curve: FalloffCurve = 'smooth'): Texture {
     scaleMode: 'linear' as const,
   };
   const source: TextureSource =
-    upload.via === 'image'
-      ? new CanvasSource({ resource: rampCanvas(upload.pixels), alphaMode: upload.alphaMode, ...shared })
+    canvas && upload.via === 'image'
+      ? new CanvasSource({ resource: paint(canvas, upload.pixels), alphaMode: upload.alphaMode, ...shared })
       : new BufferImageSource({
           resource: upload.pixels,
           width: RAMP_SIZE,
@@ -264,14 +268,23 @@ export function falloffRamp(curve: FalloffCurve = 'smooth'): Texture {
   return built;
 }
 
-/** The ramp's texels on a canvas, which is the only source type whose uploader
- *  pins `UNPACK_PREMULTIPLY_ALPHA_WEBGL` ({@link rampUpload}). */
-function rampCanvas(px: Uint8Array): HTMLCanvasElement {
-  const canvas = document.createElement('canvas');
-  canvas.width = RAMP_SIZE;
-  canvas.height = RAMP_SIZE;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('art/falloff-ramp: no 2d context to author the ramp on');
+/** A ramp-sized canvas with a 2d context, or `null` where one cannot be had —
+ *  the source type whose uploader pins `UNPACK_PREMULTIPLY_ALPHA_WEBGL`
+ *  ({@link rampUpload}). */
+function rampCanvas(): HTMLCanvasElement | null {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = RAMP_SIZE;
+    canvas.height = RAMP_SIZE;
+    return canvas.getContext('2d') ? canvas : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The ramp's straight-alpha texels, laid onto that canvas. */
+function paint(canvas: HTMLCanvasElement, px: Uint8Array): HTMLCanvasElement {
+  const ctx = canvas.getContext('2d')!;
   ctx.putImageData(new ImageData(new Uint8ClampedArray(px), RAMP_SIZE, RAMP_SIZE), 0, 0);
   return canvas;
 }
