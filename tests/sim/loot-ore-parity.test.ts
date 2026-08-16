@@ -92,9 +92,11 @@ function parkInHomeAtmosphere(world: World, ship: Ship): void {
 // --- death-drop loot is ore -------------------------------------------------
 
 describe('death-drop loot is ore the moment it enters the hold', () => {
-  it('drops exactly half the dead ship’s hold as plain, tractorable chunks', () => {
+  it('drops the ratified share of the dead ship’s hold as plain, tractorable chunks', () => {
     const { drops, dropped } = deathDrop(4);
-    // Half of 4 = 2 ore, and it is ordinary loot: nothing is flagged a courier.
+    // All 4 since a0-59 (it was half, 2, before 2026-08-16) — and it is ordinary
+    // loot either way: nothing is flagged a courier. Read off the constant, which
+    // is what makes this a statement about PROVENANCE and not about the fraction.
     expect(dropped).toBeCloseTo(4 * DEATH_ORE_DROP_FRACTION, 9);
     expect(drops.every((c) => !c.deposit)).toBe(true);
     expect(drops.length).toBeGreaterThan(0);
@@ -143,7 +145,9 @@ describe('death-drop loot is ore the moment it enters the hold', () => {
   });
 
   it('conserves ore across kill → drop → tractor → deposit', () => {
-    const { world, collector, dropped } = deathDrop(6); // 3 ore of loot
+    // A hold sized so its drop is 3 ore whatever the fraction is — the case needs
+    // a loot pile that fits in one bay, not a particular number of ore.
+    const { world, collector, dropped } = deathDrop(3 / DEATH_ORE_DROP_FRACTION);
     expect(dropped).toBeCloseTo(3, 9);
     expect(collector.cargoCap).toBeGreaterThanOrEqual(dropped); // fits in one hold
 
