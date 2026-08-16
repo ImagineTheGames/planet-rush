@@ -359,6 +359,18 @@ stands: `shipClass` is never written after world-build, `tiers` is only ever `+=
 (`buyUpgrade`), and the ladder adds off a non-negative base. So conservation holds
 exactly today, which is why nineteen sessions of ledger work never saw it.
 
+*One caveat, so this is not overclaimed.* Two float-hygiene floors also destroy ore
+without a bucket — `if (ship.cargo < 1e-9) ship.cargo = 0` in `spendOre`
+(`src/sim/buildings.ts`) and in the atmosphere drain (`src/sim/step.ts`). They are
+**bounded by 1e-9 per event** against a conservation tolerance of 1e-6, they exist
+to stop a rounding tail showing as a non-zero hold, and `src/sim/ore-journal.ts`
+already names them. They are not sinks in any meaningful sense; the cargo clamp,
+which can destroy whole units, is. Every other path is accounted: `spendOre` →
+`spent`, `killShip` → `dropped` + `deathLoss`, `scatterWreckDebris` → `dropped` +
+`capLoss`, `chipAsteroid` → `dust`, the drain and the bank order → `deposited`, and
+an eliminated player's bank is passed *into* the wreck scatter rather than dropped
+on the floor (`destroyCore`, `src/sim/match.ts`).
+
 **Not fixed, deliberately.** `refreshDerivedStats(ship)` is world-free by design —
 it is called on hand-built loadouts, including from `src/net/prediction.ts`, which
 is not this lane's — so accounting there means threading a `world` through a
