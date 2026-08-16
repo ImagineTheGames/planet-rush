@@ -1022,7 +1022,113 @@ under it did not. Trust the measured table, not the prose around it.)*
     src/sim/waves.test.ts` instead of re-deriving anything. **The only thing still
     missing is the ruling.**
 
+- **2026-08-16, fifteenth session — what this one actually did.** One commit,
+  **`a6aabf8`**, and it is the first session to measure the *fixes* rather than the
+  defect. The shipped a0-59 work is untouched.
+  - **Re-verified, nothing redone:** local `HEAD` == `origin/…` == `14e85a2` at
+    start, `main` still `221a2b1` and **0 commits ahead**, `tsc --noEmit` exits 0,
+    the constant is `1` at `constants.ts:1032`, `drops the whole hold` at
+    `damage.test.ts:83`, both remote DoD greps pass against `FETCH_HEAD`. PR #436
+    open, UNSTABLE; the only `fail` bucket is `Typecheck, test, build` (two
+    duplicate workflow runs of it, not two failures). **Still no Director ruling**
+    — there are now two comments, both mine (the sixth session's escalation and the
+    fourteenth's numeric correction), zero reviews.
+  - **Did not re-measure the wedge, the geometry, or enclosure.** Four derivations
+    agree and `src/sim/waves.test.ts` pins enclosure in 1.9 s.
+  - **Closed one more escalation channel, and it stays closed.** `/status/feedback.md`
+    is the **Director → developer** relay queue ("Director appends; developer
+    clears"), not a lane inbox — and its own entries show the established path for
+    a lane's question is *PR body / doc → Director relays* (see its p8-05 and
+    team-bots entries, which say so in as many words). Q-6 is therefore the correct
+    queue and there is no unused channel. **A sixteenth session need not re-check
+    this**, as it need not re-check the issue tracker (thirteenth session: zero
+    issues, not a convention this repo uses).
+  - **`a6aabf8` — the finding: every candidate fix had been costed by arithmetic
+    and none had ever been RUN, and two of the three costings were wrong.** I now
+    had an oracle the earlier sessions did not — `centreCanEscape` from the
+    fourteenth session's test — so the candidates could be measured instead of
+    argued. 9 seeds, waves 1–5, 8 players.
+    1. **Candidate 1 (`WAVE.lastRadiusFraction`) is NOT a non-starter.** The fourth
+       session's "needs ≈ 0.90, deletes the shrinking ring" was computed with rock
+       size held at its shipped value. **The two knobs multiply** — required ring
+       radius is proportional to total rock arc — so halving late-wave rock radius
+       halves the ring radius needed. Measured: **`lastRadiusFraction = 0.50` +
+       a 2× late-wave size cut opens the centre 9/9 at BOTH waves 4 and 5**, discs
+       307 → 269 → 230 → 192 → 154 u. §2.3's ring is weakened, not deleted.
+    2. **Candidate 2's preferred COUNT variant cannot work at all in a full
+       lobby.** `sectorRocks = Math.max(1, …)` floors the wave at one rock per
+       sector = 8 rocks at 8 players, whose arc is still **1.22×** the wave-5
+       circumference before a ship corridor. Flood-filled: count ∝ ring → 9/9
+       sealed at w5; count ×0.5 flat → 9/9 sealed. **That floor is the `N`-fold
+       fairness symmetry, so it is not a floor anyone may lower.** Eleven sessions
+       recommended this variant.
+    3. **The ore-budget argument behind that preference does not discriminate.**
+       Measured, *every* arm — count, size, both, ring width — delivers **exactly**
+       400.00 field ore per seed, identical to baseline, because `drawCanon` scales
+       ore to `waveOre` independently of radius and count. Ore-neutrality is a
+       property of the spawner, not of the count knob.
+    4. **Size alone works but needs a 6.7× cut** (`s ≈ 0.15`, max radius 46 → 7 u —
+       smaller than the `CHUNK.radius` 6 ore it emits). Note `s = 0.25` is exactly
+       *constant angular occupancy* and still leaves 4/9 sealed: **the hull is not
+       scaled**, so as the ring shrinks 4× the corridor's share of circumference
+       grows and the taper must be super-proportional.
+    5. **A cheap partial exists:** a 2× size cut alone opens **wave 4 on 9/9** and
+       leaves wave 5 sealed. Since 24 of 28 catches are at wave 4 — the wave where
+       the trap is invisible — one knob in one direction removes most of the
+       incidence.
+  - **Also measured, and nobody had: lobby size.** Every number in fourteen
+    sessions came off the 8-slot cast. Across 2–8 players, **wave 5 seals the
+    centre 9/9 at every size** — `fieldRadius` is 307.2 throughout and the wave's
+    rock budget does not scale with the count either. The **wave-4** onset *is*
+    lobby-dependent (0/9 sealed at 2 players, 9/9 at 8), so the fourteenth
+    session's "the seal closes at wave 4" is a full-lobby statement and is now
+    fenced as one. **A solo-with-bots match is as sealed as a full eight.**
+  - **No value moves.** `git diff -U0 -- src/` filtered of comment and blank lines
+    is **empty**; `tsc --noEmit` exits 0; 53 sim tests green (`waves`, `damage`,
+    `ore-ledger`, `match`, `loot-tell`). The probe was scratch under
+    `tests/harness/` (vitest's `include` ignores the repo root — twelfth session's
+    trap) and was **deleted**, with `git status -- src/ tests/` verified empty after
+    each arm set.
+  - **Method worth reusing:** none of this needed a constant edit. Rock size and
+    `lastRadiusFraction` were varied by **mutating the constant objects at runtime**
+    inside the probe (`as const` is compile-time only, not `Object.freeze`), and
+    rock count by setting `world.asteroidsPerWave`, which `spawnWave` already takes
+    as a parameter. That removes the flip-measure-flip-back risk the twelfth and
+    thirteenth sessions ran, where an inexact restore would have been a live edit.
+  - **The lesson, continuing the series.** Sessions 8/9/11/13/14 learned *sweep the
+    English*, *sweep every directory*, *link the finding where people look*, *a
+    gate's threshold is a definition not a detector*, and *do not read an
+    instrument's verdict as the thing itself*. This one is the mirror of the last:
+    **the same standard applies to the remedy, not just the defect.** Thirteen
+    sessions measured the bug to four decimal places and left every proposed fix as
+    arithmetic — including the one being actively recommended to the Director, which
+    turned out to be impossible. If a recommendation is going to be acted on,
+    measure it with the same instrument used to find the problem.
+  - **Escalated once, on the same test the fourteenth session used:** would acting
+    on the stale content waste work? Yes — briefing "cut the rock count" produces a
+    fix that measurably cannot work. Posted one short correction comment naming the
+    changed recommendation. Did not repost the analysis.
+  - **What a sixteenth session should NOT do.** Everything in the twelfth,
+    thirteenth and fourteenth lists still holds. Do not re-measure the candidate
+    fixes — the tables are in `docs/wave-commons-entombment.md`
+    (*Candidate fixes, measured*) and Q-6, and the oracle to re-run them with is a
+    committed 2-second test. Do not check `/status/feedback.md` or the issue
+    tracker again. **The only thing still missing is the ruling**, and it is now
+    queued in four places with a measured menu attached.
+
 ## BLOCKERS
+
+*(**FIFTEENTH session, 2026-08-16: the ask is still unchanged, but the MENU
+attached to it is not. Every candidate fix below had been costed by arithmetic and
+never run; measured against the reachability oracle, candidate 1 is not a
+non-starter (`lastRadiusFraction` 0.50 WITH a 2× rock-size cut opens 9/9 at both
+waves and keeps §2.3's shrinking ring) and candidate 2's recommended COUNT variant
+cannot work at all (`sectorRocks` floors at one rock per sector — 1.22×
+oversubscribed at the floor — so every count taper leaves wave 5 sealed 9/9). Both
+knobs are ore-neutral, measured identical to the cent. Also: the trap is not an
+8-player artefact — wave 5 seals 9/9 at every lobby size from 2 to 8. Tables in
+`docs/wave-commons-entombment.md` → *Candidate fixes, measured*, and in Q-6. Read
+those before re-costing anything below.**)*
 
 *(**FOURTEENTH session, 2026-08-16: the ask is unchanged, but the defect is
 bigger and quieter than every prior version of this section said. The seal closes
