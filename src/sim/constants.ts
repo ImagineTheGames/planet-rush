@@ -608,7 +608,8 @@ export const RESOURCE_FIELD = {
    *  seeds, on `main` as well as off it. The knobs with real travel are late-wave
    *  rock SIZE or COUNT; both are design calls (GDD §5.5 ties rock size to a
    *  payout the player can judge), so this is briefed separately rather than
-   *  tuned here. TUNABLE */
+   *  tuned here — see `docs/wave-commons-entombment.md` for the measured
+   *  geometry, the incidence on `main`, and the three costed candidates. TUNABLE */
   commonsHoleFraction: 0.85,
   /** Angular clearance (radians) kept around every station spoke WITHIN the
    *  commons: a wave's rocks sit only in `[gap, sectorWidth − gap]` of their
