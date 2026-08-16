@@ -386,8 +386,26 @@ export function spawnWave(world: World, count: number = world.asteroidsPerWave):
   //     so no rock lands ON a spoke where a launching ship would ram it. Under a
   //     slow renderer the drag test's gesture ramp flies the ship most of the way
   //     to the centre before its window even opens, so the whole spoke must be
-  //     clear, not just a pocket. Sized so the innermost ring rock clears a ship's
-  //     straight path by more than a ship+rock radius (`inner·sin(gap)` ≈ 74 u).
+  //     clear, not just a pocket.
+  //
+  // NEITHER SHAPE HOLDS ON THE LATE WAVES, and this comment used to claim both
+  // did. Measured off these constants in a0-59 (`docs/wave-commons-entombment.md`,
+  // reproduced from `waveRadiusFraction` + `RESOURCE_FIELD` + `ASTEROID`):
+  //   – The eye is reserved by rock CENTRE, not body — unlike `pocketOuterR` ~90
+  //     lines up, which subtracts `ASTEROID.maxRadius` and says so. The actually
+  //     free eye is `eye − maxRadius`: 215 u at wave 1 but 19.3 u at wave 5,
+  //     against a 16 u `SHIP_RADIUS`. That is a sealed pocket, not an open centre.
+  //   – The spoke gap is an ANGLE, so the linear clearance it buys shrinks with
+  //     the ring: `eye·sin(gap)` is 84.6 u at wave 1 and 21.2 u at wave 5, against
+  //     the `SHIP_RADIUS + ASTEROID.maxRadius` = 62 u this comment used to promise
+  //     ("≈ 74 u"). The promise is already broken at wave 3 (52.9 u).
+  // Root cause is not placement: wave 5 needs `24 × 2 × 34` = 1632 u of rock arc
+  // on a 446 u circumference — 3.66× oversubscribed — so no angular or radial
+  // rearrangement admits a corridor, and raising `commonsHoleFraction` (tried
+  // twice) cannot either. The knobs that would are late-wave rock size or count,
+  // which are design calls; see the defect report. DO NOT "fix" this by widening
+  // `commonsSpokeGap` or `commonsHoleFraction`.
+  //
   // Both are pure `N`-fold-symmetric reshapes of one drawn sector, so the commons
   // stays symmetric and carries the same `WAVE_ORE` — the fairness invariant is
   // untouched (`resource-fairness.test.ts`).
