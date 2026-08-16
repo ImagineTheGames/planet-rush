@@ -58,6 +58,14 @@
  * pause menu and on every error screen. Nothing in that group uploads anything; the
  * developer chooses where the file goes.
  *
+ * `./playtest-log-store` is the newest of them and the least glamorous: the ring
+ * mirrored into `sessionStorage` so it survives the page reload BACK TO MENU
+ * performs. Without it the log was a per-page-load record pretending to be a
+ * per-session one — the developer exported a match and got the boot sequence of the
+ * page that replaced it, and the Director believed the file over the person (a0-56).
+ * The same brief put `coverage: 'boot-only' | 'match'` in the export, so a log that
+ * cannot answer a gameplay question says so in a field instead of looking complete.
+ *
  * Alongside it, `./connect-trace` and `./connect-trace-view` are the connecting
  * screen said out loud (M10): the five things `CONNECTING…` used to cover —
  * allocate, ticket, dial, hand-off, seat — each named as it happens, or stopped on
@@ -111,6 +119,7 @@ export * from './wire';
 export * from './loopback';
 export * from './latency-transport';
 export * from './playtest-log';
+export * from './playtest-log-store';
 export * from './playtest-log-capture';
 export * from './playtest-log-export';
 export * from './playtest-log-button';
