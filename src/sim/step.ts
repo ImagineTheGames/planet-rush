@@ -1102,24 +1102,6 @@ function updateChunks(world: World, dt: number): void {
 // ---------------------------------------------------------------------------
 
 /**
- * While a ship is inside its own living station's atmosphere (`DEPOSIT_RANGE`),
- * drain its hold into the safe banked total at `DEPOSIT.drainRate` and, for each
- * WHOLE unit of ore that leaves the hold, spin off exactly one courier chunk that
- * flies ship→station to show it. Leave the atmosphere (or empty the hold, or lose
- * the station) and the drain simply stops the next tick — the transfer is readable
- * and interruptible, exactly as the field report asks. There is no dock or park
- * gate any more (ratified p4: "just be in that atmosphere").
- *
- * The transfer is authoritative here (hold and bank are the truth the HUD ticks
- * off) and the couriers CONSERVE it: one flight sprite per unit banked, so the
- * chunks flying home always total the ore that actually moved — never more (field
- * report p8: the atmosphere drain used to spawn couriers on a free-running time
- * cadence, ~3 per ore at `drainRate`, so the developer saw "more ore flying than
- * you hold"). Deterministic: the spawn count is a pure function of the hold's
- * integer boundary crossings, the courier's heading is pure geometry, and no RNG
- * is drawn.
- */
-/**
  * Whole `CHUNK.ore` the atmosphere drain pays out on this tick — the metronome the
  * hold steps to (a0-58).
  *
@@ -1148,6 +1130,25 @@ function dueThisTick(world: World, dt: number): number {
   return (edge(world.time) - edge(world.time - dt)) * CHUNK.ore;
 }
 
+/**
+ * While a ship is inside its own living station's atmosphere (`DEPOSIT_RANGE`),
+ * drain its hold into the safe banked total at `DEPOSIT.drainRate` — in whole
+ * `CHUNK.ore` units since a0-58, a hold being a countable thing — and, for each
+ * WHOLE unit of ore that leaves the hold, spin off exactly one courier chunk that
+ * flies ship→station to show it. Leave the atmosphere (or empty the hold, or lose
+ * the station) and the drain simply stops the next tick — the transfer is readable
+ * and interruptible, exactly as the field report asks. There is no dock or park
+ * gate any more (ratified p4: "just be in that atmosphere").
+ *
+ * The transfer is authoritative here (hold and bank are the truth the HUD ticks
+ * off) and the couriers CONSERVE it: one flight sprite per unit banked, so the
+ * chunks flying home always total the ore that actually moved — never more (field
+ * report p8: the atmosphere drain used to spawn couriers on a free-running time
+ * cadence, ~3 per ore at `drainRate`, so the developer saw "more ore flying than
+ * you hold"). Deterministic: the spawn count is a pure function of the whole ore
+ * this tick actually moved, the courier's heading is pure geometry, and no RNG is
+ * drawn.
+ */
 function updateDeposits(world: World, dt: number): void {
   for (const ship of world.ships) {
     if (!ship.alive || ship.cargo <= 1e-9) continue;
@@ -1159,8 +1160,8 @@ function updateDeposits(world: World, dt: number): void {
 
     // Authoritative transfer hold → bank (GDD §2.3: banked ore is safe), paid out
     // in WHOLE `CHUNK.ore` (a0-58). The rate is untouched — `DEPOSIT.drainRate`
-    // still buys `drainRate` ore every second, accrued in `depositProgress` — but
-    // the hold hands over countable ore, never 1/30th of a unit per tick.
+    // still buys `drainRate` ore every second — but the hold hands over countable
+    // ore rather than a thirtieth of a unit per tick.
     //
     // Why the granularity had to move: a pilot who clips their own atmosphere for
     // a third of a second used to come out holding 1.6 of a 2 slot. That hold shows
@@ -1173,22 +1174,23 @@ function updateDeposits(world: World, dt: number): void {
     //
     // `Math.min(cargo, …)` is what scrubs a sliver out of a foreign hold: 0.6 held
     // against a whole unit due banks the 0.6 and lands on exactly 0.
-    const cargoBefore = ship.cargo;
     const moved = Math.min(ship.cargo, dueThisTick(world, dt));
+    if (moved <= 0) continue; // no boundary this tick: no transfer, no courier, no line.
+    const cargoBefore = ship.cargo;
     ship.cargo -= moved;
     ship.banked += moved;
     if (ship.cargo < 1e-9) ship.cargo = 0;
-    if (moved <= 0) continue; // nothing whole earned yet: no transfer, no courier, no line.
     // Hold → bank: a transfer within the live economy (conserved), recorded so the
     // ledger can attribute where banked ore came from (`./ore-ledger`).
     ledgerAdd(world, 'deposited', moved);
 
     // The telegraph, CONSERVED: exactly one courier per whole unit that left the
-    // hold this tick. Summed across a drain this equals the whole ore banked — the
+    // hold this tick — which since a0-58 is every unit that left it, the hold
+    // having no fractional payouts left to smear between two sprites. Summed across a drain this equals the whole ore banked — the
     // single unit-keyed spawner that replaces the old rate-based emitter (field
-    // report p8). Keyed to the HOLD's integer boundaries (which the terminal
-    // `= 0` snaps cleanly) rather than the bank's running total, so float drift in
-    // `banked` can never invent or drop a courier at the exact end of a drain.
+    // report p8). Keyed to what the HOLD actually handed over this tick, never to
+    // the bank's running total, so float drift in `banked` can never invent or drop
+    // a courier at the exact end of a drain.
     const couriers = Math.floor(moved / CHUNK.ore);
     for (let i = 0; i < couriers; i++) spawnDepositFlight(world, ship, station);
 
