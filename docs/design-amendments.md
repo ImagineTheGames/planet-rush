@@ -8,6 +8,146 @@ half of these amendments; this file is the human-readable why.
 
 ---
 
+## Ore is a countable thing: every mint is WHOLE, and a hold can never hold half of one
+
+**Date:** 2026-08-16 · branch `agent/gameplay/a0-58-whole-ore-only`
+**Ratified by:** Developer (Reinaldo), reporting the bug; Director, ruling on it
+**Amends:** GDD §2.3 and §2.7 — the half-drop is *rounded down to whole ore*, the
+atmosphere drain banks *a whole ore at a time* at the same `2 ore/s`, and the
+conservation list gains one named sink (`dust`). **No rate, cost, cap, fraction or
+capacity changes**: `DEATH_ORE_DROP_FRACTION` is still 0.5, `DEPOSIT.drainRate` is
+still 2, `CHUNK.ore` is still 1 and still TUNABLE.
+
+### The ratification, verbatim
+
+> "its super easy to reproduce this ore bug, its usually from blown up ships,
+> their ore's don't always count when picked up"
+
+That one detail is the diagnosis, and the ruling that followed is the amendment:
+
+> **Ore is a countable thing.** The hold shows pips, costs are whole numbers, the
+> wheel prints integers. A currency that can hold a half-unit it cannot display is
+> a currency with an invisible remainder, and no amount of UI can honestly render
+> 0.5 of a pip. Fix it at the mint, not at the display.
+
+### The reasoning
+
+Half of an odd hold is a half. A ship dying on 3 ore shed `1.5`, laid down as one
+`CHUNK.ore` piece plus one of `0.5` — an exact split, and the ore ledger balanced
+on it perfectly. It is the **readout** that cannot: `src/ui/ore-hud.ts`,
+`build-wheel.ts` and `upgrade-wheel.ts` each floor, so collecting that half moved a
+hold from 1 to 1.5 and showed **1**. The ore was genuinely owned, genuinely
+spendable-toward, and genuinely unmentioned — and it "doesn't always" count because
+whether it ever becomes visible depends on a *second* half happening to arrive.
+
+This is the fifth report in the same family and the first that is a **rule** bug
+rather than a legibility one. a0-08 (2026-08-08) proved conservation held and
+fixed the tells; a0-54 added the partial-take tell. Both were right about what they
+saw. What none of them could see is that the economy was minting a denomination the
+interface has no way to print.
+
+### What changed
+
+Whole `CHUNK.ore` at every mint, and the remainder to a **named sink** — never
+destroyed off the books, never rounded up into ore nobody paid for:
+
+| Mint | Was | Is | Remainder goes to |
+|---|---|---|---|
+| `damage.ts` `killShip` — death drop | whole pieces **+ one remainder** | whole only | `deathLoss` — the sink half this hold already went to (GDD §2.3) |
+| `match.ts` `scatterWreckDebris` — wreck ring | whole pieces **+ one remainder** | whole only | `capLoss` — already "the fortune the wreck could not lay down" |
+| `projectiles.ts` `chipAsteroid` — mined ore | whole chunks **+ the rock's tail** | whole only | `dust` — a new ledger sink |
+| `step.ts` `spawnDepositFlight` — courier | cosmetic `CHUNK.ore`, never collectable | unchanged | — |
+
+…and the two places a hold is written:
+
+- **`updateChunks`** — room is measured in whole `CHUNK.ore`, and `full` means "no
+  room for a whole ore". On the shipped numbers both are the predicate they always
+  were; they differ only on a hold carrying a sliver, which now refuses the chunk
+  (and says so through the a0-08 tell) instead of slicing it.
+- **`updateDeposits`** — the drain paid `drainRate * dt`, a thirtieth of an ore per
+  tick, so clipping your own atmosphere for a third of a second left you holding
+  **1.6 of a 2 slot**. It now pays whole ore on a world-clock metronome:
+  `drainRate` boundaries a second, world-wide. Derived from `world.time` rather
+  than a per-ship accumulator **because of the wire** — a client that rewinds to
+  authority and replays restores the clock, and a per-ship counter would have to be
+  added to the snapshot to survive it.
+
+### Mined ore was never whole — the correction to the brief's own diagnosis
+
+The brief said "mined ore is always whole; only death drops are fractional". It is
+not, and this is the more common path. A rock's ore is **scaled** at world build to
+hit an exact field yield (`waves.ts` `drawCanon`: `rock.ore *= scale`), so a rock
+almost never holds a whole number, and its last scrap was spawned as a fractional
+chunk of its own — *every mined-out rock, every match*. Collect one and the hold is
+a fraction off a whole, so the **next** pickup finds no full slot and is refused
+with nothing said.
+
+### The cost, measured
+
+Three full natural matches (eight bots, real `createWorld`, to the ending):
+
+| seed | all ore | `dust` | share | max residual |
+|---|---|---|---|---|
+| 1 | 480 | 22.698 | 4.7% | 1.4e-13 |
+| 7 | 480 | 15.525 | 3.2% | 5.1e-13 |
+| 42 | 480 | 18.490 | 3.9% | 8.5e-14 |
+
+`capLoss` was **0.00** in all three — with banks whole, a wreck's ring divides —
+and every other flow lands on a whole number (`mined 185`, `dropped 87`,
+`looted 229`, `deposited 155`, `spent 168`, `deathLoss 48`). The economy is
+countable end to end.
+
+### Flagged, not fixed: where the 3–4% should go (Director)
+
+The alternative that keeps every unit **usable** is rounding *rock ore itself*
+whole at world build. It costs a ratified invariant: a field of whole rocks can no
+longer total `FIELD_YIELD` **exactly** at every N, because the budget is fractional
+(`400·(1−commonsShare)/3`), and that total is pinned to four decimals in
+`tests/sim/maps.test.ts` and `tests/sim/resource-fairness.test.ts`. Whole rocks or
+an exact field yield — not both. The lane took the option that breaks no ratified
+invariant and named the other one here.
+
+### What did NOT change
+
+- **The half-drop.** `DEATH_ORE_DROP_FRACTION` is untouched; half a hold still
+  drops, now rounded down to what the ring can mint whole.
+- **The drain rate.** `DEPOSIT.drainRate` is untouched, and the metronome cannot
+  outrun it — the boundaries belong to the world, so no dwell pattern banks faster
+  than `drainRate`. What phase costs is at most one boundary's wait on arrival.
+- **The couriers.** Already one per whole unit banked, so the cadence the player
+  watches is unchanged — the hold, the bank and the courier now simply step
+  together instead of the hold smearing between them.
+- **Conservation.** `oreResidual` still reads zero, to 1e-13, over full matches.
+  `expectedLiveOre` gains `− dust`; nothing else in the law moved.
+- **a0-54's partial-take tell (#429).** Intact and still correct for a chunk that
+  is larger than the room available. Worth knowing: the sim mints every chunk at
+  exactly `CHUNK.ore`, so the only thing that ever produced a partial take in
+  shipped play was a *fractional hold* — which is what this amendment removes. The
+  tell is dormant, not wrong; the full-hold tell speaks there now.
+- **The wire, the hash, and `Ship`.** Nothing added to any of them.
+
+### Determinism goldens re-measured (the bar this entry exists to meet)
+
+Three fixtures pin absolute state hashes of a *simulation*, so a sim rule change
+moves them by construction. Each says re-baselining requires exactly this: a
+ratified amendment recorded in this file. They are flagged to their owners in the
+PR and moved in their own commits, with old values kept for traceability:
+
+| Fixture | Owner | Was | Is |
+|---|---|---|---|
+| `src/bots/ffa-parity.test.ts` seed 20260806 | Bot | `ed228be2` | `f31d2c3b` |
+| `src/bots/ffa-parity.test.ts` seed 7 | Bot | `c28d0f6b` | `2400ba7e` |
+| `src/bots/ffa-parity.test.ts` seed 991 | Bot | `1c0cdaa3` | `b891918a` |
+| `tests/net/online-radio.test.ts` `FFA_GOLDEN` | Netcode | `c37926e2` | `c5ad2324` |
+
+What those fixtures actually guard — that no team-aware path is reachable in FFA —
+is untouched and still asserted by their own non-hash cases. Separately,
+`src/bots/team-winning.test.ts` moved its Task 1.7 **seed** 11 → 13 by the 1–16
+scan its own comment prescribes (seed 11's sampling window collapsed 24,362 → 2,884
+ticks); no assertion in it was relaxed.
+
+---
+
 ## In TEAMS, the fog lifts where your teammates are
 
 **Date:** 2026-08-13 · branch `agent/gameplay/a0-42-team-shared-fog`

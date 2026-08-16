@@ -49,6 +49,34 @@
  * is a *ratified developer amendment recorded in `docs/design-amendments.md`* —
  * not a refactor, not a tuning pass, and never "the test went red".
  *
+ * ### Re-baselined a second time, 2026-08-16 (a0-58) — on that same bar
+ *
+ * Gameplay lane, flagged for the Bot Engineer. The bar above is met in the way it
+ * is written: *"Ore is a countable thing: every mint is WHOLE, and a hold can
+ * never hold half of one"* in `docs/design-amendments.md`, ratified off the
+ * developer's *"its super easy to reproduce this ore bug, its usually from blown
+ * up ships, their ore's don't always count when picked up"*. A death drop, a wreck
+ * ring and a mined-out rock each used to mint one sub-`CHUNK.ore` piece, and a
+ * fraction that lands in a hold is ore every readout in the game floors away.
+ *
+ * It is the same *kind* of change a0-05 was and not a Stage 1 leak: it moves what
+ * the WORLD does, in every mode, for every player and bot alike — chunk counts and
+ * positions differ from the first mined rock onward, so eight bots flying the same
+ * decisions arrive somewhere else. There is no honest way to hold a state hash
+ * across it, and freezing the old numbers would mean freezing an economy that
+ * mints a denomination the interface cannot print.
+ *
+ * | Seed | Pre-a0-05 | Post-a0-05 | Post-a0-58 |
+ * |---|---|---|---|
+ * | 20260806 | `6d78b590` | `ed228be2` | `f31d2c3b` |
+ * | 7 | `f358341a` | `c28d0f6b` | `2400ba7e` |
+ * | 991 | `210f7504` | `1c0cdaa3` | `b891918a` |
+ *
+ * **Rule 3 is unweakened.** Nothing team-aware moved, and the two non-hash cases
+ * below — the empty ally list on every FFA bot, and the guard that a real team
+ * lineup hashes differently — are untouched and still the thing that stops a
+ * team-aware path from hiding behind a number.
+ *
  * The last case is the one that stops this file from being vacuous: it asserts
  * the harness can build a team world *at all*, and that the same lineup on two
  * sides hashes differently. Without it, a `botLobby` that quietly dropped the
@@ -78,13 +106,16 @@ const SECONDS = 180;
  * always-visible amendment widened what every bot can read (see the module note
  * for the old values and the reasoning).
  *
+ * re-measured again on `agent/gameplay/a0-58-whole-ore-only` when every ore mint
+ * became whole (a0-58 — the module note carries both moves and both reasons).
+ *
  * **Do not re-baseline these.** The only thing that has ever earned it is a
  * ratified amendment in `docs/design-amendments.md`.
  */
 const GOLDEN: readonly (readonly [seed: number, hash: string])[] = [
-  [20260806, 'ed228be2'],
-  [7, 'c28d0f6b'],
-  [991, '1c0cdaa3'],
+  [20260806, 'f31d2c3b'],
+  [7, '2400ba7e'],
+  [991, 'b891918a'],
 ];
 
 /** One eight-bot match, the shipped cast, the offline lobby's own roster path. */

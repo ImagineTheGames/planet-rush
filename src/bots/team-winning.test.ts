@@ -358,12 +358,24 @@ describe('a 2v2 of the shipped cast always reaches an ending (Task 1.4)', () => 
  * with the trigger down, 9 orders placed)**, so every assertion below is measured
  * with two orders of magnitude of room rather than on the edge of its fixture.
  * The assertions themselves are unchanged and none of them was relaxed.
+ *
+ * **And from 11 to 13 when a0-58 landed** (2026-08-16, Gameplay lane — flagged
+ * for the Bot Engineer). a0-58 makes ore countable: every mint emits whole
+ * `CHUNK.ore` and a hold moves in whole ore, which changes where chunks are and
+ * therefore where bots are, exactly as a0-10 and b3-01 did. Seed 11's window
+ * collapsed 24,362 → 2,884 ticks with 0 orders in it. The same 1–16 scan was
+ * re-run under the new rules and seed 13 is the like-for-like replacement — a
+ * **6.3-minute window (22,846 ticks, 48,169 units travelled, 1,385 ticks with the
+ * trigger down, 8 orders placed)**, the nearest profile to the seed it replaces.
+ * (Seed 16 gives a longer window, 29,971 ticks, but fewer orders, 6; seed 15 more
+ * orders, 10, on half the window.) Nothing below was relaxed, added or removed:
+ * one number moved, by the measurement this paragraph asks for.
  */
 describe('a teammate whose core dies is out, and its side plays on (Task 1.7)', () => {
   it('stops the dead-home bot dead, and its ally plays on for minutes', () => {
     const seats = fillEmptySlots([], 4, [...ROSTER.slice(2), ...ROSTER.slice(0, 2)], [0, 0, 1, 1]);
-    const world = createWorld({ seed: 11, players: botLobby(seats) });
-    const bots = createBots(seats, { seed: 11 });
+    const world = createWorld({ seed: 13, players: botLobby(seats) });
+    const bots = createBots(seats, { seed: 13 });
 
     /** The first slot to lose its home while a teammate still holds one. */
     let downSlot: PlayerId | null = null;
