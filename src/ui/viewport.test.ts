@@ -14,11 +14,9 @@ import {
   VIEW_ZOOM_STORAGE,
   cameraScale,
   contentBox,
-  isUltrawide,
   nextViewZoom,
   parseViewZoom,
   storedViewZoom,
-  viewWorldWidth,
   viewZoomLabel,
 } from './viewport';
 import { HUD_REFERENCE } from './instrument';
@@ -47,7 +45,6 @@ describe('contentBox — the cap is the HUD\'s own reference aspect', () => {
     for (const vp of [PROFILES.reference, PROFILES.golden, PROFILES.phonePortrait]) {
       const box = contentBox(vp);
       expect(box).toEqual({ x: 0, y: 0, width: vp.width, height: vp.height });
-      expect(isUltrawide(vp)).toBe(false);
     }
   });
 
@@ -71,7 +68,7 @@ describe('contentBox — the cap is the HUD\'s own reference aspect', () => {
     expect(b.width).toBeCloseTo(1080 * CONTENT_MAX_ASPECT, 6); // 1920 again
     expect(b.x).toBeCloseTo((3840 - b.width) / 2, 6);
     expect(b.width + 2 * b.x).toBeCloseTo(3840, 6); // centred, exactly
-    expect(isUltrawide(PROFILES.ultra32)).toBe(true);
+    expect(b.width).toBeLessThan(3840); // the box insets; the WORLD does not
   });
 
   it('never insets a viewport narrower than the floor, however short it is', () => {
@@ -114,11 +111,14 @@ describe('the view zoom ladder', () => {
 
   it('closes the phone/desktop gap it was sized to close', () => {
     // The report's own numbers: 798 px of phone against 1707 px of desktop.
-    const desktop = viewWorldWidth(PROFILES.desktop.width, 1);
-    expect(viewWorldWidth(798, 1) / desktop).toBeCloseTo(0.467, 3);
-    expect(viewWorldWidth(798, 2) / desktop).toBeCloseTo(0.935, 3);
+    // A world unit is a CSS pixel at the shipped camera, so the world width a
+    // screen shows is `viewportWidth x step` — stated here rather than behind a
+    // helper, so the test spells out the arithmetic the reports are about.
+    const desktop = PROFILES.desktop.width;
+    expect((798 * 1) / desktop).toBeCloseTo(0.467, 3);
+    expect((798 * 2) / desktop).toBeCloseTo(0.935, 3);
     // …and past a 1280-wide desktop window outright.
-    expect(viewWorldWidth(798, 2)).toBeGreaterThan(viewWorldWidth(1280, 1));
+    expect(798 * 2).toBeGreaterThan(1280 * 1);
   });
 
   it('cycles one button through the ladder and wraps', () => {
@@ -182,7 +182,7 @@ describe('the ladder, through the real camera', () => {
       const scale = cameraScale(step);
       const offset = cameraOffset(TARGET, VP, scale);
       const box = writeVisibleWorld(cullBox(), offset, VP, scale);
-      expect(box.right - box.left).toBeCloseTo(viewWorldWidth(VP.width, step), 6);
+      expect(box.right - box.left).toBeCloseTo(VP.width * step, 6);
       expect(box.bottom - box.top).toBeCloseTo(VP.height * step, 6);
       // Still centred on the ship — zooming out must not pan.
       expect((box.left + box.right) / 2).toBeCloseTo(TARGET.x, 6);

@@ -46,7 +46,12 @@
  *
  * {@link VIEW_ZOOM_STEPS} is the ladder that closes it — **view-width
  * multipliers**, so `2` means "twice as much world across the same screen" and
- * the camera scale the renderer applies is `1 / step` ({@link cameraScale}). It
+ * the camera scale the renderer applies is `1 / step` ({@link cameraScale}).
+ * Because a world unit is a CSS pixel at the shipped camera, the world-units-wide
+ * a screen shows is just `viewportWidth × step`; there is no helper for that
+ * product on purpose, since the only thing that should ever *report* the view
+ * width is the renderer's own `visibleWorld` (the box the cull culls against),
+ * which is what `evidence/a0-74-viewport` reads. It
  * is a short cycle rather than a slider because the developer asked for a
  * *button*, and it is touch-only because they explicitly did **not** choose the
  * other option they named (confining the desktop view).
@@ -95,13 +100,6 @@ export function contentBox(viewport: Viewport): Rect {
   return { x: (W - width) / 2, y: 0, width, height: H };
 }
 
-/** True when `viewport` is wide enough that {@link contentBox} actually insets it
- *  — i.e. the display is past the reference aspect and past the floor. Useful to
- *  a caller that wants to know whether it is on an ultrawide at all. */
-export function isUltrawide(viewport: Viewport): boolean {
-  return contentBox(viewport).width < Math.max(0, viewport.width);
-}
-
 // ---------------------------------------------------------------------------
 // 2. The view zoom
 // ---------------------------------------------------------------------------
@@ -134,12 +132,6 @@ export const DEFAULT_VIEW_ZOOM = VIEW_ZOOM_STEPS[0] as number;
 export function cameraScale(step: number): number {
   const s = normaliseZoom(step);
   return 1 / s;
-}
-
-/** The world-units-wide a viewport shows at a zoom step — the number the whole
- *  first report is about, and the one the audit measures. */
-export function viewWorldWidth(viewportWidth: number, step: number): number {
-  return Math.max(0, viewportWidth) * normaliseZoom(step);
 }
 
 /** The next rung of {@link VIEW_ZOOM_STEPS}, wrapping back to the first. The

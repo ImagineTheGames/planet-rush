@@ -186,7 +186,6 @@
     "src/ui/gantry.ts#singlePrimary": "SURFACE — an invariant written down so a spec can hold every screen to it (§4.4b)",
     "src/ui/hangar.ts#COSMETIC_INVARIANT": "SURFACE — exported for a spec to assert; triaged by pattern (§4.4b)",
     "src/ui/hangar.ts#COSMETIC_SLOTS": "SURFACE — exported for a spec to assert; triaged by pattern (§4.4b)",
-    "src/ui/hud-geometry.ts#TOUCH_TARGET_MIN": "DARK family — the M2 HUD's rects, drawn from elsewhere (§4.2)",
     "src/ui/hud-geometry.ts#alarmFrameBounds": "DARK family — the M2 HUD's rects, drawn from elsewhere (§4.2)",
     "src/ui/hud-geometry.ts#panelBounds": "DARK family — the M2 HUD's rects, drawn from elsewhere (§4.2)",
     "src/ui/hud-geometry.ts#polyBounds": "DARK family — the M2 HUD's rects, drawn from elsewhere (§4.2)",

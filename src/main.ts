@@ -133,7 +133,7 @@ import { BUILD_INFO, formatBootLine, formatBuildBadge } from '@platform/build-in
 import { buildIdentity } from '@platform/build-identity';
 import { requireWebGl, probeWebGl } from '@platform/gl-probe';
 import { describeBootFailure, showBootError } from '@platform/boot-error';
-import { writeCameraOffset } from '@platform/camera';
+import { screenToWorld, writeCameraOffset } from '@platform/camera';
 import type { Viewport } from '@platform/camera';
 import { BuildBadge, BADGE_ID, BADGE_ANCHOR, BADGE_STRIP_LIFT } from '@render/build-badge';
 import {
@@ -3539,11 +3539,16 @@ async function boot(): Promise<void> {
     camTargetScratch.y = cam ? cam.pos.y : world.bounds.height / 2;
     // The camera's scale rides this inverse too (a0-74). Without it a Tap Commander
     // order placed while zoomed out would land at a fraction of the distance the
-    // player pointed at — the ship would set off for somewhere nobody tapped.
+    // player pointed at — the ship would set off for somewhere nobody tapped. The
+    // division is `camera.ts`'s `screenToWorld` rather than spelled again here:
+    // one place owns the inverse, so it cannot be got backwards in a second one.
+    // (It allocates a Vec2, which is fine — this is the pointer path, one call per
+    // press, not the frame loop.)
     const scale = cameraScale(viewZoom);
     writeCameraOffset(camOffsetScratch, camTargetScratch, viewport, scale);
-    out.x = (logical.x - camOffsetScratch.x) / scale;
-    out.y = (logical.y - camOffsetScratch.y) / scale;
+    const inWorld = screenToWorld(logical, camOffsetScratch, scale);
+    out.x = inWorld.x;
+    out.y = inWorld.y;
     return out;
   }
 

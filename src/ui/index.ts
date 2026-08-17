@@ -1362,9 +1362,7 @@ export {
 
 export {
   contentBox,
-  isUltrawide,
   cameraScale,
-  viewWorldWidth,
   nextViewZoom,
   viewZoomLabel,
   parseViewZoom,
