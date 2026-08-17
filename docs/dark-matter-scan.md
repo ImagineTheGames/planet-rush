@@ -793,3 +793,42 @@ Stated so the report is read at the right strength:
   and nothing catches a wrong DARK or a wrong SURFACE. §4.4's own warning ("the
   section most likely to be wrong") should now be read at full strength: the one
   section that *was* checked one row at a time still shipped a wrong row.
+
+### 4.11 SURFACE — the unit a budget is stated in (a0-75, 2026-08-17)
+
+| Export | Verdict |
+|---|---|
+| `src/art/shapes.ts#spriteArea` | SURFACE — the unit of the per-frame fill budget, exported to be asserted |
+
+a0-75 was reported as *"for the host everything is super choppy … it gets worse
+the larger the playing area is on my screen"*, and it is a per-pixel cost: frame
+time is `pixels × Σ overdraw`, where a layer's overdraw is the area its shapes ask
+the rasteriser to shade divided by the field they cover. `shapeArea` computes the
+numerator for one shape and `spriteArea` sums it over a layer. Together they are
+the only reason `src/art/backdrop-fill.test.ts` can gate a **frame-time** budget
+in a unit test: a fragment is countable without a GPU, so the budget runs on every
+push instead of on a machine somebody has to own. Three existing performance gates
+were blind to a0-75 at once because none of them has an axis called *area*.
+
+**Wiring it is the wrong shape.** The renderer draws; it does not price. A
+production caller would mean the game integrating its own geometry every frame to
+satisfy this scan — cost invented to prove cost. (The one honest future caller is
+named on the allowlist row: a `?debug=1` overlay that reports the frame's own
+overdraw back to the developer. If that lands, this stops being surface and the
+row should fail again.)
+
+**Deleting it is the closer call and it loses**, for §4.4(d)'s reason. The
+arithmetic could live inside `backdrop-fill.test.ts`. But it is the definition of
+the number the PR body, `audit.txt` and `evidence/a0-75-fill-rate/overdraw.ts` all
+quote, and those are three readers in two trees; a copy in the spec is a second
+definition that nothing checks against the IR when a path kind is added.
+`shapeArea` is the more interesting half — it is where the decision that **a soft
+fill counts its whole path** lives, because alpha reaching zero at the rim costs a
+blend exactly like alpha 1 does, and a layer nobody can see can still be the most
+expensive thing in the frame. That was not hypothetical: it is what the sky was.
+Keeping the pair beside the `Shape` union they walk means a new `PathData` kind
+fails to compile here rather than silently costing nothing.
+
+Note that only `spriteArea` appears on the board: `shapeArea` has one caller and
+it is `spriteArea`, so the scan sees it as live. They stand or fall together, and
+if `spriteArea` were deleted `shapeArea` would take its place on the next report.
