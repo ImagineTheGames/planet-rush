@@ -1,7 +1,14 @@
 # a0-69-make-the-explosion-lab-play.md — working notes (art)
 
-Branch `agent/art/a0-69-explosion-lab-live`. PR **#442**, OPEN.
+Branch `agent/art/a0-69-explosion-lab-live`. PR **#442 MERGED** 2026-08-17 04:32
+(merge commit `b5cc0e4`), 13 checks passing, 0 failing.
 Working note only — the DoD, the PR and QA's attestation are the evidence.
+
+> The later notes-only commit `6446840` sits on the branch *after* that merge, so
+> it is **not in main**. Deliberate: it is a working note, not a deliverable, and
+> opening a second PR from this head would make the a0-69 DoD's
+> `sort_by(.number)|last` point at a new OPEN PR instead of the merged #442.
+> Do not open one.
 
 ## BUILT
 
@@ -73,7 +80,7 @@ default). Nothing autoplays. Filmstrip kept underneath at 128 px in `<details>`.
 
 ## NEXT
 
-- Nothing to build. PR #442 open, no failing checks — awaiting review/merge.
+- Nothing to build. PR #442 is merged and the board is in main.
 - **Director:** confirm the one-line fold is wanted (see DECISIONS).
 - **Director:** `status/art-review.json` still calls this board "shown as a
   filmstrip at 0.05 / 0.15 / …". Gitignored and outside this lane, so it cannot
