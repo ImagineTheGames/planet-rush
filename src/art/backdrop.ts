@@ -1237,27 +1237,46 @@ interface Layer {
  * untouched — this is a decision about where the pixels are rasterised, not
  * about the art.
  *
- * ## Why a third, and not a half or a quarter
+ * ## Why a third is the CEILING, and what the floor is about
  *
- * The error above is negligible at every one of them, so a third is not chosen
- * for fidelity — everything from a half to an eighth is invisible on this
- * content. It is chosen because it is where the *other* two constraints stop
- * arguing:
+ * The interpolation error above is negligible from a half to an eighth, so a
+ * third is not chosen for fidelity. It is chosen because **below a third buys
+ * nothing**: the baked layer costs one textured pass whatever resolution it
+ * holds, so only the one-off bake and the texture get cheaper, and both are
+ * already small. There is no per-frame saving past this point, so there is no
+ * reason to spend any look on it. What actually sets the number per viewport is
+ * {@link skyCacheResolution}, which takes this as a ceiling and goes coarser only
+ * as far as a stated memory budget requires — 1/3 on a phone and a 1080p desktop,
+ * 1/4 at 21:9, 1/6 at 32:9.
  *
- *  - **Below a third buys nothing.** The baked layer costs one textured pass
- *    whatever resolution it holds; only the one-off bake and the texture get
- *    cheaper, and both are already small. There is no per-frame saving past
- *    this point, so there is no reason to spend look on it.
- *  - **A third is where the ramp's dither survives.** `./textures` `rampPixels`
- *    carries noise specifically to stop the sky contouring at 8 bits, and a0-39
- *    is the brief that put it there. At a third the largest blob in the set
- *    still lands better than one cache texel per ramp texel, so the noise is
- *    resampled rather than averaged into the flat mush it exists to prevent.
+ * ## Banding: measured, and it moves the RIGHT way
  *
- * **TUNABLE** — but not downward without re-measuring the dither
- * (`evidence/a0-75-fill-rate/cache-diff.json` measures exactly that, as the
- * largest single-pixel luma step along a scanline), and not upward without
- * re-measuring the memory.
+ * The one thing a downsample could plausibly hurt is the dither `./textures`
+ * `rampPixels` carries to stop the sky contouring at 8 bits (a0-39 is the brief
+ * that put it there). It does not, and the reason is a stronger effect than the
+ * dither: **bilinear magnification interpolates between quantised values**, so
+ * the baked layer arrives smoother than the geometry did. Measured as the largest
+ * single-pixel luma step along a scanline
+ * (`evidence/a0-75-fill-rate/cache-diff.json`), across all five skies:
+ *
+ * ```
+ *   1280×800  (cache 1/3)   1.50–1.86  →  0.93–1.00
+ *   3440×1440 (cache 1/4)   1.00–1.50  →  0.93–1.00
+ * ```
+ *
+ * **Stated rather than implied: 1/6 is NOT in that table.** The ramp is 256
+ * texels over 1.25 radii, so one ramp texel spans `rx / 102.4` screen px — 3.5 px
+ * on the smallest blob a 32:9 frame carries — and at 1/6 a cache texel is 1.7 ramp
+ * texels, which does average some of the noise rather than resample it. The
+ * measurements above say the interpolation gain more than covers that at 1/3 and
+ * 1/4; nobody has measured 32:9 on real hardware, and the honest thing is to say
+ * so and to name the check. Re-run `cache-diff.mjs` with a 5120×1440 viewport and
+ * read the `maxStep` columns; if the cached number ever comes out *above* the
+ * direct one, lower {@link SKY_CACHE_MAX_TEXELS} until 1/4 fits at 32:9 and pay
+ * the memory.
+ *
+ * **TUNABLE** — but not downward without re-reading that table, and not upward
+ * without re-measuring the memory.
  */
 export const SKY_CACHE_RESOLUTION = 1 / 3;
 
