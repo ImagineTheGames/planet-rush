@@ -2599,278 +2599,465 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
   // travelling across a loop body snaps back at the seam, once per lap, forever.
   // Voices that decay to silence before the seam may sweep — a gesture that has
   // finished has nothing left to snap.
+  // ===========================================================================
+  // THE MUSIC FOUR (a0-67, 2026-08-17) — FOUR REASONS WITH ONE ROOT CAUSE
+  // ===========================================================================
+  //
+  //   musicBed    *"none of these sound like a calm music bed"*
+  //   musicPulse  *"none of these sound musical"*
+  //   musicTheme  *"these sound like very bad music"*
+  //   musicDread  *"none of these sound critical they just sound annoying"*
+  //
+  // Four different sentences, and read together they say one thing. The a0-60
+  // sweep answered ALL SIX music slots with the same three materials — *granular
+  // bed / filtered analogue / wide detuned space*, printed in this file's own
+  // family table as **"texture before melody"** — and applied them down the
+  // board. That is the correct instinct for thirty-five SFX slots and it is the
+  // wrong instinct for a soundtrack, because the four reasons above are not asking
+  // for a better texture. Three of them are asking for **music**: harmony, a bass
+  // that moves, a phrase that is going somewhere. The fourth is asking for weight
+  // where it was given noise.
+  //
+  // So the register note for this family is rewritten rather than reapplied:
+  //
+  //   OLD (a0-60)  music = texture before melody; beds are filtered material and
+  //                beating unisons; stings are one gesture, not a tune.
+  //   NEW (a0-67)  **music is harmony before texture.** The material may be as
+  //                clean and modern as the register wants — it still has to be
+  //                *notes*, in a key, with something underneath them. A texture
+  //                is what a soundtrack is made of; it is not what a soundtrack
+  //                IS, and a player who has been told a bed is calm and hears an
+  //                ion field is not hearing a debatable interpretation.
+  //
+  // The key does not move: **A minor**, the key the shipped soundtrack, the
+  // ambient bed and `upgradeBought` all already sit in (§7.5). Everything below is
+  // built out of A(55/110/220) · C(65.41/130.81/261.63) · E(82.41/164.81/329.63) ·
+  // D(146.83/293.66) · F(87.31/174.61) · G(98/196), so any pair of these four
+  // slots can be adopted together and still be in tune with each other — which is
+  // a property the developer cannot test by listening to them one at a time.
   musicBed: {
+    // *"None of these sound like a calm music bed."* Round one offered an ion
+    // field, magnetic mass, cathedral metal and almost-nothing: four textures,
+    // and the two adjectives in the reason are the two things a texture cannot
+    // be. **Calm** is consonance and slow motion; **music bed** is a chord.
+    //
+    // So all four below are chords in A minor, held, low, and moving only in the
+    // way a held chord is allowed to move — a very slow vibrato, never a filter
+    // sweep, because a corner travelling inside a loop body wraps into a wobble
+    // once per lap and a wobble is the opposite of calm. They differ in **how
+    // much harmony there is**, which is the axis a bed actually has:
+    //
+    //   h  the full triad, warm and breathing
+    //   i  root and fifth only — open, no third, so it commits to nothing
+    //   j  the triad with one voice an octave up, barely there
+    //   k  two voices and a sub: the quietest thing that is still a chord
     label: "Music Bed — Calm",
-    context: "Mining / building with no active threat — the calm foundation drone.",
+    context: "Calm layer of the adaptive soundtrack — loops under mining.",
     current: 'musicBed',
     candidates: [
       {
-        id: 'd',
-        character: "ion field, air with no floor under it",
+        id: 'h',
+        slot: 'musicBed',
+        character: "an A-minor triad, warm and breathing",
         spec: {
-          name: 'musicBed_d_ionField',
+          name: 'musicBed_h_warmTriad',
           loop: true,
           crossfade: 0.5,
           layers: [
-            place({ name: 'musicBed_d.air', wave: 'noise', attack: 0, hold: 7, decay: 0, freq: 620, lowPass: 1900, resonance: 3, highPass: 400, gain: 0.22, seed: 61090 }),
-            place({ name: 'musicBed_d.upper', wave: 'noise', attack: 0, hold: 7, decay: 0, freq: 1150, lowPass: 3000, resonance: 4.5, highPass: 700, gain: 0.14, seed: 61091 }),
-            place({ name: 'musicBed_d.trace', wave: 'triangle', attack: 0, hold: 7, decay: 0, freq: 330, noiseMix: 0.3, lowPass: 900, resonance: 5, gain: 0.1, seed: 61092 }),
+            place({ name: 'musicBed_h.root', wave: 'triangle', attack: 0, hold: 8, decay: 0, freq: 55, vibratoDepth: 0.003, vibratoRate: 0.07, noiseMix: 0.03, lowPass: 420, resonance: 1.5, gain: 0.2, seed: 61540 }),
+            place({ name: 'musicBed_h.third', wave: 'sine', attack: 0, hold: 8, decay: 0, freq: 65.41, vibratoDepth: 0.004, vibratoRate: 0.055, gain: 0.15, seed: 61541 }),
+            place({ name: 'musicBed_h.fifth', wave: 'sine', attack: 0, hold: 8, decay: 0, freq: 82.41, vibratoDepth: 0.005, vibratoRate: 0.043, gain: 0.13, seed: 61542 }),
+            place({ name: 'musicBed_h.octave', wave: 'triangle', attack: 0, hold: 8, decay: 0, freq: 110, vibratoDepth: 0.003, vibratoRate: 0.031, noiseMix: 0.02, lowPass: 620, resonance: 1.4, gain: 0.07, seed: 61543 }),
           ],
         },
       },
       {
-        id: 'e',
-        character: "magnetic mass, two unisons beating",
+        id: 'i',
+        slot: 'musicBed',
+        character: "root and fifth, open, no third",
         spec: {
-          name: 'musicBed_e_magneticMass',
+          name: 'musicBed_i_openFifth',
           loop: true,
-          crossfade: 0.6,
+          crossfade: 0.5,
           layers: [
-            place({ name: 'musicBed_e.u0', wave: 'triangle', attack: 0, hold: 8, decay: 0, freq: 55, noiseMix: 0.06, lowPass: 170, resonance: 4, gain: 0.38, seed: 61100 }),
-            place({ name: 'musicBed_e.u1', wave: 'triangle', attack: 0, hold: 8, decay: 0, freq: 55.3, noiseMix: 0.06, lowPass: 170, resonance: 4, gain: 0.3, seed: 61101 }),
-            place({ name: 'musicBed_e.corner', wave: 'noise', attack: 0, hold: 8, decay: 0, freq: 190, lowPass: 420, resonance: 6, gain: 0.16, seed: 61102 }),
+            // No third at all, so the bed is neither minor nor major and commits
+            // to nothing. It is the calmest interval there is and it leaves the
+            // whole harmonic decision to whatever plays over it.
+            place({ name: 'musicBed_i.root', wave: 'triangle', attack: 0, hold: 8, decay: 0, freq: 55, vibratoDepth: 0.0025, vibratoRate: 0.06, noiseMix: 0.03, lowPass: 380, resonance: 1.4, gain: 0.22, seed: 61550 }),
+            place({ name: 'musicBed_i.fifth', wave: 'sine', attack: 0, hold: 8, decay: 0, freq: 82.41, vibratoDepth: 0.004, vibratoRate: 0.047, gain: 0.16, seed: 61551 }),
+            place({ name: 'musicBed_i.air', wave: 'triangle', attack: 0, hold: 8, decay: 0, freq: 164.81, vibratoDepth: 0.003, vibratoRate: 0.037, noiseMix: 0.05, lowPass: 700, resonance: 1.3, gain: 0.05, seed: 61552 }),
           ],
         },
       },
       {
-        id: 'f',
-        character: "cathedral metal, inharmonic and wide",
+        id: 'j',
+        slot: 'musicBed',
+        character: "the triad, with one voice an octave up",
         spec: {
-          name: 'musicBed_f_cathedralMetal',
+          name: 'musicBed_j_triadWithLight',
           loop: true,
-          crossfade: 0.6,
+          crossfade: 0.5,
           layers: [
-            place({ name: 'musicBed_f.b0', wave: 'noise', attack: 0, hold: 8, decay: 0, freq: 110, lowPass: 300, resonance: 10, bandPass: true, gain: 0.42, seed: 61110 }),
-            place({ name: 'musicBed_f.b1', wave: 'noise', attack: 0, hold: 8, decay: 0, freq: 265, lowPass: 700, resonance: 11, bandPass: true, gain: 0.3, seed: 61111 }),
-            place({ name: 'musicBed_f.b2', wave: 'noise', attack: 0, hold: 8, decay: 0, freq: 459, lowPass: 1200, resonance: 12, bandPass: true, gain: 0.2, seed: 61112 }),
-            place({ name: 'musicBed_f.floor', wave: 'sine', attack: 0, hold: 8, decay: 0, freq: 55, gain: 0.14, seed: 61113 }),
+            place({ name: 'musicBed_j.root', wave: 'triangle', attack: 0, hold: 8, decay: 0, freq: 55, vibratoDepth: 0.003, vibratoRate: 0.065, noiseMix: 0.03, lowPass: 400, resonance: 1.5, gain: 0.19, seed: 61560 }),
+            place({ name: 'musicBed_j.third', wave: 'sine', attack: 0, hold: 8, decay: 0, freq: 65.41, vibratoDepth: 0.004, vibratoRate: 0.05, gain: 0.13, seed: 61561 }),
+            place({ name: 'musicBed_j.fifth', wave: 'sine', attack: 0, hold: 8, decay: 0, freq: 82.41, vibratoDepth: 0.004, vibratoRate: 0.041, gain: 0.11, seed: 61562 }),
+            // The one light in it: C4, two octaves over the third, quiet enough
+            // that it reads as a room rather than as a note. This is where "a bed
+            // you notice once and never again" lives.
+            place({ name: 'musicBed_j.light', wave: 'sine', attack: 0, hold: 8, decay: 0, freq: 261.63, vibratoDepth: 0.004, vibratoRate: 0.029, gain: 0.035, seed: 61563 }),
           ],
         },
       },
       {
-        id: 'g',
-        character: "almost nothing, two quiet layers",
+        id: 'k',
+        slot: 'musicBed',
+        character: "two voices and a sub, barely there",
         spec: {
-          name: 'musicBed_g_almostNothing',
+          name: 'musicBed_k_twoAndSub',
           loop: true,
-          crossfade: 0.6,
+          crossfade: 0.5,
           layers: [
-            place({ name: 'musicBed_g.low', wave: 'sine', attack: 0, hold: 8, decay: 0, freq: 55, noiseMix: 0.04, lowPass: 140, resonance: 2, gain: 0.2, seed: 61120 }),
-            place({ name: 'musicBed_g.air', wave: 'noise', attack: 0, hold: 8, decay: 0, freq: 380, lowPass: 900, resonance: 2.6, highPass: 220, gain: 0.08, seed: 61121 }),
+            place({ name: 'musicBed_k.sub', wave: 'sine', attack: 0, hold: 8, decay: 0, freq: 41.2, gain: 0.16, seed: 61570 }),
+            place({ name: 'musicBed_k.root', wave: 'triangle', attack: 0, hold: 8, decay: 0, freq: 82.41, vibratoDepth: 0.0025, vibratoRate: 0.053, noiseMix: 0.02, lowPass: 340, resonance: 1.3, gain: 0.13, seed: 61571 }),
+            place({ name: 'musicBed_k.third', wave: 'sine', attack: 0, hold: 8, decay: 0, freq: 98, vibratoDepth: 0.003, vibratoRate: 0.039, gain: 0.09, seed: 61572 }),
           ],
         },
       },
     ],
   },
   musicPulse: {
+    // *"None of these sound musical."* The bluntest possible statement of the
+    // family's root cause, and it is exact: round one offered an ion field with a
+    // grain pulse, a magnetic thud, two bands tolling and a bare heartbeat. Four
+    // rhythms. **Not one of them carried a pitch you could name**, so there was
+    // nothing for the ear to hear as music — a pulse without a note in it is a
+    // metronome, and the slot's own job (§2.3, the metronome of the match made a
+    // metronome) is what made that mistake so easy to make.
+    //
+    // The fix is one ingredient: **the pulse is a bass note**. Every beat below
+    // has a pitch, every pitch is in A minor, and the loop is long enough to hold
+    // more than one of them — because two notes is where a rhythm becomes a
+    // figure. The four differ in how much figure there is:
+    //
+    //   h  root and fifth, alternating — the plainest bass line there is
+    //   i  the root pulsing under a held third: rhythm and harmony at once
+    //   j  a two-note rise, A → C, and back. A shape rather than a beat
+    //   k  a pedal on the root with the fifth answering it once per lap
     label: "Music Pulse — Rising Tension",
-    context: "Threat detected, tension climbing toward a siege — a heartbeat over a floor.",
+    context: "Tension layer — fades in as waves rise.",
     current: 'musicPulse',
     candidates: [
       {
-        id: 'd',
-        character: "ion field with a grain pulse in it",
+        id: 'h',
+        slot: 'musicPulse',
+        character: "a bass line: root and fifth, alternating",
         spec: {
-          name: 'musicPulse_d_ionPulse',
-          loop: true,
-          crossfade: 0.04,
-          layers: [
-            place({ name: 'musicPulse_d.field', wave: 'noise', attack: 0, hold: 0.75, decay: 0, freq: 520, lowPass: 1600, resonance: 3, highPass: 300, gain: 0.1, seed: 61130 }),
-            grains('musicPulse_d.hit', { freq: 420, freqEnd: 260, grain: 0.0035, gain: 0.3, attack: 0.002, hold: 0.02, decay: 0.15, curve: 4, from: 2400, to: 800, q: 3.2, hp: 240, punch: 0.5, seed: 61132 }),
-            grains('musicPulse_d.echo', { freq: 300, freqEnd: 200, grain: 0.008, gain: 0.14, attack: 0.004, hold: 0.02, decay: 0.26, curve: 3, from: 1200, to: 460, q: 2.8, hp: 180, at: 0.07, seed: 61134 }),
-          ],
-        },
-      },
-      {
-        id: 'e',
-        character: "magnetic thud, mass under a corner",
-        spec: {
-          name: 'musicPulse_e_magneticThud',
+          name: 'musicPulse_h_bassAlternating',
           loop: true,
           crossfade: 0.05,
           layers: [
-            place({ name: 'musicPulse_e.floor', wave: 'sine', attack: 0, hold: 1, decay: 0, freq: 49, noiseMix: 0.04, lowPass: 170, resonance: 2, gain: 0.1, seed: 61140 }),
-            swept('musicPulse_e.thud', { wave: 'sine', freq: 96, freqEnd: 41, from: 300, to: 96, q: 2.6, gain: 0.4, attack: 0.004, hold: 0.02, decay: 0.32, curve: 2.8, punch: 0.6, seed: 61142 }),
-            swept('musicPulse_e.after', { wave: 'triangle', freq: 74, freqEnd: 62, from: 260, to: 130, q: 3.4, gain: 0.16, attack: 0.02, hold: 0.04, decay: 0.36, curve: 2.2, noiseMix: 0.1, at: 0.1, seed: 61144 }),
+            // The sustained floor keeps the seam from being silent — the same job
+            // the shipped `musicPulse.floor` does, at the same register.
+            place({ name: 'musicPulse_h.floor', wave: 'triangle', attack: 0, hold: 1.32, decay: 0, freq: 55, lowPass: 300, resonance: 1.4, gain: 0.06, seed: 61580 }),
+            place({ name: 'musicPulse_h.a', wave: 'sine', attack: 0.004, hold: 0.03, decay: 0.34, decayCurve: 3, punch: 0.4, freq: 55, noiseMix: 0.03, lowPass: 260, resonance: 1.6, gain: 0.3, seed: 61581 }),
+            place({ name: 'musicPulse_h.e', wave: 'sine', attack: 0.004, hold: 0.03, decay: 0.34, decayCurve: 3, punch: 0.4, freq: 82.41, noiseMix: 0.03, lowPass: 360, resonance: 1.6, gain: 0.26, seed: 61582 }, 0.66),
           ],
         },
       },
       {
-        id: 'f',
-        character: "two bands tolling in a space",
+        id: 'i',
+        slot: 'musicPulse',
+        character: "the root pulsing under a held third",
         spec: {
-          name: 'musicPulse_f_tollingBands',
+          name: 'musicPulse_i_pulseUnderThird',
           loop: true,
-          crossfade: 0.03,
+          crossfade: 0.05,
           layers: [
-            place({ name: 'musicPulse_f.floor', wave: 'triangle', attack: 0, hold: 0.8, decay: 0, freq: 55, noiseMix: 0.05, lowPass: 210, resonance: 2.4, gain: 0.16, seed: 61150 }),
-            band('musicPulse_f.t0', 520, { gain: 1.0, decay: 0.11, q: 6, curve: 5, attack: 0.002, seed: 61152 }),
-            band('musicPulse_f.t1', 392, { gain: 1.0, decay: 0.18, q: 7, curve: 4.4, attack: 0.002, at: 0.19, seed: 61154 }),
+            // The held C is the harmony and the pulsing A is the clock. This is
+            // the take where the slot does both of its jobs with one voice each.
+            place({ name: 'musicPulse_i.third', wave: 'triangle', attack: 0, hold: 1.32, decay: 0, freq: 130.81, vibratoDepth: 0.003, vibratoRate: 0.4, noiseMix: 0.04, lowPass: 620, resonance: 1.8, gain: 0.11, seed: 61590 }),
+            place({ name: 'musicPulse_i.p0', wave: 'sine', attack: 0.003, hold: 0.028, decay: 0.3, decayCurve: 3.2, punch: 0.45, freq: 55, noiseMix: 0.03, lowPass: 280, resonance: 1.6, gain: 0.3, seed: 61591 }),
+            place({ name: 'musicPulse_i.p1', wave: 'sine', attack: 0.003, hold: 0.028, decay: 0.3, decayCurve: 3.2, punch: 0.45, freq: 55, noiseMix: 0.03, lowPass: 280, resonance: 1.6, gain: 0.24, seed: 61592 }, 0.66),
           ],
         },
       },
       {
-        id: 'g',
-        character: "a heartbeat, and no scenery",
+        id: 'j',
+        slot: 'musicPulse',
+        character: "a two-note rise, A to C and back",
         spec: {
-          name: 'musicPulse_g_bareHeartbeat',
+          name: 'musicPulse_j_twoNoteRise',
           loop: true,
-          crossfade: 0.04,
+          crossfade: 0.05,
           layers: [
-            place({ name: 'musicPulse_g.floor', wave: 'sine', attack: 0, hold: 0.9, decay: 0, freq: 55, lowPass: 160, resonance: 1.8, gain: 0.08, seed: 61160 }),
-            swept('musicPulse_g.beat', { wave: 'sine', freq: 80, freqEnd: 55, from: 220, to: 90, q: 2, gain: 0.34, attack: 0.005, hold: 0.02, decay: 0.28, curve: 3, punch: 0.4, seed: 61162 }),
+            place({ name: 'musicPulse_j.floor', wave: 'triangle', attack: 0, hold: 1.32, decay: 0, freq: 41.2, lowPass: 240, resonance: 1.3, gain: 0.07, seed: 61600 }),
+            place({ name: 'musicPulse_j.a', wave: 'triangle', attack: 0.004, hold: 0.03, decay: 0.28, decayCurve: 3, punch: 0.4, freq: 55, noiseMix: 0.05, lowPass: 300, resonance: 1.8, gain: 0.28, seed: 61601 }),
+            place({ name: 'musicPulse_j.c', wave: 'triangle', attack: 0.004, hold: 0.03, decay: 0.28, decayCurve: 3, punch: 0.4, freq: 65.41, noiseMix: 0.05, lowPass: 340, resonance: 1.8, gain: 0.26, seed: 61602 }, 0.44),
+            place({ name: 'musicPulse_j.back', wave: 'triangle', attack: 0.004, hold: 0.03, decay: 0.3, decayCurve: 3, punch: 0.4, freq: 55, noiseMix: 0.05, lowPass: 300, resonance: 1.8, gain: 0.22, seed: 61603 }, 0.88),
+          ],
+        },
+      },
+      {
+        id: 'k',
+        slot: 'musicPulse',
+        character: "a pedal, with the fifth answering once",
+        spec: {
+          name: 'musicPulse_k_pedalAndAnswer',
+          loop: true,
+          crossfade: 0.05,
+          layers: [
+            place({ name: 'musicPulse_k.pedal', wave: 'triangle', attack: 0, hold: 1.32, decay: 0, freq: 55, vibratoDepth: 0.002, vibratoRate: 0.3, noiseMix: 0.03, lowPass: 260, resonance: 1.5, gain: 0.16, seed: 61610 }),
+            place({ name: 'musicPulse_k.answer', wave: 'sine', attack: 0.006, hold: 0.04, decay: 0.44, decayCurve: 2.6, freq: 164.81, noiseMix: 0.03, lowPass: 620, resonance: 1.8, gain: 0.2, seed: 61611 }, 0.6),
           ],
         },
       },
     ],
   },
   musicTheme: {
-    // §7.5 re-voices this slot and says what to keep: *"same riff, same key"*. So
-    // all four offers sound the shipped seven notes — A3 C4 E4 D4 C4 A3 E3 — at
-    // the shipped times, and the ONLY thing the developer is choosing between is
-    // what is playing them. That is the whole thesis of the sweep in one slot:
-    // round 1 changed the oscillator under this riff and the developer heard the
-    // same music. The instrument is the offer.
+    // *"These sound like very bad music."* The bluntest reason on the board, and
+    // the only one aimed at composition rather than at sound design — so it is
+    // the only one that could not be answered by choosing better numbers.
+    //
+    // Round one's four takes were, in its own words, *"the same riff, same key
+    // (§7.5) — the instrument is the offer, seven notes at the shipped times."*
+    // Holding the melody and changing the instrument was a deliberate, written
+    // decision: §7.5 protects the theme's identity, and a lane rewriting the game's
+    // tune uninvited is exactly the overreach this file is careful about. The
+    // developer has now looked at the result four ways and said the music is bad.
+    // **That is a ruling on the riff**, and it is the one thing round one refused
+    // to touch.
+    //
+    // What is actually wrong with it, stated so the next round can argue with the
+    // diagnosis rather than with the taste: the shipped theme is **seven notes in
+    // a row over one held A**. A → C → E → D → C → A → E, one voice, no chord
+    // changes underneath. A melody with no harmony moving under it has nothing to
+    // be *in* — every note lands on the same chord, so none of them means
+    // anything, and a tune that means nothing for four seconds and then does it
+    // again is what "very bad music" sounds like. It is not the instrument.
+    //
+    // So the four below are four **pieces**, not four instruments, and the thing
+    // that is new in all of them is that **the harmony moves**:
+    //
+    //   h  a four-chord loop — Am · F · C · G, one per second, and no melody at
+    //      all. If the harmony is the problem, this is the proof: nothing is
+    //      played over the top and it is still music.
+    //   i  a bass that walks — A · A · C · E under a held A-minor chord. The
+    //      motion is in the bottom voice, which is where a siege belongs.
+    //   j  two chords breathing — Am → F, two seconds each, with one upper voice
+    //      stepping down between them. The calmest, and the most patient.
+    //   k  a pedal and one answer — A held throughout, with a three-note figure
+    //      (E · D · C) once per lap. The closest of the four to what ships, and
+    //      the offer for "the tune is fine, it needs somewhere to sit".
+    //
+    // §7.5 is not ignored, it is spent deliberately and once: the key, the
+    // register, the tempo (a 4-second lap), the instrument (`./bank`'s own
+    // filtered triangle at `resonance` 2.6) and the pad that keeps the seam from
+    // going silent are all held exactly. What changes is the writing.
     label: "Music Theme — Siege",
-    context: "Active combat / base under assault — a short A-minor riff over a pad.",
+    context: "Full theme — plays during a siege.",
     current: 'musicTheme',
     candidates: [
       {
-        id: 'd',
-        character: "the riff as ion bursts, no body",
+        id: 'h',
+        slot: 'musicTheme',
+        character: "four chords, one a second, no melody",
         spec: {
-          name: 'musicTheme_d_ionBursts',
+          name: 'musicTheme_h_fourChords',
           loop: true,
           crossfade: 0.08,
           layers: [
-            place({ name: 'musicTheme_d.field', wave: 'noise', attack: 0, hold: 4, decay: 0, freq: 700, lowPass: 2000, resonance: 3.2, highPass: 420, gain: 0.11, seed: 61170 }),
-            grains('musicTheme_d.n0', { freq: 220, grain: 0.0032, gain: 0.2, attack: 0.003, hold: 0.02, decay: 0.3, curve: 4, from: 2200, to: 900, q: 4, hp: 380, seed: 61171 }),
-            grains('musicTheme_d.n1', { freq: 261.63, grain: 0.003, gain: 0.2, attack: 0.003, hold: 0.02, decay: 0.3, curve: 4, from: 2500, to: 1000, q: 4, hp: 420, at: 0.5, seed: 61172 }),
-            grains('musicTheme_d.n2', { freq: 329.63, grain: 0.0028, gain: 0.2, attack: 0.003, hold: 0.024, decay: 0.36, curve: 4, from: 3000, to: 1200, q: 4, hp: 500, at: 1, seed: 61173 }),
-            grains('musicTheme_d.n3', { freq: 293.66, grain: 0.0028, gain: 0.19, attack: 0.003, hold: 0.024, decay: 0.42, curve: 4, from: 2800, to: 1100, q: 4, hp: 460, at: 1.5, seed: 61174 }),
-            grains('musicTheme_d.n4', { freq: 261.63, grain: 0.003, gain: 0.19, attack: 0.003, hold: 0.024, decay: 0.42, curve: 4, from: 2500, to: 1000, q: 4, hp: 420, at: 2.1, seed: 61175 }),
-            grains('musicTheme_d.n5', { freq: 220, grain: 0.0032, gain: 0.18, attack: 0.004, hold: 0.03, decay: 0.7, curve: 3.6, from: 2200, to: 900, q: 4, hp: 380, at: 2.7, seed: 61176 }),
-            grains('musicTheme_d.n6', { freq: 164.81, grain: 0.0036, gain: 0.18, attack: 0.004, hold: 0.04, decay: 0.56, curve: 3.6, from: 1700, to: 700, q: 4, hp: 300, at: 3.3, seed: 61177 }),
+            place({ name: 'musicTheme_h.pad', wave: 'triangle', attack: 0.02, hold: 3.98, decay: 0, freq: 110, vibratoDepth: 0.004, vibratoRate: 0.2, noiseMix: 0.04, lowPass: 900, resonance: 2, gain: 0.09, seed: 61620 }),
+            // Am — the home chord, and the only one that gets the octave over it.
+            place({ name: 'musicTheme_h.c0r', wave: 'triangle', attack: 0.01, hold: 0.5, decay: 0.5, decayCurve: 2.2, freq: 110, noiseMix: 0.06, lowPass: 700, resonance: 2.6, gain: 0.15, seed: 61621 }),
+            place({ name: 'musicTheme_h.c0t', wave: 'triangle', attack: 0.012, hold: 0.5, decay: 0.5, decayCurve: 2.2, freq: 261.63, noiseMix: 0.06, lowPass: 1300, resonance: 2.6, gain: 0.09, seed: 61622 }),
+            // F — the lift. Same two voices a third down and a third up: the bass
+            // falls, the upper voice rises, which is the whole reason a chord
+            // change reads as movement rather than as a new note.
+            place({ name: 'musicTheme_h.c1r', wave: 'triangle', attack: 0.01, hold: 0.5, decay: 0.5, decayCurve: 2.2, freq: 87.31, noiseMix: 0.06, lowPass: 620, resonance: 2.6, gain: 0.15, seed: 61623 }, 1),
+            place({ name: 'musicTheme_h.c1t', wave: 'triangle', attack: 0.012, hold: 0.5, decay: 0.5, decayCurve: 2.2, freq: 261.63, noiseMix: 0.06, lowPass: 1300, resonance: 2.6, gain: 0.085, seed: 61624 }, 1),
+            // C — the relative major, and the only bright moment in the lap.
+            place({ name: 'musicTheme_h.c2r', wave: 'triangle', attack: 0.01, hold: 0.5, decay: 0.5, decayCurve: 2.2, freq: 130.81, noiseMix: 0.06, lowPass: 760, resonance: 2.6, gain: 0.14, seed: 61625 }, 2),
+            place({ name: 'musicTheme_h.c2t', wave: 'triangle', attack: 0.012, hold: 0.5, decay: 0.5, decayCurve: 2.2, freq: 329.63, noiseMix: 0.06, lowPass: 1500, resonance: 2.6, gain: 0.08, seed: 61626 }, 2),
+            // G — the one that has to resolve, so the lap wants to start again.
+            place({ name: 'musicTheme_h.c3r', wave: 'triangle', attack: 0.01, hold: 0.5, decay: 0.55, decayCurve: 2.2, freq: 98, noiseMix: 0.06, lowPass: 660, resonance: 2.6, gain: 0.15, seed: 61627 }, 3),
+            place({ name: 'musicTheme_h.c3t', wave: 'triangle', attack: 0.012, hold: 0.5, decay: 0.55, decayCurve: 2.2, freq: 293.66, noiseMix: 0.06, lowPass: 1400, resonance: 2.6, gain: 0.085, seed: 61628 }, 3),
           ],
         },
       },
       {
-        id: 'e',
-        character: "the riff on magnetic mass, corners closing",
+        id: 'i',
+        slot: 'musicTheme',
+        character: "a bass that walks under a held chord",
         spec: {
-          name: 'musicTheme_e_magneticMass',
+          name: 'musicTheme_i_walkingBass',
           loop: true,
           crossfade: 0.08,
           layers: [
-            place({ name: 'musicTheme_e.pad', wave: 'triangle', attack: 0, hold: 4, decay: 0, freq: 55, noiseMix: 0.05, lowPass: 180, resonance: 3.4, gain: 0.16, seed: 61180 }),
-            swept('musicTheme_e.n0', { wave: 'triangle', freq: 220, from: 1500, to: 300, q: 4.5, gain: 0.3, attack: 0.005, hold: 0.03, decay: 0.35, curve: 3.4, noiseMix: 0.16, seed: 61181 }),
-            swept('musicTheme_e.n1', { wave: 'triangle', freq: 261.63, from: 1750, to: 340, q: 4.5, gain: 0.3, attack: 0.005, hold: 0.03, decay: 0.35, curve: 3.4, noiseMix: 0.16, at: 0.5, seed: 61182 }),
-            swept('musicTheme_e.n2', { wave: 'triangle', freq: 329.63, from: 2200, to: 420, q: 4.5, gain: 0.3, attack: 0.005, hold: 0.035, decay: 0.42, curve: 3.4, noiseMix: 0.16, at: 1, seed: 61183 }),
-            swept('musicTheme_e.n3', { wave: 'triangle', freq: 293.66, from: 1950, to: 380, q: 4.5, gain: 0.29, attack: 0.005, hold: 0.035, decay: 0.48, curve: 3.4, noiseMix: 0.16, at: 1.5, seed: 61184 }),
-            swept('musicTheme_e.n4', { wave: 'triangle', freq: 261.63, from: 1750, to: 340, q: 4.5, gain: 0.29, attack: 0.005, hold: 0.035, decay: 0.48, curve: 3.4, noiseMix: 0.16, at: 2.1, seed: 61185 }),
-            swept('musicTheme_e.n5', { wave: 'triangle', freq: 220, from: 1500, to: 300, q: 4.5, gain: 0.28, attack: 0.006, hold: 0.05, decay: 0.8, curve: 3.4, noiseMix: 0.16, at: 2.7, seed: 61186 }),
-            swept('musicTheme_e.n6', { wave: 'triangle', freq: 164.81, from: 1150, to: 240, q: 4.5, gain: 0.28, attack: 0.006, hold: 0.07, decay: 0.64, curve: 3.4, noiseMix: 0.16, at: 3.3, seed: 61187 }),
+            place({ name: 'musicTheme_i.chordR', wave: 'triangle', attack: 0.03, hold: 3.95, decay: 0, freq: 220, vibratoDepth: 0.003, vibratoRate: 0.15, noiseMix: 0.05, lowPass: 1000, resonance: 2.4, gain: 0.075, seed: 61630 }),
+            place({ name: 'musicTheme_i.chordT', wave: 'triangle', attack: 0.04, hold: 3.94, decay: 0, freq: 261.63, vibratoDepth: 0.003, vibratoRate: 0.12, noiseMix: 0.05, lowPass: 1200, resonance: 2.4, gain: 0.06, seed: 61631 }),
+            place({ name: 'musicTheme_i.chordF', wave: 'triangle', attack: 0.05, hold: 3.93, decay: 0, freq: 329.63, vibratoDepth: 0.003, vibratoRate: 0.09, noiseMix: 0.05, lowPass: 1400, resonance: 2.4, gain: 0.045, seed: 61632 }),
+            place({ name: 'musicTheme_i.b0', wave: 'triangle', attack: 0.006, hold: 0.06, decay: 0.7, decayCurve: 2.6, punch: 0.35, freq: 110, noiseMix: 0.06, lowPass: 520, resonance: 2.6, gain: 0.2, seed: 61633 }),
+            place({ name: 'musicTheme_i.b1', wave: 'triangle', attack: 0.006, hold: 0.06, decay: 0.7, decayCurve: 2.6, punch: 0.35, freq: 110, noiseMix: 0.06, lowPass: 520, resonance: 2.6, gain: 0.17, seed: 61634 }, 1),
+            place({ name: 'musicTheme_i.b2', wave: 'triangle', attack: 0.006, hold: 0.06, decay: 0.7, decayCurve: 2.6, punch: 0.35, freq: 130.81, noiseMix: 0.06, lowPass: 600, resonance: 2.6, gain: 0.19, seed: 61635 }, 2),
+            place({ name: 'musicTheme_i.b3', wave: 'triangle', attack: 0.006, hold: 0.06, decay: 0.8, decayCurve: 2.6, punch: 0.35, freq: 164.81, noiseMix: 0.06, lowPass: 700, resonance: 2.6, gain: 0.18, seed: 61636 }, 3),
           ],
         },
       },
       {
-        id: 'f',
-        character: "the riff struck on cathedral bands",
+        id: 'j',
+        slot: 'musicTheme',
+        character: "two chords breathing, one voice stepping",
         spec: {
-          name: 'musicTheme_f_cathedralBands',
+          name: 'musicTheme_j_twoChordsBreathing',
           loop: true,
           crossfade: 0.08,
           layers: [
-            place({ name: 'musicTheme_f.pad', wave: 'noise', attack: 0, hold: 4, decay: 0, freq: 110, lowPass: 320, resonance: 9, bandPass: true, gain: 0.37, seed: 61190 }),
-            band('musicTheme_f.n0', 220, { gain: 1.0, decay: 0.35, q: 10, curve: 3.6, attack: 0.003, hold: 0.008, seed: 61191 }),
-            band('musicTheme_f.n1', 261.63, { gain: 1.0, decay: 0.35, q: 10, curve: 3.6, attack: 0.003, hold: 0.008, at: 0.5, seed: 61192 }),
-            band('musicTheme_f.n2', 329.63, { gain: 1.0, decay: 0.42, q: 10.5, curve: 3.6, attack: 0.003, hold: 0.008, at: 1, seed: 61193 }),
-            band('musicTheme_f.n3', 293.66, { gain: 1.0, decay: 0.48, q: 10.5, curve: 3.6, attack: 0.003, hold: 0.008, at: 1.5, seed: 61194 }),
-            band('musicTheme_f.n4', 261.63, { gain: 1.0, decay: 0.48, q: 10, curve: 3.6, attack: 0.003, hold: 0.008, at: 2.1, seed: 61195 }),
-            band('musicTheme_f.n5', 220, { gain: 1.0, decay: 0.8, q: 10, curve: 3.4, attack: 0.004, hold: 0.01, at: 2.7, seed: 61196 }),
-            band('musicTheme_f.n6', 164.81, { gain: 1.0, decay: 0.64, q: 9.5, curve: 3.4, attack: 0.004, hold: 0.012, at: 3.3, seed: 61197 }),
+            place({ name: 'musicTheme_j.pad', wave: 'triangle', attack: 0.02, hold: 3.98, decay: 0, freq: 110, vibratoDepth: 0.004, vibratoRate: 0.18, noiseMix: 0.04, lowPass: 800, resonance: 2, gain: 0.1, seed: 61640 }),
+            place({ name: 'musicTheme_j.am', wave: 'triangle', attack: 0.14, hold: 1.5, decay: 0.42, decayCurve: 1.8, freq: 164.81, noiseMix: 0.05, lowPass: 900, resonance: 2.4, gain: 0.13, seed: 61641 }),
+            place({ name: 'musicTheme_j.f', wave: 'triangle', attack: 0.14, hold: 1.5, decay: 0.42, decayCurve: 1.8, freq: 174.61, noiseMix: 0.05, lowPass: 900, resonance: 2.4, gain: 0.13, seed: 61642 }, 2),
+            // The upper voice steps down a whole tone between the two chords —
+            // the smallest amount of melody there is, and enough that the lap is
+            // going somewhere rather than repeating.
+            place({ name: 'musicTheme_j.v0', wave: 'triangle', attack: 0.1, hold: 1.4, decay: 0.5, decayCurve: 2, freq: 329.63, noiseMix: 0.05, lowPass: 1500, resonance: 2.6, gain: 0.075, seed: 61643 }),
+            place({ name: 'musicTheme_j.v1', wave: 'triangle', attack: 0.1, hold: 1.4, decay: 0.5, decayCurve: 2, freq: 293.66, noiseMix: 0.05, lowPass: 1400, resonance: 2.6, gain: 0.075, seed: 61644 }, 2),
           ],
         },
       },
       {
-        id: 'g',
-        character: "the riff, quietly, with nothing behind it",
+        id: 'k',
+        slot: 'musicTheme',
+        character: "a pedal, and one three-note answer",
         spec: {
-          name: 'musicTheme_g_bareRiff',
+          name: 'musicTheme_k_pedalAndAnswer',
           loop: true,
           crossfade: 0.08,
           layers: [
-            place({ name: 'musicTheme_g.floor', wave: 'sine', attack: 0, hold: 4, decay: 0, freq: 55, lowPass: 150, resonance: 1.8, gain: 0.1, seed: 61200 }),
-            swept('musicTheme_g.n0', { wave: 'sine', freq: 220, from: 700, to: 260, q: 2.6, gain: 0.24, attack: 0.006, hold: 0.03, decay: 0.35, curve: 3.4, noiseMix: 0.08, seed: 61201 }),
-            swept('musicTheme_g.n1', { wave: 'sine', freq: 261.63, from: 820, to: 300, q: 2.6, gain: 0.24, attack: 0.006, hold: 0.03, decay: 0.35, curve: 3.4, noiseMix: 0.08, at: 0.5, seed: 61202 }),
-            swept('musicTheme_g.n2', { wave: 'sine', freq: 329.63, from: 1000, to: 380, q: 2.6, gain: 0.24, attack: 0.006, hold: 0.035, decay: 0.42, curve: 3.4, noiseMix: 0.08, at: 1, seed: 61203 }),
-            swept('musicTheme_g.n3', { wave: 'sine', freq: 293.66, from: 900, to: 340, q: 2.6, gain: 0.23, attack: 0.006, hold: 0.035, decay: 0.48, curve: 3.4, noiseMix: 0.08, at: 1.5, seed: 61204 }),
-            swept('musicTheme_g.n4', { wave: 'sine', freq: 261.63, from: 820, to: 300, q: 2.6, gain: 0.23, attack: 0.006, hold: 0.035, decay: 0.48, curve: 3.4, noiseMix: 0.08, at: 2.1, seed: 61205 }),
-            swept('musicTheme_g.n5', { wave: 'sine', freq: 220, from: 700, to: 260, q: 2.6, gain: 0.22, attack: 0.008, hold: 0.05, decay: 0.8, curve: 3.4, noiseMix: 0.08, at: 2.7, seed: 61206 }),
-            swept('musicTheme_g.n6', { wave: 'sine', freq: 164.81, from: 560, to: 210, q: 2.6, gain: 0.22, attack: 0.008, hold: 0.07, decay: 0.64, curve: 3.4, noiseMix: 0.08, at: 3.3, seed: 61207 }),
+            place({ name: 'musicTheme_k.pedal', wave: 'triangle', attack: 0.02, hold: 3.98, decay: 0, freq: 110, vibratoDepth: 0.005, vibratoRate: 0.2, noiseMix: 0.04, lowPass: 1000, resonance: 2, gain: 0.15, seed: 61650 }),
+            place({ name: 'musicTheme_k.fifth', wave: 'triangle', attack: 0.06, hold: 3.9, decay: 0, freq: 164.81, vibratoDepth: 0.003, vibratoRate: 0.13, noiseMix: 0.04, lowPass: 900, resonance: 2, gain: 0.075, seed: 61651 }),
+            // Three notes, falling, once. The shipped theme plays seven and comes
+            // back to where it started; this says less and therefore means more.
+            place({ name: 'musicTheme_k.a0', wave: 'triangle', attack: 0.005, hold: 0.04, decay: 0.5, decayCurve: 3, freq: 329.63, noiseMix: 0.06, lowPass: 1500, resonance: 2.6, gain: 0.14, seed: 61652 }, 1.2),
+            place({ name: 'musicTheme_k.a1', wave: 'triangle', attack: 0.005, hold: 0.04, decay: 0.5, decayCurve: 3, freq: 293.66, noiseMix: 0.06, lowPass: 1400, resonance: 2.6, gain: 0.13, seed: 61653 }, 1.8),
+            place({ name: 'musicTheme_k.a2', wave: 'triangle', attack: 0.006, hold: 0.05, decay: 0.8, decayCurve: 2.8, freq: 261.63, noiseMix: 0.06, lowPass: 1300, resonance: 2.6, gain: 0.13, seed: 61654 }, 2.4),
           ],
         },
       },
     ],
   },
   musicDread: {
+    // *"None of these sound critical they just sound annoying."* Two words doing
+    // two different jobs, and the second one is the diagnosis.
+    //
+    // **Annoying** is a register: it lives above 2 kHz, where an ear cannot
+    // habituate. Round one's `d` — *"ion field thinning out, high and empty"* —
+    // put 20% of its energy up there and held it for five and a half seconds
+    // under a collapsing station. That is not dread, it is tinnitus, and it is
+    // the direct cost of the family note (*texture before melody*) meeting a slot
+    // whose brief is *"the collapse thinning out"*: thin was read as **high**.
+    //
+    // **Critical** is the other direction entirely. What makes a sound mean
+    // *something is badly wrong and time is short* is weight and instability, low
+    // down, where you feel it rather than hear it — and, above all, **something
+    // that is changing**. The shipped voice already has half of this right: a
+    // semitone clash beating slowly against a low drone. What it has never had is
+    // anything that *develops*, so it reads as unpleasant rather than as urgent.
+    //
+    // So all four below are built to two rules and differ in what is unstable:
+    //
+    //  1. **Nothing above 1 kHz**, in any layer, in any of them. `./candidates.
+    //     test.ts` holds the whole set under the shipped voice's high-frequency
+    //     share — the one number that separates dread from an irritant.
+    //  2. **Something moves across the lap.** A beat that quickens, a voice that
+    //     creeps, a pulse that is closer than it was. A held dissonance is a
+    //     state; dread is a direction.
+    //
+    //   h  a **tritone**, low — the most unstable interval there is, at 55 Hz
+    //      where it is pressure rather than pitch
+    //   i  a **pedal with a voice creeping up** a semitone across the lap: the
+    //      thing that is wrong is getting worse
+    //   j  the shipped clash, with a **slow heartbeat** under it — the same
+    //      unease, now with a clock attached
+    //   k  **one deep tone and the room emptying** around it. The restrained
+    //      one, for critical read as *nothing is coming to help*
     label: "Music Dread — Collapse",
-    context: "Core critical, defeat imminent — no melody, no resolution; thinning dread.",
+    context: "Collapse layer — replaces the others as entropy arrives.",
     current: 'musicDread',
     candidates: [
       {
-        id: 'd',
-        character: "ion field thinning out, high and empty",
+        id: 'h',
+        slot: 'musicDread',
+        character: "a tritone, low enough to be pressure",
         spec: {
-          name: 'musicDread_d_thinField',
+          name: 'musicDread_h_lowTritone',
           loop: true,
           crossfade: 0.4,
           layers: [
-            place({ name: 'musicDread_d.field', wave: 'noise', attack: 0, hold: 6, decay: 0, freq: 480, lowPass: 1500, resonance: 4, highPass: 320, gain: 0.24, seed: 61210 }),
-            place({ name: 'musicDread_d.upper', wave: 'noise', attack: 0, hold: 6, decay: 0, freq: 1300, lowPass: 3200, resonance: 5.5, highPass: 900, gain: 0.12, seed: 61211 }),
-            place({ name: 'musicDread_d.trace', wave: 'triangle', attack: 0, hold: 6, decay: 0, freq: 246.94, noiseMix: 0.34, lowPass: 800, resonance: 6, gain: 0.09, seed: 61212 }),
+            place({ name: 'musicDread_h.root', wave: 'triangle', attack: 0, hold: 6, decay: 0, freq: 55, noiseMix: 0.04, lowPass: 420, resonance: 1.8, gain: 0.24, seed: 61660 }),
+            // E♭ against A: a tritone, and the interval a listener cannot resolve
+            // no matter how long it is held. Down here it is felt in the chest
+            // rather than identified, which is the difference from a high clash.
+            place({ name: 'musicDread_h.tritone', wave: 'triangle', attack: 0, hold: 6, decay: 0, freq: 77.78, noiseMix: 0.04, lowPass: 500, resonance: 1.8, gain: 0.17, seed: 61661 }),
+            place({ name: 'musicDread_h.sub', wave: 'sine', attack: 0, hold: 6, decay: 0, freq: 36.71, gain: 0.14, seed: 61662 }),
+            // The mover: a swell that arrives once a lap, so the lap has a shape.
+            place({ name: 'musicDread_h.swell', wave: 'triangle', attack: 2.2, hold: 1.6, decay: 2.0, decayCurve: 1.3, freq: 82.41, noiseMix: 0.06, lowPass: 340, resonance: 1.6, gain: 0.12, seed: 61663 }),
           ],
         },
       },
       {
-        id: 'e',
-        character: "magnetic rumble, unisons grinding",
+        id: 'i',
+        slot: 'musicDread',
+        character: "a pedal, with a voice creeping up",
         spec: {
-          name: 'musicDread_e_magneticRumble',
+          name: 'musicDread_i_creepingVoice',
           loop: true,
-          crossfade: 0.5,
+          crossfade: 0.4,
           layers: [
-            place({ name: 'musicDread_e.u0', wave: 'triangle', attack: 0, hold: 7, decay: 0, freq: 41.2, noiseMix: 0.12, lowPass: 125, resonance: 4.2, gain: 0.42, seed: 61220 }),
-            place({ name: 'musicDread_e.u1', wave: 'triangle', attack: 0, hold: 7, decay: 0, freq: 41.75, noiseMix: 0.12, lowPass: 125, resonance: 4.2, gain: 0.3, seed: 61221 }),
-            place({ name: 'musicDread_e.press', wave: 'noise', attack: 0, hold: 7, decay: 0, freq: 130, lowPass: 300, resonance: 5, gain: 0.16, seed: 61222 }),
+            place({ name: 'musicDread_i.pedal', wave: 'triangle', attack: 0, hold: 6, decay: 0, freq: 55, noiseMix: 0.04, lowPass: 400, resonance: 1.7, gain: 0.26, seed: 61670 }),
+            // 58.27 → 61.74: a semitone of travel across six seconds, which is
+            // slow enough that nobody hears it move and everybody hears that it
+            // is worse than it was. §5.4 exempts drift at this rate by
+            // construction; a fall this slow is not a slide, it is a condition.
+            place({ name: 'musicDread_i.creep', wave: 'sine', attack: 0.4, hold: 5.6, decay: 0, freq: 58.27, freqEnd: 61.74, gain: 0.15, seed: 61671 }),
+            place({ name: 'musicDread_i.sub', wave: 'sine', attack: 0, hold: 6, decay: 0, freq: 41.2, gain: 0.13, seed: 61672 }),
+            place({ name: 'musicDread_i.floor', wave: 'triangle', attack: 0, hold: 6, decay: 0, freq: 27.5, noiseMix: 0.05, lowPass: 200, resonance: 1.4, gain: 0.1, seed: 61673 }),
           ],
         },
       },
       {
-        id: 'f',
-        character: "cathedral bands, nothing resolving",
+        id: 'j',
+        slot: 'musicDread',
+        character: "the clash, with a heartbeat under it",
         spec: {
-          name: 'musicDread_f_cathedralDread',
+          name: 'musicDread_j_clashAndHeartbeat',
           loop: true,
-          crossfade: 0.45,
+          crossfade: 0.4,
           layers: [
-            place({ name: 'musicDread_f.b0', wave: 'noise', attack: 0, hold: 6, decay: 0, freq: 82.41, lowPass: 240, resonance: 11, bandPass: true, gain: 0.42, seed: 61230 }),
-            place({ name: 'musicDread_f.b1', wave: 'noise', attack: 0, hold: 6, decay: 0, freq: 198, lowPass: 520, resonance: 12, bandPass: true, gain: 0.28, seed: 61231 }),
-            place({ name: 'musicDread_f.b2', wave: 'noise', attack: 0, hold: 6, decay: 0, freq: 343, lowPass: 900, resonance: 12, bandPass: true, gain: 0.18, seed: 61232 }),
-            place({ name: 'musicDread_f.floor', wave: 'sine', attack: 0, hold: 6, decay: 0, freq: 27.5, gain: 0.14, seed: 61233 }),
+            place({ name: 'musicDread_j.low', wave: 'triangle', attack: 0, hold: 6, decay: 0, freq: 55, noiseMix: 0.04, lowPass: 460, resonance: 1.8, gain: 0.22, seed: 61680 }),
+            place({ name: 'musicDread_j.clash', wave: 'sine', attack: 0, hold: 6, decay: 0, freq: 58.3, gain: 0.14, seed: 61681 }),
+            // Four beats in six seconds, closing up: 0.0 · 1.7 · 3.2 · 4.5. The
+            // gap shortens by ~15% each time, which is the cheapest way a loop
+            // can say *this is accelerating* without ever changing tempo.
+            place({ name: 'musicDread_j.b0', wave: 'sine', attack: 0.01, hold: 0.05, decay: 0.5, decayCurve: 2.4, punch: 0.4, freq: 41.2, gain: 0.22, seed: 61682 }),
+            place({ name: 'musicDread_j.b1', wave: 'sine', attack: 0.01, hold: 0.05, decay: 0.5, decayCurve: 2.4, punch: 0.4, freq: 41.2, gain: 0.24, seed: 61683 }, 1.7),
+            place({ name: 'musicDread_j.b2', wave: 'sine', attack: 0.01, hold: 0.05, decay: 0.5, decayCurve: 2.4, punch: 0.4, freq: 41.2, gain: 0.26, seed: 61684 }, 3.2),
+            place({ name: 'musicDread_j.b3', wave: 'sine', attack: 0.01, hold: 0.05, decay: 0.5, decayCurve: 2.4, punch: 0.4, freq: 41.2, gain: 0.28, seed: 61685 }, 4.5),
           ],
         },
       },
       {
-        id: 'g',
-        character: "one low layer, and the room emptying",
+        id: 'k',
+        slot: 'musicDread',
+        character: "one deep tone, the room emptying",
         spec: {
-          name: 'musicDread_g_oneLayer',
+          name: 'musicDread_k_oneToneEmptying',
           loop: true,
-          crossfade: 0.5,
+          crossfade: 0.4,
           layers: [
-            place({ name: 'musicDread_g.low', wave: 'sine', attack: 0, hold: 7, decay: 0, freq: 36.71, noiseMix: 0.06, lowPass: 110, resonance: 2.2, gain: 0.34, seed: 61240 }),
-            place({ name: 'musicDread_g.air', wave: 'noise', attack: 0, hold: 7, decay: 0, freq: 300, lowPass: 700, resonance: 2.4, highPass: 180, gain: 0.07, seed: 61241 }),
+            place({ name: 'musicDread_k.tone', wave: 'triangle', attack: 0, hold: 6, decay: 0, freq: 48.99, noiseMix: 0.05, lowPass: 380, resonance: 1.6, gain: 0.3, seed: 61690 }),
+            place({ name: 'musicDread_k.sub', wave: 'sine', attack: 0, hold: 6, decay: 0, freq: 32.7, gain: 0.16, seed: 61691 }),
+            // The room, leaving: a wide quiet layer that swells in and goes,
+            // once per lap. Nothing else answers it, which is the point.
+            place({ name: 'musicDread_k.room', wave: 'triangle', attack: 1.8, hold: 1.2, decay: 2.6, decayCurve: 1.2, freq: 73.42, noiseMix: 0.09, lowPass: 260, resonance: 1.4, gain: 0.1, seed: 61692 }, 0.6),
           ],
         },
       },

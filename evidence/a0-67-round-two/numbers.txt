@@ -1,0 +1,144 @@
+a0-67 — round two, the sixteen slots, measured
+==============================================
+
+Regenerate: npx vite-node evidence/a0-67-round-two/measure.ts <slot...>
+
+Each block is one slot: the sound it SHIPS today, then the offers this round
+puts on the board. The letters are the fresh ones — h/i/j/k on the fifteen
+slots that were in the a0-60 sweep (a-c spent 2026-08-07, d-g spent
+2026-08-17), g/h/i/j on oreCollect, which was never in that sweep.
+
+An offer marked "(A/B)" is the incumbent itself, on the board under a letter
+so that "keep what ships" is a verdict the review page can record.
+
+What each column is for, and which sentence it answers:
+
+  sec   length. oreCollect's "it shouldn't be too long"; the station death's
+        1.32 s longest-tail invariant, which the three seconds of silence
+        after it depend on (§4.7, §8).
+  peak  the loudest sample. Every "more subtle" is a ceiling before it is a
+        character — and round one broke it: three of four alarm offers and
+        two of four thruster offers were LOUDER than the sound being
+        complained about.
+  rms   energy over the whole cue. The number that says whether a loop
+        fatigues. thruster is held under half the shipped loop's.
+  hf    share of energy above 3 kHz. "Annoying" lives up here (musicDread's
+        denied take: 0.204) and so does "sparkle" (oreCollect) — the two
+        complaints pull opposite ways, which is why they need one number
+        each rather than a verdict about brightness.
+  zc    zero crossings per sample past the attack: a cheap spectral centre,
+        the same proxy audio.test.ts uses to keep rock and hull apart. It is
+        what holds the §8 oreCollect/depositTick pair open.
+
+
+=== oreCollect — Ore Collect
+  current (oreCollect)       sec  0.142  peak  0.298  rms  0.053  hf  0.129  zc  0.048
+  g  a prize: two notes, rising a fifth sec  0.080  peak  0.184  rms  0.032  hf  0.303  zc  0.087
+  h  a handful of chips into the tray sec  0.077  peak  0.264  rms  0.046  hf  0.511  zc  0.252
+  i  a breath, nothing struck sec  0.088  peak  0.165  rms  0.034  hf  0.307  zc  0.134
+  j  the sound that ships today (A/B) sec  0.142  peak  0.298  rms  0.053  hf  0.129  zc  0.048
+
+=== turretFire — Turret Fire
+  current (turretFire)       sec  0.094  peak  0.370  rms  0.060  hf  0.069  zc  0.025
+  h  a report: crack, thump, action sec  0.077  peak  0.434  rms  0.062  hf  0.039  zc  0.021
+  i  a discharge: beam falling, ion hiss sec  0.062  peak  0.424  rms  0.056  hf  0.270  zc  0.055
+  j  a launch: magnetic snap and weight sec  0.113  peak  0.423  rms  0.083  hf  0.016  zc  0.013
+  k  the sound that ships today (A/B) sec  0.094  peak  0.370  rms  0.060  hf  0.069  zc  0.025
+
+=== shieldHit — Shield Hit
+  current (shieldHit)        sec  0.314  peak  0.438  rms  0.084  hf  0.133  zc  0.060
+  h  deflection: it skids off, ring spreading sec  0.212  peak  0.397  rms  0.094  hf  0.145  zc  0.058
+  i  absorption: swallowed, a low bloom sec  0.198  peak  0.428  rms  0.111  hf  0.041  zc  0.028
+  j  arc: sparks over a ringing bubble sec  0.204  peak  0.421  rms  0.085  hf  0.210  zc  0.072
+  k  flex: the surface bends and settles sec  0.237  peak  0.312  rms  0.068  hf  0.083  zc  0.041
+
+=== thruster — Thruster Loop
+  current (thruster)         sec  0.360  peak  0.462  rms  0.142  hf  0.047  zc  0.031
+  h  breath: air only, no floor sec  0.360  peak  0.130  rms  0.041  hf  0.028  zc  0.023
+  i  pressure: felt, not heard sec  0.360  peak  0.133  rms  0.064  hf  0.001  zc  0.002
+  j  one warm band, nothing to beat sec  0.360  peak  0.207  rms  0.068  hf  0.015  zc  0.016
+  k  almost nothing, the floor of the slot sec  0.360  peak  0.118  rms  0.052  hf  0.003  zc  0.002
+
+=== buildPlaced — Build Placed
+  current (buildPlaced)      sec  0.130  peak  0.300  rms  0.055  hf  0.041  zc  0.042
+  h  clamp bites, a drive spins up sec  0.380  peak  0.296  rms  0.070  hf  0.019  zc  0.025
+  i  pressure takes, the line still loaded sec  0.470  peak  0.334  rms  0.143  hf  0.008  zc  0.040
+  j  it seats, then the head starts working sec  0.405  peak  0.319  rms  0.072  hf  0.075  zc  0.029
+  k  one contact, and a bus comes up sec  0.425  peak  0.212  rms  0.106  hf  0.001  zc  0.028
+
+=== bankOre — Bank Ore
+  current (bankOre)          sec  0.382  peak  0.353  rms  0.064  hf  0.072  zc  0.042
+  h  the two notes, with coins under them sec  0.362  peak  0.335  rms  0.062  hf  0.108  zc  0.078
+  i  counted, then the drawer takes it sec  0.452  peak  0.320  rms  0.049  hf  0.069  zc  0.047
+  j  the second note lands in the tray sec  0.382  peak  0.346  rms  0.056  hf  0.133  zc  0.040
+  k  the sound that ships today (A/B) sec  0.382  peak  0.353  rms  0.064  hf  0.072  zc  0.042
+
+=== upgradeBought — Upgrade Bought
+  current (upgradeBought)    sec  0.582  peak  0.418  rms  0.077  hf  0.201  zc  0.047
+  h  the same three notes, thinner sec  0.462  peak  0.239  rms  0.052  hf  0.195  zc  0.048
+  i  two notes, the triad implied sec  0.442  peak  0.264  rms  0.054  hf  0.186  zc  0.047
+  j  the three notes, receding sec  0.462  peak  0.244  rms  0.045  hf  0.158  zc  0.047
+  k  the sound that ships today (A/B) sec  0.582  peak  0.418  rms  0.077  hf  0.201  zc  0.047
+
+=== stationDeath — MiningStation Death
+  current (stationDeath)     sec  1.320  peak  0.897  rms  0.182  hf  0.007  zc  0.010
+  h  detonation: a blast front, then the mass sec  1.248  peak  0.672  rms  0.169  hf  0.009  zc  0.021
+  i  breach: a crack, then everything leaving sec  1.318  peak  0.882  rms  0.187  hf  0.042  zc  0.044
+  j  blast, and then the structure falls sec  1.300  peak  0.571  rms  0.148  hf  0.013  zc  0.100
+  k  one concussion, and the room sec  1.083  peak  0.834  rms  0.177  hf  0.001  zc  0.003
+
+=== alarm — Home Alarm
+  current (alarm)            sec  0.612  peak  0.756  rms  0.219  hf  0.159  zc  0.023
+  h  announcement: two warm horn tones sec  0.690  peak  0.553  rms  0.212  hf  0.019  zc  0.023
+  i  pressure horn: tone low, top is breath sec  0.648  peak  0.494  rms  0.193  hf  0.020  zc  0.015
+  j  down a corridor: the notes, and the room sec  0.725  peak  0.618  rms  0.189  hf  0.011  zc  0.017
+  k  two low pulses, and that is all sec  0.630  peak  0.406  rms  0.206  hf  0.009  zc  0.011
+
+=== musicBed — Music Bed — Calm
+  current (musicBed)         sec  7.500  peak  0.474  rms  0.178  hf  0.001  zc  0.003
+  h  an A-minor triad, warm and breathing sec  7.500  peak  0.469  rms  0.170  hf  0.001  zc  0.004
+  i  root and fifth, open, no third sec  7.500  peak  0.379  rms  0.157  hf  0.001  zc  0.004
+  j  the triad, with one voice an octave up sec  7.500  peak  0.421  rms  0.151  hf  0.001  zc  0.003
+  k  two voices and a sub, barely there sec  7.500  peak  0.362  rms  0.145  hf  0.001  zc  0.002
+
+=== musicPulse — Music Pulse — Rising Tension
+  current (musicPulse)       sec  0.660  peak  0.312  rms  0.079  hf  0.001  zc  0.004
+  h  a bass line: root and fifth, alternating sec  1.270  peak  0.287  rms  0.062  hf  0.001  zc  0.002
+  i  the root pulsing under a held third sec  1.270  peak  0.361  rms  0.067  hf  0.001  zc  0.002
+  j  a two-note rise, A to C and back sec  1.270  peak  0.302  rms  0.058  hf  0.000  zc  0.002
+  k  a pedal, with the fifth answering once sec  1.270  peak  0.234  rms  0.082  hf  0.001  zc  0.002
+
+=== musicTheme — Music Theme — Siege
+  current (musicTheme)       sec  3.936  peak  0.230  rms  0.072  hf  0.003  zc  0.007
+  h  four chords, one a second, no melody sec  3.982  peak  0.214  rms  0.063  hf  0.003  zc  0.005
+  i  a bass that walks under a held chord sec  3.900  peak  0.214  rms  0.049  hf  0.007  zc  0.013
+  j  two chords breathing, one voice stepping sec  3.980  peak  0.203  rms  0.064  hf  0.005  zc  0.008
+  k  a pedal, and one three-note answer sec  3.920  peak  0.207  rms  0.068  hf  0.003  zc  0.007
+
+=== musicDread — Music Dread — Collapse
+  current (musicDread)       sec  5.600  peak  0.485  rms  0.165  hf  0.001  zc  0.002
+  h  a tritone, low enough to be pressure sec  5.600  peak  0.464  rms  0.161  hf  0.000  zc  0.003
+  i  a pedal, with a voice creeping up sec  5.600  peak  0.552  rms  0.185  hf  0.000  zc  0.002
+  j  the clash, with a heartbeat under it sec  5.600  peak  0.521  rms  0.145  hf  0.000  zc  0.002
+  k  one deep tone, the room emptying sec  5.800  peak  0.469  rms  0.175  hf  0.000  zc  0.002
+
+=== musicWin — Victory Sting
+  current (musicWin)         sec  1.275  peak  0.325  rms  0.061  hf  0.026  zc  0.010
+  h  two notes, a fifth, opening sec  1.150  peak  0.311  rms  0.079  hf  0.009  zc  0.010
+  i  one chord, struck and opening sec  0.925  peak  0.317  rms  0.060  hf  0.005  zc  0.011
+  j  the top note first, the floor after sec  1.230  peak  0.270  rms  0.086  hf  0.007  zc  0.020
+  k  the sound that ships today (A/B) sec  1.275  peak  0.325  rms  0.061  hf  0.026  zc  0.010
+
+=== musicLoss — Defeat Sting
+  current (musicLoss)        sec  1.270  peak  0.313  rms  0.074  hf  0.003  zc  0.010
+  h  two notes, then a breath that stops sec  1.180  peak  0.266  rms  0.077  hf  0.003  zc  0.010
+  i  one note sinking, no melody at all sec  1.230  peak  0.309  rms  0.088  hf  0.002  zc  0.007
+  j  the phrase as one falling chord sec  1.180  peak  0.308  rms  0.074  hf  0.003  zc  0.010
+  k  the sound that ships today (A/B) sec  1.270  peak  0.313  rms  0.074  hf  0.003  zc  0.010
+
+=== pressTick — Press Tick
+  current (pressTick)        sec  0.052  peak  0.121  rms  0.027  hf  0.240  zc  0.076
+  h  the pane, thinner: two partials at A♭6 sec  0.044  peak  0.108  rms  0.024  hf  0.236  zc  0.076
+  i  the pane an octave up, at A♭7 sec  0.034  peak  0.094  rms  0.021  hf  0.458  zc  0.151
+  j  fingertip first, then the pane sec  0.046  peak  0.114  rms  0.018  hf  0.337  zc  0.078
+  k  the full pane, three partials, quietest sec  0.050  peak  0.081  rms  0.017  hf  0.242  zc  0.078

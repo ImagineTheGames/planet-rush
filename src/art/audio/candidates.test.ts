@@ -503,6 +503,131 @@ describe('sound-review candidates', () => {
     }
   });
 
+  it('answers the music four with music — harmony before texture (a0-67)', () => {
+    // Four reasons, one root cause. The a0-60 sweep answered all six music slots
+    // with the same three MATERIALS (granular bed / filtered analogue / wide
+    // detuned space — this file's own family table says "texture before melody"),
+    // and four of the six came back:
+    //
+    //   musicBed    *"none of these sound like a calm music bed"*
+    //   musicPulse  *"none of these sound musical"*
+    //   musicTheme  *"these sound like very bad music"*
+    //   musicDread  *"none of these sound critical they just sound annoying"*
+    //
+    // Three of those are asking for notes and the fourth is asking for weight. So
+    // the two properties below are the register note rewritten as a gate, and
+    // they are checked on the offers because a texture cannot be tuned into a
+    // chord after the fact.
+    const MUSIC = ['musicBed', 'musicPulse', 'musicTheme', 'musicDread'] as const;
+
+    // A minor, to the Hz — the key the shipped soundtrack, the ambient bed and
+    // `upgradeBought` are all already in (§7.5). Every pitched voice in every
+    // offer is a degree of it, in some octave, so any two of these four slots can
+    // be adopted together and still be in tune. That is a property the developer
+    // cannot check by auditioning them one at a time, which is why it is here.
+    const A_MINOR = [27.5, 30.87, 32.7, 36.71, 41.2, 43.65, 48.99];
+    const degreeOf = (f: number): number | undefined => {
+      for (const base of A_MINOR) {
+        const octaves = Math.log2(f / base);
+        if (Math.abs(octaves - Math.round(octaves)) < 0.012) return base;
+      }
+      return undefined;
+    };
+    //
+    // `musicDread` is **exempt, and only `musicDread`**: its offers carry a
+    // tritone and a semitone clash on purpose, and a note that is out of the key
+    // is the entire mechanic of that slot (`./bank`'s shipped voice does the same
+    // thing — a clash "a hair sharp of the low", which is not a degree of
+    // anything). A dread layer that stayed obediently in A minor would be a
+    // calmer bed. The fence around it is the register test further down instead.
+    for (const id of ['musicBed', 'musicPulse', 'musicTheme'] as const) {
+      for (const c of CANDIDATE_SLOTS[id]!.candidates) {
+        for (const v of voicesOf(c.spec)) {
+          if (v.wave === 'noise') continue; // noise carries no pitch to be out of key
+          expect(
+            degreeOf(v.freq),
+            `${id}/${c.id} ${v.name} is at ${v.freq} Hz, which is not a degree of A minor`,
+          ).toBeDefined();
+        }
+      }
+    }
+
+    // Harmony: more than one pitch sounding, in every offer. This is the whole of
+    // what "none of these sound musical" was pointing at — round one's pulse
+    // offers were rhythms with no nameable pitch in them at all, and a bed made
+    // of one held tone is a drone rather than a chord.
+    for (const id of MUSIC) {
+      for (const c of CANDIDATE_SLOTS[id]!.candidates) {
+        const pitches = new Set(
+          voicesOf(c.spec)
+            .filter((v) => v.wave !== 'noise')
+            .map((v) => Math.round(v.freq * 100)),
+        );
+        expect(pitches.size, `${id}/${c.id} sounds one pitch — that is a drone, not music`).toBeGreaterThanOrEqual(2);
+      }
+    }
+
+    // *"They just sound annoying"* is a register complaint and it has a number.
+    // Round one's `musicDread/d` — "ion field thinning out, high and empty" — put
+    // 20% of its energy above 3 kHz and held it for five and a half seconds under
+    // a collapsing station. "Thin" had been read as "high". Nothing in this slot
+    // may live up there again: the shipped voice measures 0.001, and every offer
+    // is held at or under it.
+    const shippedDread = brightShare(render(soundSpec('musicDread')), 3000);
+    for (const c of CANDIDATE_SLOTS.musicDread!.candidates) {
+      expect(brightShare(render(c.spec), 3000), `musicDread/${c.id} is annoying rather than critical`).toBeLessThanOrEqual(
+        shippedDread,
+      );
+      for (const v of voicesOf(c.spec)) {
+        expect(v.freq, `musicDread/${c.id} ${v.name} sits above the register dread lives in`).toBeLessThan(1000);
+      }
+    }
+
+    // `musicTheme`'s reason is about composition, and the diagnosis this round
+    // works from is that the shipped theme is **seven notes over one held A** —
+    // one chord for four seconds, so every note in the tune lands on the same
+    // harmony and none of them means anything. Round one kept the melody and
+    // changed the instrument, which could not have addressed that.
+    //
+    // Measured as **the most pitch classes ever sounding at once**. A voice is
+    // sounding from its onset until its envelope runs out, so a pad that spans
+    // the lap counts against every melody note but a note that has died does not
+    // count against the next one. The shipped theme tops out at **two** — the A
+    // pad, plus whichever single note of the tune is currently ringing — which is
+    // the diagnosis stated as an integer: it is a melody with an accompaniment of
+    // one note, so there is no chord for the tune to be *in*.
+    const maxSimultaneous = (spec: SoundSpec): number => {
+      if (!isLayered(spec)) return 0;
+      const notes = spec.layers
+        .filter((l) => l.spec.wave !== 'noise')
+        .map((l) => {
+          const at = l.at ?? 0;
+          const v = l.spec;
+          return {
+            from: at,
+            to: at + v.attack + v.hold + v.decay,
+            // Semitones above A, mod 12 — so an octave doubling is not a chord.
+            cls: ((Math.round(12 * Math.log2(v.freq / 27.5)) % 12) + 12) % 12,
+          };
+        });
+      let best = 0;
+      for (const t of notes.map((n) => n.from)) {
+        const at = new Set(notes.filter((n) => n.from <= t && n.to > t).map((n) => n.cls));
+        best = Math.max(best, at.size);
+      }
+      return best;
+    };
+    expect(maxSimultaneous(soundSpec('musicTheme')), 'the shipped theme already has chords in it').toBeLessThanOrEqual(
+      2,
+    );
+    for (const c of CANDIDATE_SLOTS.musicTheme!.candidates) {
+      expect(
+        maxSimultaneous(c.spec),
+        `musicTheme/${c.id} never sounds a chord — it is a tune over one note again`,
+      ).toBeGreaterThanOrEqual(3);
+    }
+  });
+
   it('every slot offers a full set of candidates, one letter each, with characters', () => {
     for (const id of SLOT_IDS) {
       const slot = CANDIDATE_SLOTS[id]!;

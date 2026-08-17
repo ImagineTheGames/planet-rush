@@ -851,128 +851,128 @@
     {
       "id": "musicBed",
       "label": "Music Bed — Calm",
-      "context": "Mining / building with no active threat — the calm foundation drone.",
+      "context": "Calm layer of the adaptive soundtrack — loops under mining.",
       "current": "previews/musicBed/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/musicBed/d.wav",
-          "character": "ion field, air with no floor under it",
-          "params": "src/art/audio/candidates.ts#musicBed.d"
+          "id": "h",
+          "wav": "previews/musicBed/h.wav",
+          "character": "an A-minor triad, warm and breathing",
+          "params": "src/art/audio/candidates.ts#musicBed.h"
         },
         {
-          "id": "e",
-          "wav": "previews/musicBed/e.wav",
-          "character": "magnetic mass, two unisons beating",
-          "params": "src/art/audio/candidates.ts#musicBed.e"
+          "id": "i",
+          "wav": "previews/musicBed/i.wav",
+          "character": "root and fifth, open, no third",
+          "params": "src/art/audio/candidates.ts#musicBed.i"
         },
         {
-          "id": "f",
-          "wav": "previews/musicBed/f.wav",
-          "character": "cathedral metal, inharmonic and wide",
-          "params": "src/art/audio/candidates.ts#musicBed.f"
+          "id": "j",
+          "wav": "previews/musicBed/j.wav",
+          "character": "the triad, with one voice an octave up",
+          "params": "src/art/audio/candidates.ts#musicBed.j"
         },
         {
-          "id": "g",
-          "wav": "previews/musicBed/g.wav",
-          "character": "almost nothing, two quiet layers",
-          "params": "src/art/audio/candidates.ts#musicBed.g"
+          "id": "k",
+          "wav": "previews/musicBed/k.wav",
+          "character": "two voices and a sub, barely there",
+          "params": "src/art/audio/candidates.ts#musicBed.k"
         }
       ]
     },
     {
       "id": "musicPulse",
       "label": "Music Pulse — Rising Tension",
-      "context": "Threat detected, tension climbing toward a siege — a heartbeat over a floor.",
+      "context": "Tension layer — fades in as waves rise.",
       "current": "previews/musicPulse/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/musicPulse/d.wav",
-          "character": "ion field with a grain pulse in it",
-          "params": "src/art/audio/candidates.ts#musicPulse.d"
+          "id": "h",
+          "wav": "previews/musicPulse/h.wav",
+          "character": "a bass line: root and fifth, alternating",
+          "params": "src/art/audio/candidates.ts#musicPulse.h"
         },
         {
-          "id": "e",
-          "wav": "previews/musicPulse/e.wav",
-          "character": "magnetic thud, mass under a corner",
-          "params": "src/art/audio/candidates.ts#musicPulse.e"
+          "id": "i",
+          "wav": "previews/musicPulse/i.wav",
+          "character": "the root pulsing under a held third",
+          "params": "src/art/audio/candidates.ts#musicPulse.i"
         },
         {
-          "id": "f",
-          "wav": "previews/musicPulse/f.wav",
-          "character": "two bands tolling in a space",
-          "params": "src/art/audio/candidates.ts#musicPulse.f"
+          "id": "j",
+          "wav": "previews/musicPulse/j.wav",
+          "character": "a two-note rise, A to C and back",
+          "params": "src/art/audio/candidates.ts#musicPulse.j"
         },
         {
-          "id": "g",
-          "wav": "previews/musicPulse/g.wav",
-          "character": "a heartbeat, and no scenery",
-          "params": "src/art/audio/candidates.ts#musicPulse.g"
+          "id": "k",
+          "wav": "previews/musicPulse/k.wav",
+          "character": "a pedal, with the fifth answering once",
+          "params": "src/art/audio/candidates.ts#musicPulse.k"
         }
       ]
     },
     {
       "id": "musicTheme",
       "label": "Music Theme — Siege",
-      "context": "Active combat / base under assault — a short A-minor riff over a pad.",
+      "context": "Full theme — plays during a siege.",
       "current": "previews/musicTheme/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/musicTheme/d.wav",
-          "character": "the riff as ion bursts, no body",
-          "params": "src/art/audio/candidates.ts#musicTheme.d"
+          "id": "h",
+          "wav": "previews/musicTheme/h.wav",
+          "character": "four chords, one a second, no melody",
+          "params": "src/art/audio/candidates.ts#musicTheme.h"
         },
         {
-          "id": "e",
-          "wav": "previews/musicTheme/e.wav",
-          "character": "the riff on magnetic mass, corners closing",
-          "params": "src/art/audio/candidates.ts#musicTheme.e"
+          "id": "i",
+          "wav": "previews/musicTheme/i.wav",
+          "character": "a bass that walks under a held chord",
+          "params": "src/art/audio/candidates.ts#musicTheme.i"
         },
         {
-          "id": "f",
-          "wav": "previews/musicTheme/f.wav",
-          "character": "the riff struck on cathedral bands",
-          "params": "src/art/audio/candidates.ts#musicTheme.f"
+          "id": "j",
+          "wav": "previews/musicTheme/j.wav",
+          "character": "two chords breathing, one voice stepping",
+          "params": "src/art/audio/candidates.ts#musicTheme.j"
         },
         {
-          "id": "g",
-          "wav": "previews/musicTheme/g.wav",
-          "character": "the riff, quietly, with nothing behind it",
-          "params": "src/art/audio/candidates.ts#musicTheme.g"
+          "id": "k",
+          "wav": "previews/musicTheme/k.wav",
+          "character": "a pedal, and one three-note answer",
+          "params": "src/art/audio/candidates.ts#musicTheme.k"
         }
       ]
     },
     {
       "id": "musicDread",
       "label": "Music Dread — Collapse",
-      "context": "Core critical, defeat imminent — no melody, no resolution; thinning dread.",
+      "context": "Collapse layer — replaces the others as entropy arrives.",
       "current": "previews/musicDread/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/musicDread/d.wav",
-          "character": "ion field thinning out, high and empty",
-          "params": "src/art/audio/candidates.ts#musicDread.d"
+          "id": "h",
+          "wav": "previews/musicDread/h.wav",
+          "character": "a tritone, low enough to be pressure",
+          "params": "src/art/audio/candidates.ts#musicDread.h"
         },
         {
-          "id": "e",
-          "wav": "previews/musicDread/e.wav",
-          "character": "magnetic rumble, unisons grinding",
-          "params": "src/art/audio/candidates.ts#musicDread.e"
+          "id": "i",
+          "wav": "previews/musicDread/i.wav",
+          "character": "a pedal, with a voice creeping up",
+          "params": "src/art/audio/candidates.ts#musicDread.i"
         },
         {
-          "id": "f",
-          "wav": "previews/musicDread/f.wav",
-          "character": "cathedral bands, nothing resolving",
-          "params": "src/art/audio/candidates.ts#musicDread.f"
+          "id": "j",
+          "wav": "previews/musicDread/j.wav",
+          "character": "the clash, with a heartbeat under it",
+          "params": "src/art/audio/candidates.ts#musicDread.j"
         },
         {
-          "id": "g",
-          "wav": "previews/musicDread/g.wav",
-          "character": "one low layer, and the room emptying",
-          "params": "src/art/audio/candidates.ts#musicDread.g"
+          "id": "k",
+          "wav": "previews/musicDread/k.wav",
+          "character": "one deep tone, the room emptying",
+          "params": "src/art/audio/candidates.ts#musicDread.k"
         }
       ]
     },
