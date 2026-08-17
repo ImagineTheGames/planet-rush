@@ -1,0 +1,332 @@
+{
+  "probe": "a0-72 background-and-return",
+  "label": "after-away-90s",
+  "awayMs": 90000,
+  "capturedAt": "2026-08-17T19:57:22.043Z",
+  "allocate": {
+    "room": "KFKW",
+    "machine": "4d891e33b27a95",
+    "expiresAt": 1786996672044,
+    "expiresInMs": 29997
+  },
+  "stamped": {
+    "seat": 0,
+    "banked": 42,
+    "track": "power",
+    "tier": 3
+  },
+  "suspendedAt": 242,
+  "returnedAfterMs": 89996,
+  "ticketAgeAtReturnMs": 90242,
+  "ticketExpiredOnReturn": true,
+  "frames": [
+    {
+      "at": 5,
+      "type": "welcome"
+    },
+    {
+      "at": 5,
+      "type": "lobbyState"
+    },
+    {
+      "at": 6,
+      "type": "lobbyState"
+    },
+    {
+      "at": 21,
+      "type": "lobbyState"
+    },
+    {
+      "at": 225,
+      "type": "matchStart"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "economy"
+    },
+    {
+      "at": 228,
+      "type": "snapshot"
+    },
+    {
+      "at": 90244,
+      "type": "welcome"
+    },
+    {
+      "at": 90244,
+      "type": "matchStart"
+    },
+    {
+      "at": 90244,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90244,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90244,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90244,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90244,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90244,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90244,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90244,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90244,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90244,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90244,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90244,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90244,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90244,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90245,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90245,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90245,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90245,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90245,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90245,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90245,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90245,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90245,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90245,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90245,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90245,
+      "type": "snapshot"
+    },
+    {
+      "at": 90245,
+      "type": "playerReclaimed"
+    },
+    {
+      "at": 90245,
+      "type": "lobbyState"
+    },
+    {
+      "at": 90254,
+      "type": "snapshot"
+    },
+    {
+      "at": 90254,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90254,
+      "type": "entityEvent"
+    },
+    {
+      "at": 90287,
+      "type": "snapshot"
+    },
+    {
+      "at": 90318,
+      "type": "snapshot"
+    },
+    {
+      "at": 90351,
+      "type": "snapshot"
+    },
+    {
+      "at": 90384,
+      "type": "snapshot"
+    },
+    {
+      "at": 90417,
+      "type": "snapshot"
+    }
+  ],
+  "refusal": {
+    "closeReason": null,
+    "rejectReason": null,
+    "transportState": "open"
+  },
+  "link": {
+    "phase": "live",
+    "cause": null,
+    "ending": null,
+    "attempts": 0
+  },
+  "overlay": {
+    "title": "",
+    "detail": "",
+    "failed": false
+  },
+  "trace": {
+    "title": "JOINED · SEAT 1",
+    "machine": "4d891e33",
+    "lines": [
+      "allocating ALLOCATING ROOM…",
+      "ticketed   ROOM KFKW · TICKET SIGNED",
+      "dialing    DIALING MACHINE 4d891e33…",
+      "joined     JOINED · SEAT 1",
+      "joined     JOINED · SEAT 1"
+    ]
+  },
+  "seat": {
+    "roomStillHosted": true,
+    "matchPhase": "live",
+    "botFlyingIt": false,
+    "pendingReclaim": false
+  },
+  "wallet": {
+    "banked": 53,
+    "tier": 3,
+    "clientBanked": 53,
+    "clientTier": 3,
+    "welcomes": 2
+  }
+}

@@ -71,6 +71,12 @@ for (const arg of process.argv.slice(2)) {
 /** How long the phone is away, ms. 35 s clears the 30 s ticket TTL and nothing else. */
 const AWAY_MS = Number(args.get('away') ?? 35_000);
 const LABEL = args.get('label') ?? `away-${Math.round(AWAY_MS / 1000)}s`;
+/**
+ * `--end-match=1` finishes the match on authority while the page is away — the one
+ * refusal the a0-72 ruling leaves standing, and the one that has to say something
+ * true instead of REFUSED.
+ */
+const END_MATCH = args.get('end-match') === '1';
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -224,6 +230,14 @@ async function main(): Promise<void> {
   out['suspendedAt'] = awayFrom - t0;
 
   await sleep(AWAY_MS);
+
+  if (END_MATCH) {
+    // The match finishes while they are away. Their seat was held for the whole of
+    // it — what ended is the match, and the card must say so.
+    room.world!.match.phase = 'ended';
+    await until('the room to notice the match ended', () => room.state === 'ended', 5_000);
+    out['endedWhileAway'] = true;
+  }
 
   // --- 4. …and the player comes back ----------------------------------------
   const backAt = Date.now();

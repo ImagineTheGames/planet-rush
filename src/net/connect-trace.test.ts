@@ -107,7 +107,10 @@ describe('the verbose connecting screen', () => {
     expect(refusalGloss('bad-ticket')).toBe('machine mismatch');
     expect(refusalGloss('room-full')).toBe('every seat is taken');
     expect(refusalGloss('match-live')).toBe('that match already started');
-    expect(refusalGloss('reclaim-expired')).toBe('your reconnect window ran out');
+    // a0-72: a running match has no window to run out of, so this gloss names the
+    // only thing that still empties a held seat — the player leaving it.
+    expect(refusalGloss('reclaim-expired')).toBe('you left this match');
+    expect(refusalGloss('match-over')).toBe('that match has finished');
     // An unknown token is shown bare rather than explained by guesswork.
     expect(refusalGloss('something-new')).toBe('');
     const model = connectTraceModel(connectRefused(beginConnect('join', T0), 'something-new', T0), T0);

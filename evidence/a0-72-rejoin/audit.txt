@@ -1,0 +1,231 @@
+a0-72 — "the server would not take me back", and it should have
+================================================================================
+OWNER: Netcode Engineer.  Branch: agent/netcode/a0-72-rejoin-always.
+Captured 2026-08-17 against the local fleet fixture (tests/net/local-fleet.ts):
+two ticket-enforcing Machines with the socket-hop pin armed, a Fly-shaped edge in
+front of them, a real allocator process — and the shipped client path
+(allocateRoom -> allocatorTransport -> createOnlineSession -> WebSocketTransport).
+
+The report
+--------------------------------------------------------------------------------
+  "on mobile i got disconnected because the screen went black, and when i went
+   back i saw refused - the server would not take you back... that doesnt feel
+   right to me, i should be able to join back if the match is still on-going no
+   matter what"
+
+The last sentence is the ruling this audit is measured against.
+
+
+HOW IT WAS REPRODUCED (and why not by killing the socket)
+================================================================================
+A killed socket fires `onclose`, the transport redials inside a second, and the
+reclaim lands long before anything can lapse. That is tests/net/reconnect-resume.
+test.ts, and it was green throughout the whole of this bug. A BACKGROUNDED PAGE
+runs no handlers at all: the screen blanks, the tab is frozen, the radio drops
+the TCP connection, and the client learns none of it — `transport.state` still
+reads `open`. Whatever it does next happens N seconds later, on the player's
+return, and N is the entire failure.
+
+  evidence/a0-72-rejoin/rejoin-probe.ts
+
+freezes the page (a socket that stops calling the page back and then dies), waits
+N REAL seconds — nothing here moves a clock, because the two windows under test
+are measured by the allocator and the server in real seconds — and then calls
+`session.linkShown()`, which is exactly what `visibilitychange` does in the
+shipped client.
+
+  npx vite-node evidence/a0-72-rejoin/rejoin-probe.ts -- --away=35000 --label=X
+  npx vite-node evidence/a0-72-rejoin/rejoin-probe.ts -- --away=35000 --end-match=1 --label=Y
+
+
+1. THE REFUSAL, NAMED
+================================================================================
+  before-away-35s.json   (commit 5388c0f, i.e. BEFORE any fix)
+
+  allocate:  { room: KFKW, machine: 4d891e33b27a95, expiresInMs: 30014 }
+  away:      35.0 s
+  frames:    ... snapshot, snapshot, [35242 ms] joinError { reason: "bad-ticket" }
+
+  refusal:   closeReason      "join-rejected"
+             rejectReason     "bad-ticket"
+             transportState   "closed"
+
+  trace (the same one DOWNLOAD LOG hands the developer):
+             allocating ALLOCATING ROOM...
+             ticketed   ROOM KFKW - TICKET SIGNED
+             dialing    DIALING MACHINE 4d891e33...
+             joined     JOINED - SEAT 1
+             refused    REFUSED: bad-ticket - machine mismatch
+
+  overlay:   "REFUSED - the server would not take you back"
+             "Nothing left to reclaim - the reconnect window closed while you
+              were away."
+
+  AND, AT THE SAME INSTANT, ON THE SERVER:
+             roomStillHosted  true
+             matchPhase       "live"
+             pendingReclaim   true      <-- the seat was BEING HELD
+             botFlyingIt      true
+             ship.banked      40, tier 3 on the ship they were flying
+
+So: **the ticket expired, and nothing else.** The seat was there. The match was
+running. 25 seconds of the 60-second reconnect grace were still unspent. What
+refused the player was the allocator's 30-second routing pass
+(allocator/allocator.ts DEFAULT_TICKET_TTL_MS = 30_000), which the transport
+minted once for the first dial and re-presented verbatim on every redial for the
+rest of the session — so a screen that stays off for longer than half a minute
+comes back holding a pass that lapsed while its owner was away.
+
+Two further untruths in that capture, both worth naming:
+
+  * the overlay's detail line said the reconnect window had closed. It had not.
+  * the trace glossed `bad-ticket` as "machine mismatch". There was no machine
+    mismatch; the ticket named 4d891e33b27a95 and the room was on
+    4d891e33b27a95. The gloss was standing in front of an expiry.
+
+THE OTHER TWO WALLS, for the record. The ticket is simply the first one a phone
+hits; behind it stood two more, both of which would have refused a player who got
+past it:
+
+  2. the reconnect grace — server/room.ts held a dropped seat for 60 s and then
+     gave it to the bot for good (`reclaim-expired`), and src/net/reconnect.ts
+     stopped the client redialling at the same 60 s (`grace-elapsed`);
+  3. the sweep — server/match-server.ts deleted any room with no connected human
+     and no pending reclaim, so 60 s after the last human dropped the room the
+     code named was gone (`reclaim-unknown`).
+
+A phone backgrounding is the ordinary case, not an edge case, and every one of
+those three numbers is small enough to refuse a returning player routinely.
+
+
+2. THE SAME SCENARIO, AFTER THE FIX
+================================================================================
+  after-away-35s.json    (commit e1353f3) — identical probe, identical 35 s
+
+  frames:    ... snapshot, [35xxx ms] welcome, matchStart, entityEvent x N,
+                 economy, snapshot ...
+  refusal:   closeReason null, rejectReason null, transportState "open"
+  link:      phase "live"
+  overlay:   not visible
+  trace:     allocating ALLOCATING ROOM...
+             ticketed   ROOM KFKW - TICKET SIGNED
+             dialing    DIALING MACHINE 4d891e33...
+             joined     JOINED - SEAT 1
+             joined     JOINED - SEAT 1          <-- back in the same seat
+  seat:      matchPhase "live", botFlyingIt false, pendingReclaim false
+  wallet:    authority banked 40, tier 3
+             client    banked 40, tier 3         <-- the ship, not a new one
+
+  after-away-90s.json — the same, with the phone away for NINETY seconds, which
+  is past the old grace window entirely and a place the pre-fix build could not
+  even reach (the ticket refused first, at 30 s).
+             welcomes 2, botFlyingIt false, matchPhase "live"
+             authority banked 53, tier 3 / client banked 53, tier 3
+             (53 rather than 42: the substitute bot banked ore while it flew.
+              The ship is the same ship; its wallet moved because somebody was
+              playing it, which is the design.)
+
+
+3. THE REFUSAL THAT REMAINS, SAYING SOMETHING TRUE
+================================================================================
+  after-match-over.json — page backgrounded, and the match ENDS while they are
+  away. There is genuinely nothing to come back to, and that is now its own word
+  rather than the window's:
+
+  refusal:   rejectReason "match-over"
+  trace:     refused    REFUSED: match-over - that match has finished
+  overlay:   "MATCH OVER - it finished while you were away"
+             "Your seat was held the whole time the match ran - the match is what
+              ended, not your window."
+
+Every other surviving refusal is named the same way (src/net/link-loss.ts
+`refusalTitle` / `refusalDetail`, asserted in src/net/session.test.ts):
+
+  reclaim-unknown  MATCH ENDED - that room is no longer running
+  reclaim-denied   SEAT TAKEN - somebody else is flying it
+  reclaim-expired  SEAT RELEASED - you left this match, so it went on without you
+  match-live       MATCH UNDER WAY - it started without you
+  room-full        ROOM FULL - every seat is taken
+  bad-ticket       WRONG SERVER - your pass is for a different machine
+  bad-room-code    NOT A ROOM CODE - check the letters
+
+"REFUSED - the server would not take you back" is kept for exactly one case: a
+reason this build has never heard of, where the token is printed rather than
+explained by guesswork.
+
+
+4. WHAT CHANGED, AND WHAT EACH ARTEFACT PROVES
+================================================================================
+  THE PASS   src/net/websocket-transport.ts `refreshTicket` re-mints the ticket
+             before every post-drop dial (src/net/session.ts `allocatorTransport`
+             wires it to POST /rooms/:code/join). The TTL stays 30 s — a leaked
+             pass must still go stale — so the pass is re-minted, not stretched.
+             ALSO server/match-server.ts `admitsJoin(code, ticket, reclaiming)`:
+             a Machine ALREADY HOSTING the room admits a reclaim on a
+             lapsed-but-genuine ticket, because the ticket answers "which
+             Machine" (checkable against its own room table) while the
+             `reclaimToken` answers "is this seat yours". Conflating those two
+             questions was the bug. Forged / tampered / wrong-room / wrong-Machine
+             tickets are refused exactly as before, and so is a lapsed pass on a
+             FRESH join, and so is a lapsed pass into a room this Machine does not
+             host.
+             PROVEN BY: after-away-35s.json (end to end), and by
+             src/net/session.test.ts "lets a returning owner in on a lapsed
+             ticket, with no allocator to ask" — which fails with
+             `[ 'bad-ticket' ]` the moment the exception is removed (verified by
+             reverting it and re-running).
+
+  THE WINDOW server/room.ts `HELD_FOR_MATCH`: a mid-match drop is not on a clock.
+             The seat is released when the match ENDS, or the instant the player
+             says ABANDON. Client-side the same rule: src/net/reconnect.ts retries
+             a live room however long we were away, and src/net/link-loss.ts
+             `holdForMatch()` (called on `matchStart`) stops the watchdog ending a
+             match on its own arithmetic — that arithmetic was always an estimate,
+             and an estimate that ends a match is a client refusing a seat the
+             server is holding open.
+             PROVEN BY: after-away-90s.json, and tests/server/match-server.test.ts
+             "holds the seat for the whole match, however long the player is away".
+
+  THE SWEEP  A live match with a reclaimable seat is never garbage. What bounds
+             the room instead is the match itself: at `matchEnd` the held seats
+             fall back to `graceMs`, whose one remaining job is keeping a finished
+             room alive long enough to answer `match-over` before it is swept.
+             PROVEN BY: after-match-over.json, and tests/server/match-server.test.ts
+             "sweeps a room once the match is over and nobody may come back".
+
+  THE WORDS  src/net/link-loss.ts `refusalTitle` / `refusalDetail`, and the trace
+             gloss in src/net/connect-trace.ts.
+             PROVEN BY: after-match-over.json and src/net/session.test.ts
+             "says something true and specific when the match really is over".
+
+
+5. THE COST, STATED
+================================================================================
+Holding a seat for the life of the match is not free, and the bill is NOT the one
+that first looks likely:
+
+  * it is NOT seat availability. A live match already refuses new joins
+    (`joinableSeats` is 0 once the phase is not `lobby`, and `join` answers
+    `match-live`), so a ghost seat was never a seat anybody else could have taken.
+    A 6-seat room with three ghosts has three bots flying, which is what it had
+    before this change too — the difference is only that the three seats stay
+    reclaimable instead of becoming permanently a bot's after 60 s.
+
+  * it IS server residency. Before this change, a room whose only human dropped
+    died 60 seconds later. Now it lives to the end of the match, so a Machine
+    cannot idle down while a fully-ghosted match plays itself out. That is
+    bounded — src/sim/match.ts `collapseDeadline` forces an ending, and GDD §1
+    targets 10-15 minutes — so the worst case is one room-worth of CPU
+    (~4.7 ms/s measured, docs/server-capacity.md) for the rest of one match.
+
+No limit is imposed here, deliberately: the ruling says "no matter what", and the
+brief says a limit is the developer's to pick. The design question is in the PR
+body, with numbers.
+
+--------------------------------------------------------------------------------
+FILES
+  rejoin-probe.ts        the instrument (vite-node; --away=, --end-match=, --label=)
+  before-away-35s.json   the refusal, on the pre-fix build
+  after-away-35s.json    the same scenario, passing
+  after-away-90s.json    …and past the old 60-second grace
+  after-match-over.json  the refusal that remains, saying what happened
