@@ -226,7 +226,62 @@ real line widths, in the a0-74 content box. Captured in every JSON above.
     bottom-right (asserted in `src/ui/hud.test.ts`).
 
 
-7. ONE ARTIFACT OF THE FIXTURE, NAMED
+7. THE FRAMES, AS PIXELS — the leg no probe can prove
+================================================================================
+Sections 1–6 prove the model turns authority's broadcasts into the right lines
+and `presenceBand` proves where the band lands. Neither can prove the SHIPPED
+BUNDLE puts a pixel on the screen: `HudFrame.presence` -> `PeerPresenceView` -> a
+drawn Text is exactly the leg that has shipped dead in this codebase before (the
+M2 dark-matter class — `installLinkLossView` appeared exactly once in `src/`, at
+its own definition, for the whole life of the feature).
+
+  tests/live-stage/a0-76-peer-presence.spec.ts
+
+boots the real preview bundle and drives `window.__presenceStage`, which feeds
+REAL `ServerMessage` values through `applyPresenceMessage` — the same function
+the online session's observer calls, not a shortcut past it — then reads back the
+rows the VIEW drew, post-cull, and screenshots them. Three specs, green.
+
+  drawn-dropped-desktop.png   1280x720, offline ?debug=1&freeze=1 boot
+      Bolt — CONNECTION LOST · BOT FLYING
+      Under the wave clock's rule, centred on 640 within a pixel. "Bolt" in seat
+      2's own identity colour (0x3dd68c, P3 Spring — the same hue as its ship
+      trim and its nameplate); the fact in the muted HUD grey at 0.85; the em
+      dash and the middot on the muted half, because punctuation is chrome and
+      never identity.
+
+  drawn-back-desktop.png      the same seat, the same name, the return
+      Bolt — BACK · BOT OUT
+
+  drawn-two-rows-desktop.png  a drop and an abandon at once
+      Foreman — LEFT THE MATCH · BOT FLYING     (violet, P4 — newest, on top)
+      Rusty   — CONNECTION LOST · BOT FLYING    (cyan, P2)
+      Two seats, two different facts, two different identity colours, stacked
+      newest-first and not overlapping.
+
+  drawn-dropped-phone.png     844x390 landscape phone
+      The whole row inside the HUD margin, in the top half, clear of the ore
+      cluster, HOME, the onboarding prompt and the minimap.
+
+Every image above was reviewed. The name reads as a NAME on all four — this is
+also where the offline boot earns its keep: the banner spells a seat from the
+same table the plate over its hull reads (`resolveName`), so on a boot whose
+seats are seated bot characters it says "Bolt", not "P3". A seat with no name
+falls back to the `P{n}` identity tag, which is what the two-client capture above
+shows.
+
+Two things the pixels changed, and they were changed BECAUSE of the pixels:
+  * the first capture drew `BoltCONNECTION LOST` — two tokens with a 5 px gap and
+    no separator, which read as one run-on word. The em dash the readback string
+    always carried is now DRAWN, on the muted half;
+  * the band gained its own scrim ({@link ./instrument} `drawScrim`, the wave
+    clock's own peak). A muted grey fact over a lit asteroid is a fact the player
+    cannot read, and per GDD §2.10's own rule a tell the player cannot read is a
+    tell that did not fire. A scrim, never a plate — nothing is drawn outside the
+    band's own rect, so the layer's registered footprint stays what it draws.
+
+
+8. ONE ARTIFACT OF THE FIXTURE, NAMED
 ================================================================================
   long-away.json — the 45-second run
 

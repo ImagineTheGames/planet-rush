@@ -1647,6 +1647,7 @@ async function boot(): Promise<void> {
     installAudioStage();
     installVfxStage();
     installViewStage();
+    installPresenceStage();
   }
 
   // The pause seam is installed on BOTH boots, unlike the debug stages above, and
@@ -5296,6 +5297,85 @@ async function boot(): Promise<void> {
    * Behind ?debug=1, never in a normal build; it mutates only the plain sim data
    * the boot path already reads, and reaches src/sim only through `damageStation`.
    */
+  /**
+   * Install `window.__presenceStage` — the ?debug=1 live-stage seam for the peer
+   * presence banner (a0-76), the same discipline as {@link installPressStage}.
+   *
+   * **What only a boot can prove.** `src/ui/hud.test.ts` proves the model turns
+   * authority's broadcasts into the right lines, and `hud-geometry` proves where
+   * the band lands. Neither can prove the shipped bundle DRAWS one — the leg from
+   * `HudFrame.presence` through `PeerPresenceView` to a pixel is exactly the kind
+   * of wiring that has shipped dead in this codebase before (the M2 dark-matter
+   * class: a merged feature nothing ever called).
+   *
+   * So this feeds REAL {@link ServerMessage} values through
+   * {@link applyPresenceMessage} — the same function the online session's observer
+   * calls, not a shortcut past it — and reads back the rows the view actually
+   * drew, post-cull. `?debug=1` boots offline, where nothing can drop, which is
+   * precisely why the messages are injected rather than waited for.
+   */
+  function installPresenceStage(): void {
+    const stage = {
+      /** A seat dropped: the socket went away and a bot took the controls. `held`
+       *  is a0-72's `heldForMatch` — false is an ABANDON, which is a different
+       *  line. */
+      drop(seat: number, held = true): void {
+        applyPresenceMessage(
+          peerPresence,
+          held
+            ? { type: 'playerSubstituted', player: seat, graceSeconds: 0, heldForMatch: true }
+            : { type: 'playerSubstituted', player: seat, graceSeconds: 0 },
+          world.time,
+        );
+      },
+      /** They rejoined and took their ship back. */
+      back(seat: number): void {
+        applyPresenceMessage(peerPresence, { type: 'playerReclaimed', player: seat }, world.time);
+      },
+      /** The roster's `isBot` column, as `lobbyState` publishes it. */
+      bots(isBot: readonly boolean[]): void {
+        applyPresenceMessage(
+          peerPresence,
+          {
+            type: 'lobbyState',
+            slots: isBot.map((bot, player) => ({
+              player,
+              isBot: bot,
+              shipClass: ShipClass.Vanguard,
+              ready: true,
+            })),
+          },
+          world.time,
+        );
+      },
+      /** Clear the log — a rematch is a second match. */
+      reset(): void {
+        peerPresence.reset();
+      },
+      /** The rows the HUD's view DREW last frame, post-cull. */
+      drawn(): ReturnType<typeof hud.debugPresence> {
+        return hud.debugPresence();
+      },
+      /** …and the lines the model would like drawn, so a test can tell "the model
+       *  said nothing" from "the view culled it". */
+      lines(): { text: string; seat: number; state: string }[] {
+        return peerPresence
+          .read(world.time)
+          .map((l) => ({ text: l.text, seat: l.seat, state: l.state }));
+      },
+    };
+    try {
+      Object.defineProperty(window, '__presenceStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
   function installRepairStage(): void {
     const REPAIR_INDEX = WHEEL_ORDER.indexOf('repair');
     const localStation = () => stationOf(world, LOCAL_PLAYER);

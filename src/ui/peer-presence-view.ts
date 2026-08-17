@@ -26,13 +26,13 @@
  * 12 px), read from {@link ./typography} rather than spelled here.
  */
 
-import { Container, Text } from 'pixi.js';
+import { Container, Graphics, Text } from 'pixi.js';
 import { PLAYER_COLORS } from '@render/index';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
 import type { PlayerId } from '@shared/types';
 import type { PresenceTell } from './peer-presence';
 import { TEXT_MUTED } from './chrome';
-import { hudTracking } from './instrument';
+import { drawScrim, hudTracking, SCRIM } from './instrument';
 import { FONT_BODY } from './typography';
 
 /** Layout-registry id for the banner (one entry, the union of its lines). */
@@ -48,8 +48,16 @@ export const PRESENCE_ID = 'peer-presence';
  */
 export const PRESENCE_ANCHOR: AnchorSpec = { region: 'full', margin: 0 };
 
-/** Gap between the name and the fact behind it, CSS px. */
-export const PRESENCE_TOKEN_GAP = 5;
+/** Gap between the name and the fact behind it, CSS px. The em dash that opens
+ *  the fact token does most of the separating; this is the breathing room around
+ *  it (GDD §4.7 — `—` separates a fact from its reason). */
+export const PRESENCE_TOKEN_GAP = 6;
+/** How far the band's own scrim reaches past its rows, CSS px — the same horizontal
+ *  padding the wave clock's chrome uses, so the two darknesses read as one column
+ *  rather than as two lozenges of different widths. */
+export const PRESENCE_SCRIM_PAD_X = 24;
+/** …and above/below, so the darkness starts before the type does. */
+export const PRESENCE_SCRIM_PAD_Y = 4;
 /** How much dimmer the fact is than the name it trails — the same recessive step
  *  a nameplate's difficulty tag takes, so the eye lands on the seat first. */
 export const PRESENCE_REASON_ALPHA = 0.85;
@@ -63,9 +71,12 @@ export interface DrawnPresenceLine {
   text: string;
   /** The name token alone. */
   name: string;
-  /** The fact token alone, as drawn (the clause is absent when it was dropped). */
+  /** The primary fact — `CONNECTION LOST`, `BACK`, … — never the clause. */
   reason: string;
-  /** True when the `· BOT FLYING` clause was dropped for want of width. */
+  /** The secondary clause AS DRAWN: `BOT FLYING` / `BOT OUT`, or `''` when there
+   *  was none or when it was dropped for want of width. */
+  clause: string;
+  /** True when a clause existed and the row was too wide to carry it. */
   clauseDropped: boolean;
   /** The identity colour the name drew in. */
   color: number;
@@ -77,6 +88,17 @@ export interface DrawnPresenceLine {
 }
 
 export class PeerPresenceView extends Container {
+  /**
+   * The band's own darkness, drawn behind the rows.
+   *
+   * Not decoration: the banner sits over the asteroid field, and a muted grey
+   * fact over a lit rock is a fact the player cannot read — which, per GDD §2.10's
+   * own rule, is a tell that did not fire. It is a SCRIM and not a plate
+   * ({@link ./instrument} — no plates over gameplay), drawn inside the band's own
+   * rect so the layer's registered footprint stays what it draws.
+   */
+  private readonly scrim = new Graphics();
+  private scrimKey = '';
   private readonly names: Text[] = [];
   private readonly reasons: Text[] = [];
   private drawnBounds: Rect | null = null;
@@ -127,13 +149,15 @@ export class PeerPresenceView extends Container {
 
       // Full row first; drop the secondary clause only if the full one will not
       // fit inside the margin. Measured on the real Text, never estimated.
-      const full = line.clause ? `${line.reason} · ${line.clause}` : line.reason;
+      // The separator rides the muted half, exactly as the loot tell's middot
+      // does: punctuation is chrome, never identity (style-guide §2).
+      const full = line.clause ? `— ${line.reason} · ${line.clause}` : `— ${line.reason}`;
       if (reason.text !== full) reason.text = full;
       let width = name.width + PRESENCE_TOKEN_GAP + reason.width;
       let clauseDropped = false;
       const budget = viewportWidth - 2 * margin;
       if (width > budget && line.clause) {
-        reason.text = line.reason;
+        reason.text = `— ${line.reason}`;
         width = name.width + PRESENCE_TOKEN_GAP + reason.width;
         clauseDropped = true;
       }
@@ -161,8 +185,9 @@ export class PeerPresenceView extends Container {
       reason.position.set(left + name.width + PRESENCE_TOKEN_GAP, top);
 
       this.record(drawn, line, {
-        text: `${line.name} — ${reason.text}`,
-        reason: reason.text,
+        text: `${line.name} ${reason.text}`,
+        reason: line.reason,
+        clause: clauseDropped ? '' : line.clause,
         clauseDropped,
         color: name.tint as number,
         x: left,
@@ -182,6 +207,32 @@ export class PeerPresenceView extends Container {
     this.drawnBounds =
       drawn > 0 ? { x: minX, y: minY, width: maxX - minX, height: maxY - minY } : null;
     this.visible = drawn > 0;
+    this.drawChrome(lines);
+  }
+
+  /** Redraw the band's scrim to fit what drew, and only when that rect moves —
+   *  a fading row changes its alpha sixty times a second and its geometry never. */
+  private drawChrome(lines: readonly PresenceTell[]): void {
+    const b = this.drawnBounds;
+    if (!b) {
+      this.scrim.clear();
+      this.scrimKey = '';
+      return;
+    }
+    this.ensureScrim();
+    const x = b.x - PRESENCE_SCRIM_PAD_X;
+    const y = b.y - PRESENCE_SCRIM_PAD_Y;
+    const w = b.width + PRESENCE_SCRIM_PAD_X * 2;
+    const h = b.height + PRESENCE_SCRIM_PAD_Y * 2;
+    const key = `${Math.round(x)}|${Math.round(y)}|${Math.round(w)}|${Math.round(h)}`;
+    if (key !== this.scrimKey) {
+      this.scrim.clear();
+      drawScrim(this.scrim, x, y, w, h, 'center', SCRIM.corner);
+      this.scrimKey = key;
+    }
+    // The darkness fades with the loudest row it is under, so the whole cluster
+    // leaves together instead of a scrim outliving its own text.
+    this.scrim.alpha = lines.reduce((a, l) => Math.max(a, l.alpha), 0);
   }
 
   /** The lines that actually drew last frame, post-cull. */
@@ -208,6 +259,13 @@ export class PeerPresenceView extends Container {
       this.addChild(t);
     }
     return t;
+  }
+
+  /** The scrim is added on first draw so it lands UNDER every pooled Text —
+   *  Pixi draws children in order, and the rows are added as they are needed. */
+  private ensureScrim(): void {
+    if (this.scrim.parent === this) return;
+    this.addChildAt(this.scrim, 0);
   }
 
   private reasonSlot(i: number): Text {
