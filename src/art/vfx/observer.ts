@@ -40,7 +40,7 @@
  * thousands of items per frame.
  */
 
-import { TELL, type TellQueue } from '../tells';
+import { IMPACT, IMPACT_OF, TELL, type ImpactSurface, type TellQueue } from '../tells';
 
 // ---------------------------------------------------------------------------
 // The structural view of the world (satisfied by `src/sim/state.ts`)
@@ -136,6 +136,24 @@ export interface ShieldView {
   readonly radius: number;
 }
 
+/**
+ * What the observer reads off a radar satellite (`RadarSatellite`, feature f1).
+ *
+ * New in a0-68 and **optional**, on the same back-compatible terms as
+ * `ShipView.team`: the sim's own field is optional, and a source that does not
+ * publish satellites reads as a station with none rather than as a crash. It
+ * exists because a satellite is an attackable structure a shot can die on
+ * (`src/sim/projectiles.ts` `resolveHit`), and until this view carried them the
+ * observer could not tell that impact from a shot that hit nothing — which, with
+ * rock as the fall-through, meant a sensor taking a round sounded like stone.
+ */
+export interface SatelliteView {
+  readonly id: number;
+  readonly pos: PointView;
+  readonly radius: number;
+  readonly hp: number;
+}
+
 /** What the observer reads off a build job. `satellite` is the ratified radar
  *  satellite (feature f1) — widened here so a sim `World` still satisfies
  *  `WorldView`; art's construction tell handles it like the other kinds. */
@@ -163,6 +181,8 @@ export interface StationView {
   readonly turrets: readonly TurretView[];
   readonly shields: readonly ShieldView[];
   readonly builds: readonly BuildJobView[];
+  /** Radar satellites in orbit (feature f1). Absent on a source that has none. */
+  readonly satellites?: readonly SatelliteView[];
 }
 
 /** What the observer reads off a pooled turret shot. */
@@ -242,6 +262,17 @@ interface ShipMemo {
   tierSum: number;
   vx: number;
   vy: number;
+  /**
+   * The last frame this hull was a legal target — i.e. was alive *entering* the
+   * frame, which is the state the shot resolved against.
+   *
+   * Without it, the killing blow classifies wrong: `resolveHit` only hits a live
+   * ship, so a shot that hit one is a hull hit; but by the time the observer sees
+   * the world the ship is dead, the geometric scan skips it, and the impact falls
+   * through to the default surface — the player hears STONE for the shot that
+   * just killed somebody. See {@link WorldObserver.impactSurface}.
+   */
+  hullFrame: number;
   seen: number;
 }
 
@@ -285,6 +316,14 @@ interface ShieldMemo {
   y: number;
   /** The station owner's slot — a collapsed shield rings the alarm (GDD §2.2). */
   owner: number;
+  /**
+   * The last frame this bubble was standing *entering* the frame — the same
+   * trick, and the same reason, as {@link ShipMemo.hullFrame}. `damageStation`
+   * spends a hit on a live shield before the core sees any of it, so the round
+   * that empties the last bubble was still a shield hit; reading the post-hit
+   * world alone would call it a core hit and the two are different materials.
+   */
+  upFrame: number;
   seen: number;
 }
 
@@ -408,6 +447,7 @@ export class WorldObserver {
           tierSum,
           vx: ship.vel.x,
           vy: ship.vel.y,
+          hullFrame: ship.alive ? this.frame : -1,
           seen: this.frame,
         };
         this.ships.set(ship.id, memo);
@@ -417,6 +457,10 @@ export class WorldObserver {
         }
       }
       memo.seen = this.frame;
+      // Read BEFORE the memo is overwritten below: "was this hull shootable when
+      // the tick that produced this world began?" is the question a shot resolved
+      // against, and it is the last moment that answer is available.
+      if (memo.alive) memo.hullFrame = this.frame;
 
       if (!silent) {
         if (ship.alive && !memo.alive) {
@@ -731,6 +775,7 @@ export class WorldObserver {
           x: station.pos.x,
           y: station.pos.y,
           owner: station.owner,
+          upFrame: shield.hp > 0 ? this.frame : -1,
           seen: this.frame,
         };
         this.shields.set(shield.id, memo);
@@ -743,6 +788,8 @@ export class WorldObserver {
         out.push(TELL.shieldHit, station.pos.x, station.pos.y, 0, strength, station.owner);
       }
       memo.seen = this.frame;
+      // Same read-before-overwrite as `ShipMemo.hullFrame`, one field up.
+      if (memo.hp > 0) memo.upFrame = this.frame;
       memo.hp = shield.hp;
       memo.maxHp = shield.maxHp;
       memo.radius = shield.radius;
@@ -804,7 +851,15 @@ export class WorldObserver {
           p.pos.x >= 0 && p.pos.y >= 0 && p.pos.x <= world.bounds.width && p.pos.y <= world.bounds.height;
         if (!expired && inside) {
           const heading = Math.atan2(p.vel.y, p.vel.x);
-          out.push(TELL.shotImpact, p.pos.x, p.pos.y, heading, clamp01(p.damage / 10), -1);
+          out.push(
+            TELL.shotImpact,
+            p.pos.x,
+            p.pos.y,
+            heading,
+            clamp01(p.damage / 10),
+            -1,
+            this.impactSurface(world, p.pos.x, p.pos.y),
+          );
         }
       }
       memo.active = p.active;
@@ -813,6 +868,71 @@ export class WorldObserver {
       memo.y = p.pos.y;
     }
     if (this.shots.length > shots.length) this.shots.length = shots.length;
+  }
+
+  /**
+   * What a shot that died at `(x, y)` landed on — the `variant` a `shotImpact`
+   * tell carries, and the answer to *"they should also be different depending on
+   * the thing that was hit"* (developer, 2026-08-17).
+   *
+   * ## Why this is derived and not told
+   *
+   * The simulation emits no events, deliberately (GDD §4.1, and the top of this
+   * file). It also carries no art-facing target kind — `observeMuzzles` has said
+   * so since the laser retired, and classifying geometrically is the precedent it
+   * set. So the surface is derived here, in the observer, which is the ONE thing
+   * both halves of art read and the one thing that runs identically on a locally
+   * predicted world and on an authoritative server snapshot (GDD §4.2). Deriving
+   * it in the renderer instead would let the two paths disagree about what the
+   * player hears; deriving it in the audio engine would be the same bug wearing a
+   * different hat. The tell carries it, so audio is *told*.
+   *
+   * ## The order is the sim's order, not a guess
+   *
+   * `src/sim/projectiles.ts` `resolveHit` despawns a shot on the FIRST body it
+   * strikes, testing ships → asteroids → turrets → satellites → station. This
+   * walks the same list in the same order, so where two bodies overlap the
+   * classification agrees with the branch that actually ran. Rock is last and is
+   * also the fall-through, which is what `hitsHull` already assumed and what a
+   * mined-out rock (removed at end of step, so gone by the time we look) needs.
+   *
+   * ## The two frame-boundary cases
+   *
+   * The world we are looking at is the one AFTER the hit resolved, so the two
+   * targets a shot can destroy have to be remembered rather than seen:
+   * {@link ShipMemo.hullFrame} and {@link ShieldMemo.upFrame}. Both are written
+   * from the memo's *previous* value earlier in the same frame, which is exactly
+   * the state the shot met. Everything else the scan reads survives its own hit.
+   *
+   * Cost: ≤8 ships, then ≤8 stations × (≤4 turrets + ≤1 satellite + ≤2 shields).
+   * A short scan over a small set, once per shot that landed — never over the
+   * ~200-rock field, for the same reason `hitsHull` does not.
+   */
+  private impactSurface(world: WorldView, x: number, y: number): ImpactSurface {
+    for (const ship of world.ships) {
+      if (!ship.alive && this.ships.get(ship.id)?.hullFrame !== this.frame) continue;
+      if (within(x, y, ship.pos, ship.radius)) return IMPACT_OF.ship;
+    }
+    for (const station of world.stations) {
+      for (const turret of station.turrets) {
+        if (within(x, y, turret.pos, turret.radius)) return IMPACT_OF.turret;
+      }
+      if (station.satellites) {
+        for (const sat of station.satellites) {
+          if (within(x, y, sat.pos, sat.radius)) return IMPACT_OF.satellite;
+        }
+      }
+      // A live bubble stands in front of the core and eats the whole hit
+      // (`damageStation`), so inside it the surface is the shield whatever the
+      // core is doing — and `stationTargetRadius` is that bubble's radius, which
+      // is why the core test below is the same point test at a smaller radius.
+      for (const shield of station.shields) {
+        const up = shield.hp > 0 || this.shields.get(shield.id)?.upFrame === this.frame;
+        if (up && within(x, y, station.pos, shield.radius)) return IMPACT_OF.shield;
+      }
+      if (within(x, y, station.pos, station.radius)) return IMPACT_OF.core;
+    }
+    return IMPACT.rock;
   }
 
   // -------------------------------------------------------------------------

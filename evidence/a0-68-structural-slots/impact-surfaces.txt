@@ -1,0 +1,16 @@
+=== the surface a shotImpact tell comes out carrying ===
+
+scenario                                   sim branch that ran      surface   → voice
+----------------------------------------------------------------------------------------------------
+an enemy ship                              damageShip               hull      → impactHull
+an enemy ship, killed by the shot          damageShip → dead        hull      → impactHull
+an asteroid                                chipAsteroid             rock      → impactRock
+an enemy turret                            damageTurret             station   → impactStation
+an enemy core behind a live shield (1 up)  damageStation → shields  shield    → impactShield
+an enemy core, no shield                   damageStation → core     station   → impactStation
+
+ASTEROID.maxRadius 46 · the scan is ships, then per station: turrets,
+satellites, live shields, core — the same order and the same first-body-wins
+rule as `src/sim/projectiles.ts` resolveHit, so the two cannot disagree.
+
+(Regenerate: npx vite-node evidence/a0-68-structural-slots/impact-surfaces.ts)

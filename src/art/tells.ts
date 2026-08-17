@@ -28,12 +28,31 @@
  *
  * ## The payload convention
  *
- * Every tell carries `x, y, angle, magnitude, player`. What they *mean* is
- * per-kind and documented in {@link TELL_PAYLOAD}; the two constants a reader
+ * Every tell carries `x, y, angle, magnitude, player, variant`. What they *mean*
+ * is per-kind and documented in {@link TELL_PAYLOAD}; the two constants a reader
  * should hold on to are: `angle` is radians in sim space (y-down, +x at angle 0,
  * matching `Ship.angle`), and `magnitude` is normalised 0..1 wherever it is a
  * strength — so the VFX scales a burst and the audio scales a gain from the same
  * number, and they can never disagree about how big a moment was.
+ *
+ * ## The variant column, and why `magnitude` is not it (a0-68)
+ *
+ * `variant` is a small integer meaning **which sub-kind of this moment** — today,
+ * which surface a shot landed on ({@link IMPACT}). It is a separate column rather
+ * than a value packed into `magnitude` for a reason the sound board paid for:
+ * `magnitude` is documented as a *strength*, the mix multiplies a gain out of it
+ * ({@link TELL_PAYLOAD}, `../audio/engine` `levelFor`), and a categorical value
+ * smuggled into a continuous one cannot be read back without knowing which kind
+ * it came from. A shot that hits a rock is not a quieter shot that hit a hull.
+ *
+ * The developer denied `shotImpact` with *"none of these sound like impact
+ * sounds, they should also be different depending on the thing that was hit…"*
+ * and no voice could answer that, because the tell did not carry what was hit.
+ * This column is that sentence's answer, and it deliberately arrives HERE — in
+ * the one vocabulary both halves of art read — rather than in the audio engine
+ * picking a sound out of whatever the renderer happened to know. Audio is *told*.
+ * Both the predicted local world and an authoritative server snapshot go through
+ * the same `../vfx/observer`, so both paths hear the same surface.
  */
 
 // ---------------------------------------------------------------------------
@@ -127,11 +146,83 @@ export const TELL_NAMES: readonly string[] = (() => {
 /** How many kinds there are — the width of every per-kind lookup table. */
 export const TELL_COUNT = TELL_NAMES.length;
 
-/** What `x, y, angle, magnitude, player` mean for one kind. */
+// ---------------------------------------------------------------------------
+// Impact surfaces — the `variant` column's one meaning today
+// ---------------------------------------------------------------------------
+
+/**
+ * What a shot landed on, for {@link TELL.shotImpact}'s `variant` column.
+ *
+ * ## Six branches in the sim, four voices out here
+ *
+ * `src/sim/projectiles.ts` `resolveHit` tests a shot against, in this order:
+ * an enemy **ship**, an **asteroid**, an enemy **turret**, an enemy **radar
+ * satellite**, and finally the enemy **station** — where `damageStation` spends
+ * the hit on a live **shield** bubble before it reaches the **core**. That is six
+ * distinguishable physical events, and it is what the sim really knows at the
+ * moment of impact; `docs/sound-structural-notes.md` writes the derivation down.
+ *
+ * Four of them are folded into {@link station} because the *arrival* is the same
+ * event on all three — a round biting anchored, mounted metal — and because each
+ * already has its own **consequence** voice a beat later (`turretDown`,
+ * `coreHit`, and a satellite's own death). The impact says what you hit; the
+ * consequence says what it did. Splitting the arrival three ways as well would
+ * spend three slots on a distinction the next sound already makes.
+ *
+ * The fold is a decision, not a limit — the observer classifies all six and the
+ * three station-side ones collapse in ONE place ({@link IMPACT_OF}), so a later
+ * brief that wants a satellite to ring differently moves a row rather than
+ * re-deriving any of this.
+ */
+export const IMPACT = {
+  /** An enemy ship's hull — thin plate over a body that is moving. */
+  hull: 0,
+  /** An asteroid. Stone: it absorbs, it does not ring. The default surface. */
+  rock: 1,
+  /** A live shield bubble over a core — the hit never reached anything solid. */
+  shield: 2,
+  /** Anchored station metal: a turret, a radar satellite, or the bare core. */
+  station: 3,
+} as const;
+
+/** One of the {@link IMPACT} surfaces. */
+export type ImpactSurface = (typeof IMPACT)[keyof typeof IMPACT];
+
+/** Surface names, indexed by surface. Debugging, tests, and the review board. */
+export const IMPACT_NAMES: readonly string[] = (() => {
+  const names: string[] = [];
+  for (const [name, surface] of Object.entries(IMPACT)) names[surface] = name;
+  return names;
+})();
+
+/**
+ * The surface a shot that hit `what` reads as — the one place the sim's six
+ * branches collapse into the four voices the bank carries.
+ *
+ * Named for the fold rather than inlined at the call site so that "a satellite
+ * sounds like the station it orbits" is a row somebody can move, and so the
+ * observer and any test agree on it by construction.
+ */
+export const IMPACT_OF: Readonly<Record<'ship' | 'asteroid' | 'turret' | 'satellite' | 'shield' | 'core', ImpactSurface>> = {
+  ship: IMPACT.hull,
+  asteroid: IMPACT.rock,
+  shield: IMPACT.shield,
+  turret: IMPACT.station,
+  satellite: IMPACT.station,
+  core: IMPACT.station,
+};
+
+/** What `x, y, angle, magnitude, player, variant` mean for one kind. */
 export interface PayloadNote {
   readonly at: string;
   readonly angle: string;
   readonly magnitude: string;
+  /**
+   * What the `variant` column means for this kind, or absent where the kind does
+   * not use it (which is every kind but one, today). A kind that leaves it out
+   * always reads `variant === 0`.
+   */
+  readonly variant?: string;
 }
 
 /**
@@ -147,7 +238,12 @@ export const TELL_PAYLOAD: Readonly<Record<TellKind, PayloadNote>> = {
   [TELL.oreCollect]: { at: 'the collecting ship', angle: 'chunk → ship direction', magnitude: 'hold fullness 0..1' },
   [TELL.holdFull]: { at: 'the ship', angle: 'unused (0)', magnitude: '1' },
   [TELL.turretFire]: { at: 'the muzzle', angle: 'barrel facing', magnitude: '1' },
-  [TELL.shotImpact]: { at: 'where the shot died', angle: 'flight direction', magnitude: 'damage / 10, clamped' },
+  [TELL.shotImpact]: {
+    at: 'where the shot died',
+    angle: 'flight direction',
+    magnitude: 'damage / 10, clamped',
+    variant: 'the surface it landed on ({@link IMPACT}) — hull, rock, shield, station',
+  },
   [TELL.shieldHit]: { at: 'the shield bubble centre', angle: 'unused (0)', magnitude: 'remaining strength 0..1' },
   [TELL.shieldDown]: { at: 'the shield bubble centre', angle: 'unused (0)', magnitude: 'bubble radius / 64' },
   [TELL.coreHit]: { at: 'the core', angle: 'unused (0)', magnitude: 'remaining core fraction 0..1' },
@@ -163,6 +259,13 @@ export const TELL_PAYLOAD: Readonly<Record<TellKind, PayloadNote>> = {
   [TELL.waveArrive]: { at: 'the arena centre', angle: 'unused (0)', magnitude: 'wave number / 5' },
   [TELL.collapseBegin]: { at: 'the arena centre', angle: 'unused (0)', magnitude: '1' },
   [TELL.stationDeath]: { at: 'the dying station', angle: 'outward angle from centre', magnitude: 'station radius / 64' },
+  // The outcome has always been here, and it is deliberately NOT moved into the
+  // `variant` column beside `shotImpact`'s surface (a0-68). This magnitude is
+  // already categorical, already documented as such, and already read by the
+  // soundtrack (`../audio/music` `MusicScore.end`); a second copy of one fact is
+  // worse than one copy in an unusual column. The audio bank collapsed win and
+  // loss into a single sting for six months while the tell was telling both
+  // halves of art which one it was — that was never a plumbing gap.
   [TELL.matchEnd]: { at: 'the arena centre', angle: 'unused (0)', magnitude: '1 win, 0 loss' },
   [TELL.turretDown]: { at: 'the turret mount', angle: 'barrel facing', magnitude: '1 (player = the owner whose deterrent died)' },
 };
@@ -202,6 +305,12 @@ export class TellQueue {
   readonly magnitude: Float32Array;
   /** Owning player slot, or -1 where a tell belongs to nobody. */
   readonly player: Int8Array;
+  /**
+   * Which sub-kind of this moment — see the module doc and {@link IMPACT}.
+   * `0` on every kind that does not use it, which is every kind but
+   * {@link TELL.shotImpact}.
+   */
+  readonly variant: Uint8Array;
 
   private used = 0;
   private overflow = 0;
@@ -216,6 +325,7 @@ export class TellQueue {
     this.angle = this.alloc(() => new Float32Array(this.capacity));
     this.magnitude = this.alloc(() => new Float32Array(this.capacity));
     this.player = this.alloc(() => new Int8Array(this.capacity));
+    this.variant = this.alloc(() => new Uint8Array(this.capacity));
   }
 
   private alloc<T>(make: () => T): T {
@@ -251,6 +361,7 @@ export class TellQueue {
     angle = 0,
     magnitude = 1,
     player = -1,
+    variant = 0,
   ): boolean {
     if (this.used >= this.capacity) {
       this.overflow++;
@@ -263,7 +374,13 @@ export class TellQueue {
     this.angle[i] = angle;
     this.magnitude[i] = magnitude;
     this.player[i] = player;
+    this.variant[i] = variant;
     return true;
+  }
+
+  /** The variant at slot `i` (`0 <= i < length`). `0` where a kind has none. */
+  variantAt(i: number): number {
+    return this.variant[i] ?? 0;
   }
 
   /** The kind at slot `i` (`0 <= i < length`). */

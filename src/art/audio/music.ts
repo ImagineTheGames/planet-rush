@@ -92,6 +92,26 @@ export const SIEGE_OFF = 0.2;
  */
 export const STING_GATE = 0.5;
 
+/**
+ * Seconds the music sting waits after the gate opens, so the **SFX** sting gets
+ * there first (a0-68).
+ *
+ * There are two win/loss cues and they are not the same statement.
+ * `SOUND.matchWin`/`matchLoss` are the *verdict* — short, dry, on the SFX bus,
+ * fired by `./engine` the frame {@link STING_GATE} opens, and the one a player
+ * with the music slider at zero still hears. `SOUND.musicWin`/`musicLoss` are the
+ * *reading* — longer, on the music bus, and the emotional tail. Firing both on
+ * the same frame is the two of them fighting for the same 200 ms; a short lead
+ * makes it a sequence instead, which is what the developer's *"we need separate
+ * ones for winning and losing"* actually needs to be legible.
+ *
+ * Held here rather than in the engine because this is the file that owns *when
+ * the music speaks*. It is unconditional — a director running without an engine
+ * (a test, a headless harness) still waits, so the timing under test is the
+ * timing that ships.
+ */
+export const STING_LEAD_S = 0.55;
+
 /** Where the match is on its arc — a label over the continuous model, for reads. */
 export type MusicPhase = 'calm' | 'rising' | 'siege' | 'collapse' | 'over';
 
@@ -294,6 +314,8 @@ export class MusicDirector {
   private readonly dread: SustainedVoice;
   private enabled = true;
   private stings = 0;
+  /** Seconds the gate has been open with a sting still held ({@link STING_LEAD_S}). */
+  private stingLead = 0;
 
   constructor(
     private readonly graph: AudioGraph,
@@ -340,9 +362,15 @@ export class MusicDirector {
 
     const sting = this.score.pendingSting;
     if (this.enabled && sting && hushGain > STING_GATE) {
-      this.graph.play(sting === 'win' ? SOUND.musicWin : SOUND.musicLoss, 1, 1, 'music');
-      this.score.clearSting();
-      this.stings++;
+      // The verdict has the floor for {@link STING_LEAD_S} first (a0-68). The
+      // lead is counted only while the gate is open, so a long quiet does not
+      // spend it and the two cues stay the same distance apart every match.
+      this.stingLead += dt > 0 ? dt : 0;
+      if (this.stingLead >= STING_LEAD_S) {
+        this.graph.play(sting === 'win' ? SOUND.musicWin : SOUND.musicLoss, 1, 1, 'music');
+        this.score.clearSting();
+        this.stings++;
+      }
     }
   }
 
@@ -358,6 +386,8 @@ export class MusicDirector {
 
   /** Stop every stem now. A match teardown, or the mix going away. */
   stop(): void {
+    // A rematch must not inherit a lead the last match already half-spent.
+    this.stingLead = 0;
     this.stopVoices();
   }
 

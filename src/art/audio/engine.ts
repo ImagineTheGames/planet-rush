@@ -58,6 +58,7 @@ import { UnderAttackAlarm, type AlarmOptions } from './alarm';
 import {
   SOUND,
   TELL_SOUND,
+  soundForTell,
   CUE_SOUND,
   CUE_UI,
   XP_TICK_SEMITONES,
@@ -70,7 +71,7 @@ import { SustainedVoice } from './weapons';
 import type { AudioContextLike } from './context';
 import { AudioGraph, type LoopHandle, type MixOptions, type Route, type Spatial } from './graph';
 import { HERE, place, R_NEAR, R_FAR, type Placement } from './spatial';
-import { MusicDirector, MusicScore, type MusicDirectorOptions } from './music';
+import { MusicDirector, MusicScore, STING_GATE, type MusicDirectorOptions } from './music';
 
 /**
  * Distance in world units at which a sound is at full level. Re-exported from
@@ -82,18 +83,21 @@ export const EARSHOT_NEAR = R_NEAR;
 export const EARSHOT_FAR = R_FAR;
 
 /**
- * World tells heard from anywhere — the wave klaxon, the collapse, the match-end
- * fanfare. Emitted "at the arena centre", they would fall off (or be culled) for a
- * player at the rim of an eight-facility claim, yet the wave clock is a mechanic
- * everyone must hear (GDD §2.3). Like the alarm and the win/loss/death stings
- * (ratified a3-03), these are cockpit alerts, not located combat: no pan, no
- * falloff. Everything else the sim emits at a place is spatialised.
+ * World tells heard from anywhere — the wave klaxon, the collapse. Emitted "at
+ * the arena centre", they would fall off (or be culled) for a player at the rim
+ * of an eight-facility claim, yet the wave clock is a mechanic everyone must hear
+ * (GDD §2.3). Like the alarm and the win/loss/death stings (ratified a3-03),
+ * these are cockpit alerts, not located combat: no pan, no falloff. Everything
+ * else the sim emits at a place is spatialised.
+ *
+ * `matchEnd` **left this set** in a0-68 without changing behaviour: the outcome
+ * no longer reaches {@link AudioEngine.routine} at all — it is held past the hush
+ * and played through `flat` directly, which is what a membership here bought it.
+ * A row that can never be read is dark matter (`docs/dark-matter-scan.md`), and a
+ * reader finding `matchEnd` listed here would reasonably conclude the routing
+ * still runs through the table.
  */
-const GLOBAL_TELLS: ReadonlySet<TellKind> = new Set<TellKind>([
-  TELL.waveArrive,
-  TELL.collapseBegin,
-  TELL.matchEnd,
-]);
+const GLOBAL_TELLS: ReadonlySet<TellKind> = new Set<TellKind>([TELL.waveArrive, TELL.collapseBegin]);
 
 /** Below this the mix is treated as silent and one-shots are not started. */
 const HUSHED = 0.001;
@@ -280,6 +284,15 @@ export class AudioEngine {
   private listenerY = 0;
   private hasListener = false;
   private started = false;
+  /**
+   * The match's outcome, waiting for the three seconds of quiet to lift (a0-68).
+   *
+   * `null` unless a `matchEnd` tell has arrived and its sting has not sounded yet.
+   * See {@link consume}'s `matchEnd` case for why it is held rather than played.
+   */
+  private pendingOutcome: 'win' | 'loss' | null = null;
+  private outcomeStings = 0;
+
   private played = 0;
   private skipped = 0;
   private lastSpatial: Placement = HERE;
@@ -484,6 +497,7 @@ export class AudioEngine {
       const y = tells.y[i]!;
       const magnitude = tells.magnitude[i]!;
       const player = tells.player[i]!;
+      const variant = tells.variantAt(i);
 
       // The alarm hears only YOUR SIDE's home taking sustained damage (GDD §2.2):
       // your own, and a teammate's in TEAMS — never an enemy's or a neutral's
@@ -531,9 +545,28 @@ export class AudioEngine {
           if (this.alarmRingsFor(player)) this.alarm.silence();
           break;
 
+        // --- The match resolving -------------------------------------------
+        case TELL.matchEnd:
+          // HELD, not played (a0-68). A match ends the tick the last opposing
+          // core dies, so this tell arrives in the same frame as `stationDeath`
+          // and the three-second quiet starts underneath it. Playing it here put
+          // the sting into a mix that reaches zero 0.12 s later — audible for a
+          // tenth of a second and then gone, which is the a0-55 bug one slot
+          // over and a fair reading of *"none of these sound like match end"*
+          // for four takes nobody ever actually heard.
+          //
+          // The fix is NOT to exempt it from the hush the way the death fall is:
+          // the three seconds of silence are a ratified design element (GDD
+          // §4.7) and a win fanfare inside them would be the tone paragraph
+          // deleted. So the outcome waits, and lands on the far side of the
+          // quiet — where the developer is looking at a result screen and the
+          // one thing the game must not be ambiguous about is which way it went.
+          this.pendingOutcome = magnitude >= 0.5 ? 'win' : 'loss';
+          break;
+
         // --- Everything else -----------------------------------------------
         default:
-          this.routine(kind, x, y, magnitude);
+          this.routine(kind, x, y, magnitude, variant);
           break;
       }
     }
@@ -633,6 +666,19 @@ export class AudioEngine {
     if (this.ownsDeath) this.death.update(step);
     this.thruster?.update(step);
 
+    // The outcome sting, on the far side of the quiet (a0-68). Same gate the
+    // music sting uses ({@link STING_GATE}) so both are timed off the one clock
+    // the moment actually has, and this one goes FIRST — `./music` waits a
+    // further {@link STING_LEAD_S} before its own. Verdict, then reading.
+    //
+    // Note the gate reads 1 when no death is being held, so an end that somehow
+    // arrives without one still sounds on the next frame rather than never.
+    if (this.pendingOutcome && this.death.gain > STING_GATE) {
+      const sting = this.pendingOutcome === 'win' ? SOUND.matchWin : SOUND.matchLoss;
+      this.pendingOutcome = null;
+      if (this.flat(sting, 1)) this.outcomeStings++;
+    }
+
     // The soundtrack follows the local siege, then rides the same hush every
     // other voice does — and holds its win/loss sting until the quiet lifts.
     this.musicScore.setUnderAttack(this.alarm.active);
@@ -671,6 +717,9 @@ export class AudioEngine {
     // sting's memory has to as well — otherwise the new match's FIRST engagement
     // reads as "the one we already sounded" and the alarm opens the match mute.
     this.alarmSounded = 0;
+    // A rematch must not open by sounding the LAST match's result — the one
+    // failure mode of holding a sting across the hush.
+    this.pendingOutcome = null;
     this.releaseAlarmDuck();
     if (this.ownsDeath) this.death.reset();
     this.thruster?.stop();
@@ -722,8 +771,10 @@ export class AudioEngine {
    * above; reaching here with one is a no-op rather than a silent bug, and the
    * coverage test asserts the mapping is complete either way.
    */
-  private routine(kind: TellKind, x: number, y: number, magnitude: number): void {
-    const sound = TELL_SOUND[kind];
+  private routine(kind: TellKind, x: number, y: number, magnitude: number, variant = 0): void {
+    // `soundForTell`, not `TELL_SOUND` — one kind's voice depends on its own
+    // payload (`./bank` {@link SPLIT_TELLS}), and the table alone cannot say so.
+    const sound = soundForTell(kind, magnitude, variant);
     if (!sound) return;
     const level = levelFor(kind, magnitude);
     // A global klaxon plays flat; everything the sim placed is spatialised.
