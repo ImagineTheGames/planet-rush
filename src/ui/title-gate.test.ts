@@ -29,6 +29,7 @@ import {
   PROMPT,
   SEAL_CAP_MS,
   SEAL_FLOOR_MS,
+  TITLE_GATE_DOOR_ID,
   TITLE_GATE_ID,
   TITLE_GATE_ROOT_CSS,
   TRANSITION,
@@ -1193,6 +1194,178 @@ describe('a phone held portrait', () => {
     expect(box.height).toBeLessThanOrEqual(logical.height);
   });
 });
+
+// ---------------------------------------------------------------------------
+// THE ENTRANCE ON A PHONE — a0-71
+// ---------------------------------------------------------------------------
+//
+// Reported: *"the title menu flies in from the bottom right instead of starting
+// off centered"*, and then, when a0-70 could not find it on a desktop: *"no I'm
+// on mobile, on PC it's fine"*.
+//
+// It is real, and it is this. Filmed on the two PORTRAIT device profiles the CI
+// mobile shards use — 390×844 dpr 3 and 412×915 dpr 2.6, both `isMobile: true`,
+// both taking `computeRootTransform`'s rotated branch — the shipped door leaves
+// `transitionrun` on `transform` in the browser's own event log, runs for
+// 1500 ms, and lands on `translate(-50%,-50%)` having started from the identity.
+// Frames, matrices and the desktop control are in
+// `evidence/a0-70-title-entrance/audit.txt`.
+//
+// The cause is one CSS rule: **a `var()` with no fallback is not a default of
+// zero, it invalidates the entire declaration.** Until `apply()` writes
+// `--pr-gate-door-scale`, `transform:translate(-50%,-50%) scale(var(…))` is
+// invalid at computed-value time and computes to `none` — and a door written
+// `left:50%;top:50%` with no transform hangs off the screen's centre by its
+// top-left corner, into the bottom-right quadrant. The same declaration carries
+// `transition:transform 1500ms`, so when the variable lands the door does not
+// appear in the middle, it *travels* there.
+//
+// Whether the browser resolves style in that window is not this file's to
+// control (see `gvar`), which is why the fix is for the markup to be correct on
+// its own rather than for the boot to be raced. These two tests fail on the code
+// as shipped before a0-71.
+describe('the entrance on a phone held portrait (a0-71)', () => {
+  it('paints the sealed door centred on its first computed style, before any variable is set', () => {
+    // The platform the report actually came from: portrait, and a phone. Both
+    // halves matter — `computeRootTransform` needs `isMobile` AND `physH > physW`
+    // to rotate, so a narrow desktop window reaches neither this branch nor this
+    // bug. 390×844 is the `iphone` row of QA's own device matrix.
+    const portrait = computeRootTransform(390, 844, true);
+    expect(portrait.rotated).toBe(true);
+
+    // The door, exactly as the browser first receives it — the style attribute
+    // off the shipped markup, with NO custom property set, because at the instant
+    // `GateDom.mount` appends the overlay none of them are.
+    const door = styleOf(titleGateHtml(), TITLE_GATE_DOOR_ID);
+    const first = computedValues(door, {});
+
+    // 1. THE DECLARATION SURVIVES. `null` here is `transform:none` — the whole
+    //    bug in one value, and what today's code answers.
+    expect(first.get('transform')).not.toBeNull();
+
+    // 2. AND IT IS THE CENTRING ONE. Not merely valid: the sealed door's own
+    //    transform, which is what makes the first frame the finished frame.
+    expect(first.get('transform')).toBe('translate(-50%,-50%) scale(1)');
+    expect(first.get('opacity')).toBe('1');
+
+    // 3. …AND IT IS ALREADY WHAT `apply()` IS ABOUT TO WRITE. This is the
+    //    assertion that closes the fly-in rather than just the off-centre frame:
+    //    a transition needs two DIFFERENT computed values, so if the first paint
+    //    and the sealed phase agree there is nothing for 1500 ms to interpolate.
+    const sealed = computedValues(door, gateVars('locked', throughScale({ width: 844, height: 390 })));
+    expect(first).toEqual(sealed);
+
+    // 4. And the door is still a door once the press lands — the fallbacks are
+    //    what an unset variable resolves to, never what a set one overrides.
+    const entering = computedValues(door, gateVars('entering', 4));
+    expect(entering.get('transform')).toBe('translate(-50%,-50%) scale(4)');
+  });
+
+  it('leaves no moving part of the screen resolving to nothing', () => {
+    // The door is the one the report names, but the motion log caught sixteen
+    // bolts, both leaves, the lock and the hazard stripes starting at the same
+    // instant — every `var()` in a declaration that also carries a `transition`.
+    // So the property is stated over the WHOLE screen: every custom property the
+    // markup reads must carry a fallback, and that fallback must be the sealed
+    // door's own value for it. Anything else is a first frame that does not match
+    // the phase the gate believes it is in.
+    const html = titleGateHtml();
+    const locked = gateVars('locked', 1);
+    const referenced = [...html.matchAll(/var\(\s*(--pr-gate-[a-z-]+)\s*(,)?/g)];
+    expect(referenced.length).toBeGreaterThan(8);
+
+    for (const [, name, comma] of referenced) {
+      expect(comma, `${name} is read with no fallback — the declaration is invalid until it is set`).toBe(',');
+    }
+    // …and each fallback says what the sealed door says. `--pr-gate-vw/vh` and
+    // `--pr-gate-safe-bottom` are viewport measurements rather than phase state,
+    // and carry their own documented fallbacks (`1vw`, `1vh`, `0px`).
+    for (const [name, value] of Object.entries(locked)) {
+      const at = html.indexOf(`var(${name}`);
+      if (at < 0) continue;
+      const reference = html.slice(at, matchParen(html, at + 'var'.length) + 1);
+      expect(resolveVars(`x:${reference};`, {}).get('x'), `${name}'s fallback in ${reference}`).toBe(value);
+    }
+  });
+});
+
+/** The `style="…"` of the element with `id`, straight out of the shipped markup. */
+function styleOf(html: string, id: string): string {
+  const match = new RegExp(`<[a-z]+ id="${id}"[^>]*\\sstyle="([^"]*)"`).exec(html);
+  if (!match) throw new Error(`no element #${id} with a style attribute`);
+  return match[1]!;
+}
+
+/**
+ * A declaration block's computed values, given the custom properties that are
+ * actually set — `null` for any declaration that is **invalid at computed-value
+ * time**, which is the one CSS rule this whole bug is made of.
+ *
+ * Not a CSS engine: it substitutes `var()` and reports which declarations
+ * survive, which is exactly the question here. The test environment is `node`
+ * (vite.config.ts) and jsdom's `getComputedStyle` does not resolve `var()` at
+ * all, so a DOM would answer this question with silence rather than with a
+ * different answer.
+ */
+function computedValues(decls: string, set: Readonly<Record<string, string>>): Map<string, string | null> {
+  return resolveVars(decls, set);
+}
+
+function resolveVars(decls: string, set: Readonly<Record<string, string>>): Map<string, string | null> {
+  const out = new Map<string, string | null>();
+  for (const decl of splitTopLevel(decls, ';')) {
+    const colon = decl.indexOf(':');
+    if (colon < 0) continue;
+    const prop = decl.slice(0, colon).trim();
+    if (prop.startsWith('--')) continue; // custom properties are not what is asked
+    out.set(prop, substitute(decl.slice(colon + 1).trim(), set));
+  }
+  return out;
+}
+
+/** `var(--x, fallback)` → the set value, else the fallback, else INVALID (null),
+ *  which propagates to the whole declaration exactly as the spec says it does. */
+function substitute(value: string, set: Readonly<Record<string, string>>): string | null {
+  const at = value.indexOf('var(');
+  if (at < 0) return value;
+  const close = matchParen(value, at + 'var('.length - 1);
+  const inner = value.slice(at + 'var('.length, close);
+  const comma = splitTopLevel(inner, ',');
+  const name = comma[0]!.trim();
+  const fallback = comma.length > 1 ? comma.slice(1).join(',').trim() : null;
+  const resolved = set[name] ?? fallback;
+  if (resolved === null || resolved === undefined) return null;
+  const rest = substitute(value.slice(0, at) + resolved + value.slice(close + 1), set);
+  return rest;
+}
+
+/** The index of the `)` closing the `(` at `open`. */
+function matchParen(value: string, open: number): number {
+  let depth = 0;
+  for (let i = open; i < value.length; i++) {
+    if (value[i] === '(') depth++;
+    else if (value[i] === ')' && --depth === 0) return i;
+  }
+  throw new Error(`unbalanced parentheses in ${value}`);
+}
+
+/** Split on `sep`, but not inside parentheses — `translateY(0)` is one value and
+ *  `calc(var(--a, 1vw) * 2)` is one too. */
+function splitTopLevel(value: string, sep: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < value.length; i++) {
+    if (value[i] === '(') depth++;
+    else if (value[i] === ')') depth--;
+    else if (value[i] === sep && depth === 0) {
+      parts.push(value.slice(start, i));
+      start = i + 1;
+    }
+  }
+  parts.push(value.slice(start));
+  return parts.filter((p) => p.trim().length > 0);
+}
 
 describe('?gate=0', () => {
   it('is off by default, and has to be asked for by name', () => {

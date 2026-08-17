@@ -728,6 +728,58 @@ function vh(n: number): string {
 }
 
 /**
+ * The **sealed** door's own ten values — the state this screen is first painted
+ * in, spelled by {@link gateVars} rather than retyped, so a fallback below can
+ * never drift from the phase it is the fallback for.
+ */
+const LOCKED_VARS: GateVars = gateVars('locked', 1);
+
+/**
+ * `var(--pr-gate-<name>, <the sealed door's own value>)` — a reference that is
+ * **valid before `apply()` has run**.
+ *
+ * ── WHY EVERY ONE OF THESE NEEDS A FALLBACK (a0-71, 2026-08-17) ─────────────
+ * *"the title menu flies in from the bottom right instead of starting off
+ * centered"*, on a phone, and never on a desktop. Filmed on the 390×844 and
+ * 412×915 profiles the CI mobile shards use, at `isMobile: true`
+ * (`evidence/a0-70-title-entrance/audit.txt` §A–§C).
+ *
+ * A `var()` reference to a property that is not set and has no fallback makes
+ * the WHOLE declaration invalid at computed-value time, so `transform` falls
+ * back to its initial value — `none`. The door is written
+ * `left:50%;top:50%;transform:translate(-50%,-50%) …`, so a transformless door
+ * hangs from the screen's centre by its top-left corner: the bottom-right
+ * quadrant. And the same declaration carries `transition:transform 1500ms`, so
+ * the instant the variable arrives the door *slides* from there to the middle.
+ * That is the report, in one sentence, and every bolt, both leaves and the lock
+ * ride along with it.
+ *
+ * Whether the browser ever computes style in that window is not something this
+ * file controls. `GateDom.mount` writes the root's `cssText` **before**
+ * `TitleGate.mount` calls `apply()`, and building that `cssText` reads
+ * `window.innerWidth` — which under mobile emulation (a page-scale factor, a
+ * visual viewport) is a layout-flushing read, and on a plain desktop window is
+ * not. So the phones resolve the door's style once while the variables are still
+ * unset, and the desktop resolves it once, later, when they are set. Same code,
+ * same order, two platforms, one of which the report came from.
+ *
+ * The fix is not to chase that read. It is for the markup to be **correct on its
+ * own**, exactly as {@link vw} already is: with these fallbacks the first
+ * computed value IS the sealed door, which is byte-for-byte what `apply()` writes
+ * a moment later — so there is no computed-value change, and a transition with
+ * nothing to transition between never starts. Nothing about the opening sequence
+ * moves: from the first press onward every one of these properties is set, and a
+ * fallback that is never reached cannot change what a set value does.
+ */
+function gvar(name: string): string {
+  const key = `--pr-gate-${name}`;
+  const sealed = LOCKED_VARS[key];
+  /* c8 ignore next -- a typo'd name is a programmer error, not a runtime state */
+  if (sealed === undefined) throw new Error(`title-gate: no sealed value for ${key}`);
+  return `var(${key}, ${sealed})`;
+}
+
+/**
  * The self-hosted faces, resolved against the base this bundle was built for.
  *
  * ── WHY NOT THE BARE `/fonts/…` THESE WERE (a0-66, 2026-08-16) ──────────────
@@ -790,7 +842,7 @@ const OPENING_CLIP = (() => {
 function bolt(x: string, y: string): string {
   return (
     `<div style="position:absolute;left:${x};top:${y};width:min(19px,${vw(1.6)});aspect-ratio:1;` +
-    'transform:translate(-50%,-50%) scale(var(--pr-gate-bolt-scale));' +
+    `transform:translate(-50%,-50%) scale(${gvar('bolt-scale')});` +
     `transition:transform ${TRANSITION.bolt}ms cubic-bezier(.4,0,.2,1);">` +
     '<div style="width:100%;height:100%;border-radius:50%;background:linear-gradient(160deg,#7e8894,#2d3239);' +
     `box-shadow:inset 0 1px 0 rgba(238,242,247,.32), 0 2px 5px rgba(${INK},.75);"></div>` +
@@ -827,7 +879,7 @@ function lock(): string {
   const facet = `clip-path:${OPENING_CLIP};`;
   return (
     `<div style="position:absolute;left:50%;bottom:0;width:min(148px,${vh(17)});aspect-ratio:1;` +
-    `transform:translate(-50%,50%) scale(var(--pr-gate-hub-scale));transition:transform ${TRANSITION.hub}ms ease-out;">` +
+    `transform:translate(-50%,50%) scale(${gvar('hub-scale')});transition:transform ${TRANSITION.hub}ms ease-out;">` +
     // the bored pocket the mechanism is recessed into
     `<div style="position:absolute;inset:-9%;border-radius:50%;background:radial-gradient(circle,#1a1e24 62%,#2b3138 100%);box-shadow:inset 0 3px 7px rgba(${INK},.95), inset 0 -1px 0 rgba(238,242,247,.14), 0 1px 0 rgba(238,242,247,.1);"></div>` +
     // the flange, and the fasteners holding it down
@@ -842,7 +894,7 @@ function lock(): string {
     // the seat the rotor sits in
     `<div style="position:absolute;inset:4%;border-radius:50%;background:linear-gradient(158deg,#2b3138,#1c2027);box-shadow:inset 0 2px 5px rgba(${INK},.9);"></div>` +
     // THE ROTOR — the only thing that moves in beat 1
-    `<div style="position:absolute;inset:13%;transform:rotate(var(--pr-gate-hub-rot));transition:transform ${TRANSITION.rotor}ms cubic-bezier(.32,0,.18,1);">` +
+    `<div style="position:absolute;inset:13%;transform:rotate(${gvar('hub-rot')});transition:transform ${TRANSITION.rotor}ms cubic-bezier(.32,0,.18,1);">` +
     `<div style="position:absolute;inset:0;${facet}background:linear-gradient(154deg,#6d757e 0%,#565e66 40%,#474e56 62%,#3b4148 100%);box-shadow:inset 0 1px 0 rgba(238,242,247,.34);"></div>` +
     // turned from bar stock: fine concentric tool marks
     `<div style="position:absolute;inset:0;${facet}background:repeating-radial-gradient(circle at 50% 50%, rgba(238,242,247,.06) 0 1px, rgba(${INK},.07) 1px 3px);"></div>` +
@@ -899,7 +951,7 @@ function leaf(word: string, track: number, canClip: boolean, upper: boolean): st
   const sheenDelay = canClip && TITLE.sheen > 0 && !upper ? `animation-delay:${sheenDelaySeconds().toFixed(2)}s;` : '';
   return (
     `<div${upper ? ` id="${TITLE_GATE_LEAF_ID}"` : ''} style="position:absolute;left:0;right:0;${far}:0;height:50%;` +
-    `transform:var(--pr-gate-leaf-${upper ? 'top' : 'bot'});transition:transform ${TRANSITION.leaf}ms cubic-bezier(.62,.02,.28,1);background:${body};">` +
+    `transform:${gvar(`leaf-${upper ? 'top' : 'bot'}`)};transition:transform ${TRANSITION.leaf}ms cubic-bezier(.62,.02,.28,1);background:${body};">` +
     // the leaf's own plate seams
     `<div style="position:absolute;inset:0;background:repeating-linear-gradient(90deg, rgba(${INK},.22) 0 1px, transparent 1px 12.5%);"></div>` +
     `<div style="position:absolute;left:6%;right:6%;${far}:14%;height:2px;background:linear-gradient(90deg,transparent,rgba(${INK},.5) 12%,rgba(${INK},.5) 88%,transparent);"></div>` +
@@ -908,7 +960,7 @@ function leaf(word: string, track: number, canClip: boolean, upper: boolean): st
     // one sanctioned signal yellow on this screen)
     `<div style="position:absolute;left:0;right:0;${edge}:0;height:6.5%;background:${lip};"></div>` +
     `<div style="position:absolute;left:0;right:0;${edge}:6.5%;height:2px;background:rgba(238,242,247,.26);"></div>` +
-    `<div style="position:absolute;left:0;right:0;${edge}:0;height:2.4%;opacity:var(--pr-gate-haz-op);transition:opacity ${TRANSITION.hazard}ms ease-out;background:repeating-linear-gradient(115deg, rgba(${HAZARD},.44) 0 9px, rgba(38,42,49,.94) 9px 18px);"></div>` +
+    `<div style="position:absolute;left:0;right:0;${edge}:0;height:2.4%;opacity:${gvar('haz-op')};transition:opacity ${TRANSITION.hazard}ms ease-out;background:repeating-linear-gradient(115deg, rgba(${HAZARD},.44) 0 9px, rgba(38,42,49,.94) 9px 18px);"></div>` +
     // the type, struck into the leaf and travelling with it
     `<div style="position:absolute;left:6%;right:6%;${edge}:calc(min(74px,${vh(8.5)}) + ${TITLE.lockGap}%);display:flex;justify-content:center;isolation:isolate;">` +
     `<span style="${titleCss(track, canClip)}${sheenDelay}">${escapeHtml(word)}</span>` +
@@ -976,7 +1028,7 @@ export function titleGateHtml(options: GateHtmlOptions = {}): string {
     // hull instead of sliding across it.
     `<div id="${TITLE_GATE_DOOR_ID}" style="position:absolute;z-index:3;left:50%;top:50%;` +
     `width:min(${vw(DOOR.widthOfVw * 100)},${vh(DOOR.widthOfVh * 100)});aspect-ratio:${DOOR.aspect};` +
-    'transform:translate(-50%,-50%) scale(var(--pr-gate-door-scale));opacity:var(--pr-gate-door-op);' +
+    `transform:translate(-50%,-50%) scale(${gvar('door-scale')});opacity:${gvar('door-op')};` +
     `transition:transform ${TRANSITION.frame}ms cubic-bezier(.42,0,.5,1), opacity ${TRANSITION.fade}ms linear;pointer-events:none;">` +
     jamb() +
     bolts() +
@@ -985,7 +1037,7 @@ export function titleGateHtml(options: GateHtmlOptions = {}): string {
     leaf(upper, upperTrack, canClip, true) +
     leaf(lower, lowerTrack, canClip, false) +
     // the lock rides the upper leaf, because it is bolted through it
-    `<div style="position:absolute;left:0;right:0;top:0;height:50%;transform:var(--pr-gate-leaf-top);transition:transform ${TRANSITION.leaf}ms cubic-bezier(.62,.02,.28,1);pointer-events:none;">` +
+    `<div style="position:absolute;left:0;right:0;top:0;height:50%;transform:${gvar('leaf-top')};transition:transform ${TRANSITION.leaf}ms cubic-bezier(.62,.02,.28,1);pointer-events:none;">` +
     lock() +
     '</div>' +
     '</div>' +
@@ -993,7 +1045,7 @@ export function titleGateHtml(options: GateHtmlOptions = {}): string {
     // The prompt. Register 2 (style-guide §8): procedural, unglamorous, present
     // tense, and it names the action in its first three words.
     `<div style="position:absolute;z-index:4;left:0;right:0;bottom:calc(max(${vh(3.4)},22px) + var(--pr-gate-safe-bottom, 0px));display:flex;flex-direction:column;align-items:center;gap:9px;` +
-    `opacity:var(--pr-gate-prompt-op);transition:opacity ${TRANSITION.hazard}ms ease-out;pointer-events:none;">` +
+    `opacity:${gvar('prompt-op')};transition:opacity ${TRANSITION.hazard}ms ease-out;pointer-events:none;">` +
     `<div style="display:flex;align-items:center;padding:10px 24px;border:1px solid #515861;background:linear-gradient(180deg,rgba(198,205,214,.1),rgba(198,205,214,0) 50%),linear-gradient(#383e45,#20252c);box-shadow:0 6px 20px rgba(${INK},.75);animation:pr-gate-prompt 2.1s ease-in-out infinite;">` +
     `<span style="font-family:Oxanium,system-ui,sans-serif;font-weight:800;font-size:clamp(10px,${vw(1.2)},13px);letter-spacing:.3em;color:${BONE_WHITE};">${PROMPT}</span>` +
     '</div>' +
