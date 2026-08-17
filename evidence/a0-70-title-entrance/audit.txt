@@ -1,3 +1,516 @@
+a0-71 — "the title menu flies in from the bottom right instead of starting off
+         centered"  —  ON A PHONE.  ("no I'm on mobile, on PC it's fine")
+
+OWNER: UI Engineer.  Branch: agent/ui/a0-70-title-menu-entrance.  Date: 2026-08-17.
+
+===============================================================================
+VERDICT: REPRODUCED, ORIGIN NAMED, FIXED.
+===============================================================================
+
+It flies in. It flies in from the bottom right, it takes 1500 ms to do it, and
+the browser will say so in its own words: `transitionrun` on `transform`, target
+`div#pr-title-gate-door`, starting at the identity matrix and ending at
+`translate(-50%,-50%)`.
+
+It does this on a PORTRAIT MOBILE viewport and not on a desktop, which is why
+a0-70 filmed seven times and could not see it: all three viewports it filmed
+(1707x898, 2560x1440, 900x600) are landscape, its own audit records
+`rotated: false` on every frame, and the developer's correction — *"no I'm on
+mobile, on PC it's fine"* — reached the brief after that session had started.
+Its reasoning was sound for the platform it was given. It was given the wrong
+one.
+
+The frames below are the two device profiles the CI mobile shards use, taken
+from QA's own `DEVICE_MATRIX` rather than retyped:
+
+    390x844  dpr 3    isMobile: true   →  rotated: true, logical 844x390
+    412x915  dpr 2.6  isMobile: true   →  rotated: true, logical 915x412
+
+and the landscape control on the same profile, 844x390, isMobile: true,
+rotated: false — which is the frame that tells "portrait" apart from "phone".
+
+The cause is one line of CSS in `src/ui/title-gate.ts` and one rule of the CSS
+spec. The fix is a fallback on nine custom properties. Nothing about the door's
+opening moves, and the desktop behaviour a0-70 filmed is unchanged.
+
+
+===============================================================================
+A. THE SPECIMEN
+===============================================================================
+
+  bundle      `npm run build` + `npm run preview`, the repo's own vite.config.ts
+              — the real shipped artifact, as a0-70's harness already insisted.
+  profiles    `A0_71_DEVICE=iphone|pixel` selects a row of
+              `tests/mobile/shot-budget.ts` `DEVICE_MATRIX` — the SAME numbers
+              the CI mobile shards run, imported rather than copied, so this
+              film cannot drift from the matrix it claims to be.
+              `isMobile: true` and `hasTouch: true` come with the profile.
+  why both    `computeRootTransform(physW, physH, isMobile)` rotates only when
+              `isMobile && physH > physW`. A resized desktop window satisfies
+              neither half: it is not mobile, and `isTouch` in `src/main.ts` is
+              a touch-capability probe, not a width. A narrow window would have
+              filmed the identity branch a fourth time.
+  commit      13dcf5d is the fix; `frames/before/` is the parent, rebuilt and
+              re-filmed so the two films differ by exactly the fix.
+
+  harness     evidence/a0-70-title-entrance/   (a0-70's, extended — not replaced)
+                playwright.config.ts   + A0_71_DEVICE / A0_71_LANDSCAPE
+                capture.spec.ts        CDP screencast, + A0_71_WINDOW_MS and a
+                                       directory prefix so a phone's film cannot
+                                       overwrite the desktop's
+                portrait.spec.ts       NEW — per-frame door geometry, the four
+                                       custom properties it is built from, and
+                                       the BEFORE-CHANGE computed style
+                reload.spec.ts         NEW — the landscape lock across a cold
+                                       load, a second navigation and a reload
+                motion.spec.ts         transition/animation listeners (a0-70's)
+                firstframes.spec.ts    frame-exact canvas readback (a0-70's)
+                analyse-door.mjs       NEW — where the lit hull IS, per frame
+
+  frames      Pruned to the decisive images, as a0-70 pruned its own; every
+              frame's NUMBERS survive the prune in `frames.json` / `ticks.json`
+              and each directory's `KEPT.json` says what was dropped.
+
+
+===============================================================================
+B. WHAT THE PHONE DOES — frames/before/portrait-gated/  (390x844, dpr 3)
+===============================================================================
+
+The screencast is the instrument of record here, and that is a deliberate
+choice. The boot blocks the main thread for over a second on this profile (the
+frame-exact readback in `frames/before/portrait-iphone/ticks.json` has exactly
+ONE animation frame between 477 ms and 1718 ms, and it did not drop it — there
+was nothing to drop). A transform transition runs on the COMPOSITOR, so the door
+keeps sliding across a screen the main thread is not producing frames for. Only
+a screencast can film that. This is the one thing an rAF sampler is structurally
+unable to see, and it is exactly where this bug lives.
+
+  frames/before/portrait-gated/f002-01619ms.png
+
+    The vault door — PLANET RUSH, correctly rotated for a portrait handset — is
+    hanging off the corner of the screen with roughly half of it past the edge.
+    The menu plates behind it are visible where the door should be. Its top-left
+    corner is on the screen's centre.
+
+  frames/before/portrait-gated/f012 … f016-01859ms.png
+
+    The same door, closer in. It is moving.
+
+  frames/after/portrait-gated/f002-01683ms.png
+
+    The same moment, on the fixed build: the whole door, centred, sealed, with
+    both words readable.
+
+`analyse-door.mjs` puts a number on it. It reports the CENTROID of every lit
+hull pixel — not a bounding box, because the prompt and the status line are
+bone-white type at the screen's edges and pin a box to the full frame whatever
+the door does. The door is ~25 000 lit pixels against the type's few hundred.
+The `logical` column is the physical offset turned back through the +90° root
+rotation, i.e. what the player is actually looking at:
+
+  BEFORE (frames/before/portrait-gated)        logical dx     logical dy
+    f002  1619 ms                                 +161.5         +62.3
+    f003  1631 ms                                 +156.4         +59.4
+    f004  1657 ms                                 +158.4         +59.8
+    f008  1718 ms                                 +153.1         +55.4
+    f016  1859 ms                                 +148.8         +48.9
+    f063  2635 ms                                  +20.9         −22.5
+
+  AFTER  (frames/after/portrait-gated)
+    f002  1683 ms                                  −13.2         −45.7
+    f003  1702 ms                                  −13.2         −45.7
+    f004  1732 ms                                  −13.2         −45.7
+    f008  1804 ms                                  −13.2         −45.6
+    f016  1937 ms                                  −13.6         −46.3
+    f057  2620 ms                                  −13.0         −46.4
+
+  Before: the lit mass travels about 175 logical px down and to the right of
+  where it ends up, and it is still travelling at 2635 ms — the last frame of a
+  2600 ms film. It has not arrived. (The motion log for the same build records
+  `transitionend` at 3000 ms, so that is the tail of the same slide rather than
+  a second effect.)
+
+  After: six frames spanning a second, identical to a tenth of a pixel. Nothing
+  moves.
+
+  The settled centroid is not (0,0) in either film and is not meant to be: the
+  wordmark and the prompt strip are not symmetric masses. What matters is that
+  one column travels and the other does not.
+
+THE BROWSER'S OWN ACCOUNT — frames/before/motion-portrait-iphone.json
+
+`motion.spec.ts` listens for `transitionrun`/`start`/`end` in the capture phase
+on `document`, installed before a line of app code runs. On the shipped build at
+390x844:
+
+    1520 ms  transitionrun    transform  div#pr-title-gate-door
+             rect [-131.4, 420.4, 327.4, 530.4]   matrix(1,0,0,1, −1.61, −0.99)
+    1520 ms  transitionstart  transform  div#pr-title-gate-door
+    3000 ms  transitionend    transform  div#pr-title-gate-door
+             rect [  31.3, 156.8, 327.4, 530.4]   matrix(1,0,0,1, −265.20, −163.70)
+
+    72 transition events in the first three seconds. Sixteen bolts, both leaves,
+    the lock and the hazard stripes are all in that list — every `var()` in a
+    declaration that also carries a `transition`. The whole door assembles
+    itself in flight.
+
+  Read the two rects in the space the player sees. Physical → logical is
+  `(px,py) → (py, physW − px)`, physW = 390, and the logical viewport is
+  844x390:
+
+    START  logical x from 420.4 to 950.8, y from 194.0 to 521.4
+           — the door's top-left corner is at (420, 194), which IS the centre of
+             the screen (422, 195), and the rest of it is off the bottom-right.
+    END    logical x from 156.8 to 687.2, y from 31.3 to 358.7
+           — centred: (422.0, 195.0).
+
+  "Flies in from the bottom right instead of starting off centered." Verbatim.
+
+THE `?gate=0` CONTROL, AND AN INSTRUMENT THAT WAS LYING
+
+a0-70's films came in pairs: the gated boot, and `?gate=0` — the same menu with
+no door in front of it. The pair is worth keeping on a phone for the same
+reason, so this branch shot it, and then did not commit it. The reason is worth
+writing down rather than quietly dropping.
+
+`capture.spec.ts` films two URLs back to back in ONE page: a screencast session
+is started, stopped and detached, then a second one is attached for the second
+URL. Every frame of that SECOND session came back with the menu drawn upright in
+portrait — no landscape lock, the whole scene transposed.
+
+It is not what the client does. Three instruments say so, and they agree with
+each other:
+
+  - `window.__mainMenu` reports `rotated: true`, logical 844x390, on every
+    sampled frame of a `?gate=0` boot (analysis/after-no-gate-iphone.json);
+  - `page.screenshot()` at that same URL is correctly rotated — the wordmark
+    runs up the side of the handset (analysis/reload-1-cold.png);
+  - and the FIRST screencast session in the same page, which is the film of
+    record above, is rotated too and agrees with the DOM matrices frame for
+    frame.
+
+So the second screencast session captures the surface at the wrong orientation,
+and the frames it produced are an artifact of re-attaching CDP rather than a
+state the game was ever in. They are not in this evidence set, because a frame
+that shows something the client never did is worth less than nothing in a folder
+whose whole job is to be believed — this branch exists because a0-70's brief
+warned that four rounds on the star bloom went to something that only ever
+looked broken in an instrument.
+
+What replaces it is `reload.spec.ts`, which asks the question the `?gate=0` film
+was there to answer and asks it of the app rather than of a screencast: is the
+lock the same on a cold load, on a second navigation, and on a reload? A phone
+reloading is an ordinary thing a player does, and "the lock only engages on a
+cold page" would have been its own field report.
+
+  analysis/reload.json          cold  → rotated: true, logical 844x390
+                                second→ rotated: true, logical 844x390
+                                third → rotated: true, logical 844x390
+                                reload→ rotated: true, logical 844x390
+
+  analysis/reload-1-cold.png    the menu with NO DOOR in front of it, on a
+  analysis/reload-2-third.png   portrait phone: four plates, correctly rotated,
+  analysis/reload-3-reloaded.png  identical across all three navigations.
+
+  The spec asserts the four AGREE rather than asserting a constant, so it is the
+  same test on a desktop (where all four must be the identity) as on a phone.
+
+
+AND THE DESKTOP, SAME PROBE, SAME RUN — analysis/desktop.json
+
+    269 ms   door css 1221.27x753.859   transform matrix(1,0,0,1,−610.633,−376.93)
+    …unchanged on every frame…          0 transition events
+
+  The correct value on the first frame it can be read, exactly as a0-70 filmed
+  it seven times. Nothing on this branch changes that.
+
+THE CONTROL THAT NAMES WHICH HALF MATTERS — analysis/landscape-iphone.json
+
+  The same phone profile turned landscape: 844x390, `isMobile: true`,
+  `rotated: false` — a device that never enters the rotated branch at all.
+
+    347 ms   door transform matrix(1, 0, 0, 1, 0, 0)
+   1470 ms   transitionrun transform … → matrix(1,0,0,1,−265.195,−163.695)
+
+  It flies in there too. **So the rotation is not the cause** — it is the
+  amplifier, because a rotated screen turns a physical bottom-left into the
+  logical bottom-RIGHT the report names, and because the phone is the only place
+  the game is ever rotated. The discriminator is `isMobile`, not portrait. This
+  is stated here rather than quietly enjoyed: a fix aimed at the rotation would
+  have missed half of the phones it is meant to fix.
+
+
+===============================================================================
+C. THE ORIGIN, NAMED — src/ui/title-gate.ts, the door's `style` attribute
+===============================================================================
+
+    transform:translate(-50%,-50%) scale(var(--pr-gate-door-scale));
+    transition:transform 1500ms cubic-bezier(.42,0,.5,1);
+
+**A `var()` with no fallback is not a default of zero. It invalidates the whole
+declaration.** A reference to a custom property that is not set, with nothing
+after the comma, makes the declaration INVALID AT COMPUTED-VALUE TIME, and the
+property takes its initial value — for `transform`, `none`.
+
+The door is `position:absolute; left:50%; top:50%`, so it is placed by its
+TOP-LEFT CORNER at the centre of the screen and pulled back into place by
+`translate(-50%,-50%)`. With no transform at all it simply hangs off the centre
+into the far quadrant. And the same declaration carries a 1500 ms
+`transition:transform` — so the instant the variable arrives, the door does not
+appear in the middle. It travels there.
+
+`--pr-gate-door-scale` is written by `TitleGate.apply()`. `GateDom.mount()`
+appends the overlay and writes the root's `cssText` BEFORE that. So there is a
+window, inside the boot's own synchronous task, in which the door is in the
+document and its transform is `none`. Whether the browser ever computes style in
+that window decides whether the player sees this.
+
+THE BEFORE-CHANGE STYLE, MEASURED — analysis/portrait-iphone-writes.json
+
+`portrait.spec.ts` wraps `CSSStyleDeclaration.prototype.setProperty` and the
+`cssText` setter and reads the door's computed transform IMMEDIATELY BEFORE each
+write lands. That reading is, by definition, the value a transition would start
+from:
+
+    261 ms  cssText              (the root's layout)   BEFORE door transform = none
+    261 ms  --pr-gate-door-scale = 1                   BEFORE door transform = none
+    263 ms  --pr-gate-door-op    = 1                   BEFORE door transform = matrix(1,0,0,1,0,0)
+
+  `none` before, identity after: the door's first computed transform is the
+  transformless one, and everything downstream is the 1500 ms consequence.
+
+WHY THE DESKTOP ESCAPES IT
+
+Reading `window.innerWidth` is what forces the style resolution, and
+`applyLayout` reads it — inside `gateRootLayoutCss(transform())`, evaluated
+BEFORE the `cssText` it is an argument to is assigned, with the door already in
+the document and its variable still unset. On a plain desktop window that read
+is cheap and answers from the frame's own size. Under mobile emulation
+`innerWidth` is the visual viewport divided by the page-scale factor, which is a
+layout-dependent quantity — so the read flushes style and layout, the door's
+`transform:none` becomes the before-change style, and the transition has
+something to start from. Same code, same order, two platforms.
+
+That last paragraph is a mechanism, not a fix, and it is the reason the fix is
+not "move the read". Note that the same probe reproduces the fly-in ON THE
+DESKTOP — `analysis/desktop-writes.json` shows `none` → identity there too —
+because the probe's own `getComputedStyle` forces exactly the recalc the phone
+gets for free. The defect is in the markup on every platform. The phone is
+merely where the browser walks into it unaided.
+
+a0-70 predicted this mechanism precisely, in its §5, and left it alone because
+its guardrail said not to touch the gate. It was right about the mechanism and
+right to flag it. This brief is what makes it actionable: it is filmed now.
+
+
+===============================================================================
+D. THE FIX — commit 13dcf5d
+===============================================================================
+
+Every `var(--pr-gate-*)` in the markup now carries a fallback, and the fallbacks
+are not typed out: they come from `gateVars('locked', 1)` — the sealed door's own
+ten values, the state this screen is first painted in — through one helper, so a
+fallback cannot drift from the phase it is the fallback for.
+
+    transform:translate(-50%,-50%) scale(var(--pr-gate-door-scale, 1));
+
+The point is not merely that the declaration is now valid. It is that the first
+computed value is byte-for-byte what `apply()` writes a moment later, so there
+are not two computed values, and a transition with nothing to interpolate
+between never starts. That is why the fix is a fallback rather than a
+`transition:none` on first paint: the second would hide the jump, this removes
+it.
+
+  Scope. Nine properties: door-scale, door-op, leaf-top, leaf-bot, hub-rot,
+  hub-scale, bolt-scale, haz-op, prompt-op. (`--pr-gate-cursor` already had one;
+  `--pr-gate-vw`, `--pr-gate-vh` and `--pr-gate-safe-bottom` already had theirs,
+  documented in `vw()` for this exact reason — the file already knew the rule,
+  in one half of itself.)
+
+  What it cannot change. From the first press onward every one of these
+  properties is set on the root, and a fallback that is never reached cannot
+  change what a set value does. a0-50's opening is untouched, which §E measures
+  rather than asserts.
+
+
+===============================================================================
+E. AFTER
+===============================================================================
+
+  frames/after/motion-portrait-iphone.json     transition* events: 0
+  frames/after/motion-portrait-pixel.json      transition* events: 0
+
+    (`animationstart` is still 3 — two `pr-gate-sheen` and one
+     `pr-gate-prompt`, both by design, exactly as on a0-70's desktop films.)
+
+  The MutationObserver catches the overlay's insertion inside the boot's own
+  task, on both profiles, and the door is already home:
+
+    390x844   273 ms  doorRect [31.3, 156.8, 327.4, 530.4]
+                      transform matrix(1,0,0,1, −265.195, −163.695)
+    412x915   263 ms  doorRect [33.1, 177.3, 345.9, 560.3]
+                      transform matrix(1,0,0,1, −280.156, −172.930)
+
+  …and it is the same value at `inserted+task`, 1.1 s later. It never moves.
+
+THE DOOR STILL OPENS — frames/after/portrait-open/ticks.json
+
+  A real press on a portrait phone, filmed through the whole opening. The rect's
+  CENTRE is what a scale about the wrong origin would move:
+
+    f  7   1784 ms  rect  31.3   156.8   327.4   530.4   centre (195.0, 422.0)
+    f 24   4577 ms  rect  31.3   156.8   327.4   530.4   centre (195.0, 422.0)
+    f 32   5577 ms  rect −165.2 −161.6   720.5  1167.2   centre (195.1, 422.0)
+    f 40   6527 ms  rect −254.1 −305.6   898.2  1455.1   centre (195.0, 422.0)
+    f104  13955 ms  rect −254.1 −305.6   898.2  1455.1   centre (195.0, 422.0)
+
+  The door grows by a factor of 2.7 and its centre moves one tenth of a pixel,
+  on the physical centre of a 390x844 screen. The opening sequence is what it
+  was.
+
+THE MENU BEHIND IT IS UNCHANGED — frames/{before,after}/portrait-iphone/
+
+  The frame-exact canvas readback, which sees the Pixi menu rather than the DOM
+  overlay: 1 832 595 ink px before, 1 832 461 after, ink box (33, 0, 1137, 2532)
+  on every frame of both. The 134-px difference is the build stamp, which reads
+  the commit and is the one thing on screen that changes every commit by design
+  — the same 33x8-box difference a0-70 named. No golden re-baseline: no drawing
+  code changed.
+
+
+===============================================================================
+F. THE QUIETER FORM — a layout measured against raw physW/physH while rotated
+===============================================================================
+
+The brief asks for this separately, and it is the right question: that failure
+misplaces content PERMANENTLY rather than for a second, and it would also read
+as "wrong on mobile, fine on PC". It is not present. Numbers, from
+`frames/after/portrait-iphone/ticks.json`, on the 390x844 profile:
+
+  `window.__mainMenu`  rotated: true,  logicalViewport {width: 844, height: 390}
+
+  control    logical rect (x, y, w, h)              physical tap point
+  play       ( 24,  65.0, 796, 63.9)                (293.1, 422)
+  codex      ( 24, 136.9, 796, 57.4)                (224.5, 422)
+  settings   ( 24, 202.2, 796, 57.4)                (159.1, 422)
+  hangar     ( 24, 267.6, 796, 57.4)                ( 93.7, 422)
+
+  Every plate is 796 wide inside an 844-wide logical viewport with 24 px either
+  side — centred, and measured against the SWAPPED pair, not the raw one. Had
+  anything on this path read `physW`/`physH` while rotated it would have laid
+  the menu out in a 390-wide box on an 844-wide screen, and the plates would be
+  a fixed distance off centre on every frame forever.
+
+  The tap points are the other half of the same claim: physical x runs 93.7 →
+  293.1 inside a 390-wide screen and physical y is 422 for all four, which is
+  the logical centre 422 mapped back. A tap lands on the control the player
+  sees.
+
+  The gate overlay passes the same test independently — `gateRootLayoutCss` sets
+  `--pr-gate-vw: 8.44px` and `--pr-gate-vh: 3.9px` on the 390x844 profile (one
+  percent of 844 and of 390, the LOGICAL pair), and the root measures
+  844px x 390px with `matrix(0, 1, -1, 0, 390, 0)`. Both are in
+  `analysis/portrait-iphone.json`, on every sampled frame.
+
+  `src/main.ts` has one raw `app.screen` read left, in `readViewport`'s final
+  fallback — and it is guarded: the rotated branch returns before it, and it is
+  reached only by a browser with no `visualViewport` at all. Not this.
+
+
+===============================================================================
+G. THE TESTS — src/ui/title-gate.test.ts, "the entrance on a phone held portrait"
+===============================================================================
+
+Two, and BOTH FAIL ON THE CODE AS SHIPPED. Verified by reverting the source fix
+alone and running the suite:
+
+  × the entrance on a phone held portrait (a0-71) > paints the sealed door
+    centred on its first computed style, before any variable is set
+  × the entrance on a phone held portrait (a0-71) > leaves no moving part of the
+    screen resolving to nothing
+  ✓ src/ui/main-menu.test.ts (36 tests)      ← a0-70's desktop test, still green
+    Tests  2 failed | 99 passed (101)
+
+  …and with the fix in place, 65 passed in that file, 36 in a0-70's.
+
+  1. THE FIRST COMPUTED STYLE. Drives `computeRootTransform(390, 844, true)`,
+     asserts `rotated: true` — the portrait mobile branch, by construction — then
+     takes the door's `style` attribute out of the SHIPPED markup and resolves it
+     with NO custom property set, which is the state the browser first receives
+     it in. It asserts the declaration survives (`null` there is `transform:none`
+     — the whole bug in one value), that it is the centring transform and not
+     merely a valid one, and — the assertion that closes the fly-in rather than
+     just the off-centre frame — that it EQUALS what `gateVars('locked', …)` is
+     about to write. A transition needs two different values; this is the test
+     that there is only one. It then checks a set value still overrides:
+     `gateVars('entering', 4)` gives `scale(4)`, so the fallbacks cannot quietly
+     pin the door shut.
+
+  2. THE WHOLE SCREEN, NOT JUST THE DOOR. The motion log caught sixteen bolts,
+     both leaves and the lock starting at the same instant, so the property is
+     stated over the markup: every `var(--pr-gate-*)` reference must carry a
+     fallback, and each fallback must be the sealed door's own value for that
+     property. This is what stops the next moving part from being added without
+     one.
+
+  The test environment is `node` (vite.config.ts), and jsdom's
+  `getComputedStyle` does not resolve `var()` at all — it would answer this
+  question with silence rather than with a different answer. So the test carries
+  a 40-line substitution of the one CSS rule the bug is made of, including the
+  spec's invalidation behaviour, and reports `null` for a declaration that does
+  not survive. That is the thing under test, stated directly.
+
+
+===============================================================================
+H. REPRODUCING THIS AUDIT
+===============================================================================
+
+  # the portrait phone, the film of record (composite; the door is DOM)
+  A0_71_DEVICE=iphone A0_71_DIR_PREFIX=portrait- A0_71_WINDOW_MS=2600 \
+    npx playwright test --config evidence/a0-70-title-entrance/playwright.config.ts capture
+  node evidence/a0-70-title-entrance/analyse-door.mjs \
+       evidence/a0-70-title-entrance/frames/before/portrait-gated
+
+  # what the browser says moved, and the before-change style that explains it
+  A0_71_DEVICE=iphone A0_70_NAME=motion-portrait-iphone \
+    npx playwright test --config evidence/a0-70-title-entrance/playwright.config.ts motion
+  A0_71_DEVICE=iphone A0_71_NAME=portrait-iphone \
+    npx playwright test --config evidence/a0-70-title-entrance/playwright.config.ts portrait
+
+  # the controls that name which half matters
+  A0_71_DEVICE=iphone A0_71_LANDSCAPE=1 A0_71_NAME=landscape-iphone …  portrait
+  A0_71_NAME=desktop …                                                 portrait
+
+  # the lock across a cold load, a second navigation and a reload
+  A0_71_DEVICE=iphone \
+    npx playwright test --config evidence/a0-70-title-entrance/playwright.config.ts reload
+
+  # env switches (a0-71)
+  A0_71_DEVICE=iphone|pixel|desktop   a row of QA's DEVICE_MATRIX
+  A0_71_LANDSCAPE=1                   the same profile, turned
+  A0_71_WINDOW_MS=n                   how long the screencast films
+  A0_71_DIR_PREFIX=portrait-          keep a phone's film out of the desktop's
+  A0_71_FRAMES=n / A0_71_NAME=name    the portrait probe's length and output
+
+  A0_70_* are unchanged and documented in §8 of a0-70's audit, below.
+
+
+###############################################################################
+###                                                                         ###
+###  PART TWO — a0-70's AUDIT, VERBATIM.                                    ###
+###                                                                         ###
+###  Kept in full because it is correct. It answered the question it was     ###
+###  given — is the menu off-centre on the developer's DESKTOP session —     ###
+###  measured it seven ways, said NOT REPRODUCED, and stopped, which is the  ###
+###  behaviour we want. Its §2 landscape films, its §3 measurement of the    ###
+###  door's opening and its §6 mutation check all still hold and are still   ###
+###  the desktop baseline this branch is compared against. Its §5 named the  ###
+###  exact mechanism §C above has now filmed.                               ###
+###                                                                         ###
+###  Read it as "the desktop control", not as the verdict.                   ###
+###                                                                         ###
+###############################################################################
+
 a0-70 — "the title menu flies in from the bottom right instead of starting off
          centered"
 

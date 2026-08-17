@@ -1,0 +1,2418 @@
+[
+  {
+    "t": 37,
+    "event": "fonts.ready"
+  },
+  {
+    "i": 0,
+    "t": 37,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": null
+  },
+  {
+    "i": 1,
+    "t": 42,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": null
+  },
+  {
+    "i": 2,
+    "t": 57,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": null
+  },
+  {
+    "i": 3,
+    "t": 75,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": null
+  },
+  {
+    "i": 4,
+    "t": 150,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": null
+  },
+  {
+    "i": 5,
+    "t": 150,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": null
+  },
+  {
+    "i": 6,
+    "t": 157,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": null
+  },
+  {
+    "i": 7,
+    "t": 174,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": null
+  },
+  {
+    "i": 8,
+    "t": 190,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": null
+  },
+  {
+    "i": 9,
+    "t": 338,
+    "fonts": "loading",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 10,
+    "t": 1475,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 11,
+    "t": 1584,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 12,
+    "t": 1661,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 13,
+    "t": 1730,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 14,
+    "t": 1800,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 15,
+    "t": 1867,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 16,
+    "t": 1933,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 17,
+    "t": 1999,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 18,
+    "t": 2063,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 19,
+    "t": 2127,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 20,
+    "t": 2191,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 21,
+    "t": 2254,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 22,
+    "t": 2324,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 23,
+    "t": 2389,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 24,
+    "t": 2457,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 25,
+    "t": 2533,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 26,
+    "t": 2605,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 27,
+    "t": 2673,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 28,
+    "t": 2741,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 29,
+    "t": 2821,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 30,
+    "t": 2887,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 31,
+    "t": 2964,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 32,
+    "t": 3029,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 33,
+    "t": 3092,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 34,
+    "t": 3166,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 35,
+    "t": 3231,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 36,
+    "t": 3294,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 37,
+    "t": 3361,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 38,
+    "t": 3426,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 39,
+    "t": 3490,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": {
+      "rect": [
+        0,
+        0,
+        390,
+        844
+      ],
+      "transform": "matrix(0, 1, -1, 0, 390, 0)",
+      "origin": "0px 0px",
+      "css": [
+        "844px",
+        "390px"
+      ],
+      "offset": [
+        844,
+        390
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "door": {
+      "rect": [
+        31.3,
+        156.8,
+        327.4,
+        530.4
+      ],
+      "transform": "matrix(1, 0, 0, 1, -265.195, -163.695)",
+      "origin": "265.195px 163.695px",
+      "css": [
+        "530.391px",
+        "327.391px"
+      ],
+      "offset": [
+        530,
+        327
+      ],
+      "vars": {
+        "vw": "8.44px",
+        "vh": "3.9px",
+        "scale": "1",
+        "op": "1"
+      }
+    },
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  }
+]

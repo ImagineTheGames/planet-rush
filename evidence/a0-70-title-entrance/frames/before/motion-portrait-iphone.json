@@ -1,0 +1,1048 @@
+[
+  {
+    "t": 256,
+    "type": "inserted",
+    "target": "canvas",
+    "rect": [
+      0,
+      0,
+      390,
+      844
+    ],
+    "doorRect": null,
+    "doorComputed": null,
+    "doorScaleVar": ""
+  },
+  {
+    "t": 256,
+    "type": "inserted",
+    "target": "div#pr-title-gate",
+    "rect": [
+      0,
+      0,
+      390,
+      844
+    ],
+    "doorRect": [
+      -132.4,
+      422,
+      327.4,
+      530.4
+    ],
+    "doorComputed": "matrix(1, 0, 0, 1, 0, 0)",
+    "doorScaleVar": "1"
+  },
+  {
+    "t": 256,
+    "type": "inserted+micro",
+    "target": "canvas",
+    "doorRect": null,
+    "doorComputed": null
+  },
+  {
+    "t": 256,
+    "type": "inserted+micro",
+    "target": "div#pr-title-gate",
+    "doorRect": [
+      -132.4,
+      422,
+      327.4,
+      530.4
+    ],
+    "doorComputed": "matrix(1, 0, 0, 1, 0, 0)"
+  },
+  {
+    "t": 1422,
+    "type": "inserted+task",
+    "target": "canvas",
+    "doorRect": null,
+    "doorComputed": null
+  },
+  {
+    "t": 1422,
+    "type": "inserted+task",
+    "target": "div#pr-title-gate",
+    "doorRect": [
+      -132.4,
+      422,
+      327.4,
+      530.4
+    ],
+    "doorComputed": "matrix(1, 0, 0, 1, 0, 0)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionrun",
+    "prop": "transform",
+    "target": "div#pr-title-gate-door",
+    "rect": [
+      -131.4,
+      420.4,
+      327.4,
+      530.4
+    ],
+    "computed": "matrix(1, 0, 0, 1, -1.61042, -0.994054)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionstart",
+    "prop": "transform",
+    "target": "div#pr-title-gate-door",
+    "rect": [
+      -131.4,
+      420.4,
+      327.4,
+      530.4
+    ],
+    "computed": "matrix(1, 0, 0, 1, -1.61042, -0.994054)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionrun",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      174.4,
+      557.9,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionstart",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      174.4,
+      557.9,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionrun",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      -136,
+      557.9,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionstart",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      -136,
+      557.9,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionrun",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      174.4,
+      621.6,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionstart",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      174.4,
+      621.6,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionrun",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      -136,
+      621.6,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionstart",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      -136,
+      621.6,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionrun",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      174.4,
+      685.2,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionstart",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      174.4,
+      685.2,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionrun",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      -136,
+      685.2,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionstart",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      -136,
+      685.2,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionrun",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      174.4,
+      748.8,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionstart",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      174.4,
+      748.8,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionrun",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      -136,
+      748.8,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionstart",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      -136,
+      748.8,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionrun",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      174.4,
+      812.5,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionstart",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      174.4,
+      812.5,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionrun",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      -136,
+      812.5,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionstart",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      -136,
+      812.5,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionrun",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      140.3,
+      459.3,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionstart",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      140.3,
+      459.3,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionrun",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      140.3,
+      911.2,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionstart",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      140.3,
+      911.2,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionrun",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      -102,
+      459.3,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionstart",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      -102,
+      459.3,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionrun",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      -102,
+      911.2,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionstart",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      -102,
+      911.2,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionrun",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      19.2,
+      428,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionstart",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      19.2,
+      428,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionrun",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      19.2,
+      942.4,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionstart",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      19.2,
+      942.4,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -0.370309, -0.370309)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionrun",
+    "prop": "transform",
+    "target": "div#pr-title-gate-leaf",
+    "rect": [
+      32.3,
+      470.2,
+      132.9,
+      430.7
+    ],
+    "computed": "matrix(1, 0, 0, 1, 0, 0)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionstart",
+    "prop": "transform",
+    "target": "div#pr-title-gate-leaf",
+    "rect": [
+      32.3,
+      470.2,
+      132.9,
+      430.7
+    ],
+    "computed": "matrix(1, 0, 0, 1, 0, 0)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionrun",
+    "prop": "opacity",
+    "target": "div",
+    "rect": [
+      32.3,
+      470.2,
+      3.2,
+      430.7
+    ],
+    "computed": "none"
+  },
+  {
+    "t": 1520,
+    "type": "transitionstart",
+    "prop": "opacity",
+    "target": "div",
+    "rect": [
+      32.3,
+      470.2,
+      3.2,
+      430.7
+    ],
+    "computed": "none"
+  },
+  {
+    "t": 1520,
+    "type": "transitionrun",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      -100.6,
+      470.2,
+      132.9,
+      430.7
+    ],
+    "computed": "matrix(1, 0, 0, 1, 0, 0)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionstart",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      -100.6,
+      470.2,
+      132.9,
+      430.7
+    ],
+    "computed": "matrix(1, 0, 0, 1, 0, 0)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionrun",
+    "prop": "opacity",
+    "target": "div",
+    "rect": [
+      29.1,
+      470.2,
+      3.2,
+      430.7
+    ],
+    "computed": "none"
+  },
+  {
+    "t": 1520,
+    "type": "transitionstart",
+    "prop": "opacity",
+    "target": "div",
+    "rect": [
+      29.1,
+      470.2,
+      3.2,
+      430.7
+    ],
+    "computed": "none"
+  },
+  {
+    "t": 1520,
+    "type": "transitionrun",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      32.3,
+      470.2,
+      132.9,
+      430.7
+    ],
+    "computed": "matrix(1, 0, 0, 1, 0, 0)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionstart",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      32.3,
+      470.2,
+      132.9,
+      430.7
+    ],
+    "computed": "matrix(1, 0, 0, 1, 0, 0)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionrun",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      23.7,
+      677,
+      66.3,
+      66.3
+    ],
+    "computed": "matrix(1, 0, 0, 1, -8.62404, 8.62404)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionstart",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      23.7,
+      677,
+      66.3,
+      66.3
+    ],
+    "computed": "matrix(1, 0, 0, 1, -8.62404, 8.62404)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionrun",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      32.3,
+      685.6,
+      49.1,
+      49.1
+    ],
+    "computed": "matrix(1, 0, 0, 1, 0, 0)"
+  },
+  {
+    "t": 1520,
+    "type": "transitionstart",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      32.3,
+      685.6,
+      49.1,
+      49.1
+    ],
+    "computed": "matrix(1, 0, 0, 1, 0, 0)"
+  },
+  {
+    "t": 1520,
+    "type": "animationstart",
+    "prop": "pr-gate-sheen",
+    "target": "span",
+    "rect": [
+      69.4,
+      511.2,
+      61.3,
+      348.7
+    ],
+    "computed": "none"
+  },
+  {
+    "t": 1520,
+    "type": "animationstart",
+    "prop": "pr-gate-prompt",
+    "target": "div",
+    "rect": [
+      42,
+      293,
+      35,
+      257.9
+    ],
+    "computed": "none"
+  },
+  {
+    "t": 1816,
+    "type": "transitionend",
+    "prop": "opacity",
+    "target": "div",
+    "rect": [
+      53.2,
+      436.4,
+      3.2,
+      430.7
+    ],
+    "computed": "none"
+  },
+  {
+    "t": 1816,
+    "type": "transitionend",
+    "prop": "opacity",
+    "target": "div",
+    "rect": [
+      50,
+      436.4,
+      3.2,
+      430.7
+    ],
+    "computed": "none"
+  },
+  {
+    "t": 1955,
+    "type": "transitionend",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      43.2,
+      581.1,
+      66.3,
+      66.3
+    ],
+    "computed": "matrix(1, 0, 0, 1, -33.1484, 33.1484)"
+  },
+  {
+    "t": 2104,
+    "type": "transitionend",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      253.8,
+      433.2,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -6.75, -6.75)"
+  },
+  {
+    "t": 2105,
+    "type": "transitionend",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      -56.6,
+      433.2,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -6.75, -6.75)"
+  },
+  {
+    "t": 2105,
+    "type": "transitionend",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      253.8,
+      496.8,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -6.75, -6.75)"
+  },
+  {
+    "t": 2105,
+    "type": "transitionend",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      -56.6,
+      496.8,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -6.75, -6.75)"
+  },
+  {
+    "t": 2105,
+    "type": "transitionend",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      253.8,
+      560.5,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -6.75, -6.75)"
+  },
+  {
+    "t": 2105,
+    "type": "transitionend",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      -56.6,
+      560.5,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -6.75, -6.75)"
+  },
+  {
+    "t": 2105,
+    "type": "transitionend",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      253.8,
+      624.1,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -6.75, -6.75)"
+  },
+  {
+    "t": 2105,
+    "type": "transitionend",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      -56.6,
+      624.1,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -6.75, -6.75)"
+  },
+  {
+    "t": 2105,
+    "type": "transitionend",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      253.8,
+      687.7,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -6.75, -6.75)"
+  },
+  {
+    "t": 2105,
+    "type": "transitionend",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      -56.6,
+      687.7,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -6.75, -6.75)"
+  },
+  {
+    "t": 2105,
+    "type": "transitionend",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      219.8,
+      334.5,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -6.75, -6.75)"
+  },
+  {
+    "t": 2105,
+    "type": "transitionend",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      219.8,
+      786.4,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -6.75, -6.75)"
+  },
+  {
+    "t": 2105,
+    "type": "transitionend",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      -22.5,
+      334.5,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -6.75, -6.75)"
+  },
+  {
+    "t": 2105,
+    "type": "transitionend",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      -22.5,
+      786.4,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -6.75, -6.75)"
+  },
+  {
+    "t": 2105,
+    "type": "transitionend",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      98.6,
+      303.2,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -6.75, -6.75)"
+  },
+  {
+    "t": 2105,
+    "type": "transitionend",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      98.6,
+      817.7,
+      13.5,
+      13.5
+    ],
+    "computed": "matrix(1, 0, 0, 1, -6.75, -6.75)"
+  },
+  {
+    "t": 2245,
+    "type": "animationstart",
+    "prop": "pr-gate-sheen",
+    "target": "span",
+    "rect": [
+      33.4,
+      374.2,
+      61.3,
+      300
+    ],
+    "computed": "none"
+  },
+  {
+    "t": 2309,
+    "type": "transitionend",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      119.5,
+      480,
+      49.1,
+      49.1
+    ],
+    "computed": "matrix(1, 0, 0, 1, 0, 0)"
+  },
+  {
+    "t": 2517,
+    "type": "transitionend",
+    "prop": "transform",
+    "target": "div#pr-title-gate-leaf",
+    "rect": [
+      174.6,
+      239.7,
+      132.9,
+      430.7
+    ],
+    "computed": "matrix(1, 0, 0, 1, 0, 0)"
+  },
+  {
+    "t": 2518,
+    "type": "transitionend",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      41.7,
+      239.7,
+      132.9,
+      430.7
+    ],
+    "computed": "matrix(1, 0, 0, 1, 0, 0)"
+  },
+  {
+    "t": 2518,
+    "type": "transitionend",
+    "prop": "transform",
+    "target": "div",
+    "rect": [
+      174.6,
+      239.7,
+      132.9,
+      430.7
+    ],
+    "computed": "matrix(1, 0, 0, 1, 0, 0)"
+  },
+  {
+    "t": 3000,
+    "type": "transitionend",
+    "prop": "transform",
+    "target": "div#pr-title-gate-door",
+    "rect": [
+      31.3,
+      156.8,
+      327.4,
+      530.4
+    ],
+    "computed": "matrix(1, 0, 0, 1, -265.195, -163.695)"
+  }
+]

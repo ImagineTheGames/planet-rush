@@ -1,0 +1,13 @@
+{
+  "kept": [
+    "f007-01784ms.png",
+    "f024-04577ms.png",
+    "f032-05577ms.png",
+    "f040-06527ms.png",
+    "f056-08384ms.png",
+    "f104-13955ms.png"
+  ],
+  "dropped": 98,
+  "of": 110,
+  "note": "ticks.json carries the numbers for EVERY frame of the film — the canvas readbacks are the menu BEHIND the door, and the door is DOM. The picture this brief is about is the screencast (portrait-gated)."
+}
