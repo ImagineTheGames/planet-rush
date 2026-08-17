@@ -334,6 +334,11 @@ import {
   cameraScale,
   VIEW_ZOOM_STORAGE,
   showStickFurniture,
+  // a0-76 — who is still flying: one presence state per seat, fed from the
+  // server's own drop / reclaim / roster broadcasts, and the one function that
+  // routes those broadcasts into it.
+  PeerPresenceLog,
+  applyPresenceMessage,
 } from './ui';
 import type {
   HudFrame,
@@ -2408,6 +2413,20 @@ async function boot(): Promise<void> {
   const nameableFrame: Nameable[] = [];
   let playerNames: NameTable = [];
   let playerDifficulties: DifficultyTable = [];
+  /**
+   * **Who is still flying** (a0-76) — one presence state per seat, fed from the
+   * server's own broadcasts and from nothing else.
+   *
+   * The developer: *"do we have any indication when a player loses connection …
+   * and when they join back as well … we need something to indicate that so
+   * other players know"*. The answer was no: `src/net/link-loss` tells the
+   * player who dropped, and nobody else. This log is the other side of that
+   * drop, and the HUD reads it once a frame (`hudFrame.presence`).
+   *
+   * Constructed unconditionally, wired only online: a `LocalLoopback` has no wire
+   * to drop, so an offline match feeds an empty read and draws nothing.
+   */
+  const peerPresence = new PeerPresenceLog({ local: LOCAL_PLAYER, names: playerNames });
   /** Each slot's side, and whether the match has sides worth naming (m10 teams).
    *  Rebuilt with the name table, from the same live world, on every boot and
    *  rematch — so a rematch that changed the split relabels with it. */
@@ -2496,6 +2515,10 @@ async function boot(): Promise<void> {
     }
     playerNames = table;
     playerDifficulties = tiers;
+    // The banner spells a seat exactly the way its nameplate does, so a rebuilt
+    // table re-spells any line still on screen (a0-76).
+    peerPresence.setNames(playerNames);
+    peerPresence.setLocal(LOCAL_PLAYER);
     rebuildTeamTable();
   }
 
@@ -2530,6 +2553,30 @@ async function boot(): Promise<void> {
     viewerTeam = local ? (local.team ?? local.id) : undefined;
   }
   rebuildNameTable();
+
+  // --- WHO IS STILL FLYING (a0-76) -----------------------------------------
+  //
+  // > *"do we have any indication when a player loses connection (like for the
+  // > other players that remained in match…) and when they join back as well…
+  // > we need something to indicate that so other players know"*
+  //
+  // **Authority is the only source, and this is the whole of the feed.** A client
+  // cannot know why another client went quiet — lag, a closed tab, a dead ship
+  // and a rage-quit all look identical from the cockpit — so nothing below is
+  // derived from the simulation or from a peer's ship going still. Each branch is
+  // a message the server broadcast about a seat (`src/net/transport.ts`), on the
+  // roster channel that already reaches every client.
+  //
+  // Online only: a `LocalLoopback` has no wire, so an offline match never reaches
+  // any of this and the banner is never drawn.
+  // The routing itself lives beside the model (`src/ui/peer-presence.ts`
+  // `applyPresenceMessage`) rather than as a `switch` here, so the test can drive
+  // the real feed with real wire messages instead of a re-implementation of it.
+  if (onlineSession) {
+    onlineSession.observe((message) => {
+      applyPresenceMessage(peerPresence, message, world.time);
+    });
+  }
 
   // --- Freeze (?freeze=1, with ?debug=1): advance the sim to a fixed seeded
   //     tick, then hold it there so screenshots are deterministic across boots
@@ -3151,6 +3198,8 @@ async function boot(): Promise<void> {
     // the first one's timeline (a0-56).
     recordMatchStart('rematch');
     rebuildNameTable();
+    // A rematch is a second match: last match's drops are not this one's (a0-76).
+    peerPresence.reset();
     // A new match is a new tally and a new summary: the observer is rebuilt on the
     // fresh world, and the banked sequence is dropped so the NEXT teardown writes
     // once again (`bankMatch`'s latch is this binding).
@@ -4038,6 +4087,10 @@ async function boot(): Promise<void> {
     // exactly what `areEnemies` will act on.
     hudFrame.playerTeams = playerTeams;
     hudFrame.teamsMode = teamsMode;
+    // Who dropped, who is back, and who is flying whose ship (a0-76). Read on the
+    // sim's own clock, the same one the loot tell's window runs on, so a line's
+    // five seconds are five seconds of match.
+    hudFrame.presence = peerPresence.read(world.time);
     // …and whose side is FRIENDLY (u3). Same source, same rebuild, so a rematch
     // that moves this player to the other side re-words every plate with them.
     hudFrame.viewerTeam = viewerTeam;

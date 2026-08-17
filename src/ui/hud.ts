@@ -93,6 +93,9 @@ import { nameplateModel } from './nameplates';
 import type { DifficultyTable, Nameable, NameTable, TeamTable } from './nameplates';
 import { NameplateView } from './nameplates-view';
 import type { DrawnNameplate } from './nameplates-view';
+import { PeerPresenceView } from './peer-presence-view';
+import type { DrawnPresenceLine } from './peer-presence-view';
+import type { PresenceTell } from './peer-presence';
 import { tapMarkersModel } from './tap-markers';
 import { TapMarkerView } from './tap-markers-view';
 import type { DrawnTapMarkers } from './tap-markers-view';
@@ -127,6 +130,7 @@ import {
   HP_BAR_TOP,
   SHIELD_BAR_GAP,
   SHIELD_BAR_HEIGHT,
+  presenceBand,
   promptBounds,
   promptWrapWidth,
   respawnPad,
@@ -207,6 +211,10 @@ const TYPE = {
   respawn: 24,
   /** A floating ore cost travelling to the bank. */
   costFloat: 18,
+  /** A peer-presence line under the wave clock — `P3 — CONNECTION LOST` (a0-76).
+   *  Eyebrow-sized: it is a footnote to the match state above it, not a readout
+   *  of its own, and `hudType`'s 11px floor keeps it legible on a phone. */
+  presence: 12,
   /** The partial-pickup line under the hold pips — `HOLD FULL · 1 LEFT` (a0-54).
    *  Eyebrow-sized: it is a one-second footnote to the pip row above it, not a
    *  readout of its own, and `hudType`'s 11px floor keeps it legible on a phone. */
@@ -503,6 +511,22 @@ export interface HudFrame {
   /** The sim tick, driving the minimap's low-frequency content redraw
    *  ({@link ./minimap} `MINIMAP_REDRAW_TICKS}). Default: derived from `time`. */
   readonly tick?: number;
+
+  // --- a0-76: who is still flying (GDD §2.2 — match state, top centre) -------
+
+  /**
+   * The peer-presence lines to draw this frame — a seat dropped, is coming back,
+   * is back, or is gone for good, plus whether a bot has its controls
+   * ({@link ./peer-presence} `PeerPresenceLog.read`).
+   *
+   * **Authority-sourced, always.** `main.ts` feeds the log from the session's own
+   * observer — `playerSubstituted`, `playerReclaimed`, `lobbyState` — and never
+   * from the simulation: a client cannot know *why* another client went quiet,
+   * and a peer who is lagging, dead, or reading their phone looks identical from
+   * the cockpit. Default: none ⇒ the banner is not drawn, which is also the
+   * answer for every offline match (a `LocalLoopback` cannot drop).
+   */
+  readonly presence?: readonly PresenceTell[];
 }
 
 /** Reused for a frame that carries no combatants, so the empty case allocates
@@ -515,6 +539,12 @@ const NO_NAMES: NameTable = [];
 const NO_DIFFICULTIES: DifficultyTable = [];
 /** Shared empty side table — no slot has a side, so no plate carries a label. */
 const NO_TEAMS: TeamTable = [];
+/** …and the same for the presence banner: an offline match, and every online
+ *  frame in which nobody has dropped, feeds this and allocates nothing. */
+const NO_PRESENCE: readonly PresenceTell[] = [];
+/** The placement handed to the banner when it is drawing nothing — reused so the
+ *  quiet path does not allocate an object sixty times a second. */
+const ZERO_BAND = { x: 0, y: 0, leading: 0 } as const;
 
 /** Fallback screen radius for the own-ship over-bar when the frame carries no
  *  `shipRadius` (an unwired feed) — a sane hull-sized clearance so the bar still
@@ -592,6 +622,17 @@ export class Hud extends Container {
   private readonly waveNext: Text;
   private readonly waveMatch: Text;
   private waveChromeKey = '';
+  /** The clock's layout as of the last frame — the presence banner hangs off its
+   *  drawn footprint, so the two are placed from one measurement rather than from
+   *  two guesses at the same number. */
+  private clockLayout: ClockLayout | null = null;
+
+  // --- Peer presence (under the clock; a0-76) ------------------------------
+  //     Who is still flying: `P3 — CONNECTION LOST`, `P3 — BACK`. The decision
+  //     and its window are pure ({@link ./peer-presence}, fed from AUTHORITY in
+  //     `main.ts`); this pooled layer is only the paint ({@link
+  //     ./peer-presence-view}).
+  private readonly presence = new PeerPresenceView();
 
   // --- Controls strip (bottom, desktop only) ------------------------------
   private readonly stripGroup = new Container();
@@ -955,6 +996,9 @@ export class Hud extends Container {
       this.lootTellGroup,
       this.oreGroup,
       this.waveGroup,
+      // Who is still flying, hung off the clock's own footprint — the same band
+      // of corner chrome, because it answers the same kind of question (a0-76).
+      this.presence,
       this.stationGroup,
       // The zoom control shares the top-right row with HOME and draws with it, in
       // the same corner-chrome band (a0-74).
@@ -1069,6 +1113,7 @@ export class Hud extends Container {
     set(this.promptText, TYPE.prompt, 'label');
     set(this.lootTellReason, TYPE.lootTell, 'eyebrow');
     set(this.lootTellCount, TYPE.lootTell, 'name');
+    this.presence.setTypeScale(hudType(TYPE.presence, m));
     set(this.respawnText, TYPE.respawn, 'label');
 
     // The ore cluster's two lines re-stack at the scaled sizes, so the leading
@@ -1105,6 +1150,9 @@ export class Hud extends Container {
     // it down the list changes only which frame's answer it gets — this one's,
     // rather than the previous one's.
     this.updateWaveClock(frame, wheelOpen);
+    // …and the presence banner after it, because it hangs off the clock's drawn
+    // footprint and that footprint depends on whether the clock re-flowed.
+    this.updatePresence(frame, wheelOpen);
     this.updateCostFloats(frame);
     this.updateOnboarding(frame, wheelOpen, underAttack);
   }
@@ -1377,6 +1425,52 @@ export class Hud extends Container {
       this.drawWaveChrome(layout);
       this.waveChromeKey = waveKey;
     }
+    this.clockLayout = layout;
+  }
+
+  // --- Who is still flying (a0-76) ----------------------------------------
+
+  /**
+   * Draw the peer-presence banner: one short line per seat that changed hands,
+   * stacked under the wave clock.
+   *
+   * The lines themselves are decided by authority and latched by
+   * {@link ./peer-presence}; this only places them. Placement is the whole of the
+   * brief's *"keep it out of the way of the wheel and the minimap on a phone"* —
+   * the band is culled whole when an open wheel leaves no room for it
+   * ({@link ./hud-geometry} `presenceBand`), because a transient banner has no
+   * claim on a control the player is pressing right now.
+   */
+  private updatePresence(frame: HudFrame, wheelOpen: boolean): void {
+    const lines = frame.presence ?? NO_PRESENCE;
+    const clock = this.clockLayout;
+    if (lines.length === 0 || !clock) {
+      this.presence.update(NO_PRESENCE, ZERO_BAND, this.screenWidth, PAD);
+      return;
+    }
+    // The band is measured in CONTENT space, like the clock it hangs off, then
+    // shifted onto the screen — so on an ultrawide it stays with the rest of the
+    // chrome instead of drifting to the physical middle (a0-74).
+    const heights = lines.map(() => ({ width: 0, height: hudType(TYPE.presence, this.metrics) }));
+    const band = presenceBand(this.content.width, this.content.height, clock, heights, wheelOpen);
+    if (!band.fits) {
+      this.presence.update(NO_PRESENCE, ZERO_BAND, this.screenWidth, PAD);
+      return;
+    }
+    // Newest-first, so a band with room for two of three drops the oldest.
+    this.presence.update(
+      band.shown >= lines.length ? lines : lines.slice(0, band.shown),
+      { x: this.content.x + band.x, y: band.y, leading: band.leading },
+      this.screenWidth,
+      PAD,
+    );
+  }
+
+  /** The presence lines that actually drew this frame, post-cull — the ?debug=1
+   *  live-stage seam and `hud.test.ts` read it back, so "the HUD named them" is
+   *  an assertion rather than a screenshot caught inside five seconds. */
+  debugPresence(): DrawnPresenceLine[] {
+    return this.presence.debugLines();
   }
 
   // --- Controls strip (desktop only) --------------------------------------
@@ -2694,6 +2788,16 @@ export class Hud extends Container {
     // edge), so its `full` anchor stays honest, or nothing when nothing is named.
     if (shown(this.nameplates)) {
       for (const entry of this.nameplates.describeLayout(viewport)) entries.push(entry);
+    }
+
+    // The peer-presence banner, same self-registering discipline: the union of the
+    // rows that actually drew inside the margin, or nothing at all on the frames
+    // (the overwhelming majority) where nobody has dropped. `full` + 0 rather than
+    // `top-center`, argued in ./peer-presence-view — the GDD makes no positional
+    // claim about a tell it does not yet describe, and the band is wider than any
+    // third-width zone, exactly as the clock above it is.
+    if (shown(this.presence)) {
+      for (const entry of this.presence.describeLayout(viewport)) entries.push(entry);
     }
 
     // Under-ship ore-hold indicator: the same self-registering, screen-space
