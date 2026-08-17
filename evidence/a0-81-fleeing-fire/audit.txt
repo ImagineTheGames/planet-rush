@@ -1,0 +1,269 @@
+a0-81 — a bot running home should still be shooting at whoever is chasing it
+Bot Engineer · branch agent/bots/a0-81-fire-while-fleeing · 2026-08-17
+
+The developer, from a live match:
+
+  "when rusty was fleeing from me he could have auto fired at me but instead he
+   didnt it was like he was in a retreat or return to base target but thats dumb
+   because its unfair for him to just target his base and not fire at me at same
+   time because thats what i would do"
+
+
+===============================================================================
+1. THE AUDIT — which of the two it was
+===============================================================================
+
+The brief offered two hypotheses. It is the SECOND, and it is starker than
+"gated": the fire decision was not suppressed by the movement state, it was
+hard-coded off in the movement branch.
+
+NOT one target field doing two jobs.
+  `retreat(ctx, threat)` takes the threat it is running from as an ARGUMENT and
+  reads the destination separately off `ctx.self.station`. `engage`/`attack`
+  take a position or a `TargetScore`. There is no shared `target` slot on
+  `Brain` (src/bots/tree.ts) that a destination and an aim point are both
+  written into — checked field by field. The two intents were already separate
+  data; what was missing was one of them.
+
+A fire intent nailed shut by the travelling branch.
+  Every branch whose job was "fly somewhere" ended with a literal `fire(false)`
+  and NO `aim` action at all:
+
+    src/bots/behaviors.ts  L1602/1604/1605   retreat        (all three exits)
+    src/bots/behaviors.ts  L661             haulHome        (= homeErrand)
+    src/bots/behaviors.ts  L600             spendAtHome     (docked at the wheel)
+    src/bots/behaviors.ts  L684             defendHome      (empty guard ring)
+    src/bots/behaviors.ts  L1106            defendAlly      (transit leg)
+
+  It was deliberate, and the comment said so. `retreat`'s doc block: "with a
+  live threat the weapon is off — a retreating bot does not advertise (GDD
+  §2.2)." So this is a ratified design line being overridden by the developer,
+  not an oversight being repaired, and the PR says so.
+
+Why it looked broken rather than merely passive.
+  The missing `aim` is the half that made it read as a bug from the cockpit.
+  With no aim action the simulation's facing ladder (src/sim/step.ts
+  `desiredFacing`) falls through to priority 3, "nose follows travel" — so a
+  retreating bot was not holding fire while looking at you, it was pointed at
+  its own doorstep with its back to the chase. That is exactly the developer's
+  "it was like he was in a retreat or return to base target".
+
+Why firing over the shoulder genuinely costs the bot nothing.
+  src/sim/step.ts `integrate` applies `intent.thrust` in WORLD space and never
+  reads `ship.angle`; facing steers only the gun (`fireShip` fires along
+  `ship.angle`). A hull thrusting home with its nose over its shoulder gets home
+  at exactly the speed it always did. The developer's "it costs them nothing" is
+  the simulation's own arithmetic, which is why they expect it to happen.
+
+
+===============================================================================
+2. THE MEASUREMENT — a chased bot's shots while retreating, per tier
+===============================================================================
+
+Instrument: evidence/a0-81-fleeing-fire/audit.ts
+  npx vite-node evidence/a0-81-fleeing-fire/audit.ts
+
+Eight full 8-slot FFA matches, the shipped cast (rusty, bolt, foreman, patch,
+sable, vulture, warden), 300 sim-seconds each, seeds
+1,7,23,37,101,991,20260806,20260817. No fixtures and no staging: the bots pick
+their own fights, take their own damage, and break off when their own nerve says
+to. Both builds run the identical script.
+
+  retreat tick   a tick whose winning behavior-tree leaf was `retreat`
+                 (Brain.lastBehavior) — the bot's own account, not an inference
+                 from its velocity.
+  chased tick    a retreat tick with a hostile ship inside WEAPON_RANGE at the
+                 same moment. This is the only denominator the complaint is
+                 about; a bot retreating across empty space has nothing to shoot
+                 at and counting those ticks dilutes both builds toward zero.
+  shot           a projectile that actually left the barrel, detected from the
+                 weapon reload jumping back to full inside the step
+                 (`fireWeapon`) — so a held trigger on cooldown counts once,
+                 when the shot goes out, exactly like a human's.
+
+--- BEFORE (main @ ac7163c7) --------------------------------------------------
+
+tier    bot-matches  retreat-ticks  chased-ticks  trigger-ticks   shots  shots/chased-sec  dmg-to-ships
+easy             24         166000         26893              0       0              0.00          6008
+medium           16          84825         21382              0       0              0.00          8359
+hard             24          22926          9983              0       0              0.00         12473
+
+--- AFTER (this branch) -------------------------------------------------------
+
+tier    bot-matches  retreat-ticks  chased-ticks  trigger-ticks   shots  shots/chased-sec  dmg-to-ships
+easy             24         202420         22395           6557     500              1.34          4679
+medium           16         104185         19921          11660     717              2.16          9237
+hard             24          34203         10605           7936     410              2.32          13136
+
+Read it as: across eight matches and 64 bot-seats, a bot was chased while
+retreating for **58,258 ticks (16 minutes of sim time)** and fired **zero**
+shots. Not "rarely", not "badly" — no bot in the game could do it at all, at any
+tier, which is what the developer met. After, every tier does.
+
+The ladder, which is the thing that had to survive:
+
+  tier    trigger held / chased tick   shots per chased second
+  easy              29%                        1.34
+  medium            59%                        2.16
+  hard              75%                        2.32
+
+Easy is a third as willing to have the gun on target as Hard and lands 42% fewer
+shots per second of being chased — and there is no new knob anywhere. That
+spread is the aim-error model the tier ladder is already built on doing its job
+on a new behaviour: `aimJitter` (0.32 rad at Easy vs ~0.02 at Hard) sprays the
+committed bearing so the hull rarely settles on it, `aimLatency` leads a juking
+chaser where it WAS going, and `reactionInterval` (1/6 s vs 1/24 s) refreshes
+the whole aim four times less often while the geometry of a chase changes every
+metre.
+
+
+===============================================================================
+3. THE DIFFICULTY DECISION — every tier, not Medium-and-up
+===============================================================================
+
+The brief invited a proposal to gate this at Medium. Rejected, for one decisive
+reason and one principled one.
+
+Decisive: the bot in the report is RUSTY, and Rusty is Easy (GDD §2.9 — "timid
+hoarder"). A Medium-and-up rule ships the developer's own match back to them
+unchanged. The brief itself draws the line: "Easy being bad at it is different
+from *no bot in the game being able to do it at all*, which is what the developer
+met." Section 2 is that sentence measured — 0.00 at every tier.
+
+Principled: this codebase already has the mechanism for making Easy bad at a
+thing, and it refuses to add a second one. The radio note (src/bots/ally.ts,
+docs/team-bots-plan.md §4.5) states the doctrine outright — "Cooperation is a
+difficulty dial expressed through the existing latency and miss model — there is
+no separate 'be bad at teamwork' knob." Covering fire uses the identical
+`aimAndFire` as `engage`, with the same `combatSpread`, the same
+`combatLatency`, and the same aim track, so it inherits the whole ladder for
+free and cannot become a second, quietly better gun. The measured 29/59/75%
+spread in section 2 is that decision validated rather than asserted.
+
+
+===============================================================================
+4. WHERE COVERING FIRE APPLIES — and where it deliberately does not
+===============================================================================
+
+Applied to the branches that sit ABOVE the combat branches in all three trees:
+
+    retreat · haulHome/homeErrand · spendAtHome · defendHome's idle ring ·
+    defendAlly's transit leg
+
+Reaching one of those means the bot was denied a fight by an OUTRANKING
+COMMITMENT, and a commitment is a reason not to fly at someone, never a reason
+not to shoot them.
+
+NOT applied to `roam`, `scavenge`, `hunt`. Those sit BELOW `potshot`/`attack` in
+every tree, so a bot only reaches them once its own tier declined the fight —
+Easy's `potshot` demands `weights.triangle.attack >= EASY_ATTACK_WEIGHT` (0.4)
+before Rusty will shoot at something already in front of it. Arming them would
+hand the Easy tree the seek-and-destroy branch GDD §2.9 withholds from it
+("attacks rarely"): a balance change wearing a bug fix's clothes. The defect was
+a suppressed trigger, not a missing appetite. Pinned by the test
+`leaves roam and scavenge deliberately unarmed`.
+
+What did NOT change: a bot with nothing hostile inside weapon range emits the
+same released trigger and no aim action it always did (`TRIGGER_UP`), so the
+half of "gunfire is the loudest tell" (GDD §2.2) that is load-bearing — a bot
+crossing empty space is quiet — is untouched. And an ally is never covering
+fire, at any range, in any tier: `coveringFireTarget` asks `isTargetable`, the
+one `hostile` stamp off sim/allegiance.ts, tested with two slots sharing a side
+because FFA cannot prove it (GDD §2.9).
+
+
+===============================================================================
+5. THE MIRROR CASE — does combat suppress economic decisions the same way?
+===============================================================================
+
+Asked by the brief. Answer: NOT the same defect, with one half that WAS and is
+now fixed.
+
+(a) Half of it was the same defect, and it is fixed here.
+    `spendAtHome` hard-coded `fire(false)` while the bot orbited its own dock
+    with the wheel open — a bot banking or buying had its trigger nailed down by
+    a movement branch for exactly the same reason a fleeing one did. Same one
+    line, same fix: it is in the `travel` list above, and a raider that parks on
+    a shopping bot's doorstep now gets shot at while the shopping happens.
+
+(b) The rest is tree PRIORITY, which is a different mechanism and is the design.
+    `spend`, `haul` and `fix-base` sit ABOVE `potshot`/`attack`/`hunt` in all
+    three trees, so a bot with a full hold or a purchase to make does that
+    INSTEAD of picking a fight. Nothing is suppressed — the economy wins the
+    tick. That is GDD §2.3's triangle and §2.9's "Easy attacks rarely", and
+    inverting it would be a balance change nobody asked for.
+
+(c) Banking cannot be suppressed by anything, for anyone.
+    Since the v0.6 amendment the hold auto-drains inside your own station's
+    atmosphere (`DEPOSIT_RANGE`, src/sim/step.ts auto-deposit) — no action, no
+    verb, no wheel. A bot fighting inside its own atmosphere banks exactly like
+    a human fighting there, because neither of them is doing anything.
+
+(d) Mining and shooting are one trigger, so a human cannot do both either.
+    Parity holds by construction (GDD §1: "your gun is your mining tool").
+
+(e) The one real asymmetry left, reported and NOT fixed here.
+    `defend` sits above `spend`, so a bot answering the alarm at its own docked
+    station will not press the wheel while it fights — a human standing there
+    could. It is left alone deliberately, because the GDD already ruled on the
+    trade: §2.5, "Construction takes time — a turret assembles over ~10 seconds,
+    a shield over ~15 — so defenses are bought before the attack, not during
+    it", and §2.6, "a siege cannot be out-repaired" (which `wantsCorePatch`
+    enforces directly as well). What a bot would buy mid-siege lands after the
+    siege. Changing it is a design call for the Director, not a defect.
+
+
+===============================================================================
+6. SECOND-ORDER EFFECTS — what the balance crew should read
+===============================================================================
+
+Instrument: evidence/a0-81-fleeing-fire/contention-probe.ts, 48 full 2v2 team
+matches (seeds 1..48, 300 s), both builds.
+
+  build       ship deaths / match   ship damage / match   allied same-rock   enemy same-rock
+  pre-a0-81           9.0                   564                4.06%              3.12%
+  a0-81               5.0                   391                4.13%              1.89%
+
+**Bot-vs-bot matches run 44% less lethal.** The mechanism is the developer's own
+stated goal working: a bot that shoots back damages its pursuer, the pursuer
+crosses its OWN nerve threshold and breaks off too, and a chase that used to end
+in a kill now ends in two ships disengaging. Against a human this is the point —
+a bot is meaningfully harder to farm, because a chase costs hull now. Bot
+against bot it reads as mutual disengagement, and this is the number to watch if
+that turns out to be too quiet.
+
+That effect broke one existing test's control, and it is worth stating plainly:
+src/bots/field-division.test.ts asserts allied rock contention as a RATIO
+against an enemy-pair control, and friendly fire is off (GDD §1) — allies never
+shoot each other — so a combat change can only ever move the denominator. The
+allied number, which is the quantity that stage is about, did not move
+(4.06% -> 4.13%). The bar was re-measured and an absolute assertion on the ally
+rate was ADDED beside it, so the re-baseline leaves nothing unguarded. Full
+reasoning in the test's own note.
+
+Three seed-locked suites were re-baselined for a0-81, each with its measurement,
+and none relaxed: ffa-parity's three golden hashes (a0-05 category — nothing in
+a0-81 is team-aware, so it is not the leak Rule 3 forbids), team-winning's
+fixture seed 13 -> 4 (fourth instance of a documented fixture fragility, seeds
+1-16 re-scanned, largest margin picked), and field-division's ratio as above.
+
+
+===============================================================================
+7. WHAT PINS IT
+===============================================================================
+
+src/bots/behaviors.test.ts — `a retreating bot still fires on what is chasing
+it`. Rusty, wounded, 900 units out from home, a hostile on the tail at 0.7 ×
+weapon range on the far side from home (behind, not between — a hostile between
+is a BLOCKADE and src/bots/cornered.ts owns that case). Asserts the stream
+carries an aim action, that it bears on the chaser inside the tier's own spread
+and not on the station, and that over a pinned three-second chase real
+projectiles leave the barrel.
+
+On the pre-fix build: `expected null not to be null` (no aim action at all) and
+`rusty (easy) shoots back: expected 0 to be greater than 0`.
+
+Six more cases beside it: the flight is untouched (thrust still carries the bot
+home while the gun points the other way), every tier can, a teammate on the tail
+draws nothing, empty space is still silent, a hauler gets the same gun, and
+roam/scavenge stay deliberately unarmed.
