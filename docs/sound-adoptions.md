@@ -66,13 +66,23 @@ Standing verdict, 2026-08-07T20:09:00Z, in the developer's words:
 > those sounds at once and make new ones that match the new theme (modern/sci-fi and
 > not retro/toony)
 
-`rockBurst`, `oreCollect`, `holdFull`, `turretFire`, `shotImpact`, `shieldHit`,
+`rockBurst`, `oreCollect`, `holdFull`, `turretFire`, `shotImpact`†, `shieldHit`,
 `shieldDown`, `coreHit`, `turretDown`, `shipExplode`, `shipSpawn`, `spawnPulse`,
 `thruster`, `buildPlaced`, `buildComplete`, `repairTick`, `bankOre`, `upgradeBought`,
-`waveArrive`, `collapseBegin`, `stationDeath`, `matchEnd`, `alarm`, `ambient`,
+`waveArrive`, `collapseBegin`, `stationDeath`, `matchEnd`†, `alarm`, `ambient`,
 `musicBed`, `musicPulse`, `musicTheme`, `musicDread`, `musicWin`, `musicLoss`,
 `pressTick`, `purchaseConfirm`, `rejectBuzz`, `depositTick`, `respawnBeep`,
 `respawnGo`, `minimapPing`.
+
+† **`shotImpact` and `matchEnd` no longer exist as slots** (a0-68). Their 2026-08-17
+denials said the *slot* was wrong, not the voice in it — one cue for four surfaces,
+and one cue for both outcomes — so they are split rather than re-voiced:
+`shotImpact` → `impactHull` / `impactRock` / `impactShield` / `impactStation`, and
+`matchEnd` → `matchWin` / `matchLoss`. The six heirs each carry four offers and
+none of them carries a verdict, so they belong in *Awaiting a first verdict* below
+rather than here; the two names are kept in this list with a dagger because the
+denial they inherit is still the standing one and deleting the row would lose it.
+`docs/sound-structural-notes.md` has the derivation.
 
 An adoption brief adopts the letters it was briefed with. It does not take a
 neighbouring slot along for the ride because the offer was sitting right there.
@@ -80,7 +90,9 @@ neighbouring slot along for the ride because the offer was sitting right there.
 ## Awaiting a first verdict
 
 `xpTick`, `xpBarFill`, `levelUp`, `xpSettle` — the four end-of-match summary slots
-added by p1-07, after the deny-all. They carry no verdict of any kind, which is not
+added by p1-07, after the deny-all — and the six a0-68 heirs above (`impactHull`,
+`impactRock`, `impactShield`, `impactStation`, `matchWin`, `matchLoss`), which are
+new slots and have never been voted on. They carry no verdict of any kind, which is not
 the same as being denied, but it is the same as not being adopted: the bank plays its
 own incumbents for them and none of their offers.
 

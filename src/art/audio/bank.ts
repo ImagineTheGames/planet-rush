@@ -115,9 +115,12 @@
  * later brief cannot revive one of them by accident. `docs/sound-adoptions.md`
  * is the ledger.
  *
- * The impact of a shot in flight ({@link SOUND.shotImpact}) is the turret/ship
- * projectile landing; it and the two chip voices carry weapon power in their gain
- * (`./engine` `levelFor`), so a tier-4 tool hits heavier than a tier-0 one.
+ * The impact of a shot in flight is the turret/ship projectile landing, and it is
+ * **four slots** ({@link SOUND.impactHull} · {@link SOUND.impactRock} ·
+ * {@link SOUND.impactShield} · {@link SOUND.impactStation}) since a0-68 split the
+ * one `shotImpact` had been by what the shot actually hit. All four carry weapon
+ * power in their gain (`./engine` `levelFor`) the way the two chip voices do, so a
+ * tier-4 tool hits heavier than a tier-0 one on every surface.
  *
  * ## The device cues (the p4-03 seams)
  *
