@@ -58,6 +58,32 @@ instruction to the Director:
 
 > add a little bit more of sparkle to it, like you've won a prize, but subtle... it shouldn't be too long
 
+**R5** — 2026-08-17, **nineteen slots, a reason each.** The developer listened to
+the whole a0-60 re-voiced board and denied nineteen of the thirty-five, not with a
+theme this time but with a specific sentence per slot. They are quoted character
+for character in `docs/sound-round-two-manifest.md`, which is the status of record
+for the sixteen of them that ask for new sounds (a0-67). The other three —
+`shotImpact`, `matchEnd`, `spawnPulse` — ask for **structural** changes rather
+than voices and are a0-68; they are deliberately not in that manifest, because a
+row there is a promise of four voices and offering four voices against a reason
+that is not asking for voices is how a board gets denied a third time.
+
+**What R5 says about R1, and about how this ledger reads a denial.** R1 was one
+sentence over thirty-five slots and it was answered with one theme, per family.
+Nineteen of those thirty-five came back. That is not a verdict on the sweep's
+craft — several of the round-one takes are exactly what their family note asked
+for, and `buildPlaced`'s four are a textbook execution of *"a latch, never a
+fanfare"* (§7.3). It is a verdict on the **shape of the answer**: a theme can only
+be wrong in one way at a time, and sixteen slots turned out to be wrong in sixteen
+different ways. The rule this ledger takes from it, for the next deny-all that
+arrives:
+
+> **A denial that names a register can be answered by a register. A denial that
+> names a slot cannot.** Where a reason is available per slot, the round is worked
+> slot by slot even if that is sixteen briefs' worth of reading — because the
+> alternative is one more round that answers the average of what was said and
+> none of what was said.
+
 **On R3's last clause.** The a0-49 brief quotes R3 as ending at *"we don't need
 this at all"*. The record runs four words further — *"no need for regeneration"* —
 and those four words are the whole disposition. The brief reads the shorter
@@ -114,6 +140,52 @@ no regeneration brief against them.
 | `xpBarFill`† | XP Bar Fill | R3 | 2026-08-14 19:21 | 2026-08-09 (p1-07 `c1fb32b`) | **cut** |
 
 Counted: **35 superseded, 2 revoice, 1 cut.**
+
+### R5, 2026-08-17 — nineteen rows, and where each one is
+
+The ledger's rule is that a denial gets its row before anything else happens, so
+these are recorded here as well as in the round-two manifest. `oreCollect` appears
+twice in this file on purpose: it now carries two live denials from two different
+dates, and the older one (R4) was not withdrawn by the newer.
+
+| slot | reason | disposition |
+|---|---|---|
+| `oreCollect` | R5 | **revoice — done** (a0-67, `g`/`h`/`i`/`j`) |
+| `turretFire` | R5 | **revoice — done** (a0-67, `h`/`i`/`j`/`k`) |
+| `shieldHit` | R5 | **revoice — done** (a0-67) |
+| `thruster` | R5 | **revoice — done** (a0-67) |
+| `buildPlaced` | R5 | **revoice — done** (a0-67) |
+| `bankOre` | R5 | **revoice — done** (a0-67, around the incumbent) |
+| `upgradeBought` | R5 | **revoice — done** (a0-67, around the incumbent) |
+| `stationDeath` | R5 | **revoice — done** (a0-67) |
+| `alarm` | R5 | **revoice — done** (a0-67) |
+| `musicBed` | R5 | **revoice — done** (a0-67) |
+| `musicPulse` | R5 | **revoice — done** (a0-67) |
+| `musicTheme` | R5 | **revoice — done** (a0-67) |
+| `musicDread` | R5 | **revoice — done** (a0-67) |
+| `musicWin` | R5 | **revoice — done** (a0-67, around the incumbent) |
+| `musicLoss` | R5 | **revoice — done** (a0-67, around the incumbent) |
+| `pressTick` | R5 | **revoice — done** (a0-67, back into the ratified glass) |
+| `shotImpact` | R5 | **outstanding — a0-68** (structural; not a request for voices) |
+| `matchEnd` | R5 | **outstanding — a0-68** (structural) |
+| `spawnPulse` | R5 | **outstanding — a0-68** (structural) |
+
+Every row above stays in this file under the rule at the bottom: a row leaves only
+when the slot carries a verdict that is not `deny-all`, and none of these does yet.
+What has changed for the sixteen is the same thing that changed for `oreCollect`
+and `levelUp` under a0-49 — the newest offer in the slot now post-dates the denial,
+under letters no verdict has spent, which is the test every other row here is
+judged by. The before/after in numbers is `evidence/a0-67-round-two/numbers.txt`,
+regenerable.
+
+**One thing R5 fixed that this ledger had been complaining about since a0-49.**
+`/status/sound-choices.json` records a verdict as a slot and a **letter**, so *"keep
+what ships"* has never been an expressible answer — and four of the sixteen reasons
+open with some form of *"i like current"*. Six slots now offer the incumbent under
+a letter of its own (`SoundCandidate.anchor`, written through to
+`sound-review/manifest.json`), which makes it one. It also costs nothing: an anchor
+is asserted to render sample-for-sample identical to the shipped voice, so it can
+never quietly become an improvement on the developer's own reference.
 
 > **Update, a0-60 (2026-08-16).** *Superseded* was the correct mechanical reading
 > — the a0-01b offers do post-date the denial — and it was still not what the
