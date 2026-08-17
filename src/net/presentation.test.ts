@@ -50,6 +50,8 @@ const shotAt = (slot: number, x: number, y: number, owner = REMOTE): Interpolate
   slot,
   x,
   y,
+  vx: 520,
+  vy: 0,
   meta: owner | SHOT_META.shipKind,
 });
 

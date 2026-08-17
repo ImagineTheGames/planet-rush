@@ -1,0 +1,52 @@
+{
+  "scene": {
+    "name": "field",
+    "ships": 8,
+    "asteroids": 40,
+    "simHz": 60,
+    "snapshotHz": 30,
+    "latencyMs": 75,
+    "jitterMs": 15,
+    "interpDelayMs": 100,
+    "stallMs": 0,
+    "shipMuzzleSpeed": 520,
+    "turretMuzzleSpeed": 700
+  },
+  "wireCost": {
+    "snapshots": 300,
+    "meanShotsPerSnapshot": 8.7,
+    "peakShotsPerSnapshot": 14,
+    "meanBytes": 162.4,
+    "meanBytesAtSixByteRecord": 144.9,
+    "peakBytes": 194,
+    "downstreamKBs": 5.17,
+    "downstreamKBsAtSixByteRecord": 4.66,
+    "worstCaseBytes": 494,
+    "worstCaseKBs": 14.88
+  },
+  "remoteShotsFired": 180,
+  "dotsMeasured": 5186,
+  "crossTrackError": {
+    "mean": 0.025,
+    "p95": 0.055,
+    "max": 0.083
+  },
+  "alongTrackError": {
+    "mean": 3.209,
+    "p95": 7.35,
+    "max": 8.748
+  },
+  "offItsOwnLine": {
+    "frames": 0,
+    "ofFrames": 5186,
+    "worstUnits": 0
+  },
+  "perFrameStep": {
+    "mean": 8.281,
+    "p95": 13.792,
+    "max": 24.108,
+    "frozenFrames": 93,
+    "ofFrames": 5018
+  },
+  "duringStall": null
+}

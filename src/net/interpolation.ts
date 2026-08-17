@@ -60,6 +60,35 @@ export const INTERP_DELAY_MS = 100;
  */
 export const MAX_EXTRAPOLATION_MS = 40;
 
+/**
+ * The same cap for a **shot**, and it is five times the ship one on purpose
+ * (a0-73).
+ *
+ * A ship is capped tight because extrapolating one is a *guess*: a pilot can
+ * thrust, turn or stop inside the reach, so every millisecond past the last
+ * snapshot is another millisecond of overshoot to snap back from — which is the
+ * whole argument the module header opens with.
+ *
+ * A shot cannot do any of those things. It takes no input, carries no
+ * acceleration, and flies one straight line at one constant speed from the
+ * instant it leaves the barrel until it hits something or expires
+ * (`src/sim/projectiles.ts`). Reaching forward along a velocity the wire handed
+ * us is therefore not extrapolation in the risky sense at all — it is replaying
+ * arithmetic the server is doing with the same two numbers. The only thing that
+ * *can* go wrong is drawing a shot that has already landed, and the trade there is
+ * not symmetric: a ghost dot for a few frames costs a player nothing, while a
+ * frozen dot invites them to move into a line that is live (GDD §2.6 — the dodge
+ * is the skill, and it is read off the line).
+ *
+ * 200 ms covers a six-snapshot loss burst at the 30 Hz broadcast rate. It is 58 %
+ * of the shortest shot life in the game (a turret's `range / projectileSpeed` =
+ * 343 ms) and 35 % of a stock ship shot's 577 ms, so a ghost can never outlive its
+ * shot by more than a fraction of one flight. Past it the shot holds, because a
+ * stall longer than this is a wire the acceptance gate should fail rather than one
+ * the buffer should keep inventing a match for.
+ */
+export const MAX_SHOT_EXTRAPOLATION_MS = 200;
+
 /** How long a snapshot stays useful for interpolation before it is pruned —
  *  comfortably past {@link INTERP_DELAY_MS} plus jitter, bounded so the buffer
  *  cannot grow with the match. */
@@ -159,11 +188,19 @@ export interface InterpolatedShip {
  * wire named, so the presentation layer can write it straight back into the
  * client's projectile pool; `meta` is carried verbatim (owner in the low bits,
  * ship-vs-turret kind in bit 3) so the renderer keeps tinting the two apart.
+ *
+ * `vx` / `vy` are the line the shot was fired on, off the wire (`./snapshot`
+ * `ProjSnap`). They are both how this sample was placed and what the presentation
+ * layer writes into the pool slot, so the world a renderer reads carries a shot's
+ * real heading rather than whatever the slot's previous occupant left behind.
  */
 export interface InterpolatedShot {
   readonly slot: number;
   readonly x: number;
   readonly y: number;
+  /** Muzzle velocity, world units per second. */
+  readonly vx: number;
+  readonly vy: number;
   readonly meta: number;
 }
 
@@ -183,6 +220,7 @@ export class RemoteInterpolator {
   private readonly local: PlayerId;
   private delayMsValue: number;
   private readonly maxExtrapolationMs: number;
+  private readonly shotReachMs: number;
   private readonly retainMs: number;
   private readonly maxEntries: number;
 
@@ -200,6 +238,10 @@ export class RemoteInterpolator {
      *  jitter (audit item 2d). */
     readonly delayMs?: number;
     readonly maxExtrapolationMs?: number;
+    /** How far a SHOT may fly past the newest (or before the oldest) snapshot,
+     *  ms. Default {@link MAX_SHOT_EXTRAPOLATION_MS} — deliberately far longer
+     *  than `maxExtrapolationMs`, for the reason written on that constant. */
+    readonly shotReachMs?: number;
     readonly retainMs?: number;
     readonly maxEntries?: number;
     /** Per-adjustment slew limit, ms. Default {@link DELAY_SLEW_MS}. */
@@ -209,6 +251,7 @@ export class RemoteInterpolator {
     this.adaptive = config.delayMs === undefined;
     this.delayMsValue = config.delayMs ?? INTERP_DELAY_MS;
     this.maxExtrapolationMs = config.maxExtrapolationMs ?? MAX_EXTRAPOLATION_MS;
+    this.shotReachMs = config.shotReachMs ?? MAX_SHOT_EXTRAPOLATION_MS;
     this.retainMs = config.retainMs ?? RETAIN_MS;
     this.maxEntries = config.maxEntries ?? MAX_ENTRIES;
     this.slewMs = config.slewMs ?? DELAY_SLEW_MS;
@@ -291,14 +334,37 @@ export class RemoteInterpolator {
    * Where every shot in the streamed projectile pool was {@link delayMs} ago — the
    * same three regimes as {@link sample}, on the same buffer and the same clock.
    *
-   * Shots are the one entity class the client *cannot* dead-reckon from the wire:
-   * the 6-byte projectile record carries position and owner but **no velocity**
-   * (`./snapshot`), deliberately, because a client that sees the whole board can
-   * watch a shot fly. The catch is that "watch it fly" was never implemented — a
-   * decoded shot sat still at its snapshot position and teleported on the next one,
-   * 33 ms later, which is exactly the *"jumpy projectiles"* in the field report.
-   * Interpolating between two known positions is the missing half, and it needs no
-   * wire change: two snapshots *are* the velocity.
+   * **A shot advances along its own heading, in every regime** (a0-73). The
+   * developer, from a live online match: *"other players shots dont follow the
+   * direction they were fired in."* They did not. This method used to have exactly
+   * one way of moving a shot — chord-interpolation between two snapshots that
+   * bracket it — and no way at all when there was no such pair. The chord itself is
+   * fine: measured against the ray the sim fired the shot on, an interpolated dot
+   * sits **0.026 u** off it on average (evidence/a0-73-remote-shots). The failure
+   * was everything either side of the chord, and it was a *freeze*:
+   *
+   *  - the first snapshot a shot appears in has no earlier record to pair with, so
+   *    the dot sat at the muzzle for a bracket — one frozen frame per shot, on the
+   *    frame a player reads the line to decide whether to move into it;
+   *  - the last one has no later record, so it sat again;
+   *  - and for the whole of any gap in the stream — packet loss, a mobile radio, a
+   *    backgrounded tab — every shot on screen stopped dead. Measured at a 200 ms
+   *    gap: **104 world units** behind where its own heading had it, a third of the
+   *    ship weapon's entire 300-unit reach, and then a 104-unit teleport when the
+   *    stream resumed.
+   *
+   * A frozen shot's cross-track error is zero — it is *on* its line, just not
+   * *travelling* it — and that distinction is worth nothing to the player the brief
+   * is about. Shots are the one entity where the heading IS the gameplay, so a dot
+   * that honours its line only while the packets flow is a fairness defect, not a
+   * smoothness one.
+   *
+   * So the wire carries the velocity now (`./snapshot` `ProjSnap`, 2 B per shot)
+   * and every regime here uses it. Where a bracketing pair exists the chord still
+   * wins — it is anchored at two known positions and cannot drift — and the
+   * velocity is used to *validate* the pair instead ({@link lerpShots}). Everywhere
+   * else the shot flies, forward or backward, capped by
+   * {@link MAX_SHOT_EXTRAPOLATION_MS}.
    *
    * The local player's own ship shots are absent from this stream by the time it
    * gets here — the reconcile path suppresses them so the firer sees their own
@@ -308,8 +374,11 @@ export class RemoteInterpolator {
   sampleShots(nowMs: number): InterpolatedShot[] {
     const at = this.bracket(nowMs);
     if (at === null) return [];
-    if (at.mode !== 'interpolate') return shotsOf(at.a);
-    return this.lerpShots(at.a, at.b, at.frac);
+    if (at.mode === 'interpolate') return this.lerpShots(at.a, at.b, at.frac, at.renderMs);
+    // Hold and extrapolate are the same arithmetic with opposite signs: the render
+    // clock is before the only snapshot we have, or after it. A shot flies a
+    // straight line either way, so it is reached to rather than held at.
+    return flyShots(at.a, at.renderMs - at.a.receivedMs, this.shotReachMs);
   }
 
   // --- Internals ----------------------------------------------------------
@@ -352,38 +421,70 @@ export class RemoteInterpolator {
   }
 
   /**
-   * Interpolate every shot present in both snapshots, in the same pool slot and
-   * with the same owner and kind. A slot present in only one of the two is drawn
-   * where it is: a shot that has just spawned, or one that landed between the two
-   * frames and must still be seen for the rest of its playback.
+   * Interpolate every shot present in both snapshots, in the same pool slot and on
+   * the same fired line. A slot present in only one of the two is a shot with no
+   * pair to chord across — freshly fired, or landed between the two frames — and it
+   * **flies its own heading** to the render instant rather than sitting where its
+   * one packet put it (a0-73).
    */
-  private lerpShots(a: BufferedSnapshot, b: BufferedSnapshot, frac: number): InterpolatedShot[] {
+  private lerpShots(
+    a: BufferedSnapshot,
+    b: BufferedSnapshot,
+    frac: number,
+    renderMs: number,
+  ): InterpolatedShot[] {
     const out: InterpolatedShot[] = [];
     const span = b.receivedMs - a.receivedMs;
     const maxStep = maxShotStep(span);
     for (const s of a.projectiles) {
       const next = b.projectiles.find((o) => o.id === s.id);
-      // A slot whose meta changed is a *recycled* slot, not the same shot moving:
-      // different owner or a turret shot where a ship shot was. Never lerp those.
-      if (!next || next.meta !== s.meta) {
-        out.push({ slot: s.id, x: s.posX, y: s.posY, meta: s.meta });
+      // Three ways the same pool slot can hold two DIFFERENT shots across a pair,
+      // and all three must refuse the chord — one dot lerped between two shots is
+      // a dot travelling a line neither of them flew.
+      //
+      //  - the meta changed: a different owner, or a turret shot where a ship shot
+      //    was;
+      //  - the VELOCITY changed (a0-73, and the sharpest of the three): a shot's
+      //    muzzle vector is constant for its whole life, so the same shot encodes
+      //    to the identical quantized pair every snapshot and two independent
+      //    shots agreeing to within 1.4° AND 4 u/s is a coincidence, not a match.
+      //    This is the guard that catches a recycled slot whose new shot happens to
+      //    spawn near where the old one died — mining, where a shot dies on a rock
+      //    a few tens of units out and the freed slot is taken by the next one
+      //    fired, which `maxShotStep` alone is far too coarse to see;
+      //  - the positions are further apart than any muzzle in the game could carry
+      //    a shot in this span.
+      const recycled =
+        !next || next.meta !== s.meta || next.velX !== s.velX || next.velY !== s.velY
+          ? true
+          : sq(next.posX - s.posX) + sq(next.posY - s.posY) > maxStep * maxStep;
+      if (recycled) {
+        // No chord to draw. One dot cannot be two shots, so it is drawn as
+        // whichever of them the render clock is NEARER to — the same rule the ship
+        // lerp uses for a discrete field, for the same reason — and flown along
+        // that shot's own heading to the instant being rendered. Before a0-73 this
+        // branch could only park the dot at a stored position; now it is the one
+        // place in the method that has two candidate lines rather than none, and it
+        // picks one and travels it instead of averaging them into a third that
+        // neither shot flew.
+        const pick = next && frac >= 0.5 ? next : s;
+        const from = next && frac >= 0.5 ? b : a;
+        out.push(flyShot(pick, renderMs - from.receivedMs, this.shotReachMs));
         continue;
       }
-      const dx = next.posX - s.posX;
-      const dy = next.posY - s.posY;
-      if (dx * dx + dy * dy > maxStep * maxStep) {
-        // Same slot, same owner, but further apart than any shot can fly in this
-        // span — the slot was recycled by the same shooter. Draw the newer one.
-        out.push({ slot: next.id, x: next.posX, y: next.posY, meta: next.meta });
-        continue;
-      }
-      out.push({ slot: s.id, x: s.posX + dx * frac, y: s.posY + dy * frac, meta: s.meta });
+      const dx = next!.posX - s.posX;
+      const dy = next!.posY - s.posY;
+      out.push({ slot: s.id, x: s.posX + dx * frac, y: s.posY + dy * frac, vx: s.velX, vy: s.velY, meta: s.meta });
     }
-    // Shots that appear only in the later frame: freshly fired. Draw them at their
-    // first known position rather than making the player wait a frame for them.
+    // Shots that appear only in the later frame: freshly fired. Flown BACK from
+    // their first known position to the render instant, so the dot is already
+    // travelling its line on the frame it appears rather than standing at the
+    // muzzle for a bracket. The reach is negative and bounded by the span, so the
+    // worst it can do is show a shot up to one broadcast interval early — against
+    // the certainty, before this, of showing it a whole interval late and still.
     for (const s of b.projectiles) {
       if (a.projectiles.some((o) => o.id === s.id)) continue;
-      out.push({ slot: s.id, x: s.posX, y: s.posY, meta: s.meta });
+      out.push(flyShot(s, Math.max(renderMs - b.receivedMs, -span), this.shotReachMs));
     }
     return out;
   }
@@ -456,10 +557,33 @@ export class RemoteInterpolator {
   }
 }
 
-/** One buffered frame's shots, uninterpolated — the hold and extrapolate regimes.
- *  Shots are not extrapolated at all: with no velocity on the wire there is
- *  nothing to extrapolate *along*, and a stalled stream is exactly when guessing a
- *  shot's position would put a bright dot through a hull that never was hit. */
+/**
+ * One shot flown along its own muzzle velocity by `dtMs`, clamped to `reachMs` in
+ * both directions — the whole of "advance a remote shot by the heading it was
+ * fired on" (a0-73), in one place so every regime in {@link RemoteInterpolator}
+ * does it identically.
+ *
+ * A negative `dtMs` reaches backward, which is the same straight line read the
+ * other way: the render clock sits before the only record we hold of this shot.
+ */
+function flyShot(shot: ProjSnap, dtMs: number, reachMs: number): InterpolatedShot {
+  const dt = Math.max(-reachMs, Math.min(reachMs, dtMs)) / 1000;
+  return {
+    slot: shot.id,
+    x: shot.posX + shot.velX * dt,
+    y: shot.posY + shot.velY * dt,
+    vx: shot.velX,
+    vy: shot.velY,
+    meta: shot.meta,
+  };
+}
+
+/** One buffered frame's shots, each flown by the same offset — the hold and the
+ *  extrapolate regimes, which are one operation with opposite signs. */
+function flyShots(entry: BufferedSnapshot, dtMs: number, reachMs: number): InterpolatedShot[] {
+  return entry.projectiles.map((p) => flyShot(p, dtMs, reachMs));
+}
+
 /**
  * One snapshot's projectiles with the **local player's own ship shots removed** —
  * the fix for *"shooting produces 2 sets of shots"* (M10 action-echo).
@@ -494,9 +618,7 @@ function withoutOwnShots(projectiles: readonly ProjSnap[], local: PlayerId): rea
   return kept ?? projectiles;
 }
 
-function shotsOf(entry: BufferedSnapshot): InterpolatedShot[] {
-  return entry.projectiles.map((p) => ({ slot: p.id, x: p.posX, y: p.posY, meta: p.meta }));
-}
+const sq = (v: number): number => v * v;
 
 /** Shortest-arc angle interpolation, radians. */
 function lerpAngle(a: number, b: number, frac: number): number {

@@ -54,15 +54,19 @@ function world() {
 describe('snapshot wire layout', () => {
   it('still costs exactly what the spike measured', () => {
     expect(WORST_CASE_BYTES).toBe(HEADER_BYTES + MAX_SHIPS * SHIP_BYTES + MAX_PROJECTILES * PROJECTILE_BYTES);
-    // 494 B IS the day-0 spike's measurement, and this line is now the only thing
-    // holding the live encoder to it. Until n7-01 this file also imported the
-    // spike's own `WORST_CASE_BYTES` and asserted the two agreed; the spike was
-    // deleted as dead code, so the literal carries that guard alone. It is a
-    // measured number, not a magic one — docs/netcode-spike.md §1 bills every
-    // bandwidth figure against it (494 after the v0.3 laser funeral dropped the
-    // ship `aim` field; 510 as first measured). Changing it changes that
-    // document's arithmetic, which is the point of pinning it here.
-    expect(WORST_CASE_BYTES).toBe(494);
+    // This literal is the only thing holding the live encoder to a measured
+    // number. Until n7-01 this file also imported the day-0 spike's own
+    // `WORST_CASE_BYTES` and asserted the two agreed; the spike was deleted as dead
+    // code, so the literal carries that guard alone. It is a measured number, not a
+    // magic one — docs/netcode-spike.md §1 bills every bandwidth figure against it,
+    // which is the point of pinning it here: changing it changes that document's
+    // arithmetic, and a red line here is what says so.
+    //
+    // 510 as first measured · 494 when the v0.3 laser funeral dropped the ship
+    // `aim` field · **622 since a0-73**, when the projectile record grew the 2
+    // bytes of heading and speed that let a remote shot fly the line it was fired
+    // on rather than freeze wherever the packets are not (`./snapshot` `ProjSnap`).
+    expect(WORST_CASE_BYTES).toBe(622);
   });
 
   it('stays far under the ~2 KB the GDD assumed (risk 4)', () => {
@@ -164,12 +168,23 @@ describe('encode → decode against the sim', () => {
     // decoder must never see them.
     w.projectiles.push(
       { id: 1, active: false, owner: 0, pos: { x: 0, y: 0 }, vel: { x: 0, y: 0 }, damage: 1, radius: 4, life: 0 },
-      { id: 2, active: true, owner: 3, pos: { x: 120, y: -40 }, vel: { x: 5, y: 5 }, damage: 1, radius: 4, life: 1 },
+      { id: 2, active: true, owner: 3, pos: { x: 120, y: -40 }, vel: { x: 368, y: 368 }, damage: 1, radius: 4, life: 1 },
     );
 
     const decoded = decodeSnapshot(encodeWorldSnapshot(w));
+    expect(decoded.projectiles).toHaveLength(1);
+    const [only] = decoded.projectiles;
     // An untagged shot decodes as a turret shot (meta = owner, kind bit clear).
-    expect(decoded.projectiles).toEqual([{ id: 1, posX: 120, posY: -40, meta: 3 }]);
+    expect(only!.id).toBe(1);
+    expect(only!.posX).toBe(120);
+    expect(only!.posY).toBe(-40);
+    expect(only!.meta).toBe(3);
+    // …and it carries the line it was fired on (a0-73). Velocity round-trips
+    // through the wire's polar step rather than exactly, so it is compared to the
+    // precision `SHOT_ANGLE_SCALE` and `SHOT_SPEED_QUANT` promise: a (368, 368)
+    // muzzle is a 520 u/s shot at 45°, and comes back inside half a unit per axis.
+    expect(only!.velX).toBeCloseTo(368, 0);
+    expect(only!.velY).toBeCloseTo(368, 0);
   });
 
   it('tags a ship weapon shot in the reserved meta bit, turret shots clear it (amendment v0.2)', () => {
@@ -180,12 +195,12 @@ describe('encode → decode against the sim', () => {
     );
 
     const [ship, turret] = decodeSnapshot(encodeWorldSnapshot(w)).projectiles;
-    // Same 6-byte record — the kind rides a previously-reserved bit, no byte cost.
+    // The kind still rides a previously-reserved bit, at no byte cost.
     expect(projOwner(ship!.meta)).toBe(2);
     expect(projIsShipShot(ship!.meta)).toBe(true);
     expect(projOwner(turret!.meta)).toBe(5);
     expect(projIsShipShot(turret!.meta)).toBe(false);
-    // And the layout is still exactly the post-funeral worst case.
-    expect(WORST_CASE_BYTES).toBe(494);
+    // And the layout is still exactly the worst case the doc bills against.
+    expect(WORST_CASE_BYTES).toBe(622);
   });
 });

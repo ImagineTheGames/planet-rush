@@ -16,6 +16,7 @@ import {
   INTERP_DELAY_MS,
   MAX_DELAY_MS,
   MAX_EXTRAPOLATION_MS,
+  MAX_SHOT_EXTRAPOLATION_MS,
   MIN_DELAY_MS,
   RemoteInterpolator,
   jitterDelayMs,
@@ -134,10 +135,23 @@ describe('RemoteInterpolator', () => {
 // ---------------------------------------------------------------------------
 
 describe('streamed shots', () => {
-  const shot = (id: number, x: number, y: number, meta = 0b1001): ProjSnap => ({
+  /** One shot on the wire. `vx`/`vy` default to the muzzle velocity implied by
+   *  the 20-units-per-33 ms these tests fly their shots at (~600 u/s, a real
+   *  speed), so a test that does not care about the heading still gets a
+   *  consistent one. */
+  const shot = (
+    id: number,
+    x: number,
+    y: number,
+    meta = 0b1001,
+    velX = 600,
+    velY = 0,
+  ): ProjSnap => ({
     id,
     posX: x,
     posY: y,
+    velX,
+    velY,
     meta,
   });
   const frame = (tick: number, projectiles: ProjSnap[]): DecodedSnapshot => ({
@@ -167,13 +181,21 @@ describe('streamed shots', () => {
     // across that reuse would draw one bright dot travelling the whole arena.
     const buffer = new RemoteInterpolator({ local: 0, delayMs: 100 });
     buffer.record(frame(2, [shot(1, 0, 0)]), 1_000);
-    buffer.record(frame(4, [shot(1, 900, 900)]), 1_033);
+    buffer.record(frame(4, [shot(1, 900, 900, 0b1001, 424, 424)]), 1_033);
 
-    const sampled = buffer.sampleShots(1_116.5);
-    // Too far for any muzzle in the game: drawn where the newer record puts it,
-    // never halfway between two different shots.
-    expect(sampled[0]!.x).toBe(900);
-    expect(sampled[0]!.y).toBe(900);
+    // The render clock sits at frac 0.5 of the bracket, so the newer of the two
+    // shots is the one drawn — flown back along ITS heading to the render instant
+    // (16.5 ms before the frame arrived), never halfway between two unrelated
+    // shots.
+    const sampled = buffer.sampleShots(1_016.5 + 100);
+    expect(sampled[0]!.x).toBeCloseTo(900 - 424 * 0.0165, 1);
+    expect(sampled[0]!.y).toBeCloseTo(900 - 424 * 0.0165, 1);
+
+    // …and early in the bracket it is the OLDER shot that is still live, so that
+    // is the one drawn, on its own line.
+    const early = buffer.sampleShots(1_005 + 100);
+    expect(early[0]!.x).toBeCloseTo(600 * 0.005, 1);
+    expect(early[0]!.y).toBeCloseTo(0, 5);
   });
 
   it('does not interpolate a slot whose owner or kind changed', () => {
@@ -181,29 +203,114 @@ describe('streamed shots', () => {
     buffer.record(frame(2, [shot(1, 0, 0, 0b1001)]), 1_000);
     buffer.record(frame(4, [shot(1, 10, 0, 0b1010)]), 1_033);
 
-    const sampled = buffer.sampleShots(1_116.5);
-    expect(sampled[0]!.x).toBe(0);
+    // Early in the bracket the older shot is the live one: drawn on its own line,
+    // never lerped toward a position that belongs to a different shooter's shot.
+    const sampled = buffer.sampleShots(1_105);
     expect(sampled[0]!.meta).toBe(0b1001);
+    expect(sampled[0]!.x).toBeCloseTo(600 * 0.005, 1);
   });
 
-  it('shows a shot that appears only in the later frame, at its first position', () => {
+  it('does not interpolate a slot whose shot changed HEADING — the recycle a distance guard is too coarse to see', () => {
+    // Mining: a shot dies on a rock a few tens of units out and the slot it frees
+    // is taken by the same ship's next shot, fired somewhere else entirely. Same
+    // owner, same kind, and only ~20 u apart — inside `maxShotStep`, so before the
+    // wire carried a heading the two were indistinguishable and the dot crabbed
+    // from one shot's position toward the other's.
+    const buffer = new RemoteInterpolator({ local: 0, delayMs: 100 });
+    buffer.record(frame(2, [shot(1, 0, 0, 0b1001, 600, 0)]), 1_000);
+    buffer.record(frame(4, [shot(1, 18, 4, 0b1001, 0, 600)]), 1_033);
+
+    // Drawn off the older record on ITS heading (+x), never dragged toward the
+    // newer one's (18, 4) — which a chord would have done, at 5 u off the line the
+    // shot was actually fired on.
+    const sampled = buffer.sampleShots(1_105);
+    expect(sampled[0]!.x).toBeCloseTo(600 * 0.005, 1);
+    expect(sampled[0]!.y).toBeCloseTo(0, 5);
+
+    // …and once the render clock is past the halfway mark it is the newer shot
+    // that is live, drawn on ITS heading (+y). Either way one dot travels one real
+    // line; what never happens is a dot on the line between the two.
+    const late = buffer.sampleShots(1_128);
+    expect(late[0]!.x).toBeCloseTo(18, 5);
+    expect(late[0]!.y).toBeCloseTo(4 - 600 * 0.005, 1);
+  });
+
+  it('a shot that appears only in the later frame is already travelling, not parked at the muzzle', () => {
     const buffer = new RemoteInterpolator({ local: 0, delayMs: 100 });
     buffer.record(frame(2, [shot(1, 0, 0)]), 1_000);
-    buffer.record(frame(4, [shot(1, 20, 0), shot(2, 500, 500)]), 1_033);
+    buffer.record(frame(4, [shot(1, 20, 0), shot(2, 500, 500, 0b1001, 600, 0)]), 1_033);
 
     const sampled = buffer.sampleShots(1_116.5);
     expect(sampled.map((s) => s.slot).sort()).toEqual([1, 2]);
-    expect(sampled.find((s) => s.slot === 2)!.x).toBe(500);
+    // Slot 2 is freshly fired: no earlier record to chord across, so it is flown
+    // BACK along its own heading to the render instant (16.5 ms before the frame
+    // arrived) instead of standing at 500 for a whole bracket.
+    const fresh = sampled.find((s) => s.slot === 2)!;
+    expect(fresh.x).toBeCloseTo(500 - 600 * 0.0165, 1);
+    expect(fresh.y).toBeCloseTo(500, 5);
   });
 
-  it('never extrapolates a shot — with no velocity on the wire there is nothing to extrapolate along', () => {
+  it('a remote shot keeps the heading it was fired on', () => {
+    // a0-73, and the developer's whole report: "other players shots dont follow
+    // the direction they were fired in."
+    //
+    // A shot arrives on a diagonal at 600 u/s. Then the snapshots STOP — packet
+    // loss, a mobile radio, a backgrounded tab. Before the wire carried a heading
+    // this dot stopped dead with them, because the only thing that had ever moved
+    // it was the next packet: at a 200 ms gap it sat 104 world units behind where
+    // its own heading had it, a third of the ship weapon's entire reach, and then
+    // teleported when the stream came back. A player reading that line to decide
+    // whether to move into it was reading a lie (GDD §2.6 — the dodge is the
+    // skill, and it is read off the line).
     const buffer = new RemoteInterpolator({ local: 0, delayMs: 100 });
-    buffer.record(frame(2, [shot(1, 0, 0)]), 1_000);
-    buffer.record(frame(4, [shot(1, 20, 0)]), 1_033);
+    const vx = 600 * Math.cos(Math.PI / 4);
+    const vy = 600 * Math.sin(Math.PI / 4);
+    buffer.record(frame(2, [shot(1, 0, 0, 0b1001, vx, vy)]), 1_000);
+    buffer.record(frame(4, [shot(1, vx * 0.0333, vy * 0.0333, 0b1001, vx, vy)]), 1_033);
 
-    // Render clock far past the newest frame: the stream stalled.
-    const stalled = buffer.sampleShots(2_000);
-    expect(stalled[0]!.x).toBe(20);
+    // …and nothing more arrives. Sample across the whole silence.
+    const anchor = buffer.sampleShots(1_133); // last instant the pair still brackets
+    const path = [1_150, 1_180, 1_220, 1_260].map((t) => buffer.sampleShots(t)[0]!);
+
+    for (const dot of [anchor[0]!, ...path]) {
+      // ON its own line: the cross product against the fired heading is zero.
+      const cross = Math.abs(dot.x * (vy / 600) - dot.y * (vx / 600));
+      expect(cross).toBeLessThan(0.001);
+      // …and carrying that heading, so anything reading the world gets it too.
+      expect(dot.vx).toBeCloseTo(vx, 6);
+      expect(dot.vy).toBeCloseTo(vy, 6);
+    }
+
+    // TRAVELLING it, not frozen on it — the half of the defect a cross-track
+    // measurement alone reports as clean. Each sample is strictly further along
+    // than the last, at the speed the wire named.
+    const along = [anchor[0]!, ...path].map((d) => (d.x * vx + d.y * vy) / 600);
+    for (let i = 1; i < along.length; i++) expect(along[i]!).toBeGreaterThan(along[i - 1]!);
+    // 127 ms of silence past the newest snapshot at 600 u/s ≈ 76 u further on.
+    expect(along[along.length - 1]! - along[0]!).toBeCloseTo(600 * 0.127, 0);
+
+    // And it does NOT drift toward the next packet's position. The stream resumes
+    // somewhere else entirely — a recycled slot, a different shooter — and the
+    // dot's history is untouched by it: everything above was sampled and asserted
+    // before this frame existed.
+    buffer.record(frame(40, [shot(1, -900, 700, 0b1001, -600, 0)]), 1_400);
+    const after = buffer.sampleShots(1_260)[0]!;
+    expect(after.x).toBeCloseTo(path[path.length - 1]!.x, 6);
+    expect(after.y).toBeCloseTo(path[path.length - 1]!.y, 6);
+  });
+
+  it('stops reaching once the silence is longer than a shot can be trusted to still exist', () => {
+    // Dead reckoning a shot is replayed arithmetic, not a guess — but the shot may
+    // have landed, so the reach is capped (`MAX_SHOT_EXTRAPOLATION_MS`) and then it
+    // holds. A ghost dot for a few frames costs a player nothing; a shot invented
+    // for a whole second would.
+    const buffer = new RemoteInterpolator({ local: 0, delayMs: 0 });
+    buffer.record(frame(2, [shot(1, 0, 0, 0b1001, 600, 0)]), 1_000);
+
+    const capped = buffer.sampleShots(1_000 + MAX_SHOT_EXTRAPOLATION_MS);
+    const beyond = buffer.sampleShots(5_000);
+    expect(capped[0]!.x).toBeCloseTo(600 * (MAX_SHOT_EXTRAPOLATION_MS / 1000), 6);
+    expect(beyond[0]!.x).toBe(capped[0]!.x);
   });
 });
 
