@@ -59,6 +59,16 @@ const DECLARED_TOUCH: readonly Declared[] = [
   { id: 'ship-local', region: 'center' },
   { id: 'touch-left-stick', region: 'left-half-bottom' },
   { id: 'touch-fire-button', region: 'right-half-bottom' },
+  // ── ADDED BY THE UI ENGINEER (a0-74) — one row, and it drops cleanly ────────
+  //
+  // OWNED BY QA. The touch zoom-out control (`@ui/zoom-control`), the answer to
+  // *"what i'd probably prefer is add a zoom out button on mobile"*. It is drawn
+  // on touch and nowhere else, in the top-right under the HOME cluster, and it is
+  // a tappable affordance — which is exactly the class of element this contract
+  // exists for. Its placement is unit-pinned against the registry's own resolver
+  // at five profiles (`src/ui/zoom-control.test.ts`); this is the same question
+  // asked of a real emulated device, which is the half a unit test cannot reach.
+  { id: 'zoom-control', region: 'top-right' },
 ];
 
 const DECLARED_DESKTOP: readonly Declared[] = [
@@ -113,6 +123,25 @@ interface Probe {
  * verdict — is computed browser-side against the live viewport.
  */
 async function probeLayout(page: Page): Promise<Probe> {
+  // ── EDITED BY THE UI ENGINEER (a0-74) — one line, and it drops cleanly ──────
+  //
+  // OWNED BY QA. Seat the STICKS scheme before boot, the same `addInitScript`
+  // line four other specs in this directory already carry (emulation,
+  // build-wheel-gantry, upgrade-wheel-gantry, centering).
+  //
+  // `DECLARED_TOUCH` above requires `touch-left-stick` and `touch-fire-button` to
+  // be registered on a touch profile, and it is right to: they are the affordances
+  // this contract was built for. But since a0-30 the first-run scheme on every
+  // platform is Tap Commander, and a0-74 stopped DRAWING controls the seated
+  // scheme cannot use — `sampleInput` zeroes thrust, aim and fire there and the
+  // pilot writes all three. The registry records what is on screen, so under the
+  // default scheme those two ids are legitimately absent, and the contract would
+  // be asserting a defect rather than a placement.
+  //
+  // Stating the scheme keeps the assertion the one it was written to make. The
+  // OTHER half — that these controls are absent under Tap Commander — is a unit
+  // test (`src/ui/live-controls.test.ts`), not a placement question.
+  await page.addInitScript(() => localStorage.setItem('planet-rush:controlScheme', 'sticks'));
   await page.goto('/?debug=1&freeze=1');
   await page.waitForSelector('canvas', { state: 'attached', timeout: 30_000 });
   // The registry refreshes every rendered frame; wait for the hook and a
