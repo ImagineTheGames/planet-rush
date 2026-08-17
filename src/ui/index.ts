@@ -1351,3 +1351,47 @@ export {
   PANEL_CHROME_HEIGHT,
   PANEL_ROW_HEIGHT,
 } from './hud-geometry';
+
+// --- The viewport: how much screen the HUD uses, how much world the camera shows
+//
+// a0-74, "the screen you get depends on the screen you have". Both halves are
+// pure: `contentBox` binds the HUD's chrome to a centred region of the HUD's own
+// reference aspect on an ultrawide (and to the whole viewport everywhere else),
+// and the zoom ladder is the touch zoom-out control's model. The wiring layer
+// reads the stored rung and hands the camera `cameraScale(step)`.
+
+export {
+  contentBox,
+  isUltrawide,
+  cameraScale,
+  viewWorldWidth,
+  nextViewZoom,
+  viewZoomLabel,
+  parseViewZoom,
+  storedViewZoom,
+  CONTENT_MAX_ASPECT,
+  CONTENT_MIN_WIDTH,
+  VIEW_ZOOM_STEPS,
+  VIEW_ZOOM_STORAGE,
+  DEFAULT_VIEW_ZOOM,
+} from './viewport';
+
+export {
+  showZoomControl,
+  zoomControlBounds,
+  zoomControlLabel,
+  hitZoomControl,
+  ZOOM_CONTROL_ID,
+  ZOOM_CONTROL_ANCHOR,
+  ZOOM_CONTROL_WIDTH,
+  ZOOM_CONTROL_HEIGHT,
+} from './zoom-control';
+
+// --- Which on-glass controls the seated scheme can actually drive (a0-74) ----
+//
+// "theres buttons like Fire, that shouldn't show up since im using tap commander
+// and auto fire (on pc)". The rule is read off `sampleInput`'s own four lines,
+// and the touch layer is handed the answer as booleans.
+
+export { liveOnGlassControls, showStickFurniture } from './live-controls';
+export type { OnGlassControls } from './live-controls';

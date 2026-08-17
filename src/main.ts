@@ -327,6 +327,13 @@ import {
   TitleGate,
   browserGateDom,
   gateEnabled,
+  // a0-74 — the view: how much world is on screen, and which on-glass controls
+  // the seated scheme can actually drive.
+  parseViewZoom,
+  storedViewZoom,
+  cameraScale,
+  VIEW_ZOOM_STORAGE,
+  showStickFurniture,
 } from './ui';
 import type {
   HudFrame,
@@ -1634,6 +1641,7 @@ async function boot(): Promise<void> {
     installStationHealthStage();
     installAudioStage();
     installVfxStage();
+    installViewStage();
   }
 
   // The pause seam is installed on BOTH boots, unlike the debug stages above, and
@@ -1718,6 +1726,24 @@ async function boot(): Promise<void> {
   // press away in settings or the pause menu. Read through the same storage seam
   // as the fire mode, and a saved choice wins over the default either way.
   let controlScheme = readControlScheme(platform);
+  // How much world is across the screen, as a multiple of the shipped camera
+  // (a0-74, `@ui/viewport`). The camera was translate-only, so the arena a player
+  // saw was exactly the pixel width of their glass — 1707 units on the developer's
+  // desktop against 798 on their phone, out of a 2400-unit claim. The touch
+  // zoom-out control turns this rung; the same storage seam as the fire mode and
+  // the control scheme remembers it, so a view survives the match and the reload
+  // ("remembered across matches").
+  let viewZoom = parseViewZoom(platform.storage.get(VIEW_ZOOM_STORAGE));
+  renderer.setCameraScale(cameraScale(viewZoom));
+
+  /** Seat a zoom rung: the camera, the store, and nothing else. The HUD reads the
+   *  value back off `hudFrame` on the next frame, so there is one authority for
+   *  what the view is and the control cannot drift from the camera. */
+  function setViewZoom(step: number): void {
+    viewZoom = step;
+    renderer.setCameraScale(cameraScale(step));
+    platform.storage.set(VIEW_ZOOM_STORAGE, storedViewZoom(step));
+  }
   // The active input device drives the controls strip + prompt wording (GDD
   // §2.4 auto device-switch); updated in sampleInput() by whichever device acts.
   let activeDevice: DeviceKind = isTouch ? 'touch' : 'keyboard';
@@ -2277,6 +2303,22 @@ async function boot(): Promise<void> {
     // (COLLAPSED it claims only a press that lands on the corner square, so a press
     // that misses the glance widget still flies the ship — the deliberate half of
     // the asymmetry, since the player is flying.)
+    // The zoom-out control (a0-74): a touch-only button in the top-right that
+    // widens the view a rung. Checked HERE — above the minimap, below the wheel
+    // and the BUILD button — because it is a small permanent affordance in a
+    // corner, and anything drawn over it (an open wheel, an end-of-match overlay)
+    // has already claimed the press by this line. It reports the rung it advanced
+    // to, so the camera and the stored preference are set from one answer.
+    const zoomed = hud.zoomTap(pressPoint.x, pressPoint.y);
+    if (zoomed !== null) {
+      setViewZoom(zoomed);
+      haptics.haptic('tap');
+      audio.cue('press'); // a control was pressed — the same tick a wedge gets
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      return;
+    }
+
     if (hud.minimapTap(pressPoint.x, pressPoint.y)) {
       haptics.haptic('tap');
       audio.cue('ping'); // the glance map — a rising sonar blip (locate, not alarm)
@@ -2682,6 +2724,12 @@ async function boot(): Promise<void> {
         transform.logicalWidth,
         transform.logicalHeight,
         buildVisible,
+        // a0-74: a control the seated scheme cannot drive is not drawn. Under Tap
+        // Commander `sampleInput` (above) zeroes thrust, aim and fire and lets the
+        // pilot write all three, so the two sticks and the FIRE button move
+        // nothing — which is the developer's report, on a touchscreen PC. BUILD is
+        // untouched by this and stays, because `merged.build` is untouched too.
+        showStickFurniture(isTouch, controlScheme, fireMode),
       );
       // Keep the build stamp cornered (logical bottom-left) as the viewport
       // changes, and keep the server half of it honest: a socket that has closed
@@ -3489,9 +3537,13 @@ async function boot(): Promise<void> {
     const cam = world.ships.find((s) => s.id === cameraTarget) ?? world.ships[0];
     camTargetScratch.x = cam ? cam.pos.x : world.bounds.width / 2;
     camTargetScratch.y = cam ? cam.pos.y : world.bounds.height / 2;
-    writeCameraOffset(camOffsetScratch, camTargetScratch, viewport);
-    out.x = logical.x - camOffsetScratch.x;
-    out.y = logical.y - camOffsetScratch.y;
+    // The camera's scale rides this inverse too (a0-74). Without it a Tap Commander
+    // order placed while zoomed out would land at a fraction of the distance the
+    // player pointed at — the ship would set off for somewhere nobody tapped.
+    const scale = cameraScale(viewZoom);
+    writeCameraOffset(camOffsetScratch, camTargetScratch, viewport, scale);
+    out.x = (logical.x - camOffsetScratch.x) / scale;
+    out.y = (logical.y - camOffsetScratch.y) / scale;
     return out;
   }
 
@@ -3506,8 +3558,9 @@ async function boot(): Promise<void> {
     const cam = world.ships.find((s) => s.id === cameraTarget) ?? world.ships[0];
     camTargetScratch.x = cam ? cam.pos.x : world.bounds.width / 2;
     camTargetScratch.y = cam ? cam.pos.y : world.bounds.height / 2;
-    writeCameraOffset(camOffsetScratch, camTargetScratch, viewport);
-    return { x: wx + camOffsetScratch.x, y: wy + camOffsetScratch.y };
+    const scale = cameraScale(viewZoom); // the live zoom, same as the inverse above
+    writeCameraOffset(camOffsetScratch, camTargetScratch, viewport, scale);
+    return { x: wx * scale + camOffsetScratch.x, y: wy * scale + camOffsetScratch.y };
   }
 
   /**
@@ -3710,6 +3763,10 @@ async function boot(): Promise<void> {
     hudFrame.time = world.time;
     hudFrame.device = activeDevice;
     hudFrame.fireMode = fireMode;
+    // The live zoom rung, so the touch control shows the view the camera is
+    // actually on (a0-74). Fed like the fire mode and the scheme — read back from
+    // the one authority rather than latched inside the HUD.
+    hudFrame.viewZoom = viewZoom;
     // Re-read every frame beside the fire mode, because both are changeable
     // mid-match from settings and the pause menu (GDD §2.4) and the prompt on
     // screen has to describe the scheme the player is in NOW (a0-33).
@@ -4566,6 +4623,74 @@ async function boot(): Promise<void> {
     };
     try {
       Object.defineProperty(window, '__onboardingStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
+  /**
+   * Install `window.__viewStage` — the ?debug=1 seam for **how much world is on
+   * screen, and where the HUD is bound** (a0-74).
+   *
+   * It exists because the first developer report is a *measurement*, not an
+   * opinion — *"on pc i have the entire screen but im on mobile im confined to a
+   * very small portion of the world"* — and a measurement taken by re-deriving the
+   * camera in a test is a measurement of the test's arithmetic. This reports the
+   * renderer's OWN visible-world rectangle (`renderer.visibleWorld`, the very box
+   * the cull culls against) and the HUD's OWN content box, so the audit's before
+   * and after numbers come off the shipped bundle.
+   *
+   * `setZoom` is the one mutating call: it goes through the same `setViewZoom` a
+   * real tap on the control does — camera, storage and all — so a capture at 2× is
+   * a capture of the real thing rather than of a renderer poked from the console.
+   */
+  function installViewStage(): void {
+    const stage = {
+      /** The world rectangle on screen after the last draw, in world units. */
+      world(): { left: number; top: number; right: number; bottom: number; width: number; height: number } {
+        const v = renderer.visibleWorld;
+        return {
+          left: v.left,
+          top: v.top,
+          right: v.right,
+          bottom: v.bottom,
+          width: v.right - v.left,
+          height: v.bottom - v.top,
+        };
+      },
+      /** The logical viewport, in CSS px — the other half of the ratio. */
+      viewport(): { width: number; height: number } {
+        return { width: transform.logicalWidth, height: transform.logicalHeight };
+      },
+      /** The centred region the HUD chrome is bound to (`@ui/viewport`). */
+      content(): ReturnType<typeof hud.debugContentBox> {
+        return hud.debugContentBox();
+      },
+      /** Where each piece of corner chrome was anchored this layout. */
+      anchors(): ReturnType<typeof hud.debugChromeAnchors> {
+        return hud.debugChromeAnchors();
+      },
+      /** The touch zoom control's drawn rect + rung, or null when not shown. */
+      control(): ReturnType<typeof hud.debugZoomControl> {
+        return hud.debugZoomControl();
+      },
+      /** The live rung. */
+      zoom(): number {
+        return viewZoom;
+      },
+      /** Seat a rung through the real path — camera, storage, everything. */
+      setZoom(step: number): number {
+        setViewZoom(parseViewZoom(String(step)));
+        return viewZoom;
+      },
+    };
+    try {
+      Object.defineProperty(window, '__viewStage', {
         value: stage,
         writable: false,
         configurable: false,
@@ -6312,7 +6437,14 @@ async function boot(): Promise<void> {
 
     // Touch controls: anchored home rects from the same constants that draw them
     // (touch-visuals). All null on desktop, so nothing registers there.
-    writeAffordanceRects(isTouch, fireMode, w, h, touchRects);
+    writeAffordanceRects(
+      isTouch,
+      fireMode,
+      w,
+      h,
+      touchRects,
+      showStickFurniture(isTouch, controlScheme, fireMode),
+    );
     if (touchRects.leftStickZone) reg.register('touch-left-stick', LEFT_STICK_ANCHOR, touchRects.leftStickZone);
     if (touchRects.aimZone) reg.register('touch-aim-stick', RIGHT_STICK_ANCHOR, touchRects.aimZone);
     if (touchRects.fireButton) reg.register('touch-fire-button', RIGHT_STICK_ANCHOR, touchRects.fireButton);

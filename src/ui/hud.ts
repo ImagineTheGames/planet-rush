@@ -134,11 +134,19 @@ import {
   RESPAWN_CENTER_Y,
   respawnWrapWidth,
   SCRIM_BLEED,
+  stationChromeHeight,
   waveClockLayout,
   wheelRadius,
 } from './hud-geometry';
 import type { ClockLayout } from './hud-geometry';
-import { contentBox } from './viewport';
+import { contentBox, DEFAULT_VIEW_ZOOM, nextViewZoom } from './viewport';
+import {
+  hitZoomControl,
+  ZOOM_CONTROL_ANCHOR,
+  ZOOM_CONTROL_ID,
+  zoomControlBounds,
+  zoomControlLabel,
+} from './zoom-control';
 
 // ---------------------------------------------------------------------------
 // Typography & neutral colours
@@ -252,6 +260,16 @@ export interface HudFrame {
   readonly controlScheme: ControlScheme;
   /** Touch build: the strip is hidden and prompts get touch wording (GDD §2.4). */
   readonly isTouch: boolean;
+  /**
+   * The live view-zoom rung — how many times more world is across the screen than
+   * at the shipped camera (`./viewport` `VIEW_ZOOM_STEPS`, a0-74). Drives the
+   * value on the touch zoom control and nothing else; the camera itself is set by
+   * the wiring layer, which owns the renderer.
+   *
+   * Optional and defaulting to the shipped view, so a host that has not been
+   * taught about the zoom draws the control reading `1×` rather than `undefined×`.
+   */
+  readonly viewZoom?: number;
   /** An asteroid is within weapon range — the mine prompt's trigger (GDD §2.10). */
   readonly nearAsteroid: boolean;
 
@@ -632,6 +650,21 @@ export class Hud extends Container {
   private readonly coreLabel: Text;
   private readonly stationBar = new Graphics();
 
+  // --- The touch zoom-out control (a0-74) ----------------------------------
+  //     "what i'd probably prefer is add a zoom out button on mobile" — a button,
+  //     sat on the same top-right row as HOME (`./zoom-control` argues the spot).
+  private readonly zoomGroup = new Container();
+  private readonly zoomChrome = new Graphics();
+  private readonly zoomCaption: Text;
+  private readonly zoomValue: Text;
+  /** The rect the control was last DRAWN at, screen space — what `zoomTap`
+   *  hit-tests, so the press surface is the pixels and not a second computation. */
+  private zoomRect: Rect | null = null;
+  /** The rung the control last drew, so a tap knows what to advance from without
+   *  the caller having to hand it back in. */
+  private zoomStep = DEFAULT_VIEW_ZOOM;
+  private zoomChromeKey = '';
+
   // --- Under-attack alarm (screen frame + edge arrow home — GDD §2.2) ------
   private readonly alarmGroup = new Container();
   private readonly alarmFrame = new Graphics();
@@ -876,6 +909,18 @@ export class Hud extends Container {
     this.stationGroup.addChild(this.stationChrome, this.stationBar, this.stationLabel, this.coreLabel);
     this.stationGroup.visible = false;
 
+    // The zoom control: the same eyebrow-over-value grammar as HOME and ORE, so it
+    // reads as one more instrument in that corner rather than as a new dialect —
+    // and its VALUE is the brightest metal the HUD spends (`INSTRUMENT_KEY`),
+    // which is Bone's whole mechanism for "this is the actionable thing"
+    // (./instrument, and the same call the controls-strip key takes).
+    this.zoomCaption = this.makeText('VIEW', FONT_HEADING, TYPE.eyebrow, TEXT_MUTED, 'normal', 'eyebrow');
+    this.zoomCaption.anchor.set(0.5, 0);
+    this.zoomValue = this.makeText('', FONT_NUMERAL, TYPE.bank, INSTRUMENT_KEY, 'bold', 'name');
+    this.zoomValue.anchor.set(0.5, 0);
+    this.zoomGroup.addChild(this.zoomChrome, this.zoomCaption, this.zoomValue);
+    this.zoomGroup.visible = false;
+
     // The strip's own chrome draws behind its labels, inside the strip group, so
     // the rule + scrim are part of what `controls-strip` registers.
     this.stripGroup.addChild(this.stripChrome);
@@ -911,6 +956,9 @@ export class Hud extends Container {
       this.oreGroup,
       this.waveGroup,
       this.stationGroup,
+      // The zoom control shares the top-right row with HOME and draws with it, in
+      // the same corner-chrome band (a0-74).
+      this.zoomGroup,
       this.stripGroup,
       // The minimap sits above the corner readouts but under the alarm/wheel/prompt:
       // the collapse frame and the danger tells must read over it, and the wheel
@@ -1047,6 +1095,7 @@ export class Hud extends Container {
     this.updateTapMarkers(frame);
     this.updateMinimap(frame);
     this.updateStationHp(frame);
+    this.updateZoomControl(frame);
     this.updateRespawn(frame);
     this.updateControlsStrip(frame);
     const wheelOpen = this.updateWheel(frame);
@@ -1110,7 +1159,9 @@ export class Hud extends Container {
     const ruleY = HP_BAR_TOP + HP_BAR_HEIGHT + hudSpace(4, m);
     const g = this.stationChrome;
     g.clear();
-    drawScrim(g, -width, 0, width, ruleY + hudSpace(SCRIM_BLEED, m), 'center', SCRIM.corner);
+    // The scrim's depth is `stationChromeHeight` (hud-geometry) — the zoom control
+    // stacks directly under it and must not copy the number (a0-74).
+    drawScrim(g, -width, 0, width, stationChromeHeight(m.scale), 'center', SCRIM.corner);
     drawEdgeRule(g, -width, ruleY, width, 1, INSTRUMENT_RULE);
   }
 
@@ -1490,6 +1541,84 @@ export class Hud extends Container {
     // chalk-white (never signal yellow, which is reserved for ore — style-guide §2).
     this.coreLabel.text = coreHpReadout(frame.coreHp ?? maxCore, maxCore);
     this.coreLabel.style.fill = model.critical && flash ? model.criticalColor : TEXT_PRIMARY;
+  }
+
+  // --- The touch zoom-out control (a0-74) ----------------------------------
+
+  /**
+   * Draw the zoom control — on touch, and nowhere else (`./zoom-control` argues
+   * both the placement and the touch-only rule).
+   *
+   * It is one of the few HUD elements that is *pressed*, so it keeps two things
+   * honest at once: the rect stored here is the rect it drew, and it is the rect
+   * {@link zoomTap} hit-tests. One computation, two uses — the same discipline the
+   * prompt keeps between its scrim and its registered bounds.
+   */
+  private updateZoomControl(frame: HudFrame): void {
+    const box = this.content;
+    const local = zoomControlBounds(box.width, box.height, frame.isTouch);
+    if (!local) {
+      this.zoomGroup.visible = false;
+      this.zoomRect = null;
+      return;
+    }
+    // Content-box space → screen space, the one offset every corner element takes.
+    const rect: Rect = { ...local, x: local.x + box.x };
+    this.zoomRect = rect;
+    this.zoomStep = frame.viewZoom ?? DEFAULT_VIEW_ZOOM;
+    this.zoomGroup.visible = true;
+    this.zoomGroup.x = rect.x;
+    this.zoomGroup.y = rect.y;
+
+    const { caption, value } = zoomControlLabel(this.zoomStep);
+    this.zoomCaption.text = caption;
+    this.zoomValue.text = value;
+    this.zoomCaption.x = rect.width / 2;
+    this.zoomCaption.y = 0;
+    this.zoomValue.x = rect.width / 2;
+    this.zoomValue.y = this.zoomCaption.height + hudSpace(2, this.metrics);
+
+    // A scrim closed by a rule, exactly like every other readout in this corner —
+    // never a plate over gameplay (./instrument). Redrawn only when the shape
+    // changes, so a steady frame allocates nothing.
+    const key = `${Math.round(rect.width)}x${Math.round(rect.height)}`;
+    if (key !== this.zoomChromeKey) {
+      const g = this.zoomChrome;
+      g.clear();
+      drawScrim(g, 0, 0, rect.width, rect.height, 'center', SCRIM.corner);
+      drawEdgeRule(g, 0, rect.height - 1, rect.width, 1, INSTRUMENT_RULE);
+      this.zoomChromeKey = key;
+    }
+  }
+
+  /**
+   * Route a click/tap at a screen point to the zoom control, and report the rung
+   * it advanced to — or `null` when the press landed elsewhere, which is the
+   * caller's signal to keep routing the event.
+   *
+   * The **next** rung rather than a boolean, because the caller has to do two
+   * things with it that must not disagree: set the camera scale and persist the
+   * choice. Handing back the answer means neither is re-derived.
+   *
+   * Returns `null` whenever the control is not drawn, so a desktop press can never
+   * find it.
+   */
+  zoomTap(x: number, y: number): number | null {
+    if (!this.zoomGroup.visible) return null;
+    if (!hitZoomControl(x, y, this.zoomRect)) return null;
+    const next = nextViewZoom(this.zoomStep);
+    // Optimistic: draw the new value now rather than waiting a frame for the host
+    // to feed it back, so the press reads as instant under the thumb.
+    this.zoomStep = next;
+    this.zoomValue.text = zoomControlLabel(next).value;
+    return next;
+  }
+
+  /** The zoom control's drawn rect and rung, or `null` when it is not on screen —
+   *  the ?debug=1 live-stage seam, and what a placement suite asserts against. */
+  debugZoomControl(): { rect: Rect; step: number } | null {
+    if (!this.zoomGroup.visible || !this.zoomRect) return null;
+    return { rect: { ...this.zoomRect }, step: this.zoomStep };
   }
 
   // --- Respawn countdown ("RESPAWNING 3…", field request v0.2.2) -----------
@@ -2524,6 +2653,9 @@ export class Hud extends Container {
 
     // M2 (see the table above).
     push('station-hp', 'top-right', PAD, this.stationGroup);
+    // The touch zoom control (a0-74), on the same top-right row as HOME. Drawn
+    // only on touch, so `shown()` leaves it out of a desktop frame entirely.
+    push(ZOOM_CONTROL_ID, ZOOM_CONTROL_ANCHOR.region, ZOOM_CONTROL_ANCHOR.margin ?? 0, this.zoomGroup);
     // The top-right own-ship HULL readout was removed (field report v0.2 — the
     // over-ship bar is the truth now), so nothing registers under `top-right`
     // beneath HOME any more: the layout hole is closed, not orphaned.
