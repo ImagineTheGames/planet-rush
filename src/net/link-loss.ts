@@ -935,6 +935,12 @@ export function linkLossLogEntry(status: LinkStatus): {
       // own background retries (n8-01).
       manualRedial: status.manualRedial,
       ending: status.ending,
+      // a0-72. `graceMs` above is meaningless without this — a seat held for the
+      // life of the match has a countdown that is not a deadline — and `refusal`
+      // is the difference between a paste that says REFUSED and a paste that says
+      // which door was shut.
+      heldForMatch: status.heldForMatch,
+      refusal: status.refusal,
     },
   };
 }
