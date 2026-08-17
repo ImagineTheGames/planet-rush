@@ -1,0 +1,342 @@
+a0-70 — "the title menu flies in from the bottom right instead of starting off
+         centered"
+
+OWNER: UI Engineer.  Branch: agent/ui/a0-70-title-entrance.  Date: 2026-08-17.
+
+===============================================================================
+VERDICT: NOT REPRODUCED.
+===============================================================================
+
+The brief says, in as many words: "If you cannot see the menu start off-centre,
+stop and say so". I cannot, and this is me saying so.
+
+Across seven films of the real client — the production bundle AND the dev
+server, at 1x and at the 1.5x device ratio the developer's viewport implies,
+gated and `?gate=0`, through the door's whole opening sequence, and across a
+viewport change landing mid-boot — the main menu is centred and BYTE-IDENTICAL
+on every frame from the first frame it draws any ink. The title gate's own door
+never leaves the centre of the screen while it grows. The page runs no
+`transform` transition at all, in either direction, at any point.
+
+Nothing was changed in `src/` to reach that conclusion, which is the point: the
+brief's own warning is that four rounds on the star bloom were spent fixing
+something that only ever looked broken in an instrument.
+
+What IS on this branch: a regression test that pins the property the report is
+about (`src/ui/main-menu.test.ts` — `the first frame is already centred`), the
+capture harness that produced everything below, and this audit. The test PASSES
+on today's code. The brief requires that it fail on today's code; it does not,
+and it cannot, because on the axis it measures today's code is correct. Section
+6 shows it is not vacuous — it catches the reported failure shape when that
+shape is deliberately introduced.
+
+
+===============================================================================
+1. THE SPECIMEN
+===============================================================================
+
+  bundle      `npm run build` + `npm run preview`, the repo's own vite.config.ts
+              (and separately `npm run dev`, the un-bundled module waterfall)
+  viewport    1707 x 898, desktop, no touch — the developer's session, verbatim
+  ratio       deviceScaleFactor 1 and 1.5
+              (1707x898 is a 2560x1440 panel at 150% OS scaling: 2560/1.5 =
+              1706.7. A fractional ratio meets `resolution: devicePixelRatio` +
+              `autoDensity`, so it is filmed deliberately rather than assumed
+              away.)
+  commit      a4f0291 (branch point)
+
+  harness     evidence/a0-70-title-entrance/
+                playwright.config.ts   own port 4270, never in QA's suite
+                capture.spec.ts        CDP screencast burst, gated + `?gate=0`
+                firstframes.spec.ts    frame-exact canvas readback (see below)
+                motion.spec.ts         transition/animation listeners + a
+                                       MutationObserver on the gate's insertion
+                resize-boot.spec.ts    a viewport change landing mid-boot
+                reveal.spec.ts         the composite through the door opening
+                analyse.mjs            ink box + centre, per frame
+
+  frames      Pruned to the decisive images — the last frame before ink, the
+              first inked frame and the two after it, a settled one, and a
+              spread across the opening. The NUMBERS for every frame of every
+              film survive the prune in `analysis/<condition>.txt`, so a claim
+              here can still be checked against a frame whose PNG was dropped;
+              `frames/before/KEPT.json` lists what was kept. Unpruned the set is
+              169 MB, which is not a thing to put in a git history.
+
+WHY A SECOND INSTRUMENT. CDP screencast only emits a frame once the previous one
+is acked, so the single frame this report is about is exactly the frame it is
+entitled to drop — the gaps in `frames/before/gated/` are real. `firstframes`
+replaces it with a readback that cannot drop a frame: `getContext` is wrapped to
+force `preserveDrawingBuffer` (without it `toDataURL` on Pixi's canvas reads
+back empty and every frame looks blank, which is its own way of lying), and the
+sample is queued from `setTimeout(0)` INSIDE a `requestAnimationFrame` callback.
+Every rAF callback in one frame runs in a single task, so that timeout lands
+after Pixi's renderer has drawn. Frame n in those directories is animation frame
+n of the real boot. Nothing in `src/` is patched to make it work.
+
+
+===============================================================================
+2. WHAT THE MENU DOES — frames/before/exact-gated/ (1x), exact-dpr15/ (1.5x),
+                        exact-dev/ (dev server), resize-boot/, no-gate/
+===============================================================================
+
+`analyse.mjs` reports, per frame, the bounding box of every pixel that is not
+Cold Vacuum (0x0d1015) and that box's centre against the viewport's own centre.
+
+  frames/before/exact-gated  (production, 1x, gated boot)
+
+    frame                    ink px   ink box (x,y,w,h)      centre        offset
+    f008-00343ms.png              0   (background only — Pixi up, menu not drawn)
+    f009-00681ms.png         328150   (   0,   0,1707, 888)  (853.0,443.5) dx=0.0
+    f010-00764ms.png         328150   (   0,   0,1707, 888)  (853.0,443.5) dx=0.0
+    …identical through f089 (4.9 s)…
+
+    The FIRST frame that carries any ink already carries all of it, at
+    dx = 0.0 from the viewport's centre. There is no f-minus-one: the boot
+    blocks the main thread for 338 ms between f008 and f009, so exactly one
+    animation frame occurs in that window and it is the one above. No frame was
+    dropped; there were none to drop.
+
+    dy = -5.0 is not an offset. The menu's footer beam ends 10 px above the
+    bottom edge by design, so the ink box is 10 px shorter at the bottom than at
+    the top and its centre sits 5 px high. It is identical on every frame,
+    including the settled ones, and it is the same number at every ratio once
+    scaled (dy = -8.5 at 1.5x = -5.67 CSS px).
+
+  frames/before/exact-dpr15  (production, deviceScaleFactor 1.5)
+    f009-00409ms  0 ink;  f010-01075ms → f089  732424 ink, (0,0,2561,1330),
+    centre (1280.0, 664.5), dx = 0.0 on every frame. Byte-identical throughout.
+
+  frames/before/exact-dev  (vite dev server, 1.5x, 377 frames)
+    f023-00676ms  0 ink;  f024-01434ms onward  732424 ink, dx = 0.0, identical.
+    The un-bundled boot is slower and the result is the same.
+
+  frames/before/no-gate  (`?gate=0` — the menu with NO DOOR in front of it)
+    This is the control that would have killed candidate 3 on its own: the menu
+    appears at 563 ms already at (0,0,1707,888), dx = 0.0, and does not move.
+
+  frames/before/resize-boot  (boot at 900x600, viewport changed to 1707x898 at
+    120 ms — a window being restored, or dragged to a monitor at another DPI,
+    which is the only realistic way candidate 1's "laid out before a real
+    viewport is known" could actually happen)
+    f006-00320ms  0 ink;  f007-00673ms onward  328150 ink, dx = 0.0, identical.
+    The menu's first inked frame is already the final layout.
+
+  frames/before/exact-open  (the door PRESSED and the whole reveal filmed,
+    133 frames to 8.1 s)
+    328150 ink and dx = 0.0 on every single frame from f010-00829ms to
+    f136-08112ms. The menu does not move while the door opens either.
+
+  frames/before/reveal  (the COMPOSITE — canvas plus the overlay in front of it —
+    through the whole opening; the frames above are canvas-only)
+    This is the picture the brief asks for in as many words: "the gate opens, the
+    menu is already where it belongs behind it."
+
+      r04-02881ms.png   beat 3, the frame mid-scale and past the screen edges.
+                        The menu is visible through the opening with PLAY, CODEX,
+                        SETTINGS and HANGAR ALREADY at their final positions.
+      r06-03789ms.png   settled, door gone.
+
+    Put r04 and r06 side by side: the four plates and the wordmark are on the
+    same pixels in both. Nothing arrives, nothing slides, nothing eases. The ink
+    box wanders by a couple of px through r01–r04 because the door's own
+    chrome is still in the box being measured; from r05 onward it is the menu
+    alone at 328150 px and dx = 0.0, the same number as every other film here.
+
+
+===============================================================================
+3. WHAT THE GATE DOES — frames/before/motion.json, exact-open/ticks.json
+===============================================================================
+
+The gate is a DOM overlay above the canvas, so anything it did would be a DOM
+transition, and the browser will report those directly rather than by inference
+from pixels. `motion.spec.ts` listens for `transitionrun`, `transitionstart`,
+`transitionend`, `transitioncancel` and `animationstart` in the capture phase on
+`document`, installed before a line of app code runs.
+
+  first 3 s:   transition* events ......... 0
+               animationstart ............. 3
+                 pr-gate-sheen  x2   (the wordmark's sheen pass — by design)
+                 pr-gate-prompt x1   (PRESS ANYWHERE TO ENTER — by design)
+
+  Zero transitions. Nothing on the page eases anywhere.
+
+The one instant no frame loop can reach is inside the boot's own synchronous
+task, when the overlay is inserted. A `MutationObserver` on `#app` catches it:
+
+  253 ms  inserted  div#pr-title-gate
+          --pr-gate-door-scale = "1"
+          #pr-title-gate-door  computed transform  matrix(1,0,0,1,-610.633,-376.93)
+          rect [242.9, 72.1, 1221.3, 753.9]  →  centre (853.5, 449.0)
+          viewport centre (853.5, 449.0).  Offset: zero.
+
+This is worth stating precisely, because it is the near-miss. The door is
+written `left:50%; top:50%; transform:translate(-50%,-50%) scale(var(--pr-gate-door-scale))`
+with `transition:transform 1500ms` and that custom property has NO fallback. If
+the variable were ever unset while the element was in the document, `transform`
+would be invalid at computed-value time, resolve to `none`, and drop the
+element's top-left corner onto the screen's centre — the bottom-right quadrant —
+and the 1500 ms transition would then carry it back. That is a perfect match for
+the report's words and its one-second window, and it is what I expected to find.
+
+It does not happen. `GateDom.mount` inserts the element and `TitleGate.mount`
+calls `apply()` in the SAME synchronous task, with no forced style recalc
+between them, so the browser computes the element's style exactly once and it is
+already correct. The measurement above is that fact, and the zero transition
+events are the same fact from the other side.
+
+And through the opening, the door grows in place (exact-open/ticks.json):
+
+  f7    620ms  rect  242.9   72.1  1221.3   753.9   centre 853.5,449.0
+  f39  3136ms  rect  225.3   61.2  1256.3   775.5   centre 853.5,448.9
+  f47  3599ms  rect  -76.5 -125.0  1859.9  1148.1   centre 853.5,449.0
+  f55  4047ms  rect -491.1 -381.0  2689.2  1660.0   centre 853.5,449.0
+  f63  4496ms  rect -618.0 -459.3  2943.1  1816.7   centre 853.5,449.1
+
+  The rect grows by a factor of 2.4 and its centre moves 0.1 px. Candidate 3's
+  failure mode — "a scale applied about the wrong origin moves content toward a
+  corner rather than growing it in place" — is absent, and this is the number
+  that says so. a0-50's opening is untouched, as the guardrail requires.
+
+
+===============================================================================
+4. THE THREE CANDIDATES, EACH CLOSED BY A MEASUREMENT
+===============================================================================
+
+1  FIRST-FRAME LAYOUT.  CLOSED.
+   The first frame that draws any ink is already at the final layout, at four
+   different boot speeds (production 1x, production 1.5x, dev server, and a boot
+   whose viewport changes underneath it at 120 ms). There is no "defaults on
+   frame 1, snap on frame 2": frames are byte-identical from the first inked one
+   — 328150 ink px at 1x and 732424 at 1.5x, unchanged for the length of every
+   film. `readViewport()` is not on this path at all; it belongs to the match
+   boot. The menu reads `ctx.logicalSize()`, which is derived from `app.screen`
+   after `Application.init({resizeTo: window})` has already sized it.
+
+2  THE ROOT TRANSFORM.  CLOSED.
+   `window.__mainMenu` reports `rotated: false` and
+   `logicalViewport {width: 1707, height: 898}` on every sampled frame. The
+   desktop takes the identity branch, as it must. The rotated branch's `x: physW`
+   would put content one whole screen width to the right, which is the exact
+   fingerprint the brief describes — it is not being hit, and assertion 1 of the
+   new test now fails if it ever is.
+
+3  THE TITLE GATE'S PHASES.  CLOSED, and it was the likeliest.
+   Zero transitions in the first three seconds. The door is centred at the first
+   observable style computation, 253 ms in, inside the boot's own task. Its
+   centre moves 0.1 px while it scales by 2.4x. And with `?gate=0` — no door on
+   the screen at all — the menu still appears already centred, so the gate is not
+   what places it either way.
+
+
+===============================================================================
+5. THE DELIVERABLE THAT IS MISSING, AND WHY
+===============================================================================
+
+The Definition of Done asks for a test that FAILS on today's code. There is no
+such test to write, because the defect it would have to catch is not in today's
+code on any axis I could film. Writing one that passes and calling it a
+reproduction would be the four-round star-bloom failure again, one lane over.
+
+So the test on this branch is a REGRESSION GUARD and is labelled as one in its
+own comment. It is real work and it holds a real property that nothing held
+before — but it is not proof of the reported bug, and this audit will not let it
+be read as such.
+
+DIRECTOR: this needs the developer's own conditions before another round is
+spent on it. Specifically:
+  - browser and version (everything above is Chromium 131 via Playwright);
+  - was it a clean load, or a reload / a restored session / a second monitor;
+  - `?gate=0` or the real front door;
+  - whether the window was being moved or resized in that first second;
+  - and ideally the developer's own capture, since it is a one-second window on
+    the first screen and it is cheap to film.
+
+There is one thing above that is a real latent fragility even though it is not
+firing: `--pr-gate-door-scale` has no fallback in a declaration that carries a
+1500 ms `transition:transform`, so the gate's correctness rests on `apply()`
+staying in the same synchronous task as the insertion. Any future edit that puts
+a style read (or an `await`) between them turns that into precisely the reported
+symptom. It is `title-gate.ts` — a0-50's file, not mine — and the guardrail says
+not to touch the gate's opening, so it is flagged here rather than changed.
+
+
+===============================================================================
+6. THE TEST IS NOT VACUOUS — mutation-check.txt
+===============================================================================
+
+`src/ui/main-menu.test.ts` → `the entrance` → `the first frame is already
+centred` drives a REAL `MainMenuView` headless (the same 2D-canvas stub
+`build-wheel-view.test.ts` uses), updates it exactly once with no prior
+`resize()` — which is frame 1 of the boot — and reads back the positions the
+view wrote to its own nodes.
+
+Three mutations were applied to the SHIPPED source, the suite run, and reverted:
+
+  0. unmutated ................................................ 36 passed
+  1. computeRootTransform's desktop branch answers `x: physW`
+     (content one screen width right — the bottom-right fingerprint)
+     ........................................................... 1 failed | 35 passed
+  2. stackPlates lays the column against the band's right edge
+     instead of its centre ..................................... 1 failed | 35 passed
+  3. the view's FIRST frame draws at a default viewport and only
+     a later resize() corrects it — THE REPORTED SHAPE EXACTLY:
+     right on frame 2, wrong on frame 1 ........................ 1 failed | 35 passed
+  4. all three reverted ....................................... 36 passed
+
+In every case the one failing test is the new one. Mutation 3 is the important
+row: if the menu had actually been flying in, this test would have caught it.
+
+
+===============================================================================
+7. BEFORE AND AFTER
+===============================================================================
+
+`frames/before/` was captured on the unmodified shipped client, before anything
+on this branch existed. `frames/after/` is the same capture re-run at the tip of
+this branch.
+
+They are the same frame, and that is the honest result rather than a shortfall:
+this branch adds a test, a capture harness and this audit, and changes NO client
+code. There is no "after the fix" because there was nothing to fix — the absence
+of motion the brief asks for is what the client already does.
+
+  before/exact-gated  f009-00681ms → f089:  328150 ink px, centre (853.0,443.5), dx 0.0
+  after/exact-gated   f010-00667ms → f089:  328125 ink px, centre (853.0,443.5), dx 0.0
+
+The 25-px difference is named rather than waved at. A pixel diff of the two
+first-inked frames:
+
+  differing pixels ... 201
+  bounding box ....... x=13  y=880  w=33  h=8   (of 1707 x 898)
+
+A 33x8 box in the bottom-left corner: the build stamp, which reads the commit
+(`a4f0291*` before, `ab3ccc6*` after) and is the one thing on screen that changes
+every commit by design — it is why `?freeze=1` exists. Every other pixel of the
+menu, all 1 532 685 of them, is bit-identical across the branch.
+
+No golden re-baseline: no frame changes, because no drawing code changed.
+
+
+===============================================================================
+8. REPRODUCING THIS AUDIT
+===============================================================================
+
+  # the frame-exact film (production build, the developer's viewport)
+  npx playwright test --config evidence/a0-70-title-entrance/playwright.config.ts firstframes
+  node evidence/a0-70-title-entrance/analyse.mjs \
+       evidence/a0-70-title-entrance/frames/before/exact
+
+  # env switches
+  A0_70_DPR=1.5     the 1.5x device ratio 1707x898 implies
+  A0_70_DEV=1       the vite dev server instead of the production build
+  A0_70_PRESS=1     press the door and film the reveal as well as the boot
+  A0_70_FRAMES=n    how many animation frames to keep (default 90)
+  A0_70_DIR=name    which directory under frames/<label>/ to write
+  A0_70_LABEL=after write under frames/after/ instead of frames/before/
+
+  # what moved, straight from the browser
+  npx playwright test --config evidence/a0-70-title-entrance/playwright.config.ts motion
+
+  # a viewport change landing mid-boot
+  npx playwright test --config evidence/a0-70-title-entrance/playwright.config.ts resize-boot

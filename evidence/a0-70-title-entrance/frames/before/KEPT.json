@@ -1,0 +1,76 @@
+{
+  "exact-dev": [
+    "f023-00676ms.png",
+    "f024-01434ms.png",
+    "f025-01596ms.png",
+    "f026-01728ms.png",
+    "f399-47464ms.png"
+  ],
+  "exact-dpr15": [
+    "f009-00409ms.png",
+    "f010-01075ms.png",
+    "f011-01225ms.png",
+    "f012-01342ms.png",
+    "f089-10687ms.png"
+  ],
+  "exact-gated": [
+    "f008-00343ms.png",
+    "f009-00681ms.png",
+    "f010-00764ms.png",
+    "f011-00821ms.png",
+    "f089-05246ms.png"
+  ],
+  "exact-open": [
+    "f007-00620ms.png",
+    "f008-00710ms.png",
+    "f009-00770ms.png",
+    "f015-01714ms.png",
+    "f023-02210ms.png",
+    "f031-02682ms.png",
+    "f039-03136ms.png",
+    "f047-03599ms.png",
+    "f055-04047ms.png",
+    "f063-04496ms.png",
+    "f071-04917ms.png",
+    "f079-05363ms.png",
+    "f087-05738ms.png",
+    "f095-06120ms.png",
+    "f103-06503ms.png",
+    "f111-06912ms.png",
+    "f119-07292ms.png",
+    "f127-07673ms.png",
+    "f135-08065ms.png",
+    "f139-08248ms.png"
+  ],
+  "gated": [
+    "f000-00000ms.png",
+    "f001-00046ms.png",
+    "f002-00694ms.png",
+    "f003-00713ms.png",
+    "f004-00735ms.png",
+    "f006-00791ms.png",
+    "f012-00913ms.png",
+    "f018-01080ms.png",
+    "f024-01239ms.png",
+    "f030-01364ms.png",
+    "f033-01431ms.png"
+  ],
+  "no-gate": [
+    "f000-00000ms.png",
+    "f001-00030ms.png",
+    "f002-00047ms.png",
+    "f006-00290ms.png",
+    "f012-00745ms.png",
+    "f018-00932ms.png",
+    "f024-01114ms.png",
+    "f030-01313ms.png",
+    "f035-01474ms.png"
+  ],
+  "resize-boot": [
+    "f006-00320ms.png",
+    "f007-00673ms.png",
+    "f008-00759ms.png",
+    "f009-00814ms.png",
+    "f059-03666ms.png"
+  ]
+}

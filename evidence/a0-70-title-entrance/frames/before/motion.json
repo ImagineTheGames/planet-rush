@@ -1,0 +1,112 @@
+[
+  {
+    "t": 253,
+    "type": "inserted",
+    "target": "canvas",
+    "rect": [
+      0,
+      0,
+      1707,
+      898
+    ],
+    "doorRect": null,
+    "doorComputed": null,
+    "doorScaleVar": ""
+  },
+  {
+    "t": 253,
+    "type": "inserted",
+    "target": "div#pr-title-gate",
+    "rect": [
+      0,
+      0,
+      1707,
+      898
+    ],
+    "doorRect": [
+      242.9,
+      72.1,
+      1221.3,
+      753.9
+    ],
+    "doorComputed": "matrix(1, 0, 0, 1, -610.633, -376.93)",
+    "doorScaleVar": "1"
+  },
+  {
+    "t": 253,
+    "type": "inserted+micro",
+    "target": "canvas",
+    "doorRect": null,
+    "doorComputed": null
+  },
+  {
+    "t": 253,
+    "type": "inserted+micro",
+    "target": "div#pr-title-gate",
+    "doorRect": [
+      242.9,
+      72.1,
+      1221.3,
+      753.9
+    ],
+    "doorComputed": "matrix(1, 0, 0, 1, -610.633, -376.93)"
+  },
+  {
+    "t": 572,
+    "type": "inserted+task",
+    "target": "canvas",
+    "doorRect": null,
+    "doorComputed": null
+  },
+  {
+    "t": 572,
+    "type": "inserted+task",
+    "target": "div#pr-title-gate",
+    "doorRect": [
+      242.9,
+      72.1,
+      1221.3,
+      753.9
+    ],
+    "doorComputed": "matrix(1, 0, 0, 1, -610.633, -376.93)"
+  },
+  {
+    "t": 645,
+    "type": "animationstart",
+    "prop": "pr-gate-sheen",
+    "target": "span",
+    "rect": [
+      453.9,
+      224.6,
+      799.2,
+      141.3
+    ],
+    "computed": "none"
+  },
+  {
+    "t": 645,
+    "type": "animationstart",
+    "prop": "pr-gate-prompt",
+    "target": "div",
+    "rect": [
+      693.1,
+      806.5,
+      320.7,
+      38
+    ],
+    "computed": "none"
+  },
+  {
+    "t": 1404,
+    "type": "animationstart",
+    "prop": "pr-gate-sheen",
+    "target": "span",
+    "rect": [
+      508.4,
+      532.2,
+      690.3,
+      141.3
+    ],
+    "computed": "none"
+  }
+]

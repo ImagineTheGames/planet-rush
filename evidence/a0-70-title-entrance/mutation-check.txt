@@ -1,0 +1,18 @@
+a0-70 — is 'the first frame is already centred' load-bearing?
+Each mutation is applied to the SHIPPED source, the test run, and reverted.
+
+0. unmutated
+      Tests  36 passed (36)
+
+1. computeRootTransform desktop branch answers x: physW (the bottom-right fingerprint)
+      Tests  1 failed | 35 passed (36)
+
+2. stackPlates lays the column against the band's right edge, not its centre
+      Tests  1 failed | 35 passed (36)
+
+3. the view's FIRST frame draws at a default viewport and only a later resize() corrects it
+   (the reported shape exactly: right on frame 2, wrong on frame 1)
+      Tests  1 failed | 35 passed (36)
+
+4. reverted — all three mutations backed out
+      Tests  36 passed (36)
