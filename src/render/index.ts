@@ -591,6 +591,9 @@ export class Renderer {
    *  (URL-bar / notch / fullscreen aware), not the raw canvas — see camera.ts.
    *  Mutated whole via {@link setViewport}; read every frame in centerCamera. */
   private viewport: Viewport;
+  /** CSS pixels per world unit — the world root's scale (a0-74). 1 is the shipped
+   *  translate-only camera; {@link setCameraScale} is the only writer. */
+  private cameraScale = 1;
   /** Reused scratch so centerCamera allocates nothing per frame (GDD §4.3). */
   private readonly offsetScratch: Vec2 = { x: 0, y: 0 };
   /** The slice of the world on screen this frame, in world units — rewritten by
@@ -716,6 +719,27 @@ export class Renderer {
     this.viewport = viewport;
   }
 
+  /**
+   * Set the camera scale — how many CSS pixels one world unit draws as (a0-74).
+   *
+   * 1 is the shipped camera. Below 1 the world root shrinks and the player sees
+   * proportionally more arena, which is what the touch zoom-out control buys
+   * (`@ui/viewport` owns the ladder and the fact that it is touch-only; this is
+   * the arithmetic end of it). Cheap and idempotent: one container transform plus
+   * a number the next frame's camera and cull read, so it can flip any frame.
+   *
+   * Nothing is re-baked. Every entity's texture is rasterised at its own fixed
+   * pixels-per-unit and drawn at `radius / ART_SCALE` (see the header); a camera
+   * scale under 1 only ever *minifies* what is already minified, so the atlas, the
+   * pool and the draw-call count are all untouched.
+   */
+  setCameraScale(scale: number): void {
+    const s = scale > 0 && Number.isFinite(scale) ? scale : 1;
+    if (s === this.cameraScale) return;
+    this.cameraScale = s;
+    this.worldRoot.scale.set(s);
+  }
+
   /** Toggle reduced-VFX mode (GDD §4.3). Cheap and idempotent — the flag is read
    *  in {@link draw}; nothing is created or destroyed, so it can flip any frame. */
   setReduceVfx(on: boolean): void {
@@ -730,8 +754,12 @@ export class Renderer {
    *  (debug-hook.ts) projects the local ship through this so QA asserts against
    *  what is really on screen, not a recomputed ideal. Call after {@link draw}. */
   projectToScreen(world: Vec2, out: Vec2): Vec2 {
-    out.x = this.worldRoot.x + world.x;
-    out.y = this.worldRoot.y + world.y;
+    // Reads the world root's ACTUAL transform, scale included (a0-74) — so every
+    // screen-space overlay that rides this seam (nameplates, health bars, tap
+    // markers, the combat debug hook) follows a zoomed camera without knowing one
+    // exists.
+    out.x = this.worldRoot.x + world.x * this.worldRoot.scale.x;
+    out.y = this.worldRoot.y + world.y * this.worldRoot.scale.y;
     return out;
   }
 
@@ -761,13 +789,13 @@ export class Renderer {
     // the canvas centre, which drifts off-screen on mobile (camera.ts).
     TARGET_SCRATCH.x = cx;
     TARGET_SCRATCH.y = cy;
-    writeCameraOffset(this.offsetScratch, TARGET_SCRATCH, this.viewport);
+    writeCameraOffset(this.offsetScratch, TARGET_SCRATCH, this.viewport, this.cameraScale);
     this.worldRoot.x = this.offsetScratch.x;
     this.worldRoot.y = this.offsetScratch.y;
     // ...and, from that same offset, the world rectangle the player can see. The
     // cull is a function of where the world ACTUALLY got drawn, so it can never
     // drift from the camera the way a separately-derived rectangle would.
-    writeVisibleWorld(this.visible, this.offsetScratch, this.viewport);
+    writeVisibleWorld(this.visible, this.offsetScratch, this.viewport, this.cameraScale);
   }
 
   /** The world rectangle on screen after the last {@link draw} — the one notion

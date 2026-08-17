@@ -1,0 +1,288 @@
+a0-74 — THE SCREEN YOU GET DEPENDS ON THE SCREEN YOU HAVE
+=========================================================
+Branch  agent/ui/a0-74-viewport-and-hud-fit
+Bundle  the real production pipeline (npm run build + npm run preview), frozen
+        seeded scene (?debug=1&freeze=1&gate=0) — the same scene the goldens use.
+Method  every number below is READ OFF THE SHIPPED CLIENT via window.__viewStage
+        (?debug=1): the world rect is `renderer.visibleWorld`, the very box the
+        entity cull culls against, and the content box is the HUD's own. Nothing
+        here re-derives the camera — a number this audit computed would be a
+        measurement of this audit. Raw readings: ./readback.json.
+        Harness: ./playwright.config.ts, ./measure.spec.ts, ./shots.spec.ts.
+
+
+1. HOW MUCH WORLD YOU CAN SEE  (report 1)
+-----------------------------------------
+The developer:
+
+  "on pc i have the entire screen but im on mobile im confined to a very small
+   portion of the world. perhaps we need a way to either confine the screen on pc
+   or what i'd probably prefer is add a zoom out button on mobile"
+
+THE CAUSE, IN ONE LINE: the camera was translate-only, so ONE WORLD UNIT WAS ONE
+CSS PIXEL. The slice of the claim a player saw was exactly the pixel size of the
+glass they were holding. Nobody chose that ratio; it fell out of the hardware.
+(`src/platform/camera.ts` before this branch; `WORLD_SIZE` = 2400.)
+
+MEASURED, BEFORE (zoom 1x — the shipped camera, every profile):
+
+  profile                      viewport     world units   vs desktop   of arena
+  ---------------------------  -----------  ------------  -----------  --------
+  desktop 1707x898 (developer) 1707 x  898  1707 x  898       100.0%     71.1%
+  desktop 1280x800 (goldens)   1280 x  800  1280 x  800        75.0%     53.3%
+  phone landscape 798x384      798  x  384   798 x  384        46.7%     33.3%
+  phone landscape 844x390      844  x  390   844 x  390        49.4%     35.2%
+  phone PORTRAIT held 390x844  844  x  390   844 x  390        49.4%     35.2%
+
+  THE RATIO THE COMPLAINT IS: 798 / 1707 = 0.467. A phone player saw 46.7% of
+  the world width a desktop player saw — 33% of the arena against 71%.
+
+  The portrait row is not a typo and it matters: the game is landscape-locked
+  (`orientation.ts`), so a phone held upright lays out at 844x390 exactly as one
+  held sideways. There is no third case; portrait is the landscape case rotated.
+
+MEASURED, AFTER (the touch zoom-out control, walking its ladder through the same
+`setViewZoom` a real tap runs):
+
+  profile                  rung   world units    vs desktop 1707   of arena
+  -----------------------  -----  -------------  ----------------  --------
+  phone landscape 798x384  1x      798 x  384          46.7%         33.3%
+  phone landscape 798x384  1.5x   1197 x  576          70.1%         49.9%
+  phone landscape 798x384  2x     1596 x  768          93.5%         66.5%
+  phone landscape 844x390  1x      844 x  390          49.4%         35.2%
+  phone landscape 844x390  1.5x   1266 x  585          74.2%         52.8%
+  phone landscape 844x390  2x     1688 x  780          98.9%         70.3%
+  phone PORTRAIT   390x844 2x     1688 x  780          98.9%         70.3%
+
+  THE GAP CLOSES. At the top rung the smaller phone reaches 93.5% of the
+  developer's desktop view and the larger one 98.9% — and both exceed a
+  1280-wide desktop window (1280 units) outright. It is not left half-closed and
+  there is nothing here for the developer to have to rule on.
+
+WHY THE LADDER STOPS AT 2x, and it is a measurement rather than a preference:
+  - 2x already reaches 93.5% / 98.9%. The remaining 6.5% on the smaller phone is
+    worth less than what buying it costs.
+  - `SHIP_RADIUS` is 16 world units. At 1x a ship is 32 CSS px across; at 2x it
+    is 16; a 3x rung would draw it at 10.7 and a hull bar under it thinner than
+    the bar's own stroke. The frames in ./shots/after-phone-zoom-2x.png are the
+    check on that: at 2x the station is still a readable object and the whole
+    asteroid field plus the arena wall are on screen.
+
+WHAT WAS **NOT** DONE, and why (the brief is explicit): the desktop view is NOT
+confined. That is the other option the developer named and did not choose, and it
+takes something away from every existing player. Desktop is untouched — the
+control is drawn on touch only, and `cameraScale(1)` is byte-for-byte the camera
+that shipped (asserted in src/ui/viewport.test.ts).
+
+DEFAULT: the ladder starts at 1x — the shipped view — and the player's choice is
+remembered across matches (`planet-rush:viewZoom`, the same storage seam as the
+fire mode and the control scheme). FOR THE DEVELOPER TO RULE ON: whether the
+first-run default on touch should be 1.5x rather than 1x. A button that defaults
+to off leaves a fresh phone player at 46.7% until they find it; a default of 1.5x
+would seat every phone at 70.1% with the shipped view one tap away. Both rungs
+are measured above. Not decided here, because "what the game looks like on first
+boot" is not a placement fix.
+
+
+2. THE HUD ON AN ULTRAWIDE  (report 2)
+--------------------------------------
+  "on pc we also need a way to handle UI locations because i have an ultra wide
+   and all that UI goes to the edges of the screens"
+
+THE FIX: the HUD's chrome is bound to a CONTENT BOX — a centred region of the
+HUD's own reference aspect — and the world renders full-bleed behind it.
+
+WHY 16:9 IS THE CAP, and why it is not a taste: `src/ui/instrument.ts` scales
+every HUD metric from `HUD_REFERENCE = 1280x720`, which is 16:9 exactly. Binding
+the chrome to that aspect gives an ultrawide the HUD *as it was authored*, scaled
+— rather than the same HUD pulled apart until the build wheel and the hold pips
+are a head-turn from each other. Anything wider is world, which is what an
+ultrawide is for.
+
+WHY THERE IS ALSO A FLOOR, and why it is not optional: a bare aspect cap gets
+phones badly wrong. A 844x390 landscape phone is aspect **2.16** — already wider
+than 16:9 — so a pure cap would inset the one device with no horizontal room to
+give away. The box is `min(W, max(FLOOR, H x 16/9))` with FLOOR =
+`HUD_REFERENCE.width` (1280): under the frame the HUD was drawn for, nothing is
+ever inset. Height is never capped — all three reports are horizontal, and an
+ultrawide is short rather than tall.
+
+MEASURED (read off the client; `content` is the box, `world` is what the camera
+shows, and the two differing IS the full-bleed claim):
+
+  profile                viewport      content box        world on screen
+  ---------------------  ------------  -----------------  ----------------
+  16:9  1920x1080        1920 x 1080   x=0    w=1920      1920 x 1080
+  21:9  2560x1080        2560 x 1080   x=320  w=1920      2560 x 1080
+  32:9  3840x1080        3840 x 1080   x=960  w=1920      3840 x 1080
+  desktop 1707x898       1707 x  898   x=55   w=1596      1707 x  898
+  desktop 1280x800       1280 x  800   x=0    w=1280      1280 x  800
+  phone landscape 844x390 844 x  390   x=0    w=844        844 x  390
+  phone landscape 798x384 798 x  384   x=0    w=798        798 x  384
+
+  The world column never shrinks. The box only ever narrows, and only on a
+  display past BOTH the reference aspect and the floor: 21:9 and 32:9 lose 320
+  and 960 px per side to the world, the developer's own 1707x898 window loses 55,
+  and every phone and every 16:9-or-narrower window loses nothing at all.
+
+SCREENSHOTS — ./shots/, all three aspects the DoD names, before and after, same
+frozen scene, same height (1080) so the box is the same 1920 px in all three and
+the only difference between frames is how much world is either side of it:
+
+  before-fit-16x9-1920x1080.png   after-fit-16x9-1920x1080.png   (the control)
+  before-fit-21x9-2560x1080.png   after-fit-21x9-2560x1080.png
+  before-fit-32x9-3840x1080.png   after-fit-32x9-3840x1080.png
+
+  Read at full size, every one. What they show:
+  - 16:9 — IDENTICAL before and after, and that is the point of shooting it: the
+    box is the viewport there, so ORE is at x=16, HOME's bar ends at 1904 and the
+    minimap is in the true corner, exactly as they always were.
+  - 21:9 — before: ORE at the far left edge, HOME at the far right, 2528 px
+    apart. After: 336 and 2224, so 1888 px apart, both inside the centred box.
+  - 32:9 — before: ORE at x=10 and HOME's right edge at 3830, **3820 px apart**,
+    with the minimap alone in a corner nearly a metre of desk away from the build
+    wheel. After: 976 and 2864. The world behind them is untouched in both — the
+    star field, the rocks and the enemy station out at x=290 fill all 3840 px in
+    the "after" frame too, which is the full-bleed half of the claim.
+
+WHAT IS BOUND: the ore readout, the wave clock, the HOME cluster, the controls
+strip and its scrim, the minimap (and its hit test, from the same offset), the
+onboarding prompt's band and wrap, the respawn overlay's wrap, and the alarm
+frame — a threat-red frame on the physical edge of a 32:9 is a frame drawn for
+nobody.
+
+WHAT IS DELIBERATELY NOT BOUND, and this is the load-bearing half: everything
+that tracks the WORLD rather than the screen — over-ship health bars, nameplates,
+the under-ship hold pips, Tap Commander's order markers, the loot tell. Those
+follow the camera, and binding them to a box would tear them off the thing they
+label. Visible in the after 32:9 frame: the enemy nameplates out at x=290 and
+x=580, correctly outside the box, sitting on the ships they name.
+
+THE SCREEN-EDGE ARROW asks two questions of two rectangles, deliberately: "is
+home already on screen" of the WHOLE viewport (the world is full-bleed, so a
+station in the gutter is a station you can see, and GDD §2.2 says the station is
+then the tell), and "where does the arrow go" of the CONTENT BOX (an arrow is
+only a tell if it is read).
+
+TEST: `the HUD stays reachable on an ultrawide` in src/ui/hud.test.ts asserts the
+anchors sit inside the box at 32:9 — named individually, so a bug that piled them
+all in the middle would fail — and that every one clears the physical edge by the
+960 px gutter. Two companion tests pin that 16:9 and every phone are unchanged,
+and that 21:9 binds by the same rule rather than as a special case.
+
+
+3. CONTROLS THE SEATED SCHEME CANNOT USE  (report 3)
+----------------------------------------------------
+  "theres buttons like Fire, that shouldn't show up since im using tap commander
+   and auto fire (on pc)"
+
+"on pc" IS NOT A MISTAKE, and it is the finding under the finding. `src/main.ts`
+seats the touch layer on `'ontouchstart' in window || navigator.maxTouchPoints > 0`,
+which is TRUE on any touchscreen laptop. So a developer on a PC gets the on-glass
+thumb furniture, and this report is about that — not about the desktop controls
+strip, which has been scheme-aware since a0-37 and already drops its fire row
+under Tap Commander.
+
+WHAT I FOUND IN THAT CATEGORY, read off `sampleInput` rather than guessed from
+the buttons' names. Under `scheme === 'tap'` it runs, every frame:
+
+    merged.thrust.x = 0; merged.thrust.y = 0;
+    merged.aim = null;   merged.fire = false;
+    // ...and TapPilot writes all three from the standing order.
+
+  HIDDEN (all three, on desktop and on touch alike):
+    - the hold-to-FIRE button          — the one reported
+    - the LEFT THRUST STICK (ghost + live base + knob)
+    - the RIGHT AIM STICK (ghost + live base + knob)
+  Every one of them writes into a field discarded on the next line. The engaged
+  halves are gated as well as the idle ghosts: a scheme that cannot use a stick
+  must not draw one under a thumb either, however that thumb got there.
+
+  KEPT, and hiding it would be the same defect pointing the other way:
+    - BUILD & UPGRADE — `merged.build` is deliberately NOT zeroed there, so that
+      button really does open the wheel under Tap Commander.
+    - the minimap toggle, the pause button — live in both schemes.
+    - the desktop controls strip — already correct (a0-37); under Tap Commander
+      it lists `Click anywhere / Move or attack` and the Build row, and nothing
+      else. Re-checked, not re-fixed.
+
+  FOUND AND DELIBERATELY KEPT — reported rather than acted on:
+    - The SETTINGS "FIRE MODE" row. It is genuinely inert while Tap Commander is
+      seated: `sampleInput` derives the mode from the pilot's lock
+      (`tapPilot.lockedRef ? Manual : AutoAim`) and ignores the player's setting
+      entirely. But it configures the OTHER scheme, and hiding a setting because
+      the current scheme ignores it would strand a player who wants to switch
+      back. A dead BUTTON on the play surface and a currently-irrelevant SETTINGS
+      ROW are different things; only the first is what the report is about.
+
+  MEASURED AND NOT DONE, stated so it is not mistaken for missed: the prompt
+  band still reserves `PROMPT_THUMB_COLUMN` (156 px each side) and the minimap
+  still holds `MINIMAP_FIRE_COLUMN` (120 px) clear of a FIRE button that, since
+  a0-30 made Tap Commander the default everywhere, is usually not drawn at all.
+  That is ~430 px of a 844 px phone reserved for furniture that is not there —
+  real, and worth a brief. It is a LAYOUT change, not a dead-control one, and it
+  moves every phone golden, so it is reported here rather than smuggled in.
+
+FRAMES: ./shots/before-phone-zoom-1x.png against ./shots/after-phone-zoom-1x.png,
+same phone, same frozen scene, both seated in the shipped defaults (Tap Commander
++ Auto-aim). Before: a full-size FIRE button in the bottom-right and the left
+thrust-stick ghost in the bottom-left, neither of which moves the ship. After:
+both gone, and the VIEW control in the top-right in their place.
+
+TEST: `draws no FIRE button under Tap Commander + auto-fire` in
+src/ui/live-controls.test.ts — the developer's case by name, plus the two sticks
+that go with it, plus a test that the sticks scheme is left exactly as it shipped.
+
+
+4. THE CONTROL ITSELF
+---------------------
+VIEW 1x / 1.5x / 2x, cycled by one tap, top-right under the HOME cluster,
+touch-only, persisted. Drawn rect, measured on the client: 64x48 at (718, 61) on
+the 798-wide phone and (764, 61) on the 844-wide one.
+
+WHERE IT SITS WAS MEASURED, NOT PICKED. The first attempt was the same ROW as
+HOME and the 568x320 profile killed it: at the 0.75 scale floor the wave clock's
+strip is ~151 px wide centred on 284 (so it runs to ~360) and HOME's left edge is
+at 398 — 38 px of gap for a 64 px control. Stacked UNDER HOME it fits, but only
+with a clamp: the `top-right` anchor zone is y in [16, 106.7] there, 90 px tall,
+and HOME's own chrome takes 39 of it. So the control gives up its GAP and never
+its SIZE — a HUD metric scales with the frame, a touch target does not, because a
+thumb does not get smaller with the viewport (GDD §2.4). 48 px, `TOUCH_TARGET_MIN`,
+on every profile. src/ui/zoom-control.test.ts pins all of it against the layout
+registry's own resolver at five profiles.
+
+
+5. WHAT ELSE THIS TOUCHED, AND WHAT IT DID NOT
+----------------------------------------------
+CROSS-LANE, both marked as their own commits and both additive-with-defaults, so
+either drops cleanly if its owner declines:
+  - src/platform/camera.ts + src/render/{index,cull}.ts — the camera scale. No
+    control in src/ui can close report 1 without a scale to turn, and
+    `src/render/cull.ts` said in so many words "if a zoom is ever added, this
+    file is where it lands". `cameraOffset(t, vp, cameraScale(1))` is asserted
+    equal to `cameraOffset(t, vp)`.
+  - src/platform/touch-visuals.ts — one `sticksLive = true` argument. The
+    DECISION stays in src/ui/live-controls.ts; the view is handed a boolean.
+
+NOT RE-BAKED, NOT RE-POOLED: every entity texture is rasterised at its own fixed
+pixels-per-unit and drawn at `radius / ART_SCALE`. A camera scale under 1 only
+minifies what is already minified, so the atlas, the sprite pool and the draw-call
+count are untouched. What does change on a zoomed-out phone is how many bodies
+clear the cull — `writeVisibleWorld` now divides by the scale, so at 2x a phone
+submits roughly what a desktop already submits today. That is the same budget the
+desktop has been meeting since a1-12, on the device with less headroom, and it is
+opt-in.
+
+THE SIM IS UNTOUCHED. The zoom is a render transform: no constant, no rule and no
+action changed, and both camera inverses in main.ts (`logicalToWorld`,
+`worldToLogical`) take the scale — without that a Tap Commander order placed while
+zoomed out would land at a fraction of the distance the player pointed at.
+
+
+6. THE RUN
+----------
+npx tsc --noEmit                 clean
+npm test -- --run                307 files, 5646 tests, all green
+goldens                          re-baselined in the container; see
+                                 ./goldens-rebaseline.md for what moved in each
+                                 frame and why, with eyes on every image.

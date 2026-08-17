@@ -314,6 +314,21 @@ export const HP_BAR_TOP = HP_VALUE_ROW + SHIELD_BAR_HEIGHT + SHIELD_BAR_GAP;
  * own-station HP into the left half of the screen and breaks the anchor;
  * `hud-geometry.test.ts` pins it.
  */
+/**
+ * How tall the HOME cluster's **chrome** runs from the top of its group, CSS px —
+ * the scrim's full depth, which is the bar plus the rule that closes it plus the
+ * scrim's bleed below that rule.
+ *
+ * Extracted here (a0-74) because a second element now has to sit *under* HOME and
+ * a hand-copied number would be the drift this whole file exists to prevent:
+ * `./hud` `drawStationChrome` draws exactly this depth, and
+ * `./zoom-control` starts exactly below it.
+ */
+export function stationChromeHeight(scale: number): number {
+  const m = { scale };
+  return HP_BAR_TOP + HP_BAR_HEIGHT + hudSpace(4, m) + hudSpace(SCRIM_BLEED, m);
+}
+
 export function stationHpBounds(viewportWidth: number, labelWidth = 0): Rect {
   const width = Math.max(HP_BAR_WIDTH, labelWidth);
   return {

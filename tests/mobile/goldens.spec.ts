@@ -324,6 +324,30 @@ test('golden: landscape phone THUMB BAND — the controls, in Bone (a0-23)', asy
 
   const vp = page.viewportSize();
   if (vp) await page.setViewportSize({ width: vp.height, height: vp.width }); // portrait → landscape
+
+  // ── EDITED BY THE UI ENGINEER (a0-74) — one line, and it drops cleanly ──────
+  //
+  // OWNED BY QA. Seat the STICKS scheme before boot, the same line three other
+  // specs in this directory already carry (build-wheel-gantry, upgrade-wheel-
+  // gantry, centering) and the thrust-rate test in emulation.spec.ts.
+  //
+  // This baseline exists to film **the four touch controls in Gantry/Bone**
+  // (a0-23). a0-74 stopped drawing controls the seated scheme cannot use, and
+  // since a0-30 the first-run scheme on every platform is Tap Commander — which
+  // has no sticks and no FIRE button, because `sampleInput` zeroes thrust, aim and
+  // fire and the local pilot writes all three. Left alone, this frame would
+  // re-baseline to an EMPTY BAND and quietly stop testing the thing it is named
+  // for: a re-baseline that deletes the subject is not a re-baseline.
+  //
+  // So the scheme is stated rather than defaulted, and the frame goes on filming
+  // the rings it was written for — byte-identical to its stored baseline, which
+  // is why this commit re-baselines nothing here. The *other* half of a0-74 (that
+  // these controls are ABSENT under Tap Commander) is asserted in
+  // `src/ui/live-controls.test.ts` and filmed in
+  // `evidence/a0-74-viewport/shots/`, where it belongs — a golden that shows a
+  // control and a test that proves it is hidden are two different questions.
+  await page.addInitScript(() => localStorage.setItem('planet-rush:controlScheme', 'sticks'));
+
   await bootFrozen(page);
   await expect(page).toHaveScreenshot('phone-landscape-thumb-band.png', {
     ...GOLDEN,

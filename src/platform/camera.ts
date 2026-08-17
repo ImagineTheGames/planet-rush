@@ -15,6 +15,13 @@
  * fullscreen transitions. On desktop the two coincide; on a phone they do not, so
  * centring on the canvas leaves the ship visibly off to one side.
  *
+ * **a0-74 added a scale.** The camera was translate-only, which meant one world
+ * unit was one CSS pixel and the arena a player could see was exactly the pixel
+ * width of their screen — the first of the three reports this file's `scale`
+ * argument answers. Every entry point takes it as a **defaulted** argument, so an
+ * untouched caller gets the shipped translate-only camera unchanged; the ladder of
+ * values, and the decision that the control is touch-only, are `@ui/viewport`'s.
+ *
  * Coordinate spaces (all CSS pixels — under Pixi `autoDensity` the stage is in
  * CSS px, so devicePixelRatio never enters this math; centring is DPR-invariant):
  *   - **world**        : sim coordinates.
@@ -55,14 +62,41 @@ export function viewportCenter(vp: Viewport): Vec2 {
 }
 
 /**
+ * The camera's **scale**: how many CSS pixels one world unit draws as.
+ *
+ * It was implicitly 1 until a0-74, and that implicit 1 is the whole of the first
+ * developer report — *"on pc i have the entire screen but im on mobile im
+ * confined to a very small portion of the world"*. With world units pinned to CSS
+ * pixels, the slice of the arena a player sees is exactly the pixel size of the
+ * glass they hold: 1707 units on a 1707 px desktop, 798 on a 798 px phone, out of
+ * a `WORLD_SIZE` of 2400. Nobody decided that ratio; it fell out of the hardware.
+ *
+ * Every function here takes it as a defaulted argument, so an untouched caller
+ * gets exactly the translate-only camera that shipped, byte for byte.
+ * `@ui/viewport` owns the ladder of values (`cameraScale`) and the fact that the
+ * control is touch-only; this layer only does the arithmetic.
+ */
+export const DEFAULT_CAMERA_SCALE = 1;
+
+/**
  * Allocation-free camera offset: write into `out` the worldRoot position that
  * puts `target` (world coords) at the visible viewport centre, and return it.
  * The renderer calls this once per frame, so it must not allocate (GDD §4.3,
  * zero per-frame allocation) — hence the reused `out`.
+ *
+ * `scale` is the world root's scale (see {@link DEFAULT_CAMERA_SCALE}). The target
+ * is scaled and the viewport centre is not, because the scale applies to the world
+ * container and the centre is a screen fact: `screen = offset + world × scale`, so
+ * `offset = centre − target × scale` is what lands the target on the centre.
  */
-export function writeCameraOffset(out: Vec2, target: Vec2, vp: Viewport): Vec2 {
-  out.x = vp.originX + vp.width / 2 - target.x;
-  out.y = vp.originY + vp.height / 2 - target.y;
+export function writeCameraOffset(
+  out: Vec2,
+  target: Vec2,
+  vp: Viewport,
+  scale: number = DEFAULT_CAMERA_SCALE,
+): Vec2 {
+  out.x = vp.originX + vp.width / 2 - target.x * scale;
+  out.y = vp.originY + vp.height / 2 - target.y * scale;
   return out;
 }
 
@@ -71,13 +105,34 @@ export function writeCameraOffset(out: Vec2, target: Vec2, vp: Viewport): Vec2 {
  * (allocating) wrapper over {@link writeCameraOffset} for tests and one-off callers;
  * the per-frame render path uses the `write` form instead.
  */
-export function cameraOffset(target: Vec2, vp: Viewport): Vec2 {
-  return writeCameraOffset({ x: 0, y: 0 }, target, vp);
+export function cameraOffset(
+  target: Vec2,
+  vp: Viewport,
+  scale: number = DEFAULT_CAMERA_SCALE,
+): Vec2 {
+  return writeCameraOffset({ x: 0, y: 0 }, target, vp, scale);
 }
 
-/** Project a world point to canvas-local screen (CSS px) given the world offset. */
-export function worldToScreen(world: Vec2, offset: Vec2): Vec2 {
-  return { x: offset.x + world.x, y: offset.y + world.y };
+/** Project a world point to canvas-local screen (CSS px) given the world offset
+ *  and the camera scale — `screen = offset + world × scale`. */
+export function worldToScreen(
+  world: Vec2,
+  offset: Vec2,
+  scale: number = DEFAULT_CAMERA_SCALE,
+): Vec2 {
+  return { x: offset.x + world.x * scale, y: offset.y + world.y * scale };
+}
+
+/** The inverse of {@link worldToScreen}: a canvas-local screen point back to
+ *  world coordinates. The one place the division lives, so a caller cannot invert
+ *  a zoom by hand and get it backwards. */
+export function screenToWorld(
+  screen: Vec2,
+  offset: Vec2,
+  scale: number = DEFAULT_CAMERA_SCALE,
+): Vec2 {
+  const s = scale > 0 && Number.isFinite(scale) ? scale : DEFAULT_CAMERA_SCALE;
+  return { x: (screen.x - offset.x) / s, y: (screen.y - offset.y) / s };
 }
 
 /**
