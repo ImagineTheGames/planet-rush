@@ -1,0 +1,59 @@
+a0-75 — the shipped bundle, BEFORE, at six viewport sizes
+=========================================================
+
+Run:      node evidence/a0-75-fill-rate/sweep.mjs --frames 60 --settle 30
+Tree:     evidence commit 5df1422, whose src/ is pristine main f7ef828
+Build:    vite build (the real bundle, served by vite preview)
+Scene:    ?debug=1&freeze=1 — the sim pinned at the golden tick, so the ONLY
+          variable across the six rows is the viewport
+Map:      oval → Plasma Reef, the additive sky, over the wide arena
+Box:      ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShader
+          driver) — a CPU rasteriser. See the caveat at the head of sweep.mjs:
+          these are NOT the developer's milliseconds, and the value of the box is
+          that it is a pure function of fragments shaded, which is the axis a0-75
+          is about.
+
+  scene   viewport      Mpx   median ms   p95 ms   ms/Mpx
+  ------------------------------------------------------------
+  frozen  phone        0.31       133.3    150.0   435.01
+  frozen  1280×720     0.92       233.4    250.1   253.26
+  frozen  1920×1080    2.07       416.7    433.4   200.95
+  frozen  2560×1440    3.69       683.4   1049.9   185.38
+  frozen  3440×1440    4.95      1083.3   1650.0   218.69
+  frozen  5120×1440    7.37      1949.9   2483.3   264.47
+
+The `live` half of this run did not complete: the instrument was killed
+mid-sweep while the port was being reclaimed from an earlier attempt, so the JSON
+was never written and these six rows are transcribed from the run's stdout. They
+are the frozen scene, which is the controlled one, and the one every after-number
+is compared against.
+
+WHAT THE COLUMN SAYS
+--------------------
+
+`ms/Mpx` is NOT flat and it is not even monotonic — 435 → 253 → 201 → 185 → 219
+→ 264. A pure pixel model does not describe this.
+
+The fragment model does. Against the counted per-frame fill of the same scene
+(`overdraw.txt`, before): 1.5 / 4.1 / 9.2 / 16.1 / 26.7 / 54.5 Mfrag.
+
+  t = 93 ms + 34 ms × Mfrag
+
+  viewport     Mfrag   predicted   measured   error
+  ---------------------------------------------------
+  phone          1.5       144.4      133.3    +8.3%
+  1280×720       4.1       232.7      233.4    −0.3%
+  1920×1080      9.2       406.4      416.7    −2.5%
+  2560×1440     16.1       641.5      683.4    −6.1%
+  3440×1440     26.7      1002.7     1083.3    −7.4%
+  5120×1440     54.5      1949.3     1949.9    −0.0%
+
+Every row inside 9%, with a 93 ms intercept that is everything in the frame that
+is not backdrop fill (the entities, the HUD, the present) and a slope that is the
+box's per-fragment tariff. The two rows the pixel model gets most wrong —
+3440×1440 and 5120×1440 — are exactly the two where the sky's overdraw was
+inflated by the aspect-ratio bug, and the fragment model absorbs them because it
+counts that inflation.
+
+**So: it is fill, and the backdrop's overdraw is the multiplier.** At 1280×720
+the backdrop was 61% of the frame; at 5120×1440 it was 95%.

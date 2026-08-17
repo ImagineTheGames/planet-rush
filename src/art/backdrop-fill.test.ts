@@ -41,15 +41,19 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import type { Container } from 'pixi.js';
 import {
+  MAP_NEBULA,
   NEBULAE,
   NEBULA_IDS,
   STAR_LAYERS,
   VOID_SEED,
+  VoidBackdrop,
   coverSpan,
   nebulaSprite,
   skyCacheResolution,
   starFieldSprite,
+  type MapId,
   type NebulaId,
 } from './backdrop';
 import { spriteArea } from './shapes';
@@ -237,6 +241,62 @@ describe('the per-frame fill budget, across viewport sizes (a0-75)', () => {
         expect(sky.paid).toBeLessThanOrEqual(SKY_FILL_CEILING);
       }
     }
+  });
+
+  /**
+   * **The wiring, not just the arithmetic.** Every assertion above is about
+   * geometry; this one is about the live scene graph, because a budget computed
+   * off `skyCacheResolution` says nothing if `configure` forgot to call
+   * `cacheAsTexture` with it. The failure it guards is silent by construction —
+   * an uncached sky is pixel-identical and three screenfuls more expensive — so
+   * it is asserted on the object the renderer actually adds to the stage.
+   */
+  it('builds a CACHED sky on every map, at every viewport, and reports it', () => {
+    for (const vp of VIEWPORTS) {
+      for (const mapId of Object.keys(MAP_NEBULA) as MapId[]) {
+        const b = new VoidBackdrop();
+        b.setMap(mapId);
+        b.configure(WIDE.w, WIDE.h, vp.w, vp.h);
+        const layer = b.view.children.find((c) =>
+          ((c as Container).label ?? '').startsWith('void-nebula-'),
+        ) as Container | undefined;
+        if (MAP_NEBULA[mapId] === 'none') {
+          // The one sky that is no layer at any tier (r9-01) — and therefore
+          // nothing to cache, rather than something that failed to be cached.
+          expect(layer, `${mapId} has no sky, so no nebula layer`).toBeUndefined();
+          expect(b.skyIsCached).toBe(false);
+          b.destroy();
+          continue;
+        }
+        expect(layer, `${mapId} at ${vp.name}: no nebula layer on the stage`).toBeDefined();
+        expect(
+          layer!.isCachedAsTexture,
+          `${mapId} at ${vp.name}: the sky layer is not cached — 3× fill, invisibly`,
+        ).toBe(true);
+        expect(b.skyIsCached, `${mapId} at ${vp.name}: read-back disagrees with the stage`).toBe(true);
+        // The label survives the wrapper: `backdrop-reducer.test.ts` and
+        // `render/reduce-vfx.test.ts` both find this layer by name.
+        expect(layer!.label).toBe(`void-nebula-${MAP_NEBULA[mapId]}`);
+        b.destroy();
+      }
+    }
+  });
+
+  it('drops the cache when the layers go, so a dragged window does not leak', () => {
+    const b = new VoidBackdrop();
+    b.setMap('oval');
+    b.configure(WIDE.w, WIDE.h, 1280, 800);
+    expect(b.skyIsCached).toBe(true);
+    // A resize storm: every distinct viewport is a rebuild, and each one has to
+    // hand its 8 MB render texture back before taking another.
+    for (let w = 1281; w < 1291; w++) {
+      b.configure(WIDE.w, WIDE.h, w, 800);
+      expect(b.skyIsCached).toBe(true);
+      expect(b.view.children.filter((c) => ((c as Container).label ?? '').startsWith('void-nebula-'))).toHaveLength(1);
+    }
+    b.destroy();
+    expect(b.skyIsCached).toBe(false);
+    expect(b.view.children).toHaveLength(0);
   });
 
   /**
