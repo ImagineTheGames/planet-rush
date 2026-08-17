@@ -25,6 +25,7 @@ import {
   coverSpan,
   groundSprite,
   nebulaSprite,
+  skyCacheResolution,
   starFieldSprite,
   type NebulaId,
 } from '../../src/art/backdrop';
@@ -156,26 +157,31 @@ function stars(view: Container, w: number, h: number, map: (d: SpriteDef) => Spr
   );
 }
 
-function sky(id: NebulaId, view: Container, w: number, h: number): RigLayer[] {
+/**
+ * One sky, either way. `cached: false` is the pre-a0-75 draw path — raw geometry
+ * straight onto the frame buffer — and `cached: true` is the shipped one. Both
+ * are built from the same `SpriteDef`, so the A/B in this rig is the fix and
+ * nothing else, measured under one load in one run.
+ */
+function sky(id: NebulaId, view: Container, w: number, h: number, cached: boolean): RigLayer[] {
   const spec = NEBULAE[id];
+  const nw = coverSpan(spec.parallax, w, WIDE.width);
+  const nh = coverSpan(spec.parallax, h, WIDE.height);
   const g = new Graphics();
-  g.label = `sky-${id}`;
-  drawSprite(
-    g,
-    nebulaSprite(
-      id,
-      VOID_SEED,
-      coverSpan(spec.parallax, w, WIDE.width),
-      coverSpan(spec.parallax, h, WIDE.height),
-      1,
-      w,
-      h,
-    ),
-    1,
-  );
+  drawSprite(g, nebulaSprite(id, VOID_SEED, nw, nh, 1, w, h), 1);
   if (spec.additive) g.blendMode = 'add';
-  view.addChild(g);
-  return [{ gfx: g, parallax: spec.parallax }];
+  const holder = new Container();
+  holder.label = `sky-${id}${cached ? '-cached' : ''}`;
+  holder.addChild(g);
+  const resolution = skyCacheResolution(nw, nh);
+  if (cached && resolution !== null) {
+    if (spec.additive) holder.blendMode = 'add';
+    holder.cacheAsTexture({ resolution, antialias: false });
+  } else if (spec.additive) {
+    holder.blendMode = 'add';
+  }
+  view.addChild(holder);
+  return [{ gfx: holder, parallax: spec.parallax }];
 }
 
 /**
@@ -194,15 +200,27 @@ export const SCENARIOS: readonly { name: string; build: Build }[] = [
     build: (v, w, h) => [...ground(v, w, h), ...stars(v, w, h, withoutBloom)],
   },
   { name: 'bloom-only', build: (v, w, h) => stars(v, w, h, bloomOnly) },
-  { name: 'ground+reef', build: (v, w, h) => [...ground(v, w, h), ...sky('plasmaReef', v, w, h)] },
-  { name: 'ground+patina', build: (v, w, h) => [...ground(v, w, h), ...sky('patinaDrift', v, w, h)] },
+  // The A/B. `-raw` is the pre-a0-75 sky, `-baked` is the shipped one, and the
+  // pair is measured back to back in the same page under the same load.
+  { name: 'ground+reef-raw', build: (v, w, h) => [...ground(v, w, h), ...sky('plasmaReef', v, w, h, false)] },
+  { name: 'ground+reef-baked', build: (v, w, h) => [...ground(v, w, h), ...sky('plasmaReef', v, w, h, true)] },
+  { name: 'ground+patina-raw', build: (v, w, h) => [...ground(v, w, h), ...sky('patinaDrift', v, w, h, false)] },
+  { name: 'ground+patina-baked', build: (v, w, h) => [...ground(v, w, h), ...sky('patinaDrift', v, w, h, true)] },
   {
-    name: 'full-reef',
-    build: (v, w, h) => [...ground(v, w, h), ...sky('plasmaReef', v, w, h), ...stars(v, w, h)],
+    name: 'full-reef-raw',
+    build: (v, w, h) => [...ground(v, w, h), ...sky('plasmaReef', v, w, h, false), ...stars(v, w, h)],
   },
   {
-    name: 'full-patina',
-    build: (v, w, h) => [...ground(v, w, h), ...sky('patinaDrift', v, w, h), ...stars(v, w, h)],
+    name: 'full-reef-baked',
+    build: (v, w, h) => [...ground(v, w, h), ...sky('plasmaReef', v, w, h, true), ...stars(v, w, h)],
+  },
+  {
+    name: 'full-patina-raw',
+    build: (v, w, h) => [...ground(v, w, h), ...sky('patinaDrift', v, w, h, false), ...stars(v, w, h)],
+  },
+  {
+    name: 'full-patina-baked',
+    build: (v, w, h) => [...ground(v, w, h), ...sky('patinaDrift', v, w, h, true), ...stars(v, w, h)],
   },
   // The default map's sky is NONE, so this is what most boots actually pay.
   { name: 'full-none', build: (v, w, h) => [...ground(v, w, h), ...stars(v, w, h)] },

@@ -88,14 +88,14 @@
       "height": 1440,
       "fitsCache": true,
       "maxChannel": 4,
-      "meanChannel": 0.5110992678741577,
-      "maxDeltaE": 4.249074646424883,
-      "meanDeltaE": 0.8166885455315334,
-      "changedFraction": 0.8131017845607235,
+      "meanChannel": 0.5000135255178196,
+      "maxDeltaE": 3.4261190000440633,
+      "meanDeltaE": 0.8044481821125523,
+      "changedFraction": 0.8041020671834626,
       "maxStepDirect": 1,
       "maxStepCached": 0.9278000000000048,
       "peakDirect": 47.2298,
-      "peakCached": 47.1576
+      "peakCached": 46.8728
     },
     {
       "viewport": "3440x1440",
@@ -104,14 +104,14 @@
       "height": 1440,
       "fitsCache": true,
       "maxChannel": 5,
-      "meanChannel": 0.45254441214420593,
-      "maxDeltaE": 4.664805489381146,
-      "meanDeltaE": 0.9136299138925645,
-      "changedFraction": 0.6595877745478036,
+      "meanChannel": 0.44293712316910716,
+      "maxDeltaE": 4.429265323453818,
+      "meanDeltaE": 0.9049472968041693,
+      "changedFraction": 0.6538079376614987,
       "maxStepDirect": 1.430400000000006,
-      "maxStepCached": 1.0000000000000036,
+      "maxStepCached": 1,
       "peakDirect": 43.1826,
-      "peakCached": 43.038199999999996
+      "peakCached": 42.825599999999994
     },
     {
       "viewport": "3440x1440",
@@ -119,15 +119,15 @@
       "width": 3440,
       "height": 1440,
       "fitsCache": true,
-      "maxChannel": 4,
-      "meanChannel": 0.4533887139302585,
-      "maxDeltaE": 5.962976560783974,
-      "meanDeltaE": 0.934805648727787,
-      "changedFraction": 0.7689930555555555,
+      "maxChannel": 5,
+      "meanChannel": 0.4413724025605116,
+      "maxDeltaE": 5.570327115105052,
+      "meanDeltaE": 0.9250110180660073,
+      "changedFraction": 0.7586793443152455,
       "maxStepDirect": 1.4303999999999988,
-      "maxStepCached": 0.9278000000000048,
+      "maxStepCached": 0.9278000000000013,
       "peakDirect": 35.1732,
-      "peakCached": 35.032799999999995
+      "peakCached": 35.1732
     },
     {
       "viewport": "3440x1440",
@@ -136,14 +136,14 @@
       "height": 1440,
       "fitsCache": true,
       "maxChannel": 3,
-      "meanChannel": 0.0856167904813756,
-      "maxDeltaE": 3.544764689997274,
-      "meanDeltaE": 0.76857455955366,
-      "changedFraction": 0.22306140988372092,
+      "meanChannel": 0.1194161821699049,
+      "maxDeltaE": 3.401337368040692,
+      "meanDeltaE": 0.7766485542837366,
+      "changedFraction": 0.29806605297157623,
       "maxStepDirect": 1.502600000000001,
       "maxStepCached": 1,
       "peakDirect": 56.432199999999995,
-      "peakCached": 56.35999999999999
+      "peakCached": 56.432199999999995
     },
     {
       "viewport": "3440x1440",
@@ -152,14 +152,14 @@
       "height": 1440,
       "fitsCache": true,
       "maxChannel": 4,
-      "meanChannel": 0.37292379952251137,
+      "meanChannel": 0.3651332364305684,
       "maxDeltaE": 2.850257273977507,
-      "meanDeltaE": 0.6683590736848698,
-      "changedFraction": 0.6451768410852713,
+      "meanDeltaE": 0.664838997582211,
+      "changedFraction": 0.636109697997416,
       "maxStepDirect": 1.4303999999999988,
       "maxStepCached": 0.9278000000000013,
       "peakDirect": 21.414799999999996,
-      "peakCached": 22.133999999999997
+      "peakCached": 21.708799999999997
     }
   ]
 }

@@ -111,7 +111,7 @@ async function main() {
   // the scene graph.
   const passes = [];
   for (const vp of VIEWPORTS) passes.push({ vp, aa: 1, only: null });
-  for (const vp of VIEWPORTS) passes.push({ vp, aa: 0, only: 'full-reef,full-none,clear' });
+  for (const vp of VIEWPORTS) passes.push({ vp, aa: 0, only: 'full-reef-baked,full-reef-raw,full-none,clear' });
 
   for (const pass of passes) {
     const ctx = await browser.newContext({
