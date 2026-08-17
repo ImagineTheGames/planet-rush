@@ -1,0 +1,19 @@
+<!doctype html>
+<!--
+  evidence/a0-75-fill-rate/fill-rig.html — the page `attribute.mjs` drives.
+  OWNER: Art Agent (a0-75).
+
+  Dev server only. `vite build` takes `index.html` as its single input, so
+  nothing here reaches the shipped bundle — the same arrangement
+  `tests/perf/draw-budget.html` lives under.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Planet Rush — a0-75 backdrop fill rig</title>
+  </head>
+  <body style="margin: 0; background: #0d1015; color: #c8d2dc; font: 12px/1.4 monospace">
+    <pre id="out" style="position: absolute; top: 0; left: 0; z-index: 1">measuring…</pre>
+    <script type="module" src="./fill-rig.ts"></script>
+  </body>
+</html>
