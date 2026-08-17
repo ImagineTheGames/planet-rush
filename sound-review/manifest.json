@@ -244,28 +244,28 @@
       "current": "previews/shieldHit/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/shieldHit/d.wav",
-          "character": "lattice ring, struck and held",
-          "params": "src/art/audio/candidates.ts#shieldHit.d"
+          "id": "h",
+          "wav": "previews/shieldHit/h.wav",
+          "character": "deflection: it skids off, ring spreading",
+          "params": "src/art/audio/candidates.ts#shieldHit.h"
         },
         {
-          "id": "e",
-          "wav": "previews/shieldHit/e.wav",
-          "character": "absorption wash, pressure taken",
-          "params": "src/art/audio/candidates.ts#shieldHit.e"
+          "id": "i",
+          "wav": "previews/shieldHit/i.wav",
+          "character": "absorption: swallowed, a low bloom",
+          "params": "src/art/audio/candidates.ts#shieldHit.i"
         },
         {
-          "id": "f",
-          "wav": "previews/shieldHit/f.wav",
-          "character": "capacitor bloom over the bubble",
-          "params": "src/art/audio/candidates.ts#shieldHit.f"
+          "id": "j",
+          "wav": "previews/shieldHit/j.wav",
+          "character": "arc: sparks over a ringing bubble",
+          "params": "src/art/audio/candidates.ts#shieldHit.j"
         },
         {
-          "id": "g",
-          "wav": "previews/shieldHit/g.wav",
-          "character": "damped tick, the field barely notices",
-          "params": "src/art/audio/candidates.ts#shieldHit.g"
+          "id": "k",
+          "wav": "previews/shieldHit/k.wav",
+          "character": "flex: the surface bends and settles",
+          "params": "src/art/audio/candidates.ts#shieldHit.k"
         }
       ]
     },
@@ -500,28 +500,28 @@
       "current": "previews/buildPlaced/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/buildPlaced/d.wav",
-          "character": "stepper travel into a stop",
-          "params": "src/art/audio/candidates.ts#buildPlaced.d"
+          "id": "h",
+          "wav": "previews/buildPlaced/h.wav",
+          "character": "clamp bites, a drive spins up",
+          "params": "src/art/audio/candidates.ts#buildPlaced.h"
         },
         {
-          "id": "e",
-          "wav": "previews/buildPlaced/e.wav",
-          "character": "vacuum taking up, weight resting",
-          "params": "src/art/audio/candidates.ts#buildPlaced.e"
+          "id": "i",
+          "wav": "previews/buildPlaced/i.wav",
+          "character": "pressure takes, the line still loaded",
+          "params": "src/art/audio/candidates.ts#buildPlaced.i"
         },
         {
-          "id": "f",
-          "wav": "previews/buildPlaced/f.wav",
-          "character": "weld struck and quenched",
-          "params": "src/art/audio/candidates.ts#buildPlaced.f"
+          "id": "j",
+          "wav": "previews/buildPlaced/j.wav",
+          "character": "it seats, then the head starts working",
+          "params": "src/art/audio/candidates.ts#buildPlaced.j"
         },
         {
-          "id": "g",
-          "wav": "previews/buildPlaced/g.wav",
-          "character": "one latch, and that is all",
-          "params": "src/art/audio/candidates.ts#buildPlaced.g"
+          "id": "k",
+          "wav": "previews/buildPlaced/k.wav",
+          "character": "one contact, and a bus comes up",
+          "params": "src/art/audio/candidates.ts#buildPlaced.k"
         }
       ]
     },
@@ -724,28 +724,28 @@
       "current": "previews/stationDeath/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/stationDeath/d.wav",
-          "character": "the shipped fall, cleanly made",
-          "params": "src/art/audio/candidates.ts#stationDeath.d"
+          "id": "h",
+          "wav": "previews/stationDeath/h.wav",
+          "character": "detonation: a blast front, then the mass",
+          "params": "src/art/audio/candidates.ts#stationDeath.h"
         },
         {
-          "id": "e",
-          "wav": "previews/stationDeath/e.wav",
-          "character": "the structure closing on itself",
-          "params": "src/art/audio/candidates.ts#stationDeath.e"
+          "id": "i",
+          "wav": "previews/stationDeath/i.wav",
+          "character": "breach: a crack, then everything leaving",
+          "params": "src/art/audio/candidates.ts#stationDeath.i"
         },
         {
-          "id": "f",
-          "wav": "previews/stationDeath/f.wav",
-          "character": "one detuned toll, and the room",
-          "params": "src/art/audio/candidates.ts#stationDeath.f"
+          "id": "j",
+          "wav": "previews/stationDeath/j.wav",
+          "character": "blast, and then the structure falls",
+          "params": "src/art/audio/candidates.ts#stationDeath.j"
         },
         {
-          "id": "g",
-          "wav": "previews/stationDeath/g.wav",
-          "character": "the fall alone, nothing answering",
-          "params": "src/art/audio/candidates.ts#stationDeath.g"
+          "id": "k",
+          "wav": "previews/stationDeath/k.wav",
+          "character": "one concussion, and the room",
+          "params": "src/art/audio/candidates.ts#stationDeath.k"
         }
       ]
     },
@@ -1045,28 +1045,28 @@
       "current": "previews/pressTick/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/pressTick/d.wav",
-          "character": "a capacitive contact, no tone",
-          "params": "src/art/audio/candidates.ts#pressTick.d"
+          "id": "h",
+          "wav": "previews/pressTick/h.wav",
+          "character": "the pane, thinner: two partials at A♭6",
+          "params": "src/art/audio/candidates.ts#pressTick.h"
         },
         {
-          "id": "e",
-          "wav": "previews/pressTick/e.wav",
-          "character": "a damped actuator, felt not heard",
-          "params": "src/art/audio/candidates.ts#pressTick.e"
+          "id": "i",
+          "wav": "previews/pressTick/i.wav",
+          "character": "the pane an octave up, at A♭7",
+          "params": "src/art/audio/candidates.ts#pressTick.i"
         },
         {
-          "id": "f",
-          "wav": "previews/pressTick/f.wav",
-          "character": "one filtered band, machine-clean",
-          "params": "src/art/audio/candidates.ts#pressTick.f"
+          "id": "j",
+          "wav": "previews/pressTick/j.wav",
+          "character": "fingertip first, then the pane",
+          "params": "src/art/audio/candidates.ts#pressTick.j"
         },
         {
-          "id": "g",
-          "wav": "previews/pressTick/g.wav",
-          "character": "the smallest click that still reads",
-          "params": "src/art/audio/candidates.ts#pressTick.g"
+          "id": "k",
+          "wav": "previews/pressTick/k.wav",
+          "character": "the full pane, three partials, quietest",
+          "params": "src/art/audio/candidates.ts#pressTick.k"
         }
       ]
     },

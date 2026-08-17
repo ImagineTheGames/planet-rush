@@ -1103,51 +1103,96 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       },
     ],
   },
+  // ---------------------------------------------------------------------------
+  // ROUND 2 (a0-67, 2026-08-17)
+  // ---------------------------------------------------------------------------
+  //
+  //   *"none of these sound like ashield hit"*
+  //
+  // The shortest reason on the board and the most diagnosable, because the slot
+  // has a **grammar** and the sweep dropped it. The shipped `shieldHit` is a
+  // 1320 Hz body with a 14 Hz shimmer on it and a low-pass that *opens* 1100 →
+  // 2200 — `./bank`'s own comment is *"the skin opening under the hit — absorbed,
+  // not broken"* — and that opening is the entire difference between a field
+  // taking a hit and a plate being struck. Round one offered a struck lattice (a
+  // plate: that is a hull), a wash, a bloom and a tick. Not one of them **gives**.
+  //
+  // So the thing all four below have, that none of the denied four had:
+  //
+  //  1. **The field gives and comes back.** Something rises after the contact —
+  //     a corner opening, a body bending up — because a shield deforms. A filter
+  //     that only closes is a thing being damaged, which is `coreHit`'s job.
+  //  2. **A shimmer.** Slow modulation across the tail, so the surface reads as
+  //     energetic rather than as material. §5.4 exempts drift inside a voice this
+  //     short by construction, and the shipped voice already carries it.
+  //  3. **No hard edge.** No plate, no snap, no metal transient — those all say
+  //     *hull*, and §2.2's whole point is that the player can hear which layer is
+  //     being eaten.
+  //
+  // The four are four kinds of field, not four takes on one:
+  //
+  //   h  **deflection** — the hit skids off. Contact, then a ring that spreads
+  //      upward and outward and is gone.
+  //   i  **absorption** — the hit is swallowed. No contact at all: a low bloom
+  //      that swells and dies, the quietest of the four.
+  //   j  **arc** — the field discharges where it is struck. Granular sparks over
+  //      a bubble that is still ringing. The bright one.
+  //   k  **flex** — the surface bends and settles. A pitched body pushed up and
+  //      let back down, with the shimmer strongest.
   shieldHit: {
     label: "Shield Hit",
     context: "A shield absorbs a hit — struck bell, not broken.",
     current: 'shieldHit',
     candidates: [
       {
-        id: 'd',
-        character: "lattice ring, struck and held",
+        id: 'h',
+        slot: 'shieldHit',
+        character: "deflection: it skids off, ring spreading",
         spec: {
-          name: 'shieldHit_d_latticeRing',
+          name: 'shieldHit_h_deflection',
           layers: [
-            ...plate('shieldHit_d.lattice', 1320, { gain: 0.34, decay: 0.22, ratios: [1, 2.14, 3.63], q: 10, curve: 3.6, punch: 0.35, grain: 0.18, seed: 60090 }),
+            swept('shieldHit_h.skid', { wave: 'noise', freq: 1500, from: 1200, to: 4200, q: 5, gain: 0.3, attack: 0.0015, hold: 0.01, decay: 0.13, curve: 3.6, hp: 700, seed: 60130 }),
+            place({ name: 'shieldHit_h.ring', wave: 'sine', attack: 0.002, hold: 0.01, decay: 0.2, decayCurve: 3.4, freq: 1245, freqEnd: 1400, vibratoDepth: 0.016, vibratoRate: 11, noiseMix: 0.05, lowPass: 1400, lowPassEnd: 3000, resonance: 3.2, gain: 0.26, seed: 60132 }),
           ],
         },
       },
       {
-        id: 'e',
-        character: "absorption wash, pressure taken",
+        id: 'i',
+        slot: 'shieldHit',
+        character: "absorption: swallowed, a low bloom",
         spec: {
-          name: 'shieldHit_e_absorptionWash',
+          name: 'shieldHit_i_absorption',
           layers: [
-            swept('shieldHit_e.wash', { wave: 'noise', freq: 1250, from: 1400, to: 3000, q: 5.5, gain: 0.46, attack: 0.004, hold: 0.02, decay: 0.19, curve: 3.4, hp: 600, seed: 60100 }),
-            band('shieldHit_e.skin', 1900, { gain: 0.3, decay: 0.15, q: 9, curve: 4, attack: 0.002, seed: 60102 }),
+            // 8 ms to full — no transient anywhere. This is the take that says a
+            // shield is not a surface you hit, it is a budget you spend.
+            swept('shieldHit_i.bloom', { wave: 'sine', freq: 620, from: 700, to: 1600, q: 2.8, gain: 0.28, attack: 0.008, hold: 0.02, decay: 0.17, curve: 3, vib: [0.014, 9], noiseMix: 0.06, seed: 60140 }),
+            swept('shieldHit_i.body', { wave: 'noise', freq: 420, from: 500, to: 1200, q: 3.4, gain: 0.2, attack: 0.01, hold: 0.016, decay: 0.15, curve: 2.8, hp: 200, seed: 60142 }),
           ],
         },
       },
       {
-        id: 'f',
-        character: "capacitor bloom over the bubble",
+        id: 'j',
+        slot: 'shieldHit',
+        character: "arc: sparks over a ringing bubble",
         spec: {
-          name: 'shieldHit_f_bubbleBloom',
+          name: 'shieldHit_j_arc',
           layers: [
-            band('shieldHit_f.bloom', 2450, { gain: 0.967, decay: 0.17, q: 11, curve: 4.2, punch: 0.4, hp: 900, seed: 60110 }),
-            band('shieldHit_f.under', 980, { gain: 0.58, decay: 0.1, q: 7, curve: 5, at: 0.004, seed: 60112 }),
+            grains('shieldHit_j.sparks', { freq: 3100, freqEnd: 4200, grain: 0.0022, gain: 0.24, hold: 0.006, decay: 0.09, curve: 3.8, from: 3000, to: 5600, q: 4, hp: 1600, seed: 60150 }),
+            place({ name: 'shieldHit_j.bubble', wave: 'sine', attack: 0.002, hold: 0.012, decay: 0.19, decayCurve: 3.4, freq: 1568, freqEnd: 1720, vibratoDepth: 0.02, vibratoRate: 13, noiseMix: 0.05, lowPass: 1800, lowPassEnd: 3400, resonance: 3, gain: 0.22, seed: 60152 }),
           ],
         },
       },
       {
-        id: 'g',
-        character: "damped tick, the field barely notices",
+        id: 'k',
+        slot: 'shieldHit',
+        character: "flex: the surface bends and settles",
         spec: {
-          name: 'shieldHit_g_dampedTick',
+          name: 'shieldHit_k_flex',
           layers: [
-            grains('shieldHit_g.contact', { freq: 1650, grain: 0.0035, gain: 0.34, hold: 0.004, decay: 0.06, curve: 6, from: 3600, to: 1500, q: 4, hp: 900, seed: 60120 }),
-            band('shieldHit_g.trace', 2150, { gain: 0.26, decay: 0.09, q: 10, curve: 5, at: 0.006, seed: 60122 }),
+            // The pitch goes UP and stays there: pushed in, and holding. A fall
+            // would be the field failing, which is `shieldDown`'s ×6.9 (§8).
+            place({ name: 'shieldHit_k.flex', wave: 'triangle', attack: 0.003, hold: 0.014, decay: 0.22, decayCurve: 3.2, freq: 880, freqEnd: 1010, vibratoDepth: 0.026, vibratoRate: 15, noiseMix: 0.08, lowPass: 1200, lowPassEnd: 2600, resonance: 3.6, gain: 0.32, seed: 60160 }),
+            swept('shieldHit_k.skin', { wave: 'noise', freq: 1100, from: 900, to: 2800, q: 4.5, gain: 0.24, attack: 0.004, hold: 0.012, decay: 0.12, curve: 3.2, hp: 500, at: 0.004, seed: 60162 }),
           ],
         },
       },
@@ -1587,51 +1632,100 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
   // centroid proxy (d 468 · e 380 · f 350 · g 305) and `purchaseConfirm` bottoms
   // out at 624 (d 1784 · e 624 · f 1397 · g 1813) — worst pairing ×1.33, against
   // the ×1.23 the census measured on the pair that ships today.
+  // ---------------------------------------------------------------------------
+  // ROUND 2 (a0-67, 2026-08-17)
+  // ---------------------------------------------------------------------------
+  //
+  //   *"none of these sound like a build started"*
+  //
+  // Six words, and the operative one is **started**. Read the four denied
+  // characters back: *stepper travel into a stop* · *vacuum taking up, weight
+  // resting* · *weld struck and quenched* · *one latch, and that is all*. Every
+  // one of them ENDS. They were written to this slot's own standing note — *"a
+  // latch, never a fanfare"* (§7.3) — and they execute it perfectly, which is how
+  // four correct sounds can all be the wrong sound: a latch is a **terminating**
+  // gesture, and this slot fires at the moment a turret starts building, not at
+  // the moment it finishes. The sweep gave the developer four `buildComplete`s.
+  //
+  // So the shape changes, and it is a shape change rather than a material one:
+  // **every take below opens.** Something engages, and then something is
+  // audibly still running when the cue ends — a bed at level, a texture
+  // repeating, a corner that has moved up and stayed. The latch is still there;
+  // it is now the *first* half instead of the last.
+  //
+  // That also repairs a §8 pair the old set had blurred. `buildPlaced` and
+  // `buildComplete` are the two ends of one build, seconds apart on the same
+  // structure, and both families were seating and stopping. Now the grammar is
+  // one word long and audible without a manual: **placed opens, complete
+  // seats.** `./candidates.test.ts` holds it as a number — the last third of
+  // every `buildPlaced` offer is louder than its own first third; every
+  // `buildComplete` offer is the other way round.
+  //
+  //   h  **fabricator** — the clamp bites and a drive spins up behind it.
+  //   i  **hydraulics** — pressure taking, and the line still under load.
+  //   j  **printer** — a seat, then the head working, plainly repetitive.
+  //   k  **power routed** — one contact, and a bus coming up to level.
   buildPlaced: {
     label: "Build Placed",
     context: "A turret/build is placed and starts building — ore spent, a latch not a fanfare.",
     current: 'buildPlaced',
     candidates: [
       {
-        id: 'd',
-        character: "stepper travel into a stop",
+        id: 'h',
+        slot: 'buildPlaced',
+        character: "clamp bites, a drive spins up",
         spec: {
-          name: 'buildPlaced_d_stepperStop',
+          name: 'buildPlaced_h_fabricator',
           layers: [
-            grains('buildPlaced_d.travel', { freq: 420, freqEnd: 340, grain: 0.0055, gain: 0.32, hold: 0.02, decay: 0.07, curve: 4, from: 1700, to: 620, q: 3, hp: 180, seed: 60530 }),
-            band('buildPlaced_d.stop', 300, { gain: 0.34, decay: 0.06, q: 4.5, curve: 6, punch: 0.4, at: 0.05, seed: 60532 }),
+            band('buildPlaced_h.clamp', 380, { gain: 0.42, decay: 0.05, q: 4.5, curve: 6, punch: 0.45, seed: 60570 }),
+            // The corner travels UP and the level rises into the tail: the drive
+            // is at speed when the cue stops, which is the whole word "started".
+            swept('buildPlaced_h.drive', { wave: 'triangle', freq: 124, from: 260, to: 1150, q: 3.4, gain: 0.3, attack: 0.09, hold: 0.16, decay: 0.1, curve: 1.6, noiseMix: 0.2, at: 0.03, seed: 60572 }),
+            grains('buildPlaced_h.rotor', { freq: 320, grain: 0.0075, gain: 0.14, attack: 0.06, hold: 0.14, decay: 0.09, curve: 1.8, from: 700, to: 1400, q: 2.4, hp: 150, at: 0.05, seed: 60574 }),
           ],
         },
       },
       {
-        id: 'e',
-        character: "vacuum taking up, weight resting",
+        id: 'i',
+        slot: 'buildPlaced',
+        character: "pressure takes, the line still loaded",
         spec: {
-          name: 'buildPlaced_e_vacuumSeat',
+          name: 'buildPlaced_i_hydraulics',
           layers: [
-            swept('buildPlaced_e.take', { wave: 'noise', freq: 300, from: 1400, to: 380, q: 2.8, gain: 0.206, attack: 0.004, hold: 0.02, decay: 0.09, curve: 3.4, seed: 60540 }),
-            swept('buildPlaced_e.rest', { wave: 'sine', freq: 84, from: 240, to: 110, q: 2.2, gain: 0.257, attack: 0.002, hold: 0.02, decay: 0.14, curve: 3.6, punch: 0.5, noiseMix: 0.12, at: 0.055, seed: 60542 }),
+            swept('buildPlaced_i.seat', { wave: 'noise', freq: 280, from: 1300, to: 420, q: 2.8, gain: 0.15, attack: 0.003, hold: 0.018, decay: 0.07, curve: 3.6, seed: 60580 }),
+            swept('buildPlaced_i.load', { wave: 'sine', freq: 82, freqEnd: 98, from: 200, to: 620, q: 2.4, gain: 0.38, attack: 0.07, hold: 0.29, decay: 0.06, curve: 1.5, noiseMix: 0.1, at: 0.04, seed: 60582 }),
+            band('buildPlaced_i.hiss', 900, { gain: 0.34, decay: 0.07, q: 2.6, curve: 1.8, attack: 0.1, hold: 0.24, hp: 400, at: 0.06, seed: 60584 }),
           ],
         },
       },
       {
-        id: 'f',
-        character: "weld struck and quenched",
+        id: 'j',
+        slot: 'buildPlaced',
+        character: "it seats, then the head starts working",
         spec: {
-          name: 'buildPlaced_f_weldQuench',
+          name: 'buildPlaced_j_printer',
           layers: [
-            band('buildPlaced_f.weld', 880, { gain: 1.0, decay: 0.05, q: 9, curve: 6, punch: 0.5, seed: 60550 }),
-            band('buildPlaced_f.quench', 520, { gain: 0.964, decay: 0.075, q: 6, curve: 5.5, at: 0.03, seed: 60552 }),
+            band('buildPlaced_j.seat', 300, { gain: 0.4, decay: 0.055, q: 4, curve: 6, punch: 0.4, seed: 60590 }),
+            // 11 ms between grains is a rate the ear reads as *work being done*
+            // rather than as a texture — the one take where "started" is carried
+            // by rhythm instead of by level.
+            grains('buildPlaced_j.head', { freq: 540, grain: 0.011, gain: 0.26, attack: 0.05, hold: 0.19, decay: 0.09, curve: 1.6, from: 900, to: 2000, q: 3.2, hp: 240, at: 0.045, seed: 60592 }),
+            swept('buildPlaced_j.bed', { wave: 'triangle', freq: 98, from: 220, to: 480, q: 2.2, gain: 0.18, attack: 0.08, hold: 0.18, decay: 0.1, curve: 1.6, noiseMix: 0.14, at: 0.045, seed: 60594 }),
           ],
         },
       },
       {
-        id: 'g',
-        character: "one latch, and that is all",
+        id: 'k',
+        slot: 'buildPlaced',
+        character: "one contact, and a bus comes up",
         spec: {
-          name: 'buildPlaced_g_oneLatch',
+          name: 'buildPlaced_k_powerRouted',
           layers: [
-            band('buildPlaced_g.latch', 560, { gain: 1.0, decay: 0.045, q: 5, curve: 6.5, punch: 0.45, seed: 60560 }),
+            band('buildPlaced_k.contact', 620, { gain: 0.52, decay: 0.035, q: 5, curve: 7, punch: 0.5, seed: 60600 }),
+            // The restrained one: nothing is machined, a supply simply arrives and
+            // is still there. It is the offer to pick if "started" should be one
+            // word rather than a sentence.
+            swept('buildPlaced_k.bus', { wave: 'sine', freq: 110, from: 180, to: 700, q: 2.6, gain: 0.3, attack: 0.11, hold: 0.2, decay: 0.09, curve: 1.4, noiseMix: 0.07, at: 0.025, seed: 60602 }),
           ],
         },
       },
@@ -1986,71 +2080,114 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     ],
   },
   stationDeath: {
-    // **Re-voiced last, and by translation.** Two reasons, both on the record:
-    // a0-55 was moving this sound's routing while the sweep ran (`./bank`'s own
-    // note calls it the most serious sound in the game, and the previous re-voice
-    // deliberately left it alone), and §7.4 says any change here is a developer
-    // question rather than a re-voice. So the four offers are not four ideas —
-    // they are the SHIPPED beat rebuilt in the sweep's materials, and the thing
-    // being chosen is how much of it there is:
+    // ROUND 2 (a0-67, 2026-08-17) — *"they should sound like an explosion"*
     //
-    //   d  the shipped three layers — fall, crust, toll — rebuilt on the round-2
-    //      instrument. The closest thing to "the same sound, cleanly made".
-    //   e  the **crust** carrying it: the structure closing on itself, the fall
-    //      underneath rather than in front.
-    //   f  the **toll** carrying it, detuned, with the room it happened in.
-    //   g  the fall **alone**. One layer. Nothing answers it.
+    // The round-one four were deliberately **not** a design: this is the most
+    // serious sound in the game, §7.4 makes any change here a developer question
+    // rather than a lane's re-voice, and a0-55 was moving its routing while the
+    // sweep ran. So the sweep offered the SHIPPED beat in four materials — a
+    // fall, a crust, a toll, and the fall alone — and the choice on the board was
+    // *how much of it there is*. That was the careful reading, and it produced
+    // four takes of a station **sinking**.
     //
-    // What none of them do: resolve, sparkle, or run long. Every offer ends
-    // inside the shipped 1.32 s longest-tail invariant, because three seconds of
-    // silence (§4.7) start when this stops and a longer tail eats them.
+    // The developer has now answered the question §7.4 said to ask, in seven
+    // words: a station death is an **explosion**. That is a ruling, not a note on
+    // execution, and it is the one thing the round-one set could not have been
+    // tuned into — you cannot tune a fall into a blast, because a fall has no
+    // front on it.
+    //
+    // **What an explosion is here, and what it is not.** It is a *station* dying,
+    // not a firework: the energy is enormous and slow, and §7.2's rule for
+    // `shipExplode` — no sparkle layer, ever — applies harder rather than less.
+    // So every take below is built as three stages that all four share, and
+    // differ in which stage carries the weight:
+    //
+    //   1. **A front.** Something arrives in under 20 ms. This is the whole thing
+    //      round one did not have.
+    //   2. **A body.** Low, broad, and long — the mass of the thing going.
+    //   3. **A room.** Late, dark returns. A blast this size is heard twice.
+    //
+    //   h  **detonation** — the front carries it: a hard blast edge, then body.
+    //   i  **breach** — the body carries it: a crack, then everything leaving at
+    //      once, a roar that thins rather than falls.
+    //   j  **blast into collapse** — the explosion, and then the shipped fall
+    //      underneath it as its *consequence*. The bridge between the two rounds,
+    //      and the one to pick if the answer is "both".
+    //   k  **one concussion** — a single deep hit and the room it happened in.
+    //      The restrained one; the quiet three seconds start earliest here.
+    //
+    // Three things do not move, because the developer did not move them:
+    //
+    //  - **The 1.32 s longest-tail invariant (§8).** The three seconds of near
+    //    silence (§4.7) begin when this stops, and a longer tail eats them. Every
+    //    offer ends inside it, which is why none of these has a debris shower —
+    //    debris is what makes a film explosion long, and this one may not be.
+    //  - **Nothing sparkles.** An explosion made of bright shards is a firework
+    //    and this is the beat the game goes quiet for.
+    //  - **It stays the longest and the heaviest thing in the bank**, clear of
+    //    `shipExplode` (a ship, half the length, and allowed its top end).
     label: "MiningStation Death",
     context: "A station dies (GDD §4.7) — the most serious sound in the game; then three seconds of silence.",
     current: 'stationDeath',
     candidates: [
       {
-        id: 'd',
-        character: "the shipped fall, cleanly made",
+        id: 'h',
+        slot: 'stationDeath',
+        character: "detonation: a blast front, then the mass",
         spec: {
-          name: 'stationDeath_d_cleanFall',
+          name: 'stationDeath_h_detonation',
           layers: [
-            swept('stationDeath_d.fall', { wave: 'sine', freq: 205, freqEnd: 34, from: 620, to: 90, q: 1.8, gain: 0.4, attack: 0.01, hold: 0.2, decay: 1.08, curve: 1.5, punch: 0.4, noiseMix: 0.05, seed: 61340 }),
-            swept('stationDeath_d.crust', { wave: 'noise', freq: 175, freqEnd: 46, from: 780, to: 150, q: 2, gain: 0.26, attack: 0.02, hold: 0.28, decay: 0.98, curve: 1.4, at: 0.01, seed: 61342 }),
-            swept('stationDeath_d.toll', { wave: 'triangle', freq: 98, freqEnd: 92, from: 400, to: 140, q: 2.6, gain: 0.26, attack: 0.006, hold: 0.02, decay: 0.92, curve: 2.2, noiseMix: 0.06, at: 0.12, seed: 61344 }),
+            // The front. 6 ms of broadband, high-passed so it does not eat the
+            // body's register, and steep enough to be an edge rather than a note.
+            place({ name: 'stationDeath_h.front', wave: 'noise', attack: 0.0004, hold: 0.004, decay: 0.075, decayCurve: 7, punch: 0.9, freq: 900, lowPass: 4200, lowPassEnd: 700, resonance: 1.4, highPass: 260, gain: 0.44, seed: 61380 }),
+            swept('stationDeath_h.body', { wave: 'sine', freq: 96, freqEnd: 33, from: 480, to: 78, q: 1.8, gain: 0.46, attack: 0.008, hold: 0.22, decay: 1.02, curve: 1.5, punch: 0.5, noiseMix: 0.07, seed: 61382 }),
+            swept('stationDeath_h.debris', { wave: 'noise', freq: 210, freqEnd: 60, from: 1100, to: 150, q: 2.2, gain: 0.24, attack: 0.02, hold: 0.24, decay: 0.86, curve: 1.4, at: 0.03, seed: 61384 }),
+            ...returns('stationDeath_h.room', { freq: 180, gain: 0.16, decay: 0.4, from: 420, to: 130, at: 0.3, gap: 0.28, count: 2, seed: 61386 }),
           ],
         },
       },
       {
-        id: 'e',
-        character: "the structure closing on itself",
+        id: 'i',
+        slot: 'stationDeath',
+        character: "breach: a crack, then everything leaving",
         spec: {
-          name: 'stationDeath_e_structureCloses',
+          name: 'stationDeath_i_breach',
           layers: [
-            swept('stationDeath_e.crust', { wave: 'noise', freq: 190, freqEnd: 40, from: 900, to: 110, q: 2.4, gain: 0.44, attack: 0.03, hold: 0.3, decay: 0.98, curve: 1.4, seed: 61350 }),
-            grains('stationDeath_e.give', { freq: 240, freqEnd: 62, grain: 0.019, gain: 0.24, attack: 0.03, hold: 0.3, decay: 0.92, curve: 1.4, from: 800, to: 150, q: 2.2, at: 0.05, seed: 61352 }),
-            swept('stationDeath_e.under', { wave: 'sine', freq: 82, freqEnd: 30, from: 200, to: 70, q: 1.6, gain: 0.3, attack: 0.02, hold: 0.24, decay: 1.04, curve: 1.5, seed: 61354 }),
+            band('stationDeath_i.crack', 640, { gain: 0.6, decay: 0.09, q: 3.6, curve: 6.5, punch: 0.8, hp: 220, seed: 61390 }),
+            // The roar THINS rather than falls: the corner closes while the pitch
+            // stands still, which is a compartment emptying. A fall here would be
+            // round one's gesture wearing a new letter.
+            swept('stationDeath_i.roar', { wave: 'noise', freq: 150, from: 1600, to: 120, q: 2, gain: 0.5, attack: 0.012, hold: 0.3, decay: 1.0, curve: 1.35, at: 0.006, seed: 61392 }),
+            swept('stationDeath_i.mass', { wave: 'sine', freq: 62, freqEnd: 29, from: 200, to: 62, q: 1.6, gain: 0.34, attack: 0.02, hold: 0.26, decay: 1.0, curve: 1.5, seed: 61394 }),
           ],
         },
       },
       {
-        id: 'f',
-        character: "one detuned toll, and the room",
+        id: 'j',
+        slot: 'stationDeath',
+        character: "blast, and then the structure falls",
         spec: {
-          name: 'stationDeath_f_tollAndRoom',
+          name: 'stationDeath_j_blastIntoCollapse',
           layers: [
-            swept('stationDeath_f.toll', { wave: 'triangle', freq: 98, freqEnd: 86, from: 420, to: 120, q: 3.4, gain: 0.62, attack: 0.006, hold: 0.02, decay: 1.1, curve: 1.9, noiseMix: 0.08, seed: 61360 }),
-            swept('stationDeath_f.beat', { wave: 'triangle', freq: 99.4, freqEnd: 87.2, from: 390, to: 112, q: 3.2, gain: 0.46, attack: 0.008, hold: 0.02, decay: 1.08, curve: 1.9, noiseMix: 0.07, at: 0.01, seed: 61362 }),
-            ...returns('stationDeath_f.room', { freq: 190, gain: 0.22, decay: 0.46, from: 460, to: 140, at: 0.22, gap: 0.26, count: 2, seed: 61364 }),
+            place({ name: 'stationDeath_j.blast', wave: 'noise', attack: 0.0006, hold: 0.006, decay: 0.11, decayCurve: 6, punch: 0.85, freq: 700, lowPass: 3400, lowPassEnd: 500, resonance: 1.6, highPass: 180, gain: 0.46, seed: 61400 }),
+            // The shipped fall, kept — it is what the developer has been hearing
+            // for a fortnight and nothing said to remove it. It is now the second
+            // half rather than the whole sound: the station goes, and THEN it
+            // comes down.
+            swept('stationDeath_j.fall', { wave: 'sine', freq: 205, freqEnd: 34, from: 620, to: 90, q: 1.8, gain: 0.44, attack: 0.01, hold: 0.18, decay: 1.0, curve: 1.5, noiseMix: 0.05, at: 0.09, seed: 61402 }),
+            swept('stationDeath_j.crust', { wave: 'noise', freq: 175, freqEnd: 46, from: 820, to: 140, q: 2, gain: 0.27, attack: 0.03, hold: 0.26, decay: 0.9, curve: 1.4, at: 0.11, seed: 61404 }),
           ],
         },
       },
       {
-        id: 'g',
-        character: "the fall alone, nothing answering",
+        id: 'k',
+        slot: 'stationDeath',
+        character: "one concussion, and the room",
         spec: {
-          name: 'stationDeath_g_fallAlone',
+          name: 'stationDeath_k_concussion',
           layers: [
-            swept('stationDeath_g.fall', { wave: 'sine', freq: 196, freqEnd: 31, from: 560, to: 80, q: 2, gain: 0.5, attack: 0.012, hold: 0.22, decay: 1.06, curve: 1.5, punch: 0.4, noiseMix: 0.08, seed: 61370 }),
+            swept('stationDeath_k.hit', { wave: 'sine', freq: 78, freqEnd: 27, from: 620, to: 60, q: 2.2, gain: 0.56, attack: 0.003, hold: 0.16, decay: 0.92, curve: 1.6, punch: 0.9, noiseMix: 0.1, seed: 61410 }),
+            ...returns('stationDeath_k.room', { freq: 150, gain: 0.2, decay: 0.44, from: 380, to: 110, at: 0.26, gap: 0.3, count: 2, seed: 61412 }),
           ],
         },
       },
@@ -2701,49 +2838,101 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
   // against *your reactor is taking damage* — and §7.6's own note says re-voicing
   // reject upward is what protects it. Every reject offer sits above 300 Hz of
   // spectral centre; the fight family's core offers all sit under 250.
+  // ---------------------------------------------------------------------------
+  // ROUND 2 (a0-67, 2026-08-17) — A REGRESSION REPORT, NOT A PREFERENCE
+  // ---------------------------------------------------------------------------
+  //
+  //   *"what happened to the glass theme we had, none of these are glass themed
+  //   like the main menu"*
+  //
+  // Every other reason on the round-two board is an opinion about a sound. This
+  // one is a **bug report**, it is correct, and it can be read straight out of
+  // the file: the sound this slot ships is `strike('pressTick', 1661, …)` —
+  // sine partials on 1 / 2.76 / 5.4 at A♭6, the ratified Gantry/Bone glass, the
+  // same material and the same root as the main menu's `pick` cue. The four takes
+  // round one offered were a capacitive contact, a damped actuator, a filtered
+  // band and a click. All four are impeccably "modern/sci-fi, not retro/toony" —
+  // and all four left the family. **A slot can pass the register test and still be
+  // a regression**, and nothing in the sweep was watching for that, which is the
+  // actual lesson here rather than anything about taste.
+  //
+  // **What the glass theme IS, in sound terms** — so it stops being lost. The
+  // long form is on {@link glass}, which reads the numbers out of `./ui-cues`
+  // rather than retyping them; the short form is five properties:
+  //
+  //  1. **Sine partials on 1 / 2.76 / 5.4.** Inharmonic, and neither a harmonic
+  //     series nor a bell's. That spacing is what a struck pane does.
+  //  2. **Upper partials die first** (each 0.66 of the one below). This single
+  //     line is the difference between glass and bell metal — a chime made of the
+  //     same ratios rings *upward* and does not sound like this at all.
+  //  3. **A ~2 ms strike, never zero.** Zero is a click; 2 ms is a strike.
+  //  4. **A contact edge in front of the note** — a breath of band-passed noise,
+  //     so it reads as two hard things touching rather than a tone switching on.
+  //  5. **A♭6 = 1661 Hz is the root**, and every pitch in the menu is measured
+  //     off it.
+  //
+  // So all four offers below are glass. What they differ in is **how much glass
+  // there is** — which is the axis this slot actually has, because it is the
+  // lightest sound in the game and it fires dozens of times a match:
+  //
+  //   h  **the pane, thinner** — the family root, two partials, less contact.
+  //   i  **the pane, higher** — an octave up at A♭7, the register `detent`
+  //      already uses, so a press sits under the wheel cue rather than beside it.
+  //   j  **fingertip on the pane** — contact first, note second: the edge is the
+  //      loudest thing in it and the glass is what it lands on.
+  //   k  **the pane, three partials, quietest** — the full material at the
+  //      smallest size. The offer for "keep the theme, take the level down".
+  //
+  // Held, and measured in `./candidates.test.ts`: every offer is quieter and
+  // shorter than the SHIPPED tick (this is the slot §7.6 names as the fatigue
+  // case — *"heard dozens of times a match, forever"*), and every offer really is
+  // glass rather than described as glass, checked against the ratified ratios.
   pressTick: {
     label: "Press Tick",
     context: "A wheel wedge / menu control was pressed — the lightest possible click, heard dozens of times a match.",
     current: 'pressTick',
     candidates: [
       {
-        id: 'd',
-        character: "a capacitive contact, no tone",
+        id: 'h',
+        slot: 'pressTick',
+        character: "the pane, thinner: two partials at A♭6",
         spec: {
-          name: 'pressTick_d_capacitive',
+          name: 'pressTick_h_thinPane',
+          layers: [...glass('pressTick_h', 1661, { gain: 0.088, decay: 0.042, partials: GLASS_PAIR, contact: 0.7, seed: 30510 })],
+        },
+      },
+      {
+        id: 'i',
+        slot: 'pressTick',
+        character: "the pane an octave up, at A♭7",
+        spec: {
+          name: 'pressTick_i_highPane',
+          layers: [...glass('pressTick_i', 3322, { gain: 0.075, decay: 0.032, partials: GLASS_PAIR, contact: 0.5, seed: 30520 })],
+        },
+      },
+      {
+        id: 'j',
+        slot: 'pressTick',
+        character: "fingertip first, then the pane",
+        spec: {
+          name: 'pressTick_j_fingertip',
           layers: [
-            grains('pressTick_d.touch', { freq: 1350, grain: 0.0018, gain: 0.24, hold: 0.002, decay: 0.018, curve: 7, from: 3600, to: 1500, q: 2.8, hp: 700, seed: 60770 }),
+            // The contact carries it and the note is what it lands on — the same
+            // two ingredients as the others, in the other order. It is the offer
+            // for a press that should feel like touching something rather than
+            // like sounding something.
+            ...glass('pressTick_j', 1661, { gain: 0.055, decay: 0.044, partials: GLASS_PAIR, contact: 0, grain: 0.04, seed: 30530 }),
+            band('pressTick_j.touch', 4300, { gain: 0.22, decay: 0.014, q: 2.4, curve: 7, punch: 0.4, hp: 1800, seed: 30534 }),
           ],
         },
       },
       {
-        id: 'e',
-        character: "a damped actuator, felt not heard",
+        id: 'k',
+        slot: 'pressTick',
+        character: "the full pane, three partials, quietest",
         spec: {
-          name: 'pressTick_e_dampedActuator',
-          layers: [
-            swept('pressTick_e.press', { wave: 'sine', freq: 300, from: 900, to: 340, q: 2.6, gain: 0.28, attack: 0.0015, hold: 0.003, decay: 0.024, curve: 6, noiseMix: 0.2, seed: 60780 }),
-          ],
-        },
-      },
-      {
-        id: 'f',
-        character: "one filtered band, machine-clean",
-        spec: {
-          name: 'pressTick_f_filteredBand',
-          layers: [
-            band('pressTick_f.band', 1050, { gain: 0.42, decay: 0.022, q: 6, curve: 6.5, seed: 60790 }),
-          ],
-        },
-      },
-      {
-        id: 'g',
-        character: "the smallest click that still reads",
-        spec: {
-          name: 'pressTick_g_smallest',
-          layers: [
-            band('pressTick_g.click', 1650, { gain: 0.627, decay: 0.012, q: 3.5, curve: 8, hp: 800, seed: 60800 }),
-          ],
+          name: 'pressTick_k_fullPaneQuiet',
+          layers: [...glass('pressTick_k', 1661, { gain: 0.062, decay: 0.048, partials: GLASS_PARTIALS, contact: 0.55, seed: 30540 })],
         },
       },
     ],

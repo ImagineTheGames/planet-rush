@@ -16,6 +16,11 @@ import { CANDIDATE_SLOTS, CANDIDATE_SLOT_ORDER } from './candidates';
 import { grains, plate, swept } from './instrument';
 import { isLayered, loops, soundSpec, SOUND_NAMES, type SoundName, type SoundSpec } from './bank';
 import { renderLayered, renderVoice, seamless, peak, rms, type VoiceSpec } from './synth';
+// The ratified Gantry/Bone glass. Imported rather than restated: a0-67's
+// `pressTick` reason is that a slot LEFT this family, so the test that puts it
+// back has to be measured against the family's own numbers, not against a copy
+// of them that can drift (`./ui-cues`, s6-01).
+import { A_FLAT_6, FOURTH_BELOW, GLASS_PARTIALS, OCTAVE_ABOVE } from './ui-cues';
 import { XP_FILL_GAIN } from './engine';
 
 /** The faithful render recipe (mirrors `graph.renderSound`), headless. */
@@ -278,6 +283,97 @@ describe('sound-review candidates', () => {
         CANDIDATE_SLOTS[id]!.candidates.some((c) => c.anchor === true),
         `${id} offers an anchor nobody asked for`,
       ).toBe(false);
+    }
+  });
+
+  it('answers `buildPlaced` with a build STARTING, which none of the denied takes was', () => {
+    // *"none of these sound like a build started"*. The denied four were a
+    // stepper into a stop, a vacuum seating, a weld quenched and one latch —
+    // four correct executions of this slot's own standing note (*"a latch, never
+    // a fanfare"*, §7.3) and four sounds that END. The slot fires when a turret
+    // STARTS building.
+    //
+    // So the property is the shape rather than the material: the cue must be
+    // going somewhere when it stops. Measured as the last third's energy against
+    // the first third's — an opening gesture is >1, a seating one is well under.
+    // The shipped voice measures 0.02, which is how completely it terminates.
+    const thirds = (spec: SoundSpec): number => {
+      const buf = render(spec);
+      const t = Math.floor(buf.length / 3);
+      return rms(buf.subarray(buf.length - t)) / Math.max(1e-9, rms(buf.subarray(0, t)));
+    };
+    expect(thirds(soundSpec('buildPlaced')), 'the shipped voice already opens — the diagnosis is wrong').toBeLessThan(
+      0.2,
+    );
+    for (const c of CANDIDATE_SLOTS.buildPlaced!.candidates) {
+      expect(thirds(c.spec), `buildPlaced/${c.id} ends instead of starting`).toBeGreaterThan(1);
+    }
+    // The other half of the §8 pair is NOT asserted, and the reason is worth
+    // more than the assertion would be: `buildComplete` was not denied this
+    // round, so its four offers carry no verdict and this brief may not touch
+    // them — re-voicing un-judged work is destroying a review, not doing one
+    // (the a0-48 rule). Three of them seat (0.31 / 0.40 / 0.06) and **`f` — "two
+    // welds, the second holding" — opens, at 1.43.** If the developer adopts a
+    // `buildPlaced` above and `buildComplete/f`, the two ends of one build are
+    // the same gesture and want listening to as a pair. That belongs on the
+    // board, not in a test that would fail for a lane that did nothing wrong.
+  });
+
+  it('brings `pressTick` back into the glass family it left (a0-67)', () => {
+    // *"what happened to the glass theme we had, none of these are glass themed
+    // like the main menu"* — a regression report, and a correct one. The shipped
+    // tick is struck glass at A♭6 (`./bank`'s `strike`, the ratified Gantry/Bone
+    // material); the four takes it was offered instead were a capacitive
+    // contact, a damped actuator, a filtered band and a click. Every one of them
+    // satisfied "modern/sci-fi, not retro/toony". None of them was glass.
+    //
+    // Glass is checked here as the thing it actually is, not as a word in a
+    // character label: sine partials on the ratified inharmonic ratios, upper
+    // ones decaying faster than the fundamental, and a strike that is short but
+    // never zero. A take that describes itself as glass and is made of noise
+    // fails this.
+    const menuRoots = [A_FLAT_6, OCTAVE_ABOVE, FOURTH_BELOW];
+    for (const c of CANDIDATE_SLOTS.pressTick!.candidates) {
+      const where = `pressTick/${c.id}`;
+      const voices = voicesOf(c.spec);
+      const partials = voices.filter((v) => v.wave === 'sine');
+      expect(partials.length, `${where} has no struck partials in it — that is not glass`).toBeGreaterThanOrEqual(2);
+
+      // The fundamental is a pitch the menu family actually uses…
+      const root = Math.min(...partials.map((v) => v.freq));
+      expect(
+        menuRoots.some((f) => Math.abs(root - f) < 1),
+        `${where} is struck at ${root} Hz, which is not a pitch the menu set uses`,
+      ).toBe(true);
+
+      // …the partials sit on the ratified spacing, in order…
+      const ratios = [...partials].sort((a, b) => a.freq - b.freq).map((v) => v.freq / root);
+      for (const [i, r] of ratios.entries()) {
+        expect(Math.abs(r - GLASS_PARTIALS[i]!), `${where} partial ${i} is at ×${r}, not the glass spacing`).toBeLessThan(
+          0.01,
+        );
+      }
+
+      // …the upper ones die first, which is the whole difference from bell metal…
+      const decays = [...partials].sort((a, b) => a.freq - b.freq).map((v) => v.decay);
+      for (let i = 1; i < decays.length; i++) {
+        expect(decays[i]!, `${where} partial ${i} outlasts the one below it — that is a chime`).toBeLessThan(
+          decays[i - 1]!,
+        );
+      }
+
+      // …and it is struck, not switched on.
+      for (const v of partials) {
+        expect(v.attack, `${where} arrives with a click`).toBeGreaterThan(0);
+        expect(v.attack, `${where} fades in rather than being struck`).toBeLessThanOrEqual(0.004);
+      }
+
+      // §7.6's fatigue clause, which the glass does not get an exemption from:
+      // this is the sound heard dozens of times a match, forever.
+      const buf = render(c.spec);
+      const shipped = render(soundSpec('pressTick'));
+      expect(peak(buf), `${where} peaks over the tick that ships`).toBeLessThanOrEqual(peak(shipped));
+      expect(buf.length, `${where} is longer than the tick that ships`).toBeLessThanOrEqual(shipped.length);
     }
   });
 
