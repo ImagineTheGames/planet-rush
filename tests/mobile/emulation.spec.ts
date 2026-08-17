@@ -397,6 +397,26 @@ test('touch: FIRE button + ghost stick render, controls strip is ABSENT', async 
 
   // Play-mode affordance assertion → landscape (portrait is the blocked state).
   await useLandscape(page);
+
+  // ── EDITED BY THE UI ENGINEER (a0-74) — one line, and it drops cleanly ──────
+  //
+  // OWNED BY QA. Seat the STICKS scheme before boot, exactly as the thrust-rate
+  // test at the foot of this file already does (a0-30) and for a reason one step
+  // further on.
+  //
+  // Since a0-30 Tap Commander is the first-run default on every platform, and
+  // a0-74 stopped drawing controls the seated scheme cannot use — under Tap
+  // Commander `main.ts` `sampleInput` zeroes thrust, aim AND fire every frame and
+  // the local pilot writes all three, so a FIRE button and a thrust stick there
+  // are affordances that move nothing (developer report: *"theres buttons like
+  // Fire, that shouldn't show up since im using tap commander and auto fire"*).
+  //
+  // This test is the M1 gap-#1 guard: **the visible touch controls must actually
+  // render**. That is still exactly the right assertion — it just has to be made
+  // of the scheme that HAS them, or it asserts the defect. Nothing else about the
+  // test moves: the same regions, the same predicates, the same bars.
+  await page.addInitScript(() => localStorage.setItem('planet-rush:controlScheme', 'sticks'));
+
   await boot(page);
   const img = await shoot(page);
 
