@@ -2,14 +2,23 @@
  * src/ui/main-menu.test.ts — the main-menu model, headless.
  *
  * The screen decides two things: what its buttons say, and where a tap lands.
- * Both are pure functions of a viewport, so the whole of the front door is
- * asserted here with no Pixi and no canvas — the same discipline as the rest of
+ * Both are pure functions of a viewport, so all but the last block below is
+ * asserted with no Pixi and no canvas — the same discipline as the rest of
  * `src/ui/`. The *wiring* (a clean boot opens this, PLAY builds the world) is the
  * live-stage suite's job (`tests/live-stage/main-menu.spec.ts`), because the M2
  * lesson is that a menu can be model-green and still never reached.
+ *
+ * The exception is `the entrance` (a0-70), which drives a REAL `MainMenuView`
+ * headless: its claim is about what the view puts on the screen on its first
+ * frame, and a pure layout function cannot be asked that question. The Pixi
+ * scene graph is headless right up to measuring a `Text`, so the file carries the
+ * same 2D-canvas stub `build-wheel-view.test.ts` does.
  */
 
 import { describe, it, expect } from 'vitest';
+import { DOMAdapter, Text } from 'pixi.js';
+import { computeRootTransform } from '@platform/orientation';
+import { MainMenuView } from './main-menu-view';
 import {
   MAIN_MENU_EYEBROW,
   MAIN_MENU_ITEMS,
@@ -32,6 +41,28 @@ import * as flow from './lobby-flow';
 import { FLOW_SCREENS, createFlow, flowKey, flowOpenHangar, flowScreenHandler, flowTapHangar } from './lobby-flow';
 import { singlePrimary } from './gantry';
 import { BEAM, COLUMN, PLATE_SCALES, TOUCH_MIN, frameMetrics } from '../art/materials';
+
+// A `Text` measures itself against a 2D canvas, which a node test does not have.
+// The stub is the whole of the workaround — the same one `build-wheel-view.test.ts`
+// uses for the same reason — and it is not a mock of anything under test: nothing
+// below reads a text *size*, only the positions the view wrote.
+const stubTextContext = {
+  font: '',
+  measureText(text: string) {
+    return {
+      width: text.length * 7,
+      actualBoundingBoxAscent: 8,
+      actualBoundingBoxDescent: 2,
+      actualBoundingBoxLeft: 0,
+      actualBoundingBoxRight: text.length * 7,
+    };
+  },
+};
+const stubCanvas = { width: 1, height: 1, getContext: () => stubTextContext };
+DOMAdapter.set({
+  ...DOMAdapter.get(),
+  createCanvas: () => stubCanvas as unknown as HTMLCanvasElement,
+} as never);
 
 const VIEWPORT = { width: 1280, height: 720 };
 /** The phone the field report was on: 390×844 held portrait → the landscape lock
@@ -406,3 +437,115 @@ describe('hit test', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// The entrance (a0-70)
+// ---------------------------------------------------------------------------
+//
+// Reported: *"the title menu flies in from the bottom right instead of starting
+// off centered"*. It was filmed before anything was changed — the real
+// production bundle, the developer's own 1707×898 desktop session, at 1× and at
+// the 1.5× ratio that viewport implies, gated and `?gate=0`, on the preview
+// server and on the dev server, plus the door's whole opening sequence and a
+// boot across a mid-flight viewport change. The menu is centred and
+// byte-identical on every frame of all of them, the door's centre never leaves
+// the viewport's, and the page runs no `transform` transition at all. The
+// capture, the numbers and the frames are in
+// `evidence/a0-70-title-entrance/audit.txt`.
+//
+// **So this test passes on today's code, and it is a regression guard rather
+// than a reproduction.** It is written down anyway because the property it pins
+// is the one the report is about and nothing held it before: the menu is where
+// it belongs on the FIRST frame it draws, not on the second. It is deliberately
+// built so the three mechanisms that could have produced the report each fail
+// it — see the three assertions below.
+describe('the entrance', () => {
+  it('the first frame is already centred', () => {
+    // The developer's own session, so the numbers here are the numbers filmed.
+    const view = { width: 1707, height: 898 };
+
+    // 1. THE ROOT TRANSFORM. A desktop must take the identity branch. The rotated
+    //    branch answers `x: physW`, which puts every child one whole screen width
+    //    to the right — a bottom-right offset is that bug's exact fingerprint, and
+    //    it is a bug on its own if a desktop ever reaches it (`isMobile` is a
+    //    touch-capability probe, and a touchscreen laptop sets it).
+    const root = computeRootTransform(view.width, view.height, false);
+    expect(root).toEqual({
+      rotated: false,
+      logicalWidth: view.width,
+      logicalHeight: view.height,
+      rotation: 0,
+      x: 0,
+      y: 0,
+    });
+
+    // 2. THE LAYOUT. Everything the screen draws is centred on the viewport the
+    //    root transform just reported — the wordmark's strip and every plate.
+    const layout = mainMenuLayout({ width: root.logicalWidth, height: root.logicalHeight });
+    const midX = root.logicalWidth / 2;
+    expect(layout.title.x + layout.title.width / 2).toBeCloseTo(midX, 6);
+    for (const rect of layout.buttons) {
+      expect(rect.x + rect.width / 2).toBeCloseTo(midX, 6);
+    }
+
+    // 3. THE FIRST FRAME ITSELF. A real `MainMenuView`, updated exactly ONCE and
+    //    never resized — which is frame 1 of the boot, since `openMainMenu`
+    //    constructs the view from the live logical size and renders straight
+    //    away. Read back what the view actually wrote to its nodes.
+    const first = new MainMenuView(view.width, view.height);
+    first.update(mainMenuModel());
+    const firstNodes = nodePositions(first);
+
+    // The wordmark, at the centre of the strip the layout gave it — an absolute
+    // claim about a drawn node, not about the layout function agreeing with
+    // itself. Anchored 0.5/0.5, so its `x` IS its centre.
+    expect(firstNodes.wordmark.text).toBe(MAIN_MENU_TITLE);
+    expect(firstNodes.wordmark.x).toBeCloseTo(midX, 6);
+
+    // Every plate's label starts inside the plate the layout put there. A screen
+    // that had drifted toward a corner would have its text outside its own rect.
+    expect(firstNodes.plateLabels).toHaveLength(MAIN_MENU_ITEMS.length);
+    firstNodes.plateLabels.forEach((label, i) => {
+      const rect = layout.buttons[i]!;
+      expect(label.x).toBeGreaterThan(rect.x);
+      expect(label.x).toBeLessThan(rect.x + rect.width);
+      expect(label.y).toBeGreaterThanOrEqual(rect.y);
+      expect(label.y).toBeLessThanOrEqual(rect.y + rect.height);
+    });
+
+    // 4. AND IT IS NOT MERELY A LATER FRAME THAT SETTLES. The same view driven
+    //    through a resize and several more updates — every chance the shipped code
+    //    has to correct itself — must land on the positions frame 1 already had.
+    //    A menu that started off-centre and snapped into place would pass
+    //    everything above only if the snap happened before the first `update`;
+    //    this is what closes that door.
+    const settled = new MainMenuView(view.width, view.height);
+    settled.update(mainMenuModel());
+    settled.update(mainMenuModel({ hover: 'play' }));
+    settled.resize(view.width, view.height);
+    settled.update(mainMenuModel());
+    expect(nodePositions(settled)).toEqual(firstNodes);
+  });
+});
+
+/** What a `MainMenuView` actually put on the screen, read off its own nodes.
+ *  The view adds `backdrop, beams, heading, eyebrow, status` and then a
+ *  `body, label, sub` triple per plate, so the `Text` children arrive in a known
+ *  order — the same order `MAIN_MENU_ITEMS` is walked in. */
+function nodePositions(view: MainMenuView): {
+  wordmark: { text: string; x: number; y: number };
+  plateLabels: { text: string; x: number; y: number }[];
+} {
+  const texts = view.children.filter((c): c is Text => c instanceof Text);
+  const [wordmark, , , ...rest] = texts;
+  const plateLabels: { text: string; x: number; y: number }[] = [];
+  // label, sub, label, sub … — the labels are the even ones.
+  for (let i = 0; i < rest.length; i += 2) {
+    const label = rest[i]!;
+    plateLabels.push({ text: label.text, x: label.x, y: label.y });
+  }
+  return {
+    wordmark: { text: wordmark!.text, x: wordmark!.x, y: wordmark!.y },
+    plateLabels,
+  };
+}
