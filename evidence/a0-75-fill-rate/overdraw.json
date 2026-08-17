@@ -1,0 +1,521 @@
+{
+  "perViewport": [
+    {
+      "nebula": "plasmaReef",
+      "viewport": "798×384",
+      "width": 798,
+      "height": 384,
+      "layers": [
+        {
+          "key": "ground",
+          "shapes": 1,
+          "area": 308800,
+          "fieldArea": 306432,
+          "overdraw": 1.0077276524644945
+        },
+        {
+          "key": "sky/plasmaReef (additive)",
+          "shapes": 78,
+          "area": 8137766.076755492,
+          "fieldArea": 2660943.3712000004,
+          "overdraw": 3.0582259528077143
+        },
+        {
+          "key": "stars/deep points",
+          "shapes": 4281,
+          "area": 18253.67712131049,
+          "fieldArea": 2887145.9199999995,
+          "overdraw": 0.006322395066651323
+        },
+        {
+          "key": "stars/deep bloom",
+          "shapes": 762,
+          "area": 548655.4298905303,
+          "fieldArea": 2887145.9199999995,
+          "overdraw": 0.1900338414105964
+        },
+        {
+          "key": "stars/mid points",
+          "shapes": 4278,
+          "area": 18291.171984926175,
+          "fieldArea": 5867164.4032,
+          "overdraw": 0.0031175489091374397
+        },
+        {
+          "key": "stars/mid bloom",
+          "shapes": 825,
+          "area": 593129.7959849174,
+          "fieldArea": 5867164.4032,
+          "overdraw": 0.10109309288511152
+        },
+        {
+          "key": "stars/near points",
+          "shapes": 2687,
+          "area": 11465.24302268386,
+          "fieldArea": 12281848,
+          "overdraw": 0.0009335112291475892
+        },
+        {
+          "key": "stars/near bloom",
+          "shapes": 495,
+          "area": 355656.6299326939,
+          "fieldArea": 12281848,
+          "overdraw": 0.028957908446081884
+        }
+      ],
+      "overdraw": 4.396411903218935,
+      "fragments": 1347201.2923271847
+    },
+    {
+      "nebula": "plasmaReef",
+      "viewport": "1280×720",
+      "width": 1280,
+      "height": 720,
+      "layers": [
+        {
+          "key": "ground",
+          "shapes": 1,
+          "area": 925604,
+          "fieldArea": 921600,
+          "overdraw": 1.0043446180555555
+        },
+        {
+          "key": "sky/plasmaReef (additive)",
+          "shapes": 61,
+          "area": 19662024.425378725,
+          "fieldArea": 6294901.76,
+          "overdraw": 3.1234839200062
+        },
+        {
+          "key": "stars/deep points",
+          "shapes": 9797,
+          "area": 41942.677869801555,
+          "fieldArea": 6607616,
+          "overdraw": 0.006347626416214495
+        },
+        {
+          "key": "stars/deep bloom",
+          "shapes": 1764,
+          "area": 1264102.3395728322,
+          "fieldArea": 6607616,
+          "overdraw": 0.19130989748387803
+        },
+        {
+          "key": "stars/mid points",
+          "shapes": 7593,
+          "area": 32246.655370337245,
+          "fieldArea": 10413455.36,
+          "overdraw": 0.003096633562592738
+        },
+        {
+          "key": "stars/mid bloom",
+          "shapes": 1368,
+          "area": 984588.2132405539,
+          "fieldArea": 10413455.36,
+          "overdraw": 0.0945496167412921
+        },
+        {
+          "key": "stars/near points",
+          "shapes": 3879,
+          "area": 16269.450396617065,
+          "fieldArea": 17734400,
+          "overdraw": 0.0009173950286796884
+        },
+        {
+          "key": "stars/near bloom",
+          "shapes": 672,
+          "area": 484710.0571235952,
+          "fieldArea": 17734400,
+          "overdraw": 0.027331629890134157
+        }
+      ],
+      "overdraw": 4.4513813371845465,
+      "fragments": 4102393.040349278
+    },
+    {
+      "nebula": "plasmaReef",
+      "viewport": "1920×1080",
+      "width": 1920,
+      "height": 1080,
+      "layers": [
+        {
+          "key": "ground",
+          "shapes": 1,
+          "area": 2079604,
+          "fieldArea": 2073600,
+          "overdraw": 1.0028954475308642
+        },
+        {
+          "key": "sky/plasmaReef (additive)",
+          "shapes": 55,
+          "area": 39313966.01939243,
+          "fieldArea": 12589682.56,
+          "overdraw": 3.122713049517305
+        },
+        {
+          "key": "stars/deep points",
+          "shapes": 19242,
+          "area": 83443.167635371,
+          "fieldArea": 12978496,
+          "overdraw": 0.0064293403207406315
+        },
+        {
+          "key": "stars/deep bloom",
+          "shapes": 3591,
+          "area": 2578879.4230634877,
+          "fieldArea": 12978496,
+          "overdraw": 0.19870402726660222
+        },
+        {
+          "key": "stars/mid points",
+          "shapes": 12755,
+          "area": 54959.43361042466,
+          "fieldArea": 17492124.16,
+          "overdraw": 0.0031419530931585077
+        },
+        {
+          "key": "stars/mid bloom",
+          "shapes": 2349,
+          "area": 1687877.7041631893,
+          "fieldArea": 17492124.16,
+          "overdraw": 0.09649358126687281
+        },
+        {
+          "key": "stars/near points",
+          "shapes": 5582,
+          "area": 23628.95846130648,
+          "fieldArea": 25518400,
+          "overdraw": 0.0009259576799997837
+        },
+        {
+          "key": "stars/near bloom",
+          "shapes": 975,
+          "area": 702450.9800740109,
+          "fieldArea": 25518400,
+          "overdraw": 0.027527234469011022
+        }
+      ],
+      "overdraw": 4.4588305911445545,
+      "fragments": 9245831.113797348
+    },
+    {
+      "nebula": "plasmaReef",
+      "viewport": "2560×1440",
+      "width": 2560,
+      "height": 1440,
+      "layers": [
+        {
+          "key": "ground",
+          "shapes": 1,
+          "area": 3694404,
+          "fieldArea": 3686400,
+          "overdraw": 1.0021712239583334
+        },
+        {
+          "key": "sky/plasmaReef (additive)",
+          "shapes": 51,
+          "area": 63814138.863550164,
+          "fieldArea": 21044336.639999997,
+          "overdraw": 3.0323663774820786
+        },
+        {
+          "key": "stars/deep points",
+          "shapes": 31846,
+          "area": 137933.56945963408,
+          "fieldArea": 21479424,
+          "overdraw": 0.006421660537062543
+        },
+        {
+          "key": "stars/deep bloom",
+          "shapes": 5889,
+          "area": 4230575.292039991,
+          "fieldArea": 21479424,
+          "overdraw": 0.1969594385789857
+        },
+        {
+          "key": "stars/mid points",
+          "shapes": 19247,
+          "area": 82915.11380699297,
+          "fieldArea": 26395607.04,
+          "overdraw": 0.003141246711293402
+        },
+        {
+          "key": "stars/mid bloom",
+          "shapes": 3552,
+          "area": 2551708.3873099736,
+          "fieldArea": 26395607.04,
+          "overdraw": 0.09667170690346713
+        },
+        {
+          "key": "stars/near points",
+          "shapes": 7594,
+          "area": 32064.31253444277,
+          "fieldArea": 34713600,
+          "overdraw": 0.0009236815695993147
+        },
+        {
+          "key": "stars/near bloom",
+          "shapes": 1341,
+          "area": 968266.2651191559,
+          "fieldArea": 34713600,
+          "overdraw": 0.02789299482390636
+        }
+      ],
+      "overdraw": 4.3665483305647275,
+      "fragments": 16096843.76579381
+    },
+    {
+      "nebula": "plasmaReef",
+      "viewport": "3440×1440",
+      "width": 3440,
+      "height": 1440,
+      "layers": [
+        {
+          "key": "ground",
+          "shapes": 1,
+          "area": 4963364,
+          "fieldArea": 4953600,
+          "overdraw": 1.001971091731266
+        },
+        {
+          "key": "sky/plasmaReef (additive)",
+          "shapes": 50,
+          "area": 83637148.84689452,
+          "fieldArea": 27631756.16,
+          "overdraw": 3.026848831561726
+        },
+        {
+          "key": "stars/deep points",
+          "shapes": 41653,
+          "area": 180551.4546680667,
+          "fieldArea": 28093856,
+          "overdraw": 0.0064267238597672995
+        },
+        {
+          "key": "stars/deep bloom",
+          "shapes": 7725,
+          "area": 5547440.406444398,
+          "fieldArea": 28093856,
+          "overdraw": 0.19746098244557095
+        },
+        {
+          "key": "stars/mid points",
+          "shapes": 24234,
+          "area": 104210.09949501617,
+          "fieldArea": 33235093.76,
+          "overdraw": 0.003135544020051417
+        },
+        {
+          "key": "stars/mid bloom",
+          "shapes": 4389,
+          "area": 3156716.7352549466,
+          "fieldArea": 33235093.76,
+          "overdraw": 0.09498143011271427
+        },
+        {
+          "key": "stars/near points",
+          "shapes": 9116,
+          "area": 38596.084694605954,
+          "fieldArea": 41674400,
+          "overdraw": 0.0009261341421737554
+        },
+        {
+          "key": "stars/near bloom",
+          "shapes": 1611,
+          "area": 1161807.0113929904,
+          "fieldArea": 41674400,
+          "overdraw": 0.027878194080610406
+        }
+      ],
+      "overdraw": 4.359628931953879,
+      "fragments": 21595857.877326734
+    },
+    {
+      "nebula": "plasmaReef",
+      "viewport": "5120×1440",
+      "width": 5120,
+      "height": 1440,
+      "layers": [
+        {
+          "key": "ground",
+          "shapes": 1,
+          "area": 7385924,
+          "fieldArea": 7372800,
+          "overdraw": 1.001780056423611
+        },
+        {
+          "key": "sky/plasmaReef (additive)",
+          "shapes": 49,
+          "area": 121833242.2400161,
+          "fieldArea": 40207738.879999995,
+          "overdraw": 3.0300943458578318
+        },
+        {
+          "key": "stars/deep points",
+          "shapes": 60375,
+          "area": 262225.06043926766,
+          "fieldArea": 40721408,
+          "overdraw": 0.00643948903827853
+        },
+        {
+          "key": "stars/deep bloom",
+          "shapes": 11127,
+          "area": 7983430.080007607,
+          "fieldArea": 40721408,
+          "overdraw": 0.19604995190754718
+        },
+        {
+          "key": "stars/mid points",
+          "shapes": 33755,
+          "area": 145027.43192062015,
+          "fieldArea": 46292295.68,
+          "overdraw": 0.0031328632505749207
+        },
+        {
+          "key": "stars/mid bloom",
+          "shapes": 6102,
+          "area": 4382477.445726118,
+          "fieldArea": 46292295.68,
+          "overdraw": 0.09466969354944979
+        },
+        {
+          "key": "stars/near points",
+          "shapes": 12023,
+          "area": 51312.237096837234,
+          "fieldArea": 54963200,
+          "overdraw": 0.0009335744115487678
+        },
+        {
+          "key": "stars/near bloom",
+          "shapes": 2166,
+          "area": 1563135.6814747069,
+          "fieldArea": 54963200,
+          "overdraw": 0.02843967748374743
+        }
+      ],
+      "overdraw": 4.361539651922589,
+      "fragments": 32156759.54569487
+    }
+  ],
+  "skyRows": [
+    {
+      "sky": "None",
+      "id": "none",
+      "map": "octagon",
+      "shapes": 0,
+      "skyOd": 0,
+      "starOd": 0.33080900866088814,
+      "total": 1.332780100392154,
+      "reduced": 1.332780100392154
+    },
+    {
+      "sky": "Coalsack",
+      "id": "coalsack",
+      "map": "compass",
+      "shapes": 53,
+      "skyOd": 3.5698433653201542,
+      "starOd": 0.33080900866088814,
+      "total": 4.902623465712308,
+      "reduced": 3.1123250247952394
+    },
+    {
+      "sky": "Iron Veil",
+      "id": "ironVeil",
+      "map": "crescents",
+      "shapes": 78,
+      "skyOd": 3.360461167742468,
+      "starOd": 0.33080900866088814,
+      "total": 4.693241268134622,
+      "reduced": 2.958998173348273
+    },
+    {
+      "sky": "Patina Drift",
+      "id": "patinaDrift",
+      "map": "diamond",
+      "shapes": 123,
+      "skyOd": 4.2198213141485175,
+      "starOd": 0.33080900866088814,
+      "total": 5.552601414540671,
+      "reduced": 3.067185972224952
+    },
+    {
+      "sky": "Plasma Reef",
+      "id": "plasmaReef",
+      "map": "oval",
+      "shapes": 50,
+      "skyOd": 3.026848831561726,
+      "starOd": 0.33080900866088814,
+      "total": 4.359628931953879,
+      "reduced": 2.8396240220344033
+    },
+    {
+      "sky": "Deep Ember",
+      "id": "deepEmber",
+      "map": "line",
+      "shapes": 123,
+      "skyOd": 3.4841455922403304,
+      "starOd": 0.33080900866088814,
+      "total": 4.816925692632484,
+      "reduced": 3.031382916788659
+    }
+  ],
+  "stars": {
+    "nebula": "none",
+    "viewport": "3440×1440",
+    "width": 3440,
+    "height": 1440,
+    "layers": [
+      {
+        "key": "ground",
+        "shapes": 1,
+        "area": 4963364,
+        "fieldArea": 4953600,
+        "overdraw": 1.001971091731266
+      },
+      {
+        "key": "stars/deep points",
+        "shapes": 41653,
+        "area": 180551.4546680667,
+        "fieldArea": 28093856,
+        "overdraw": 0.0064267238597672995
+      },
+      {
+        "key": "stars/deep bloom",
+        "shapes": 7725,
+        "area": 5547440.406444398,
+        "fieldArea": 28093856,
+        "overdraw": 0.19746098244557095
+      },
+      {
+        "key": "stars/mid points",
+        "shapes": 24234,
+        "area": 104210.09949501617,
+        "fieldArea": 33235093.76,
+        "overdraw": 0.003135544020051417
+      },
+      {
+        "key": "stars/mid bloom",
+        "shapes": 4389,
+        "area": 3156716.7352549466,
+        "fieldArea": 33235093.76,
+        "overdraw": 0.09498143011271427
+      },
+      {
+        "key": "stars/near points",
+        "shapes": 9116,
+        "area": 38596.084694605954,
+        "fieldArea": 41674400,
+        "overdraw": 0.0009261341421737554
+      },
+      {
+        "key": "stars/near bloom",
+        "shapes": 1611,
+        "area": 1161807.0113929904,
+        "fieldArea": 41674400,
+        "overdraw": 0.027878194080610406
+      }
+    ],
+    "overdraw": 1.332780100392154,
+    "fragments": 6602059.5053025745
+  }
+}

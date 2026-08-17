@@ -1,0 +1,645 @@
+================================================================================
+a0-75 — THE BIGGER THE WINDOW, THE WORSE IT RUNS
+Fill-rate audit. Art Agent, 2026-08-17. Branch agent/art/a0-75-fill-rate.
+================================================================================
+
+The developer handed over a complete diagnosis of the class of bug before we had
+any instrument on it:
+
+    "for the host everything is super choppy"
+    "the stutter was only on pc, i tried switching hosts to be the mobile phone
+     but only pc has this stuter, i think it gets worse the larger the playing
+     area is on my screen"
+    "yes it does, if i resize to a small window the game plays much better"
+
+Not the host, not the network, not entity count. It scales with rendered area.
+This audit measures that, attributes it, fixes it, and states the budget the fix
+holds — including at the 32:9 the developer owns a screen for.
+
+VERDICT IN ONE PARAGRAPH. It is per-pixel cost, and the backdrop is 61% of it at
+1280x720 and 95% at 5120x1440. Of the backdrop, the SKY is three quarters: nine
+alpha-blended gradient clots, each covering ~40% of the frame, stacked, redrawn
+every frame. On top of that the sky's coverage grew with the frame's ASPECT
+RATIO as well as its area — 3.03x at 16:9, 4.07x at 21:9, 6.06x at 32:9 — which
+is a defect nobody had looked for and which lands hardest on exactly the screen
+the report came from. Both are fixed. Backdrop fill is now 2.33 blended
+screenfuls per frame at EVERY viewport and on every map, against 5.40 at the
+developer's 3440x1440 and 7.39 at 5120x1440.
+
+
+--------------------------------------------------------------------------------
+0. THE INSTRUMENT, AND WHAT IT CANNOT SAY
+--------------------------------------------------------------------------------
+
+The studio image has no GPU. Chromium here draws WebGL through SwiftShader
+(reported: "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)),
+SwiftShader driver)"), a CPU rasteriser.
+
+    NO MILLISECOND IN THIS FILE IS THE DEVELOPER'S MILLISECOND.
+
+What SwiftShader is unusually good for is the axis a0-75 is about: it is a pure
+function of work done, with no fixed-function fill headroom to hide behind, and
+an A/B measured back-to-back in one page under one load is a real A/B. What it
+gets WRONG is the balance between fill and geometry — a CPU rasteriser pays
+per-triangle setup that a GPU absorbs, so it over-weights the star field, which
+is 3,800-54,000 tiny circles, relative to the sky, which is 9-22 huge ones.
+
+So the load-bearing evidence for WHICH LAYER is not a millisecond. It is
+`overdraw.ts`, which walks the shipped `SpriteDef`s and sums the area every shape
+asks the rasteriser to shade. That needs no GPU at all, so a fragment counted
+here is the same fragment on the developer's ultrawide. Milliseconds are used for
+two things only: to show that the shipped bundle's frame time is explained by a
+FRAGMENT model and not by a pixel model (section 1), and to A/B the fix under
+identical load (section 4).
+
+Files (all under evidence/a0-75-fill-rate/, none in the shipped bundle):
+
+    overdraw.ts        counted fill, no GPU        npx vite-node <path>
+    sweep.mjs          shipped bundle, 6 viewports node <path>
+    fill-rig.ts/.html  the void layer by layer     driven by attribute.mjs
+    attribute.mjs      the sweep + the raw/baked A/B
+    cache-diff.ts/.mjs the baked sky vs the sky, pixel for pixel, + 20 PNGs
+    reducer.ts         VfxAutoQuality, driven rather than read
+
+Two instrument bugs are recorded here because both silently produced wrong
+numbers before they were caught, and both are the kind that recur:
+
+  * Headless rAF is vsync-locked, so every delta lands on a multiple of 16.7 ms
+    and a 3 ms layer measures the same as a 15 ms one. The rig closes its clock
+    with a one-pixel `readPixels` instead, which drains the GL pipeline.
+  * A stage scaled to 1/2 is NOT a fill/geometry probe, however much it looks
+    like one. A backdrop field is 2-5 screens across, so most of its geometry is
+    off-viewport and clipped, and halving the stage pulls 4x more of it through
+    the clipper. Measured, the star scenarios came out SLOWER at 1/2 (127 -> 157
+    ms at 1280x720). Attribution is by scenario subtraction instead.
+
+And one process note, since it cost a whole result: NEVER run a build or a test
+suite while a timing rig is running. An "after" sweep read 183 ms where the
+"before" read 133, entirely from a concurrent `vite build`. The clean A/B on a
+quiet box says -60%.
+
+
+--------------------------------------------------------------------------------
+1. FRAME TIME BY VIEWPORT SIZE, BEFORE — AND WHAT MODEL EXPLAINS IT
+--------------------------------------------------------------------------------
+
+Shipped `vite build` bundle served by `vite preview`, `?debug=1&freeze=1` (the sim
+pinned at the golden tick, so the only variable across rows is the viewport),
+map `oval` -> Plasma Reef over the wide arena. 60 sampled frames after 30 settle
+frames. Tree: pristine main f7ef828.
+
+    scene   viewport      Mpx   median ms   p95 ms   ms/Mpx
+    ------------------------------------------------------------
+    frozen  phone        0.31       133.3    150.0   435.01
+    frozen  1280x720     0.92       233.4    250.1   253.26
+    frozen  1920x1080    2.07       416.7    433.4   200.95
+    frozen  2560x1440    3.69       683.4   1049.9   185.38
+    frozen  3440x1440    4.95      1083.3   1650.0   218.69
+    frozen  5120x1440    7.37      1949.9   2483.3   264.47
+
+The brief asks whether frame time tracks pixel count roughly linearly. It does
+not, quite — `ms/Mpx` is not even monotonic (435 -> 253 -> 201 -> 185 -> 219 ->
+264). That non-monotonicity is itself the finding, and the model that explains it
+is fragments, not pixels. Counted fill for the same scene (section 2): 1.5 / 4.1
+/ 9.2 / 16.1 / 26.7 / 54.5 Mfrag.
+
+    t = 93 ms + 34 ms x Mfrag
+
+    viewport     Mfrag   predicted   measured   error
+    ---------------------------------------------------
+    phone          1.5       144.4      133.3    +8.3%
+    1280x720       4.1       232.7      233.4    -0.3%
+    1920x1080      9.2       406.4      416.7    -2.5%
+    2560x1440     16.1       641.5      683.4    -6.1%
+    3440x1440     26.7      1002.7     1083.3    -7.4%
+    5120x1440     54.5      1949.3     1949.9    -0.0%
+
+Every row inside 9%, with a 93 ms intercept that is everything in the frame which
+is NOT backdrop fill (the entities, the HUD, the present) and a slope that is the
+box's per-fragment tariff. The two rows a pixel model gets most wrong, 3440x1440
+and 5120x1440, are exactly the two where the sky's overdraw was inflated by the
+aspect-ratio bug of section 3 — and the fragment model absorbs them because it
+counts that inflation.
+
+    It is fill. The backdrop's overdraw is the multiplier. The backdrop was 61%
+    of the frame at 1280x720 and 95% of it at 5120x1440.
+
+
+--------------------------------------------------------------------------------
+2. ATTRIBUTION — WHICH LAYER WAS COSTING WHAT
+--------------------------------------------------------------------------------
+
+Counted off the shipped geometry, before any change. "x" is the number of times
+the GPU blends each screen pixel for that layer, every frame. Overdraw is
+viewport-independent by construction, because the void is authored PER SCREENFUL
+(backdrop.ts NebulaSpec.build) — which is exactly why per-frame cost is
+`pixels x sum(overdraw)` and why dragging the window fixed it.
+
+    BEFORE, oval / Plasma Reef, wide arena
+
+    viewport              Mpx   ground      sky    stars    bloom   TOTAL   Mfrag
+    -------------------------------------------------------------------------------
+    phone (798x384)      0.31    1.008    3.575    0.010    0.320   4.913     1.5
+    1280x720             0.92    1.004    3.123    0.010    0.313   4.451     4.1
+    1920x1080            2.07    1.003    3.123    0.010    0.323   4.459     9.2
+    2560x1440            3.69    1.002    3.032    0.010    0.322   4.367    16.1
+    3440x1440            4.95    1.002    4.067    0.010    0.320   5.400    26.7
+    5120x1440            7.37    1.002    6.060    0.011    0.319   7.392    54.5
+
+Taking the brief's four candidates in order:
+
+1. THE NEBULA — CONFIRMED, and it is three quarters of the backdrop.
+   3.0 to 6.1 blended screenfuls a frame, against the ground's 1.0 and the whole
+   star field's 0.33. Nine Plasma Reef clots at rx 619-1307 px on a 3440-wide
+   frame: each covers ~40% of the screen and there are nine of them. `setReduceVfx`
+   naming "translucent-disc overdraw" first was right.
+
+   Worth flagging for the record: `NebulaSpec.overdraw` declares 2.175 for the
+   reef and `backdrop.test.ts` holds it to 15%. Both are correct AS MEASURED —
+   the test samples one screenful-sized field, where a blob of radius 0.18-0.38
+   of the width has most of itself outside the sampled box. Over a real parallax
+   field, where the field is 2-5 screens across and the edges are never on
+   screen, the same geometry integrates to 3.03. So the ratified table
+   under-reports what a desktop frame actually pays by about 40%. That is the
+   a0-39 lesson recurring ("it used to sample ONE screenful"), and it is why
+   section 6 adds a gate that measures the field the frame is drawn from.
+
+2. BLOOMED STAR HALOS — priced, and NOT the problem. Confirmed rather than
+   assumed, per the brief. The bloom population (halo disc + diffraction cross,
+   the a0-44/a0-45 fix that made them paint at full strength for the first time)
+   is 0.320x of a screen per frame — 32x the star POINTS at 0.010x, so a0-44 did
+   move real cost, and one ninth of the sky. At 3440x1440 that is 13,725 halo
+   and spike shapes. On a CPU rasteriser they dominate the frame; on a GPU they
+   are 6% of the backdrop's fill. Left alone: the design's numbers stand.
+
+       layer                     shapes   overdraw
+       stars/deep points          41,653     0.0064
+       stars/deep bloom            7,725     0.1975
+       stars/mid points           24,234     0.0031
+       stars/mid bloom             4,389     0.0950
+       stars/near points           9,116     0.0009
+       stars/near bloom            1,611     0.0279
+
+3. THE VOID'S OWN LAYERS — the ground is one opaque quad at 1.0x, the cheapest
+   thing that can be in a frame, and it is not a blend. It stays.
+
+   Does a resize rebake at the new size on the frame it happens? YES.
+   `VoidBackdrop.configure` keys its rebuild on (boundsW, boundsH, viewW, viewH,
+   density, nebula), so every distinct viewport during a window drag destroys and
+   re-tessellates every layer — at 3440x1440 that is ~88,000 shapes rebuilt on a
+   frame the player is already dragging. It is not the steady-state defect the
+   developer bisected (they resized and then reported it PLAYING better), so it
+   is not fixed here; but the a0-75 cache now allocates an 8 MB render texture per
+   rebuild too, so `releaseLayers()` hands the old one back before taking the
+   next, and a test drives ten consecutive resizes to prove it.
+
+4. FULL-SCREEN THINGS THAT COULD BE CACHED — this is where the fix went. See 3
+   and 4 below. Also checked and cleared: there are no PixiJS filters anywhere in
+   the game render path (`grep -rn "filters ="` finds exactly one hit, in
+   `src/ui/title-gate.ts`, which is a front screen). No full-screen post pass, no
+   blur, no bloom pass. The overdraw table above is the whole story.
+
+
+--------------------------------------------------------------------------------
+3. THE FINDING THE BRIEF DID NOT PREDICT — AN ULTRAWIDE PAID TWICE
+--------------------------------------------------------------------------------
+
+Look again at the sky column above. It is flat at 3.03-3.12 for every 16:9 row
+and then jumps: 4.067 at 21:9 and 6.060 at 32:9. Overdraw is supposed to be
+viewport-independent. It was not aspect-independent.
+
+`mockup-reference.ts` `mockupBlobs` sized every element off the frame's WIDTH:
+
+    const rx = screenW * pick(rng, sky.radius);
+
+while element COUNT is per screen AREA (`mockupCount`: field area / screen area).
+So a sky's coverage of the frame is
+
+    count x pi k^2 screenW^2 / (screenW x screenH)  =  count x pi k^2 x W/H
+
+— proportional to the aspect ratio, with nothing bounding it. The developer plays
+on a 21:9 and owns a 32:9.
+
+It is also, and this is the part that makes the fix a fidelity fix rather than a
+perf hack, a LOOK drift. The design panel is 640x360 and the radius fractions
+(0.18/0.38, 0.10/0.26, 0.16/0.26) are measured against its width. On a 32:9 frame
+those same fractions make a clot twice the fraction of the frame's HEIGHT that
+the design draws it at — so the sky reads coarser and emptier than the compositor
+board the developer approved. One error, two faces.
+
+THE FIX: `featureSpan(W, H) = sqrt(W x H x Wp/Hp)`.
+
+It is the unique rule that satisfies both constraints:
+
+  * IDENTITY AT THE DESIGN'S ASPECT. Put W/H = 16/9 in and it returns exactly W.
+    Every number the design measured still means what it measured; no sky is
+    re-art-directed to buy a millisecond, which is precisely the drift a0-40
+    exists to undo. `backdrop-fill.test.ts` asserts this on the RULE, at four
+    16:9 sizes and at the panel itself.
+  * SHARE OF THE FRAME CONSTANT EVERYWHERE ELSE, because element area is
+    proportional to span^2 and span^2 is proportional to W x H = the frame.
+
+Rejected: the short side, `min(W, H)`. Scale-invariant too, but not the identity
+at 16:9 — it would shrink every blob to 0.5625 of the design's on the very shape
+the design was measured on. Re-art-directing the whole set to fix an ultrawide is
+the wrong way round.
+
+Measured after: the sky column reads 3.06 / 3.12 / 3.12 / 3.03 / 3.03 / 3.03
+across the whole sweep. Flat. The three 16:9 rows are bit-identical to before.
+3440x1440 total fill 26.7 -> 21.6 Mfrag/frame; 5120x1440 54.5 -> 32.2.
+
+
+--------------------------------------------------------------------------------
+4. THE FIX AT THE LAYER THE PROFILE IMPLICATES — BAKE THE SKY ONCE
+--------------------------------------------------------------------------------
+
+The sky is three blended screenfuls a frame. It cannot be made cheaper by having
+less of it: the counts, radii and alphas are `MOCKUP_REFERENCE`'s, a0-40 exists
+because five briefs thinned them toward CI ceilings, and the ruling on this
+backdrop is that the game matches the design — "not close enough, the same". So
+the sky is drawn exactly as it is drawn, and what changes is WHERE.
+
+`VoidBackdrop.configure` now wraps the sky's `Graphics` in a container and calls
+`cacheAsTexture`. Two properties of this layer and only this layer make that
+free, and both are load-bearing:
+
+  1. IT ONLY EVER TRANSLATES. Geometry is played into a static `Graphics` at
+     configure() and thereafter only `position` moves (`update`). Pixi's cached
+     render group re-renders only when its CONTENTS change, and a parallax offset
+     is not a change (RenderGroup.textureNeedsUpdate is set by init,
+     enableCacheAsTexture and updateCacheTexture, and by nothing else). So the
+     bake is once per (map, viewport, tier) — exactly where the geometry build
+     already happens — and never in a frame.
+
+  2. ITS SMALLEST FEATURE IS ENORMOUS. The smallest radius any sky declares is
+     Patina Drift's 0.10 of featureSpan: 128 px at 1280x720, 297 px at 3440x1440.
+     The alpha across it is a radial ramp. Linear interpolation error on (1-t^2)^2
+     sampled every third pixel is (dt^2/8)*max|f''| = 5.5e-4 of peak alpha, and
+     at Patina Drift's own peak (0.086) over its own colour delta (151 codes)
+     that is 0.007 of ONE 8-bit code value.
+
+Blend correctness is the thing that could have gone wrong silently, so it is
+stated: the blend mode goes on BOTH the `Graphics` (so clots composite with each
+other inside the cache exactly as they did on the frame buffer) and the wrapper
+(so the finished cache composites onto the ground the same way). Source-over is
+associative and additive is associative, so the two-step composite IS the
+one-step composite. That is the whole licence for a cache to stand in for a
+layer, and section 5 measures it rather than trusting it.
+
+Resolution is derived from a MEMORY budget rather than set: `skyCacheResolution`
+returns 1/3, or the first coarser whole fraction whose texture fits 2^21 texels
+(2048x1024 = 8 MB at RGBA8) after the power-of-two rounding Pixi's texture pool
+applies. 2048 is the WebGL2 GUARANTEED MAX_TEXTURE_SIZE, so a cache inside the
+budget fits every device the game claims to run on, with no capability query and
+no fallback path that only fires on hardware we do not own. Below 1/8 it declines
+to cache and draws directly — correct and expensive, never absent, which is
+r9-01's rule arriving in a new place.
+
+    viewport              cache texture   resolution
+    -----------------------------------------------
+    phone 798x384              2.0 MB       1/3
+    desktop 1280x800           8.0 MB       1/3
+    1920x1080                  8.0 MB       1/3
+    2560x1440                  8.0 MB       1/4
+    ultrawide 3440x1440        8.0 MB       1/4
+    32:9 5120x1440             8.0 MB       1/6
+
+THE A/B, measured back-to-back in one page under one load (SwiftShader ms; the
+`ground+sky` pairs are the clean read, since they isolate the layer and are
+adjacent in time):
+
+    scenario                1280x720      1920x1080     2560x1440
+    ----------------------------------------------------------------
+    clear                       1.1            2.0           4.1
+    ground                     26.9           36.2          78.8
+    ground+reef   raw          90.2          166.6         318.0
+    ground+reef   baked        36.1           62.1         125.1     -60% -63% -61%
+    ground+patina raw         154.2          199.8         421.9
+    ground+patina baked        49.6           62.3         119.1     -68% -69% -72%
+
+    the sky layer alone (minus the ground quad):
+      Plasma Reef    63.3 ->  9.2 ms   -85%
+      Patina Drift  127.3 -> 22.7 ms   -82%
+
+    whole stack (the star field is geometry-bound on a CPU rasteriser and
+    dominates these totals in a way it does not on a GPU — see section 0):
+      full-reef   raw 356.3 -> baked 228.9   (-36%)
+      full-patina raw 403.6 -> baked 183.6   (-55%)
+
+COUNTED FILL, BEFORE AND AFTER (the portable number; printed by
+src/art/backdrop-fill.test.ts on every run):
+
+    viewport              Mpx   before   after   Mfrag before   Mfrag after
+    ------------------------------------------------------------------------
+    phone 798x384        0.31    4.913   2.330          1.5           0.7
+    desktop 1280x800     1.02    4.451   2.324          4.6           2.4
+    1920x1080            2.07    4.459   2.333          9.2           4.8
+    2560x1440            3.69    4.367   2.332         16.1           8.6
+    ultrawide 3440x1440  4.95    5.400   2.331         26.7          11.5
+    32:9 5120x1440       7.37    7.392   2.330         54.5          17.2
+
+The after column is flat because every term in it is now scale- AND
+aspect-invariant: 1.000 ground + 1.000 baked sky + 0.331 star field.
+
+
+--------------------------------------------------------------------------------
+5. IS IT THE SAME SKY? — MEASURED, AND LOOKED AT
+--------------------------------------------------------------------------------
+
+`cache-diff.mjs` renders each sky twice into the same canvas at the same camera
+offset — raw geometry, then the cache — reads both frames back, and writes both
+out. 20 PNGs in `frames/`, and every one of them was looked at.
+
+    viewport   sky           maxD/255  meanD   maxDE  changed  luma step   peak Y'
+    --------------------------------------------------------------------------------
+    1280x800   coalsack             4   0.519    3.80   82.0%  1.57->1.00  47.4->47.4
+    1280x800   ironVeil             6   0.498    4.42   69.7%  1.86->1.00  45.6->46.0
+    1280x800   patinaDrift          5   0.453    5.94   77.0%  1.64->0.93  35.2->35.3
+    1280x800   plasmaReef           4   0.169    4.10   38.6%  1.50->0.93  59.8->59.8
+    1280x800   deepEmber            4   0.355    3.72   62.0%  0.93->0.93  23.1->23.7
+    3440x1440  coalsack             4   0.500    3.43   80.4%  1.00->0.93  47.2->46.9
+    3440x1440  ironVeil             5   0.443    4.43   65.4%  1.43->1.00  43.2->42.8
+    3440x1440  patinaDrift          5   0.441    5.57   75.9%  1.43->0.93  35.2->35.2
+    3440x1440  plasmaReef           3   0.119    3.40   29.8%  1.50->1.00  56.4->56.4
+    3440x1440  deepEmber            4   0.365    2.85   63.6%  1.43->0.93  21.4->21.7
+
+The column that matters most is the last one. Six developer reports on this
+backdrop are about the brightness ladder, and it holds to under half a code value
+on every sky at both viewports. The ladder's ORDER is untouched.
+
+The residual 3-6 code values are the ramp's DITHER resampling, not gradient
+error — the mean difference is half a code value, and the error the interpolation
+argument predicts is 0.007. And the banding measure moves the RIGHT way: the
+largest single-pixel luma step along a scanline falls from 1.50-1.86 to
+0.93-1.00, because bilinear magnification interpolates between quantised values.
+The worry that a downsample would average a0-39's anti-banding noise into the
+mush it exists to prevent was backwards: caching makes the sky SMOOTHER.
+
+By eye: identical. The additive sky is the one that could have failed silently —
+a wrong blend through a render target shows as a brighter or darker reef, or as a
+rectangular seam where the texture ends — and Plasma Reef direct and cached are
+indistinguishable, at the same peak Y' 59.8, with no seam. Iron Veil's rust band
+and Coalsack's dust lane sit in the same places at the same values.
+
+
+--------------------------------------------------------------------------------
+6. THE STATED FRAME BUDGET
+--------------------------------------------------------------------------------
+
+    THE BACKDROP BLENDS AT MOST 2.5 SCREENFULS PER FRAME, AT ANY VIEWPORT, ON
+    ANY MAP.
+
+Enforced by `src/art/backdrop-fill.test.ts` on every push, over a six-viewport
+sweep from the landscape phone to 32:9, on all six maps. It is stated on the
+SHAPE of the stack rather than as a percentage: the ground is one opaque pass,
+the sky is one textured pass, the star field is a third of a pass, total 2.331.
+Anything above ~2.4 means a layer stopped being a single pass — a regression in
+kind, which is what a gate should catch.
+
+At the two sizes the brief asks about, and with the assumption stated so the
+developer can substitute their own hardware's number:
+
+    AT 3440x1440 (4.95 Mpx, the developer's screen)
+      backdrop blends       11.5 Mfrag/frame     (was 26.7)
+      at 60 fps             693 Mfrag/s          (was 1.60 Gfrag/s)
+      on integrated graphics at a nominal 5 Gfrag/s of blended fill:
+                            2.3 ms of a 16.7 ms frame   (was 5.3 ms)
+
+    AT 5120x1440 (7.37 Mpx, 32:9)
+      backdrop blends       17.2 Mfrag/frame     (was 54.5)
+      at 60 fps             1.03 Gfrag/s         (was 3.27 Gfrag/s)
+      same assumed rate:    3.4 ms of a 16.7 ms frame   (was 10.9 ms)
+
+The 5 Gfrag/s is an assumption about integrated graphics, labelled as one; the
+Mfrag/frame column is measured and portable. The shape of the before column is
+the point: at 32:9 the backdrop alone wanted two thirds of a 60 fps frame for
+nothing but the sky behind the game, and at 21:9 nearly a third. After, it wants
+a seventh and a fifth.
+
+WHAT THE FIX DOES *NOT* DO. It does not take the view away. Nothing about what a
+desktop player sees changed — same viewport, same arena on screen, same sky, same
+counts, same alphas, same brightness ladder. a0-74 is widening the mobile view
+toward parity at the same time and this does not touch that trade; the developer
+declined it once and it is not re-proposed here.
+
+WHAT IS LEFT, IN ORDER, if this is not enough on the developer's box:
+
+  a) `coverSpan` over-provisions every parallax field by a whole viewport — 4.9x
+     the area. It costs no fill, and it costs 3.2x the star geometry baked and
+     re-submitted every frame (the deep layer holds 49,378 shapes at 3440x1440
+     where 15,560 would cover the screen) plus 4x the cache texture. See (b) in
+     section 8: it is a Director's call, not a deferral.
+  b) App-level MSAA — REASONED, NOT MEASURED, and flagged as such. `main.ts:833`
+     requests `antialias: true` on the `Application`, which asks WebGL for a
+     multisampled default framebuffer; this box reports MAX_SAMPLES 4. Blending
+     under MSAA is per SAMPLE, so the mechanism is a ~4x multiplier on the blended
+     traffic of every pass, the backdrop's included. The argument that it buys
+     nothing on THIS content is that every backdrop edge is the zero rim of a
+     falloff where the alpha has already arrived at 0, and every entity is a
+     `Sprite` off a texture the baker already antialiased (`generateTexture`,
+     `antialias: true`); the one thing it plausibly helps is the arena wall's thin
+     steel strokes.
+     That reasoning is not a measurement, and a0-75's own history says so: the
+     scale-1/2 probe in section 0 was equally reasonable and equally wrong. The
+     rig can settle it — `attribute.mjs` already takes an `aa=0` pass — and this
+     branch did not run it, because the run was cut to free the box and because
+     `antialias` is Platform Engineer's line to move either way. RAISED, with the
+     check named, not claimed.
+  c) `resolution: window.devicePixelRatio` on the same call, uncapped, where the
+     VFX texture cache caps at 2 for exactly this reason (main.ts:1477 — "a dpr-3
+     phone would otherwise bake nine times the texels it can show"). On a HiDPI
+     ultrawide, or with Windows display scaling at 125%/150%, the drawing buffer
+     is 1.56x to 4x the CSS pixels — multiplying everything above. Also Platform
+     Engineer's.
+
+
+--------------------------------------------------------------------------------
+7. VfxAutoQuality — IS IT ENGAGING, IS IT HELPING, SHOULD IT READ AREA?
+--------------------------------------------------------------------------------
+
+Driven rather than read; full run in `reducer.txt`.
+
+IS IT ENGAGING? Only at or below 30 fps sustained. 30 s of steady play:
+
+     fps  frame ms  engaged  verdict
+      25      40.0      yes  sheds VFX
+      29      34.5      yes  sheds VFX
+      30      33.3      yes  sheds VFX
+      31      32.3       no  CHOPPY AND UNTOUCHED
+      36      27.8       no  CHOPPY AND UNTOUCHED
+      45      22.2       no  CHOPPY AND UNTOUCHED
+      50      20.0       no  CHOPPY AND UNTOUCHED
+
+Everything from 31 to 54 fps is a frame rate the player feels — a 40 fps frame on
+a 60 Hz panel judders every third refresh — and the reducer never fires.
+
+IS IT THRASHING? No, and the real failure is the opposite. A rate wandering +-8
+fps around 26 fps engages 0% of the time over 60 s, because any excursion above
+the floor resets `bandSeconds` to zero and a 4 s wobble crosses 30 twice a cycle.
+It fires on a steady slog and not on a stutter, and a stutter is what a stutter
+is. No chatter anywhere, at any centre: the 20 fps hysteresis gap and the two 3 s
+sustain windows do exactly what their docstring promises.
+
+SHOULD IT REACT TO VIEWPORT AREA RATHER THAN ONLY TO FRAME TIME? NO, and the
+reason is what it can reach. Every lever the flag has is per-ENTITY — the
+particle budget (`vfxField.quality`), impact glows, spawn shimmer, the station
+halo — and r9-01 deliberately forbids it the sky mid-match, because the density
+is pinned at build so a device that throttles at t+8 s keeps the sky it booted
+with. a0-75 is a per-PIXEL cost. Wiring viewport area into this state machine
+would have shed sparks on a big window while three screenfuls of sky went on
+being paid for in full: the right signal reaching the wrong lever.
+
+And after this branch there is nothing for an area input to react to. Backdrop
+fill is 2.33 screenfuls at every viewport in the sweep and on every map. The
+honest fix for a cost that scaled with area was to stop it scaling, not to detect
+that it had.
+
+One thing to hand to the Platform Engineer, since `vfx-quality.ts` is theirs:
+`sample()` discards any frame over 1 s as a tab thaw (line 90). That is right for
+a thaw, and it means a machine slow enough to produce genuinely 2 s frames —
+which is what this container does at 5120x1440 — is invisible to the reducer. The
+device that needs it most is the one it never sees. Not changed here; it is a
+deliberate spike guard and weighing it is theirs.
+
+
+--------------------------------------------------------------------------------
+8. SHOULD THE PERFORMANCE GATE SWEEP VIEWPORT SIZES?
+--------------------------------------------------------------------------------
+
+Yes, and it is worth being precise about why the studio's three existing gates
+could not have caught this, rather than filing it as bad luck:
+
+    tests/harness/perf.test.ts      profiles the SIM, which has no viewport
+    tests/perf/draw-budget.spec.ts  counts draw calls and submitted entities,
+                                    which barely move with the viewport
+    tests/perf/frame-time.spec.ts   measures ONE fixed viewport, and gates only
+                                    on hardware CI does not have
+
+Every one is a real gate and none of them has an axis called AREA. So a per-pixel
+cost that is fine at 1280x720, a third worse at 3440x1440 and double at 32:9 was
+invisible to all three at once, and the developer found it by dragging a window
+corner.
+
+The art half of that axis is added here: `src/art/backdrop-fill.test.ts`, a unit
+test rather than a browser suite ON PURPOSE. Fragments are countable without a
+GPU, so the budget gates on every push instead of on a machine somebody has to
+own, and it asserts the two things a millisecond cannot: that fill is FLAT across
+aspect ratios, and that the sky layer is actually cached (an uncached sky is
+pixel-identical and three screenfuls more expensive — the exact failure this
+whole brief is about).
+
+Two recommendations that are not art's to make, put here so they are on record:
+
+  (a) `tests/perf/frame-time.spec.ts` should sweep, not sample. Two more
+      viewports — a 21:9 and a 32:9 — would have turned a0-75 into a red gate
+      before it reached the developer, and the whole cost of that is `page.
+      setViewportSize`.
+  (b) `coverSpan`'s over-provision (section 6a) needs a brief of its own. The
+      arithmetic is now written on the function: the requirement is
+      `max(view(1+f), view(1-f) + 2f*bound)` and it returns that plus a whole
+      view AND the documented quarter-view of slack. The correction was
+      implemented and measured on this branch and then REVERTED, because the field
+      is not only a cover margin: a `lane` sky's `reach` and a `band` sky's spread
+      are fractions of it, so shrinking it makes Coalsack's dust lane physically
+      shorter and re-packs every structure that spans the field. Three ratified
+      declarations went out of tolerance at once (Coalsack peak luma 46.3 -> 35.2,
+      Patina Drift 32.3 -> 35.4, and a0-07b's own build-cost claim). Buying
+      geometry by re-shaping three skies is the trade a0-40 exists to refuse. It
+      wants a brief that re-derives the sky measurements against a corrected
+      field. DIRECTOR'S CALL.
+
+
+--------------------------------------------------------------------------------
+9. BEFORE AND AFTER ON THE SHIPPED BUNDLE, INTERLEAVED
+--------------------------------------------------------------------------------
+
+"Quiet box" is not something a lane on this image can assert: four lanes share
+eight cores and none can see another's load. The first attempt at this table
+proved the point — an "after" run twenty minutes after the "before" came back
++38% SLOWER, entirely because a `vite build` of mine was beside it.
+
+So the before/after is not taken across two runs. `ab-sweep.mjs` builds BOTH
+bundles (a git worktree at f7ef828 for the before, `dist/` for the after), serves
+them on two ports, and takes each viewport's PAIR back to back in the same minute
+— alternating which goes first, so a monotonic drift in load cannot land on one
+column.
+
+    FROZEN SCENE, oval / Plasma Reef, wide arena, 30 sampled frames after 15
+
+    viewport      Mpx     before ms       after ms     delta   order
+    ------------------------------------------------------------------------
+    phone        0.31   133.3 (p95  150)  116.7 ( 150)   -12%   before first
+    1280x720     0.92   516.6 (p95  617)  316.7 ( 450)   -39%   after first
+    1920x1080    2.07   783.3 (p95  917)  700.0 ( 883)   -11%   before first
+    2560x1440    3.69  1333.3 (p95 1550)  733.3 (1283)   -45%   after first
+    3440x1440    4.95  1266.7 (p95 2133)  849.9 (1017)   -33%   before first
+
+    LIVE MATCH — eight seats of bot AI, projectiles, ore, a moving camera
+
+    viewport      Mpx     before ms       after ms     delta   order
+    ------------------------------------------------------------------------
+    1280x720     0.92   300.0 (p95  383)  216.7 ( 267)   -28%   before first
+    3440x1440    4.95  1300.0 (p95 1500)  866.5 (1117)   -33%   after first
+
+    (Two sizes rather than five: the live scene carries bot AI on eight seats and
+    a moving camera, so it costs more per reading and varies more, and the frozen
+    table above is the controlled one. Note that `VfxAutoQuality` HAS engaged in
+    both live columns — this box renders far below its 30 fps floor — so both
+    sides are measured with the particle field thinned, equally.)
+
+Every pair is negative, at every size, in both orders. Read the pairs and not the
+column: 3440x1440's "before" (1266.7) reads FASTER than 2560x1440's (1333.3),
+which is arithmetically impossible for the same build on more pixels, and is the
+neighbouring lane's load showing through. The pair-wise deltas are the signal;
+their absolute scale is not.
+
+TWO THINGS TO BE HONEST ABOUT IN THIS TABLE.
+
+First, it is 5120x1440 short. The run was stopped after the 3440x1440 pair to
+free the box for the golden re-baseline; the counted-fill table in section 4 does
+cover 32:9 (7.392 -> 2.330), and that is the number the budget in section 6 is
+stated on.
+
+Second, and more important: **this table UNDERSTATES the fix, and by a knowable
+amount.** On a CPU rasteriser the star field's per-triangle setup is the dominant
+term — 3,800 to 54,000 tiny circles, against the sky's 9 to 22 huge ones — and
+the star field is unchanged by this branch. From the layer rig at 1920x1080:
+
+    ground                                36.2 ms
+    ground + stars                       278.0 ms   -> stars cost 241.8 ms
+    ground + reef (raw)                  166.6 ms   -> sky   cost 130.4 ms
+    ground + reef (baked)                 62.1 ms   -> sky   cost  25.9 ms
+
+    predicted whole-frame saving: 130.4 - 25.9 = 104.5 ms
+    measured whole-frame saving:  783.3 - 700.0 =  83.3 ms
+
+Same order, and the residual is load. On a GPU the ratio inverts: 0.33 blended
+screenfuls of star field is nothing and ~1 M static triangles is well under a
+millisecond, while three blended screenfuls of full-frame gradient is the whole
+problem. That is exactly why the load-bearing claim in this audit is the COUNTED
+fill of section 4 and not a millisecond off this box.
+
+
+--------------------------------------------------------------------------------
+10. WHAT IS IN THIS BRANCH
+--------------------------------------------------------------------------------
+
+Production:
+
+  src/art/mockup-reference.ts   featureSpan(W, H), and mockupBlobs sizing off it
+  src/art/backdrop.ts           SKY_CACHE_RESOLUTION / _MAX_TEXELS /
+                                _MIN_RESOLUTION, skyCacheResolution(),
+                                skyIsCached read-back, releaseLayers(), and
+                                configure() wrapping the sky in a cached
+                                container. The coverSpan docstring now carries
+                                the arithmetic of its own over-provision.
+  src/art/shapes.ts             shapeArea / spriteArea — the unit of this brief
+  src/art/backdrop-fill.test.ts THE GATE: 8 tests over a six-viewport sweep
+  assets/preview/sprite-sheet.svg  regenerated (the review tile is 1.6:1, so the
+                                   aspect fix moves its blobs by 5.4%)
+
+Not touched, deliberately: every design number in MOCKUP_REFERENCE, every sky's
+count/radius/alpha/hue/seed, SKY_PARALLAX, STAR_LAYERS, the bloom rule and its
+threshold, reducedDensity, MAP_NEBULA, coverSpan's arithmetic, and every file
+outside src/art/ and assets/.
+

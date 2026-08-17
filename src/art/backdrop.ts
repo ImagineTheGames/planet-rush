@@ -1192,22 +1192,198 @@ export const ARENA_WALL_BANDS: readonly WallBand[] = [
 // ---------------------------------------------------------------------------
 
 interface Layer {
-  readonly gfx: Graphics;
+  /** The display object this layer moves each frame. A `Graphics` for the ground
+   *  and the star layers; a cached `Container` for the sky ({@link
+   *  SKY_CACHE_RESOLUTION}). */
+  readonly gfx: Container;
   readonly parallax: number;
+}
+
+/**
+ * **The sky is baked once into a texture at a third of linear resolution, and
+ * that is the whole of a0-75's fill fix.**
+ *
+ * The developer, having bisected it themselves: *"i think it gets worse the
+ * larger the playing area is on my screen … if i resize to a small window the
+ * game plays much better."* Counted off the shipped geometry
+ * (`evidence/a0-75-fill-rate/overdraw.txt`), a desktop frame over the wide arena
+ * blends **4.4 screenfuls** of backdrop, and **3.0 of them are the sky** — nine
+ * clots each covering ~40% of the frame, stacked. The ground is 1.0 and the
+ * whole star field, halos and diffraction crosses included, is 0.33.
+ *
+ * ## Why a texture is free here and would not be anywhere else
+ *
+ * Two properties of *this* layer, and both are load-bearing:
+ *
+ *  1. **It only ever translates.** The geometry is played into a static
+ *     `Graphics` at {@link VoidBackdrop.configure} and thereafter only its
+ *     `position` moves ({@link VoidBackdrop.update}). Pixi's cached render group
+ *     re-renders only when its contents change, and a parallax offset is not a
+ *     change — so the bake happens **once per (map, viewport, tier)**, exactly
+ *     where the geometry build already happens, and never in a frame.
+ *  2. **Its smallest feature is enormous.** The smallest radius any sky declares
+ *     is Patina Drift's `0.10` of `./mockup-reference` `featureSpan` — 128 px at 1280×720, 297
+ *     at 3440×1440 — and the alpha across it is a radial ramp. Linear
+ *     interpolation error on `(1 − t²)²` sampled every third pixel is
+ *     `(Δt²/8)·max|f″|` = **5.5 × 10⁻⁴ of peak alpha**; at Patina Drift's own
+ *     peak (0.086) over its own colour delta (151 codes) that is **0.007 of one
+ *     8-bit code value**. The sky cannot tell the difference and neither can the
+ *     frame it is quantised into.
+ *
+ * So the layer that was 3.0 blended screenfuls becomes **one textured quad at
+ * 1.0**, and its thousands of triangles become two. Nothing about what the sky
+ * *is* changes: same shapes, same counts, same alphas, same colours, same seed.
+ * `./compliance` and `backdrop.test.ts` audit the `SpriteDef`, which is
+ * untouched — this is a decision about where the pixels are rasterised, not
+ * about the art.
+ *
+ * ## Why a third is the CEILING, and what the floor is about
+ *
+ * The interpolation error above is negligible from a half to an eighth, so a
+ * third is not chosen for fidelity. It is chosen because **below a third buys
+ * nothing**: the baked layer costs one textured pass whatever resolution it
+ * holds, so only the one-off bake and the texture get cheaper, and both are
+ * already small. There is no per-frame saving past this point, so there is no
+ * reason to spend any look on it. What actually sets the number per viewport is
+ * {@link skyCacheResolution}, which takes this as a ceiling and goes coarser only
+ * as far as a stated memory budget requires — 1/3 on a phone and a 1080p desktop,
+ * 1/4 at 21:9, 1/6 at 32:9.
+ *
+ * ## Banding: measured, and it moves the RIGHT way
+ *
+ * The one thing a downsample could plausibly hurt is the dither `./textures`
+ * `rampPixels` carries to stop the sky contouring at 8 bits (a0-39 is the brief
+ * that put it there). It does not, and the reason is a stronger effect than the
+ * dither: **bilinear magnification interpolates between quantised values**, so
+ * the baked layer arrives smoother than the geometry did. Measured as the largest
+ * single-pixel luma step along a scanline
+ * (`evidence/a0-75-fill-rate/cache-diff.json`), across all five skies:
+ *
+ * ```
+ *   1280×800  (cache 1/3)   1.50–1.86  →  0.93–1.00
+ *   3440×1440 (cache 1/4)   1.00–1.50  →  0.93–1.00
+ * ```
+ *
+ * **Stated rather than implied: 1/6 is NOT in that table.** The ramp is 256
+ * texels over 1.25 radii, so one ramp texel spans `rx / 102.4` screen px — 3.5 px
+ * on the smallest blob a 32:9 frame carries — and at 1/6 a cache texel is 1.7 ramp
+ * texels, which does average some of the noise rather than resample it. The
+ * measurements above say the interpolation gain more than covers that at 1/3 and
+ * 1/4; nobody has measured 32:9 on real hardware, and the honest thing is to say
+ * so and to name the check. Re-run `cache-diff.mjs` with a 5120×1440 viewport and
+ * read the `maxStep` columns; if the cached number ever comes out *above* the
+ * direct one, lower {@link SKY_CACHE_MAX_TEXELS} until 1/4 fits at 32:9 and pay
+ * the memory.
+ *
+ * **TUNABLE** — but not downward without re-reading that table, and not upward
+ * without re-measuring the memory.
+ */
+export const SKY_CACHE_RESOLUTION = 1 / 3;
+
+/**
+ * **The cache's memory budget, in texels — and the reason the resolution above
+ * is a ceiling rather than a setting.**
+ *
+ * The cache is the size of the parallax **field**, not of the screen, and
+ * `coverSpan` builds a field about 2.1× wider than the screen ever needs (see
+ * it). At a flat third that puts a 3440×1440 ultrawide's cache at 2664×1153,
+ * which Pixi's texture pool rounds up to 4096×2048 = **32 MB** — a lot of a
+ * phone's texture budget spent on field nobody can see. So the budget is stated
+ * and the resolution follows from it, rather than the other way round.
+ *
+ * `2²¹` is 2048×1024 = **8 MB** at RGBA8. Both of those numbers matter: 2048 is
+ * the WebGL2 *guaranteed* `MAX_TEXTURE_SIZE`, so a cache inside this budget fits
+ * every device the game claims to run on with no capability query and no
+ * fallback path that only fires on hardware we do not own; and 8 MB is one
+ * texture, once per (map, viewport, tier), against the three blended screenfuls
+ * a frame it replaces.
+ *
+ * Measured across the whole sweep it lands at 8 MB **flat** — phone to 32:9 —
+ * because the resolution absorbs the difference (`backdrop-fill.test.ts` prints
+ * the column).
+ */
+export const SKY_CACHE_MAX_TEXELS = 2 ** 21;
+
+/**
+ * **The floor.** Below this a blob's own gradient is carried by too few texels
+ * to be sure of, and the sky is better off expensive than approximated: the
+ * layer draws directly, exactly as it did before a0-75. A guard against a
+ * viewport nobody has thought of yet, not a path any shipping screen takes — the
+ * widest in the sweep (32:9 over the wide arena) asks for a sixth, where the
+ * smallest blob in the set is still 60 texels across.
+ */
+export const SKY_CACHE_MIN_RESOLUTION = 1 / 8;
+
+/**
+ * The resolution this field's cache is baked at: {@link SKY_CACHE_RESOLUTION},
+ * or the first coarser whole fraction whose texture fits
+ * {@link SKY_CACHE_MAX_TEXELS} **after** the power-of-two rounding Pixi's
+ * texture pool applies. `null` when even {@link SKY_CACHE_MIN_RESOLUTION} would
+ * not fit, which means *draw the sky directly* — correct and expensive, never
+ * absent (the r9-01 rule, in a new place).
+ *
+ * Whole fractions rather than a continuous fit, because the pow2 rounding makes
+ * the cost a staircase: between 1/3 and 1/4 there is nothing to buy, and a
+ * continuous `min()` would happily return 1/3.38 and land on the same texture as
+ * 1/4 while looking like a considered number.
+ *
+ * Exported so the gate can assert a real number at every viewport the game is
+ * played at. An uncached sky is invisible to the eye and costs three blended
+ * screenfuls a frame, which is the whole of a0-75 — not a thing to discover from
+ * a frame-time regression months later.
+ */
+export function skyCacheResolution(fieldW: number, fieldH: number): number | null {
+  const pow2 = (n: number): number => 2 ** Math.ceil(Math.log2(Math.max(1, n)));
+  for (let d = Math.round(1 / SKY_CACHE_RESOLUTION); d <= Math.round(1 / SKY_CACHE_MIN_RESOLUTION); d++) {
+    const r = 1 / d;
+    if (pow2(Math.ceil(fieldW * r)) * pow2(Math.ceil(fieldH * r)) <= SKY_CACHE_MAX_TEXELS) return r;
+  }
+  return null;
 }
 
 /**
  * The area a field must span to cover the screen at any camera offset, given a
  * parallax factor `f`, the viewport size and the arena bound on that axis. The
  * field, positioned at `f·cameraOffset`, must overlap `[0, view]` for every
- * `cameraOffset ∈ [center − bound, center]`; the two extremes ask for
- * `view·(1 + f)` and `view·(1 − f) + 2·bound·f`, and this returns more than
- * both, plus a quarter-view of slack.
+ * `cameraOffset ∈ [view/2 − bound, view/2]`; the two extremes ask for
+ * `view·(1 + f)` and `view·(1 − f) + 2·bound·f`, and this returns the larger of
+ * them plus a quarter-view of slack.
  *
  * Exported because it is the *reason* a faster sky costs anything at all: raise
  * `f` and the field grows, so `backdrop.test.ts` can hold both halves of that
  * trade — the field genuinely covers the screen at {@link SKY_PARALLAX}, and
- * what it costs to do so is the ~22% of build-time geometry a0-07b declares.
+ * what it costs to do so is the ~20% of build-time geometry a0-07b declares.
+ *
+ * ## a0-75 found it over-provisions by a whole viewport, and did NOT take it
+ *
+ * `(2 − f)·view + 2·f·bound` is `[view·(1 − f) + 2·f·bound] + view` — the second
+ * requirement with an entire viewport added on top, which then has the
+ * documented quarter-view of slack added to *that*. `Math.max(…) + view/4` is
+ * what the paragraph above describes, and against it every field in the void is
+ * built about **2.1× too wide and 2.3× too tall — 4.9× the area.** It costs no
+ * per-frame fill (the rasteriser clips what is off screen) and it costs
+ * everything else: the deep star layer bakes **49,378 shapes at 3440×1440**
+ * where 15,560 would cover the screen and every one of them is submitted every
+ * frame; the a0-75 sky cache is field-sized, so it wants 4× the texels; and
+ * every rebuild — which is every resize frame while a window is being dragged —
+ * pays all of it. Measured with `Math.max`: 3.2× less star geometry, and the
+ * cache at 3440×1440 falls from 32 MB to 8.
+ *
+ * **It is left alone here, deliberately, and that is a finding rather than a
+ * deferral.** The field is not only a cover margin: a `lane` sky's `reach` and a
+ * `band` sky's spread are fractions of it (`./mockup-reference` `mockupBlobs`),
+ * so shrinking it makes Coalsack's dust lane physically shorter and re-packs
+ * every structure that spans the field. Measured, three ratified declarations
+ * move out of tolerance at once — Coalsack's peak luma 46.3 → 35.2, Patina
+ * Drift's 32.3 → 35.4, and a0-07b's own build-cost claim. Buying memory by
+ * re-shaping three skies is the exact trade a0-40 exists to refuse, and the
+ * honest fix is a brief that re-derives the sky measurements against a corrected
+ * field — not a0-75 doing it on the way past. **Director's call.**
+ *
+ * a0-75 therefore pays for the over-provision where it can be paid without
+ * touching a sky: {@link skyCacheResolution} sizes the cache to a memory budget
+ * instead of to the field, so an oversized field costs resolution nobody can see
+ * rather than megabytes everybody does.
  */
 export function coverSpan(f: number, view: number, bound: number): number {
   return (2 - f) * view + 2 * f * bound + view * 0.25; // + a quarter-view of slack
@@ -1238,6 +1414,10 @@ export class VoidBackdrop {
    * {@link configure} reads the tier.
    */
   private pinnedDensity: number | null = null;
+  /** Whether the sky on the stage is the baked quad or the raw geometry — false
+   *  when there is no sky, and when the field was too big to cache
+   *  ({@link skyCacheResolution}). The read-back for the a0-75 fill fix. */
+  private skyCached = false;
   /** The config the current geometry was built for, so a no-op frame rebuilds
    *  nothing (GDD §4.3). `-1` = never built. */
   private builtW = -1;
@@ -1303,6 +1483,21 @@ export class VoidBackdrop {
   }
 
   /**
+   * Whether the sky on the stage is the **baked quad** rather than its raw
+   * geometry ({@link SKY_CACHE_RESOLUTION}). False when the map's sky is `none`,
+   * and false when the parallax field was too large to cache
+   * ({@link skyCacheResolution}) — in which case the sky is correct and expensive
+   * rather than absent.
+   *
+   * Exported as a read-back because "did the fill fix engage" is otherwise
+   * invisible: an uncached sky looks identical and costs three screenfuls a
+   * frame, which is precisely the failure mode a0-75 was reported as.
+   */
+  get skyIsCached(): boolean {
+    return this.skyCached;
+  }
+
+  /**
    * Build (or rebuild) the field to cover a `viewW`×`viewH` viewport over a
    * `boundsW`×`boundsH` arena. Cheap no-op when nothing changed — safe to call
    * every frame. Geometry is played into static `Graphics` here and only moved
@@ -1335,9 +1530,7 @@ export class VoidBackdrop {
     this.builtNebula = this.nebula.id;
 
     // Discard any prior build.
-    for (const l of this.layers) l.gfx.destroy();
-    this.layers = [];
-    this.view.removeChildren();
+    this.releaseLayers();
 
     // The ground, first and always: one opaque Floor quad, fixed to the screen
     // (parallax 0, so it needs no cover slack at all).
@@ -1356,11 +1549,35 @@ export class VoidBackdrop {
       const nw = coverSpan(this.nebula.parallax, viewW, boundsW);
       const nh = coverSpan(this.nebula.parallax, viewH, boundsH);
       const g = new Graphics();
-      g.label = `void-nebula-${this.nebula.id}`;
       drawSprite(g, nebulaSprite(this.nebula.id, this.seed, nw, nh, density, viewW, viewH), 1);
       if (this.nebula.additive) g.blendMode = 'add';
-      this.view.addChild(g);
-      this.layers.push({ gfx: g, parallax: this.nebula.parallax });
+
+      // **Bake it (a0-75; {@link SKY_CACHE_RESOLUTION}).** Three screenfuls of
+      // stacked gradient become one textured quad. The wrapper carries the
+      // label, so every read-back that finds this layer by name still does
+      // (`backdrop-reducer.test.ts`, `render/reduce-vfx.test.ts`).
+      const holder = new Container();
+      holder.label = `void-nebula-${this.nebula.id}`;
+      holder.addChild(g);
+      const resolution = skyCacheResolution(nw, nh);
+      if (resolution !== null) {
+        // The blend goes on BOTH: on the `Graphics` so the clots composite with
+        // each other inside the cache exactly as they did on the frame buffer,
+        // and on the wrapper so the finished cache composites onto the ground
+        // the same way. Source-over is associative and additive is too, so the
+        // two-step result is the one-step result — which is the whole reason a
+        // cache is allowed to stand in for the layer.
+        if (this.nebula.additive) holder.blendMode = 'add';
+        // `antialias: false` deliberately. Every edge in this layer is the zero
+        // rim of a falloff, where the alpha has already arrived at 0 — there is
+        // no edge to smooth, and MSAA on a cache is 4× the bake for nothing.
+        holder.cacheAsTexture({ resolution, antialias: false });
+        this.skyCached = true;
+      } else {
+        this.skyCached = false;
+      }
+      this.view.addChild(holder);
+      this.layers.push({ gfx: holder, parallax: this.nebula.parallax });
     };
 
     // A sky of light sits behind the star-field; a sky of dust sits in front of
@@ -1392,13 +1609,30 @@ export class VoidBackdrop {
     }
   }
 
+  /**
+   * Drop every layer, and drop the sky's **cache texture** with them.
+   *
+   * `cacheAsTexture(false)` before `destroy()` is not tidiness: a cached render
+   * group holds a pooled `RenderTexture`, and destroying the container without
+   * disabling the cache first leaves that texture in the pool keyed to a render
+   * group that no longer exists. At 8 MB a sky and one rebuild per resize, a
+   * window being dragged is the exact input that turns that into a leak.
+   */
+  private releaseLayers(): void {
+    for (const l of this.layers) {
+      if (l.gfx.isCachedAsTexture) l.gfx.cacheAsTexture(false);
+      l.gfx.destroy({ children: true });
+    }
+    this.layers = [];
+    this.skyCached = false;
+    this.view.removeChildren();
+  }
+
   /** Release every layer's geometry (context loss / teardown). The density pin
    *  goes with them: nothing is on the stage, so the next build is entitled to
    *  read the tier afresh (r9-01). */
   destroy(): void {
-    for (const l of this.layers) l.gfx.destroy();
-    this.layers = [];
-    this.view.removeChildren();
+    this.releaseLayers();
     this.pinnedDensity = null;
     this.builtDensity = -1;
   }

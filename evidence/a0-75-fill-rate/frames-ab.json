@@ -1,0 +1,70 @@
+{
+  "rows": [
+    {
+      "scene": "octagon-none",
+      "map": "octagon",
+      "width": 1280,
+      "height": 800,
+      "pixels": 1024000,
+      "maxChannel": 0,
+      "meanChannel": 0,
+      "changedFraction": 0,
+      "over2Fraction": 0
+    },
+    {
+      "scene": "compass-coalsack",
+      "map": "compass",
+      "width": 1280,
+      "height": 800,
+      "pixels": 1024000,
+      "maxChannel": 9,
+      "meanChannel": 0.8115406901042039,
+      "changedFraction": 0.7838740234375,
+      "over2Fraction": 0.08042578125
+    },
+    {
+      "scene": "oval-plasma-reef",
+      "map": "oval",
+      "width": 1280,
+      "height": 800,
+      "pixels": 1024000,
+      "maxChannel": 11,
+      "meanChannel": 1.5100706380202729,
+      "changedFraction": 0.8949345703125,
+      "over2Fraction": 0.4333408203125
+    },
+    {
+      "scene": "line-deep-ember",
+      "map": "line",
+      "width": 1280,
+      "height": 800,
+      "pixels": 1024000,
+      "maxChannel": 5,
+      "meanChannel": 0.5275543619788385,
+      "changedFraction": 0.6680263671875,
+      "over2Fraction": 0.029142578125
+    },
+    {
+      "scene": "oval-plasma-reef-ultrawide",
+      "map": "oval",
+      "width": 3440,
+      "height": 1440,
+      "pixels": 4953600,
+      "maxChannel": 25,
+      "meanChannel": 5.248686342588807,
+      "changedFraction": 0.9404784399224806,
+      "over2Fraction": 0.8932180636304909
+    },
+    {
+      "scene": "line-deep-ember-ultrawide",
+      "map": "line",
+      "width": 3440,
+      "height": 1440,
+      "pixels": 4953600,
+      "maxChannel": 9,
+      "meanChannel": 1.2852464873931506,
+      "changedFraction": 0.895642159237726,
+      "over2Fraction": 0.33676033591731264
+    }
+  ]
+}

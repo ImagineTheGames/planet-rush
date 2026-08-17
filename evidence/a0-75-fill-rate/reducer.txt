@@ -1,0 +1,70 @@
+a0-75 — VfxAutoQuality, driven rather than read
+==========================================================================
+
+config: engage ≤ 30 fps sustained 3s ·
+        release ≥ 50 fps sustained 3s ·
+        EMA smoothing 0.1
+
+1. DOES IT ENGAGE? — 30 s of steady play at each rate
+
+   fps   frame ms   engaged   flips   verdict
+    12       83.3       yes       1   sheds VFX
+    20       50.0       yes       1   sheds VFX
+    25       40.0       yes       1   sheds VFX
+    28       35.7       yes       1   sheds VFX
+    29       34.5       yes       1   sheds VFX
+    30       33.3       yes       1   sheds VFX
+    31       32.3        no       0   CHOPPY AND UNTOUCHED
+    33       30.3        no       0   CHOPPY AND UNTOUCHED
+    36       27.8        no       0   CHOPPY AND UNTOUCHED
+    40       25.0        no       0   CHOPPY AND UNTOUCHED
+    45       22.2        no       0   CHOPPY AND UNTOUCHED
+    50       20.0        no       0   CHOPPY AND UNTOUCHED
+    55       18.2        no       0   fine, nothing to do
+    60       16.7        no       0   fine, nothing to do
+
+The floor is 30 fps, so everything from 31 to 54 is a frame rate the player
+feels — on a 60 Hz panel a 40 fps frame judders every third refresh — and
+the reducer never fires at all. It is not broken; it is answering a
+different question than the one a0-75 asks.
+
+2. DOES IT THRASH? — 60 s wandering ±8 fps around each centre, 4 s period
+
+ centre  flips/60s   engaged   
+     22          1       95%
+     26          0        0%
+     30          0        0%
+     34          0        0%
+     40          0        0%
+     48          0        0%
+
+No chatter anywhere: the 20 fps hysteresis gap and the two 3 s sustain
+windows do exactly what their docstring says. A reducer that toggled every
+second would be worse than one that never fired, and this is not that.
+
+3. SHOULD IT READ THE VIEWPORT? — no, and the reason is what it can reach
+
+  What the flag actually sheds (main.ts:2570 and its callees):
+    · vfxField.quality      — particle budget per burst (thins, never drops)
+    · renderer.setReduceVfx — impact glows, spawn shimmer, station halo
+    · VoidBackdrop          — NOTHING mid-match. r9-01 pins the sky density
+                              at build on purpose, so a device that throttles
+                              at t+8s keeps the sky it booted with.
+
+  Every one of those is per-ENTITY. None of them is per-PIXEL, and a0-75 is
+  a per-pixel cost: the backdrop was blending 5.40 screenfuls a frame at
+  3440×1440 and 7.39 at 32:9. Wiring viewport area into this state machine
+  would have shed sparks on a big window while the sky went on being paid
+  for in full — a reducer reacting to the right signal with the wrong lever.
+
+  And after the fix there is nothing left for an area input to react to.
+  Backdrop fill is now 2.33 screenfuls at EVERY viewport in the sweep and on
+  every map (src/art/backdrop-fill.test.ts). The honest fix for a cost that
+  scaled with area was to stop it scaling, not to detect that it had.
+
+  One thing worth handing to the Platform Engineer, since it is their file:
+  `sample()` discards any frame over 1 s (vfx-quality.ts:90) as a tab thaw.
+  That is right for a thaw and it means a genuinely 2 s frame — which is what
+  the container measures at 5120×1440 — is invisible to the reducer, so a
+  machine slow enough to need it most is the one it never sees. Not changed
+  here: it is a deliberate spike guard and moving it is theirs to weigh.
