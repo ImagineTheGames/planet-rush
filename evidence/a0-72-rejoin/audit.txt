@@ -121,7 +121,8 @@ those three numbers is small enough to refuse a returning player routinely.
   even reach (the ticket refused first, at 30 s).
              welcomes 2, botFlyingIt false, matchPhase "live"
              authority banked 53, tier 3 / client banked 53, tier 3
-             (53 rather than 42: the substitute bot banked ore while it flew.
+             (53 rather than the 40 the ship carried when they dropped: the
+              substitute bot banked ore while it flew.
               The ship is the same ship; its wallet moved because somebody was
               playing it, which is the design.)
 
