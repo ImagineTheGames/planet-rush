@@ -551,6 +551,145 @@ export function openDirection(ctx: BotCtx, fallback: Vec2, ignoreRock?: number):
 }
 
 // ---------------------------------------------------------------------------
+// Covering fire — movement intent and fire intent are independent (a0-81)
+// ---------------------------------------------------------------------------
+//
+// The developer, 2026-08-17, from a live match: *"when rusty was fleeing from me
+// he could have auto fired at me but instead he didnt … thats dumb because its
+// unfair for him to just target his base and not fire at me at same time because
+// thats what i would do."* The last clause is the standard, and it is the one
+// this whole file already claims to meet: a bot uses the same action interface a
+// human does, so it should be *allowed* to do what a human does.
+//
+// What it was doing instead: every travelling branch below returned a literal
+// `fire(false)` and **no `aim` at all**. Two consequences, and the second is the
+// one that made it look broken rather than merely passive — with no aim action
+// the sim's facing ladder falls through to "nose follows velocity"
+// (`sim/step.ts` `desiredFacing`), so a retreating bot was not holding fire, it
+// was pointed at its own doorstep with its back to the chase.
+//
+// The rule now: **movement intent and fire intent are independent**. A bot that
+// is retreating, hauling or banking still shoots whatever is in range and in
+// arc, on exactly the terms a player has — weapon reload, the same allegiance
+// predicate, the same aim-error model, the same fog.
+//
+// This costs the flight nothing, and that is not a balance concession, it is the
+// simulation's own arithmetic: `sim/step.ts` `integrate` applies `intent.thrust`
+// in **world space**, independent of `ship.angle`. Facing steers only the gun.
+// So a hull thrusting home with its nose over its shoulder gets home at exactly
+// the speed it always did — which is what the developer means by "it costs them
+// nothing", and why they expect it to happen.
+//
+// ── Where this applies, and where it deliberately does not ──────────────────
+//
+// It is wired into the branches that sit *above* the combat branches in all
+// three trees — `retreat`, `haulHome`/`homeErrand`, `spendAtHome`, the idle leg
+// of `defendHome`, the transit leg of `defendAlly`. Reaching one of those means
+// the bot was denied a fight by an **outranking commitment**, and a commitment
+// is a reason not to fly at someone, never a reason not to shoot them.
+//
+// It is deliberately NOT wired into `scavenge`, `roam` or `hunt`. Those sit
+// *below* `potshot`/`attack`, so reaching them means the tier's own attack gate
+// declined the fight — Easy's `potshot` demands `weights.triangle.attack >=
+// EASY_ATTACK_WEIGHT` before Rusty will shoot at something already in front of
+// it. Arming a roaming Rusty would not restore parity, it would hand the Easy
+// tree the seek-and-destroy branch GDD §2.9 withholds from it ("attacks
+// rarely"). The defect was a suppressed trigger, not a missing appetite.
+//
+// ── The difficulty ladder ───────────────────────────────────────────────────
+//
+// Every tier can do this, and Easy is bad at it. Gating the capability at
+// Medium was considered and rejected for one decisive reason: the bot in the
+// report is **Rusty, an Easy character**, so a Medium-and-up rule leaves the
+// developer's own match unchanged. Easy is made worse the way this codebase
+// makes Easy worse at everything else, with no new knob — `aimJitter` sprays
+// the shot, `aimLatency` leads a juking chaser where it *was* going, and
+// `reactionInterval` refreshes the whole aim roughly four times less often than
+// Hard's while the geometry of a chase changes every metre. Same doctrine as
+// the radio: cooperation is a difficulty dial expressed through the existing
+// latency and miss model, and there is no separate "be bad at it" knob.
+// Measured per tier in `evidence/a0-81-fleeing-fire/audit.txt`.
+
+/** Trigger up and nothing to shoot at: the pair a travelling branch emits when
+ *  covering fire finds no target. Frozen and shared — this is the common case,
+ *  and it must not allocate on a quiet tick (GDD §4.3). */
+const TRIGGER_UP: readonly Action[] = Object.freeze([Object.freeze(fire(false))]);
+
+/**
+ * What a travelling bot shoots back at, or `null` for nobody.
+ *
+ * `preferred` is the ship the branch already has a reason to care about — the
+ * threat a retreat is running from — and it wins while it is still shootable, so
+ * a bot being chased keeps its gun on the chaser rather than swapping to whoever
+ * happens to be a metre nearer. Otherwise: the nearest thing in weapon range.
+ *
+ * Fog-honest and allegiance-honest for free, because both questions are asked
+ * the one way the rest of the file asks them — `ctx.view.ships` is the perceived
+ * set, and {@link isTargetable} is the `hostile` stamp from `sim/allegiance.ts`.
+ * A teammate is never covering fire, at any range, in any tier (GDD §2.9).
+ */
+export function coveringFireTarget(ctx: BotCtx, preferred: PerceivedShip | null): PerceivedShip | null {
+  if (!ctx.self.alive) return null;
+  if (preferred && isTargetable(preferred) && preferred.distance <= WEAPON_RANGE) return preferred;
+  return nearestThreat(ctx, WEAPON_RANGE);
+}
+
+/**
+ * The `aim` + `fire` pair a travelling bot adds to its thrust — shooting over
+ * its shoulder without changing where it is going.
+ *
+ * The shot is {@link engage}'s shot exactly: the same {@link aimAndFire}, the
+ * same `combatSpread`, the same latency-delayed intercept lead keyed on the
+ * same `ctx.brain.aim` track. That sameness is the point — covering fire must
+ * not become a second, quietly better gun that skips the tier's aim error, and
+ * it must not become a second, quietly worse one either. The only thing this
+ * does *not* borrow from `engage` is the `standOff` thrust, which is the entire
+ * difference between fighting and running while firing.
+ *
+ * Returns `[fire(false)]` when there is nothing to shoot, so a branch can splice
+ * the result in unconditionally and still emit a released trigger.
+ */
+export function coveringFire(ctx: BotCtx, preferred: PerceivedShip | null = null): readonly Action[] {
+  const target = coveringFireTarget(ctx, preferred);
+  if (target === null) return TRIGGER_UP;
+  const { aim, fire: shot } = aimAndFire(
+    ctx.self,
+    target.pos,
+    SHIP_RADIUS,
+    target.vel,
+    combatSpread(ctx),
+    ctx.rng,
+    ctx.brain.aim,
+    target.id,
+    ctx.view.time,
+    combatLatency(ctx),
+  );
+  return [aim, shot];
+}
+
+/**
+ * A travelling decision, as one line: fly this way, and shoot back at whatever
+ * is in range while doing it.
+ *
+ * Every branch that used to end `..., fire(false)]` ends here instead. One
+ * helper rather than a `coveringFire` call spliced by hand at each site, for the
+ * reason the allegiance amendment gives about `isTargetable` (GDD §2.9): a rule
+ * spelled once holds in every behavior at once, and a rule spelled five times
+ * drifts apart branch by branch. `extra` carries the one-shot a branch may also
+ * be emitting — `spendAtHome`'s wheel press.
+ */
+export function travel(
+  ctx: BotCtx,
+  move: ThrustAction,
+  threat: PerceivedShip | null = null,
+  extra?: Action,
+): readonly Action[] {
+  const actions: Action[] = [move, ...coveringFire(ctx, threat)];
+  if (extra) actions.push(extra);
+  return actions;
+}
+
+// ---------------------------------------------------------------------------
 // Purchases (GDD §2.5 — one wheel, five segments, and the panel behind one)
 // ---------------------------------------------------------------------------
 
@@ -597,7 +736,10 @@ export function spendAtHome(ctx: BotCtx, plan: (ctx: BotCtx) => Purchase | null)
   if (ctx.self.spendable <= ctx.brain.endowment + 1e-9) return null;
   const purchase = plan(ctx);
   if (!purchase) return null;
-  return [go(ctx, orbit(ctx.self, station.pos, DOCK_RADIUS, 0.2)), fire(false), purchaseAction(purchase)];
+  // Banking and buying are not a truce (a0-81). The wheel press is a one-shot on
+  // a screen; the gun is still the player's, and a raider who parks on a
+  // shopping bot's doorstep gets shot at while the shopping happens.
+  return travel(ctx, go(ctx, orbit(ctx.self, station.pos, DOCK_RADIUS, 0.2)), null, purchaseAction(purchase));
 }
 
 // ---------------------------------------------------------------------------
@@ -653,12 +795,23 @@ export function mine(ctx: BotCtx, rock: { id: number; pos: Vec2; radius: number 
 // Haul and bank (GDD §2.3, §2.5)
 // ---------------------------------------------------------------------------
 
-/** Fly home with a load. Trigger up: a hauling bot opening fire is a bot
- *  advertising a full hold (GDD §2.2). */
+/**
+ * Fly home with a load — and shoot at whatever is in range on the way (a0-81).
+ *
+ * This used to hold fire on the argument that "a hauling bot opening fire is a
+ * bot advertising a full hold" (GDD §2.2 — gunfire is the loudest tell). That
+ * argument is retired, and it is worth saying why rather than just deleting it:
+ * the tell is real, but a bot already in weapon range of a hostile has been
+ * *seen*, so the silence buys nothing and costs the whole hold. A human hauling
+ * a full load past a hunter shoots at the hunter. The stealth read still holds
+ * everywhere it is actually load-bearing — a bot with nothing in range emits the
+ * same released trigger it always did ({@link coveringFire}), so a hauler
+ * crossing empty space is exactly as quiet as before.
+ */
 export function haulHome(ctx: BotCtx): readonly Action[] | null {
   const station = ctx.self.station;
   if (!station) return null;
-  return [go(ctx, arrive(ctx.self, station.pos, ARRIVE_RADIUS)), fire(false)];
+  return travel(ctx, go(ctx, arrive(ctx.self, station.pos, ARRIVE_RADIUS)));
 }
 
 // ---------------------------------------------------------------------------
@@ -681,7 +834,10 @@ export function defendHome(ctx: BotCtx): readonly Action[] | null {
   // klaxon. Cooldown-gated, so this is not one call per decision.
   callSiege(ctx);
   const intruder = homeIntruder(ctx);
-  if (!intruder) return [go(ctx, orbit(ctx.self, station.pos, GUARD_RADIUS)), fire(false)];
+  // Nobody inside the alarm ring, but a guard on its ring is still a gun: a
+  // hostile that has crept inside weapon range without crossing the doorstep
+  // gets shot at rather than watched (a0-81).
+  if (!intruder) return travel(ctx, go(ctx, orbit(ctx.self, station.pos, GUARD_RADIUS)));
   return engage(ctx, intruder.pos, 16, WEAPON_RANGE * 0.6, intruder.vel, intruder.id);
 }
 
@@ -1103,7 +1259,10 @@ export function defendAlly(ctx: BotCtx): readonly Action[] | null {
   const at = latch.at;
   const intruder = intruderNear(ctx, at);
   if (intruder) return engage(ctx, intruder.pos, 16, WEAPON_RANGE * 0.6, intruder.vel, intruder.id);
-  return [go(ctx, arrive(ctx.self, at, ARRIVE_RADIUS)), fire(false)];
+  // Still crossing the map to the alarm. A responder that flies straight past a
+  // hostile without shooting at it is the same suppressed trigger a0-81 is
+  // about — the commitment says where to go, not whether the gun works.
+  return travel(ctx, go(ctx, arrive(ctx.self, at, ARRIVE_RADIUS)));
 }
 
 // ---------------------------------------------------------------------------
@@ -1585,10 +1744,28 @@ export function wantsRetreat(ctx: BotCtx): boolean {
  *    they enter this later and leave it sooner, so they flee shallower.
  *  - **Rusty** (timid, high `caution`): enters earliest, runs straight home.
  *
- * The trigger stays up on the way out only when there is no threat to flee (a
- * fleeing bot that keeps firing keeps its gun trained on what it is running from
- * and never leaves); with a live threat the weapon is off — a retreating bot
- * does not advertise (GDD §2.2).
+ * **And it shoots back the whole way out** *(a0-81, developer 2026-08-17: "when
+ * rusty was fleeing from me he could have auto fired at me but instead he didnt
+ * … thats what i would do")*. This function used to hold the trigger down —
+ * `fire(false)` on all three exits — on two arguments that both turned out to be
+ * wrong here:
+ *
+ *  - *"a fleeing bot that keeps firing keeps its gun trained on what it is
+ *    running from and never leaves."* That was true of a design where facing and
+ *    thrust were coupled. They are not: `sim/step.ts` `integrate` accelerates
+ *    along `intent.thrust` in world space and `ship.angle` steers only the gun,
+ *    so a bot aiming backwards runs exactly as fast as one aiming forwards. The
+ *    flee vector below is untouched by covering fire, and the distance-opens
+ *    property the v0.2.2 report asked for still holds decision by decision.
+ *  - *"a retreating bot does not advertise (GDD §2.2)."* Gunfire is the loudest
+ *    tell, but there is nothing left to hide from a ship that is inside weapon
+ *    range and chasing: it has already found the bot. Out of range the trigger is
+ *    still up, so nothing about the quiet half of that rule changed.
+ *
+ * What the player gets is the thing they asked for — a chase that is a decision
+ * rather than a free kill. The threat this retreat was handed is the preferred
+ * gun target ({@link coveringFire}), so the bot shoots at its chaser and not at
+ * whatever it happens to be flying past.
  */
 export function retreat(ctx: BotCtx, threat: PerceivedShip | null): readonly Action[] {
   const station = ctx.self.station;
@@ -1599,10 +1776,10 @@ export function retreat(ctx: BotCtx, threat: PerceivedShip | null): readonly Act
   // and silent in FFA, where there is nobody to hear it.
   callHelp(ctx);
   if (station && station.alive && !threatAtHome(ctx, threat)) {
-    return [go(ctx, arrive(ctx.self, station.pos, ARRIVE_RADIUS)), fire(false)];
+    return travel(ctx, go(ctx, arrive(ctx.self, station.pos, ARRIVE_RADIUS)), threat);
   }
-  if (threat) return [go(ctx, flee(ctx.self, threat.pos)), fire(false)];
-  return [thrust({ x: 0, y: 0 }), fire(false)];
+  if (threat) return travel(ctx, go(ctx, flee(ctx.self, threat.pos)), threat);
+  return travel(ctx, thrust({ x: 0, y: 0 }));
 }
 
 /**
