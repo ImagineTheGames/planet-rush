@@ -1,0 +1,41 @@
+{
+  "scene": "live",
+  "map": "oval",
+  "frames": 30,
+  "settle": 15,
+  "query": "?debug=1",
+  "rows": [
+    {
+      "scene": "live",
+      "viewport": "1280x720",
+      "megapixels": 0.9216,
+      "firstMeasured": "before",
+      "before": {
+        "median": 300,
+        "p95": 383.2999999999993,
+        "frames": 30
+      },
+      "after": {
+        "median": 216.70000000000073,
+        "p95": 266.7000000000007,
+        "frames": 30
+      }
+    },
+    {
+      "scene": "live",
+      "viewport": "3440x1440",
+      "megapixels": 4.9536,
+      "firstMeasured": "after",
+      "before": {
+        "median": 1300,
+        "p95": 1500,
+        "frames": 30
+      },
+      "after": {
+        "median": 866.5,
+        "p95": 1116.5999999999985,
+        "frames": 30
+      }
+    }
+  ]
+}

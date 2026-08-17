@@ -1,0 +1,46 @@
+a0-75 — the void's per-frame fill, counted off the shipped geometry
+==============================================================================
+
+OVERDRAW IS VIEWPORT-INDEPENDENT — the same layer stack at six sizes
+(sky: Plasma Reef, the wide arena. "×" = times each screen pixel is blended)
+
+viewport              Mpx   ground      sky    stars    bloom   TOTAL ×   Mfrag/fr
+phone (798×384)      0.31    1.008    3.575    0.010    0.320     4.913        1.5
+1280×720             0.92    1.004    3.123    0.010    0.313     4.451        4.1
+1920×1080            2.07    1.003    3.123    0.010    0.323     4.459        9.2
+2560×1440            3.69    1.002    3.032    0.010    0.322     4.367       16.1
+3440×1440            4.95    1.002    4.067    0.010    0.320     5.400       26.7
+5120×1440            7.37    1.002    6.060    0.011    0.319     7.392       54.5
+
+The overdraw column does not move. The fragment column is a straight line
+through the pixel count — which is exactly the report: "it gets worse the
+larger the playing area is on my screen".
+
+EVERY SKY, AT 3440×1440 ON THE WIDE ARENA
+
+sky           map          shapes    sky ×  +ground   +stars   TOTAL ×  reduced ×
+None          octagon           0    0.000    1.000    0.331     1.333      1.333
+Coalsack      compass          53    4.797    1.000    0.331     6.130      3.724
+Iron Veil     crescents        78    4.516    1.000    0.331     5.848      3.518
+Patina Drift  diamond         123    5.670    1.000    0.331     7.003      3.663
+Plasma Reef   oval             50    4.067    1.000    0.331     5.400      3.358
+Deep Ember    line            123    4.682    1.000    0.331     6.015      3.615
+
+THE STAR FIELD, BY POPULATION (3440×1440, wide arena)
+
+layer                      shapes  overdraw ×
+stars/deep points           41653      0.0064
+stars/deep bloom             7725      0.1975
+stars/mid points            24234      0.0031
+stars/mid bloom              4389      0.0950
+stars/near points            9116      0.0009
+stars/near bloom             1611      0.0279
+
+SQUARE ARENA (octagon/compass/crescents/line), 3440×1440
+
+  None              1.333 ×        6.6 Mfrag/frame
+  Coalsack          6.117 ×       30.3 Mfrag/frame
+  Iron Veil         5.839 ×       28.9 Mfrag/frame
+  Patina Drift      6.991 ×       34.6 Mfrag/frame
+  Plasma Reef       5.391 ×       26.7 Mfrag/frame
+  Deep Ember        6.004 ×       29.7 Mfrag/frame

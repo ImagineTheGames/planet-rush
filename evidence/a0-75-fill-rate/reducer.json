@@ -1,0 +1,113 @@
+{
+  "config": {
+    "engageFps": 30,
+    "releaseFps": 50,
+    "engageSustainSeconds": 3,
+    "releaseSustainSeconds": 3,
+    "smoothing": 0.1
+  },
+  "engageRows": [
+    {
+      "fps": 12,
+      "engaged": true,
+      "flips": 1
+    },
+    {
+      "fps": 20,
+      "engaged": true,
+      "flips": 1
+    },
+    {
+      "fps": 25,
+      "engaged": true,
+      "flips": 1
+    },
+    {
+      "fps": 28,
+      "engaged": true,
+      "flips": 1
+    },
+    {
+      "fps": 29,
+      "engaged": true,
+      "flips": 1
+    },
+    {
+      "fps": 30,
+      "engaged": true,
+      "flips": 1
+    },
+    {
+      "fps": 31,
+      "engaged": false,
+      "flips": 0
+    },
+    {
+      "fps": 33,
+      "engaged": false,
+      "flips": 0
+    },
+    {
+      "fps": 36,
+      "engaged": false,
+      "flips": 0
+    },
+    {
+      "fps": 40,
+      "engaged": false,
+      "flips": 0
+    },
+    {
+      "fps": 45,
+      "engaged": false,
+      "flips": 0
+    },
+    {
+      "fps": 50,
+      "engaged": false,
+      "flips": 0
+    },
+    {
+      "fps": 55,
+      "engaged": false,
+      "flips": 0
+    },
+    {
+      "fps": 60,
+      "engaged": false,
+      "flips": 0
+    }
+  ],
+  "wobbleRows": [
+    {
+      "centre": 22,
+      "flips": 1,
+      "engagedFraction": 0.9504095179621601
+    },
+    {
+      "centre": 26,
+      "flips": 0,
+      "engagedFraction": 0
+    },
+    {
+      "centre": 30,
+      "flips": 0,
+      "engagedFraction": 0
+    },
+    {
+      "centre": 34,
+      "flips": 0,
+      "engagedFraction": 0
+    },
+    {
+      "centre": 40,
+      "flips": 0,
+      "engagedFraction": 0
+    },
+    {
+      "centre": 48,
+      "flips": 0,
+      "engagedFraction": 0
+    }
+  ]
+}

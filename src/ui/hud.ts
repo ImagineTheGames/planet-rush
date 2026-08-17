@@ -53,7 +53,7 @@ import { Container, Graphics, Text } from 'pixi.js';
 import type { TextStyleFontWeight } from 'pixi.js';
 import { PALETTE } from '@render/index';
 import type { DeviceKind, FireMode } from '@platform/actions';
-import type { LayoutEntry, Viewport } from '@platform/layout-registry';
+import type { LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
 import { ShipClass } from '@shared/types';
 import type { PlayerId } from '@shared/types';
 import { Onboarding, oreWasSpent, resolvePromptText } from './onboarding';
@@ -134,10 +134,19 @@ import {
   RESPAWN_CENTER_Y,
   respawnWrapWidth,
   SCRIM_BLEED,
+  stationChromeHeight,
   waveClockLayout,
   wheelRadius,
 } from './hud-geometry';
 import type { ClockLayout } from './hud-geometry';
+import { contentBox, DEFAULT_VIEW_ZOOM, nextViewZoom } from './viewport';
+import {
+  hitZoomControl,
+  ZOOM_CONTROL_ANCHOR,
+  ZOOM_CONTROL_ID,
+  zoomControlBounds,
+  zoomControlLabel,
+} from './zoom-control';
 
 // ---------------------------------------------------------------------------
 // Typography & neutral colours
@@ -251,6 +260,16 @@ export interface HudFrame {
   readonly controlScheme: ControlScheme;
   /** Touch build: the strip is hidden and prompts get touch wording (GDD §2.4). */
   readonly isTouch: boolean;
+  /**
+   * The live view-zoom rung — how many times more world is across the screen than
+   * at the shipped camera (`./viewport` `VIEW_ZOOM_STEPS`, a0-74). Drives the
+   * value on the touch zoom control and nothing else; the camera itself is set by
+   * the wiring layer, which owns the renderer.
+   *
+   * Optional and defaulting to the shipped view, so a host that has not been
+   * taught about the zoom draws the control reading `1×` rather than `undefined×`.
+   */
+  readonly viewZoom?: number;
   /** An asteroid is within weapon range — the mine prompt's trigger (GDD §2.10). */
   readonly nearAsteroid: boolean;
 
@@ -631,6 +650,21 @@ export class Hud extends Container {
   private readonly coreLabel: Text;
   private readonly stationBar = new Graphics();
 
+  // --- The touch zoom-out control (a0-74) ----------------------------------
+  //     "what i'd probably prefer is add a zoom out button on mobile" — a button,
+  //     sat on the same top-right row as HOME (`./zoom-control` argues the spot).
+  private readonly zoomGroup = new Container();
+  private readonly zoomChrome = new Graphics();
+  private readonly zoomCaption: Text;
+  private readonly zoomValue: Text;
+  /** The rect the control was last DRAWN at, screen space — what `zoomTap`
+   *  hit-tests, so the press surface is the pixels and not a second computation. */
+  private zoomRect: Rect | null = null;
+  /** The rung the control last drew, so a tap knows what to advance from without
+   *  the caller having to hand it back in. */
+  private zoomStep = DEFAULT_VIEW_ZOOM;
+  private zoomChromeKey = '';
+
   // --- Under-attack alarm (screen frame + edge arrow home — GDD §2.2) ------
   private readonly alarmGroup = new Container();
   private readonly alarmFrame = new Graphics();
@@ -748,6 +782,25 @@ export class Hud extends Container {
   private readonly floatsGroup = new Container();
   private readonly floatTexts: Text[] = [];
 
+  /**
+   * The centred region of the viewport the HUD's **chrome** anchors to (a0-74) —
+   * `./viewport` `contentBox`. Equal to the whole viewport on every display 16:9
+   * or narrower and on everything under the reference width, which is every phone,
+   * every tablet and every ordinary desktop window; a centred reference-aspect box
+   * on a 21:9 or 32:9 display.
+   *
+   * **Only the chrome.** The world renders full-bleed behind this, and so do the
+   * elements that track the *world* rather than the screen — the over-ship health
+   * bars, the nameplates, the hold pips, the tap markers, the loot tell. Those
+   * follow the camera, whose ship sits at the viewport centre; binding them to a
+   * box would tear them off the thing they label. `screenWidth`/`screenHeight`
+   * stay the viewport for exactly that reason and are read by exactly those
+   * elements.
+   *
+   * Rewritten by {@link layout}; never null after the constructor's call.
+   */
+  private content: Rect = { x: 0, y: 0, width: 0, height: 0 };
+
   constructor(
     private screenWidth: number,
     private screenHeight: number,
@@ -798,8 +851,8 @@ export class Hud extends Container {
     this.bankedText = this.makeText('', FONT_NUMERAL, TYPE.bank, PALETTE.signalYellow, 'bold', 'name');
     this.bankedText.y = TOTAL_LABEL_H;
     this.oreGroup.addChild(this.oreChrome, this.totalLabel, this.bankedText);
-    this.oreGroup.x = PAD;
-    this.oreGroup.y = PAD;
+    // Placed in `layout()` with the rest of the corner chrome — the top-LEFT
+    // corner is the content box's, not the screen's, on an ultrawide (a0-74).
 
     // The partial-pickup line (a0-54), in the SAME grammar as the readout above:
     // a muted word for what happened, an ore-yellow numeral for the ore. The
@@ -856,6 +909,18 @@ export class Hud extends Container {
     this.stationGroup.addChild(this.stationChrome, this.stationBar, this.stationLabel, this.coreLabel);
     this.stationGroup.visible = false;
 
+    // The zoom control: the same eyebrow-over-value grammar as HOME and ORE, so it
+    // reads as one more instrument in that corner rather than as a new dialect —
+    // and its VALUE is the brightest metal the HUD spends (`INSTRUMENT_KEY`),
+    // which is Bone's whole mechanism for "this is the actionable thing"
+    // (./instrument, and the same call the controls-strip key takes).
+    this.zoomCaption = this.makeText('VIEW', FONT_HEADING, TYPE.eyebrow, TEXT_MUTED, 'normal', 'eyebrow');
+    this.zoomCaption.anchor.set(0.5, 0);
+    this.zoomValue = this.makeText('', FONT_NUMERAL, TYPE.bank, INSTRUMENT_KEY, 'bold', 'name');
+    this.zoomValue.anchor.set(0.5, 0);
+    this.zoomGroup.addChild(this.zoomChrome, this.zoomCaption, this.zoomValue);
+    this.zoomGroup.visible = false;
+
     // The strip's own chrome draws behind its labels, inside the strip group, so
     // the rule + scrim are part of what `controls-strip` registers.
     this.stripGroup.addChild(this.stripChrome);
@@ -891,6 +956,9 @@ export class Hud extends Container {
       this.oreGroup,
       this.waveGroup,
       this.stationGroup,
+      // The zoom control shares the top-right row with HOME and draws with it, in
+      // the same corner-chrome band (a0-74).
+      this.zoomGroup,
       this.stripGroup,
       // The minimap sits above the corner readouts but under the alarm/wheel/prompt:
       // the collapse frame and the danger tells must read over it, and the wheel
@@ -923,18 +991,35 @@ export class Hud extends Container {
   }
 
   private layout(): void {
-    // The Gantry frame first: every size and gap below is derived from it, so a
+    // The content box first: on an ultrawide the chrome is bound to a centred
+    // reference-aspect region rather than to the physical edges, so the wheel, the
+    // hold pips and the minimap stay within one glance of each other instead of a
+    // head-turn apart (a0-74; ./viewport `contentBox`). On every 16:9-or-narrower
+    // display — and on everything under the reference width, so every phone — this
+    // IS the viewport and not one number below moves.
+    this.content = contentBox({ width: this.screenWidth, height: this.screenHeight });
+    const box = this.content;
+
+    // The Gantry frame second: every size and gap below is derived from it, so a
     // phone gets the same layout a quarter smaller rather than desktop pixels
-    // rattling around in a short viewport (./instrument `hudMetrics`).
-    this.metrics = hudMetrics(this.screenWidth, this.screenHeight);
+    // rattling around in a short viewport (./instrument `hudMetrics`). Measured on
+    // the content box, because that is the frame the chrome is actually laid out
+    // in — and the two agree exactly everywhere the box is the viewport.
+    this.metrics = hudMetrics(box.width, box.height);
     this.applyTypeScale();
 
-    this.waveGroup.x = this.screenWidth / 2;
+    // The corners are the box's corners, never the screen's. Centred elements are
+    // unchanged by construction: the box is centred, so its middle IS the screen's
+    // middle, which is also where the follow camera holds the ship.
+    this.oreGroup.x = box.x + PAD;
+    this.oreGroup.y = PAD;
+    this.waveGroup.x = box.x + box.width / 2;
     this.waveGroup.y = PAD;
-    this.stationGroup.x = this.screenWidth - PAD;
+    this.stationGroup.x = box.x + box.width - PAD;
     this.stationGroup.y = PAD;
+    this.stripGroup.x = box.x;
     this.stripGroup.y = this.screenHeight - STRIP_ROW - STRIP_PAD;
-    this.promptGroup.x = this.screenWidth / 2;
+    this.promptGroup.x = box.x + box.width / 2;
     // The prompt's y is no longer a fraction of the screen: it hangs from the
     // bottom of the clear band under the build wheel, and that band depends on
     // the panel's own measured height — so it is set in `updateOnboarding`, from
@@ -1010,6 +1095,7 @@ export class Hud extends Container {
     this.updateTapMarkers(frame);
     this.updateMinimap(frame);
     this.updateStationHp(frame);
+    this.updateZoomControl(frame);
     this.updateRespawn(frame);
     this.updateControlsStrip(frame);
     const wheelOpen = this.updateWheel(frame);
@@ -1073,7 +1159,9 @@ export class Hud extends Container {
     const ruleY = HP_BAR_TOP + HP_BAR_HEIGHT + hudSpace(4, m);
     const g = this.stationChrome;
     g.clear();
-    drawScrim(g, -width, 0, width, ruleY + hudSpace(SCRIM_BLEED, m), 'center', SCRIM.corner);
+    // The scrim's depth is `stationChromeHeight` (hud-geometry) — the zoom control
+    // stacks directly under it and must not copy the number (a0-74).
+    drawScrim(g, -width, 0, width, stationChromeHeight(m.scale), 'center', SCRIM.corner);
     drawEdgeRule(g, -width, ruleY, width, 1, INSTRUMENT_RULE);
   }
 
@@ -1093,8 +1181,14 @@ export class Hud extends Container {
     const g = this.stripChrome;
     g.clear();
     if (width <= 0) return;
-    drawScrim(g, 0, top, this.screenWidth, height, 'bottom', SCRIM.strip);
-    drawEdgeRule(g, STRIP_PAD, top, Math.min(width, this.screenWidth - 2 * STRIP_PAD), 1, INSTRUMENT_RULE);
+    // Drawn in the strip group's own space, and that group starts at the content
+    // box's left edge (a0-74) — so on an ultrawide the legend and its scrim span
+    // the box rather than reaching 960 px out to a physical edge nobody is looking
+    // at. On every other display `content.width` is the viewport width and this is
+    // byte-for-byte the strip that shipped.
+    const span = this.content.width;
+    drawScrim(g, 0, top, span, height, 'bottom', SCRIM.strip);
+    drawEdgeRule(g, STRIP_PAD, top, Math.min(width, span - 2 * STRIP_PAD), 1, INSTRUMENT_RULE);
   }
 
   // --- Ore: the BANK (top-left) and the HOLD (under the ship) --------------
@@ -1264,8 +1358,8 @@ export class Hud extends Container {
     // wedge. Measured metrics in, so the decision survives a font swap.
     const rows = [this.waveName, this.waveNext, this.waveMatch];
     const layout = waveClockLayout(
-      this.screenWidth,
-      this.screenHeight,
+      this.content.width,
+      this.content.height,
       rows.map((t) => ({ width: t.width, height: t.height })),
       wheelOpen,
     );
@@ -1449,6 +1543,84 @@ export class Hud extends Container {
     this.coreLabel.style.fill = model.critical && flash ? model.criticalColor : TEXT_PRIMARY;
   }
 
+  // --- The touch zoom-out control (a0-74) ----------------------------------
+
+  /**
+   * Draw the zoom control — on touch, and nowhere else (`./zoom-control` argues
+   * both the placement and the touch-only rule).
+   *
+   * It is one of the few HUD elements that is *pressed*, so it keeps two things
+   * honest at once: the rect stored here is the rect it drew, and it is the rect
+   * {@link zoomTap} hit-tests. One computation, two uses — the same discipline the
+   * prompt keeps between its scrim and its registered bounds.
+   */
+  private updateZoomControl(frame: HudFrame): void {
+    const box = this.content;
+    const local = zoomControlBounds(box.width, box.height, frame.isTouch);
+    if (!local) {
+      this.zoomGroup.visible = false;
+      this.zoomRect = null;
+      return;
+    }
+    // Content-box space → screen space, the one offset every corner element takes.
+    const rect: Rect = { ...local, x: local.x + box.x };
+    this.zoomRect = rect;
+    this.zoomStep = frame.viewZoom ?? DEFAULT_VIEW_ZOOM;
+    this.zoomGroup.visible = true;
+    this.zoomGroup.x = rect.x;
+    this.zoomGroup.y = rect.y;
+
+    const { caption, value } = zoomControlLabel(this.zoomStep);
+    this.zoomCaption.text = caption;
+    this.zoomValue.text = value;
+    this.zoomCaption.x = rect.width / 2;
+    this.zoomCaption.y = 0;
+    this.zoomValue.x = rect.width / 2;
+    this.zoomValue.y = this.zoomCaption.height + hudSpace(2, this.metrics);
+
+    // A scrim closed by a rule, exactly like every other readout in this corner —
+    // never a plate over gameplay (./instrument). Redrawn only when the shape
+    // changes, so a steady frame allocates nothing.
+    const key = `${Math.round(rect.width)}x${Math.round(rect.height)}`;
+    if (key !== this.zoomChromeKey) {
+      const g = this.zoomChrome;
+      g.clear();
+      drawScrim(g, 0, 0, rect.width, rect.height, 'center', SCRIM.corner);
+      drawEdgeRule(g, 0, rect.height - 1, rect.width, 1, INSTRUMENT_RULE);
+      this.zoomChromeKey = key;
+    }
+  }
+
+  /**
+   * Route a click/tap at a screen point to the zoom control, and report the rung
+   * it advanced to — or `null` when the press landed elsewhere, which is the
+   * caller's signal to keep routing the event.
+   *
+   * The **next** rung rather than a boolean, because the caller has to do two
+   * things with it that must not disagree: set the camera scale and persist the
+   * choice. Handing back the answer means neither is re-derived.
+   *
+   * Returns `null` whenever the control is not drawn, so a desktop press can never
+   * find it.
+   */
+  zoomTap(x: number, y: number): number | null {
+    if (!this.zoomGroup.visible) return null;
+    if (!hitZoomControl(x, y, this.zoomRect)) return null;
+    const next = nextViewZoom(this.zoomStep);
+    // Optimistic: draw the new value now rather than waiting a frame for the host
+    // to feed it back, so the press reads as instant under the thumb.
+    this.zoomStep = next;
+    this.zoomValue.text = zoomControlLabel(next).value;
+    return next;
+  }
+
+  /** The zoom control's drawn rect and rung, or `null` when it is not on screen —
+   *  the ?debug=1 live-stage seam, and what a placement suite asserts against. */
+  debugZoomControl(): { rect: Rect; step: number } | null {
+    if (!this.zoomGroup.visible || !this.zoomRect) return null;
+    return { rect: { ...this.zoomRect }, step: this.zoomStep };
+  }
+
   // --- Respawn countdown ("RESPAWNING 3…", field request v0.2.2) -----------
 
   /**
@@ -1481,7 +1653,9 @@ export class Hud extends Container {
     this.respawnText.text = model.text;
     this.respawnText.style.fill = model.color; // the player's own colour (§5.2)
     this.respawnText.style.wordWrap = true;
-    this.respawnText.style.wordWrapWidth = respawnWrapWidth(this.screenWidth, this.screenHeight);
+    // Wrapped to the content box (a0-74), like the prompt: the overlay is centred
+    // on the ship either way, so all this changes is the width one line may run to.
+    this.respawnText.style.wordWrapWidth = respawnWrapWidth(this.content.width, this.content.height);
     this.respawnText.style.align = 'center';
 
     // A scrim sized to the text, so the countdown reads over the death scene, and
@@ -1489,7 +1663,7 @@ export class Hud extends Container {
     // rather than a stroked panel around it. This is the one scrim on the HUD
     // allowed to run heavy (`SCRIM.overlay`): the local ship has just exploded,
     // so there is nothing under the centre of the screen to read through.
-    const pad = respawnPad(this.screenWidth, this.screenHeight);
+    const pad = respawnPad(this.content.width, this.content.height);
     const w = this.respawnText.width + pad.x;
     const h = this.respawnText.height + pad.y;
     const key = `${Math.round(w)}x${Math.round(h)}:${model.color}`;
@@ -1652,10 +1826,17 @@ export class Hud extends Container {
     this.minimapIsTouch = frame.isTouch;
     this.safeInsets = frame.safeInsets ?? {};
     const tick = frame.tick ?? Math.floor(frame.time * 60);
+    // Laid out in the content box and shifted onto it (a0-74). The minimap is the
+    // element the second report names first — "all that UI goes to the edges" —
+    // and on a 32:9 display the bottom-right corner is nearly a metre of desk away
+    // from the build wheel. The view draws in box space; one container offset puts
+    // it on screen, and `minimapTap` below subtracts the same offset so the hit
+    // test and the pixels can never come apart.
+    this.minimap.x = this.content.x;
     this.minimap.update(
       frame.minimap ?? null,
       this.minimapModel.state,
-      { width: this.screenWidth, height: this.screenHeight },
+      { width: this.content.width, height: this.content.height },
       this.minimapIsTouch,
       this.safeInsets,
       tick,
@@ -1681,10 +1862,12 @@ export class Hud extends Container {
    */
   minimapTap(x: number, y: number): boolean {
     if (!this.minimap.visible) return false;
+    // Into the content box's space — the one offset `updateMinimap` drew with
+    // (a0-74). Zero everywhere the box is the viewport, which is every phone.
     return this.minimapModel.tap(
-      x,
+      x - this.content.x,
       y,
-      { width: this.screenWidth, height: this.screenHeight },
+      { width: this.content.width, height: this.content.height },
       this.minimapIsTouch,
       this.safeInsets,
     );
@@ -1911,13 +2094,20 @@ export class Hud extends Container {
 
     // Frame: pulses with match time so it reads as an alarm rather than a border.
     const pulse = 0.35 + 0.35 * (0.5 + 0.5 * Math.sin(frame.time * 8));
+    // Framed on the CONTENT BOX (a0-74), not the physical screen. The alarm is a
+    // mechanic (GDD §2.2) and its whole job is to be seen: on a 32:9 display a
+    // frame on the physical edges puts its two vertical strokes 960 px outside the
+    // region the player is looking at, which is a frame drawn for nobody. On
+    // everything 16:9 and narrower the box IS the screen and this is the same
+    // flush-to-the-edge frame it has always been.
+    const box = this.content;
     this.alarmFrame.clear();
     this.alarmFrame
       .rect(
+        box.x + ALARM_FRAME_INSET,
         ALARM_FRAME_INSET,
-        ALARM_FRAME_INSET,
-        this.screenWidth - 2 * ALARM_FRAME_INSET,
-        this.screenHeight - 2 * ALARM_FRAME_INSET,
+        box.width - 2 * ALARM_FRAME_INSET,
+        box.height - 2 * ALARM_FRAME_INSET,
       )
       .stroke({ width: ALARM_FRAME_STROKE, color: PALETTE.threatRed, alpha: pulse });
 
@@ -1934,13 +2124,32 @@ export class Hud extends Container {
     this.arrowDrawn = false;
     if (!ship || !home) return;
 
-    const arrow = homeArrow(
+    // Two questions, two rectangles, and they are genuinely different on an
+    // ultrawide (a0-74).
+    //
+    //  - **Is home already on screen?** Asked of the WHOLE viewport, because the
+    //    world is full-bleed: a station drawn out in the gutter is a station the
+    //    player can see, and §2.2's rule is that at that point the station itself
+    //    is the tell. Answering this against the content box would draw an arrow
+    //    pointing at a home that is plainly visible ten degrees away from it.
+    //  - **Where does the arrow go?** Clamped to the CONTENT BOX, because an arrow
+    //    is only a tell if it is read, and the far edge of a 32:9 display is where
+    //    the whole second report says the player is not looking.
+    //
+    // On every 16:9-or-narrower display the two rectangles are the same rectangle
+    // and this is exactly the arrow that shipped.
+    const box = this.content;
+    const visible = homeArrow(
       ship,
       home,
       { width: this.screenWidth, height: this.screenHeight },
       ARROW_EDGE_INSET,
     );
-    if (arrow.onScreen) return;
+    if (visible.onScreen) return;
+    const inBox = homeArrow(ship, home, { width: box.width, height: box.height }, ARROW_EDGE_INSET);
+    // Content-space → screen space. The box is centred, so the ship sits at its
+    // middle exactly as it sits at the screen's, and the shift is the one offset.
+    const arrow = { ...inBox, x: inBox.x + box.x };
     this.arrowDrawn = true;
 
     // A triangle pointing along `angle`, drawn at the clamped edge position.
@@ -2193,12 +2402,17 @@ export class Hud extends Container {
     // prompt breaks to a second line rather than running under a thumb stick or
     // the minimap's corner square — see hud-geometry.ts `promptBand` for the
     // measurements, and for why the band replaced a single `PROMPT_CENTER_Y`.
+    //
+    // The band is measured in the CONTENT BOX (a0-74): on an ultrawide a prompt
+    // wrapped to 3840 px would be one very long line the eye has to travel, which
+    // is the second report's complaint applied to a sentence.
     const isTouch = frame.isTouch;
     const insets = this.safeInsets;
+    const box = this.content;
     this.promptText.style.wordWrap = true;
     this.promptText.style.wordWrapWidth = promptWrapWidth(
-      this.screenWidth,
-      this.screenHeight,
+      box.width,
+      box.height,
       isTouch,
       insets,
     );
@@ -2208,14 +2422,14 @@ export class Hud extends Container {
     // registry is handed, so the drawn rect and the registered rect are one
     // computation rather than two that have to agree.
     const bounds = promptBounds(
-      this.screenWidth,
-      this.screenHeight,
+      box.width,
+      box.height,
       this.promptText.width,
       this.promptText.height,
       isTouch,
       insets,
     );
-    this.promptGroup.x = this.screenWidth / 2;
+    this.promptGroup.x = box.x + box.width / 2;
     this.promptGroup.y = bounds.y + bounds.height / 2;
 
     // The scrim IS the registered rect, not a second sizing of it (a0-24).
@@ -2248,6 +2462,52 @@ export class Hud extends Container {
     // asserted against.
 
     this.promptGroup.visible = true;
+  }
+
+  // --- The content box, and where it put the chrome (a0-74) ----------------
+
+  /**
+   * The content box this HUD last laid its chrome out in, CSS px — a copy, so a
+   * caller cannot reach in and move it.
+   *
+   * Public because it is the answer to a question two other layers legitimately
+   * ask: a test, which needs to know where "inside" is at 32:9 without recomputing
+   * it (`hud.test.ts`), and any host that wants to report the box on the debug
+   * surface. It is derived — `./viewport` `contentBox` of the live viewport — so
+   * this can never disagree with what was drawn.
+   */
+  debugContentBox(): Rect {
+    const b = this.content;
+    return { x: b.x, y: b.y, width: b.width, height: b.height };
+  }
+
+  /**
+   * Where each piece of **corner chrome** was anchored by the last {@link layout}.
+   *
+   * Deliberately the group ORIGINS rather than `getBounds()`: these are the numbers
+   * `layout()` actually computes, they are exact, and — unlike bounds — they are
+   * readable in a headless test, where a `Text` has no canvas to measure itself
+   * against. `describeLayout` remains the measured-bounds seam the layout registry
+   * uses; this is the placement one, and the two answer different questions.
+   *
+   * The `origin` field names which edge of the element the point IS, because three
+   * of these are not top-left corners: the HOME cluster is right-anchored (it runs
+   * leftward from its origin) and the wave clock and the prompt are centre-anchored.
+   * A test that assumed top-left for all five would pass on a bug.
+   */
+  debugChromeAnchors(): ReadonlyArray<{
+    readonly id: string;
+    readonly x: number;
+    readonly y: number;
+    readonly origin: 'left' | 'right' | 'center';
+  }> {
+    return [
+      { id: 'ore-hud', x: this.oreGroup.x, y: this.oreGroup.y, origin: 'left' },
+      { id: 'wave-clock', x: this.waveGroup.x, y: this.waveGroup.y, origin: 'center' },
+      { id: 'station-hp', x: this.stationGroup.x, y: this.stationGroup.y, origin: 'right' },
+      { id: 'controls-strip', x: this.stripGroup.x, y: this.stripGroup.y, origin: 'left' },
+      { id: 'onboarding', x: this.promptGroup.x, y: this.promptGroup.y, origin: 'center' },
+    ];
   }
 
   // --- Layout registry seam (GDD §3.4 platform instrument) ----------------
@@ -2393,6 +2653,9 @@ export class Hud extends Container {
 
     // M2 (see the table above).
     push('station-hp', 'top-right', PAD, this.stationGroup);
+    // The touch zoom control (a0-74), on the same top-right row as HOME. Drawn
+    // only on touch, so `shown()` leaves it out of a desktop frame entirely.
+    push(ZOOM_CONTROL_ID, ZOOM_CONTROL_ANCHOR.region, ZOOM_CONTROL_ANCHOR.margin ?? 0, this.zoomGroup);
     // The top-right own-ship HULL readout was removed (field report v0.2 — the
     // over-ship bar is the truth now), so nothing registers under `top-right`
     // beneath HOME any more: the layout hole is closed, not orphaned.

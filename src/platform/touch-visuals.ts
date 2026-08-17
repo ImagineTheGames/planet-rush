@@ -205,8 +205,12 @@ export function writeAffordanceRects(
   w: number,
   h: number,
   out: TouchAffordanceRects,
+  sticksLive = true,
 ): TouchAffordanceRects {
-  if (!isTouch) {
+  // A control that is not drawn does not register (a0-74) — the registry records
+  // what is on screen, and a Tap Commander frame has no sticks and no FIRE on it.
+  // Defaulted, so an untouched caller is unchanged.
+  if (!isTouch || !sticksLive) {
     out.leftStickZone = null;
     out.aimZone = null;
     out.fireButton = null;
@@ -521,9 +525,18 @@ export class TouchVisuals extends Container {
     w: number,
     h: number,
     docked = false,
+    sticksLive = true,
   ): void {
     const mode = touch.getFireMode();
-    writeAffordanceVisibility(isTouch, mode, this.vis);
+    // `sticksLive` is the UI's verdict on whether the SEATED SCHEME can drive the
+    // stick/fire furniture at all (a0-74, `@ui/live-controls` `showStickFurniture`
+    // — Tap Commander cannot: `main.ts` `sampleInput` zeroes thrust, aim and fire
+    // and lets the pilot write all three). It is a defaulted argument, so an
+    // untouched caller gets exactly the layer that shipped; and it is passed IN
+    // rather than derived here, because "can this scheme use this control" is a
+    // UI question and this file is a Pixi view. BUILD is deliberately outside it:
+    // the scheme leaves `merged.build` alone, so that button really does work.
+    writeAffordanceVisibility(isTouch && sticksLive, mode, this.vis);
 
     // Whole layer off on desktop — nothing to draw, nothing to position.
     this.visible = isTouch;
@@ -534,8 +547,12 @@ export class TouchVisuals extends Container {
     const rightAnchorX = w - EDGE_MARGIN - R_STICK;
 
     // --- Left thrust stick: ghost when idle, live base+knob when engaged. ----
-    const le = touch.left.engaged;
-    this.leftGhost.visible = this.vis.leftStickZone && !le;
+    //     The ENGAGED halves are gated on the same verdict as the ghost (a0-74):
+    //     a scheme that cannot use the stick must not draw one under a thumb
+    //     either, however that thumb got there.
+    const sticks = this.vis.leftStickZone;
+    const le = sticks && touch.left.engaged;
+    this.leftGhost.visible = sticks && !le;
     this.leftGhost.position.set(leftAnchorX, bottom);
     this.leftBase.visible = le;
     this.leftKnob.visible = le;
@@ -545,7 +562,7 @@ export class TouchVisuals extends Container {
     }
 
     // --- Right side: aim stick (Manual) or FIRE button (Auto-aim). -----------
-    const manual = mode === FireMode.Manual;
+    const manual = mode === FireMode.Manual && this.vis.aimHint;
     const re = touch.right.engaged;
     this.aimGhost.visible = this.vis.aimHint && !re;
     this.aimGhost.position.set(rightAnchorX, bottom);

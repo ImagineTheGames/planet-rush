@@ -1,0 +1,858 @@
+[
+  {
+    "profile": "desktop-1707x898",
+    "label": "desktop — the developer's own session",
+    "viewport": {
+      "width": 1707,
+      "height": 898
+    },
+    "zoom": 1,
+    "world": {
+      "left": 1114.5,
+      "top": 751,
+      "right": 2821.5,
+      "bottom": 1649,
+      "width": 1707,
+      "height": 898
+    },
+    "content": {
+      "x": 55.27777777777783,
+      "y": 0,
+      "width": 1596.4444444444443,
+      "height": 898
+    },
+    "anchors": [
+      {
+        "id": "ore-hud",
+        "x": 71.27777777777783,
+        "y": 16,
+        "origin": "left"
+      },
+      {
+        "id": "wave-clock",
+        "x": 853.5,
+        "y": 16,
+        "origin": "center"
+      },
+      {
+        "id": "station-hp",
+        "x": 1635.7222222222222,
+        "y": 16,
+        "origin": "right"
+      },
+      {
+        "id": "controls-strip",
+        "x": 55.27777777777783,
+        "y": 868,
+        "origin": "left"
+      },
+      {
+        "id": "onboarding",
+        "x": 853.5,
+        "y": 827.5,
+        "origin": "center"
+      }
+    ],
+    "control": null
+  },
+  {
+    "profile": "desktop-1280x800",
+    "label": "desktop — the golden suite's control",
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "zoom": 1,
+    "world": {
+      "left": 1328,
+      "top": 800,
+      "right": 2608,
+      "bottom": 1600,
+      "width": 1280,
+      "height": 800
+    },
+    "content": {
+      "x": 0,
+      "y": 0,
+      "width": 1280,
+      "height": 800
+    },
+    "anchors": [
+      {
+        "id": "ore-hud",
+        "x": 16,
+        "y": 16,
+        "origin": "left"
+      },
+      {
+        "id": "wave-clock",
+        "x": 640,
+        "y": 16,
+        "origin": "center"
+      },
+      {
+        "id": "station-hp",
+        "x": 1264,
+        "y": 16,
+        "origin": "right"
+      },
+      {
+        "id": "controls-strip",
+        "x": 0,
+        "y": 770,
+        "origin": "left"
+      },
+      {
+        "id": "onboarding",
+        "x": 640,
+        "y": 720,
+        "origin": "center"
+      }
+    ],
+    "control": null
+  },
+  {
+    "profile": "phone-798x384",
+    "label": "phone landscape — the size named in the report",
+    "viewport": {
+      "width": 798,
+      "height": 384
+    },
+    "zoom": 1,
+    "world": {
+      "left": 1569,
+      "top": 1008,
+      "right": 2367,
+      "bottom": 1392,
+      "width": 798,
+      "height": 384
+    },
+    "content": {
+      "x": 0,
+      "y": 0,
+      "width": 798,
+      "height": 384
+    },
+    "anchors": [
+      {
+        "id": "ore-hud",
+        "x": 16,
+        "y": 16,
+        "origin": "left"
+      },
+      {
+        "id": "wave-clock",
+        "x": 399,
+        "y": 16,
+        "origin": "center"
+      },
+      {
+        "id": "station-hp",
+        "x": 782,
+        "y": 16,
+        "origin": "right"
+      },
+      {
+        "id": "controls-strip",
+        "x": 0,
+        "y": 354,
+        "origin": "left"
+      },
+      {
+        "id": "onboarding",
+        "x": 399,
+        "y": 338.5,
+        "origin": "center"
+      }
+    ],
+    "control": {
+      "rect": {
+        "x": 718,
+        "y": 61,
+        "width": 64,
+        "height": 48
+      },
+      "step": 1
+    }
+  },
+  {
+    "profile": "phone-798x384",
+    "label": "phone landscape — the size named in the report",
+    "viewport": {
+      "width": 798,
+      "height": 384
+    },
+    "zoom": 1.5,
+    "world": {
+      "left": 1369.5,
+      "top": 912,
+      "right": 2566.5,
+      "bottom": 1488,
+      "width": 1197,
+      "height": 576
+    },
+    "content": {
+      "x": 0,
+      "y": 0,
+      "width": 798,
+      "height": 384
+    },
+    "anchors": [
+      {
+        "id": "ore-hud",
+        "x": 16,
+        "y": 16,
+        "origin": "left"
+      },
+      {
+        "id": "wave-clock",
+        "x": 399,
+        "y": 16,
+        "origin": "center"
+      },
+      {
+        "id": "station-hp",
+        "x": 782,
+        "y": 16,
+        "origin": "right"
+      },
+      {
+        "id": "controls-strip",
+        "x": 0,
+        "y": 354,
+        "origin": "left"
+      },
+      {
+        "id": "onboarding",
+        "x": 399,
+        "y": 338.5,
+        "origin": "center"
+      }
+    ],
+    "control": {
+      "rect": {
+        "x": 718,
+        "y": 61,
+        "width": 64,
+        "height": 48
+      },
+      "step": 1.5
+    }
+  },
+  {
+    "profile": "phone-798x384",
+    "label": "phone landscape — the size named in the report",
+    "viewport": {
+      "width": 798,
+      "height": 384
+    },
+    "zoom": 2,
+    "world": {
+      "left": 1170,
+      "top": 816,
+      "right": 2766,
+      "bottom": 1584,
+      "width": 1596,
+      "height": 768
+    },
+    "content": {
+      "x": 0,
+      "y": 0,
+      "width": 798,
+      "height": 384
+    },
+    "anchors": [
+      {
+        "id": "ore-hud",
+        "x": 16,
+        "y": 16,
+        "origin": "left"
+      },
+      {
+        "id": "wave-clock",
+        "x": 399,
+        "y": 16,
+        "origin": "center"
+      },
+      {
+        "id": "station-hp",
+        "x": 782,
+        "y": 16,
+        "origin": "right"
+      },
+      {
+        "id": "controls-strip",
+        "x": 0,
+        "y": 354,
+        "origin": "left"
+      },
+      {
+        "id": "onboarding",
+        "x": 399,
+        "y": 338.5,
+        "origin": "center"
+      }
+    ],
+    "control": {
+      "rect": {
+        "x": 718,
+        "y": 61,
+        "width": 64,
+        "height": 48
+      },
+      "step": 2
+    }
+  },
+  {
+    "profile": "phone-844x390",
+    "label": "phone landscape — iPhone profile (DEVICE_MATRIX)",
+    "viewport": {
+      "width": 844,
+      "height": 390
+    },
+    "zoom": 1,
+    "world": {
+      "left": 1546,
+      "top": 1005,
+      "right": 2390,
+      "bottom": 1395,
+      "width": 844,
+      "height": 390
+    },
+    "content": {
+      "x": 0,
+      "y": 0,
+      "width": 844,
+      "height": 390
+    },
+    "anchors": [
+      {
+        "id": "ore-hud",
+        "x": 16,
+        "y": 16,
+        "origin": "left"
+      },
+      {
+        "id": "wave-clock",
+        "x": 422,
+        "y": 16,
+        "origin": "center"
+      },
+      {
+        "id": "station-hp",
+        "x": 828,
+        "y": 16,
+        "origin": "right"
+      },
+      {
+        "id": "controls-strip",
+        "x": 0,
+        "y": 360,
+        "origin": "left"
+      },
+      {
+        "id": "onboarding",
+        "x": 422,
+        "y": 344.5,
+        "origin": "center"
+      }
+    ],
+    "control": {
+      "rect": {
+        "x": 764,
+        "y": 61,
+        "width": 64,
+        "height": 48
+      },
+      "step": 1
+    }
+  },
+  {
+    "profile": "phone-844x390",
+    "label": "phone landscape — iPhone profile (DEVICE_MATRIX)",
+    "viewport": {
+      "width": 844,
+      "height": 390
+    },
+    "zoom": 1.5,
+    "world": {
+      "left": 1335,
+      "top": 907.5,
+      "right": 2601,
+      "bottom": 1492.5,
+      "width": 1266,
+      "height": 585
+    },
+    "content": {
+      "x": 0,
+      "y": 0,
+      "width": 844,
+      "height": 390
+    },
+    "anchors": [
+      {
+        "id": "ore-hud",
+        "x": 16,
+        "y": 16,
+        "origin": "left"
+      },
+      {
+        "id": "wave-clock",
+        "x": 422,
+        "y": 16,
+        "origin": "center"
+      },
+      {
+        "id": "station-hp",
+        "x": 828,
+        "y": 16,
+        "origin": "right"
+      },
+      {
+        "id": "controls-strip",
+        "x": 0,
+        "y": 360,
+        "origin": "left"
+      },
+      {
+        "id": "onboarding",
+        "x": 422,
+        "y": 344.5,
+        "origin": "center"
+      }
+    ],
+    "control": {
+      "rect": {
+        "x": 764,
+        "y": 61,
+        "width": 64,
+        "height": 48
+      },
+      "step": 1.5
+    }
+  },
+  {
+    "profile": "phone-844x390",
+    "label": "phone landscape — iPhone profile (DEVICE_MATRIX)",
+    "viewport": {
+      "width": 844,
+      "height": 390
+    },
+    "zoom": 2,
+    "world": {
+      "left": 1124,
+      "top": 810,
+      "right": 2812,
+      "bottom": 1590,
+      "width": 1688,
+      "height": 780
+    },
+    "content": {
+      "x": 0,
+      "y": 0,
+      "width": 844,
+      "height": 390
+    },
+    "anchors": [
+      {
+        "id": "ore-hud",
+        "x": 16,
+        "y": 16,
+        "origin": "left"
+      },
+      {
+        "id": "wave-clock",
+        "x": 422,
+        "y": 16,
+        "origin": "center"
+      },
+      {
+        "id": "station-hp",
+        "x": 828,
+        "y": 16,
+        "origin": "right"
+      },
+      {
+        "id": "controls-strip",
+        "x": 0,
+        "y": 360,
+        "origin": "left"
+      },
+      {
+        "id": "onboarding",
+        "x": 422,
+        "y": 344.5,
+        "origin": "center"
+      }
+    ],
+    "control": {
+      "rect": {
+        "x": 764,
+        "y": 61,
+        "width": 64,
+        "height": 48
+      },
+      "step": 2
+    }
+  },
+  {
+    "profile": "phone-portrait-390x844",
+    "label": "phone PORTRAIT held — landscape-locked to 844×390",
+    "viewport": {
+      "width": 844,
+      "height": 390
+    },
+    "zoom": 1,
+    "world": {
+      "left": 1546,
+      "top": 1005,
+      "right": 2390,
+      "bottom": 1395,
+      "width": 844,
+      "height": 390
+    },
+    "content": {
+      "x": 0,
+      "y": 0,
+      "width": 844,
+      "height": 390
+    },
+    "anchors": [
+      {
+        "id": "ore-hud",
+        "x": 16,
+        "y": 16,
+        "origin": "left"
+      },
+      {
+        "id": "wave-clock",
+        "x": 422,
+        "y": 16,
+        "origin": "center"
+      },
+      {
+        "id": "station-hp",
+        "x": 828,
+        "y": 16,
+        "origin": "right"
+      },
+      {
+        "id": "controls-strip",
+        "x": 0,
+        "y": 360,
+        "origin": "left"
+      },
+      {
+        "id": "onboarding",
+        "x": 422,
+        "y": 344.5,
+        "origin": "center"
+      }
+    ],
+    "control": {
+      "rect": {
+        "x": 764,
+        "y": 61,
+        "width": 64,
+        "height": 48
+      },
+      "step": 1
+    }
+  },
+  {
+    "profile": "phone-portrait-390x844",
+    "label": "phone PORTRAIT held — landscape-locked to 844×390",
+    "viewport": {
+      "width": 844,
+      "height": 390
+    },
+    "zoom": 1.5,
+    "world": {
+      "left": 1335,
+      "top": 907.5,
+      "right": 2601,
+      "bottom": 1492.5,
+      "width": 1266,
+      "height": 585
+    },
+    "content": {
+      "x": 0,
+      "y": 0,
+      "width": 844,
+      "height": 390
+    },
+    "anchors": [
+      {
+        "id": "ore-hud",
+        "x": 16,
+        "y": 16,
+        "origin": "left"
+      },
+      {
+        "id": "wave-clock",
+        "x": 422,
+        "y": 16,
+        "origin": "center"
+      },
+      {
+        "id": "station-hp",
+        "x": 828,
+        "y": 16,
+        "origin": "right"
+      },
+      {
+        "id": "controls-strip",
+        "x": 0,
+        "y": 360,
+        "origin": "left"
+      },
+      {
+        "id": "onboarding",
+        "x": 422,
+        "y": 344.5,
+        "origin": "center"
+      }
+    ],
+    "control": {
+      "rect": {
+        "x": 764,
+        "y": 61,
+        "width": 64,
+        "height": 48
+      },
+      "step": 1.5
+    }
+  },
+  {
+    "profile": "phone-portrait-390x844",
+    "label": "phone PORTRAIT held — landscape-locked to 844×390",
+    "viewport": {
+      "width": 844,
+      "height": 390
+    },
+    "zoom": 2,
+    "world": {
+      "left": 1124,
+      "top": 810,
+      "right": 2812,
+      "bottom": 1590,
+      "width": 1688,
+      "height": 780
+    },
+    "content": {
+      "x": 0,
+      "y": 0,
+      "width": 844,
+      "height": 390
+    },
+    "anchors": [
+      {
+        "id": "ore-hud",
+        "x": 16,
+        "y": 16,
+        "origin": "left"
+      },
+      {
+        "id": "wave-clock",
+        "x": 422,
+        "y": 16,
+        "origin": "center"
+      },
+      {
+        "id": "station-hp",
+        "x": 828,
+        "y": 16,
+        "origin": "right"
+      },
+      {
+        "id": "controls-strip",
+        "x": 0,
+        "y": 360,
+        "origin": "left"
+      },
+      {
+        "id": "onboarding",
+        "x": 422,
+        "y": 344.5,
+        "origin": "center"
+      }
+    ],
+    "control": {
+      "rect": {
+        "x": 764,
+        "y": 61,
+        "width": 64,
+        "height": 48
+      },
+      "step": 2
+    }
+  },
+  {
+    "profile": "fit-16x9-1920x1080",
+    "label": "16:9 — the control",
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "zoom": 1,
+    "world": {
+      "left": 1008,
+      "top": 660,
+      "right": 2928,
+      "bottom": 1740,
+      "width": 1920,
+      "height": 1080
+    },
+    "content": {
+      "x": 0,
+      "y": 0,
+      "width": 1920,
+      "height": 1080
+    },
+    "anchors": [
+      {
+        "id": "ore-hud",
+        "x": 16,
+        "y": 16,
+        "origin": "left"
+      },
+      {
+        "id": "wave-clock",
+        "x": 960,
+        "y": 16,
+        "origin": "center"
+      },
+      {
+        "id": "station-hp",
+        "x": 1904,
+        "y": 16,
+        "origin": "right"
+      },
+      {
+        "id": "controls-strip",
+        "x": 0,
+        "y": 1050,
+        "origin": "left"
+      },
+      {
+        "id": "onboarding",
+        "x": 960,
+        "y": 1009.5,
+        "origin": "center"
+      }
+    ],
+    "control": null
+  },
+  {
+    "profile": "fit-21x9-2560x1080",
+    "label": "21:9 ultrawide",
+    "viewport": {
+      "width": 2560,
+      "height": 1080
+    },
+    "zoom": 1,
+    "world": {
+      "left": 688,
+      "top": 660,
+      "right": 3248,
+      "bottom": 1740,
+      "width": 2560,
+      "height": 1080
+    },
+    "content": {
+      "x": 320,
+      "y": 0,
+      "width": 1920,
+      "height": 1080
+    },
+    "anchors": [
+      {
+        "id": "ore-hud",
+        "x": 336,
+        "y": 16,
+        "origin": "left"
+      },
+      {
+        "id": "wave-clock",
+        "x": 1280,
+        "y": 16,
+        "origin": "center"
+      },
+      {
+        "id": "station-hp",
+        "x": 2224,
+        "y": 16,
+        "origin": "right"
+      },
+      {
+        "id": "controls-strip",
+        "x": 320,
+        "y": 1050,
+        "origin": "left"
+      },
+      {
+        "id": "onboarding",
+        "x": 1280,
+        "y": 1009.5,
+        "origin": "center"
+      }
+    ],
+    "control": null
+  },
+  {
+    "profile": "fit-32x9-3840x1080",
+    "label": "32:9 super-ultrawide",
+    "viewport": {
+      "width": 3840,
+      "height": 1080
+    },
+    "zoom": 1,
+    "world": {
+      "left": 48,
+      "top": 660,
+      "right": 3888,
+      "bottom": 1740,
+      "width": 3840,
+      "height": 1080
+    },
+    "content": {
+      "x": 960,
+      "y": 0,
+      "width": 1920,
+      "height": 1080
+    },
+    "anchors": [
+      {
+        "id": "ore-hud",
+        "x": 976,
+        "y": 16,
+        "origin": "left"
+      },
+      {
+        "id": "wave-clock",
+        "x": 1920,
+        "y": 16,
+        "origin": "center"
+      },
+      {
+        "id": "station-hp",
+        "x": 2864,
+        "y": 16,
+        "origin": "right"
+      },
+      {
+        "id": "controls-strip",
+        "x": 960,
+        "y": 1050,
+        "origin": "left"
+      },
+      {
+        "id": "onboarding",
+        "x": 1920,
+        "y": 1009.5,
+        "origin": "center"
+      }
+    ],
+    "control": null
+  }
+]
