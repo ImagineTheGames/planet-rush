@@ -296,13 +296,24 @@ row: if the menu had actually been flying in, this test would have caught it.
 on this branch existed. `frames/after/` is the same capture re-run at the tip of
 this branch.
 
-They are identical, and that is the honest result rather than a shortfall: this
-branch adds a test, a capture harness and this audit, and changes NO client
+They are the same frame, and that is the honest result rather than a shortfall:
+this branch adds a test, a capture harness and this audit, and changes NO client
 code. There is no "after the fix" because there was nothing to fix — the absence
 of motion the brief asks for is what the client already does.
 
-  before/exact-gated  f009 → f089:  328150 ink px, centre (853.0, 443.5), dx 0.0
-  after/exact-gated   f009 → f089:  328150 ink px, centre (853.0, 443.5), dx 0.0
+  before/exact-gated  f009-00681ms → f089:  328150 ink px, centre (853.0,443.5), dx 0.0
+  after/exact-gated   f010-00667ms → f089:  328125 ink px, centre (853.0,443.5), dx 0.0
+
+The 25-px difference is named rather than waved at. A pixel diff of the two
+first-inked frames:
+
+  differing pixels ... 201
+  bounding box ....... x=13  y=880  w=33  h=8   (of 1707 x 898)
+
+A 33x8 box in the bottom-left corner: the build stamp, which reads the commit
+(`a4f0291*` before, `ab3ccc6*` after) and is the one thing on screen that changes
+every commit by design — it is why `?freeze=1` exists. Every other pixel of the
+menu, all 1 532 685 of them, is bit-identical across the branch.
 
 No golden re-baseline: no frame changes, because no drawing code changed.
 
