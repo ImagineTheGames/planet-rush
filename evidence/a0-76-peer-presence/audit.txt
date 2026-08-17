@@ -1,0 +1,268 @@
+a0-76 — "the players who stayed are told nothing", and now they are told
+================================================================================
+OWNER: UI Engineer.  Branch: agent/ui/a0-76-peer-presence.
+Captured 2026-08-17 against the local fleet fixture (tests/net/local-fleet.ts):
+two ticket-enforcing Machines with the socket-hop pin armed, a Fly-shaped edge in
+front of them, a real allocator process — and the shipped client path for BOTH
+clients (allocateRoom / joinRoom -> allocatorTransport -> createOnlineSession ->
+WebSocketTransport).
+
+The report
+--------------------------------------------------------------------------------
+  "do we have any indication when a player loses connection (like for the other
+   players that remained in match...) and when they join back as well... we need
+   something to indicate that so other players know"
+
+The answer was no. `src/ui/connection-status.ts` and `src/net/link-loss.ts` are
+entirely about YOUR OWN socket, so from the other side of a drop a disconnected
+player was a ship that simply stopped making good decisions. Rage-quit, lag, a
+reconnect in flight and a bot substitution all looked identical from the cockpit,
+and each of them calls for a different response — press the advantage, wait, or
+stop counting on an ally.
+
+
+HOW IT WAS CAPTURED (and why from the OTHER seat)
+================================================================================
+a0-72's probe stands next to the player who dropped and asks whether the server
+takes them back. This one stands next to the player who STAYED and asks what
+their screen says about it.
+
+  evidence/a0-76-peer-presence/presence-probe.ts
+
+  WATCHER   allocates the room, starts the match, FLIES (a real client sends
+            input every rendered frame), and stays. Its session is fed to
+            `applyPresenceMessage` — the SAME function `src/main.ts` hands every
+            observed message to — so every "banner" line below is what the HUD
+            draws, not a re-implementation of it.
+  PHONE     joins the same room through the allocator's join route, then
+            backgrounds: a socket that stops calling the page back and then dies,
+            which is what a suspended tab leaves behind (`transport.state` still
+            reads `open`, no `onclose`, no frame). Real wall-clock seconds pass —
+            nothing here moves a clock.
+
+  npx vite-node evidence/a0-76-peer-presence/presence-probe.ts -- --away=25000 --label=drop-and-return
+  npx vite-node evidence/a0-76-peer-presence/presence-probe.ts -- --abandon=1   --label=abandon
+  npx vite-node evidence/a0-76-peer-presence/presence-probe.ts -- --away=25000 --end-match=1 --label=match-over
+  npx vite-node evidence/a0-76-peer-presence/presence-probe.ts -- --away=45000 --label=long-away
+
+Every frame below carries THREE things side by side: the banner the watcher's HUD
+had, the standing per-seat state behind it, and AUTHORITY'S OWN ROSTER at the same
+instant (`room.lobbyState()` + `room.seatHeldForMatch()`), read straight off the
+Machine. That third column is the check that the HUD is not making anything up.
+
+Room PBQW throughout; WATCHER is seat 0 (P1), PHONE is seat 1 (P2).
+
+
+1. DROPPED — "P2 — CONNECTION LOST · BOT FLYING"
+================================================================================
+  drop-and-return.json
+
+  wire (what authority actually said, ms from boot):
+        1     lobbyState
+      449     playerSubstituted  { player: 1, graceSeconds: 0, heldForMatch: true }
+      449     lobbyState
+    25579     playerReclaimed    { player: 1 }
+    25579     lobbyState
+
+  t = 0.00 s   match live — two humans flying, nothing to say
+    banner    (nothing)
+    state     (nothing)
+    authority seat 0  bot:no  held:no      seat 1  bot:no  held:no
+
+  t = 0.30 s   their screen went black
+    banner    P2 — CONNECTION LOST · BOT FLYING
+    row       name "P2" (seat 1's identity colour) · reason "CONNECTION LOST"
+              (muted) · clause "BOT FLYING" · alpha 1.00
+    state     seat 1  dropped  bot:yes
+    authority seat 0  bot:no  held:no      seat 1  bot:YES  held:YES
+
+  The banner and authority agree, character for character, at the same instant:
+  the room seated a bot on seat 1 and is holding that seat for its operator for as
+  long as the match runs (a0-72's `heldForMatch`). NOTHING in that line was
+  inferred from the simulation — the whole of it comes from `playerSubstituted`
+  and the `lobbyState` that rides with it.
+
+  t = 6.27 s   six seconds later
+    banner    (nothing)
+    state     seat 1  dropped  bot:yes
+    authority seat 1  bot:YES  held:YES
+
+  THE LINE IS TRANSIENT; THE STATE IS NOT. This is the distinction the whole model
+  turns on: five seconds of banner is what a player can read mid-fight, and the
+  standing "seat 1 is a bot right now" is what stays true for the twenty-five
+  seconds a player spends deciding whether to press the advantage.
+
+
+2. BACK — "P2 — BACK · BOT OUT"
+================================================================================
+  drop-and-return.json (same run)
+
+  t = 25.30 s  still away, still held — the moment before they return
+    banner    (nothing)
+    state     seat 1  dropped  bot:yes
+    authority seat 1  bot:YES  held:YES
+
+  t = 25.53 s  they are back
+    banner    P2 — BACK · BOT OUT
+    row       name "P2" · reason "BACK" · clause "BOT OUT" · alpha 1.00
+    state     seat 1  back  bot:no
+    authority seat 1  bot:no   held:no
+
+  NAMED AGAIN, AND BY THE SAME NAME. A player who read `P2 — CONNECTION LOST` half
+  a minute ago does not have to work out that "seat 1" is the same person: the
+  banner spells a seat exactly the way its nameplate and its hull decal do
+  (`resolveName`, `P{n}` for a seat with no lobby name), and it is drawn in that
+  seat's own identity colour.
+
+  `BOT OUT` is stated rather than left to inference — the substitution was
+  announced, so the hand-back is too.
+
+  t = 31.55 s  six seconds later — the seat is an ordinary seat again
+    banner    (nothing)
+    state     (nothing)
+    authority seat 1  bot:no   held:no
+
+  `back` is a thing that happened, not a condition: once its line has been on
+  screen for its whole window the seat settles back to `here` and the log holds
+  nothing about it at all.
+
+
+3. GONE FOR GOOD, by their own hand — "P2 — LEFT THE MATCH · BOT FLYING"
+================================================================================
+  abandon.json
+
+  wire:
+        1     lobbyState
+      273     playerSubstituted  { player: 1, graceSeconds: 0, heldForMatch: FALSE }
+      273     lobbyState
+
+  t = 0.13 s   they pressed ABANDON
+    banner    P2 — LEFT THE MATCH · BOT FLYING
+    state     seat 1  gone  bot:yes
+    authority seat 1  bot:YES  held:NO
+
+  THE SAME MESSAGE CARRIES BOTH, AND `heldForMatch` IS THE WHOLE DIFFERENCE. A
+  drop and an abandon arrive as one message type with one seat number on it; a
+  peer does different things about them, so the banner says which. `held: NO` on
+  the authority row is the fact the copy is reading — there is no window, the
+  token is dead, and nobody is coming back to that seat.
+
+
+4. GONE FOR GOOD, because the match ended — silently
+================================================================================
+  match-over.json
+
+  wire:
+      449     playerSubstituted  { player: 1, graceSeconds: 0, heldForMatch: true }
+    25583     matchEnd
+    25583     lobbyState
+
+  t =  0.28 s  their screen went black
+    banner    P2 — CONNECTION LOST · BOT FLYING
+    state     seat 1  dropped  bot:yes
+    authority seat 1  bot:YES  held:YES
+
+  t = 25.35 s  the match ended while they were away
+    banner    (nothing)
+    state     seat 1  GONE  bot:yes
+    authority seat 1  bot:YES  held:NO      <-- the hold ended with the match
+
+  The hold a0-72 grants runs for the length of the match and no longer, so a
+  player still on their way back has nothing left to come back to. The state
+  moves; the banner does not fire. That is deliberate: the end-of-match summary is
+  up, and a line announcing a departure over a screen that has already announced
+  the result is noise about a match that is over.
+
+
+5. RETURNING — MODELLED, AND HONESTLY NOT REACHED
+================================================================================
+This is the one state in the brief's list that no frame above shows, and the
+reason is a fact about the wire rather than a gap in the HUD.
+
+Between "the phone starts dialling" and "the phone is back", authority says
+NOTHING to anyone else. `server/room.ts` `reclaim()` learns a returning player
+exists at the instant their reclaim succeeds, and broadcasts `playerReclaimed` at
+that same instant — so there is no in-flight window on the wire for a peer to
+observe. Measured across the four runs above, the whole of that window is:
+
+  drop-and-return   playerReclaimed at 25579 ms; the dial began ~360 ms earlier
+  long-away         playerReclaimed at 45577 ms; same shape
+
+`PeerPresence` carries `returning` as a first-class state with its own copy
+(`RECONNECTING`, the word `src/ui/connection-status.ts` already uses for your own
+socket) and its own entry point (`PeerPresenceLog.noteReturning`), so it lights up
+the moment authority announces one. **No client-side guess is offered in its
+place**: a client cannot know another client is dialling, and inventing that would
+be exactly the thing this whole deliverable exists to stop inventing. The PR
+carries the one additive broadcast that would light it up; `src/net/` and
+`server/` are the Netcode Engineer's files.
+
+
+6. WHERE IT LANDS — phone to ultrawide
+================================================================================
+Placement is measured off the wave clock's own DRAWN footprint, at the clock's
+real line widths, in the a0-74 content box. Captured in every JSON above.
+
+  viewport                        clock ends   band top   centre    rows, wheel:
+                                                                    closed / open
+  844x390   phone (landscape)         70 px      75 px     422 px      2  /  0
+  390x844   phone (portrait)          70 px      75 px     195 px      2  /  2
+  1280x720  desktop 16:9              82 px      88 px     640 px      2  /  2
+  3840x1080 ultrawide 32:9            82 px      88 px    1920 px      2  /  2
+
+  * Every band sits INSIDE the HUD margin at every profile (`insideMargin: true`),
+    which is what makes the layer's `full` + PAD registration honest rather than
+    hopeful.
+  * On the ULTRAWIDE the band is centred on 1920, not on 3840/2-of-the-raw-viewport
+    — it is laid out in the centred content box (x=960, width=1920) like the clock
+    above it, so it stays with the rest of the chrome instead of a head-turn away
+    (a0-74).
+  * On a 390 px-TALL LANDSCAPE PHONE with the Build wheel open the band shows
+    ZERO rows. The wheel is a control the player is pressing right now and the
+    banner is transient, so the wheel wins the pixels — the same call a0-24 made
+    for the clock itself. Everywhere else the band sheds its OLDEST row rather
+    than going silent.
+  * The band never reaches the minimap: it is a top-centre element and the map is
+    bottom-right (asserted in `src/ui/hud.test.ts`).
+
+
+7. ONE ARTIFACT OF THE FIXTURE, NAMED
+================================================================================
+  long-away.json — the 45-second run
+
+    35215     playerReclaimed   { player: 0 }     <-- the WATCHER's own seat
+
+The watcher reconnects at 35.2 s in every run longer than that, and it is the
+fixture, not the product: `server/ws.ts` pings an idle socket every
+`PING_INTERVAL_MS` (20 s) and destroys it `PONG_TIMEOUT_MS` (15 s) later if no
+pong comes back — 35 s exactly — and `tests/net/node-websocket.ts` is a
+hand-rolled RFC 6455 client that does not answer protocol pings. A real browser
+WebSocket answers them in the browser, below JavaScript. a0-72's probe never saw
+this because its single client was the one being suspended. Runs 1–4 above are
+therefore captured at a 25-second background, which is under that ceiling and
+still a real one: the socket is dead, a bot is flying, and the seat is held.
+
+Kept rather than deleted, because it is also a positive result:
+
+  t = 45.30 s  state  seat 0 back (the watcher's OWN seat)  ·  seat 1 dropped
+               banner (nothing about seat 0)
+
+Your own drop is `src/net/link-loss`'s full-screen card with RECONNECT and ABANDON
+on it. The log tracks the local seat's state and DRAWS NOTHING for it, so a
+second, quieter copy of that card never appears under the wave clock. The 45 s run
+is the only place in this evidence where that suppression is exercised against a
+real reconnect.
+
+
+WHAT THE PLAYER GETS
+================================================================================
+  a seat drops        P2 — CONNECTION LOST · BOT FLYING
+  a seat comes back   P2 — BACK · BOT OUT
+  a seat abandons     P2 — LEFT THE MATCH · BOT FLYING
+  a seat is reclaimed by the match ending          (state only, no line)
+  your own seat       (nothing — that is the overlay's job)
+
+Five seconds a line, top centre under the wave clock, newest first, at most three
+at once, in the seat's own identity colour. Plain and diagnostic, per GDD §4.7's
+match/machine line — a dropped socket is a machine fact, and the mining authority
+has no voice for it.

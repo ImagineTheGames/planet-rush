@@ -1,0 +1,299 @@
+{
+  "probe": "a0-76 peer presence, from the seat that stayed",
+  "label": "long-away",
+  "awayMs": 45000,
+  "mode": "drop-and-return",
+  "capturedAt": "2026-08-17T23:18:37.701Z",
+  "room": {
+    "code": "PBQW",
+    "machine": "4d891e33b27a95"
+  },
+  "seats": {
+    "watcher": 0,
+    "phone": 1
+  },
+  "wire": [
+    {
+      "at": 1,
+      "type": "lobbyState"
+    },
+    {
+      "at": 442,
+      "type": "playerSubstituted",
+      "detail": {
+        "player": 1,
+        "graceSeconds": 0,
+        "heldForMatch": true
+      }
+    },
+    {
+      "at": 442,
+      "type": "lobbyState"
+    },
+    {
+      "at": 35215,
+      "type": "playerReclaimed",
+      "detail": {
+        "player": 0
+      }
+    },
+    {
+      "at": 35215,
+      "type": "lobbyState"
+    },
+    {
+      "at": 45577,
+      "type": "playerReclaimed",
+      "detail": {
+        "player": 1
+      }
+    },
+    {
+      "at": 45578,
+      "type": "lobbyState"
+    }
+  ],
+  "frames": [
+    {
+      "moment": "match live — two humans flying, nothing to say",
+      "at": 0,
+      "banner": [],
+      "rows": [],
+      "seats": [],
+      "authority": [
+        {
+          "seat": 0,
+          "isBot": false,
+          "heldForMatch": false,
+          "hasSocket": true
+        },
+        {
+          "seat": 1,
+          "isBot": false,
+          "heldForMatch": false,
+          "hasSocket": true
+        }
+      ]
+    },
+    {
+      "moment": "their screen went black",
+      "at": 0.32,
+      "banner": [
+        "P2 — CONNECTION LOST · BOT FLYING"
+      ],
+      "rows": [
+        {
+          "seat": 1,
+          "name": "P2",
+          "reason": "CONNECTION LOST",
+          "clause": "BOT FLYING",
+          "alpha": 1
+        }
+      ],
+      "seats": [
+        {
+          "seat": 1,
+          "state": "dropped",
+          "bot": true
+        }
+      ],
+      "authority": [
+        {
+          "seat": 0,
+          "isBot": false,
+          "heldForMatch": false,
+          "hasSocket": true
+        },
+        {
+          "seat": 1,
+          "isBot": true,
+          "heldForMatch": true,
+          "hasSocket": false
+        }
+      ]
+    },
+    {
+      "moment": "six seconds later — the line has gone, the state has not",
+      "at": 6.27,
+      "banner": [],
+      "rows": [],
+      "seats": [
+        {
+          "seat": 1,
+          "state": "dropped",
+          "bot": true
+        }
+      ],
+      "authority": [
+        {
+          "seat": 0,
+          "isBot": false,
+          "heldForMatch": false,
+          "hasSocket": true
+        },
+        {
+          "seat": 1,
+          "isBot": true,
+          "heldForMatch": true,
+          "hasSocket": false
+        }
+      ]
+    },
+    {
+      "moment": "still away, still held — the moment before they return",
+      "at": 45.3,
+      "banner": [],
+      "rows": [],
+      "seats": [
+        {
+          "seat": 0,
+          "state": "back",
+          "bot": false
+        },
+        {
+          "seat": 1,
+          "state": "dropped",
+          "bot": true
+        }
+      ],
+      "authority": [
+        {
+          "seat": 0,
+          "isBot": false,
+          "heldForMatch": false,
+          "hasSocket": true
+        },
+        {
+          "seat": 1,
+          "isBot": true,
+          "heldForMatch": true,
+          "hasSocket": false
+        }
+      ]
+    },
+    {
+      "moment": "they are back",
+      "at": 45.45,
+      "banner": [
+        "P2 — BACK · BOT OUT"
+      ],
+      "rows": [
+        {
+          "seat": 1,
+          "name": "P2",
+          "reason": "BACK",
+          "clause": "BOT OUT",
+          "alpha": 1
+        }
+      ],
+      "seats": [
+        {
+          "seat": 0,
+          "state": "back",
+          "bot": false
+        },
+        {
+          "seat": 1,
+          "state": "back",
+          "bot": false
+        }
+      ],
+      "authority": [
+        {
+          "seat": 0,
+          "isBot": false,
+          "heldForMatch": false,
+          "hasSocket": true
+        },
+        {
+          "seat": 1,
+          "isBot": false,
+          "heldForMatch": false,
+          "hasSocket": true
+        }
+      ]
+    },
+    {
+      "moment": "six seconds later — the seat is an ordinary seat again",
+      "at": 51.43,
+      "banner": [],
+      "rows": [],
+      "seats": [
+        {
+          "seat": 0,
+          "state": "back",
+          "bot": false
+        }
+      ],
+      "authority": [
+        {
+          "seat": 0,
+          "isBot": false,
+          "heldForMatch": false,
+          "hasSocket": true
+        },
+        {
+          "seat": 1,
+          "isBot": false,
+          "heldForMatch": false,
+          "hasSocket": true
+        }
+      ]
+    }
+  ],
+  "watcherWelcomes": 2,
+  "placement": [
+    {
+      "viewport": "844x390 — phone (landscape)",
+      "contentBox": {
+        "x": 0,
+        "width": 844
+      },
+      "clockBottom": 70,
+      "bandTop": 75,
+      "bandCentreOnScreen": 422,
+      "rowsShownWheelClosed": 2,
+      "rowsShownWheelOpen": 0,
+      "insideMargin": true
+    },
+    {
+      "viewport": "390x844 — phone (portrait)",
+      "contentBox": {
+        "x": 0,
+        "width": 390
+      },
+      "clockBottom": 70,
+      "bandTop": 75,
+      "bandCentreOnScreen": 195,
+      "rowsShownWheelClosed": 2,
+      "rowsShownWheelOpen": 2,
+      "insideMargin": true
+    },
+    {
+      "viewport": "1280x720 — desktop 16:9",
+      "contentBox": {
+        "x": 0,
+        "width": 1280
+      },
+      "clockBottom": 82,
+      "bandTop": 88,
+      "bandCentreOnScreen": 640,
+      "rowsShownWheelClosed": 2,
+      "rowsShownWheelOpen": 2,
+      "insideMargin": true
+    },
+    {
+      "viewport": "3840x1080 — ultrawide 32:9",
+      "contentBox": {
+        "x": 960,
+        "width": 1920
+      },
+      "clockBottom": 82,
+      "bandTop": 88,
+      "bandCentreOnScreen": 1920,
+      "rowsShownWheelClosed": 2,
+      "rowsShownWheelOpen": 2,
+      "insideMargin": true
+    }
+  ]
+}
