@@ -136,7 +136,9 @@
  */
 
 import type { SoundLayer, SoundName, SoundSpec } from './bank';
+import { isLayered, soundSpec } from './bank';
 import { band, grains, place, plate, swept } from './instrument';
+import { GLASS_PARTIALS, GLASS_PAIR, PARTIAL_DECAY, PARTIAL_ROLLOFF, STRIKE_S } from './ui-cues';
 
 // ---------------------------------------------------------------------------
 // The instrument the candidates are built out of lives in `./instrument` now.
@@ -195,6 +197,127 @@ function returns(
   );
 }
 
+/**
+ * The **glass** the main menu is made of — the ratified Gantry/Bone material.
+ *
+ * a0-67 exists because a slot lost it. The developer's words on `pressTick` were
+ * *"what happened to the glass theme we had, none of these are glass themed like
+ * the main menu"* — a **regression report**, not a preference, and the thing it
+ * reports is real: the shipped `pressTick` is a struck glass note at A♭6, and the
+ * a0-60 re-voice offered four takes (a capacitive contact, a damped actuator, a
+ * filtered band, a click) that were all correctly "modern/sci-fi" and none of
+ * which was glass. A slot can pass the register test and still leave the family.
+ *
+ * **What the glass theme is, in sound terms** — read out of `./ui-cues`, which is
+ * where it is ratified, so this is a re-use rather than a re-invention:
+ *
+ *  - **Sine partials on 1 / 2.76 / 5.4** ({@link GLASS_PARTIALS}). Inharmonic, and
+ *    neither a harmonic series nor a bell's — that spacing is what a struck *pane*
+ *    does. The thin form drops the top partial ({@link GLASS_PAIR}).
+ *  - **The upper partials die first** ({@link PARTIAL_DECAY} = 0.66 of the one
+ *    below). *"Steeper rolloff + faster upper-partial decay = glass, not bell
+ *    metal"* — this one line is the whole difference, and it is why a chime and a
+ *    pane made of the same ratios do not sound alike.
+ *  - **A ~2 ms strike** ({@link STRIKE_S}), never zero, which is a click.
+ *  - **A contact edge** — a breath of band-passed noise ahead of the note, which
+ *    is what makes a strike read as two hard things touching rather than as a tone
+ *    being switched on. `./bank`'s own `strike()` adds it and `./ui-cues` calls it
+ *    `air`; it is the round-2 half of the material and it stays.
+ *  - **A♭6 = 1661 Hz is the family root.** Every pitch in the menu set is measured
+ *    off it.
+ *
+ * This is deliberately a **copy of `./bank`'s private `strike()`**, not an import
+ * of it: `strike` is not exported, and the board must be able to offer glass that
+ * is *not* what ships without either file reaching into the other. The numbers are
+ * the ratified ones and are imported from `./ui-cues` rather than retyped, so the
+ * copy cannot drift from the material it claims to be.
+ */
+function glass(
+  name: string,
+  freq: number,
+  o: {
+    readonly gain: number;
+    /** The fundamental's decay. Each partial above it decays faster. */
+    readonly decay: number;
+    readonly at?: number;
+    /** {@link GLASS_PARTIALS} (three, full) or {@link GLASS_PAIR} (two, thinner). */
+    readonly partials?: readonly number[];
+    /** Scale the contact edge, 0 to drop it. Default 1. */
+    readonly contact?: number;
+    /** Grain on the fundamental — a trace of pitched noise. A pure sine is a test tone. */
+    readonly grain?: number;
+    readonly seed: number;
+  },
+): SoundLayer[] {
+  const contact = o.contact ?? 1;
+  const grain = o.grain ?? 0.03;
+  const layers: SoundLayer[] = [];
+
+  if (contact > 0) {
+    layers.push(
+      band(`${name}.contact`, freq * 2.1, {
+        gain: o.gain * 0.42 * contact,
+        decay: Math.min(0.04, o.decay * 0.55),
+        q: 3.2,
+        curve: 7, // an edge, not a layer: gone almost before it registers
+        punch: 0.5,
+        ...(o.at === undefined ? {} : { at: o.at }),
+        seed: o.seed + 90,
+      }),
+    );
+  }
+
+  for (const [i, ratio] of (o.partials ?? GLASS_PARTIALS).entries()) {
+    layers.push(
+      place(
+        {
+          name: `${name}.p${i}`,
+          wave: 'sine',
+          attack: STRIKE_S,
+          hold: 0, // a struck body peaks and dies; it does not sit at full level
+          decay: o.decay * Math.pow(PARTIAL_DECAY, i),
+          decayCurve: 3.2 + i,
+          freq: freq * ratio,
+          noiseMix: grain + i * 0.012,
+          gain: o.gain / Math.pow(i + 1, PARTIAL_ROLLOFF),
+          seed: o.seed + i,
+        },
+        o.at,
+      ),
+    );
+  }
+
+  return layers;
+}
+
+/**
+ * The sound this slot **ships today**, offered as a letter of its own.
+ *
+ * Four of the sixteen round-two reasons open with some form of *"i like current"*
+ * (`bankOre`, `upgradeBought`, `musicWin`, `musicLoss`) and two more ask to be
+ * shown directions to move *from* it (`oreCollect`, `turretFire`). In both cases
+ * the incumbent is the reference and not the reject — but the board has only ever
+ * been able to say that in prose. A `current` preview does exist beside every
+ * slot, and it is not a thing a **verdict** can land on: `/status/sound-choices.
+ * json` records a slot and a *letter*, so *"keep what ships"* has never been an
+ * expressible answer, and a developer who wants it has to deny four takes and
+ * hope somebody reads the reason.
+ *
+ * So the incumbent takes a letter. Picking it is a real verdict — *keep what
+ * ships* — and, more usefully for the four "more X than this" reasons, it puts the
+ * reference in the A/B where it can be heard against the new takes instead of
+ * remembered between them.
+ *
+ * The spec is the shipped one, renamed so the review page prints which letter it
+ * arrived under. It is marked {@link SoundCandidate.anchor} so nothing downstream
+ * mistakes it for new work.
+ */
+function incumbent(name: SoundName, id: string): SoundSpec {
+  const spec = soundSpec(name);
+  const renamed = `${name}_${id}_current`;
+  return isLayered(spec) ? { ...spec, name: renamed } : { ...spec, name: renamed };
+}
+
 /** One candidate voice for a slot: an id, a short character label, and the spec itself. */
 export interface SoundCandidate {
   /**
@@ -230,6 +353,17 @@ export interface SoundCandidate {
   readonly character: string;
   /** The synth param set — the same shape as a shipped bank entry. */
   readonly spec: SoundSpec;
+  /**
+   * This letter **is the sound that ships today** ({@link incumbent}), offered so
+   * that *"keep what ships"* is an answer a verdict can express and so that the
+   * A/B against it is playable rather than remembered (a0-67).
+   *
+   * It is not new work and it is not one of the directions a round is offering, so
+   * anything that counts or measures a round's takes excludes it — the review page
+   * prints it as the current sound, and `./candidates.test.ts` holds the round's
+   * bounds against the non-anchor offers.
+   */
+  readonly anchor?: boolean;
 }
 
 /** One reviewable slot: a shipped sound, and three candidate replacements. */
@@ -598,49 +732,133 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
   //   d  **flake shear** — the snap, and bright chips coming off it. Granular.
   //   e  **charged intake** — the pull, with an ionised edge riding up the top.
   //   f  **assay ping** — a dry contact and two narrow high bands reading it back.
+  //
+  // ---------------------------------------------------------------------------
+  // ROUND 4 (a0-67, 2026-08-17) — THREE DIRECTIONS, NOT THREE TAKES
+  // ---------------------------------------------------------------------------
+  //
+  // All three of round 3 were denied, verbatim:
+  //
+  //   *"they need to sound more satisfying, like you've won something, but subtle
+  //   at same time, make 3 distinct sounds so that i can see what direction to go
+  //   in"*
+  //
+  // The last clause is an instruction about the **shape of the round**, and it is
+  // the one that is easy to average away. *"So that i can see what direction to go
+  // in"* is not a request for three more attempts at one idea — it is a request to
+  // be shown the **options space**, so one of them can be picked and developed. So
+  // the three below are pushed as far apart as an 80 ms pickup allows: they are
+  // three different answers to *what does winning a small thing sound like*, and a
+  // reader should be able to say which one they prefer without having heard them.
+  //
+  //   g  **an interval** — the reward is *musical*. Two struck notes rising a
+  //      fifth. If this is the direction, the slot grows a pitch grammar and the
+  //      next round is about which interval.
+  //   h  **a handful of material** — the reward is *the ore itself*. Many tiny
+  //      bright contacts landing in a tray, no pitch anywhere. If this is the
+  //      direction, the next round is about how much of it there is.
+  //   i  **a breath** — the reward is a *feeling*, and nothing is struck at all: a
+  //      soft bloom that opens and closes. If this is the direction, the slot
+  //      stops being an event and becomes a swell.
+  //   j  **the sound that ships today**, so *"more satisfying than what I have"*
+  //      can be judged against what they have rather than from memory.
+  //
+  // What did NOT change, because it was not withdrawn:
+  //
+  //  - ***"but subtle at same time"*** is the same clause as round 3's *"but
+  //    subtle"*, said again. It stays a **level ceiling on the whole cue**: no new
+  //    take is louder in peak or in RMS than the incumbent.
+  //  - ***"it shouldn't be too long"*** (round 3) was not retracted, and it is a
+  //    hard bound rather than a preference — `TELL.oreCollect` fires on every
+  //    pickup. Every new take is at or under the incumbent's length.
+  //
+  // The one bound that had to be **re-scoped**, said out loud rather than dropped
+  // quietly: round 3 held *every* offer above the denied set's high-frequency
+  // share, which is how *"sparkle"* was answered. Holding that per-offer now would
+  // forbid two of the three directions the developer just asked for — a dry
+  // handful of material and a breath are not bright by construction. So the
+  // sparkle clause moves from *every offer* to *the set*: at least one direction
+  // still carries it, and `./candidates.test.ts` asserts that rather than letting
+  // it lapse. A clause that is answered by one of three offers is still answered;
+  // a clause deleted because it was inconvenient is a denial being ignored.
   oreCollect: {
     label: "Ore Collect",
     context: "A loose ore chunk is tractored in",
     current: 'oreCollect',
     candidates: [
       {
-        id: 'd',
-        character: "flake shear, bright chips off the snap",
+        id: 'g',
+        slot: 'oreCollect',
+        character: "a prize: two notes, rising a fifth",
         spec: {
-          name: 'oreCollect_d_flakeShear',
+          name: 'oreCollect_g_prizeInterval',
           layers: [
-            ...plate('oreCollect_d.snap', 1400, { gain: 0.26, decay: 0.04, ratios: [1, 2.41], q: 8, curve: 6, punch: 0.6, grain: 0.34, seed: 30410 }),
-            grains('oreCollect_d.flecks', { freq: 4300, freqEnd: 5600, grain: 0.0032, gain: 0.32, hold: 0.004, decay: 0.055, curve: 4.2, from: 6200, to: 4400, q: 5, hp: 2600, at: 0.01, seed: 30414 }),
-            band('oreCollect_d.glint', 5900, { gain: 0.4, decay: 0.04, q: 10, curve: 4.5, hp: 3000, at: 0.022, seed: 30416 }),
+            // D6 then A6. A rising fifth is the plainest "that went well" an
+            // interval can be, and it is not the incumbent's material: `plate`'s
+            // 1 · 2.41 spacing, deliberately not the ratified glass — an offer
+            // made of the incumbent's material is the incumbent with a filter on
+            // it, and this direction has to be audibly its own idea.
+            // F6 then C7, not D6/A6: the §8 pair `oreCollect`/`depositTick` is
+            // held on spectral centre (*picked a chunk up* vs *banked a chunk*),
+            // and a fifth spelled a third lower sat inside a `depositTick` offer's
+            // band. The interval is the direction; the register it is spelled in
+            // is what keeps it off another mechanic.
+            ...plate('oreCollect_g.one', 1396.91, { gain: 0.17, decay: 0.034, ratios: [1, 2.41], q: 9, curve: 6, punch: 0.45, grain: 0.16, seed: 30460 }),
+            // 38 ms apart and 40 ms long, which is what keeps the whole gesture
+            // inside the length ceiling round 3 set (*"it shouldn't be too
+            // long"*). An interval needs two notes; it does not need two long
+            // ones, and the second is the only one allowed any ring at all.
+            ...plate('oreCollect_g.two', 2093, { gain: 0.2, decay: 0.04, ratios: [1, 2.41], q: 10, curve: 5, grain: 0.14, edge: 0.6, at: 0.038, seed: 30464 }),
+            // The one bright thing in this direction, on the second note only: it
+            // is the *arrival* that gets the glint, which is what makes an
+            // interval read as landing somewhere rather than as two pips. It also
+            // carries the round-3 sparkle clause on this take, which a plain pair
+            // of struck notes would not.
+            band('oreCollect_g.glint', 5040, { gain: 0.62, decay: 0.03, q: 9, curve: 5, hp: 2600, at: 0.04, seed: 30468 }),
           ],
         },
       },
       {
-        id: 'e',
-        character: "charged intake, an ionised edge",
+        id: 'h',
+        slot: 'oreCollect',
+        character: "a handful of chips into the tray",
         spec: {
-          name: 'oreCollect_e_chargedIntake',
+          name: 'oreCollect_h_handfulOfChips',
           layers: [
-            swept('oreCollect_e.intake', { wave: 'triangle', freq: 520, from: 420, to: 2200, q: 5, gain: 0.08, attack: 0.002, hold: 0.01, decay: 0.05, curve: 3.8, noiseMix: 0.24, seed: 30420 }),
-            swept('oreCollect_e.ion', { wave: 'noise', freq: 3400, from: 2600, to: 6200, q: 7, gain: 0.46, attack: 0.003, hold: 0.006, decay: 0.05, curve: 4, hp: 2600, at: 0.012, seed: 30422 }),
-            grains('oreCollect_e.spark', { freq: 5200, grain: 0.0028, gain: 0.36, hold: 0.003, decay: 0.045, curve: 5, from: 6200, to: 4600, q: 4.5, hp: 3600, at: 0.026, seed: 30424 }),
+            // No pitch anywhere: the whole cue is small contacts at a rate. The
+            // satisfaction here is *quantity* — you can hear that something
+            // arrived, and roughly how much of it — which is the reading of
+            // "you've won something" that does not reach for a tune.
+            grains('oreCollect_h.fall', { freq: 2600, freqEnd: 3400, grain: 0.0026, gain: 0.3, hold: 0.004, decay: 0.05, curve: 3.4, from: 5400, to: 3200, q: 3.4, hp: 1400, seed: 30470 }),
+            grains('oreCollect_h.settle', { freq: 3900, grain: 0.0034, gain: 0.24, hold: 0.003, decay: 0.055, curve: 4.6, from: 6200, to: 3600, q: 4, hp: 2400, at: 0.018, seed: 30472 }),
+            band('oreCollect_h.tray', 780, { gain: 0.34, decay: 0.05, q: 4.5, curve: 5, at: 0.006, seed: 30474 }),
           ],
         },
       },
       {
-        id: 'f',
-        character: "assay ping, two high bands reading back",
+        id: 'i',
+        slot: 'oreCollect',
+        character: "a breath, nothing struck",
         spec: {
-          name: 'oreCollect_f_assayPing',
+          name: 'oreCollect_i_breath',
           layers: [
-            grains('oreCollect_f.contact', { freq: 1100, grain: 0.0025, gain: 0.28, hold: 0.003, decay: 0.026, curve: 6, from: 2600, to: 1200, q: 3, hp: 600, seed: 30430 }),
-            // `band` passes very little of what enters it (see `./instrument`), so
-            // a gain near 1 here is a quiet layer, not a hot one: this is the
-            // quietest of the three offers by RMS and by peak.
-            band('oreCollect_f.read0', 3600, { gain: 0.98, decay: 0.05, q: 11, curve: 5, hp: 2000, at: 0.008, seed: 30432 }),
-            band('oreCollect_f.read1', 5700, { gain: 0.88, decay: 0.042, q: 12, curve: 5.5, hp: 3200, at: 0.022, seed: 30433 }),
+            // The one with no transient at all — 6 ms to full where the other two
+            // are under one. It is the direction that says the pickup is a state
+            // change rather than an impact, and it is deliberately the hardest of
+            // the three to notice, because *"but subtle at same time"* has a floor
+            // as well as a ceiling and somebody should get to hear where it is.
+            swept('oreCollect_i.open', { wave: 'noise', freq: 2800, from: 1800, to: 5200, q: 3.6, gain: 0.26, attack: 0.006, hold: 0.008, decay: 0.045, curve: 2.6, hp: 1200, seed: 30480 }),
+            swept('oreCollect_i.close', { wave: 'noise', freq: 3600, from: 5200, to: 2400, q: 4.2, gain: 0.2, attack: 0.004, hold: 0.004, decay: 0.05, curve: 3.4, hp: 1800, at: 0.03, seed: 30482 }),
+            swept('oreCollect_i.body', { wave: 'sine', freq: 392, from: 900, to: 500, q: 2.2, gain: 0.07, attack: 0.008, hold: 0.01, decay: 0.055, curve: 2.8, noiseMix: 0.1, seed: 30484 }),
           ],
         },
+      },
+      {
+        id: 'j',
+        slot: 'oreCollect',
+        anchor: true,
+        character: "the sound that ships today (A/B)",
+        spec: incumbent('oreCollect', 'j'),
       },
     ],
   },
@@ -733,54 +951,106 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
   // offer keeps a ring and every `coreHit` offer stays dull, low and closing, so
   // a besieged player still hears which layer is being eaten (§2.2) in all
   // sixteen combinations rather than in the three that happened to be on offer.
+  // ---------------------------------------------------------------------------
+  // ROUND 2 (a0-67, 2026-08-17) — THREE DIRECTIONS, NOT THREE TAKES
+  // ---------------------------------------------------------------------------
+  //
+  // All four of the sweep's takes were denied, verbatim:
+  //
+  //   *"none of these sound like a gun fire or laser turret, make 3 distinct
+  //   sounds for it so we can see the direciton to go in"*
+  //
+  // The first clause is a **category** rejection and it names the thing the sweep
+  // got wrong. Read the four characters above: rail *contact*, compressed *vent*,
+  // capacitor *bloom*, damped *hardware*. Every one of them is a machine doing
+  // something — and not one of them is a **weapon discharging**. They were written
+  // to a register note (*"nothing slides in pitch… the hardware is audible and the
+  // cartoon is not"*) and they satisfy it exactly, which is how a set can be right
+  // about the brief and wrong about the sound. A gun is not a mechanism noise; it
+  // is energy leaving fast enough to be violent, and the sweep's own constraint —
+  // no pitch motion inside a 60 ms voice, because that is the 1980s laser §5.4
+  // retires — is precisely what took the violence out.
+  //
+  // **The developer has now asked for the laser by name, twice over.** That
+  // outranks this lane's reading of §5.4, on the precedent already set by the
+  // alarm: legibility outranks register (a0-60, §2.2). So `i` below is allowed a
+  // bounded downward pitch fall — ×1.5 over 45 ms, which is a bolt losing energy,
+  // where the retired idiom was ×4 over 86 ms with a duty sweep on a square. The
+  // ratio and the oscillator are the difference between a plasma discharge and a
+  // cabinet pew, and both are written down here so the next round can move the
+  // number instead of re-litigating the clause.
+  //
+  //   h  **a report** — the gun direction. A broadband crack, a low thump under
+  //      it, and the action working after. Nothing pitched, nothing electric.
+  //   i  **a discharge** — the laser-turret direction. A bright narrow beam-tone
+  //      falling as it leaves, over an ionised hiss. The only one with pitch
+  //      motion in it, deliberately.
+  //   j  **a launch** — the mass-driver direction, between the two: magnetic
+  //      snap, real weight low down, and air torn behind the round.
+  //   k  **the sound that ships today**, so the three directions are heard against
+  //      the thing they are moving away from.
+  //
+  // §8 holds across all of them: the pair this slot may never collide with is
+  // `shotImpact` (*a turret fired at me* vs *something landed on me*), and the
+  // dimension that separates them is **length** as much as pitch — every
+  // `shotImpact` offer is under 60 ms and none of these is.
   turretFire: {
     label: "Turret Fire",
     context: "Your turret or ship fires a shot.",
     current: 'turretFire',
     candidates: [
       {
-        id: 'd',
-        character: "rail contact, dry snap and eddy",
+        id: 'h',
+        slot: 'turretFire',
+        character: "a report: crack, thump, action",
         spec: {
-          name: 'turretFire_d_railContact',
+          name: 'turretFire_h_report',
           layers: [
-            band('turretFire_d.contact', 2050, { gain: 0.728, decay: 0.022, q: 7, curve: 7, punch: 0.7, seed: 60010 }),
-            swept('turretFire_d.eddy', { wave: 'triangle', freq: 205, from: 1600, to: 300, q: 5, gain: 0.437, attack: 0.0006, hold: 0.004, decay: 0.05, curve: 6.5, noiseMix: 0.34, seed: 60012 }),
+            // The crack is the whole tell and it is over in 12 ms: broadband,
+            // high-passed so it reads as air splitting rather than as a body, and
+            // steep enough that the ear takes it as an event rather than a note.
+            place({ name: 'turretFire_h.crack', wave: 'noise', attack: 0.0002, hold: 0.0015, decay: 0.012, decayCurve: 9, punch: 0.9, freq: 3200, lowPass: 6200, lowPassEnd: 2400, resonance: 1.2, highPass: 900, gain: 0.34, seed: 60050 }),
+            swept('turretFire_h.thump', { wave: 'sine', freq: 78, from: 420, to: 120, q: 1.8, gain: 0.23, attack: 0.0008, hold: 0.006, decay: 0.07, curve: 5.5, punch: 0.8, noiseMix: 0.1, seed: 60052 }),
+            grains('turretFire_h.action', { freq: 700, grain: 0.0055, gain: 0.11, hold: 0.004, decay: 0.045, curve: 5, from: 2400, to: 800, q: 3, hp: 320, at: 0.016, seed: 60054 }),
           ],
         },
       },
       {
-        id: 'e',
-        character: "compressed vent, body and gas",
+        id: 'i',
+        slot: 'turretFire',
+        character: "a discharge: beam falling, ion hiss",
         spec: {
-          name: 'turretFire_e_compressedVent',
+          name: 'turretFire_i_discharge',
           layers: [
-            swept('turretFire_e.body', { wave: 'sine', freq: 96, from: 300, to: 130, q: 2.2, gain: 0.208, attack: 0.001, hold: 0.01, decay: 0.08, curve: 5, punch: 0.75, noiseMix: 0.14, seed: 60020 }),
-            grains('turretFire_e.gas', { freq: 1150, freqEnd: 700, grain: 0.0024, gain: 0.229, hold: 0.006, decay: 0.07, curve: 4.5, from: 4600, to: 1100, q: 3.2, hp: 700, at: 0.003, seed: 60022 }),
+            // 2200 → 1466 Hz is ×1.5 over 45 ms. Written as a ratio on purpose:
+            // the retired idiom is ×4 over 86 ms on a duty-swept square, and the
+            // distance between the two is what stops "the developer asked for a
+            // laser" becoming "the cartoon came back".
+            place({ name: 'turretFire_i.beam', wave: 'triangle', attack: 0.0006, hold: 0.004, decay: 0.045, decayCurve: 5.5, punch: 0.6, freq: 2200, freqEnd: 1466, noiseMix: 0.12, lowPass: 4200, lowPassEnd: 1800, resonance: 6, gain: 0.3, seed: 60060 }),
+            swept('turretFire_i.ion', { wave: 'noise', freq: 2600, from: 4800, to: 1600, q: 4.5, gain: 0.31, attack: 0.0004, hold: 0.003, decay: 0.05, curve: 6, punch: 0.5, hp: 1100, seed: 60062 }),
+            swept('turretFire_i.coil', { wave: 'sine', freq: 132, from: 600, to: 200, q: 2.4, gain: 0.16, attack: 0.001, hold: 0.006, decay: 0.055, curve: 5, noiseMix: 0.08, seed: 60064 }),
           ],
         },
       },
       {
-        id: 'f',
-        character: "capacitor bloom, damped at once",
+        id: 'j',
+        slot: 'turretFire',
+        character: "a launch: magnetic snap and weight",
         spec: {
-          name: 'turretFire_f_capacitorBloom',
+          name: 'turretFire_j_launch',
           layers: [
-            band('turretFire_f.bloom', 3100, { gain: 1.0, decay: 0.038, q: 10, curve: 5.5, punch: 0.5, hp: 1200, seed: 60030 }),
-            band('turretFire_f.damp', 1250, { gain: 0.741, decay: 0.026, q: 4, curve: 8, seed: 60032 }),
+            band('turretFire_j.snap', 1750, { gain: 0.48, decay: 0.016, q: 6, curve: 8, punch: 0.8, hp: 700, seed: 60070 }),
+            swept('turretFire_j.mass', { wave: 'sine', freq: 62, from: 340, to: 96, q: 2, gain: 0.3, attack: 0.001, hold: 0.012, decay: 0.1, curve: 4.5, punch: 0.7, noiseMix: 0.08, seed: 60072 }),
+            swept('turretFire_j.wake', { wave: 'noise', freq: 1400, from: 3800, to: 900, q: 2.4, gain: 0.16, attack: 0.002, hold: 0.005, decay: 0.06, curve: 4, hp: 500, at: 0.008, seed: 60074 }),
           ],
         },
       },
       {
-        id: 'g',
-        character: "damped hardware, mechanism only",
-        spec: {
-          name: 'turretFire_g_dampedHardware',
-          layers: [
-            grains('turretFire_g.action', { freq: 620, grain: 0.0032, gain: 0.34, hold: 0.003, decay: 0.03, curve: 7, punch: 0.5, from: 2600, to: 900, q: 3, hp: 260, seed: 60040 }),
-            band('turretFire_g.seat', 430, { gain: 0.26, decay: 0.03, q: 3.5, curve: 7, seed: 60042 }),
-          ],
-        },
+        id: 'k',
+        slot: 'turretFire',
+        anchor: true,
+        character: "the sound that ships today (A/B)",
+        spec: incumbent('turretFire', 'k'),
       },
     ],
   },

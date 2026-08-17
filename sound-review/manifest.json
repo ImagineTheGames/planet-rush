@@ -114,22 +114,29 @@
       "current": "previews/oreCollect/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/oreCollect/d.wav",
-          "character": "flake shear, bright chips off the snap",
-          "params": "src/art/audio/candidates.ts#oreCollect.d"
+          "id": "g",
+          "wav": "previews/oreCollect/g.wav",
+          "character": "a prize: two notes, rising a fifth",
+          "params": "src/art/audio/candidates.ts#oreCollect.g"
         },
         {
-          "id": "e",
-          "wav": "previews/oreCollect/e.wav",
-          "character": "charged intake, an ionised edge",
-          "params": "src/art/audio/candidates.ts#oreCollect.e"
+          "id": "h",
+          "wav": "previews/oreCollect/h.wav",
+          "character": "a handful of chips into the tray",
+          "params": "src/art/audio/candidates.ts#oreCollect.h"
         },
         {
-          "id": "f",
-          "wav": "previews/oreCollect/f.wav",
-          "character": "assay ping, two high bands reading back",
-          "params": "src/art/audio/candidates.ts#oreCollect.f"
+          "id": "i",
+          "wav": "previews/oreCollect/i.wav",
+          "character": "a breath, nothing struck",
+          "params": "src/art/audio/candidates.ts#oreCollect.i"
+        },
+        {
+          "id": "j",
+          "wav": "previews/oreCollect/j.wav",
+          "character": "the sound that ships today (A/B)",
+          "params": "src/art/audio/candidates.ts#oreCollect.j",
+          "anchor": true
         }
       ]
     },
@@ -172,28 +179,29 @@
       "current": "previews/turretFire/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/turretFire/d.wav",
-          "character": "rail contact, dry snap and eddy",
-          "params": "src/art/audio/candidates.ts#turretFire.d"
+          "id": "h",
+          "wav": "previews/turretFire/h.wav",
+          "character": "a report: crack, thump, action",
+          "params": "src/art/audio/candidates.ts#turretFire.h"
         },
         {
-          "id": "e",
-          "wav": "previews/turretFire/e.wav",
-          "character": "compressed vent, body and gas",
-          "params": "src/art/audio/candidates.ts#turretFire.e"
+          "id": "i",
+          "wav": "previews/turretFire/i.wav",
+          "character": "a discharge: beam falling, ion hiss",
+          "params": "src/art/audio/candidates.ts#turretFire.i"
         },
         {
-          "id": "f",
-          "wav": "previews/turretFire/f.wav",
-          "character": "capacitor bloom, damped at once",
-          "params": "src/art/audio/candidates.ts#turretFire.f"
+          "id": "j",
+          "wav": "previews/turretFire/j.wav",
+          "character": "a launch: magnetic snap and weight",
+          "params": "src/art/audio/candidates.ts#turretFire.j"
         },
         {
-          "id": "g",
-          "wav": "previews/turretFire/g.wav",
-          "character": "damped hardware, mechanism only",
-          "params": "src/art/audio/candidates.ts#turretFire.g"
+          "id": "k",
+          "wav": "previews/turretFire/k.wav",
+          "character": "the sound that ships today (A/B)",
+          "params": "src/art/audio/candidates.ts#turretFire.k",
+          "anchor": true
         }
       ]
     },

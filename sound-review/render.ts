@@ -127,6 +127,14 @@ interface ManifestCandidate {
   wav: string;
   character: string;
   params: string;
+  /**
+   * This letter IS the sound the slot ships today (a0-67). Six slots carry one,
+   * because their round-two reason was *"i like current"* or *"show me directions
+   * to move from it"* — and a verdict names a LETTER, so until the incumbent had
+   * one, *"keep what ships"* was not an answer the board could record. The page
+   * should mark it as the current sound rather than printing it as a fourth take.
+   */
+  anchor?: boolean;
 }
 interface ManifestDenied extends ManifestCandidate {
   deniedAt: string;
@@ -191,6 +199,7 @@ for (const slotId of CANDIDATE_SLOT_ORDER) {
     wav: writePreview(slotId, c.id, c.spec),
     character: c.character,
     params: `src/art/audio/candidates.ts#${slotId}.${c.id}`,
+    ...(c.anchor === true ? { anchor: true } : {}),
   }));
 
   const denied: ManifestDenied[] = (slot.denied ?? []).map((d) => ({

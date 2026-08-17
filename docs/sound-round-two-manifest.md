@@ -52,8 +52,8 @@ previews rendered) / `held` (deliberately not re-voiced, with the reason).
 
 | slot | status | the developer's reason, verbatim | how the new set answers it |
 |---|---|---|---|
-| oreCollect | todo | "they need to sound more satisfying, like you've won something, but subtle at same time, make 3 distinct sounds so that i can see what direction to go in" | |
-| turretFire | todo | "none of these sound like a gun fire or laser turret, make 3 distinct sounds for it so we can see the direciton to go in" | |
+| oreCollect | done | "they need to sound more satisfying, like you've won something, but subtle at same time, make 3 distinct sounds so that i can see what direction to go in" | three DIRECTIONS — an interval (`g`), a handful of material (`h`), a breath (`i`) — plus what ships (`j`). All under the incumbent in peak, RMS and length |
+| turretFire | done | "none of these sound like a gun fire or laser turret, make 3 distinct sounds for it so we can see the direciton to go in" | three DIRECTIONS — a report (`h`), a discharge (`i`), a launch (`j`) — plus what ships (`k`). The laser gets a bounded ×1.5 pitch fall, by the developer's ruling |
 | shieldHit | todo | "none of these sound like ashield hit" | |
 | thruster | todo | "all of these sound annoying being looped, we need something more subtle since these will play all the time" | |
 | buildPlaced | todo | "none of these sound like a build started" | |

@@ -74,7 +74,11 @@ describe('sound-review candidates', () => {
     // outstanding denials and dispositions each one revoice / cut / superseded.
     // `oreCollect` denied 2026-08-14 ("more sparkle… but subtle… shouldn't be too
     // long"), `levelUp` denied 2026-08-14 ("too toony, doesn't sound rewarding").
-    oreCollect: ['d', 'e', 'f'],
+    // a0-67: `oreCollect`'s d/e/f were denied in turn on 2026-08-17, so it is the
+    // one slot on `g` — it was never in the a0-60 sweep, so it has spent a-f
+    // where the fifteen slots that were have spent a-g. `j` is the incumbent,
+    // offered as a letter so *"keep what ships"* is an expressible verdict.
+    oreCollect: ['g', 'h', 'i', 'j'],
     levelUp: ['d', 'e', 'f'],
     // a0-57. Denied 2026-08-16 with a CATEGORY reason — *"none of these sound
     // like sounds for XP collection"* — so the re-offer is four readings of the
@@ -139,6 +143,141 @@ describe('sound-review candidates', () => {
     // still be *on the board*, so the next brief has something to pick up.
     for (const [id, status] of REVOICE_MANIFEST) {
       if (status === 'todo') expect(CANDIDATE_SLOTS[id], `${id} is owed but missing`).toBeDefined();
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // Round two (a0-67) — sixteen slots, sixteen reasons
+  // -------------------------------------------------------------------------
+  //
+  // The a0-60 sweep answered ONE sentence over thirty-five slots. On 2026-08-17
+  // the developer listened to the whole re-voiced board and denied sixteen of
+  // them with a **specific reason each** — *"none of these sound like a shield
+  // hit"*, *"they should sound like an explosion"*, *"what happened to the glass
+  // theme we had"*. A theme cannot answer sixteen different sentences, so the
+  // round is worked slot by slot and `docs/sound-round-two-manifest.md` carries
+  // every reason verbatim beside the row it belongs to.
+  //
+  // This is the gate on that manifest, and it is deliberately the same shape as
+  // the a0-60 one: the table is READ, never restated here, so the test and the
+  // status of record cannot drift apart.
+
+  /** `| <slot> | <status> | "<reason>" | <note> |` out of the round-two manifest. */
+  const ROUND_TWO: ReadonlyMap<string, string> = (() => {
+    const rows = new Map<string, string>();
+    for (const line of readFileSync('docs/sound-round-two-manifest.md', 'utf8').split('\n')) {
+      const m = /^\|\s*([A-Za-z]+)\s*\|\s*(todo|done|held)\s*\|/i.exec(line);
+      if (m) rows.set(m[1]!, m[2]!.toLowerCase());
+    }
+    return rows;
+  })();
+
+  /**
+   * The letters a verdict has already spent, per slot.
+   *
+   * A letter is the whole of how a verdict names an offer (`/status/sound-
+   * choices.json` records `{"verdict": "b"}`), so a re-offer under a spent letter
+   * makes the standing record unreadable — nobody can tell which take the deny was
+   * aimed at. Two denials are on these slots and they did not spend the same
+   * letters, which is why this is a table and not a constant:
+   *
+   *  - **2026-08-07**, `deny-all` on `a`/`b`/`c` — all sixteen.
+   *  - **2026-08-17**, round two — `d`/`e`/`f`/`g` on the fifteen that were in the
+   *    a0-60 sweep, and `d`/`e`/`f` on `oreCollect`, which was not in it (it was
+   *    re-voiced a day earlier under a0-49 and only ever had three).
+   */
+  const SPENT: Readonly<Record<string, readonly string[]>> = Object.fromEntries(
+    [...ROUND_TWO.keys()].map((id) => [id, id === 'oreCollect' ? list('a', 'f') : list('a', 'g')]),
+  );
+
+  /** Inclusive letter range, so a spent set is stated as its endpoints. */
+  function list(from: string, to: string): readonly string[] {
+    const out: string[] = [];
+    for (let c = from.charCodeAt(0); c <= to.charCodeAt(0); c++) out.push(String.fromCharCode(c));
+    return out;
+  }
+
+  it('round two answers the reason it was given', () => {
+    // The manifest lists the sixteen, and the DoD floor is half of them landed.
+    expect(ROUND_TWO.size, 'the round-two manifest does not list the sixteen').toBe(16);
+    const done = [...ROUND_TWO].filter(([, s]) => s === 'done').map(([id]) => id);
+    expect(done.length, 'the DoD floor is eight slots answered').toBeGreaterThanOrEqual(8);
+
+    for (const id of done) {
+      const slot = CANDIDATE_SLOTS[id];
+      expect(slot, `${id} is marked done but is not on the board`).toBeDefined();
+      if (!slot) continue;
+      // Four offers, the round-one bar carried forward: a reason this specific
+      // deserves a set wide enough that the next verdict is a choice.
+      expect(slot.candidates.length, `${id} is marked done with fewer than four offers`).toBeGreaterThanOrEqual(4);
+      for (const c of slot.candidates) {
+        expect(SPENT[id], `${id}/${c.id} re-offers under a letter a verdict has spent`).not.toContain(c.id);
+      }
+      // Distinct letters, distinct characters, distinct specs — four *answers*,
+      // not four takes on one, which is the bar every board on this file is held
+      // to and the one a round answering "make N distinct sounds" must not miss.
+      expect(new Set(slot.candidates.map((c) => c.id)).size, `${id} offers a letter twice`).toBe(
+        slot.candidates.length,
+      );
+      expect(new Set(slot.candidates.map((c) => c.character)).size, `${id} repeats a character`).toBe(
+        slot.candidates.length,
+      );
+      expect(new Set(slot.candidates.map((c) => c.spec.name)).size, `${id} repeats a spec name`).toBe(
+        slot.candidates.length,
+      );
+      // Every take names the slot it sits in. Round two touches sixteen blocks
+      // scattered through 3 000 lines of near-identical ones, so the back-pointer
+      // stops being decoration and starts being the only thing between a
+      // mis-paste and the developer being offered a sound for another event.
+      for (const c of slot.candidates) {
+        expect(c.slot, `${id}/${c.id} does not name its slot`).toBe(id);
+      }
+    }
+
+    // A `todo` row is a slot still wearing the set that was denied — it must stay
+    // on the board so the next brief has something to pick up.
+    for (const [id, status] of ROUND_TWO) {
+      if (status === 'todo') expect(CANDIDATE_SLOTS[id], `${id} is owed but missing`).toBeDefined();
+    }
+  });
+
+  it('offers the sound that ships as a letter wherever the developer said they like it', () => {
+    // Four of the sixteen reasons open with some form of *"i like current"*, and
+    // two more ask to be shown directions to move away from it. The board could
+    // not express either: `/status/sound-choices.json` records a slot and a
+    // LETTER, so *"keep what ships"* was not a verdict anybody could give, and the
+    // A/B against the incumbent had to be done from memory between two clicks.
+    //
+    // So the incumbent takes a letter on those six slots. The assertion that
+    // matters is that it really IS the incumbent — an "anchor" that has been
+    // quietly improved is the worst possible offer on the board, because it makes
+    // the developer's own reference the thing they cannot trust.
+    const LIKE_CURRENT = ['bankOre', 'upgradeBought', 'musicWin', 'musicLoss'] as const;
+    const SHOW_ME_DIRECTIONS = ['oreCollect', 'turretFire'] as const;
+    for (const id of [...LIKE_CURRENT, ...SHOW_ME_DIRECTIONS]) {
+      if (ROUND_TWO.get(id) !== 'done') continue; // not landed yet; the row says so
+      const slot = CANDIDATE_SLOTS[id]!;
+      const anchors = slot.candidates.filter((c) => c.anchor === true);
+      expect(anchors.length, `${id} does not offer what ships as a letter`).toBe(1);
+      const shipped = render(soundSpec(slot.current));
+      const offered = render(anchors[0]!.spec);
+      expect(
+        offered.length === shipped.length && offered.every((v, i) => v === shipped[i]),
+        `${id}'s anchor is not the sound that ships`,
+      ).toBe(true);
+      // …and it still has to be three NEW takes beside it, not two and a copy.
+      expect(slot.candidates.length - anchors.length, `${id} offers fewer than three new takes`).toBeGreaterThanOrEqual(
+        3,
+      );
+    }
+    // Nowhere else: an anchor on a slot whose reason did not ask for one is a
+    // fourth offer that costs a listen and answers nothing.
+    for (const id of SLOT_IDS) {
+      if (([...LIKE_CURRENT, ...SHOW_ME_DIRECTIONS] as readonly string[]).includes(id)) continue;
+      expect(
+        CANDIDATE_SLOTS[id]!.candidates.some((c) => c.anchor === true),
+        `${id} offers an anchor nobody asked for`,
+      ).toBe(false);
     }
   });
 
@@ -565,9 +704,12 @@ describe('sound-review candidates', () => {
     }
   });
 
-  it('adds sparkle to `oreCollect` without adding level or length (a0-49)', () => {
+  it('adds sparkle to `oreCollect` without adding level or length (a0-49, re-scoped a0-67)', () => {
     // *"add a little bit more of sparkle to it, like you've won a prize, but
-    // subtle... it shouldn't be too long"* — three clauses, three bounds.
+    // subtle... it shouldn't be too long"* (2026-08-14) — three clauses, three
+    // bounds. Two of them are unchanged by round four and one had to move; the
+    // move is written out here rather than made quietly, because a bound that
+    // loosens without a sentence beside it is a denial being dropped.
     //
     // SPARKLE is read as high-frequency detail with a short life, and measured as
     // the share of energy above 3 kHz — a share rather than a level, because
@@ -575,19 +717,34 @@ describe('sound-review candidates', () => {
     // 3 kHz and not higher because `./synth` clamps a resonant cutoff to
     // SVF_MAX_HZ_FRACTION (~6.5 kHz at 44.1 k), so 3–6.4 kHz *is* the top of this
     // bank's spectrum.
+    //
+    // **What moved (a0-67).** The 2026-08-17 denial asks for *"3 distinct sounds
+    // so that i can see what direction to go in"*. Two of the three directions —
+    // a dry handful of material, and a breath with nothing struck — are not bright
+    // by construction, so holding the sparkle clause on EVERY offer would forbid
+    // the spread the developer just asked for. It therefore binds **the set**: at
+    // least one live offer still carries it, comfortably. The level and length
+    // clauses do not move, because *"but subtle at same time"* is the same clause
+    // said again and nothing withdrew the length one.
     const denied = deniedOf('oreCollect').map((s) => render(s));
     const deniedBrightest = Math.max(...denied.map((b) => brightShare(b, 3000)));
     const incumbent = render(soundSpec('oreCollect'));
+    // The incumbent is on the board as its own letter now (a0-67). It is not a
+    // take this round is offering, so the round's bounds are not asked of it —
+    // it *is* the reference they are measured against.
+    const offers = CANDIDATE_SLOTS.oreCollect!.candidates.filter((c) => c.anchor !== true);
 
-    for (const c of CANDIDATE_SLOTS.oreCollect!.candidates) {
+    // Sparkle, held on the set: more than any denied take, with room to spare —
+    // not "0.5% brighter than the brightest", which would satisfy a grep and
+    // nobody's ear.
+    const brightest = Math.max(...offers.map((c) => brightShare(render(c.spec), 3000)));
+    expect(brightest, 'no offer on the slot is brighter than the takes that were denied').toBeGreaterThan(
+      deniedBrightest * 1.25,
+    );
+
+    for (const c of offers) {
       const buf = render(c.spec);
       const where = `oreCollect/${c.id}`;
-      // More sparkle than any of the three that were denied, with room to spare —
-      // not "0.5% brighter than the brightest", which would satisfy a grep and
-      // nobody's ear.
-      expect(brightShare(buf, 3000), `${where} is no brighter than the takes that were denied`).toBeGreaterThan(
-        deniedBrightest * 1.25,
-      );
       // *"but subtle"* qualifies the sparkle, not the cue, so it binds the whole
       // sound: adding brightness may not make this louder than the sound the
       // developer was asking to add sparkle *to*.
@@ -616,7 +773,19 @@ describe('sound-review candidates', () => {
       render(soundSpec('depositTick')),
       ...CANDIDATE_SLOTS.depositTick!.candidates.map((c) => render(c.spec)),
     ];
+    //
+    // The **anchor** is exempt and it is worth saying why in numbers rather than
+    // in principle (a0-67). It is the incumbent, offered as a letter so that
+    // "keep what ships" is an expressible verdict — and the incumbent clears the
+    // brightest `depositTick` offer by only **×1.23**, not ×1.5. That is not a
+    // regression this round introduced; it is what the shipped pair has always
+    // measured, and it is exactly the reason the margin was written against the
+    // *offers* in the first place. It does mean one thing for the board, and it
+    // belongs on the record rather than in a passing test: **if the developer
+    // keeps `oreCollect` as it ships AND picks a bright `depositTick`, that pair
+    // is the tightest in the bank and wants a listen together.**
     for (const c of CANDIDATE_SLOTS.oreCollect!.candidates) {
+      if (c.anchor === true) continue;
       const ore = render(c.spec);
       for (const dep of deposits) {
         expect(zcr(ore), `oreCollect/${c.id} sits on top of a depositTick voice`).toBeGreaterThan(zcr(dep) * 1.5);
@@ -861,12 +1030,22 @@ describe('sound-review candidates', () => {
     // shipped, because the incumbents are allowed to be re-voiced by a future
     // brief; what is not allowed is one of the offers arriving in the bank
     // without a verdict behind it.
+    //
+    // The one deliberate exception is an {@link SoundCandidate.anchor} (a0-67):
+    // on the six slots whose reason was *"i like current"* or *"show me
+    // directions"*, the incumbent is offered as a letter of its own so that
+    // "keep what ships" is a verdict somebody can give. It renders identical to
+    // the shipped voice **by definition** — that is the whole point of it — and
+    // the test that it really is identical is above, in `offers the sound that
+    // ships as a letter…`. What this test still catches on those slots is the
+    // dangerous case: a *new* take that is secretly the incumbent.
     const denied = SLOT_IDS.filter((id) => ADOPTED[id] === undefined);
     expect(denied.length, 'the adopted set is not three slots any more').toBe(SLOT_IDS.length - 3);
     for (const id of denied) {
       const slot = CANDIDATE_SLOTS[id]!;
       const shipped = render(soundSpec(slot.current));
       for (const c of slot.candidates) {
+        if (c.anchor === true) continue;
         expect(
           sameSamples(shipped, render(c.spec)),
           `${id} now plays candidate ${c.id} — no verdict has adopted that slot`,
