@@ -78,6 +78,45 @@ than set, in whole fractions because pow2 rounding makes the cost a staircase:
 draws directly — correct and expensive, never absent, which is r9-01's rule in a
 new place.
 
+## End to end on the shipped bundle
+
+`ab-sweep.mjs` builds **both** bundles (a git worktree at `f7ef828` for the
+before, `dist/` for the after), serves them on two ports, and takes each
+viewport's **pair back to back in the same minute**, alternating which goes first.
+
+| scene | viewport | before | after | Δ |
+|---|---|---|---|---|
+| frozen | phone 798×384 | 133.3 ms | 116.7 | **−12%** |
+| frozen | 1280×720 | 516.6 ms | 316.7 | **−39%** |
+| frozen | 1920×1080 | 783.3 ms | 700.0 | **−11%** |
+| frozen | 2560×1440 | 1333.3 ms | 733.3 | **−45%** |
+| frozen | 3440×1440 | 1266.7 ms | 849.9 | **−33%** |
+| live | 1280×720 | 300.0 ms | 216.7 | **−28%** |
+| live | 3440×1440 | 1300.0 ms | 866.5 | **−33%** |
+
+Read the pairs, not the column — 3440×1440's "before" reads *faster* than
+2560×1440's, which is arithmetically impossible for one build on more pixels and
+is the neighbouring lane's load showing through.
+
+**And this table understates the fix, by a knowable amount.** On a CPU rasteriser
+the star field's per-triangle setup dominates, and the star field is unchanged
+here. From the layer rig at 1920×1080: stars cost 241.8 ms, the raw sky 130.4 ms,
+the baked sky 25.9 ms → predicted whole-frame saving 104.5 ms against a measured
+83.3 ms. Same order; the residual is load. On a GPU the ratio inverts — 0.33
+blended screenfuls of star field is nothing and ~1 M static triangles is well
+under a millisecond, while three blended screenfuls of full-frame gradient is the
+whole problem. Which is why the load-bearing claim above is the **counted** fill.
+
+The isolated-layer A/B, same page, same load:
+
+| | 1280×720 | 1920×1080 | 2560×1440 |
+|---|---|---|---|
+| `ground+reef` raw → baked | 90.2 → 36.1 (−60%) | 166.6 → 62.1 (−63%) | 318.0 → 125.1 (−61%) |
+| `ground+patina` raw → baked | 154.2 → 49.6 (−68%) | 199.8 → 62.3 (−69%) | 421.9 → 119.1 (−72%) |
+
+The sky layer alone, minus the ground quad: Plasma Reef 63.3 → 9.2 ms (**−85%**),
+Patina Drift 127.3 → 22.7 ms (**−82%**).
+
 ## Is it the same sky? Measured, and looked at
 
 `evidence/a0-75-fill-rate/cache-diff.mjs` renders each sky twice into the same
@@ -207,7 +246,53 @@ Both are per-pixel multipliers on everything above.
 
 ## Goldens
 
-[[GOLDENS]]
+All **50 baselines in `tests/mobile/goldens.spec.ts-snapshots` pass unchanged**,
+including the three the suite dedicates to skies and the one it names *"THE
+CONTROL — this one was already correct"*. So no baseline is re-generated: doing
+so would write 50 byte-different PNGs recording a difference the studio's own gate
+calls immaterial, and would throw away the useful fact that it IS under the gate.
+
+That is not by itself proof, and that spec says so about itself — its 1%
+`maxDiffPixelRatio` over a frame that is mostly star-field exists to survive font
+and GPU antialiasing, and *"a complete re-skin of the screen a player spends the
+entire match on sat on the knife-edge of the one gate that is supposed to catch
+it"*. So `evidence/a0-75-fill-rate/frames-ab.mjs` captures the same scenes from
+**both bundles** and measures the whole shipped screen — entities, HUD and all.
+12 frames in `frames-shipped/`, **every one looked at**:
+
+| scene | size | maxΔ/255 | meanΔ | any | >2 codes |
+|---|---|---|---|---|---|
+| **`octagon` — sky NONE** | 1280×800 | **0** | 0.0000 | **0.0%** | 0.00% |
+| `compass` — Coalsack | 1280×800 | 9 | 0.81 | 78.4% | 8.04% |
+| `oval` — Plasma Reef | 1280×800 | 11 | 1.51 | 89.5% | 43.3% |
+| `line` — Deep Ember | 1280×800 | 5 | 0.53 | 66.8% | 2.91% |
+| `oval` — Plasma Reef | 3440×1440 | 25 | 5.25 | 94.0% | 89.3% |
+| `line` — Deep Ember | 3440×1440 | 9 | 1.29 | 89.6% | 33.7% |
+
+**`octagon` is byte-identical.** That is the control worth having: the default
+board's sky is NONE, so its frame is ground + star field + entities and nothing
+else — and it comes back bit for bit. Neither fix touched the star field, the
+ground, the entities or the HUD, and this is the proof rather than the claim.
+
+Justifying each change by eye:
+
+- **Coalsack, Deep Ember, Plasma Reef at 1280×800** — indistinguishable. Same
+  dust lane in the same place occluding the same stars; same rust band; same
+  clots at the same brightness. The 5–11 code values are the ramp's dither
+  resampling through the cache, spread thin (mean under 1.6 codes).
+- **Plasma Reef at 3440×1440 (the largest change, maxΔ 25)** — this one is the
+  **aspect fix doing its job**, and it is visible if you look for it: the cyan
+  wash in the lower right reaches very slightly less far. That is the reef's
+  clots at the design's own proportion of the frame instead of 34% oversized.
+  Nothing else in the frame moves — stations, rocks, nameplates, minimap and HUD
+  are pixel-for-pixel where they were.
+- **Deep Ember at 3440×1440** — same story, quieter: the warm red along the left
+  edge is a touch less spread. The middle of the screen, where the fight is,
+  stays clean, which is the argument that put Deep Ember on The Line.
+
+No seam anywhere, no banding, no rectangle where a cached texture ends — which
+are the three ways this fix could have failed visibly, and the reason the sky
+diff also measures banding directly (it improves).
 
 ## Instrument caveat, stated once
 
