@@ -541,11 +541,96 @@ Two recommendations that are not art's to make, put here so they are on record:
 
 
 --------------------------------------------------------------------------------
-9. AFTER — THE SHIPPED BUNDLE, RE-MEASURED
+9. BEFORE AND AFTER ON THE SHIPPED BUNDLE, INTERLEAVED
 --------------------------------------------------------------------------------
 
-Same instrument, same scene, same map, same six viewports, on a quiet box.
-(See section 0: a concurrent build corrupted an earlier attempt at this table by
-+38%, so this one was run with nothing else on the machine.)
+"Quiet box" is not something a lane on this image can assert: four lanes share
+eight cores and none can see another's load. The first attempt at this table
+proved the point — an "after" run twenty minutes after the "before" came back
++38% SLOWER, entirely because a `vite build` of mine was beside it.
 
-[[AFTER_SWEEP]]
+So the before/after is not taken across two runs. `ab-sweep.mjs` builds BOTH
+bundles (a git worktree at f7ef828 for the before, `dist/` for the after), serves
+them on two ports, and takes each viewport's PAIR back to back in the same minute
+— alternating which goes first, so a monotonic drift in load cannot land on one
+column.
+
+    FROZEN SCENE, oval / Plasma Reef, wide arena, 30 sampled frames after 15
+
+    viewport      Mpx     before ms       after ms     delta   order
+    ------------------------------------------------------------------------
+    phone        0.31   133.3 (p95  150)  116.7 ( 150)   -12%   before first
+    1280x720     0.92   516.6 (p95  617)  316.7 ( 450)   -39%   after first
+    1920x1080    2.07   783.3 (p95  917)  700.0 ( 883)   -11%   before first
+    2560x1440    3.69  1333.3 (p95 1550)  733.3 (1283)   -45%   after first
+    3440x1440    4.95  1266.7 (p95 2133)  849.9 (1017)   -33%   before first
+
+    LIVE MATCH — eight seats of bot AI, projectiles, ore, a moving camera
+
+    viewport      Mpx     before ms       after ms     delta   order
+    ------------------------------------------------------------------------
+    1280x720     0.92   300.0 (p95  383)  216.7 ( 267)   -28%   before first
+    3440x1440    4.95  1300.0 (p95 1500)  866.5 (1117)   -33%   after first
+
+    (Two sizes rather than five: the live scene carries bot AI on eight seats and
+    a moving camera, so it costs more per reading and varies more, and the frozen
+    table above is the controlled one. Note that `VfxAutoQuality` HAS engaged in
+    both live columns — this box renders far below its 30 fps floor — so both
+    sides are measured with the particle field thinned, equally.)
+
+Every pair is negative, at every size, in both orders. Read the pairs and not the
+column: 3440x1440's "before" (1266.7) reads FASTER than 2560x1440's (1333.3),
+which is arithmetically impossible for the same build on more pixels, and is the
+neighbouring lane's load showing through. The pair-wise deltas are the signal;
+their absolute scale is not.
+
+TWO THINGS TO BE HONEST ABOUT IN THIS TABLE.
+
+First, it is 5120x1440 short. The run was stopped after the 3440x1440 pair to
+free the box for the golden re-baseline; the counted-fill table in section 4 does
+cover 32:9 (7.392 -> 2.330), and that is the number the budget in section 6 is
+stated on.
+
+Second, and more important: **this table UNDERSTATES the fix, and by a knowable
+amount.** On a CPU rasteriser the star field's per-triangle setup is the dominant
+term — 3,800 to 54,000 tiny circles, against the sky's 9 to 22 huge ones — and
+the star field is unchanged by this branch. From the layer rig at 1920x1080:
+
+    ground                                36.2 ms
+    ground + stars                       278.0 ms   -> stars cost 241.8 ms
+    ground + reef (raw)                  166.6 ms   -> sky   cost 130.4 ms
+    ground + reef (baked)                 62.1 ms   -> sky   cost  25.9 ms
+
+    predicted whole-frame saving: 130.4 - 25.9 = 104.5 ms
+    measured whole-frame saving:  783.3 - 700.0 =  83.3 ms
+
+Same order, and the residual is load. On a GPU the ratio inverts: 0.33 blended
+screenfuls of star field is nothing and ~1 M static triangles is well under a
+millisecond, while three blended screenfuls of full-frame gradient is the whole
+problem. That is exactly why the load-bearing claim in this audit is the COUNTED
+fill of section 4 and not a millisecond off this box.
+
+
+--------------------------------------------------------------------------------
+10. WHAT IS IN THIS BRANCH
+--------------------------------------------------------------------------------
+
+Production:
+
+  src/art/mockup-reference.ts   featureSpan(W, H), and mockupBlobs sizing off it
+  src/art/backdrop.ts           SKY_CACHE_RESOLUTION / _MAX_TEXELS /
+                                _MIN_RESOLUTION, skyCacheResolution(),
+                                skyIsCached read-back, releaseLayers(), and
+                                configure() wrapping the sky in a cached
+                                container. The coverSpan docstring now carries
+                                the arithmetic of its own over-provision.
+  src/art/shapes.ts             shapeArea / spriteArea — the unit of this brief
+  src/art/backdrop-fill.test.ts THE GATE: 8 tests over a six-viewport sweep
+  assets/preview/sprite-sheet.svg  regenerated (the review tile is 1.6:1, so the
+                                   aspect fix moves its blobs by 5.4%)
+
+Not touched, deliberately: every design number in MOCKUP_REFERENCE, every sky's
+count/radius/alpha/hue/seed, SKY_PARALLAX, STAR_LAYERS, the bloom rule and its
+threshold, reducedDensity, MAP_NEBULA, coverSpan's arithmetic, and every file
+outside src/art/ and assets/.
+

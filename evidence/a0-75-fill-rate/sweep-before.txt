@@ -24,9 +24,17 @@ Box:      ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)), SwiftShade
 
 The `live` half of this run did not complete: the instrument was killed
 mid-sweep while the port was being reclaimed from an earlier attempt, so the JSON
-was never written and these six rows are transcribed from the run's stdout. They
-are the frozen scene, which is the controlled one, and the one every after-number
-is compared against.
+was never written and these six rows are transcribed from the run's stdout.
+
+ON WHETHER THIS RUN WAS TAKEN ON A QUIET BOX. It cannot be asserted — the studio
+image is shared and no lane can see another's load. What CAN be said is that the
+run is internally consistent: p95 sits within 13% of the median on the three
+smallest viewports, and the fragment model below fits all six rows to 9% with a
+single slope and a single intercept. A run being pushed around by a neighbour
+does not usually fit a two-parameter model that well. That is why the before/
+after comparison in section 9 of the audit is NOT taken across this run and a
+later one, but by interleaving both bundles in one session (`ab-sweep.mjs`) —
+this table's job is to establish the MODEL, not the baseline.
 
 WHAT THE COLUMN SAYS
 --------------------

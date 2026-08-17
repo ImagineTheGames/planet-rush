@@ -1397,7 +1397,7 @@ export class VoidBackdrop {
   private pinnedDensity: number | null = null;
   /** Whether the sky on the stage is the baked quad or the raw geometry — false
    *  when there is no sky, and when the field was too big to cache
-   *  ({@link skyFitsCache}). The read-back for the a0-75 fill fix. */
+   *  ({@link skyCacheResolution}). The read-back for the a0-75 fill fix. */
   private skyCached = false;
   /** The config the current geometry was built for, so a no-op frame rebuilds
    *  nothing (GDD §4.3). `-1` = never built. */
@@ -1467,7 +1467,7 @@ export class VoidBackdrop {
    * Whether the sky on the stage is the **baked quad** rather than its raw
    * geometry ({@link SKY_CACHE_RESOLUTION}). False when the map's sky is `none`,
    * and false when the parallax field was too large to cache
-   * ({@link skyFitsCache}) — in which case the sky is correct and expensive
+   * ({@link skyCacheResolution}) — in which case the sky is correct and expensive
    * rather than absent.
    *
    * Exported as a read-back because "did the fill fix engage" is otherwise

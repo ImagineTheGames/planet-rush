@@ -155,7 +155,13 @@ const BACKDROP_FILL_CEILING = 2.5;
  * **The sky's own ceiling, once baked.** A cached layer is one textured quad, so
  * anything above 1 means the cache did not engage — a silent, invisible, 3× fill
  * regression, which is the failure this whole brief is about. Slack of 1% for
- * the ground quad's own two-pixel overhang and nothing else.
+ * regression, which is the failure this whole brief is about.
+ *
+ * What it actually guards: `skyFill().paid` is `1` on the cached path and the RAW
+ * overdraw (~3) on the uncached one, so this ceiling is the tripwire on the
+ * fallback — if `skyCacheResolution` ever returns `null` at a shipping viewport,
+ * this fires with the real number in the message rather than the sky quietly
+ * costing three screenfuls again. The 1% is float margin and nothing else.
  */
 const SKY_FILL_CEILING = 1.01;
 
