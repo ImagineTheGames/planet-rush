@@ -538,3 +538,69 @@ export function spriteColors(def: SpriteDef): number[] {
   }
   return seen;
 }
+
+// ---------------------------------------------------------------------------
+// Area — what a shape costs the rasteriser (a0-75)
+// ---------------------------------------------------------------------------
+
+/**
+ * **The area one shape asks the rasteriser to shade**, in the sprite's own
+ * units squared.
+ *
+ * This is the unit of a0-75. The developer bisected a stutter to *"it gets worse
+ * the larger the playing area is on my screen"*, and what makes that true is
+ * that per-frame cost is `screen pixels × Σ overdraw`, where overdraw is the sum
+ * of these areas over the field they cover. Counting it needs no GPU, so it is
+ * the same answer on the developer's ultrawide as in a test runner — which is
+ * exactly what a per-frame budget has to be to be a budget.
+ *
+ * **A soft fill counts its WHOLE path.** Alpha reaching zero at the rim costs a
+ * blend exactly like alpha 1 does, and a layer nobody can see can still be the
+ * most expensive thing in the frame. That is not a hypothetical: it is what the
+ * sky was.
+ */
+export function shapeArea(shape: Shape): number {
+  let area = 0;
+  if (shape.fill) {
+    area += shape.path.kind === 'circle' ? Math.PI * shape.path.r ** 2 : polyArea(shape.path.points);
+  }
+  if (shape.stroke) {
+    const len =
+      shape.path.kind === 'circle'
+        ? 2 * Math.PI * shape.path.r
+        : polyLength(shape.path.points, shape.path.closed);
+    area += len * shape.stroke.width;
+  }
+  return area;
+}
+
+/** {@link shapeArea} summed over a sprite — the fill one layer submits. */
+export function spriteArea(def: SpriteDef): number {
+  let a = 0;
+  for (const s of def.shapes) a += shapeArea(s);
+  return a;
+}
+
+/** A closed polygon's own area, by the shoelace formula. */
+function polyArea(points: readonly number[]): number {
+  let a = 0;
+  const n = points.length / 2;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    a += points[2 * i]! * points[2 * j + 1]! - points[2 * j]! * points[2 * i + 1]!;
+  }
+  return Math.abs(a) / 2;
+}
+
+/** A path's length — what a stroke's area is its width times. */
+function polyLength(points: readonly number[], closed: boolean): number {
+  let len = 0;
+  const n = points.length / 2;
+  for (let i = 0; i + 1 < n; i++) {
+    len += Math.hypot(points[2 * i + 2]! - points[2 * i]!, points[2 * i + 3]! - points[2 * i + 1]!);
+  }
+  if (closed && n > 1) {
+    len += Math.hypot(points[0]! - points[2 * n - 2]!, points[1]! - points[2 * n - 1]!);
+  }
+  return len;
+}
