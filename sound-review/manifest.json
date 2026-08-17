@@ -468,28 +468,28 @@
       "current": "previews/thruster/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/thruster/d.wav",
-          "character": "ion wash, fine grain and hiss",
-          "params": "src/art/audio/candidates.ts#thruster.d"
+          "id": "h",
+          "wav": "previews/thruster/h.wav",
+          "character": "breath: air only, no floor",
+          "params": "src/art/audio/candidates.ts#thruster.h"
         },
         {
-          "id": "e",
-          "wav": "previews/thruster/e.wav",
-          "character": "inertial mass, low and pressurised",
-          "params": "src/art/audio/candidates.ts#thruster.e"
+          "id": "i",
+          "wav": "previews/thruster/i.wav",
+          "character": "pressure: felt, not heard",
+          "params": "src/art/audio/candidates.ts#thruster.i"
         },
         {
-          "id": "f",
-          "wav": "previews/thruster/f.wav",
-          "character": "containment hum, two narrow bands",
-          "params": "src/art/audio/candidates.ts#thruster.f"
+          "id": "j",
+          "wav": "previews/thruster/j.wav",
+          "character": "one warm band, nothing to beat",
+          "params": "src/art/audio/candidates.ts#thruster.j"
         },
         {
-          "id": "g",
-          "wav": "previews/thruster/g.wav",
-          "character": "hardware only, a quiet running machine",
-          "params": "src/art/audio/candidates.ts#thruster.g"
+          "id": "k",
+          "wav": "previews/thruster/k.wav",
+          "character": "almost nothing, the floor of the slot",
+          "params": "src/art/audio/candidates.ts#thruster.k"
         }
       ]
     },
@@ -788,28 +788,28 @@
       "current": "previews/alarm/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/alarm/d.wav",
-          "character": "klaxon with a tectonic body under it",
-          "params": "src/art/audio/candidates.ts#alarm.d"
+          "id": "h",
+          "wav": "previews/alarm/h.wav",
+          "character": "announcement: two warm horn tones",
+          "params": "src/art/audio/candidates.ts#alarm.h"
         },
         {
-          "id": "e",
-          "wav": "previews/alarm/e.wav",
-          "character": "klaxon driven by air, grain in the tone",
-          "params": "src/art/audio/candidates.ts#alarm.e"
+          "id": "i",
+          "wav": "previews/alarm/i.wav",
+          "character": "pressure horn: tone low, top is breath",
+          "params": "src/art/audio/candidates.ts#alarm.i"
         },
         {
-          "id": "f",
-          "wav": "previews/alarm/f.wav",
-          "character": "klaxon in a hull, bands ringing with it",
-          "params": "src/art/audio/candidates.ts#alarm.f"
+          "id": "j",
+          "wav": "previews/alarm/j.wav",
+          "character": "down a corridor: the notes, and the room",
+          "params": "src/art/audio/candidates.ts#alarm.j"
         },
         {
-          "id": "g",
-          "wav": "previews/alarm/g.wav",
-          "character": "the two notes, loud, and nothing around them",
-          "params": "src/art/audio/candidates.ts#alarm.g"
+          "id": "k",
+          "wav": "previews/alarm/k.wav",
+          "character": "two low pulses, and that is all",
+          "params": "src/art/audio/candidates.ts#alarm.k"
         }
       ]
     },

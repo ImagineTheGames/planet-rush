@@ -377,6 +377,83 @@ describe('sound-review candidates', () => {
     }
   });
 
+  it('spends "more subtle" on the two slots that repeat, as a number (a0-67)', () => {
+    // The word appears four times across the sixteen reasons, and on two slots it
+    // is a **fatigue** report rather than a taste note:
+    //
+    //   thruster — *"all of these sound annoying being looped, we need something
+    //   more subtle since these will play all the time"*
+    //   alarm    — *"all of these are ultra annoying, more subtle"*
+    //
+    // A character label cannot answer that; a level can. The bar is the sound
+    // that SHIPS, because that is what the developer has in their ear when they
+    // say "more subtle" — and it is the bar round one missed most plainly:
+    // three of its four alarm offers and two of its four thruster offers were
+    // *louder* than the incumbent they were meant to calm down.
+    const quieterThanShipped = (id: SoundName): void => {
+      const shipped = rms(render(soundSpec(id)));
+      for (const c of CANDIDATE_SLOTS[id]!.candidates) {
+        expect(rms(render(c.spec)), `${id}/${c.id} is not quieter than the sound that was called annoying`).toBeLessThan(
+          shipped,
+        );
+      }
+    };
+    quieterThanShipped('alarm');
+
+    // The thruster is held to **half**, not merely under: it is the only voice a
+    // player holds down, so it is the only slot where the fiftieth second is the
+    // one being judged.
+    const shippedThruster = rms(render(soundSpec('thruster')));
+    for (const c of CANDIDATE_SLOTS.thruster!.candidates) {
+      expect(rms(render(c.spec)), `thruster/${c.id} is not half the level of the loop that fatigues`).toBeLessThan(
+        shippedThruster * 0.5,
+      );
+      // …and nothing in it may ring. A narrow resonance with noise running
+      // through it beats at the rate the noise excites it, and a beat inside a
+      // held loop is the single most fatiguing thing a sound can do. Round one
+      // put a Q of 8.5 and 10 on a loop layer; this is the fence around that.
+      for (const v of voicesOf(c.spec)) {
+        expect(v.resonance ?? 0, `thruster/${c.id} ${v.name} rings inside a held loop`).toBeLessThan(4);
+        expect(v.lowPassEnd, `thruster/${c.id} ${v.name} sweeps a corner across the loop seam`).toBeUndefined();
+      }
+    }
+
+    // The alarm may get quieter; it may not stop being a mechanic. §2.2 makes it
+    // the tell that your home is under attack, and `./audio.test.ts` holds the
+    // shipped voice above the chatter — so every OFFER is held there too, or an
+    // approval would quietly retire the mechanic.
+    const chatter = (['oreCollect', 'repairTick', 'spawnPulse', 'shotImpact'] as const).map((n) =>
+      rms(render(soundSpec(n))),
+    );
+    for (const c of CANDIDATE_SLOTS.alarm!.candidates) {
+      expect(rms(render(c.spec)), `alarm/${c.id} would not be heard over the chatter`).toBeGreaterThan(
+        Math.max(...chatter),
+      );
+      // The rising minor third is the recognisable shape and it is what survives
+      // the saw's removal: a second event, a minor third above the first and
+      // later than it — the same interval the shipped klaxon spells. Legibility
+      // is carried by the interval, not by the waveform, which is what this bank
+      // already learnt on `waveArrive` (its two-horn tell survived the same
+      // removal with the pitches held to the Hz).
+      //
+      // Stated as "there exists such a pair" rather than "the two lowest voices
+      // are one", because these offers carry bodies and rooms as well as notes
+      // and a rule that counted layers would be a rule about arrangement.
+      const spec = c.spec;
+      expect(isLayered(spec), `alarm/${c.id} is a single voice — it cannot spell an interval`).toBe(true);
+      const events = isLayered(spec) ? spec.layers.map((l) => ({ at: l.at ?? 0, f: l.spec.freq })) : [];
+      const rising = events.some((a) =>
+        events.some((b) => b.at > a.at && Math.abs(12 * Math.log2(b.f / a.f) - 3) < 0.35),
+      );
+      expect(rising, `alarm/${c.id} does not spell a rising minor third`).toBe(true);
+      // And the saw is gone: it is what "ultra annoying" was made of — full-level
+      // partials straight through 2-4 kHz, the band an ear cannot habituate to.
+      for (const v of voicesOf(c.spec)) {
+        expect(v.wave, `alarm/${c.id} ${v.name} is still a saw`).not.toBe('saw');
+      }
+    }
+  });
+
   it('every slot offers a full set of candidates, one letter each, with characters', () => {
     for (const id of SLOT_IDS) {
       const slot = CANDIDATE_SLOTS[id]!;

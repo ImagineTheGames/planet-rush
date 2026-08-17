@@ -55,12 +55,12 @@ previews rendered) / `held` (deliberately not re-voiced, with the reason).
 | oreCollect | done | "they need to sound more satisfying, like you've won something, but subtle at same time, make 3 distinct sounds so that i can see what direction to go in" | three DIRECTIONS — an interval (`g`), a handful of material (`h`), a breath (`i`) — plus what ships (`j`). All under the incumbent in peak, RMS and length |
 | turretFire | done | "none of these sound like a gun fire or laser turret, make 3 distinct sounds for it so we can see the direciton to go in" | three DIRECTIONS — a report (`h`), a discharge (`i`), a launch (`j`) — plus what ships (`k`). The laser gets a bounded ×1.5 pitch fall, by the developer's ruling |
 | shieldHit | done | "none of these sound like ashield hit" | four kinds of FIELD, all of which give and come back — deflection (`h`), absorption (`i`), arc (`j`), flex (`k`). The denied four were struck plates and washes; none of them gave |
-| thruster | todo | "all of these sound annoying being looped, we need something more subtle since these will play all the time" | |
+| thruster | done | "all of these sound annoying being looped, we need something more subtle since these will play all the time" | held to a NUMBER, not a character: every offer under half the shipped loop's RMS, every Q under 4 (a resonance beats at the grain rate — that is what "annoying looped" is), no corner sweeping the seam. Four amounts of presence: breath, pressure, one warm band, almost nothing |
 | buildPlaced | done | "none of these sound like a build started" | four builds STARTING, not four latches: every take opens (last third louder than first; the shipped voice measures 0.02). Fabricator, hydraulics, printer, power |
 | bankOre | todo | "i like the current and none of the new generations, they should some more like money related" | |
 | upgradeBought | todo | "i like current but i want to hear new optinos that are more like it but also more subtle" | |
 | stationDeath | done | "they should sound like an explosion" | four EXPLOSIONS — front, body, room — detonation (`h`), breach (`i`), blast-into-collapse (`j`), one concussion (`k`). All inside the 1.32 s tail invariant; nothing sparkles |
-| alarm | todo | "all of these are ultra annoying, more subtle" | |
+| alarm | done | "all of these are ultra annoying, more subtle" | the saw goes and the rising minor third stays. Since §2.2 was amended (2026-08-07) the alarm sounds ONCE and the screen arrow carries the duration — it must be unmistakable for a second, not nag for a siege. All four under the shipped alarm, all four still over the chatter |
 | musicBed | todo | "none of these sound like a calm music bed" | |
 | musicPulse | todo | "none of these sound musical" | |
 | musicTheme | todo | "these sound like very bad music" | |

@@ -1541,6 +1541,46 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       },
     ],
   },
+  // ---------------------------------------------------------------------------
+  // ROUND 2 (a0-67, 2026-08-17) — A FATIGUE COMPLAINT, HELD AS A NUMBER
+  // ---------------------------------------------------------------------------
+  //
+  //   *"all of these sound annoying being looped, we need something more subtle
+  //   since these will play all the time"*
+  //
+  // Both halves of that sentence are diagnosis, and neither is taste. *"Being
+  // looped"* and *"play all the time"* say the same thing twice: this is the one
+  // voice in the bank that a player holds down, so the thing being judged is not
+  // how it sounds once but what it is like on the fiftieth second. A sound that
+  // is pleasant once and unbearable at the fiftieth repeat has failed this slot,
+  // and no amount of character fixes it.
+  //
+  // So "subtle" is spent on the three things that actually cause loop fatigue,
+  // in order of how much they cause it:
+  //
+  //  1. **Level.** The denied four ran at 0.51 / 0.51 / 0.33 / 0.35 peak against
+  //     a shipped 0.46 — two of them were *louder* than the thing being
+  //     complained about. Every offer below is under **half** the shipped
+  //     thruster's RMS, and `./candidates.test.ts` holds it there.
+  //  2. **Bandwidth.** A wide voice masks the rest of the mix and the ear cannot
+  //     stop attending to it. These are narrow: nothing here is broadband, and
+  //     the two with any top end are rolled off hard.
+  //  3. **Anything periodic.** A resonant peak with grain moving through it beats
+  //     at the loop rate, and a beat is the single most fatiguing thing a held
+  //     sound can do — you cannot un-hear a pulse. Round one already knew half of
+  //     this (*"no `lowPassEnd`: a sweep inside a loop body wraps to a 2.5 Hz
+  //     wobble"*) and then put a Q of 8.5 and 10 on `f`'s two bands, which
+  //     rings at the rate the grains hit it. Every Q below is under 4.
+  //
+  // The four are four amounts of *presence*, not four materials — because the
+  // question this slot is asking is now "how little is enough":
+  //
+  //   h  **breath** — air only, no floor. The lightest thing that still says the
+  //      engine is lit.
+  //   i  **pressure** — felt rather than heard: almost all of it under 120 Hz.
+  //   j  **a warm band** — one soft formant, no grain in it, nothing to beat.
+  //   k  **almost nothing** — the floor of the slot, offered so somebody can hear
+  //      where too-quiet actually is rather than guessing at it.
   thruster: {
     label: "Thruster Loop",
     context: "Held engine note while the throttle is open (loops continuously)",
@@ -1548,59 +1588,65 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     candidates: [
       // A loop has no envelope to carry character — `hold` runs flat and `decay`
       // is zero, which is what `./candidates.test.ts` checks for. So all four are
-      // made of *material* instead: the grain rate, the corner, the Q. None of
+      // made of *material* instead: the corner, the Q, the register. None of
       // them names a `lowPassEnd`: a filter sweep inside a loop body wraps into a
       // 2.5 Hz wobble at the loop rate, which is a helicopter, not a drive.
       {
-        id: 'd',
-        character: "ion wash, fine grain and hiss",
+        id: 'h',
+        slot: 'thruster',
+        character: "breath: air only, no floor",
         spec: {
-          name: 'thruster_d_ionWash',
+          name: 'thruster_h_breath',
           loop: true,
           crossfade: 0.04,
           layers: [
-            grains('thruster_d.wash', { freq: 260, freqEnd: 260, grain: 0.0018, gain: 0.3, attack: 0, hold: 0.4, decay: 0, from: 3000, q: 2.2, hp: 220, seed: 60370 }),
-            place({ name: 'thruster_d.duct', wave: 'noise', attack: 0, hold: 0.4, decay: 0, freq: 96, lowPass: 380, resonance: 1.8, gain: 0.17, seed: 60371 }),
+            place({ name: 'thruster_h.air', wave: 'noise', attack: 0, hold: 0.4, decay: 0, freq: 240, lowPass: 620, resonance: 1.2, highPass: 130, gain: 0.13, seed: 60410 }),
+            place({ name: 'thruster_h.duct', wave: 'noise', attack: 0, hold: 0.4, decay: 0, freq: 150, lowPass: 300, resonance: 1.4, gain: 0.1, seed: 60411 }),
           ],
         },
       },
       {
-        id: 'e',
-        character: "inertial mass, low and pressurised",
+        id: 'i',
+        slot: 'thruster',
+        character: "pressure: felt, not heard",
         spec: {
-          name: 'thruster_e_inertialMass',
+          name: 'thruster_i_pressure',
           loop: true,
           crossfade: 0.04,
           layers: [
-            place({ name: 'thruster_e.mass', wave: 'sine', attack: 0, hold: 0.4, decay: 0, freq: 46, noiseMix: 0.2, lowPass: 180, resonance: 1.6, gain: 0.3, seed: 60380 }),
-            place({ name: 'thruster_e.press', wave: 'noise', attack: 0, hold: 0.4, decay: 0, freq: 135, lowPass: 600, resonance: 2.6, gain: 0.28, seed: 60381 }),
+            place({ name: 'thruster_i.mass', wave: 'sine', attack: 0, hold: 0.4, decay: 0, freq: 52, noiseMix: 0.12, lowPass: 150, resonance: 1.4, gain: 0.11, seed: 60420 }),
+            place({ name: 'thruster_i.body', wave: 'noise', attack: 0, hold: 0.4, decay: 0, freq: 105, lowPass: 280, resonance: 1.8, gain: 0.066, seed: 60421 }),
           ],
         },
       },
       {
-        id: 'f',
-        character: "containment hum, two narrow bands",
+        id: 'j',
+        slot: 'thruster',
+        character: "one warm band, nothing to beat",
         spec: {
-          name: 'thruster_f_containmentHum',
+          name: 'thruster_j_warmBand',
           loop: true,
           crossfade: 0.04,
           layers: [
-            place({ name: 'thruster_f.b0', wave: 'noise', attack: 0, hold: 0.4, decay: 0, freq: 360, lowPass: 1200, resonance: 8.5, bandPass: true, gain: 0.55, seed: 60390 }),
-            place({ name: 'thruster_f.b1', wave: 'noise', attack: 0, hold: 0.4, decay: 0, freq: 540, lowPass: 1800, resonance: 10, bandPass: true, gain: 0.34, seed: 60391 }),
-            place({ name: 'thruster_f.floor', wave: 'triangle', attack: 0, hold: 0.4, decay: 0, freq: 90, noiseMix: 0.24, lowPass: 340, resonance: 3, gain: 0.2, seed: 60392 }),
+            // Q 3.2, not the 8.5 and 10 the denied take used. A narrow resonance
+            // with noise running through it rings at the rate the noise excites
+            // it, and that ring is the thing an ear locks onto and cannot let go.
+            place({ name: 'thruster_j.formant', wave: 'noise', attack: 0, hold: 0.4, decay: 0, freq: 300, lowPass: 640, resonance: 3.2, highPass: 90, gain: 0.16, seed: 60430 }),
+            place({ name: 'thruster_j.floor', wave: 'triangle', attack: 0, hold: 0.4, decay: 0, freq: 74, noiseMix: 0.14, lowPass: 210, resonance: 1.6, gain: 0.13, seed: 60431 }),
           ],
         },
       },
       {
-        id: 'g',
-        character: "hardware only, a quiet running machine",
+        id: 'k',
+        slot: 'thruster',
+        character: "almost nothing, the floor of the slot",
         spec: {
-          name: 'thruster_g_runningMachine',
+          name: 'thruster_k_almostNothing',
           loop: true,
           crossfade: 0.04,
           layers: [
-            place({ name: 'thruster_g.run', wave: 'noise', attack: 0, hold: 0.4, decay: 0, freq: 155, lowPass: 700, resonance: 3.4, highPass: 70, gain: 0.24, seed: 60400 }),
-            place({ name: 'thruster_g.rotor', wave: 'triangle', attack: 0, hold: 0.4, decay: 0, freq: 62, noiseMix: 0.3, lowPass: 240, resonance: 2.2, gain: 0.18, seed: 60401 }),
+            place({ name: 'thruster_k.trace', wave: 'noise', attack: 0, hold: 0.4, decay: 0, freq: 170, lowPass: 400, resonance: 1.3, highPass: 80, gain: 0.085, seed: 60440 }),
+            place({ name: 'thruster_k.under', wave: 'sine', attack: 0, hold: 0.4, decay: 0, freq: 58, noiseMix: 0.08, lowPass: 140, resonance: 1.3, gain: 0.075, seed: 60441 }),
           ],
         },
       },
@@ -1657,9 +1703,19 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
   // `buildComplete` are the two ends of one build, seconds apart on the same
   // structure, and both families were seating and stopping. Now the grammar is
   // one word long and audible without a manual: **placed opens, complete
-  // seats.** `./candidates.test.ts` holds it as a number — the last third of
-  // every `buildPlaced` offer is louder than its own first third; every
-  // `buildComplete` offer is the other way round.
+  // seats.** `./candidates.test.ts` holds the first half as a number — the last
+  // third of every `buildPlaced` offer is louder than its own first third, where
+  // the shipped voice measures 0.02.
+  //
+  // The second half is **not** asserted, and the reason is on the record rather
+  // than in a test: `buildComplete` was not denied this round, so its four
+  // offers carry no verdict and this brief may not touch them (re-voicing
+  // un-judged work destroys a review instead of doing one — the a0-48 rule).
+  // Three of them seat, at 0.31 / 0.40 / 0.06. **`f` — "two welds, the second
+  // holding" — opens, at 1.43.** So if the developer adopts one of the four
+  // below *and* `buildComplete/f`, the two ends of one build are the same
+  // gesture and want hearing as a pair. That is a note for the board, not a
+  // failure for a lane that did nothing wrong.
   //
   //   h  **fabricator** — the clamp bites and a drive spins up behind it.
   //   i  **hydraulics** — pressure taking, and the line still under load.
@@ -2255,61 +2311,118 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     // syncAlarm, with the screen-edge arrow carrying the duration (GDD §2.2,
     // amended 2026-08-07). All four offers are one-shots on the shipped bar.
     //
-    // This is the one slot in the sweep where "modern/sci-fi, not retro/toony"
-    // does NOT get to decide: a klaxon is retro *because it works*, and §2.2 makes
-    // legibility a mechanic. So the saw and the rising minor third are constants
-    // across d/e/f/g, and the four offers differ only in the body around them —
-    // which is the honest amount of room this slot has.
+    // -------------------------------------------------------------------------
+    // ROUND 2 (a0-67, 2026-08-17)
+    // -------------------------------------------------------------------------
+    //
+    //   *"all of these are ultra annoying, more subtle"*
+    //
+    // Round one's note on this slot said, in as many words, that the register
+    // does not get to decide here: *"a klaxon is retro because it works, and §2.2
+    // makes legibility a mechanic"*, so the saw and the rising minor third were
+    // held constant across all four and only the body around them moved. That is
+    // a defensible reading and it produced four offers the developer calls ultra
+    // annoying — three of them **louder than the alarm that ships**.
+    //
+    // The thing round one did not use is the amendment that had already made room
+    // for this. **§2.2, amended 2026-08-07: the alarm sounds ONCE per engagement,
+    // and the screen-edge arrow carries the duration.** Legibility is now split
+    // across two tells and only one of them is audible. A sound that no longer
+    // has to nag for the length of a siege does not have to be built like a siren
+    // — it has to be *unmistakable for one second*, which is a different job and a
+    // much quieter one. Round one was still voicing the pre-amendment alarm.
+    //
+    // So what is kept and what goes:
+    //
+    //  - **KEPT: the two notes and the rising minor third** (B4 → D5, then D5 →
+    //    F5). That interval is the recognisable shape and it is the half of
+    //    legibility that costs nothing in fatigue. `./candidates.test.ts` holds
+    //    every offer to it.
+    //  - **KEPT: loudest in the bank.** §2.2 is a mechanic and `./audio.test.ts`
+    //    asserts the alarm out-levels the chatter. Every offer stays above every
+    //    `oreCollect`, `repairTick`, `spawnPulse` and `shotImpact` voice — but
+    //    **under the alarm that ships**, which is where "more subtle" is spent.
+    //  - **GONE: the saw.** It is what "ultra annoying" is made of: a saw at 494
+    //    Hz puts full-amplitude partials right through 2-4 kHz, the band the ear
+    //    is most sensitive to and cannot habituate to. The klaxon survives the
+    //    saw's removal because the *interval* is what makes a klaxon, not the
+    //    waveform — which is exactly what this bank learnt on `waveArrive`, whose
+    //    two-horn tell survived the same removal with its pitches held to the Hz.
+    //  - **GONE: the 2.4-3.0 Q on the horn body.** A resonant peak sitting on top
+    //    of a harmonic-rich tone is the pierce, and it is the first thing to go.
+    //
+    // The four are four ways of being unmistakable without being shrill:
+    //
+    //   h  **an announcement** — two filtered horn tones, warm, wide, no edge.
+    //      The most "station PA" of the four.
+    //   i  **a pressure horn** — driven by air: the tone is low and the top is
+    //      breath rather than harmonics.
+    //   j  **down a corridor** — the same two notes with the room in front of
+    //      them, so it reads as *elsewhere in the structure*, which is what an
+    //      alarm about a building actually is.
+    //   k  **two low pulses** — the smallest thing that still spells the
+    //      interval. The offer for "subtle" read as literally as it can be read
+    //      without losing the mechanic.
     label: "Home Alarm",
     context: "Your home is under attack (GDD §2.2) — a mechanic, not music; sounded once per engagement.",
     current: 'alarm',
     candidates: [
       {
-        id: 'd',
-        character: "klaxon with a tectonic body under it",
+        id: 'h',
+        slot: 'alarm',
+        character: "announcement: two warm horn tones",
         spec: {
-          name: 'alarm_d_tectonicKlaxon',
+          name: 'alarm_h_announcement',
           layers: [
-            swept('alarm_d.low', { wave: 'saw', freq: 494, freqEnd: 587, from: 2100, to: 1300, q: 3, gain: 0.46, attack: 0.014, hold: 0.16, decay: 0.1, seed: 61050 }),
-            swept('alarm_d.high', { wave: 'saw', freq: 587, freqEnd: 698, from: 2300, to: 1400, q: 3, gain: 0.46, attack: 0.014, hold: 0.16, decay: 0.14, at: 0.3, seed: 61052 }),
-            swept('alarm_d.mass', { wave: 'sine', freq: 61.75, from: 200, to: 120, q: 1.8, gain: 0.34, attack: 0.02, hold: 0.5, decay: 0.16, curve: 2, noiseMix: 0.08, seed: 61054 }),
+            swept('alarm_h.low', { wave: 'triangle', freq: 494, freqEnd: 587, from: 1500, to: 1000, q: 1.6, gain: 0.4, attack: 0.02, hold: 0.17, decay: 0.12, curve: 2.6, noiseMix: 0.07, seed: 61440 }),
+            swept('alarm_h.high', { wave: 'triangle', freq: 587, freqEnd: 698, from: 1700, to: 1100, q: 1.6, gain: 0.4, attack: 0.02, hold: 0.17, decay: 0.16, curve: 2.6, noiseMix: 0.07, at: 0.3, seed: 61442 }),
+            swept('alarm_h.body', { wave: 'sine', freq: 123.47, from: 300, to: 180, q: 1.5, gain: 0.24, attack: 0.03, hold: 0.5, decay: 0.16, curve: 2, seed: 61444 }),
           ],
         },
       },
       {
-        id: 'e',
-        character: "klaxon driven by air, grain in the tone",
+        id: 'i',
+        slot: 'alarm',
+        character: "pressure horn: tone low, top is breath",
         spec: {
-          name: 'alarm_e_airKlaxon',
+          name: 'alarm_i_pressureHorn',
           layers: [
-            swept('alarm_e.low', { wave: 'saw', freq: 494, freqEnd: 587, from: 2400, to: 1600, q: 2.4, gain: 0.44, attack: 0.012, hold: 0.16, decay: 0.1, noiseMix: 0.14, seed: 61060 }),
-            swept('alarm_e.high', { wave: 'saw', freq: 587, freqEnd: 698, from: 2600, to: 1700, q: 2.4, gain: 0.44, attack: 0.012, hold: 0.16, decay: 0.14, noiseMix: 0.14, at: 0.3, seed: 61062 }),
-            grains('alarm_e.air', { freq: 1500, freqEnd: 1900, grain: 0.0055, gain: 0.36, attack: 0.01, hold: 0.16, decay: 0.12, curve: 2.6, from: 5800, to: 4000, q: 3, hp: 1300, seed: 61064 }),
-            grains('alarm_e.air2', { freq: 1800, freqEnd: 2200, grain: 0.0045, gain: 0.34, attack: 0.01, hold: 0.16, decay: 0.16, curve: 2.6, from: 6000, to: 4200, q: 3, hp: 1500, at: 0.3, seed: 61066 }),
+            swept('alarm_i.low', { wave: 'sine', freq: 247, freqEnd: 293.66, from: 700, to: 460, q: 1.8, gain: 0.42, attack: 0.018, hold: 0.17, decay: 0.12, curve: 2.4, noiseMix: 0.1, seed: 61450 }),
+            swept('alarm_i.high', { wave: 'sine', freq: 293.66, freqEnd: 349.23, from: 800, to: 520, q: 1.8, gain: 0.42, attack: 0.018, hold: 0.17, decay: 0.16, curve: 2.4, noiseMix: 0.1, at: 0.3, seed: 61452 }),
+            // The air is what makes it a horn rather than a tone, and it is kept
+            // low-passed at 1.6 k — the shrill band is exactly where an alarm
+            // must not put a sustained layer if it is not allowed to be annoying.
+            grains('alarm_i.air', { freq: 470, grain: 0.006, gain: 0.18, attack: 0.03, hold: 0.42, decay: 0.16, curve: 2, from: 1600, q: 2, hp: 260, seed: 61454 }),
           ],
         },
       },
       {
-        id: 'f',
-        character: "klaxon in a hull, bands ringing with it",
+        id: 'j',
+        slot: 'alarm',
+        character: "down a corridor: the notes, and the room",
         spec: {
-          name: 'alarm_f_hullKlaxon',
+          name: 'alarm_j_downACorridor',
           layers: [
-            swept('alarm_f.low', { wave: 'saw', freq: 494, freqEnd: 587, from: 1500, to: 4200, q: 6.5, gain: 0.44, attack: 0.012, hold: 0.16, decay: 0.1, seed: 61070 }),
-            swept('alarm_f.high', { wave: 'saw', freq: 587, freqEnd: 698, from: 4400, to: 1700, q: 6.5, gain: 0.44, attack: 0.012, hold: 0.16, decay: 0.14, at: 0.3, seed: 61072 }),
-            band('alarm_f.hull0', 988, { gain: 0.3, decay: 0.12, q: 8, curve: 4, attack: 0.003, seed: 61074 }),
-            band('alarm_f.hull1', 1174, { gain: 0.3, decay: 0.12, q: 8, curve: 4, attack: 0.003, at: 0.3, seed: 61076 }),
+            band('alarm_j.low', 494, { gain: 1.0, decay: 0.2, q: 3.4, curve: 2.8, attack: 0.02, hold: 0.14, seed: 61460 }),
+            band('alarm_j.high', 587, { gain: 1.0, decay: 0.24, q: 3.4, curve: 2.8, attack: 0.02, hold: 0.14, at: 0.3, seed: 61462 }),
+            // A band passes very little of what enters it, so the two notes above
+            // arrive quiet — and an alarm that peaks under `shotImpact` is not a
+            // mechanic any more (§2.2). This body is what buys the level back
+            // without putting anything back into the band that made it shrill.
+            swept('alarm_j.body', { wave: 'sine', freq: 123.47, from: 320, to: 200, q: 1.5, gain: 0.3, attack: 0.03, hold: 0.46, decay: 0.18, curve: 2, seed: 61466 }),
+            ...returns('alarm_j.room', { freq: 420, gain: 0.34, decay: 0.22, from: 1100, to: 400, at: 0.36, gap: 0.16, count: 2, seed: 61464 }),
           ],
         },
       },
       {
-        id: 'g',
-        character: "the two notes, loud, and nothing around them",
+        id: 'k',
+        slot: 'alarm',
+        character: "two low pulses, and that is all",
         spec: {
-          name: 'alarm_g_bareKlaxon',
+          name: 'alarm_k_twoLowPulses',
           layers: [
-            swept('alarm_g.low', { wave: 'saw', freq: 494, freqEnd: 587, from: 1800, to: 1100, q: 2.2, gain: 0.54, attack: 0.014, hold: 0.17, decay: 0.1, seed: 61080 }),
-            swept('alarm_g.high', { wave: 'saw', freq: 587, freqEnd: 698, from: 2000, to: 1200, q: 2.2, gain: 0.54, attack: 0.014, hold: 0.17, decay: 0.14, at: 0.3, seed: 61082 }),
+            swept('alarm_k.one', { wave: 'sine', freq: 246.94, freqEnd: 293.66, from: 520, to: 380, q: 1.4, gain: 0.37, attack: 0.02, hold: 0.16, decay: 0.11, curve: 2.6, noiseMix: 0.05, seed: 61470 }),
+            swept('alarm_k.two', { wave: 'sine', freq: 293.66, freqEnd: 349.23, from: 600, to: 420, q: 1.4, gain: 0.37, attack: 0.02, hold: 0.16, decay: 0.15, curve: 2.6, noiseMix: 0.05, at: 0.3, seed: 61472 }),
           ],
         },
       },
