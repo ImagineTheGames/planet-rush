@@ -429,13 +429,22 @@ WHAT IS LEFT, IN ORDER, if this is not enough on the developer's box:
      re-submitted every frame (the deep layer holds 49,378 shapes at 3440x1440
      where 15,560 would cover the screen) plus 4x the cache texture. See (b) in
      section 8: it is a Director's call, not a deferral.
-  b) App-level MSAA. `main.ts:833` requests `antialias: true` on the
-     `Application`, which is a 4x multiplier on the blended traffic of every pass
-     including the backdrop's. It buys nothing on this content: every backdrop
-     edge is the zero rim of a falloff where the alpha has already reached 0, and
-     every entity is a `Sprite` off a texture the baker already antialiased. The
-     one thing it does help is the arena wall's thin steel strokes. Platform
-     Engineer's file, so it is raised and not changed.
+  b) App-level MSAA — REASONED, NOT MEASURED, and flagged as such. `main.ts:833`
+     requests `antialias: true` on the `Application`, which asks WebGL for a
+     multisampled default framebuffer; this box reports MAX_SAMPLES 4. Blending
+     under MSAA is per SAMPLE, so the mechanism is a ~4x multiplier on the blended
+     traffic of every pass, the backdrop's included. The argument that it buys
+     nothing on THIS content is that every backdrop edge is the zero rim of a
+     falloff where the alpha has already arrived at 0, and every entity is a
+     `Sprite` off a texture the baker already antialiased (`generateTexture`,
+     `antialias: true`); the one thing it plausibly helps is the arena wall's thin
+     steel strokes.
+     That reasoning is not a measurement, and a0-75's own history says so: the
+     scale-1/2 probe in section 0 was equally reasonable and equally wrong. The
+     rig can settle it — `attribute.mjs` already takes an `aa=0` pass — and this
+     branch did not run it, because the run was cut to free the box and because
+     `antialias` is Platform Engineer's line to move either way. RAISED, with the
+     check named, not claimed.
   c) `resolution: window.devicePixelRatio` on the same call, uncapped, where the
      VFX texture cache caps at 2 for exactly this reason (main.ts:1477 — "a dpr-3
      phone would otherwise bake nine times the texels it can show"). On a HiDPI

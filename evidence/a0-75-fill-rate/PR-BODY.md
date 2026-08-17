@@ -231,11 +231,16 @@ than read (`evidence/a0-75-fill-rate/reducer.txt`).
 
 **(e) Two things in `src/main.ts` (Platform Engineer's — raised, not changed).**
 Both are per-pixel multipliers on everything above.
-- `antialias: true` on the `Application` (main.ts:833) is 4× MSAA on the blended
-  traffic of every pass. It buys nothing on this content: every backdrop edge is
-  the zero rim of a falloff where alpha has already reached 0, and every entity is
-  a `Sprite` off a texture the baker already antialiased. The one thing it helps is
-  the arena wall's thin steel strokes.
+- `antialias: true` on the `Application` (main.ts:833) asks WebGL for a
+  multisampled default framebuffer, and blending under MSAA is per *sample* — so
+  the mechanism is a ~4× multiplier on the blended traffic of every pass, the
+  backdrop's included. The argument that it buys nothing on *this* content is that
+  every backdrop edge is the zero rim of a falloff where alpha has already arrived
+  at 0, and every entity is a `Sprite` off a texture the baker already
+  antialiased; the one thing it plausibly helps is the arena wall's thin steel
+  strokes. **That is reasoned, not measured, and it is flagged as such** — a0-75's
+  own scale-½ probe was equally reasonable and equally wrong. `attribute.mjs`
+  already takes an `aa=0` pass and can settle it; this branch did not run it.
 - `resolution: window.devicePixelRatio` on the same call, **uncapped** — where the
   VFX texture cache caps at 2 for exactly this reason (main.ts:1477: *"a dpr-3
   phone would otherwise bake nine times the texels it can show"*). On a HiDPI
