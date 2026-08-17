@@ -644,8 +644,40 @@ describe('two economies stop doing one economy\'s work', () => {
     // A plain 1..24 scan rather than a chosen set, deliberately: a hand-picked
     // list is exactly how three seeds came to flatter this measurement.
     //
-    // **The threshold below is untouched at 1.6.** Widening the pool strengthens
-    // the instrument; it does not lower the bar.
+    // **The threshold below was 1.6, and a0-81 moved it to 2.4** (2026-08-17,
+    // this lane). This is the one re-baseline in this file, it is a real
+    // finding rather than a red test being tidied away, and the paragraph it
+    // takes to say why is the point:
+    //
+    // The bar above is a *ratio*, and the sentence justifying that choice — "so
+    // it survives a change to the rock supply, the map or the cast, any of which
+    // would move both numbers together" — names the one class of change it is
+    // robust to and, by omission, the class it is not. **Friendly fire is off
+    // (GDD §1, §2.1): allies never shoot each other.** So a change to COMBAT can
+    // only ever move the enemy leg, and the control stops being a control.
+    // a0-81 is exactly that change — a retreating, hauling or banking bot now
+    // fires at what is chasing it — and it moves the two legs apart:
+    //
+    //   build      ally     foe      ratio      ship deaths / 300 s match
+    //   pre-a0-81  4.06%    3.12%    1.30       9.0
+    //   a0-81      4.13%    1.89%    2.19       5.0
+    //
+    // (Pooled seeds 1..48; at the 24 this case runs, 1.31 → 1.77. Both builds
+    // measured on the same probe, `evidence/a0-81-fleeing-fire/contention-probe.ts`.)
+    //
+    // **The ally number — the one this stage is actually about — did not move**:
+    // 4.06% → 4.13%, inside the seed-to-seed wobble. What moved is the
+    // denominator, and the mechanism is measured rather than assumed: a bot that
+    // shoots back damages its pursuer, the pursuer crosses its own nerve and
+    // breaks off too, and bot-vs-bot matches run **44% less lethal** (9.0 → 5.0
+    // deaths). Fewer kills means fewer enemy pairs alive to be counted, and the
+    // small denominator is what the ratio is amplifying.
+    //
+    // So the ratio is kept — it is still the right shape for a change to the
+    // board — with the bar re-measured, and the absolute ally rate is asserted
+    // beside it so that re-measuring the ratio cannot leave the stage unguarded.
+    // The two mechanism cases above (`allyCrowding`, the `claim` tabu) are
+    // untouched and green, and neither of them can be reached by a combat change.
     const runs = Array.from({ length: 24 }, (_, i) => i + 1).map((s) => contention(s, 300));
     const ally = runs.reduce((a, r) => a + r.ally, 0) / runs.length;
     const foe = runs.reduce((a, r) => a + r.foe, 0) / runs.length;
@@ -654,10 +686,18 @@ describe('two economies stop doing one economy\'s work', () => {
     expect(runs.every((r) => r.allyTicks > 1000)).toBe(true);
     expect(ally).toBeGreaterThan(0);
 
+    // **The stage's own quantity, absolutely.** New with the a0-81 re-baseline
+    // above, and the guard that makes it safe: allied pairs hold the same
+    // committed site 4.0% of their pair-ticks on both builds, so a ceiling of 5%
+    // catches a genuine regression in field division no matter what happens to
+    // the enemy control. Untethered from combat by construction — allies cannot
+    // shoot each other, so nothing in a combat change can reach this number.
+    expect(ally).toBeLessThan(0.05);
+
     // And allies no longer contend like a pair that spawned next to each other.
-    // Asserted as a *ratio* against the in-match control, so it survives a
-    // change to the rock supply, the map or the cast — any of which would move
-    // both numbers together.
-    expect(ally / foe).toBeLessThan(1.6);
+    // Still a ratio against the in-match control, for the reason the original
+    // note gives; see the a0-81 paragraph above for the one class of change that
+    // control cannot absorb, and what was measured on both sides of it.
+    expect(ally / foe).toBeLessThan(2.4);
   });
 });
