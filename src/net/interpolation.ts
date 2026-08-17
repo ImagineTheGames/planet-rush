@@ -454,11 +454,15 @@ export class RemoteInterpolator {
       //    fired, which `maxShotStep` alone is far too coarse to see;
       //  - the positions are further apart than any muzzle in the game could carry
       //    a shot in this span.
-      const recycled =
-        !next || next.meta !== s.meta || next.velX !== s.velX || next.velY !== s.velY
-          ? true
-          : sq(next.posX - s.posX) + sq(next.posY - s.posY) > maxStep * maxStep;
-      if (recycled) {
+      //
+      // The slot has to clear all three to be chorded.
+      const sameShot =
+        next !== undefined &&
+        next.meta === s.meta &&
+        next.velX === s.velX &&
+        next.velY === s.velY &&
+        sq(next.posX - s.posX) + sq(next.posY - s.posY) <= maxStep * maxStep;
+      if (!sameShot) {
         // No chord to draw. One dot cannot be two shots, so it is drawn as
         // whichever of them the render clock is NEARER to — the same rule the ship
         // lerp uses for a discrete field, for the same reason — and flown along
@@ -472,8 +476,8 @@ export class RemoteInterpolator {
         out.push(flyShot(pick, renderMs - from.receivedMs, this.shotReachMs));
         continue;
       }
-      const dx = next!.posX - s.posX;
-      const dy = next!.posY - s.posY;
+      const dx = next.posX - s.posX;
+      const dy = next.posY - s.posY;
       out.push({ slot: s.id, x: s.posX + dx * frac, y: s.posY + dy * frac, vx: s.velX, vy: s.velY, meta: s.meta });
     }
     // Shots that appear only in the later frame: freshly fired. Flown BACK from
