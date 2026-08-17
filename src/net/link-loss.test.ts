@@ -398,7 +398,13 @@ describe('the words on screen', () => {
     watch.poll(5_000);
     expect(linkNotice(watch.poll(5_000)).failed).toBe(false);
     expect(linkNotice(watch.poll(12_000)).failed).toBe(true);
+    // A refusal with no reason attached is still the bare word — but that is now
+    // the *fallback* rather than what every refused player reads (a0-72): given
+    // the server's own reason, the card names it instead.
     expect(endingTitle('join-rejected')).toContain('REFUSED');
+    expect(endingTitle('join-rejected', 'match-over')).toBe(
+      'MATCH OVER — it finished while you were away',
+    );
   });
 });
 
