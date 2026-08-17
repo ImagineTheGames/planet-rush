@@ -124,6 +124,31 @@ this note says so, and the reason holds independently: three of the four options
 above change what the slot is for, and voices written against the wrong slot are
 what got this row denied in the first place.
 
+### What the board still shows, which is deliberate but must not be misread
+
+`spawnPulse` is the one R5 row whose **board state is unchanged**: it still carries
+a0-60's four offers, `d`–`g`, in `candidates` — so the review board will present
+them as live. They are not. They are the takes the R5 verdict landed on, and
+`d`, `e`, `f`, `g` join `a`, `b`, `c` as **spent letters**: under the a0-48 rule a
+replacement may never be filed under a letter the developer has already turned
+down. Whoever implements the ruling starts at `h`.
+
+They were left in place rather than parked in {@link CandidateSlot.denied} — the
+mechanism `xpSettle` established for exactly this shape — because **which
+disposition is correct depends on the ruling that has not happened yet.** Under
+(A) the four are the baseline the new set is judged against and belong on the
+board; under (B) they are voices for a slot that no longer means what they were
+written for; under (C) the slot leaves the board entirely and takes them with it.
+Parking them now would be this lane guessing the answer to the question it was
+sent to ask. The manifest vocabulary has no fourth status for *held pending a
+ruling* (`done` / `todo` / `split`), and inventing one to describe a state that
+lasts until the next verdict would be machinery outliving its subject.
+
+**So the row reads `done` in `docs/sound-revoice-manifest.md` and that is now
+half-true**: a0-60 did deliver four offers, and R5 denied them. The denial ledger
+is the authority here, not the manifest — `docs/sound-denials-outstanding.md`
+carries the open row.
+
 ---
 
 ## 2. `matchEnd` — *"none of these sound like match end and we need separate ones for winning and losing"*

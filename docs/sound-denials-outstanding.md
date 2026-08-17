@@ -182,7 +182,7 @@ dates, and the older one (R4) was not withdrawn by the newer.
 | `pressTick` | R5 | **revoice — done** (a0-67, back into the ratified glass) |
 | `shotImpact` | R5 | **superseded — structural** (a0-68): the slot is gone, split into `impactHull`/`impactRock`/`impactShield`/`impactStation`, four offers each |
 | `matchEnd` | R5 | **superseded — structural** (a0-68): the slot is gone, split into `matchWin`/`matchLoss`, four offers each |
-| `spawnPulse` | R5 | **finding — awaiting the developer** (a0-68). The mechanic is live, ratified and effective; the SOUND is unattributable. `docs/sound-structural-notes.md` §1 puts three options up. **No candidates until they rule** |
+| `spawnPulse` | R5 | **finding — awaiting the developer** (a0-68). The mechanic is live, ratified and effective; the SOUND is unattributable. `docs/sound-structural-notes.md` §1 puts three options up. **No candidates until they rule** — and note the board still shows a0-60's `d`-`g` as live offers: they carry this verdict, so `a`-`g` are all spent and the next set starts at `h` |
 | `rejectBuzz` | R5 | **revoice — done** (a0-68, `h`-`k`). Denied the same evening as the other nineteen and left out of both a0-67's brief and a0-68's original scope; `denied_without_work` caught it |
 
 Every row above stays in this file under the rule at the bottom: a row leaves only
