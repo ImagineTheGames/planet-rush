@@ -53,8 +53,8 @@ import type {
   Transport,
 } from './transport';
 import { WebSocketTransport } from './websocket-transport';
-import type { WebSocketTransportConfig } from './websocket-transport';
-import { probeRoomLiveness } from './allocator-client';
+import type { TicketRefresh, WebSocketTransportConfig } from './websocket-transport';
+import { joinRoom, probeRoomLiveness } from './allocator-client';
 import type { AllocatorClientConfig, ResolvedConnection } from './allocator-client';
 
 /** What the game loop needs from the network, and nothing more. */
@@ -202,6 +202,8 @@ const OFFLINE_LINK: LinkStatus = {
   cause: null,
   silentMs: 0,
   graceRemainingMs: 0,
+  heldForMatch: false,
+  refusal: null,
   attempts: 0,
   manualRedial: 'none',
   ending: null,
@@ -455,7 +457,7 @@ export class TransportSession implements MatchSession {
   pollLink(now: number = this.clock()): LinkStatus {
     const watch = this.watch;
     if (!watch) return OFFLINE_LINK;
-    watch.transportState(this.transport.state, now, this.closeReason);
+    watch.transportState(this.transport.state, now, this.closeReason, this.rejectReason);
     // Size the silence limit from the wire's own round trip, not from a constant:
     // a satellite link deserves more patience than a LAN (`./link-loss`).
     watch.setRtt(this.networkPingMs);
@@ -682,6 +684,15 @@ export class TransportSession implements MatchSession {
         // predicted world around it: predicting the wrong ship would mispredict
         // every input this client ever sends, and reconcile forever.
         if (message.you !== undefined) this.player = message.you;
+        // **The match is live, so the seat is this player's until it ends**
+        // (a0-72). Said here because this frame is exactly the server-side event
+        // that starts the hold (`server/room.ts` — a drop from a `'live'` room is
+        // held for the life of the match), so the watchdog's rule and the room's
+        // rule change over on the same message rather than on two clocks that
+        // could disagree. From here the overlay stops counting a window down and
+        // stops ending a match on its own arithmetic (`./link-loss`
+        // `holdForMatch`); `matchEnd` retires the watch and takes it back.
+        this.watch?.holdForMatch();
         // RUSH! (or a reclaim's replay) re-bases the clock: the server names the
         // tick to predict from, and nothing this client sent before it is on that
         // timeline (`beginPredicting`).
@@ -1025,20 +1036,41 @@ export function createOnlineSession(config: OnlineSessionConfig): OnlineSession 
  *   • a room-liveness **probe**, bound to *this resolved room* — the code the
  *     allocator minted for an allocate, not whatever the caller typed — so a
  *     reconnect asks about the right room and can tell "the room ended" (stop)
- *     from "my connection dropped" (keep trying) (`./reconnect`).
+ *     from "my connection dropped" (keep trying) (`./reconnect`);
+ *   • a **ticket re-mint** for the same room (a0-72), called before every dial
+ *     that follows a drop.
  *
- * Binding the probe to the wrong room is the one easy mistake here (a freshly
+ * The re-mint is the fix for the developer's phone. A ticket lives 30 seconds
+ * (`allocator/allocator.ts` `DEFAULT_TICKET_TTL_MS`) and the one signed for the
+ * first dial used to be re-presented for the rest of the session, so a screen that
+ * blanked for longer than half a minute came back holding a pass that had expired
+ * while its owner was away — and was told `bad-ticket`, with the seat still held
+ * and the match still running. `POST /rooms/:code/join` is the allocator verb that
+ * answers exactly this ("which Machine hosts this room, and here is a current pass
+ * for it"), and its 404 is the same "the room has ended" the probe reads, arriving
+ * on the same round trip.
+ *
+ * Binding either call to the wrong room is the one easy mistake here (a freshly
  * minted code is not the code the player entered), which is exactly why this
  * lives in one tested place instead of at each call site. Without an allocator
- * there is no ticket and no probe — the direct-connect path passes neither and is
- * untouched.
+ * there is no ticket, no probe and no re-mint — the direct-connect path passes
+ * none of them and is untouched.
  */
 export function allocatorTransport(
   connection: ResolvedConnection,
   client: AllocatorClientConfig,
-): Pick<WebSocketTransportConfig, 'ticket' | 'checkRoomAlive'> {
+): Pick<WebSocketTransportConfig, 'ticket' | 'checkRoomAlive' | 'refreshTicket'> {
   return {
     ticket: connection.ticket,
     checkRoomAlive: () => probeRoomLiveness(client, connection.room),
+    refreshTicket: async (): Promise<TicketRefresh> => {
+      const result = await joinRoom(client, connection.room);
+      if (result.ok) return { ok: true, ticket: result.connection.ticket };
+      // 404 is the allocator saying no live Machine hosts the code — the room has
+      // ended. Every other failure (`no-capacity`, `bad-response`, `network`) is
+      // the *allocator* being unavailable, which says nothing about the room, so
+      // the dial still goes out on the pass we hold.
+      return { ok: false, roomGone: result.reason === 'not-found' };
+    },
   };
 }

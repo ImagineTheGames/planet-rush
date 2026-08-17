@@ -1,0 +1,188 @@
+{
+  "probe": "a0-72 background-and-return",
+  "label": "after-match-over",
+  "awayMs": 35000,
+  "capturedAt": "2026-08-17T20:00:25.182Z",
+  "allocate": {
+    "room": "KFKW",
+    "machine": "4d891e33b27a95",
+    "expiresAt": 1786996855184,
+    "expiresInMs": 29998
+  },
+  "stamped": {
+    "seat": 0,
+    "banked": 42,
+    "track": "power",
+    "tier": 3
+  },
+  "suspendedAt": 243,
+  "endedWhileAway": true,
+  "returnedAfterMs": 35020,
+  "ticketAgeAtReturnMs": 35266,
+  "ticketExpiredOnReturn": true,
+  "frames": [
+    {
+      "at": 5,
+      "type": "welcome"
+    },
+    {
+      "at": 5,
+      "type": "lobbyState"
+    },
+    {
+      "at": 5,
+      "type": "lobbyState"
+    },
+    {
+      "at": 21,
+      "type": "lobbyState"
+    },
+    {
+      "at": 226,
+      "type": "matchStart"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "entityEvent"
+    },
+    {
+      "at": 226,
+      "type": "economy"
+    },
+    {
+      "at": 228,
+      "type": "snapshot"
+    },
+    {
+      "at": 35266,
+      "type": "joinError",
+      "detail": {
+        "reason": "match-over"
+      }
+    }
+  ],
+  "refusal": {
+    "closeReason": "join-rejected",
+    "rejectReason": "match-over",
+    "transportState": "closed"
+  },
+  "link": {
+    "phase": "expired",
+    "cause": "socket",
+    "ending": "join-rejected",
+    "attempts": 0
+  },
+  "overlay": {
+    "title": "MATCH OVER — it finished while you were away",
+    "detail": "Your seat was held the whole time the match ran — the match is what ended, not your window.",
+    "failed": true
+  },
+  "trace": {
+    "title": "REFUSED: match-over — that match has finished",
+    "machine": "4d891e33",
+    "lines": [
+      "allocating ALLOCATING ROOM…",
+      "ticketed   ROOM KFKW · TICKET SIGNED",
+      "dialing    DIALING MACHINE 4d891e33…",
+      "joined     JOINED · SEAT 1",
+      "refused    REFUSED: match-over — that match has finished"
+    ]
+  },
+  "seat": {
+    "roomStillHosted": true,
+    "matchPhase": "ended",
+    "botFlyingIt": true,
+    "pendingReclaim": true
+  },
+  "wallet": {
+    "banked": 40,
+    "tier": 3,
+    "clientBanked": 3,
+    "clientTier": 0,
+    "welcomes": 1
+  }
+}

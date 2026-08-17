@@ -448,8 +448,14 @@ export function refusalGloss(reason: string): string {
   switch (reason) {
     case 'bad-ticket':
       // The M10 failure, named the way the fix is named: the upgrade landed on a
-      // Machine that does not host this room and was not handed on.
+      // Machine that does not host this room and was not handed on. Since a0-72 it
+      // is *only* that: a lapsed pass is no longer refused for a returning owner
+      // (`server/match-server.ts` `admitsJoin`), so this gloss no longer stands in
+      // front of an expiry it was never true of — which is exactly what it did on
+      // the developer's phone.
       return 'machine mismatch';
+    case 'match-over':
+      return 'that match has finished';
     case 'bad-room-code':
       return 'that code is not a room code';
     case 'room-full':
@@ -459,7 +465,9 @@ export function refusalGloss(reason: string): string {
     case 'reclaim-unknown':
       return 'that match has ended';
     case 'reclaim-expired':
-      return 'your reconnect window ran out';
+      // Since a0-72 a running match has no window to run out of, so what is left
+      // here is the seat a player gave up themselves (`server/room.ts` `abandon`).
+      return 'you left this match';
     case 'reclaim-denied':
       return 'that seat is not yours';
     default:

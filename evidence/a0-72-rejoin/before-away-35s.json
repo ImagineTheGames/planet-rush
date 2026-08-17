@@ -1,0 +1,187 @@
+{
+  "probe": "a0-72 background-and-return",
+  "label": "before-away-35s",
+  "awayMs": 35000,
+  "capturedAt": "2026-08-17T19:28:30.210Z",
+  "allocate": {
+    "room": "KFKW",
+    "machine": "4d891e33b27a95",
+    "expiresAt": 1786994940211,
+    "expiresInMs": 29998
+  },
+  "stamped": {
+    "seat": 0,
+    "banked": 42,
+    "track": "power",
+    "tier": 3
+  },
+  "suspendedAt": 242,
+  "returnedAfterMs": 34998,
+  "ticketAgeAtReturnMs": 35243,
+  "ticketExpiredOnReturn": true,
+  "frames": [
+    {
+      "at": 6,
+      "type": "welcome"
+    },
+    {
+      "at": 6,
+      "type": "lobbyState"
+    },
+    {
+      "at": 6,
+      "type": "lobbyState"
+    },
+    {
+      "at": 21,
+      "type": "lobbyState"
+    },
+    {
+      "at": 224,
+      "type": "matchStart"
+    },
+    {
+      "at": 224,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "economy"
+    },
+    {
+      "at": 226,
+      "type": "snapshot"
+    },
+    {
+      "at": 35242,
+      "type": "joinError",
+      "detail": {
+        "reason": "bad-ticket"
+      }
+    }
+  ],
+  "refusal": {
+    "closeReason": "join-rejected",
+    "rejectReason": "bad-ticket",
+    "transportState": "closed"
+  },
+  "link": {
+    "phase": "expired",
+    "cause": "socket",
+    "ending": "join-rejected",
+    "attempts": 0
+  },
+  "overlay": {
+    "title": "REFUSED — the server would not take you back",
+    "detail": "Nothing left to reclaim — the reconnect window closed while you were away.",
+    "failed": true
+  },
+  "trace": {
+    "title": "REFUSED: bad-ticket — machine mismatch",
+    "machine": "4d891e33",
+    "lines": [
+      "allocating ALLOCATING ROOM…",
+      "ticketed   ROOM KFKW · TICKET SIGNED",
+      "dialing    DIALING MACHINE 4d891e33…",
+      "joined     JOINED · SEAT 1",
+      "refused    REFUSED: bad-ticket — machine mismatch"
+    ]
+  },
+  "seat": {
+    "roomStillHosted": true,
+    "matchPhase": "live",
+    "botFlyingIt": true,
+    "pendingReclaim": true
+  },
+  "wallet": {
+    "banked": 40,
+    "tier": 3,
+    "clientBanked": 3,
+    "clientTier": 0,
+    "welcomes": 1
+  }
+}

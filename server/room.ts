@@ -20,17 +20,31 @@
  *  1. A player's socket drops mid-match. Their ship is *not* removed — a bot
  *     takes over the controls immediately, so the match keeps its shape and the
  *     room does not stall. Everyone is told (`playerSubstituted`).
- *  2. For {@link DEFAULT_GRACE_MS} (~60 s, TUNABLE) that slot is held. The
- *     player rejoins by room code, presents the reclaim token their `welcome`
- *     gave them, and takes the controls back: same ship, same hull, same cargo,
- *     same banked ore, same upgrades — because the ship was never touched, only
- *     the hands on it changed (`playerReclaimed`).
- *  3. If the window closes first, the bot keeps the seat for the rest of the
- *     match and the token stops working.
+ *  2. The slot is **held for as long as the match runs** ({@link HELD_FOR_MATCH},
+ *     a0-72). The player rejoins by room code, presents the reclaim token their
+ *     `welcome` gave them, and takes the controls back: same ship, same hull,
+ *     same cargo, same banked ore, same upgrades — because the ship was never
+ *     touched, only the hands on it changed (`playerReclaimed`).
+ *  3. The seat is released when the **match ends**, or the instant the player
+ *     says ABANDON — the two cases where there is genuinely nothing to come back
+ *     to. Not on a clock.
  *
- * This is written for mobile play, where a screen lock, an app backgrounding, or
- * a cellular hand-off is routine rather than exceptional (GDD §4.2, mobile
- * amendment).
+ * **Why the clock went away (a0-72).** Step 2 used to read *"for
+ * {@link DEFAULT_GRACE_MS} (~60 s, TUNABLE)"*, and the developer, playing online
+ * on a phone, watched that window refuse them:
+ *
+ *   *"on mobile i got disconnected because the screen went black, and when i went
+ *   back i saw refused — the server would not take you back… that doesnt feel
+ *   right to me, i should be able to join back if the match is still on-going no
+ *   matter what"*
+ *
+ * The last sentence is the ruling, and it is stronger than the number it replaces:
+ * while the match runs and the seat is its owner's, they get back in. **A phone
+ * backgrounding is the ordinary case, not an edge case** — a screen blanking, a
+ * call arriving, a tab being evicted are how mobile sessions normally pause, and
+ * any window measured in tens of seconds refuses a returning player routinely.
+ * `graceMs` survives for the case a running match cannot cover (see
+ * {@link DEFAULT_GRACE_MS}).
  */
 
 import type { Action, PlayerId } from '@shared/types';
@@ -129,8 +143,33 @@ export interface ServerSocket {
 // Tunables
 // ---------------------------------------------------------------------------
 
-/** The reconnect-grace window (GDD §4.2: "~60 seconds", TUNABLE). */
+/**
+ * The reconnect-grace window (GDD §4.2: "~60 seconds", TUNABLE) — **for a seat
+ * whose match is not running**.
+ *
+ * Since a0-72 a mid-match drop is not on a clock at all ({@link HELD_FOR_MATCH}),
+ * so this no longer governs the case it was written for. What it governs now is
+ * **how long a finished room lingers to explain itself**: when the match ends, the
+ * seats it was holding are given this window instead of the match's life, so a
+ * player returning a few seconds later gets `'match-over'` — *your match finished*
+ * — rather than a swept room's vaguer `'reclaim-unknown'`. Past it the room is
+ * garbage and `MatchServer.update` collects it.
+ */
 export const DEFAULT_GRACE_MS = 60_000;
+
+/**
+ * **The seat is its owner's for as long as the match runs** (a0-72) — the value a
+ * mid-match drop writes to {@link Slot.graceUntil}, in place of a deadline.
+ *
+ * Infinity rather than a large number, and that is deliberate: every test this
+ * field is read by is a comparison (`graceUntil < nowMs` is expiry, `>= 0` is
+ * "somebody may still come back"), and infinity answers all of them correctly and
+ * for good, where a large constant is a deadline somebody eventually sails past on
+ * a long match. It never serialises — the wire carries
+ * `PlayerSubstitutedMessage.heldForMatch`, a boolean, precisely so a JSON encoder
+ * is never handed this.
+ */
+export const HELD_FOR_MATCH = Number.POSITIVE_INFINITY;
 
 /** Snapshot every 2nd sim tick = 30 Hz, the rate the day-0 spike decided
  *  (docs/netcode-spike.md). */
@@ -200,6 +239,17 @@ export type JoinRejection =
   | 'reclaim-unknown'
   | 'reclaim-expired'
   | 'reclaim-denied'
+  /**
+   * **The match this seat belonged to is over** (a0-72). The room is still here —
+   * its summary screen is up, or it is a beat away from being swept — but the
+   * thing the player is asking to come back to has finished.
+   *
+   * Its own word because it is the one refusal the a0-72 ruling leaves standing,
+   * and the ruling is precisely that the *other* refusals were lies: a player told
+   * "your reconnect window ran out" when their window never ran out and their match
+   * simply ended is being told the wrong thing about their own game.
+   */
+  | 'match-over'
   /**
    * The room named by a **join**-intent ticket is not on this Machine (a0-26
    * Milestone A). The player asked for a room that has ended — a code whose
@@ -629,16 +679,32 @@ export class MatchRoom {
     return this.slots.filter((s) => s.socket === null && this.seatStates[s.player] === 'open').length;
   }
 
-  /** True while somebody may still come back to a held seat (GDD §4.2). */
+  /** True while somebody may still come back to a held seat (GDD §4.2) — which,
+   *  since a0-72, is every dropped seat for the whole of a running match. It is
+   *  what keeps `MatchServer.update` from sweeping the room out from under a
+   *  player who is on their way back. */
   get hasPendingReclaim(): boolean {
     return this.slots.some((s) => s.graceUntil >= 0);
   }
 
-  /** Seconds left on a slot's reconnect window, or 0 when it holds no seat. */
+  /**
+   * Seconds left on a slot's reconnect window, or 0 when it holds no seat.
+   *
+   * `Infinity` for a seat held for the life of the match ({@link HELD_FOR_MATCH}),
+   * which is every mid-match drop since a0-72 — the honest answer to "how long have
+   * I got?" when the answer is "as long as the match runs". Callers that want the
+   * *fact* rather than the number should read {@link seatHeldForMatch}.
+   */
   graceRemaining(player: PlayerId, nowMs: number): number {
     const slot = this.slots[player];
     if (!slot || slot.graceUntil < 0) return 0;
     return Math.max(0, (slot.graceUntil - nowMs) / 1000);
+  }
+
+  /** True when this seat is being held for its owner for as long as the match runs
+   *  (a0-72) — as against a finite window, or no hold at all. */
+  seatHeldForMatch(player: PlayerId): boolean {
+    return this.slots[player]?.graceUntil === HELD_FOR_MATCH;
   }
 
   /** The public lobby view (GDD §2.1; player colors are the slot index, §5.2). */
@@ -703,6 +769,7 @@ export class MatchRoom {
   ): JoinOutcome {
     if (request.reclaim !== undefined) return this.reclaim(socket, request, nowMs);
 
+    if (this.phase === 'ended') return { ok: false, reason: 'match-over' };
     if (this.phase !== 'lobby') return { ok: false, reason: 'match-live' };
     // The lowest seat that is free AND still a seat: a chair the host shut is not
     // one a joiner may sit in (GDD §2.1 — closed is "excluded from the match
@@ -730,8 +797,14 @@ export class MatchRoom {
   ): JoinOutcome {
     const slot = this.slots[request.reclaim as number];
     if (!slot) return { ok: false, reason: 'reclaim-unknown' };
-    // A seat nobody is holding is not reclaimable: either the window closed and
-    // the bot owns it now, or that player never dropped in the first place.
+    // **The one refusal that survives a0-72**, and it is said in its own words
+    // rather than borrowing the window's. A seat is its owner's while the match
+    // runs; when the match is over there is nothing to fly back to, and telling a
+    // player their "reconnect window ran out" would be a second untruth on top of
+    // the first — their window never ran out, their match finished.
+    if (this.phase === 'ended') return { ok: false, reason: 'match-over' };
+    // A seat nobody is holding is not reclaimable: either the player is still in it
+    // (they never dropped), or they said ABANDON and gave it up.
     if (slot.graceUntil < 0) {
       return { ok: false, reason: slot.socket ? 'reclaim-denied' : 'reclaim-expired' };
     }
@@ -793,11 +866,18 @@ export class MatchRoom {
 
   /**
    * A connection went away. In the lobby the seat simply frees. Mid-match it is
-   * *held*: a bot takes the controls at once so the match keeps its shape, and
-   * the grace clock starts (GDD §4.2).
+   * *held*: a bot takes the controls at once so the match keeps its shape, and the
+   * seat stays its owner's **for as long as the match runs** (a0-72; GDD §4.2).
+   *
+   * `nowMs` is no longer read — a held seat has no deadline to compute — and is
+   * kept so every caller (`server/match-server.ts` `ServerConnection.close`, and
+   * every test) still hands this method the clock it always did. A room whose
+   * match has *ended* takes the `phase !== 'live'` branch in {@link vacate} and
+   * frees the seat outright, exactly as the lobby does.
    */
   disconnect(player: PlayerId, nowMs: number): void {
-    this.vacate(player, nowMs + this.graceMs);
+    void nowMs;
+    this.vacate(player, HELD_FOR_MATCH);
   }
 
   /**
@@ -819,8 +899,9 @@ export class MatchRoom {
 
   /**
    * The seat loses its connection, for whichever of the two reasons. `graceUntil`
-   * is the whole difference: a wall-clock deadline for a drop (the player may be
-   * back), `-1` for a stated leave (they will not be).
+   * is the whole difference: {@link HELD_FOR_MATCH} for a drop (the player may be
+   * back, and the seat waits for them as long as the match lasts), `-1` for a
+   * stated leave (they will not be).
    */
   private vacate(player: PlayerId, graceUntil: number): void {
     const slot = this.slots[player];
@@ -850,7 +931,13 @@ export class MatchRoom {
     this.broadcast({
       type: 'playerSubstituted',
       player: slot.player,
-      graceSeconds: graceUntil < 0 ? 0 : this.graceMs / 1000,
+      // Seconds are what a peer's roster counts down, and a held seat has none to
+      // count: it is held until the match ends, which is a fact rather than a
+      // duration ({@link HELD_FOR_MATCH}). `heldForMatch` says which of the two
+      // this is, so `graceSeconds: 0` can keep meaning the one thing it has always
+      // meant — there is no window, this player said ABANDON.
+      graceSeconds: 0,
+      ...(graceUntil < 0 ? {} : { heldForMatch: true }),
     });
     this.broadcastLobby();
   }
@@ -1284,6 +1371,25 @@ export class MatchRoom {
     if (isOver(world)) {
       this.phase = 'ended';
       this.broadcast({ type: 'matchEnd', winner: world.match.winner, tick: world.tick });
+      // **The unbounded hold ends here, and becomes a bounded one** (a0-72).
+      //
+      // A mid-match drop is held for the life of the match ({@link HELD_FOR_MATCH}),
+      // and this is where that life ends — so without this line the hold would be
+      // unbounded, the room would never satisfy `MatchServer.update`'s sweep
+      // (`humanCount === 0 && !hasPendingReclaim`), and a Machine whose players had
+      // all walked away would never idle down again.
+      //
+      // What replaces it is {@link DEFAULT_GRACE_MS}, doing the one job a window is
+      // still right for: **staying alive long enough to answer honestly**. A player
+      // who comes back a few seconds after the last station fell is owed
+      // `match-over` — *your match finished* — and that answer only exists while the
+      // room does. Past it the room is swept and the same rejoin gets the vaguer
+      // `reclaim-unknown`, which is true but says less. The knob is therefore how
+      // long a *finished* room lingers to explain itself, and nothing else.
+      for (const slot of this.slots) {
+        if (slot.graceUntil >= 0) slot.graceUntil = this.lastUpdateMs + this.graceMs;
+      }
+      this.broadcastLobby();
     }
   }
 
@@ -1637,8 +1743,10 @@ export class MatchRoom {
     }
   }
 
-  /** The window closed: the bot keeps the seat for the rest of the match, and
-   *  the token stops working. */
+  /** The hold ends: the bot keeps the seat, and the token stops working. Since
+   *  a0-72 a *live* match never reaches this for a dropped seat — the two callers
+   *  left are the finite window on a room whose match is not running, and the
+   *  release at `matchEnd` ({@link step}). */
   private expireGrace(slot: Slot): void {
     slot.graceUntil = -1;
     slot.token = null;

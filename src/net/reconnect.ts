@@ -29,7 +29,8 @@ import type { RoomCode } from './transport';
  * What the allocator last told us about the room behind a dead socket.
  *
  *   • `'live'`    — the allocator resolved the code to a Machine: the room is up,
- *                   a bot has our seat, and it is ours to reclaim inside the window.
+ *                   a bot has our seat, and it is ours to reclaim for as long as
+ *                   the match runs (a0-72 — no longer "inside the window").
  *   • `'gone'`    — the allocator answered 404: no Machine hosts the code. The
  *                   room has ended; there is nothing to reclaim, ever.
  *   • `'unknown'` — we never asked, or the ask *itself* failed (the allocator was
@@ -39,10 +40,18 @@ import type { RoomCode } from './transport';
  */
 export type RoomLiveness = 'live' | 'gone' | 'unknown';
 
-/** The reconnect-grace window (GDD §4.2, ~60 s TUNABLE). The seat is the player's
- *  to reclaim until this elapses; past it a bot owns it for the rest of the match.
- *  Mirrors `RECONNECT_WINDOW_MS` in `./websocket-transport`, restated here so the
- *  pure decision layer needs no import from the transport that consumes it. */
+/**
+ * The reconnect-grace window (GDD §4.2, ~60 s TUNABLE) — **the fallback, since
+ * a0-72, for a room whose liveness we could not establish.**
+ *
+ * When the allocator answers, its answer decides ({@link decideReconnect}): a live
+ * room is retried however long the player was away, because the seat is held for
+ * the life of the match. This number is what is left when nobody could be asked —
+ * the direct-connect path with no probe wired, or an allocator that is down.
+ *
+ * Mirrors `RECONNECT_WINDOW_MS` in `./websocket-transport`, restated here so the
+ * pure decision layer needs no import from the transport that consumes it.
+ */
 export const DEFAULT_GRACE_WINDOW_MS = 60_000;
 
 /** Why we stopped trying — the half of the verdict a screen turns into words.
@@ -69,15 +78,28 @@ export interface ReconnectContext {
 }
 
 /**
- * The verdict. Order matters: a dead room short-circuits *before* the clock,
- * because "no Machine hosts this code" is true now and in fifty seconds alike —
- * waiting out the window against a room that has ended is the exact bug Task 9b
- * removes. Only once the room might still be there does the grace window decide,
- * and at the boundary the window is *closed* (`>=`), matching the transport that
- * stops redialling into a match a bot now owns (`./websocket-transport`).
+ * The verdict. Order matters, and since a0-72 the *room* decides before the clock
+ * in both directions:
+ *
+ *  1. **`'gone'` stops, always.** "No Machine hosts this code" is true now and in
+ *     fifty seconds alike — waiting out a window against a room that has ended is
+ *     the bug Task 9b removed.
+ *  2. **`'live'` retries, always** — the a0-72 ruling, in one line: *"i should be
+ *     able to join back if the match is still on-going no matter what"*. A client
+ *     that gave up on the clock while the allocator was telling it the room was
+ *     right there would be refusing a seat the server is holding. The seat is held
+ *     for the life of the match (`server/room.ts` `HELD_FOR_MATCH`), so the honest
+ *     client-side rule is the same one: keep asking while there is something to ask.
+ *     This does not loop forever — a room that will not have us answers `joinError`
+ *     and the transport ends terminally on the server's own word
+ *     (`./websocket-transport` `rejectJoin`), which is a truthful ending rather
+ *     than an arithmetic one.
+ *  3. **`'unknown'` falls back to the window.** We could not ask, so we keep the
+ *     old conservative rule; at the boundary the window is *closed* (`>=`).
  */
 export function decideReconnect(ctx: ReconnectContext): ReconnectDecision {
   if (ctx.roomLiveness === 'gone') return { action: 'stop', reason: 'room-gone' };
+  if (ctx.roomLiveness === 'live') return { action: 'retry' };
   if (ctx.elapsedMs >= ctx.graceWindowMs) return { action: 'stop', reason: 'grace-elapsed' };
   return { action: 'retry' };
 }

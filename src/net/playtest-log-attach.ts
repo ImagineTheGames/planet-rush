@@ -193,6 +193,12 @@ export function attachSessionLog(config: AttachConfig): SessionLogHandle {
       case 'playerSubstituted':
         log.recordMatch('playerSubstituted', {
           player: message.player,
+          // Both, because they answer different questions and the log is read
+          // after the fact: `heldForMatch` is whether the seat had a deadline at
+          // all (a0-72 — a mid-match drop does not), `graceSeconds` is the number
+          // when there was one. A paste that carried only the number would say
+          // `0` for a seat held for ten more minutes.
+          heldForMatch: message.heldForMatch === true,
           graceSeconds: message.graceSeconds,
           isLocal: message.player === session.you,
         });

@@ -1,0 +1,328 @@
+{
+  "probe": "a0-72 background-and-return",
+  "label": "after-away-35s",
+  "awayMs": 35000,
+  "capturedAt": "2026-08-17T19:56:31.970Z",
+  "allocate": {
+    "room": "KFKW",
+    "machine": "4d891e33b27a95",
+    "expiresAt": 1786996621971,
+    "expiresInMs": 29996
+  },
+  "stamped": {
+    "seat": 0,
+    "banked": 42,
+    "track": "power",
+    "tier": 3
+  },
+  "suspendedAt": 241,
+  "returnedAfterMs": 35003,
+  "ticketAgeAtReturnMs": 35250,
+  "ticketExpiredOnReturn": true,
+  "frames": [
+    {
+      "at": 7,
+      "type": "welcome"
+    },
+    {
+      "at": 7,
+      "type": "lobbyState"
+    },
+    {
+      "at": 8,
+      "type": "lobbyState"
+    },
+    {
+      "at": 21,
+      "type": "lobbyState"
+    },
+    {
+      "at": 225,
+      "type": "matchStart"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "entityEvent"
+    },
+    {
+      "at": 225,
+      "type": "economy"
+    },
+    {
+      "at": 227,
+      "type": "snapshot"
+    },
+    {
+      "at": 35248,
+      "type": "welcome"
+    },
+    {
+      "at": 35248,
+      "type": "matchStart"
+    },
+    {
+      "at": 35248,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35248,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35248,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35248,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35248,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35248,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35248,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35248,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35248,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35248,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35248,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35248,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35248,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35248,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35248,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35248,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35248,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35248,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35248,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35248,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35248,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35248,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35248,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35248,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35249,
+      "type": "snapshot"
+    },
+    {
+      "at": 35249,
+      "type": "playerReclaimed"
+    },
+    {
+      "at": 35249,
+      "type": "lobbyState"
+    },
+    {
+      "at": 35274,
+      "type": "snapshot"
+    },
+    {
+      "at": 35307,
+      "type": "snapshot"
+    },
+    {
+      "at": 35339,
+      "type": "snapshot"
+    },
+    {
+      "at": 35339,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35339,
+      "type": "entityEvent"
+    },
+    {
+      "at": 35372,
+      "type": "snapshot"
+    },
+    {
+      "at": 35405,
+      "type": "snapshot"
+    },
+    {
+      "at": 35437,
+      "type": "snapshot"
+    }
+  ],
+  "refusal": {
+    "closeReason": null,
+    "rejectReason": null,
+    "transportState": "open"
+  },
+  "link": {
+    "phase": "live",
+    "cause": null,
+    "ending": null,
+    "attempts": 0
+  },
+  "overlay": {
+    "title": "",
+    "detail": "",
+    "failed": false
+  },
+  "trace": {
+    "title": "JOINED · SEAT 1",
+    "machine": "4d891e33",
+    "lines": [
+      "allocating ALLOCATING ROOM…",
+      "ticketed   ROOM KFKW · TICKET SIGNED",
+      "dialing    DIALING MACHINE 4d891e33…",
+      "joined     JOINED · SEAT 1",
+      "joined     JOINED · SEAT 1"
+    ]
+  },
+  "seat": {
+    "roomStillHosted": true,
+    "matchPhase": "live",
+    "botFlyingIt": false,
+    "pendingReclaim": false
+  },
+  "wallet": {
+    "banked": 40,
+    "tier": 3,
+    "clientBanked": 40,
+    "clientTier": 3,
+    "welcomes": 2
+  }
+}

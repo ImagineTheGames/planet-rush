@@ -628,12 +628,31 @@ export interface EntityEventMessage {
   data: unknown;
 }
 
-/** A player dropped; a bot has taken their slot for the grace window (GDD §4.2). */
+/** A player dropped; a bot has taken their slot until they come back (GDD §4.2). */
 export interface PlayerSubstitutedMessage {
   type: 'playerSubstituted';
   player: PlayerId;
-  /** Seconds remaining to rejoin by room code and reclaim the ship. */
+  /**
+   * Seconds remaining to rejoin by room code and reclaim the ship — a countdown a
+   * peer's roster can run. `0` means there is no window at all: this player pressed
+   * ABANDON and gave the seat up (`server/room.ts` `abandon`).
+   *
+   * **Read {@link heldForMatch} first** (a0-72): when that is true this number is
+   * not a countdown and not a deadline, because the seat is held for as long as the
+   * match runs. It is `0` there too, and deliberately — a number is the wrong shape
+   * for "no deadline", and inventing a large one would be a deadline somebody
+   * eventually reaches on a long match.
+   */
   graceSeconds: number;
+  /**
+   * **The seat is its owner's until the match ends** (a0-72) — the ordinary case
+   * for a mid-match drop, and the shape the developer's ruling put on this channel:
+   * *"i should be able to join back if the match is still on-going no matter what"*.
+   *
+   * Absent for a stated leave (nothing is held) and from any server older than
+   * a0-72, where a reader falls back to {@link graceSeconds} exactly as before.
+   */
+  heldForMatch?: boolean;
 }
 
 /** A dropped player rejoined within grace and reclaimed their ship + upgrades. */

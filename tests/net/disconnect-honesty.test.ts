@@ -176,7 +176,12 @@ describe('a silently-killed socket (the backgrounded tab)', () => {
     const notice = linkNotice(alice.link);
     expect(notice.visible).toBe(true);
     expect(notice.title + notice.detail).toContain('no server data for');
-    expect(notice.grace).toMatch(/^\d+s$/);
+    // No countdown, and that is the a0-72 ruling on this card: the match is running
+    // and the seat is held for the life of it, so there is no number of seconds that
+    // would be true here (`src/net/link-loss` `holdForMatch`). What the card offers
+    // instead is the fact.
+    expect(notice.grace).toBe('');
+    expect(notice.detail).toContain('for as long as the match runs');
 
     // --- RECONNECT: the redial the transport would never have made on its own -
     if (alice.link.phase === 'lost') expect(alice.reconnect(clock)).toBe(true);

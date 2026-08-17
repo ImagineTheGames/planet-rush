@@ -324,9 +324,27 @@ describe('match events', () => {
     session.emit({ type: 'playerSubstituted', player: 5, graceSeconds: 47 });
 
     const events = log.events.filter((e) => e.kind === 'match');
-    expect(events[0]!.data).toEqual({ player: 2, graceSeconds: 60, isLocal: true });
+    expect(events[0]!.data).toEqual({ player: 2, heldForMatch: false, graceSeconds: 60, isLocal: true });
     expect(events[1]!.data).toEqual({ player: 2, isLocal: true });
     expect(events[2]!.data!['isLocal']).toBe(false);
+  });
+
+  it('records a mid-match drop as held rather than as a countdown (a0-72)', () => {
+    // The pair that matters when the log is read after the fact: a seat held for
+    // the life of the match has no deadline at all, and a paste carrying only a
+    // number would report `0` for a seat that is being held for ten more minutes.
+    const log = newLog();
+    const session = fakeSession();
+    attachSessionLog({ log, session });
+
+    // Exactly what `server/room.ts` broadcasts for a held seat: the flag, and a
+    // `graceSeconds` that is 0 because a number is the wrong shape for "no
+    // deadline" — not because the window has run out.
+    session.emit({ type: 'playerSubstituted', player: 2, graceSeconds: 0, heldForMatch: true });
+
+    const events = log.events.filter((e) => e.kind === 'match');
+    expect(events[0]!.data!['heldForMatch']).toBe(true);
+    expect(events[0]!.data!['graceSeconds']).toBe(0);
   });
 
   it('marks a matchStart past tick 0 as the reclaim replay it is', () => {
