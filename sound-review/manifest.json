@@ -114,22 +114,29 @@
       "current": "previews/oreCollect/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/oreCollect/d.wav",
-          "character": "flake shear, bright chips off the snap",
-          "params": "src/art/audio/candidates.ts#oreCollect.d"
+          "id": "g",
+          "wav": "previews/oreCollect/g.wav",
+          "character": "a prize: two notes, rising a fifth",
+          "params": "src/art/audio/candidates.ts#oreCollect.g"
         },
         {
-          "id": "e",
-          "wav": "previews/oreCollect/e.wav",
-          "character": "charged intake, an ionised edge",
-          "params": "src/art/audio/candidates.ts#oreCollect.e"
+          "id": "h",
+          "wav": "previews/oreCollect/h.wav",
+          "character": "a handful of chips into the tray",
+          "params": "src/art/audio/candidates.ts#oreCollect.h"
         },
         {
-          "id": "f",
-          "wav": "previews/oreCollect/f.wav",
-          "character": "assay ping, two high bands reading back",
-          "params": "src/art/audio/candidates.ts#oreCollect.f"
+          "id": "i",
+          "wav": "previews/oreCollect/i.wav",
+          "character": "a breath, nothing struck",
+          "params": "src/art/audio/candidates.ts#oreCollect.i"
+        },
+        {
+          "id": "j",
+          "wav": "previews/oreCollect/j.wav",
+          "character": "the sound that ships today (A/B)",
+          "params": "src/art/audio/candidates.ts#oreCollect.j",
+          "anchor": true
         }
       ]
     },
@@ -172,28 +179,29 @@
       "current": "previews/turretFire/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/turretFire/d.wav",
-          "character": "rail contact, dry snap and eddy",
-          "params": "src/art/audio/candidates.ts#turretFire.d"
+          "id": "h",
+          "wav": "previews/turretFire/h.wav",
+          "character": "a report: crack, thump, action",
+          "params": "src/art/audio/candidates.ts#turretFire.h"
         },
         {
-          "id": "e",
-          "wav": "previews/turretFire/e.wav",
-          "character": "compressed vent, body and gas",
-          "params": "src/art/audio/candidates.ts#turretFire.e"
+          "id": "i",
+          "wav": "previews/turretFire/i.wav",
+          "character": "a discharge: beam falling, ion hiss",
+          "params": "src/art/audio/candidates.ts#turretFire.i"
         },
         {
-          "id": "f",
-          "wav": "previews/turretFire/f.wav",
-          "character": "capacitor bloom, damped at once",
-          "params": "src/art/audio/candidates.ts#turretFire.f"
+          "id": "j",
+          "wav": "previews/turretFire/j.wav",
+          "character": "a launch: magnetic snap and weight",
+          "params": "src/art/audio/candidates.ts#turretFire.j"
         },
         {
-          "id": "g",
-          "wav": "previews/turretFire/g.wav",
-          "character": "damped hardware, mechanism only",
-          "params": "src/art/audio/candidates.ts#turretFire.g"
+          "id": "k",
+          "wav": "previews/turretFire/k.wav",
+          "character": "the sound that ships today (A/B)",
+          "params": "src/art/audio/candidates.ts#turretFire.k",
+          "anchor": true
         }
       ]
     },
@@ -236,28 +244,28 @@
       "current": "previews/shieldHit/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/shieldHit/d.wav",
-          "character": "lattice ring, struck and held",
-          "params": "src/art/audio/candidates.ts#shieldHit.d"
+          "id": "h",
+          "wav": "previews/shieldHit/h.wav",
+          "character": "deflection: it skids off, ring spreading",
+          "params": "src/art/audio/candidates.ts#shieldHit.h"
         },
         {
-          "id": "e",
-          "wav": "previews/shieldHit/e.wav",
-          "character": "absorption wash, pressure taken",
-          "params": "src/art/audio/candidates.ts#shieldHit.e"
+          "id": "i",
+          "wav": "previews/shieldHit/i.wav",
+          "character": "absorption: swallowed, a low bloom",
+          "params": "src/art/audio/candidates.ts#shieldHit.i"
         },
         {
-          "id": "f",
-          "wav": "previews/shieldHit/f.wav",
-          "character": "capacitor bloom over the bubble",
-          "params": "src/art/audio/candidates.ts#shieldHit.f"
+          "id": "j",
+          "wav": "previews/shieldHit/j.wav",
+          "character": "arc: sparks over a ringing bubble",
+          "params": "src/art/audio/candidates.ts#shieldHit.j"
         },
         {
-          "id": "g",
-          "wav": "previews/shieldHit/g.wav",
-          "character": "damped tick, the field barely notices",
-          "params": "src/art/audio/candidates.ts#shieldHit.g"
+          "id": "k",
+          "wav": "previews/shieldHit/k.wav",
+          "character": "flex: the surface bends and settles",
+          "params": "src/art/audio/candidates.ts#shieldHit.k"
         }
       ]
     },
@@ -460,28 +468,28 @@
       "current": "previews/thruster/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/thruster/d.wav",
-          "character": "ion wash, fine grain and hiss",
-          "params": "src/art/audio/candidates.ts#thruster.d"
+          "id": "h",
+          "wav": "previews/thruster/h.wav",
+          "character": "breath: air only, no floor",
+          "params": "src/art/audio/candidates.ts#thruster.h"
         },
         {
-          "id": "e",
-          "wav": "previews/thruster/e.wav",
-          "character": "inertial mass, low and pressurised",
-          "params": "src/art/audio/candidates.ts#thruster.e"
+          "id": "i",
+          "wav": "previews/thruster/i.wav",
+          "character": "pressure: felt, not heard",
+          "params": "src/art/audio/candidates.ts#thruster.i"
         },
         {
-          "id": "f",
-          "wav": "previews/thruster/f.wav",
-          "character": "containment hum, two narrow bands",
-          "params": "src/art/audio/candidates.ts#thruster.f"
+          "id": "j",
+          "wav": "previews/thruster/j.wav",
+          "character": "one warm band, nothing to beat",
+          "params": "src/art/audio/candidates.ts#thruster.j"
         },
         {
-          "id": "g",
-          "wav": "previews/thruster/g.wav",
-          "character": "hardware only, a quiet running machine",
-          "params": "src/art/audio/candidates.ts#thruster.g"
+          "id": "k",
+          "wav": "previews/thruster/k.wav",
+          "character": "almost nothing, the floor of the slot",
+          "params": "src/art/audio/candidates.ts#thruster.k"
         }
       ]
     },
@@ -492,28 +500,28 @@
       "current": "previews/buildPlaced/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/buildPlaced/d.wav",
-          "character": "stepper travel into a stop",
-          "params": "src/art/audio/candidates.ts#buildPlaced.d"
+          "id": "h",
+          "wav": "previews/buildPlaced/h.wav",
+          "character": "clamp bites, a drive spins up",
+          "params": "src/art/audio/candidates.ts#buildPlaced.h"
         },
         {
-          "id": "e",
-          "wav": "previews/buildPlaced/e.wav",
-          "character": "vacuum taking up, weight resting",
-          "params": "src/art/audio/candidates.ts#buildPlaced.e"
+          "id": "i",
+          "wav": "previews/buildPlaced/i.wav",
+          "character": "pressure takes, the line still loaded",
+          "params": "src/art/audio/candidates.ts#buildPlaced.i"
         },
         {
-          "id": "f",
-          "wav": "previews/buildPlaced/f.wav",
-          "character": "weld struck and quenched",
-          "params": "src/art/audio/candidates.ts#buildPlaced.f"
+          "id": "j",
+          "wav": "previews/buildPlaced/j.wav",
+          "character": "it seats, then the head starts working",
+          "params": "src/art/audio/candidates.ts#buildPlaced.j"
         },
         {
-          "id": "g",
-          "wav": "previews/buildPlaced/g.wav",
-          "character": "one latch, and that is all",
-          "params": "src/art/audio/candidates.ts#buildPlaced.g"
+          "id": "k",
+          "wav": "previews/buildPlaced/k.wav",
+          "character": "one contact, and a bus comes up",
+          "params": "src/art/audio/candidates.ts#buildPlaced.k"
         }
       ]
     },
@@ -584,64 +592,66 @@
     {
       "id": "bankOre",
       "label": "Bank Ore",
-      "context": "Ore banked into your economy — a drop that settles.",
+      "context": "Ore is deposited into your station's store.",
       "current": "previews/bankOre/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/bankOre/d.wav",
-          "character": "conveyor stop, gravel settling",
-          "params": "src/art/audio/candidates.ts#bankOre.d"
+          "id": "h",
+          "wav": "previews/bankOre/h.wav",
+          "character": "the two notes, with coins under them",
+          "params": "src/art/audio/candidates.ts#bankOre.h"
         },
         {
-          "id": "e",
-          "wav": "previews/bankOre/e.wav",
-          "character": "vault seating, mass coming down",
-          "params": "src/art/audio/candidates.ts#bankOre.e"
+          "id": "i",
+          "wav": "previews/bankOre/i.wav",
+          "character": "counted, then the drawer takes it",
+          "params": "src/art/audio/candidates.ts#bankOre.i"
         },
         {
-          "id": "f",
-          "wav": "previews/bankOre/f.wav",
-          "character": "two bands falling to rest",
-          "params": "src/art/audio/candidates.ts#bankOre.f"
+          "id": "j",
+          "wav": "previews/bankOre/j.wav",
+          "character": "the second note lands in the tray",
+          "params": "src/art/audio/candidates.ts#bankOre.j"
         },
         {
-          "id": "g",
-          "wav": "previews/bankOre/g.wav",
-          "character": "counted, filed, nothing more",
-          "params": "src/art/audio/candidates.ts#bankOre.g"
+          "id": "k",
+          "wav": "previews/bankOre/k.wav",
+          "character": "the sound that ships today (A/B)",
+          "params": "src/art/audio/candidates.ts#bankOre.k",
+          "anchor": true
         }
       ]
     },
     {
       "id": "upgradeBought",
       "label": "Upgrade Bought",
-      "context": "An upgrade purchased — the brightest confirmation in the bank.",
+      "context": "An upgrade is purchased from the wheel.",
       "current": "previews/upgradeBought/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/upgradeBought/d.wav",
-          "character": "three stepper contacts, no shine",
-          "params": "src/art/audio/candidates.ts#upgradeBought.d"
+          "id": "h",
+          "wav": "previews/upgradeBought/h.wav",
+          "character": "the same three notes, thinner",
+          "params": "src/art/audio/candidates.ts#upgradeBought.h"
         },
         {
-          "id": "e",
-          "wav": "previews/upgradeBought/e.wav",
-          "character": "pressure lifting, sub under it",
-          "params": "src/art/audio/candidates.ts#upgradeBought.e"
+          "id": "i",
+          "wav": "previews/upgradeBought/i.wav",
+          "character": "two notes, the triad implied",
+          "params": "src/art/audio/candidates.ts#upgradeBought.i"
         },
         {
-          "id": "f",
-          "wav": "previews/upgradeBought/f.wav",
-          "character": "three welds rising, each quenched",
-          "params": "src/art/audio/candidates.ts#upgradeBought.f"
+          "id": "j",
+          "wav": "previews/upgradeBought/j.wav",
+          "character": "the three notes, receding",
+          "params": "src/art/audio/candidates.ts#upgradeBought.j"
         },
         {
-          "id": "g",
-          "wav": "previews/upgradeBought/g.wav",
-          "character": "up one step, said once",
-          "params": "src/art/audio/candidates.ts#upgradeBought.g"
+          "id": "k",
+          "wav": "previews/upgradeBought/k.wav",
+          "character": "the sound that ships today (A/B)",
+          "params": "src/art/audio/candidates.ts#upgradeBought.k",
+          "anchor": true
         }
       ]
     },
@@ -716,28 +726,28 @@
       "current": "previews/stationDeath/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/stationDeath/d.wav",
-          "character": "the shipped fall, cleanly made",
-          "params": "src/art/audio/candidates.ts#stationDeath.d"
+          "id": "h",
+          "wav": "previews/stationDeath/h.wav",
+          "character": "detonation: a blast front, then the mass",
+          "params": "src/art/audio/candidates.ts#stationDeath.h"
         },
         {
-          "id": "e",
-          "wav": "previews/stationDeath/e.wav",
-          "character": "the structure closing on itself",
-          "params": "src/art/audio/candidates.ts#stationDeath.e"
+          "id": "i",
+          "wav": "previews/stationDeath/i.wav",
+          "character": "breach: a crack, then everything leaving",
+          "params": "src/art/audio/candidates.ts#stationDeath.i"
         },
         {
-          "id": "f",
-          "wav": "previews/stationDeath/f.wav",
-          "character": "one detuned toll, and the room",
-          "params": "src/art/audio/candidates.ts#stationDeath.f"
+          "id": "j",
+          "wav": "previews/stationDeath/j.wav",
+          "character": "blast, and then the structure falls",
+          "params": "src/art/audio/candidates.ts#stationDeath.j"
         },
         {
-          "id": "g",
-          "wav": "previews/stationDeath/g.wav",
-          "character": "the fall alone, nothing answering",
-          "params": "src/art/audio/candidates.ts#stationDeath.g"
+          "id": "k",
+          "wav": "previews/stationDeath/k.wav",
+          "character": "one concussion, and the room",
+          "params": "src/art/audio/candidates.ts#stationDeath.k"
         }
       ]
     },
@@ -780,28 +790,28 @@
       "current": "previews/alarm/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/alarm/d.wav",
-          "character": "klaxon with a tectonic body under it",
-          "params": "src/art/audio/candidates.ts#alarm.d"
+          "id": "h",
+          "wav": "previews/alarm/h.wav",
+          "character": "announcement: two warm horn tones",
+          "params": "src/art/audio/candidates.ts#alarm.h"
         },
         {
-          "id": "e",
-          "wav": "previews/alarm/e.wav",
-          "character": "klaxon driven by air, grain in the tone",
-          "params": "src/art/audio/candidates.ts#alarm.e"
+          "id": "i",
+          "wav": "previews/alarm/i.wav",
+          "character": "pressure horn: tone low, top is breath",
+          "params": "src/art/audio/candidates.ts#alarm.i"
         },
         {
-          "id": "f",
-          "wav": "previews/alarm/f.wav",
-          "character": "klaxon in a hull, bands ringing with it",
-          "params": "src/art/audio/candidates.ts#alarm.f"
+          "id": "j",
+          "wav": "previews/alarm/j.wav",
+          "character": "down a corridor: the notes, and the room",
+          "params": "src/art/audio/candidates.ts#alarm.j"
         },
         {
-          "id": "g",
-          "wav": "previews/alarm/g.wav",
-          "character": "the two notes, loud, and nothing around them",
-          "params": "src/art/audio/candidates.ts#alarm.g"
+          "id": "k",
+          "wav": "previews/alarm/k.wav",
+          "character": "two low pulses, and that is all",
+          "params": "src/art/audio/candidates.ts#alarm.k"
         }
       ]
     },
@@ -841,160 +851,161 @@
     {
       "id": "musicBed",
       "label": "Music Bed — Calm",
-      "context": "Mining / building with no active threat — the calm foundation drone.",
+      "context": "Calm layer of the adaptive soundtrack — loops under mining.",
       "current": "previews/musicBed/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/musicBed/d.wav",
-          "character": "ion field, air with no floor under it",
-          "params": "src/art/audio/candidates.ts#musicBed.d"
+          "id": "h",
+          "wav": "previews/musicBed/h.wav",
+          "character": "an A-minor triad, warm and breathing",
+          "params": "src/art/audio/candidates.ts#musicBed.h"
         },
         {
-          "id": "e",
-          "wav": "previews/musicBed/e.wav",
-          "character": "magnetic mass, two unisons beating",
-          "params": "src/art/audio/candidates.ts#musicBed.e"
+          "id": "i",
+          "wav": "previews/musicBed/i.wav",
+          "character": "root and fifth, open, no third",
+          "params": "src/art/audio/candidates.ts#musicBed.i"
         },
         {
-          "id": "f",
-          "wav": "previews/musicBed/f.wav",
-          "character": "cathedral metal, inharmonic and wide",
-          "params": "src/art/audio/candidates.ts#musicBed.f"
+          "id": "j",
+          "wav": "previews/musicBed/j.wav",
+          "character": "the triad, with one voice an octave up",
+          "params": "src/art/audio/candidates.ts#musicBed.j"
         },
         {
-          "id": "g",
-          "wav": "previews/musicBed/g.wav",
-          "character": "almost nothing, two quiet layers",
-          "params": "src/art/audio/candidates.ts#musicBed.g"
+          "id": "k",
+          "wav": "previews/musicBed/k.wav",
+          "character": "two voices and a sub, barely there",
+          "params": "src/art/audio/candidates.ts#musicBed.k"
         }
       ]
     },
     {
       "id": "musicPulse",
       "label": "Music Pulse — Rising Tension",
-      "context": "Threat detected, tension climbing toward a siege — a heartbeat over a floor.",
+      "context": "Tension layer — fades in as waves rise.",
       "current": "previews/musicPulse/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/musicPulse/d.wav",
-          "character": "ion field with a grain pulse in it",
-          "params": "src/art/audio/candidates.ts#musicPulse.d"
+          "id": "h",
+          "wav": "previews/musicPulse/h.wav",
+          "character": "a bass line: root and fifth, alternating",
+          "params": "src/art/audio/candidates.ts#musicPulse.h"
         },
         {
-          "id": "e",
-          "wav": "previews/musicPulse/e.wav",
-          "character": "magnetic thud, mass under a corner",
-          "params": "src/art/audio/candidates.ts#musicPulse.e"
+          "id": "i",
+          "wav": "previews/musicPulse/i.wav",
+          "character": "the root pulsing under a held third",
+          "params": "src/art/audio/candidates.ts#musicPulse.i"
         },
         {
-          "id": "f",
-          "wav": "previews/musicPulse/f.wav",
-          "character": "two bands tolling in a space",
-          "params": "src/art/audio/candidates.ts#musicPulse.f"
+          "id": "j",
+          "wav": "previews/musicPulse/j.wav",
+          "character": "a two-note rise, A to C and back",
+          "params": "src/art/audio/candidates.ts#musicPulse.j"
         },
         {
-          "id": "g",
-          "wav": "previews/musicPulse/g.wav",
-          "character": "a heartbeat, and no scenery",
-          "params": "src/art/audio/candidates.ts#musicPulse.g"
+          "id": "k",
+          "wav": "previews/musicPulse/k.wav",
+          "character": "a pedal, with the fifth answering once",
+          "params": "src/art/audio/candidates.ts#musicPulse.k"
         }
       ]
     },
     {
       "id": "musicTheme",
       "label": "Music Theme — Siege",
-      "context": "Active combat / base under assault — a short A-minor riff over a pad.",
+      "context": "Full theme — plays during a siege.",
       "current": "previews/musicTheme/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/musicTheme/d.wav",
-          "character": "the riff as ion bursts, no body",
-          "params": "src/art/audio/candidates.ts#musicTheme.d"
+          "id": "h",
+          "wav": "previews/musicTheme/h.wav",
+          "character": "four chords, one a second, no melody",
+          "params": "src/art/audio/candidates.ts#musicTheme.h"
         },
         {
-          "id": "e",
-          "wav": "previews/musicTheme/e.wav",
-          "character": "the riff on magnetic mass, corners closing",
-          "params": "src/art/audio/candidates.ts#musicTheme.e"
+          "id": "i",
+          "wav": "previews/musicTheme/i.wav",
+          "character": "a bass that walks under a held chord",
+          "params": "src/art/audio/candidates.ts#musicTheme.i"
         },
         {
-          "id": "f",
-          "wav": "previews/musicTheme/f.wav",
-          "character": "the riff struck on cathedral bands",
-          "params": "src/art/audio/candidates.ts#musicTheme.f"
+          "id": "j",
+          "wav": "previews/musicTheme/j.wav",
+          "character": "two chords breathing, one voice stepping",
+          "params": "src/art/audio/candidates.ts#musicTheme.j"
         },
         {
-          "id": "g",
-          "wav": "previews/musicTheme/g.wav",
-          "character": "the riff, quietly, with nothing behind it",
-          "params": "src/art/audio/candidates.ts#musicTheme.g"
+          "id": "k",
+          "wav": "previews/musicTheme/k.wav",
+          "character": "a pedal, and one three-note answer",
+          "params": "src/art/audio/candidates.ts#musicTheme.k"
         }
       ]
     },
     {
       "id": "musicDread",
       "label": "Music Dread — Collapse",
-      "context": "Core critical, defeat imminent — no melody, no resolution; thinning dread.",
+      "context": "Collapse layer — replaces the others as entropy arrives.",
       "current": "previews/musicDread/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/musicDread/d.wav",
-          "character": "ion field thinning out, high and empty",
-          "params": "src/art/audio/candidates.ts#musicDread.d"
+          "id": "h",
+          "wav": "previews/musicDread/h.wav",
+          "character": "a tritone, low enough to be pressure",
+          "params": "src/art/audio/candidates.ts#musicDread.h"
         },
         {
-          "id": "e",
-          "wav": "previews/musicDread/e.wav",
-          "character": "magnetic rumble, unisons grinding",
-          "params": "src/art/audio/candidates.ts#musicDread.e"
+          "id": "i",
+          "wav": "previews/musicDread/i.wav",
+          "character": "a pedal, with a voice creeping up",
+          "params": "src/art/audio/candidates.ts#musicDread.i"
         },
         {
-          "id": "f",
-          "wav": "previews/musicDread/f.wav",
-          "character": "cathedral bands, nothing resolving",
-          "params": "src/art/audio/candidates.ts#musicDread.f"
+          "id": "j",
+          "wav": "previews/musicDread/j.wav",
+          "character": "the clash, with a heartbeat under it",
+          "params": "src/art/audio/candidates.ts#musicDread.j"
         },
         {
-          "id": "g",
-          "wav": "previews/musicDread/g.wav",
-          "character": "one low layer, and the room emptying",
-          "params": "src/art/audio/candidates.ts#musicDread.g"
+          "id": "k",
+          "wav": "previews/musicDread/k.wav",
+          "character": "one deep tone, the room emptying",
+          "params": "src/art/audio/candidates.ts#musicDread.k"
         }
       ]
     },
     {
       "id": "musicWin",
       "label": "Victory Sting",
-      "context": "Match won (after the three-second quiet) — one-shot, rising major arpeggio.",
+      "context": "Match won (after the three-second quiet) — one-shot, a short rising resolution.",
       "current": "previews/musicWin/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/musicWin/d.wav",
-          "character": "ion bursts rising, thin and dry",
-          "params": "src/art/audio/candidates.ts#musicWin.d"
+          "id": "h",
+          "wav": "previews/musicWin/h.wav",
+          "character": "two notes, a fifth, opening",
+          "params": "src/art/audio/candidates.ts#musicWin.h"
         },
         {
-          "id": "e",
-          "wav": "previews/musicWin/e.wav",
-          "character": "magnetic lift, weight arriving",
-          "params": "src/art/audio/candidates.ts#musicWin.e"
+          "id": "i",
+          "wav": "previews/musicWin/i.wav",
+          "character": "one chord, struck and opening",
+          "params": "src/art/audio/candidates.ts#musicWin.i"
         },
         {
-          "id": "f",
-          "wav": "previews/musicWin/f.wav",
-          "character": "cathedral bands opening, one room",
-          "params": "src/art/audio/candidates.ts#musicWin.f"
+          "id": "j",
+          "wav": "previews/musicWin/j.wav",
+          "character": "the top note first, the floor after",
+          "params": "src/art/audio/candidates.ts#musicWin.j"
         },
         {
-          "id": "g",
-          "wav": "previews/musicWin/g.wav",
-          "character": "won: two notes and a floor",
-          "params": "src/art/audio/candidates.ts#musicWin.g"
+          "id": "k",
+          "wav": "previews/musicWin/k.wav",
+          "character": "the sound that ships today (A/B)",
+          "params": "src/art/audio/candidates.ts#musicWin.k",
+          "anchor": true
         }
       ]
     },
@@ -1005,28 +1016,29 @@
       "current": "previews/musicLoss/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/musicLoss/d.wav",
-          "character": "ion field falling away to nothing",
-          "params": "src/art/audio/candidates.ts#musicLoss.d"
+          "id": "h",
+          "wav": "previews/musicLoss/h.wav",
+          "character": "two notes, then a breath that stops",
+          "params": "src/art/audio/candidates.ts#musicLoss.h"
         },
         {
-          "id": "e",
-          "wav": "previews/musicLoss/e.wav",
-          "character": "magnetic descent, mass settling low",
-          "params": "src/art/audio/candidates.ts#musicLoss.e"
+          "id": "i",
+          "wav": "previews/musicLoss/i.wav",
+          "character": "one note sinking, no melody at all",
+          "params": "src/art/audio/candidates.ts#musicLoss.i"
         },
         {
-          "id": "f",
-          "wav": "previews/musicLoss/f.wav",
-          "character": "one band tolling in an empty room",
-          "params": "src/art/audio/candidates.ts#musicLoss.f"
+          "id": "j",
+          "wav": "previews/musicLoss/j.wav",
+          "character": "the phrase as one falling chord",
+          "params": "src/art/audio/candidates.ts#musicLoss.j"
         },
         {
-          "id": "g",
-          "wav": "previews/musicLoss/g.wav",
-          "character": "lost: one note, going down and stopping",
-          "params": "src/art/audio/candidates.ts#musicLoss.g"
+          "id": "k",
+          "wav": "previews/musicLoss/k.wav",
+          "character": "the sound that ships today (A/B)",
+          "params": "src/art/audio/candidates.ts#musicLoss.k",
+          "anchor": true
         }
       ]
     },
@@ -1037,28 +1049,28 @@
       "current": "previews/pressTick/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/pressTick/d.wav",
-          "character": "a capacitive contact, no tone",
-          "params": "src/art/audio/candidates.ts#pressTick.d"
+          "id": "h",
+          "wav": "previews/pressTick/h.wav",
+          "character": "the pane, thinner: two partials at A♭6",
+          "params": "src/art/audio/candidates.ts#pressTick.h"
         },
         {
-          "id": "e",
-          "wav": "previews/pressTick/e.wav",
-          "character": "a damped actuator, felt not heard",
-          "params": "src/art/audio/candidates.ts#pressTick.e"
+          "id": "i",
+          "wav": "previews/pressTick/i.wav",
+          "character": "the pane an octave up, at A♭7",
+          "params": "src/art/audio/candidates.ts#pressTick.i"
         },
         {
-          "id": "f",
-          "wav": "previews/pressTick/f.wav",
-          "character": "one filtered band, machine-clean",
-          "params": "src/art/audio/candidates.ts#pressTick.f"
+          "id": "j",
+          "wav": "previews/pressTick/j.wav",
+          "character": "fingertip first, then the pane",
+          "params": "src/art/audio/candidates.ts#pressTick.j"
         },
         {
-          "id": "g",
-          "wav": "previews/pressTick/g.wav",
-          "character": "the smallest click that still reads",
-          "params": "src/art/audio/candidates.ts#pressTick.g"
+          "id": "k",
+          "wav": "previews/pressTick/k.wav",
+          "character": "the full pane, three partials, quietest",
+          "params": "src/art/audio/candidates.ts#pressTick.k"
         }
       ]
     },

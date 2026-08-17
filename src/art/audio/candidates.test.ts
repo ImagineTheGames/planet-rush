@@ -16,6 +16,11 @@ import { CANDIDATE_SLOTS, CANDIDATE_SLOT_ORDER } from './candidates';
 import { grains, plate, swept } from './instrument';
 import { isLayered, loops, soundSpec, SOUND_NAMES, type SoundName, type SoundSpec } from './bank';
 import { renderLayered, renderVoice, seamless, peak, rms, type VoiceSpec } from './synth';
+// The ratified Gantry/Bone glass. Imported rather than restated: a0-67's
+// `pressTick` reason is that a slot LEFT this family, so the test that puts it
+// back has to be measured against the family's own numbers, not against a copy
+// of them that can drift (`./ui-cues`, s6-01).
+import { A_FLAT_6, FOURTH_BELOW, GLASS_PARTIALS, OCTAVE_ABOVE } from './ui-cues';
 import { XP_FILL_GAIN } from './engine';
 
 /** The faithful render recipe (mirrors `graph.renderSound`), headless. */
@@ -74,7 +79,11 @@ describe('sound-review candidates', () => {
     // outstanding denials and dispositions each one revoice / cut / superseded.
     // `oreCollect` denied 2026-08-14 ("more sparkle… but subtle… shouldn't be too
     // long"), `levelUp` denied 2026-08-14 ("too toony, doesn't sound rewarding").
-    oreCollect: ['d', 'e', 'f'],
+    // a0-67: `oreCollect`'s d/e/f were denied in turn on 2026-08-17, so it is the
+    // one slot on `g` — it was never in the a0-60 sweep, so it has spent a-f
+    // where the fifteen slots that were have spent a-g. `j` is the incumbent,
+    // offered as a letter so *"keep what ships"* is an expressible verdict.
+    oreCollect: ['g', 'h', 'i', 'j'],
     levelUp: ['d', 'e', 'f'],
     // a0-57. Denied 2026-08-16 with a CATEGORY reason — *"none of these sound
     // like sounds for XP collection"* — so the re-offer is four readings of the
@@ -139,6 +148,483 @@ describe('sound-review candidates', () => {
     // still be *on the board*, so the next brief has something to pick up.
     for (const [id, status] of REVOICE_MANIFEST) {
       if (status === 'todo') expect(CANDIDATE_SLOTS[id], `${id} is owed but missing`).toBeDefined();
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // Round two (a0-67) — sixteen slots, sixteen reasons
+  // -------------------------------------------------------------------------
+  //
+  // The a0-60 sweep answered ONE sentence over thirty-five slots. On 2026-08-17
+  // the developer listened to the whole re-voiced board and denied sixteen of
+  // them with a **specific reason each** — *"none of these sound like a shield
+  // hit"*, *"they should sound like an explosion"*, *"what happened to the glass
+  // theme we had"*. A theme cannot answer sixteen different sentences, so the
+  // round is worked slot by slot and `docs/sound-round-two-manifest.md` carries
+  // every reason verbatim beside the row it belongs to.
+  //
+  // This is the gate on that manifest, and it is deliberately the same shape as
+  // the a0-60 one: the table is READ, never restated here, so the test and the
+  // status of record cannot drift apart.
+
+  /** `| <slot> | <status> | "<reason>" | <note> |` out of the round-two manifest. */
+  const ROUND_TWO: ReadonlyMap<string, string> = (() => {
+    const rows = new Map<string, string>();
+    for (const line of readFileSync('docs/sound-round-two-manifest.md', 'utf8').split('\n')) {
+      const m = /^\|\s*([A-Za-z]+)\s*\|\s*(todo|done|held)\s*\|/i.exec(line);
+      if (m) rows.set(m[1]!, m[2]!.toLowerCase());
+    }
+    return rows;
+  })();
+
+  /**
+   * The letters a verdict has already spent, per slot.
+   *
+   * A letter is the whole of how a verdict names an offer (`/status/sound-
+   * choices.json` records `{"verdict": "b"}`), so a re-offer under a spent letter
+   * makes the standing record unreadable — nobody can tell which take the deny was
+   * aimed at. Two denials are on these slots and they did not spend the same
+   * letters, which is why this is a table and not a constant:
+   *
+   *  - **2026-08-07**, `deny-all` on `a`/`b`/`c` — all sixteen.
+   *  - **2026-08-17**, round two — `d`/`e`/`f`/`g` on the fifteen that were in the
+   *    a0-60 sweep, and `d`/`e`/`f` on `oreCollect`, which was not in it (it was
+   *    re-voiced a day earlier under a0-49 and only ever had three).
+   */
+  const SPENT: Readonly<Record<string, readonly string[]>> = Object.fromEntries(
+    [...ROUND_TWO.keys()].map((id) => [id, id === 'oreCollect' ? list('a', 'f') : list('a', 'g')]),
+  );
+
+  /** Inclusive letter range, so a spent set is stated as its endpoints. */
+  function list(from: string, to: string): readonly string[] {
+    const out: string[] = [];
+    for (let c = from.charCodeAt(0); c <= to.charCodeAt(0); c++) out.push(String.fromCharCode(c));
+    return out;
+  }
+
+  it('round two answers the reason it was given', () => {
+    // The manifest lists the sixteen, and the DoD floor is half of them landed.
+    expect(ROUND_TWO.size, 'the round-two manifest does not list the sixteen').toBe(16);
+    const done = [...ROUND_TWO].filter(([, s]) => s === 'done').map(([id]) => id);
+    expect(done.length, 'the DoD floor is eight slots answered').toBeGreaterThanOrEqual(8);
+
+    for (const id of done) {
+      const slot = CANDIDATE_SLOTS[id];
+      expect(slot, `${id} is marked done but is not on the board`).toBeDefined();
+      if (!slot) continue;
+      // Four offers, the round-one bar carried forward: a reason this specific
+      // deserves a set wide enough that the next verdict is a choice.
+      expect(slot.candidates.length, `${id} is marked done with fewer than four offers`).toBeGreaterThanOrEqual(4);
+      for (const c of slot.candidates) {
+        expect(SPENT[id], `${id}/${c.id} re-offers under a letter a verdict has spent`).not.toContain(c.id);
+      }
+      // Distinct letters, distinct characters, distinct specs — four *answers*,
+      // not four takes on one, which is the bar every board on this file is held
+      // to and the one a round answering "make N distinct sounds" must not miss.
+      expect(new Set(slot.candidates.map((c) => c.id)).size, `${id} offers a letter twice`).toBe(
+        slot.candidates.length,
+      );
+      expect(new Set(slot.candidates.map((c) => c.character)).size, `${id} repeats a character`).toBe(
+        slot.candidates.length,
+      );
+      expect(new Set(slot.candidates.map((c) => c.spec.name)).size, `${id} repeats a spec name`).toBe(
+        slot.candidates.length,
+      );
+      // Every take names the slot it sits in. Round two touches sixteen blocks
+      // scattered through 3 000 lines of near-identical ones, so the back-pointer
+      // stops being decoration and starts being the only thing between a
+      // mis-paste and the developer being offered a sound for another event.
+      for (const c of slot.candidates) {
+        expect(c.slot, `${id}/${c.id} does not name its slot`).toBe(id);
+      }
+    }
+
+    // A `todo` row is a slot still wearing the set that was denied — it must stay
+    // on the board so the next brief has something to pick up.
+    for (const [id, status] of ROUND_TWO) {
+      if (status === 'todo') expect(CANDIDATE_SLOTS[id], `${id} is owed but missing`).toBeDefined();
+    }
+  });
+
+  it('offers the sound that ships as a letter wherever the developer said they like it', () => {
+    // Four of the sixteen reasons open with some form of *"i like current"*, and
+    // two more ask to be shown directions to move away from it. The board could
+    // not express either: `/status/sound-choices.json` records a slot and a
+    // LETTER, so *"keep what ships"* was not a verdict anybody could give, and the
+    // A/B against the incumbent had to be done from memory between two clicks.
+    //
+    // So the incumbent takes a letter on those six slots. The assertion that
+    // matters is that it really IS the incumbent — an "anchor" that has been
+    // quietly improved is the worst possible offer on the board, because it makes
+    // the developer's own reference the thing they cannot trust.
+    const LIKE_CURRENT = ['bankOre', 'upgradeBought', 'musicWin', 'musicLoss'] as const;
+    const SHOW_ME_DIRECTIONS = ['oreCollect', 'turretFire'] as const;
+    for (const id of [...LIKE_CURRENT, ...SHOW_ME_DIRECTIONS]) {
+      if (ROUND_TWO.get(id) !== 'done') continue; // not landed yet; the row says so
+      const slot = CANDIDATE_SLOTS[id]!;
+      const anchors = slot.candidates.filter((c) => c.anchor === true);
+      expect(anchors.length, `${id} does not offer what ships as a letter`).toBe(1);
+      const shipped = render(soundSpec(slot.current));
+      const offered = render(anchors[0]!.spec);
+      expect(
+        offered.length === shipped.length && offered.every((v, i) => v === shipped[i]),
+        `${id}'s anchor is not the sound that ships`,
+      ).toBe(true);
+      // …and it still has to be three NEW takes beside it, not two and a copy.
+      expect(slot.candidates.length - anchors.length, `${id} offers fewer than three new takes`).toBeGreaterThanOrEqual(
+        3,
+      );
+    }
+    // Nowhere else: an anchor on a slot whose reason did not ask for one is a
+    // fourth offer that costs a listen and answers nothing.
+    for (const id of SLOT_IDS) {
+      if (([...LIKE_CURRENT, ...SHOW_ME_DIRECTIONS] as readonly string[]).includes(id)) continue;
+      expect(
+        CANDIDATE_SLOTS[id]!.candidates.some((c) => c.anchor === true),
+        `${id} offers an anchor nobody asked for`,
+      ).toBe(false);
+    }
+  });
+
+  it('answers `buildPlaced` with a build STARTING, which none of the denied takes was', () => {
+    // *"none of these sound like a build started"*. The denied four were a
+    // stepper into a stop, a vacuum seating, a weld quenched and one latch —
+    // four correct executions of this slot's own standing note (*"a latch, never
+    // a fanfare"*, §7.3) and four sounds that END. The slot fires when a turret
+    // STARTS building.
+    //
+    // So the property is the shape rather than the material: the cue must be
+    // going somewhere when it stops. Measured as the last third's energy against
+    // the first third's — an opening gesture is >1, a seating one is well under.
+    // The shipped voice measures 0.02, which is how completely it terminates.
+    const thirds = (spec: SoundSpec): number => {
+      const buf = render(spec);
+      const t = Math.floor(buf.length / 3);
+      return rms(buf.subarray(buf.length - t)) / Math.max(1e-9, rms(buf.subarray(0, t)));
+    };
+    expect(thirds(soundSpec('buildPlaced')), 'the shipped voice already opens — the diagnosis is wrong').toBeLessThan(
+      0.2,
+    );
+    for (const c of CANDIDATE_SLOTS.buildPlaced!.candidates) {
+      expect(thirds(c.spec), `buildPlaced/${c.id} ends instead of starting`).toBeGreaterThan(1);
+    }
+    // The other half of the §8 pair is NOT asserted, and the reason is worth
+    // more than the assertion would be: `buildComplete` was not denied this
+    // round, so its four offers carry no verdict and this brief may not touch
+    // them — re-voicing un-judged work is destroying a review, not doing one
+    // (the a0-48 rule). Three of them seat (0.31 / 0.40 / 0.06) and **`f` — "two
+    // welds, the second holding" — opens, at 1.43.** If the developer adopts a
+    // `buildPlaced` above and `buildComplete/f`, the two ends of one build are
+    // the same gesture and want listening to as a pair. That belongs on the
+    // board, not in a test that would fail for a lane that did nothing wrong.
+  });
+
+  it('brings `pressTick` back into the glass family it left (a0-67)', () => {
+    // *"what happened to the glass theme we had, none of these are glass themed
+    // like the main menu"* — a regression report, and a correct one. The shipped
+    // tick is struck glass at A♭6 (`./bank`'s `strike`, the ratified Gantry/Bone
+    // material); the four takes it was offered instead were a capacitive
+    // contact, a damped actuator, a filtered band and a click. Every one of them
+    // satisfied "modern/sci-fi, not retro/toony". None of them was glass.
+    //
+    // Glass is checked here as the thing it actually is, not as a word in a
+    // character label: sine partials on the ratified inharmonic ratios, upper
+    // ones decaying faster than the fundamental, and a strike that is short but
+    // never zero. A take that describes itself as glass and is made of noise
+    // fails this.
+    const menuRoots = [A_FLAT_6, OCTAVE_ABOVE, FOURTH_BELOW];
+    for (const c of CANDIDATE_SLOTS.pressTick!.candidates) {
+      const where = `pressTick/${c.id}`;
+      const voices = voicesOf(c.spec);
+      const partials = voices.filter((v) => v.wave === 'sine');
+      expect(partials.length, `${where} has no struck partials in it — that is not glass`).toBeGreaterThanOrEqual(2);
+
+      // The fundamental is a pitch the menu family actually uses…
+      const root = Math.min(...partials.map((v) => v.freq));
+      expect(
+        menuRoots.some((f) => Math.abs(root - f) < 1),
+        `${where} is struck at ${root} Hz, which is not a pitch the menu set uses`,
+      ).toBe(true);
+
+      // …the partials sit on the ratified spacing, in order…
+      const ratios = [...partials].sort((a, b) => a.freq - b.freq).map((v) => v.freq / root);
+      for (const [i, r] of ratios.entries()) {
+        expect(Math.abs(r - GLASS_PARTIALS[i]!), `${where} partial ${i} is at ×${r}, not the glass spacing`).toBeLessThan(
+          0.01,
+        );
+      }
+
+      // …the upper ones die first, which is the whole difference from bell metal…
+      const decays = [...partials].sort((a, b) => a.freq - b.freq).map((v) => v.decay);
+      for (let i = 1; i < decays.length; i++) {
+        expect(decays[i]!, `${where} partial ${i} outlasts the one below it — that is a chime`).toBeLessThan(
+          decays[i - 1]!,
+        );
+      }
+
+      // …and it is struck, not switched on.
+      for (const v of partials) {
+        expect(v.attack, `${where} arrives with a click`).toBeGreaterThan(0);
+        expect(v.attack, `${where} fades in rather than being struck`).toBeLessThanOrEqual(0.004);
+      }
+
+      // §7.6's fatigue clause, which the glass does not get an exemption from:
+      // this is the sound heard dozens of times a match, forever.
+      const buf = render(c.spec);
+      const shipped = render(soundSpec('pressTick'));
+      expect(peak(buf), `${where} peaks over the tick that ships`).toBeLessThanOrEqual(peak(shipped));
+      expect(buf.length, `${where} is longer than the tick that ships`).toBeLessThanOrEqual(shipped.length);
+    }
+  });
+
+  it('spends "more subtle" on the two slots that repeat, as a number (a0-67)', () => {
+    // The word appears four times across the sixteen reasons, and on two slots it
+    // is a **fatigue** report rather than a taste note:
+    //
+    //   thruster — *"all of these sound annoying being looped, we need something
+    //   more subtle since these will play all the time"*
+    //   alarm    — *"all of these are ultra annoying, more subtle"*
+    //
+    // A character label cannot answer that; a level can. The bar is the sound
+    // that SHIPS, because that is what the developer has in their ear when they
+    // say "more subtle" — and it is the bar round one missed most plainly:
+    // three of its four alarm offers and two of its four thruster offers were
+    // *louder* than the incumbent they were meant to calm down.
+    const quieterThanShipped = (id: SoundName): void => {
+      const shipped = rms(render(soundSpec(id)));
+      for (const c of CANDIDATE_SLOTS[id]!.candidates) {
+        expect(rms(render(c.spec)), `${id}/${c.id} is not quieter than the sound that was called annoying`).toBeLessThan(
+          shipped,
+        );
+      }
+    };
+    quieterThanShipped('alarm');
+
+    // The thruster is held to **half**, not merely under: it is the only voice a
+    // player holds down, so it is the only slot where the fiftieth second is the
+    // one being judged.
+    const shippedThruster = rms(render(soundSpec('thruster')));
+    for (const c of CANDIDATE_SLOTS.thruster!.candidates) {
+      expect(rms(render(c.spec)), `thruster/${c.id} is not half the level of the loop that fatigues`).toBeLessThan(
+        shippedThruster * 0.5,
+      );
+      // …and nothing in it may ring. A narrow resonance with noise running
+      // through it beats at the rate the noise excites it, and a beat inside a
+      // held loop is the single most fatiguing thing a sound can do. Round one
+      // put a Q of 8.5 and 10 on a loop layer; this is the fence around that.
+      for (const v of voicesOf(c.spec)) {
+        expect(v.resonance ?? 0, `thruster/${c.id} ${v.name} rings inside a held loop`).toBeLessThan(4);
+        expect(v.lowPassEnd, `thruster/${c.id} ${v.name} sweeps a corner across the loop seam`).toBeUndefined();
+      }
+    }
+
+    // The alarm may get quieter; it may not stop being a mechanic. §2.2 makes it
+    // the tell that your home is under attack, and `./audio.test.ts` holds the
+    // shipped voice above the chatter — so every OFFER is held there too, or an
+    // approval would quietly retire the mechanic.
+    const chatter = (['oreCollect', 'repairTick', 'spawnPulse', 'shotImpact'] as const).map((n) =>
+      rms(render(soundSpec(n))),
+    );
+    for (const c of CANDIDATE_SLOTS.alarm!.candidates) {
+      expect(rms(render(c.spec)), `alarm/${c.id} would not be heard over the chatter`).toBeGreaterThan(
+        Math.max(...chatter),
+      );
+      // The rising minor third is the recognisable shape and it is what survives
+      // the saw's removal: a second event, a minor third above the first and
+      // later than it — the same interval the shipped klaxon spells. Legibility
+      // is carried by the interval, not by the waveform, which is what this bank
+      // already learnt on `waveArrive` (its two-horn tell survived the same
+      // removal with the pitches held to the Hz).
+      //
+      // Stated as "there exists such a pair" rather than "the two lowest voices
+      // are one", because these offers carry bodies and rooms as well as notes
+      // and a rule that counted layers would be a rule about arrangement.
+      const spec = c.spec;
+      expect(isLayered(spec), `alarm/${c.id} is a single voice — it cannot spell an interval`).toBe(true);
+      const events = isLayered(spec) ? spec.layers.map((l) => ({ at: l.at ?? 0, f: l.spec.freq })) : [];
+      const rising = events.some((a) =>
+        events.some((b) => b.at > a.at && Math.abs(12 * Math.log2(b.f / a.f) - 3) < 0.35),
+      );
+      expect(rising, `alarm/${c.id} does not spell a rising minor third`).toBe(true);
+      // And the saw is gone: it is what "ultra annoying" was made of — full-level
+      // partials straight through 2-4 kHz, the band an ear cannot habituate to.
+      for (const v of voicesOf(c.spec)) {
+        expect(v.wave, `alarm/${c.id} ${v.name} is still a saw`).not.toBe('saw');
+      }
+    }
+  });
+
+  it('generates AROUND the incumbent on the four slots that said "i like current"', () => {
+    // Four of the sixteen reasons open by keeping the shipped sound:
+    //
+    //   bankOre       — *"i like the current and none of the new generations…"*
+    //   upgradeBought — *"i like current but i want to hear new optinos that are
+    //                    more like it but also more subtle"*
+    //   musicWin      — *"…the current is closest but too video gamey"*
+    //   musicLoss     — *"i like current, but it still sounds too video gamey"*
+    //
+    // On these the incumbent is the reference and starting over throws away the
+    // only thing on the board the developer has said they like. "Around it" is
+    // held here as the two things that would show a fresh start had happened
+    // anyway: the take is made of the incumbent's **material**, and it does not
+    // get **louder** than the incumbent while claiming to be more subtle.
+    const AROUND = ['bankOre', 'upgradeBought', 'musicWin', 'musicLoss'] as const;
+    for (const id of AROUND) {
+      const shipped = soundSpec(id);
+      const shippedWaves = new Set(voicesOf(shipped).map((v) => v.wave));
+      const shippedPeak = peak(render(shipped));
+      for (const c of CANDIDATE_SLOTS[id]!.candidates) {
+        if (c.anchor === true) continue;
+        const where = `${id}/${c.id}`;
+        // Same family of oscillators as the sound being kept. Round one answered
+        // these four with granular fields, magnetic mass and cathedral bands —
+        // new materials, which is precisely what "i like the current" rules out.
+        for (const v of voicesOf(c.spec)) {
+          expect(shippedWaves, `${where} is made of ${v.wave}, which the incumbent is not`).toContain(v.wave);
+        }
+        // *"More subtle"* / *"less video gamey"* are never satisfied by being
+        // louder. Held on PEAK rather than RMS on purpose: a sustained chord
+        // carries more energy than a sequence of struck notes at the same peak,
+        // and "does not shout" is a statement about the loudest moment (§4.7 —
+        // the two stings land into the three seconds of near-silence).
+        expect(peak(render(c.spec)), `${where} shouts louder than the sound it is meant to be like`).toBeLessThanOrEqual(
+          shippedPeak,
+        );
+      }
+    }
+
+    // The two stings also stay promotable: nothing may outrun the station death,
+    // which is the beat the quiet belongs to (§8's 1.32 s longest-tail invariant).
+    const deathLength = render(soundSpec('stationDeath')).length;
+    for (const id of ['musicWin', 'musicLoss'] as const) {
+      for (const c of CANDIDATE_SLOTS[id]!.candidates) {
+        expect(render(c.spec).length, `${id}/${c.id} outruns the station death`).toBeLessThanOrEqual(deathLength);
+      }
+    }
+  });
+
+  it('answers the music four with music — harmony before texture (a0-67)', () => {
+    // Four reasons, one root cause. The a0-60 sweep answered all six music slots
+    // with the same three MATERIALS (granular bed / filtered analogue / wide
+    // detuned space — this file's own family table says "texture before melody"),
+    // and four of the six came back:
+    //
+    //   musicBed    *"none of these sound like a calm music bed"*
+    //   musicPulse  *"none of these sound musical"*
+    //   musicTheme  *"these sound like very bad music"*
+    //   musicDread  *"none of these sound critical they just sound annoying"*
+    //
+    // Three of those are asking for notes and the fourth is asking for weight. So
+    // the two properties below are the register note rewritten as a gate, and
+    // they are checked on the offers because a texture cannot be tuned into a
+    // chord after the fact.
+    const MUSIC = ['musicBed', 'musicPulse', 'musicTheme', 'musicDread'] as const;
+
+    // A minor, to the Hz — the key the shipped soundtrack, the ambient bed and
+    // `upgradeBought` are all already in (§7.5). Every pitched voice in every
+    // offer is a degree of it, in some octave, so any two of these four slots can
+    // be adopted together and still be in tune. That is a property the developer
+    // cannot check by auditioning them one at a time, which is why it is here.
+    const A_MINOR = [27.5, 30.87, 32.7, 36.71, 41.2, 43.65, 48.99];
+    const degreeOf = (f: number): number | undefined => {
+      for (const base of A_MINOR) {
+        const octaves = Math.log2(f / base);
+        if (Math.abs(octaves - Math.round(octaves)) < 0.012) return base;
+      }
+      return undefined;
+    };
+    //
+    // `musicDread` is **exempt, and only `musicDread`**: its offers carry a
+    // tritone and a semitone clash on purpose, and a note that is out of the key
+    // is the entire mechanic of that slot (`./bank`'s shipped voice does the same
+    // thing — a clash "a hair sharp of the low", which is not a degree of
+    // anything). A dread layer that stayed obediently in A minor would be a
+    // calmer bed. The fence around it is the register test further down instead.
+    for (const id of ['musicBed', 'musicPulse', 'musicTheme'] as const) {
+      for (const c of CANDIDATE_SLOTS[id]!.candidates) {
+        for (const v of voicesOf(c.spec)) {
+          if (v.wave === 'noise') continue; // noise carries no pitch to be out of key
+          expect(
+            degreeOf(v.freq),
+            `${id}/${c.id} ${v.name} is at ${v.freq} Hz, which is not a degree of A minor`,
+          ).toBeDefined();
+        }
+      }
+    }
+
+    // Harmony: more than one pitch sounding, in every offer. This is the whole of
+    // what "none of these sound musical" was pointing at — round one's pulse
+    // offers were rhythms with no nameable pitch in them at all, and a bed made
+    // of one held tone is a drone rather than a chord.
+    for (const id of MUSIC) {
+      for (const c of CANDIDATE_SLOTS[id]!.candidates) {
+        const pitches = new Set(
+          voicesOf(c.spec)
+            .filter((v) => v.wave !== 'noise')
+            .map((v) => Math.round(v.freq * 100)),
+        );
+        expect(pitches.size, `${id}/${c.id} sounds one pitch — that is a drone, not music`).toBeGreaterThanOrEqual(2);
+      }
+    }
+
+    // *"They just sound annoying"* is a register complaint and it has a number.
+    // Round one's `musicDread/d` — "ion field thinning out, high and empty" — put
+    // 20% of its energy above 3 kHz and held it for five and a half seconds under
+    // a collapsing station. "Thin" had been read as "high". Nothing in this slot
+    // may live up there again: the shipped voice measures 0.001, and every offer
+    // is held at or under it.
+    const shippedDread = brightShare(render(soundSpec('musicDread')), 3000);
+    for (const c of CANDIDATE_SLOTS.musicDread!.candidates) {
+      expect(brightShare(render(c.spec), 3000), `musicDread/${c.id} is annoying rather than critical`).toBeLessThanOrEqual(
+        shippedDread,
+      );
+      for (const v of voicesOf(c.spec)) {
+        expect(v.freq, `musicDread/${c.id} ${v.name} sits above the register dread lives in`).toBeLessThan(1000);
+      }
+    }
+
+    // `musicTheme`'s reason is about composition, and the diagnosis this round
+    // works from is that the shipped theme is **seven notes over one held A** —
+    // one chord for four seconds, so every note in the tune lands on the same
+    // harmony and none of them means anything. Round one kept the melody and
+    // changed the instrument, which could not have addressed that.
+    //
+    // Measured as **the most pitch classes ever sounding at once**. A voice is
+    // sounding from its onset until its envelope runs out, so a pad that spans
+    // the lap counts against every melody note but a note that has died does not
+    // count against the next one. The shipped theme tops out at **two** — the A
+    // pad, plus whichever single note of the tune is currently ringing — which is
+    // the diagnosis stated as an integer: it is a melody with an accompaniment of
+    // one note, so there is no chord for the tune to be *in*.
+    const maxSimultaneous = (spec: SoundSpec): number => {
+      if (!isLayered(spec)) return 0;
+      const notes = spec.layers
+        .filter((l) => l.spec.wave !== 'noise')
+        .map((l) => {
+          const at = l.at ?? 0;
+          const v = l.spec;
+          return {
+            from: at,
+            to: at + v.attack + v.hold + v.decay,
+            // Semitones above A, mod 12 — so an octave doubling is not a chord.
+            cls: ((Math.round(12 * Math.log2(v.freq / 27.5)) % 12) + 12) % 12,
+          };
+        });
+      let best = 0;
+      for (const t of notes.map((n) => n.from)) {
+        const at = new Set(notes.filter((n) => n.from <= t && n.to > t).map((n) => n.cls));
+        best = Math.max(best, at.size);
+      }
+      return best;
+    };
+    expect(maxSimultaneous(soundSpec('musicTheme')), 'the shipped theme already has chords in it').toBeLessThanOrEqual(
+      2,
+    );
+    for (const c of CANDIDATE_SLOTS.musicTheme!.candidates) {
+      expect(
+        maxSimultaneous(c.spec),
+        `musicTheme/${c.id} never sounds a chord — it is a tune over one note again`,
+      ).toBeGreaterThanOrEqual(3);
     }
   });
 
@@ -565,9 +1051,12 @@ describe('sound-review candidates', () => {
     }
   });
 
-  it('adds sparkle to `oreCollect` without adding level or length (a0-49)', () => {
+  it('adds sparkle to `oreCollect` without adding level or length (a0-49, re-scoped a0-67)', () => {
     // *"add a little bit more of sparkle to it, like you've won a prize, but
-    // subtle... it shouldn't be too long"* — three clauses, three bounds.
+    // subtle... it shouldn't be too long"* (2026-08-14) — three clauses, three
+    // bounds. Two of them are unchanged by round four and one had to move; the
+    // move is written out here rather than made quietly, because a bound that
+    // loosens without a sentence beside it is a denial being dropped.
     //
     // SPARKLE is read as high-frequency detail with a short life, and measured as
     // the share of energy above 3 kHz — a share rather than a level, because
@@ -575,19 +1064,34 @@ describe('sound-review candidates', () => {
     // 3 kHz and not higher because `./synth` clamps a resonant cutoff to
     // SVF_MAX_HZ_FRACTION (~6.5 kHz at 44.1 k), so 3–6.4 kHz *is* the top of this
     // bank's spectrum.
+    //
+    // **What moved (a0-67).** The 2026-08-17 denial asks for *"3 distinct sounds
+    // so that i can see what direction to go in"*. Two of the three directions —
+    // a dry handful of material, and a breath with nothing struck — are not bright
+    // by construction, so holding the sparkle clause on EVERY offer would forbid
+    // the spread the developer just asked for. It therefore binds **the set**: at
+    // least one live offer still carries it, comfortably. The level and length
+    // clauses do not move, because *"but subtle at same time"* is the same clause
+    // said again and nothing withdrew the length one.
     const denied = deniedOf('oreCollect').map((s) => render(s));
     const deniedBrightest = Math.max(...denied.map((b) => brightShare(b, 3000)));
     const incumbent = render(soundSpec('oreCollect'));
+    // The incumbent is on the board as its own letter now (a0-67). It is not a
+    // take this round is offering, so the round's bounds are not asked of it —
+    // it *is* the reference they are measured against.
+    const offers = CANDIDATE_SLOTS.oreCollect!.candidates.filter((c) => c.anchor !== true);
 
-    for (const c of CANDIDATE_SLOTS.oreCollect!.candidates) {
+    // Sparkle, held on the set: more than any denied take, with room to spare —
+    // not "0.5% brighter than the brightest", which would satisfy a grep and
+    // nobody's ear.
+    const brightest = Math.max(...offers.map((c) => brightShare(render(c.spec), 3000)));
+    expect(brightest, 'no offer on the slot is brighter than the takes that were denied').toBeGreaterThan(
+      deniedBrightest * 1.25,
+    );
+
+    for (const c of offers) {
       const buf = render(c.spec);
       const where = `oreCollect/${c.id}`;
-      // More sparkle than any of the three that were denied, with room to spare —
-      // not "0.5% brighter than the brightest", which would satisfy a grep and
-      // nobody's ear.
-      expect(brightShare(buf, 3000), `${where} is no brighter than the takes that were denied`).toBeGreaterThan(
-        deniedBrightest * 1.25,
-      );
       // *"but subtle"* qualifies the sparkle, not the cue, so it binds the whole
       // sound: adding brightness may not make this louder than the sound the
       // developer was asking to add sparkle *to*.
@@ -616,7 +1120,19 @@ describe('sound-review candidates', () => {
       render(soundSpec('depositTick')),
       ...CANDIDATE_SLOTS.depositTick!.candidates.map((c) => render(c.spec)),
     ];
+    //
+    // The **anchor** is exempt and it is worth saying why in numbers rather than
+    // in principle (a0-67). It is the incumbent, offered as a letter so that
+    // "keep what ships" is an expressible verdict — and the incumbent clears the
+    // brightest `depositTick` offer by only **×1.23**, not ×1.5. That is not a
+    // regression this round introduced; it is what the shipped pair has always
+    // measured, and it is exactly the reason the margin was written against the
+    // *offers* in the first place. It does mean one thing for the board, and it
+    // belongs on the record rather than in a passing test: **if the developer
+    // keeps `oreCollect` as it ships AND picks a bright `depositTick`, that pair
+    // is the tightest in the bank and wants a listen together.**
     for (const c of CANDIDATE_SLOTS.oreCollect!.candidates) {
+      if (c.anchor === true) continue;
       const ore = render(c.spec);
       for (const dep of deposits) {
         expect(zcr(ore), `oreCollect/${c.id} sits on top of a depositTick voice`).toBeGreaterThan(zcr(dep) * 1.5);
@@ -861,12 +1377,22 @@ describe('sound-review candidates', () => {
     // shipped, because the incumbents are allowed to be re-voiced by a future
     // brief; what is not allowed is one of the offers arriving in the bank
     // without a verdict behind it.
+    //
+    // The one deliberate exception is an {@link SoundCandidate.anchor} (a0-67):
+    // on the six slots whose reason was *"i like current"* or *"show me
+    // directions"*, the incumbent is offered as a letter of its own so that
+    // "keep what ships" is a verdict somebody can give. It renders identical to
+    // the shipped voice **by definition** — that is the whole point of it — and
+    // the test that it really is identical is above, in `offers the sound that
+    // ships as a letter…`. What this test still catches on those slots is the
+    // dangerous case: a *new* take that is secretly the incumbent.
     const denied = SLOT_IDS.filter((id) => ADOPTED[id] === undefined);
     expect(denied.length, 'the adopted set is not three slots any more').toBe(SLOT_IDS.length - 3);
     for (const id of denied) {
       const slot = CANDIDATE_SLOTS[id]!;
       const shipped = render(soundSpec(slot.current));
       for (const c of slot.candidates) {
+        if (c.anchor === true) continue;
         expect(
           sameSamples(shipped, render(c.spec)),
           `${id} now plays candidate ${c.id} — no verdict has adopted that slot`,
