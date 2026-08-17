@@ -1,0 +1,46 @@
+{
+  "cold": {
+    "rotated": true,
+    "logicalViewport": {
+      "width": 844,
+      "height": 390
+    },
+    "window": [
+      390,
+      844
+    ]
+  },
+  "second": {
+    "rotated": true,
+    "logicalViewport": {
+      "width": 844,
+      "height": 390
+    },
+    "window": [
+      390,
+      844
+    ]
+  },
+  "third": {
+    "rotated": true,
+    "logicalViewport": {
+      "width": 844,
+      "height": 390
+    },
+    "window": [
+      390,
+      844
+    ]
+  },
+  "reloaded": {
+    "rotated": true,
+    "logicalViewport": {
+      "width": 844,
+      "height": 390
+    },
+    "window": [
+      390,
+      844
+    ]
+  }
+}

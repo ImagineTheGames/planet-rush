@@ -61,6 +61,8 @@ A. THE SPECIMEN
                 portrait.spec.ts       NEW — per-frame door geometry, the four
                                        custom properties it is built from, and
                                        the BEFORE-CHANGE computed style
+                reload.spec.ts         NEW — the landscape lock across a cold
+                                       load, a second navigation and a reload
                 motion.spec.ts         transition/animation listeners (a0-70's)
                 firstframes.spec.ts    frame-exact canvas readback (a0-70's)
                 analyse-door.mjs       NEW — where the lit hull IS, per frame
@@ -163,6 +165,56 @@ on `document`, installed before a line of app code runs. On the shipped build at
            — centred: (422.0, 195.0).
 
   "Flies in from the bottom right instead of starting off centered." Verbatim.
+
+THE `?gate=0` CONTROL, AND AN INSTRUMENT THAT WAS LYING
+
+a0-70's films came in pairs: the gated boot, and `?gate=0` — the same menu with
+no door in front of it. The pair is worth keeping on a phone for the same
+reason, so this branch shot it, and then did not commit it. The reason is worth
+writing down rather than quietly dropping.
+
+`capture.spec.ts` films two URLs back to back in ONE page: a screencast session
+is started, stopped and detached, then a second one is attached for the second
+URL. Every frame of that SECOND session came back with the menu drawn upright in
+portrait — no landscape lock, the whole scene transposed.
+
+It is not what the client does. Three instruments say so, and they agree with
+each other:
+
+  - `window.__mainMenu` reports `rotated: true`, logical 844x390, on every
+    sampled frame of a `?gate=0` boot (analysis/after-no-gate-iphone.json);
+  - `page.screenshot()` at that same URL is correctly rotated — the wordmark
+    runs up the side of the handset (analysis/reload-1-cold.png);
+  - and the FIRST screencast session in the same page, which is the film of
+    record above, is rotated too and agrees with the DOM matrices frame for
+    frame.
+
+So the second screencast session captures the surface at the wrong orientation,
+and the frames it produced are an artifact of re-attaching CDP rather than a
+state the game was ever in. They are not in this evidence set, because a frame
+that shows something the client never did is worth less than nothing in a folder
+whose whole job is to be believed — this branch exists because a0-70's brief
+warned that four rounds on the star bloom went to something that only ever
+looked broken in an instrument.
+
+What replaces it is `reload.spec.ts`, which asks the question the `?gate=0` film
+was there to answer and asks it of the app rather than of a screencast: is the
+lock the same on a cold load, on a second navigation, and on a reload? A phone
+reloading is an ordinary thing a player does, and "the lock only engages on a
+cold page" would have been its own field report.
+
+  analysis/reload.json          cold  → rotated: true, logical 844x390
+                                second→ rotated: true, logical 844x390
+                                third → rotated: true, logical 844x390
+                                reload→ rotated: true, logical 844x390
+
+  analysis/reload-1-cold.png    the menu with NO DOOR in front of it, on a
+  analysis/reload-2-third.png   portrait phone: four plates, correctly rotated,
+  analysis/reload-3-reloaded.png  identical across all three navigations.
+
+  The spec asserts the four AGREE rather than asserting a constant, so it is the
+  same test on a desktop (where all four must be the identity) as on a phone.
+
 
 AND THE DESKTOP, SAME PROBE, SAME RUN — analysis/desktop.json
 
@@ -428,6 +480,10 @@ H. REPRODUCING THIS AUDIT
   # the controls that name which half matters
   A0_71_DEVICE=iphone A0_71_LANDSCAPE=1 A0_71_NAME=landscape-iphone …  portrait
   A0_71_NAME=desktop …                                                 portrait
+
+  # the lock across a cold load, a second navigation and a reload
+  A0_71_DEVICE=iphone \
+    npx playwright test --config evidence/a0-70-title-entrance/playwright.config.ts reload
 
   # env switches (a0-71)
   A0_71_DEVICE=iphone|pixel|desktop   a row of QA's DEVICE_MATRIX

@@ -59,7 +59,7 @@ const MOBILE = PROFILE
 
 export default defineConfig({
   testDir: dirname(fileURLToPath(import.meta.url)),
-  testMatch: /(capture|firstframes|motion|portrait|resize-boot|reveal)\.spec\.ts/,
+  testMatch: /(capture|firstframes|motion|portrait|reload|resize-boot|reveal)\.spec\.ts/,
   reporter: [['list']],
   workers: 1,
   timeout: 180_000,

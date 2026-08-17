@@ -1,0 +1,602 @@
+[
+  {
+    "t": 48,
+    "event": "fonts.ready"
+  },
+  {
+    "i": 0,
+    "t": 49,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": null
+  },
+  {
+    "i": 1,
+    "t": 57,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": null
+  },
+  {
+    "i": 2,
+    "t": 75,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": null
+  },
+  {
+    "i": 3,
+    "t": 90,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": null
+  },
+  {
+    "i": 4,
+    "t": 172,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": null
+  },
+  {
+    "i": 5,
+    "t": 172,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": null
+  },
+  {
+    "i": 6,
+    "t": 173,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": null
+  },
+  {
+    "i": 7,
+    "t": 190,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": null
+  },
+  {
+    "i": 8,
+    "t": 207,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": null
+  },
+  {
+    "i": 9,
+    "t": 319,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 10,
+    "t": 1468,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 11,
+    "t": 1556,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 12,
+    "t": 1615,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 13,
+    "t": 1676,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 14,
+    "t": 1736,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 15,
+    "t": 1797,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 16,
+    "t": 1858,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 17,
+    "t": 1917,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 18,
+    "t": 1976,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 19,
+    "t": 2035,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 20,
+    "t": 2109,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 21,
+    "t": 2178,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 22,
+    "t": 2236,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 23,
+    "t": 2296,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  },
+  {
+    "i": 24,
+    "t": 2357,
+    "fonts": "loaded",
+    "window": [
+      390,
+      844,
+      3
+    ],
+    "visual": [
+      390,
+      844,
+      0,
+      0,
+      1
+    ],
+    "root": null,
+    "door": null,
+    "menu": {
+      "rotated": true,
+      "logicalViewport": {
+        "width": 844,
+        "height": 390
+      }
+    }
+  }
+]
