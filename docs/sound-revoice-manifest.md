@@ -59,7 +59,7 @@ this brief, with the reason in the note).
 | slot | status | note |
 |---|---|---|
 | turretFire | done | rail contact / compressed vent / capacitor bloom / damped hardware — `d`-`g`, nothing slides in pitch |
-| shotImpact | done | absorber tick / spall / ferrite knock / charge dump — `d`-`g`, all under 60 ms |
+| shotImpact | split | **a0-68 — the slot is gone**: `impactHull` / `impactRock` / `impactShield` / `impactStation`. The `d`-`g` takes this row recorded were denied on 2026-08-17 with *"they should also be different depending on the thing that was hit..."*, which no set of takes against ONE slot could answer |
 | shieldHit | done | four that ring, so the §2.2 shield-vs-core grammar survives the sweep |
 | shieldDown | done | the ×6.9 fall kept in all four; they differ in what is falling |
 | coreHit | done | four dull, low and closing — no sparkle within reach of a home |
@@ -79,11 +79,11 @@ this brief, with the reason in the note).
 | depositTick | done | the station materials at a tenth of the size; fires in bursts, so all four stay tiny |
 | pressTick | done | four kinds of restraint, not four events — no returns anywhere in this family |
 | purchaseConfirm | done | two rising beats kept; §8 margin over buildComplete held across all sixteen pairings (×1.33) |
-| rejectBuzz | done | a stop, not a raspberry; sits ×1.86 above the coreHit family at worst (§8) |
+| rejectBuzz | done | re-voiced again under **a0-68** (`h`-`k`): the `d`-`g` takes this row landed were denied on 2026-08-17 with *"none of these sound like rejected"*, and all four were built to be understated when a refusal has to be flat and unmistakable |
 | minimapPing | done | it locates, never alarms — nothing repeats, nothing rises |
 | waveArrive | done | the two low notes and the 0.18 s gap kept (§7.4); four things making the horn |
 | collapseBegin | done | tectonic shift / atmosphere leaving / hull strain / one long fall — slow, low, no event |
-| matchEnd | done | a resolution, not a victory — it plays on a loss too, so nothing here congratulates |
+| matchEnd | split | **a0-68 — the slot is gone**: `matchWin` / `matchLoss`. This row's own note (*"it plays on a loss too, so nothing here congratulates"*) is the defect written down a week before the developer named it: *"we need separate ones for winning and losing"* |
 | alarm | done | saw and rising minor third kept on all four (§5.1, §2.2 — legibility outranks register); one-shots |
 | stationDeath | done | last, and by translation (§7.4, a0-55): the shipped beat in the sweep's materials, choosing how much of it there is |
 | ambient | done | a0-48 already answered this denial with `d`/`e`/`f`; a0-60 adds `g` (the far end of that axis) rather than destroying un-judged offers |

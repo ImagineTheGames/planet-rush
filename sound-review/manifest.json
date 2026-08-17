@@ -206,34 +206,130 @@
       ]
     },
     {
-      "id": "shotImpact",
-      "label": "Shot Impact",
-      "context": "A turret/ship projectile lands.",
-      "current": "previews/shotImpact/current.wav",
+      "id": "impactHull",
+      "label": "Impact — Hull",
+      "context": "A shot lands on an enemy ship. Thin plate over a body that is moving — the only one of the four that RINGS.",
+      "current": "previews/impactHull/current.wav",
       "candidates": [
         {
+          "id": "a",
+          "wav": "previews/impactHull/a.wav",
+          "character": "a dent: plate deforming, then ringing",
+          "params": "src/art/audio/candidates.ts#impactHull.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/impactHull/b.wav",
+          "character": "spall: debris comes off the plate",
+          "params": "src/art/audio/candidates.ts#impactHull.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/impactHull/c.wav",
+          "character": "a punch-through, and the hollow behind it",
+          "params": "src/art/audio/candidates.ts#impactHull.c"
+        },
+        {
           "id": "d",
-          "wav": "previews/shotImpact/d.wav",
-          "character": "absorber tick, hull taking it",
-          "params": "src/art/audio/candidates.ts#shotImpact.d"
+          "wav": "previews/impactHull/d.wav",
+          "character": "armour doing its job: damped, almost no ring",
+          "params": "src/art/audio/candidates.ts#impactHull.d"
+        }
+      ]
+    },
+    {
+      "id": "impactRock",
+      "label": "Impact — Rock",
+      "context": "A shot bites stone. Dry and low, and NOTHING rings — a rock that rings is a bell somebody painted grey.",
+      "current": "previews/impactRock/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/impactRock/a.wav",
+          "character": "a bite: granular cutting, no tone",
+          "params": "src/art/audio/candidates.ts#impactRock.a"
         },
         {
-          "id": "e",
-          "wav": "previews/shotImpact/e.wav",
-          "character": "spall, micro debris off plate",
-          "params": "src/art/audio/candidates.ts#shotImpact.e"
+          "id": "b",
+          "wav": "previews/impactRock/b.wav",
+          "character": "mass: pressure into stone, no grit",
+          "params": "src/art/audio/candidates.ts#impactRock.b"
         },
         {
-          "id": "f",
-          "wav": "previews/shotImpact/f.wav",
-          "character": "ferrite knock, two damped partials",
-          "params": "src/art/audio/candidates.ts#shotImpact.f"
+          "id": "c",
+          "wav": "previews/impactRock/c.wav",
+          "character": "shatter: chips leaving the face",
+          "params": "src/art/audio/candidates.ts#impactRock.c"
         },
         {
-          "id": "g",
-          "wav": "previews/shotImpact/g.wav",
-          "character": "charge dump, corner slamming shut",
-          "params": "src/art/audio/candidates.ts#shotImpact.g"
+          "id": "d",
+          "wav": "previews/impactRock/d.wav",
+          "character": "dead stop: the round just ends",
+          "params": "src/art/audio/candidates.ts#impactRock.d"
+        }
+      ]
+    },
+    {
+      "id": "impactShield",
+      "label": "Impact — Shield",
+      "context": "A shot stopped by a live bubble. The round never reached anything solid, and THAT is the whole information.",
+      "current": "previews/impactShield/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/impactShield/a.wav",
+          "character": "stopped short: the contact is cut off",
+          "params": "src/art/audio/candidates.ts#impactShield.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/impactShield/b.wav",
+          "character": "swallowed: a corner closing over it",
+          "params": "src/art/audio/candidates.ts#impactShield.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/impactShield/c.wav",
+          "character": "static: it ionises, with no body at all",
+          "params": "src/art/audio/candidates.ts#impactShield.c"
+        },
+        {
+          "id": "d",
+          "wav": "previews/impactShield/d.wav",
+          "character": "a glance: it slides off and away",
+          "params": "src/art/audio/candidates.ts#impactShield.d"
+        }
+      ]
+    },
+    {
+      "id": "impactStation",
+      "label": "Impact — Station",
+      "context": "A shot on anchored metal: a turret, a radar satellite, or the bare core. The darkest of the four — mass that does not move.",
+      "current": "previews/impactStation/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/impactStation/a.wav",
+          "character": "anchored: a thud that goes nowhere",
+          "params": "src/art/audio/candidates.ts#impactStation.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/impactStation/b.wav",
+          "character": "bulkhead: a big damped panel",
+          "params": "src/art/audio/candidates.ts#impactStation.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/impactStation/c.wav",
+          "character": "structure: the hit travels into the frame",
+          "params": "src/art/audio/candidates.ts#impactStation.c"
+        },
+        {
+          "id": "d",
+          "wav": "previews/impactStation/d.wav",
+          "character": "a ricochet off armour, into a room",
+          "params": "src/art/audio/candidates.ts#impactStation.d"
         }
       ]
     },
@@ -752,34 +848,66 @@
       ]
     },
     {
-      "id": "matchEnd",
-      "label": "Match End",
-      "context": "The match resolves — a short rising resolution.",
-      "current": "previews/matchEnd/current.wav",
+      "id": "matchWin",
+      "label": "Match End — Win",
+      "context": "You won. Lands AFTER the three seconds of quiet, ahead of the music sting. Arrival, never a fanfare.",
+      "current": "previews/matchWin/current.wav",
       "candidates": [
         {
+          "id": "a",
+          "wav": "previews/matchWin/a.wav",
+          "character": "direction: two notes rising a fifth",
+          "params": "src/art/audio/candidates.ts#matchWin.a"
+        },
+        {
+          "id": "b",
+          "wav": "previews/matchWin/b.wav",
+          "character": "the room: a chord opening upward",
+          "params": "src/art/audio/candidates.ts#matchWin.b"
+        },
+        {
+          "id": "c",
+          "wav": "previews/matchWin/c.wav",
+          "character": "pressure: the corner opens, no melody",
+          "params": "src/art/audio/candidates.ts#matchWin.c"
+        },
+        {
           "id": "d",
-          "wav": "previews/matchEnd/d.wav",
-          "character": "three weighted contacts coming to rest",
-          "params": "src/art/audio/candidates.ts#matchEnd.d"
+          "wav": "previews/matchWin/d.wav",
+          "character": "the stamp: one note, and it's over",
+          "params": "src/art/audio/candidates.ts#matchWin.d"
+        }
+      ]
+    },
+    {
+      "id": "matchLoss",
+      "label": "Match End — Loss",
+      "context": "You lost. The same gesture as the win, inverted — and never a joke: the home that just died is the one serious thing (§4.7).",
+      "current": "previews/matchLoss/current.wav",
+      "candidates": [
+        {
+          "id": "a",
+          "wav": "previews/matchLoss/a.wav",
+          "character": "direction: two notes falling a fifth",
+          "params": "src/art/audio/candidates.ts#matchLoss.a"
         },
         {
-          "id": "e",
-          "wav": "previews/matchEnd/e.wav",
-          "character": "air settling, the field going quiet",
-          "params": "src/art/audio/candidates.ts#matchEnd.e"
+          "id": "b",
+          "wav": "previews/matchLoss/b.wav",
+          "character": "the room: a chord closing downward",
+          "params": "src/art/audio/candidates.ts#matchLoss.b"
         },
         {
-          "id": "f",
-          "wav": "previews/matchEnd/f.wav",
-          "character": "two bands opening in a big room",
-          "params": "src/art/audio/candidates.ts#matchEnd.f"
+          "id": "c",
+          "wav": "previews/matchLoss/c.wav",
+          "character": "pressure: the corner shuts, no melody",
+          "params": "src/art/audio/candidates.ts#matchLoss.c"
         },
         {
-          "id": "g",
-          "wav": "previews/matchEnd/g.wav",
-          "character": "over: one low note, allowed to end",
-          "params": "src/art/audio/candidates.ts#matchEnd.g"
+          "id": "d",
+          "wav": "previews/matchLoss/d.wav",
+          "character": "the stamp: one low note, and nothing",
+          "params": "src/art/audio/candidates.ts#matchLoss.d"
         }
       ]
     },
@@ -1109,32 +1237,32 @@
     {
       "id": "rejectBuzz",
       "label": "Reject Buzz",
-      "context": "A buy the player can't afford — a low, flat, faintly gritty 'nope' that falls a little and stops.",
+      "context": "A buy the player can't afford. The sound of NO: flat, short, unmistakable, and never funny.",
       "current": "previews/rejectBuzz/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/rejectBuzz/d.wav",
-          "character": "a dry refusal, grit and stop",
-          "params": "src/art/audio/candidates.ts#rejectBuzz.d"
+          "id": "h",
+          "wav": "previews/rejectBuzz/h.wav",
+          "character": "the glass, refused: a minor second struck at once",
+          "params": "src/art/audio/candidates.ts#rejectBuzz.h"
         },
         {
-          "id": "e",
-          "wav": "previews/rejectBuzz/e.wav",
-          "character": "blocked: the corner shuts",
-          "params": "src/art/audio/candidates.ts#rejectBuzz.e"
+          "id": "i",
+          "wav": "previews/rejectBuzz/i.wav",
+          "character": "a bar dropping: the shop shuts",
+          "params": "src/art/audio/candidates.ts#rejectBuzz.i"
         },
         {
-          "id": "f",
-          "wav": "previews/rejectBuzz/f.wav",
-          "character": "two bands a semitone apart, unresolved",
-          "params": "src/art/audio/candidates.ts#rejectBuzz.f"
+          "id": "j",
+          "wav": "previews/rejectBuzz/j.wav",
+          "character": "the buzzer, done properly: one flat band, cut",
+          "params": "src/art/audio/candidates.ts#rejectBuzz.j"
         },
         {
-          "id": "g",
-          "wav": "previews/rejectBuzz/g.wav",
-          "character": "no, said quietly, once",
-          "params": "src/art/audio/candidates.ts#rejectBuzz.g"
+          "id": "k",
+          "wav": "previews/rejectBuzz/k.wav",
+          "character": "dead: the signal is cut mid-word",
+          "params": "src/art/audio/candidates.ts#rejectBuzz.k"
         }
       ]
     },

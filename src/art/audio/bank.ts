@@ -115,9 +115,12 @@
  * later brief cannot revive one of them by accident. `docs/sound-adoptions.md`
  * is the ledger.
  *
- * The impact of a shot in flight ({@link SOUND.shotImpact}) is the turret/ship
- * projectile landing; it and the two chip voices carry weapon power in their gain
- * (`./engine` `levelFor`), so a tier-4 tool hits heavier than a tier-0 one.
+ * The impact of a shot in flight is the turret/ship projectile landing, and it is
+ * **four slots** ({@link SOUND.impactHull} · {@link SOUND.impactRock} ·
+ * {@link SOUND.impactShield} · {@link SOUND.impactStation}) since a0-68 split the
+ * one `shotImpact` had been by what the shot actually hit. All four carry weapon
+ * power in their gain (`./engine` `levelFor`) the way the two chip voices do, so a
+ * tier-4 tool hits heavier than a tier-0 one on every surface.
  *
  * ## The device cues (the p4-03 seams)
  *
@@ -136,8 +139,8 @@
  * louder than both because it is a mechanic (GDD §2.2), not a notification.
  */
 
-import { TELL, type TellKind } from '../tells';
-import { grains, plate, swept } from './instrument';
+import { IMPACT, TELL, type TellKind } from '../tells';
+import { band, grains, plate, swept } from './instrument';
 import type { VoiceSpec } from './synth';
 import {
   GLASS_PAIR,
@@ -210,7 +213,29 @@ export const SOUND = {
 
   // --- Fight --------------------------------------------------------------
   turretFire: 'turretFire',
-  shotImpact: 'shotImpact',
+
+  // A shot arriving, **by what it arrived on** (a0-68). One slot until the
+  // developer heard it: *"none of these sound like impact sounds, they should
+  // also be different depending on the thing that was hit…"* — and no voice could
+  // answer the second half, because a hull, a rock, a shield bubble and a
+  // station were four physical events sharing one cue. The surface rides the
+  // tell's `variant` column ({@link IMPACT}, `../tells`) and {@link soundForTell}
+  // picks; the fold from the sim's six branches down to these four is written
+  // down beside `IMPACT` and in `docs/sound-structural-notes.md`.
+  //
+  // They are a FAMILY, not four unrelated sounds: same transient, same length
+  // class, same level neighbourhood, and each one sits UNDER the consequence
+  // voice that follows it a beat later (`shieldHit`, `coreHit`, `rockCrack`).
+  // The impact says what you hit; the next sound says what it did.
+  /** A round on an enemy hull — thin plate over something that is moving. */
+  impactHull: 'impactHull',
+  /** A round into stone. Dry, low, and nothing rings. */
+  impactRock: 'impactRock',
+  /** A round stopped by a live shield bubble — it never reached anything solid. */
+  impactShield: 'impactShield',
+  /** A round on anchored station metal: a turret, a satellite, or the bare core. */
+  impactStation: 'impactStation',
+
   shieldHit: 'shieldHit',
   shieldDown: 'shieldDown',
   /** The core taking damage. Low, and one of the two sounds homes get. */
@@ -236,7 +261,22 @@ export const SOUND = {
 
   // --- The one serious thing ----------------------------------------------
   stationDeath: 'stationDeath',
-  matchEnd: 'matchEnd',
+
+  // The match resolving, **as two outcomes** (a0-68). *"none of these sound like
+  // match end and we need separate ones for winning and losing"* — and the second
+  // clause is the whole brief: one cue played whether you had just won or just
+  // lost, at the single moment in a match where the game must not be ambiguous.
+  //
+  // These are the STINGS, on the SFX bus. `musicWin`/`musicLoss` are the music
+  // half and they are not these: the sting is the verdict and lands first; the
+  // music is the reading and follows it (`./engine` OUTCOME_STING, `./music`
+  // STING_LEAD_S). A player with the music slider at zero still hears which way
+  // it went, which is the property that makes two buses right rather than
+  // redundant.
+  /** The win sting. Brief, level, arriving — never a fanfare. */
+  matchWin: 'matchWin',
+  /** The loss sting. The same gesture, downward and stopping. */
+  matchLoss: 'matchLoss',
 
   // --- Mechanics that are not moments -------------------------------------
   /** The under-attack alarm (GDD §2.2) — a mechanic, not polish. See `./alarm`. */
@@ -701,24 +741,126 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
     ],
   },
 
+  // ---- The impact family (a0-68) ------------------------------------------
+  //
   // A shot in flight landing. **A tick, not a "pew"** — the ×3.00 fall inside
   // 57 ms was the arcade half of a projectile, and the arrival is the transient.
-  [SOUND.shotImpact]: {
-    name: 'shotImpact',
-    wave: 'noise',
-    attack: 0.0005,
-    hold: 0.003,
-    decay: 0.058,
-    decayCurve: 8, // a landing is an edge with a tail, not a burst of hiss
-    punch: 0.4,
-    freq: 900,
-    freqEnd: 780,
-    lowPass: 5200,
-    lowPassEnd: 2600,
-    resonance: 3,
-    highPass: 400,
-    gain: 0.34, // a landing shot still has to land
-    seed: 0xb23a,
+  // That much survives from the single `shotImpact` these four replace; what it
+  // could not do is the developer's second clause, *"different depending on the
+  // thing that was hit"*.
+  //
+  // ## What is shared, so four voices are one game
+  //
+  // Every one of them is: a CONTACT (a band-passed noise edge, ≤1 ms attack) and
+  // a BODY (the material answering it). The contact is the round; the body is the
+  // thing. Only the body changes across the four, which is what makes them read
+  // as one weapon striking four materials rather than four weapons.
+  //
+  // ## What is not shared, in the order a player learns it
+  //
+  //   hull     bright, and it RINGS — thin plate over a body that is moving
+  //   shield   no contact at all: the edge is swallowed by a field that closes
+  //   rock     dry and low, and nothing rings — stone absorbs
+  //   station  the darkest and the heaviest — anchored mass that does not move
+  //
+  // ## The bound that keeps them out of the way
+  //
+  // Each one is followed a beat later by its CONSEQUENCE (`shieldHit` when a
+  // bubble takes it, `coreHit` on a core, `rockCrack` on a rock that gave way),
+  // and the consequence is the one carrying the mechanic. So every impact here is
+  // held under its consequence in level and well under it in length; `audio.test.
+  // ts` states both as numbers. An arrival that drowns the thing it arrived at is
+  // a louder game, not a clearer one.
+
+  /** Hull: a dent in thin plate, with the plate ringing after it. */
+  [SOUND.impactHull]: {
+    name: 'impactHull',
+    layers: [
+      band('impactHull.contact', 2050, { gain: 0.95, decay: 0.02, q: 4.5, curve: 7, punch: 0.55, hp: 600, seed: 0xb2a0 }),
+      // The ring, and the ONLY one of the four that has one: an inharmonic pair,
+      // so it is a panel and not a bell (the ratified glass spacing belongs to
+      // the interface, `./ui-cues`, and reusing it here would blur the two).
+      band('impactHull.plate', 1180, { gain: 0.62, decay: 0.075, q: 8, curve: 5, seed: 0xb2a1 }),
+      band('impactHull.plate2', 1735, { gain: 0.38, decay: 0.055, q: 9, curve: 6, seed: 0xb2a2 }),
+    ],
+  },
+
+  /** Rock: a dry bite into stone. Grain, no tone, gone before the next shot. */
+  [SOUND.impactRock]: {
+    name: 'impactRock',
+    layers: [
+      band('impactRock.contact', 1150, { gain: 0.26, decay: 0.016, q: 4, curve: 7, punch: 0.5, hp: 340, seed: 0xb2b0 }),
+      // Stone answers with mass and grit, and it stops. A closing corner rather
+      // than a partial — a rock that rings is a bell somebody painted grey.
+      swept('impactRock.body', {
+        wave: 'noise',
+        freq: 240,
+        from: 900,
+        to: 260,
+        q: 2.2,
+        gain: 0.28,
+        attack: 0.0006,
+        hold: 0.004,
+        decay: 0.062,
+        curve: 6.5,
+        punch: 0.4,
+        seed: 0xb2b1,
+      }),
+    ],
+  },
+
+  /** Shield: the round never lands. A contact swallowed by a field closing over it. */
+  [SOUND.impactShield]: {
+    name: 'impactShield',
+    layers: [
+      // Deliberately the softest opening of the four (attack 0.9 ms against
+      // ≤0.5 ms elsewhere): *nothing solid was struck* is the whole information,
+      // and a hard edge here would be the lie the slot has been telling.
+      swept('impactShield.absorb', {
+        wave: 'noise',
+        freq: 620,
+        from: 3400,
+        to: 700,
+        q: 3.4,
+        gain: 0.24,
+        attack: 0.0009,
+        hold: 0.004,
+        decay: 0.09,
+        curve: 4.5,
+        punch: 0.3,
+        hp: 300,
+        seed: 0xb2c0,
+      }),
+      // The field flexing back — one narrow partial, low level, slightly late, so
+      // it reads as the bubble answering rather than as part of the arrival.
+      band('impactShield.flex', 1480, { gain: 0.1, decay: 0.085, q: 11, curve: 3.6, at: 0.012, seed: 0xb2c1 }),
+    ],
+  },
+
+  /** Station: anchored mass. The darkest and heaviest of the four; it does not move. */
+  [SOUND.impactStation]: {
+    name: 'impactStation',
+    layers: [
+      band('impactStation.contact', 760, { gain: 0.36, decay: 0.018, q: 4, curve: 7, punch: 0.5, hp: 200, seed: 0xb2d0 }),
+      // A big thing taking a hit and not going anywhere: a low body under a
+      // corner that closes, and a longer tail than any of the other three — but
+      // still inside the family's length class, because it fires at combat rate.
+      swept('impactStation.mass', {
+        wave: 'triangle',
+        freq: 96,
+        from: 620,
+        to: 170,
+        q: 2.6,
+        gain: 0.44,
+        attack: 0.0008,
+        hold: 0.008,
+        decay: 0.12,
+        curve: 5,
+        punch: 0.45,
+        noiseMix: 0.2,
+        seed: 0xb2d1,
+      }),
+    ],
   },
 
   // Shimmer: a bell that rings a moment and fades. Struck, not broken.
@@ -1437,59 +1579,118 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
     ],
   },
 
-  [SOUND.matchEnd]: {
-    name: 'matchEnd',
+  // ---- The two stings (a0-68) ---------------------------------------------
+  //
+  // These replace the single `matchEnd`, which sounded the same whether you had
+  // just won or just lost. The reason they are a PAIR rather than one cue with a
+  // parameter is that the moment has to be unambiguous in the first 200 ms, and
+  // the only thing that reliably separates two outcomes that fast is direction:
+  // one of these goes UP and one goes DOWN, out of the same two-note gesture, in
+  // the same key (A minor, §7.5 — so neither can fight the music sting that
+  // follows it).
+  //
+  // ## Where they sit against `musicWin` / `musicLoss`
+  //
+  // A match ends the tick the last opposing core dies, so `stationDeath` and
+  // `matchEnd` land in the SAME frame, and the three seconds of silence (GDD
+  // §4.7) start on top of them. That quiet is ratified and it is protected here,
+  // not punched through: neither of these plays inside it. `./engine` holds the
+  // outcome until the hush lifts, then the sting lands, and `./music` waits a
+  // further {@link STING_LEAD_S} before its own longer win/loss music. Verdict,
+  // then reading. The old cue did neither — it started at full level into a mix
+  // that was multiplied to zero 0.12 s later, which is the a0-55 bug one slot
+  // over, and it is why *"none of these sound like match end"* was a fair thing
+  // to say about four takes that were never actually heard.
+  //
+  // ## Why they are SHORT
+  //
+  // The music sting is the one allowed to take its time. These are stamps: both
+  // are under 0.7 s so the sequence reads as verdict-then-reading rather than as
+  // two pieces of music starting near each other. `audio.test.ts` holds that.
+
+  /** The win: two notes rising a fifth, the second held. Arrival, not fanfare. */
+  [SOUND.matchWin]: {
+    name: 'matchWin',
     layers: [
       {
         spec: {
-          name: 'matchEnd.a',
+          name: 'matchWin.a',
           wave: 'triangle',
           attack: 0.004,
-          hold: 0.04,
-          decay: 0.4,
-          decayCurve: 3,
-          freq: 392,
+          hold: 0.03,
+          decay: 0.22,
+          decayCurve: 3.4,
+          freq: 220, // A3 — the root of the soundtrack's key
           noiseMix: 0.07,
-          lowPass: 1600,
+          lowPass: 1400,
           resonance: 2.6,
-          gain: 0.5,
+          gain: 0.53,
           seed: 0xdce3,
         },
       },
       {
         spec: {
-          name: 'matchEnd.b',
-          wave: 'triangle',
-          attack: 0.004,
-          hold: 0.04,
-          decay: 0.52,
-          decayCurve: 3,
-          freq: 523,
-          noiseMix: 0.07,
-          lowPass: 2000,
-          resonance: 2.6,
-          gain: 0.48,
-          seed: 0xdce4,
-        },
-        at: 0.12,
-      },
-      {
-        spec: {
-          name: 'matchEnd.c',
+          name: 'matchWin.b',
           wave: 'triangle',
           attack: 0.004,
           hold: 0.05,
-          decay: 0.95,
-          decayCurve: 3.4,
-          freq: 784,
+          decay: 0.42,
+          decayCurve: 3.2,
+          freq: 329.63, // E4 — up a fifth, and it stays there
           noiseMix: 0.07,
-          lowPass: 2600,
+          lowPass: 2100,
           resonance: 2.6,
-          gain: 0.44,
-          seed: 0xdce5,
+          gain: 0.53,
+          seed: 0xdce4,
         },
-        at: 0.24,
+        at: 0.11,
       },
+      // One quiet partial an octave over the arrival, so the win has a top
+      // without a third note in it. A third note is a tune; this is a stamp.
+      band('matchWin.lift', 1319, { gain: 0.11, decay: 0.3, q: 9, curve: 3.4, at: 0.11, seed: 0xdce5 }),
+    ],
+  },
+
+  /** The loss: the same gesture, inverted. Two notes falling, and it stops. */
+  [SOUND.matchLoss]: {
+    name: 'matchLoss',
+    layers: [
+      {
+        spec: {
+          name: 'matchLoss.a',
+          wave: 'triangle',
+          attack: 0.005,
+          hold: 0.03,
+          decay: 0.24,
+          decayCurve: 3.2,
+          freq: 220, // the same A3: both outcomes start in the same place
+          noiseMix: 0.07,
+          lowPass: 1200,
+          resonance: 2.6,
+          gain: 0.51,
+          seed: 0xdce6,
+        },
+      },
+      {
+        spec: {
+          name: 'matchLoss.b',
+          wave: 'triangle',
+          attack: 0.006,
+          hold: 0.05,
+          decay: 0.46,
+          decayCurve: 2.8,
+          freq: 146.83, // D3 — down a fifth, the mirror of the win
+          noiseMix: 0.07,
+          lowPass: 760,
+          resonance: 2.4,
+          gain: 0.51,
+          seed: 0xdce7,
+        },
+        at: 0.12,
+      },
+      // No lift layer. The win has a top and the loss does not — the asymmetry IS
+      // the tell, and it survives a phone speaker that cannot reproduce the
+      // fundamental of either note.
     ],
   },
 
@@ -2588,7 +2789,9 @@ export const TELL_SOUND: Readonly<Record<TellKind, SoundName | null>> = {
   [TELL.oreCollect]: SOUND.oreCollect,
   [TELL.holdFull]: SOUND.holdFull,
   [TELL.turretFire]: SOUND.turretFire,
-  [TELL.shotImpact]: SOUND.shotImpact,
+  // Split (a0-68): the sound depends on the tell's own payload, not on its kind
+  // alone. Ask {@link soundForTell}, never this table.
+  [TELL.shotImpact]: null,
   [TELL.shieldHit]: SOUND.shieldHit,
   [TELL.shieldDown]: SOUND.shieldDown,
   [TELL.coreHit]: SOUND.coreHit,
@@ -2604,7 +2807,7 @@ export const TELL_SOUND: Readonly<Record<TellKind, SoundName | null>> = {
   [TELL.waveArrive]: SOUND.waveArrive,
   [TELL.collapseBegin]: SOUND.collapseBegin,
   [TELL.stationDeath]: SOUND.stationDeath,
-  [TELL.matchEnd]: SOUND.matchEnd,
+  [TELL.matchEnd]: null, // split (a0-68) — see {@link soundForTell}
   [TELL.turretDown]: SOUND.turretDown,
 };
 
@@ -2616,6 +2819,58 @@ export const TELL_SOUND: Readonly<Record<TellKind, SoundName | null>> = {
  * two firing loops to sustain — only the engine note under the local player's thumb.
  */
 export const SUSTAINED_TELLS: readonly TellKind[] = [TELL.thrust];
+
+/**
+ * Tells whose sound is chosen from the tell's **own payload** rather than from
+ * its kind — the second legal reason for a `null` in {@link TELL_SOUND}, and the
+ * a0-68 answer to two denials that were both really about one slot doing two
+ * jobs. Named here for the same reason {@link SUSTAINED_TELLS} is: the coverage
+ * test can then insist a `null` is one of these two things and never a mechanic
+ * somebody forgot to give a voice to.
+ */
+export const SPLIT_TELLS: readonly TellKind[] = [TELL.shotImpact, TELL.matchEnd];
+
+/**
+ * The sound one tell should make — the single place kind, magnitude and variant
+ * turn into a bank entry.
+ *
+ * Two kinds are not a straight table lookup, and the two are split on different
+ * columns on purpose:
+ *
+ *  - **`shotImpact` reads `variant`.** The surface ({@link IMPACT}) is
+ *    categorical and the tell gained a column to carry it, because `magnitude`
+ *    is already the shot's damage and the mixer multiplies a gain out of it.
+ *  - **`matchEnd` reads `magnitude`.** The outcome has been in that column since
+ *    the tell was written (`../tells` {@link TELL_PAYLOAD}: *"1 win, 0 loss"*),
+ *    documented as categorical, and the soundtrack already reads it there
+ *    (`./music` `MusicScore.end`). A second copy in `variant` would be a second
+ *    source of truth for one fact, which is a worse defect than one fact living
+ *    in an unusual column. **The win/lose plumbing was never missing** — the bank
+ *    was throwing it away, which is what a0-68 found and what this fixes.
+ *
+ * Returns `null` for a genuinely voiceless kind (`thrust`, a held state) and for
+ * an out-of-range variant, which cannot happen from the observer but can from a
+ * hand-built queue in a test.
+ */
+export function soundForTell(kind: TellKind, magnitude = 1, variant = 0): SoundName | null {
+  if (kind === TELL.shotImpact) return IMPACT_SOUND[variant] ?? null;
+  if (kind === TELL.matchEnd) return magnitude >= 0.5 ? SOUND.matchWin : SOUND.matchLoss;
+  return TELL_SOUND[kind];
+}
+
+/**
+ * Impact surface → voice, indexed by the {@link IMPACT} code the tell carries.
+ * A plain array because the codes are dense from zero and this is read once per
+ * shot that landed.
+ */
+export const IMPACT_SOUND: readonly SoundName[] = (() => {
+  const table: SoundName[] = [];
+  table[IMPACT.hull] = SOUND.impactHull;
+  table[IMPACT.rock] = SOUND.impactRock;
+  table[IMPACT.shield] = SOUND.impactShield;
+  table[IMPACT.station] = SOUND.impactStation;
+  return table;
+})();
 
 // ---------------------------------------------------------------------------
 // Device cues → sounds

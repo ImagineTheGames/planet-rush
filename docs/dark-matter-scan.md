@@ -659,6 +659,57 @@ requirement.
 **If a fake store ever gains a production caller** — an offline/replay mode, say —
 it stops being this and becomes wiring, and this row should fail again.
 
+### 4.10 SURFACE — the two names a split slot needs (a0-68, 2026-08-17)
+
+| Export | Verdict |
+|---|---|
+| `src/art/audio/bank.ts#SPLIT_TELLS` | SURFACE — the second legal `null`, named so the coverage spec keeps its teeth |
+| `src/art/tells.ts#IMPACT_NAMES` | SURFACE — a surface code printed as a word, for the two readers that print one |
+
+a0-68 answered two denials that were both really one slot doing two jobs:
+`matchEnd` played the same cue whether the player had won or lost, and
+`shotImpact` played one cue for a hull, a shield, a rock and a station. Both are
+now chosen from the tell's **own payload** rather than from its kind, which is
+what put these two exports on the board. Neither is pattern triage — both were
+checked singly, and the wire/delete options were tried first in that order.
+
+**`SPLIT_TELLS` cannot be wired, for the same reason `SUSTAINED_TELLS` never
+was.** `TELL_SOUND` is a `kind → sound` table and a split kind has no single
+entry, so it holds `null` — and a `null` in that table is exactly what a
+forgotten mechanic looks like. GDD §3.6 says every mechanic gets a voice, and
+`audio.test.ts` is what holds the bank to it, so the spec has to be able to tell
+the two apart. `SPLIT_TELLS` is that list. Production never consults it:
+`soundForTell` dispatches on `kind` in two branches and returns the voice, so a
+membership test in the engine would be weight invented to satisfy this scan
+rather than to run the game. `SUSTAINED_TELLS` sits three lines above it with the
+same job and the same verdict; this is that row a second time, written down
+rather than absorbed into the 157.
+
+**`IMPACT_NAMES` has two readers and production is not one of them.** It inverts
+`IMPACT` into `code → name`. Production only ever goes the other way — the
+observer classifies a hit to a code and `IMPACT_SOUND[variant]` indexes the voice
+straight out of it — so nothing in the game has a reason to render the word
+"shield". The two things that do are `audio/audio.test.ts`, which enumerates the
+surfaces and labels each assertion with the one that failed, and
+`evidence/a0-68-structural-slots/impact-surfaces.ts`, which is the measurement
+that answered *"they should also be different depending on the thing that was
+hit"* by reporting what surface each of a match's shots actually classified as.
+That is §4.4(a)'s stated shape — *"they run in specs and in `evidence/`
+scripts"* — reached by a single row rather than by the pattern.
+
+**Deleting it was the closer call and it loses.** Both readers could invert
+`IMPACT` themselves, so the export is not load-bearing in the way §4.9's double
+is. But that is two copies of one derivation, in two trees, and the second lives
+in `evidence/` where nothing type-checks it against a surface added later — the
+duplication §4.4(d) declined for `inkAlphaAt`, for the same reason. Deriving it
+once beside the table it inverts costs one export and keeps the spec's
+enumeration and the evidence's report reading from the same list.
+
+**If either gains a production caller** — a debug overlay that names the surface,
+or an engine that wants to ask whether a kind is split before calling
+`soundForTell` — it stops being surface and becomes wiring, and the row should
+fail again.
+
 ## 5. Should it gate CI? Yes — and here is the number
 
 **It ships as a gate**, `npm run dark-matter:check`, in the `ci` job. It fails on

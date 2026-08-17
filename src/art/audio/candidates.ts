@@ -439,7 +439,13 @@ export const CANDIDATE_SLOT_ORDER: readonly string[] = [
   'oreCollect',
   'holdFull',
   'turretFire',
-  'shotImpact',
+  // The impact family (a0-68): `shotImpact` was one slot for four physical
+  // events, so it is four slots now. Kept in bank order, where the one they
+  // replace sat, so a reviewer sweeping the board is not re-ordered underneath.
+  'impactHull',
+  'impactRock',
+  'impactShield',
+  'impactStation',
   'shieldHit',
   'shieldDown',
   'coreHit',
@@ -456,7 +462,11 @@ export const CANDIDATE_SLOT_ORDER: readonly string[] = [
   'waveArrive',
   'collapseBegin',
   'stationDeath',
-  'matchEnd',
+  // Two outcomes (a0-68) where `matchEnd` was one. These are the STINGS;
+  // `musicWin`/`musicLoss` below are the music half and they are not the same
+  // cue — see the block above `matchWin` in `CANDIDATE_SLOTS`.
+  'matchWin',
+  'matchLoss',
   'alarm',
   'ambient',
   'musicBed',
@@ -1054,50 +1064,286 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       },
     ],
   },
-  shotImpact: {
-    label: "Shot Impact",
-    context: "A turret/ship projectile lands.",
-    current: 'shotImpact',
+  // ---------------------------------------------------------------------------
+  // THE IMPACT FAMILY (a0-68, 2026-08-17)
+  // ---------------------------------------------------------------------------
+  //
+  //   *"none of these sound like impact sounds, they should also be different
+  //   depending on the thing that was hit..."*
+  //
+  // Two requests, and the second one is why `shotImpact` is not on this board any
+  // more. It was one slot for four physical events, so no set of four takes could
+  // have answered it — the fourth denial would have been as fair as the third.
+  // The slot is replaced by these four, the tell now carries which one
+  // (`../tells` IMPACT, `../vfx/observer` impactSurface), and the sim's six
+  // branches fold to four voices under a table anyone can move. The derivation is
+  // in `docs/sound-structural-notes.md`; the measured proof that each branch comes
+  // out carrying the right surface is `evidence/a0-68-structural-slots/`.
+  //
+  // ## Letters start at `a`, and that is not a mistake
+  //
+  // A letter is only meaningful inside a slot — `/status/sound-choices.json`
+  // records a slot AND a letter. These are four slot ids no verdict has ever
+  // named, so `a` here cannot be confused with `shotImpact/a`; there is no
+  // `impactHull` record to make unreadable. The a0-48 re-lettering rule is about
+  // a slot re-offering under its own spent letters, which is not this.
+  //
+  // ## What every offer in all four slots has to be
+  //
+  //  1. **An arrival, not a weapon.** `turretFire` is the shot leaving; these are
+  //     the shot landing, and `./bank`'s own note says low is what separates them.
+  //     Nothing here may read as a discharge.
+  //  2. **Under its consequence.** Each impact is followed a beat later by the
+  //     voice that carries the mechanic — `shieldHit`, `coreHit`, `rockCrack`.
+  //     The arrival says what you hit; the consequence says what it did. Every
+  //     offer is held under the shipped consequence in level, in
+  //     `./candidates.test.ts`, because an arrival that drowns its own consequence
+  //     is a louder game rather than a clearer one.
+  //  3. **Short.** They fire at combat rate, several a second in a firefight, so
+  //     every offer is inside 0.2 s and gone before the next one.
+  //
+  // ## And what makes the four SLOTS different from each other
+  //
+  // Read across the four blocks at the same letter and the *material* changes
+  // while the gesture holds. That is deliberate: the player has to learn four
+  // surfaces by ear during a fight, and four families that share a grammar is a
+  // thing an ear picks up in one match. Four unrelated sounds is four lessons.
+
+  impactHull: {
+    label: "Impact — Hull",
+    context: "A shot lands on an enemy ship. Thin plate over a body that is moving — the only one of the four that RINGS.",
+    current: 'impactHull',
     candidates: [
       {
+        id: 'a',
+        slot: 'impactHull',
+        character: "a dent: plate deforming, then ringing",
+        spec: {
+          name: 'impactHull_a_dent',
+          layers: [
+            band('impactHull_a.contact', 2150, { gain: 0.4, decay: 0.017, q: 4.5, curve: 7.5, punch: 0.6, hp: 700, seed: 68100 }),
+            // Inharmonic on purpose: a panel, never the ratified glass spacing —
+            // that material belongs to the interface (`./ui-cues`) and borrowing
+            // it here would blur a menu tick into a firefight.
+            ...plate('impactHull_a.panel', 1150, { gain: 0.26, decay: 0.07, ratios: [1, 2.37], q: 8, curve: 5, grain: 0.22, edge: 0, seed: 68102 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        slot: 'impactHull',
+        character: "spall: debris comes off the plate",
+        spec: {
+          name: 'impactHull_b_spall',
+          layers: [
+            grains('impactHull_b.spall', { freq: 2900, freqEnd: 2200, grain: 0.0016, gain: 0.4, hold: 0.002, decay: 0.032, curve: 6.5, punch: 0.6, from: 5800, to: 2400, q: 3.6, hp: 1500, seed: 68110 }),
+            band('impactHull_b.plate', 980, { gain: 0.22, decay: 0.045, q: 7, curve: 5.5, seed: 68112 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        slot: 'impactHull',
+        character: "a punch-through, and the hollow behind it",
+        spec: {
+          name: 'impactHull_c_punchThrough',
+          layers: [
+            band('impactHull_c.punch', 1820, { gain: 0.62, decay: 0.012, q: 5, curve: 8.5, punch: 0.75, hp: 600, seed: 68120 }),
+            // The volume on the far side of the hole: a body with the corner
+            // OPENING, which is the one filter direction that reads as space
+            // rather than as damage.
+            swept('impactHull_c.hollow', { wave: 'triangle', freq: 210, from: 520, to: 1500, q: 3, gain: 0.4, attack: 0.0012, hold: 0.004, decay: 0.075, curve: 4.2, noiseMix: 0.3, at: 0.006, seed: 68122 }),
+          ],
+        },
+      },
+      {
         id: 'd',
-        character: "absorber tick, hull taking it",
+        slot: 'impactHull',
+        character: "armour doing its job: damped, almost no ring",
         spec: {
-          name: 'shotImpact_d_absorberTick',
+          name: 'impactHull_d_armour',
           layers: [
-            band('shotImpact_d.tick', 1750, { gain: 0.42, decay: 0.016, q: 6, curve: 8, punch: 0.6, seed: 60050 }),
-            swept('shotImpact_d.absorb', { wave: 'sine', freq: 150, from: 420, to: 150, q: 2.4, gain: 0.3, attack: 0.0008, hold: 0.005, decay: 0.045, curve: 6, seed: 60052 }),
+            band('impactHull_d.contact', 1650, { gain: 0.38, decay: 0.014, q: 4, curve: 8, punch: 0.65, hp: 500, seed: 68130 }),
+            swept('impactHull_d.damp', { wave: 'noise', freq: 420, from: 1900, to: 380, q: 2.6, gain: 0.26, attack: 0.0005, hold: 0.003, decay: 0.036, curve: 7, punch: 0.4, seed: 68132 }),
+          ],
+        },
+      },
+    ],
+  },
+
+  impactRock: {
+    label: "Impact — Rock",
+    context: "A shot bites stone. Dry and low, and NOTHING rings — a rock that rings is a bell somebody painted grey.",
+    current: 'impactRock',
+    candidates: [
+      {
+        id: 'a',
+        slot: 'impactRock',
+        character: "a bite: granular cutting, no tone",
+        spec: {
+          name: 'impactRock_a_bite',
+          layers: [
+            grains('impactRock_a.grit', { freq: 220, grain: 0.0028, gain: 0.36, hold: 0.003, decay: 0.05, curve: 6, punch: 0.5, from: 1500, to: 420, q: 3.2, hp: 120, seed: 68200 }),
+            band('impactRock_a.edge', 950, { gain: 0.2, decay: 0.013, q: 4, curve: 8, punch: 0.5, seed: 68202 }),
           ],
         },
       },
       {
-        id: 'e',
-        character: "spall, micro debris off plate",
+        id: 'b',
+        slot: 'impactRock',
+        character: "mass: pressure into stone, no grit",
         spec: {
-          name: 'shotImpact_e_spall',
+          name: 'impactRock_b_mass',
           layers: [
-            grains('shotImpact_e.spall', { freq: 3100, freqEnd: 2400, grain: 0.0018, gain: 0.5, hold: 0.003, decay: 0.038, curve: 6, punch: 0.55, from: 6300, to: 2600, q: 3.4, hp: 1800, seed: 60060 }),
-            band('shotImpact_e.plate', 900, { gain: 0.24, decay: 0.02, q: 4, curve: 8, seed: 60062 }),
+            swept('impactRock_b.mass', { wave: 'sine', freq: 128, from: 700, to: 170, q: 2.2, gain: 0.4, attack: 0.0008, hold: 0.008, decay: 0.075, curve: 5.5, punch: 0.55, noiseMix: 0.14, seed: 68210 }),
+            band('impactRock_b.tap', 640, { gain: 0.16, decay: 0.012, q: 3.6, curve: 8, seed: 68212 }),
           ],
         },
       },
       {
-        id: 'f',
-        character: "ferrite knock, two damped partials",
+        id: 'c',
+        slot: 'impactRock',
+        character: "shatter: chips leaving the face",
         spec: {
-          name: 'shotImpact_f_ferriteKnock',
+          name: 'impactRock_c_shatter',
           layers: [
-            ...plate('shotImpact_f.knock', 1180, { gain: 0.34, decay: 0.03, ratios: [1, 2.41], q: 6, curve: 7, punch: 0.6, grain: 0.42, edge: 0.6, seed: 60070 }),
+            band('impactRock_c.strike', 1250, { gain: 0.3, decay: 0.011, q: 4.5, curve: 8.5, punch: 0.6, hp: 380, seed: 68220 }),
+            grains('impactRock_c.chips', { freq: 1900, freqEnd: 1250, grain: 0.0021, gain: 0.28, hold: 0.002, decay: 0.055, curve: 4.5, from: 3600, to: 900, q: 3, hp: 700, at: 0.005, seed: 68222 }),
           ],
         },
       },
       {
-        id: 'g',
-        character: "charge dump, corner slamming shut",
+        id: 'd',
+        slot: 'impactRock',
+        character: "dead stop: the round just ends",
         spec: {
-          name: 'shotImpact_g_chargeDump',
+          name: 'impactRock_d_deadStop',
           layers: [
-            swept('shotImpact_g.dump', { wave: 'noise', freq: 640, from: 5200, to: 380, q: 4.5, gain: 0.5, attack: 0.0006, hold: 0.004, decay: 0.05, curve: 7, punch: 0.5, hp: 200, seed: 60080 }),
+            // The shortest offer on the board for this slot, deliberately: at
+            // mining rate the most useful thing a rock impact can be is over.
+            swept('impactRock_d.stop', { wave: 'noise', freq: 300, from: 1800, to: 240, q: 2.4, gain: 0.42, attack: 0.0004, hold: 0.002, decay: 0.028, curve: 8, punch: 0.5, seed: 68230 }),
+          ],
+        },
+      },
+    ],
+  },
+
+  impactShield: {
+    label: "Impact — Shield",
+    context: "A shot stopped by a live bubble. The round never reached anything solid, and THAT is the whole information.",
+    current: 'impactShield',
+    candidates: [
+      // These deliberately do NOT reuse a0-67's four readings of `shieldHit`
+      // (deflection · absorption · arc · flex). That slot is the FIELD'S
+      // response and it plays a beat after this one; offering the same four
+      // ideas twice in a row would make the pair sound like one sound with an
+      // echo. These four are about the ROUND failing to arrive.
+      {
+        id: 'a',
+        slot: 'impactShield',
+        character: "stopped short: the contact is cut off",
+        spec: {
+          name: 'impactShield_a_stoppedShort',
+          layers: [
+            // A contact with its own tail removed — the decay is shorter than
+            // the ear expects from an edge that bright, which is what "it did
+            // not land" sounds like.
+            band('impactShield_a.cut', 1700, { gain: 0.3, decay: 0.008, q: 5, curve: 9, punch: 0.5, hp: 600, seed: 68300 }),
+            swept('impactShield_a.field', { wave: 'noise', freq: 720, from: 2600, to: 640, q: 3.6, gain: 0.2, attack: 0.001, hold: 0.004, decay: 0.07, curve: 4.5, hp: 320, at: 0.004, seed: 68302 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        slot: 'impactShield',
+        character: "swallowed: a corner closing over it",
+        spec: {
+          name: 'impactShield_b_swallowed',
+          layers: [
+            swept('impactShield_b.close', { wave: 'noise', freq: 560, from: 4200, to: 400, q: 3.8, gain: 0.32, attack: 0.0012, hold: 0.005, decay: 0.095, curve: 4, punch: 0.3, hp: 240, seed: 68310 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        slot: 'impactShield',
+        character: "static: it ionises, with no body at all",
+        spec: {
+          name: 'impactShield_c_static',
+          layers: [
+            grains('impactShield_c.crackle', { freq: 2400, freqEnd: 2600, grain: 0.0024, gain: 0.26, hold: 0.002, decay: 0.07, curve: 3.8, from: 4800, to: 2000, q: 4.2, hp: 1400, seed: 68320 }),
+          ],
+        },
+      },
+      {
+        id: 'd',
+        slot: 'impactShield',
+        character: "a glance: it slides off and away",
+        spec: {
+          name: 'impactShield_d_glance',
+          layers: [
+            // The corner OPENS rather than closing — the round leaving, not the
+            // round stopping. The only offer here with upward motion, and it is
+            // motion in the filter, not in pitch (§5.4).
+            swept('impactShield_d.skid', { wave: 'noise', freq: 900, from: 700, to: 3800, q: 3.2, gain: 0.62, attack: 0.0011, hold: 0.004, decay: 0.08, curve: 4.2, punch: 0.35, hp: 400, seed: 68330 }),
+            band('impactShield_d.brush', 1560, { gain: 0.24, decay: 0.05, q: 10, curve: 4, at: 0.01, seed: 68332 }),
+          ],
+        },
+      },
+    ],
+  },
+
+  impactStation: {
+    label: "Impact — Station",
+    context: "A shot on anchored metal: a turret, a radar satellite, or the bare core. The darkest of the four — mass that does not move.",
+    current: 'impactStation',
+    candidates: [
+      {
+        id: 'a',
+        slot: 'impactStation',
+        character: "anchored: a thud that goes nowhere",
+        spec: {
+          name: 'impactStation_a_anchored',
+          layers: [
+            band('impactStation_a.contact', 700, { gain: 0.28, decay: 0.014, q: 4, curve: 8, punch: 0.5, hp: 180, seed: 68400 }),
+            swept('impactStation_a.mass', { wave: 'triangle', freq: 88, from: 560, to: 150, q: 2.6, gain: 0.36, attack: 0.001, hold: 0.01, decay: 0.11, curve: 5, punch: 0.5, noiseMix: 0.18, seed: 68402 }),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        slot: 'impactStation',
+        character: "bulkhead: a big damped panel",
+        spec: {
+          name: 'impactStation_b_bulkhead',
+          layers: [
+            ...plate('impactStation_b.panel', 320, { gain: 0.3, decay: 0.1, ratios: [1, 1.83, 3.11], q: 5.5, curve: 4.5, punch: 0.45, grain: 0.35, edge: 0.7, seed: 68410 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        slot: 'impactStation',
+        character: "structure: the hit travels into the frame",
+        spec: {
+          name: 'impactStation_c_structure',
+          layers: [
+            band('impactStation_c.contact', 840, { gain: 0.26, decay: 0.011, q: 4.5, curve: 8.5, punch: 0.55, hp: 240, seed: 68420 }),
+            // Late and low — the frame answering after the round, which is what
+            // makes a station feel big without making the cue long.
+            swept('impactStation_c.frame', { wave: 'sine', freq: 74, from: 300, to: 110, q: 2.2, gain: 0.3, attack: 0.004, hold: 0.012, decay: 0.13, curve: 3.8, noiseMix: 0.1, at: 0.018, seed: 68422 }),
+          ],
+        },
+      },
+      {
+        id: 'd',
+        slot: 'impactStation',
+        character: "a ricochet off armour, into a room",
+        spec: {
+          name: 'impactStation_d_ricochet',
+          layers: [
+            band('impactStation_d.ric', 1480, { gain: 0.3, decay: 0.02, q: 6.5, curve: 7, punch: 0.7, hp: 520, seed: 68430 }),
+            swept('impactStation_d.room', { wave: 'noise', freq: 260, from: 900, to: 200, q: 2, gain: 0.22, attack: 0.006, hold: 0.008, decay: 0.12, curve: 3.4, at: 0.014, seed: 68432 }),
           ],
         },
       },
@@ -2319,57 +2565,188 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       },
     ],
   },
-  matchEnd: {
-    label: "Match End",
-    context: "The match resolves — a short rising resolution.",
-    current: 'matchEnd',
+  // ---------------------------------------------------------------------------
+  // THE TWO STINGS (a0-68, 2026-08-17)
+  // ---------------------------------------------------------------------------
+  //
+  //   *"none of these sound like match end and we need separate ones for winning
+  //   and losing"*
+  //
+  // `matchEnd` is not on this board any more, for the same reason `shotImpact`
+  // is not: the slot was wrong, so a fifth set of takes against it would have
+  // been denied as fairly as the fourth. One cue played whether you had just won
+  // or just lost, at the one moment in a match the game must not be ambiguous.
+  //
+  // ## The other half of why the denied four could not win
+  //
+  // A match resolves the tick the last opposing core dies, so the `matchEnd` tell
+  // arrived in the same frame as `stationDeath` and the three-second quiet
+  // (GDD §4.7) started underneath it. The cue began at full level into a mix that
+  // reached zero 0.12 s later. Every one of the four denied takes is longer than
+  // a second; the developer heard the first tenth of each. *"None of these sound
+  // like match end"* was a fair thing to say about four sounds nobody had played.
+  //
+  // `./engine` now HOLDS the outcome and lands it on the far side of the quiet —
+  // the silence is a ratified design element and it is protected here rather than
+  // punched through. See `docs/sound-structural-notes.md` §2.
+  //
+  // ## Where these sit against `musicWin` / `musicLoss`
+  //
+  // There are two win/loss pairs in the bank and they are not competing:
+  //
+  //   THESE (SFX bus)          the VERDICT — short, dry, first, and the one a
+  //                            player with the music slider at zero still hears
+  //   musicWin/musicLoss       the READING — longer, on the music bus, arriving
+  //   (music bus)              STING_LEAD_S after, and re-voiced in a0-67
+  //
+  // So every offer below is under 0.8 s. A sting that ran as long as the music
+  // cue would collide with it however the two were scheduled, and the sequence
+  // would read as two pieces of music starting near each other instead of as a
+  // verdict and its answer.
+  //
+  // ## The letters pair ACROSS the two slots, and that is a property
+  //
+  // `matchWin/a` and `matchLoss/a` are the same gesture inverted; so are `b`/`b`,
+  // `c`/`c`, `d`/`d`. Adopt any letter for the win and any letter for the loss and
+  // the two still contrast — but adopting the SAME letter for both gets a matched
+  // pair, which is the version that reads as one game. `./candidates.test.ts`
+  // holds the four pairings to a measured contrast so this cannot quietly rot.
+  //
+  //   a  **direction** — two notes, a fifth apart. The plainest possible statement.
+  //   b  **the room** — a chord opening upward, or closing downward.
+  //   c  **pressure** — no melody at all: a corner opening, or shutting.
+  //   d  **the stamp** — one struck note and nothing after it. The shortest "it's over".
+
+  matchWin: {
+    label: "Match End — Win",
+    context: "You won. Lands AFTER the three seconds of quiet, ahead of the music sting. Arrival, never a fanfare.",
+    current: 'matchWin',
     candidates: [
-      // A *resolution*, not a victory: this plays on a loss too, and the summary
-      // sequence (`docs/progression-plan.md` §6.5) lands the XP beat underneath
-      // it. So no offer here congratulates and none of them is a chord anybody
-      // could hum — the rise is in the corner and in the level, not in a tune.
+      {
+        id: 'a',
+        slot: 'matchWin',
+        character: "direction: two notes rising a fifth",
+        spec: {
+          name: 'matchWin_a_rise',
+          layers: [
+            place({ name: 'matchWin_a.n0', wave: 'triangle', attack: 0.004, hold: 0.03, decay: 0.2, decayCurve: 3.4, freq: 220, noiseMix: 0.07, lowPass: 1400, resonance: 2.6, gain: 0.42, seed: 68500 }),
+            place({ name: 'matchWin_a.n1', wave: 'triangle', attack: 0.004, hold: 0.05, decay: 0.4, decayCurve: 3.2, freq: 329.63, noiseMix: 0.07, lowPass: 2100, resonance: 2.6, gain: 0.42, seed: 68502 }, 0.11),
+          ],
+        },
+      },
+      {
+        id: 'b',
+        slot: 'matchWin',
+        character: "the room: a chord opening upward",
+        spec: {
+          name: 'matchWin_b_roomOpens',
+          layers: [
+            // Three pitches at once rather than in sequence — a0-67's register
+            // note for the music family is *harmony before texture*, and it
+            // applies here for the same reason: a chord is one event, and a
+            // verdict has to be one event.
+            place({ name: 'matchWin_b.root', wave: 'triangle', attack: 0.008, hold: 0.05, decay: 0.42, decayCurve: 3, freq: 220, noiseMix: 0.06, lowPass: 1200, resonance: 2.4, gain: 0.3, seed: 68510 }),
+            place({ name: 'matchWin_b.third', wave: 'triangle', attack: 0.01, hold: 0.05, decay: 0.44, decayCurve: 3, freq: 261.63, noiseMix: 0.06, lowPass: 1500, resonance: 2.4, gain: 0.26, seed: 68512 }),
+            place({ name: 'matchWin_b.fifth', wave: 'triangle', attack: 0.012, hold: 0.05, decay: 0.5, decayCurve: 2.8, freq: 329.63, noiseMix: 0.06, lowPass: 1900, resonance: 2.4, gain: 0.26, seed: 68514 }),
+          ],
+        },
+      },
+      {
+        id: 'c',
+        slot: 'matchWin',
+        character: "pressure: the corner opens, no melody",
+        spec: {
+          name: 'matchWin_c_pressureOpens',
+          layers: [
+            // For a developer who does not want a tune at the end of a match at
+            // all: one sustained body, and the corner opening over it.
+            //
+            // The BODY carries the outcome too, and it has to. Built with the
+            // same 110 Hz fundamental as its loss twin, the pair measured ×1.004
+            // apart on the zero-crossing centre — the proxy this repo uses for
+            // *what survives a phone speaker* — because a filter corner is not
+            // something a small speaker reliably reproduces and the fundamental
+            // dominated both. Two takes that are only distinguishable on good
+            // headphones are ambiguous at the one moment that may not be. So the
+            // win sits an octave up (A3) and the loss an octave down (A1); it is
+            // still one body and still no melody.
+            swept('matchWin_c.open', { wave: 'triangle', freq: 220, from: 380, to: 2600, q: 3, gain: 0.42, attack: 0.02, hold: 0.06, decay: 0.42, curve: 2.6, noiseMix: 0.14, seed: 68520 }),
+          ],
+        },
+      },
       {
         id: 'd',
-        character: "three weighted contacts coming to rest",
+        slot: 'matchWin',
+        character: "the stamp: one note, and it's over",
         spec: {
-          name: 'matchEnd_d_weightedRest',
+          name: 'matchWin_d_stamp',
           layers: [
-            swept('matchEnd_d.n0', { wave: 'triangle', freq: 165, from: 380, to: 900, q: 3.4, gain: 0.36, attack: 0.02, hold: 0.14, decay: 0.22, curve: 2.4, noiseMix: 0.12, seed: 61010 }),
-            swept('matchEnd_d.n1', { wave: 'triangle', freq: 220, from: 900, to: 480, q: 3.6, gain: 0.34, attack: 0.015, hold: 0.1, decay: 0.34, curve: 2.6, noiseMix: 0.1, at: 0.14, seed: 61012 }),
-            swept('matchEnd_d.floor', { wave: 'sine', freq: 55, from: 170, q: 1.6, gain: 0.26, attack: 0.04, hold: 0.24, decay: 0.5, curve: 2, seed: 61014 }),
+            band('matchWin_d.stamp', 660, { gain: 1.6, decay: 0.24, q: 7.5, curve: 4, attack: 0.003, hold: 0.02, punch: 0.4, seed: 68530 }),
+          ],
+        },
+      },
+    ],
+  },
+
+  matchLoss: {
+    label: "Match End — Loss",
+    context: "You lost. The same gesture as the win, inverted — and never a joke: the home that just died is the one serious thing (§4.7).",
+    current: 'matchLoss',
+    candidates: [
+      {
+        id: 'a',
+        slot: 'matchLoss',
+        character: "direction: two notes falling a fifth",
+        spec: {
+          name: 'matchLoss_a_fall',
+          layers: [
+            // The SAME A3 the win opens on: both outcomes start in one place, so
+            // the second note is doing all of the work and the ear only has to
+            // resolve one question.
+            place({ name: 'matchLoss_a.n0', wave: 'triangle', attack: 0.005, hold: 0.03, decay: 0.22, decayCurve: 3.2, freq: 220, noiseMix: 0.07, lowPass: 1200, resonance: 2.6, gain: 0.4, seed: 68600 }),
+            place({ name: 'matchLoss_a.n1', wave: 'triangle', attack: 0.006, hold: 0.05, decay: 0.44, decayCurve: 2.8, freq: 146.83, noiseMix: 0.07, lowPass: 760, resonance: 2.4, gain: 0.4, seed: 68602 }, 0.12),
           ],
         },
       },
       {
-        id: 'e',
-        character: "air settling, the field going quiet",
+        id: 'b',
+        slot: 'matchLoss',
+        character: "the room: a chord closing downward",
         spec: {
-          name: 'matchEnd_e_airSettles',
+          name: 'matchLoss_b_roomCloses',
           layers: [
-            grains('matchEnd_e.air', { freq: 420, freqEnd: 300, grain: 0.007, gain: 0.34, attack: 0.02, hold: 0.12, decay: 0.4, curve: 2.6, from: 2400, to: 700, q: 3, hp: 260, seed: 61020 }),
-            grains('matchEnd_e.settle', { freq: 260, freqEnd: 190, grain: 0.012, gain: 0.28, attack: 0.03, hold: 0.14, decay: 0.6, curve: 2.4, from: 1100, to: 340, q: 2.6, hp: 140, at: 0.16, seed: 61022 }),
+            place({ name: 'matchLoss_b.root', wave: 'triangle', attack: 0.01, hold: 0.05, decay: 0.46, decayCurve: 2.8, freq: 220, noiseMix: 0.06, lowPass: 1100, resonance: 2.4, gain: 0.28, seed: 68610 }),
+            place({ name: 'matchLoss_b.third', wave: 'triangle', attack: 0.012, hold: 0.05, decay: 0.48, decayCurve: 2.6, freq: 174.61, noiseMix: 0.06, lowPass: 880, resonance: 2.4, gain: 0.26, seed: 68612 }),
+            place({ name: 'matchLoss_b.low', wave: 'sine', attack: 0.014, hold: 0.05, decay: 0.54, decayCurve: 2.4, freq: 110, noiseMix: 0.05, lowPass: 420, resonance: 2.2, gain: 0.28, seed: 68614 }),
           ],
         },
       },
       {
-        id: 'f',
-        character: "two bands opening in a big room",
+        id: 'c',
+        slot: 'matchLoss',
+        character: "pressure: the corner shuts, no melody",
         spec: {
-          name: 'matchEnd_f_openBands',
+          name: 'matchLoss_c_pressureShuts',
           layers: [
-            band('matchEnd_f.n0', 294, { gain: 1.0, decay: 0.3, q: 9, curve: 3.4, attack: 0.005, hold: 0.02, seed: 61030 }),
-            band('matchEnd_f.n1', 440, { gain: 1.0, decay: 0.5, q: 10, curve: 3, attack: 0.005, hold: 0.02, at: 0.14, seed: 61032 }),
-            ...returns('matchEnd_f.room', { freq: 400, gain: 0.409, decay: 0.34, from: 1100, to: 340, at: 0.4, gap: 0.22, count: 2, seed: 61034 }),
+            // An octave under the win's body — see the note on `matchWin/c`.
+            swept('matchLoss_c.shut', { wave: 'triangle', freq: 55, from: 1600, to: 150, q: 3, gain: 0.46, attack: 0.02, hold: 0.06, decay: 0.46, curve: 2.4, noiseMix: 0.14, seed: 68620 }),
           ],
         },
       },
       {
-        id: 'g',
-        character: "over: one low note, allowed to end",
+        id: 'd',
+        slot: 'matchLoss',
+        character: "the stamp: one low note, and nothing",
         spec: {
-          name: 'matchEnd_g_over',
+          name: 'matchLoss_d_stamp',
           layers: [
-            swept('matchEnd_g.over', { wave: 'triangle', freq: 110, from: 320, to: 180, q: 2.8, gain: 0.44, attack: 0.02, hold: 0.16, decay: 0.62, curve: 2.2, noiseMix: 0.1, seed: 61040 }),
+            // A2, an octave under the win's stamp and under the A3 both `a`
+            // takes open on. It was written at 220 and that put the LOSS stamp
+            // above the WIN phrase on the centre measure — the board lets the
+            // developer adopt any win letter with any loss letter, so the
+            // contrast has to hold across all sixteen pairings and not only the
+            // matched ones.
+            band('matchLoss_d.stamp', 110, { gain: 2.6, decay: 0.28, q: 6.5, curve: 3.6, attack: 0.004, hold: 0.02, punch: 0.35, seed: 68630 }),
           ],
         },
       },
@@ -3422,55 +3799,115 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       },
     ],
   },
+  // ---------------------------------------------------------------------------
+  // REJECT BUZZ (a0-68, denied 2026-08-17 with the other nineteen)
+  // ---------------------------------------------------------------------------
+  //
+  //   *"none of these sound like rejected"*
+  //
+  // This slot belongs with a0-67's sixteen and was left out of both briefs; the
+  // board's own `denied_without_work` flagged it. It gets what any round-two slot
+  // gets — four fresh takes under letters no verdict has spent (`a`-`c` on
+  // 2026-08-07, `d`-`g` on 2026-08-17, so these are `h`-`k`).
+  //
+  // ## Why the denied four were not refusals
+  //
+  // Read the characters back: *a dry refusal* · *blocked: the corner shuts* ·
+  // *two bands a semitone apart* · *no, said quietly, once*. All four are
+  // **understated**, and three of the four say so in their own name. They were
+  // built to a §8 note about staying clear of `coreHit` and to a fear of the slot
+  // being a raspberry, and between the two they arrived at a sound that is
+  // tasteful and does not read as *no*.
+  //
+  // A refusal is not a quiet sound. It is a FLAT and UNMISTAKABLE one — you
+  // pressed a thing and the thing did not happen, and the interface has to say so
+  // without being asked twice. The developer has said elsewhere that a buy they
+  // cannot afford must not be entertaining, and that is the other fence: never
+  // funny, nothing that wobbles, nothing with a raspberry in it.
+  //
+  // So the three properties all four below hold, that the denied four did not:
+  //
+  //  1. **A hard front.** Every one of these starts at full level in under 4 ms.
+  //     A refusal that fades in is a refusal you have to listen for.
+  //  2. **Flat, or falling. Never rising.** No offer here ends higher than it
+  //     started, in pitch OR in filter corner — up is `purchaseConfirm`'s
+  //     direction and the two cues are answers to the same press.
+  //  3. **It stops.** All four are inside 0.2 s and none has a tail that rings.
+  //     `./candidates.test.ts` holds all three.
+  //
+  // The §8 clearance over the core family is kept and re-measured, not dropped:
+  // the constraint that produced the timid set was never wrong, it was just the
+  // only thing anybody was optimising.
   rejectBuzz: {
     label: "Reject Buzz",
-    context: "A buy the player can't afford — a low, flat, faintly gritty 'nope' that falls a little and stops.",
+    context: "A buy the player can't afford. The sound of NO: flat, short, unmistakable, and never funny.",
     current: 'rejectBuzz',
     candidates: [
-      // A refusal is a *stop*, not a raspberry: nothing here buzzes at an audible
-      // rate, nothing wobbles, and every offer falls a little and ends. The §8
-      // job is to stay legibly above `coreHit` — measured rather than asserted,
-      // on the zero-crossing centroid proxy: these four sit at 1035 / 366 / 1009
-      // / 838 Hz against the core family's 64 / 197 / 166 / 64, so the *worst* of
-      // the sixteen pairings clears ×1.86 where §8 asks for ×1.12.
       {
-        id: 'd',
-        character: "a dry refusal, grit and stop",
+        id: 'h',
+        slot: 'rejectBuzz',
+        character: "the glass, refused: a minor second struck at once",
         spec: {
-          name: 'rejectBuzz_d_dryRefusal',
+          name: 'rejectBuzz_h_glassRefused',
           layers: [
-            grains('rejectBuzz_d.grit', { freq: 480, freqEnd: 400, grain: 0.0035, gain: 0.32, hold: 0.02, decay: 0.07, curve: 4.5, from: 1500, to: 620, q: 3, hp: 260, seed: 60850 }),
+            // The pressTick precedent (a0-67): this is the material the interface
+            // ACTUALLY speaks — the ratified Gantry/Bone glass — rather than a
+            // fourth invention beside it. What makes it a refusal is that the two
+            // partials are struck TOGETHER instead of in sequence: a minor second
+            // sounded at once is a dissonance the ear reads as one flat wrong
+            // event, where the same two notes in order read as a little tune.
+            band('rejectBuzz_h.a', 1661, { gain: 1.05, decay: 0.09, q: 9, curve: 5, attack: 0.001, hold: 0.006, seed: 68700 }),
+            band('rejectBuzz_h.b', 1760, { gain: 0.99, decay: 0.085, q: 9, curve: 5, attack: 0.001, hold: 0.006, seed: 68702 }),
+            band('rejectBuzz_h.floor', 415, { gain: 0.5, decay: 0.055, q: 5, curve: 6, attack: 0.001, hold: 0.004, seed: 68704 }),
           ],
         },
       },
       {
-        id: 'e',
-        character: "blocked: the corner shuts",
+        id: 'i',
+        slot: 'rejectBuzz',
+        character: "a bar dropping: the shop shuts",
         spec: {
-          name: 'rejectBuzz_e_blocked',
+          name: 'rejectBuzz_i_barDrops',
           layers: [
-            swept('rejectBuzz_e.block', { wave: 'triangle', freq: 372, freqEnd: 330, from: 1300, to: 420, q: 3.4, gain: 0.34, attack: 0.003, hold: 0.03, decay: 0.06, curve: 4.5, noiseMix: 0.26, seed: 60860 }),
+            // Weight, and a stop. The one offer with real mass in it, for the
+            // reading where a refusal is a mechanism physically closing.
+            band('rejectBuzz_i.latch', 520, { gain: 0.36, decay: 0.016, q: 4.5, curve: 8, punch: 0.7, seed: 68710 }),
+            swept('rejectBuzz_i.drop', { wave: 'triangle', freq: 116, from: 900, to: 150, q: 2.6, gain: 0.38, attack: 0.0015, hold: 0.014, decay: 0.075, curve: 5.5, punch: 0.5, noiseMix: 0.2, seed: 68712 }),
           ],
         },
       },
       {
-        id: 'f',
-        character: "two bands a semitone apart, unresolved",
+        id: 'j',
+        slot: 'rejectBuzz',
+        character: "the buzzer, done properly: one flat band, cut",
         spec: {
-          name: 'rejectBuzz_f_semitone',
+          name: 'rejectBuzz_j_flatBand',
           layers: [
-            band('rejectBuzz_f.b0', 690, { gain: 0.763, decay: 0.09, q: 6.5, curve: 4.5, attack: 0.003, hold: 0.014, seed: 60870 }),
-            band('rejectBuzz_f.b1', 730, { gain: 0.702, decay: 0.08, q: 6.5, curve: 4.5, attack: 0.004, hold: 0.012, at: 0.006, seed: 60872 }),
+            // The offer that is actually the slot's own name, and the one to pick
+            // if *"none of these sound like rejected"* means "none of these is a
+            // BUZZER". A narrow band held dead flat — no pitch motion, no filter
+            // motion, no modulation — for 90 ms and then truncated with a curve
+            // steep enough to read as a switch opening.
+            //
+            // Deliberately NOT a low-rate amplitude buzz: below about 30 Hz that
+            // is a raspberry, and a raspberry is the joke this slot may not make.
+            band('rejectBuzz_j.band', 330, { gain: 1.5, decay: 0.088, q: 11, curve: 9, attack: 0.001, hold: 0.055, punch: 0.35, seed: 68720 }),
+            band('rejectBuzz_j.teeth', 662, { gain: 0.68, decay: 0.086, q: 12, curve: 9, attack: 0.001, hold: 0.055, seed: 68722 }),
           ],
         },
       },
       {
-        id: 'g',
-        character: "no, said quietly, once",
+        id: 'k',
+        slot: 'rejectBuzz',
+        character: "dead: the signal is cut mid-word",
         spec: {
-          name: 'rejectBuzz_g_quietNo',
+          name: 'rejectBuzz_k_dead',
           layers: [
-            swept('rejectBuzz_g.no', { wave: 'noise', freq: 604, from: 1100, to: 520, q: 3, gain: 0.3, attack: 0.004, hold: 0.02, decay: 0.05, curve: 5, hp: 300, seed: 60880 }),
+            // Refusal as ABSENCE. It starts like something that was going to be a
+            // confirmation and is switched off before it gets anywhere — the
+            // shortest offer here, and the one that costs the player the least
+            // attention on the fiftieth press of a match.
+            swept('rejectBuzz_k.cut', { wave: 'triangle', freq: 392, freqEnd: 370, from: 1500, to: 900, q: 4, gain: 0.4, attack: 0.0012, hold: 0.026, decay: 0.014, curve: 9, punch: 0.4, noiseMix: 0.12, seed: 68730 }),
           ],
         },
       },

@@ -157,17 +157,22 @@ describe('ParticlePool — zero per-frame allocations (GDD §4.3, risk 5)', () =
 });
 
 describe('TellQueue — the same discipline, one layer up', () => {
-  it('buys six columns once and never again', () => {
+  // Seven since a0-68: `variant` joined the six when `shotImpact` had to start
+  // carrying WHICH SURFACE a shot landed on (`../tells` IMPACT). The count is
+  // what this test is about — one buffer per column, bought in the constructor
+  // and never again — so it moves with the column count and the discipline is
+  // unchanged.
+  it('buys seven columns once and never again', () => {
     const tells = new TellQueue(64);
-    const before = [tells.kind, tells.x, tells.y, tells.angle, tells.magnitude, tells.player];
+    const before = [tells.kind, tells.x, tells.y, tells.angle, tells.magnitude, tells.player, tells.variant];
     withNoAllocation(() => {
       for (let frame = 0; frame < 1000; frame++) {
         for (let i = 0; i < 40; i++) tells.push(TELL.mineHit, i, i, 0, 1, i % 8);
         tells.clear();
       }
     });
-    expect(tells.bufferCount).toBe(6);
-    expect([tells.kind, tells.x, tells.y, tells.angle, tells.magnitude, tells.player]).toEqual(before);
+    expect(tells.bufferCount).toBe(7);
+    expect([tells.kind, tells.x, tells.y, tells.angle, tells.magnitude, tells.player, tells.variant]).toEqual(before);
   });
 
   it('drops on overflow and counts it, rather than growing mid-frame', () => {

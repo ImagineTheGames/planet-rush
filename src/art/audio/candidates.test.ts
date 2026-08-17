@@ -91,6 +91,31 @@ describe('sound-review candidates', () => {
     // three: the board's promise is "options", and the count is not what a
     // verdict names.
     xpSettle: ['d', 'e', 'f', 'g'],
+    // a0-68. `rejectBuzz` belongs with a0-67's sixteen and was left out of both
+    // briefs; `denied_without_work` caught it. Denied 2026-08-17 with *"none of
+    // these sound like rejected"* on `d`-`g`, so `h`-`k` are the fresh letters —
+    // the same arithmetic every a0-60 slot did.
+    rejectBuzz: ['h', 'i', 'j', 'k'],
+  };
+
+  /**
+   * Slots that were BORN with four offers, on letters starting at `a` (a0-68).
+   *
+   * These six are the heirs of `shotImpact` and `matchEnd`. They start at `a` and
+   * that is not a slip: a letter only means anything inside a slot
+   * (`/status/sound-choices.json` records a slot AND a letter), and no verdict has
+   * ever named an `impactHull` or a `matchWin`, so there is no record for an `a`
+   * to make unreadable. The a0-48 re-lettering rule is about a slot re-offering
+   * under its OWN spent letters, which is not this — and inventing a fake letter
+   * offset would suggest a history the slot does not have.
+   */
+  const BORN_WITH_FOUR: Readonly<Record<string, readonly string[]>> = {
+    impactHull: ['a', 'b', 'c', 'd'],
+    impactRock: ['a', 'b', 'c', 'd'],
+    impactShield: ['a', 'b', 'c', 'd'],
+    impactStation: ['a', 'b', 'c', 'd'],
+    matchWin: ['a', 'b', 'c', 'd'],
+    matchLoss: ['a', 'b', 'c', 'd'],
   };
 
   /**
@@ -103,7 +128,7 @@ describe('sound-review candidates', () => {
   const REVOICE_MANIFEST: ReadonlyMap<string, string> = (() => {
     const rows = new Map<string, string>();
     for (const line of readFileSync('docs/sound-revoice-manifest.md', 'utf8').split('\n')) {
-      const m = /^\|\s*([A-Za-z]+)\s*\|\s*(todo|done|held)\s*\|/i.exec(line);
+      const m = /^\|\s*([A-Za-z]+)\s*\|\s*(todo|done|held|split)\s*\|/i.exec(line);
       if (m) rows.set(m[1]!, m[2]!.toLowerCase());
     }
     return rows;
@@ -111,6 +136,26 @@ describe('sound-review candidates', () => {
 
   /** The slots the sweep has actually landed — the only rows this file holds to the new bar. */
   const REVOICED: readonly string[] = [...REVOICE_MANIFEST].filter(([, s]) => s === 'done').map(([id]) => id);
+
+  /**
+   * Rows whose SLOT no longer exists, because the developer's reason was that the
+   * slot itself was wrong (a0-68).
+   *
+   * `shotImpact` (*"…different depending on the thing that was hit"*) and
+   * `matchEnd` (*"we need separate ones for winning and losing"*) could not be
+   * answered by any set of takes filed against them: one slot was doing two — or
+   * four — jobs. A fifth round of voices would have been denied as fairly as the
+   * fourth.
+   *
+   * The row stays in the manifest and stays counted, because the sweep really did
+   * cover thirty-five slots and deleting the row would quietly shrink the history
+   * of what was asked for. What it does NOT do is promise offers on the board: the
+   * heirs are named in the row and held to the bar under their own ids.
+   */
+  const SPLIT_ROWS: Readonly<Record<string, readonly string[]>> = {
+    shotImpact: ['impactHull', 'impactRock', 'impactShield', 'impactStation'],
+    matchEnd: ['matchWin', 'matchLoss'],
+  };
 
   /**
    * The letters the 2026-08-07 `deny-all` was recorded against, on all 35 slots.
@@ -148,6 +193,27 @@ describe('sound-review candidates', () => {
     // still be *on the board*, so the next brief has something to pick up.
     for (const [id, status] of REVOICE_MANIFEST) {
       if (status === 'todo') expect(CANDIDATE_SLOTS[id], `${id} is owed but missing`).toBeDefined();
+    }
+
+    // A `split` row owes its heirs instead of itself, and owes them the SAME bar:
+    // four offers each, distinct letters, distinct characters. Otherwise "the slot
+    // was wrong" becomes a way to leave a denial unanswered.
+    for (const [id, status] of REVOICE_MANIFEST) {
+      if (status !== 'split') continue;
+      const heirs = SPLIT_ROWS[id];
+      expect(heirs, `${id} is marked split but names no heirs in this test`).toBeDefined();
+      expect(CANDIDATE_SLOTS[id], `${id} is marked split but is still on the board`).toBeUndefined();
+      for (const heir of heirs ?? []) {
+        const slot = CANDIDATE_SLOTS[heir];
+        expect(slot, `${id} split into ${heir}, which is not on the board`).toBeDefined();
+        expect(slot?.candidates.length, `${heir} inherited a denial with fewer than four offers`).toBeGreaterThanOrEqual(
+          4,
+        );
+        expect(new Set(slot?.candidates.map((c) => c.character)).size).toBe(slot?.candidates.length);
+        for (const c of slot?.candidates ?? []) {
+          expect(c.slot, `${heir}/${c.id} does not name its slot`).toBe(heir);
+        }
+      }
     }
   });
 
@@ -422,9 +488,11 @@ describe('sound-review candidates', () => {
     // the tell that your home is under attack, and `./audio.test.ts` holds the
     // shipped voice above the chatter — so every OFFER is held there too, or an
     // approval would quietly retire the mechanic.
-    const chatter = (['oreCollect', 'repairTick', 'spawnPulse', 'shotImpact'] as const).map((n) =>
-      rms(render(soundSpec(n))),
-    );
+    // The impact family is four slots since a0-68, and the alarm has to clear the
+    // loudest of them rather than whichever one happened to be listed.
+    const chatter = (
+      ['oreCollect', 'repairTick', 'spawnPulse', 'impactHull', 'impactRock', 'impactShield', 'impactStation'] as const
+    ).map((n) => rms(render(soundSpec(n))));
     for (const c of CANDIDATE_SLOTS.alarm!.candidates) {
       expect(rms(render(c.spec)), `alarm/${c.id} would not be heard over the chatter`).toBeGreaterThan(
         Math.max(...chatter),
@@ -635,7 +703,7 @@ describe('sound-review candidates', () => {
       // Three on every slot that has never been re-lettered; the re-lettered ones
       // declare their own letters above (`xpSettle` offers four, a0-57).
       expect(slot.candidates.map((c) => c.id), `${id} does not offer its letters`).toEqual(
-        RE_LETTERED[id] ?? ['a', 'b', 'c'],
+        RE_LETTERED[id] ?? BORN_WITH_FOUR[id] ?? ['a', 'b', 'c'],
       );
       expect(slot.candidates.length, `${id} offers fewer than three`).toBeGreaterThanOrEqual(3);
       for (const c of slot.candidates) {
@@ -786,7 +854,10 @@ describe('sound-review candidates', () => {
   // is a shipped sound that has not been chosen yet, and the constraints plan
   // §6.5 puts on the set are constraints on the offer, not on the incumbent.
   const SUMMARY_SLOTS = ['xpTick', 'xpBarFill', 'levelUp', 'xpSettle'] as const;
-  const DENIED_STINGS = ['matchEnd', 'musicWin', 'musicLoss'] as const;
+  // `matchEnd` split into `matchWin`/`matchLoss` (a0-68). The plan's prohibition
+  // is on the EVENT — *the sound the result already made* — not on a slot name,
+  // so both heirs inherit it and the summary beat may reach for neither.
+  const DENIED_STINGS = ['matchWin', 'matchLoss', 'musicWin', 'musicLoss'] as const;
 
   const voicesOf = (spec: SoundSpec): readonly VoiceSpec[] =>
     isLayered(spec) ? spec.layers.map((l) => l.spec) : [spec as VoiceSpec];
@@ -861,7 +932,9 @@ describe('sound-review candidates', () => {
     // plays beneath the result, so every one of the twelve is quieter than the
     // sting it lands under. The bar bed is measured at its own ceiling
     // (`./engine` XP_FILL_GAIN = 0.5) because it is a held voice, not a one-shot.
-    const result = rms(render(soundSpec('matchEnd')));
+    // Two stings since a0-68, so the bound is the QUIETER of them: under the win
+    // but over the loss is under the result only half the time.
+    const result = Math.min(rms(render(soundSpec('matchWin'))), rms(render(soundSpec('matchLoss'))));
     for (const id of SUMMARY_SLOTS) {
       for (const c of CANDIDATE_SLOTS[id]!.candidates) {
         const level = rms(render(c.spec)) * (id === 'xpBarFill' ? XP_FILL_GAIN : 1);
@@ -915,6 +988,201 @@ describe('sound-review candidates', () => {
   // A third slot — `xpBarFill` — is dispositioned **cut** in the same ledger
   // (*"we don't need this at all no need for regeneration"*) and is deliberately
   // NOT re-offered, which is why it is absent from `RE_LETTERED` above.
+
+  // -------------------------------------------------------------------------
+  // a0-68 — the three structural denials, and the one that fell between briefs
+  // -------------------------------------------------------------------------
+
+  /** The impact family, in the order a player meets its surfaces. */
+  const IMPACT_SLOTS = ['impactHull', 'impactRock', 'impactShield', 'impactStation'] as const;
+
+  it('answers `shotImpact` with four SURFACES that still read as one weapon', () => {
+    // *"none of these sound like impact sounds, they should also be different
+    // depending on the thing that was hit..."*
+    //
+    // The second clause is answered by the tell carrying the surface (`../tells`
+    // IMPACT, and `evidence/a0-68-structural-slots/` measures it end to end).
+    // What this holds is the sound half: four families that a player can tell
+    // apart AND can hear as one game.
+    for (const id of IMPACT_SLOTS) {
+      const slot = CANDIDATE_SLOTS[id]!;
+      for (const c of slot.candidates) {
+        const where = `${id}/${c.id}`;
+        const buf = render(c.spec);
+        // An arrival is a transient. Every offer is open inside 2 ms — anything
+        // slower is a sound that swells, and a shot landing does not swell.
+        const fastest = Math.min(...voicesOf(c.spec).map((v) => v.attack));
+        expect(fastest, `${where} has no transient — it fades in`).toBeLessThanOrEqual(0.002);
+        // …and it is over before the next shot. These fire several a second.
+        expect(buf.length / 44100, `${where} is too long for combat rate`).toBeLessThan(0.2);
+      }
+    }
+
+    // The two surfaces whose CONSEQUENCE always lands a beat later have to sit
+    // under it: the arrival says what you hit, the consequence says what it did,
+    // and an arrival that drowns its own consequence is a louder game rather
+    // than a clearer one. (Hull and rock have no always-paired consequence —
+    // `shipExplode` only on a death, `rockCrack` only on a stage change — so they
+    // are held to the family spread below instead of to a partner.)
+    for (const c of CANDIDATE_SLOTS.impactShield!.candidates) {
+      expect(rms(render(c.spec)), `impactShield/${c.id} is louder than the shield hit it precedes`).toBeLessThan(
+        rms(render(soundSpec('shieldHit'))),
+      );
+    }
+    for (const c of CANDIDATE_SLOTS.impactStation!.candidates) {
+      expect(rms(render(c.spec)), `impactStation/${c.id} is louder than the core hit it precedes`).toBeLessThan(
+        rms(render(soundSpec('coreHit'))),
+      );
+    }
+
+    // One game: no offer anywhere in the family is more than 4x another in RMS.
+    // A surface that is four times the weight of another is not a material
+    // difference, it is a mixing error — and the player would learn the loud one
+    // and mishear the rest.
+    const all = IMPACT_SLOTS.flatMap((id) => CANDIDATE_SLOTS[id]!.candidates.map((c) => rms(render(c.spec))));
+    expect(Math.max(...all) / Math.min(...all), 'the impact family is not one weapon').toBeLessThan(4);
+  });
+
+  it('keeps the four impact surfaces apart in the dimension a phone speaker keeps', () => {
+    // Four surfaces are only worth carrying if a player can hear which is which
+    // mid-fight, on the worst speaker they will use. Spectral centre is that
+    // dimension (the same proxy `./audio.test.ts` uses for rock-vs-hull), and the
+    // ORDER is the design: a hull is thin bright plate, a station is anchored
+    // mass, and the two must never cross.
+    const centre = (buf: Float32Array): number => {
+      let n = 0;
+      for (let i = 1; i < buf.length; i++) {
+        if ((buf[i - 1]! < 0) !== (buf[i]! < 0)) n++;
+      }
+      return (n * 44100) / (2 * Math.max(1, buf.length));
+    };
+    const shipped = Object.fromEntries(IMPACT_SLOTS.map((id) => [id, centre(render(soundSpec(id)))]));
+    expect(shipped.impactHull!, 'the hull is not the brightest surface').toBeGreaterThan(shipped.impactRock!);
+    expect(shipped.impactRock!, 'stone is not darker than a hull').toBeGreaterThan(shipped.impactStation!);
+    // The shipped set is the reference, and the spread it ships at is the spread
+    // the family is worth: the brightest and the darkest are a real distance
+    // apart rather than four takes on one grey.
+    expect(shipped.impactHull! / shipped.impactStation!, 'hull and station are the same sound').toBeGreaterThan(1.5);
+  });
+
+  it('answers `matchEnd` with two outcomes that cannot be confused, letter for letter', () => {
+    // *"none of these sound like match end and we need separate ones for winning
+    // and losing"*.
+    //
+    // The board records a slot and a LETTER, so the developer can adopt any win
+    // letter with any loss letter. The property that has to survive every one of
+    // those sixteen pairings is that the two are not the same sound — and the
+    // one dimension that separates two outcomes inside 200 ms is DIRECTION.
+    const winSlot = CANDIDATE_SLOTS.matchWin!;
+    const lossSlot = CANDIDATE_SLOTS.matchLoss!;
+
+    /** Spectral centre, the dimension a phone speaker keeps. */
+    const centre = (buf: Float32Array): number => {
+      let n = 0;
+      for (let i = 1; i < buf.length; i++) {
+        if ((buf[i - 1]! < 0) !== (buf[i]! < 0)) n++;
+      }
+      return (n * 44100) / (2 * Math.max(1, buf.length));
+    };
+
+    // The contrast is stated as REGISTER rather than as drift-over-time, because
+    // two of the four readings do not move at all: `b` sounds its chord at once
+    // (a verdict is one event, so a chord beats an arpeggio) and `d` is a single
+    // struck note. Both carry the outcome in *where they sit*, which is the thing
+    // that survives a small speaker anyway. A drift test would have failed `b`
+    // for being the shape it was designed to be — it did, first run.
+    expect(winSlot.candidates.length).toBe(lossSlot.candidates.length);
+    for (let i = 0; i < winSlot.candidates.length; i++) {
+      const w = winSlot.candidates[i]!;
+      const l = lossSlot.candidates[i]!;
+      expect(w.id, 'the two slots are not lettered in step').toBe(l.id);
+      expect(
+        centre(render(w.spec)) / centre(render(l.spec)),
+        `matchWin/${w.id} and matchLoss/${l.id} are the same sound — the outcome is ambiguous`,
+      ).toBeGreaterThan(1.15);
+    }
+
+    // …and it holds for EVERY pairing, not only the matched letters: the board
+    // records a slot and a letter independently, so the developer can adopt `c`
+    // for the win and `a` for the loss and must still be told which is which.
+    for (const w of winSlot.candidates) {
+      for (const l of lossSlot.candidates) {
+        expect(
+          centre(render(w.spec)),
+          `matchWin/${w.id} does not sit above matchLoss/${l.id}`,
+        ).toBeGreaterThan(centre(render(l.spec)));
+      }
+    }
+    // The shipped pair, which is what a player hears until a verdict lands.
+    expect(centre(render(soundSpec('matchWin')))).toBeGreaterThan(centre(render(soundSpec('matchLoss'))));
+
+    // Both are STINGS, not music: `musicWin`/`musicLoss` are the longer half of
+    // the pair and they arrive STING_LEAD_S later (`./music`). A verdict that ran
+    // as long as its own answer would collide with it however it was scheduled.
+    for (const c of [...winSlot.candidates, ...lossSlot.candidates]) {
+      const slot = winSlot.candidates.includes(c) ? 'matchWin' : 'matchLoss';
+      expect(render(c.spec).length / 44100, `${slot}/${c.id} is music, not a sting`).toBeLessThan(0.8);
+    }
+    expect(render(soundSpec('matchWin')).length, 'the win sting outlasts the music it introduces').toBeLessThan(
+      render(soundSpec('musicWin')).length,
+    );
+    expect(render(soundSpec('matchLoss')).length, 'the loss sting outlasts the music it introduces').toBeLessThan(
+      render(soundSpec('musicLoss')).length,
+    );
+  });
+
+  it('answers `rejectBuzz` with a refusal: hard, flat and short (a0-68)', () => {
+    // *"none of these sound like rejected"*. Read the denied four back and they
+    // are all UNDERSTATED — *a dry refusal*, *blocked*, *two bands a semitone
+    // apart*, *no, said quietly, once*. They were built to a §8 note about
+    // clearing `coreHit` and to a fear of being a raspberry, and between the two
+    // they arrived somewhere tasteful that does not read as NO.
+    //
+    // A refusal is flat and unmistakable: you pressed a thing and the thing did
+    // not happen. The three properties, all measured.
+    const slot = CANDIDATE_SLOTS.rejectBuzz!;
+    for (const c of slot.candidates) {
+      const where = `rejectBuzz/${c.id}`;
+      const buf = render(c.spec);
+      // 1. A hard front. A refusal you have to listen for is not one.
+      for (const v of voicesOf(c.spec)) {
+        expect(v.attack, `${where} ${v.name} fades in`).toBeLessThanOrEqual(0.004);
+      }
+      // 2. Flat, or falling. Never rising — up is `purchaseConfirm`'s direction,
+      //    and the two are answers to the same press.
+      for (const v of voicesOf(c.spec)) {
+        if (v.freqEnd !== undefined) {
+          expect(v.freqEnd, `${where} ${v.name} rises in pitch`).toBeLessThanOrEqual(v.freq);
+        }
+        if (v.lowPassEnd !== undefined && v.lowPass !== undefined) {
+          expect(v.lowPassEnd, `${where} ${v.name} opens up`).toBeLessThanOrEqual(v.lowPass);
+        }
+        // …and nothing wobbles. A wobble is the funny one, and a buy the player
+        // cannot afford must not be entertaining.
+        expect(v.vibratoDepth ?? 0, `${where} ${v.name} wobbles`).toBe(0);
+      }
+      // 3. It stops.
+      expect(buf.length / 44100, `${where} rings on`).toBeLessThan(0.25);
+    }
+
+    // The §8 clearance that produced the timid set is KEPT, not dropped: it was
+    // never wrong, it was just the only thing anybody was optimising. A refusal
+    // still has to sit clear of the core family or it reads as damage.
+    const centre = (buf: Float32Array): number => {
+      let n = 0;
+      for (let i = 1; i < buf.length; i++) {
+        if ((buf[i - 1]! < 0) !== (buf[i]! < 0)) n++;
+      }
+      return (n * 44100) / (2 * Math.max(1, buf.length));
+    };
+    const core = (['coreHit', 'stationDeath'] as const).map((n) => centre(render(soundSpec(n))));
+    for (const c of slot.candidates) {
+      const mine = centre(render(c.spec));
+      for (const low of core) {
+        expect(mine / low, `rejectBuzz/${c.id} sits in the core family's register`).toBeGreaterThan(1.12);
+      }
+    }
+  });
 
   /** RMS of everything under `hz`, one-pole — the same filter `./synth` uses. */
   const lowBandRms = (buf: Float32Array, hz: number): number => {
@@ -1154,7 +1422,7 @@ describe('sound-review candidates', () => {
     const denied = deniedOf('levelUp').map((s) => render(s));
     const deniedMass = Math.max(...denied.map((b) => lowBandRms(b, 200)));
     const deniedSustain = Math.max(...denied.map((b) => lateOverEarly(b)));
-    const result = rms(render(soundSpec('matchEnd')));
+    const result = Math.min(rms(render(soundSpec('matchWin'))), rms(render(soundSpec('matchLoss'))));
 
     for (const c of CANDIDATE_SLOTS.levelUp!.candidates) {
       const buf = render(c.spec);

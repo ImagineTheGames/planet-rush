@@ -77,6 +77,21 @@ and are deliberately absent from the table above — a row here is a promise of
 four voices, and offering four voices against a reason that is not asking for
 voices is how round two happens a third time.
 
+**a0-68 has landed** (`docs/sound-structural-notes.md`): `shotImpact` and
+`matchEnd` are gone as slots, split into four impact surfaces and two outcomes
+with four offers each, and `spawnPulse` is a **finding** awaiting a developer
+ruling with no candidates against it.
+
+A **fourth** slot was denied that evening and is in neither list: `rejectBuzz`,
+*"none of these sound like rejected"*, 2026-08-17T00:45:19.932Z. It is not
+structural — it is an ordinary round-two re-voice and it belongs with the sixteen
+above. It was left out of both this brief and a0-68's original scope because the
+two were written from two different readings of one verdict pass, and the board's
+own `denied_without_work` signal is what caught it. It was answered under a0-68
+(`h`-`k`) rather than added to the table here, because this file's test asserts
+the count is sixteen and a seventeenth row would rewrite the record of what round
+two *was*. `docs/sound-denials-outstanding.md` carries it as an R5 addendum.
+
 ## The test that holds this file
 
 `candidates.test.ts` → **`round two answers the reason it was given`** parses the

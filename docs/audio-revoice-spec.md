@@ -404,7 +404,7 @@ Measurements are today's, from §2's census.
 | id | today | measured | action | target character |
 |---|---|---|---|---|
 | `turretFire` | `square` duty 0.22 + `dutySweep` 1.6 + chirp ×4.00 | 4589 Hz · 0.086 s | **RE-VOICE** | The single most arcade voice in the bank — a duty-swept square with a four-to-one downward sweep is a 1980s laser. Target: a **coil discharge** — a short filtered-noise transient over a low tonal body, no sweep, no slide |
-| `shotImpact` | `noise`, chirp ×3.00 in 0.057 s | 7837 Hz | **DE-TELL** | Glide to ≤ ×1.5. A projectile arriving is a tick, not a "pew" |
+| `shotImpact` | `noise`, chirp ×3.00 in 0.057 s | 7837 Hz | **DE-TELL** | Glide to ≤ ×1.5. A projectile arriving is a tick, not a "pew". **Slot split in a0-68** into `impactHull`/`impactRock`/`impactShield`/`impactStation`; the ruling carries to all four |
 | `shieldHit` | `sine` ×2, shimmer 14 Hz × 0.02 | 1187 Hz · 0.312 s | **HOLD** | Already the register: a struck body ringing and fading. Exempt from §5.4 (over 250 ms, depth 0.02). Lowest priority in the pass |
 | `shieldDown` | **`saw`** fall + `noise` pop | 4905 Hz · 0.544 s | **RE-VOICE** (wave only) | The ×6.92 fall **stays** — the bubble failing *is* a collapse (§5.4 exempt). Only the saw goes: `triangle` + `noiseMix`, same envelope, same glide |
 | `coreHit` | `sine` thud + `noise` tear | 1906 Hz · 0.332 s | **HOLD** | One of the two sounds homes get. The ache depends on it. Doc comment only |
@@ -431,7 +431,7 @@ Measurements are today's, from §2's census.
 | `waveArrive` | **`saw`** ×2 foghorn | 2239 Hz · 0.810 s | **RE-VOICE** (wave only) | Keep the two low notes and the pitch — the foghorn is the mechanic (§2.3's metronome). Replace saw with filtered `triangle` plus low noise air. **Must stay clear of `alarm` (§8)** |
 | `collapseBegin` | `noise` rumble + `sine` drone | 1033 Hz · 2.300 s | **HOLD** | Entropy arriving. Already exactly the register |
 | `stationDeath` | `sine` fall + `noise` crust + `triangle` toll | 1617 Hz · 1.320 s | **HOLD — protected** | The ache. A long fall, no resolution, and then the mix goes to zero under it. **Any change here is a developer question, not a re-voice** (§11 Q6). It also holds the longest-tail invariant (§8) |
-| `matchEnd` | `triangle` ×3 rising | 1255 Hz · 1.250 s | **HOLD** | No tells |
+| `matchEnd` | `triangle` ×3 rising | 1255 Hz · 1.250 s | **HOLD** | No tells. **Slot split in a0-68** into `matchWin`/`matchLoss`; both heirs are shorter than this (they are stings ahead of the music, not music) |
 | `alarm` | **`saw`** ×2, minor third | 5009 Hz · loop | **HOLD — sanctioned exception** | §5.1. *"An unmistakable alarm"* is a mechanic (§2.2) and not cuttable (§4.9). Offered as a question (§11 Q3) but the recommendation is: do not touch it |
 | `ambient` | `sine` ×2 + `triangle` + `noise` | 309 Hz · loop | **HOLD** | Cold Vacuum as a sound already |
 
