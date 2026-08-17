@@ -37,11 +37,16 @@
  * (`?debug=1`) reports that same viewport, so QA and the cull are reading one
  * rectangle.
  *
- * The camera is translate-only (no zoom), so world units are CSS px and the
- * inverse is a subtraction. If a zoom is ever added, this file is where it lands.
+ * The camera was translate-only when this was written — world units were CSS px
+ * and the inverse was a subtraction — and this paragraph said *"if a zoom is ever
+ * added, this file is where it lands."* a0-74 added one (`@platform/camera`
+ * `writeCameraOffset`, `@ui/viewport`), and it landed here: {@link
+ * writeVisibleWorld} now divides. The scale is a defaulted argument, so a caller
+ * that does not pass one still gets the translate-only cull exactly.
  */
 
 import type { Vec2 } from '@shared/types';
+import { DEFAULT_CAMERA_SCALE } from '@platform/camera';
 import type { Viewport } from '@platform/camera';
 
 /**
@@ -77,11 +82,21 @@ export function cullBox(): CullBox {
  * cull a function of *where the world actually got drawn*, so the two can never
  * drift apart the way a recomputed ideal would.
  */
-export function writeVisibleWorld(out: CullBox, offset: Vec2, vp: Viewport): CullBox {
-  out.left = vp.originX - offset.x;
-  out.top = vp.originY - offset.y;
-  out.right = out.left + vp.width;
-  out.bottom = out.top + vp.height;
+export function writeVisibleWorld(
+  out: CullBox,
+  offset: Vec2,
+  vp: Viewport,
+  scale: number = DEFAULT_CAMERA_SCALE,
+): CullBox {
+  // a0-74: the camera gained a scale, and this file said in so many words that it
+  // is where a zoom lands. `screen = offset + world × scale`, so the inverse is a
+  // subtraction AND a division — and the visible span in world units is the screen
+  // span divided by the scale, which is exactly what zooming out buys the player.
+  const s = scale > 0 && Number.isFinite(scale) ? scale : DEFAULT_CAMERA_SCALE;
+  out.left = (vp.originX - offset.x) / s;
+  out.top = (vp.originY - offset.y) / s;
+  out.right = out.left + vp.width / s;
+  out.bottom = out.top + vp.height / s;
   return out;
 }
 

@@ -22,6 +22,8 @@ import {
   viewZoomLabel,
 } from './viewport';
 import { HUD_REFERENCE } from './instrument';
+import { cameraOffset, screenToWorld, worldToScreen } from '@platform/camera';
+import { cullBox, writeVisibleWorld } from '@render/cull';
 
 /** The profiles the three reports are actually about. */
 const PROFILES = {
@@ -152,5 +154,57 @@ describe('the view zoom ladder', () => {
       expect(Number.isFinite(s)).toBe(true);
       expect(s).toBeGreaterThan(0);
     }
+  });
+});
+
+/**
+ * The ladder is only worth anything if it reaches the camera. These drive the
+ * REAL camera and cull maths (`@platform/camera`, `@render/cull`) with what
+ * {@link cameraScale} produces, rather than restating the arithmetic — a ladder
+ * that silently zoomed IN, or a cull that kept culling to the old rectangle, would
+ * pass a test written against this file alone.
+ */
+describe('the ladder, through the real camera', () => {
+  const VP = { width: 798, height: 384, originX: 0, originY: 0 };
+  const TARGET = { x: 1200, y: 1200 }; // arena centre, WORLD_SIZE 2400
+
+  it('keeps the ship dead centre at every rung', () => {
+    for (const step of VIEW_ZOOM_STEPS) {
+      const offset = cameraOffset(TARGET, VP, cameraScale(step));
+      const screen = worldToScreen(TARGET, offset, cameraScale(step));
+      expect(screen.x).toBeCloseTo(VP.width / 2, 9);
+      expect(screen.y).toBeCloseTo(VP.height / 2, 9);
+    }
+  });
+
+  it('shows exactly `step ×` more world across the same screen', () => {
+    for (const step of VIEW_ZOOM_STEPS) {
+      const scale = cameraScale(step);
+      const offset = cameraOffset(TARGET, VP, scale);
+      const box = writeVisibleWorld(cullBox(), offset, VP, scale);
+      expect(box.right - box.left).toBeCloseTo(viewWorldWidth(VP.width, step), 6);
+      expect(box.bottom - box.top).toBeCloseTo(VP.height * step, 6);
+      // Still centred on the ship — zooming out must not pan.
+      expect((box.left + box.right) / 2).toBeCloseTo(TARGET.x, 6);
+    }
+  });
+
+  it('round-trips a tap back to the world point it landed on', () => {
+    // The Tap Commander path: a pointer in logical space becomes a world point,
+    // and at 2× a tap near the screen edge must resolve twice as far out.
+    const scale = cameraScale(2);
+    const offset = cameraOffset(TARGET, VP, scale);
+    const tap = { x: VP.width, y: VP.height / 2 }; // the right-hand edge
+    const world = screenToWorld(tap, offset, scale);
+    expect(world.x - TARGET.x).toBeCloseTo(VP.width, 6); // half of 2 × 798
+    const back = worldToScreen(world, offset, scale);
+    expect(back.x).toBeCloseTo(tap.x, 6);
+    expect(back.y).toBeCloseTo(tap.y, 6);
+  });
+
+  it('is byte-for-byte the shipped camera at the default rung', () => {
+    const scaled = cameraOffset(TARGET, VP, cameraScale(DEFAULT_VIEW_ZOOM));
+    const untouched = cameraOffset(TARGET, VP); // no scale argument at all
+    expect(scaled).toEqual(untouched);
   });
 });
