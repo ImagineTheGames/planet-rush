@@ -344,7 +344,14 @@ export class MusicDirector {
 
   /**
    * One frame: drive the stems toward the score, and fire a held sting once the
-   * hush ({@link DeathMoment.gain}) has climbed back past {@link STING_GATE}.
+   * hush has climbed back past {@link STING_GATE}.
+   *
+   * @param hushGain The hush **as a sting gate**, not as a mix multiplier —
+   *   `DeathMoment.gain` crosses the gate on the way INTO the quiet as well as
+   *   out of it, so a caller passing the raw gain would open this on the ramp
+   *   down and fire three seconds early. `./engine` corrects it (`stingGate`)
+   *   and hands the corrected number here; a caller with no hush at all leaves
+   *   it at 1. Stems are not scaled by it — the duck node does that.
    */
   update(dt: number, hushGain = 1): void {
     if (this.enabled) {

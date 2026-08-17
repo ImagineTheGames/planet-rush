@@ -773,12 +773,12 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
   [SOUND.impactHull]: {
     name: 'impactHull',
     layers: [
-      band('impactHull.contact', 2050, { gain: 0.3, decay: 0.02, q: 4.5, curve: 7, punch: 0.55, hp: 600, seed: 0xb2a0 }),
+      band('impactHull.contact', 2050, { gain: 0.95, decay: 0.02, q: 4.5, curve: 7, punch: 0.55, hp: 600, seed: 0xb2a0 }),
       // The ring, and the ONLY one of the four that has one: an inharmonic pair,
       // so it is a panel and not a bell (the ratified glass spacing belongs to
       // the interface, `./ui-cues`, and reusing it here would blur the two).
-      band('impactHull.plate', 1180, { gain: 0.2, decay: 0.075, q: 8, curve: 5, seed: 0xb2a1 }),
-      band('impactHull.plate2', 1735, { gain: 0.12, decay: 0.055, q: 9, curve: 6, seed: 0xb2a2 }),
+      band('impactHull.plate', 1180, { gain: 0.62, decay: 0.075, q: 8, curve: 5, seed: 0xb2a1 }),
+      band('impactHull.plate2', 1735, { gain: 0.38, decay: 0.055, q: 9, curve: 6, seed: 0xb2a2 }),
     ],
   },
 
@@ -838,7 +838,7 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
   [SOUND.impactStation]: {
     name: 'impactStation',
     layers: [
-      band('impactStation.contact', 760, { gain: 0.24, decay: 0.018, q: 4, curve: 7, punch: 0.5, hp: 200, seed: 0xb2d0 }),
+      band('impactStation.contact', 760, { gain: 0.36, decay: 0.018, q: 4, curve: 7, punch: 0.5, hp: 200, seed: 0xb2d0 }),
       // A big thing taking a hit and not going anywhere: a low body under a
       // corner that closes, and a longer tail than any of the other three — but
       // still inside the family's length class, because it fires at combat rate.
@@ -848,7 +848,7 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
         from: 620,
         to: 170,
         q: 2.6,
-        gain: 0.3,
+        gain: 0.44,
         attack: 0.0008,
         hold: 0.008,
         decay: 0.12,
@@ -1621,7 +1621,7 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
           noiseMix: 0.07,
           lowPass: 1400,
           resonance: 2.6,
-          gain: 0.46,
+          gain: 0.53,
           seed: 0xdce3,
         },
       },
@@ -1637,14 +1637,14 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
           noiseMix: 0.07,
           lowPass: 2100,
           resonance: 2.6,
-          gain: 0.46,
+          gain: 0.53,
           seed: 0xdce4,
         },
         at: 0.11,
       },
       // One quiet partial an octave over the arrival, so the win has a top
       // without a third note in it. A third note is a tune; this is a stamp.
-      band('matchWin.lift', 1319, { gain: 0.09, decay: 0.3, q: 9, curve: 3.4, at: 0.11, seed: 0xdce5 }),
+      band('matchWin.lift', 1319, { gain: 0.11, decay: 0.3, q: 9, curve: 3.4, at: 0.11, seed: 0xdce5 }),
     ],
   },
 
@@ -1664,7 +1664,7 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
           noiseMix: 0.07,
           lowPass: 1200,
           resonance: 2.6,
-          gain: 0.44,
+          gain: 0.51,
           seed: 0xdce6,
         },
       },
@@ -1680,7 +1680,7 @@ const SPECS: Readonly<Record<SoundName, SoundSpec>> = {
           noiseMix: 0.07,
           lowPass: 760,
           resonance: 2.4,
-          gain: 0.44,
+          gain: 0.51,
           seed: 0xdce7,
         },
         at: 0.12,

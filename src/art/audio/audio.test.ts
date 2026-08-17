@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { TELL, TELL_NAMES, TellQueue, type TellKind } from '../tells';
+import { IMPACT_NAMES, TELL, TELL_NAMES, TellQueue, type TellKind } from '../tells';
 import { DeathMoment, HUSH_S } from '../vfx/death-moment';
 import { ENGAGE, LEAK, MIN_HOLD_S, UnderAttackAlarm, WEIGHTS } from './alarm';
 import { SustainedVoice } from './weapons';
@@ -27,7 +27,9 @@ import {
   loops,
   SOUND,
   SOUND_NAMES,
+  SPLIT_TELLS,
   SUSTAINED_TELLS,
+  soundForTell,
   soundSpec,
   TELL_SOUND,
   XP_TICK_SEMITONES,
@@ -70,7 +72,7 @@ import {
   R_FAR,
   R_NEAR,
 } from './spatial';
-import { MusicDirector, MusicScore, MUSIC_COMBAT, SIEGE_ON, STING_GATE } from './music';
+import { MusicDirector, MusicScore, MUSIC_COMBAT, SIEGE_ON, STING_GATE, STING_LEAD_S } from './music';
 import { DEFAULT_SAMPLE_RATE, peak, renderVoice, rms, seamless, voiceDuration, type VoiceSpec } from './synth';
 import { AudioUnlock, defaultUnlockTarget, UNLOCK_EVENTS, type UnlockTarget } from './unlock';
 
@@ -516,8 +518,14 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
     for (const kind of ALL_KINDS) {
       const sound = TELL_SOUND[kind];
       if (sound === null) {
-        // The only legal silences: states whose voice is sustained elsewhere.
-        expect(SUSTAINED_TELLS, `${TELL_NAMES[kind]} has no sound`).toContain(kind);
+        // Two legal silences, and no third: a state whose voice is sustained
+        // elsewhere, or a kind whose voice depends on its own payload (a0-68).
+        // Anything else is a mechanic somebody forgot to give a sound to.
+        const split = (SPLIT_TELLS as readonly TellKind[]).includes(kind);
+        expect(
+          split || (SUSTAINED_TELLS as readonly TellKind[]).includes(kind),
+          `${TELL_NAMES[kind]} has no sound and is neither sustained nor split`,
+        ).toBe(true);
       } else {
         expect(SOUND_NAMES, `${TELL_NAMES[kind]} → ${sound}`).toContain(sound);
       }
@@ -525,6 +533,14 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
     // The thruster alone is held now: firing became discrete with amendment v0.3.
     expect(SUSTAINED_TELLS).toHaveLength(1);
     expect(SUSTAINED_TELLS).toContain(TELL.thrust);
+
+    // …and every split kind really does resolve, for every payload it can carry.
+    // A `null` here would be a silent mechanic wearing the split exemption.
+    for (const surface of IMPACT_NAMES.keys()) {
+      expect(soundForTell(TELL.shotImpact, 1, surface), `shotImpact/${IMPACT_NAMES[surface]}`).not.toBeNull();
+    }
+    expect(soundForTell(TELL.matchEnd, 1)).toBe(SOUND.matchWin);
+    expect(soundForTell(TELL.matchEnd, 0)).toBe(SOUND.matchLoss);
   });
 
   it('keeps the two firing voices as discrete one-shots after the mining laser retired', () => {
@@ -569,7 +585,18 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
 
   it('makes the alarm the loudest thing in the bank — it is a mechanic (§2.2)', () => {
     const alarm = rms(renderSound(soundSpec(SOUND.alarm)));
-    const chatter = [SOUND.oreCollect, SOUND.repairTick, SOUND.spawnPulse, SOUND.shotImpact];
+    // Every impact voice, not one of them (a0-68): the family is four slots now
+    // and the alarm has to beat the loudest of them, whichever that turns out to
+    // be after the next round of verdicts.
+    const chatter = [
+      SOUND.oreCollect,
+      SOUND.repairTick,
+      SOUND.spawnPulse,
+      SOUND.impactHull,
+      SOUND.impactRock,
+      SOUND.impactShield,
+      SOUND.impactStation,
+    ];
     for (const name of chatter) {
       expect(alarm, `alarm vs ${name}`).toBeGreaterThan(rms(renderSound(soundSpec(name))));
     }
@@ -589,10 +616,11 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
   it('layers the sounds that are layered and keeps the rest single voices', () => {
     // `rockCrack` was the single-voice example here until s10-01, when the
     // developer chose its candidate **c** — a struck plate with a grain of dust
-    // behind it, which is a stack. `shotImpact` takes its place as the one-voice
-    // case: it is still one band-limited hit, and it is one of the thirty-seven
-    // slots sitting at deny-all, so it is not about to become a stack either.
-    expect(isLayered(soundSpec(SOUND.shotImpact))).toBe(false);
+    // behind it, which is a stack. `shotImpact` took its place and then stopped
+    // existing (a0-68 split it four ways, and each of the four is a contact plus
+    // a body). `pressTick` is the one-voice case now — one struck note at the
+    // family root, and the slot whose whole point is that it does not grow.
+    expect(isLayered(soundSpec(SOUND.pressTick))).toBe(true);
     expect(isLayered(soundSpec(SOUND.shipExplode))).toBe(true);
     expect(isLayered(soundSpec(SOUND.rockCrack))).toBe(true); // adopted: candidates.ts#rockCrack.c
     expect(loops(soundSpec(SOUND.rockCrack))).toBe(false);
@@ -974,7 +1002,7 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
     expect(
       rms(chip),
       'the mining voice is quieter than the shot landing beside it — lower has become gone',
-    ).toBeGreaterThan(rms(renderSound(soundSpec(SOUND.shotImpact))));
+    ).toBeGreaterThan(rms(renderSound(soundSpec(SOUND.impactRock))));
 
     // And the half of the pair that a phone CAN emit, which is the part of
     // Finding 3 that survives. §2.3's inversion is *am I mining or shooting a
@@ -1000,8 +1028,10 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
 
   /** The four, in the order the sequence plays them (plan §6.3 beats 1–5). */
   const SUMMARY: readonly SoundName[] = [SOUND.xpTick, SOUND.xpBarFill, SOUND.levelUp, SOUND.xpSettle];
-  /** The three slots the plan forbids this beat to reach for — all under deny-all. */
-  const DENIED_STINGS: readonly SoundName[] = [SOUND.matchEnd, SOUND.musicWin, SOUND.musicLoss];
+  /** The slots the plan forbids this beat to reach for — all under deny-all.
+   *  `matchEnd` became `matchWin`/`matchLoss` (a0-68); the prohibition follows the
+   *  event, not the name, so both heirs are listed. */
+  const DENIED_STINGS: readonly SoundName[] = [SOUND.matchWin, SOUND.matchLoss, SOUND.musicWin, SOUND.musicLoss];
 
   it('puts each summary cue inside the amended tone envelope (GDD §4.7, p1-07)', () => {
     // The same clauses `docs/audio-revoice-spec.md` §5 states and the two tests
@@ -1105,7 +1135,10 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
     // ever get.
     const level = (name: SoundName) =>
       rms(renderSound(soundSpec(name))) * (name === SOUND.xpBarFill ? XP_FILL_GAIN : 1);
-    const result = level(SOUND.matchEnd);
+    // The result is two sounds now (a0-68), so the bound is the LOUDER of them:
+    // a summary cue under the win but over the loss would be under the result
+    // only half the time, which is not a constraint.
+    const result = Math.min(level(SOUND.matchWin), level(SOUND.matchLoss));
     for (const name of SUMMARY) {
       expect(level(name), `${name} is louder than the result it plays under`).toBeLessThan(result);
       expect(level(name), `${name} is louder than a home dying`).toBeLessThan(level(SOUND.stationDeath));
@@ -1221,8 +1254,7 @@ describe('the bank (`./bank`) — a sound for every mechanic (GDD §3.6)', () =>
       [SOUND.alarm, SOUND.waveArrive, 2.45, 'home is under attack vs a wave arrived (§2.2, §2.3)'],
       // The game's central inversion. Also guarded on its own, below.
       [SOUND.rockChip, SOUND.hullHit, 3.92, 'am I mining or shooting a ship (§2.3)'],
-      [SOUND.rockChip, SOUND.shotImpact, 4.68, 'my shot chipped rock vs my shot landed'],
-      [SOUND.turretFire, SOUND.shotImpact, 16.78, 'a turret fired at me vs something landed'],
+      [SOUND.turretFire, SOUND.impactHull, 1.12, 'a turret fired at me vs something landed on a hull'],
 
       // --- Pairs the s7-02 re-voice CREATED, guarded at what it ships -------
       //
@@ -1435,8 +1467,8 @@ describe('the mix (`./graph`) — built headless', () => {
   it('caps concurrent voices rather than letting a firefight open hundreds', () => {
     const ctx = new FakeAudioContext();
     const graph = new AudioGraph(ctx, { maxVoices: 3, repeatGap: 0 });
-    for (let i = 0; i < 3; i++) expect(graph.play(SOUND.shotImpact)).toBe(true);
-    expect(graph.play(SOUND.shotImpact)).toBe(false);
+    for (let i = 0; i < 3; i++) expect(graph.play(SOUND.impactHull)).toBe(true);
+    expect(graph.play(SOUND.impactHull)).toBe(false);
     expect(graph.voiceCount).toBe(3);
   });
 
@@ -1673,6 +1705,12 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
       const tells = new TellQueue(8);
       tells.push(kind, 0, 0, 0, 0.7, 0);
       engine.consume(tells);
+      // `matchEnd` is the one kind whose sound does not land in `consume`: it is
+      // held until the three-second quiet has lifted (a0-68), because a match
+      // resolves in the same frame as the final station death. One `update` with
+      // no death held finds the gate already open and lands it — so the mechanic
+      // still has a voice, which is what this test is here to insist on.
+      if (kind === TELL.matchEnd) engine.update(1 / 60);
       expect(engine.playCount, `${TELL_NAMES[kind]} made no sound`).toBe(1);
     }
   });
@@ -2169,6 +2207,11 @@ describe('the engine (`./engine`) — tells in, sound out', () => {
       const q = new TellQueue(4);
       q.push(kind, EARSHOT_FAR * 4, 0, 0, 0.6, -1); // far past the horizon
       engine.consume(q);
+      // The outcome is held past the quiet (a0-68) rather than played in
+      // `consume`; the property under test — it is not culled by distance — is
+      // the same one, and holding it is what makes the sting non-spatial by
+      // construction (it never reaches the placement path at all).
+      if (kind === TELL.matchEnd) engine.update(1 / 60);
       expect(engine.playCount, `${TELL_NAMES[kind]} was culled`).toBe(1);
     }
   });
@@ -2586,12 +2629,60 @@ describe('the adaptive soundtrack (`./music`) — following the match', () => {
     expect(director.stingCount).toBe(0);
     expect(score.pendingSting).toBe('win');
 
-    // The quiet lifts (gain climbs back past the gate): the sting lands, once.
+    // The quiet lifts (gain climbs back past the gate) — and the music still
+    // waits STING_LEAD_S, because the SFX verdict (`matchWin`/`matchLoss`) has
+    // the floor first (a0-68). The lead is spent only while the gate is open, so
+    // one frame past it is not enough.
     director.update(1 / 60, STING_GATE + 0.1);
+    expect(director.stingCount, 'the music sting jumped the SFX verdict').toBe(0);
+    expect(score.pendingSting).toBe('win');
+
+    // …and then it lands, once.
+    for (let i = 0; i < Math.ceil(STING_LEAD_S * 60); i++) director.update(1 / 60, 1);
     expect(director.stingCount).toBe(1);
     expect(score.pendingSting).toBeNull();
     director.update(1 / 60, 1);
     expect(director.stingCount).toBe(1); // not again
+  });
+
+  it('lands the SFX verdict BEFORE the music that reads it (a0-68)', () => {
+    // *"we need separate ones for winning and losing"* produced two PAIRS of
+    // cues — a sting on the SFX bus and a longer piece of music on the music bus
+    // — and the brief that produced them says in as many words that the two must
+    // not fight. So the ordering is a property, not a hope: on the frame the
+    // quiet lifts the SFX sting is out and the music is still holding.
+    const ctx = new FakeAudioContext();
+    const engine = new AudioEngine({ context: ctx, local: 0 });
+    engine.start();
+    const q = new TellQueue(4);
+    q.push(TELL.stationDeath, 0, 0, 0, 1, 0);
+    q.push(TELL.matchEnd, 0, 0, 0, 1, 0); // a win, same frame — as the sim resolves it
+    engine.consume(q);
+    const afterDeath = engine.playCount;
+
+    // Through the quiet: neither cue may sound inside the three seconds (§4.7).
+    for (let i = 0; i < Math.ceil(HUSH_S * 60); i++) {
+      engine.update(1 / 60);
+      ctx.advance(1 / 60);
+    }
+    expect(engine.playCount, 'something sounded inside the three seconds').toBe(afterDeath);
+
+    // The gain climbs back: the verdict lands, and the music has not yet.
+    for (let i = 0; i < 40; i++) {
+      engine.update(1 / 60);
+      ctx.advance(1 / 60);
+    }
+    expect(engine.playCount, 'the outcome sting never landed').toBeGreaterThan(afterDeath);
+    expect(engine.outcomeStingCount).toBe(1);
+    expect(engine.musicStingCount, 'the music jumped the verdict').toBe(0);
+
+    // …and the music answers it a lead later.
+    for (let i = 0; i < Math.ceil(STING_LEAD_S * 60) + 2; i++) {
+      engine.update(1 / 60);
+      ctx.advance(1 / 60);
+    }
+    expect(engine.musicStingCount).toBe(1);
+    expect(engine.outcomeStingCount, 'the verdict sounded twice').toBe(1);
   });
 
   it('stops its stems when the soundtrack is switched off (GDD §4.9 item 3)', () => {
@@ -2646,10 +2737,14 @@ describe('the adaptive soundtrack (`./music`) — following the match', () => {
     expect(engine.musicScore.phase).toBe('collapse');
 
     feed(TELL.matchEnd, 1, -1); // a win
-    // No station death in this synthetic arc, so the hush is not down: the sting
-    // lands on the next frame.
+    // No station death in this synthetic arc, so the hush is not down and both
+    // gates are already open. The SFX verdict lands on the next frame; the music
+    // still waits its lead behind it (a0-68).
     step();
     expect(engine.musicScore.phase).toBe('over');
+    expect(engine.outcomeStingCount).toBe(1);
+    expect(engine.music!.stingCount).toBe(0);
+    for (let i = 0; i < Math.ceil(STING_LEAD_S * 60) + 2; i++) step();
     expect(engine.music!.stingCount).toBe(1);
   });
 });

@@ -58,7 +58,21 @@ instruction to the Director:
 
 > add a little bit more of sparkle to it, like you've won a prize, but subtle... it shouldn't be too long
 
-**R5** — 2026-08-17, **nineteen slots, a reason each.** The developer listened to
+**R5 addendum** — `rejectBuzz`, 2026-08-17T00:45:19.932Z, denied in the same pass
+as the other nineteen and missed by both briefs that answered it:
+
+> none of these sound like rejected
+
+It is recorded separately here because the miss is the point. a0-67 was scoped to
+sixteen slots and a0-68 to three, and this row was in neither list — not because
+anybody argued it out, but because the two briefs were written from two different
+readings of one verdict pass. The board's own `denied_without_work` signal flagged
+it within a minute of being pointed at the rule that work must post-date the
+verdict it answers. That signal is still the open question at the bottom of this
+file: nothing reads it, and this is now the **third** round where it would have
+caught something before a person did.
+
+**R5** — 2026-08-17, **twenty slots, a reason each.** The developer listened to
 the whole a0-60 re-voiced board and denied nineteen of the thirty-five, not with a
 theme this time but with a specific sentence per slot. They are quoted character
 for character in `docs/sound-round-two-manifest.md`, which is the status of record
@@ -166,9 +180,10 @@ dates, and the older one (R4) was not withdrawn by the newer.
 | `musicWin` | R5 | **revoice — done** (a0-67, around the incumbent) |
 | `musicLoss` | R5 | **revoice — done** (a0-67, around the incumbent) |
 | `pressTick` | R5 | **revoice — done** (a0-67, back into the ratified glass) |
-| `shotImpact` | R5 | **outstanding — a0-68** (structural; not a request for voices) |
-| `matchEnd` | R5 | **outstanding — a0-68** (structural) |
-| `spawnPulse` | R5 | **outstanding — a0-68** (structural) |
+| `shotImpact` | R5 | **superseded — structural** (a0-68): the slot is gone, split into `impactHull`/`impactRock`/`impactShield`/`impactStation`, four offers each |
+| `matchEnd` | R5 | **superseded — structural** (a0-68): the slot is gone, split into `matchWin`/`matchLoss`, four offers each |
+| `spawnPulse` | R5 | **finding — awaiting the developer** (a0-68). The mechanic is live, ratified and effective; the SOUND is unattributable. `docs/sound-structural-notes.md` §1 puts three options up. **No candidates until they rule** |
+| `rejectBuzz` | R5 | **revoice — done** (a0-68, `h`-`k`). Denied the same evening as the other nineteen and left out of both a0-67's brief and a0-68's original scope; `denied_without_work` caught it |
 
 Every row above stays in this file under the rule at the bottom: a row leaves only
 when the slot carries a verdict that is not `deny-all`, and none of these does yet.
@@ -482,6 +497,18 @@ up all three of `turretDown`'s week, `oreCollect`'s invisibility, and the
 
 A denial arrives → add the row, verbatim reason and all, before doing anything
 else. A row leaves this file only when the slot has a verdict that is not
-`deny-all`, or its voice is gone from the bank. When you re-offer, take the next
+`deny-all`, or its voice is gone from the bank.
+
+**`superseded — structural` (new, a0-68).** Some denials say the SLOT is wrong, not
+the voice in it — *"they should also be different depending on the thing that was
+hit"* cannot be satisfied by any set of takes filed against one slot. Those rows
+can never earn a non-`deny-all` verdict, because there is nothing left to vote on.
+They resolve as `superseded — structural`, and that disposition is not a way to
+make a denial go away quietly: it requires the reason quoted verbatim as always,
+the **heirs named on the row** so the trail from denial to answer is one hop, and
+every heir carrying a full set of offers under unspent letters. The last of those
+is enforced rather than promised — `candidates.test.ts` reads the `split` rows out
+of `docs/sound-revoice-manifest.md` and holds each heir to four offers, so a slot
+cannot be deleted to escape the work it owed. When you re-offer, take the next
 free letters and add the slot to `RE_LETTERED` in `candidates.test.ts`, so the
 board can still say which offers the old verdict was about.

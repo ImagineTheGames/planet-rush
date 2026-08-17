@@ -335,6 +335,23 @@ export class AudioEngine {
   }
 
   /**
+   * Outcome stings sounded since construction — `matchWin` or `matchLoss`, once
+   * per match, on the far side of the three-second quiet (a0-68).
+   *
+   * Exposed beside {@link musicStingCount} because the ORDER of the two is the
+   * property the split is worth having: the SFX verdict lands first and the music
+   * answers it. A test that could see only one of the pair could not check that.
+   */
+  get outcomeStingCount(): number {
+    return this.outcomeStings;
+  }
+
+  /** Win/loss **music** stings the director has fired (`./music`). See above. */
+  get musicStingCount(): number {
+    return this.music?.stingCount ?? 0;
+  }
+
+  /**
    * Alarm stings raised since construction — **one per engagement**, never one
    * per frame of a siege (developer, s9-01: *"it should only play once, and not
    * keep playing"*).
@@ -666,14 +683,28 @@ export class AudioEngine {
     if (this.ownsDeath) this.death.update(step);
     this.thruster?.update(step);
 
-    // The outcome sting, on the far side of the quiet (a0-68). Same gate the
-    // music sting uses ({@link STING_GATE}) so both are timed off the one clock
-    // the moment actually has, and this one goes FIRST — `./music` waits a
-    // further {@link STING_LEAD_S} before its own. Verdict, then reading.
+    // The hush gain **as a sting gate**, which is not the same number as the
+    // hush gain as a mix multiplier (a0-68).
     //
-    // Note the gate reads 1 when no death is being held, so an end that somehow
+    // `DeathMoment.gain` crosses {@link STING_GATE} TWICE: once on the 0.12 s
+    // ramp down into the quiet, and once on the 0.9 s ramp back out of it. A
+    // gate written as `gain > STING_GATE` therefore opens on the way IN — three
+    // seconds early, inside the silence it exists to protect — and the first
+    // version of the outcome sting did exactly that, one frame after the station
+    // died. `silent` is the unambiguous half of the same clock: true for the
+    // whole three seconds and false either side, so this reads as zero on the
+    // way down and as the real gain on the way back up.
+    //
+    // It is computed here and handed to the music director as well, so the same
+    // correction covers both stings rather than the music being protected by the
+    // accident of its own lead being longer than the ramp.
+    const stingGate = this.death.silent ? 0 : this.death.gain;
+
+    // The outcome sting, on the far side of the quiet. This one goes FIRST —
+    // `./music` waits a further {@link STING_LEAD_S} behind it. Verdict, then
+    // reading. With no death held the gate reads 1, so an end that somehow
     // arrives without one still sounds on the next frame rather than never.
-    if (this.pendingOutcome && this.death.gain > STING_GATE) {
+    if (this.pendingOutcome && stingGate > STING_GATE) {
       const sting = this.pendingOutcome === 'win' ? SOUND.matchWin : SOUND.matchLoss;
       this.pendingOutcome = null;
       if (this.flat(sting, 1)) this.outcomeStings++;
@@ -683,7 +714,7 @@ export class AudioEngine {
     // other voice does — and holds its win/loss sting until the quiet lifts.
     this.musicScore.setUnderAttack(this.alarm.active);
     this.musicScore.update(step);
-    if (this.started) this.music?.update(step, this.death.gain);
+    if (this.started) this.music?.update(step, stingGate);
 
     if (this.xpDuckLeft > 0) {
       this.xpDuckLeft -= step;
