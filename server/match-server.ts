@@ -37,7 +37,7 @@ import type { PlayerId, Rng } from '@shared/types';
 import { mulberry32 } from '@shared/types';
 import type { ClientMessage, RoomCode } from '../src/net/transport';
 import { makeRoomCode } from '../src/net/room-code';
-import { verifyTicket } from '../src/net/ticket';
+import { readTicket, verifyTicket } from '../src/net/ticket';
 import type { MachineId } from '../src/net/ticket';
 import { parseClientMessage, parseRoomCode } from '../src/net/wire';
 import type { WireFrame } from '../src/net/wire';
@@ -255,17 +255,51 @@ export class MatchServer {
    *
    * Expiry is judged against {@link MatchServer.now}, the server's own injected
    * clock, so a test controls the window exactly.
+   *
+   * ── THE ONE EXCEPTION: A RETURNING PLAYER (a0-72) ─────────────────────────
+   *
+   * `reclaiming` marks a join that names a seat and carries that seat's token, and
+   * for it the **expiry alone is not a refusal** when this Machine is already
+   * hosting the room. That is not a hole; it is the recognition that the ticket
+   * answers a different question from the one being asked:
+   *
+   *   • the ticket answers *which Machine hosts this room* — a routing decision,
+   *     and one this Machine can check against its own room table rather than
+   *     against a clock. If the room is here, the decision was right, whenever it
+   *     was signed.
+   *   • the **`reclaimToken`** answers *is this seat yours*, and it is the
+   *     server's own per-seat secret (`server/room.ts` `reclaim`), unexpired and
+   *     unforgeable. It is checked immediately after this gate, always.
+   *
+   * The developer's report is the cost of conflating them: a phone whose screen
+   * blanked for 35 seconds came back to a live match with its seat still held and
+   * a bot flying it, and was told **REFUSED** — because the pass minted for the
+   * first dial had lapsed at 30 s (`allocator/allocator.ts`
+   * `DEFAULT_TICKET_TTL_MS`), and a lapsed pass and a forged pass were the same
+   * answer here. A backgrounded phone is the ordinary case, not an edge case.
+   *
+   * Everything else still fails closed. A forged, tampered or malformed ticket
+   * never reaches the expiry test at all ({@link readTicket} rejects it on the
+   * signature); a ticket for another room or another Machine is refused as it
+   * always was; a *fresh* join on a lapsed ticket is refused as it always was; and
+   * a lapsed ticket for a room this Machine does not host is refused, because then
+   * the routing claim it makes is exactly the claim that cannot be checked. What a
+   * lapsed ticket buys a returning player is the right to present their token.
    */
-  admitsJoin(code: RoomCode, ticket: string | undefined): boolean {
+  admitsJoin(code: RoomCode, ticket: string | undefined, reclaiming = false): boolean {
     if (this.ticketSecret === undefined) return true;
     if (ticket === undefined) return false;
-    const claims = verifyTicket(ticket, this.ticketSecret, this.now);
+    // Signature and shape first, and without the clock, so "is this genuine?" and
+    // "is this fresh?" can be answered separately (`src/net/ticket.ts`).
+    const claims = readTicket(ticket, this.ticketSecret);
     if (claims === null) return false;
     if (claims.room !== code) return false;
     // A ticket names the Machine it was minted for; one Machine will not honour
     // another's. Skip only when this process was not told its own id.
     if (this.machineId !== undefined && claims.machine !== this.machineId) return false;
-    return true;
+    if (this.now < claims.expiresAt) return true;
+    // Lapsed: only a reclaim, and only into a room this Machine actually holds.
+    return reclaiming && this.rooms.has(code);
   }
 
   /**
@@ -512,7 +546,10 @@ class ServerConnection implements Connection {
     // The ticket gate comes *before* the room is touched: a join this Machine was
     // never sent must not even be able to create a room (M9 fleet membership). On
     // a Machine that is not enforcing, this admits everything and costs nothing.
-    if (!this.server.admitsJoin(code, message.ticket)) {
+    // A reclaim is held to the same ticket as any join, bar its expiry — see
+    // `admitsJoin` for why a returning player's lapsed pass is still a good
+    // routing claim, and why their seat token is what actually lets them in.
+    if (!this.server.admitsJoin(code, message.ticket, message.reclaim !== undefined)) {
       this.refuse('bad-ticket');
       return;
     }

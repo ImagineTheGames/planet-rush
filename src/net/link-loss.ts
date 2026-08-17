@@ -193,6 +193,18 @@ export interface LinkStatus {
   readonly manualRedial: ManualRedial;
   /** How it ended, when {@link phase} is `'expired'`. */
   readonly ending: LinkEnding | null;
+  /**
+   * **The seat is held for as long as the match runs** (a0-72), so
+   * {@link graceRemainingMs} is not a countdown and nothing here expires on it.
+   * True for every loss inside a live online match; false in the lobby, offline,
+   * and on a transport whose server predates the rule.
+   */
+  readonly heldForMatch: boolean;
+  /** The server's own word for a refusal (`server/match-server.ts`
+   *  `JoinErrorMessage.reason`), when {@link ending} is `'join-rejected'`. Null
+   *  otherwise — and it is what stops the terminal card saying `REFUSED` at a
+   *  player instead of saying what happened. */
+  readonly refusal: string | null;
 }
 
 const LIVE: LinkStatus = {
@@ -203,6 +215,8 @@ const LIVE: LinkStatus = {
   attempts: 0,
   manualRedial: 'none',
   ending: null,
+  heldForMatch: false,
+  refusal: null,
 };
 
 export interface LinkWatchConfig {
@@ -255,6 +269,11 @@ export class LinkWatch {
   private manual: ManualRedial = 'none';
   /** True once the match is over ({@link retire}): nothing is detected any more. */
   private retired = false;
+  /** True from `matchStart` (a0-72): the seat is this player's until the match
+   *  ends, so no amount of elapsed time takes it away ({@link holdForMatch}). */
+  private held = false;
+  /** The server's stated refusal, when one ended us ({@link LinkStatus.refusal}). */
+  private refusal: string | null = null;
   private current: LinkStatus = LIVE;
 
   constructor(startedAt: number, config: LinkWatchConfig = {}) {
@@ -346,6 +365,32 @@ export class LinkWatch {
   }
 
   /**
+   * **The match is live, so the seat is this player's until it ends** (a0-72).
+   * Called by `./session` on `matchStart` — the same frame the server starts
+   * holding the seat for the life of the match (`server/room.ts` `HELD_FOR_MATCH`).
+   *
+   * From here on this watch **never expires a loss on its own arithmetic**. That
+   * arithmetic was always an *estimate* — the authoritative clock started when the
+   * server noticed the socket was gone, which a client cannot observe — and an
+   * estimate that ends a match is a client refusing a seat the server is still
+   * holding. It errs early by construction ({@link LinkStatus.graceRemainingMs}),
+   * which is the right way to err about a countdown and the wrong way to err about
+   * a door that is open. Endings now come from where they can be true: the
+   * transport closing with a reason, or the server refusing the join in words.
+   *
+   * The countdown itself is not thrown away — it is simply no longer a deadline,
+   * and {@link linkNotice} stops printing it as one.
+   */
+  holdForMatch(): void {
+    this.held = true;
+  }
+
+  /** True while the seat is held for the life of the match ({@link holdForMatch}). */
+  get heldForMatch(): boolean {
+    return this.held;
+  }
+
+  /**
    * The transport's own view, folded in (`Transport.state`). `reconnecting` is the
    * socket having genuinely closed — the case that always worked — and it is a loss
    * with a dial already in flight, so it goes straight to `redialing` rather than
@@ -353,10 +398,18 @@ export class LinkWatch {
    * `closed` is terminal and carries its reason (`./websocket-transport`
    * `CloseReason`).
    */
-  transportState(state: ConnectionState, now: number, closeReason?: string | null): void {
+  transportState(
+    state: ConnectionState,
+    now: number,
+    closeReason?: string | null,
+    refusal?: string | null,
+  ): void {
     // A retired watch still ignores the socket: the match is over, and a client
     // hanging up on its way to the menu is not a disconnection to report.
     if (this.retired || this.phase === 'expired') return;
+    // The server's own word for a refusal, kept whether or not it is what ends us,
+    // so the terminal card can quote it rather than say `REFUSED` (a0-72).
+    if (typeof refusal === 'string' && refusal.length > 0) this.refusal = refusal;
     if (state === 'closed') {
       this.expire(asEnding(closeReason), now);
       this.sync(now);
@@ -387,7 +440,10 @@ export class LinkWatch {
     if (this.phase === 'live' && !this.isHidden && now - this.lastFrameAt >= this.silenceLimitMs) {
       this.lose('silence', now);
     }
-    if (this.phase === 'lost' || this.phase === 'redialing') {
+    // The countdown ends a loss only while the seat is on a clock. Inside a live
+    // match it is not ({@link holdForMatch}) — the seat is held until the match
+    // ends, and this watch is in no position to decide it has.
+    if (!this.held && (this.phase === 'lost' || this.phase === 'redialing')) {
       if (this.graceRemaining(now) <= 0) this.expire('grace-elapsed', now);
     }
     return this.sync(now);
@@ -402,7 +458,9 @@ export class LinkWatch {
   takeAutoRedial(now: number): boolean {
     if (!this.autoRedialPending) return false;
     if (this.phase !== 'lost') return false;
-    if (this.graceRemaining(now) <= 0) return false;
+    // A held seat has no window to have run out of, so the returning tab always
+    // gets its automatic attempt — which is the one the developer's phone needed.
+    if (!this.held && this.graceRemaining(now) <= 0) return false;
     this.autoRedialPending = false;
     return true;
   }
@@ -422,7 +480,7 @@ export class LinkWatch {
    */
   beginRedial(now: number, manual = false): void {
     if (this.phase !== 'lost' && this.phase !== 'redialing') return;
-    if (this.graceRemaining(now) <= 0) {
+    if (!this.held && this.graceRemaining(now) <= 0) {
       // Pressed a hair too late. The seat is gone, and the terminal card says so —
       // but the press was still not nothing, so it is recorded as the failure it was.
       if (manual) this.manual = 'failed';
@@ -456,7 +514,7 @@ export class LinkWatch {
       if (manual) this.sync(now);
       return;
     }
-    if (this.graceRemaining(now) <= 0) this.expire('grace-elapsed', now);
+    if (!this.held && this.graceRemaining(now) <= 0) this.expire('grace-elapsed', now);
     else this.phase = 'lost';
     this.sync(now);
   }
@@ -482,6 +540,9 @@ export class LinkWatch {
     this.ending = null;
     this.autoRedialPending = false;
     this.manual = 'none';
+    // The match is over, so the seat is not held for it any more (a0-72).
+    this.held = false;
+    this.refusal = null;
     this.sync(now);
   }
 
@@ -512,6 +573,9 @@ export class LinkWatch {
     this.phase = 'live';
     this.cause = null;
     this.ending = null;
+    // A refusal we recovered from was not the end of anything (`held` survives:
+    // the match is still running, and the seat is still ours).
+    this.refusal = null;
     this.lostAt = -1;
     this.graceFrom = -1;
     this.attempts = 0;
@@ -542,6 +606,8 @@ export class LinkWatch {
       attempts: this.attempts,
       manualRedial: this.manual,
       ending: this.ending,
+      heldForMatch: this.held,
+      refusal: this.refusal,
     };
     return this.current;
   }
@@ -661,18 +727,87 @@ export function manualRedialPhrase(manual: ManualRedial, attempts: number): stri
   }
 }
 
-/** The sentence a terminal ending gets. Each names what is true now, in the tone
- *  the GDD asks for at a death: plain, and not a joke (§4.7). */
-export function endingTitle(ending: LinkEnding | null): string {
+/**
+ * The sentence a terminal ending gets. Each names what is true now, in the tone
+ * the GDD asks for at a death: plain, and not a joke (§4.7).
+ *
+ * **`refusal` is the server's own word** (`server/match-server.ts`
+ * `JoinErrorMessage.reason`), and passing it is the whole of a0-72's last clause.
+ * `REFUSED — the server would not take you back` is what the developer read on
+ * their phone, and it was true of nothing: their match was running, their seat was
+ * held, and a thirty-second pass had lapsed while the screen was off. A refusal
+ * that survives the fix is a refusal with a *cause*, and the card says the cause.
+ */
+export function endingTitle(ending: LinkEnding | null, refusal?: string | null): string {
   switch (ending) {
     case 'room-gone':
       return 'MATCH ENDED — the room is gone';
     case 'join-rejected':
-      return 'REFUSED — the server would not take you back';
+      return refusalTitle(refusal);
     case 'left':
       return 'MATCH ABANDONED — your seat is a bot’s now';
     default:
       return 'SEAT EXPIRED — a bot flew your ship, match went on';
+  }
+}
+
+/**
+ * A refused rejoin, in the player's own terms — one line per reason the server can
+ * give, each saying the thing that is actually true of their match.
+ *
+ * The bare `REFUSED` is kept for exactly one case: a reason this build has never
+ * heard of. Inventing a sentence for an unknown token would be the same failure in
+ * a new coat — but the token is printed, so a bug report still carries it.
+ */
+export function refusalTitle(refusal: string | null | undefined): string {
+  switch (refusal) {
+    case 'match-over':
+      return 'MATCH OVER — it finished while you were away';
+    case 'reclaim-unknown':
+      return 'MATCH ENDED — that room is no longer running';
+    case 'reclaim-expired':
+      return 'SEAT RELEASED — you left this match, so it went on without you';
+    case 'reclaim-denied':
+      return 'SEAT TAKEN — somebody else is flying it';
+    case 'match-live':
+      return 'MATCH UNDER WAY — it started without you';
+    case 'room-full':
+      return 'ROOM FULL — every seat is taken';
+    case 'room-gone':
+      return 'MATCH ENDED — the room is gone';
+    case 'bad-ticket':
+      // Since a0-72 a lapsed pass is no longer this (`server/match-server.ts`
+      // `admitsJoin` admits a returning owner's), so what is left is a pass for a
+      // room or a Machine that is not the one on the other end of this socket.
+      return 'WRONG SERVER — your pass is for a different machine';
+    case 'bad-room-code':
+      return 'NOT A ROOM CODE — check the letters';
+    default:
+      return refusal
+        ? `REFUSED — the server said “${refusal}”`
+        : 'REFUSED — the server would not take you back';
+  }
+}
+
+/** The sentence under {@link refusalTitle}: what the player can do about it. */
+export function refusalDetail(refusal: string | null | undefined): string {
+  switch (refusal) {
+    case 'match-over':
+      return 'Your seat was held the whole time the match ran — the match is what ended, not your window.';
+    case 'reclaim-unknown':
+    case 'room-gone':
+      return 'There is nothing left to rejoin. Start a new match, or take a room code from a friend.';
+    case 'reclaim-expired':
+      return 'You pressed ABANDON MATCH, which frees the seat at once. A bot took it and the match carried on.';
+    case 'reclaim-denied':
+      return 'That seat is not yours to take — the code alone is not the credential.';
+    case 'match-live':
+    case 'room-full':
+      return 'Matches are entered from the lobby. Ask for the next one, or open a room of your own.';
+    case 'bad-ticket':
+      return 'The pass you presented names another machine. RETRY asks the allocator for a fresh one.';
+    default:
+      return 'The server would not take the rejoin, and this build has no better words for its reason.';
   }
 }
 
@@ -686,11 +821,8 @@ export function linkNotice(status: LinkStatus): LinkNotice {
   if (status.phase === 'expired') {
     return {
       visible: true,
-      title: endingTitle(status.ending),
-      detail:
-        status.ending === 'left'
-          ? 'You left the match. The seat is freed and the match went on without you.'
-          : 'Nothing left to reclaim — the reconnect window closed while you were away.',
+      title: endingTitle(status.ending, status.refusal),
+      detail: expiredDetail(status),
       grace: '',
       actions: [{ kind: 'menu', label: 'BACK TO MENU', primary: true }],
       busy: false,
@@ -698,7 +830,14 @@ export function linkNotice(status: LinkStatus): LinkNotice {
     };
   }
 
-  const grace = `${seconds(status.graceRemainingMs)}s`;
+  // **What the countdown is** (a0-72). Held for the match, it is not a deadline
+  // and must not be drawn as one: a phone that reads `12s` reads it as the time it
+  // has left to get back, and the whole point of the ruling is that there is no
+  // such time. Empty here, and the detail line says the true thing instead.
+  const grace = status.heldForMatch ? '' : `${seconds(status.graceRemainingMs)}s`;
+  const graceClause = status.heldForMatch
+    ? 'your seat is held for as long as the match runs'
+    : `${grace} of grace left`;
   const pressed = manualRedialPhrase(status.manualRedial, status.attempts);
   if (status.phase === 'redialing') {
     return {
@@ -706,7 +845,7 @@ export function linkNotice(status: LinkStatus): LinkNotice {
       title: `RECONNECTING…${status.attempts > 1 ? ` ATTEMPT ${status.attempts}` : ''}`,
       // The cause is kept through the redial: a player watching this needs to know
       // what it is recovering *from*, and it is the line they will screenshot.
-      detail: `${lossPhrase(status.cause, status.silentMs)} — reclaiming your seat, ${grace} of grace left.${pressed}`,
+      detail: `${lossPhrase(status.cause, status.silentMs)} — reclaiming your seat, ${graceClause}.${pressed}`,
       grace,
       // **RECONNECT belongs here, and for most of the grace window this is the only
       // card there is** (n8-01). The earlier reading — "nothing for the player to
@@ -723,7 +862,7 @@ export function linkNotice(status: LinkStatus): LinkNotice {
       // sleeping out an exponential backoff the player cannot see; theirs cancels the
       // wait and goes now (`./websocket-transport` `redial`).
       actions: [
-        { kind: 'reconnect', label: `RECONNECT NOW · ${grace}`, primary: true },
+        { kind: 'reconnect', label: reconnectLabel('RECONNECT NOW', grace), primary: true },
         { kind: 'abandon', label: 'ABANDON MATCH', primary: false },
       ],
       busy: true,
@@ -734,17 +873,40 @@ export function linkNotice(status: LinkStatus): LinkNotice {
   return {
     visible: true,
     title: `CONNECTION LOST — ${lossPhrase(status.cause, status.silentMs)}`,
-    detail: `A bot is flying your ship. RECONNECT inside ${grace} and you get it back — same cargo, same upgrades.${pressed}`,
+    detail: status.heldForMatch
+      ? `A bot is flying your ship. RECONNECT and you get it back — same cargo, same upgrades — for as long as the match runs.${pressed}`
+      : `A bot is flying your ship. RECONNECT inside ${grace} and you get it back — same cargo, same upgrades.${pressed}`,
     grace,
     actions: [
       // The countdown rides the button itself, because the seconds are the whole
-      // decision: a player reading "RECONNECT · 6s" knows to press it NOW.
-      { kind: 'reconnect', label: `RECONNECT · ${grace}`, primary: true },
+      // decision: a player reading "RECONNECT · 6s" knows to press it NOW. A held
+      // seat has no seconds, so the button is the bare verb — a suffix that read
+      // `· 0s` would be a deadline invented by punctuation.
+      { kind: 'reconnect', label: reconnectLabel('RECONNECT', grace), primary: true },
       { kind: 'abandon', label: 'ABANDON MATCH', primary: false },
     ],
     busy: false,
     failed: false,
   };
+}
+
+/** `RECONNECT · 6s` while a window is counting; the bare verb when the seat is
+ *  held for the match and there is no number that would be true (a0-72). */
+function reconnectLabel(verb: string, grace: string): string {
+  return grace === '' ? verb : `${verb} · ${grace}`;
+}
+
+/** The sentence under a terminal card. A refusal quotes the server; the rest say
+ *  what this client concluded on its own. */
+function expiredDetail(status: LinkStatus): string {
+  if (status.ending === 'left') {
+    return 'You left the match. The seat is freed and the match went on without you.';
+  }
+  if (status.ending === 'join-rejected') return refusalDetail(status.refusal);
+  if (status.ending === 'room-gone') {
+    return 'The match server has no room under that code any more — the match is over.';
+  }
+  return 'Nothing left to reclaim — the reconnect window closed while you were away.';
 }
 
 // ---------------------------------------------------------------------------

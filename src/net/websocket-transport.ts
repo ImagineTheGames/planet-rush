@@ -70,6 +70,27 @@ export interface WebSocketTransportConfig {
    */
   readonly ticket?: string;
   /**
+   * **Mint a fresh ticket for this room** (a0-72), called before every dial that
+   * follows a drop. Absent on the direct-connect path, where there is no allocator
+   * and no ticket to refresh.
+   *
+   * A ticket is deliberately short-lived — 30 seconds
+   * (`allocator/allocator.ts` `DEFAULT_TICKET_TTL_MS`) — and until a0-72 the one
+   * minted for the *first* dial was re-presented on every redial for the rest of
+   * the session. That is fine for a redial that happens two seconds after a socket
+   * closes, and it is the developer's bug for a phone: the screen blanked, thirty
+   * seconds passed, and the return dial presented a pass that had lapsed while its
+   * owner was away. The seat was still held, the match was still running, and the
+   * Machine said `bad-ticket`.
+   *
+   * So the pass is re-minted rather than stretched: the TTL stays short (it is what
+   * stops a leaked ticket being useful later), and a player who is coming back gets
+   * a current one. The answer doubles as a liveness verdict — an allocator that
+   * cannot find the room is telling us the match has ended, which is the one case
+   * where there is genuinely nothing to dial for.
+   */
+  readonly refreshTicket?: () => Promise<TicketRefresh>;
+  /**
    * Ask the allocator whether the room still exists, used only after a drop to
    * tell "my connection died" from "the room died" (`./reconnect`, M9 Task 9b).
    * A `'gone'` answer stops the retry loop *early* instead of hammering a dead
@@ -107,6 +128,23 @@ export interface WebSocketTransportConfig {
  * reads, exactly as `player` already is.
  */
 export type CloseReason = 'left' | 'join-rejected' | StopReason;
+
+/**
+ * What {@link WebSocketTransportConfig.refreshTicket} came back with.
+ *
+ *   • `{ ok: true }`  — a current ticket for the same room; the dial carries it.
+ *   • `roomGone: true` — the allocator knows of no Machine hosting the code (404).
+ *     The match has ended; nothing to reclaim, and the retry loop stops here.
+ *   • `roomGone: false` — the *allocator* could not be reached, or answered
+ *     something unusable. That says nothing about the room, so the dial goes out
+ *     on the ticket we already hold: a Machine still hosting the room admits a
+ *     reclaim on a lapsed-but-genuine pass (`server/match-server.ts` `admitsJoin`),
+ *     which is precisely the case a returning player must not be denied because a
+ *     third service is having a bad afternoon.
+ */
+export type TicketRefresh =
+  | { readonly ok: true; readonly ticket: string }
+  | { readonly ok: false; readonly roomGone: boolean };
 
 /** Defaults, named so the reconnect behaviour is legible without reading code. */
 export const RECONNECT_WINDOW_MS = 60_000;
@@ -158,9 +196,17 @@ export class WebSocketTransport implements Transport {
   private readonly retryBase: number;
   private readonly retryMax: number;
   private readonly checkRoomAlive: (() => Promise<RoomLiveness>) | null;
+  private readonly refreshTicket: (() => Promise<TicketRefresh>) | null;
+  /** The pass this transport is currently carrying. Seeded from the config and
+   *  re-minted before a redial (a0-72), so it is a field rather than a constant. */
+  private ticket: string | undefined;
+  /** True while a re-mint is in flight, so a second dial cannot start behind it. */
+  private refreshing = false;
 
   constructor(private readonly config: WebSocketTransportConfig) {
     this.checkRoomAlive = config.checkRoomAlive ?? null;
+    this.refreshTicket = config.refreshTicket ?? null;
+    this.ticket = config.ticket;
     this.connectSocket =
       config.connect ?? ((url) => new WebSocket(url) as unknown as WebSocketLike);
     this.now = config.now ?? (() => Date.now());
@@ -251,7 +297,7 @@ export class WebSocketTransport implements Transport {
 
     this.attempt = 0;
     this.setState('reconnecting');
-    this.open();
+    this.reopen();
     return true;
   }
 
@@ -324,9 +370,53 @@ export class WebSocketTransport implements Transport {
 
   // --- Dialling -----------------------------------------------------------
 
+  /**
+   * Dial again after a drop — **with a current ticket** (a0-72).
+   *
+   * Every dial that is not the first goes through here, because every dial that is
+   * not the first happens an unknown number of seconds after the last one, and the
+   * ticket's 30-second life is measured in those same seconds. A refresh that
+   * cannot be had is not a reason to sit still: the dial goes out on the pass we
+   * hold, which a Machine still hosting the room will honour for a reclaim.
+   *
+   * The only verdict that stops the dial is the allocator saying the room is *gone*
+   * — the one answer that means there is nothing on the far end to reach.
+   */
+  private reopen(): void {
+    if (this.left || this.rejected) return;
+    if (this.refreshTicket === null) {
+      this.open();
+      return;
+    }
+    if (this.refreshing) return; // a dial is already forming behind a re-mint
+    this.refreshing = true;
+    this.refreshTicket()
+      .then((result) => {
+        if (result.ok) this.ticket = result.ticket;
+        else if (result.roomGone) this.roomLiveness = 'gone';
+      })
+      .catch(() => {
+        // An allocator that threw is an allocator we could not reach. It says
+        // nothing about the room, so nothing changes and the dial still goes.
+      })
+      .finally(() => {
+        this.refreshing = false;
+        if (this.left || this.rejected) return;
+        if (this.roomLiveness === 'gone') {
+          if (this.retry !== null) {
+            this.cancel(this.retry);
+            this.retry = null;
+          }
+          this.stop('room-gone');
+          return;
+        }
+        this.open();
+      });
+  }
+
   private open(): void {
     if (this.left || this.rejected) return;
-    const socket = this.connectSocket(dialUrl(this.config.url, this.config.ticket));
+    const socket = this.connectSocket(dialUrl(this.config.url, this.ticket));
     // Snapshots are binary; without this a browser hands them over as `Blob`
     // and every read becomes asynchronous (docs/netcode-spike.md wire layout).
     socket.binaryType = 'arraybuffer';
@@ -406,7 +496,9 @@ export class WebSocketTransport implements Transport {
   private sendJoin(): void {
     // The allocator's ticket rides every dial, reclaims included: in a fleet the
     // Machine refuses a join it was never sent, and a redial is still a join.
-    const ticket = this.config.ticket;
+    // Since a0-72 this is the *current* pass, re-minted before a redial rather
+    // than the one the first dial was handed ({@link reopen}).
+    const ticket = this.ticket;
     const message: ClientMessage =
       this.seat !== null && this.token !== null
         ? {
@@ -472,7 +564,7 @@ export class WebSocketTransport implements Transport {
         this.stop(again.reason);
         return;
       }
-      this.open();
+      this.reopen();
     }, delay);
   }
 

@@ -119,6 +119,34 @@ export function signTicket(claims: TicketClaims, secret: string): string {
  * @param nowMs  The verifier's current epoch-ms — expiry is judged against this.
  */
 export function verifyTicket(ticket: string, secret: string, nowMs: number): TicketClaims | null {
+  const claims = readTicket(ticket, secret);
+  if (claims === null) return null;
+  if (nowMs >= claims.expiresAt) return null; // stale at the verifier's clock
+  return claims;
+}
+
+/**
+ * **Authenticity without the clock** (a0-72): the same signature and shape checks
+ * {@link verifyTicket} makes, minus the expiry test. Returns claims for a ticket
+ * this secret genuinely signed, however old it is; `null` for one it did not.
+ *
+ * This exists because *expiry and authenticity answer different questions*, and
+ * exactly one caller needs to tell them apart. A returning player's ticket proves
+ * a **routing decision** — which Machine hosts this room — and that decision does
+ * not rot: the room is either still on this Machine or it is not, and the Machine
+ * can see which. What proves the returning player is the seat's *owner* is the
+ * per-seat `reclaimToken` the server itself minted (`server/room.ts`), which has
+ * nothing to do with this file. So a Machine that already holds the room may admit
+ * a **reclaim** on a lapsed-but-genuine ticket (`server/match-server.ts`
+ * `admitsJoin`) without weakening anything: a forged, tampered, wrong-room or
+ * wrong-Machine ticket still fails here, and a lapsed one still buys nothing more
+ * than the right to *present a token*.
+ *
+ * Every other caller must keep using {@link verifyTicket}: a fresh join, a room
+ * this Machine does not host, and the upgrade router's routing hint are all cases
+ * where an expired pass is exactly as good as no pass at all.
+ */
+export function readTicket(ticket: string, secret: string): TicketClaims | null {
   const dot = ticket.indexOf('.');
   if (dot <= 0) return null; // no payload, or leading dot
   const payload = ticket.slice(0, dot);
@@ -141,7 +169,6 @@ export function verifyTicket(ticket: string, secret: string, nowMs: number): Tic
     return null;
   }
   if (!isTicketClaims(claims)) return null;
-  if (nowMs >= claims.expiresAt) return null; // stale at the verifier's clock
   return claims;
 }
 

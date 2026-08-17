@@ -41,11 +41,30 @@ describe('decideReconnect', () => {
     ).toEqual({ action: 'stop', reason: 'room-gone' });
   });
 
-  it('stops when the grace window closes on a still-live room', () => {
-    // The room is fine, but the seat is a bot's now for the rest of the match.
+  it('keeps trying a live room however long we were away (a0-72)', () => {
+    // **The developer's ruling, in this module.** This test used to assert the
+    // opposite — *"the room is fine, but the seat is a bot's now for the rest of
+    // the match"* — and that sentence is what they overruled, from a phone whose
+    // screen had blanked for longer than a minute:
+    //
+    //   *"i should be able to join back if the match is still on-going no matter
+    //   what"*
+    //
+    // A live room means the seat is held for the life of the match
+    // (`server/room.ts` `HELD_FOR_MATCH`), so a client that gave up on arithmetic
+    // would be refusing a seat the server is holding open for it. The loop does not
+    // run forever: a room that will not have us answers `joinError` and the
+    // transport ends on the server's own word, which is a truthful ending.
     expect(
       decideReconnect(ctx({ elapsedMs: DEFAULT_GRACE_WINDOW_MS, roomLiveness: 'live' })),
-    ).toEqual({ action: 'stop', reason: 'grace-elapsed' });
+    ).toEqual({ action: 'retry' });
+    expect(decideReconnect(ctx({ elapsedMs: 30 * 60_000, roomLiveness: 'live' }))).toEqual({
+      action: 'retry',
+    });
+    // …and a dead room still stops instantly, whichever side of the window it is.
+    expect(
+      decideReconnect(ctx({ elapsedMs: DEFAULT_GRACE_WINDOW_MS, roomLiveness: 'gone' })),
+    ).toEqual({ action: 'stop', reason: 'room-gone' });
   });
 
   it('treats the window as closed at the exact boundary (>=, not >)', () => {

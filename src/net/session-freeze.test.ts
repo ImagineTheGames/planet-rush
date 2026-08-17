@@ -213,19 +213,61 @@ describe('the backgrounded tab, end to end (brief §1, §2)', () => {
     expect(notice.title).toContain('CONNECTION LOST — no server data for');
   });
 
-  it('offers the seconds it has left, and stops offering when they run out', () => {
+  it('offers no countdown inside a live match, and never ends one on its own (a0-72)', () => {
+    // **This test used to be the bug.** It asserted `8s` on the card and then
+    // `expired`/`grace-elapsed` two seconds past a ten-second window — a client
+    // deciding, from arithmetic it admits is an estimate, that a match it can no
+    // longer see is over for it. The developer overruled exactly that:
+    //
+    //   *"i should be able to join back if the match is still on-going no matter
+    //   what"*
+    //
+    // `matchStart` has arrived here (see `running`), so the seat is held for the
+    // life of the match (`./link-loss` `holdForMatch`, `server/room.ts`
+    // `HELD_FOR_MATCH`). There is no countdown to print, and no number of seconds
+    // that ends anything.
     const { session, at } = running(10_000);
     at(SILENCE_FLOOR_MS);
     session.pollLink();
+    const lost = linkNotice(session.link);
+    expect(session.link.heldForMatch).toBe(true);
+    expect(lost.grace).toBe('');
+    // The button says the verb and no deadline — `RECONNECT · 0s` would be a
+    // deadline invented by punctuation.
+    expect(lost.actions[0]?.label).toMatch(/^RECONNECT( NOW)?$/);
+    expect(lost.detail).toContain('for as long as the match runs');
+
+    // A window's worth of time passes, and then five more of them. Still holding.
+    at(11_000);
+    expect(session.pollLink().phase).not.toBe('expired');
+    at(60 * 1_000);
+    const late = session.pollLink();
+    expect(late.phase).not.toBe('expired');
+    expect(linkNotice(late).actions.map((a) => a.kind)).toEqual(['reconnect', 'abandon']);
+    // Frozen throughout — no authority means no world to advance, which is a
+    // separate promise and is unchanged (brief §1).
+    expect(session.frozen).toBe(true);
+  });
+
+  it('still counts a window down before the match starts', () => {
+    // The hold is a property of a *running match*. In the lobby there is no ship,
+    // no wallet and nothing being held for anybody, so the old rule stands: the
+    // window is real, it is shown, and it ends the attempt when it runs out.
+    const transport = new StubTransport();
+    let clock = T0;
+    const session = new TransportSession(transport, { now: () => clock, link: { graceWindowMs: 10_000 } });
+    transport.deliver({ type: 'welcome', you: LOCAL, room: 'QK7P', tick: 0 });
+
+    clock = T0 + SILENCE_FLOOR_MS;
+    session.pollLink();
+    expect(session.link.heldForMatch).toBe(false);
     expect(linkNotice(session.link).grace).toBe('8s');
 
-    at(11_000);
+    clock = T0 + 11_000;
     const gone = session.pollLink();
     expect(gone.phase).toBe('expired');
     expect(gone.ending).toBe('grace-elapsed');
     expect(linkNotice(gone).actions.map((a) => a.kind)).toEqual(['menu']);
-    // Still frozen: there is no world to fly any more, only a screen to leave.
-    expect(session.frozen).toBe(true);
   });
 });
 

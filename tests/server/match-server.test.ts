@@ -315,7 +315,12 @@ describe('the authoritative match server', () => {
 
     const substituted = host.socket.first('playerSubstituted');
     expect(substituted?.player).toBe(1);
-    expect(substituted?.graceSeconds).toBe(GRACE_MS / 1000);
+    // **Held, not counted down** (a0-72). The seat is its owner's until the match
+    // ends, so what peers are told is the fact rather than a duration — and
+    // `graceSeconds: 0` keeps meaning the one thing it has always meant, which is
+    // the ABANDON case below it.
+    expect(substituted?.heldForMatch).toBe(true);
+    expect(substituted?.graceSeconds).toBe(0);
     expect(host.connection.room!.lobbyState()[1]?.isBot).toBe(true);
     // The match keeps its shape: the seat is still flying, and still stepping.
     const before = host.connection.room!.world!.tick;
@@ -394,24 +399,61 @@ describe('the authoritative match server', () => {
     expect(forgetful.socket.errors()[0]?.reason).toBe('reclaim-denied');
   });
 
-  it('closes the window after ~60 seconds and lets the bot keep the seat', () => {
+  it('holds the seat for the whole match, however long the player is away (a0-72)', () => {
+    // **The test this replaces asserted the developer's bug.** It was called
+    // *"closes the window after ~60 seconds and lets the bot keep the seat"*, and
+    // it was green on the day they were refused:
+    //
+    //   *"i should be able to join back if the match is still on-going no matter
+    //   what"*
+    //
+    // So the window is gone from a running match ({@link HELD_FOR_MATCH}). Ten
+    // minutes away, five sweeps later, the seat is still theirs and the ship is
+    // still the one they were flying.
     const { code, host, guest } = liveMatch();
     const token = guest.socket.first('welcome')?.reclaimToken;
+    const room = host.connection.room!;
+    const ship = room.world!.ships[1]!;
+    ship.banked = 17;
     drop(guest);
 
     advance(GRACE_MS - 1_000);
-    expect(host.connection.room!.hasPendingReclaim).toBe(true);
-    expect(host.connection.room!.graceRemaining(1, now)).toBeGreaterThan(0);
+    expect(room.hasPendingReclaim).toBe(true);
+    expect(room.seatHeldForMatch(1)).toBe(true);
 
-    advance(2_000); // the window closes
-    expect(host.connection.room!.hasPendingReclaim).toBe(false);
+    advance(2_000); // where the window used to close
+    expect(room.hasPendingReclaim).toBe(true);
+    expect(room.seatHeldForMatch(1)).toBe(true);
+
+    advance(10 * 60_000); // …and long past any window anybody would have picked
+    expect(room.hasPendingReclaim).toBe(true);
+    expect(room.graceRemaining(1, now)).toBe(Number.POSITIVE_INFINITY);
+
+    const back = rejoin(code, 1, token);
+    expect(back.connection.player).toBe(1);
+    expect(back.connection.room).toBe(room);
+    expect(room.lobbyState()[1]?.isBot).toBe(false);
+    expect(room.seatHeldForMatch(1)).toBe(false);
+    // The same ship, with its wealth: a bot minded it, nothing rebuilt it.
+    expect(room.world!.ships[1]).toBe(ship);
+    expect(ship.cargo + ship.banked).toBeCloseTo(17, 9);
+  });
+
+  it('says "match-over" — not "your window ran out" — once the match has ended', () => {
+    // The one refusal a0-72 leaves standing, and it is owed its own words. A player
+    // whose match finished while they were away did not run out of anything.
+    const { code, host, guest } = liveMatch();
+    const token = guest.socket.first('welcome')?.reclaimToken;
+    drop(guest);
+    const room = host.connection.room!;
+    // End the match the way the sim does, then let the room notice.
+    room.world!.match.phase = 'ended';
+    advance(32);
+    expect(room.state).toBe('ended');
 
     const late = rejoin(code, 1, token);
     expect(late.connection.room).toBeNull();
-    expect(late.socket.errors()[0]?.reason).toBe('reclaim-expired');
-    // The match plays on, eight ships, with a bot in that seat for good.
-    expect(host.connection.room!.lobbyState()[1]?.isBot).toBe(true);
-    expect(host.connection.room!.world?.ships).toHaveLength(8);
+    expect(late.socket.errors()[0]?.reason).toBe('match-over');
   });
 
   it('refuses a reclaim for a seat nobody dropped, and for a room that never existed', () => {
@@ -444,12 +486,27 @@ describe('the authoritative match server', () => {
     expect(replacement.connection.player).toBe(1);
   });
 
-  it('sweeps a room once nobody is in it and nobody may come back', () => {
+  it('sweeps a room once the match is over and nobody may come back', () => {
     const { host, guest } = liveMatch();
+    const room = host.connection.room!;
     drop(host);
     drop(guest);
     expect(server.roomCount).toBe(1); // both seats are still held
 
+    // **A live match is never swept out from under a player who may return**
+    // (a0-72). This used to be `advance(GRACE_MS + 1_000)` and a room count of
+    // zero — a room deleted a minute after its last human dropped, which is the
+    // third of the three walls the developer hit: come back, and the room the code
+    // named is simply gone.
+    advance(10 * 60_000);
+    expect(server.roomCount).toBe(1);
+
+    // What bounds the room instead is the match itself. When it ends the seats fall
+    // back to the finite window (`server/room.ts` DEFAULT_GRACE_MS — how long a
+    // finished room lingers to say `match-over`), and then it is garbage.
+    room.world!.match.phase = 'ended';
+    advance(32);
+    expect(server.roomCount).toBe(1); // still explaining itself
     advance(GRACE_MS + 1_000);
     expect(server.roomCount).toBe(0);
   });
