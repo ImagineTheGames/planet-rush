@@ -339,9 +339,15 @@ describe('the shared log', () => {
 
   it('carries pre-boot events into the described log, keeping their timestamps', () => {
     const c = clock();
-    // A module logs before boot: the fallback log takes it at t=0 of its own clock.
+    // A module logs before boot: the fallback log stamps it on ITS OWN clock, which
+    // is the real one — `playtestLog()` takes no config, by design, so there is no
+    // clock to inject here. Read the stamp rather than predicting it: on an idle
+    // machine it is 0, but a loaded one can put a millisecond between the lazy
+    // construction above and the note below, and that millisecond is not the
+    // property under test.
     const early = playtestLog();
     early.recordNote('early line');
+    const stampedAt = early.events.find((e) => e.msg === 'early line')!.at;
 
     c.tick(3_000);
     const log = installPlaytestLog({ env: ENV, now: c.now });
@@ -350,8 +356,8 @@ describe('the shared log', () => {
     expect(msgs).toContain('session start');
     expect(msgs).toContain('early line');
     // Adopted verbatim: the early line keeps the `at` it was stamped with, rather
-    // than being rewritten to "now".
-    expect(log.events.find((e) => e.msg === 'early line')!.at).toBe(0);
+    // than being rewritten to "now" — 3_000 away on the installed log's clock.
+    expect(log.events.find((e) => e.msg === 'early line')!.at).toBe(stampedAt);
     expect(playtestLog()).toBe(log);
   });
 
