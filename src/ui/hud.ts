@@ -53,7 +53,7 @@ import { Container, Graphics, Text } from 'pixi.js';
 import type { TextStyleFontWeight } from 'pixi.js';
 import { PALETTE } from '@render/index';
 import type { DeviceKind, FireMode } from '@platform/actions';
-import type { LayoutEntry, Viewport } from '@platform/layout-registry';
+import type { LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
 import { ShipClass } from '@shared/types';
 import type { PlayerId } from '@shared/types';
 import { Onboarding, oreWasSpent, resolvePromptText } from './onboarding';
@@ -138,6 +138,7 @@ import {
   wheelRadius,
 } from './hud-geometry';
 import type { ClockLayout } from './hud-geometry';
+import { contentBox } from './viewport';
 
 // ---------------------------------------------------------------------------
 // Typography & neutral colours
@@ -748,6 +749,25 @@ export class Hud extends Container {
   private readonly floatsGroup = new Container();
   private readonly floatTexts: Text[] = [];
 
+  /**
+   * The centred region of the viewport the HUD's **chrome** anchors to (a0-74) —
+   * `./viewport` `contentBox`. Equal to the whole viewport on every display 16:9
+   * or narrower and on everything under the reference width, which is every phone,
+   * every tablet and every ordinary desktop window; a centred reference-aspect box
+   * on a 21:9 or 32:9 display.
+   *
+   * **Only the chrome.** The world renders full-bleed behind this, and so do the
+   * elements that track the *world* rather than the screen — the over-ship health
+   * bars, the nameplates, the hold pips, the tap markers, the loot tell. Those
+   * follow the camera, whose ship sits at the viewport centre; binding them to a
+   * box would tear them off the thing they label. `screenWidth`/`screenHeight`
+   * stay the viewport for exactly that reason and are read by exactly those
+   * elements.
+   *
+   * Rewritten by {@link layout}; never null after the constructor's call.
+   */
+  private content: Rect = { x: 0, y: 0, width: 0, height: 0 };
+
   constructor(
     private screenWidth: number,
     private screenHeight: number,
@@ -798,8 +818,8 @@ export class Hud extends Container {
     this.bankedText = this.makeText('', FONT_NUMERAL, TYPE.bank, PALETTE.signalYellow, 'bold', 'name');
     this.bankedText.y = TOTAL_LABEL_H;
     this.oreGroup.addChild(this.oreChrome, this.totalLabel, this.bankedText);
-    this.oreGroup.x = PAD;
-    this.oreGroup.y = PAD;
+    // Placed in `layout()` with the rest of the corner chrome — the top-LEFT
+    // corner is the content box's, not the screen's, on an ultrawide (a0-74).
 
     // The partial-pickup line (a0-54), in the SAME grammar as the readout above:
     // a muted word for what happened, an ore-yellow numeral for the ore. The
@@ -923,18 +943,35 @@ export class Hud extends Container {
   }
 
   private layout(): void {
-    // The Gantry frame first: every size and gap below is derived from it, so a
+    // The content box first: on an ultrawide the chrome is bound to a centred
+    // reference-aspect region rather than to the physical edges, so the wheel, the
+    // hold pips and the minimap stay within one glance of each other instead of a
+    // head-turn apart (a0-74; ./viewport `contentBox`). On every 16:9-or-narrower
+    // display — and on everything under the reference width, so every phone — this
+    // IS the viewport and not one number below moves.
+    this.content = contentBox({ width: this.screenWidth, height: this.screenHeight });
+    const box = this.content;
+
+    // The Gantry frame second: every size and gap below is derived from it, so a
     // phone gets the same layout a quarter smaller rather than desktop pixels
-    // rattling around in a short viewport (./instrument `hudMetrics`).
-    this.metrics = hudMetrics(this.screenWidth, this.screenHeight);
+    // rattling around in a short viewport (./instrument `hudMetrics`). Measured on
+    // the content box, because that is the frame the chrome is actually laid out
+    // in — and the two agree exactly everywhere the box is the viewport.
+    this.metrics = hudMetrics(box.width, box.height);
     this.applyTypeScale();
 
-    this.waveGroup.x = this.screenWidth / 2;
+    // The corners are the box's corners, never the screen's. Centred elements are
+    // unchanged by construction: the box is centred, so its middle IS the screen's
+    // middle, which is also where the follow camera holds the ship.
+    this.oreGroup.x = box.x + PAD;
+    this.oreGroup.y = PAD;
+    this.waveGroup.x = box.x + box.width / 2;
     this.waveGroup.y = PAD;
-    this.stationGroup.x = this.screenWidth - PAD;
+    this.stationGroup.x = box.x + box.width - PAD;
     this.stationGroup.y = PAD;
+    this.stripGroup.x = box.x;
     this.stripGroup.y = this.screenHeight - STRIP_ROW - STRIP_PAD;
-    this.promptGroup.x = this.screenWidth / 2;
+    this.promptGroup.x = box.x + box.width / 2;
     // The prompt's y is no longer a fraction of the screen: it hangs from the
     // bottom of the clear band under the build wheel, and that band depends on
     // the panel's own measured height — so it is set in `updateOnboarding`, from
@@ -1093,8 +1130,14 @@ export class Hud extends Container {
     const g = this.stripChrome;
     g.clear();
     if (width <= 0) return;
-    drawScrim(g, 0, top, this.screenWidth, height, 'bottom', SCRIM.strip);
-    drawEdgeRule(g, STRIP_PAD, top, Math.min(width, this.screenWidth - 2 * STRIP_PAD), 1, INSTRUMENT_RULE);
+    // Drawn in the strip group's own space, and that group starts at the content
+    // box's left edge (a0-74) — so on an ultrawide the legend and its scrim span
+    // the box rather than reaching 960 px out to a physical edge nobody is looking
+    // at. On every other display `content.width` is the viewport width and this is
+    // byte-for-byte the strip that shipped.
+    const span = this.content.width;
+    drawScrim(g, 0, top, span, height, 'bottom', SCRIM.strip);
+    drawEdgeRule(g, STRIP_PAD, top, Math.min(width, span - 2 * STRIP_PAD), 1, INSTRUMENT_RULE);
   }
 
   // --- Ore: the BANK (top-left) and the HOLD (under the ship) --------------
@@ -1264,8 +1307,8 @@ export class Hud extends Container {
     // wedge. Measured metrics in, so the decision survives a font swap.
     const rows = [this.waveName, this.waveNext, this.waveMatch];
     const layout = waveClockLayout(
-      this.screenWidth,
-      this.screenHeight,
+      this.content.width,
+      this.content.height,
       rows.map((t) => ({ width: t.width, height: t.height })),
       wheelOpen,
     );
@@ -1481,7 +1524,9 @@ export class Hud extends Container {
     this.respawnText.text = model.text;
     this.respawnText.style.fill = model.color; // the player's own colour (§5.2)
     this.respawnText.style.wordWrap = true;
-    this.respawnText.style.wordWrapWidth = respawnWrapWidth(this.screenWidth, this.screenHeight);
+    // Wrapped to the content box (a0-74), like the prompt: the overlay is centred
+    // on the ship either way, so all this changes is the width one line may run to.
+    this.respawnText.style.wordWrapWidth = respawnWrapWidth(this.content.width, this.content.height);
     this.respawnText.style.align = 'center';
 
     // A scrim sized to the text, so the countdown reads over the death scene, and
@@ -1489,7 +1534,7 @@ export class Hud extends Container {
     // rather than a stroked panel around it. This is the one scrim on the HUD
     // allowed to run heavy (`SCRIM.overlay`): the local ship has just exploded,
     // so there is nothing under the centre of the screen to read through.
-    const pad = respawnPad(this.screenWidth, this.screenHeight);
+    const pad = respawnPad(this.content.width, this.content.height);
     const w = this.respawnText.width + pad.x;
     const h = this.respawnText.height + pad.y;
     const key = `${Math.round(w)}x${Math.round(h)}:${model.color}`;
@@ -1652,10 +1697,17 @@ export class Hud extends Container {
     this.minimapIsTouch = frame.isTouch;
     this.safeInsets = frame.safeInsets ?? {};
     const tick = frame.tick ?? Math.floor(frame.time * 60);
+    // Laid out in the content box and shifted onto it (a0-74). The minimap is the
+    // element the second report names first — "all that UI goes to the edges" —
+    // and on a 32:9 display the bottom-right corner is nearly a metre of desk away
+    // from the build wheel. The view draws in box space; one container offset puts
+    // it on screen, and `minimapTap` below subtracts the same offset so the hit
+    // test and the pixels can never come apart.
+    this.minimap.x = this.content.x;
     this.minimap.update(
       frame.minimap ?? null,
       this.minimapModel.state,
-      { width: this.screenWidth, height: this.screenHeight },
+      { width: this.content.width, height: this.content.height },
       this.minimapIsTouch,
       this.safeInsets,
       tick,
@@ -1681,10 +1733,12 @@ export class Hud extends Container {
    */
   minimapTap(x: number, y: number): boolean {
     if (!this.minimap.visible) return false;
+    // Into the content box's space — the one offset `updateMinimap` drew with
+    // (a0-74). Zero everywhere the box is the viewport, which is every phone.
     return this.minimapModel.tap(
-      x,
+      x - this.content.x,
       y,
-      { width: this.screenWidth, height: this.screenHeight },
+      { width: this.content.width, height: this.content.height },
       this.minimapIsTouch,
       this.safeInsets,
     );
@@ -1911,13 +1965,20 @@ export class Hud extends Container {
 
     // Frame: pulses with match time so it reads as an alarm rather than a border.
     const pulse = 0.35 + 0.35 * (0.5 + 0.5 * Math.sin(frame.time * 8));
+    // Framed on the CONTENT BOX (a0-74), not the physical screen. The alarm is a
+    // mechanic (GDD §2.2) and its whole job is to be seen: on a 32:9 display a
+    // frame on the physical edges puts its two vertical strokes 960 px outside the
+    // region the player is looking at, which is a frame drawn for nobody. On
+    // everything 16:9 and narrower the box IS the screen and this is the same
+    // flush-to-the-edge frame it has always been.
+    const box = this.content;
     this.alarmFrame.clear();
     this.alarmFrame
       .rect(
+        box.x + ALARM_FRAME_INSET,
         ALARM_FRAME_INSET,
-        ALARM_FRAME_INSET,
-        this.screenWidth - 2 * ALARM_FRAME_INSET,
-        this.screenHeight - 2 * ALARM_FRAME_INSET,
+        box.width - 2 * ALARM_FRAME_INSET,
+        box.height - 2 * ALARM_FRAME_INSET,
       )
       .stroke({ width: ALARM_FRAME_STROKE, color: PALETTE.threatRed, alpha: pulse });
 
@@ -1934,13 +1995,32 @@ export class Hud extends Container {
     this.arrowDrawn = false;
     if (!ship || !home) return;
 
-    const arrow = homeArrow(
+    // Two questions, two rectangles, and they are genuinely different on an
+    // ultrawide (a0-74).
+    //
+    //  - **Is home already on screen?** Asked of the WHOLE viewport, because the
+    //    world is full-bleed: a station drawn out in the gutter is a station the
+    //    player can see, and §2.2's rule is that at that point the station itself
+    //    is the tell. Answering this against the content box would draw an arrow
+    //    pointing at a home that is plainly visible ten degrees away from it.
+    //  - **Where does the arrow go?** Clamped to the CONTENT BOX, because an arrow
+    //    is only a tell if it is read, and the far edge of a 32:9 display is where
+    //    the whole second report says the player is not looking.
+    //
+    // On every 16:9-or-narrower display the two rectangles are the same rectangle
+    // and this is exactly the arrow that shipped.
+    const box = this.content;
+    const visible = homeArrow(
       ship,
       home,
       { width: this.screenWidth, height: this.screenHeight },
       ARROW_EDGE_INSET,
     );
-    if (arrow.onScreen) return;
+    if (visible.onScreen) return;
+    const inBox = homeArrow(ship, home, { width: box.width, height: box.height }, ARROW_EDGE_INSET);
+    // Content-space → screen space. The box is centred, so the ship sits at its
+    // middle exactly as it sits at the screen's, and the shift is the one offset.
+    const arrow = { ...inBox, x: inBox.x + box.x };
     this.arrowDrawn = true;
 
     // A triangle pointing along `angle`, drawn at the clamped edge position.
@@ -2193,12 +2273,17 @@ export class Hud extends Container {
     // prompt breaks to a second line rather than running under a thumb stick or
     // the minimap's corner square — see hud-geometry.ts `promptBand` for the
     // measurements, and for why the band replaced a single `PROMPT_CENTER_Y`.
+    //
+    // The band is measured in the CONTENT BOX (a0-74): on an ultrawide a prompt
+    // wrapped to 3840 px would be one very long line the eye has to travel, which
+    // is the second report's complaint applied to a sentence.
     const isTouch = frame.isTouch;
     const insets = this.safeInsets;
+    const box = this.content;
     this.promptText.style.wordWrap = true;
     this.promptText.style.wordWrapWidth = promptWrapWidth(
-      this.screenWidth,
-      this.screenHeight,
+      box.width,
+      box.height,
       isTouch,
       insets,
     );
@@ -2208,14 +2293,14 @@ export class Hud extends Container {
     // registry is handed, so the drawn rect and the registered rect are one
     // computation rather than two that have to agree.
     const bounds = promptBounds(
-      this.screenWidth,
-      this.screenHeight,
+      box.width,
+      box.height,
       this.promptText.width,
       this.promptText.height,
       isTouch,
       insets,
     );
-    this.promptGroup.x = this.screenWidth / 2;
+    this.promptGroup.x = box.x + box.width / 2;
     this.promptGroup.y = bounds.y + bounds.height / 2;
 
     // The scrim IS the registered rect, not a second sizing of it (a0-24).
@@ -2248,6 +2333,52 @@ export class Hud extends Container {
     // asserted against.
 
     this.promptGroup.visible = true;
+  }
+
+  // --- The content box, and where it put the chrome (a0-74) ----------------
+
+  /**
+   * The content box this HUD last laid its chrome out in, CSS px — a copy, so a
+   * caller cannot reach in and move it.
+   *
+   * Public because it is the answer to a question two other layers legitimately
+   * ask: a test, which needs to know where "inside" is at 32:9 without recomputing
+   * it (`hud.test.ts`), and any host that wants to report the box on the debug
+   * surface. It is derived — `./viewport` `contentBox` of the live viewport — so
+   * this can never disagree with what was drawn.
+   */
+  debugContentBox(): Rect {
+    const b = this.content;
+    return { x: b.x, y: b.y, width: b.width, height: b.height };
+  }
+
+  /**
+   * Where each piece of **corner chrome** was anchored by the last {@link layout}.
+   *
+   * Deliberately the group ORIGINS rather than `getBounds()`: these are the numbers
+   * `layout()` actually computes, they are exact, and — unlike bounds — they are
+   * readable in a headless test, where a `Text` has no canvas to measure itself
+   * against. `describeLayout` remains the measured-bounds seam the layout registry
+   * uses; this is the placement one, and the two answer different questions.
+   *
+   * The `origin` field names which edge of the element the point IS, because three
+   * of these are not top-left corners: the HOME cluster is right-anchored (it runs
+   * leftward from its origin) and the wave clock and the prompt are centre-anchored.
+   * A test that assumed top-left for all five would pass on a bug.
+   */
+  debugChromeAnchors(): ReadonlyArray<{
+    readonly id: string;
+    readonly x: number;
+    readonly y: number;
+    readonly origin: 'left' | 'right' | 'center';
+  }> {
+    return [
+      { id: 'ore-hud', x: this.oreGroup.x, y: this.oreGroup.y, origin: 'left' },
+      { id: 'wave-clock', x: this.waveGroup.x, y: this.waveGroup.y, origin: 'center' },
+      { id: 'station-hp', x: this.stationGroup.x, y: this.stationGroup.y, origin: 'right' },
+      { id: 'controls-strip', x: this.stripGroup.x, y: this.stripGroup.y, origin: 'left' },
+      { id: 'onboarding', x: this.promptGroup.x, y: this.promptGroup.y, origin: 'center' },
+    ];
   }
 
   // --- Layout registry seam (GDD §3.4 platform instrument) ----------------

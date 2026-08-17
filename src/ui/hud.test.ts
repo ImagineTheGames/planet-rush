@@ -36,6 +36,10 @@ import {
   leftNumeral,
   partialTake,
 } from './loot-tell';
+import { CONTENT_MAX_ASPECT } from './viewport';
+import { HUD_PAD } from './hud-geometry';
+import { collapsedRect } from './minimap';
+import { resolveAnchor, rectContains } from '@platform/layout-registry';
 
 /**
  * A lone ship parked mid-arena with a hand-placed hold, clear of its own
@@ -238,5 +242,108 @@ describe('a0-54 — the HUD carries the seam that says it', () => {
     const hud = new Hud(1280, 720);
     expect(typeof hud.debugLootTell).toBe('function');
     expect(hud.debugLootTell()).toBeNull();
+  });
+});
+
+/**
+ * ── a0-74 ───────────────────────────────────────────────────────────────────
+ * The developer, on their own display:
+ *
+ * > *"on pc we also need a way to handle UI locations because i have an ultra
+ * > wide and all that UI goes to the edges of the screens"*
+ *
+ * The HUD is bound to a centred content box (`./viewport` `contentBox`) rather
+ * than to the raw viewport, and the world renders full-bleed behind it. These
+ * assertions are on the *placements* `Hud.layout` computes — exact numbers, and
+ * readable headless, where a `Text` has no canvas to measure itself against.
+ */
+describe('a0-74 — the HUD is bound to a content box', () => {
+  it('the HUD stays reachable on an ultrawide', () => {
+    const W = 3840;
+    const H = 1080; // 32:9 — the widest shape the second report is about
+    const hud = new Hud(W, H);
+    const box = hud.debugContentBox();
+
+    // The box is real: a centred 16:9 region, with the extra 1920 px of width
+    // left to the world behind it.
+    expect(box.width).toBeCloseTo(H * CONTENT_MAX_ASPECT, 6);
+    expect(box.width).toBeLessThan(W);
+    expect(box.x).toBeCloseTo((W - box.width) / 2, 6);
+    expect(box.height).toBe(H);
+
+    const anchors = hud.debugChromeAnchors();
+    expect(anchors.map((a) => a.id)).toEqual([
+      'ore-hud',
+      'wave-clock',
+      'station-hp',
+      'controls-strip',
+      'onboarding',
+    ]);
+
+    for (const a of anchors) {
+      // INSIDE THE BOX — the assertion the whole brief turns on.
+      expect(a.x).toBeGreaterThanOrEqual(box.x);
+      expect(a.x).toBeLessThanOrEqual(box.x + box.width);
+      // …and NOT AT THE VIEWPORT EDGE, which is the thing that was wrong. Each
+      // corner element clears the physical edge by the gutter (960 px) — a
+      // placement that merely stayed on screen would satisfy the line above.
+      expect(a.x).toBeGreaterThan(box.x - 1);
+      expect(W - a.x).toBeGreaterThan(box.x - 1);
+    }
+
+    // Named individually, because "inside the box" is satisfied by a bug that
+    // piles every element in the middle. Each is where the box's own corner is.
+    const byId = new Map(anchors.map((a) => [a.id, a]));
+    expect(byId.get('ore-hud')?.x).toBeCloseTo(box.x + HUD_PAD, 6);
+    expect(byId.get('station-hp')?.x).toBeCloseTo(box.x + box.width - HUD_PAD, 6);
+    expect(byId.get('controls-strip')?.x).toBeCloseTo(box.x, 6);
+    // The centred pair are unchanged by construction — a centred box has the
+    // screen's own middle, which is also where the follow camera holds the ship.
+    expect(byId.get('wave-clock')?.x).toBeCloseTo(W / 2, 6);
+    expect(byId.get('onboarding')?.x).toBeCloseTo(W / 2, 6);
+
+    // The minimap is the element the report names first ("all that UI"). It is
+    // laid out in the box and shifted onto it, so its drawn rect is inside too.
+    const map = collapsedRect({ width: box.width, height: box.height }, false);
+    const drawn = { ...map, x: map.x + box.x };
+    expect(drawn.x).toBeGreaterThanOrEqual(box.x);
+    expect(drawn.x + drawn.width).toBeLessThanOrEqual(box.x + box.width + 0.5);
+    expect(W - (drawn.x + drawn.width)).toBeGreaterThan(900); // clear of the edge
+
+    // Every declared anchor still resolves inside its layout-registry region —
+    // binding to the box moves elements INWARD, so nothing can leave the zone it
+    // registers under (`@platform/layout-registry`). Asserted rather than argued.
+    const zone = resolveAnchor({ region: 'bottom-right', margin: 0 }, { width: W, height: H });
+    expect(rectContains(zone, drawn)).toBe(true);
+  });
+
+  it('changes nothing at all on 16:9 and narrower — every phone included', () => {
+    // The floor is what makes this true for phones, which are *wider* than 16:9
+    // in landscape (844×390 is aspect 2.16) and have no width to give away.
+    for (const vp of [
+      { width: 1280, height: 800 }, // the golden suite's desktop control
+      { width: 1280, height: 720 }, // the HUD's own reference frame
+      { width: 844, height: 390 }, // landscape phone
+      { width: 390, height: 844 }, // portrait phone
+    ]) {
+      const hud = new Hud(vp.width, vp.height);
+      expect(hud.debugContentBox()).toEqual({ x: 0, y: 0, width: vp.width, height: vp.height });
+      const byId = new Map(hud.debugChromeAnchors().map((a) => [a.id, a]));
+      // The pre-a0-74 numbers, spelled out: the screen's own corners.
+      expect(byId.get('ore-hud')?.x).toBe(HUD_PAD);
+      expect(byId.get('station-hp')?.x).toBe(vp.width - HUD_PAD);
+      expect(byId.get('controls-strip')?.x).toBe(0);
+      expect(byId.get('wave-clock')?.x).toBe(vp.width / 2);
+    }
+  });
+
+  it('binds at 21:9 as well as 32:9 — the same rule, not a special case', () => {
+    const hud = new Hud(2560, 1080);
+    const box = hud.debugContentBox();
+    expect(box.width).toBeCloseTo(1920, 6);
+    expect(box.x).toBeCloseTo(320, 6);
+    const byId = new Map(hud.debugChromeAnchors().map((a) => [a.id, a]));
+    expect(byId.get('station-hp')?.x).toBeCloseTo(2560 - 320 - HUD_PAD, 6);
+    expect(byId.get('ore-hud')?.x).toBeCloseTo(320 + HUD_PAD, 6);
   });
 });
