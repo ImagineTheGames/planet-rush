@@ -1,0 +1,11 @@
+{
+  "kept": [
+    "f000-00000ms.png",
+    "f002-00041ms.png",
+    "f008-00130ms.png",
+    "f035-02653ms.png"
+  ],
+  "dropped": 32,
+  "of": 36,
+  "note": "frames.json lists every frame the screencast emitted, with its CDP timestamp; the PNGs kept are the decisive ones (audit.txt §B)."
+}

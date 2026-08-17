@@ -26,8 +26,15 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 /** `frames/before` on today's code; re-run with A0_70_LABEL=after post-fix. */
 const LABEL = process.env.A0_70_LABEL ?? 'before';
 
-/** How long the window under test is. The report is about "the first second". */
-const WINDOW_MS = 1400;
+/** How long the window under test is. The report is about "the first second".
+ *
+ *  a0-71 films the phones for longer (`A0_71_WINDOW_MS`): the boot blocks the
+ *  main thread for over a second there, and the transform transition this brief
+ *  is about runs on the COMPOSITOR — so the slide is on screen during the block,
+ *  and lands after it. A screencast is the one instrument that can see a frame
+ *  the main thread never got to produce, which is why it is the film of record
+ *  here and the frame-exact readback is not. */
+const WINDOW_MS = Number(process.env.A0_71_WINDOW_MS ?? 1400);
 
 interface Frame {
   readonly index: number;
@@ -66,10 +73,15 @@ async function film(page: import('@playwright/test').Page, url: string, dir: str
 }
 
 test('film the first second, gate and no-gate', async ({ page }) => {
-  const gated = await film(page, '/', 'gated');
+  // `A0_71_DIR_PREFIX=portrait-` keeps a phone's film out of the desktop film's
+  // directory. `film()` clears the directory it writes, so without this a mobile
+  // run silently replaces a0-70's committed desktop frames with same-named ones
+  // shot at another viewport — a whole evidence set overwritten by a re-run.
+  const prefix = process.env.A0_71_DIR_PREFIX ?? '';
+  const gated = await film(page, '/', `${prefix}gated`);
   expect(gated.length).toBeGreaterThan(5);
 
-  const bare = await film(page, '/?gate=0', 'no-gate');
+  const bare = await film(page, '/?gate=0', `${prefix}no-gate`);
   expect(bare.length).toBeGreaterThan(5);
 
   // eslint-disable-next-line no-console
