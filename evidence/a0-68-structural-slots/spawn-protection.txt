@@ -1,0 +1,34 @@
+=== 1. spawnProtect at match start, and its countdown ===
+SPAWN_PROTECTION_S (src/sim/constants.ts, TUNABLE)   10 s
+ships[0].spawnProtect at t=0                          10
+stations[0].spawnProtect at t=0                       10
+ship protection lapses at                             10.000 s
+core protection lapses at                             10.000 s
+
+=== 2. a shot at a protected hull, and the same shot once it lapses ===
+target.spawnProtect = 10.0  → damage dealt 0  (shot flew over: true)
+target.spawnProtect = 0.0  → damage dealt 3.5  (shot flew over: false)
+VERDICT: the rule is LIVE — protection is the only difference between the two.
+
+=== 3. spawnPulse tells over the first 15 seconds of a match ===
+spawnPulse tells emitted                              38
+  first at 0.52 s, last at 9.52 s
+  per ship: p0=19, p1=19
+  SPAWN_PULSE_S (observer, one clock for every glow)  0.5 s
+
+Every tell kind the same fifteen seconds produced, for scale:
+  spawnPulse          38
+
+The two firing voices, as a control (rockChip / hullHit are the sounds these route to):
+  mineHit          0
+  weaponHit        0
+
+=== 4. why mineHit / weaponHit never fire ===
+buy a turret through the action stream                ok (1 mounted)
+turret muzzles published over 60 s of live fire       90
+  …of which carry a hitPoint                          0
+`src/sim/buildings.ts` emits `hitPoint: null` unconditionally since the v0.3
+laser funeral, and `observer.observeMuzzles` skips a muzzle without one — so
+`shotImpact` is the ONLY impact voice a player can hear.
+
+(Regenerate: npx vite-node evidence/a0-68-structural-slots/spawn-protection.ts)
