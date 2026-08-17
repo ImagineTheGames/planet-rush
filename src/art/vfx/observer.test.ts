@@ -18,7 +18,7 @@
 import { describe, expect, it } from 'vitest';
 import { ShipClass } from '@shared/types';
 import { createWorld, shipTopSpeed, step, type World } from '../../sim';
-import { TELL, TELL_NAMES, TellQueue } from '../tells';
+import { IMPACT, TELL, TELL_NAMES, TellQueue } from '../tells';
 import { REPAIR_PULSE_S, SPAWN_PULSE_S, THRUST_DEADZONE, WorldObserver, type WorldView } from './observer';
 
 /** The compile-time half: a real World *is* a WorldView, or this file fails tsc. */
@@ -527,6 +527,113 @@ describe('WorldObserver — deriving the moments', () => {
       world({ projectiles: [shot({ active: false, pos: { x: 1200, y: 500 } })] }),
     );
     expect(left.has(TELL.shotImpact)).toBe(false);
+  });
+
+  it('tells a shot landing on a hull from one landing on rock, a shield, or a station', () => {
+    // a0-68. *"none of these sound like impact sounds, they should also be
+    // different depending on the thing that was hit..."* — so the tell carries
+    // the surface, derived here, in the one place both the VFX and the audio read
+    // and the one that runs the same on a predicted world as on a snapshot.
+    //
+    // The order is `src/sim/projectiles.ts` resolveHit's order, and these cases
+    // are its branches.
+    const shot = (over: Record<string, unknown> = {}) => ({
+      id: 1,
+      active: true,
+      pos: { x: 200, y: 200 },
+      vel: { x: 300, y: 0 },
+      damage: 4,
+      life: 2,
+      ...over,
+    });
+    const landed = (at: { x: number; y: number }, rest: Partial<Mutable>) =>
+      diff(
+        world({ ...rest, projectiles: [shot({ pos: at })] }),
+        world({ ...rest, projectiles: [shot({ pos: at, active: false })] }),
+      );
+    const surfaceOf = (tells: TellQueue): number => {
+      const i = tells.indexOf(TELL.shotImpact);
+      expect(i, 'no shotImpact tell').toBeGreaterThanOrEqual(0);
+      return tells.variantAt(i);
+    };
+
+    // Nothing there: rock is the fall-through, as it has been since `hitsHull`.
+    expect(surfaceOf(landed({ x: 200, y: 200 }, {}))).toBe(IMPACT.rock);
+
+    // A hull.
+    const hull = landed({ x: 300, y: 300 }, { ships: [ship({ id: 3, pos: { x: 300, y: 300 } })] });
+    expect(surfaceOf(hull)).toBe(IMPACT.hull);
+
+    // An asteroid, stated rather than inferred from the fall-through.
+    const rock = landed({ x: 700, y: 120 }, {
+      asteroids: [{ id: 9, pos: { x: 700, y: 120 }, radius: 30, ore: 40, crackStage: 0 }],
+    });
+    expect(surfaceOf(rock)).toBe(IMPACT.rock);
+
+    // A turret, a satellite and a bare core all read as anchored station metal —
+    // the fold is a decision (`IMPACT_OF`), so it is asserted rather than assumed.
+    const turret = landed({ x: 560, y: 500 }, {
+      stations: [station({ turrets: [{ id: 7, pos: { x: 560, y: 500 }, radius: 10, angle: 0, cooldown: 0, hp: 30 }] })],
+    });
+    expect(surfaceOf(turret)).toBe(IMPACT.station);
+
+    const satellite = landed({ x: 620, y: 500 }, {
+      stations: [station({ satellites: [{ id: 8, pos: { x: 620, y: 500 }, radius: 8, hp: 20 }] })],
+    });
+    expect(surfaceOf(satellite)).toBe(IMPACT.station);
+
+    expect(surfaceOf(landed({ x: 500, y: 500 }, { stations: [station()] }))).toBe(IMPACT.station);
+
+    // A live bubble stands in front of the core and eats the whole hit
+    // (`damageStation` spends it on shields before the core sees any).
+    const shielded = landed({ x: 500, y: 500 }, {
+      stations: [station({ shields: [{ id: 5, hp: 40, maxHp: 40, radius: 90 }] })],
+    });
+    expect(surfaceOf(shielded)).toBe(IMPACT.shield);
+
+    // A DEAD bubble does not: the round reached the metal.
+    const popped = landed({ x: 500, y: 500 }, {
+      stations: [station({ shields: [{ id: 5, hp: 0, maxHp: 40, radius: 90 }] })],
+    });
+    expect(surfaceOf(popped)).toBe(IMPACT.station);
+
+    // "You cannot shoot through things" — resolveHit tests rock BEFORE structures,
+    // so a rock sitting over a station's footprint eats the shot bound for it.
+    const covered = landed({ x: 500, y: 500 }, {
+      stations: [station()],
+      asteroids: [{ id: 9, pos: { x: 500, y: 500 }, radius: 30, ore: 40, crackStage: 0 }],
+    });
+    expect(surfaceOf(covered)).toBe(IMPACT.rock);
+  });
+
+  it('calls the killing blow a HULL hit, not a shot into stone', () => {
+    // The frame-boundary case that made `ShipMemo.hullFrame` necessary, and the
+    // reason it is not defensive coding: `resolveHit` only strikes a LIVE ship, so
+    // this IS a hull hit — but the observer is looking at a world in which the
+    // hull is already dead, a geometric scan skips it, and the impact falls
+    // through to the default surface. The shot that kills somebody would have
+    // sounded like a shot into rock.
+    const shot = (over: Record<string, unknown> = {}) => ({
+      id: 1,
+      active: true,
+      pos: { x: 300, y: 300 },
+      vel: { x: 300, y: 0 },
+      damage: 9,
+      life: 2,
+      ...over,
+    });
+    const tells = diff(
+      world({ ships: [ship({ id: 3, pos: { x: 300, y: 300 }, alive: true })], projectiles: [shot()] }),
+      world({
+        ships: [ship({ id: 3, pos: { x: 300, y: 300 }, alive: false, hull: 0 })],
+        projectiles: [shot({ active: false })],
+      }),
+    );
+    const i = tells.indexOf(TELL.shotImpact);
+    expect(i, 'no shotImpact tell').toBeGreaterThanOrEqual(0);
+    expect(tells.variantAt(i)).toBe(IMPACT.hull);
+    // …and the death itself still sounds, in the same frame.
+    expect(tells.has(TELL.shipExplode)).toBe(true);
   });
 
   it('reads the clock: waves, collapse, and the end', () => {

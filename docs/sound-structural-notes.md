@@ -306,6 +306,20 @@ an enemy core behind a live shield (1 up)  damageStation → shields  shield    
 an enemy core, no shield                   damageStation → core     station   → impactStation
 ```
 
+### "You cannot shoot through things", restored without paying for it
+
+`resolveHit` tests **asteroids before structures**, so a rock sitting over a
+station's footprint eats a shot bound for it — the sim gets that property free from
+its ordering. The classifier uses rock as its *fall-through* rather than scanning
+~200 bodies on every landed shot (the cost `hitsHull` declined to pay, and the
+reason rock is the default at all), which inverts that one case: a shot that really
+hit a rock overlapping a station would have read as metal.
+
+So the rock scan runs **only when the point also lands inside a station** — the
+only case that can be wrong, and the only case that asks. Held as a test
+(`observer.test.ts`, *"tells a shot landing on a hull from one landing on rock, a
+shield, or a station"*).
+
 ### Known limit, stated rather than hidden
 
 Bodies move between the tick the shot resolved and the frame the observer reads. At
@@ -313,6 +327,12 @@ Bodies move between the tick the shot resolved and the frame the observer reads.
 is small — but it is a real approximation, and it is the same one `hitsHull` has
 lived with since the laser retired. If it ever misclassifies in practice, the fix
 is a wider slop or a memo of last-frame positions, not a different architecture.
+
+The classifier also carries **no allegiance filter**, because `ProjectileView` does
+not publish the shot's owner. `resolveHit` skips a friendly station (a shot passes
+through your own home); the classifier does not know to. It cannot produce a wrong
+sound on its own — a shot cannot die on a friendly station, so nothing lands there
+to classify — but if the view ever grows an owner, the filter belongs here.
 
 ---
 

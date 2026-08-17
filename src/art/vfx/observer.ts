@@ -928,11 +928,32 @@ export class WorldObserver {
       // is why the core test below is the same point test at a smaller radius.
       for (const shield of station.shields) {
         const up = shield.hp > 0 || this.shields.get(shield.id)?.upFrame === this.frame;
-        if (up && within(x, y, station.pos, shield.radius)) return IMPACT_OF.shield;
+        if (up && within(x, y, station.pos, shield.radius) && !this.onRock(x, y)) return IMPACT_OF.shield;
       }
-      if (within(x, y, station.pos, station.radius)) return IMPACT_OF.core;
+      if (within(x, y, station.pos, station.radius) && !this.onRock(x, y)) return IMPACT_OF.core;
     }
     return IMPACT.rock;
+  }
+
+  /**
+   * Is a live asteroid covering this point?
+   *
+   * `resolveHit` tests **asteroids before structures**, so a rock sitting over a
+   * station's footprint eats a shot bound for it — "you cannot shoot through
+   * things", which the sim gets for free from its ordering. This scan restores
+   * that ordering without paying for it on every impact: rock is the classifier's
+   * fall-through, so the only case that can be wrong is a point that ALSO lands
+   * inside a station, and that is the only case that asks.
+   *
+   * The alternative — testing rocks in sim order, before the station loop —
+   * would scan ~200 bodies on every landed shot, which is the cost `hitsHull`
+   * declined to pay and the reason rock is the default here in the first place.
+   */
+  private onRock(x: number, y: number): boolean {
+    for (const memo of this.rocks.values()) {
+      if (within(x, y, memo, memo.radius)) return true;
+    }
+    return false;
   }
 
   // -------------------------------------------------------------------------
