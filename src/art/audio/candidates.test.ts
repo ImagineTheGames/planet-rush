@@ -454,6 +454,55 @@ describe('sound-review candidates', () => {
     }
   });
 
+  it('generates AROUND the incumbent on the four slots that said "i like current"', () => {
+    // Four of the sixteen reasons open by keeping the shipped sound:
+    //
+    //   bankOre       — *"i like the current and none of the new generations…"*
+    //   upgradeBought — *"i like current but i want to hear new optinos that are
+    //                    more like it but also more subtle"*
+    //   musicWin      — *"…the current is closest but too video gamey"*
+    //   musicLoss     — *"i like current, but it still sounds too video gamey"*
+    //
+    // On these the incumbent is the reference and starting over throws away the
+    // only thing on the board the developer has said they like. "Around it" is
+    // held here as the two things that would show a fresh start had happened
+    // anyway: the take is made of the incumbent's **material**, and it does not
+    // get **louder** than the incumbent while claiming to be more subtle.
+    const AROUND = ['bankOre', 'upgradeBought', 'musicWin', 'musicLoss'] as const;
+    for (const id of AROUND) {
+      const shipped = soundSpec(id);
+      const shippedWaves = new Set(voicesOf(shipped).map((v) => v.wave));
+      const shippedPeak = peak(render(shipped));
+      for (const c of CANDIDATE_SLOTS[id]!.candidates) {
+        if (c.anchor === true) continue;
+        const where = `${id}/${c.id}`;
+        // Same family of oscillators as the sound being kept. Round one answered
+        // these four with granular fields, magnetic mass and cathedral bands —
+        // new materials, which is precisely what "i like the current" rules out.
+        for (const v of voicesOf(c.spec)) {
+          expect(shippedWaves, `${where} is made of ${v.wave}, which the incumbent is not`).toContain(v.wave);
+        }
+        // *"More subtle"* / *"less video gamey"* are never satisfied by being
+        // louder. Held on PEAK rather than RMS on purpose: a sustained chord
+        // carries more energy than a sequence of struck notes at the same peak,
+        // and "does not shout" is a statement about the loudest moment (§4.7 —
+        // the two stings land into the three seconds of near-silence).
+        expect(peak(render(c.spec)), `${where} shouts louder than the sound it is meant to be like`).toBeLessThanOrEqual(
+          shippedPeak,
+        );
+      }
+    }
+
+    // The two stings also stay promotable: nothing may outrun the station death,
+    // which is the beat the quiet belongs to (§8's 1.32 s longest-tail invariant).
+    const deathLength = render(soundSpec('stationDeath')).length;
+    for (const id of ['musicWin', 'musicLoss'] as const) {
+      for (const c of CANDIDATE_SLOTS[id]!.candidates) {
+        expect(render(c.spec).length, `${id}/${c.id} outruns the station death`).toBeLessThanOrEqual(deathLength);
+      }
+    }
+  });
+
   it('every slot offers a full set of candidates, one letter each, with characters', () => {
     for (const id of SLOT_IDS) {
       const slot = CANDIDATE_SLOTS[id]!;

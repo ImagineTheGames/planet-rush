@@ -592,64 +592,66 @@
     {
       "id": "bankOre",
       "label": "Bank Ore",
-      "context": "Ore banked into your economy — a drop that settles.",
+      "context": "Ore is deposited into your station's store.",
       "current": "previews/bankOre/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/bankOre/d.wav",
-          "character": "conveyor stop, gravel settling",
-          "params": "src/art/audio/candidates.ts#bankOre.d"
+          "id": "h",
+          "wav": "previews/bankOre/h.wav",
+          "character": "the two notes, with coins under them",
+          "params": "src/art/audio/candidates.ts#bankOre.h"
         },
         {
-          "id": "e",
-          "wav": "previews/bankOre/e.wav",
-          "character": "vault seating, mass coming down",
-          "params": "src/art/audio/candidates.ts#bankOre.e"
+          "id": "i",
+          "wav": "previews/bankOre/i.wav",
+          "character": "counted, then the drawer takes it",
+          "params": "src/art/audio/candidates.ts#bankOre.i"
         },
         {
-          "id": "f",
-          "wav": "previews/bankOre/f.wav",
-          "character": "two bands falling to rest",
-          "params": "src/art/audio/candidates.ts#bankOre.f"
+          "id": "j",
+          "wav": "previews/bankOre/j.wav",
+          "character": "the second note lands in the tray",
+          "params": "src/art/audio/candidates.ts#bankOre.j"
         },
         {
-          "id": "g",
-          "wav": "previews/bankOre/g.wav",
-          "character": "counted, filed, nothing more",
-          "params": "src/art/audio/candidates.ts#bankOre.g"
+          "id": "k",
+          "wav": "previews/bankOre/k.wav",
+          "character": "the sound that ships today (A/B)",
+          "params": "src/art/audio/candidates.ts#bankOre.k",
+          "anchor": true
         }
       ]
     },
     {
       "id": "upgradeBought",
       "label": "Upgrade Bought",
-      "context": "An upgrade purchased — the brightest confirmation in the bank.",
+      "context": "An upgrade is purchased from the wheel.",
       "current": "previews/upgradeBought/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/upgradeBought/d.wav",
-          "character": "three stepper contacts, no shine",
-          "params": "src/art/audio/candidates.ts#upgradeBought.d"
+          "id": "h",
+          "wav": "previews/upgradeBought/h.wav",
+          "character": "the same three notes, thinner",
+          "params": "src/art/audio/candidates.ts#upgradeBought.h"
         },
         {
-          "id": "e",
-          "wav": "previews/upgradeBought/e.wav",
-          "character": "pressure lifting, sub under it",
-          "params": "src/art/audio/candidates.ts#upgradeBought.e"
+          "id": "i",
+          "wav": "previews/upgradeBought/i.wav",
+          "character": "two notes, the triad implied",
+          "params": "src/art/audio/candidates.ts#upgradeBought.i"
         },
         {
-          "id": "f",
-          "wav": "previews/upgradeBought/f.wav",
-          "character": "three welds rising, each quenched",
-          "params": "src/art/audio/candidates.ts#upgradeBought.f"
+          "id": "j",
+          "wav": "previews/upgradeBought/j.wav",
+          "character": "the three notes, receding",
+          "params": "src/art/audio/candidates.ts#upgradeBought.j"
         },
         {
-          "id": "g",
-          "wav": "previews/upgradeBought/g.wav",
-          "character": "up one step, said once",
-          "params": "src/art/audio/candidates.ts#upgradeBought.g"
+          "id": "k",
+          "wav": "previews/upgradeBought/k.wav",
+          "character": "the sound that ships today (A/B)",
+          "params": "src/art/audio/candidates.ts#upgradeBought.k",
+          "anchor": true
         }
       ]
     },
@@ -977,32 +979,33 @@
     {
       "id": "musicWin",
       "label": "Victory Sting",
-      "context": "Match won (after the three-second quiet) — one-shot, rising major arpeggio.",
+      "context": "Match won (after the three-second quiet) — one-shot, a short rising resolution.",
       "current": "previews/musicWin/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/musicWin/d.wav",
-          "character": "ion bursts rising, thin and dry",
-          "params": "src/art/audio/candidates.ts#musicWin.d"
+          "id": "h",
+          "wav": "previews/musicWin/h.wav",
+          "character": "two notes, a fifth, opening",
+          "params": "src/art/audio/candidates.ts#musicWin.h"
         },
         {
-          "id": "e",
-          "wav": "previews/musicWin/e.wav",
-          "character": "magnetic lift, weight arriving",
-          "params": "src/art/audio/candidates.ts#musicWin.e"
+          "id": "i",
+          "wav": "previews/musicWin/i.wav",
+          "character": "one chord, struck and opening",
+          "params": "src/art/audio/candidates.ts#musicWin.i"
         },
         {
-          "id": "f",
-          "wav": "previews/musicWin/f.wav",
-          "character": "cathedral bands opening, one room",
-          "params": "src/art/audio/candidates.ts#musicWin.f"
+          "id": "j",
+          "wav": "previews/musicWin/j.wav",
+          "character": "the top note first, the floor after",
+          "params": "src/art/audio/candidates.ts#musicWin.j"
         },
         {
-          "id": "g",
-          "wav": "previews/musicWin/g.wav",
-          "character": "won: two notes and a floor",
-          "params": "src/art/audio/candidates.ts#musicWin.g"
+          "id": "k",
+          "wav": "previews/musicWin/k.wav",
+          "character": "the sound that ships today (A/B)",
+          "params": "src/art/audio/candidates.ts#musicWin.k",
+          "anchor": true
         }
       ]
     },
@@ -1013,28 +1016,29 @@
       "current": "previews/musicLoss/current.wav",
       "candidates": [
         {
-          "id": "d",
-          "wav": "previews/musicLoss/d.wav",
-          "character": "ion field falling away to nothing",
-          "params": "src/art/audio/candidates.ts#musicLoss.d"
+          "id": "h",
+          "wav": "previews/musicLoss/h.wav",
+          "character": "two notes, then a breath that stops",
+          "params": "src/art/audio/candidates.ts#musicLoss.h"
         },
         {
-          "id": "e",
-          "wav": "previews/musicLoss/e.wav",
-          "character": "magnetic descent, mass settling low",
-          "params": "src/art/audio/candidates.ts#musicLoss.e"
+          "id": "i",
+          "wav": "previews/musicLoss/i.wav",
+          "character": "one note sinking, no melody at all",
+          "params": "src/art/audio/candidates.ts#musicLoss.i"
         },
         {
-          "id": "f",
-          "wav": "previews/musicLoss/f.wav",
-          "character": "one band tolling in an empty room",
-          "params": "src/art/audio/candidates.ts#musicLoss.f"
+          "id": "j",
+          "wav": "previews/musicLoss/j.wav",
+          "character": "the phrase as one falling chord",
+          "params": "src/art/audio/candidates.ts#musicLoss.j"
         },
         {
-          "id": "g",
-          "wav": "previews/musicLoss/g.wav",
-          "character": "lost: one note, going down and stopping",
-          "params": "src/art/audio/candidates.ts#musicLoss.g"
+          "id": "k",
+          "wav": "previews/musicLoss/k.wav",
+          "character": "the sound that ships today (A/B)",
+          "params": "src/art/audio/candidates.ts#musicLoss.k",
+          "anchor": true
         }
       ]
     },

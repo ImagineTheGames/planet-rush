@@ -57,16 +57,16 @@ previews rendered) / `held` (deliberately not re-voiced, with the reason).
 | shieldHit | done | "none of these sound like ashield hit" | four kinds of FIELD, all of which give and come back — deflection (`h`), absorption (`i`), arc (`j`), flex (`k`). The denied four were struck plates and washes; none of them gave |
 | thruster | done | "all of these sound annoying being looped, we need something more subtle since these will play all the time" | held to a NUMBER, not a character: every offer under half the shipped loop's RMS, every Q under 4 (a resonance beats at the grain rate — that is what "annoying looped" is), no corner sweeping the seam. Four amounts of presence: breath, pressure, one warm band, almost nothing |
 | buildPlaced | done | "none of these sound like a build started" | four builds STARTING, not four latches: every take opens (last third louder than first; the shipped voice measures 0.02). Fabricator, hydraulics, printer, power |
-| bankOre | todo | "i like the current and none of the new generations, they should some more like money related" | |
-| upgradeBought | todo | "i like current but i want to hear new optinos that are more like it but also more subtle" | |
+| bankOre | done | "i like the current and none of the new generations, they should some more like money related" | the incumbent's glass and its two-note fall kept; what is added is MONEY — coins under the notes (`h`), counted-and-accepted (`i`), into the tray (`j`), plus what ships (`k`) |
+| upgradeBought | done | "i like current but i want to hear new optinos that are more like it but also more subtle" | one axis, three points on it: the same A-minor triad in the same glass, thinner (`h`) / two notes instead of three (`i`) / receding rather than arriving (`j`), plus what ships (`k`). All still above the press tick (§8) |
 | stationDeath | done | "they should sound like an explosion" | four EXPLOSIONS — front, body, room — detonation (`h`), breach (`i`), blast-into-collapse (`j`), one concussion (`k`). All inside the 1.32 s tail invariant; nothing sparkles |
 | alarm | done | "all of these are ultra annoying, more subtle" | the saw goes and the rising minor third stays. Since §2.2 was amended (2026-08-07) the alarm sounds ONCE and the screen arrow carries the duration — it must be unmistakable for a second, not nag for a siege. All four under the shipped alarm, all four still over the chatter |
 | musicBed | todo | "none of these sound like a calm music bed" | |
 | musicPulse | todo | "none of these sound musical" | |
 | musicTheme | todo | "these sound like very bad music" | |
 | musicDread | todo | "none of these sound critical they just sound annoying" | |
-| musicWin | todo | "they still sound video gamey, the current is closest but too video gamey" | |
-| musicLoss | todo | "i like current, but it still sounds too video gamey" | |
+| musicWin | done | "they still sound video gamey, the current is closest but too video gamey" | the video-gamey part is the RISING MAJOR ARPEGGIO, not the material. Same voice, run removed: two notes (`h`), one chord (`i`), arrival-then-floor (`j`), plus what ships (`k`) |
+| musicLoss | done | "i like current, but it still sounds too video gamey" | same diagnosis downward — three notes stepping down is a "you lose" jingle. Two notes and a breath (`h`), one note sinking with no melody (`i`), the phrase as one falling chord (`j`), plus what ships (`k`) |
 | pressTick | done | "what happened to the glass theme we had, none of these are glass themed like the main menu" | back in the glass: sine partials on 1 / 2.76 / 5.4, upper ones dying first, ~2 ms strike, A♭6 root. Four sizes of the same pane, all quieter and shorter than what ships |
 
 ## Not in this round

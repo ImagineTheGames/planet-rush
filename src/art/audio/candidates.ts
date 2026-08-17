@@ -1886,113 +1886,183 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
       },
     ],
   },
+  // ---------------------------------------------------------------------------
+  // ROUND 2 (a0-67, 2026-08-17) — GENERATE AROUND THE INCUMBENT
+  // ---------------------------------------------------------------------------
+  //
+  //   *"i like the current and none of the new generations, they should some more
+  //   like money related"*
+  //
+  // Two instructions, and the first one changes what kind of round this is. **The
+  // shipped sound is the reference, not the reject.** Round one replaced it with
+  // four machines — a conveyor stop, a vault seating, two falling bands, a filing
+  // — which is what a slot under a `deny-all` deserves and is not what this one is
+  // asking for. Starting over here would throw away the only thing on the board
+  // the developer has said they like.
+  //
+  // So all three new takes are built on the incumbent's own material and gesture,
+  // and the incumbent itself is on the board as `k` so the A/B is playable:
+  //
+  //  - **Kept: the material.** Struck glass, the ratified Gantry/Bone partials —
+  //    the same {@link glass} the main menu and the shipped `bankOre` are made of.
+  //  - **Kept: the gesture.** Two notes, the second lower and later. A deposit
+  //    lands and settles; it does not rise, because rising is a purchase (§8's
+  //    `bankOre` / `purchaseConfirm` pair).
+  //  - **Changed: what "money" is made of.** Ore banked is a *transaction*, and a
+  //    transaction sounds like counting: many small metal contacts, a total
+  //    arriving, a drawer taking it. That is the one thing the incumbent's two
+  //    clean notes do not have, and it is what each take below adds.
+  //
+  //   h  **coins under the notes** — the incumbent, with a scatter of small metal
+  //      landing beneath it. The nearest thing to *"the current, but money"*.
+  //   i  **counted and accepted** — three quick pips and a drawer taking them:
+  //      the transaction rather than the deposit.
+  //   j  **into the tray** — the second note lands in a mass of loose metal.
+  //      The most literal, and the one with the most of it.
+  //   k  **the sound that ships today**, for the A/B.
   bankOre: {
     label: "Bank Ore",
-    context: "Ore banked into your economy — a drop that settles.",
+    context: "Ore is deposited into your station's store.",
     current: 'bankOre',
     candidates: [
       {
-        id: 'd',
-        character: "conveyor stop, gravel settling",
+        id: 'h',
+        slot: 'bankOre',
+        character: "the two notes, with coins under them",
         spec: {
-          name: 'bankOre_d_conveyorStop',
+          name: 'bankOre_h_coinsUnder',
           layers: [
-            grains('bankOre_d.pour', { freq: 500, freqEnd: 300, grain: 0.0035, gain: 0.34, hold: 0.03, decay: 0.16, curve: 3.2, from: 2200, to: 560, q: 2.8, hp: 200, seed: 60650 }),
-            band('bankOre_d.stop', 260, { gain: 0.3, decay: 0.09, q: 4, curve: 5.5, at: 0.09, seed: 60652 }),
+            ...glass('bankOre_h.drop', 880, { gain: 0.22, decay: 0.17, seed: 30550 }),
+            ...glass('bankOre_h.settle', 587.33, { gain: 0.18, decay: 0.28, at: 0.08, partials: GLASS_PAIR, seed: 30554 }),
+            // The money. Small, bright, uneven — a rate rather than a pitch, so it
+            // never argues with the two notes it is sitting under.
+            grains('bankOre_h.coins', { freq: 2600, freqEnd: 1900, grain: 0.0075, gain: 0.15, hold: 0.03, decay: 0.2, curve: 3.2, from: 5200, to: 2200, q: 3, hp: 1300, at: 0.03, seed: 30558 }),
           ],
         },
       },
       {
-        id: 'e',
-        character: "vault seating, mass coming down",
+        id: 'i',
+        slot: 'bankOre',
+        character: "counted, then the drawer takes it",
         spec: {
-          name: 'bankOre_e_vaultSeat',
+          name: 'bankOre_i_countedAndAccepted',
           layers: [
-            swept('bankOre_e.drop', { wave: 'sine', freq: 150, freqEnd: 92, from: 460, to: 160, q: 2.4, gain: 0.42, attack: 0.002, hold: 0.02, decay: 0.18, curve: 3.4, punch: 0.55, noiseMix: 0.12, seed: 60660 }),
-            swept('bankOre_e.settle', { wave: 'noise', freq: 210, from: 700, to: 260, q: 2.6, gain: 0.22, attack: 0.006, hold: 0.02, decay: 0.14, curve: 3, at: 0.06, seed: 60662 }),
+            // Three pips at one pitch, not three rising — a count is a repetition,
+            // and a rise here would collide with `purchaseConfirm` (§8).
+            ...glass('bankOre_i.c0', 1046.5, { gain: 0.14, decay: 0.05, partials: GLASS_PAIR, contact: 0.6, seed: 30560 }),
+            ...glass('bankOre_i.c1', 1046.5, { gain: 0.14, decay: 0.05, partials: GLASS_PAIR, contact: 0.6, at: 0.055, seed: 30564 }),
+            ...glass('bankOre_i.c2', 1046.5, { gain: 0.14, decay: 0.06, partials: GLASS_PAIR, contact: 0.6, at: 0.11, seed: 30568 }),
+            ...glass('bankOre_i.total', 587.33, { gain: 0.2, decay: 0.26, at: 0.19, seed: 30572 }),
+            swept('bankOre_i.drawer', { wave: 'noise', freq: 300, from: 900, to: 320, q: 2.4, gain: 0.16, attack: 0.004, hold: 0.02, decay: 0.12, curve: 3.4, at: 0.19, seed: 30576 }),
           ],
         },
       },
       {
-        id: 'f',
-        character: "two bands falling to rest",
+        id: 'j',
+        slot: 'bankOre',
+        character: "the second note lands in the tray",
         spec: {
-          name: 'bankOre_f_fallingBands',
+          name: 'bankOre_j_intoTheTray',
           layers: [
-            band('bankOre_f.b0', 620, { gain: 1.0, decay: 0.08, q: 4.65, curve: 5, punch: 0.35, seed: 60670 }),
-            band('bankOre_f.b1', 415, { gain: 1.0, decay: 0.17, q: 4.96, curve: 4.5, at: 0.075, seed: 60672 }),
+            ...glass('bankOre_j.drop', 880, { gain: 0.185, decay: 0.14, partials: GLASS_PAIR, seed: 30580 }),
+            grains('bankOre_j.tray', { freq: 1800, freqEnd: 1150, grain: 0.0045, gain: 0.22, hold: 0.02, decay: 0.24, curve: 2.8, from: 4200, to: 1400, q: 3.2, hp: 800, at: 0.08, seed: 30584 }),
+            ...glass('bankOre_j.settle', 587.33, { gain: 0.17, decay: 0.3, at: 0.08, partials: GLASS_PAIR, contact: 0.5, seed: 30586 }),
           ],
         },
       },
       {
-        id: 'g',
-        character: "counted, filed, nothing more",
-        spec: {
-          name: 'bankOre_g_counted',
-          layers: [
-            grains('bankOre_g.count', { freq: 380, grain: 0.0045, gain: 0.26, hold: 0.008, decay: 0.06, curve: 5, from: 1200, to: 460, q: 2.8, hp: 150, seed: 60680 }),
-            swept('bankOre_g.file', { wave: 'sine', freq: 110, from: 300, to: 140, q: 2, gain: 0.3, attack: 0.003, hold: 0.014, decay: 0.1, curve: 3.6, at: 0.045, seed: 60682 }),
-          ],
-        },
+        id: 'k',
+        slot: 'bankOre',
+        anchor: true,
+        character: "the sound that ships today (A/B)",
+        spec: incumbent('bankOre', 'k'),
       },
     ],
   },
+  // ---------------------------------------------------------------------------
+  // ROUND 2 (a0-67, 2026-08-17) — GENERATE AROUND THE INCUMBENT
+  // ---------------------------------------------------------------------------
+  //
+  //   *"i like current but i want to hear new optinos that are more like it but
+  //   also more subtle"*
+  //
+  // The clearest brief on the whole board: keep the sound, take it down. So this
+  // is one axis with three points on it, and the incumbent is the fourth.
+  //
+  // What the incumbent is, and what is held: **three struck glass notes rising an
+  // A-minor triad** — C6, E6, A6, 80 ms apart, the key the soundtrack and the
+  // ambient bed already sit in. Minor rather than major on purpose (`./bank`: *"a
+  // machine acknowledging a spend, not a game cheering"*). Every take below keeps
+  // that material, that key and that direction. None of them is a new idea,
+  // because a new idea was not asked for.
+  //
+  // "More subtle" is spent in three different places, one per take, so the
+  // developer can hear WHICH kind of quieter they meant:
+  //
+  //   h  **thinner** — the same three notes, two partials each instead of three
+  //      on the last, less contact edge, shorter tails. Same phrase, less of it.
+  //   i  **fewer** — two notes instead of three, C6 and G6. The triad is implied
+  //      by the fifth rather than spelled out; subtlety by omission.
+  //   j  **receding** — the same three notes with the level falling across the
+  //      phrase instead of rising into the top one, so the cue walks away rather
+  //      than arriving. The most changed of the three, and still the same notes.
+  //   k  **the sound that ships today**, for the A/B.
+  //
+  // §8's `upgradeBought` / `pressTick` pair is watched by `./audio.test.ts`, and
+  // taking this slot quieter walks toward it — so every take stays above the
+  // shipped press tick in level, which is the margin that keeps *you bought
+  // something* apart from *you touched something*.
   upgradeBought: {
     label: "Upgrade Bought",
-    context: "An upgrade purchased — the brightest confirmation in the bank.",
+    context: "An upgrade is purchased from the wheel.",
     current: 'upgradeBought',
     candidates: [
-      // "The brightest confirmation in the bank" is a ranking inside this family,
-      // not permission to sparkle: §4.7 register 2 is that the interface does not
-      // congratulate. So brightness here is *bandwidth* — a higher corner, a
-      // narrower band, a faster contact — and never a chime, an arpeggio or a
-      // major third. All four are three rising events, because what the player is
-      // being told is that a thing went UP.
       {
-        id: 'd',
-        character: "three stepper contacts, no shine",
+        id: 'h',
+        slot: 'upgradeBought',
+        character: "the same three notes, thinner",
         spec: {
-          name: 'upgradeBought_d_threeSteps',
+          name: 'upgradeBought_h_thinner',
           layers: [
-            grains('upgradeBought_d.s0', { freq: 620, grain: 0.0035, gain: 0.3, hold: 0.006, decay: 0.045, curve: 5, from: 2200, to: 800, q: 3.2, hp: 300, seed: 60690 }),
-            grains('upgradeBought_d.s1', { freq: 780, grain: 0.0032, gain: 0.32, hold: 0.006, decay: 0.05, curve: 5, from: 2800, to: 950, q: 3.2, hp: 340, at: 0.07, seed: 60692 }),
-            grains('upgradeBought_d.s2', { freq: 980, grain: 0.003, gain: 0.34, hold: 0.01, decay: 0.11, curve: 4.5, from: 3400, to: 1200, q: 3.4, hp: 400, at: 0.14, seed: 60694 }),
+            ...glass('upgradeBought_h.a', 1046.5, { gain: 0.15, decay: 0.2, partials: GLASS_PAIR, contact: 0.6, seed: 30600 }),
+            ...glass('upgradeBought_h.b', 1318.51, { gain: 0.15, decay: 0.2, partials: GLASS_PAIR, contact: 0.6, at: 0.08, seed: 30604 }),
+            ...glass('upgradeBought_h.c', 1760, { gain: 0.16, decay: 0.3, partials: GLASS_PAIR, contact: 0.6, at: 0.16, seed: 30608 }),
           ],
         },
       },
       {
-        id: 'e',
-        character: "pressure lifting, sub under it",
+        id: 'i',
+        slot: 'upgradeBought',
+        character: "two notes, the triad implied",
         spec: {
-          name: 'upgradeBought_e_pressureLift',
+          name: 'upgradeBought_i_twoNotes',
           layers: [
-            swept('upgradeBought_e.lift', { wave: 'triangle', freq: 330, freqEnd: 392, from: 700, to: 2600, q: 4.5, gain: 0.36, attack: 0.02, hold: 0.07, decay: 0.1, curve: 2.6, noiseMix: 0.16, seed: 60700 }),
-            swept('upgradeBought_e.seat', { wave: 'sine', freq: 98, from: 280, to: 140, q: 2.2, gain: 0.34, attack: 0.003, hold: 0.03, decay: 0.2, curve: 3, punch: 0.45, at: 0.15, seed: 60702 }),
+            ...glass('upgradeBought_i.a', 1046.5, { gain: 0.17, decay: 0.22, partials: GLASS_PAIR, contact: 0.7, seed: 30620 }),
+            ...glass('upgradeBought_i.b', 1568, { gain: 0.18, decay: 0.34, contact: 0.7, at: 0.1, seed: 30624 }),
           ],
         },
       },
       {
-        id: 'f',
-        character: "three welds rising, each quenched",
+        id: 'j',
+        slot: 'upgradeBought',
+        character: "the three notes, receding",
         spec: {
-          name: 'upgradeBought_f_threeWelds',
+          name: 'upgradeBought_j_receding',
           layers: [
-            band('upgradeBought_f.w0', 700, { gain: 1.0, decay: 0.06, q: 8, curve: 5.5, punch: 0.35, seed: 60710 }),
-            band('upgradeBought_f.w1', 880, { gain: 1.0, decay: 0.07, q: 8.5, curve: 5, punch: 0.35, at: 0.075, seed: 60712 }),
-            band('upgradeBought_f.w2', 1100, { gain: 1.0, decay: 0.19, q: 9.5, curve: 4.2, punch: 0.35, at: 0.15, seed: 60714 }),
+            ...glass('upgradeBought_j.a', 1046.5, { gain: 0.19, decay: 0.2, partials: GLASS_PAIR, seed: 30640 }),
+            ...glass('upgradeBought_j.b', 1318.51, { gain: 0.13, decay: 0.2, partials: GLASS_PAIR, contact: 0.6, at: 0.08, seed: 30644 }),
+            // The top note is the quietest thing in the cue rather than the
+            // loudest. Same phrase, walking away from you.
+            ...glass('upgradeBought_j.c', 1760, { gain: 0.085, decay: 0.3, partials: GLASS_PAIR, contact: 0.3, at: 0.16, seed: 30648 }),
           ],
         },
       },
       {
-        id: 'g',
-        character: "up one step, said once",
-        spec: {
-          name: 'upgradeBought_g_upOneStep',
-          layers: [
-            swept('upgradeBought_g.step', { wave: 'triangle', freq: 392, from: 1100, to: 480, q: 4.4, gain: 0.38, attack: 0.004, hold: 0.03, decay: 0.15, curve: 3.4, punch: 0.35, noiseMix: 0.16, seed: 60720 }),
-            band('upgradeBought_g.mark', 784, { gain: 0.4, decay: 0.09, q: 7, curve: 5, at: 0.09, seed: 60722 }),
-          ],
-        },
+        id: 'k',
+        slot: 'upgradeBought',
+        anchor: true,
+        character: "the sound that ships today (A/B)",
+        spec: incumbent('upgradeBought', 'k'),
       },
     ],
   },
@@ -2807,117 +2877,178 @@ export const CANDIDATE_SLOTS: Readonly<Record<string, CandidateSlot>> = {
     ],
   },
   musicWin: {
+    // -------------------------------------------------------------------------
+    // ROUND 2 (a0-67, 2026-08-17) — GENERATE AROUND THE INCUMBENT
+    // -------------------------------------------------------------------------
+    //
+    //   *"they still sound video gamey, the current is closest but too video
+    //   gamey"*
+    //
+    // *"The current is closest"* makes the incumbent the reference, so the round
+    // is an adjustment and not a replacement — and the adjustment is nameable.
+    // **What is video-gamey about the shipped sting is not its material, it is
+    // its melody: four notes climbing a major triad, A3 → C♯4 → E4 → A4, with a
+    // shine an octave over the top.** That is a fanfare, it is the "level
+    // complete" idiom, and no amount of filtering makes a rising major arpeggio
+    // read as anything else. Round one heard "video gamey" as a texture note and
+    // offered ion bursts, magnetic lift and cathedral bands — new materials
+    // playing the same run, which is why they came back marked *still*.
+    //
+    // So the material is kept exactly (filtered triangle, `noiseMix` 0.06,
+    // `resonance` 2.6 — the shipped voice's own numbers) and **the run goes**:
+    //
+    //   h  **two notes** — A3 up a fifth to E4, long, opening. A gesture instead
+    //      of a run: the shortest possible thing that is still a rise.
+    //   i  **one chord** — the same pitches struck together and allowed to open.
+    //      No sequence at all, so there is nothing to hum.
+    //   j  **arrival, then the floor under it** — the top note first, the lower
+    //      ones arriving beneath it. Nothing climbs, and the last thing you hear
+    //      is the bottom of the chord rather than the top.
+    //   k  **the sound that ships today**, for the A/B.
+    //
+    // §4.7 is the fence around all four: this lands into the three seconds of
+    // near-silence, so nothing here shouts, nothing is louder than the incumbent,
+    // and nothing runs past the 1.32 s longest-tail invariant (§8) — a winner has
+    // to be promotable into the bank without eating the beat it lands after.
     label: "Victory Sting",
-    context: "Match won (after the three-second quiet) — one-shot, rising major arpeggio.",
+    context: "Match won (after the three-second quiet) — one-shot, a short rising resolution.",
     current: 'musicWin',
     candidates: [
-      // It lands after the three seconds of silence (§4.7), so it arrives into
-      // nothing and does not have to shout. No offer here is a fanfare: the rise
-      // is carried by the corner and by level, not by an arpeggio getting louder.
       {
-        id: 'd',
-        character: "ion bursts rising, thin and dry",
+        id: 'h',
+        slot: 'musicWin',
+        character: "two notes, a fifth, opening",
         spec: {
-          name: 'musicWin_d_ionRise',
+          name: 'musicWin_h_twoNotes',
           layers: [
-            grains('musicWin_d.n0', { freq: 440, grain: 0.0032, gain: 0.32, attack: 0.004, hold: 0.05, decay: 0.13, curve: 4, from: 2600, to: 1000, q: 3.6, hp: 420, seed: 61250 }),
-            grains('musicWin_d.n1', { freq: 587.33, grain: 0.003, gain: 0.3, attack: 0.004, hold: 0.05, decay: 0.16, curve: 4, from: 3200, to: 1300, q: 3.6, hp: 520, at: 0.12, seed: 61252 }),
-            grains('musicWin_d.n2', { freq: 880, grain: 0.0026, gain: 0.28, attack: 0.004, hold: 0.08, decay: 0.46, curve: 3.4, from: 4200, to: 1700, q: 3.8, hp: 700, at: 0.26, seed: 61254 }),
+            place({ name: 'musicWin_h.n0', wave: 'triangle', attack: 0.02, hold: 0.14, decay: 0.4, decayCurve: 3, freq: 220, noiseMix: 0.06, lowPass: 900, lowPassEnd: 1400, resonance: 2.6, gain: 0.2369, seed: 61480 }),
+            place({ name: 'musicWin_h.n1', wave: 'triangle', attack: 0.03, hold: 0.2, decay: 0.62, decayCurve: 2.8, freq: 329.63, noiseMix: 0.06, lowPass: 1200, lowPassEnd: 2000, resonance: 2.6, gain: 0.2538, seed: 61482 }, 0.3),
+            place({ name: 'musicWin_h.floor', wave: 'triangle', attack: 0.04, hold: 0.3, decay: 0.5, decayCurve: 2.2, freq: 110, noiseMix: 0.04, lowPass: 320, resonance: 2, gain: 0.1861, seed: 61484 }, 0.3),
           ],
         },
       },
       {
-        id: 'e',
-        character: "magnetic lift, weight arriving",
+        id: 'i',
+        slot: 'musicWin',
+        character: "one chord, struck and opening",
         spec: {
-          name: 'musicWin_e_magneticLift',
+          name: 'musicWin_i_oneChord',
           layers: [
-            swept('musicWin_e.lift', { wave: 'triangle', freq: 220, from: 340, to: 1800, q: 4, gain: 0.36, attack: 0.03, hold: 0.15, decay: 0.1, curve: 2.4, noiseMix: 0.14, seed: 61260 }),
-            swept('musicWin_e.land', { wave: 'triangle', freq: 293.66, from: 1700, to: 520, q: 4.4, gain: 0.4, attack: 0.006, hold: 0.06, decay: 0.5, curve: 2.8, punch: 0.4, noiseMix: 0.12, at: 0.28, seed: 61262 }),
-            swept('musicWin_e.floor', { wave: 'sine', freq: 73.42, from: 240, q: 1.8, gain: 0.26, attack: 0.012, hold: 0.1, decay: 0.44, curve: 2.4, at: 0.04, seed: 61264 }),
+            // All four at `at: 0`. There is no order, so there is no tune — the
+            // whole gesture is the corner opening across the held chord.
+            place({ name: 'musicWin_i.root', wave: 'triangle', attack: 0.025, hold: 0.24, decay: 0.66, decayCurve: 2.6, freq: 110, noiseMix: 0.05, lowPass: 400, lowPassEnd: 700, resonance: 2.4, gain: 0.1785, seed: 61490 }),
+            place({ name: 'musicWin_i.fifth', wave: 'triangle', attack: 0.03, hold: 0.22, decay: 0.62, decayCurve: 2.8, freq: 164.81, noiseMix: 0.06, lowPass: 700, lowPassEnd: 1300, resonance: 2.6, gain: 0.1373, seed: 61492 }),
+            place({ name: 'musicWin_i.oct', wave: 'triangle', attack: 0.035, hold: 0.2, decay: 0.58, decayCurve: 3, freq: 220, noiseMix: 0.06, lowPass: 1000, lowPassEnd: 1800, resonance: 2.6, gain: 0.1167, seed: 61494 }),
+            place({ name: 'musicWin_i.third', wave: 'triangle', attack: 0.05, hold: 0.18, decay: 0.52, decayCurve: 3, freq: 329.63, noiseMix: 0.04, lowPass: 1400, lowPassEnd: 2400, resonance: 2.2, gain: 0.0755, seed: 61496 }),
           ],
         },
       },
       {
-        id: 'f',
-        character: "cathedral bands opening, one room",
+        id: 'j',
+        slot: 'musicWin',
+        character: "the top note first, the floor after",
         spec: {
-          name: 'musicWin_f_cathedralOpen',
+          name: 'musicWin_j_arrivalThenFloor',
           layers: [
-            band('musicWin_f.n0', 392, { gain: 0.953, decay: 0.14, q: 8.5, curve: 4.5, attack: 0.003, hold: 0.01, seed: 61270 }),
-            band('musicWin_f.n1', 587.33, { gain: 0.911, decay: 0.2, q: 9, curve: 4.2, attack: 0.003, hold: 0.01, at: 0.13, seed: 61272 }),
-            band('musicWin_f.n2', 784, { gain: 0.911, decay: 0.46, q: 9.5, curve: 3.8, attack: 0.003, hold: 0.012, at: 0.27, seed: 61274 }),
-            ...returns('musicWin_f.room', { freq: 620, gain: 0.29, decay: 0.3, from: 1600, to: 520, at: 0.55, gap: 0.22, count: 2, seed: 61276 }),
+            place({ name: 'musicWin_j.top', wave: 'triangle', attack: 0.02, hold: 0.16, decay: 0.44, decayCurve: 3, freq: 440, noiseMix: 0.06, lowPass: 1800, lowPassEnd: 1100, resonance: 2.6, gain: 0.22, seed: 61500 }),
+            place({ name: 'musicWin_j.mid', wave: 'triangle', attack: 0.03, hold: 0.2, decay: 0.5, decayCurve: 2.8, freq: 220, noiseMix: 0.06, lowPass: 900, resonance: 2.6, gain: 0.24, seed: 61502 }, 0.18),
+            place({ name: 'musicWin_j.floor', wave: 'triangle', attack: 0.05, hold: 0.28, decay: 0.56, decayCurve: 2.2, freq: 110, noiseMix: 0.04, lowPass: 300, resonance: 2, gain: 0.26, seed: 61504 }, 0.34),
           ],
         },
       },
       {
-        id: 'g',
-        character: "won: two notes and a floor",
-        spec: {
-          name: 'musicWin_g_twoNotes',
-          layers: [
-            swept('musicWin_g.n0', { wave: 'sine', freq: 293.66, from: 900, to: 400, q: 2.6, gain: 0.34, attack: 0.006, hold: 0.05, decay: 0.16, curve: 3.2, noiseMix: 0.08, seed: 61280 }),
-            swept('musicWin_g.n1', { wave: 'sine', freq: 440, from: 1300, to: 560, q: 2.6, gain: 0.34, attack: 0.006, hold: 0.07, decay: 0.5, curve: 2.8, noiseMix: 0.08, at: 0.2, seed: 61282 }),
-          ],
-        },
+        id: 'k',
+        slot: 'musicWin',
+        anchor: true,
+        character: "the sound that ships today (A/B)",
+        spec: incumbent('musicWin', 'k'),
       },
     ],
   },
   musicLoss: {
-    // *"The one thing in the soundtrack allowed to be sad"* (§7.5). All four fall
-    // and none of them lands anywhere: no offer here resolves to its root, and no
-    // offer runs past the shipped 1.32 s longest-tail invariant (§8) — a winner
-    // has to be promotable into the bank without breaking the beat it protects.
+    // -------------------------------------------------------------------------
+    // ROUND 2 (a0-67, 2026-08-17) — GENERATE AROUND THE INCUMBENT
+    // -------------------------------------------------------------------------
+    //
+    //   *"i like current, but it still sounds too video gamey"*
+    //
+    // The same diagnosis as `musicWin` and the same fix, aimed downward. The
+    // shipped sting is a falling minor phrase — A3 → F3 → D3, with a low A under
+    // it — and the phrase is the video-gamey part: **three discrete notes stepping
+    // down in time is a "you lose" jingle**, no matter how dark the material is.
+    // The material itself is not the problem and is kept to the number: filtered
+    // triangles and sines, `noiseMix` 0.06, `resonance` 2.6, the same key.
+    //
+    // *"I like current"* means the fall stays. What changes is how much of it is
+    // spelled out:
+    //
+    //   h  **two notes and a breath** — the outer two of the three, and a long
+    //      low sustain under them that simply stops. Half the jingle.
+    //   i  **one note sinking** — no melody at all: a held tone whose corner
+    //      closes over a second and a half. The ache with nothing counting it out.
+    //   j  **the phrase as one chord** — the same three pitches, overlapped
+    //      instead of sequenced, decaying together. The fall becomes a harmony
+    //      that is already falling when you meet it.
+    //   k  **the sound that ships today**, for the A/B.
+    //
+    // Nothing resolves in any of them — that is §4.7's ache and it is not what
+    // was complained about — and every offer stays inside the 1.32 s longest-tail
+    // invariant (§8) and under the incumbent's level.
     label: "Defeat Sting",
     context: "Match lost (after the three-second quiet) — one-shot, falling minor phrase that settles low.",
     current: 'musicLoss',
     candidates: [
       {
-        id: 'd',
-        character: "ion field falling away to nothing",
+        id: 'h',
+        slot: 'musicLoss',
+        character: "two notes, then a breath that stops",
         spec: {
-          name: 'musicLoss_d_fieldFalls',
+          name: 'musicLoss_h_twoAndBreath',
           layers: [
-            grains('musicLoss_d.n0', { freq: 220, grain: 0.0035, gain: 0.3, attack: 0.012, hold: 0.12, decay: 0.2, curve: 3, from: 1700, to: 700, q: 3.4, hp: 260, seed: 61290 }),
-            grains('musicLoss_d.n1', { freq: 174.61, grain: 0.004, gain: 0.28, attack: 0.014, hold: 0.12, decay: 0.24, curve: 2.8, from: 1300, to: 520, q: 3.2, hp: 190, at: 0.3, seed: 61292 }),
-            grains('musicLoss_d.n2', { freq: 130.81, grain: 0.005, gain: 0.26, attack: 0.016, hold: 0.14, decay: 0.5, curve: 2.4, from: 950, to: 340, q: 3, hp: 130, at: 0.62, seed: 61294 }),
+            place({ name: 'musicLoss_h.n0', wave: 'triangle', attack: 0.012, hold: 0.12, decay: 0.36, decayCurve: 3.2, freq: 220, noiseMix: 0.06, lowPass: 1000, lowPassEnd: 620, resonance: 2.6, gain: 0.26, seed: 61510 }),
+            place({ name: 'musicLoss_h.n1', wave: 'sine', attack: 0.02, hold: 0.16, decay: 0.6, decayCurve: 2.4, freq: 146.83, noiseMix: 0.05, lowPass: 620, lowPassEnd: 300, resonance: 2.4, gain: 0.28, seed: 61512 }, 0.34),
+            // A triangle with a third of its signal as pitched noise, not a noise
+            // layer: *"i like current"* rules out new materials as much as it
+            // rules out new ideas, and the incumbent is triangles and sines.
+            place({ name: 'musicLoss_h.breath', wave: 'triangle', attack: 0.12, hold: 0.3, decay: 0.42, decayCurve: 1.8, freq: 110, noiseMix: 0.34, lowPass: 400, lowPassEnd: 170, resonance: 1.6, gain: 0.12, seed: 61514 }, 0.34),
           ],
         },
       },
       {
-        id: 'e',
-        character: "magnetic descent, mass settling low",
+        id: 'i',
+        slot: 'musicLoss',
+        character: "one note sinking, no melody at all",
         spec: {
-          name: 'musicLoss_e_magneticDescent',
+          name: 'musicLoss_i_oneNoteSinking',
           layers: [
-            swept('musicLoss_e.n0', { wave: 'triangle', freq: 155.56, freqEnd: 146.83, from: 480, to: 200, q: 4.2, gain: 0.34, attack: 0.014, hold: 0.13, decay: 0.22, curve: 2.6, noiseMix: 0.12, seed: 61300 }),
-            swept('musicLoss_e.n1', { wave: 'triangle', freq: 116.54, freqEnd: 110, from: 360, to: 150, q: 4.2, gain: 0.34, attack: 0.016, hold: 0.13, decay: 0.26, curve: 2.4, noiseMix: 0.12, at: 0.3, seed: 61302 }),
-            swept('musicLoss_e.n2', { wave: 'sine', freq: 77.78, freqEnd: 69.3, from: 190, to: 84, q: 2.6, gain: 0.38, attack: 0.02, hold: 0.15, decay: 0.5, curve: 2, noiseMix: 0.06, at: 0.62, seed: 61304 }),
+            // The corner closes 900 → 190 over a second and a half at a FIXED
+            // pitch. §5.4 is explicit that this is a different gesture from a
+            // pitch slide, and it is the one that does not spell anything.
+            place({ name: 'musicLoss_i.hold', wave: 'triangle', attack: 0.03, hold: 0.28, decay: 0.92, decayCurve: 2, freq: 146.83, noiseMix: 0.06, lowPass: 900, lowPassEnd: 190, resonance: 2.6, gain: 0.249, seed: 61520 }),
+            place({ name: 'musicLoss_i.under', wave: 'sine', attack: 0.06, hold: 0.34, decay: 0.8, decayCurve: 2, freq: 73.42, noiseMix: 0.04, lowPass: 220, resonance: 2, gain: 0.1992, seed: 61522 }),
           ],
         },
       },
       {
-        id: 'f',
-        character: "one band tolling in an empty room",
+        id: 'j',
+        slot: 'musicLoss',
+        character: "the phrase as one falling chord",
         spec: {
-          name: 'musicLoss_f_emptyToll',
+          name: 'musicLoss_j_fallingChord',
           layers: [
-            band('musicLoss_f.toll', 146.83, { gain: 1.0, decay: 0.6, q: 8.5, curve: 2.8, attack: 0.006, hold: 0.02, seed: 61310 }),
-            band('musicLoss_f.beat', 148.9, { gain: 0.902, decay: 0.58, q: 8.5, curve: 2.8, attack: 0.008, hold: 0.02, at: 0.014, seed: 61312 }),
-            ...returns('musicLoss_f.room', { freq: 280, gain: 0.289, decay: 0.3, from: 640, to: 220, at: 0.42, gap: 0.3, count: 2, seed: 61314 }),
+            place({ name: 'musicLoss_j.a', wave: 'triangle', attack: 0.014, hold: 0.14, decay: 0.5, decayCurve: 2.8, freq: 220, noiseMix: 0.06, lowPass: 950, lowPassEnd: 480, resonance: 2.6, gain: 0.14, seed: 61530 }),
+            place({ name: 'musicLoss_j.f', wave: 'triangle', attack: 0.02, hold: 0.16, decay: 0.62, decayCurve: 2.6, freq: 174.61, noiseMix: 0.06, lowPass: 760, lowPassEnd: 380, resonance: 2.6, gain: 0.154, seed: 61532 }, 0.06),
+            place({ name: 'musicLoss_j.d', wave: 'sine', attack: 0.026, hold: 0.18, decay: 0.76, decayCurve: 2.3, freq: 146.83, noiseMix: 0.05, lowPass: 600, lowPassEnd: 270, resonance: 2.4, gain: 0.182, seed: 61534 }, 0.12),
+            place({ name: 'musicLoss_j.low', wave: 'sine', attack: 0.04, hold: 0.24, decay: 0.6, decayCurve: 2.2, freq: 110, noiseMix: 0.04, lowPass: 300, resonance: 2, gain: 0.154, seed: 61536 }, 0.3),
           ],
         },
       },
       {
-        id: 'g',
-        character: "lost: one note, going down and stopping",
-        spec: {
-          name: 'musicLoss_g_oneNoteDown',
-          layers: [
-            swept('musicLoss_g.down', { wave: 'triangle', freq: 130.81, freqEnd: 98, from: 420, to: 140, q: 3, gain: 0.42, attack: 0.02, hold: 0.16, decay: 0.6, curve: 2.2, noiseMix: 0.1, seed: 61320 }),
-          ],
-        },
+        id: 'k',
+        slot: 'musicLoss',
+        anchor: true,
+        character: "the sound that ships today (A/B)",
+        spec: incumbent('musicLoss', 'k'),
       },
     ],
   },
