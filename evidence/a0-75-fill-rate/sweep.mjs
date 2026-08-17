@@ -34,7 +34,9 @@ import { chromium } from 'playwright';
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const PORT = Number(process.env.A075_PORT ?? 4196);
-const URL_BASE = `http://localhost:${PORT}`;
+// 127.0.0.1, not `localhost` — see attribute.mjs: Node resolves `localhost` to
+// ::1 and the vite servers bind IPv4 only.
+const URL_BASE = `http://127.0.0.1:${PORT}`;
 
 const argv = process.argv.slice(2);
 const arg = (name, fallback) => {
@@ -106,7 +108,7 @@ async function sampleFrames(page, frames, settle) {
 }
 
 async function main() {
-  const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], {
+  const server = spawn('npx', ['vite', 'preview', '--host', '127.0.0.1', '--port', String(PORT), '--strictPort'], {
     cwd: ROOT,
     stdio: ['ignore', 'pipe', 'pipe'],
   });

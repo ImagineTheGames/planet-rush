@@ -42,8 +42,12 @@ export interface Reading {
   readonly width: number;
   readonly height: number;
   readonly antialias: boolean;
-  /** Stage scale the reading was taken at — 1 and 0.5, the fill/geometry probe. */
+  /** Stage scale the reading was taken at. 1 unless `?scales=` says otherwise —
+   *  see {@link measure} for why the ½ probe is confounded. */
   readonly scale: number;
+  /** Drawing commands baked into this stage's `Graphics` — the geometry half of
+   *  the frame, the number that pairs with `./overdraw.ts`'s fragment count. */
+  readonly shapes: number;
   readonly frames: number;
   readonly median: number;
   readonly p95: number;
@@ -104,6 +108,23 @@ function bloomOnly(def: SpriteDef): SpriteDef {
 }
 
 type Build = (view: Container, w: number, h: number) => RigLayer[];
+
+/**
+ * Every drawing instruction baked into a subtree's `Graphics`. Read off the live
+ * `GraphicsContext` rather than counted at build, so it is what the renderer
+ * actually holds — `backdrop-bloom.test.ts` reads the same list for the same
+ * reason.
+ */
+function countShapes(root: Container): number {
+  let n = 0;
+  const walk = (c: Container): void => {
+    const ctx = (c as unknown as { context?: { instructions?: unknown[] } }).context;
+    if (ctx?.instructions) n += ctx.instructions.length;
+    for (const child of c.children) walk(child as Container);
+  };
+  walk(root);
+  return n;
+}
 
 function layerFrom(def: SpriteDef, parallax: number, label: string, view: Container): RigLayer {
   const g = new Graphics();
@@ -196,11 +217,22 @@ export const SCENARIOS: readonly { name: string; build: Build }[] = [
  * read after `render()` forces the GL pipeline to drain, so the interval this
  * times is the work the frame actually did, at sub-millisecond resolution.
  *
- * `scale` shrinks the whole stage about the viewport centre. That is the fill/
- * geometry probe: the triangle count, the vertex count and the draw calls are
- * *identical* at any scale, and only the fragments change — so the difference
- * between scale 1 and scale ½ is three quarters of the layer's fill and nothing
- * else, and what does not move under it is geometry cost.
+ * `scale` shrinks the whole stage about the viewport centre.
+ *
+ * **It was meant to be the fill/geometry probe and it is not one — recorded here
+ * so the next brief does not re-derive it.** The idea was that the triangle
+ * count is identical at any scale and only the fragments change, so scale 1 vs.
+ * scale ½ isolates fill. It is confounded by clipping: a backdrop field is
+ * 2–5 screens across, so most of its geometry is *off* the viewport and never
+ * rasterised, and halving the stage pulls four times as much of it back on.
+ * Measured, the star scenarios come out **slower** at ½ than at 1 (127→157 ms at
+ * 1280×720), which is the confound reading its own signature.
+ *
+ * The decomposition that does work is **subtraction between scenarios**, whose
+ * fill is known exactly from `./overdraw.ts`: adding the reef to the ground adds
+ * 2.87 Mfrag and 50 shapes, adding the stars adds 0.30 Mfrag and ~54,000, and
+ * two equations in two unknowns fall out. `--scales 1` is the default because of
+ * that; pass `scales=1,0.5` to reproduce the confound.
  */
 async function measure(
   app: Application,
@@ -251,6 +283,7 @@ async function run(): Promise<void> {
   const settle = Number(params.get('settle') ?? 20);
   const antialias = params.get('aa') !== '0';
   const only = params.get('only');
+  const scales = (params.get('scales') ?? '1').split(',').map(Number);
 
   const out = document.getElementById('out') as HTMLPreElement;
   const readings: Reading[] = [];
@@ -278,9 +311,9 @@ async function run(): Promise<void> {
     const view = new Container();
     app.stage.addChild(view);
     const layers = scenario.build(view, width, height);
-    for (const scale of [1, 0.5]) {
+    for (const scale of scales) {
       const r = await measure(app, view, layers, width, height, frames, settle, scale);
-      readings.push({ scenario: scenario.name, width, height, antialias, scale, ...r });
+      readings.push({ scenario: scenario.name, width, height, antialias, scale, shapes: countShapes(view), ...r });
       show();
     }
     app.stage.removeChild(view);
@@ -297,9 +330,9 @@ async function run(): Promise<void> {
     holder.addChild(b.view);
     app.stage.addChild(holder);
     const layers = b.view.children.map((c, i) => ({ gfx: c as Graphics, parallax: i === 0 ? 0 : 0.2 }));
-    for (const scale of [1, 0.5]) {
+    for (const scale of scales) {
       const r = await measure(app, holder, layers, width, height, frames, settle, scale);
-      readings.push({ scenario: 'VoidBackdrop(oval)', width, height, antialias, scale, ...r });
+      readings.push({ scenario: 'VoidBackdrop(oval)', width, height, antialias, scale, shapes: countShapes(holder), ...r });
       show();
     }
   }

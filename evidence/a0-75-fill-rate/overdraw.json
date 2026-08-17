@@ -16,9 +16,9 @@
         {
           "key": "sky/plasmaReef (additive)",
           "shapes": 78,
-          "area": 9512603.520544771,
+          "area": 8137766.076755492,
           "fieldArea": 2660943.3712000004,
-          "overdraw": 3.5748988961966863
+          "overdraw": 3.0582259528077143
         },
         {
           "key": "stars/deep points",
@@ -63,8 +63,8 @@
           "overdraw": 0.028957908446081884
         }
       ],
-      "overdraw": 4.913084846607907,
-      "fragments": 1505526.4157157543
+      "overdraw": 4.396411903218935,
+      "fragments": 1347201.2923271847
     },
     {
       "nebula": "plasmaReef",
@@ -280,9 +280,9 @@
         {
           "key": "sky/plasmaReef (additive)",
           "shapes": 50,
-          "area": 112387420.07587466,
+          "area": 83637148.84689452,
           "fieldArea": 27631756.16,
-          "overdraw": 4.067328164923798
+          "overdraw": 3.026848831561726
         },
         {
           "key": "stars/deep points",
@@ -327,8 +327,8 @@
           "overdraw": 0.027878194080610406
         }
       ],
-      "overdraw": 5.400108265315952,
-      "fragments": 26749976.303069096
+      "overdraw": 4.359628931953879,
+      "fragments": 21595857.877326734
     },
     {
       "nebula": "plasmaReef",
@@ -346,9 +346,9 @@
         {
           "key": "sky/plasmaReef (additive)",
           "shapes": 49,
-          "area": 243666484.73638767,
+          "area": 121833242.2400161,
           "fieldArea": 40207738.879999995,
-          "overdraw": 6.060188698091438
+          "overdraw": 3.0300943458578318
         },
         {
           "key": "stars/deep points",
@@ -393,8 +393,8 @@
           "overdraw": 0.02843967748374743
         }
       ],
-      "overdraw": 7.391634004156195,
-      "fragments": 54497039.1858428
+      "overdraw": 4.361539651922589,
+      "fragments": 32156759.54569487
     }
   ],
   "skyRows": [
@@ -413,50 +413,50 @@
       "id": "coalsack",
       "map": "compass",
       "shapes": 53,
-      "skyOd": 4.7969770906068,
+      "skyOd": 3.5698433653201542,
       "starOd": 0.33080900866088814,
-      "total": 6.129757190998954,
-      "reduced": 3.7240436084930426
+      "total": 4.902623465712308,
+      "reduced": 3.1123250247952394
     },
     {
       "sky": "Iron Veil",
       "id": "ironVeil",
       "map": "crescents",
       "shapes": 78,
-      "skyOd": 4.515619660444,
+      "skyOd": 3.360461167742468,
       "starOd": 0.33080900866088814,
-      "total": 5.848399760836154,
-      "reduced": 3.518010635083198
+      "total": 4.693241268134622,
+      "reduced": 2.958998173348273
     },
     {
       "sky": "Patina Drift",
       "id": "patinaDrift",
       "map": "diamond",
       "shapes": 123,
-      "skyOd": 5.67038485002291,
+      "skyOd": 4.2198213141485175,
       "starOd": 0.33080900866088814,
-      "total": 7.003164950415064,
-      "reduced": 3.6633879521340917
+      "total": 5.552601414540671,
+      "reduced": 3.067185972224952
     },
     {
       "sky": "Plasma Reef",
       "id": "plasmaReef",
       "map": "oval",
       "shapes": 50,
-      "skyOd": 4.067328164923798,
+      "skyOd": 3.026848831561726,
       "starOd": 0.33080900866088814,
-      "total": 5.400108265315952,
-      "reduced": 3.3576016208197075
+      "total": 4.359628931953879,
+      "reduced": 2.8396240220344033
     },
     {
       "sky": "Deep Ember",
       "id": "deepEmber",
       "map": "line",
       "shapes": 123,
-      "skyOd": 4.681820668815998,
+      "skyOd": 3.4841455922403304,
       "starOd": 0.33080900866088814,
-      "total": 6.014600769208152,
-      "reduced": 3.615277661490107
+      "total": 4.816925692632484,
+      "reduced": 3.031382916788659
     }
   ],
   "stars": {

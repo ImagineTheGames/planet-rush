@@ -887,10 +887,65 @@ export function mockupCount(
 }
 
 /**
+ * **The length a radius fraction is a fraction OF**, for a screen of any shape.
+ *
+ * The design states every radius against {@link MOCKUP_PANEL}'s **width** (see
+ * the note at the top of this file: `0.18/0.38` and friends are the fit that
+ * comes out round). On a 16:9 screen "the width" and "the panel's width" mean
+ * the same thing and this returns exactly `screenW`, so **nothing changes on the
+ * shape the game was authored in.** Off 16:9 they stop meaning the same thing,
+ * and a0-75 is what that cost.
+ *
+ * ## What went wrong, in one line of arithmetic (a0-75)
+ *
+ * Element *size* was `screenW × radius` and element *count* is per screen
+ * **area** ({@link mockupCount}). A sky's coverage of the frame is therefore
+ * `count × π k² screenW² / (screenW × screenH)` = **`count π k² × W/H`** — it
+ * grows with the frame's aspect ratio and nothing bounds it. Measured off the
+ * shipped geometry (`evidence/a0-75-fill-rate/overdraw.txt`), Plasma Reef:
+ *
+ * ```
+ *   16:9   (2560×1440)   3.03 ×      ← the design's own shape
+ *   21:9   (3440×1440)   4.07 ×      ← +34%, and the developer plays here
+ *   32:9   (5120×1440)   6.06 ×      ← +100%
+ * ```
+ *
+ * That is a per-frame fill-rate multiplier on the widest screens in the world,
+ * and it is *also* a fidelity drift: at 32:9 a clot is twice the fraction of the
+ * frame's height that the design draws it at, so the sky reads coarser and
+ * emptier than the compositor board the developer approved. The two are the same
+ * error seen from two sides, which is why the fix is one number and not a budget.
+ *
+ * ## The rule, and why this one
+ *
+ * The geometric mean of the frame, re-scaled by the design panel's own aspect:
+ * `√(W · H · Wp/Hp)`. It is the unique rule that
+ *
+ *  1. **is the identity at the design's aspect** — put `W/H = Wp/Hp` in and it
+ *     returns `W`, so every number the design measured still means what it
+ *     measured, and no sky is re-art-directed to buy a millisecond (which is
+ *     precisely the drift a0-40 exists to undo); and
+ *  2. **holds a blob's share of the FRAME constant at any aspect**, because
+ *     area ∝ this², and this² ∝ W·H = the frame. So the overdraw column above
+ *     flattens to its 16:9 value everywhere, and the sky keeps the proportions
+ *     it was drawn with on a shape it was never drawn on.
+ *
+ * The rejected alternative is the short side (`min(W, H)`), which is what
+ * `thickness` uses one line below. It is scale-invariant too, but it is *not*
+ * the identity at 16:9 — it would shrink every blob to 0.5625 of the design's on
+ * the very shape the design was measured on. That is re-art-directing the whole
+ * set to fix an ultrawide, and it is the wrong way round.
+ */
+export function featureSpan(screenW: number, screenH: number): number {
+  return Math.sqrt(screenW * screenH * (MOCKUP_PANEL.w / MOCKUP_PANEL.h));
+}
+
+/**
  * **The design's geometry for one sky**, over a `fieldW`×`fieldH` parallax field
  * seen through a `screenW`×`screenH` viewport.
  *
- * Feature size is a fraction of the **viewport's width** and placement spans the
+ * Feature size is a fraction of the **viewport** ({@link featureSpan} — its
+ * width exactly, on the 16:9 the design was drawn at) and placement spans the
  * **field**, which is the per-screenful discipline `NebulaSpec.build` documents:
  * the design's "9 blobs" and "22 blobs" are what a phone sees, not what an arena
  * holds, and sizing to the field instead is what once put nine clots across five
@@ -918,9 +973,12 @@ export function mockupBlobs(
   // thickness, like every feature size, is the SCREEN's business.
   const reach = Math.max(hw, hh) * 1.12;
   const thickness = Math.min(screenW, screenH) / 2;
+  // The length a radius fraction is a fraction of — `screenW` exactly on the
+  // 16:9 the design was drawn at, and the frame's own scale off it (a0-75).
+  const span = featureSpan(screenW, screenH);
 
   for (let i = 0; i < n; i++) {
-    const rx = screenW * pick(rng, sky.radius);
+    const rx = span * pick(rng, sky.radius);
     const ry = rx * pick(rng, sky.aspect);
     // Alpha is drawn before the position so that thinning a sky (fewer elements,
     // same seed) leaves the elements it keeps exactly where they were.
