@@ -1,25 +1,76 @@
 # Planet Rush CI + classroom distribution (GDD §4.8).
 #
-#   push (any branch/PR) -> typecheck, unit tests, build     (the merge gate)
-#   push to main         -> + deploy dist/ to GitHub Pages    (the public URL)
-#   push of a v* tag     -> + ping ntfy with the milestone's play notes
+#   pull_request      -> typecheck, unit tests, build, mobile   (the merge gate)
+#   push to main      -> the same + deploy dist/ to GitHub Pages (the public URL)
+#   push of a v* tag  -> the same + ping ntfy with the milestone's play notes
+#   workflow_dispatch -> the same, on any ref, for a branch with no PR yet
 #
 # A relative Vite base ('./', see vite.config.ts) lets the one built bundle
 # serve from any Pages subpath, so deploy needs no per-ref rebuild.
 name: CI
 
+# --- ONE RUN PER PUSH (a0-83). --------------------------------------------
+#
+# `branches: ['**']` used to sit next to `pull_request`, and a branch with an
+# open PR matches BOTH, so every push to every agent branch fired two identical
+# runs. Of the 97 non-main commits in the 200 CI runs before this change, 81
+# were built twice.
+#
+# The wasted minutes were the smaller half. The twins are not synchronised
+# (measured 2026-08-18: a0-81's pair started in the same second, a0-77's 37 s
+# apart), so a PR stays UNSTABLE until the SLOWER twin finishes and
+# merge-on-green ends up waiting on a redundant copy of work that already
+# passed. #449 and #450 sat green-but-unmerged for over two hours for exactly
+# that reason.
+#
+# So `push` no longer covers agent branches. `pull_request` is their gate, and
+# it is the better of the two: it builds the merge result rather than the
+# branch tip, and it is the only event for which the `mobile` job's `if:` is
+# true off main. What `push` still covers is unchanged and load-bearing:
+#
+#   - main, because that is the path to the player — `deploy` and then
+#     `Verify live deploy boots`, the gate that exists because a stale service
+#     worker once bricked the phone (LESSONS §5);
+#   - `v*` tags, because milestone deploys and the ntfy ping ride them. A
+#     `push` block carrying both `branches:` and `tags:` fires when EITHER
+#     matches, so narrowing the branch list leaves the tag path alone.
+#
+# The one gap this opens is a branch pushed before its PR exists, which now
+# gets no CI until the PR is opened. `workflow_dispatch` covers that on
+# demand — `gh workflow run ci.yml --ref <branch>` — which is a cheaper
+# answer than duplicating every push all day to buy coverage for the few
+# minutes before a PR is opened.
 on:
   push:
-    branches: ['**']
+    branches: [main]
     tags: ['v*']
   pull_request:
+  workflow_dispatch:
+
+# --- Supersede a PR's own stale runs, and nothing that ships. -------------
+#
+# Agents push in bursts — a0-75 pushed three commits in four minutes and all
+# three ran the whole pipeline to completion, though only the last one's result
+# was ever read. Grouping a PR's runs by PR NUMBER lets the run for commit N+1
+# cancel the superseded run for commit N, whose checks hang off an SHA that is
+# no longer the head, so nothing a merge gate reads goes yellow.
+#
+# push and dispatch runs key on `github.run_id` instead, which is unique per
+# run, so each is alone in its group by construction: a main or tag run can
+# never be cancelled by a later one — and never QUEUES behind one either, which
+# a shared group with `cancel-in-progress: false` would do, serialising every
+# merge to main behind the previous merge's six-shard mobile suite. Deploy
+# keeps its own `pages` group below; that is the thing that must not overlap.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 # Least privilege by default; the deploy job widens this for itself.
 permissions:
   contents: read
 
 jobs:
-  # --- The merge gate: runs on every push and PR. ------------------------
+  # --- The merge gate: runs on every event this workflow answers to. -----
   ci:
     name: Typecheck, test, build
     runs-on: ubuntu-latest
@@ -106,10 +157,10 @@ jobs:
   # and the app-shell worker required to take control. `deploy` needs it, so this
   # class of bug now fails a PR instead of a deploy.
   #
-  # Runs on every push, like the merge gate and the perf gate and unlike the
-  # mobile suite: it is ~25 s of test behind the build, and it must not be
-  # `if:`-gated to PRs/main, because `deploy` depends on it and a SKIPPED
-  # dependency skips the dependent — which would silently stop v* tags shipping.
+  # Ungated, like the merge gate and the perf gate and unlike the mobile suite:
+  # it is ~25 s of test behind the build, and it must not be `if:`-gated to
+  # PRs/main, because `deploy` depends on it and a SKIPPED dependency skips the
+  # dependent — which would silently stop v* tags shipping.
   subpath-boot:
     name: Boot from the deploy subpath
     runs-on: ubuntu-latest
@@ -150,8 +201,8 @@ jobs:
   deploy:
     name: Deploy to GitHub Pages
     # `subpath-boot` joins `ci` here so a base-path regression can never reach
-    # the live URL again (a0-66). Both run on every push, so neither can be
-    # skipped out from under this job.
+    # the live URL again (a0-66). Both are ungated, so neither can be skipped
+    # out from under this job.
     needs: [ci, subpath-boot]
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
@@ -230,9 +281,9 @@ jobs:
   # on what hardware, and when it is required (before a milestone tag, at
   # minimum). Nothing in CI substitutes for it.
   #
-  # Runs on every push, like the merge gate above and unlike the mobile suite:
-  # it is ~20 s of measurement behind a ~2 min fixed cost, and a renderer
-  # regression is cheapest to see on the push that caused it.
+  # Ungated, like the merge gate above and unlike the mobile suite: it is ~20 s
+  # of measurement behind a ~2 min fixed cost, and a renderer regression is
+  # cheapest to see on the push that caused it.
   perf-budget:
     name: Perf gate — submission budget (draw calls, entities)
     runs-on: ubuntu-latest
@@ -313,7 +364,8 @@ jobs:
   # Full table, and the N either side: tests/reports/mobile-shard-a0-00.md.
   mobile:
     name: Mobile emulation (Playwright) — shard ${{ matrix.shard }}/${{ strategy.job-total }}
-    # Run where gating matters (PRs + main) — not on every agent branch push.
+    # Run where gating matters: PRs and main. A `workflow_dispatch` on a branch
+    # is a smoke check, not a gate, so it stops at the cheap jobs above.
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     strategy:

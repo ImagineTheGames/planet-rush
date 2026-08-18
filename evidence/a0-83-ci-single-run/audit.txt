@@ -1,0 +1,262 @@
+a0-83 — one CI run per push
+Run counts before and after, for the three refs that matter.
+
+Repo:   ImagineTheGames/planet-rush
+Branch: agent/platform/a0-83-ci-single-run
+PR:     #453
+Change: 047e7c2  ci(a0-83): one run per push — `push` stops shadowing `pull_request`
+Date:   2026-08-18
+
+  BEFORE                                AFTER
+  on:                                   on:
+    push:                                 push:
+      branches: ['**']                      branches: [main]
+      tags: ['v*']                          tags: ['v*']
+    pull_request:                         pull_request:
+                                          workflow_dispatch:
+
+                                        concurrency:
+                                          group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+                                          cancel-in-progress: true
+
+
+================================================================================
+(a) AGENT BRANCH WITH AN OPEN PR
+================================================================================
+
+BEFORE — every push fired two identical runs, because a branch with an open PR
+matches both `push: branches: ['**']` and `pull_request`.
+
+  Population: the 200 most recent CI runs as of 2026-08-18 03:00Z, restricted
+  to non-main head branches, grouped by head SHA.
+
+    $ gh run list --workflow ci.yml --limit 200 \
+        --json databaseId,event,headBranch,headSha,createdAt --jq \
+        '[.[]|select(.headBranch!="main")]|group_by(.headSha)
+         |map({n:length})|group_by(.n)|map({runs_per_sha:.[0].n,shas:length})'
+
+      [{"runs_per_sha":1,"shas":16},{"runs_per_sha":2,"shas":81}]
+
+    81 of 97 commits built twice.  (The 16 singletons are pushes made before
+    the branch's PR was opened — the same asymmetry this change makes uniform.)
+
+  Event split over the same 200 runs:  119 push  /  81 pull_request.
+
+  The two pairs named in the brief, re-read from the API:
+
+    a0-81  753aeae3   32085980061  push          2026-08-18T00:49:46Z  success
+                      32085981387  pull_request  2026-08-18T00:49:47Z  (same second)
+    a0-77  245a25f3   32087982679  push          2026-08-18T01:22:30Z
+                      32088019964  pull_request  2026-08-18T01:23:07Z  (+37s)
+
+  The cost that is not minutes: the twins are not synchronised, so `gh pr checks`
+  reports UNSTABLE until the slower one finishes. #449 and #450 were
+  green-but-unmerged for over two hours on that.
+
+AFTER — pushes to this very branch, which has PR #453 open.
+
+  1. Branch created and pushed (commit 047e7c2), BEFORE the PR existed:
+
+     $ git push -u origin agent/platform/a0-83-ci-single-run
+     $ gh run list --branch agent/platform/a0-83-ci-single-run
+
+       (no runs)                                          <- 0 runs, as designed
+
+     Under the old `on:` this push alone would have fired one `push` run.
+
+  2. PR #453 opened on the same SHA:
+
+       32094319483  pull_request  047e7c2a  2026-08-18T03:07:18Z   <- 1 run
+
+  3. Trivial commit pushed to the branch with the PR open — the DoD experiment:
+
+     $ git commit -m "evidence(a0-83): before-counts ..."   (348b77f)
+     $ git push origin agent/platform/a0-83-ci-single-run
+     $ gh run list --branch agent/platform/a0-83-ci-single-run
+
+       32094528208  pull_request  348b77f3  2026-08-18T03:10:36Z   <- 1 run
+       32094319483  pull_request  047e7c2a  cancelled              <- superseded
+
+     ONE run for the pushed SHA.  Under the old `on:` this would have been two
+     (32094528208 plus a `push` twin on the same commit).
+
+     The `cancelled` line is the new `concurrency` group doing its other job:
+     047e7c2a is no longer the head, so its run was superseded by the one for
+     348b77f3.  It leaves nothing for a merge gate to trip over — `gh pr checks
+     453` lists exactly nine checks, all of them on the head SHA:
+
+       Typecheck, test, build ........................ pending
+       Boot from the deploy subpath .................. pending
+       Perf gate — submission budget ................. pending
+       Mobile emulation (Playwright) — shard 1..6/6 .. pending
+
+  For contrast, a branch still carrying the old `on:` block, pushed 90 seconds
+  after the probes, in the same runner queue:
+
+       32094598216  pull_request  agent/ui/a0-78-menu-swipe-softlock  queued
+       32094561652  push          agent/ui/a0-78-menu-swipe-softlock  queued
+
+  RESULT (a):  2 runs per push  ->  1 run per push.
+
+
+================================================================================
+(b) PUSH TO main
+================================================================================
+
+BEFORE — one run, full pipeline, deploy and verify-live included.
+
+  32073070975  push  main  40608f6d  2026-08-17T21:49:34Z  success
+
+    Perf gate — submission budget (draw calls, entities)   success
+    Typecheck, test, build                                 success
+    Boot from the deploy subpath                           success
+    Mobile emulation (Playwright) — shard 1..6/6           success  (x6)
+    Mobile emulation (Playwright)                          success
+    Deploy to GitHub Pages                                 success
+    Verify live deploy boots                               success
+    Ping ntfy (tagged release)                             skipped  (not a tag)
+
+  (`push` and `pull_request` never duplicated on main: main has no PR to
+  itself, so this ref was already at one run and must stay there.)
+
+AFTER — main must still fire, and everything after `ci` must still run. Three
+pieces of evidence, none of which required pushing to main or deploying:
+
+  b1. THE `push` TRIGGER STILL FIRES FOR A BRANCH NAMED IN `branches:`.
+      Proved on a throwaway branch whose own copy of ci.yml adds itself to the
+      list — `branches: [main, scratch/a0-83-trigger-probe]` — and changes
+      nothing else:
+
+        $ git push origin scratch/a0-83-trigger-probe
+        $ gh run list --branch scratch/a0-83-trigger-probe
+
+          32094382562  push  63a22b1b  2026-08-18T03:08:19Z  success   <- 1 run
+
+        Typecheck, test, build                                 success
+        Perf gate — submission budget (draw calls, entities)   success
+        Boot from the deploy subpath                           success
+        Mobile emulation (Playwright) — shard .../...          skipped
+        Mobile emulation (Playwright)                          skipped
+        Deploy to GitHub Pages                                 skipped
+        Verify live deploy boots                               skipped
+        Ping ntfy (tagged release)                             skipped
+
+      Exactly one run, and the workflow parsed and executed — so the new `on:`
+      + `concurrency` YAML is valid, and a `push` to a ref in `branches:`
+      still starts the pipeline.  The five skips are the shipping gates
+      correctly declining a ref that is neither `refs/heads/main` nor
+      `refs/tags/v*`: they are live and evaluated, not dead.
+
+  b2. NOTHING BELOW THE `on:` BLOCK MOVED.  The entire non-comment diff
+      against main is seven lines, all of them in `on:`/`concurrency`:
+
+        $ git diff main..HEAD -- .github/workflows/ci.yml \
+            | grep -E '^[+-]' | grep -vE '^[+-]\s*#|^(\+\+\+|---)'
+
+          -    branches: ['**']
+          +    branches: [main]
+          +  workflow_dispatch:
+          +
+          +concurrency:
+          +  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+          +  cancel-in-progress: true
+
+      No `if:` expression, no `needs:`, no step. `deploy`, `verify-live` and
+      `notify` are byte-identical, and `main` is in the branch list, so the
+      run in the BEFORE column above is the run main keeps getting.
+
+  b3. THE SHAPE IS ALREADY PROVEN IN THIS REPOSITORY.
+      `.github/workflows/deploy-server.yml` has used `workflow_dispatch` +
+      `push: branches: [main]` all along, and fires on every main push:
+
+        32085944175  push  main  success  2026-08-18T00:49:09Z
+        32073070977  push  main  success  2026-08-17T21:49:34Z
+        31960567385  push  main  success  2026-08-16T17:05:46Z
+        31912007263  push  main  success  2026-08-15T22:23:36Z
+
+      Note 32085944175 / 32073070977 — the same two main pushes that produced
+      CI runs 32085944154 / 32073070975 above.
+
+  WHAT IS NOT PROVED PRE-MERGE, AND WHY: `Deploy to GitHub Pages` publishes to
+  the live URL and `Ping ntfy` posts to the classroom topic. Firing either from
+  a probe would mean deploying non-main content to the players' URL, which is
+  not a platform agent's call to make. The end-to-end run is this PR's own
+  merge commit; its run id is appended below when it lands.
+
+  RESULT (b):  1 full run (deploy + verify-live)  ->  1 full run, unchanged.
+
+
+================================================================================
+(c) PUSH OF A TAG
+================================================================================
+
+BEFORE — one run per tag (a tag has no PR, so `pull_request` never doubled it):
+
+  v0.3.0   30641597650  push  2026-07-31T15:08:24Z  success
+  v0.2.7   30421824723  push  2026-07-29T04:16:25Z  success
+  v0.2.6   30347627208  push  2026-07-28T09:41:13Z  success
+
+  Jobs of 30641597650 (v0.3.0):
+
+    Typecheck, test, build          success
+    Mobile emulation (Playwright)   skipped
+    Deploy to GitHub Pages          success
+    Verify live deploy boots        success
+    Ping ntfy (tagged release)      success
+
+AFTER — the risk here is not the `v*` glob, which is untouched; it is that
+adding a `branches:` narrowing might stop tag pushes matching at all. It does
+not: a `push` block carrying both `branches:` and `tags:` fires when EITHER
+matches. Proved with a tag that deliberately does NOT match `v*`, on the probe
+branch whose ci.yml adds a second glob `tags: ['v*', 'ci-probe-*']`:
+
+  $ git tag ci-probe-a0-83 && git push origin ci-probe-a0-83
+  $ gh run list --branch ci-probe-a0-83
+
+    32094423528  push  63a22b1b  2026-08-18T03:08:57Z  success       <- 1 run
+
+    Boot from the deploy subpath                           success
+    Typecheck, test, build                                 success
+    Perf gate — submission budget (draw calls, entities)   success
+    Mobile emulation (Playwright) — shard .../...          skipped
+    Mobile emulation (Playwright)                          skipped
+    Verify live deploy boots                               skipped
+    Deploy to GitHub Pages                                 skipped
+    Ping ntfy (tagged release)                             skipped
+
+  One run, from the `tags:` half of a `push` block whose `branches:` half did
+  not match — which is the property under test. `Deploy` and `Ping ntfy` skip
+  because `startsWith(github.ref, 'refs/tags/v')` is false for
+  `refs/tags/ci-probe-a0-83`, which is the same guard, evaluated, that lets a
+  real `v*` tag through. Firing a real `v*` probe would have deployed to the
+  players' URL and pinged the classroom, so it was not fired.
+
+  RESULT (c):  1 run per tag  ->  1 run per tag, unchanged.
+
+
+================================================================================
+CLEANUP
+================================================================================
+
+The probe refs existed only for this audit and were deleted after it:
+
+  $ git push origin --delete scratch/a0-83-trigger-probe
+  $ git push origin --delete ci-probe-a0-83
+
+Neither ever matched `refs/heads/main` or `refs/tags/v*`, so no deploy ran and
+no ntfy message was sent — see the skip lists above.
+
+
+================================================================================
+SUMMARY
+================================================================================
+
+  ref                              before   after
+  -------------------------------  ------   -----
+  (a) agent branch with open PR      2        1
+  (b) push to main                   1        1   (deploy + verify-live intact)
+  (c) push of a tag                  1        1   (deploy + ntfy intact)
+
+Extrapolated from the measured population: 81 redundant full-pipeline runs per
+200 CI runs, and a PR that no longer sits UNSTABLE waiting on a duplicate copy
+of work that already passed.
