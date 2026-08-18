@@ -720,6 +720,39 @@ export class Renderer {
   }
 
   /**
+   * Adopt a caller-owned container into the **world** — the one transform every
+   * world-space drawing rides (a0-80).
+   *
+   * The layer is appended, so it draws over every entity layer this class owns
+   * (boundary → shots) and under whatever HUD the caller stacks above the
+   * renderer. It is not otherwise touched: the caller keeps its contents, its
+   * lifetime and its per-frame draw. What it gains is the camera — the offset
+   * `centerCamera` writes *and* the scale {@link setCameraScale} applies — for
+   * free, in the only place either of them exists.
+   *
+   * ── Why this seam exists ────────────────────────────────────────────────
+   *
+   * The VFX layer (`art/vfx/layer.ts`, its own docs: "add it to the world root")
+   * was parented one level up, beside `worldRoot`, and chased the camera by
+   * writing its position from {@link projectToScreen} each frame. That carried
+   * the *offset* and silently dropped the *scale*: at the shipped 1× camera the
+   * two spaces coincide and it looked right, and the hour a0-74 gave the player
+   * a 1.5× and a 2× rung, every particle in the game landed at a fraction of the
+   * distance to the emitter it came off — thrusters, impacts, ore, shield hits,
+   * the station-death burst, all of it.
+   *
+   * A layer positioned from the outside can only ever track the parts of the
+   * camera whoever wrote it knew about. A layer parented **inside** tracks the
+   * camera, full stop, including the parts added after it was written. So the
+   * general seam is the fix, not a scale multiply at the emitter: two owners of
+   * one transform disagree the first time either changes, which is exactly the
+   * bug above. One container, one scale.
+   */
+  addWorldLayer(layer: Container): void {
+    this.worldRoot.addChild(layer);
+  }
+
+  /**
    * Set the camera scale — how many CSS pixels one world unit draws as (a0-74).
    *
    * 1 is the shipped camera. Below 1 the world root shrinks and the player sees

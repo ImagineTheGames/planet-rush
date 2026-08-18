@@ -650,10 +650,6 @@ const MATCH_SEED = 1;
  */
 const REDUCED_VFX_DENSITY = 0.5;
 
-/** The world origin, for reading the live camera offset back out of the renderer
- *  (`projectToScreen`). A module constant so the read costs no allocation. */
-const WORLD_ORIGIN: Vec2 = { x: 0, y: 0 };
-
 /** Index of UPGRADE SHIP: the one segment that opens a screen instead of
  *  spending (GDD §2.5). Read from the wheel's own order so it cannot drift. */
 const UPGRADE_SEGMENT = WHEEL_ORDER.indexOf('upgrade');
@@ -1520,15 +1516,22 @@ async function boot(): Promise<void> {
   const vfxTextures = new SpriteTextureCache(app.renderer, Math.min(window.devicePixelRatio || 1, 2));
   const vfxField = new VfxField({ seed: matchSeed });
   const vfxLayer = new VfxLayer(vfxTextures);
-  //     Above the world the renderer just added to `gameRoot`, below the HUD that
-  //     is added after us — an explosion draws over the ship it came off, and
-  //     under the readouts. It is a WORLD-space layer parked in screen space: the
-  //     renderer's camera transform is read back through its own public
-  //     `projectToScreen` seam each frame (below), so nothing in `src/render/`
-  //     — the Platform Engineer's file — has to change to carry it.
-  gameRoot.addChild(vfxLayer);
-  /** Reused scratch for that camera read-back — zero per-frame allocation. */
-  const vfxOriginScratch: Vec2 = { x: 0, y: 0 };
+  //     INSIDE the world, above every entity layer and below the HUD added after
+  //     us — an explosion draws over the ship it came off, and under the readouts.
+  //     The particles are world-space, so they are parented into the world's own
+  //     container (`renderer.addWorldLayer`, a0-80) and inherit the whole camera:
+  //     the offset AND the zoom scale a0-74 added.
+  //
+  //     It used to hang off `gameRoot` beside that container and chase the camera
+  //     by writing its own position from `projectToScreen` every frame. That is
+  //     the seam this bug came through: a layer positioned from the outside only
+  //     tracks the parts of the camera its author knew about, and the day the
+  //     camera grew a scale, every particle in the game landed at a fraction of
+  //     the distance to its emitter — which the developer saw on the thruster at
+  //     1.5× and 2× and which was equally true of impacts, ore, shield hits and
+  //     the station-death burst. The fix is parentage, not a scale multiply here:
+  //     two owners of one transform disagree the first time either one changes.
+  renderer.addWorldLayer(vfxLayer);
   /** Whether the frozen review sheet has been staged this boot (`?freeze=1`). */
   let vfxShowcased = false;
 
@@ -2717,14 +2720,11 @@ async function boot(): Promise<void> {
         vfxField.consume(audioTells);
         vfxField.update(frameSeconds);
       }
-      // The layer holds world-space particles but hangs in screen space beside the
-      // renderer's own world root, so it is offset by the camera the renderer just
-      // wrote — read back through its public `projectToScreen` seam rather than
-      // recomputed, so the particles can never disagree with the ships they came
-      // off. Two writes, no allocation.
-      renderer.projectToScreen(WORLD_ORIGIN, vfxOriginScratch);
-      vfxLayer.x = vfxOriginScratch.x;
-      vfxLayer.y = vfxOriginScratch.y;
+      // The layer's particles are in world units and the layer sits INSIDE the
+      // renderer's world container (a0-80), so the camera — offset and zoom scale
+      // both — is already on it and there is nothing to write here but the pool.
+      // The particles cannot disagree with the ships they came off, because they
+      // are drawn through the same transform, not through a copy of part of it.
       vfxLayer.draw(vfxField.pool);
       // Phones lock and tabs get backgrounded mid-match; the context comes back
       // suspended and the rest of the game is silent unless something re-arms the
