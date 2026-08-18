@@ -652,10 +652,6 @@ const MATCH_SEED = 1;
  */
 const REDUCED_VFX_DENSITY = 0.5;
 
-/** The world origin, for reading the live camera offset back out of the renderer
- *  (`projectToScreen`). A module constant so the read costs no allocation. */
-const WORLD_ORIGIN: Vec2 = { x: 0, y: 0 };
-
 /** Index of UPGRADE SHIP: the one segment that opens a screen instead of
  *  spending (GDD §2.5). Read from the wheel's own order so it cannot drift. */
 const UPGRADE_SEGMENT = WHEEL_ORDER.indexOf('upgrade');
@@ -1522,15 +1518,22 @@ async function boot(): Promise<void> {
   const vfxTextures = new SpriteTextureCache(app.renderer, Math.min(window.devicePixelRatio || 1, 2));
   const vfxField = new VfxField({ seed: matchSeed });
   const vfxLayer = new VfxLayer(vfxTextures);
-  //     Above the world the renderer just added to `gameRoot`, below the HUD that
-  //     is added after us — an explosion draws over the ship it came off, and
-  //     under the readouts. It is a WORLD-space layer parked in screen space: the
-  //     renderer's camera transform is read back through its own public
-  //     `projectToScreen` seam each frame (below), so nothing in `src/render/`
-  //     — the Platform Engineer's file — has to change to carry it.
-  gameRoot.addChild(vfxLayer);
-  /** Reused scratch for that camera read-back — zero per-frame allocation. */
-  const vfxOriginScratch: Vec2 = { x: 0, y: 0 };
+  //     INSIDE the world, above every entity layer and below the HUD added after
+  //     us — an explosion draws over the ship it came off, and under the readouts.
+  //     The particles are world-space, so they are parented into the world's own
+  //     container (`renderer.addWorldLayer`, a0-80) and inherit the whole camera:
+  //     the offset AND the zoom scale a0-74 added.
+  //
+  //     It used to hang off `gameRoot` beside that container and chase the camera
+  //     by writing its own position from `projectToScreen` every frame. That is
+  //     the seam this bug came through: a layer positioned from the outside only
+  //     tracks the parts of the camera its author knew about, and the day the
+  //     camera grew a scale, every particle in the game landed at a fraction of
+  //     the distance to its emitter — which the developer saw on the thruster at
+  //     1.5× and 2× and which was equally true of impacts, ore, shield hits and
+  //     the station-death burst. The fix is parentage, not a scale multiply here:
+  //     two owners of one transform disagree the first time either one changes.
+  renderer.addWorldLayer(vfxLayer);
   /** Whether the frozen review sheet has been staged this boot (`?freeze=1`). */
   let vfxShowcased = false;
 
@@ -2719,14 +2722,11 @@ async function boot(): Promise<void> {
         vfxField.consume(audioTells);
         vfxField.update(frameSeconds);
       }
-      // The layer holds world-space particles but hangs in screen space beside the
-      // renderer's own world root, so it is offset by the camera the renderer just
-      // wrote — read back through its public `projectToScreen` seam rather than
-      // recomputed, so the particles can never disagree with the ships they came
-      // off. Two writes, no allocation.
-      renderer.projectToScreen(WORLD_ORIGIN, vfxOriginScratch);
-      vfxLayer.x = vfxOriginScratch.x;
-      vfxLayer.y = vfxOriginScratch.y;
+      // The layer's particles are in world units and the layer sits INSIDE the
+      // renderer's world container (a0-80), so the camera — offset and zoom scale
+      // both — is already on it and there is nothing to write here but the pool.
+      // The particles cannot disagree with the ships they came off, because they
+      // are drawn through the same transform, not through a copy of part of it.
       vfxLayer.draw(vfxField.pool);
       // Phones lock and tabs get backgrounded mid-match; the context comes back
       // suspended and the rest of the game is silent unless something re-arms the
@@ -3983,8 +3983,12 @@ async function boot(): Promise<void> {
    * all is both correct and simplest. Positions are projected world → screen via
    * the renderer's *actual* camera transform (`projectToScreen`, called after
    * `renderer.draw`), so a bar sits exactly over the sprite and is a fixed screen
-   * size regardless of zoom — the camera renders 1:1, so a world radius is a
-   * screen radius.
+   * size regardless of zoom. The RADIUS crosses the same seam and needs the same
+   * transform: the bar hangs clear of the sprite by it, and `Combatant.radius` is
+   * screen px by contract (`@ui/healthbar`). It read `ship.radius` straight off
+   * the sim while the camera was 1:1, and a0-74's zoom made those two different
+   * numbers — so it goes through `projectLength` now, for the same reason and off
+   * the same transform as the position beside it (a0-80).
    *
    * Allocation-free after warm-up (GDD §4.3): the combatant records are pooled
    * and overwritten in place, and the frame array is reused. The count is bounded
@@ -4003,7 +4007,7 @@ async function boot(): Promise<void> {
       c.alive = ship.alive;
       c.inCombat = ship.firing; // firing this tick (sim publishes the tell)
       renderer.projectToScreen(ship.pos, c.pos);
-      c.radius = ship.radius;
+      c.radius = renderer.projectLength(ship.radius);
       c.turret = false;
     }
     for (const station of world.stations) {
@@ -4020,7 +4024,7 @@ async function boot(): Promise<void> {
         // `turret.pos` is derived from the orbit angle each tick, so the bar rides
         // along as the turret slides around its station's rim (sim orbit, P1).
         renderer.projectToScreen(turret.pos, c.pos);
-        c.radius = turret.radius;
+        c.radius = renderer.projectLength(turret.radius);
         c.turret = true;
       }
     }
@@ -4067,7 +4071,9 @@ async function boot(): Promise<void> {
       c.alive = ship.alive && !ship.eliminated;
       c.local = ship.id === LOCAL_PLAYER;
       renderer.projectToScreen(ship.pos, c.pos);
-      c.radius = ship.radius;
+      // Screen px by contract (`@ui/nameplates-view` floats the label off it), so
+      // it rides the camera scale exactly as the position does (a0-80).
+      c.radius = renderer.projectLength(ship.radius);
     }
     for (const station of world.stations) {
       const c = nameableSlot(n++);
@@ -4077,7 +4083,7 @@ async function boot(): Promise<void> {
       c.alive = station.alive;
       c.local = false;
       renderer.projectToScreen(station.pos, c.pos);
-      c.radius = station.radius;
+      c.radius = renderer.projectLength(station.radius);
     }
     nameableFrame.length = 0;
     for (let i = 0; i < n; i++) nameableFrame.push(nameablePool[i]!);
@@ -4145,7 +4151,11 @@ async function boot(): Promise<void> {
       renderer.projectToScreen(locked.pos, tapLockScreen);
       tapLockMark.x = tapLockScreen.x;
       tapLockMark.y = tapLockScreen.y;
-      tapLockMark.radius = locked.radius;
+      // The reticle's brackets float just outside the target's SCREEN radius
+      // (`@ui/tap-markers`), so the world radius crosses the camera the same way
+      // the centre does — otherwise the bracket sits a target's width off the
+      // drawn edge at 2x (a0-80).
+      tapLockMark.radius = renderer.projectLength(locked.radius);
       hudFrame.tapLock = tapLockMark;
     } else {
       delete hudFrame.tapLock;

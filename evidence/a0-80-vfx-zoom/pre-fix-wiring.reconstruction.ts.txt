@@ -248,8 +248,11 @@ function burnThruster(step: number) {
   const baker = blankBaker();
   const renderer = new Renderer(stage, VFX_VIEW, { baker, resolution: 1 });
   const layer = new VfxLayer(new SpriteTextureCache(baker, 1));
-  // The fix: the effects are a child of the world, not a sibling of it.
-  renderer.addWorldLayer(layer);
+  // PRE-FIX WIRING (a0-74 and before), reconstructed exactly: the layer is a
+  // SIBLING of the world container, positioned each frame from the camera
+  // read-back. This is the only edit — everything else in this file is the
+  // committed test, verbatim.
+  stage.addChild(layer);
 
   const field = new VfxField({ seed: 7 });
   const tells = new TellQueue();
@@ -261,6 +264,9 @@ function burnThruster(step: number) {
 
   renderer.setCameraScale(cameraScale(step));
   renderer.draw(world, { cameraTarget: ship.id, muzzles: [] });
+  const origin = renderer.projectToScreen({ x: 0, y: 0 }, { x: 0, y: 0 });
+  layer.x = origin.x;
+  layer.y = origin.y;
   layer.draw(field.pool);
 
   return { renderer, layer, ship, particles: drawnParticles(layer) };

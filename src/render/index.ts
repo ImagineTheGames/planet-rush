@@ -720,6 +720,39 @@ export class Renderer {
   }
 
   /**
+   * Adopt a caller-owned container into the **world** — the one transform every
+   * world-space drawing rides (a0-80).
+   *
+   * The layer is appended, so it draws over every entity layer this class owns
+   * (boundary → shots) and under whatever HUD the caller stacks above the
+   * renderer. It is not otherwise touched: the caller keeps its contents, its
+   * lifetime and its per-frame draw. What it gains is the camera — the offset
+   * `centerCamera` writes *and* the scale {@link setCameraScale} applies — for
+   * free, in the only place either of them exists.
+   *
+   * ── Why this seam exists ────────────────────────────────────────────────
+   *
+   * The VFX layer (`art/vfx/layer.ts`, its own docs: "add it to the world root")
+   * was parented one level up, beside `worldRoot`, and chased the camera by
+   * writing its position from {@link projectToScreen} each frame. That carried
+   * the *offset* and silently dropped the *scale*: at the shipped 1× camera the
+   * two spaces coincide and it looked right, and the hour a0-74 gave the player
+   * a 1.5× and a 2× rung, every particle in the game landed at a fraction of the
+   * distance to the emitter it came off — thrusters, impacts, ore, shield hits,
+   * the station-death burst, all of it.
+   *
+   * A layer positioned from the outside can only ever track the parts of the
+   * camera whoever wrote it knew about. A layer parented **inside** tracks the
+   * camera, full stop, including the parts added after it was written. So the
+   * general seam is the fix, not a scale multiply at the emitter: two owners of
+   * one transform disagree the first time either changes, which is exactly the
+   * bug above. One container, one scale.
+   */
+  addWorldLayer(layer: Container): void {
+    this.worldRoot.addChild(layer);
+  }
+
+  /**
    * Set the camera scale — how many CSS pixels one world unit draws as (a0-74).
    *
    * 1 is the shipped camera. Below 1 the world root shrinks and the player sees
@@ -761,6 +794,26 @@ export class Renderer {
     out.x = this.worldRoot.x + world.x * this.worldRoot.scale.x;
     out.y = this.worldRoot.y + world.y * this.worldRoot.scale.y;
     return out;
+  }
+
+  /**
+   * The screen LENGTH (canvas-local CSS px) a world length draws as this frame,
+   * read from the same actual worldRoot transform {@link projectToScreen} reads
+   * (a0-80).
+   *
+   * A point and a length are two different crossings of this seam and only the
+   * first was carried when the camera grew a scale. Every screen-space overlay
+   * that floats itself off an entity's SIZE — the health bar's clearance, the
+   * nameplate's, the lock reticle's brackets — takes a radius in CSS px by
+   * contract and was being handed one in world units, which was the same number
+   * only while the camera was 1:1. Off by the whole of the zoom at 1.5x and 2x:
+   * a bar hanging a full ship-radius clear of a half-size ship.
+   *
+   * Uniform scale, so one axis answers for both; the camera has never had a
+   * non-uniform one and {@link setCameraScale} is its only writer.
+   */
+  projectLength(world: number): number {
+    return world * this.worldRoot.scale.x;
   }
 
   /** Draw one frame from read-only sim state. Allocation-free on the hot paths. */
