@@ -241,11 +241,77 @@ allied number, which is the quantity that stage is about, did not move
 rate was ADDED beside it, so the re-baseline leaves nothing unguarded. Full
 reasoning in the test's own note.
 
-Three seed-locked suites were re-baselined for a0-81, each with its measurement,
-and none relaxed: ffa-parity's three golden hashes (a0-05 category — nothing in
-a0-81 is team-aware, so it is not the leak Rule 3 forbids), team-winning's
-fixture seed 13 -> 4 (fourth instance of a documented fixture fragility, seeds
-1-16 re-scanned, largest margin picked), and field-division's ratio as above.
+THE SAME EFFECT, MEASURED AT THE STATIONS: the first knockout comes ~30% later
+--------------------------------------------------------------------------------
+
+Instrument: evidence/a0-81-fleeing-fire/elimination-probe.ts, seeds 1..24, 8-slot
+scarce FFA, both builds. Fewer ship deaths per match turns out to mean the
+placement ladder itself forms later — which is the second-order effect stated
+above, read at the only place it changes what a MATCH looks like rather than
+what a fight looks like.
+
+  build       median first elimination   seeds with one inside 120s   seeds past 240s
+  pre-a0-81            114.1 s                   12 / 24                   5 / 24
+  a0-81                148.5 s                    7 / 24                   1 / 24
+
+Two things in that table, and they point opposite ways. Matches take longer to
+draw first blood at a station — the balance crew's number to watch, alongside
+the 44%. But the long tail also collapses: five seeds used to run past 240 s
+before anyone was out and now one does. A bot that shoots back is a bot that
+gets shot, so the sieges that used to stall out at a stalemate resolve; the
+distribution tightens around its middle rather than simply sliding right. Both
+readings come off the same 24 seeds and neither is a target — GDD §1's 10-15
+minute match is measured on a finished match, and every run here is capped.
+
+
+WHAT THIS COST THE TEST SUITE: five seed-locked cases, none relaxed
+--------------------------------------------------------------------------------
+
+Five suites are pinned to literals a deliberate behaviour change necessarily
+moves. Each was re-baselined with its before/after measurement in the file
+itself, and none of them had its bar lowered to fit:
+
+  src/bots/ffa-parity.test.ts      three golden hashes. a0-05 category: nothing
+                                   in a0-81 is team-aware, so it is not the leak
+                                   Rule 3 forbids. Fifth documented instance.
+  src/bots/team-winning.test.ts    fixture seed 13 -> 4. Fourth instance of a
+                                   fragility the file documents and prescribes a
+                                   re-scan for; seeds 1-16 re-scanned, largest
+                                   margin picked.
+  src/bots/field-division.test.ts  the contention ratio, plus a NEW absolute
+                                   ally-rate assertion beside it. As above.
+  tests/harness/p1-08-pay.test.ts  fixture seed 9 -> 8, in one case only.
+  tests/net/online-radio.test.ts   the FFA control hash, 53aa6f97 -> a83554a1.
+
+THE LAST TWO ARE OUTSIDE THE BOT LANE and are called out in the PR for their
+owners (QA Agent and Netcode Engineer respectively). Both are one-literal edits
+carrying the reasoning; neither weakens an assertion.
+
+  p1-08-pay — this is the one case in that file whose PREMISE is a property of
+  the match rather than of the pricer. `MatchAccrual.placement` only reaches
+  `slots` once `world.match.eliminated` is non-empty, so "the first player out
+  clears zero placement rungs" has nothing to assert unless somebody is out
+  inside the 120 s probe. Seed 9 stopped clearing it: 72.3 s -> 200.4 s, which is
+  the elimination-timing table above happening to one fixture. Seed 8 replaces
+  it because it clears on BOTH builds — 37.7 s before, 46.9 s after, the largest
+  margin either way — so the fixture is not a seed chosen for passing on the new
+  code. The arithmetic assertion itself is untouched, and the file's other cases
+  stay at seed 9. Note that this file deliberately pins no pay NUMBER, for the
+  stated reason that "a test that pinned them would have to be edited by every
+  bot-tree change"; that discipline is why a0-81 costs it one seed and nothing
+  else.
+
+  online-radio — a full world-state hash of a 60 s served FFA match, guarding
+  b2-02's claim that a team radio is unreachable in a free-for-all. Its note
+  defers to ffa-parity's Rule 3, and the answer is the same one given there:
+  `coveringFire` branches on `isTargetable` — the single `hostile` stamp, true
+  for every ship on an FFA board — and on nothing about sides, radios or ally
+  lists, so it moves Teams and FFA by the identical mechanism. The assertions
+  that would actually catch a radio leak are untouched and still green: all
+  three seats read `radio === null` at t0 and again a minute in. The file
+  requires a re-baselined value be measured twice; it was, and it is stable.
+  This literal has been re-baselined twice before on the same grounds (a0-58,
+  a0-59), both times for a sim change from another lane.
 
 
 ===============================================================================
