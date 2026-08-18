@@ -194,7 +194,26 @@ const SHOT_ANGLE_SCALE = 256 / (2 * Math.PI);
  */
 export const SHOT_SPEED_QUANT = 4;
 
-/** Largest muzzle speed the wire can carry, world units per second. */
+/**
+ * Largest muzzle speed the wire can carry, world units per second — the speed
+ * byte's top step at {@link SHOT_SPEED_QUANT}.
+ *
+ * **It binds** ({@link quantizeShotVelocity} clamps to it), because the
+ * alternative is a wrapped byte: `Math.round(1024 / 4)` is 256, which lands on
+ * the wire as 0 and reaches the client as a shot standing still — the exact
+ * a0-73 failure this record exists to fix, in a rarer case and harder to spot.
+ *
+ * A clamped shot is not free either. It keeps its heading and loses its speed:
+ * the receiver draws it on the right line, travelling slower than authority has
+ * it, and every reconciliation snaps it forward again. That is a visible bug of
+ * its own, so the clamp is a *last* line — the guarantee is that no shot the game
+ * can fire ever reaches it. The fastest muzzle that exists is a turret's 700 u/s
+ * (`src/sim/constants` `TURRET.projectileSpeed`) against this 1020, and
+ * `snapshot.test.ts` ("no shot the game can fire overflows the wire") walks every
+ * weapon in the game — every ship class × every SPEED tier, every turret Mk — and
+ * fails the build if a retune, a new hull, or a shot that inherits its shooter's
+ * velocity ever puts one within reach of the clamp.
+ */
 export const MAX_WIRE_SHOT_SPEED = 255 * SHOT_SPEED_QUANT;
 
 /**
@@ -359,10 +378,15 @@ function quantizeShotVelocity(velX: number, velY: number): { heading: number; sp
   const speed = Math.hypot(velX, velY);
   if (!(speed > 0)) return { heading: 0, speed: 0 };
   const turns = Math.atan2(velY, velX) * SHOT_ANGLE_SCALE;
-  const q = Math.round(speed / SHOT_SPEED_QUANT);
+  // The speed byte's ceiling ({@link MAX_WIRE_SHOT_SPEED}) is applied to the
+  // *speed*, not to the quantized step, so the bound reads as the world-unit
+  // number it is stated in — and, like {@link quantize}, it clamps rather than
+  // truncating: a wrapped byte would hand the client a wrong velocity, which is
+  // worse than a slow one. Nothing the game fires gets here (see the constant).
+  const q = Math.round(Math.min(speed, MAX_WIRE_SHOT_SPEED) / SHOT_SPEED_QUANT);
   return {
     heading: ((Math.round(turns) % 256) + 256) % 256,
-    speed: q > 255 ? 255 : q,
+    speed: q,
   };
 }
 

@@ -19,8 +19,21 @@
  * ship onto a wall.
  */
 import { describe, it, expect } from 'vitest';
-import { ShipClass } from '@shared/types';
-import { MAPS, createWorld, step } from '../sim';
+import { ShipClass, UpgradeTrack } from '@shared/types';
+import {
+  MAPS,
+  SHIP_WEAPON,
+  SHOT_SPEED_STEPS,
+  TURRET,
+  TURRET_TIERS,
+  createWorld,
+  fireShipProjectile,
+  fireTurretProjectile,
+  shipTopSpeed,
+  shotSpeed,
+  step,
+  stockTiers,
+} from '../sim';
 import {
   decodeSnapshot,
   dequantizeAngle,
@@ -35,7 +48,9 @@ import {
   SHIP_FLAG,
   snapshotWorld,
   MAX_WIRE_COORD,
+  MAX_WIRE_SHOT_SPEED,
   POS_SCALE,
+  SHOT_SPEED_QUANT,
   WORST_CASE_BYTES,
 } from './snapshot';
 
@@ -202,5 +217,128 @@ describe('encode → decode against the sim', () => {
     expect(projIsShipShot(turret!.meta)).toBe(false);
     // And the layout is still exactly the worst case the doc bills against.
     expect(WORST_CASE_BYTES).toBe(622);
+  });
+});
+
+describe("the wire's shot-speed ceiling", () => {
+  /**
+   * The speed byte carries 0 … {@link MAX_WIRE_SHOT_SPEED} (1020 u/s) and the
+   * encoder clamps to it. A clamp is not a fix — a clamped shot keeps its heading
+   * and loses its speed, so the receiver draws it on the right line moving too
+   * slowly and reconciliation jerks it forward every snapshot, which is a0-73's
+   * own bug wearing a different coat. What makes the ceiling safe is that nothing
+   * the game can fire comes near it, and that is a claim about the *sim*, not the
+   * codec — so it is asserted against the sim's real fire paths rather than
+   * asserted about the constants by hand.
+   *
+   * Every muzzle in the game is walked: the ship weapon at every hull × every
+   * SPEED tier, and the turret gun at every Mk. Each is fired through the real
+   * `fire*Projectile` and the resulting pool slot is measured, so a shot that one
+   * day *does* inherit its shooter's velocity is caught here — that matters,
+   * because inheritance is how a speed exceeds its muzzle value and the headroom
+   * would not survive it (see the assertion at the end).
+   */
+  it('no shot the game can fire overflows the wire', () => {
+    const w = world();
+    const shooter = w.ships[0]!;
+    const fired: { what: string; speed: number }[] = [];
+
+    // ── Every ship weapon: 4 hulls × every rung of the SPEED ladder ──────────
+    for (const shipClass of Object.values(ShipClass)) {
+      for (let tier = 0; tier < SHOT_SPEED_STEPS.length; tier++) {
+        // Fire it for real, from a ship travelling flat out along +x. If a shot
+        // ever inherits the hull's velocity, this is the case that shows it.
+        Object.assign(shooter, { shipClass, tiers: { ...stockTiers(), [UpgradeTrack.Speed]: tier } });
+        const top = shipTopSpeed(shooter);
+        shooter.vel.x = top;
+        shooter.vel.y = 0;
+        w.projectiles.length = 0;
+        fireShipProjectile(w, shooter, { x: 1, y: 0 });
+
+        const shot = w.projectiles.find((p) => p.active)!;
+        const speed = Math.hypot(shot.vel.x, shot.vel.y);
+        // The shot leaves at its muzzle speed and NOTHING else: no inheritance,
+        // so the fastest ship shot is the fastest muzzle, full stop.
+        expect(speed).toBeCloseTo(shotSpeed(shooter), 6);
+        fired.push({ what: `${shipClass} SPEED tier ${tier}`, speed });
+      }
+    }
+
+    // ── Every turret Mk ─────────────────────────────────────────────────────
+    for (let tier = 0; tier < TURRET_TIERS.length; tier++) {
+      w.projectiles.length = 0;
+      fireTurretProjectile(
+        w,
+        { id: 1, owner: 0, slot: 0, pos: { x: 0, y: 0 }, radius: TURRET.radius, hp: TURRET.hp, maxHp: TURRET.hp, angle: 0, cooldown: 0, targetId: null, muzzle: null, tier },
+        0.7,
+      );
+      const shot = w.projectiles.find((p) => p.active)!;
+      fired.push({ what: `turret ${TURRET_TIERS[tier]!.label}`, speed: Math.hypot(shot.vel.x, shot.vel.y) });
+    }
+
+    // ── The ceiling holds for every one of them, through the real encoder ────
+    for (const { what, speed } of fired) {
+      expect(speed, what).toBeLessThan(MAX_WIRE_SHOT_SPEED);
+      // Not just under it — under it with room, so a retune has somewhere to go
+      // before this test is the only thing standing between a player and a shot
+      // that wraps to a standstill.
+      expect(speed, what).toBeLessThan(MAX_WIRE_SHOT_SPEED * 0.85);
+      // And the number actually survives the round trip: encoded at this speed,
+      // a shot comes back at this speed (to the byte's step), never wrapped to a
+      // near-zero velocity by the top of the range.
+      const w2 = world();
+      w2.projectiles.length = 0;
+      w2.projectiles.push({ id: 1, active: true, owner: 0, pos: { x: 10, y: 10 }, vel: { x: speed, y: 0 }, damage: 1, radius: 5, life: 1, kind: 'ship' });
+      const decoded = decodeSnapshot(encodeWorldSnapshot(w2)).projectiles[0]!;
+      // Half a quantization step is the whole error the speed byte is allowed
+      // (598 u/s rounds to 600); a wrap would be off by hundreds.
+      const roundTrip = Math.hypot(decoded.velX, decoded.velY);
+      expect(Math.abs(roundTrip - speed), `${what} (round-tripped at ${roundTrip})`).toBeLessThanOrEqual(
+        SHOT_SPEED_QUANT / 2 + 1e-9,
+      );
+    }
+
+    // The fastest thing in the list, named: a turret's flat 700 u/s, which is
+    // 69 % of the ceiling. (The fastest ship shot is 520 × 1.3 = 676.)
+    const fastest = fired.reduce((a, b) => (b.speed > a.speed ? b : a));
+    expect(fastest.speed).toBe(TURRET.projectileSpeed);
+    expect(fastest.speed).toBe(700);
+    expect(Math.max(...SHOT_SPEED_STEPS.map((m) => SHIP_WEAPON.projectileSpeed * m))).toBe(676);
+
+    // ── Why the no-inheritance assertion above is load-bearing ───────────────
+    // The headroom is comfortable only because a shot's speed IS its muzzle
+    // speed. Add the fastest hull the game can build (an Interceptor at ENGINE
+    // Mk III) to the fastest ship muzzle and the sum is over the ceiling — so
+    // "shots inherit the shooter's velocity" is a change that would silently
+    // start wrapping shots to a standstill, and the per-shot equality above is
+    // what fails first if anyone makes it.
+    const fastestHull = Math.max(
+      ...Object.values(ShipClass).map((c) =>
+        shipTopSpeed({ shipClass: c, tiers: { ...stockTiers(), [UpgradeTrack.Engine]: 3 } }),
+      ),
+    );
+    expect(676 + fastestHull).toBeGreaterThan(MAX_WIRE_SHOT_SPEED);
+  });
+
+  it('clamps an over-ceiling shot to the ceiling rather than wrapping it to a standstill', () => {
+    // Unreachable from the sim (the test above is why), so this pins the codec's
+    // behaviour at the edge: the byte would take `round(2000/4) = 500` and keep
+    // the low 8 bits — 244, a 976 u/s shot — or, at 1024 u/s exactly, a 0 that
+    // decodes as a shot standing still. Clamping instead means the worst a
+    // retune can do is stream a *slow* shot on the right line, which is visible
+    // and recoverable, rather than a stopped or randomly-slower one.
+    const w = world();
+    w.projectiles.length = 0;
+    w.projectiles.push(
+      { id: 1, active: true, owner: 0, pos: { x: 0, y: 0 }, vel: { x: 2000, y: 0 }, damage: 1, radius: 5, life: 1, kind: 'ship' },
+      { id: 2, active: true, owner: 1, pos: { x: 0, y: 0 }, vel: { x: 0, y: 1024 }, damage: 1, radius: 5, life: 1, kind: 'ship' },
+    );
+
+    const [fast, wrapper] = decodeSnapshot(encodeWorldSnapshot(w)).projectiles;
+    expect(fast!.velX).toBe(MAX_WIRE_SHOT_SPEED);
+    expect(fast!.velY).toBeCloseTo(0, 6);
+    // The heading survives the clamp — only the magnitude is lost.
+    expect(wrapper!.velY).toBe(MAX_WIRE_SHOT_SPEED);
+    expect(wrapper!.velX).toBeCloseTo(0, 6);
   });
 });
