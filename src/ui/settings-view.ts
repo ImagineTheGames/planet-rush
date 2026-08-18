@@ -44,9 +44,17 @@ import type { FrameMetrics, PlateState } from '../art/materials';
 import { PALETTE } from '@render/index';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
 import { FONT_BODY, FONT_HEADING } from './typography';
-import { SETTINGS_ID, VOLUME_STEPS, settingsHitTest, settingsLayout, volumeButtons } from './settings';
+import {
+  SETTINGS_HELP_GLYPH,
+  SETTINGS_ID,
+  VOLUME_STEPS,
+  settingsHitTest,
+  settingsLayout,
+  volumeButtons,
+} from './settings';
 import type { SettingsLayout, SettingsModel, SettingsRowView, SettingsTarget } from './settings';
 import type { Insets } from './menu-geometry';
+import { CodexHintView } from './codex-hint-view';
 import { ScreenCache } from './screen-cache';
 
 export const SETTINGS_ANCHOR: AnchorSpec = { region: 'full' };
@@ -73,12 +81,34 @@ const PIP_GAP = 4;
  */
 const VOLUME_LABEL_COLUMN = 176;
 
+/**
+ * The least room the pips may be squeezed into on a volume row, at the reference
+ * — scaled with the plate like every other number here (a0-77).
+ *
+ * {@link VOLUME_LABEL_COLUMN} is a *preference*, read off a desktop handoff whose
+ * row is 680px wide. On the 372px row a landscape phone gets, that fixed column
+ * spends 25px it does not have to spare now that the row also carries a `?`, and
+ * the pips are what pays. So the column is now honoured only while it leaves the
+ * pips this much: the label still cannot be written over (its measured width is
+ * a hard floor, unchanged), and the readout no longer collapses to keep a
+ * desktop metric that has nothing left to buy at that width.
+ */
+const PIPS_MIN_WIDTH = 90;
+
+/** The focus ring's stroke and inset (logical px at the reference). A keyboard
+ *  focus is drawn as a RING rather than as the hover state, so "the pointer is
+ *  here" and "the keyboard is here" stay two different pictures. */
+const FOCUS_RING_WIDTH = 2;
+const FOCUS_RING_INSET = 2;
+
 interface RowNodes {
   readonly body: Graphics;
   readonly label: Text;
   readonly value: Text;
   readonly minus: Text;
   readonly plus: Text;
+  /** The row's `?` glyph (a0-77) — the control that explains the setting. */
+  readonly help: Text;
 }
 
 /**
@@ -96,11 +126,28 @@ export class SettingsView extends Container {
   /** A settings screen is static between state changes — see ./screen-cache. */
   private readonly cache = new ScreenCache(this);
   private readonly backLabel: Text;
+  /**
+   * The `?` panel (a0-77) — **the lobby's own codex tooltip**, not a second
+   * implementation of one: a compact title-and-summary panel that floats near
+   * the control it describes and is clamped inside the viewport. Reusing it is
+   * the brief's instruction and the reason the two popups in this game cannot
+   * drift apart, since there is only one.
+   */
+  private readonly hint = new CodexHintView();
+  /** The logical viewport, kept so the panel can be clamped inside it — the
+   *  layout's rects are inside the frame's margins, and the panel is allowed the
+   *  whole screen. */
+  private viewport: Viewport;
+  /** Which explanation the cached texture was rasterised with. A panel opening
+   *  changes the container's contents outside any rect this screen redraws, so
+   *  the cache is dropped whole rather than refreshed in place. */
+  private cachedHelp: number | null = null;
 
   private layout: SettingsLayout;
 
   constructor(screenWidth: number, screenHeight: number, isTouch = false, insets?: Insets) {
     super();
+    this.viewport = { width: screenWidth, height: screenHeight };
     this.layout = settingsLayout({ width: screenWidth, height: screenHeight }, opts(isTouch, insets));
     this.heading = makeText('SETTINGS', FONT_HEADING, HEADING_PX, MATERIAL_SHADES.bone);
     this.heading.anchor.set(0, 0.5);
@@ -108,10 +155,11 @@ export class SettingsView extends Container {
     this.eyebrow.anchor.set(1, 0.5);
     this.backLabel = makeText('DONE', FONT_HEADING, DONE_PX, BONE.hi);
     this.backLabel.anchor.set(0.5, 0.5);
-    this.addChild(this.backdrop, this.beams, this.heading, this.eyebrow, this.backBody, this.backLabel);
+    this.addChild(this.backdrop, this.beams, this.heading, this.eyebrow, this.backBody, this.backLabel, this.hint);
   }
 
   resize(width: number, height: number, isTouch = this.layout.isTouch, insets?: Insets): void {
+    this.viewport = { width, height };
     this.layout = settingsLayout({ width, height }, opts(isTouch, insets));
     // The cached texture is the size the OLD viewport rasterised to; refreshing
     // it in place would blit a stale-sized screen, so drop it (./screen-cache).
@@ -135,6 +183,16 @@ export class SettingsView extends Container {
     // polygons and a render-to-texture — see ./screen-cache.
     const signature = JSON.stringify(model);
     if (this.cache.unchanged(signature)) return;
+    // A panel opening or closing changes what the container's bounds enclose, and
+    // `updateCacheTexture` re-renders into the texture it already has. Opening
+    // and closing are player events (twice per question asked, not per frame), so
+    // the safe answer is the cheap one: drop the texture and let the refresh at
+    // the end of this pass measure the screen again.
+    const openIndex = model.openHelp?.index ?? null;
+    if (openIndex !== this.cachedHelp) {
+      this.cache.invalidate();
+      this.cachedHelp = openIndex;
+    }
     const { header, footer, title, rows, back, metrics } = this.layout;
 
     // Near-opaque over the whole viewport: the settings screen can be opened from
@@ -157,10 +215,11 @@ export class SettingsView extends Container {
       const rect = rows[i];
       const row = model.rows[i];
       if (!rect || !row) continue;
-      this.drawRow(this.rowSlot(i), row, rect, metrics);
+      this.drawRow(this.rowSlot(i), row, rect, metrics, i);
     }
 
     this.drawBack(model, back, metrics);
+    this.drawHint(model);
     // Everything above is now on the display list; rasterise it once so the
     // frames between state changes cost one blit rather than ~170 translucent
     // polygons (./screen-cache).
@@ -192,13 +251,14 @@ export class SettingsView extends Container {
     this.eyebrow.visible = this.heading.width + this.eyebrow.width + m.gutter <= title.width;
   }
 
-  private drawRow(nodes: RowNodes, row: SettingsRowView, rect: Rect, m: FrameMetrics): void {
+  private drawRow(nodes: RowNodes, row: SettingsRowView, rect: Rect, m: FrameMetrics, index: number): void {
     nodes.body.clear();
     if (rect.width <= 0 || rect.height <= 0) {
       nodes.label.visible = false;
       nodes.value.visible = false;
       nodes.minus.visible = false;
       nodes.plus.visible = false;
+      nodes.help.visible = false;
       return;
     }
     nodes.label.visible = true;
@@ -209,11 +269,14 @@ export class SettingsView extends Container {
     drawPlate(nodes.body, rect.x, rect.y, rect.width, rect.height, 'inert', 'compact', row.state);
 
     const padX = Math.max(8, Math.round(ROW.padX * m.plateScale));
+    // The `?` leads the row, so the label starts after it (a0-77). One pad, the
+    // row's own — the same gap the label used to keep from the plate's edge.
+    const help = this.drawHelpControl(nodes, row, index, m);
     const labelPx = plateTypeSize(ROW_LABEL_PX, m);
     nodes.label.text = row.label;
     nodes.label.style.fontSize = labelPx;
     nodes.label.style.letterSpacing = trackingPx(TRACKING.name, labelPx);
-    nodes.label.x = rect.x + padX;
+    nodes.label.x = (help > 0 ? help : rect.x) + padX;
     nodes.label.y = rect.y + rect.height / 2;
 
     if (row.kind === 'volume') {
@@ -259,6 +322,71 @@ export class SettingsView extends Container {
     nodes.value.y = cy + chipH / 2;
   }
 
+  /**
+   * The row's `?` — the control that explains the setting (a0-77).
+   *
+   * Drawn as the `secondary` chip the −/+ steppers wear, because it **is** a
+   * control and the material has one word for that. It carries no hue: yellow
+   * means ore and red means damage (style-guide §2), and a help affordance is
+   * neither — the same reading the lobby's own `?` takes (`./lobby-view`
+   * `drawHelpControl`), which is the control this one is a second instance of.
+   *
+   * Three states are on it at once and they are deliberately different marks:
+   * the pointer's hover/press ride the plate, an OPEN panel holds the plate down
+   * (so the `?` you are reading from reads as held), and the KEYBOARD focus is a
+   * ring inside the chip's edge. A focus drawn as a hover would tell a player
+   * driving with both hands that the mouse is somewhere it is not.
+   *
+   * Returns the x its chip ENDS at (0 when there was no room to draw one), which
+   * is where the row's label begins.
+   */
+  private drawHelpControl(nodes: RowNodes, row: SettingsRowView, index: number, m: FrameMetrics): number {
+    const rect = this.layout.help[index];
+    const visible = !!rect && rect.width > 0 && rect.height > 0;
+    nodes.help.visible = visible;
+    if (!rect || !visible) return 0;
+
+    // An open panel reads as a held control — `press` outranks whatever the
+    // pointer is doing, because the panel is the louder fact about this chip.
+    const state: PlateState = row.helpOpen ? 'press' : (row.helpState as PlateState);
+    drawPlate(nodes.body, rect.x, rect.y, rect.width, rect.height, 'secondary', 'chip', state);
+
+    if (row.helpFocused) {
+      const inset = Math.max(1, Math.round(FOCUS_RING_INSET * m.plateScale));
+      const width = Math.max(1, Math.round(FOCUS_RING_WIDTH * m.plateScale));
+      nodes.body
+        .rect(rect.x + inset, rect.y + inset, rect.width - 2 * inset, rect.height - 2 * inset)
+        .stroke({ width, color: BONE.hi, alpha: 1 });
+    }
+
+    const px = plateTypeSize(ROW_LABEL_PX, m);
+    nodes.help.text = SETTINGS_HELP_GLYPH;
+    nodes.help.style.fontSize = px;
+    nodes.help.style.fill = MATERIAL_SHADES.bone;
+    nodes.help.x = rect.x + rect.width / 2;
+    nodes.help.y = rect.y + rect.height / 2 + (state === 'press' ? 1 : 0);
+    return rect.x + rect.width;
+  }
+
+  /**
+   * The open explanation, floated over the row it belongs to — or nothing.
+   *
+   * Anchored at the TOP CENTRE of the `?` that opened it and clamped inside the
+   * whole logical viewport by the panel itself (`./codex-hint-view` `show`), so
+   * it sits above the control on a desktop and folds below it on a row near the
+   * top of a short phone screen. The viewport, not the content box: a panel is
+   * allowed the margins the rows are not.
+   */
+  private drawHint(model: SettingsModel): void {
+    const open = model.openHelp;
+    const rect = open ? this.layout.help[open.index] : undefined;
+    if (!open || !rect || rect.width <= 0) {
+      this.hint.hide();
+      return;
+    }
+    this.hint.show(open.hint, rect.x + rect.width / 2, rect.y, this.viewport.width, this.viewport.height);
+  }
+
   /** A volume as filled/empty pips between a − and a + chip. */
   private drawVolume(nodes: RowNodes, row: SettingsRowView, rect: Rect, m: FrameMetrics): void {
     const { minus, plus, bar } = volumeButtons(rect, this.layout.stepper);
@@ -282,12 +410,22 @@ export class SettingsView extends Container {
       node.y = box.y + box.height / 2 + (state === 'press' ? 1 : 0);
     }
 
-    // The pips start after the label's column and run to the steppers. The
-    // measured label is a second bound rather than the only one, so a face that
-    // sets wider than expected still cannot be written over.
-    const column = bar.x + Math.round((ROW.padX + VOLUME_LABEL_COLUMN) * m.plateScale);
+    // The pips start after the label's column and run to the steppers. Three
+    // bounds, in strict precedence:
+    //
+    //   1. the MEASURED label is a hard floor — a face that sets wider than
+    //      expected still cannot be written over (u7-01's first phone golden);
+    //   2. the handoff's fixed column is a preference, taken from where the label
+    //      STARTS (which the `?` moved, a0-77) rather than from the row's edge,
+    //      so it means the same thing it always did;
+    //   3. …and that preference is given up once it would leave the readout under
+    //      {@link PIPS_MIN_WIDTH}, which is the width a phone row now has to
+    //      spend after a thumb-sized `?` and two thumb-sized steppers.
+    const column = nodes.label.x + Math.round(VOLUME_LABEL_COLUMN * m.plateScale);
     const afterLabel = nodes.label.x + nodes.label.width + Math.max(8, Math.round(ROW.padX * m.plateScale));
-    const pipsX = Math.min(Math.max(column, afterLabel), bar.x + bar.width);
+    const barRight = bar.x + bar.width;
+    const roomiest = Math.max(bar.x, barRight - Math.round(PIPS_MIN_WIDTH * m.plateScale));
+    const pipsX = Math.min(Math.max(Math.min(column, roomiest), afterLabel), barRight);
     const pipsW = Math.max(0, bar.x + bar.width - pipsX - PIP_GAP);
     if (pipsW <= 0 || max <= 0) return;
     const gap = Math.max(2, Math.round(PIP_GAP * m.plateScale));
@@ -332,8 +470,14 @@ export class SettingsView extends Container {
     minus.anchor.set(0.5, 0.5);
     const plus = makeText('', FONT_BODY, STEPPER_PX, MATERIAL_SHADES.bone);
     plus.anchor.set(0.5, 0.5);
-    this.addChild(body, label, value, minus, plus);
-    const nodes: RowNodes = { body, label, value, minus, plus };
+    const help = makeText('', FONT_BODY, ROW_LABEL_PX, MATERIAL_SHADES.bone);
+    help.anchor.set(0.5, 0.5);
+    this.addChild(body, label, value, minus, plus, help);
+    // A row's nodes are added lazily, on the frame the row is first drawn — so
+    // the panel, which must float OVER the rows, is pushed back to the top of the
+    // display list each time a slot is built.
+    this.setChildIndex(this.hint, this.children.length - 1);
+    const nodes: RowNodes = { body, label, value, minus, plus, help };
     this.rowNodes[index] = nodes;
     return nodes;
   }

@@ -235,6 +235,8 @@ import {
   parseControlScheme,
   storedControlScheme,
   SETTINGS_ROWS,
+  settingsHelpStep,
+  settingsRowKey,
   createSettings,
   toggleReduceVfx,
   adjustVolume,
@@ -1788,6 +1790,14 @@ async function boot(): Promise<void> {
   // fires on touch; press is released on pointer-up or on a cancelled gesture.
   let pauseSettingsHover: SettingsTarget | null = null;
   let pauseSettingsPress: SettingsTarget | null = null;
+  /** The row whose `?` explanation is open on the PAUSE settings screen, and what
+   *  was open when the press landed (a0-77). The in-match screen is the same
+   *  {@link SettingsView} as the pre-match one, so it draws the same six `?`
+   *  controls — and a drawn control that does nothing is worse than no control,
+   *  which is why the tap is wired here too. The keyboard column is the front-of-
+   *  match screen's only: in a match the arrow keys fly the ship. */
+  let pauseSettingsHelp: number | null = null;
+  let pauseSettingsHelpAtPress: number | null = null;
   // …and the same three states for the two full-screen overlays' own plates
   // (u7-05). Both are made of the material now, and a plate that never lifts under
   // the cursor or sinks under a finger is only two-thirds of the direction.
@@ -3212,6 +3222,11 @@ async function boot(): Promise<void> {
   function handlePausePointer(lx: number, ly: number): void {
     if (pauseScreen === 'settings') {
       const hit = pauseSettings.hitTest(lx, ly);
+      // Tap away dismisses an open explanation, before the tap does anything else
+      // (a0-77 — the lobby's ratified grammar, kept identically on both settings
+      // surfaces so the rule is the game's and not the screen's).
+      pauseSettingsHelpAtPress = pauseSettingsHelp;
+      pauseSettingsHelp = null;
       // The plate goes down before it acts (u7-01), and is released on pointer-up.
       pauseSettingsPress = hit;
       pauseSettingsHover = hit;
@@ -3271,8 +3286,15 @@ async function boot(): Promise<void> {
       case 'back':
         haptics.haptic('tap');
         audio.cue('back');
+        pauseSettingsHelp = null;
         pauseScreen = nextPauseScreen(pauseScreen, 'closeSettings');
         return;
+      case 'help':
+        // Open (or close) the row's explanation. Changes no setting, so nothing
+        // is persisted, nothing reaches the mixer and the match is untouched.
+        pauseSettingsHelp = pauseSettingsHelpAtPress === target.index ? null : target.index;
+        audio.cue(pauseSettingsHelp === null ? 'back' : 'press');
+        break;
       case 'fireMode':
         fireMode = fireMode === FireMode.AutoAim ? FireMode.Manual : FireMode.AutoAim;
         touch.setFireMode(fireMode);
@@ -3354,6 +3376,7 @@ async function boot(): Promise<void> {
         settingsModel(matchSettings, fireMode, controlScheme, controlsDevice({ isTouch, gamepadConnected }), {
           hover: pauseSettingsHover,
           press: pauseSettingsPress,
+          help: pauseSettingsHelp,
         }),
       );
     }
@@ -7699,6 +7722,19 @@ function openMainMenu(
   let menuFocus: MainMenuOption = 'play';
   let settingsHover: SettingsTarget | null = null;
   let settingsPress: SettingsTarget | null = null;
+  /**
+   * Which row's `?` explanation is open, and which row's `?` the keyboard is on
+   * (a0-77). Held here beside the hover and the press because they are the same
+   * kind of fact — what the player is doing to the screen right now — and none of
+   * them is a setting: nothing here is persisted, and closing the screen forgets
+   * both.
+   */
+  let settingsHelp: number | null = null;
+  let settingsHelpFocus: number | null = null;
+  /** The panel that was open when the press LANDED. Any press dismisses the panel
+   *  before it acts (the ratified grammar the lobby's dossier keeps, a0-06), so a
+   *  second press on the same `?` needs to know what it is toggling away from. */
+  let settingsHelpAtPress: number | null = null;
   // The doors and the CODEX joined the Gantry/Bone set in u7-04, so they get the
   // same hover/press routing the title and settings screens have had since u7-01.
   // Both are keyed by a plain string rather than a target object, because a pad of
@@ -7996,9 +8032,21 @@ function openMainMenu(
       kind: SETTINGS_ROWS[i]?.kind ?? 'row',
       physicalCenter: ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2),
     }));
+    // …and every row's `?` (a0-77), keyed by the row it explains — `help:fireMode`,
+    // `help:volume:master`. Reported for the same reason the rows are: a capture or
+    // a live-stage run presses the control the client actually drew, at the point it
+    // drew it, through the landscape-lock remap, rather than through a hit-test seam.
+    const helpReports = settingsRects.help.map((r, i) => {
+      const spec = SETTINGS_ROWS[i];
+      return {
+        kind: spec ? `help:${settingsRowKey(spec)}` : 'help',
+        physicalCenter: ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2),
+      };
+    });
     const back = settingsRects.back;
     seam.settingsControls = [
       ...rowReports,
+      ...helpReports,
       { kind: 'back', physicalCenter: ctx.toPhysical(back.x + back.width / 2, back.y + back.height / 2) },
     ];
 
@@ -8069,7 +8117,7 @@ function openMainMenu(
         fireMode,
         controlScheme,
         controlsDevice({ isTouch, gamepadConnected }),
-        { hover: settingsHover, press: settingsPress },
+        { hover: settingsHover, press: settingsPress, help: settingsHelp, focus: settingsHelpFocus },
       );
       settingsView.update(model);
       // …and report the words it just drew (a0-30). The same model object, so the
@@ -9160,6 +9208,10 @@ function openMainMenu(
 
   function closeSettings(): void {
     screen = 'menu';
+    // The screen is left; the explanation and the focus ring go with it, so
+    // re-opening SETTINGS never re-opens a panel the player closed by leaving.
+    settingsHelp = null;
+    settingsHelpFocus = null;
     render();
   }
 
@@ -9172,6 +9224,17 @@ function openMainMenu(
         ctx.cue('back');
         closeSettings();
         return;
+      case 'help':
+        // The row's `?` (a0-77) — **tap to open, tap again or tap away to
+        // dismiss**, the same grammar the lobby's codex dossier keeps (a0-06) so
+        // a player learns one dismissal rule for the whole game. It changes no
+        // setting, so nothing is toggled, persisted or re-rendered by anyone but
+        // the panel itself; the keyboard focus follows the press, so an arrow
+        // after a tap carries on from the row the finger was on.
+        settingsHelp = settingsHelpAtPress === target.index ? null : target.index;
+        settingsHelpFocus = target.index;
+        ctx.cue(settingsHelp === null ? 'back' : 'press');
+        break;
       case 'fireMode':
         fireMode = fireMode === FireMode.AutoAim ? FireMode.Manual : FireMode.AutoAim;
         platform.storage.set(FIRE_MODE_KEY, fireMode);
@@ -9240,6 +9303,12 @@ function openMainMenu(
       // here, which is exactly the shortcut the ratified flow replaced.
     } else if (screen === 'settings') {
       const hit = settingsView.hitTest(x, y);
+      // **Tap away dismisses** (a0-77, the lobby's rule): any press, anywhere,
+      // closes an open explanation before it does anything else — including a
+      // press on the `?` that opened it, which is why the pre-press state is
+      // remembered for `applySettings` to read.
+      settingsHelpAtPress = settingsHelp;
+      settingsHelp = null;
       settingsPress = hit;
       settingsHover = hit;
       if (hit) applySettings(hit);
@@ -9430,7 +9499,35 @@ function openMainMenu(
       return;
     }
     if (screen === 'settings') {
-      if (e.code === 'Escape') closeSettings();
+      // Escape backs out one level: an open explanation first, then the screen —
+      // the same "one key out, one level at a time" the pause overlay keeps.
+      if (e.code === 'Escape') {
+        if (settingsHelp !== null) {
+          settingsHelp = null;
+          ctx.cue('back');
+          render();
+        } else {
+          closeSettings();
+        }
+        return;
+      }
+      // The `?` controls are a keyboard column of their own (a0-77): the arrows
+      // (or W/S, or Tab) move the focus ring down them and Enter or Space opens
+      // the one it is on. A pointer-only affordance is a desktop-only feature
+      // with extra steps, and the parity principle has no cell for one (GDD
+      // §2.4) — the same reason the menu grew arrow navigation in a0-14.
+      if (e.code === 'ArrowDown' || e.code === 'KeyS' || e.code === 'Tab') {
+        focusSettingsHelp(settingsHelpStep(settingsHelpFocus, 1));
+        e.preventDefault();
+      } else if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+        focusSettingsHelp(settingsHelpStep(settingsHelpFocus, -1));
+      } else if (e.code === 'Enter' || e.code === 'Space') {
+        // Enter with nothing focused yet enters at the first row, so one press
+        // from a cold screen always opens something rather than nothing.
+        const index = settingsHelpFocus ?? 0;
+        settingsHelpAtPress = settingsHelp;
+        applySettings({ kind: 'help', index });
+      }
       return;
     }
     if (screen === 'codex') {
@@ -9455,6 +9552,16 @@ function openMainMenu(
     } else if (e.code === 'Enter' || e.code === 'Space') {
       activateMenu(menuFocus);
     }
+  }
+
+  /** Move the keyboard focus down the settings screen's column of `?` controls
+   *  (a0-77). The ring moves; nothing opens and nothing closes — an explanation
+   *  already up stays up until Enter, Escape or a tap says otherwise. */
+  function focusSettingsHelp(index: number): void {
+    if (settingsHelpFocus === index) return;
+    settingsHelpFocus = index;
+    ctx.cue('hover');
+    render();
   }
 
   /** Move the keyboard focus and light the plate under it — the focused plate

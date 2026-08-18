@@ -13,6 +13,8 @@ import {
   CONTROL_SCHEME_STORAGE,
   DEFAULT_VOLUMES,
   SETTINGS_EYEBROW,
+  SETTINGS_HELP,
+  SETTINGS_HELP_GLYPH,
   SETTINGS_ROWS,
   STICKS_LABELS,
   TAP_COMMANDER_LABEL,
@@ -25,9 +27,12 @@ import {
   sameTarget,
   setReduceVfx,
   setVolume,
+  settingsHelp,
+  settingsHelpStep,
   settingsHitTest,
   settingsLayout,
   settingsModel,
+  settingsRowKey,
   storedControlScheme,
   toggleReduceVfx,
   volumeButtons,
@@ -339,11 +344,14 @@ describe('layout and hit test agree', () => {
   it('flips a toggle from anywhere on its row', () => {
     const layout = settingsLayout(VIEWPORT);
     const fireRow = layout.rows[0]!;
-    // The far-left of the row (the label) still toggles a toggle.
-    expect(settingsHitTest(layout, fireRow.x + 4, center(fireRow).y)).toEqual({ kind: 'fireMode' });
+    // "Anywhere" now means anywhere but the `?` (a0-77): the row's leading square
+    // is a control of its own, exactly as its trailing squares are on a volume
+    // row. Everything from the label rightwards still toggles.
+    const clearOfHelp = (i: number): number => layout.rows[i]!.x + layout.help[i]!.width + 4;
+    expect(settingsHitTest(layout, clearOfHelp(0), center(fireRow).y)).toEqual({ kind: 'fireMode' });
     const controlsIdx = SETTINGS_ROWS.findIndex((r) => r.kind === 'controls');
     const controlsRow = layout.rows[controlsIdx]!;
-    expect(settingsHitTest(layout, controlsRow.x + 4, center(controlsRow).y)).toEqual({ kind: 'controls' });
+    expect(settingsHitTest(layout, clearOfHelp(controlsIdx), center(controlsRow).y)).toEqual({ kind: 'controls' });
     const vfxIdx = SETTINGS_ROWS.findIndex((r) => r.kind === 'reduceVfx');
     const vfxRow = layout.rows[vfxIdx]!;
     expect(settingsHitTest(layout, center(vfxRow).x, center(vfxRow).y)).toEqual({ kind: 'reduceVfx' });
@@ -358,9 +366,11 @@ describe('layout and hit test agree', () => {
 
     expect(settingsHitTest(layout, center(plus).x, center(plus).y)).toEqual({ kind: 'volume', channel, dir: 1 });
     expect(settingsHitTest(layout, center(minus).x, center(minus).y)).toEqual({ kind: 'volume', channel, dir: -1 });
-    // A tap on the bar (left end, clear of the buttons) is inert.
-    expect(hitRect(bar, bar.x + 2, center(bar).y)).toBe(true);
-    expect(settingsHitTest(layout, bar.x + 2, center(bar).y)).toBeNull();
+    // A tap on the bar (clear of the buttons AND of the row's leading `?`) is
+    // inert — the bar is a readout, not a control.
+    const onBar = bar.x + layout.help[idx]!.width + 2;
+    expect(hitRect(bar, onBar, center(bar).y)).toBe(true);
+    expect(settingsHitTest(layout, onBar, center(bar).y)).toBeNull();
   });
 
   it('returns null for a tap off every control', () => {
@@ -429,8 +439,10 @@ describe('short, wide touch viewport (portrait phone under the landscape lock)',
     expect(controls.x + controls.width).toBeLessThanOrEqual(layout.content.x + layout.content.width + 0.5);
     expect(controls.y).toBeGreaterThanOrEqual(layout.content.y - 0.5);
     expect(controls.y + controls.height).toBeLessThanOrEqual(layout.content.y + layout.content.height + 0.5);
-    // A tap anywhere on it flips the scheme — the whole row is live, as on desktop.
-    expect(settingsHitTest(layout, controls.x + 4, center(controls).y)).toEqual({ kind: 'controls' });
+    // A tap anywhere on it flips the scheme — the whole row is live, as on
+    // desktop, from the end of its `?` rightwards (a0-77).
+    const afterHelp = controls.x + layout.help[idx]!.width + 4;
+    expect(settingsHitTest(layout, afterHelp, center(controls).y)).toEqual({ kind: 'controls' });
     expect(settingsHitTest(layout, center(controls).x, center(controls).y)).toEqual({ kind: 'controls' });
   });
 
@@ -456,5 +468,192 @@ describe('short, wide touch viewport (portrait phone under the landscape lock)',
       expect(row.x).toBeGreaterThanOrEqual(insets.left);
       expect(row.x + row.width).toBeLessThanOrEqual(PHONE.width - insets.right + 0.5);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// a0-77 — a `?` on every setting, and the copy behind it
+// ---------------------------------------------------------------------------
+
+describe('a ? on every setting (a0-77)', () => {
+  /**
+   * **The gate.** Not "today's six rows have copy" — that is a fact about today,
+   * and it would still pass on the day a seventh row shipped with nothing behind
+   * its `?`. This walks {@link SETTINGS_ROWS} itself, so the assertion is *every
+   * row the screen draws explains itself*, and a row added later without help
+   * text fails the build rather than shipping silently.
+   *
+   * The type system holds the other half: {@link SETTINGS_HELP} is a `Record`
+   * over the key union derived from `SettingsRowSpec`, so a new row kind cannot
+   * even compile without an entry. This test is what catches the entry that
+   * exists but says nothing, or that says it about the wrong row.
+   */
+  it('every row explains itself', () => {
+    expect(SETTINGS_ROWS.length).toBeGreaterThan(0);
+    const model = settingsModel(createSettings(), FireMode.AutoAim, 'tap', 'touch');
+    expect(model.rows).toHaveLength(SETTINGS_ROWS.length);
+
+    const seen = new Set<string>();
+    for (const [i, spec] of SETTINGS_ROWS.entries()) {
+      const key = settingsRowKey(spec);
+      const help = settingsHelp(spec);
+      const row = model.rows[i]!;
+
+      // There IS an explanation, and it is a sentence rather than a placeholder.
+      expect(help, `row ${key} has help`).toBeTruthy();
+      expect(help.title.trim().length, `row ${key} help has a title`).toBeGreaterThan(0);
+      expect(help.summary.trim().length, `row ${key} help has a summary`).toBeGreaterThan(20);
+
+      // It names the row it belongs to, in the row's OWN words — a panel titled
+      // anything else is a panel a player cannot tie to the control they tapped.
+      expect(help.title, `row ${key} help names its row`).toBe(row.label);
+
+      // …and it is that row's own copy, not a neighbour's pasted across.
+      expect(seen.has(help.summary), `row ${key} help is its own`).toBe(false);
+      seen.add(help.summary);
+
+      // Length is part of clarity (GDD §4.7): the panel is 260px wide, so a
+      // paragraph here is a paragraph nobody reads mid-decision.
+      expect(help.summary.length, `row ${key} help stays brief`).toBeLessThanOrEqual(260);
+
+      // No badges on a settings row: the value chip beside the `?` already shows
+      // the seated value, and a badge would be a second, dimmer copy of it.
+      expect(help.badges).toEqual([]);
+    }
+    // Every key in the register is spoken for by a row — no orphan copy for a
+    // setting the screen no longer has.
+    expect(Object.keys(SETTINGS_HELP).sort()).toEqual(SETTINGS_ROWS.map(settingsRowKey).sort());
+  });
+
+  it('says the two things about the CONTROLS row that the in-match tip says', () => {
+    // a0-33's prompt teaches Tap Commander as "tap … to mine it" / "tap your own
+    // station to bank"; this row's copy has to teach the same gesture, or a
+    // player who read one and then the other has two games to reconcile.
+    const controls = settingsHelp({ kind: 'controls' }).summary;
+    expect(controls).toContain('TAP COMMANDER');
+    expect(controls).toContain('tap a target');
+    expect(controls).toContain('tap your own station');
+    // …and the alternative is described by what the HANDS do, on all three of the
+    // devices whose word the row itself might be showing (u8-01), because naming
+    // just one of them would be wrong on the other two.
+    expect(controls).toContain('WASD');
+    expect(controls).toContain('sticks');
+  });
+
+  it('tells a player that REDUCE VFX also happens on its own', () => {
+    // The half a player cannot account for otherwise: `VfxAutoQuality` engages
+    // the same flag under load (GDD §4.8 risk 5), and somebody watching effects
+    // thin out mid-fight deserves to learn from this screen that nothing broke.
+    const summary = settingsHelp({ kind: 'reduceVfx' }).summary;
+    expect(summary).toMatch(/on its own|by itself|automatically/);
+    expect(summary).toContain('frame rate');
+  });
+
+  it('says what each audio channel covers, including the alarm that ignores SFX', () => {
+    const master = settingsHelp({ kind: 'volume', channel: 'master' }).summary;
+    const sfx = settingsHelp({ kind: 'volume', channel: 'sfx' }).summary;
+    const music = settingsHelp({ kind: 'volume', channel: 'music' }).summary;
+    // The mixer's own routing (`../art/audio/graph`): everything sums into master,
+    // and the under-attack alarm has its own bus so the SFX slider cannot silence
+    // a mechanic on the not-cuttable list.
+    expect(master).toContain('alarm');
+    expect(sfx).toContain('alarm');
+    expect(sfx).toMatch(/not on this channel/);
+    expect(music).toContain('soundtrack');
+  });
+
+  it('gives every row a `?` that is a real touch target, clear of the value and the steppers', () => {
+    for (const [viewport, isTouch] of [
+      [VIEWPORT, false],
+      [{ width: 844, height: 390 }, true], // the landscape phone the goldens use
+      [{ width: 798, height: 384 }, true], // the developer's phone, landscape
+    ] as const) {
+      const layout = settingsLayout(viewport, { isTouch });
+      expect(layout.help).toHaveLength(SETTINGS_ROWS.length);
+      for (const [i, spec] of SETTINGS_ROWS.entries()) {
+        const row = layout.rows[i]!;
+        const help = layout.help[i]!;
+        const where = `${viewport.width}x${viewport.height} row ${settingsRowKey(spec)}`;
+
+        // A control, not a glyph: the thumb floor on both axes, everywhere.
+        expect(help.width, `${where} is thumb-wide`).toBeGreaterThanOrEqual(TOUCH_MIN);
+        expect(help.height, `${where} is thumb-tall`).toBeGreaterThanOrEqual(TOUCH_MIN);
+
+        // Inside its row, on the LEADING edge — the one edge where nothing that
+        // takes a press already lives.
+        expect(help.x).toBe(row.x);
+        expect(help.y).toBeGreaterThanOrEqual(row.y - 0.5);
+        expect(help.y + help.height).toBeLessThanOrEqual(row.y + row.height + 0.5);
+
+        // …and therefore clear of BOTH steppers on a volume row, with the whole
+        // pip bar between them. This is the check the developer's screenshot is
+        // about: at 798x384 the row is 372px and the `?` may not reach the −.
+        const { minus, plus } = volumeButtons(row, layout.stepper);
+        expect(help.x + help.width, `${where} clears the − stepper`).toBeLessThanOrEqual(minus.x);
+        expect(help.x + help.width, `${where} clears the + stepper`).toBeLessThanOrEqual(plus.x);
+
+        // The `?` answers the tap that lands on it, ahead of the row it sits on.
+        expect(settingsHitTest(layout, center(help).x, center(help).y)).toEqual({ kind: 'help', index: i });
+      }
+    }
+  });
+
+  it('opens the tapped row\'s explanation, and only that one', () => {
+    const index = SETTINGS_ROWS.findIndex((r) => r.kind === 'reduceVfx');
+    const model = settingsModel(createSettings(), FireMode.AutoAim, 'tap', 'touch', { help: index });
+    expect(model.openHelp).toEqual({ index, hint: settingsHelp(SETTINGS_ROWS[index]!) });
+    expect(model.rows.filter((r) => r.helpOpen)).toHaveLength(1);
+    expect(model.rows[index]!.helpOpen).toBe(true);
+    // The `?` reads as held while its panel is up.
+    expect(model.rows[index]!.helpState).toBe('rest');
+    // …and with nothing open, nothing is open.
+    expect(settingsModel(createSettings(), FireMode.AutoAim, 'tap', 'touch').openHelp).toBeNull();
+  });
+
+  it('carries the pointer and the keyboard on a `?` as two different marks', () => {
+    const hovered = settingsModel(createSettings(), FireMode.AutoAim, 'tap', 'touch', {
+      hover: { kind: 'help', index: 2 },
+      focus: 4,
+    });
+    expect(hovered.rows[2]!.helpState).toBe('hover');
+    expect(hovered.rows[2]!.helpFocused).toBe(false);
+    expect(hovered.rows[4]!.helpState).toBe('rest');
+    expect(hovered.rows[4]!.helpFocused).toBe(true);
+    // A press outranks a hover on a `?` exactly as it does on a row.
+    const pressed = settingsModel(createSettings(), FireMode.AutoAim, 'tap', 'touch', {
+      hover: { kind: 'help', index: 2 },
+      press: { kind: 'help', index: 2 },
+    });
+    expect(pressed.rows[2]!.helpState).toBe('press');
+  });
+
+  it('compares two help targets by the row they explain', () => {
+    expect(sameTarget({ kind: 'help', index: 1 }, { kind: 'help', index: 1 })).toBe(true);
+    expect(sameTarget({ kind: 'help', index: 1 }, { kind: 'help', index: 2 })).toBe(false);
+    expect(sameTarget({ kind: 'help', index: 1 }, { kind: 'controls' })).toBe(false);
+  });
+
+  it('walks the `?` column with the keyboard, wrapping at both ends', () => {
+    const last = SETTINGS_ROWS.length - 1;
+    // A cold screen enters at the near end, whichever way the first press went,
+    // so one arrow always lands somewhere.
+    expect(settingsHelpStep(null, 1)).toBe(0);
+    expect(settingsHelpStep(null, -1)).toBe(last);
+    expect(settingsHelpStep(0, 1)).toBe(1);
+    expect(settingsHelpStep(last, 1)).toBe(0);
+    expect(settingsHelpStep(0, -1)).toBe(last);
+    // Every row is reachable in one pass — no row is unreachable by keyboard.
+    const seen = new Set<number>();
+    let at = settingsHelpStep(null, 1);
+    for (let i = 0; i < SETTINGS_ROWS.length; i++) {
+      seen.add(at);
+      at = settingsHelpStep(at, 1);
+    }
+    expect(seen.size).toBe(SETTINGS_ROWS.length);
+  });
+
+  it('marks the control with the one glyph the game already uses for "explain this"', () => {
+    // The same mark as the lobby's roster rows (`./lobby` SEAT_HELP_GLYPH, a0-06).
+    expect(SETTINGS_HELP_GLYPH).toBe('?');
   });
 });
