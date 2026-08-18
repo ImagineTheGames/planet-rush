@@ -112,6 +112,24 @@ used to end in a kill now ends in two ships disengaging. Against a human that is
 exactly what was asked for. Bot against bot it reads as mutual disengagement, and
 this is the number to revisit if solo matches turn out too quiet.
 
+The same effect read at the **stations** rather than at the hulls — seeds 1–24,
+8-slot scarce FFA, both builds
+(`evidence/a0-81-fleeing-fire/elimination-probe.ts`):
+
+| | median first elimination | seeds with one inside 120 s | seeds past 240 s |
+|---|---|---|---|
+| pre-a0-81 | 114.1 s | 12 / 24 | 5 / 24 |
+| a0-81 | **148.5 s** | 7 / 24 | **1 / 24** |
+
+Two things there, pointing opposite ways, and the balance crew should have both.
+Matches take ~30% longer to draw first blood at a station. But **the long tail
+collapses**: five seeds used to run past 240 s before anyone was out and now one
+does. A bot that shoots back is also a bot that gets shot, so the sieges that
+used to stall into a stalemate now resolve — the distribution tightens around its
+middle rather than simply sliding right. Neither number is a target; GDD §1's
+10–15 minute match is measured on a *finished* match and every run here is
+capped.
+
 ---
 
 ## Where covering fire applies — and where it deliberately does not
@@ -164,7 +182,7 @@ defect — with one half that was, and is fixed here.**
 
 ---
 
-## Tests, and three documented re-baselines
+## Tests, and five documented re-baselines — two of them outside this lane
 
 **New:** `src/bots/behaviors.test.ts` — `a retreating bot still fires on what is
 chasing it`, plus six cases (the flight is untouched, every tier can, a teammate
@@ -173,9 +191,10 @@ roam/scavenge stay unarmed). **Verified failing on the pre-fix build**:
 `expected null not to be null` (no aim action at all) and `rusty (easy) shoots
 back: expected 0 to be greater than 0`.
 
-Three seed-locked soaks in `src/bots/` are pinned to literals that a deliberate
-behaviour change necessarily moves. **None is relaxed to fit**; each carries the
-before/after measurement in its own note.
+Five seed-locked suites are pinned to literals that a deliberate behaviour change
+necessarily moves. **None is relaxed to fit**; each carries the before/after
+measurement in its own note. Three are in `src/bots/`; the last two are not, and
+are called out for their owners below.
 
 - **`ffa-parity`** — the three golden hashes. Rule 3 in that file forbids
   re-baselining for a *Stage-1 team-aware path leaking into FFA*, and a0-81 is
@@ -198,6 +217,37 @@ before/after measurement in its own note.
   **new absolute assertion on the ally rate (< 5%)** is added beside it, so the
   re-baseline leaves nothing unguarded — that number is untouchable by a combat
   change by construction.
+
+### ⚠️ Two of these are other lanes' files
+
+Both are one-literal edits carrying their reasoning, neither weakens an
+assertion, and both are here because there is no way to hold the literal without
+reverting the feature. Flagging them rather than letting their owners find them
+in a merge:
+
+- **`tests/harness/p1-08-pay.test.ts` — QA Agent.** Fixture seed 9 → 8, in **one
+  case only** (`doubling the placement rung cannot pay the first player out`).
+  This is the single case in that file whose *premise* is a property of the match
+  rather than of the pricer: `MatchAccrual.placement` only reaches `slots` once
+  `world.match.eliminated` is non-empty, so the assertion has nothing to bite on
+  unless somebody is out inside the 120 s probe. That is the elimination-timing
+  table above happening to one fixture — seed 9 went 72.3 s → 200.4 s. **Seed 8
+  replaces it because it clears on *both* builds** (37.7 s before, 46.9 s after,
+  the largest margin either way), so it is not a seed picked for passing on the
+  new code. The arithmetic assertion is untouched and the file's other cases stay
+  at seed 9. Worth noting that this file deliberately pins no pay *number* —
+  *"a test that pinned them would have to be edited by every bot-tree change"* —
+  and that discipline is exactly why a0-81 costs it one seed and nothing else.
+- **`tests/net/online-radio.test.ts` — Netcode Engineer.** The FFA control hash,
+  `53aa6f97` → `a83554a1`. A full world-state hash guarding b2-02's claim that a
+  team radio is unreachable in a free-for-all. Its note defers to `ffa-parity`'s
+  Rule 3, and the answer is the one given there: `coveringFire` branches on
+  `isTargetable` and on nothing about sides, radios or ally lists, so it moves
+  Teams and FFA by the identical mechanism. **The assertions that would actually
+  catch a radio leak are untouched and green** — all three seats read
+  `radio === null` at t0 and again a minute in. That file requires a re-baselined
+  value be measured twice; it was, and it is stable. This is its third
+  re-baseline, after a0-58 and a0-59 — both times for another lane's change.
 
 `npx tsc --noEmit` and `npm test -- --run` both green.
 
