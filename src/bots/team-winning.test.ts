@@ -370,12 +370,37 @@ describe('a 2v2 of the shipped cast always reaches an ending (Task 1.4)', () => 
  * (Seed 16 gives a longer window, 29,971 ticks, but fewer orders, 6; seed 15 more
  * orders, 10, on half the window.) Nothing below was relaxed, added or removed:
  * one number moved, by the measurement this paragraph asks for.
+ *
+ * **And from 13 to 4 when a0-81 landed** (2026-08-17, this lane). a0-81 makes a
+ * retreating, hauling or banking bot fire at whatever is chasing it — movement
+ * intent and fire intent stopped being one decision — so bots trade damage on
+ * ticks they previously did not, break off at different moments, and are
+ * somewhere else when a core goes. Fourth instance of the same fixture
+ * fragility, fourth time the prescribed answer is a re-scan rather than the next
+ * number: seed 13's window collapsed 22,846 → 895 ticks with 0 orders in it.
+ *
+ * Seeds 1–16 re-scanned under the new rules for every quantity asserted below.
+ * The distribution is bimodal exactly as before — eleven of sixteen seeds give
+ * under 3,000 ticks — and **seed 4 is the largest-margin replacement**: a
+ * **3.9-minute window (13,924 ticks, 19,365 units travelled, 1,895 ticks with
+ * the trigger down, 4 orders placed)**, and it resolves as a team result with
+ * zero ghost inputs like every other seed in the scan. (Seed 8 is the runner-up
+ * at 8,172 ticks — more travel and more trigger, fewer orders and half the
+ * window.) Nothing below was relaxed, added or removed.
+ *
+ * One thing the scan is worth reporting for, because it is a real second-order
+ * effect of a0-81 rather than a fixture quirk: **orders placed inside these
+ * windows fell across the whole scan**, from 8 at the old seed to 0–4 anywhere.
+ * A bot that shoots back is a bot whose pursuer breaks off sooner, so bot-vs-bot
+ * matches run less lethal and a survivor spends more of the window flying and
+ * fighting rather than docked and shopping. Measured properly, on full matches
+ * and both builds, in `evidence/a0-81-fleeing-fire/audit.txt`.
  */
 describe('a teammate whose core dies is out, and its side plays on (Task 1.7)', () => {
   it('stops the dead-home bot dead, and its ally plays on for minutes', () => {
     const seats = fillEmptySlots([], 4, [...ROSTER.slice(2), ...ROSTER.slice(0, 2)], [0, 0, 1, 1]);
-    const world = createWorld({ seed: 13, players: botLobby(seats) });
-    const bots = createBots(seats, { seed: 13 });
+    const world = createWorld({ seed: 4, players: botLobby(seats) });
+    const bots = createBots(seats, { seed: 4 });
 
     /** The first slot to lose its home while a teammate still holds one. */
     let downSlot: PlayerId | null = null;

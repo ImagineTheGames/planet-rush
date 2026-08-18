@@ -104,8 +104,30 @@ const CONTROL_SECONDS = 60;
  * guards is untouched and still asserted, and the new value was measured twice.
  * Same rule as above: re-baselined for this reason only; any *other* red still
  * means revert.
+ *
+ * **`53aa6f97` → `a83554a1`, 2026-08-18, a0-81 (Bot lane — flagged for the
+ * Netcode Engineer).** The first of these three that is a change to the BOT
+ * TREES rather than to the sim, so it is the one that has to answer rule 3
+ * head-on instead of pointing at another lane. The rule: a bot's movement intent
+ * and its fire intent are independent, so a retreating, hauling or banking bot
+ * shoots at a hostile in range on the same terms a player has — ratified off the
+ * developer's *"when rusty was fleeing from me he could have auto fired at me
+ * but instead he didnt … thats what i would do"* (brief a0-81; audit in
+ * `evidence/a0-81-fleeing-fire/audit.txt`).
+ *
+ * **Why this is not the thing rule 3 forbids.** Rule 3 catches a *team-aware
+ * path reachable in FFA*: FFA is teams-of-one, so a branch that needs allies must
+ * be unreachable there, and a moved hash is the proof it was reached. Nothing in
+ * a0-81 is team-aware. The new `coveringFire` branches on `isTargetable` — the
+ * single `hostile` stamp, true for every ship on an FFA board — and on nothing
+ * about sides, radios or ally lists. It moves Teams and FFA by the identical
+ * mechanism, which is what the two entries above are and the opposite of a leak.
+ * What this literal actually guards is untouched and still asserted: the three
+ * seats still read `radio === null` at t0 and a minute in, and `send` on a null
+ * channel still draws no random number. New value measured twice, stable. Same
+ * rule as above: any *other* red still means revert.
  */
-const FFA_GOLDEN = '53aa6f97';
+const FFA_GOLDEN = 'a83554a1';
 
 /** A socket the room can write to. This file asserts on the room's own state and
  *  on its bots, never on what a client was told, so nothing is kept. */
