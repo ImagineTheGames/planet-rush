@@ -44,16 +44,29 @@
  *   three exports with no production caller — exactly the shape
  *   `npm run dark-matter:check` gates on in CI. They are three lines each and are
  *   reproduced below VERBATIM; the port will use the originals.
+ *
+ * ## a0-86 — every candidate is now TWO options, and the difference is colour
+ *
+ * The developer asked why an explosion in this game is only ever blue. It is a
+ * fair question with a real answer for yellow (ore) and no answer at all for red
+ * (danger, which is what an explosion is), so each of the nineteen now appears
+ * twice: `<id>-C` in the cold register it was authored in, and `<id>-R` in the
+ * ember register. **The candidate list below did not change** — not one number,
+ * not one particle. A red twin is the SAME `emit` function, off the SAME seed,
+ * run into a `HeatPool` (`./heat`) that moves the colour column as it passes.
+ * That is what makes the board's variable colour ALONE: motion cannot drift
+ * between two twins, because there is only one copy of it.
  */
 
-import { ShipClass, type Rng } from '@shared/types';
+import { ShipClass, mulberry32, type Rng } from '@shared/types';
 import { asteroidSprite } from '../../src/art/asteroids';
 import { shipSprite } from '../../src/art/ships';
 import { stationSprite } from '../../src/art/stations';
 import type { SpriteDef } from '../../src/art/shapes';
 import { asteroidBurst, explosion, ring, stationDeath } from '../../src/art/vfx/emitters';
 import { PARTICLE, particleKind } from '../../src/art/vfx/kinds';
-import type { ParticlePool } from '../../src/art/vfx/particles';
+import { ParticlePool } from '../../src/art/vfx/particles';
+import { HeatPool, heatDiffers } from './heat';
 import { VFX_SHOWCASE_DT } from '../../src/art/vfx/showcase';
 import { ASTEROID, SHIP_RADIUS, STATION } from '../../src/sim/constants';
 
@@ -748,6 +761,8 @@ export interface Family {
   readonly title: string;
   /** What the developer is being asked about this family. */
   readonly ask: string;
+  /** What the colour round means for THIS family, in particular (a0-86). */
+  readonly heatNote: string;
   /** Half the frame's world extent, world units. */
   readonly half: number;
   /** The reference body's shipped sprite and its shipped radius. */
@@ -766,6 +781,10 @@ export const FAMILIES: Family[] = [
     ask:
       'A ship is cheap and respawns free, so this one is allowed to be quick and bright. ' +
       'The variable is the balance of flare, sparks, shards and smoke.',
+    heatNote:
+      'Every ship candidate has real light in it — a flare, a shockwave, embers, sparks — so every ' +
+      'red twin here is a genuinely different frame. This is the family where the question was ' +
+      'asked and it is the family with the most to say back.',
     half: 150,
     ref: shipSprite({ shipClass: ShipClass.Vanguard, playerId: 0 }),
     refRadius: SHIP_RADIUS,
@@ -780,6 +799,12 @@ export const FAMILIES: Family[] = [
       'and nobody jokes — and the shipped effect says in its own comment that it is "deliberately not a ' +
       'firework". Four of the five candidates keep that stance and vary weight and duration instead. ' +
       'L is the one that does not, and it is here so the departure is something you decline on purpose.',
+    heatNote:
+      'A station death is mostly mass: shards, smoke and a shockwave. So the red twins of G, H and I ' +
+      'move a handful of embers and the wave, and J and K — the two candidates whose whole character ' +
+      'is that NOTHING burns — have only their wave to repaint. If red reads as heat, a red wave on ' +
+      'an implosion may be exactly the heat those two were written to refuse; that is worth looking ' +
+      'at rather than assuming.',
     half: 320,
     ref: stationSprite(1, 0),
     refRadius: STATION_R,
@@ -794,6 +819,15 @@ export const FAMILIES: Family[] = [
       'Every candidate here leads with dust: slow, low-alpha cloud that hangs and drifts, chips as an accent, ' +
       'and the ore glints kept, because the payout is why anyone shot the rock. Six candidates, not five — ' +
       'this is the family with the most room in it.',
+    heatNote:
+      'YOUR DUST DIRECTION IS ABOUT MATERIAL, NOT HEAT, AND THE MAP AGREES WITH IT. A rock is not on ' +
+      'fire: there is no fuel and no oxygen, and the thing coming off it is powdered stone. The ' +
+      'treatment repaints LIGHT — plasma into threat red — and five of these seven candidates ' +
+      'contain no light at all, so their red twin comes back identical, particle for particle. Only ' +
+      'M and Q have a shockwave ring, and that ring is the only thing red can reach here. That is ' +
+      'the argument, and it is made by the map rather than by this paragraph: if you want warmth in ' +
+      'a rock burst it has to come from a new particle, not from a recolour, and the honest place ' +
+      'for it would be the hit that broke the rock rather than the dust that followed.',
     half: 100,
     ref: asteroidSprite({ seed: 7, crackStage: 2 }),
     refRadius: ROCK_R,
@@ -806,3 +840,67 @@ export const FAMILIES: Family[] = [
     candidates: ASTEROIDS,
   },
 ];
+
+// ---------------------------------------------------------------------------
+// Treatments — the colour round (a0-86)
+// ---------------------------------------------------------------------------
+
+/**
+ * One colour treatment of a candidate. Two of these times nineteen candidates is
+ * the thirty-eight options the board now offers.
+ *
+ * The pair exists because the developer's question was about colour and the
+ * board could only answer about motion. Splitting the two apart is the whole
+ * design: a red twin is not a new candidate, it is the same candidate with the
+ * cold-energy register mapped into the ember register on the way to the GPU
+ * (`./heat`). Nothing else can differ, because nothing else has a second copy.
+ */
+export interface Treatment {
+  /** Suffix on the option id — `A-C`, `A-R`. A verdict names one of these. */
+  readonly key: 'C' | 'R';
+  /** What the panel is labelled. */
+  readonly label: string;
+  /** One line of why, on the panel itself. */
+  readonly line: string;
+  /** True for the ember register — the only difference between the two. */
+  readonly heat: boolean;
+}
+
+export const TREATMENTS: readonly Treatment[] = [
+  {
+    key: 'C',
+    label: 'COLD',
+    line: 'Plasma — the register every effect in the game is authored in today.',
+    heat: false,
+  },
+  {
+    key: 'R',
+    label: 'RED',
+    line: 'Threat red, brightening toward WHITE — the same light, in the danger register.',
+    heat: true,
+  },
+];
+
+/** The id a verdict names: the candidate's letter plus its colour suffix. */
+export function optionId(candidate: Candidate, treatment: Treatment): string {
+  return `${candidate.id}-${treatment.key}`;
+}
+
+/** A fresh pool of the right kind for a treatment. The candidate never knows. */
+export function poolFor(treatment: Treatment): ParticlePool {
+  return treatment.heat ? new HeatPool(LAB_POOL_CAPACITY) : new ParticlePool(LAB_POOL_CAPACITY);
+}
+
+/**
+ * Particles this candidate's red twin actually repaints.
+ *
+ * **Zero is a real answer and the board prints it.** Five of the seven asteroid
+ * candidates are rock dust, rock chips and ore glints — no light anywhere in
+ * them — so the map has nothing to reach and the two panels are identical frame
+ * for frame. That is the asteroid family's answer to "can you argue warmth
+ * here", arrived at mechanically rather than asserted: rock is not on fire, and
+ * a treatment keyed on the colour of LIGHT cannot pretend otherwise.
+ */
+export function heatMoved(candidate: Candidate): number {
+  return heatDiffers((pool) => candidate.emit(pool, mulberry32(SEED)));
+}
