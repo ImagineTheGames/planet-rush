@@ -221,9 +221,11 @@ per-pixel bill on every frame; this pays it once per resize.
   over everything, and the developer's ask was for the sky to persist
   PAST it, which it now does.
 
-Found and fixed on the way past, in one line, because the teardown list
-was right there: `hangarView` was added to the shell root at a0-14 and
-never removed or destroyed with the rest.
+Found and fixed on the way past, in two lines, because both lists were
+right there: `hangarView` was added to the shell root at a0-14 and appears
+in NEITHER `relayout()` nor `teardown()`. So the fourth door outlived the
+shell that owned it, and it never re-laid-out on a rotation — the exact
+failure the M1 field report caught on the menu itself. It joins both.
 
 
 §6. A THING THE GOLDEN GATE CANNOT SEE — found on the way past

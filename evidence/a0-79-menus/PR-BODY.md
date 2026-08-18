@@ -181,9 +181,11 @@ per resize.
 - **The title gate's own canvas star field.** It is a DOM overlay that seals over
   everything, and the ask was for the sky to persist *past* it, which it now does.
 
-Found and fixed on the way past, one line, because the teardown list was right
-there: `hangarView` was added to the shell root at a0-14 and never removed or
-destroyed with the rest.
+Found and fixed on the way past, two lines, because both lists were right there:
+`hangarView` was added to the shell root at a0-14 and appears in neither
+`relayout()` nor `teardown()`. So the fourth door outlived the shell that owned
+it, **and it never re-laid-out on a rotation** — the exact failure the field
+report caught on the menu itself (M1: rotate, menu stranded). It joins both.
 
 ## Held by
 
