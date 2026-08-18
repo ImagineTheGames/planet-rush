@@ -44,13 +44,30 @@
  * lab that ran differently on a 144 Hz monitor would approve one effect on the
  * developer's machine and a different one on the agent's.
  *
+ * ## a0-86 — two panels per candidate, one motion, one texture set apart
+ *
+ * The colour round doubles the panels and doubles nothing else. Each candidate
+ * gets a cold `Live` and a red one; the red one's pool is a `HeatPool` (`./heat`)
+ * that maps the colour column as the candidate's own emit code writes into it,
+ * and its `VfxLayer` is built over a SECOND {@link SpriteTextureCache} that was
+ * seeded with the warm looks before the layer asked for them.
+ *
+ * That second cache is the whole mechanism, and it is worth being plain about
+ * why it is a cache rather than a flag: `VfxLayer` bakes a kind's texture through
+ * `cache.getBy('vfx:<name>:<size>', …)`, and `getBy` builds only on a miss. Seed
+ * the key and the layer picks up the warm texture without a line of `src/`
+ * changing and without the lab drawing particles by any path but the game's own.
+ * Two caches, not one, because the cold panel beside it must still get the cold
+ * texture under that same key.
+ *
  * ## The DOM contract
  *
  * `../make-explosion-lab.ts` writes the markup this file binds to, from the same
  * `FAMILIES` array, and a mismatch throws rather than silently animating the
  * wrong panel:
  *
- *   `[data-live-cand="<id>"][data-live-fam="<key>"]`  one candidate's canvas
+ *   `[data-live-cand="<id>"][data-live-fam="<key>"]`  one candidate's CARD
+ *   `[data-live-treat="C"|"R"]`                       one treatment's panel in it
  *   `[data-act="play"|"replay"]`                      inside that candidate's card
  *   `[data-live-family="<key>"]`                      the family transport bar
  *   `[data-act="play-family"|"stop-family"|"loop"]`   inside that bar
@@ -64,16 +81,28 @@ import { Container, Sprite, autoDetectRenderer, type Renderer } from 'pixi.js';
 import { mulberry32 } from '@shared/types';
 import { FLOOR } from '../../src/art/tokens';
 import { SpriteTextureCache } from '../../src/art/textures';
-import { VfxLayer } from '../../src/art/vfx/layer';
-import { ParticlePool } from '../../src/art/vfx/particles';
+import { PARTICLE_KINDS } from '../../src/art/vfx/kinds';
+import { PARTICLE_TEXTURE_PX, VfxLayer } from '../../src/art/vfx/layer';
+import type { ParticlePool } from '../../src/art/vfx/particles';
 import { VFX_SHOWCASE_DT } from '../../src/art/vfx/showcase';
-import { FAMILIES, LAB_POOL_CAPACITY, REF_ALPHA, SEED, type Candidate, type Family } from './candidates';
+import { HEAT_SPRITES } from './heat';
+import {
+  FAMILIES,
+  REF_ALPHA,
+  SEED,
+  TREATMENTS,
+  optionId,
+  poolFor,
+  type Candidate,
+  type Family,
+  type Treatment,
+} from './candidates';
 
 /** Logical pixels across one live canvas. Every family uses the same box, so a
  *  comparison between two candidates is a comparison of the effects and not of
  *  the frames they were given. World extent per family still differs — that is
  *  what makes the scale true. */
-const LIVE_PX = 440;
+const LIVE_PX = 400;
 
 /** The device-pixel-ratio clamp the client itself uses (`src/main.ts`). Applied
  *  to the renderer, to the baked textures, and to every panel's backing store,
@@ -98,16 +127,16 @@ const MAX_STEPS = 16;
  *  effect that snapped straight back would read as part of the effect. */
 const LOOP_HOLD = 0.55;
 
-/** One candidate, wired to its canvas and its own pool. */
+/** One candidate in one treatment, wired to its canvas and its own pool. */
 interface Live {
   readonly family: FamilyState;
   readonly candidate: Candidate;
+  readonly treatment: Treatment;
   /** The candidate's card in the page — the scope every control is found in. */
   readonly card: HTMLElement;
   readonly canvas: HTMLCanvasElement;
   readonly ctx: CanvasRenderingContext2D;
   readonly clock: HTMLElement | null;
-  readonly playButton: HTMLElement | null;
   /** The scene this candidate renders: ruler body, then the real VFX layer. */
   readonly stage: Container;
   readonly layer: VfxLayer;
@@ -119,6 +148,19 @@ interface Live {
   acc: number;
   /** Real seconds the pool has been empty — the loop's rest interval. */
   dead: number;
+}
+
+/**
+ * One candidate's two treatments and the transport they share.
+ *
+ * The transport is per candidate rather than per panel on purpose: the round is
+ * a colour comparison, and two colours played one after the other are one colour
+ * played against a memory of the other. Both fire on the same instant.
+ */
+interface Pair {
+  readonly card: HTMLElement;
+  readonly playButton: HTMLElement | null;
+  readonly members: Live[];
 }
 
 /** One family's shared transport state. */
@@ -148,20 +190,39 @@ async function boot(): Promise<void> {
 
   // The client's own cache, at the client's own device-pixel-ratio clamp
   // (`src/main.ts`). Eleven particle textures and three reference bodies, baked
-  // once between all nineteen panels.
+  // once between all nineteen candidates.
   const cache = new SpriteTextureCache(renderer, resolution);
+  // And the red one. `VfxLayer` bakes a kind through `getBy('vfx:<name>:<size>')`
+  // and `getBy` builds only on a miss, so seeding those keys with the warm looks
+  // is all it takes for the layer to draw the ember register — no fork of the
+  // draw path, no branch in `src/`, the same eleven kinds through the same code.
+  const heatCache = new SpriteTextureCache(renderer, resolution);
+  for (const spec of PARTICLE_KINDS) {
+    const warm = HEAT_SPRITES[spec.kind];
+    if (warm) heatCache.getBy(`vfx:${spec.name}:${PARTICLE_TEXTURE_PX}`, () => warm, PARTICLE_TEXTURE_PX);
+  }
+
   const states: FamilyState[] = [];
+  const pairs: Pair[] = [];
 
   for (const family of FAMILIES) {
     const state: FamilyState = { family, loop: false, members: [] };
     for (const candidate of family.candidates) {
-      state.members.push(wire(state, candidate, cache));
+      const members = TREATMENTS.map((treatment) =>
+        wire(state, candidate, treatment, treatment.heat ? heatCache : cache, cache),
+      );
+      const card = members[0]?.card;
+      if (!card) throw new Error(`explosion lab: no treatments for ${family.key}/${candidate.id}`);
+      state.members.push(...members);
+      pairs.push({ card, playButton: card.querySelector<HTMLElement>('[data-act="play"]'), members });
     }
     bindFamily(state);
     states.push(state);
   }
 
   const all = states.flatMap((s) => s.members);
+  /** A panel's card → the pair it belongs to, for the shared transport. */
+  const pairOf = new Map<HTMLElement, Pair>(pairs.map((p) => [p.card, p]));
   let raf = 0;
   let last = 0;
 
@@ -230,6 +291,15 @@ async function boot(): Promise<void> {
         ? `${live.t.toFixed(2)}s · ${live.pool.count}p`
         : 'ready';
     }
+    label(live);
+  };
+
+  /** A pair's button says what pressing it will do, whichever panel is running. */
+  const label = (live: Live): void => {
+    const pair = pairOf.get(live.card);
+    if (!pair?.playButton) return;
+    const any = pair.members.some((m) => m.playing);
+    pair.playButton.textContent = any ? '❚❚ Pause both' : '▶ Play both';
   };
 
   /** (Re-)fire a candidate from t = 0 on a fresh stream off the same seed. */
@@ -240,7 +310,6 @@ async function boot(): Promise<void> {
     live.acc = 0;
     live.dead = 0;
     live.playing = true;
-    if (live.playButton) live.playButton.textContent = '❚❚ Pause';
     paint(live);
     pump();
   };
@@ -249,7 +318,7 @@ async function boot(): Promise<void> {
   const halt = (live: Live): void => {
     live.playing = false;
     live.acc = 0;
-    if (live.playButton) live.playButton.textContent = '▶ Play';
+    label(live);
     if (live.clock) {
       // Paused and finished are different states and the readout says which:
       // "end" against a frame that still has particles in it would be a lie
@@ -270,19 +339,33 @@ async function boot(): Promise<void> {
     live.ctx.drawImage(renderer.canvas as CanvasImageSource, 0, 0);
   };
 
-  for (const live of all) {
-    // Play/Pause on the candidate, Replay always from t = 0 — two viewings of
-    // one candidate have to be identical for a comparison to be a comparison.
-    live.playButton?.addEventListener('click', () => {
-      if (live.playing) halt(live);
-      else if (live.pool.count > 0) {
-        live.playing = true;
-        if (live.playButton) live.playButton.textContent = '❚❚ Pause';
-        pump();
-      } else start(live);
+  /** Resume a paused panel without re-emitting — Play after Pause is not Replay. */
+  const resume = (live: Live): void => {
+    if (live.pool.count > 0) {
+      live.playing = true;
+      label(live);
+      pump();
+    } else start(live);
+  };
+
+  for (const pair of pairs) {
+    // Play/Pause acts on BOTH treatments at once, so the two colours are always
+    // on the same frame of the same motion; Replay always goes back to t = 0.
+    // Two viewings of one option have to be identical for a comparison to be a
+    // comparison, and two panels have to be simultaneous for the same reason.
+    pair.playButton?.addEventListener('click', () => {
+      if (pair.members.some((m) => m.playing)) for (const m of pair.members) halt(m);
+      else for (const m of pair.members) resume(m);
     });
-    live.card.querySelector('[data-act="replay"]')?.addEventListener('click', () => start(live));
-    // "Click it and that one plays" — the canvas is the biggest target there is.
+    pair.card.querySelector('[data-act="replay"]')?.addEventListener('click', () => {
+      for (const m of pair.members) start(m);
+    });
+  }
+
+  for (const live of all) {
+    // "Click it and that one plays" — the canvas is the biggest target there is,
+    // and it is the one control that acts on a SINGLE option, which is how a
+    // verdict takes a second look at exactly the one it is about to name.
     live.canvas.addEventListener('click', () => {
       if (live.playing) halt(live);
       else start(live);
@@ -311,17 +394,33 @@ async function boot(): Promise<void> {
   document.body.dataset['live'] = 'on';
 }
 
-/** Build one candidate's panel: canvas, scene, pool, and the ruler body. */
-function wire(state: FamilyState, candidate: Candidate, cache: SpriteTextureCache): Live {
+/**
+ * Build one option's panel: canvas, scene, pool, and the ruler body.
+ *
+ * `cache` is the treatment's own texture cache — cold or red — and `refCache` is
+ * always the cold one, because the reference body is a RULER. Warming the ship
+ * you are measuring against would put the treatment on both sides of the
+ * comparison.
+ */
+function wire(
+  state: FamilyState,
+  candidate: Candidate,
+  treatment: Treatment,
+  cache: SpriteTextureCache,
+  refCache: SpriteTextureCache,
+): Live {
   const key = state.family.key;
+  const id = optionId(candidate, treatment);
   const card = document.querySelector<HTMLElement>(
     `[data-live-cand="${candidate.id}"][data-live-fam="${key}"]`,
   );
-  if (!card) throw new Error(`explosion lab: no panel for ${key}/${candidate.id}`);
-  const canvas = card.querySelector('canvas');
-  if (!canvas) throw new Error(`explosion lab: no canvas for ${key}/${candidate.id}`);
+  if (!card) throw new Error(`explosion lab: no card for ${key}/${candidate.id}`);
+  const box = card.querySelector<HTMLElement>(`[data-live-treat="${treatment.key}"]`);
+  if (!box) throw new Error(`explosion lab: no ${treatment.key} panel for ${key}/${id}`);
+  const canvas = box.querySelector('canvas');
+  if (!canvas) throw new Error(`explosion lab: no canvas for ${key}/${id}`);
   const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error(`explosion lab: no 2d context for ${key}/${candidate.id}`);
+  if (!ctx) throw new Error(`explosion lab: no 2d context for ${key}/${id}`);
   // Backing store at the same resolution the renderer draws at, so the blit is
   // a straight copy: `drawImage(source, 0, 0)` with no scale and no resample.
   canvas.width = Math.round(LIVE_PX * RESOLUTION);
@@ -339,7 +438,7 @@ function wire(state: FamilyState, candidate: Candidate, cache: SpriteTextureCach
   // fraction of its own unit radius the art reaches to (1.95 for a station,
   // whose boom leaves the body) — so unit radius 1 lands on `refRadius` world
   // units at a scale of 2·r·extent / REF_TEX_PX.
-  const ref = new Sprite(cache.get(state.family.ref, REF_TEX_PX));
+  const ref = new Sprite(refCache.get(state.family.ref, REF_TEX_PX));
   ref.anchor.set(0.5);
   ref.scale.set((2 * state.family.refRadius * state.family.ref.extent) / REF_TEX_PX);
   ref.alpha = state.family.refAlpha ?? REF_ALPHA;
@@ -350,14 +449,14 @@ function wire(state: FamilyState, candidate: Candidate, cache: SpriteTextureCach
   return {
     family: state,
     candidate,
+    treatment,
     card,
     canvas,
     ctx,
-    clock: card.querySelector<HTMLElement>('.clock'),
-    playButton: card.querySelector<HTMLElement>('[data-act="play"]'),
+    clock: box.querySelector<HTMLElement>('.clock'),
     stage,
     layer,
-    pool: new ParticlePool(LAB_POOL_CAPACITY),
+    pool: poolFor(treatment),
     playing: false,
     t: 0,
     acc: 0,
@@ -375,7 +474,11 @@ function bindFamily(state: FamilyState): void {
 
 boot().catch((err: unknown) => {
   // The filmstrips are plain SVG and are already on the page, so a failure here
-  // degrades to the a0-63 board rather than to six dead rectangles.
+  // degrades to the a0-63 board rather than to six dead rectangles. a0-86 folded
+  // them into a closed `<details>` — thirty-eight strips open at once is a page
+  // nobody can scroll — so the fallback has to open them again, or the degraded
+  // board would be a list of summaries.
+  for (const d of document.querySelectorAll('details.stills')) (d as HTMLDetailsElement).open = true;
   document.body.dataset['live'] = 'off';
   const why = document.querySelector('#live-error');
   if (why) why.textContent = String(err instanceof Error ? err.message : err);

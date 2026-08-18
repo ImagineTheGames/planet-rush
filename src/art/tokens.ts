@@ -170,7 +170,7 @@ export const MATERIALS = {
   ice: {
     bases: ['plasma'],
     reads:
-      'The cold cutting-torch blue: the plasma torch, cockpit glass, shield sheen and the frost veins on an ice-cored asteroid. Also the register the steel-blue ocean sits in. Energy reads cold here — never a warm spark.',
+      'The cold cutting-torch blue: the plasma torch, cockpit glass, shield sheen and the frost veins on an ice-cored asteroid. Also the register the steel-blue ocean sits in. Energy reads cold here — never a warm spark. NARROWED 2026-08-18 (a0-86, style-guide §2.3): that is a rule about the light of things WORKING — shields, the torch, ore pickup, thrusters, spawn, build, repair. The light of a thing being DESTROYED belongs to ember below, because destruction is danger and danger is what red already means.',
     shades: [
       { hex: 0xdff4ff, where: 'Bright inner pass of the plasma torch' },
       { hex: 0xc6cdd6, where: 'Cold off-white ("bone"): rail barrels, wreck struts, HUD text and HP-bar frames' },
@@ -181,7 +181,7 @@ export const MATERIALS = {
   ember: {
     bases: ['signalYellow', 'threatRed'],
     reads:
-      'The two warm signals, both load-bearing: signal yellow = ore and the station core ("this matters"), threat red = damage, alarm and enemy fire ("this hurts"). Warmth is rationed to meaning — there is no decorative amber in Cold Vacuum (both hues are RESERVED, §2).',
+      'The two warm signals, both load-bearing: signal yellow = ore and the station core ("this matters"), threat red = damage, alarm and enemy fire ("this hurts") — and, since a0-86, DESTRUCTION, which is the same state seen at the end of it: an explosion may burn red (style-guide §2.3). Warmth is rationed to meaning — there is no decorative amber in Cold Vacuum (both hues are RESERVED, §2), and red brightens toward WHITE and never toward yellow, because a red that brightens through orange arrives at ore.',
     shades: [
       { hex: 0xfff6c8, where: 'The hot lit centre of the station core' },
       { hex: 0xffd9d3, where: 'Bright inner pass of enemy-fire / the alarm tell' },

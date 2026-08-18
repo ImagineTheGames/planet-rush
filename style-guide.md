@@ -141,7 +141,9 @@ either drifts by a rounding:
   Every misuse spends that trust. Treat yellow as a controlled substance.
 
 Threat red `#B23A3A` carries the danger half of the same discipline: it is
-damage, alarm, and enemy fire only — never a neutral or friendly accent.
+damage, alarm, and enemy fire only — never a neutral or friendly accent. Note the
+shape of that sentence: red is reserved to a **state**, not to a faction, and
+**destruction is that state** — see §2.3.
 
 ### 2.1 The cost-numeral carve-out — one exception, stated in both colours *(amended 2026-08-06 — the ratified Gantry/Bone build wheel, u7-02; **scope clarified 2026-08-06 by u7-06 — it covers BOTH wheels**; see `docs/design/gantry-bone-handoff.md` and GDD §2.5)*
 
@@ -254,6 +256,59 @@ maps took NONE, Coalsack, Patina Drift and Plasma Reef, none of which spends a
 reserved hue at all. Iron Veil and Deep Ember waited in the registry for the maps
 `a0-12` is building, which gives the Director a clean seam to veto this section
 on before a single shipped frame depends on it.
+
+### 2.3 Destruction may burn red — and nothing may burn ore-yellow *(added 2026-08-18, a0-86 — the developer, on the explosion lab; `src/art/vfx/kinds.test.ts` enforces the second half)*
+
+The developer, looking at nineteen candidate explosions that were all cold blue:
+
+> *"they all lack explosion colors like yellow, and red, is there a reason they
+> dont have that? is space explosions only blue, whats the thought process
+> there?"* — and, given the RESERVED rule: *"what about red. we already use red
+> for enemies and red can also mean death aka explosion 💥"*
+
+**They are right, and the ruling is theirs.** Threat red is not a roster identity
+colour and it is not "the enemy's colour" — §2 reserves it to a STATE, danger,
+which is why enemy fire (`shotEnemy1/2/3`), damage fills and alarm rings all wear
+it without ambiguity. A ship, station or turret coming apart is a danger event.
+Red on an explosion is therefore not a second meaning smuggled into a reserved
+hue; **it is the meaning that hue already carries.**
+
+So the rule, in one line each way:
+
+> **Destruction may burn red. Nothing may burn ore-yellow.**
+
+- **Destruction** — ship, station, turret, and whatever the asteroid family
+  becomes — may build on `threatRed` and its declared shades, i.e. the `ember`
+  material's own bases (`tokens.ts` `MATERIALS.ember`).
+- **Energy that is not destruction stays cold.** Shields, the mining torch, ore
+  pickup, thrusters, spawn glow, build and repair: *"Energy reads cold here —
+  never a warm spark"* (`MATERIALS.ice`). That line was never a rule about all
+  light; it is a rule about the light of things **working**. This section is the
+  narrowing, and it narrows nothing else — §2 and §2.1 and §2.2 are untouched.
+- **Yellow does not move, at any brightness.** Ore is what a player scans a field
+  for continuously. `kinds.ts` says it plainly: *"a spark that quietly went
+  signal yellow fails CI rather than teaching a player that yellow means
+  something other than ore."*
+
+**The trap, and it is the whole reason this section names a mechanism.** The
+obvious way to make a red explosion brighter is to slide it toward orange — and
+orange is one mix step from ore, so a red that brightens that way lands on ore's
+colour at the exact moment the effect is biggest and brightest. `palette.ts`
+already runs red hot **toward WHITE** and says *"never yellow"* twice; threat red
+is `#B2`**`3A3A`**, so mixing toward white adds equally to green and blue and the
+whole ramp keeps `G === B`. A colour on that axis cannot be ore at any
+brightness.
+
+`src/art/vfx/kinds.test.ts` (`no explosion particle lands on ore yellow`) holds
+it mechanically, and measures the thing that actually goes wrong — not "is this
+signal yellow", which nobody would fail, but **how far along the road to ore a
+colour has travelled**, ceiling derived from `YELLOW_FAMILY`'s own reading. The
+roster's orange `#ff8a3d` is ΔE 46 from the nearest ore shade and 40% of the way
+to it by direction; it passes on distance and fails on direction, which is the
+case the gate exists for.
+
+Nothing is shipped red yet. `docs/art-direction/explosion-lab.html` puts both
+registers side by side, per candidate, and the developer picks.
 
 ---
 

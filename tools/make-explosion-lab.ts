@@ -81,18 +81,23 @@ import { shapeToSvg, spriteToGroup } from '../src/art/svg';
 import { FLOOR } from '../src/art/tokens';
 import type { SpriteDef } from '../src/art/shapes';
 import { fadeAt, PARTICLE_KINDS, particleKind, particleSprite } from '../src/art/vfx/kinds';
-import { ParticlePool } from '../src/art/vfx/particles';
+import type { ParticlePool } from '../src/art/vfx/particles';
 import { VFX_SHOWCASE_DT } from '../src/art/vfx/showcase';
+import { HEAT_SPRITES, WARMED_KIND_NAMES, heatColor } from './explosion-lab/heat';
 import {
   ALPHA_FLOOR,
   FAMILIES,
   FRAME_STEPS,
   FRAME_TIMES,
-  LAB_POOL_CAPACITY,
   REF_ALPHA,
   SEED,
+  TREATMENTS,
+  heatMoved,
+  optionId,
+  poolFor,
   type Candidate,
   type Family,
+  type Treatment,
 } from './explosion-lab/candidates';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -127,8 +132,12 @@ const OUTPUTS = [
 const SIZE_BUDGET = 4_000_000;
 
 /** Logical pixels across one live canvas. Mirrors `LIVE_PX` in the runtime — the
- *  CSS box and the backing store have to agree, and the runtime owns the store. */
-const LIVE_PX = 440;
+ *  CSS box and the backing store have to agree, and the runtime owns the store.
+ *  a0-86 took it from 440 to 400 so that a cold panel and its red twin fit side
+ *  by side in one row: two effects a developer has to scroll between are two
+ *  effects they are comparing from memory, which is the thing this round exists
+ *  to avoid. Below ~900 px of viewport the pair wraps and stacks instead. */
+const LIVE_PX = 400;
 
 // ---------------------------------------------------------------------------
 // Simulate — the real pool, the real update loop, a fixed timestep
@@ -144,9 +153,9 @@ interface Snap {
   readonly a: number;
 }
 
-/** Run one candidate and snapshot it at each of {@link FRAME_STEPS}. */
-function filmstrip(candidate: Candidate, half: number): Snap[][] {
-  const pool = new ParticlePool(LAB_POOL_CAPACITY);
+/** Run one candidate in one treatment and snapshot it at {@link FRAME_STEPS}. */
+function filmstrip(candidate: Candidate, half: number, treatment: Treatment): Snap[][] {
+  const pool = poolFor(treatment);
   const rng = mulberry32(SEED);
   candidate.emit(pool, rng);
 
@@ -156,7 +165,7 @@ function filmstrip(candidate: Candidate, half: number): Snap[][] {
   for (let step = 0; step <= last; step++) {
     if (step > 0) pool.update(VFX_SHOWCASE_DT);
     while (next < FRAME_STEPS.length && FRAME_STEPS[next] === step) {
-      frames.push(capture(pool, half));
+      frames.push(capture(pool, half, treatment));
       next++;
     }
   }
@@ -164,7 +173,7 @@ function filmstrip(candidate: Candidate, half: number): Snap[][] {
 }
 
 /** The visible particles, exactly as `layer.ts` would hand them to the GPU. */
-function capture(pool: ParticlePool, half: number): Snap[] {
+function capture(pool: ParticlePool, half: number, treatment: Treatment): Snap[] {
   const out: Snap[] = [];
   for (let i = 0; i < pool.count; i++) {
     const kind = pool.kind[i]!;
@@ -175,11 +184,18 @@ function capture(pool: ParticlePool, half: number): Snap[] {
     const y = pool.y[i]!;
     // Wholly outside the frame: it is honest to drop it, and it is bytes.
     if (Math.abs(x) - r > half || Math.abs(y) - r > half) continue;
-    // Every candidate paints kinds in their own palette colour — no emitter here
-    // tints — so the SVG sprite's baked fills ARE the tint. Assert it rather than
-    // promise it: a tinted particle would silently render the wrong colour.
-    if (pool.color[i] !== (particleKind(kind).color >>> 0)) {
-      throw new Error(`particle kind ${kind} carries a tint this page cannot draw`);
+    // Every candidate paints kinds in their own palette colour and no emitter
+    // here tints, so the SVG sprite's baked fills ARE the tint — in the cold
+    // treatment the kind's own colour, in the red one that colour mapped through
+    // `./explosion-lab/heat`. Assert it rather than promise it: a particle
+    // carrying any other tint would render the wrong colour in the stills while
+    // the live panel beside it rendered the right one, which is the one way this
+    // page could lie about the thing it is asking about.
+    const want = particleKind(kind).color;
+    if (pool.color[i] !== ((treatment.heat ? heatColor(want) : want) >>> 0)) {
+      throw new Error(
+        `particle kind ${kind} carries a tint the ${treatment.key} strip cannot draw`,
+      );
     }
     out.push({ kind, x, y, rot: pool.rot[i]!, r, a });
   }
@@ -195,10 +211,18 @@ function n(v: number): string {
   return String(Object.is(r, -0) ? 0 : r);
 }
 
-/** Every particle look, once, as a referenceable `<g>` in unit space. */
-const kindDefs = PARTICLE_KINDS.map(
-  (spec) => `<g id="pk-${spec.name}">${particleSprite(spec.kind).shapes.map(shapeToSvg).join('')}</g>`,
-).join('');
+/**
+ * Every particle look, once, as a referenceable `<g>` in unit space — and now
+ * twice over, cold and red, because the two treatments are two sets of baked
+ * fills. Twenty-two tiny `<g>`s against 228 frames that `<use>` them: this is
+ * the same trick that took the a0-63 board from 2.3 MB to 498 KB.
+ */
+const kindDefs = PARTICLE_KINDS.flatMap((spec) => [
+  `<g id="pk-${spec.name}">${particleSprite(spec.kind).shapes.map(shapeToSvg).join('')}</g>`,
+  `<g id="pk-${spec.name}-R">${(HEAT_SPRITES[spec.kind] ?? particleSprite(spec.kind)).shapes
+    .map(shapeToSvg)
+    .join('')}</g>`,
+]).join('');
 
 const KIND_NAME = new Map<number, string>(PARTICLE_KINDS.map((s) => [s.kind as number, s.name]));
 
@@ -221,7 +245,7 @@ const refDefs = (): string =>
   FAMILIES.map((f) => `<g id="ref-${f.key}">${refGroup(f.ref, f.refRadius)}</g>`).join('');
 
 /** One frame, in world coordinates — the viewBox IS world space. */
-function frameSvg(family: Family, snaps: Snap[]): string {
+function frameSvg(family: Family, snaps: Snap[], treatment: Treatment): string {
   const half = family.half;
   const matter: string[] = [];
   const light: string[] = [];
@@ -229,7 +253,8 @@ function frameSvg(family: Family, snaps: Snap[]): string {
     const name = KIND_NAME.get(s.kind) ?? 'spark';
     const rot = (s.rot * 180) / Math.PI;
     const t = `translate(${n(s.x)} ${n(s.y)}) rotate(${n(rot)}) scale(${n(s.r)})`;
-    const el = `<use href="#pk-${name}" transform="${t}" opacity="${n(s.a)}"/>`;
+    const look = treatment.heat ? `${name}-R` : name;
+    const el = `<use href="#pk-${look}" transform="${t}" opacity="${n(s.a)}"/>`;
     (particleKind(s.kind).additive ? light : matter).push(el);
   }
   return (
@@ -250,36 +275,76 @@ function esc(s: string): string {
 }
 
 /**
- * One candidate: the live panel, its transport, then the stills.
+ * One treatment's live panel: its id, its badge, its canvas and its clock.
+ *
+ * The id printed on the panel is the id a verdict names — `A-C`, `A-R` — because
+ * a board that shows two things and can only be answered about one is a board
+ * that gets answered ambiguously.
+ */
+function panel(candidate: Candidate, treatment: Treatment, moved: number, peak: number): string {
+  const id = optionId(candidate, treatment);
+  const badge = !treatment.heat
+    ? ''
+    : moved === 0
+      ? '<b class="tag same">IDENTICAL</b>'
+      : `<b class="tag moved">${moved} OF ${peak} REPAINTED</b>`;
+  const note =
+    treatment.heat && moved === 0
+      ? 'Nothing in this candidate is light — it is rock, dust and ore — so the map has ' +
+        'nothing to warm and this panel is the cold one, particle for particle.'
+      : esc(treatment.line);
+  return `<div class="live" data-live-treat="${treatment.key}">
+      <div class="phd"><span class="oid">${id}</span><b class="tag ${treatment.heat ? 'red' : 'cold'}">${
+        treatment.label
+      }</b>${badge}</div>
+      <canvas width="${LIVE_PX}" height="${LIVE_PX}" title="Click to play ${esc(candidate.name)} — ${id}"></canvas>
+      <div class="ptx"><span class="clock">ready</span><span class="pline">${note}</span></div>
+    </div>`;
+}
+
+/**
+ * One candidate: two live panels side by side, one transport, then both strips.
  *
  * The `data-live-*` attributes are the contract `runtime.ts` binds against, and
- * it throws by name if one is missing rather than animating the wrong panel.
+ * it throws by name if one is missing rather than animating the wrong panel. The
+ * transport is per CANDIDATE and fires both treatments on the same instant —
+ * comparing two colours by playing them one after the other is comparing one of
+ * them against a memory of the other. Clicking a single canvas still plays only
+ * that one, which is how a verdict gets a second look at exactly one option.
  */
 function candidateRow(family: Family, candidate: Candidate): string {
-  const strips = filmstrip(candidate, family.half);
-  const peak = strips.reduce((m, f) => Math.max(m, f.length), 0);
+  const moved = heatMoved(candidate);
+  const strips = TREATMENTS.map((t) => ({ t, frames: filmstrip(candidate, family.half, t) }));
+  const peak = strips[0]?.frames.reduce((m, f) => Math.max(m, f.length), 0) ?? 0;
   const tags = [
     candidate.today ? '<b class="tag today">TODAY</b>' : '',
     candidate.departure ? '<b class="tag depart">DEPARTURE</b>' : '',
   ].join('');
-  const frames = strips
-    .map((f, i) => `<figure>${frameSvg(family, f)}<figcaption>${FRAME_TIMES[i]}s</figcaption></figure>`)
+  const stillCols = strips
+    .map(
+      ({ t, frames }) => `<div class="stripcol"><span class="oid">${optionId(candidate, t)}</span>
+      <div class="strip">${frames
+        .map(
+          (f, i) =>
+            `<figure>${frameSvg(family, f, t)}<figcaption>${FRAME_TIMES[i]}s</figcaption></figure>`,
+        )
+        .join('')}</div></div>`,
+    )
     .join('');
   return `<article class="cand" id="c-${candidate.id}" data-live-fam="${family.key}" data-live-cand="${candidate.id}">
   <div class="hd"><span class="id">${candidate.id}</span><h3>${esc(candidate.name)}</h3>${tags}
-    <span class="peak">${peak} particles at its peak frame</span></div>
+    <span class="peak">${peak} particles at its peak frame — in both</span></div>
   <p class="line">${esc(candidate.line)}</p>
-  <div class="live">
-    <canvas width="${LIVE_PX}" height="${LIVE_PX}" title="Click to play ${esc(candidate.name)}"></canvas>
-    <div class="tx">
-      <button class="btn" type="button" data-act="play">▶ Play</button>
-      <button class="btn" type="button" data-act="replay">↻ Replay</button>
-      <span class="clock">ready</span>
-    </div>
+  <div class="pair">${TREATMENTS.map((t) => panel(candidate, t, moved, peak)).join('')}</div>
+  <div class="tx">
+    <button class="btn" type="button" data-act="play">▶ Play both</button>
+    <button class="btn" type="button" data-act="replay">↻ Replay both</button>
+    <span class="hint">Both at the same instant, off the same seed — the two panels are the same
+      motion and differ in colour only. Click one canvas to play just that option.</span>
   </div>
-  <details class="stills" open>
+  <details class="stills">
     <summary>Stills — ${FRAME_TIMES.map((t) => `${t}s`).join(' · ')}</summary>
-    <div class="strip">${frames}</div>
+    <div class="striprow">${stillCols}</div>
   </details>
 </article>`;
 }
@@ -290,6 +355,7 @@ function familySection(family: Family): string {
   return `<section class="fam" id="f-${family.key}">
   <h2>${esc(family.title)}</h2>
   <p class="ask">${esc(family.ask)}</p>
+  <p class="ask heat">${esc(family.heatNote)}</p>
   <p class="meta">Frame: <b>${scale}</b>. ${esc(family.refNote)} The body is drawn at ${Math.round(
     (family.refAlpha ?? REF_ALPHA) * 100,
   )}% as a <b>ruler</b> — it is there for scale, not because it is still standing.</p>
@@ -380,8 +446,16 @@ const runtime = await bundleRuntime();
 const sections = FAMILIES.map(familySection).join('\n');
 
 const ids = FAMILIES.map(
-  (f) => `<b>${esc(f.title)}</b> — ${f.candidates.map((c) => `${c.id} ${esc(c.name)}`).join(' · ')}`,
+  (f) =>
+    `<b>${esc(f.title)}</b> — ${f.candidates
+      .map((c) => `${TREATMENTS.map((t) => optionId(c, t)).join('/')} ${esc(c.name)}`)
+      .join(' · ')}`,
 ).join('<br>');
+
+/** Every option id on the board, for the ART review manifest. */
+const OPTION_IDS = FAMILIES.flatMap((f) =>
+  f.candidates.flatMap((c) => TREATMENTS.map((t) => optionId(c, t))),
+);
 
 /** Where the bundle is spliced in, AFTER the page has been folded to one line —
  *  the bundle's own newlines are escaped and must not be touched by the fold. */
@@ -394,7 +468,7 @@ const page = `<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Planet Rush — Explosion lab: ships, stations, asteroids</title>
 <!--
-  a0-63 / a0-69 · The explosion lab. GENERATED — edit tools/make-explosion-lab.ts
+  a0-63 / a0-69 / a0-86 · The explosion lab. GENERATED — edit tools/make-explosion-lab.ts
   (and tools/explosion-lab/) and re-run \`npx vite-node tools/make-explosion-lab.ts\`,
   never this file.
 
@@ -408,6 +482,11 @@ const page = `<!DOCTYPE html>
   draw path — on a real PixiJS WebGL renderer, bundled into the single <script>
   at the foot of this file. One file, no siblings: the dashboard serves a board
   by reading this .html and nothing else.
+
+  a0-86 adds the colour round: each candidate appears cold and red, the two twins
+  emitted by ONE copy of the motion into two pools, one of which maps the colour
+  column (tools/explosion-lab/heat.ts). plasma -> threatRed, plasmaHot ->
+  shotEnemy3, and nothing on this page can reach signal yellow.
 
   Nothing in src/ changed. This page is the decision; the port is a follow-up.
 -->
@@ -432,6 +511,7 @@ const page = `<!DOCTYPE html>
   code{font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12px;color:#8fd0e8}
   .fam{padding:26px 34px 10px;border-bottom:1px solid var(--rule)}
   .ask{color:var(--text)}
+  .ask.heat{border-left:3px solid var(--red);padding-left:12px;color:#e2d2d2}
   .meta{color:var(--muted);font-size:12.5px}
   .cand{margin:18px 0 26px;padding:14px 16px 10px;background:var(--panel);
         border:1px solid var(--hair);border-radius:10px}
@@ -443,16 +523,29 @@ const page = `<!DOCTYPE html>
        padding:3px 7px;border-radius:4px;font-weight:700}
   .today{background:#1d3243;color:#8fd0e8;border:1px solid #2c5570}
   .depart{background:#3a2020;color:#e0a0a0;border:1px solid #6a3535}
+  .cold{background:#12242f;color:#7cc7e8;border:1px solid #27506a}
+  .red{background:#2e1616;color:#d59393;border:1px solid #6a3535}
+  .same{background:#1a1f27;color:var(--muted);border:1px solid #333c4a}
+  .moved{background:#1a1f27;color:#c9a0a0;border:1px solid #4a3535}
   .peak{margin-left:auto;color:var(--muted);font-size:11.5px;
         font-family:ui-monospace,monospace}
   .line{margin:8px 0 12px;color:var(--muted);font-size:13px;max-width:104ch}
 
-  /* --- The live panel: the thing being approved --------------------------- */
-  .live{margin:0 0 14px;width:${LIVE_PX}px}
+  /* --- The two live panels: the thing being approved ---------------------- */
+  /* Side by side is the whole point of the round — two colours judged one after
+     the other are one colour judged against a memory. They wrap and stack only
+     when the viewport genuinely cannot hold both. */
+  .pair{display:flex;gap:12px;flex-wrap:wrap;margin:0 0 6px}
+  .live{margin:0 0 8px;width:${LIVE_PX}px}
+  .phd{display:flex;align-items:center;gap:8px;margin:0 0 6px}
+  .oid{font-family:ui-monospace,monospace;font-size:12.5px;font-weight:700;color:var(--text);
+       letter-spacing:.06em}
+  .ptx{margin-top:6px;display:flex;flex-direction:column;gap:3px}
+  .pline{color:var(--muted);font-size:11.5px;line-height:1.45}
   .live canvas{display:block;width:${LIVE_PX}px;height:${LIVE_PX}px;background:var(--floor);
     border:1px solid #2b3644;border-radius:6px;cursor:pointer}
   .live canvas:hover{border-color:var(--plasma)}
-  .tx{display:flex;align-items:center;gap:10px;margin-top:8px}
+  .tx{display:flex;align-items:center;gap:10px;margin-top:2px;flex-wrap:wrap}
   .clock{font-family:ui-monospace,monospace;font-size:11.5px;color:var(--muted)}
   .btn{font-family:"Oxanium",system-ui,sans-serif;font-size:13px;color:var(--text);
     background:#1b2430;border:1px solid #33415a;border-radius:6px;padding:6px 12px;
@@ -469,7 +562,9 @@ const page = `<!DOCTYPE html>
   .stills{margin:0 0 4px}
   .stills summary{color:var(--muted);font-size:12px;cursor:pointer;
     font-family:ui-monospace,monospace;letter-spacing:.04em}
-  .strip{display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;padding:8px 0 6px}
+  .striprow{display:flex;gap:16px;flex-wrap:wrap}
+  .stripcol{display:flex;flex-direction:column;gap:2px}
+  .strip{display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;padding:4px 0 6px}
   figure{margin:0;flex:0 0 auto}
   figcaption{margin-top:3px;text-align:center;color:var(--muted);
              font-family:ui-monospace,monospace;font-size:10px}
@@ -484,7 +579,8 @@ const page = `<!DOCTYPE html>
   .nolive{display:none;margin:14px 34px 0;padding:12px 14px;border-radius:8px;
     background:#2a1c1c;border:1px solid #6a3535;color:#e6c3c3;font-size:13px}
   body[data-live="off"] .nolive{display:block}
-  body[data-live="off"] .live,body[data-live="off"] .famtx{display:none}
+  body[data-live="off"] .pair,body[data-live="off"] .tx,
+  body[data-live="off"] .famtx{display:none}
   #live-error{font-family:ui-monospace,monospace;font-size:12px;color:#f0b0b0}
 
   footer{padding:26px 34px 46px;color:var(--muted);font-size:13px;max-width:104ch}
@@ -496,13 +592,49 @@ const page = `<!DOCTYPE html>
 <svg class="defs" xmlns="http://www.w3.org/2000/svg"><defs>${kindDefs}${refDefs()}</defs></svg>
 
 <header>
-  <h1>Explosion lab</h1>
+  <h1>Explosion lab — the colour round</h1>
   <p class="sub">
-    Nineteen candidates across three families, and <b>every one of them plays</b>. Press
-    <b>▶ Play</b> on a candidate — or click its canvas — and that death runs at true scale on the
-    game's own Floor, against its reference body. <b>▶ Play family</b> fires all of them at the same
-    instant, which is the only honest way to judge six explosions against each other. In every family
-    the <b>first candidate is today's effect</b>, labelled <b class="tag today">TODAY</b>.
+    <b>"is space explosions only blue, whats the thought process there?"</b> — you, on this board.
+    It was a fair question with no good answer, so here is the answer as a comparison: every one of
+    the nineteen candidates now appears <b>twice</b>, side by side — <b class="tag cold">COLD</b> in
+    the plasma register it was authored in, and <b class="tag red">RED</b> in the threat-red one.
+    Thirty-eight options, all playable. Press <b>▶ Play both</b> and the pair fires on the same
+    instant; click one canvas to play just that option.
+  </p>
+  <p class="sub">
+    <b>Red is legal, and it is legal for the reason you gave.</b> Threat red is not a player's colour
+    — it is a STATE colour meaning danger: enemy fire is <code>shotEnemy1/2/3</code> ("unmistakably
+    threat red"), damage fills are red, alarm rings are red. A ship coming apart is a danger event,
+    so red on an explosion is not a new meaning smuggled into a reserved hue, it is the meaning that
+    hue already carries. <b>Signal yellow is a different matter and it does not move.</b> Yellow is
+    ore, ore is what you scan a field for all match long, and an explosion that went ore-yellow at
+    its brightest would teach a player that yellow sometimes means something else. Nothing on this
+    page burns yellow, at any brightness — the ore glints in the asteroid family are ore, and they
+    are the only yellow here.
+  </p>
+  <p class="sub">
+    <b>The comparison is colour and nothing else, by construction.</b> A red twin is not a second
+    candidate: it is the same <code>emit</code> function, off the same seed, writing the same
+    positions, velocities, lifetimes, radii and alphas — run into a pool that maps the colour column
+    on the way past. There is exactly one copy of the motion, so the motion cannot drift between the
+    two panels. The whole treatment is two colours:
+    <code>plasma → threat red</code> and <code>plasmaHot → shotEnemy3</code>, which are the same
+    point on the same value ramp in the other register (both are their base mixed 45% toward
+    <b>WHITE</b>). <b>Red climbs toward white, never toward orange</b> — that is the one way to get
+    this wrong, because a red that brightens through orange lands on ore's colour at the exact
+    moment it is biggest and brightest.
+  </p>
+  <p class="sub">
+    <b>What the map cannot reach.</b> It is keyed on the colour of LIGHT, so it warms flares, sparks,
+    embers and shockwave rings and it is structurally incapable of touching rock chips, hull shards,
+    smoke, ash, dust, the repair channel or the ore payout. Debris is not on fire. Each red panel
+    prints how many of that candidate's particles it actually repainted, and
+    <b class="tag same">IDENTICAL</b> is a real and frequent answer in the asteroid family.
+  </p>
+  <p class="sub">
+    In every family the <b>first candidate is today's effect</b>, labelled
+    <b class="tag today">TODAY</b>. <b>▶ Play family</b> fires every panel in the family at the same
+    instant, which is the only honest way to judge six deaths against each other.
   </p>
   <p class="sub">
     <b>Everything here is the game's own particle system, drawn by the game's own renderer.</b> Real
@@ -528,8 +660,10 @@ const page = `<!DOCTYPE html>
     <b>${FRAME_TIMES.map((t) => `${t}s`).join(' · ')}</b>. A single instant is the way to judge a single
     instant, and they are plain SVG, so they show even if the live half cannot run.
   </p>
-  <p class="sub"><b>Answer with a letter per family</b> — "B, J, N" is a complete answer. Every
-    candidate carries a fixed id so the verdict can be recorded against it.</p>
+  <p class="sub"><b>Answer with one id per family</b> — <b>"B-R, J-C, N-C"</b> is a complete
+    answer. Every option carries a fixed id, printed on its own panel, so a verdict can name exactly
+    one of the two colours as well as one of the shapes. Two answers are also fine: if the shape is
+    settled and the colour is not, say so.</p>
 </header>
 
 <div class="nolive">
@@ -544,10 +678,21 @@ ${sections}
   count on the right of each header is the busiest frame, against a pool capacity of 1600 shared with
   everything else on screen — so it is also the cost.
   <br><br>
-  <b>What is deliberately not here.</b> No candidate invents a colour, a blend mode or a particle look:
-  all nineteen are built from the eleven shipped kinds, which is what makes a pick a tuning rather than a
-  rewrite. The ore glints in the asteroid family are signal yellow, which is legal and load-bearing —
-  ore is one of the two things that colour is allowed to mean.
+  <b>What is deliberately not here.</b> No candidate invents a motion, a blend mode or a particle
+  shape: all nineteen are built from the eleven shipped kinds, which is what makes a pick a tuning rather
+  than a rewrite. The red treatment adds no seventh hue either — it reuses <code>threatRed</code> and
+  <code>shotEnemy3</code>, both already in the palette and both already meaning danger. The ore glints in
+  the asteroid family are signal yellow, which is legal and load-bearing — ore is one of the two things
+  that colour is allowed to mean, and it is the one thing on this page red is never allowed to become.
+  The four looks the treatment can reach at all are <b>${WARMED_KIND_NAMES.join(', ')}</b> — the four made
+  of light. The other seven are matter, and they come through untouched.
+  <br><br>
+  <b>The third option nobody has asked for yet.</b> The map warms every light in an effect, shockwave
+  ring included. If what you want is red embers over a cold wave — heat from the fire, cold from the
+  pressure — that is a real third treatment and it is one line to add. Say so and it will be here.
+  <br><br>
+  <b>Nothing has been ported.</b> Not one byte of <code>src/</code> changed for this round; the red
+  looks live in the lab. A pick is what moves them into the game.
   <br><br>
   <b>The station family's stance.</b> G, H, I, J and K all keep the shipped one: no sparkle added, the
   weight and duration of the collapse varied instead. <b>L is a labelled departure</b> — it is what a
@@ -581,6 +726,10 @@ for (const out of OUTPUTS) {
 const total = FAMILIES.reduce((sum, f) => sum + f.candidates.length, 0);
 console.log(
   `wrote ${OUTPUTS.length} copies (${(html.length / 1024).toFixed(0)} KB each, of which ` +
-    `${(runtime.length / 1024).toFixed(0)} KB is the inlined runtime) — ${total} candidates live, ` +
-    `${total * FRAME_TIMES.length} stills\n  ${OUTPUTS.join('\n  ')}`,
+    `${(runtime.length / 1024).toFixed(0)} KB is the inlined runtime) — ${total} candidates in ` +
+    `${TREATMENTS.length} treatments = ${OPTION_IDS.length} options live, ` +
+    `${OPTION_IDS.length * FRAME_TIMES.length} stills\n  ${OUTPUTS.join('\n  ')}`,
 );
+// The Director registers a board's options in `status/art-review.json` by id, and
+// a0-63 recorded that being forgotten once already. Print them ready to paste.
+console.log(`option ids for status/art-review.json:\n  ${JSON.stringify(OPTION_IDS)}`);
