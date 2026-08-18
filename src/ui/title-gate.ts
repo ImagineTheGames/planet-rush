@@ -428,6 +428,34 @@ export function gateVars(phase: GatePhase, scale: number): GateVars {
   };
 }
 
+/**
+ * **Is the door in front of the menu?** — the invariant a0-78 exists to make
+ * unbreakable.
+ *
+ * The overlay is a full-screen `position:fixed` element at `z-index:20` sitting
+ * directly on top of the Pixi canvas the menu is drawn on. While it is showing
+ * it is the only thing a finger can land on, so "is it showing" is not a
+ * decoration: it is whether the game has a front screen at all.
+ *
+ * It used to be a one-shot WRITE — `through()` hid the overlay once, on its way
+ * past beat 4, and nothing ever re-asserted it. That is what made a0-78 a
+ * soft-lock rather than a flicker: a single `window` resize replayed the root's
+ * whole style block ({@link browserGateDom} `applyLayout`), the one-shot write
+ * was not in it, and the door came back over the menu with no phase left that
+ * would ever take it away again. `press()` refuses because the phase is not
+ * `locked`, `Escape` is not a key a phone has, and the frame loop stopped at
+ * beat 4 — so there was no sequence of gestures that got the menu back.
+ *
+ * So it is a **derived fact**, stated once here and re-applied by
+ * {@link TitleGate} `apply` on every phase change and every resize alike. There
+ * is exactly one phase in which the door is behind us, and in that phase the
+ * overlay is always out of the way — not because something remembered to hide
+ * it, but because there is nowhere left for a stale value to hide.
+ */
+export function gateCovers(phase: GatePhase): boolean {
+  return phase !== 'open';
+}
+
 // ---------------------------------------------------------------------------
 // 4. The type, struck into the leaf
 // ---------------------------------------------------------------------------
@@ -1470,7 +1498,8 @@ export class TitleGate {
     if (this.phase === 'locked' || this.phase === 'closing' || this.phase === 'returning') return;
     if (!(this.opts.canReseal?.() ?? true)) return;
     this.clearTimers();
-    this.dom.setVisible(true);
+    // `run` below sets `returning` on its first step, and `apply` puts the
+    // overlay back on the screen with it — one owner, both directions.
     this.sfx('gateReseal');
     this.startLoop();
     this.run(GATE_RESEAL_STEPS, (phase) => {
@@ -1544,10 +1573,21 @@ export class TitleGate {
     this.apply();
   }
 
-  /** Push {@link gateVars} at the root. Ten writes, no reconciliation. */
+  /**
+   * Push {@link gateVars} at the root, and re-assert whether the door is in
+   * front of the menu at all. Ten writes plus one, no reconciliation.
+   *
+   * The eleventh write is the a0-78 floor. It runs from `setPhase` — every beat
+   * of both sequences — AND from {@link resize}, which is the path a phone takes
+   * whenever its URL bar collapses under a swipe. Making the overlay's presence
+   * a function of the phase rather than a thing `through()` did once means a
+   * stranded or replayed style block self-heals on the very next thing that
+   * happens, instead of needing every way of stranding it to be enumerated.
+   */
   private apply(): void {
     const vars = gateVars(this.phase, throughScale(this.viewport));
     for (const [name, value] of Object.entries(vars)) this.dom.setVar(name, value);
+    this.dom.setVisible(gateCovers(this.phase));
   }
 
   /** Beat 4. The overlay stops painting and stops taking input; the menu behind
@@ -1555,7 +1595,10 @@ export class TitleGate {
    *  and a door that has been removed cannot come back. */
   private through(): void {
     this.stopLoop();
-    this.dom.setVisible(false);
+    // The overlay is already out of the way: `setPhase('open')` ran `apply`
+    // immediately before this, and `apply` owns whether the door is in front of
+    // the menu ({@link gateCovers}). It used to be written here instead, which
+    // made beat 4 the ONLY place that ever hid it — see a0-78.
     this.sfx('gateSeated');
     this.opts.onThrough?.();
   }
@@ -1591,6 +1634,18 @@ export class TitleGate {
   // --- painting -----------------------------------------------------------
 
   private paint(ms: number): void {
+    // BEAT 4 PAINTS NOTHING (a0-78). We are through, the overlay is inert, and
+    // the only picture this canvas can produce from here is a solid one: the
+    // punch is passed `phase !== 'open'`, so a paint at `open` is the starfield
+    // with **no doorway cut out of it** — a full-screen opaque lid over the
+    // menu, which is trap 1 arriving through the back door.
+    //
+    // `tick` already returns before this at `open`, so the loop never got here.
+    // {@link resize} did: it paints on the spot, because sizing a canvas clears
+    // it and the field has to be complete on the first frame. That is the right
+    // rule while the door is up and the wrong one once it is gone, and it is
+    // exactly the path a phone walks when a swipe collapses its URL bar.
+    if (this.phase === 'open') return;
     const g = this.ctx;
     if (!g || this.viewport.width <= 0 || this.viewport.height <= 0) return;
     // The punch tracks the door's REAL scale, measured mid-transition. Falling
@@ -1602,7 +1657,13 @@ export class TitleGate {
     // only things a frozen clock costs, and they are the only things on this
     // screen that are decoration. See {@link fieldAnimates} for what is not.
     const clock = fieldAnimates(this.reducedNow, this.phase) ? ms : 0;
-    paintSky(g, this.viewport, this.stars, clock, scale, this.phase !== 'open');
+    // ALWAYS punched. The doorway is the one thing this screen may never paint
+    // shut, and the argument used to be `this.phase !== 'open'` — true for every
+    // phase that reaches this line and false for the one that no longer can. The
+    // early return above is what makes it a constant, and the compiler agrees:
+    // it narrows `this.phase` past `open`, so an unpunched field is not a bug
+    // that has been fixed here, it is a picture this module cannot draw.
+    paintSky(g, this.viewport, this.stars, clock, scale, true);
   }
 
   private startLoop(): void {
@@ -1699,6 +1760,19 @@ export function browserGateDom(browser: GateBrowser): GateDom {
   let unbind: (() => void)[] = [];
   /** The gate's own custom properties, kept so a relayout can replay them. */
   const vars = new Map<string, string>();
+  /**
+   * Whether the overlay is on the screen — kept here for exactly the same
+   * reason {@link vars} is, and its absence from this map is the a0-78
+   * soft-lock.
+   *
+   * `setVisible` writes three properties into the root's inline style block.
+   * `applyLayout` REPLACES that whole block (`cssText`), so anything not
+   * replayed afterwards is silently reverted to what {@link TITLE_GATE_ROOT_CSS}
+   * says — which is a visible, tap-eating, full-screen element. The custom
+   * properties were replayed; these three were not, so every `resize` while the
+   * menu was up put the door back over it.
+   */
+  let visible = true;
 
   /** The live landscape lock, read from the real window each time it is needed —
    *  a phone can be turned while this screen is up. */
@@ -1719,6 +1793,25 @@ export function browserGateDom(browser: GateBrowser): GateDom {
     if (!root) return;
     root.style.cssText = TITLE_GATE_ROOT_CSS + gateRootLayoutCss(transform());
     for (const [name, value] of vars) root.style.setProperty(name, value);
+    // …and the overlay's own presence, which `cssText` has just thrown away
+    // along with everything else. Replayed here rather than left to the gate's
+    // own `apply` because the ORDER is against us: the resize listener relays
+    // the box BEFORE it tells the gate to re-measure, so a door restored here
+    // and re-hidden a call later is still a frame of a full-screen lid over the
+    // menu — and if the gate is ever driven by a host that does not forward the
+    // event, it is not a frame, it is forever (a0-78).
+    writeVisible();
+  };
+
+  /** The three properties that decide whether the overlay is in front of the
+   *  menu. NOT `display:none`: `Escape` has to reach the window listener, and
+   *  the overlay must stop eating the menu's presses the instant we are
+   *  through. */
+  const writeVisible = (): void => {
+    if (!root) return;
+    root.style.opacity = visible ? '1' : '0';
+    root.style.pointerEvents = visible ? 'auto' : 'none';
+    root.style.visibility = visible ? 'visible' : 'hidden';
   };
 
   /** A CSS transform's `translateY`/`scale`, read off the live computed style —
@@ -1785,13 +1878,9 @@ export function browserGateDom(browser: GateBrowser): GateDom {
       vars.set(name, value);
       root?.style.setProperty(name, value);
     },
-    setVisible(visible) {
-      if (!root) return;
-      root.style.opacity = visible ? '1' : '0';
-      // Not `display:none`: `Escape` has to reach the window listener, and the
-      // overlay must stop eating the menu's presses the instant we are through.
-      root.style.pointerEvents = visible ? 'auto' : 'none';
-      root.style.visibility = visible ? 'visible' : 'hidden';
+    setVisible(next) {
+      visible = next;
+      writeVisible();
     },
     sky(view, dpr) {
       if (!canvas) return null;

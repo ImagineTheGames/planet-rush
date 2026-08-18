@@ -1,0 +1,17 @@
+[iphone-landscape] through the door (baseline)                    MENU REACHABLE  menu.visible=true screen=menu hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] swipe up, across the middle                    MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] swipe down, across the middle                  MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] swipe left                                     MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] swipe right                                    MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] edge swipe from the left                       MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] edge swipe from the bottom                     MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] edge swipe from the top                        MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] fast flick (3 samples)                         MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] slow drag (40 samples)                         MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] press then CANCEL, no touchend                 MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] swipe off a button and CANCEL                  MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] URL bar collapses (window resize)              MENU LOST  menu.visible=true screen=hangar hit@PLAY=canvas#pr-title-gate-sky overlay(op=1 vis=visible pe=auto) skyCentreAlpha=255
+[iphone-landscape] URL bar returns (window resize back)           MENU LOST  menu.visible=true screen=hangar hit@PLAY=canvas#pr-title-gate-sky overlay(op=1 vis=visible pe=auto) skyCentreAlpha=255
+[iphone-landscape] press the middle (a player trying)             MENU LOST  menu.visible=true screen=hangar hit@PLAY=canvas#pr-title-gate-sky overlay(op=1 vis=visible pe=auto) skyCentreAlpha=255
+[iphone-landscape] press PLAY where the menu says it is           MENU LOST  menu.visible=true screen=hangar hit@PLAY=canvas#pr-title-gate-sky overlay(op=1 vis=visible pe=auto) skyCentreAlpha=255
+[iphone-landscape] swipe again (trying to undo it)                MENU LOST  menu.visible=true screen=hangar hit@PLAY=canvas#pr-title-gate-sky overlay(op=1 vis=visible pe=auto) skyCentreAlpha=255

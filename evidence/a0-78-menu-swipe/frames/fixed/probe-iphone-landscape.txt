@@ -1,0 +1,34 @@
+[iphone-portrait] through the door (baseline)                    MENU REACHABLE  menu.visible=true screen=menu hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] swipe up, across the middle                    MENU REACHABLE  menu.visible=true screen=menu hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] swipe down, across the middle                  MENU REACHABLE  menu.visible=true screen=menu hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] swipe left                                     MENU REACHABLE  menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] swipe right                                    MENU REACHABLE  menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] edge swipe from the left                       MENU REACHABLE  menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] edge swipe from the bottom                     MENU REACHABLE  menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] edge swipe from the top                        MENU REACHABLE  menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] fast flick (3 samples)                         MENU REACHABLE  menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] slow drag (40 samples)                         MENU REACHABLE  menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] press then CANCEL, no touchend                 MENU REACHABLE  menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] swipe off a button and CANCEL                  MENU REACHABLE  menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] URL bar collapses (window resize)              MENU REACHABLE  menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] URL bar returns (window resize back)           MENU REACHABLE  menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] press the middle (a player trying)             MENU REACHABLE  menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] press PLAY where the menu says it is           MENU REACHABLE  menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] swipe again (trying to undo it)                MENU REACHABLE  menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] through the door (baseline)                    MENU REACHABLE  menu.visible=true screen=menu hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] swipe up, across the middle                    MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] swipe down, across the middle                  MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] swipe left                                     MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] swipe right                                    MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] edge swipe from the left                       MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] edge swipe from the bottom                     MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] edge swipe from the top                        MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] fast flick (3 samples)                         MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] slow drag (40 samples)                         MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] press then CANCEL, no touchend                 MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] swipe off a button and CANCEL                  MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] URL bar collapses (window resize)              MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] URL bar returns (window resize back)           MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] press the middle (a player trying)             MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] press PLAY where the menu says it is           MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] swipe again (trying to undo it)                MENU REACHABLE  menu.visible=true screen=hangar hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0

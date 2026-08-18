@@ -1,0 +1,10 @@
+[iphone-landscape] the main menu, nothing pressed:
+    menu.visible=true screen=menu hit@PLAY=canvas
+    overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] after ONE resize, nothing pressed:
+    menu.visible=true screen=menu hit@PLAY=canvas
+    overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] after pressing and swiping to get it back:
+    menu.visible=true screen=hangar hit@PLAY=canvas
+    overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-landscape] page errors during the run: (none)
