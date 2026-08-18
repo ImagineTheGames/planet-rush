@@ -546,7 +546,16 @@ export function codexLayout(
   // ultrawide ran a 3352px article across a metre of glass. Same ceiling as the
   // title, settings and hangar screens; this screen's absolute is the two-pane
   // one, because a rail and an article want more room than one stack of plates.
-  const band = menuColumnBand(frame.band, COLUMN.title + COLUMN.settings * 0.5, m);
+  //
+  // **Two content columns, not one.** The floor is per column, and this screen's
+  // content is a rail AND an article — and the article is a scrolling body of
+  // text, so narrowing it does not reflow, it pushes paragraphs off the bottom.
+  // Measured on the shipped bundle at 798x384
+  // (`evidence/a0-79-menus/frames/`), a one-column floor took the article from
+  // "fits the band" to "cut mid-sentence". Field is not worth a paragraph, so on
+  // a phone this screen keeps its band and the ceiling does its work where there
+  // is room to spare.
+  const band = menuColumnBand(frame.band, COLUMN.title + COLUMN.settings * 0.5, m, 2);
   const tabHeight = Math.max(0, Math.min(valueChipHeight(m), band.height));
   const tabs = tabStrip({ x: band.x, y: band.y, width: band.width, height: tabHeight }, m);
 
