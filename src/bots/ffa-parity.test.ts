@@ -126,6 +126,41 @@
  * nothing in a0-65 is mode-aware — it is map geometry, identical in FFA and in
  * teams.
  *
+ * ### Re-baselined a fifth time, 2026-08-17 (a0-81) — the bots' own lane
+ *
+ * The first of these five that is a **bot** change, so it is the one that has to
+ * answer Rule 3 head-on rather than by pointing at another lane. It does, and on
+ * the same bar: the developer's report is *"when rusty was fleeing from me he
+ * could have auto fired at me but instead he didnt … thats what i would do"*, and
+ * the rule it ratifies is that a bot's movement intent and fire intent are
+ * independent — a retreating, hauling or banking bot fires at a hostile in range
+ * on exactly the terms a player has (brief a0-81; audit in
+ * `evidence/a0-81-fleeing-fire/audit.txt`).
+ *
+ * **Why it is not the thing Rule 3 forbids.** Rule 3 exists to catch a
+ * *team-aware path leaking into FFA*: FFA is teams-of-one, so a branch that only
+ * runs when a bot has allies must be unreachable there, and a moved hash would
+ * be the proof it was reached. Nothing in a0-81 is team-aware. `coveringFire`
+ * asks `isTargetable` — the single `hostile` stamp off `sim/allegiance.ts`, which
+ * in FFA is true for every ship on the board — and takes no other branch on
+ * anything about sides, radios or ally lists. It moves FFA and TEAMS by the
+ * identical mechanism, which is the definition of the a0-05 category and the
+ * opposite of the leak. The two non-hash cases below are untouched and still the
+ * thing that would catch the leak if one ever happened.
+ *
+ * It moves the hash from the first engagement, and unavoidably: eight bots that
+ * shoot while breaking off deal and take damage on ticks they previously did
+ * not, so hulls, projectiles, kills, chunks and every downstream decision differ.
+ * Measured over eight full matches, no bot in the shipped cast fired a single
+ * shot while retreating before this and they fire 1.34 / 2.16 / 2.32 per
+ * chased-second after, by tier.
+ *
+ * | Seed | Post-a0-65 | Post-a0-81 |
+ * |---|---|---|
+ * | 20260806 | `b02582c0` | `de94b69e` |
+ * | 7 | `52475e8b` | `ab03dcd3` |
+ * | 991 | `6bc0291a` | `a37c4e2c` |
+ *
  * The last case is the one that stops this file from being vacuous: it asserts
  * the harness can build a team world *at all*, and that the same lineup on two
  * sides hashes differently. Without it, a `botLobby` that quietly dropped the
@@ -159,15 +194,17 @@ const SECONDS = 180;
  * became whole (a0-58), once more on `agent/gameplay/a0-59-full-death-drop` when a
  * destroyed ship began dropping its whole hold (a0-59), and a fourth time on the
  * same branch when a0-65 reshaped the commons waves so they stop entombing ships
- * at the map centre — the module note carries all four moves and their reasons.
+ * at the map centre, and a fifth time on `agent/bots/a0-81-fire-while-fleeing`
+ * when a bot breaking off stopped holding its fire — the module note carries all
+ * five moves and their reasons.
  *
  * **Do not re-baseline these.** The only thing that has ever earned it is a
  * ratified amendment in `docs/design-amendments.md`.
  */
 const GOLDEN: readonly (readonly [seed: number, hash: string])[] = [
-  [20260806, 'b02582c0'],
-  [7, '52475e8b'],
-  [991, '6bc0291a'],
+  [20260806, 'de94b69e'],
+  [7, 'ab03dcd3'],
+  [991, 'a37c4e2c'],
 ];
 
 /** One eight-bot match, the shipped cast, the offline lobby's own roster path. */

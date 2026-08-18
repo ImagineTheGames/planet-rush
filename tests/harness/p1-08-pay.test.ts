@@ -315,7 +315,24 @@ describe('p1-08 — the report’s arithmetic', () => {
     // The finding that made the report recommend a flat row instead: `rungs =
     // slots − placement`, so the first out clears zero of them and a bigger rung
     // pays them nothing while paying the winner twice.
-    const run = { ...runPayMatch(setup({ seed: 9 }), { maxSeconds: PROBE_SECONDS }), ok: true, failure: null };
+    //
+    // SEED 9 -> 8, 2026-08-18 (a0-81), and it is a fixture move, not a relaxed
+    // bar. This is the one case in the file whose *premise* is a property of the
+    // match rather than of the pricer: `placement` only reaches `slots` once
+    // `world.match.eliminated` is non-empty (`src/progression/accrual.ts`), so
+    // the arithmetic below has nothing to assert unless SOMEBODY IS OUT inside
+    // `PROBE_SECONDS`. a0-81 (a retreating bot returns fire) makes a chased bot's
+    // pursuer break off, and matches consequently reach their first knockout
+    // later: measured over seeds 1–24, the first elimination lands at a median
+    // 114.1s -> 148.5s and the seeds clearing the 120s window go 12/24 -> 7/24.
+    // Seed 9 is one that stopped clearing it — 72.3s -> 200.4s.
+    //
+    // Seed 8 is chosen because it clears on BOTH builds — 37.7s before, 46.9s
+    // after, the largest margin either way — so this is not a seed picked for
+    // passing on the new code. Measurement:
+    // `evidence/a0-81-fleeing-fire/elimination-probe.ts`. Nothing else in the
+    // file moves: the other cases hold at seed 9, and are left there.
+    const run = { ...runPayMatch(setup({ seed: 8 }), { maxSeconds: PROBE_SECONDS }), ok: true, failure: null };
     const firstOut = playerMatches([run]).filter((p) => p.firstOut);
     expect(firstOut.length).toBeGreaterThan(0);
     for (const p of firstOut) expect(rowCount(p, 'placement')).toBe(0);

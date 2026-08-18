@@ -23,7 +23,7 @@
 import type { Rect, Viewport } from '@platform/layout-registry';
 import { COLUMN, plateHeight } from '../art/materials';
 import type { FrameMetrics, PlateRole, PlateScale } from '../art/materials';
-import { beamContent, gantryFrame, stackPlates } from './gantry';
+import { beamContent, gantryFrame, menuColumnWidth, stackPlates } from './gantry';
 import { hitRect } from './menu-geometry';
 import type { Insets } from './menu-geometry';
 import { CODEX_TABS } from './codex';
@@ -321,7 +321,11 @@ export function mainMenuLayout(viewport: Viewport, options: MainMenuLayoutOption
   };
   const title: Rect = { ...beamStrip };
 
-  const columnWidth = Math.min(COLUMN.title, frame.band.width);
+  // The column, capped absolutely AND proportionally ({@link ./gantry}
+  // `menuColumnWidth`). The absolute cap alone never bit on a phone — the band is
+  // narrower than it there — so the plates took the screen edge to edge and the
+  // field went to 2.9% a side (a0-79, the developer's 798x384 screenshot).
+  const columnWidth = menuColumnWidth(frame.band.width, COLUMN.title, metrics);
   const heights = MAIN_MENU_ITEMS.map((item) => plateHeight(itemPlate(item).scale, metrics));
   const buttons = stackPlates(frame.band, columnWidth, heights, metrics.gap);
 

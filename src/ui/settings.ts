@@ -30,7 +30,7 @@ import type { ControlScheme, DeviceKind } from '@platform/actions';
 import type { Rect, Viewport } from '@platform/layout-registry';
 import { COLUMN, plateHeight, rowHeight, valueChipHeight } from '../art/materials';
 import type { FrameMetrics, PlateRole } from '../art/materials';
-import { beamContent, gantryFrame } from './gantry';
+import { beamContent, gantryFrame, menuColumnBand, menuColumnWidth } from './gantry';
 import { FONT_HEADING } from './typography';
 import { centeredGrid, clamp, hitRect } from './menu-geometry';
 import type { Insets } from './menu-geometry';
@@ -730,7 +730,9 @@ export function settingsLayout(viewport: Viewport, options: SettingsLayoutOption
   const band = frame.band;
   const rowH = rowHeight(metrics);
   const gap = metrics.rowGap;
-  const columnWidth = Math.min(COLUMN.settings, band.width);
+  // Absolutely AND proportionally capped, the same ceiling the title screen uses
+  // ({@link ./gantry} `menuColumnWidth`) — the front of the game is one system.
+  const columnWidth = menuColumnWidth(band.width, COLUMN.settings, metrics);
   // How many rows fit in one column at the full (thumb) row height? If fewer than
   // all of them, wrap into as many columns as it takes — capped — so no row is
   // ever compressed below its target just to fit the height. On a tall desktop
@@ -740,7 +742,24 @@ export function settingsLayout(viewport: Viewport, options: SettingsLayoutOption
     SETTINGS_MAX_COLUMNS,
     Math.max(1, Math.ceil(SETTINGS_ROWS.length / Math.max(1, perColumnFit))),
   );
-  const rows = centeredGrid(band, SETTINGS_ROWS.length, columnWidth, rowH, columns, gap, metrics.gap);
+  // The grid gets the shared ceiling too, sized for however many columns it
+  // wrapped into (a0-79). It is applied to the GRID and not only to a column
+  // because with two columns the band's own halves are the narrower cap, so
+  // capping a column alone changed nothing and the rows still ran edge to edge —
+  // which is the defect, one screen over from the one the developer photographed.
+  //
+  // On a phone it is the FLOOR that wins, and that is the honest answer rather
+  // than an omission: the two-column wrap exists because a landscape phone is
+  // short, and at 798x384 a column is 372px holding content that measures 345px.
+  // There are 27px to give and this does not spend them
+  // (`evidence/a0-79-menus/plate-room.txt`).
+  const grid = menuColumnBand(
+    band,
+    columns * COLUMN.settings + (columns - 1) * metrics.gap,
+    metrics,
+    columns,
+  );
+  const rows = centeredGrid(grid, SETTINGS_ROWS.length, columnWidth, rowH, columns, gap, metrics.gap);
   const stepper = stepperSize(rows[0], metrics);
   const help = rows.map((row) => helpRect(row, stepper));
 

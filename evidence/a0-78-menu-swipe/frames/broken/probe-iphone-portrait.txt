@@ -1,0 +1,17 @@
+[iphone-portrait] through the door (baseline)                    MENU REACHABLE  menu.visible=true screen=menu hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] swipe up, across the middle                    MENU REACHABLE  menu.visible=true screen=menu hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] swipe down, across the middle                  MENU REACHABLE  menu.visible=true screen=menu hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] swipe left                                     MENU REACHABLE  menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] swipe right                                    MENU REACHABLE  menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] edge swipe from the left                       MENU REACHABLE  menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] edge swipe from the bottom                     MENU REACHABLE  menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] edge swipe from the top                        MENU REACHABLE  menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] fast flick (3 samples)                         MENU REACHABLE  menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] slow drag (40 samples)                         MENU REACHABLE  menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] press then CANCEL, no touchend                 MENU REACHABLE  menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] swipe off a button and CANCEL                  MENU REACHABLE  menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] URL bar collapses (window resize)              MENU LOST  menu.visible=true screen=online hit@PLAY=canvas#pr-title-gate-sky overlay(op=1 vis=visible pe=auto) skyCentreAlpha=255
+[iphone-portrait] URL bar returns (window resize back)           MENU LOST  menu.visible=true screen=online hit@PLAY=canvas#pr-title-gate-sky overlay(op=1 vis=visible pe=auto) skyCentreAlpha=255
+[iphone-portrait] press the middle (a player trying)             MENU LOST  menu.visible=true screen=online hit@PLAY=canvas#pr-title-gate-sky overlay(op=1 vis=visible pe=auto) skyCentreAlpha=255
+[iphone-portrait] press PLAY where the menu says it is           MENU LOST  menu.visible=true screen=online hit@PLAY=canvas#pr-title-gate-sky overlay(op=1 vis=visible pe=auto) skyCentreAlpha=255
+[iphone-portrait] swipe again (trying to undo it)                MENU LOST  menu.visible=true screen=online hit@PLAY=canvas#pr-title-gate-sky overlay(op=1 vis=visible pe=auto) skyCentreAlpha=255

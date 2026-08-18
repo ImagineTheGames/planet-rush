@@ -24,9 +24,9 @@ npx tsc --noEmit                            # strict, whole repo
 ```
 
 What survives the deletion is the part that matters: `src/net/snapshot.test.ts`
-holds the live encoder to the same **494 B** worst case (`toBe(494)`), so the
-bandwidth arithmetic in §1 below cannot drift without a red test. The
-`Transport` interface is in `src/net/transport.ts`.
+holds the live encoder to a measured worst case (`toBe(622)` since a0-73, 494 B
+before it), so the bandwidth arithmetic in §1 below cannot drift without a red
+test. The `Transport` interface is in `src/net/transport.ts`.
 
 **Status since (prediction):** the client no longer waits for the wire. It runs
 the same `step()` the server runs on its own input the moment that input is sent,
@@ -53,8 +53,8 @@ because they are measurements rather than intentions:
 in-process for offline play and speaks the protocol below with the wire
 removed. The measured wire layout is promoted to `src/net/snapshot.ts` and
 encodes the *real* `World` rather than the stand-in; `src/net/snapshot.test.ts`
-pins it to the same 510-byte worst case measured here, so the bandwidth numbers
-in this document cannot silently drift. Two spike items remain open and are
+pins it to a measured worst case (510 B here, 622 B today — §1's amendments), so
+the bandwidth numbers in this document cannot silently drift. Two spike items remain open and are
 called out below rather than quietly closed: the **TCP head-of-line measurement
 still needs a real lossy network**, which arrives with `WebSocketTransport`, and
 the tick-rate headroom is still measured against the stand-in workload, not the
@@ -127,8 +127,8 @@ little-endian hand-packed record and is pinned to the same total):
 |---|---|---|
 | Header | `tick u32` · `shipCount u8` · `projCount u8` | 6 |
 | Ship × 8 | `id u8` · `posX/posY i16` · `velX/velY i16` · `heading u16` · `hull u8` · `flags u8` = 13 ea | 104 |
-| Projectile × 64 | `id u8` · `posX/posY i16` · `meta u8` = 6 ea | 384 |
-| **Worst case** | 8 ships + 64 projectiles (GDD entity caps) | **494** |
+| Projectile × 64 | `id u8` · `posX/posY i16` · `heading u8` · `speed u8` · `meta u8` = 8 ea | 512 |
+| **Worst case** | 8 ships + 64 projectiles (GDD entity caps) | **622** |
 
 > **Amendment (v0.3 laser funeral).** The ship record was 15 B / worst case
 > **510 B** as originally measured, with a `heading u16` **and** an `aim u16`.
@@ -138,6 +138,23 @@ little-endian hand-packed record and is pinned to the same total):
 > ships takes the ship record to 13 B and the worst case to **494 B**. The
 > numbers below are the original day-0 measurement; the 16 B reduction only makes
 > the bandwidth argument stronger. See `docs/design-amendments.md`.
+
+> **Amendment (a0-73, remote shot heading — wire v3).** The projectile record was
+> 6 B and carried **no velocity in any form**, so a client could only ever place a
+> remote shot where a packet put it: chord-interpolated while two snapshots
+> bracketed it, and *frozen* at the head of a flight, at the tail of one, and for
+> the whole of any gap in the stream. Measured at a 200 ms gap, a shot finished it
+> **104 world units** behind where its own heading had it — a third of the ship
+> weapon's entire reach — which is the developer's *"other players shots dont
+> follow the direction they were fired in."* The record now carries one byte of
+> heading (1.406°/step) and one of speed (4 u/s per step): **8 B, worst case
+> 622 B**, and `WIRE_VERSION` goes to 3 because the record *stride* moved. Polar
+> rather than an `i16` velocity pair because a shot is a straight line at a
+> constant speed — 2 B instead of 4. The bandwidth table in §3 is re-billed against
+> 622 B below; the day-0 decision (30 Hz, 512 B budget) is unchanged in kind and
+> the worst case is now 26 % above that budget line while still 47 % of the
+> per-client one. Measurement, both columns and the per-shot cost:
+> `evidence/a0-73-remote-shots/audit.txt`.
 
 Only ships and projectiles stream as binary; static entities (asteroids,
 turrets, shields, wrecks) are events on join/change (GDD §4.2), so they cost
@@ -163,20 +180,29 @@ leaves ≈ 1138 / 250 ≈ **4.5× headroom** at 60 Hz — still real-time.
 
 ### 3. Per-client bandwidth (measured size × candidate rates)
 
-Per frame on the wire ≈ 510 B payload + ~44 B overhead (4 B WebSocket server→
-client header + ~40 B IPv4/TCP):
+Per frame on the wire ≈ payload + ~44 B overhead (4 B WebSocket server→client
+header + ~40 B IPv4/TCP). The day-0 column is the 510 B payload as first measured;
+the a0-73 column is the shipping 622 B one (§1's amendment), and it is what a
+client is billed today:
 
-| Broadcast rate | Worst-case down (per client) | vs 40 KB/s budget |
-|---|---|---|
-| 20 Hz | **10.8 KB/s** | 27% |
-| 30 Hz | **16.2 KB/s** | 41% |
-| 60 Hz (not used) | 32.5 KB/s | 81% |
+| Broadcast rate | Worst-case down, day-0 (510 B) | a0-73 (622 B) | vs 40 KB/s budget |
+|---|---|---|---|
+| 20 Hz | **10.8 KB/s** | **13.0 KB/s** | 32% |
+| 30 Hz | **16.2 KB/s** | **19.5 KB/s** | 49% |
+| 60 Hz (not used) | 32.5 KB/s | 39.0 KB/s | 98% |
+
+Measured rather than worst-cased, on an 8-ship match firing into a rock field
+(8.7 concurrent shots on average, peak 14): a snapshot is **179.9 B** and a client
+takes **5.68 KB/s**, against 162.4 B / 5.17 KB/s before a0-73 — the two extra
+bytes cost a real match **+0.51 KB/s**, or 35 bytes over a whole ship shot's
+0.577-second flight (`evidence/a0-73-remote-shots/`).
 
 Upstream (client → server) is one small `InputMessage` per client tick — a
 handful of `Action`s; binary-encodable to tens of bytes, tens of KB/s at most,
-never the bottleneck. Server aggregate egress at 30 Hz ≈ 8 × 16.2 = **~1.04
-Mbps**, ≈ **117 MB per 15-min match** — negligible against any host's transfer
-allowance (Oracle Always Free alone gives 10 TB/month).
+never the bottleneck. Server aggregate egress at 30 Hz ≈ 8 × 19.5 = **~1.25
+Mbps** worst case, ≈ **140 MB per 15-min match** (8 × 16.2 = ~1.04 Mbps / 117 MB
+before a0-73) — negligible against any host's transfer allowance either way
+(Oracle Always Free alone gives 10 TB/month).
 
 ---
 
@@ -184,18 +210,20 @@ allowance (Oracle Always Free alone gives 10 TB/month).
 
 ### The two GDD §4.2 hypotheses, adjudicated
 
-- **~2 KB snapshot → BUSTED.** Measured worst case is **510 B**, ~3.9× smaller;
-  typical live is ~300–400 B. The assumption over-estimated; the real number is
-  comfortably smaller.
-- **~40 KB/s per-client budget → CONFIRMED.** Worst case at the chosen 30 Hz is
-  **16.2 KB/s** (41% of budget). Even a 60 Hz broadcast would stay under. The
-  budget holds with room to spare.
+- **~2 KB snapshot → BUSTED.** Measured worst case was **510 B** on day 0 and is
+  **622 B** today (a0-73), still ~3.2× smaller than the assumption; typical live is
+  ~180–400 B. The assumption over-estimated; the real number is comfortably
+  smaller, and it has room to grow into.
+- **~40 KB/s per-client budget → CONFIRMED.** Worst case at the chosen 30 Hz was
+  **16.2 KB/s** (41% of budget) on day 0 and is **19.5 KB/s** (49%) since a0-73.
+  Even a 60 Hz broadcast would stay under, barely. The budget holds.
 
 ### TCP head-of-line blocking (risk 3)
 
 Cannot be fully characterized without a real lossy network (that lands with the
-day-3 transport), but the size argument is favorable: a 510 B snapshot fits in a
-single sub-MTU TCP segment, so one snapshot ≈ one segment. A dropped segment
+day-3 transport), but the size argument is favorable: a snapshot fits in a single
+sub-MTU TCP segment at 510 B, at 494 B, and at today's 622 B alike — so one
+snapshot ≈ one segment. A dropped segment
 stalls only ~1 RTT until retransmit, and because snapshots are **full state**,
 not deltas, the very next snapshot fully recovers — a lost frame is a skipped
 interpolation target, not desync. HoL risk at 8 players is therefore **low but
@@ -253,6 +281,16 @@ the server.
 ---
 
 ## DECISION: sim 60 Hz / snapshot broadcast 30 Hz · snapshot budget 512 B (measured 510 B worst case) · host = Oracle Cloud Always Free (ARM Ampere A1), fallback = ~€4/mo Hetzner VPS — both run the identical Dockerized Node process, so switching is an afternoon (risk 1).
+
+> **The 512 B budget line is EXCEEDED, deliberately, and is recorded here rather
+> than quietly re-drawn (a0-73).** The measured worst case is **622 B**. 512 was a
+> round number set just above a 510 B measurement, not a constraint anything
+> enforces — the constraints this spike actually adjudicated are the GDD's ~2 KB
+> snapshot (still busted, 3.2×) and its ~40 KB/s per-client budget (still
+> confirmed, 49 %), and both hold. The two bytes bought a remote shot the heading
+> it was fired on, which is a fairness rule (GDD §2.6) rather than a smoothness
+> one. Everything else on this line — 60 Hz sim, 30 Hz broadcast, the host
+> reasoning — is untouched.
 
 > **The host line above is superseded — Oracle → Fly.io.** See
 > *Status since (hosting, 2026-07-25)* below for the change and, more to the
@@ -504,7 +542,7 @@ region hints, router). Out of scope for M10 by the brief.
 QA's live online gates passed create and two-clients and failed **reconnect**: a
 reclaimed seat got its ship back *naked*. The cause was a layout decision from this
 spike, working as designed. The 30 Hz snapshot carries ships and projectiles only —
-510 measured bytes — because a ship's **wallet** (held ore, banked ore, upgrade
+510 measured bytes then, 622 now — because a ship's **wallet** (held ore, banked ore, upgrade
 tiers, the DAMAGE/SPEED weapon tiers among them) is match-lifetime state a client
 maintains by *deterministic replay of its own input*: same `step()`, same result, no
 bytes. That reasoning holds exactly as long as the player is flying.
@@ -540,9 +578,10 @@ has no business knowing it. Instead:
 
 **Measured cost.** 136 B typical / 168 B worst case as a JSON text frame (five
 upgrade tracks, fractional held ore) against the snapshot stream's 16.2 KB/s at
-30 Hz. Worst case — a client mining continuously, so the hold changes every tick —
-adds ~5.0 KB/s, taking one client's downstream to ~21 KB/s (**53%** of the 40 KB/s
-budget, from 41%). Typical is far below that: a wallet that has not moved sends
+30 Hz (19.5 KB/s since a0-73). Worst case — a client mining continuously, so the
+hold changes every tick — adds ~5.0 KB/s, taking one client's downstream to
+~21 KB/s (**53%** of the 40 KB/s budget, from 41%); on today's layout that is
+~24.5 KB/s (**61%**, from 49%). Typical is far below that: a wallet that has not moved sends
 nothing, and nothing about flying, shooting or being shot at moves a wallet. It is
 state, not a diff, so a dropped frame is corrected by the next one rather than
 desyncing the client.

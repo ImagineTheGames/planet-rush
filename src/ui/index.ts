@@ -347,6 +347,46 @@ export {
 } from './nameplates-view';
 export type { DrawnNameplate } from './nameplates-view';
 
+// --- Who is still flying (a0-76) -------------------------------------------
+//
+// The developer: *"do we have any indication when a player loses connection …
+// and when they join back as well … we need something to indicate that so other
+// players know"*. `./connection-status` and `src/net/link-loss` are about YOUR
+// socket; this is the other side of the same drop — a peer's seat, named, and
+// named again when they return.
+//
+// The same pure-model / pooled-view split as the nameplates above:
+// `PeerPresenceLog` holds one state per seat and produces the transition lines,
+// `PeerPresenceView` paints them under the wave clock and self-registers.
+//
+// **Wiring seam**, for whoever boots the client (`src/main.ts`, Platform) — the
+// log is fed from AUTHORITY and from nothing else, because a client cannot know
+// why another client went quiet:
+//
+//   const presence = new PeerPresenceLog({ local: LOCAL_PLAYER, names });
+//   session.observe((m) => {
+//     if (m.type === 'playerSubstituted') presence.noteDropped(m.player, now, { held: m.heldForMatch });
+//     else if (m.type === 'playerReclaimed') presence.noteBack(m.player, now);
+//     else if (m.type === 'lobbyState') presence.noteBots(m.slots.map((s) => s.isBot), now);
+//     else if (m.type === 'matchEnd') presence.noteMatchEnd(now);
+//   });
+//   hudFrame.presence = presence.read(now);   // once a frame
+export {
+  PeerPresenceLog,
+  applyPresenceMessage,
+  presenceClause,
+  presenceText,
+  PRESENCE_REASON,
+  PRESENCE_TELL_SECONDS,
+  PRESENCE_FADE,
+  PRESENCE_MAX_LINES,
+  BOT_CLAUSE,
+  BOT_CLAUSE_CLEARED,
+} from './peer-presence';
+export type { PeerPresence, PresenceTell, SeatPresence } from './peer-presence';
+export { PeerPresenceView, PRESENCE_ID, PRESENCE_ANCHOR } from './peer-presence-view';
+export type { DrawnPresenceLine } from './peer-presence-view';
+
 // --- The 8-slot lobby (GDD §2.1, §2.11, §4.2) ------------------------------
 //
 // The same three-piece shape as everything else here: a pure model
@@ -1086,6 +1126,16 @@ export { beamContent, countPrimaries, gantryFrame, singlePrimary, stackPlates } 
 export type { GantryFrame } from './gantry';
 
 export { MainMenuView, MAIN_MENU_ANCHOR } from './main-menu-view';
+// The void behind the menus (a0-79) — the REAL `VoidBackdrop`, baked once per
+// resize because a menu is static. See `./menu-backdrop` for the trade.
+export {
+  MenuBackdrop,
+  MENU_SKY,
+  MENU_SKY_MAP,
+  MENU_BAKE_MAX_TEXELS,
+  menuBakeResolution,
+  menuSkyEnabled,
+} from './menu-backdrop';
 
 // --- The CODEX — the optional main-menu reference (GDD §2.10) ---------------
 //

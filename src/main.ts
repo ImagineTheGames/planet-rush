@@ -157,6 +157,8 @@ import {
   BUILD_BUTTON_ID,
   BUILD_BUTTON_ANCHOR,
   MainMenuView,
+  MenuBackdrop,
+  menuSkyEnabled,
   SettingsView,
   mainMenuModel,
   mainMenuLayout,
@@ -337,6 +339,11 @@ import {
   cameraScale,
   VIEW_ZOOM_STORAGE,
   showStickFurniture,
+  // a0-76 — who is still flying: one presence state per seat, fed from the
+  // server's own drop / reclaim / roster broadcasts, and the one function that
+  // routes those broadcasts into it.
+  PeerPresenceLog,
+  applyPresenceMessage,
 } from './ui';
 import type {
   HudFrame,
@@ -647,10 +654,6 @@ const MATCH_SEED = 1;
  * sparks, never a mechanic (GDD §3.6).
  */
 const REDUCED_VFX_DENSITY = 0.5;
-
-/** The world origin, for reading the live camera offset back out of the renderer
- *  (`projectToScreen`). A module constant so the read costs no allocation. */
-const WORLD_ORIGIN: Vec2 = { x: 0, y: 0 };
 
 /** Index of UPGRADE SHIP: the one segment that opens a screen instead of
  *  spending (GDD §2.5). Read from the wheel's own order so it cannot drift. */
@@ -1518,15 +1521,22 @@ async function boot(): Promise<void> {
   const vfxTextures = new SpriteTextureCache(app.renderer, Math.min(window.devicePixelRatio || 1, 2));
   const vfxField = new VfxField({ seed: matchSeed });
   const vfxLayer = new VfxLayer(vfxTextures);
-  //     Above the world the renderer just added to `gameRoot`, below the HUD that
-  //     is added after us — an explosion draws over the ship it came off, and
-  //     under the readouts. It is a WORLD-space layer parked in screen space: the
-  //     renderer's camera transform is read back through its own public
-  //     `projectToScreen` seam each frame (below), so nothing in `src/render/`
-  //     — the Platform Engineer's file — has to change to carry it.
-  gameRoot.addChild(vfxLayer);
-  /** Reused scratch for that camera read-back — zero per-frame allocation. */
-  const vfxOriginScratch: Vec2 = { x: 0, y: 0 };
+  //     INSIDE the world, above every entity layer and below the HUD added after
+  //     us — an explosion draws over the ship it came off, and under the readouts.
+  //     The particles are world-space, so they are parented into the world's own
+  //     container (`renderer.addWorldLayer`, a0-80) and inherit the whole camera:
+  //     the offset AND the zoom scale a0-74 added.
+  //
+  //     It used to hang off `gameRoot` beside that container and chase the camera
+  //     by writing its own position from `projectToScreen` every frame. That is
+  //     the seam this bug came through: a layer positioned from the outside only
+  //     tracks the parts of the camera its author knew about, and the day the
+  //     camera grew a scale, every particle in the game landed at a fraction of
+  //     the distance to its emitter — which the developer saw on the thruster at
+  //     1.5× and 2× and which was equally true of impacts, ore, shield hits and
+  //     the station-death burst. The fix is parentage, not a scale multiply here:
+  //     two owners of one transform disagree the first time either one changes.
+  renderer.addWorldLayer(vfxLayer);
   /** Whether the frozen review sheet has been staged this boot (`?freeze=1`). */
   let vfxShowcased = false;
 
@@ -1645,6 +1655,7 @@ async function boot(): Promise<void> {
     installAudioStage();
     installVfxStage();
     installViewStage();
+    installPresenceStage();
   }
 
   // The pause seam is installed on BOTH boots, unlike the debug stages above, and
@@ -2419,6 +2430,20 @@ async function boot(): Promise<void> {
   const nameableFrame: Nameable[] = [];
   let playerNames: NameTable = [];
   let playerDifficulties: DifficultyTable = [];
+  /**
+   * **Who is still flying** (a0-76) — one presence state per seat, fed from the
+   * server's own broadcasts and from nothing else.
+   *
+   * The developer: *"do we have any indication when a player loses connection …
+   * and when they join back as well … we need something to indicate that so
+   * other players know"*. The answer was no: `src/net/link-loss` tells the
+   * player who dropped, and nobody else. This log is the other side of that
+   * drop, and the HUD reads it once a frame (`hudFrame.presence`).
+   *
+   * Constructed unconditionally, wired only online: a `LocalLoopback` has no wire
+   * to drop, so an offline match feeds an empty read and draws nothing.
+   */
+  const peerPresence = new PeerPresenceLog({ local: LOCAL_PLAYER, names: playerNames });
   /** Each slot's side, and whether the match has sides worth naming (m10 teams).
    *  Rebuilt with the name table, from the same live world, on every boot and
    *  rematch — so a rematch that changed the split relabels with it. */
@@ -2507,6 +2532,10 @@ async function boot(): Promise<void> {
     }
     playerNames = table;
     playerDifficulties = tiers;
+    // The banner spells a seat exactly the way its nameplate does, so a rebuilt
+    // table re-spells any line still on screen (a0-76).
+    peerPresence.setNames(playerNames);
+    peerPresence.setLocal(LOCAL_PLAYER);
     rebuildTeamTable();
   }
 
@@ -2541,6 +2570,30 @@ async function boot(): Promise<void> {
     viewerTeam = local ? (local.team ?? local.id) : undefined;
   }
   rebuildNameTable();
+
+  // --- WHO IS STILL FLYING (a0-76) -----------------------------------------
+  //
+  // > *"do we have any indication when a player loses connection (like for the
+  // > other players that remained in match…) and when they join back as well…
+  // > we need something to indicate that so other players know"*
+  //
+  // **Authority is the only source, and this is the whole of the feed.** A client
+  // cannot know why another client went quiet — lag, a closed tab, a dead ship
+  // and a rage-quit all look identical from the cockpit — so nothing below is
+  // derived from the simulation or from a peer's ship going still. Each branch is
+  // a message the server broadcast about a seat (`src/net/transport.ts`), on the
+  // roster channel that already reaches every client.
+  //
+  // Online only: a `LocalLoopback` has no wire, so an offline match never reaches
+  // any of this and the banner is never drawn.
+  // The routing itself lives beside the model (`src/ui/peer-presence.ts`
+  // `applyPresenceMessage`) rather than as a `switch` here, so the test can drive
+  // the real feed with real wire messages instead of a re-implementation of it.
+  if (onlineSession) {
+    onlineSession.observe((message) => {
+      applyPresenceMessage(peerPresence, message, world.time);
+    });
+  }
 
   // --- Freeze (?freeze=1, with ?debug=1): advance the sim to a fixed seeded
   //     tick, then hold it there so screenshots are deterministic across boots
@@ -2680,14 +2733,11 @@ async function boot(): Promise<void> {
         vfxField.consume(audioTells);
         vfxField.update(frameSeconds);
       }
-      // The layer holds world-space particles but hangs in screen space beside the
-      // renderer's own world root, so it is offset by the camera the renderer just
-      // wrote — read back through its public `projectToScreen` seam rather than
-      // recomputed, so the particles can never disagree with the ships they came
-      // off. Two writes, no allocation.
-      renderer.projectToScreen(WORLD_ORIGIN, vfxOriginScratch);
-      vfxLayer.x = vfxOriginScratch.x;
-      vfxLayer.y = vfxOriginScratch.y;
+      // The layer's particles are in world units and the layer sits INSIDE the
+      // renderer's world container (a0-80), so the camera — offset and zoom scale
+      // both — is already on it and there is nothing to write here but the pool.
+      // The particles cannot disagree with the ships they came off, because they
+      // are drawn through the same transform, not through a copy of part of it.
       vfxLayer.draw(vfxField.pool);
       // Phones lock and tabs get backgrounded mid-match; the context comes back
       // suspended and the rest of the game is silent unless something re-arms the
@@ -3162,6 +3212,8 @@ async function boot(): Promise<void> {
     // the first one's timeline (a0-56).
     recordMatchStart('rematch');
     rebuildNameTable();
+    // A rematch is a second match: last match's drops are not this one's (a0-76).
+    peerPresence.reset();
     // A new match is a new tally and a new summary: the observer is rebuilt on the
     // fresh world, and the banked sequence is dropped so the NEXT teardown writes
     // once again (`bankMatch`'s latch is this binding).
@@ -3955,8 +4007,12 @@ async function boot(): Promise<void> {
    * all is both correct and simplest. Positions are projected world → screen via
    * the renderer's *actual* camera transform (`projectToScreen`, called after
    * `renderer.draw`), so a bar sits exactly over the sprite and is a fixed screen
-   * size regardless of zoom — the camera renders 1:1, so a world radius is a
-   * screen radius.
+   * size regardless of zoom. The RADIUS crosses the same seam and needs the same
+   * transform: the bar hangs clear of the sprite by it, and `Combatant.radius` is
+   * screen px by contract (`@ui/healthbar`). It read `ship.radius` straight off
+   * the sim while the camera was 1:1, and a0-74's zoom made those two different
+   * numbers — so it goes through `projectLength` now, for the same reason and off
+   * the same transform as the position beside it (a0-80).
    *
    * Allocation-free after warm-up (GDD §4.3): the combatant records are pooled
    * and overwritten in place, and the frame array is reused. The count is bounded
@@ -3975,7 +4031,7 @@ async function boot(): Promise<void> {
       c.alive = ship.alive;
       c.inCombat = ship.firing; // firing this tick (sim publishes the tell)
       renderer.projectToScreen(ship.pos, c.pos);
-      c.radius = ship.radius;
+      c.radius = renderer.projectLength(ship.radius);
       c.turret = false;
     }
     for (const station of world.stations) {
@@ -3992,7 +4048,7 @@ async function boot(): Promise<void> {
         // `turret.pos` is derived from the orbit angle each tick, so the bar rides
         // along as the turret slides around its station's rim (sim orbit, P1).
         renderer.projectToScreen(turret.pos, c.pos);
-        c.radius = turret.radius;
+        c.radius = renderer.projectLength(turret.radius);
         c.turret = true;
       }
     }
@@ -4039,7 +4095,9 @@ async function boot(): Promise<void> {
       c.alive = ship.alive && !ship.eliminated;
       c.local = ship.id === LOCAL_PLAYER;
       renderer.projectToScreen(ship.pos, c.pos);
-      c.radius = ship.radius;
+      // Screen px by contract (`@ui/nameplates-view` floats the label off it), so
+      // it rides the camera scale exactly as the position does (a0-80).
+      c.radius = renderer.projectLength(ship.radius);
     }
     for (const station of world.stations) {
       const c = nameableSlot(n++);
@@ -4049,7 +4107,7 @@ async function boot(): Promise<void> {
       c.alive = station.alive;
       c.local = false;
       renderer.projectToScreen(station.pos, c.pos);
-      c.radius = station.radius;
+      c.radius = renderer.projectLength(station.radius);
     }
     nameableFrame.length = 0;
     for (let i = 0; i < n; i++) nameableFrame.push(nameablePool[i]!);
@@ -4062,6 +4120,10 @@ async function boot(): Promise<void> {
     // exactly what `areEnemies` will act on.
     hudFrame.playerTeams = playerTeams;
     hudFrame.teamsMode = teamsMode;
+    // Who dropped, who is back, and who is flying whose ship (a0-76). Read on the
+    // sim's own clock, the same one the loot tell's window runs on, so a line's
+    // five seconds are five seconds of match.
+    hudFrame.presence = peerPresence.read(world.time);
     // …and whose side is FRIENDLY (u3). Same source, same rebuild, so a rematch
     // that moves this player to the other side re-words every plate with them.
     hudFrame.viewerTeam = viewerTeam;
@@ -4113,7 +4175,11 @@ async function boot(): Promise<void> {
       renderer.projectToScreen(locked.pos, tapLockScreen);
       tapLockMark.x = tapLockScreen.x;
       tapLockMark.y = tapLockScreen.y;
-      tapLockMark.radius = locked.radius;
+      // The reticle's brackets float just outside the target's SCREEN radius
+      // (`@ui/tap-markers`), so the world radius crosses the camera the same way
+      // the centre does — otherwise the bracket sits a target's width off the
+      // drawn edge at 2x (a0-80).
+      tapLockMark.radius = renderer.projectLength(locked.radius);
       hudFrame.tapLock = tapLockMark;
     } else {
       delete hudFrame.tapLock;
@@ -5267,6 +5333,85 @@ async function boot(): Promise<void> {
    * Behind ?debug=1, never in a normal build; it mutates only the plain sim data
    * the boot path already reads, and reaches src/sim only through `damageStation`.
    */
+  /**
+   * Install `window.__presenceStage` — the ?debug=1 live-stage seam for the peer
+   * presence banner (a0-76), the same discipline as {@link installPressStage}.
+   *
+   * **What only a boot can prove.** `src/ui/hud.test.ts` proves the model turns
+   * authority's broadcasts into the right lines, and `hud-geometry` proves where
+   * the band lands. Neither can prove the shipped bundle DRAWS one — the leg from
+   * `HudFrame.presence` through `PeerPresenceView` to a pixel is exactly the kind
+   * of wiring that has shipped dead in this codebase before (the M2 dark-matter
+   * class: a merged feature nothing ever called).
+   *
+   * So this feeds REAL {@link ServerMessage} values through
+   * {@link applyPresenceMessage} — the same function the online session's observer
+   * calls, not a shortcut past it — and reads back the rows the view actually
+   * drew, post-cull. `?debug=1` boots offline, where nothing can drop, which is
+   * precisely why the messages are injected rather than waited for.
+   */
+  function installPresenceStage(): void {
+    const stage = {
+      /** A seat dropped: the socket went away and a bot took the controls. `held`
+       *  is a0-72's `heldForMatch` — false is an ABANDON, which is a different
+       *  line. */
+      drop(seat: number, held = true): void {
+        applyPresenceMessage(
+          peerPresence,
+          held
+            ? { type: 'playerSubstituted', player: seat, graceSeconds: 0, heldForMatch: true }
+            : { type: 'playerSubstituted', player: seat, graceSeconds: 0 },
+          world.time,
+        );
+      },
+      /** They rejoined and took their ship back. */
+      back(seat: number): void {
+        applyPresenceMessage(peerPresence, { type: 'playerReclaimed', player: seat }, world.time);
+      },
+      /** The roster's `isBot` column, as `lobbyState` publishes it. */
+      bots(isBot: readonly boolean[]): void {
+        applyPresenceMessage(
+          peerPresence,
+          {
+            type: 'lobbyState',
+            slots: isBot.map((bot, player) => ({
+              player,
+              isBot: bot,
+              shipClass: ShipClass.Vanguard,
+              ready: true,
+            })),
+          },
+          world.time,
+        );
+      },
+      /** Clear the log — a rematch is a second match. */
+      reset(): void {
+        peerPresence.reset();
+      },
+      /** The rows the HUD's view DREW last frame, post-cull. */
+      drawn(): ReturnType<typeof hud.debugPresence> {
+        return hud.debugPresence();
+      },
+      /** …and the lines the model would like drawn, so a test can tell "the model
+       *  said nothing" from "the view culled it". */
+      lines(): { text: string; seat: number; state: string }[] {
+        return peerPresence
+          .read(world.time)
+          .map((l) => ({ text: l.text, seat: l.seat, state: l.state }));
+      },
+    };
+    try {
+      Object.defineProperty(window, '__presenceStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
   function installRepairStage(): void {
     const REPAIR_INDEX = WHEEL_ORDER.indexOf('repair');
     const localStation = () => stationOf(world, LOCAL_PLAYER);
@@ -7765,7 +7910,36 @@ function openMainMenu(
   const hangarView = new HangarView(menu0.w, menu0.h, isTouch);
   let hangarHover: string | null = null;
   let hangarPress: string | null = null;
+  // --- The sky behind all five screens (a0-79; `./ui/menu-backdrop`) --------
+  //     Developer: *"I'd like to see a space background on every menu screen
+  //     (the main title screen already has it, id like it to persist
+  //     throughout)"*. The void used to belong to the MATCH renderer alone, so
+  //     the moment a player left the title gate the game's own sky disappeared
+  //     and every menu was a flat panel.
+  //
+  //     It is the REAL `VoidBackdrop`, not a second star field — one field, one
+  //     set of numbers — and it is BAKED, because a menu is static: `configure`
+  //     and `update` run once per resize and the assembled void is blitted
+  //     thereafter (see `./ui/menu-backdrop` for the measured trade, and a0-75
+  //     for the per-pixel cost it is buying out of).
+  //
+  //     Added FIRST so it sits behind the five screens, and each screen is told
+  //     it no longer has to paint its own ground — a full-screen opaque fill in
+  //     front of the sky is a sky nobody can see.
+  //
+  //     `?sky=0` turns it off and nothing else — the lever the cost evidence
+  //     A/Bs against, in one page under one load (`./ui/menu-backdrop`
+  //     `menuSkyEnabled`). Default is on.
+  const skyBehindMenus = menuSkyEnabled(window.location.search);
+  const menuBackdrop = skyBehindMenus ? new MenuBackdrop(app.renderer.resolution) : null;
+  if (menuBackdrop) {
+    menuBackdrop.resize(menu0.w, menu0.h);
+    ctx.root.addChild(menuBackdrop);
+  }
   ctx.root.addChild(menuView, settingsView, codexView, entryView, hangarView);
+  for (const view of [menuView, settingsView, codexView, entryView, hangarView]) {
+    view.setVoidBehind(skyBehindMenus);
+  }
 
   // The read-only test seam. `matchStarted` is flipped by `handle.matchStarted()`
   // once the real world is built, never here — so the suite's "no sim on the
@@ -9674,10 +9848,14 @@ function openMainMenu(
     // re-layout the field report found missing (rotate → menu stranded).
     ctx.recomputeTransform();
     const { w, h } = ctx.logicalSize();
+    // The still frame first: it is baked for one viewport, so a resize has to
+    // re-bake it before anything draws over it (`./ui/menu-backdrop`).
+    menuBackdrop?.resize(w, h, app.renderer.resolution);
     menuView.resize(w, h, isTouch);
     settingsView.resize(w, h, isTouch);
     codexView.resize(w, h, isTouch);
     entryView.resize(w, h, isTouch);
+    hangarView.resize(w, h, isTouch);
     render();
   }
 
@@ -9703,11 +9881,20 @@ function openMainMenu(
     // view is exactly the u12-01 failure, one screen over.
     if (browseTimer !== null) clearInterval(browseTimer);
     browseTimer = null;
-    ctx.root.removeChild(menuView, settingsView, codexView, entryView);
+    // The hangar joined this list in a0-79: it was added to the root at a0-14 and
+    // never taken off it, so the fourth door outlived the shell that owned it.
+    ctx.root.removeChild(menuView, settingsView, codexView, entryView, hangarView);
+    // The backdrop first, and through its own `destroy` — it holds a pooled
+    // render texture that has to be released before the container goes.
+    if (menuBackdrop) {
+      ctx.root.removeChild(menuBackdrop);
+      menuBackdrop.destroy({ children: true });
+    }
     menuView.destroy({ children: true });
     settingsView.destroy({ children: true });
     codexView.destroy({ children: true });
     entryView.destroy({ children: true });
+    hangarView.destroy({ children: true });
   }
 
   app.canvas.addEventListener('pointerdown', onPointerDown);

@@ -1994,11 +1994,19 @@ export function applySnapshot(
     projectile.kind = (snap.meta & SHOT_META.shipKind) !== 0 ? 'ship' : 'turret';
     projectile.pos.x = snap.posX;
     projectile.pos.y = snap.posY;
-    // Velocity is not streamed for shots — six bytes each, and a client that
-    // sees the whole board can watch them fly. A slot the client was already
-    // flying keeps its heading and is merely corrected; a slot it has never seen
-    // starts still and is placed again 2 ticks later. What it must *not* do is
-    // expire between snapshots, so the clock is wound back on every one.
+    // The line the shot was fired on, off the wire (a0-73). This used to read
+    // "velocity is not streamed for shots… a slot the client was already flying
+    // keeps its heading and is merely corrected", and both halves were wrong in the
+    // same direction: a slot the client had *never* flown started at rest, and a
+    // slot it had flown kept the heading of whatever shot used it BEFORE — the pool
+    // is slot-keyed and `takeProjectile` hands out the lowest free slot, so that
+    // previous occupant is routinely a different shooter aiming somewhere else.
+    // Every replayed tick then carried the shot along that stale line. Authority
+    // knows the answer and now says it.
+    projectile.vel.x = snap.velX;
+    projectile.vel.y = snap.velY;
+    // What a streamed shot must *not* do is expire between snapshots, so the clock
+    // is wound back on every one.
     projectile.life = PROJECTILE.life;
   }
   return wireSlots;

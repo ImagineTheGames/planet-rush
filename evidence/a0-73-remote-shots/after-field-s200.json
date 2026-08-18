@@ -1,0 +1,64 @@
+{
+  "scene": {
+    "name": "field",
+    "ships": 8,
+    "asteroids": 40,
+    "simHz": 60,
+    "snapshotHz": 30,
+    "latencyMs": 75,
+    "jitterMs": 0,
+    "interpDelayMs": 100,
+    "stallMs": 200,
+    "shipMuzzleSpeed": 520,
+    "turretMuzzleSpeed": 700
+  },
+  "wireCost": {
+    "snapshots": 294,
+    "meanShotsPerSnapshot": 8.6,
+    "peakShotsPerSnapshot": 14,
+    "meanBytes": 179,
+    "meanBytesAtSixByteRecord": 161.8,
+    "peakBytes": 222,
+    "downstreamKBs": 5.65,
+    "downstreamKBsAtSixByteRecord": 5.15,
+    "worstCaseBytes": 622,
+    "worstCaseKBs": 18.63
+  },
+  "remoteShotsFired": 180,
+  "dotsMeasured": 5137,
+  "crossTrackError": {
+    "mean": 0.034,
+    "p95": 0.067,
+    "max": 1.133
+  },
+  "alongTrackError": {
+    "mean": 0.026,
+    "p95": 0.06,
+    "max": 0.084
+  },
+  "offItsOwnLine": {
+    "frames": 4,
+    "ofFrames": 5137,
+    "worstUnits": 1.133
+  },
+  "perFrameStep": {
+    "mean": 8.667,
+    "p95": 8.706,
+    "max": 8.737,
+    "frozenFrames": 0,
+    "ofFrames": 4969
+  },
+  "duringStall": {
+    "dots": 203,
+    "crossTrackError": {
+      "mean": 0.204,
+      "p95": 0.845,
+      "max": 1.133
+    },
+    "alongTrackError": {
+      "mean": 0.028,
+      "p95": 0.057,
+      "max": 0.07
+    }
+  }
+}

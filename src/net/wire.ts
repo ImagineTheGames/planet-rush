@@ -89,8 +89,16 @@ import type {
  * payload's positions and velocities became eighths of a world unit rather than
  * whole ones (`./snapshot` `POS_SCALE`) — a v1 client decoding a v2 payload would
  * draw the entire match at an eighth scale.
+ *
+ * **v3 (a0-73, remote shot heading)** — the projectile record grew from 6 bytes to
+ * 8: a shot now carries the heading and speed it was fired on (`./snapshot`
+ * `ProjSnap`), so a client can advance a remote shot along its own line between
+ * snapshots instead of leaving it frozen wherever the packets are not. The record
+ * *stride* moved, which is the worst kind of change to meet unversioned — a v2
+ * reader would walk a v3 projectile array 2 bytes out of step per entity and
+ * decode the whole stream into garbage rather than reject it.
  */
-export const WIRE_VERSION = 2;
+export const WIRE_VERSION = 3;
 
 /** First byte of a binary frame: this is a snapshot. Room for more binary
  *  frame kinds later (a binary input frame is the obvious next one). */

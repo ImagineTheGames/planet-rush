@@ -1,28 +1,170 @@
 # Planet Rush CI + classroom distribution (GDD §4.8).
 #
-#   push (any branch/PR) -> typecheck, unit tests, build     (the merge gate)
-#   push to main         -> + deploy dist/ to GitHub Pages    (the public URL)
-#   push of a v* tag     -> + ping ntfy with the milestone's play notes
+#   pull_request      -> typecheck, unit tests, build, mobile   (the merge gate)
+#   push to main      -> the same + deploy dist/ to GitHub Pages (the public URL)
+#   push of a v* tag  -> the same + ping ntfy with the milestone's play notes
+#   workflow_dispatch -> the same, on any ref, for a branch with no PR yet
 #
 # A relative Vite base ('./', see vite.config.ts) lets the one built bundle
 # serve from any Pages subpath, so deploy needs no per-ref rebuild.
 name: CI
 
+# --- ONE RUN PER PUSH (a0-83). --------------------------------------------
+#
+# `branches: ['**']` used to sit next to `pull_request`, and a branch with an
+# open PR matches BOTH, so every push to every agent branch fired two identical
+# runs. Of the 97 non-main commits in the 200 CI runs before this change, 81
+# were built twice.
+#
+# The wasted minutes were the smaller half. The twins are not synchronised
+# (measured 2026-08-18: a0-81's pair started in the same second, a0-77's 37 s
+# apart), so a PR stays UNSTABLE until the SLOWER twin finishes and
+# merge-on-green ends up waiting on a redundant copy of work that already
+# passed. #449 and #450 sat green-but-unmerged for over two hours for exactly
+# that reason.
+#
+# So `push` no longer covers agent branches. `pull_request` is their gate, and
+# it is the better of the two: it builds the merge result rather than the
+# branch tip, and it is the only event for which the `mobile` job's `if:` is
+# true off main. What `push` still covers is unchanged and load-bearing:
+#
+#   - main, because that is the path to the player — `deploy` and then
+#     `Verify live deploy boots`, the gate that exists because a stale service
+#     worker once bricked the phone (LESSONS §5);
+#   - `v*` tags, because milestone deploys and the ntfy ping ride them. A
+#     `push` block carrying both `branches:` and `tags:` fires when EITHER
+#     matches, so narrowing the branch list leaves the tag path alone.
+#
+# The one gap this opens is a branch pushed before its PR exists, which now
+# gets no CI until the PR is opened. `workflow_dispatch` covers that on
+# demand — `gh workflow run ci.yml --ref <branch>` — which is a cheaper
+# answer than duplicating every push all day to buy coverage for the few
+# minutes before a PR is opened.
 on:
   push:
-    branches: ['**']
+    branches: [main]
     tags: ['v*']
   pull_request:
+  workflow_dispatch:
+
+# --- Supersede a PR's own stale runs, and nothing that ships. -------------
+#
+# Agents push in bursts — a0-75 pushed three commits in four minutes and all
+# three ran the whole pipeline to completion, though only the last one's result
+# was ever read. Grouping a PR's runs by PR NUMBER lets the run for commit N+1
+# cancel the superseded run for commit N, whose checks hang off an SHA that is
+# no longer the head, so nothing a merge gate reads goes yellow.
+#
+# push and dispatch runs key on `github.run_id` instead, which is unique per
+# run, so each is alone in its group by construction: a main or tag run can
+# never be cancelled by a later one — and never QUEUES behind one either, which
+# a shared group with `cancel-in-progress: false` would do, serialising every
+# merge to main behind the previous merge's six-shard mobile suite. Deploy
+# keeps its own `pages` group below; that is the thing that must not overlap.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 # Least privilege by default; the deploy job widens this for itself.
 permissions:
   contents: read
 
+# --- EVERY JOB IS BOUNDED (a0-84). ----------------------------------------
+#
+# GitHub's default job timeout is SIX HOURS, and on 2026-08-18 four runs used
+# most of it: `Boot from the deploy subpath` and `Mobile emulation shard 6/6`
+# sat at step 7/13 for up to 3h40m on `npx playwright install-deps chromium`,
+# an apt call against a stalled mirror. Nothing failed, so nothing retried, and
+# #451/#452/#454 held finished work at UNSTABLE for one to three hours until a
+# human cancelled them by hand. A hung job must FAIL, because a failure retries
+# and a hang does not.
+#
+# HOW THESE NUMBERS WERE PICKED. Measured, not guessed: all 487 ci.yml runs
+# between 2026-08-11 and 2026-08-18 (35 932 step records), with the Playwright
+# install steps subtracted so a stalled mirror could not inflate the very
+# budget meant to catch it. Per job, in minutes:
+#
+#   job                             n     p50    p99     max    timeout
+#   Typecheck, test, build        480     7.6   10.2    14.7      25
+#   Boot from the deploy subpath   91     1.1    3.6     7.1      15
+#   Perf gate — submission budget 421     1.6    4.5     8.1      15
+#   Mobile shard N/6             1484    17.1   26.8    41.8      55
+#   Verify live deploy boots       72     0.9    3.6     4.0      15
+#   Deploy to GitHub Pages         73     0.1    0.8     1.6      15
+#   Mobile emulation (rollup)     245      ~0     ~0      ~0       5
+#   Ping ntfy (tagged release)      —       —      —       —       5
+#
+# THE LONGEST LEGITIMATE JOB IN THAT WEEK WAS 41.8 MINUTES — mobile shard 1/6
+# on run 31893809811, and it was RED: a failing shard pays retries and trace
+# capture, so the slowest honest run of this pipeline is a failing one, not a
+# passing one. The slowest GREEN shard was 29.2 min (shard 6, run 32070397700,
+# which also ate a 6m45s `actions/checkout` stall). That is the number to
+# compare against when asking "is this job slow or is it hung": under ~42 min a
+# mobile shard is working, over it is not, and every other job in this file
+# should be done inside 15.
+#
+# The `max` column is what sets each budget, not `p99` — a timeout that trips on
+# a legitimate slow run is a flaky gate, and a flaky gate gets ignored. Headroom
+# is roughly 1.3–1.9x over the observed max. What these numbers cannot do is
+# absorb a suite that grows: if a mobile shard starts timing out at 55 min, the
+# answer is the shard plan (tests/mobile/shard-plan.ts, N in the matrix below),
+# not a bigger number here.
+
+# --- AND NO APT ON THE MERGE PATH AT ALL (a0-84). -------------------------
+#
+# A timeout turns the hang into a failure. Removing the hang is better, and the
+# hang had exactly one source: `npx playwright install-deps chromium`, an
+# apt-get inside the runner, on the critical path of every merge. Measured over
+# the same week: n=2106, p50 **14 s**, p90 21 s, p99 162 s, max **1975 s** — and
+# that 32.9-minute one concluded `success` (run 32077383512), so it was not even
+# visible as a problem. Nothing else in this file has that shape.
+#
+# WAS IT DOING ANYTHING? Yes, but not what its name suggests, and this was
+# measured on the runner rather than assumed. On ubuntu-latest 24.04 every
+# Chromium shared library it names is already installed — it reports "already
+# the newest version" for libnss3, libgbm1, libasound2t64, libcups2t64, the
+# whole list — and `ldd chrome` resolves clean on a bare runner with the step
+# gone. What it actually installed was 9 packages, 21.1 MB, ALL FONTS:
+# fonts-freefont-ttf, fonts-ipafont-gothic, fonts-tlwg-loma-otf, fonts-unifont,
+# fonts-wqy-zenhei, xfonts-{cyrillic,encodings,scalable,utils}. CJK, Thai,
+# Cyrillic and a bitmap-font toolchain, on a game whose UI is English.
+#
+# SO THE REAL QUESTION WAS THE GOLDENS, AND IT WAS ANSWERED BY RUNNING THEM.
+# The game ships its own latin-subset webfonts (public/fonts/{Audiowide,
+# Oxanium}*.woff2, `font-display: block`), so a system face is reached only by
+# the generic fallbacks. On a bare runner all six generic families —
+# sans-serif, serif, monospace, system-ui, "Trebuchet MS", "Segoe UI" — resolve
+# to DejaVu, which ships with the image; the 9 packages never displaced it, they
+# only added glyph coverage nothing here renders. Locally, forcing the harsher
+# case (hiding those font dirs, which DOES move the mono fallback) changes 254
+# of 1 024 000 pixels on the CODEX screen, the densest text in the game — 0.025%,
+# and all 254 are the monospace git-SHA build stamp in the bottom-left corner.
+# The same render twice with the fonts present differs by 0 pixels, so that is
+# signal, not noise — it is just the only signal there is.
+#
+# On the runner, with this step gone, all three shards that carry
+# goldens.spec.ts ran and passed: shard 1/6 iphone (31 passed), shard 4/6 pixel
+# (26), shard 6/6 desktop (37) — run 32105957750.
+#
+# What is left is the cache-MISS path, which downloads the browser binary from
+# the Playwright CDN and touches no package manager. Over the measured week it
+# ran ZERO times out of 2123 opportunities — the version-keyed cache hit every
+# single time — so it was never the risk; it is bounded at 10 minutes anyway.
+#
+# IF THIS EVER NEEDS TO COME BACK (a runner image that drops a library, a suite
+# that starts rendering CJK), the failure is loud and fast — Chromium refuses to
+# launch and names the missing library — and the way back is a BOUNDED call, not
+# this one: `timeout 120s npx playwright install-deps chromium` in a three-try
+# loop under a step `timeout-minutes`. Never an unbounded apt-get again.
+
 jobs:
-  # --- The merge gate: runs on every push and PR. ------------------------
+  # --- The merge gate: runs on every event this workflow answers to. -----
   ci:
     name: Typecheck, test, build
     runs-on: ubuntu-latest
+    # 14.7 min observed max over 480 runs (the max is a RED run — a failing
+    # vitest suite runs longer than a passing one). No apt on this job at all.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
 
@@ -106,13 +248,16 @@ jobs:
   # and the app-shell worker required to take control. `deploy` needs it, so this
   # class of bug now fails a PR instead of a deploy.
   #
-  # Runs on every push, like the merge gate and the perf gate and unlike the
-  # mobile suite: it is ~25 s of test behind the build, and it must not be
-  # `if:`-gated to PRs/main, because `deploy` depends on it and a SKIPPED
-  # dependency skips the dependent — which would silently stop v* tags shipping.
+  # Ungated, like the merge gate and the perf gate and unlike the mobile suite:
+  # it is ~25 s of test behind the build, and it must not be `if:`-gated to
+  # PRs/main, because `deploy` depends on it and a SKIPPED dependency skips the
+  # dependent — which would silently stop v* tags shipping.
   subpath-boot:
     name: Boot from the deploy subpath
     runs-on: ubuntu-latest
+    # 7.1 min observed max over 91 runs, net of the apt step this job no longer
+    # has. It is ~25 s of test behind an `npm ci` and a build; 15 is generous.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -128,9 +273,8 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
       - if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-      - if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
+        run: npx playwright install chromium
+        timeout-minutes: 10
 
       # The same VITE_ALLOCATOR_URL the shipped build is given, so the bundle
       # under test is the bundle that deploys and the online menu does not fail
@@ -149,9 +293,13 @@ jobs:
   # --- Publish the built client to GitHub Pages. ------------------------
   deploy:
     name: Deploy to GitHub Pages
+    # 1.6 min observed max over 73 runs; this job is one `deploy-pages` call.
+    # 15 leaves that action's own 10-minute internal timeout to fire first, so
+    # a stuck Pages API reports itself instead of being guillotined by us.
+    timeout-minutes: 15
     # `subpath-boot` joins `ci` here so a base-path regression can never reach
-    # the live URL again (a0-66). Both run on every push, so neither can be
-    # skipped out from under this job.
+    # the live URL again (a0-66). Both are ungated, so neither can be skipped
+    # out from under this job.
     needs: [ci, subpath-boot]
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
@@ -175,6 +323,9 @@ jobs:
   # --- On a v* tag: ping the classroom with the milestone's play notes. --
   notify:
     name: Ping ntfy (tagged release)
+    # A checkout, a jq lookup and one curl. No v* tag was pushed in the measured
+    # week, so this is sized from its content rather than from history.
+    timeout-minutes: 5
     needs: deploy
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
@@ -230,12 +381,17 @@ jobs:
   # on what hardware, and when it is required (before a milestone tag, at
   # minimum). Nothing in CI substitutes for it.
   #
-  # Runs on every push, like the merge gate above and unlike the mobile suite:
-  # it is ~20 s of measurement behind a ~2 min fixed cost, and a renderer
-  # regression is cheapest to see on the push that caused it.
+  # Ungated, like the merge gate above and unlike the mobile suite: it is ~20 s
+  # of measurement behind a ~2 min fixed cost, and a renderer regression is
+  # cheapest to see on the push that caused it.
   perf-budget:
     name: Perf gate — submission budget (draw calls, entities)
     runs-on: ubuntu-latest
+    # 8.1 min observed max over 421 runs net of apt — and this is the job that
+    # showed the problem most clearly: its raw max was 34.6 min, of which 32.9
+    # was a single `install-deps` that still concluded `success` (run
+    # 32077383512). ~2 min of fixed cost + ~75 s of measurement otherwise.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -252,9 +408,8 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
       - if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-      - if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
+        run: npx playwright install chromium
+        timeout-minutes: 10
 
       # The thresholds live in tests/perf/budget.ts with their provenance. They
       # are NOT overridden here, and the one knob that exists (PERF_BUDGET_SCALE)
@@ -313,7 +468,14 @@ jobs:
   # Full table, and the N either side: tests/reports/mobile-shard-a0-00.md.
   mobile:
     name: Mobile emulation (Playwright) — shard ${{ matrix.shard }}/${{ strategy.job-total }}
-    # Run where gating matters (PRs + main) — not on every agent branch push.
+    # The one genuinely long job in this file: 41.8 min observed max over 1484
+    # shard-jobs, net of apt. Red shards are the slow ones (retries + traces);
+    # the slowest green shard was 29.2 min. 55 is ~1.3x the honest worst case.
+    # This is a job budget, not a test budget — Playwright bounds each test in
+    # playwright.config.ts, and the shard plan bounds each shard.
+    timeout-minutes: 55
+    # Run where gating matters: PRs and main. A `workflow_dispatch` on a branch
+    # is a smoke check, not a gate, so it stops at the cheap jobs above.
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     strategy:
@@ -341,12 +503,12 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
 
-      # On a cache miss: browser + system libs. On a hit: only the system libs
-      # (they're apt packages, not in ~/.cache, so they never get cached).
+      # On a cache miss: the browser binary, from the Playwright CDN. On a hit:
+      # nothing at all. The apt half of this is gone — see a0-84's note at the
+      # top of the file for the measurement that removed it.
       - if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-      - if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
+        run: npx playwright install chromium
+        timeout-minutes: 10
 
       # `strategy.job-total` is the length of the matrix above, so N is stated
       # in exactly one place — add a shard to the list and the denominator
@@ -394,6 +556,8 @@ jobs:
   mobile-gate:
     name: Mobile emulation (Playwright)
     needs: mobile
+    # Reads one string out of `needs` and echoes it. Seconds, always.
+    timeout-minutes: 5
     if: ${{ !cancelled() && (github.event_name == 'pull_request' || github.ref == 'refs/heads/main') }}
     runs-on: ubuntu-latest
     steps:
@@ -417,6 +581,9 @@ jobs:
   verify-live:
     name: Verify live deploy boots
     needs: deploy
+    # 4.0 min observed max over 72 runs net of apt; ~25 s of test behind the
+    # fixed cost. It fetches a LIVE url, so the tail here is the internet's.
+    timeout-minutes: 15
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
@@ -434,9 +601,8 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
       - if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-      - if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
+        run: npx playwright install chromium
+        timeout-minutes: 10
       - env:
           LIVE_URL: ${{ needs.deploy.outputs.page_url }}
         run: npx playwright test --config tests/live/playwright.live.config.ts

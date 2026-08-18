@@ -36,3 +36,10 @@ dist-a0-14/
 # — same story as dist-a0-14: a private outDir on a private port, so a capture
 # can never be taken against another lane's preview.
 dist-a0-31/
+
+# The a0-79 evidence capture's two client bundles (evidence/a0-79-menus/) — this
+# branch's and pristine `main`'s, built to private outDirs and served on private
+# ports so the before/after frames and the frame-cost A/B can never be taken
+# against another lane's preview. Same story as dist-a0-14 and dist-a0-31.
+dist-a079-after/
+dist-a079-before/

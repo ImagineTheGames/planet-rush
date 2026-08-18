@@ -44,7 +44,16 @@ function ship(id: number): ShipSnap {
 }
 
 function projectile(id: number): ProjSnap {
-  return { id, posX: -300 + id * 11, posY: 400 - id * 9, meta: id & 0x7 };
+  // Velocity is on the wire since v3 (a0-73). The heading is spread across ids so
+  // the round trip is checked against a real spread of angles, not one axis.
+  return {
+    id,
+    posX: -300 + id * 11,
+    posY: 400 - id * 9,
+    velX: Math.cos(id) * 520,
+    velY: Math.sin(id) * 520,
+    meta: id & 0x7,
+  };
 }
 
 describe('client → server', () => {
@@ -404,7 +413,18 @@ describe('server → client', () => {
     const snapshot = decodeSnapshot(decoded.payload);
     expect(snapshot.tick).toBe(4096);
     expect(snapshot.ships).toEqual(ships);
-    expect(snapshot.projectiles).toEqual(projectiles);
+    // Positions, slot and meta survive the round trip exactly; the velocity pair
+    // does not, and is not supposed to — it rides the wire as one byte of heading
+    // and one of speed (v3, a0-73), so it comes back rounded to 1.4° and 4 u/s.
+    // Asserted to that promise rather than to equality, because a test that
+    // demanded equality would be a test demanding four bytes.
+    expect(snapshot.projectiles.map((p) => ({ id: p.id, posX: p.posX, posY: p.posY, meta: p.meta }))).toEqual(
+      projectiles.map((p) => ({ id: p.id, posX: p.posX, posY: p.posY, meta: p.meta })),
+    );
+    for (const [i, got] of snapshot.projectiles.entries()) {
+      const sent = projectiles[i]!;
+      expect(Math.hypot(got.velX - sent.velX, got.velY - sent.velY)).toBeLessThan(7);
+    }
   });
 
   it('refuses a binary frame it cannot read', () => {
