@@ -69,11 +69,55 @@ concurrency:
 permissions:
   contents: read
 
+# --- EVERY JOB IS BOUNDED (a0-84). ----------------------------------------
+#
+# GitHub's default job timeout is SIX HOURS, and on 2026-08-18 four runs used
+# most of it: `Boot from the deploy subpath` and `Mobile emulation shard 6/6`
+# sat at step 7/13 for up to 3h40m on `npx playwright install-deps chromium`,
+# an apt call against a stalled mirror. Nothing failed, so nothing retried, and
+# #451/#452/#454 held finished work at UNSTABLE for one to three hours until a
+# human cancelled them by hand. A hung job must FAIL, because a failure retries
+# and a hang does not.
+#
+# HOW THESE NUMBERS WERE PICKED. Measured, not guessed: all 487 ci.yml runs
+# between 2026-08-11 and 2026-08-18 (35 932 step records), with the Playwright
+# install steps subtracted so a stalled mirror could not inflate the very
+# budget meant to catch it. Per job, in minutes:
+#
+#   job                             n     p50    p99     max    timeout
+#   Typecheck, test, build        480     7.6   10.2    14.7      25
+#   Boot from the deploy subpath   91     1.1    3.6     7.1      15
+#   Perf gate — submission budget 421     1.6    4.5     8.1      15
+#   Mobile shard N/6             1484    17.1   26.8    41.8      55
+#   Verify live deploy boots       72     0.9    3.6     4.0      15
+#   Deploy to GitHub Pages         73     0.1    0.8     1.6      15
+#   Mobile emulation (rollup)     245      ~0     ~0      ~0       5
+#   Ping ntfy (tagged release)      —       —      —       —       5
+#
+# THE LONGEST LEGITIMATE JOB IN THAT WEEK WAS 41.8 MINUTES — mobile shard 1/6
+# on run 31893809811, and it was RED: a failing shard pays retries and trace
+# capture, so the slowest honest run of this pipeline is a failing one, not a
+# passing one. The slowest GREEN shard was 29.2 min (shard 6, run 32070397700,
+# which also ate a 6m45s `actions/checkout` stall). That is the number to
+# compare against when asking "is this job slow or is it hung": under ~42 min a
+# mobile shard is working, over it is not, and every other job in this file
+# should be done inside 15.
+#
+# The `max` column is what sets each budget, not `p99` — a timeout that trips on
+# a legitimate slow run is a flaky gate, and a flaky gate gets ignored. Headroom
+# is roughly 1.3–1.9x over the observed max. What these numbers cannot do is
+# absorb a suite that grows: if a mobile shard starts timing out at 55 min, the
+# answer is the shard plan (tests/mobile/shard-plan.ts, N in the matrix below),
+# not a bigger number here.
+
 jobs:
   # --- The merge gate: runs on every event this workflow answers to. -----
   ci:
     name: Typecheck, test, build
     runs-on: ubuntu-latest
+    # 14.7 min observed max over 480 runs (the max is a RED run — a failing
+    # vitest suite runs longer than a passing one). No apt on this job at all.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
 
@@ -164,6 +208,9 @@ jobs:
   subpath-boot:
     name: Boot from the deploy subpath
     runs-on: ubuntu-latest
+    # 7.1 min observed max over 91 runs, net of the apt step this job no longer
+    # has. It is ~25 s of test behind an `npm ci` and a build; 15 is generous.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -200,6 +247,10 @@ jobs:
   # --- Publish the built client to GitHub Pages. ------------------------
   deploy:
     name: Deploy to GitHub Pages
+    # 1.6 min observed max over 73 runs; this job is one `deploy-pages` call.
+    # 15 leaves that action's own 10-minute internal timeout to fire first, so
+    # a stuck Pages API reports itself instead of being guillotined by us.
+    timeout-minutes: 15
     # `subpath-boot` joins `ci` here so a base-path regression can never reach
     # the live URL again (a0-66). Both are ungated, so neither can be skipped
     # out from under this job.
@@ -226,6 +277,9 @@ jobs:
   # --- On a v* tag: ping the classroom with the milestone's play notes. --
   notify:
     name: Ping ntfy (tagged release)
+    # A checkout, a jq lookup and one curl. No v* tag was pushed in the measured
+    # week, so this is sized from its content rather than from history.
+    timeout-minutes: 5
     needs: deploy
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
@@ -287,6 +341,11 @@ jobs:
   perf-budget:
     name: Perf gate — submission budget (draw calls, entities)
     runs-on: ubuntu-latest
+    # 8.1 min observed max over 421 runs net of apt — and this is the job that
+    # showed the problem most clearly: its raw max was 34.6 min, of which 32.9
+    # was a single `install-deps` that still concluded `success` (run
+    # 32077383512). ~2 min of fixed cost + ~75 s of measurement otherwise.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -364,6 +423,12 @@ jobs:
   # Full table, and the N either side: tests/reports/mobile-shard-a0-00.md.
   mobile:
     name: Mobile emulation (Playwright) — shard ${{ matrix.shard }}/${{ strategy.job-total }}
+    # The one genuinely long job in this file: 41.8 min observed max over 1484
+    # shard-jobs, net of apt. Red shards are the slow ones (retries + traces);
+    # the slowest green shard was 29.2 min. 55 is ~1.3x the honest worst case.
+    # This is a job budget, not a test budget — Playwright bounds each test in
+    # playwright.config.ts, and the shard plan bounds each shard.
+    timeout-minutes: 55
     # Run where gating matters: PRs and main. A `workflow_dispatch` on a branch
     # is a smoke check, not a gate, so it stops at the cheap jobs above.
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
@@ -446,6 +511,8 @@ jobs:
   mobile-gate:
     name: Mobile emulation (Playwright)
     needs: mobile
+    # Reads one string out of `needs` and echoes it. Seconds, always.
+    timeout-minutes: 5
     if: ${{ !cancelled() && (github.event_name == 'pull_request' || github.ref == 'refs/heads/main') }}
     runs-on: ubuntu-latest
     steps:
@@ -469,6 +536,9 @@ jobs:
   verify-live:
     name: Verify live deploy boots
     needs: deploy
+    # 4.0 min observed max over 72 runs net of apt; ~25 s of test behind the
+    # fixed cost. It fetches a LIVE url, so the tail here is the internet's.
+    timeout-minutes: 15
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
