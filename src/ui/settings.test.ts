@@ -40,6 +40,7 @@ import {
 } from './settings';
 import type { ControlScheme, VolumeChannel } from './settings';
 import { hitRect } from './menu-geometry';
+import { textWidth } from './font-metrics';
 import { singlePrimary } from './gantry';
 import { BEAM, COLUMN, ROW, TOUCH_MIN, rowHeight, frameMetrics } from '../art/materials';
 
@@ -496,13 +497,16 @@ describe('a ? on every setting (a0-77)', () => {
     const seen = new Set<string>();
     for (const [i, spec] of SETTINGS_ROWS.entries()) {
       const key = settingsRowKey(spec);
-      const help = settingsHelp(spec);
+      const help = settingsHelp(spec, 'touch');
       const row = model.rows[i]!;
 
-      // There IS an explanation, and it is a sentence rather than a placeholder.
+      // There IS an explanation. NOT "and it is at least twenty characters" —
+      // that floor was a licence to pad, and a0-87 cashed it in: MUSIC VOLUME
+      // now says "The soundtrack." and is finished. An empty panel would be a
+      // better row than a padded one; a missing one is the bug this catches.
       expect(help, `row ${key} has help`).toBeTruthy();
       expect(help.title.trim().length, `row ${key} help has a title`).toBeGreaterThan(0);
-      expect(help.summary.trim().length, `row ${key} help has a summary`).toBeGreaterThan(20);
+      expect(help.summary.trim(), `row ${key} help has a summary`).not.toBe('');
 
       // It names the row it belongs to, in the row's OWN words — a panel titled
       // anything else is a panel a player cannot tie to the control they tapped.
@@ -511,10 +515,6 @@ describe('a ? on every setting (a0-77)', () => {
       // …and it is that row's own copy, not a neighbour's pasted across.
       expect(seen.has(help.summary), `row ${key} help is its own`).toBe(false);
       seen.add(help.summary);
-
-      // Length is part of clarity (GDD §4.7): the panel is 260px wide, so a
-      // paragraph here is a paragraph nobody reads mid-decision.
-      expect(help.summary.length, `row ${key} help stays brief`).toBeLessThanOrEqual(260);
 
       // No badges on a settings row: the value chip beside the `?` already shows
       // the seated value, and a badge would be a second, dimmer copy of it.
@@ -525,41 +525,151 @@ describe('a ? on every setting (a0-77)', () => {
     expect(Object.keys(SETTINGS_HELP).sort()).toEqual(SETTINGS_ROWS.map(settingsRowKey).sort());
   });
 
-  it('says the two things about the CONTROLS row that the in-match tip says', () => {
-    // a0-33's prompt teaches Tap Commander as "tap … to mine it" / "tap your own
-    // station to bank"; this row's copy has to teach the same gesture, or a
-    // player who read one and then the other has two games to reconcile.
-    const controls = settingsHelp({ kind: 'controls' }).summary;
-    expect(controls).toContain('TAP COMMANDER');
-    expect(controls).toContain('tap a target');
-    expect(controls).toContain('tap your own station');
-    // …and the alternative is described by what the HANDS do, on all three of the
-    // devices whose word the row itself might be showing (u8-01), because naming
-    // just one of them would be wrong on the other two.
-    expect(controls).toContain('WASD');
-    expect(controls).toContain('sticks');
+  /**
+   * **The bug that created the Writer role, as a test** (a0-87).
+   *
+   * The CONTROLS help used to end by naming all three input schemes in one
+   * clause, so that the sentence would be "true on every device". It was — and
+   * a player on a phone read about a keyboard (developer field report,
+   * 2026-08-18). Truth on every device is not the bar; usefulness on the device
+   * in front of the player is.
+   *
+   * So: resolve every row's help for each device, and assert it contains none of
+   * the OTHER devices' words. This walks {@link SETTINGS_ROWS}, not just the
+   * CONTROLS row, because "no device-blind copy anywhere" is the standing rule
+   * and the next row to break it will not be this one.
+   *
+   * `tap` is deliberately absent from every list. TAP COMMANDER is a *scheme*,
+   * not a device — it reads the same on all three, because a tap is a tap
+   * whether it lands from a finger or a mouse ({@link TAP_COMMANDER_LABEL}).
+   * `sticks` is absent for the same reason from the other direction: it is true
+   * of the glass AND of a pad, so it cannot mark either as foreign.
+   */
+  it('never names another device', () => {
+    /** Words that belong to exactly one device, and are a lie on the other two. */
+    const DEVICE_WORDS: Record<DeviceKind, readonly RegExp[]> = {
+      keyboard: [/\bWASD\b/i, /\bkeyboard\b/i, /\bmouse\b/i, /\bkeys?\b/i, /\bclick/i, /\bspacebar\b/i],
+      gamepad: [/\bgamepad\b/i, /\bcontroller\b/i, /\bpad\b/i, /\btwin sticks\b/i, /\btrigger/i, /\bbumper/i],
+      touch: [/\bglass\b/i, /\bfinger/i, /\bthumbs?\b/i, /\bswipe/i, /\btouchscreen\b/i],
+    };
+    const DEVICES: readonly DeviceKind[] = ['touch', 'gamepad', 'keyboard'];
+
+    for (const device of DEVICES) {
+      for (const spec of SETTINGS_ROWS) {
+        const { title, summary } = settingsHelp(spec, device);
+        const text = `${title} ${summary}`;
+        for (const other of DEVICES) {
+          if (other === device) continue;
+          for (const word of DEVICE_WORDS[other]) {
+            expect(
+              word.test(text),
+              `on ${device}, row ${settingsRowKey(spec)} says ${String(word)}: ${text}`,
+            ).toBe(false);
+          }
+        }
+      }
+    }
+
+    // The converse, so the rule cannot be satisfied by saying nothing at all:
+    // the CONTROLS row still names the scheme the player would switch to, and it
+    // names it with the SAME word the value chip shows (u8-01's seam), so the
+    // panel and the pill can never disagree.
+    for (const device of DEVICES) {
+      const summary = settingsHelp({ kind: 'controls' }, device).summary;
+      expect(summary, `${device} names its own scheme`).toContain(STICKS_LABELS[device]);
+      expect(summary, `${device} names Tap Commander`).toContain(TAP_COMMANDER_LABEL);
+    }
+    // …and the three readings really are three different sentences, not one
+    // hedge with a word swapped in that happens to pass the sweep above.
+    const readings = new Set(DEVICES.map((d) => settingsHelp({ kind: 'controls' }, d).summary));
+    expect(readings.size).toBe(DEVICES.length);
+  });
+
+  /**
+   * Length, as the panel actually measures it (a0-87).
+   *
+   * The old ceiling was `summary.length <= 260` justified as "the panel is 260px
+   * wide" — a character count standing in for a pixel one, which is not the same
+   * number in any font. `codex-hint-view` draws this panel at a fixed 260px with
+   * 10px padding, wraps the summary at 240px in Oxanium 12 with .4px tracking,
+   * and clamps the whole thing inside the viewport with an 8px margin. So the
+   * real constraint is HEIGHT, at the narrowest screen we support: the
+   * developer's phone, 798x384, where both field reports came from.
+   */
+  it('fits its panel on the narrowest screen', () => {
+    const PANEL_WIDTH = 260;
+    const PAD = 10;
+    const MARGIN = 8;
+    const WRAP = PANEL_WIDTH - 2 * PAD;
+    /** Oxanium 12 with `letterSpacing: 0.4` — `codex-hint-view` `makeText`. */
+    const BODY = { face: 'body', size: 12, tracking: 0.4 / 12 } as const;
+    const HEADING = { face: 'heading', size: 15, tracking: 0.4 / 15 } as const;
+    const PHONE = { width: 798, height: 384 };
+
+    /** Greedy word wrap at `WRAP`, the same rule Pixi's `wordWrap` applies. */
+    const lines = (text: string, spec: typeof BODY | typeof HEADING): number => {
+      let n = 1;
+      let line = '';
+      for (const word of text.split(' ')) {
+        const next = line === '' ? word : `${line} ${word}`;
+        // A single word wider than the band gets its own line and overflows;
+        // that is Pixi's behaviour too, and it is a copy bug, so assert it away.
+        expect(textWidth(word, spec), `"${word}" fits the panel`).toBeLessThanOrEqual(WRAP);
+        if (textWidth(next, spec) <= WRAP) line = next;
+        else {
+          n++;
+          line = word;
+        }
+      }
+      return n;
+    };
+
+    for (const device of ['touch', 'gamepad', 'keyboard'] as const) {
+      for (const spec of SETTINGS_ROWS) {
+        const help = settingsHelp(spec, device);
+        // pad + title + 4 + summary + pad, per `codex-hint-view.show` (no badges).
+        const height =
+          PAD + lines(help.title, HEADING) * 1.32 * HEADING.size + 4 + lines(help.summary, BODY) * 1.32 * BODY.size + PAD;
+        expect(
+          height,
+          `${device} ${settingsRowKey(spec)} fits ${PHONE.width}x${PHONE.height}`,
+        ).toBeLessThanOrEqual(PHONE.height - 2 * MARGIN);
+      }
+    }
   });
 
   it('tells a player that REDUCE VFX also happens on its own', () => {
     // The half a player cannot account for otherwise: `VfxAutoQuality` engages
     // the same flag under load (GDD §4.8 risk 5), and somebody watching effects
     // thin out mid-fight deserves to learn from this screen that nothing broke.
-    const summary = settingsHelp({ kind: 'reduceVfx' }).summary;
+    const summary = settingsHelp({ kind: 'reduceVfx' }, 'touch').summary;
     expect(summary).toMatch(/on its own|by itself|automatically/);
     expect(summary).toContain('frame rate');
   });
 
-  it('says what each audio channel covers, including the alarm that ignores SFX', () => {
-    const master = settingsHelp({ kind: 'volume', channel: 'master' }).summary;
-    const sfx = settingsHelp({ kind: 'volume', channel: 'sfx' }).summary;
-    const music = settingsHelp({ kind: 'volume', channel: 'music' }).summary;
-    // The mixer's own routing (`../art/audio/graph`): everything sums into master,
-    // and the under-attack alarm has its own bus so the SFX slider cannot silence
-    // a mechanic on the not-cuttable list.
-    expect(master).toContain('alarm');
-    expect(sfx).toContain('alarm');
-    expect(sfx).toMatch(/not on this channel/);
-    expect(music).toContain('soundtrack');
+  it('says what is ON each audio channel, and nothing about what is not', () => {
+    const master = settingsHelp({ kind: 'volume', channel: 'master' }, 'touch').summary;
+    const sfx = settingsHelp({ kind: 'volume', channel: 'sfx' }, 'touch').summary;
+    const music = settingsHelp({ kind: 'volume', channel: 'music' }, 'touch').summary;
+
+    // Each one lists what it covers, and that is the whole job.
+    expect(master).toMatch(/every sound/i);
+    expect(sfx).toMatch(/weapons/i);
+    expect(music).toMatch(/soundtrack/i);
+
+    // a0-87: the under-attack alarm's ROUTING is gone from both sliders that
+    // used to teach it — MASTER said the alarm was included, SFX said it was
+    // not on that channel and stayed audible at zero, and a player who only
+    // wanted to know what a slider changes was handed the mixer twice
+    // (developer field report, 2026-08-18). The routing itself is untouched and
+    // `../art/audio/audio.test.ts` still holds the mixer to it; it is simply
+    // not something the settings screen says. Defining a control by what it
+    // EXCLUDES is the pattern, not the alarm specifically, so the guard is on
+    // the pattern too.
+    for (const [name, copy] of [['master', master], ['sfx', sfx], ['music', music]] as const) {
+      expect(copy, `${name} does not route the alarm`).not.toMatch(/alarm/i);
+      expect(copy, `${name} does not define itself by exclusion`).not.toMatch(/\bnot\b|\bexcept\b|\bnothing else\b/i);
+    }
   });
 
   it('gives every row a `?` that is a real touch target, clear of the value and the steppers', () => {
@@ -601,7 +711,7 @@ describe('a ? on every setting (a0-77)', () => {
   it('opens the tapped row\'s explanation, and only that one', () => {
     const index = SETTINGS_ROWS.findIndex((r) => r.kind === 'reduceVfx');
     const model = settingsModel(createSettings(), FireMode.AutoAim, 'tap', 'touch', { help: index });
-    expect(model.openHelp).toEqual({ index, hint: settingsHelp(SETTINGS_ROWS[index]!) });
+    expect(model.openHelp).toEqual({ index, hint: settingsHelp(SETTINGS_ROWS[index]!, 'touch') });
     expect(model.rows.filter((r) => r.helpOpen)).toHaveLength(1);
     expect(model.rows[index]!.helpOpen).toBe(true);
     // The `?` reads as held while its panel is up.
