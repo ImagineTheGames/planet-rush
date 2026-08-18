@@ -11,8 +11,8 @@
  *
  * The client's entry point is `./session`: `createLocalSession()` for offline,
  * and one `sendInput()` per fixed tick from the game loop. Binary snapshot
- * encoding — the measured 510-byte worst case from docs/netcode-spike.md — is
- * in `./snapshot`.
+ * encoding — a measured worst case, 622 bytes since a0-73 gave a shot the heading
+ * it was fired on, billed in docs/netcode-spike.md — is in `./snapshot`.
  *
  * Online is here too: `./wire` is how the protocol is spelled on a socket (JSON
  * for words, binary frames for snapshots) and is shared with `server/`, and

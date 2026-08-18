@@ -948,7 +948,7 @@ describe('shots the client did not fire', () => {
     const planted = world.projectiles.length - 1;
 
     client.predict(1, THRUST);
-    client.reconcile({ tick: 1, ships: [], projectiles: [{ id: 0, posX: 5, posY: 5, meta: 0b0010 }] }, 1);
+    client.reconcile({ tick: 1, ships: [], projectiles: [{ id: 0, posX: 5, posY: 5, velX: 700, velY: 0, meta: 0b0010 }] }, 1);
 
     expect(world.projectiles[planted]!.active).toBe(false);
     expect(world.projectiles[0]!.active).toBe(true);
@@ -961,8 +961,8 @@ describe('shots the client did not fire', () => {
       tick: 3,
       ships: [],
       projectiles: [
-        { id: 0, posX: 1, posY: 2, meta: 0b0001 },
-        { id: 1, posX: 3, posY: 4, meta: 0b1001 },
+        { id: 0, posX: 1, posY: 2, velX: 700, velY: 0, meta: 0b0001 },
+        { id: 1, posX: 3, posY: 4, velX: 0, velY: 520, meta: 0b1001 },
       ],
     });
     expect(world.projectiles[0]!.kind).toBe('turret');
@@ -974,7 +974,7 @@ describe('shots the client did not fire', () => {
     const slots = applySnapshot(world, {
       tick: 3,
       ships: [],
-      projectiles: [{ id: 0, posX: 1, posY: 2, meta: 0b1000 }],
+      projectiles: [{ id: 0, posX: 1, posY: 2, velX: 520, velY: 0, meta: 0b1000 }],
     });
     expect([...slots]).toEqual([0]);
     expect(world.projectiles[0]!.active).toBe(true);

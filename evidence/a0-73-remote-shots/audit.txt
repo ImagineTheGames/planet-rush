@@ -1,0 +1,237 @@
+a0-73 — "other players shots dont follow the direction they were fired in"
+================================================================================
+OWNER: Netcode Engineer.  Branch: agent/netcode/a0-73-remote-shot-heading.
+Captured 2026-08-17 against the REAL simulation and the REAL wire: the shipping
+codec (src/net/snapshot.ts), the shipping interpolation buffer
+(src/net/interpolation.ts), a 60 Hz sim broadcasting at 30 Hz exactly as
+server/room.ts does, at 75 ms one-way latency and the buffer's 100 ms playback
+delay.
+
+  evidence/a0-73-remote-shots/shot-path-probe.ts
+
+  npx vite-node evidence/a0-73-remote-shots/shot-path-probe.ts -- --scene=field
+  npx vite-node evidence/a0-73-remote-shots/shot-path-probe.ts -- --scene=field --stall=200
+  npx vite-node evidence/a0-73-remote-shots/shot-path-probe.ts -- --scene=field --jitter=15
+
+BEFORE numbers are the same probe run against main @ 40608f6, in a throwaway
+worktree, so the two columns differ only by this branch's change.
+Raw output: before-*.json / after-*.json beside this file.
+
+The report
+--------------------------------------------------------------------------------
+  "other players shots down follow the diretion they were fired in"
+
+The brief's scope note stands: the host-choppiness half of the original report
+moved to a0-75 once the developer established the stutter follows the PC and not
+the host. This audit is shots only.
+
+
+1. WHAT THE WIRE CARRIED FOR A SHOT — ESTABLISHED FIRST, CHANGED SECOND
+================================================================================
+BEFORE (wire v2, src/net/snapshot.ts @ 40608f6) — 6 bytes, no heading anywhere:
+
+    id u8 | posX i16 | posY i16 | meta u8
+
+    id    the POOL SLOT, not an entity id. Slots are recycled.
+    pos   eighths of a world unit (POS_SCALE).
+    meta  owner in bits 0..2, ship-vs-turret kind in bit 3, bits 4..7 reserved.
+
+A shot's velocity was not on the wire in any form — not a vector, not an angle,
+not an index. `applySnapshot` said so in as many words ("Velocity is not streamed
+for shots — six bytes each, and a client that sees the whole board can watch them
+fly"), and the interpolation buffer said it twice more ("with no velocity on the
+wire there is nothing to extrapolate *along*").
+
+AFTER (wire v3, this branch) — 8 bytes:
+
+    id u8 | posX i16 | posY i16 | heading u8 | speed u8 | meta u8
+
+    heading  a full turn over one byte — 1.406° per step, ±0.703°.
+    speed    world units/s in steps of 4 — 0…1020 u/s, ±2 u/s.
+
+Polar, not a velocity vector, because a shot is a straight line at a constant
+speed and those are exactly its two degrees of freedom: 2 bytes rather than the 4
+an i16 pair would cost. The polar step is the codec's own business, like
+POS_SCALE — `ProjSnap` carries a plain `velX`/`velY` in world units on both sides
+of the socket, so no consumer knows the wire is polar.
+
+WIRE_VERSION 2 → 3. Mandatory, not cosmetic: the record STRIDE moved, so a v2
+reader would walk a v3 projectile array two bytes out of step per entity and
+decode the whole stream into garbage rather than reject it.
+
+
+2. HOW A REMOTE SHOT ADVANCED BETWEEN SNAPSHOTS — BEFORE
+================================================================================
+Only ever by packet. There were three playback regimes and exactly one of them
+moved a shot at all:
+
+  interpolate  the render clock falls between two buffered snapshots that both
+               hold this slot: lerp the chord between the two positions.
+  hold         render clock older than the oldest snapshot: DRAW IT WHERE IT IS.
+  extrapolate  render clock newer than the newest (the stream stalled):
+               DRAW IT WHERE IT IS.
+
+and inside `interpolate`, a slot present in only one of the two frames — a shot
+just fired, or one that landed mid-bracket — was also DRAWN WHERE IT IS.
+
+So the answer to the brief's second question is: **neither dead reckoning nor,
+strictly, interpolation — a remote shot was positioned by snapshot and by nothing
+else, and stood still whenever two snapshots did not happen to bracket it.**
+
+The chord itself was fine. Measured against the ray the sim actually fired each
+shot along, an interpolated dot sat 0.026 u off it — the wire's own eighth-unit
+position step, and nothing more. THE DIRECTION WAS NEVER WRONG WHILE PACKETS
+FLOWED. What was wrong is that a shot only travelled its line while they did.
+
+
+3. THE ERROR, IN WORLD UNITS
+================================================================================
+Two errors, because they mean different things and only one of them is visible to
+a cross-track measurement:
+
+  cross-track  perpendicular distance from the drawn dot to the ray (muzzle,
+               heading) the sim launched it on — "is it on its line at all".
+  along-track  how far the dot is from where the shot TRULY was at that instant,
+               measured along its own line — "is it where its heading put it".
+
+A frozen shot has a cross-track error of ZERO. It is on its line; it is not
+travelling it. To a player reading that line to decide whether to move into it,
+the two are the same defect, and along-track is the one that names it.
+
+                                                      BEFORE        AFTER
+  duel — one shooter, empty field, clean wire
+    along-track  mean / max                       0.304 / 8.698  0.023 / 0.075
+    frozen render frames                              16 / 476        0 / 476
+
+  field — 8 ships firing into 40 rocks, clean wire
+    along-track  mean / max                       0.326 / 8.748  0.026 / 0.084
+    frozen render frames                            180 / 5018       0 / 5018
+
+  field + 200 ms of lost snapshots
+    along-track DURING the loss  mean / p95 / max
+                             29.592 / 95.315 / 104.042  0.028 / 0.057 / 0.070
+    frozen render frames                            299 / 4969       0 / 4969
+
+  field + 400 ms of lost snapshots
+    along-track DURING the loss  mean / max
+                                     24.702 / 104.042    0.027 / 0.078
+    cross-track max  (frames off their own line)
+                              34.682  (20 frames)  1.133  (4 frames)
+
+  field + ±15 ms arrival jitter
+    frozen render frames                             93 / 5018       0 / 5018
+    along-track  mean                                   3.209          3.125
+
+Read the four numbers that matter:
+
+  * 8.7 u — EVERY SHOT, EVERY MATCH, on a perfect wire. One frozen render frame
+    per shot (180 frozen frames for 180 shots), at its first appearance: the dot
+    sat at the muzzle for a bracket and then jumped 8.7 u. That is the frame a
+    player reads to decide whether the line is coming at them.
+
+  * 104 u — a 200 ms gap in the stream. The shot stopped dead and finished the
+    gap 104 world units behind where its own heading had it: a THIRD of the ship
+    weapon's entire 300-unit reach, and then a 104-unit teleport when the packets
+    came back. A player who moved out of the frozen dot's way was moving into a
+    shot that was never where it was drawn. This is the fairness defect, and it
+    is what a mobile radio, a lossy wifi link or a backgrounded tab produces.
+
+  * 34.7 u — the crab, and it is real but it is NOT the main event. Under a
+    400 ms loss the buffer prunes down to two frames and the recycled-pool-slot
+    guard (`maxShotStep`, ~38 u at a 33 ms span) stops being able to tell two
+    shots apart: 20 render frames drew a dot up to 34.7 u OFF the line the shot
+    was fired on, travelling between two shots that were not the same shot. It
+    needed packet loss to appear, so it is not what the developer saw on every
+    volley — the freeze is.
+
+  * 1.133 u — the honest cost of the fix. Cross-track error goes UP, from 0.084 u
+    to 1.133 u worst case, and every unit of that is the one-byte heading
+    quantization showing up exactly where it was predicted to: at the far end of
+    the longest reach the buffer will take (200 ms × 700 u/s = 140 u, and
+    140·tan(0.703°) = 1.7 u is the bound). On the ordinary 33 ms reach it is
+    0.171 u. The shot's collision radius is 5 u.
+
+
+4. WHAT CHANGED
+================================================================================
+  src/net/snapshot.ts       ProjSnap carries velX/velY; the record is 8 bytes;
+                            SHOT_ANGLE_SCALE and SHOT_SPEED_QUANT are the two
+                            quantizations and their error budgets are written out.
+                            WORST_CASE_BYTES 494 → 622.
+  src/net/wire.ts           WIRE_VERSION 2 → 3 (the record stride moved).
+  src/net/interpolation.ts  every regime advances a shot along its own heading.
+                            `hold` and `extrapolate` are one signed operation now
+                            (`flyShot`), capped by MAX_SHOT_EXTRAPOLATION_MS =
+                            200 ms — five times the ship cap, because a ship can
+                            thrust and turn inside the reach and a shot cannot.
+                            A singleton inside a bracket flies too: forward for a
+                            shot that landed, backward for one just fired.
+                            The recycled-slot guard gained the sharpest test it
+                            could have — a shot's muzzle vector is constant, so
+                            two records of the same shot encode identically and
+                            two different shots agreeing to within 1.4° AND
+                            4 u/s is a coincidence, not a match.
+  src/net/presentation.ts   the presented pool slot is written with the wire's
+                            velocity (and it is stashed and restored, so the
+                            picture still never reaches the simulation).
+  src/net/prediction.ts     applySnapshot writes projectile.vel. It did not, and
+                            the pool is slot-keyed with `takeProjectile` handing
+                            out the LOWEST free slot — so a wire shot inherited
+                            the muzzle vector of whatever shot used that slot
+                            before it, and every replayed tick carried it along
+                            that stale line.
+
+
+5. WHAT THIS COSTS ON THE WIRE
+================================================================================
+Per shot, per snapshot: 2 bytes. At the 30 Hz broadcast rate that is 60 B/s while
+a shot is in flight, and over a whole flight:
+
+  a stock ship shot   0.577 s ≈ 17 snapshots ≈  35 bytes, once, ever
+  a turret shot       0.343 s ≈ 10 snapshots ≈  21 bytes, once, ever
+
+Per client, measured (not extrapolated) on the 8-ship rock-field scene above,
+which averaged 8.7 concurrent shots and peaked at 14:
+
+                                     BEFORE      AFTER
+    mean snapshot payload            162.4 B     179.9 B    (+10.8 %)
+    peak snapshot payload              194 B       222 B
+    downstream at 30 Hz             5.17 KB/s   5.68 KB/s   (+0.51 KB/s)
+
+Per client, worst case (the GDD §4.2/§4.3 entity caps — 8 ships, 64 shots):
+
+                                     BEFORE      AFTER
+    snapshot payload                   494 B       622 B    (+26 %)
+    downstream at 30 Hz            14.88 KB/s  18.63 KB/s   (+3.75 KB/s)
+    vs the 40 KB/s per-client budget      37 %        47 %
+
+With the economy channel's measured ~5 KB/s on top (docs/netcode-spike.md §7) a
+worst-case client sits at ~24 KB/s, 60 % of budget, from 50 %. The day-0 decision
+(30 Hz, 512 B snapshot budget) is unaffected in kind; the measured worst case is
+now 622 B and docs/netcode-spike.md has been re-billed against it rather than
+left to drift. src/net/snapshot.test.ts pins the 622 so it cannot.
+
+Two bytes and not one: heading alone would be 1 byte, and a client can recover
+speed from two positions a heading has confirmed are the same shot. It is not
+enough. The frame a shot FIRST appears on has no history to recover anything
+from, and that is the frame the whole mechanic turns on — a player reads a new
+line to decide whether to move into it (GDD §2.6). "A shot arrives, snapshots
+stop, and it continues" is only satisfiable from one packet.
+
+
+6. WHAT IS STILL TRUE AFTER THIS, AND IS NOT MINE TO FIX HERE
+================================================================================
+Arrival jitter still warps a shot's apparent SPEED along its line. At ±15 ms the
+per-frame step ranges 0 → 22.5 u against a true constant 8.67 u, so a shot surges
+and eases as packets bunch. The fix took the frozen frames in that scene from 93
+to 0 and left the along-track mean where it was (3.209 → 3.125 u).
+
+That is not a shot problem and it must not be fixed as one: `bracket()` locates
+the render clock in ARRIVAL-TIME space, and remote ships ride the same bracket
+through the same warp. The snapshot carries an exact `tick`, so bracketing in
+tick space instead would remove it for both — one contained change to one method,
+affecting every interpolated entity. Named here as a follow-up rather than
+smuggled into a shots-only brief.
+
+The shot is on its line throughout (cross-track mean 0.026 u under that jitter);
+what varies is how fast it travels it.

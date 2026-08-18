@@ -80,6 +80,12 @@ interface ShotStash {
   active: boolean;
   x: number;
   y: number;
+  /** The simulation's own muzzle velocity for this slot. Stashed since a0-73,
+   *  because the presented shot now writes one — and a picture that wrote a
+   *  velocity the simulation never had, and did not put it back, would be the
+   *  exact "the lie compounds into drift" this module exists to prevent. */
+  vx: number;
+  vy: number;
   owner: PlayerId;
   kind: 'ship' | 'turret' | undefined;
 }
@@ -147,7 +153,7 @@ export class PresentationLayer {
       const stashedUpTo = Math.min(world.projectiles.length, LOCAL_SHOT_BASE);
       for (let slot = 0; slot < stashedUpTo; slot++) {
         const p = world.projectiles[slot]!;
-        this.shots.push({ index: slot, active: p.active, x: p.pos.x, y: p.pos.y, owner: p.owner, kind: p.kind });
+        this.shots.push({ index: slot, active: p.active, x: p.pos.x, y: p.pos.y, vx: p.vel.x, vy: p.vel.y, owner: p.owner, kind: p.kind });
         p.active = false;
       }
       for (const shot of frame.shots) {
@@ -158,11 +164,18 @@ export class PresentationLayer {
         // when it fires. It still needs a stash entry, or `restore` would leave the
         // presented shot behind as if the simulation had produced it.
         if (shot.slot >= stashedUpTo && !this.shots.some((s) => s.index === shot.slot)) {
-          this.shots.push({ index: shot.slot, active: false, x: p.pos.x, y: p.pos.y, owner: p.owner, kind: p.kind });
+          this.shots.push({ index: shot.slot, active: false, x: p.pos.x, y: p.pos.y, vx: p.vel.x, vy: p.vel.y, owner: p.owner, kind: p.kind });
         }
         p.active = true;
         p.pos.x = shot.x;
         p.pos.y = shot.y;
+        // The line it was fired on, off the wire (a0-73). A slot the wire owns used
+        // to keep whatever velocity its previous occupant left in it, so anything
+        // reading the world for a shot's heading — a renderer drawing a streak, an
+        // audio pan, a debug overlay — read a direction that belonged to a
+        // different shot.
+        p.vel.x = shot.vx;
+        p.vel.y = shot.vy;
         p.owner = (shot.meta & SHOT_META.ownerMask) as PlayerId;
         p.kind = (shot.meta & SHOT_META.shipKind) !== 0 ? 'ship' : 'turret';
       }
@@ -196,6 +209,8 @@ export class PresentationLayer {
       p.active = stash.active;
       p.pos.x = stash.x;
       p.pos.y = stash.y;
+      p.vel.x = stash.vx;
+      p.vel.y = stash.vy;
       p.owner = stash.owner;
       if (stash.kind === undefined) delete p.kind;
       else p.kind = stash.kind;

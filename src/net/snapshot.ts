@@ -29,6 +29,14 @@
  * {@link POS_SCALE} is the diagnosis and the arithmetic). Velocity *is* sent, so a
  * client can dead-reckon a remote ship between snapshots instead of stuttering.
  *
+ * **A shot carries its velocity too, since a0-73** — one byte of heading and one
+ * of speed, taking the projectile record from 6 B to 8 B and the worst case from
+ * 494 B to {@link WORST_CASE_BYTES}. It did not, and the developer could see it:
+ * *"other players shots dont follow the direction they were fired in."* The long
+ * note on {@link ProjSnap} is the diagnosis; {@link SHOT_ANGLE_SCALE} and
+ * {@link SHOT_SPEED_QUANT} are why two bytes are enough and the four an `i16`
+ * pair would cost are not spent.
+ *
  * The wire's precision is the codec's own business: {@link ShipSnap} and
  * {@link ProjSnap} carry **world units** on both sides of the wire, and the
  * fixed-point step exists only between {@link encodeSnapshot} and
@@ -61,11 +69,14 @@ import type { World } from '../sim';
 //                        hull u8                                        1
 //                        flags u8                                       1
 //                                                                    = 13 bytes
-//   Proj   (per entity)  id u8 | posX i16 | posY i16 | meta u8          6 bytes
+//   Proj   (per entity)  id u8 | posX i16 | posY i16                    5
+//                        heading u8 | speed u8                          2
+//                        meta u8                                        1
+//                                                                    = 8 bytes
 
 export const HEADER_BYTES = 6;
 export const SHIP_BYTES = 13;
-export const PROJECTILE_BYTES = 6;
+export const PROJECTILE_BYTES = 8;
 
 /** GDD §4.2/§4.3 entity caps that bound one snapshot: 8 slots, 64 shots. */
 export const MAX_SHIPS = 8;
@@ -88,10 +99,16 @@ export const MAX_SHIPS = 8;
  */
 export const MAX_PROJECTILES = 64;
 
-/** Worst-case snapshot payload, in bytes — the number bandwidth is billed
- *  against in docs/netcode-spike.md (measured, not assumed; GDD risk 4). Now
- *  494 B, down from 510 B: the v0.3 laser funeral dropped the ship `aim`
- *  field (2 B × 8 ships). */
+/**
+ * Worst-case snapshot payload, in bytes — the number bandwidth is billed against
+ * in docs/netcode-spike.md (measured, not assumed; GDD risk 4).
+ *
+ * **622 B (a0-73), up from 494 B.** The projectile record gained the two bytes of
+ * {@link SHOT_ANGLE_SCALE} heading and {@link SHOT_SPEED_QUANT} speed that let a
+ * remote shot fly the line it was fired on instead of being frozen wherever the
+ * packets are not (see {@link ProjSnap}). Before that it was 494 B, down from the
+ * day-0 510 B when the v0.3 laser funeral dropped the ship `aim` field.
+ */
 export const WORST_CASE_BYTES =
   HEADER_BYTES + MAX_SHIPS * SHIP_BYTES + MAX_PROJECTILES * PROJECTILE_BYTES;
 
@@ -132,6 +149,72 @@ export function projIsShipShot(meta: number): boolean {
 
 /** Angle quantization: a full turn over the u16 range (~0.005° per step). */
 const ANGLE_SCALE = 65536 / (2 * Math.PI);
+
+/**
+ * A **shot's** heading quantization: a full turn over one byte, 1.406° per step
+ * and ±0.703° of error. A ship's hull spends two bytes on the same job and a shot
+ * spends one, which is not an inconsistency — the two angles are read over
+ * different distances.
+ *
+ * A hull's heading is what it is *drawn* at, and a visibly-crooked sprite is a
+ * defect at any range. A shot's heading is only ever used to reach forward from a
+ * position the wire just gave us, and the reach is bounded
+ * ({@link ../interpolation} `MAX_SHOT_EXTRAPOLATION_MS`, 200 ms): the fastest
+ * muzzle in the game (a turret's 700 u/s) covers 140 u in that time, and
+ * `140 · tan(0.703°)` is **1.7 world units** of cross-track error at the very end
+ * of the longest reach the buffer will take. Over the ordinary one-broadcast-
+ * interval reach (33 ms, 23 u) it is **0.28 u** — under the wire's own
+ * eighth-unit position step ({@link POS_SCALE}) times three, and far inside the
+ * 5-unit shot radius a player is reading. The next snapshot then re-anchors the
+ * position exactly, so the error never accumulates across a flight.
+ *
+ * The second byte would buy 0.0066 u at that reach, against 64 shots × 30 Hz =
+ * 1.92 KB/s. Shot volume is the highest-frequency entity traffic in the game, so
+ * the byte is not spent.
+ */
+const SHOT_ANGLE_SCALE = 256 / (2 * Math.PI);
+
+/**
+ * A shot's muzzle-speed quantization: **world units per second per step**, one
+ * byte, so the wire carries 0 … 1020 u/s with ±2 u/s of error.
+ *
+ * The whole game has four muzzle speeds — a turret's 700 (`src/sim/constants`
+ * `TURRET.projectileSpeed`, flat across Mk I–III) and a ship's 520 scaled by the
+ * SPEED ladder's `[1, 1.15, 1.3]`, i.e. 520 / 598 / 676 — so this range is
+ * generous headroom rather than a tight fit, and a retune has room to move in.
+ * Three of the four land exactly on a step; 598 rounds to 600.
+ *
+ * Speed is carried rather than derived because a shot's *first* packet is a
+ * shot with no history, and that is the packet a player reads to decide whether
+ * to move into its line (GDD §2.6 — dodging is the skill). Two positions are a
+ * velocity only once there are two.
+ *
+ * ±2 u/s over the 200 ms maximum reach is **0.4 u** along-track; over one
+ * broadcast interval, 0.07 u.
+ */
+export const SHOT_SPEED_QUANT = 4;
+
+/**
+ * Largest muzzle speed the wire can carry, world units per second — the speed
+ * byte's top step at {@link SHOT_SPEED_QUANT}.
+ *
+ * **It binds** ({@link quantizeShotVelocity} clamps to it), because the
+ * alternative is a wrapped byte: `Math.round(1024 / 4)` is 256, which lands on
+ * the wire as 0 and reaches the client as a shot standing still — the exact
+ * a0-73 failure this record exists to fix, in a rarer case and harder to spot.
+ *
+ * A clamped shot is not free either. It keeps its heading and loses its speed:
+ * the receiver draws it on the right line, travelling slower than authority has
+ * it, and every reconciliation snaps it forward again. That is a visible bug of
+ * its own, so the clamp is a *last* line — the guarantee is that no shot the game
+ * can fire ever reaches it. The fastest muzzle that exists is a turret's 700 u/s
+ * (`src/sim/constants` `TURRET.projectileSpeed`) against this 1020, and
+ * `snapshot.test.ts` ("no shot the game can fire overflows the wire") walks every
+ * weapon in the game — every ship class × every SPEED tier, every turret Mk — and
+ * fails the build if a retune, a new hull, or a shot that inherits its shooter's
+ * velocity ever puts one within reach of the clamp.
+ */
+export const MAX_WIRE_SHOT_SPEED = 255 * SHOT_SPEED_QUANT;
 
 /**
  * Fixed-point steps per world unit for every streamed position and velocity —
@@ -208,13 +291,41 @@ export interface ShipSnap {
   flags: number;
 }
 
-/** A projectile's streamed state. `id` is its **pool slot**, not an entity id:
- *  slots are reused and stable, which is exactly what a u8 can carry and what a
- *  client needs to correlate a shot across snapshots. */
+/**
+ * A projectile's streamed state, in **world units** on both sides of the socket.
+ * `id` is its **pool slot**, not an entity id: slots are reused and stable, which
+ * is exactly what a u8 can carry and what a client needs to correlate a shot
+ * across snapshots.
+ *
+ * **`velX` / `velY` are new in wire v3 (a0-73), and they are the whole point.**
+ * The developer, from a live online match: *"other players shots dont follow the
+ * direction they were fired in."* Measured (evidence/a0-73-remote-shots) they did
+ * not, and could not: a shot record carried a position and an owner and nothing
+ * else, so a remote shot only ever moved when a packet moved it. Between two
+ * packets that bracket it a client can chord-interpolate and the chord happens to
+ * lie on the fired line — but at the head of a flight, at the tail of one, and for
+ * the whole of any gap in the stream there is no pair, and a shot with no velocity
+ * simply **stopped**, up to 104 u behind where its own heading had it. A player
+ * reading a shot's line to decide whether to move into it was reading a dot that
+ * was not travelling that line at all.
+ *
+ * The pair is carried as **polar** on the wire — one byte of heading
+ * ({@link SHOT_ANGLE_SCALE}) and one of speed ({@link SHOT_SPEED_QUANT}), 2 B
+ * rather than the 4 B two `i16` components would cost — because a shot is a
+ * straight line at a constant speed and those are exactly its two degrees of
+ * freedom. The polar step is the codec's own business, like {@link POS_SCALE}:
+ * this record is a plain velocity vector either side of the socket, so no consumer
+ * has to know the wire is polar. It does mean `decode(encode(v))` returns `v`
+ * rounded to the two quantizations above, exactly as positions are.
+ */
 export interface ProjSnap {
   id: number;
   posX: number;
   posY: number;
+  /** Muzzle velocity, world units per second. Constant for a shot's whole life —
+   *  a projectile takes no input and no acceleration (`src/sim/projectiles.ts`). */
+  velX: number;
+  velY: number;
   /** `owner` in bits 0..2; bit 3 is the ship-vs-turret shot-kind flag (design
    *  amendment v0.2); bits 4..7 still reserved. Decode with {@link projOwner} /
    *  {@link projIsShipShot}. */
@@ -260,6 +371,33 @@ export function dequantizeAngle(wire: number): number {
   return (wire & 0xffff) / ANGLE_SCALE;
 }
 
+/** A shot's velocity vector → the wire's `heading u8 | speed u8` pair. A zero
+ *  vector encodes as speed 0, and decodes back to one — a shot the encoder was
+ *  handed with no velocity is streamed as having none, never as a guess. */
+function quantizeShotVelocity(velX: number, velY: number): { heading: number; speed: number } {
+  const speed = Math.hypot(velX, velY);
+  if (!(speed > 0)) return { heading: 0, speed: 0 };
+  const turns = Math.atan2(velY, velX) * SHOT_ANGLE_SCALE;
+  // The speed byte's ceiling ({@link MAX_WIRE_SHOT_SPEED}) is applied to the
+  // *speed*, not to the quantized step, so the bound reads as the world-unit
+  // number it is stated in — and, like {@link quantize}, it clamps rather than
+  // truncating: a wrapped byte would hand the client a wrong velocity, which is
+  // worse than a slow one. Nothing the game fires gets here (see the constant).
+  const q = Math.round(Math.min(speed, MAX_WIRE_SHOT_SPEED) / SHOT_SPEED_QUANT);
+  return {
+    heading: ((Math.round(turns) % 256) + 256) % 256,
+    speed: q,
+  };
+}
+
+/** The wire's `heading u8 | speed u8` pair → a velocity vector in world units. */
+function dequantizeShotVelocity(heading: number, speed: number): { velX: number; velY: number } {
+  if (speed === 0) return { velX: 0, velY: 0 };
+  const radians = (heading & 0xff) / SHOT_ANGLE_SCALE;
+  const magnitude = speed * SHOT_SPEED_QUANT;
+  return { velX: Math.cos(radians) * magnitude, velY: Math.sin(radians) * magnitude };
+}
+
 // ---------------------------------------------------------------------------
 // The sim → wire adapter
 // ---------------------------------------------------------------------------
@@ -299,6 +437,12 @@ export function snapshotWorld(world: World): { ships: ShipSnap[]; projectiles: P
       id: slot & 0xff,
       posX: p.pos.x,
       posY: p.pos.y,
+      // The line the shot was fired on, straight off authority (a0-73). A shot
+      // flies this vector unchanged for its whole life, so one reading of it is
+      // the whole trajectory — which is what lets a client advance a remote shot
+      // by its own heading between snapshots instead of freezing it.
+      velX: p.vel.x,
+      velY: p.vel.y,
       // Owner in bits 0..2; the shot-kind bit marks a ship weapon shot so the
       // renderer can draw it apart from a turret shot (design amendment v0.2).
       meta: (p.owner & SHOT_META.ownerMask) | (p.kind === 'ship' ? SHOT_META.shipKind : 0),
@@ -367,6 +511,11 @@ export function encodeSnapshot(
     o += 2;
     dv.setInt16(o, quantize(p.posY), true);
     o += 2;
+    const v = quantizeShotVelocity(p.velX, p.velY);
+    dv.setUint8(o, v.heading);
+    o += 1;
+    dv.setUint8(o, v.speed);
+    o += 1;
     dv.setUint8(o, p.meta & 0xff);
     o += 1;
   }
@@ -415,9 +564,14 @@ export function decodeSnapshot(buf: ArrayBuffer): DecodedSnapshot {
     o += 2;
     const posY = dequantize(dv.getInt16(o, true));
     o += 2;
+    const heading = dv.getUint8(o);
+    o += 1;
+    const speed = dv.getUint8(o);
+    o += 1;
     const meta = dv.getUint8(o);
     o += 1;
-    projectiles.push({ id, posX, posY, meta });
+    const { velX, velY } = dequantizeShotVelocity(heading, speed);
+    projectiles.push({ id, posX, posY, velX, velY, meta });
   }
 
   return { tick, ships, projectiles };

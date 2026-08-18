@@ -42,7 +42,7 @@ function snapshot(tick: number, shots: readonly { id: number; x: number; meta: n
   return {
     tick,
     ships: [],
-    projectiles: shots.map((s) => ({ id: s.id, posX: s.x, posY: 0, meta: s.meta })),
+    projectiles: shots.map((s) => ({ id: s.id, posX: s.x, posY: 0, velX: 520, velY: 0, meta: s.meta })),
   };
 }
 
