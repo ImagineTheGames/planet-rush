@@ -1,0 +1,149 @@
+{
+  "probe": "a0-76 peer presence, from the seat that stayed",
+  "label": "abandon",
+  "awayMs": 0,
+  "mode": "abandon",
+  "capturedAt": "2026-08-17T23:17:53.042Z",
+  "room": {
+    "code": "PBQW",
+    "machine": "4d891e33b27a95"
+  },
+  "seats": {
+    "watcher": 0,
+    "phone": 1
+  },
+  "wire": [
+    {
+      "at": 1,
+      "type": "lobbyState"
+    },
+    {
+      "at": 273,
+      "type": "playerSubstituted",
+      "detail": {
+        "player": 1,
+        "graceSeconds": 0,
+        "heldForMatch": false
+      }
+    },
+    {
+      "at": 273,
+      "type": "lobbyState"
+    }
+  ],
+  "frames": [
+    {
+      "moment": "match live — two humans flying, nothing to say",
+      "at": 0,
+      "banner": [],
+      "rows": [],
+      "seats": [],
+      "authority": [
+        {
+          "seat": 0,
+          "isBot": false,
+          "heldForMatch": false,
+          "hasSocket": true
+        },
+        {
+          "seat": 1,
+          "isBot": false,
+          "heldForMatch": false,
+          "hasSocket": true
+        }
+      ]
+    },
+    {
+      "moment": "they pressed ABANDON",
+      "at": 0.13,
+      "banner": [
+        "P2 — LEFT THE MATCH · BOT FLYING"
+      ],
+      "rows": [
+        {
+          "seat": 1,
+          "name": "P2",
+          "reason": "LEFT THE MATCH",
+          "clause": "BOT FLYING",
+          "alpha": 1
+        }
+      ],
+      "seats": [
+        {
+          "seat": 1,
+          "state": "gone",
+          "bot": true
+        }
+      ],
+      "authority": [
+        {
+          "seat": 0,
+          "isBot": false,
+          "heldForMatch": false,
+          "hasSocket": true
+        },
+        {
+          "seat": 1,
+          "isBot": true,
+          "heldForMatch": false,
+          "hasSocket": false
+        }
+      ]
+    }
+  ],
+  "watcherWelcomes": 1,
+  "placement": [
+    {
+      "viewport": "844x390 — phone (landscape)",
+      "contentBox": {
+        "x": 0,
+        "width": 844
+      },
+      "clockBottom": 70,
+      "bandTop": 75,
+      "bandCentreOnScreen": 422,
+      "rowsShownWheelClosed": 2,
+      "rowsShownWheelOpen": 0,
+      "insideMargin": true
+    },
+    {
+      "viewport": "390x844 — phone (portrait)",
+      "contentBox": {
+        "x": 0,
+        "width": 390
+      },
+      "clockBottom": 70,
+      "bandTop": 75,
+      "bandCentreOnScreen": 195,
+      "rowsShownWheelClosed": 2,
+      "rowsShownWheelOpen": 2,
+      "insideMargin": true
+    },
+    {
+      "viewport": "1280x720 — desktop 16:9",
+      "contentBox": {
+        "x": 0,
+        "width": 1280
+      },
+      "clockBottom": 82,
+      "bandTop": 88,
+      "bandCentreOnScreen": 640,
+      "rowsShownWheelClosed": 2,
+      "rowsShownWheelOpen": 2,
+      "insideMargin": true
+    },
+    {
+      "viewport": "3840x1080 — ultrawide 32:9",
+      "contentBox": {
+        "x": 960,
+        "width": 1920
+      },
+      "clockBottom": 82,
+      "bandTop": 88,
+      "bandCentreOnScreen": 1920,
+      "rowsShownWheelClosed": 2,
+      "rowsShownWheelOpen": 2,
+      "insideMargin": true
+    }
+  ]
+}

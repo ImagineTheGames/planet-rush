@@ -519,6 +519,76 @@ export function waveClockLayout(
 }
 
 // ---------------------------------------------------------------------------
+// The peer-presence banner (a0-76 — who is still flying)
+// ---------------------------------------------------------------------------
+
+/** Clearance between the wave clock's scrim and the first presence line,
+ *  reference px. Scaled with the frame like every other Gantry metric. */
+export const PRESENCE_CLOCK_GAP = 6;
+/** Leading between stacked presence lines, reference px. */
+export const PRESENCE_LINE_LEADING = 15;
+
+/** Where the presence banner's lines go, in SCREEN space. */
+export interface PresenceBand {
+  /** Centre-x of every line — the clock's own centre, so the two read as one
+   *  column of match state rather than two unrelated readouts. */
+  readonly x: number;
+  /** Top-y of the first line. */
+  readonly y: number;
+  /** Distance from one line's top to the next. */
+  readonly leading: number;
+  /** The band's whole footprint — of the {@link shown} rows only. */
+  readonly bounds: Rect;
+  /**
+   * **How many of the given rows there is room for**, top-down, before the band
+   * would reach the open Build wheel.
+   *
+   * The banner is transient and the wheel is a thing the player is pressing right
+   * now, so the wheel wins the pixels — but it wins them a row at a time rather
+   * than all at once: a 1280×720 desktop with the wheel open has room for two
+   * lines and not three, and answering that with silence would drop the newest
+   * fact in the game to protect a wedge nothing was going to overlap. The rows
+   * are newest-first ({@link ./peer-presence} `read`), so what is dropped is
+   * always the oldest.
+   */
+  readonly shown: number;
+  /** `shown > 0` — the banner draws at all this frame. */
+  readonly fits: boolean;
+}
+
+/**
+ * Lay the presence banner out under the wave clock, given the clock's own
+ * layout and the measured height of each line the view is about to draw.
+ *
+ * Under the clock rather than anywhere else because that is where a player
+ * already looks for match state (GDD §2.2 puts the wave clock top-centre), and
+ * because every other region is spoken for: ore top-left, HOME top-right, the
+ * wheel at the ship, the minimap bottom-right, the strip along the bottom.
+ */
+export function presenceBand(
+  viewportWidth: number,
+  viewportHeight: number,
+  clock: ClockLayout,
+  lines: readonly ClockLine[],
+  wheelOpen: boolean,
+): PresenceBand {
+  const scale = hudMetrics(viewportWidth, viewportHeight);
+  const leading = hudSpace(PRESENCE_LINE_LEADING, scale);
+  const x = clock.bounds.x + clock.bounds.width / 2;
+  const y = clock.bounds.y + clock.bounds.height + hudSpace(PRESENCE_CLOCK_GAP, scale);
+  const wheelTop = wheelBounds(viewportWidth, viewportHeight).y;
+  const spanOf = (n: number): number =>
+    n <= 0 ? 0 : (n - 1) * leading + (lines[n - 1]?.height ?? 0);
+  let shown = lines.length;
+  while (shown > 0 && wheelOpen && y + spanOf(shown) + CLOCK_WHEEL_GAP > wheelTop) shown--;
+
+  const widest = lines.slice(0, shown).reduce((w, l) => Math.max(w, l.width), 0);
+  const height = spanOf(shown);
+  const bounds: Rect = { x: x - widest / 2, y, width: widest, height };
+  return { x, y, leading, bounds, shown, fits: shown > 0 };
+}
+
+// ---------------------------------------------------------------------------
 // The onboarding prompt (GDD §2.10)
 // ---------------------------------------------------------------------------
 

@@ -29,6 +29,7 @@ import { describe, expect, it } from 'vitest';
 import { ShipClass } from '../shared/types';
 import { TICK_DT, createWorld, step } from '../sim';
 import type { PlayerSpec, Ship, World } from '../sim';
+import type { LobbySlot, ServerMessage } from '../net/transport';
 import { Hud } from './hud';
 import {
   LOOT_TELL_SECONDS,
@@ -36,8 +37,14 @@ import {
   leftNumeral,
   partialTake,
 } from './loot-tell';
+import {
+  PRESENCE_MAX_LINES,
+  PRESENCE_TELL_SECONDS,
+  PeerPresenceLog,
+  applyPresenceMessage,
+} from './peer-presence';
 import { CONTENT_MAX_ASPECT } from './viewport';
-import { HUD_PAD } from './hud-geometry';
+import { HUD_PAD, presenceBand, waveClockLayout, wheelBounds } from './hud-geometry';
 import { collapsedRect } from './minimap';
 import { resolveAnchor, rectContains } from '@platform/layout-registry';
 
@@ -345,5 +352,382 @@ describe('a0-74 — the HUD is bound to a content box', () => {
     const byId = new Map(hud.debugChromeAnchors().map((a) => [a.id, a]));
     expect(byId.get('station-hp')?.x).toBeCloseTo(2560 - 320 - HUD_PAD, 6);
     expect(byId.get('ore-hud')?.x).toBeCloseTo(320 + HUD_PAD, 6);
+  });
+});
+
+/**
+ * ── a0-76 ───────────────────────────────────────────────────────────────────
+ * The developer, 2026-08-17:
+ *
+ * > *"do we have any indication when a player loses connection (like for the
+ * > other players that remained in match…) and when they join back as well…
+ * > we need something to indicate that so other players know"*
+ *
+ * No. `./connection-status` and `src/net/link-loss` are entirely about your OWN
+ * socket, so from the other side of a drop a disconnected player was a ship that
+ * simply stopped making good decisions — rage-quit, lag, a reconnect in flight
+ * and a bot substitution all looked identical from the cockpit, and every one of
+ * them calls for a different response.
+ *
+ * These tests drive the REAL feed with REAL wire messages: `applyPresenceMessage`
+ * is the exact function `main.ts` hands every observed `ServerMessage` to, and
+ * the fixtures below are typed as {@link ServerMessage}, so a shape that moves in
+ * `src/net/transport.ts` fails compilation here rather than passing against a
+ * re-implementation of the routing.
+ *
+ * The Pixi half (the pooled two-token rows under the wave clock) is not exercised
+ * here: drawing measures text, which needs a DOM. Its decision logic is
+ * {@link ./peer-presence}'s, its placement is `presenceBand`'s and is asserted
+ * headless below, and its pixels are the golden/live-stage suites' — the same
+ * split every other element in this directory keeps.
+ */
+
+/** Authority's own drop broadcast (`server/room.ts` `vacate`). `heldForMatch` is
+ *  the a0-72 hold: the seat is its operator's for as long as the match runs. */
+function substituted(player: number, held: boolean): ServerMessage {
+  return held
+    ? { type: 'playerSubstituted', player, graceSeconds: 0, heldForMatch: true }
+    : { type: 'playerSubstituted', player, graceSeconds: 0 };
+}
+
+/** …and the reclaim broadcast that answers it. */
+function reclaimed(player: number): ServerMessage {
+  return { type: 'playerReclaimed', player };
+}
+
+/** A roster broadcast carrying who is a bot right now — the room re-sends this
+ *  on every drop and every reclaim. Only `player`/`isBot` matter here; the rest
+ *  is the shape `server/room.ts` `lobbyState()` actually publishes. */
+function roster(bots: readonly boolean[]): ServerMessage {
+  const slots: LobbySlot[] = bots.map((isBot, player) => ({
+    player,
+    isBot,
+    shipClass: ShipClass.Vanguard,
+    ready: true,
+    state: 'open',
+  }));
+  return { type: 'lobbyState', slots };
+}
+
+describe('a0-76 — the HUD says who stopped flying', () => {
+  it('a peer who drops is named, and named again when they return', () => {
+    // Four seats; this client is P1 (seat 0) and is watching seat 2.
+    const log = new PeerPresenceLog({ local: 0 });
+
+    // ── THE DROP ────────────────────────────────────────────────────────────
+    // Authority, not inference: the room lost seat 2's socket mid-match, seated a
+    // bot, and is holding the seat for as long as the match runs (a0-72).
+    applyPresenceMessage(log, substituted(2, true), 10);
+    applyPresenceMessage(log, roster([false, false, true, false]), 10);
+
+    const dropped = log.read(10);
+    expect(dropped, 'a drop must produce exactly one line').toHaveLength(1);
+    // NAMED — the whole point of the brief. `P3` is seat 2's 1-based identity
+    // tag, the same string its nameplate and its hull decal carry, so the banner
+    // ties to a ship the player can see rather than to an index they cannot.
+    expect(dropped[0]!.name).toBe('P3');
+    expect(dropped[0]!.seat).toBe(2);
+    expect(dropped[0]!.state).toBe('dropped');
+    expect(dropped[0]!.reason).toBe('CONNECTION LOST');
+    // …and the bot that took the seat, because an ally who is suddenly an AI is
+    // match information too. Secondary clause, so it never displaces the name.
+    expect(dropped[0]!.clause).toBe('BOT FLYING');
+    expect(dropped[0]!.text).toBe('P3 — CONNECTION LOST · BOT FLYING');
+    expect(log.presence(2)).toMatchObject({ state: 'dropped', bot: true });
+
+    // The line is transient; the STATE is not. Twenty seconds later the banner is
+    // clear and seat 2 is still dropped — which is what a player pressing the
+    // advantage needs to remain true.
+    expect(log.read(10 + PRESENCE_TELL_SECONDS)).toHaveLength(0);
+    expect(log.presence(2).state).toBe('dropped');
+
+    // ── THE RETURN ──────────────────────────────────────────────────────────
+    // A return that is silent is as confusing as a drop that is.
+    applyPresenceMessage(log, reclaimed(2), 40);
+    applyPresenceMessage(log, roster([false, false, false, false]), 40);
+
+    const back = log.read(40);
+    expect(back, 'a return must produce exactly one line').toHaveLength(1);
+    // NAMED AGAIN, and by the same name — a player who read `P3 — CONNECTION
+    // LOST` four seats ago must not have to work out that `Seat 2` is the same
+    // person.
+    expect(back[0]!.name).toBe('P3');
+    expect(back[0]!.seat).toBe(2);
+    expect(back[0]!.state).toBe('back');
+    expect(back[0]!.reason).toBe('BACK');
+    // …and the bot is out, stated rather than left to inference.
+    expect(back[0]!.clause).toBe('BOT OUT');
+    expect(back[0]!.text).toBe('P3 — BACK · BOT OUT');
+    expect(log.presence(2).bot).toBe(false);
+
+    // `back` is a thing that happened, not a condition: once its line has been on
+    // screen for its whole window the seat is an ordinary flying seat again.
+    expect(log.read(40 + PRESENCE_TELL_SECONDS)).toHaveLength(0);
+    expect(log.presence(2).state).toBe('here');
+  });
+
+  it('names the player with the name the lobby gave them, not a seat number', () => {
+    // The banner spells a seat exactly the way its nameplate does (`resolveName`),
+    // so a named seat reads its name and a nameless one falls back to `P{n}`.
+    const log = new PeerPresenceLog({ local: 0, names: [undefined, undefined, 'Warden'] });
+    applyPresenceMessage(log, substituted(2, true), 5);
+    expect(log.read(5)[0]!.text).toBe('Warden — CONNECTION LOST · BOT FLYING');
+
+    // …and a table that arrives later re-spells the line still on screen.
+    const late = new PeerPresenceLog({ local: 0 });
+    applyPresenceMessage(late, substituted(3, true), 5);
+    expect(late.read(5)[0]!.name).toBe('P4');
+    late.setNames([undefined, undefined, undefined, 'Sable']);
+    expect(late.read(5)[0]!.name).toBe('Sable');
+  });
+
+  it('tells a drop from an abandon — one may come back, the other may not', () => {
+    // The SAME message carries both, and `heldForMatch` is the whole difference
+    // (a0-72). A peer does different things about them, so the banner says which.
+    const log = new PeerPresenceLog({ local: 0 });
+
+    applyPresenceMessage(log, substituted(1, true), 1);
+    expect(log.read(1)[0]!.reason).toBe('CONNECTION LOST');
+    expect(log.presence(1).state).toBe('dropped');
+
+    applyPresenceMessage(log, substituted(3, false), 2);
+    const gone = log.read(2).find((l) => l.seat === 3);
+    expect(gone!.reason).toBe('LEFT THE MATCH');
+    expect(gone!.state).toBe('gone');
+    expect(log.presence(3).state).toBe('gone');
+  });
+
+  it('the match ending closes every seat still away — the hold runs no longer', () => {
+    const log = new PeerPresenceLog({ local: 0 });
+    applyPresenceMessage(log, substituted(1, true), 1);
+    applyPresenceMessage(log, substituted(2, true), 2);
+    expect(log.away().map((s) => s.state)).toEqual(['dropped', 'dropped']);
+
+    applyPresenceMessage(log, { type: 'matchEnd', tick: 900, winner: 0 }, 600);
+    expect(log.presence(1).state).toBe('gone');
+    expect(log.presence(2).state).toBe('gone');
+    // Silently: the summary screen is up, and a banner announcing two departures
+    // over it would be noise about a match that is over.
+    expect(log.read(600)).toHaveLength(0);
+  });
+
+  it('surfaces a bot taking a seat, and never invents one for a seat the host set', () => {
+    const log = new PeerPresenceLog({ local: 0 });
+    // Seats 4..7 were BOT from the lobby. The FIRST roster broadcast must not
+    // announce four substitutions — nothing happened to those seats, and a banner
+    // that cries wolf on match start is a banner nobody reads on minute nine.
+    applyPresenceMessage(log, roster([false, false, false, false, true, true, true, true]), 0);
+    expect(log.read(0)).toHaveLength(0);
+    expect(log.away()).toHaveLength(0);
+
+    // A seat the log knows about is a different matter: this is the substitution
+    // arriving on the roster channel, and it is stated.
+    applyPresenceMessage(log, substituted(2, true), 30);
+    expect(log.read(30)[0]!.clause).toBe('BOT FLYING');
+  });
+
+  it('is silent about your own seat — that drop is the overlay’s, not the banner’s', () => {
+    // `src/net/link-loss` throws a full-screen card with RECONNECT and ABANDON on
+    // it when YOUR socket goes. A second, quieter copy of that under the wave
+    // clock would be noise over a card the player cannot miss.
+    const log = new PeerPresenceLog({ local: 3 });
+    applyPresenceMessage(log, substituted(3, true), 10);
+    expect(log.read(10)).toHaveLength(0);
+    applyPresenceMessage(log, reclaimed(3), 20);
+    expect(log.read(20)).toHaveLength(0);
+
+    // The seat's STATE is still tracked — only the line is suppressed.
+    expect(log.presence(3).state).toBe('back');
+    // …and it settles like any other seat. This is driven off the SEAT rather
+    // than off its line, because a suppressed seat has no line to settle from:
+    // reading the lines left this client's own seat reporting `back` for the
+    // rest of the match, which the 45-second evidence run caught.
+    expect(log.read(20 + PRESENCE_TELL_SECONDS)).toHaveLength(0);
+    expect(log.presence(3).state).toBe('here');
+    expect(log.away(), 'and it stops being listed as away at all').toHaveLength(0);
+  });
+
+  it('does not stack a second line when authority repeats itself', () => {
+    // A reconnecting client is re-taught the roster, and the room re-broadcasts on
+    // every change: the same fact can arrive several times and must read as one.
+    const log = new PeerPresenceLog({ local: 0 });
+    applyPresenceMessage(log, substituted(1, true), 1);
+    applyPresenceMessage(log, substituted(1, true), 2);
+    applyPresenceMessage(log, roster([false, true]), 3);
+    expect(log.read(3)).toHaveLength(1);
+    expect(log.read(3)[0]!.text).toBe('P2 — CONNECTION LOST · BOT FLYING');
+  });
+
+  it('shows the newest few and never a tower of them', () => {
+    // Eight seats can drop together (a router reboot at a LAN party). A stack that
+    // tall reaches the build wheel on a phone, so the newest win — a tell nobody
+    // sees until four seconds from now is not a tell about now.
+    const log = new PeerPresenceLog({ local: 0 });
+    for (let seat = 1; seat < 8; seat++) applyPresenceMessage(log, substituted(seat, true), seat);
+    const lines = log.read(7);
+    expect(lines).toHaveLength(PRESENCE_MAX_LINES);
+    expect(lines.map((l) => l.seat)).toEqual([7, 6, 5]);
+  });
+
+  it('holds a line long enough to read mid-fight, then fades it out', () => {
+    const log = new PeerPresenceLog({ local: 0 });
+    applyPresenceMessage(log, substituted(1, true), 100);
+    expect(log.read(100)[0]!.alpha).toBe(1);
+    expect(log.read(100 + PRESENCE_TELL_SECONDS * 0.5)[0]!.alpha).toBe(1);
+
+    const leaving = log.read(100 + PRESENCE_TELL_SECONDS - 0.2)[0]!;
+    expect(leaving.alpha).toBeGreaterThan(0);
+    expect(leaving.alpha).toBeLessThan(1);
+    expect(log.read(100 + PRESENCE_TELL_SECONDS)).toHaveLength(0);
+
+    // A clock that went backwards is a rematch or a reclaim's rebuilt world: drop
+    // anything standing rather than drawing a line stamped in the future.
+    applyPresenceMessage(log, substituted(2, true), 200);
+    expect(log.read(0)).toHaveLength(0);
+  });
+
+  it('ignores every message that is not about a seat changing hands', () => {
+    const log = new PeerPresenceLog({ local: 0 });
+    expect(applyPresenceMessage(log, { type: 'pong', id: 1, queueMs: 0, loopLagMs: 0 }, 1)).toBe(false);
+    expect(applyPresenceMessage(log, substituted(1, true), 1)).toBe(true);
+  });
+
+  it('speaks the machine register — plain, diagnostic, no fiction and no drama', () => {
+    // GDD §4.7's match/machine line: *"a dropped socket is a machine fact, and the
+    // mining authority has no voice for it"*. So no claim/operator/seal vocabulary
+    // here, and — §4.7 again — no exclamation, ever.
+    const log = new PeerPresenceLog({ local: 0 });
+    applyPresenceMessage(log, substituted(1, true), 1);
+    applyPresenceMessage(log, substituted(2, false), 1);
+    applyPresenceMessage(log, reclaimed(3), 1);
+    for (const line of log.read(1)) {
+      expect(line.text).toBe(line.text.toUpperCase().replace('—', '—'));
+      expect(line.text).not.toContain('!');
+      // The FACT leads the row after the name, per the clarity rule — a player
+      // under fire reads the first two words and nothing else.
+      expect(['CONNECTION LOST', 'LEFT THE MATCH', 'BACK']).toContain(line.reason);
+      expect(line.reason.split(' ').length).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it('carries the seam the HUD draws it through, and starts with nothing up', () => {
+    // The Pixi HUD cannot draw headless (text measurement needs a DOM), but the
+    // seam a live-stage test and the evidence capture read is asserted here so it
+    // cannot quietly vanish — the way `debugLootTell` is.
+    const hud = new Hud(1280, 720);
+    expect(typeof hud.debugPresence).toBe('function');
+    expect(hud.debugPresence()).toEqual([]);
+  });
+});
+
+describe('a0-76 — where the banner goes', () => {
+  /** The clock as the HUD lays it out, at real-ish measured line widths. */
+  function clockAt(w: number, h: number, wheelOpen = false) {
+    return waveClockLayout(
+      w,
+      h,
+      [
+        { width: 168, height: 18 },
+        { width: 96, height: 17 },
+        { width: 91, height: 16 },
+      ],
+      wheelOpen,
+    );
+  }
+  const lines = (n: number) => Array.from({ length: n }, () => ({ width: 190, height: 14 }));
+
+  it('hangs under the wave clock — where the player already looks for match state', () => {
+    // GDD §2.2 puts the wave clock top-centre and names a corner or a band for
+    // every other element (ore top-left, HOME top-right, minimap bottom-right,
+    // strip along the bottom), so this is the region that answers "what is
+    // happening in the match" and the banner joins it rather than inventing one.
+    for (const vp of [
+      { width: 1280, height: 720 },
+      { width: 844, height: 390 }, // landscape phone
+      { width: 390, height: 844 }, // portrait phone
+      { width: 1920, height: 1080 },
+    ]) {
+      const clock = clockAt(vp.width, vp.height);
+      const band = presenceBand(vp.width, vp.height, clock, lines(3), false);
+      expect(band.fits).toBe(true);
+      expect(band.shown, 'a closed wheel takes nothing from the band').toBe(3);
+      // Centred on the clock, and strictly BELOW its drawn footprint (scrim
+      // included) — the two read as one column, never as an overlap.
+      expect(band.x).toBeCloseTo(clock.bounds.x + clock.bounds.width / 2, 6);
+      expect(band.y).toBeGreaterThan(clock.bounds.y + clock.bounds.height);
+      // …and clear of the top-left ore cluster and the top-right HOME panel by
+      // construction: it is centred, and its widest row is far narrower than the
+      // gap between those two corners on every profile above.
+      expect(band.bounds.x).toBeGreaterThan(HUD_PAD);
+      expect(band.bounds.x + band.bounds.width).toBeLessThan(vp.width - HUD_PAD);
+    }
+  });
+
+  it('gets out of the way of an open build wheel on a phone', () => {
+    // The brief: *"keep it out of the way of the wheel and the minimap on a
+    // phone"*. The wheel is a control the player is pressing right now and the
+    // banner is transient, so on a viewport too short to hold both the banner is
+    // culled whole — the same call a0-24 made for the clock itself.
+    const vp = { width: 844, height: 390 };
+    const clock = clockAt(vp.width, vp.height, true);
+    const open = presenceBand(vp.width, vp.height, clock, lines(3), true);
+    expect(open.fits, 'a 390px-tall phone has no room for the band at all').toBe(false);
+    expect(open.shown).toBe(0);
+
+    // …and it is back, whole, the moment the wheel closes.
+    const closed = presenceBand(vp.width, vp.height, clockAt(vp.width, vp.height), lines(3), false);
+    expect(closed.fits).toBe(true);
+    expect(closed.shown).toBe(3);
+
+    // The minimap is the other thing a phone has no room for, and the banner never
+    // reaches it: it is a top-centre element and the map is bottom-right.
+    const map = collapsedRect(vp, false);
+    expect(closed.bounds.y + closed.bounds.height).toBeLessThan(map.y);
+  });
+
+  it('gives the wheel the pixels a ROW at a time, not all at once', () => {
+    // A 1280×720 desktop with the wheel open has room for two lines and not
+    // three. Answering that with silence would drop the newest fact in the game
+    // to protect a wedge nothing was going to overlap, so the band sheds its
+    // OLDEST row instead — and what survives still clears the wheel exactly.
+    const vp = { width: 1280, height: 720 };
+    const clock = clockAt(vp.width, vp.height, true);
+    const wheelTop = wheelBounds(vp.width, vp.height).y;
+
+    const three = presenceBand(vp.width, vp.height, clock, lines(3), true);
+    expect(three.fits).toBe(true);
+    expect(three.shown).toBeGreaterThan(0);
+    expect(three.shown).toBeLessThan(3);
+    expect(three.bounds.y + three.bounds.height).toBeLessThan(wheelTop);
+
+    // …and with the wheel CLOSED all three draw, because there is no wheel to
+    // clear: the clearance is a constraint on a control that is on screen, not a
+    // permanent no-go band down the middle of the HUD.
+    const closed = presenceBand(vp.width, vp.height, clockAt(vp.width, vp.height), lines(3), false);
+    expect(closed.shown).toBe(3);
+  });
+
+  it('one line, two lines or three all stack from the same top', () => {
+    const vp = { width: 1280, height: 720 };
+    const clock = clockAt(vp.width, vp.height);
+    const one = presenceBand(vp.width, vp.height, clock, lines(1), false);
+    const three = presenceBand(vp.width, vp.height, clock, lines(3), false);
+    expect(one.y).toBe(three.y);
+    expect(three.bounds.height).toBeCloseTo(2 * three.leading + 14, 6);
+    expect(one.bounds.height).toBe(14);
+  });
+
+  it('reads on an ultrawide, bound to the content box like the clock above it', () => {
+    // a0-74: the chrome is laid out in a centred reference-aspect box, so the
+    // banner is measured against that box and not against 3840 physical pixels —
+    // otherwise it would sit a head-turn away from the clock it belongs to.
+    const box = { width: 1080 * CONTENT_MAX_ASPECT, height: 1080 };
+    const clock = clockAt(box.width, box.height);
+    const band = presenceBand(box.width, box.height, clock, lines(2), false);
+    expect(band.fits).toBe(true);
+    expect(band.x).toBeCloseTo(box.width / 2, 6);
+    // Shifted onto the screen by the HUD, which is what keeps it off the edges.
+    const shifted = band.x + (3840 - box.width) / 2;
+    expect(shifted).toBeCloseTo(3840 / 2, 6);
   });
 });
