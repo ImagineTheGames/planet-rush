@@ -1,0 +1,38 @@
+a0-85 — the settings ROW GEOMETRY, before and after the merge
+==============================================================================
+
+BEFORE = a0-77 as written (branch point ac7163c7, which predates a0-79).
+AFTER  = the merged tree. Neither number is re-derived here: both are read
+         off the shipped client (__mainMenu.settingsControls) by
+         evidence/a0-77-settings-help/measure.spec.ts, re-run in the container.
+
+a0-79 caps the settings GRID at MENU_COLUMN_SHARE of the band with a floor at
+MENU_COLUMN_MIN. Where the cap already bit (desktop, at COLUMN.settings = 680)
+or the floor wins (798x384), the ceiling is a NO-OP and a0-79 predicted so
+itself — evidence/a0-79-menus/plate-room.txt, whose numbers these reproduce.
+
+── phone landscape 798×384 — the developer's screenshot, the narrowest supported width
+   logical viewport   798x384
+   row width          372 -> 372   unchanged
+   field, left        23 -> 23   unchanged
+   field, right       23 -> 23   unchanged
+   ? controls         6 of 6 rows, smallest 48x48 logical (TOUCH_MIN is 48)
+
+── phone PORTRAIT held — landscape-locked, so the screen lays out at 844×390
+   logical viewport   844x390  (portrait-held, through the landscape lock)
+   row width          394 -> 384   -10px
+   field, left        24 -> 34   +10px
+   field, right       24 -> 34   +10px
+   ? controls         6 of 6 rows, smallest 48x48 logical (TOUCH_MIN is 48)
+
+── desktop 1280×800 — the golden suite's control width
+   logical viewport   1280x800
+   row width          680 -> 680   unchanged
+   field, left        300 -> 300   unchanged
+   field, right       300 -> 300   unchanged
+   ? controls         6 of 6 rows, smallest 48x48 logical (TOUCH_MIN is 48)
+
+The two CI phone baselines — phone-landscape-settings and phone-portrait-settings
+— are BOTH the 844x390 logical screen (the landscape one is the iphone profile
+rotated to landscape; the portrait one is the same profile held portrait and
+rotated by the lock). So the 10px each side above is what moved in both of them.

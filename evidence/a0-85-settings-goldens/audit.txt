@@ -1,0 +1,184 @@
+a0-85 — the three settings goldens, rebaked from the merged tree
+==============================================================================
+UI Engineer. Branch agent/ui/a0-77-settings-help. Container run, 2026-08-18.
+
+THE CONFLICT, AND WHY NEITHER SIDE COULD BE PICKED
+------------------------------------------------------------------------------
+a0-77 (the `?` help affordance on every settings row) re-baselined three
+baselines. While it sat unshipped for six hours, a0-79 (menu plate geometry and
+the void behind the menus) re-baselined the same three and merged first. PR #452
+came back DIRTY on exactly:
+
+  tests/mobile/goldens.spec.ts-snapshots/desktop-settings-desktop-linux.png
+  tests/mobile/goldens.spec.ts-snapshots/phone-landscape-settings-iphone-linux.png
+  tests/mobile/goldens.spec.ts-snapshots/phone-portrait-settings-iphone-linux.png
+
+`--ours` keeps a settings screen with the `?` marks and no plate geometry and no
+void; `--theirs` keeps one with the geometry and the void and no `?` marks. The
+merged CODE draws all of it, so the only correct baseline is a frame rendered
+FROM the merged tree. That is what these three are.
+
+`git merge origin/main` auto-merged everything else. The merge was checked for
+sense and not only for text: merged `src/ui/settings.ts` lays the rows out
+through a0-79's `menuColumnWidth`/`menuColumnBand` and THEN maps a0-77's
+`helpRect` over the resulting rows, and merged `src/ui/settings-view.ts` draws
+the `?` control and sits on a0-79's `./menu-backdrop`. Neither brief's code was
+dropped by the merge.
+
+THE TWO CHANGES, NAMED
+------------------------------------------------------------------------------
+A. a0-77 — a `?` chip on the LEADING edge of all six settings rows, stepper-sized
+   (48x48 logical, TOUCH_MIN), pushing each row's label right by one `?` plus a
+   row pad, and on the phone shortening the pips with it.
+
+B. a0-79 — TWO things, and the distinction matters below:
+   B1. the VOID behind the menus: the real baked backdrop, on every menu screen,
+       settings included.
+   B2. the plate GEOMETRY: the settings grid capped at `MENU_COLUMN_SHARE` of the
+       band with a floor at `MENU_COLUMN_MIN`.
+
+CONFIRMED IN EACH OF THE THREE FRAMES
+------------------------------------------------------------------------------
+All three were opened and read at full size. What each shows:
+
+  desktop-settings-desktop-linux.png            1280x800, dpr 1
+    A. `?` on all six rows — FIRE MODE, CONTROLS, REDUCE VFX, MASTER/SFX/MUSIC
+       VOLUME — at the same size as the -/+ steppers, labels shifted right of it,
+       AUTO-AIM / TAP COMMANDER / OFF unmoved on the right, ten pips still ten.
+    B1. the void: VISIBLE, the full frame behind the rows and the beams.
+    B2. the geometry: rows x=300 w=680, side field 300px. UNCHANGED from a0-77 —
+        the desktop was already at the `COLUMN.settings` 680 ceiling, so a0-79's
+        proportional cap is a no-op at this width BY ITS OWN DESIGN, and a0-79's
+        `plate-room.txt` predicts exactly 680/300. See NOTE below.
+
+  phone-landscape-settings-iphone-linux.png     844x390 logical, dpr 3
+    A. `?` on all six rows, both columns, clearing every value chip and every
+       stepper.
+    B1. the void: VISIBLE across the whole frame.
+    B2. the geometry: MOVED. Rows 394 -> 384 wide, side field 24 -> 34px each
+        side. This is a0-79's cap biting, and matches `plate-room.txt`'s 34/34.
+
+  phone-portrait-settings-iphone-linux.png      390x844 held, 844x390 logical
+    A. `?` on all six rows, through the landscape-lock rotation.
+    B1. the void: VISIBLE, rotated with the rest.
+    B2. the geometry: MOVED, the same 394 -> 384 / 24 -> 34, rotated. Both phone
+        baselines are the SAME 844x390 logical screen — the landscape one is the
+        iphone profile rotated to landscape, the portrait one is it held portrait
+        and rotated by the lock.
+
+THE DEVELOPER'S OWN VIEWPORT — 798x384 PHONE LANDSCAPE
+------------------------------------------------------------------------------
+Called out explicitly because NO CI baseline covers it: the golden suite's phone
+profile is 390x844 (844x390 logical), and the developer's screenshot — the one
+a0-77 was written from, the narrowest supported width — is 798x384. It is
+covered by this branch's own evidence instead, re-captured from the MERGED tree:
+
+  evidence/a0-77-settings-help/shots/phone-landscape-798x384-rest.png      -> both
+  evidence/a0-77-settings-help/shots/phone-landscape-798x384-open.png      -> both
+  evidence/a0-77-settings-help/shots/phone-landscape-798x384-open-alt.png  -> both
+  evidence/a0-77-settings-help/shots/phone-landscape-798x384-keyboard.png  -> both
+
+Read at full size:
+  A.  `?` on all six rows, 48x48 logical, two columns, clearing the value chips
+      and both steppers; the panel opens on MASTER VOLUME by touch and on
+      CONTROLS by touch, and by ArrowDown+Enter with no pointer at all.
+  B1. the void: VISIBLE behind the rows at this width too.
+  B2. the geometry: rows x=23 w=372, field 23/23px. UNCHANGED. At 798x384 it is
+      a0-79's FLOOR that wins, not its ceiling — a0-79 says so in its own words
+      ("There are 27px to give and this does not spend them",
+      evidence/a0-79-menus/plate-room.txt). See NOTE.
+
+NOTE — where B2 is a no-op, and why that is not a broken merge
+------------------------------------------------------------------------------
+The brief asks that both changes be visible in each frame. A is, in all four. B
+is, in all four — but B2, the margin, only MOVES at 844x390. On the desktop the
+cap was already bitten at 680; at 798x384 the floor wins. Those are a0-79's own
+documented outcomes at those two widths, reproduced here by measurement rather
+than assumed, and the frames agree with them to the pixel. Where B2 does not
+move, a0-79's visible contribution to the screen is B1, the void — and that IS
+present in every frame. So nothing is missing from the merge; the margin is
+width-dependent by design.
+
+The measurements, before and after, read off the shipped client and not
+re-derived: evidence/a0-85-settings-goldens/margins.txt.
+
+THE PROOF THAT EACH FRAME IS NEITHER SIDE
+------------------------------------------------------------------------------
+Each rebaked golden compared against BOTH halves of the conflict, with a0-03's
+cluster localiser (full output: evidence/a0-85-settings-goldens/clusters.txt;
+the two halves themselves are kept at evidence/a0-85-settings-goldens/sides/ so
+the claim is checkable without a git checkout).
+
+  frame                     vs OURS (a0-77)          vs THEIRS (a0-79)
+  desktop-settings          15.54%, 25 clusters      1.82%, 2 clusters
+  phone-landscape-settings  16.31%,  6 clusters      3.63%, 3 clusters
+  phone-portrait-settings   16.31%,  6 clusters      3.63%, 3 clusters
+
+Non-zero against both: the frame is neither side, which is the whole point.
+
+And the clusters say WHICH change each delta is:
+  vs OURS   — one whole-frame cluster (156 643px @ [0,0,1296,792] on the desktop,
+              53 601px @ [0,0,864,384] on the phone). That is B1, the void, which
+              covers the entire frame. Nothing else could.
+  vs THEIRS — the rows block and nothing else: 18 467px @ [288,192,840,624] on
+              the desktop; 7 256px @ [408,96,696,288] (the volume column) and
+              4 575px @ [24,96,216,288] (the toggle column) on both phones. That
+              is A, the `?` chips and the label shift they cause. These are the
+              same two clusters a0-77's own goldens-rebaseline.md reported
+              against the pre-a0-79 baseline, with their boxes moved by exactly
+              B2's 10px (volume column right edge 720 -> 696; toggle column right
+              edge 192 -> 216).
+  The small corner cluster in each (164px / 122px) is the build stamp — the
+  commit sha drawn bottom-left, which changes on every build and is nobody's UI.
+
+HOW THEY WERE MADE
+------------------------------------------------------------------------------
+In the studio container, against this branch's own production bundle, on a
+private port. LESSONS §5 is the rule; a0-06's trap is the reason for the port:
+the committed config pins 4173 with `reuseExistingServer: !CI`, several lanes
+share this box, and a rebake on the default port can silently bake another
+lane's bundle into this branch.
+
+  rm tests/mobile/goldens.spec.ts-snapshots/{desktop,phone-landscape,phone-portrait}-settings-*.png
+  PREVIEW_PORT=4285 npm run test:mobile -- --update-snapshots --grep "settings screen"
+    -> 3 passed, all three written ("A snapshot doesn't exist ... writing actual")
+
+  PREVIEW_PORT=4285 npm run test:mobile -- --grep "settings screen"
+    -> 3 passed, at the SHIPPED tolerance, nothing edited
+
+DELETING the three PNGs is what forces the rebake here, and it replaces the
+house `maxDiffPixelRatio: 0` edit that a0-03/a0-41/a0-77 all had to make and
+then remember to revert. The reason that edit exists is that at 0.01 a PASSING
+test is not rewritten, so a re-baseline run can report success having changed no
+pixels — and a0-77's own notes record that its desktop settings frame passed at
+0.01 while stale. A missing snapshot is written regardless of tolerance, which
+buys the same guarantee without touching QA's file. `tests/mobile/goldens.spec.ts`
+is byte-identical to its committed state: `git status` on it is clean, and its
+tolerance is untouched (it is the right number; it exists for font/GPU
+antialiasing).
+
+WHAT ELSE THIS COMMIT REBAKES, STATED RATHER THAN SMUGGLED
+------------------------------------------------------------------------------
+a0-77's own evidence bundle — `evidence/a0-77-settings-help/shots/*.png` (12
+frames) and `readback.json` — was captured at the branch point, which predates
+a0-79. Left alone it would ship a PR whose evidence pictures a screen that will
+not exist after the merge: no void, and 394px rows on the phone. It is therefore
+re-captured from the merged tree by its own committed harness, unchanged:
+
+  PREVIEW_PORT=4286 npx playwright test --config evidence/a0-77-settings-help/playwright.config.ts
+    -> 6 passed
+
+That harness ASSERTS as well as photographs, and its assertions still hold on the
+merged tree: one `?` per row, each >= 48x48 logical, and on every volume row the
+`?` ends before the `-` begins. The affordance's grammar readback is unchanged
+from the pre-merge run, key for key, at all three profiles: open by press, close
+by pressing the same `?`, close by pressing away, open by ArrowDown+Enter with no
+pointer, close by Escape, and the screen is still SETTINGS afterwards.
+
+VERIFICATION
+------------------------------------------------------------------------------
+  npx tsc --noEmit                              clean
+  npm test -- --run                             311 files, 5730 tests, all pass
+  test:mobile --grep "settings screen"          3 passed at the shipped tolerance
+  evidence/a0-77-settings-help (6 specs)        6 passed
+  all three goldens + the 798x384 frames        read at full size, both changes seen

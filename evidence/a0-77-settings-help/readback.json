@@ -351,12 +351,12 @@
         "kind": "fireMode",
         "physicalCenter": {
           "x": 254,
-          "y": 221
+          "y": 226
         },
         "logical": {
-          "x": 24,
+          "x": 34,
           "y": 108.5,
-          "width": 394,
+          "width": 384,
           "height": 55
         }
       },
@@ -364,12 +364,12 @@
         "kind": "controls",
         "physicalCenter": {
           "x": 195,
-          "y": 221
+          "y": 226
         },
         "logical": {
-          "x": 24,
+          "x": 34,
           "y": 167.5,
-          "width": 394,
+          "width": 384,
           "height": 55
         }
       },
@@ -377,12 +377,12 @@
         "kind": "reduceVfx",
         "physicalCenter": {
           "x": 136,
-          "y": 221
+          "y": 226
         },
         "logical": {
-          "x": 24,
+          "x": 34,
           "y": 226.5,
-          "width": 394,
+          "width": 384,
           "height": 55
         }
       },
@@ -390,12 +390,12 @@
         "kind": "volume",
         "physicalCenter": {
           "x": 254,
-          "y": 623
+          "y": 618
         },
         "logical": {
           "x": 426,
           "y": 108.5,
-          "width": 394,
+          "width": 384,
           "height": 55
         }
       },
@@ -403,12 +403,12 @@
         "kind": "volume",
         "physicalCenter": {
           "x": 195,
-          "y": 623
+          "y": 618
         },
         "logical": {
           "x": 426,
           "y": 167.5,
-          "width": 394,
+          "width": 384,
           "height": 55
         }
       },
@@ -416,12 +416,12 @@
         "kind": "volume",
         "physicalCenter": {
           "x": 136,
-          "y": 623
+          "y": 618
         },
         "logical": {
           "x": 426,
           "y": 226.5,
-          "width": 394,
+          "width": 384,
           "height": 55
         }
       },
@@ -429,10 +429,10 @@
         "kind": "help:fireMode",
         "physicalCenter": {
           "x": 254,
-          "y": 48
+          "y": 58
         },
         "logical": {
-          "x": 24,
+          "x": 34,
           "y": 112,
           "width": 48,
           "height": 48
@@ -442,10 +442,10 @@
         "kind": "help:controls",
         "physicalCenter": {
           "x": 195,
-          "y": 48
+          "y": 58
         },
         "logical": {
-          "x": 24,
+          "x": 34,
           "y": 171,
           "width": 48,
           "height": 48
@@ -455,10 +455,10 @@
         "kind": "help:reduceVfx",
         "physicalCenter": {
           "x": 136,
-          "y": 48
+          "y": 58
         },
         "logical": {
-          "x": 24,
+          "x": 34,
           "y": 230,
           "width": 48,
           "height": 48
@@ -507,10 +507,10 @@
         "kind": "minus:volume:master",
         "physicalCenter": {
           "x": 254,
-          "y": 742
+          "y": 732
         },
         "logical": {
-          "x": 718,
+          "x": 708,
           "y": 112,
           "width": 48,
           "height": 48
@@ -520,10 +520,10 @@
         "kind": "plus:volume:master",
         "physicalCenter": {
           "x": 254,
-          "y": 796
+          "y": 786
         },
         "logical": {
-          "x": 772,
+          "x": 762,
           "y": 112,
           "width": 48,
           "height": 48
@@ -533,10 +533,10 @@
         "kind": "minus:volume:sfx",
         "physicalCenter": {
           "x": 195,
-          "y": 742
+          "y": 732
         },
         "logical": {
-          "x": 718,
+          "x": 708,
           "y": 171,
           "width": 48,
           "height": 48
@@ -546,10 +546,10 @@
         "kind": "plus:volume:sfx",
         "physicalCenter": {
           "x": 195,
-          "y": 796
+          "y": 786
         },
         "logical": {
-          "x": 772,
+          "x": 762,
           "y": 171,
           "width": 48,
           "height": 48
@@ -559,10 +559,10 @@
         "kind": "minus:volume:music",
         "physicalCenter": {
           "x": 136,
-          "y": 742
+          "y": 732
         },
         "logical": {
-          "x": 718,
+          "x": 708,
           "y": 230,
           "width": 48,
           "height": 48
@@ -572,10 +572,10 @@
         "kind": "plus:volume:music",
         "physicalCenter": {
           "x": 136,
-          "y": 796
+          "y": 786
         },
         "logical": {
-          "x": 772,
+          "x": 762,
           "y": 230,
           "width": 48,
           "height": 48
