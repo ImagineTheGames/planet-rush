@@ -1,0 +1,390 @@
+a0-78 — A SWIPE ON THE MAIN MENU REMOVED IT PERMANENTLY
+=======================================================
+Owner: UI Engineer.  Branch: agent/ui/a0-78-menu-swipe-softlock.
+Filmed: 2026-08-18, Chromium (Playwright 1.49.1) against the real `vite build`
++ `vite preview` bundle — the shipped artifact, not a dev server, and NOT
+`?gate=0`: the title gate is the front screen, so every run below opens the real
+door with a real touch press before it touches anything else.
+
+Harness:  evidence/a0-78-menu-swipe/playwright.config.ts
+          evidence/a0-78-menu-swipe/capture.spec.ts
+Re-run:   npx playwright test --config evidence/a0-78-menu-swipe/playwright.config.ts
+          (CAPTURE_DIR=frames/fixed for the after set)
+
+
+1. THE VIEWPORTS IT WAS REPRODUCED AT
+-------------------------------------
+Both phone-shaped, both dpr 3, both `isMobile` + `hasTouch`:
+
+  iphone-portrait   390x844   (portrait — the landscape lock rotates the whole
+                               overlay +90 degrees here)
+  iphone-landscape  844x390   (the un-rotated control)
+
+It reproduces identically on both, which is what rules the landscape lock out as
+the cause rather than merely the setting.
+
+
+2. THE MINIMAL REPRODUCTION — TWO FRAMES
+----------------------------------------
+Nothing is pressed in this one. The door is opened, the main menu is confirmed
+to be what is on the screen, and then the one thing a swipe does to a phone
+browser happens: the URL bar collapses, so the window gets shorter by 60 CSS px.
+
+  frames/broken/iphone-portrait-min-1-menu.png       the main menu
+  frames/broken/iphone-portrait-min-2-menu-gone.png  a bare starfield
+  frames/broken/iphone-portrait-min-3-still-gone.png the same bare starfield,
+                                                     after pressing and swiping
+  (and the same three for iphone-landscape)
+
+Readback, frames/broken/probe-minimal-iphone-portrait.txt, verbatim:
+
+  [iphone-portrait] the main menu, nothing pressed:
+      menu.visible=true screen=menu hit@PLAY=canvas
+      overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+  [iphone-portrait] after ONE resize, nothing pressed:
+      menu.visible=true screen=menu hit@PLAY=canvas#pr-title-gate-sky
+      overlay(op=1 vis=visible pe=auto) skyCentreAlpha=255
+  [iphone-portrait] after pressing and swiping to get it back:
+      menu.visible=true screen=menu hit@PLAY=canvas#pr-title-gate-sky
+      overlay(op=1 vis=visible pe=auto) skyCentreAlpha=255
+  [iphone-portrait] page errors during the run: (none)
+
+`page errors: (none)` matters. Nothing threw. The app did not crash; it drew a
+lid over itself and carried on believing the menu was up.
+
+Eyes on frame 2: there is no menu, no door, no wordmark, no prompt, and no
+control of any kind. Just stars. That is the developer's screen.
+
+(The gesture-matrix run in section 3 also ends up showing an online connect
+failure panel — `FAILED: no allocator configured`, RETRY / DOWNLOAD LOG. That is
+not a crash and it is not this bug: its swipes navigate to the doors screen and
+press HOST there, against a `vite preview` that has no allocator URL baked in, so
+the doors correctly report that they cannot reach one. It is section 6's separate
+bug doing its thing, and it is exactly why the minimal reproduction above presses
+nothing at all.)
+
+
+3. WHAT ELSE WAS TRIED, AND WHAT EACH GESTURE DID
+-------------------------------------------------
+Every gesture below is a genuine touch stream dispatched through CDP
+(`Input.dispatchTouchEvent`: touchStart / touchMove x N / touchEnd), not a
+synthesised mouse drag. Full readback: frames/broken/probe-iphone-portrait.txt
+and frames/broken/probe-iphone-landscape.txt.
+
+After each gesture four facts were recorded:
+
+  * `__mainMenu.visible` / `.screen`         — what the menu thinks it is doing
+  * `document.elementFromPoint()` at PLAY's  — what a finger would actually hit
+    own reported tap point
+  * the overlay root's computed `opacity` /  — the three properties that take
+    `visibility` / `pointer-events`             the door out of the way
+  * the alpha of the gate's sky canvas at    — 0 = the doorway is punched open,
+    dead centre                                 255 = the starfield is a LID
+
+That last one is the decisive measurement and it cannot be got any other way.
+The doorway is a `destination-out` punch in that canvas, so a screenshot shows
+you a lid but only the alpha tells you it is one.
+
+  GESTURE                                    RESULT
+  swipe up / down / left / right             menu survives (but see section 5)
+  edge swipe from left / bottom / top        menu survives
+  fast flick (3 samples)                     menu survives
+  slow drag (40 samples)                     menu survives
+  pointerdown + moves + POINTERCANCEL,       menu survives
+    with no pointerup
+  pointerdown + POINTERCANCEL immediately    menu survives
+  --------------------------------------------------------------------------
+  the window resizes (what a swipe DOES      *** MENU LOST — PERMANENTLY ***
+    to a phone browser: the URL bar
+    collapses under the gesture)
+
+
+4. THE GESTURE, NAMED
+---------------------
+**A swipe that collapses (or restores) the phone browser's URL bar.**
+
+A swipe on a phone is not only a touch stream. It is also the gesture the
+browser itself claims to show or hide its own chrome, and when the chrome moves
+the layout viewport changes height and the window fires `resize`. That is the
+half of the gesture Chromium under emulation has no way to perform — a headless
+browser has no URL bar to collapse — so the capture applies the height change
+directly (`page.setViewportSize`), which delivers the identical event from the
+identical cause with the un-emulatable chrome stripped off.
+
+This is not a liberty taken to make a theory work. `src/main.ts:6772` already
+says it in the shipped source, about this exact platform behaviour:
+
+    // Mobile URL-bar show/hide and pinch reflow the *visual* viewport without a
+    // window resize — these fire then.
+
+The same latch fires for every other source of a resize while the front screen
+is up: turning the handset, a software keyboard, a fullscreen transition. The
+capture films the handset-turn case too (`the handset turned while the menu is
+up`, in the unit test) and it strands identically.
+
+HONEST LIMIT OF COVERAGE — read this before treating the above as complete.
+What was verified in emulation is the LATCH: a window resize while the front
+screen is up removes the menu permanently. What was NOT verified in emulation
+is the first link of the chain — that the developer's particular swipe is what
+produced that resize on their particular handset — because Chromium emulation
+renders no browser chrome to collapse. On a real device that link is standard,
+long-documented behaviour on both mobile Chrome and iOS Safari, and this
+codebase already handles it elsewhere; but it is inferred here, not filmed.
+If the developer can film the original swipe on their phone, the frame worth
+capturing is the moment the URL bar moves.
+
+One route that was CHECKED AND RULED OUT, so nobody re-checks it: a swipe that
+begins on PLAY does press PLAY (see section 5), and a door press calls
+`ctx.enterImmersive()` — fullscreen, which also reshapes the window. That looked
+like a pure-gesture route to the same latch with no URL bar needed. It is not:
+`resolvePlay()` fires on the same line, `boot()` resumes, and
+`titleGate.dispose()` takes the overlay out of the DOM before the fullscreen
+transition can land. Filmed anyway, in frames/broken/probe-play-*.txt —
+`fullscreen=false` there is Chromium declining the request without a user
+activation it recognises, so that run proves the navigation, not the fullscreen.
+
+
+5. THE STRANDED STATE
+---------------------
+Read straight off frames/broken/probe-iphone-landscape.txt. Before, then after:
+
+  before   menu.visible=true  hit@PLAY=canvas
+           overlay(op=0 vis=hidden pe=none)   skyCentreAlpha=0
+  after    menu.visible=true  hit@PLAY=canvas#pr-title-gate-sky
+           overlay(op=1 vis=visible pe=auto)  skyCentreAlpha=255
+
+Three things changed and every one of them is fatal:
+
+  * `op=0 vis=hidden pe=none` -> `op=1 vis=visible pe=auto`. The overlay is a
+    full-screen `position:fixed` element at `z-index:20` directly on top of the
+    Pixi canvas the menu is drawn on. It is back, and it is taking pointers.
+  * `skyCentreAlpha` 0 -> 255. The starfield was repainted with NO doorway cut
+    out of it. It is not a translucent wash over the menu; it is an opaque lid.
+  * `hit@PLAY` is now `canvas#pr-title-gate-sky`. The menu still believes it is
+    up — `__mainMenu.visible` is still `true`, which is why nothing in the app
+    ever notices — but a finger landing exactly where the menu says PLAY is
+    lands on the gate instead.
+
+AND IT NEVER COMES BACK. The capture then tries every input a phone has:
+
+  press the middle                MENU LOST (unchanged)
+  press PLAY where the menu       MENU LOST (unchanged)
+    says PLAY is
+  swipe again                     MENU LOST (unchanged)
+  let the URL bar come back        MENU LOST (unchanged)
+    (resize the other way)
+
+Why nothing works, in the source:
+
+  * The overlay's `pointerdown` reaches `TitleGate.press()`, which begins with
+    `if (this.phase !== 'locked') return;`. The phase is `open`. Refused.
+  * `Escape` would reseal. There is no Escape key on a phone.
+  * The frame loop stopped at beat 4 (`through()` -> `stopLoop()`), so nothing
+    repaints and nothing re-measures.
+  * Nothing at all re-asserts the overlay's visibility, because until this fix
+    only ONE line in the module ever hid it, once, on the way past beat 4.
+
+This is a soft-lock on the first screen of the game, reachable by one gesture,
+with no way out but reloading the page.
+
+
+6. A SECOND, DISTINCT BUG — FILMED HERE, DELIBERATELY NOT FIXED HERE
+--------------------------------------------------------------------
+The probe logs show `screen=menu` becoming `screen=hangar` on the very first
+swipe, and the PLAY-swipe run shows `screen=menu` becoming `screen=online`:
+
+  frames/broken/probe-iphone-landscape.txt line 2:
+    [iphone-landscape] swipe up, across the middle   ... screen=hangar
+  frames/broken/probe-play-iphone-portrait.txt line 2:
+    [iphone-portrait] after the swipe: ... screen=online
+
+**A swipe on the main menu is read as a press on whatever button it started
+on.** `src/main.ts` `onPointerDown` acts on pointer-DOWN with no drag or slop
+test, so the beginning of a swipe navigates. That is also, literally, "a swipe
+on main menu made it disappear" — and it is very likely the first half of what
+the developer saw, with the latch in section 4 supplying the "never reappear".
+
+It is NOT fixed in this PR, and that is a judgement call worth stating plainly
+rather than burying:
+
+  * It does not violate the invariant this brief names. It leaves you with A
+    menu (the hangar, or the doors) and a way back (BACK). Section 5 leaves you
+    with no menu and no way back.
+  * Fixing it means moving touch activation from pointer-down to pointer-up
+    behind a slop test — the pattern the codex screen in the same function
+    already uses (`CODEX_DRAG_SLOP`). That changes ratified routing which the
+    shipped comment calls out by name ("the menu has always acted on
+    pointer-DOWN, and the landscape-lock suite taps it that way") and which
+    roughly thirty live-stage and mobile specs press through. Making that change
+    inside a soft-lock fix, without being able to run those suites here, would
+    put the highest-severity item in the queue behind a regression risk it does
+    not need to carry.
+
+Recommendation: file it, fix it on its own branch, with the mobile and
+live-stage suites green on it. Everything needed to reproduce it is in this
+directory already.
+
+
+7. THE FIX
+----------
+One cause, three faults on the same path, all in `src/ui/title-gate.ts`.
+
+THE SETTING. The title gate is mounted for the WHOLE front-of-match flow — menu,
+doors, lobby. `src/main.ts` only calls `titleGate.dispose()` after
+`untilPlay()` resolves, deliberately: "`Escape` reseals and a door taken out of
+the DOM cannot come back." So a full-screen overlay sits on the menu's canvas
+the entire time, and everything below is about what happens to it.
+
+  (1) `browserGateDom.applyLayout()` wrote
+          root.style.cssText = TITLE_GATE_ROOT_CSS + gateRootLayoutCss(...)
+      which REPLACES the whole inline declaration block. It replayed the gate's
+      ten custom properties on the next line — and did not replay the three
+      properties `setVisible(false)` had written. Those three are the entire
+      difference between "the door is gone" and "the door is over the menu".
+      So every resize put it back.
+
+  (2) `TitleGate.resize()` calls `paint()` unconditionally, because sizing a
+      canvas clears it and the field has to be complete on the first frame. That
+      is the right rule while the door is up. `paint()` passed the punch as
+      `phase !== 'open'` — so a paint at `open` drew the starfield with no
+      doorway in it. That is the 255 alpha in section 5: an opaque lid.
+
+  (3) Nothing re-asserted either. `through()` was the only place in the module
+      that had ever hidden the overlay, and it ran once.
+
+THE FIX IS A FLOOR, NOT THREE PATCHES.
+
+  * `gateCovers(phase)` — new, exported, pure: the door is in front of the menu
+    in every phase but `open`. Visibility becomes a DERIVED fact.
+  * `TitleGate.apply()` re-applies it. `apply()` already ran on every phase
+    change; it also runs on every `resize()`. So a stranded phase or a replayed
+    style block self-heals on the very next thing that happens, instead of
+    needing every possible way of stranding it to be enumerated — which is what
+    the brief asked for and is the part that matters most.
+  * `TitleGate.paint()` returns early at `open`. The overlay is inert; there is
+    nothing to draw. This also makes the punch argument a constant `true`, and
+    the compiler agrees: it narrows `phase` past `open`, so an unpunched
+    full-screen field is no longer a bug that has been fixed, it is a picture
+    the module cannot draw.
+  * `applyLayout()` replays the visibility beside the vars. Belt and braces, and
+    necessary: the resize listener relays the box BEFORE it tells the gate to
+    re-measure, so leaving it to `apply()` alone would still flash a full-screen
+    lid for one call — and would strand outright under any host that does not
+    forward the event.
+
+`through()` and `reseal()` no longer write visibility directly. One owner.
+
+
+8. THE TEST
+-----------
+`src/ui/main-menu.test.ts` — `no gesture can leave the front screen without a
+menu`.
+
+It drives the real `TitleGate` over the real `browserGateDom` against a DOM
+double whose one load-bearing behaviour is the CSSOM's: assigning `cssText`
+replaces the entire declaration block. It opens the door with a real press, runs
+the four beats out, then throws the gesture matrix at it — a tap, a swipe, a
+`pointerdown` the browser steals with `pointercancel` and NEVER completes with a
+`pointerup`, an edge swipe cancelled before it moves, the URL bar collapsing and
+returning, and the handset being turned. After every one it asserts three
+things: the overlay is out of the way on all three properties, nothing has been
+painted over the menu, and the machine is not stranded mid-transition. It then
+asserts the menu is INTERACTIVE rather than merely uncovered (a tap at each
+plate's centre resolves to that plate), and finally that the door can still be
+resealed and re-opened — so the gestures cost the screen nothing at all.
+
+VERIFIED RED ON PRE-FIX SOURCE, and for the right reason:
+
+  x the front screen > no gesture can leave the front screen without a menu
+    -> after a swipe that collapses the URL bar (window resize): the menu is
+       reachable: expected false to be true
+
+Each half of the fix is independently covered. With only the paint fix reverted
+and the visibility floor kept, the same test still fails, on the other
+assertion:
+
+    -> after a swipe that collapses the URL bar (window resize): nothing painted
+       over the menu: expected 126 to be 68
+
+A second test, `the door is only ever out of the way in exactly one phase`, pins
+`gateCovers` over the whole `GatePhase` union, so a new phase cannot be added
+that hides the menu forever.
+
+
+9. AFTER THE FIX — THE SAME CAPTURE, THE SAME VIEWPORTS
+-------------------------------------------------------
+Re-shot with CAPTURE_DIR=frames/fixed against a `vite build` of the fixed tree
+(the config never reuses a running preview, so the before and after frames are
+each built from the tree they claim to be — a0-06's trap).
+
+All six capture tests pass:
+
+  the menu, then one resize            — iphone-portrait   PASS
+  the menu, then one resize            — iphone-landscape  PASS
+  front screen survives every gesture  — iphone-portrait   PASS
+  front screen survives every gesture  — iphone-landscape  PASS
+  a swipe that starts on PLAY          — iphone-portrait   PASS
+  a swipe that starts on PLAY          — iphone-landscape  PASS
+
+frames/fixed/probe-minimal-iphone-portrait.txt, verbatim:
+
+  [iphone-portrait] the main menu, nothing pressed:
+      menu.visible=true screen=menu hit@PLAY=canvas
+      overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+  [iphone-portrait] after ONE resize, nothing pressed:
+      menu.visible=true screen=menu hit@PLAY=canvas
+      overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+  [iphone-portrait] after pressing and swiping to get it back:
+      menu.visible=true screen=menu hit@PLAY=canvas
+      overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+  [iphone-portrait] page errors during the run: (none)
+
+`MENU LOST` appears zero times in either gesture-matrix log now
+(frames/fixed/probe-iphone-portrait.txt, frames/fixed/probe-iphone-landscape.txt
+— 17 gestures each, both empty of it).
+
+EYES ON EVERY IMAGE — what is actually in the fixed frames:
+
+  iphone-portrait-min-1-menu.png       the main menu, rotated by the landscape
+                                       lock: PLANET RUSH down the right, the
+                                       eyebrow cluster, PLAY / CODEX / SETTINGS
+                                       / HANGAR with their sub-lines, PLAY the
+                                       one bright plate.
+  iphone-portrait-min-2-menu-gone.png  (the name is the broken set's; kept so
+                                       the pairs line up) the SAME menu, after
+                                       the resize. Every plate, every label,
+                                       every sub-line, correctly re-laid at the
+                                       new height. No starfield.
+  iphone-portrait-min-3-still-gone.png the menu again, after the closing press
+                                       and swipe.
+  iphone-portrait-3-after-urlbar-resize.png
+                                       the DOORS — SOLO / CAMPAIGN / HOST /
+                                       JOIN, BACK, SETTINGS, and the benign
+                                       `FAILED: no allocator configured` panel
+                                       described in section 2. Drawn, complete,
+                                       reachable. Before the fix this same frame
+                                       was a starfield.
+  iphone-landscape-min-3-still-gone.png the HANGAR — the fleet bay, VANGUARD /
+                                       ANVIL, LEVEL 1 0/300 XP, "No cosmetics
+                                       yet", and BACK. Not the main menu, and
+                                       that is section 6's separate bug showing
+                                       itself again: the closing swipe pressed
+                                       HANGAR on its way past. It is drawn, it
+                                       is complete, it has its BACK, and the
+                                       door is not over it — which is all this
+                                       brief's invariant asks.
+
+No frame changed in any golden suite: the gate's own beats, geometry, vars and
+sounds are untouched, and `tests/mobile/` boots `?gate=0` and never sees this
+screen at all. Nothing to re-baseline.
+
+
+10. DEFINITION OF DONE
+----------------------
+  npx tsc --noEmit                clean
+  npm test -- --run               309 files, 5684 tests, all passing
+  the named test                  src/ui/main-menu.test.ts
+                                  `no gesture can leave the front screen
+                                  without a menu` — verified RED before the fix
+  this file                       evidence/a0-78-menu-swipe/audit.txt
+  goldens                         none changed; nothing to re-baseline

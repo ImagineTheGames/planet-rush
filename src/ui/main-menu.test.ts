@@ -35,6 +35,8 @@ import {
 import type { Rect } from '@platform/layout-registry';
 import type { MainMenuOption } from './main-menu';
 import { CODEX_TABS } from './codex';
+import { TitleGate, browserGateDom, gateCovers } from './title-gate';
+import type { GatePhase } from './title-gate';
 import { NAV_EDGES, NAV_SCREENS, reachesMainMenuWithoutMatch } from './menu-nav';
 import type { NavScreen } from './menu-nav';
 import * as flow from './lobby-flow';
@@ -549,3 +551,328 @@ function nodePositions(view: MainMenuView): {
     plateLabels,
   };
 }
+
+// ---------------------------------------------------------------------------
+// THE FLOOR — a0-78
+// ---------------------------------------------------------------------------
+
+/**
+ * A CSS declaration block with the one behaviour this whole bug turns on:
+ * assigning `cssText` **replaces the entire block**, so any property written
+ * before it and not replayed after it is gone (CSSOM: `cssText` re-parses into a
+ * fresh declaration list). Everything else here is the minimum a
+ * {@link browserGateDom} needs to run.
+ */
+class FakeStyle {
+  private props = new Map<string, string>();
+  get cssText(): string {
+    return [...this.props].map(([k, v]) => `${k}:${v}`).join(';');
+  }
+  set cssText(text: string) {
+    this.props = new Map();
+    for (const decl of text.split(';')) {
+      const i = decl.indexOf(':');
+      if (i > 0) this.props.set(decl.slice(0, i).trim(), decl.slice(i + 1).trim());
+    }
+  }
+  setProperty(name: string, value: string): void {
+    this.props.set(name, value);
+  }
+  getPropertyValue(name: string): string {
+    return this.props.get(name) ?? '';
+  }
+  get opacity(): string { return this.props.get('opacity') ?? ''; }
+  set opacity(v: string) { this.props.set('opacity', v); }
+  get visibility(): string { return this.props.get('visibility') ?? ''; }
+  set visibility(v: string) { this.props.set('visibility', v); }
+  get pointerEvents(): string { return this.props.get('pointer-events') ?? ''; }
+  set pointerEvents(v: string) { this.props.set('pointer-events', v); }
+}
+
+/** A recording 2D context — the sky canvas, so the test can ask what was
+ *  painted rather than look at it. */
+class RecordingContext {
+  fillStyle: unknown = '';
+  globalAlpha = 1;
+  globalCompositeOperation = 'source-over';
+  fills = 0;
+  setTransform(): void {}
+  fillRect(): void { this.fills++; }
+  beginPath(): void {}
+  closePath(): void {}
+  moveTo(): void {}
+  lineTo(): void {}
+  arc(): void {}
+  fill(): void { this.fills++; }
+  save(): void {}
+  restore(): void {}
+  createRadialGradient() { return { addColorStop(): void {} }; }
+}
+
+/** One element, with just enough of an `Element` for the gate's DOM edge. */
+class FakeElement {
+  id = '';
+  innerHTML = '';
+  width = 0;
+  height = 0;
+  readonly style = new FakeStyle();
+  readonly children: FakeElement[] = [];
+  readonly listeners = new Map<string, ((e: unknown) => void)[]>();
+  removed = false;
+  private readonly ctx = new RecordingContext();
+  appendChild(child: FakeElement): void { this.children.push(child); }
+  remove(): void { this.removed = true; }
+  addEventListener(type: string, fn: (e: unknown) => void): void {
+    const list = this.listeners.get(type) ?? [];
+    list.push(fn);
+    this.listeners.set(type, list);
+  }
+  removeEventListener(type: string, fn: (e: unknown) => void): void {
+    this.listeners.set(type, (this.listeners.get(type) ?? []).filter((f) => f !== fn));
+  }
+  dispatch(type: string, e: unknown = {}): void {
+    for (const fn of [...(this.listeners.get(type) ?? [])]) fn(e);
+  }
+  getContext(): RecordingContext { return this.ctx; }
+  recorder(): RecordingContext { return this.ctx; }
+  querySelector(selector: string): FakeElement | null {
+    const id = selector.replace('#', '');
+    const found = this.parts.get(id);
+    return found ?? null;
+  }
+  /** The three ids `browserGateDom` looks up inside the overlay's markup. The
+   *  gate writes real HTML into `innerHTML`, which this stub does not parse, so
+   *  the pieces are stood up here instead. */
+  readonly parts = new Map<string, FakeElement>();
+}
+
+/** The whole browser, as much of it as the gate touches. */
+function fakeBrowser(width: number, height: number) {
+  const host = new FakeElement();
+  const win = new FakeElement();
+  const timers: { handle: number; cb: () => void }[] = [];
+  let frameCb: ((ms: number) => void) | null = null;
+  let next = 1;
+  const created: FakeElement[] = [];
+  const browser = {
+    document: {
+      createElement(): FakeElement {
+        const el = new FakeElement();
+        for (const id of ['pr-title-gate-sky', 'pr-title-gate-door', 'pr-title-gate-leaf']) {
+          el.parts.set(id, new FakeElement());
+        }
+        created.push(el);
+        return el;
+      },
+    },
+    window: {
+      innerWidth: width,
+      innerHeight: height,
+      devicePixelRatio: 1,
+      addEventListener: (t: string, fn: (e: unknown) => void) => win.addEventListener(t, fn),
+      removeEventListener: (t: string, fn: (e: unknown) => void) => win.removeEventListener(t, fn),
+      // `transform:none` everywhere: the gate then falls back to the phase's own
+      // target scale, and a leaf that reports nothing counts as home.
+      getComputedStyle: () => ({ transform: 'none' }),
+      requestAnimationFrame: (cb: (ms: number) => void) => { frameCb = cb; return next++; },
+      cancelAnimationFrame: () => { frameCb = null; },
+      setTimeout: (cb: () => void) => { const h = next++; timers.push({ handle: h, cb }); return h; },
+      clearTimeout: (h: number) => {
+        const i = timers.findIndex((t) => t.handle === h);
+        if (i >= 0) timers.splice(i, 1);
+      },
+    },
+    mount: host,
+    isTouch: true,
+  };
+  return {
+    browser,
+    win,
+    host,
+    root: () => created[0]!,
+    sky: () => created[0]!.parts.get('pr-title-gate-sky')!,
+    /** Fire every scheduled step, the way a clock that is not being watched does. */
+    runTimers(): void {
+      for (let i = 0; i < 20 && timers.length > 0; i++) {
+        const due = timers.splice(0, timers.length);
+        for (const t of due) t.cb();
+      }
+    },
+    /** Drive one animation frame. */
+    frame(ms: number): void {
+      const cb = frameCb;
+      frameCb = null;
+      cb?.(ms);
+    },
+  };
+}
+
+/** Are the three properties that take the door out of the way all saying so?
+ *  All three, because the overlay is a full-screen fixed element on top of the
+ *  Pixi canvas: two out of three still eats every tap the menu is waiting for. */
+function menuIsReachable(root: FakeElement): boolean {
+  return (
+    root.style.opacity === '0' &&
+    root.style.visibility === 'hidden' &&
+    root.style.pointerEvents === 'none'
+  );
+}
+
+describe('the front screen', () => {
+  /**
+   * **a0-78 — a swipe on the main menu removed it permanently.**
+   *
+   * Reported from a phone: *"I also managed to swipe on main menu and made it
+   * disappear and never reappear"*. Filmed in
+   * `evidence/a0-78-menu-swipe/audit.txt` at 390×844 and 844×390: after a window
+   * resize — which is what a swipe does to a phone browser, whose URL bar
+   * collapses under it — the title gate's overlay came back over the menu,
+   * opaque and taking every tap, with no phase left that would ever remove it.
+   *
+   * The invariant, and it is deliberately about the MENU rather than about any
+   * particular way of stranding the door: **there is no sequence of gestures
+   * after which the front screen has no menu and no way back.** So this drives
+   * the real gate over the real DOM edge, throws the whole gesture matrix at it
+   * — including a `pointerdown` the browser steals with `pointercancel` and
+   * never completes with a `pointerup` — and asks, after each one, whether a
+   * finger could still reach the screen underneath.
+   *
+   * It fails three ways on the code before the fix: `applyLayout`'s `cssText`
+   * write drops the hidden state, `resize` repaints the starfield with no
+   * doorway punched out of it, and nothing re-asserts either.
+   */
+  it('no gesture can leave the front screen without a menu', () => {
+    const W = 844;
+    const H = 390;
+    const env = fakeBrowser(W, H);
+    const gate = new TitleGate({ dom: browserGateDom(env.browser as never) });
+    gate.mount();
+    const root = env.root();
+
+    // Sealed: the door IS the front screen, and it is supposed to be in the way.
+    expect(gate.current).toBe('locked');
+    expect(menuIsReachable(root)).toBe(false);
+
+    // Open it with a real press on the overlay, and run the four beats out.
+    root.dispatch('pointerdown');
+    env.runTimers();
+    expect(gate.current).toBe('open');
+    expect(menuIsReachable(root)).toBe(true);
+
+    // Nothing may paint from here: the punch is what makes the doorway a hole,
+    // and a field painted once we are through has no doorway in it at all.
+    const paintsWhenThrough = env.sky().recorder().fills;
+
+    // --- The gesture matrix ------------------------------------------------
+    // Each entry is a whole gesture, in the events a browser actually delivers.
+    // The third is the one the brief names: a press the browser claims for
+    // itself part-way through, which delivers a `pointercancel` and NO
+    // `pointerup`, so anything that only finishes on one never finishes.
+    const gestures: { name: string; run: () => void }[] = [
+      {
+        name: 'a tap that completes',
+        run: () => {
+          root.dispatch('pointerdown');
+          root.dispatch('pointerup');
+        },
+      },
+      {
+        name: 'a swipe across the screen',
+        run: () => {
+          root.dispatch('pointerdown');
+          for (let i = 0; i < 8; i++) root.dispatch('pointermove');
+          root.dispatch('pointerup');
+        },
+      },
+      {
+        name: 'a press the browser steals — pointercancel, no pointerup',
+        run: () => {
+          root.dispatch('pointerdown');
+          for (let i = 0; i < 8; i++) root.dispatch('pointermove');
+          root.dispatch('pointercancel');
+        },
+      },
+      {
+        name: 'an edge swipe the browser steals before it even moves',
+        run: () => {
+          root.dispatch('pointerdown');
+          root.dispatch('pointercancel');
+        },
+      },
+      {
+        name: 'a swipe that collapses the URL bar (window resize)',
+        run: () => {
+          env.browser.window.innerHeight = H - 60;
+          env.win.dispatch('resize');
+        },
+      },
+      {
+        name: 'and one that brings it back',
+        run: () => {
+          env.browser.window.innerHeight = H;
+          env.win.dispatch('resize');
+        },
+      },
+      {
+        name: 'the handset turned while the menu is up',
+        run: () => {
+          env.browser.window.innerWidth = H;
+          env.browser.window.innerHeight = W;
+          env.win.dispatch('resize');
+        },
+      },
+    ];
+
+    for (const gesture of gestures) {
+      gesture.run();
+      env.runTimers();
+      env.frame(16);
+      // 1. The door has not come back over the menu.
+      expect(menuIsReachable(root), `after ${gesture.name}: the menu is reachable`).toBe(true);
+      // 2. Nor has the starfield been repainted over it. A paint here can only
+      //    be an unpunched one — see `TitleGate.paint`.
+      expect(env.sky().recorder().fills, `after ${gesture.name}: nothing painted over the menu`)
+        .toBe(paintsWhenThrough);
+      // 3. And the machine is where it should be, not stranded mid-transition.
+      expect(gate.current, `after ${gesture.name}: still through the door`).toBe('open');
+    }
+
+    // --- The menu is INTERACTIVE, not merely uncovered ----------------------
+    // With the overlay taking no pointers, a tap at a plate's own centre lands
+    // on that plate — the whole of what "the menu is still there" means to a
+    // player who has just swiped.
+    const layout = mainMenuLayout({ width: H, height: W }, { isTouch: true });
+    for (let i = 0; i < MAIN_MENU_ITEMS.length; i++) {
+      const rect = layout.buttons[i]!;
+      const hit = mainMenuHitTest(layout, rect.x + rect.width / 2, rect.y + rect.height / 2);
+      expect(hit).toBe(MAIN_MENU_ITEMS[i]!.kind);
+    }
+
+    // --- …and there is still a way back -------------------------------------
+    // The door can be resealed and re-opened after everything above, so the
+    // gestures cost the screen nothing at all.
+    gate.reseal();
+    env.runTimers();
+    for (let i = 0; i < 400 && gate.current !== 'locked'; i++) env.frame(16 * i);
+    expect(gate.current).toBe('locked');
+    expect(menuIsReachable(root)).toBe(false);
+    root.dispatch('pointerdown');
+    env.runTimers();
+    expect(gate.current).toBe('open');
+    expect(menuIsReachable(root)).toBe(true);
+  });
+
+  /**
+   * The same invariant stated as a property of the machine rather than of one
+   * run: the overlay is in front of the menu in every phase but `open`, and out
+   * of the way in that one. It is what `TitleGate.apply` re-asserts on every
+   * phase change AND every resize, which is what makes a stranded phase
+   * self-heal instead of needing each way of stranding it to be enumerated.
+   */
+  it('the door is only ever out of the way in exactly one phase', () => {
+    const phases: GatePhase[] = [
+      'locked', 'turning', 'parting', 'entering', 'open', 'returning', 'closing',
+    ];
+    expect(phases.filter((p) => !gateCovers(p))).toEqual(['open']);
+  });
+});

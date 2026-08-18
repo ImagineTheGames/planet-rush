@@ -1,0 +1,3 @@
+[iphone-portrait] before the swipe: menu.visible=true screen=menu hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
+[iphone-portrait] after the swipe:  menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0 fullscreen=false
+[iphone-portrait] after pressing:   menu.visible=true screen=online hit@PLAY=canvas overlay(op=0 vis=hidden pe=none) skyCentreAlpha=0
