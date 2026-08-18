@@ -30,7 +30,7 @@ import type { ControlScheme, DeviceKind } from '@platform/actions';
 import type { Rect, Viewport } from '@platform/layout-registry';
 import { COLUMN, plateHeight, rowHeight, valueChipHeight } from '../art/materials';
 import type { FrameMetrics, PlateRole } from '../art/materials';
-import { beamContent, gantryFrame, menuColumnWidth } from './gantry';
+import { beamContent, gantryFrame, menuColumnBand, menuColumnWidth } from './gantry';
 import { FONT_HEADING } from './typography';
 import { centeredGrid, clamp, hitRect } from './menu-geometry';
 import type { Insets } from './menu-geometry';
@@ -532,7 +532,24 @@ export function settingsLayout(viewport: Viewport, options: SettingsLayoutOption
     SETTINGS_MAX_COLUMNS,
     Math.max(1, Math.ceil(SETTINGS_ROWS.length / Math.max(1, perColumnFit))),
   );
-  const rows = centeredGrid(band, SETTINGS_ROWS.length, columnWidth, rowH, columns, gap, metrics.gap);
+  // The grid gets the shared ceiling too, sized for however many columns it
+  // wrapped into (a0-79). It is applied to the GRID and not only to a column
+  // because with two columns the band's own halves are the narrower cap, so
+  // capping a column alone changed nothing and the rows still ran edge to edge —
+  // which is the defect, one screen over from the one the developer photographed.
+  //
+  // On a phone it is the FLOOR that wins, and that is the honest answer rather
+  // than an omission: the two-column wrap exists because a landscape phone is
+  // short, and at 798x384 a column is 372px holding content that measures 345px.
+  // There are 27px to give and this does not spend them
+  // (`evidence/a0-79-menus/plate-room.txt`).
+  const grid = menuColumnBand(
+    band,
+    columns * COLUMN.settings + (columns - 1) * metrics.gap,
+    metrics,
+    columns,
+  );
+  const rows = centeredGrid(grid, SETTINGS_ROWS.length, columnWidth, rowH, columns, gap, metrics.gap);
   const stepper = stepperSize(rows[0], metrics);
 
   return { content: frame.content, header: frame.header, footer: frame.footer, title, rows, back, stepper, isTouch, metrics };

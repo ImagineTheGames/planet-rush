@@ -28,11 +28,15 @@ import {
   DISPLAY_TRACKING,
   PLATE_SCALES,
   TRACKING,
+  ROW,
+  VALUE_CHIP,
   frameMetrics,
   plateTypeSize,
   platePadX,
 } from '../../src/art/materials';
 import { gantryFrame } from '../../src/ui/gantry';
+import { createSettings, settingsLayout, settingsModel } from '../../src/ui/settings';
+import { FireMode } from '../../src/platform/actions';
 import { MAIN_MENU_ITEMS, itemPlate, mainMenuLayout } from '../../src/ui/main-menu';
 import { textWidth } from '../../src/ui/font-metrics';
 
@@ -114,6 +118,47 @@ for (const v of VIEWPORTS) {
   say(
     `   tightest label: ${worst.name} needs ${worst.need.toFixed(0)}px in ${worst.room.toFixed(0)}px` +
       ` → slack ${worst.slack.toFixed(0)}px ${worst.slack >= 0 ? 'FITS' : 'OVERFLOWS'}`,
+  );
+  say('');
+}
+
+// ---------------------------------------------------------------------------
+// The SETTINGS screen — the same question, on a screen whose rows are dense
+// ---------------------------------------------------------------------------
+say('');
+say('SETTINGS rows — the same margin question on a screen with a two-column wrap');
+say('-'.repeat(78));
+say('');
+for (const v of VIEWPORTS) {
+  const layout = settingsLayout({ width: v.w, height: v.h });
+  const row = layout.rows[0];
+  if (!row) continue;
+  const m = frameMetrics(v.w, v.h);
+  const cols = new Set(layout.rows.map((r) => Math.round(r.x))).size;
+  const left = Math.min(...layout.rows.map((r) => r.x));
+  const right = v.w - Math.max(...layout.rows.map((r) => r.x + r.width));
+  say(`── ${v.name}`);
+  say(
+    `   ${cols} column(s), row ${row.width.toFixed(0)}px` +
+      `  side field ${left.toFixed(0)}/${right.toFixed(0)}px` +
+      ` = ${((left / v.w) * 100).toFixed(2)}% a side`,
+  );
+  // What one row actually has to hold: its label, then a value control that has
+  // its own minimum width, with the row's padding on both sides.
+  const padX = Math.max(8, Math.round(ROW.padX * m.plateScale));
+  const chip = Math.max(VALUE_CHIP.minWidth * m.plateScale, 0);
+  let widestLabel = 0;
+  const model = settingsModel(createSettings(), FireMode.AutoAim, 'tap', 'touch');
+  for (const r of model.rows) {
+    widestLabel = Math.max(
+      widestLabel,
+      textWidth(r.label, { face: 'body', size: Math.max(9, Math.round(15 * m.plateScale)), tracking: TRACKING.label }),
+    );
+  }
+  const need = padX * 2 + widestLabel + chip + padX;
+  say(
+    `   widest row needs ~${need.toFixed(0)}px (label ${widestLabel.toFixed(0)} + chip ${chip.toFixed(0)} + pad)` +
+      ` → slack ${(row.width - need).toFixed(0)}px`,
   );
   say('');
 }

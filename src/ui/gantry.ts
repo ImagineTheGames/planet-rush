@@ -274,10 +274,12 @@ export const MENU_COLUMN_SHARE = COLUMN.title / REFERENCE_BAND_WIDTH;
  *
  * So below this width the screen gives up **field** rather than **words**: the
  * ceiling stops descending and the column is simply the band. The number is not
- * a preference either — it is the narrowest plate the menu's own longest
- * sub-line still fits at a phone's plate scale, and `main-menu.test.ts` measures
- * that against the real advance tables ({@link ./font-metrics}) rather than
- * trusting this comment, so copy that outgrows it fails loudly.
+ * a preference either — it is the narrowest column the widest thing the front of
+ * the game puts in one still fits at a phone's plate scale. That thing is the
+ * main menu's longest sub-line (383px at 844x390, against the settings screen's
+ * widest row at 345px), and `main-menu.test.ts` measures it against the real
+ * advance tables ({@link ./font-metrics}) rather than trusting this comment, so
+ * copy that outgrows it fails loudly.
  */
 export const MENU_COLUMN_MIN = 448;
 
@@ -292,9 +294,19 @@ export const MENU_COLUMN_MIN = 448;
  * each screen still names its own absolute column, and the proportion is decided
  * in exactly one place.
  */
-export function menuColumnWidth(bandWidth: number, max: number, m: FrameMetrics): number {
+export function menuColumnWidth(
+  bandWidth: number,
+  max: number,
+  m: FrameMetrics,
+  columns = 1,
+): number {
   const band = Math.max(0, bandWidth);
-  const floor = Math.min(band, MENU_COLUMN_MIN * m.plateScale);
+  const n = Math.max(1, Math.round(columns));
+  // `columns` is for the screens that WRAP (the settings grid on a short phone):
+  // the floor protects a column's content, so a band holding n of them has to
+  // clear n floors and the gaps between them, or the ceiling would buy its
+  // margin out of every column at once.
+  const floor = Math.min(band, MENU_COLUMN_MIN * m.plateScale * n + m.gap * (n - 1));
   return Math.max(0, Math.min(max, band, Math.max(band * MENU_COLUMN_SHARE, floor)));
 }
 
@@ -305,8 +317,8 @@ export function menuColumnWidth(bandWidth: number, max: number, m: FrameMetrics)
  * then lays out inside the returned rect exactly as it used to lay out inside
  * the band.
  */
-export function menuColumnBand(band: Rect, max: number, m: FrameMetrics): Rect {
-  const width = menuColumnWidth(band.width, max, m);
+export function menuColumnBand(band: Rect, max: number, m: FrameMetrics, columns = 1): Rect {
+  const width = menuColumnWidth(band.width, max, m, columns);
   return { x: band.x + (band.width - width) / 2, y: band.y, width, height: band.height };
 }
 
