@@ -3981,8 +3981,12 @@ async function boot(): Promise<void> {
    * all is both correct and simplest. Positions are projected world → screen via
    * the renderer's *actual* camera transform (`projectToScreen`, called after
    * `renderer.draw`), so a bar sits exactly over the sprite and is a fixed screen
-   * size regardless of zoom — the camera renders 1:1, so a world radius is a
-   * screen radius.
+   * size regardless of zoom. The RADIUS crosses the same seam and needs the same
+   * transform: the bar hangs clear of the sprite by it, and `Combatant.radius` is
+   * screen px by contract (`@ui/healthbar`). It read `ship.radius` straight off
+   * the sim while the camera was 1:1, and a0-74's zoom made those two different
+   * numbers — so it goes through `projectLength` now, for the same reason and off
+   * the same transform as the position beside it (a0-80).
    *
    * Allocation-free after warm-up (GDD §4.3): the combatant records are pooled
    * and overwritten in place, and the frame array is reused. The count is bounded
@@ -4001,7 +4005,7 @@ async function boot(): Promise<void> {
       c.alive = ship.alive;
       c.inCombat = ship.firing; // firing this tick (sim publishes the tell)
       renderer.projectToScreen(ship.pos, c.pos);
-      c.radius = ship.radius;
+      c.radius = renderer.projectLength(ship.radius);
       c.turret = false;
     }
     for (const station of world.stations) {
@@ -4018,7 +4022,7 @@ async function boot(): Promise<void> {
         // `turret.pos` is derived from the orbit angle each tick, so the bar rides
         // along as the turret slides around its station's rim (sim orbit, P1).
         renderer.projectToScreen(turret.pos, c.pos);
-        c.radius = turret.radius;
+        c.radius = renderer.projectLength(turret.radius);
         c.turret = true;
       }
     }
@@ -4065,7 +4069,9 @@ async function boot(): Promise<void> {
       c.alive = ship.alive && !ship.eliminated;
       c.local = ship.id === LOCAL_PLAYER;
       renderer.projectToScreen(ship.pos, c.pos);
-      c.radius = ship.radius;
+      // Screen px by contract (`@ui/nameplates-view` floats the label off it), so
+      // it rides the camera scale exactly as the position does (a0-80).
+      c.radius = renderer.projectLength(ship.radius);
     }
     for (const station of world.stations) {
       const c = nameableSlot(n++);
@@ -4075,7 +4081,7 @@ async function boot(): Promise<void> {
       c.alive = station.alive;
       c.local = false;
       renderer.projectToScreen(station.pos, c.pos);
-      c.radius = station.radius;
+      c.radius = renderer.projectLength(station.radius);
     }
     nameableFrame.length = 0;
     for (let i = 0; i < n; i++) nameableFrame.push(nameablePool[i]!);
@@ -4143,7 +4149,11 @@ async function boot(): Promise<void> {
       renderer.projectToScreen(locked.pos, tapLockScreen);
       tapLockMark.x = tapLockScreen.x;
       tapLockMark.y = tapLockScreen.y;
-      tapLockMark.radius = locked.radius;
+      // The reticle's brackets float just outside the target's SCREEN radius
+      // (`@ui/tap-markers`), so the world radius crosses the camera the same way
+      // the centre does — otherwise the bracket sits a target's width off the
+      // drawn edge at 2x (a0-80).
+      tapLockMark.radius = renderer.projectLength(locked.radius);
       hudFrame.tapLock = tapLockMark;
     } else {
       delete hudFrame.tapLock;

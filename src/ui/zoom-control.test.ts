@@ -329,6 +329,30 @@ describe('the world the control zooms', () => {
     }
   });
 
+  it('floats the screen overlays off a SIZE the camera has scaled, not a world one', () => {
+    // The second crossing of the same seam, found by sweeping the class rather
+    // than the report (a0-80). A point and a length both cross world → screen, and
+    // a0-74 carried only the point: the health bar, the nameplate and the lock
+    // reticle each hang clear of an entity by a radius their contracts declare in
+    // SCREEN px (`@ui/healthbar` `Combatant.radius`, `@ui/nameplates-view`,
+    // `@ui/tap-markers`), and `main.ts` was handing them `ship.radius` — the same
+    // number only while the camera was 1:1. `projectLength` is the length half of
+    // `projectToScreen`, off the same live transform, so the two cannot disagree.
+    for (const step of VIEW_ZOOM_STEPS) {
+      const { renderer, ship } = burnThruster(step);
+      const hull = ship.radius;
+      // Two world points one hull-radius apart ARE the gap an over-ship bar has to
+      // clear; projecting both and measuring is the long way round to the number
+      // `projectLength` returns, so agreeing is the whole claim.
+      const centre = projected(renderer, ship.pos);
+      const rim = projected(renderer, { x: ship.pos.x + hull, y: ship.pos.y });
+      expect(renderer.projectLength(hull)).toBeCloseTo(Math.hypot(rim.x - centre.x, rim.y - centre.y), 6);
+      // ...and it is the rung, so a ship drawn half size gets half the clearance
+      // instead of a bar floating a whole hull above it.
+      expect(renderer.projectLength(hull)).toBeCloseTo(hull * cameraScale(step), 6);
+    }
+  });
+
   it('is why the effects are PARENTED to the world and not positioned beside it', () => {
     // The wiring this replaced, reconstructed: a layer hung beside the world
     // container and offset each frame from the camera read-back. It is exact at

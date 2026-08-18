@@ -796,6 +796,26 @@ export class Renderer {
     return out;
   }
 
+  /**
+   * The screen LENGTH (canvas-local CSS px) a world length draws as this frame,
+   * read from the same actual worldRoot transform {@link projectToScreen} reads
+   * (a0-80).
+   *
+   * A point and a length are two different crossings of this seam and only the
+   * first was carried when the camera grew a scale. Every screen-space overlay
+   * that floats itself off an entity's SIZE — the health bar's clearance, the
+   * nameplate's, the lock reticle's brackets — takes a radius in CSS px by
+   * contract and was being handed one in world units, which was the same number
+   * only while the camera was 1:1. Off by the whole of the zoom at 1.5x and 2x:
+   * a bar hanging a full ship-radius clear of a half-size ship.
+   *
+   * Uniform scale, so one axis answers for both; the camera has never had a
+   * non-uniform one and {@link setCameraScale} is its only writer.
+   */
+  projectLength(world: number): number {
+    return world * this.worldRoot.scale.x;
+  }
+
   /** Draw one frame from read-only sim state. Allocation-free on the hot paths. */
   draw(world: World, view: RenderView): void {
     this.centerCamera(world, view.cameraTarget);
