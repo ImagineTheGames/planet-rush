@@ -110,6 +110,53 @@ permissions:
 # answer is the shard plan (tests/mobile/shard-plan.ts, N in the matrix below),
 # not a bigger number here.
 
+# --- AND NO APT ON THE MERGE PATH AT ALL (a0-84). -------------------------
+#
+# A timeout turns the hang into a failure. Removing the hang is better, and the
+# hang had exactly one source: `npx playwright install-deps chromium`, an
+# apt-get inside the runner, on the critical path of every merge. Measured over
+# the same week: n=2106, p50 **14 s**, p90 21 s, p99 162 s, max **1975 s** — and
+# that 32.9-minute one concluded `success` (run 32077383512), so it was not even
+# visible as a problem. Nothing else in this file has that shape.
+#
+# WAS IT DOING ANYTHING? Yes, but not what its name suggests, and this was
+# measured on the runner rather than assumed. On ubuntu-latest 24.04 every
+# Chromium shared library it names is already installed — it reports "already
+# the newest version" for libnss3, libgbm1, libasound2t64, libcups2t64, the
+# whole list — and `ldd chrome` resolves clean on a bare runner with the step
+# gone. What it actually installed was 9 packages, 21.1 MB, ALL FONTS:
+# fonts-freefont-ttf, fonts-ipafont-gothic, fonts-tlwg-loma-otf, fonts-unifont,
+# fonts-wqy-zenhei, xfonts-{cyrillic,encodings,scalable,utils}. CJK, Thai,
+# Cyrillic and a bitmap-font toolchain, on a game whose UI is English.
+#
+# SO THE REAL QUESTION WAS THE GOLDENS, AND IT WAS ANSWERED BY RUNNING THEM.
+# The game ships its own latin-subset webfonts (public/fonts/{Audiowide,
+# Oxanium}*.woff2, `font-display: block`), so a system face is reached only by
+# the generic fallbacks. On a bare runner all six generic families —
+# sans-serif, serif, monospace, system-ui, "Trebuchet MS", "Segoe UI" — resolve
+# to DejaVu, which ships with the image; the 9 packages never displaced it, they
+# only added glyph coverage nothing here renders. Locally, forcing the harsher
+# case (hiding those font dirs, which DOES move the mono fallback) changes 254
+# of 1 024 000 pixels on the CODEX screen, the densest text in the game — 0.025%,
+# and all 254 are the monospace git-SHA build stamp in the bottom-left corner.
+# The same render twice with the fonts present differs by 0 pixels, so that is
+# signal, not noise — it is just the only signal there is.
+#
+# On the runner, with this step gone, all three shards that carry
+# goldens.spec.ts ran and passed: shard 1/6 iphone (31 passed), shard 4/6 pixel
+# (26), shard 6/6 desktop (37) — run 32105957750.
+#
+# What is left is the cache-MISS path, which downloads the browser binary from
+# the Playwright CDN and touches no package manager. Over the measured week it
+# ran ZERO times out of 2123 opportunities — the version-keyed cache hit every
+# single time — so it was never the risk; it is bounded at 10 minutes anyway.
+#
+# IF THIS EVER NEEDS TO COME BACK (a runner image that drops a library, a suite
+# that starts rendering CJK), the failure is loud and fast — Chromium refuses to
+# launch and names the missing library — and the way back is a BOUNDED call, not
+# this one: `timeout 120s npx playwright install-deps chromium` in a three-try
+# loop under a step `timeout-minutes`. Never an unbounded apt-get again.
+
 jobs:
   # --- The merge gate: runs on every event this workflow answers to. -----
   ci:
@@ -228,33 +275,6 @@ jobs:
       - if: steps.pw-cache.outputs.cache-hit != 'true'
         run: npx playwright install chromium
         timeout-minutes: 10
-
-      # TEMPORARY (a0-84 probe) — REMOVE BEFORE MERGE. Records what a bare
-      # ubuntu-latest actually provides, so the install-deps verdict is a
-      # measurement on the runner rather than an inference from a container.
-      - name: PROBE — runner font + dep state without install-deps
-        run: |
-          echo "::group::runner image"
-          cat /imagegeneration/imagedata.json 2>/dev/null | head -5 || true
-          echo "::endgroup::"
-          echo "::group::fc-match on a bare runner"
-          for fam in sans-serif serif monospace system-ui "Trebuchet MS" "Segoe UI"; do
-            printf '%-14s -> %s\n' "$fam" "$(fc-match "$fam" 2>&1)"
-          done
-          echo "::endgroup::"
-          echo "::group::font files present"
-          fc-list | sed 's/:.*//' | xargs -n1 dirname | sort | uniq -c
-          echo "::endgroup::"
-          echo "::group::what install-deps WOULD have added (dry run, bounded)"
-          sudo apt-get -qq update >/dev/null 2>&1 || true
-          timeout 120s npx playwright install-deps --dry-run chromium 2>&1 | tail -40 || \
-            echo "(--dry-run unsupported on this playwright version)"
-          echo "::endgroup::"
-          echo "::group::chromium shared-library check"
-          BIN=$(node -e "console.log(require('playwright-core').chromium.executablePath())")
-          echo "$BIN"
-          ldd "$BIN" | grep -i 'not found' && { echo "::error::missing shared libs"; exit 1; } || echo "all shared libraries resolve"
-          echo "::endgroup::"
 
       # The same VITE_ALLOCATOR_URL the shipped build is given, so the bundle
       # under test is the bundle that deploys and the online menu does not fail
