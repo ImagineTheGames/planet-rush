@@ -3,7 +3,7 @@
   "label": "long-away",
   "awayMs": 45000,
   "mode": "drop-and-return",
-  "capturedAt": "2026-08-17T23:18:37.701Z",
+  "capturedAt": "2026-08-18T00:00:44.716Z",
   "room": {
     "code": "PBQW",
     "machine": "4d891e33b27a95"
@@ -18,7 +18,7 @@
       "type": "lobbyState"
     },
     {
-      "at": 442,
+      "at": 437,
       "type": "playerSubstituted",
       "detail": {
         "player": 1,
@@ -27,29 +27,29 @@
       }
     },
     {
-      "at": 442,
+      "at": 437,
       "type": "lobbyState"
     },
     {
-      "at": 35215,
+      "at": 35212,
       "type": "playerReclaimed",
       "detail": {
         "player": 0
       }
     },
     {
-      "at": 35215,
+      "at": 35212,
       "type": "lobbyState"
     },
     {
-      "at": 45577,
+      "at": 45575,
       "type": "playerReclaimed",
       "detail": {
         "player": 1
       }
     },
     {
-      "at": 45578,
+      "at": 45575,
       "type": "lobbyState"
     }
   ],
@@ -146,11 +146,6 @@
       "rows": [],
       "seats": [
         {
-          "seat": 0,
-          "state": "back",
-          "bot": false
-        },
-        {
           "seat": 1,
           "state": "dropped",
           "bot": true
@@ -173,7 +168,7 @@
     },
     {
       "moment": "they are back",
-      "at": 45.45,
+      "at": 45.43,
       "banner": [
         "P2 — BACK · BOT OUT"
       ],
@@ -187,11 +182,6 @@
         }
       ],
       "seats": [
-        {
-          "seat": 0,
-          "state": "back",
-          "bot": false
-        },
         {
           "seat": 1,
           "state": "back",
@@ -218,13 +208,7 @@
       "at": 51.43,
       "banner": [],
       "rows": [],
-      "seats": [
-        {
-          "seat": 0,
-          "state": "back",
-          "bot": false
-        }
-      ],
+      "seats": [],
       "authority": [
         {
           "seat": 0,

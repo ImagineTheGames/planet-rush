@@ -297,16 +297,26 @@ this because its single client was the one being suspended. Runs 1–4 above are
 therefore captured at a 25-second background, which is under that ceiling and
 still a real one: the socket is dead, a bot is flying, and the seat is held.
 
-Kept rather than deleted, because it is also a positive result:
+Kept rather than deleted, because it is also a positive result. Authority told
+this client, in so many words, that ITS OWN seat had been reclaimed —
 
-  t = 45.30 s  state  seat 0 back (the watcher's OWN seat)  ·  seat 1 dropped
-               banner (nothing about seat 0)
+    35212  playerReclaimed { player: 0 }      <-- seat 0 IS the watcher
+    45575  playerReclaimed { player: 1 }      <-- and this is the phone
+
+— and the banner said nothing about seat 0 at any point in the run:
+
+  t = 45.30 s  banner (nothing)          state  seat 1 dropped
+  t = 45.43 s  banner P2 — BACK · BOT OUT  state  seat 1 back
 
 Your own drop is `src/net/link-loss`'s full-screen card with RECONNECT and ABANDON
 on it. The log tracks the local seat's state and DRAWS NOTHING for it, so a
 second, quieter copy of that card never appears under the wave clock. The 45 s run
 is the only place in this evidence where that suppression is exercised against a
-real reconnect.
+real reconnect — and it is also what caught a real bug in the model: `back`
+settled to `here` by walking the LINES, and the local seat has no line, so this
+client's own seat reported `back` for the rest of the match. It settles off the
+seat now (`src/ui/hud.test.ts`, "is silent about your own seat"), which is why
+seat 0 appears nowhere in the frames above.
 
 
 WHAT THE PLAYER GETS

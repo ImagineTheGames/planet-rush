@@ -355,13 +355,15 @@ export class PeerPresenceLog {
     // anything standing rather than drawing a line stamped in the future.
     if (this.lines.some((l) => l.at > now)) this.lines = [];
 
-    for (const line of this.lines) {
-      if (line.state !== 'back' || now - line.at < PRESENCE_TELL_SECONDS) continue;
-      const entry = this.seats.get(line.seat);
-      if (entry?.state === 'back') {
-        entry.state = 'here';
-        entry.since = now;
-      }
+    // `back` settles to `here` once it has had its window. Driven off the SEAT
+    // rather than off its line, because the local seat never gets a line at all
+    // ({@link push}) — reading the lines would leave this client's own seat
+    // reporting `back` for the rest of the match, which the a0-76 evidence
+    // caught on a 45-second run.
+    for (const [, entry] of this.seats) {
+      if (entry.state !== 'back' || now - entry.since < PRESENCE_TELL_SECONDS) continue;
+      entry.state = 'here';
+      entry.since = now;
     }
     this.lines = this.lines.filter((l) => now - l.at < PRESENCE_TELL_SECONDS);
 

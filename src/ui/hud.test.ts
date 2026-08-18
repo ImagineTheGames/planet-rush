@@ -538,6 +538,13 @@ describe('a0-76 — the HUD says who stopped flying', () => {
 
     // The seat's STATE is still tracked — only the line is suppressed.
     expect(log.presence(3).state).toBe('back');
+    // …and it settles like any other seat. This is driven off the SEAT rather
+    // than off its line, because a suppressed seat has no line to settle from:
+    // reading the lines left this client's own seat reporting `back` for the
+    // rest of the match, which the 45-second evidence run caught.
+    expect(log.read(20 + PRESENCE_TELL_SECONDS)).toHaveLength(0);
+    expect(log.presence(3).state).toBe('here');
+    expect(log.away(), 'and it stops being listed as away at all').toHaveLength(0);
   });
 
   it('does not stack a second line when authority repeats itself', () => {
