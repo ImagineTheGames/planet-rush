@@ -1,0 +1,43 @@
+a0-79 — the room the main-menu plates leave, and what still fits in them
+==============================================================================
+
+The handoff draws an 800px column on a 1280px screen:
+  the plates take 62.5% of the viewport and leave
+  18.75% of it as field on EACH side.
+That is the proportion every viewport should read, and the one this measures against.
+
+── phone landscape 798x384 (developer's screenshot)
+   band 752  column 504.7  (67.1% of band, 63.2% of viewport)
+   side field  left 146.7px  right 146.7px  = 18.38% of the viewport each side
+   tightest label: HANGAR needs 305px in 427px → slack 121px FITS
+
+── phone portrait-held 844x390 (logical, landscape lock)
+   band 796  column 534.2  (67.1% of band, 63.3% of viewport)
+   side field  left 154.9px  right 154.9px  = 18.35% of the viewport each side
+   tightest label: HANGAR needs 305px in 456px → slack 151px FITS
+
+── phone PORTRAIT 390x844 (unlocked logical)
+   band 364  column 364.0  (100.0% of band, 93.3% of viewport)
+   side field  left 13.0px  right 13.0px  = 3.33% of the viewport each side
+   tightest label: HANGAR needs 305px in 286px → slack -19px OVERFLOWS
+
+── phone PORTRAIT narrow 360x780
+   band 336  column 336.0  (100.0% of band, 93.3% of viewport)
+   side field  left 12.0px  right 12.0px  = 3.33% of the viewport each side
+   tightest label: HANGAR needs 305px in 258px → slack -47px OVERFLOWS
+
+── reference desktop 1280x720
+   band 1192  column 800.0  (67.1% of band, 62.5% of viewport)
+   side field  left 240.0px  right 240.0px  = 18.75% of the viewport each side
+   tightest label: HANGAR needs 367px in 709px → slack 342px FITS
+
+── desktop 1920x1080
+   band 1832  column 800.0  (43.7% of band, 41.7% of viewport)
+   side field  left 560.0px  right 560.0px  = 29.17% of the viewport each side
+   tightest label: HANGAR needs 367px in 709px → slack 342px FITS
+
+── ultrawide 3440x1440
+   band 3352  column 800.0  (23.9% of band, 23.3% of viewport)
+   side field  left 1320.0px  right 1320.0px  = 38.37% of the viewport each side
+   tightest label: HANGAR needs 367px in 709px → slack 342px FITS
+

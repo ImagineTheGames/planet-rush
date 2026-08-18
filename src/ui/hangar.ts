@@ -65,7 +65,7 @@ import type { Rect, Viewport } from '@platform/layout-registry';
 import type { ShipClass } from '@shared/types';
 import { COLUMN, plateHeight, rowHeight } from '../art/materials';
 import type { FrameMetrics, PlateRole, PlateScale, PlateState } from '../art/materials';
-import { beamContent, gantryFrame } from './gantry';
+import { beamContent, gantryFrame, menuColumnWidth } from './gantry';
 import { hitRect } from './menu-geometry';
 import type { Insets } from './menu-geometry';
 import { CLASS_OPTIONS } from './lobby';
@@ -480,7 +480,11 @@ export function hangarLayout(viewport: Viewport, options: HangarLayoutOptions = 
   // The band, capped at the same column the other screens use so a 4K desktop
   // does not stretch the hangar across a metre of glass.
   const band = frame.band;
-  const width = Math.min(COLUMN.title + COLUMN.settings * 0.5, band.width);
+  // Absolutely AND proportionally capped ({@link ./gantry} `menuColumnWidth`), the
+  // same ceiling the title and settings screens take. The absolute is this
+  // screen's own — two panes want more room than one stack of plates — and the
+  // share is the handoff's, so a phone keeps its margins here too (a0-79).
+  const width = menuColumnWidth(band.width, COLUMN.title + COLUMN.settings * 0.5, metrics);
   const x = band.x + (band.width - width) / 2;
   const gap = Math.min(PANE_GAP, width / 8);
   const bayWidth = Math.max(0, Math.min(width * BAY_SHARE, Math.max(0, width - gap)));

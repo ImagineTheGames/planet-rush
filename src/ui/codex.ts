@@ -33,9 +33,9 @@
  */
 
 import type { Rect, Viewport } from '@platform/layout-registry';
-import { rowHeight, valueChipHeight } from '../art/materials';
+import { COLUMN, rowHeight, valueChipHeight } from '../art/materials';
 import type { FrameMetrics, PlateRole } from '../art/materials';
-import { beamContent, beamPlate, gantryFrame } from './gantry';
+import { beamContent, beamPlate, gantryFrame, menuColumnBand } from './gantry';
 import { hitRect } from './menu-geometry';
 import type { Insets } from './menu-geometry';
 
@@ -540,7 +540,13 @@ export function codexLayout(
 
   // The tab row, off the top of the band. A value chip's height, which is floored
   // at the thumb minimum on every device — the brief's one hard number here.
-  const band = frame.band;
+  // The band, narrowed to the shared menu column ({@link ./gantry}
+  // `menuColumnBand`) before anything is laid out in it. The codex used to take
+  // the WHOLE band — so a phone ran its tabs edge to edge (a0-79) and an
+  // ultrawide ran a 3352px article across a metre of glass. Same ceiling as the
+  // title, settings and hangar screens; this screen's absolute is the two-pane
+  // one, because a rail and an article want more room than one stack of plates.
+  const band = menuColumnBand(frame.band, COLUMN.title + COLUMN.settings * 0.5, m);
   const tabHeight = Math.max(0, Math.min(valueChipHeight(m), band.height));
   const tabs = tabStrip({ x: band.x, y: band.y, width: band.width, height: tabHeight }, m);
 

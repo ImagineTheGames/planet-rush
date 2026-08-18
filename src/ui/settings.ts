@@ -30,7 +30,7 @@ import type { ControlScheme, DeviceKind } from '@platform/actions';
 import type { Rect, Viewport } from '@platform/layout-registry';
 import { COLUMN, plateHeight, rowHeight, valueChipHeight } from '../art/materials';
 import type { FrameMetrics, PlateRole } from '../art/materials';
-import { beamContent, gantryFrame } from './gantry';
+import { beamContent, gantryFrame, menuColumnWidth } from './gantry';
 import { FONT_HEADING } from './typography';
 import { centeredGrid, clamp, hitRect } from './menu-geometry';
 import type { Insets } from './menu-geometry';
@@ -520,7 +520,9 @@ export function settingsLayout(viewport: Viewport, options: SettingsLayoutOption
   const band = frame.band;
   const rowH = rowHeight(metrics);
   const gap = metrics.rowGap;
-  const columnWidth = Math.min(COLUMN.settings, band.width);
+  // Absolutely AND proportionally capped, the same ceiling the title screen uses
+  // ({@link ./gantry} `menuColumnWidth`) — the front of the game is one system.
+  const columnWidth = menuColumnWidth(band.width, COLUMN.settings, metrics);
   // How many rows fit in one column at the full (thumb) row height? If fewer than
   // all of them, wrap into as many columns as it takes — capped — so no row is
   // ever compressed below its target just to fit the height. On a tall desktop

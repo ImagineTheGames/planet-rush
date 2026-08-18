@@ -36,7 +36,7 @@
  */
 
 import type { Rect, Viewport } from '@platform/layout-registry';
-import { TOUCH_MIN, beamContentInset, frameMetrics, plateHeight } from '../art/materials';
+import { COLUMN, REFERENCE_VIEWPORT, TOUCH_MIN, beamContentInset, frameMetrics, plateHeight } from '../art/materials';
 import type { BeamKind, FrameMetrics, PlateRole, PlateScale } from '../art/materials';
 import type { Insets } from './menu-geometry';
 
@@ -211,6 +211,103 @@ export function beamActionPlate(
   const w = Math.max(0, Math.min(width, strip.width));
   const x = align === 'leading' ? strip.x : strip.x + strip.width - w;
   return { rect: { x, y, width: w, height }, overflow };
+}
+
+// ---------------------------------------------------------------------------
+// The column — how much of the band a menu's content may claim
+// ---------------------------------------------------------------------------
+
+/**
+ * The content band at the reference viewport: 1280 less the handoff's 44px page
+ * margin on each side. Derived rather than written down, so a change to either
+ * number moves {@link MENU_COLUMN_SHARE} with it instead of leaving it stale.
+ */
+const REFERENCE_BAND_WIDTH =
+  REFERENCE_VIEWPORT.width - 2 * frameMetrics(REFERENCE_VIEWPORT.width, REFERENCE_VIEWPORT.height).margin;
+
+/**
+ * **The proportional ceiling on a menu's column — the handoff's own share.**
+ *
+ * Every menu screen used to cap its column with one absolute number
+ * ({@link ../art/materials} `COLUMN`) and nothing else:
+ *
+ * ```ts
+ * const columnWidth = Math.min(COLUMN.title, frame.band.width);
+ * ```
+ *
+ * On a desktop the absolute wins and the plates stay a sane column. On a phone
+ * the *band* wins — it is narrower than the cap — so the cap never bites and the
+ * plates take everything. Measured on the developer's own 798x384 screenshot
+ * viewport, the field left beside a plate was **2.9% of the screen on each
+ * side**: edge to edge, which is exactly what the screenshot showed.
+ *
+ * The fix is a ceiling that scales, and the honest number for it is not a taste:
+ * the ratified handoff draws an **800px column in a 1192px band**, so the design
+ * itself says a menu's plates get 67.1% of the band and give the remaining third
+ * back as field. This is that ratio, so:
+ *
+ *  - the reference desktop is **unchanged to the pixel** — 1192 x 0.671 = 800,
+ *    which is `COLUMN.title`, and the absolute cap still holds every viewport
+ *    wider than the reference;
+ *  - a narrow screen reads the **same proportion of field** the handoff draws
+ *    rather than surrendering it. At 798x384 the plates go 752 -> 505 and the
+ *    field goes 2.9% -> 18.4% a side, which is the desktop's own 18.75%.
+ *
+ * The margin is the fix, not a smaller plate: 505px of plate on a 798px screen
+ * is still far and away the biggest control on it, and a plate's *tappability*
+ * is its height, which {@link ../art/materials} `frameMetrics` floors at the
+ * thumb minimum and this does not touch.
+ */
+export const MENU_COLUMN_SHARE = COLUMN.title / REFERENCE_BAND_WIDTH;
+
+/**
+ * **The floor the proportional ceiling stops at**, in reference px — scaled by
+ * `plateScale`, because what it protects is the type *inside* the plate and that
+ * is what `plateScale` sizes.
+ *
+ * A share alone is the right rule in one direction only. Landscape is wide and
+ * has field to spare; **portrait is the opposite constraint** — at a 390px-wide
+ * logical viewport the whole band is 364px, and taking a third of that as field
+ * leaves 244px of plate to hold a label, an accent tick, two lots of padding and
+ * a sub-line as long as *"Ship, level, and what a level unlocks"*. That is a
+ * screen whose words are squeezed to buy air nobody asked for.
+ *
+ * So below this width the screen gives up **field** rather than **words**: the
+ * ceiling stops descending and the column is simply the band. The number is not
+ * a preference either — it is the narrowest plate the menu's own longest
+ * sub-line still fits at a phone's plate scale, and `main-menu.test.ts` measures
+ * that against the real advance tables ({@link ./font-metrics}) rather than
+ * trusting this comment, so copy that outgrows it fails loudly.
+ */
+export const MENU_COLUMN_MIN = 448;
+
+/**
+ * How wide a menu's column may be in `bandWidth`: at most `max` (the screen's own
+ * absolute cap from {@link ../art/materials} `COLUMN`), at most
+ * {@link MENU_COLUMN_SHARE} of the band, and never squeezed below
+ * {@link MENU_COLUMN_MIN} — or the band itself, when even that will not fit.
+ *
+ * This is the seam the four flat menu screens share (title, settings, codex,
+ * hangar), so the front of the game is one system rather than four that drifted:
+ * each screen still names its own absolute column, and the proportion is decided
+ * in exactly one place.
+ */
+export function menuColumnWidth(bandWidth: number, max: number, m: FrameMetrics): number {
+  const band = Math.max(0, bandWidth);
+  const floor = Math.min(band, MENU_COLUMN_MIN * m.plateScale);
+  return Math.max(0, Math.min(max, band, Math.max(band * MENU_COLUMN_SHARE, floor)));
+}
+
+/**
+ * `band`, narrowed to {@link menuColumnWidth} and re-centred in itself — for the
+ * screens whose content is not a stack of plates but a whole two-pane layout
+ * (the codex's tabs + rail + article). Same ceiling, same centring; the screen
+ * then lays out inside the returned rect exactly as it used to lay out inside
+ * the band.
+ */
+export function menuColumnBand(band: Rect, max: number, m: FrameMetrics): Rect {
+  const width = menuColumnWidth(band.width, max, m);
+  return { x: band.x + (band.width - width) / 2, y: band.y, width, height: band.height };
 }
 
 // ---------------------------------------------------------------------------
