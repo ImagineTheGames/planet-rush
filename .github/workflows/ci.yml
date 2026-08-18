@@ -226,9 +226,35 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
       - if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-      - if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
+        run: npx playwright install chromium
+        timeout-minutes: 10
+
+      # TEMPORARY (a0-84 probe) — REMOVE BEFORE MERGE. Records what a bare
+      # ubuntu-latest actually provides, so the install-deps verdict is a
+      # measurement on the runner rather than an inference from a container.
+      - name: PROBE — runner font + dep state without install-deps
+        run: |
+          echo "::group::runner image"
+          cat /imagegeneration/imagedata.json 2>/dev/null | head -5 || true
+          echo "::endgroup::"
+          echo "::group::fc-match on a bare runner"
+          for fam in sans-serif serif monospace system-ui "Trebuchet MS" "Segoe UI"; do
+            printf '%-14s -> %s\n' "$fam" "$(fc-match "$fam" 2>&1)"
+          done
+          echo "::endgroup::"
+          echo "::group::font files present"
+          fc-list | sed 's/:.*//' | xargs -n1 dirname | sort | uniq -c
+          echo "::endgroup::"
+          echo "::group::what install-deps WOULD have added (dry run, bounded)"
+          sudo apt-get -qq update >/dev/null 2>&1 || true
+          timeout 120s npx playwright install-deps --dry-run chromium 2>&1 | tail -40 || \
+            echo "(--dry-run unsupported on this playwright version)"
+          echo "::endgroup::"
+          echo "::group::chromium shared-library check"
+          BIN=$(node -e "console.log(require('playwright-core').chromium.executablePath())")
+          echo "$BIN"
+          ldd "$BIN" | grep -i 'not found' && { echo "::error::missing shared libs"; exit 1; } || echo "all shared libraries resolve"
+          echo "::endgroup::"
 
       # The same VITE_ALLOCATOR_URL the shipped build is given, so the bundle
       # under test is the bundle that deploys and the online menu does not fail
@@ -362,9 +388,8 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
       - if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-      - if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
+        run: npx playwright install chromium
+        timeout-minutes: 10
 
       # The thresholds live in tests/perf/budget.ts with their provenance. They
       # are NOT overridden here, and the one knob that exists (PERF_BUDGET_SCALE)
@@ -458,12 +483,12 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
 
-      # On a cache miss: browser + system libs. On a hit: only the system libs
-      # (they're apt packages, not in ~/.cache, so they never get cached).
+      # On a cache miss: the browser binary, from the Playwright CDN. On a hit:
+      # nothing at all. The apt half of this is gone — see a0-84's note at the
+      # top of the file for the measurement that removed it.
       - if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-      - if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
+        run: npx playwright install chromium
+        timeout-minutes: 10
 
       # `strategy.job-total` is the length of the matrix above, so N is stated
       # in exactly one place — add a shard to the list and the denominator
@@ -556,9 +581,8 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
       - if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-      - if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
+        run: npx playwright install chromium
+        timeout-minutes: 10
       - env:
           LIVE_URL: ${{ needs.deploy.outputs.page_url }}
         run: npx playwright test --config tests/live/playwright.live.config.ts
