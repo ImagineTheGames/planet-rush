@@ -39,9 +39,11 @@ const ULTRAWIDE = { w: 3440, h: 1440 };
 const labels = (c: Container): string[] => c.children.map((k) => (k as Container).label ?? '');
 
 describe('the sky the menus fly under', () => {
-  it('is a NAMED sky, pinned to the map registry rather than left to the default', () => {
-    // The whole point of naming it: a re-assignment in `MAP_NEBULA` cannot
-    // silently change what the front of the game looks like.
+  it('is a NAMED sky, looked up in the map registry rather than left to the default', () => {
+    // `MENU_SKY_MAP` is DERIVED from `MENU_SKY`, so this is not a tautology: it
+    // fails the moment no map in `MAP_NEBULA` carries the menu's sky any more, at
+    // which point the lookup falls back to the first map and the front of the
+    // game would quietly fly under whatever that map's sky happens to be.
     expect(MAP_NEBULA[MENU_SKY_MAP]).toBe(MENU_SKY);
   });
 

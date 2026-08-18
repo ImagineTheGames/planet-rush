@@ -72,16 +72,29 @@ import type { MapId, NebulaId } from '../art/backdrop';
 export const MENU_SKY: NebulaId = 'patinaDrift';
 
 /**
- * The map whose sky the menus fly under.
+ * The map whose sky is {@link MENU_SKY} — **looked up, not written down.**
  *
  * `VoidBackdrop`'s public way to choose a sky is `setMap`, and that is the API
- * this file is required to use rather than reaching past it — so the menu names
- * a map, and `menu-backdrop.test.ts` pins {@link MAP_NEBULA}`[MENU_SKY_MAP]` to
- * {@link MENU_SKY}. A re-assignment in the map/sky registry can therefore not
- * silently change what the front of the game looks like; it fails a test that
- * says which sky was chosen and why.
+ * this file is required to use rather than reaching past it. So the menu has to
+ * name a map. It names the SKY it wants and asks the registry which map carries
+ * it, rather than hard-coding a map id that a re-assignment in
+ * {@link MAP_NEBULA} could quietly re-point at a different sky — which is
+ * exactly the silent change this whole comment exists to prevent.
+ *
+ * If no map carries {@link MENU_SKY} the lookup falls back to the first map in
+ * the registry, and `menu-backdrop.test.ts` fails: the fallback is the *default*
+ * map, whose sky is `none`, which is precisely the wrong answer to ship
+ * quietly.
  */
-export const MENU_SKY_MAP: MapId = 'diamond';
+export const MENU_SKY_MAP: MapId = mapForSky(MENU_SKY);
+
+/** The first map in {@link MAP_NEBULA} flying under `sky`, or the first map at
+ *  all when none does. See {@link MENU_SKY_MAP} for why the fallback is a
+ *  test failure rather than a shrug. */
+function mapForSky(sky: NebulaId): MapId {
+  const ids = Object.keys(MAP_NEBULA) as MapId[];
+  return ids.find((id) => MAP_NEBULA[id] === sky) ?? ids[0]!;
+}
 
 /**
  * The texel ceiling on the baked still frame — a MEMORY budget, in the same
