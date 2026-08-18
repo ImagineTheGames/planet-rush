@@ -1,0 +1,15 @@
+a0-79 — what the MENU BACKDROP costs per frame
+==============================================================================
+
+Median rAF delta on the MAIN MENU, one bundle, `?sky=0` vs `?sky=1`, taken
+back to back, 3 alternated passes, ~3000 ms window each. The match column
+is `?debug=1` in the same run: this box has NO GPU (SwiftShader), so the
+milliseconds are this box's and the RATIO is what travels.
+
+  viewport               device px    sky=0     sky=1     backdrop   match    menu/match
+  phone 798x384          1.23 Mpx       22.5 ms    36.0 ms   +13.5 ms   135.1 ms  0.27x
+  desktop 1280x720       0.92 Mpx       16.1 ms    26.6 ms   +10.5 ms   166.7 ms  0.16x
+  ultrawide 3440x1440    4.95 Mpx       85.7 ms   151.1 ms   +65.4 ms   653.2 ms  0.23x
+
+`menu/match` is the invariant tests/mobile/menu-frame-cost.spec.ts gates on
+(ceiling 4x): the static front door must not cost more than the running game.

@@ -57,6 +57,18 @@ async function serve() {
   if (!existsSync(`${ROOT}/${OUT_DIR}/index.html`)) {
     throw new Error(`no bundle at ${ROOT}/${OUT_DIR} — npx vite build --outDir ${OUT_DIR}`);
   }
+  // **Refuse to attach to a server this rig did not start.** `vite preview` on a
+  // busy port exits, and a loop that only polls for a 200 will happily measure —
+  // or photograph — WHOSE EVER bundle is already there. That is not a theory:
+  // playwright.config.ts carries the same warning because a0-06 got a local PASS
+  // against another lane's pixels, and this rig hit it too, silently re-shooting
+  // the previous run's bundle from an orphaned preview.
+  try {
+    const stale = await fetch(`http://127.0.0.1:${PORT}`, { signal: AbortSignal.timeout(1500) });
+    if (stale.ok) throw new Error(`port ${PORT} already answers — kill it, this rig will not measure a stranger's bundle`);
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('already answers')) throw e;
+  }
   const proc = spawn(
     'npx',
     ['vite', 'preview', '--outDir', OUT_DIR, '--host', '127.0.0.1', '--port', String(PORT), '--strictPort'],
@@ -146,7 +158,17 @@ async function matchSample(browser, url, vp) {
 
 const main = async () => {
   const served = await serve();
-  const browser = await chromium.launch();
+  // **Vsync off, or this instrument cannot see the thing it is measuring.**
+  // a0-75 wrote it down and this rig re-learned it: headless Chromium presents
+  // on the compositor's clock, so a median rAF delta is QUANTISED to 16.7 ms.
+  // The first run of this file read 16.7 -> 33.3 ms at every phone pass — three
+  // passes, perfectly repeatable, and completely uninformative: all it says is
+  // "the frame crossed one vsync boundary", which is true of a 0.1 ms regression
+  // and of a 16 ms one alike. With the limiter off, rAF fires as fast as the
+  // frame is drawn and the delta is the frame.
+  const browser = await chromium.launch({
+    args: ['--disable-gpu-vsync', '--disable-frame-rate-limit'],
+  });
   const rows = [];
   try {
     for (const vp of VIEWPORTS) {
@@ -172,6 +194,8 @@ const main = async () => {
         pixels: vp.w * vp.h * vp.dpr * vp.dpr,
         skyOff: median(without),
         skyOn: median(withSky),
+        offPasses: without,
+        onPasses: withSky,
         match,
       });
     }
@@ -210,7 +234,13 @@ const main = async () => {
   writeFileSync(`${HERE}frame-cost.json`, JSON.stringify(rows, null, 2) + '\n');
 };
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+main()
+  .then(() => {
+    // The spawned previews keep the event loop alive even after SIGTERM, so say
+    // so explicitly rather than leaving a rig that has finished looking hung.
+    process.exit(0);
+  })
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });

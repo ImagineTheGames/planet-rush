@@ -1,3 +1,19 @@
 a0-79 — the plate margin, measured on the SHIPPED bundles
 ==========================================================================
 
+── 798x384-landscape-phone  (logical 798x384)
+   before : plate 752px · field 23/23px · 2.88% a side
+   after  : plate 505px · field 147/147px · 18.38% a side
+
+── 390x844-portrait-phone  (logical 844x390, rotated)
+   before : plate 796px · field 24/24px · 2.84% a side
+   after  : plate 534px · field 155/155px · 18.35% a side
+
+── 1280x720-desktop  (logical 1280x720)
+   before : plate 800px · field 240/240px · 18.75% a side
+   after  : plate 800px · field 240/240px · 18.75% a side
+
+── 3440x1440-ultrawide  (logical 3440x1440)
+   before : plate 800px · field 1320/1320px · 38.37% a side
+   after  : plate 800px · field 1320/1320px · 38.37% a side
+

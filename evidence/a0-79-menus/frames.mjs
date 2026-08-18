@@ -52,6 +52,18 @@ async function serve(build) {
   if (!existsSync(`${build.root}/${build.out}/index.html`)) {
     throw new Error(`${build.name}: no bundle at ${build.root}/${build.out} — build it first`);
   }
+  // **Refuse to attach to a server this rig did not start.** `vite preview` on a
+  // busy port exits, and a loop that only polls for a 200 will happily measure —
+  // or photograph — WHOSE EVER bundle is already there. That is not a theory:
+  // playwright.config.ts carries the same warning because a0-06 got a local PASS
+  // against another lane's pixels, and this rig hit it too, silently re-shooting
+  // the previous run's bundle from an orphaned preview.
+  try {
+    const stale = await fetch(`http://127.0.0.1:${build.port}`, { signal: AbortSignal.timeout(1500) });
+    if (stale.ok) throw new Error(`port ${build.port} already answers — kill it, this rig will not measure a stranger's bundle`);
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('already answers')) throw e;
+  }
   const proc = spawn(
     'npx',
     [
@@ -237,7 +249,13 @@ const main = async () => {
   writeFileSync(`${HERE}frames.json`, JSON.stringify(rows, null, 2) + '\n');
 };
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+main()
+  .then(() => {
+    // The spawned previews keep the event loop alive even after SIGTERM, so say
+    // so explicitly rather than leaving a rig that has finished looking hung.
+    process.exit(0);
+  })
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
