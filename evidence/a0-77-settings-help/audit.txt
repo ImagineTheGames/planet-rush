@@ -1,0 +1,227 @@
+a0-77 — A "?" ON EVERY SETTING, THAT SAYS WHAT THE SETTING DOES
+===============================================================
+Branch  agent/ui/a0-77-settings-help
+Bundle  the real production pipeline (npm run build + npm run preview) on a
+        private port (PREVIEW_PORT=4277), because several lanes share this box
+        and 4173 may be serving another lane's bundle (a0-06's trap).
+Method  every frame is reached by a REAL press at the physical point the client
+        itself reports the control at (`window.__mainMenu.controls` /
+        `.settingsControls`, through the landscape-lock remap) — never a
+        hit-test seam and never a debug method. Every number below is read off
+        that same seam, which now carries each control's LOGICAL rect as well as
+        its press point. Nothing here re-derives the layout: a number this audit
+        computed would be a measurement of this audit.
+        Harness: ./playwright.config.ts, ./profiles.ts, ./boot.ts,
+        ./measure.spec.ts, ./shots.spec.ts. Raw readings: ./readback.json.
+        Frames: ./shots/ (12 — four per profile). Goldens: ./goldens-rebaseline.md.
+
+
+THE REPORT
+----------
+Developer, 2026-08-17, with a screenshot of SETTINGS on a phone:
+
+  "id like to see ? marks that are clickable on PC and mobile next to each
+   button somewhere convenient that shows a pop up and explains what that
+   toggle/button does..."
+
+Before this branch a player read `FIRE MODE · AUTO-AIM` and `CONTROLS · TAP
+COMMANDER` and had to change them mid-match to find out what they did. Two of
+those rows change how the game PLAYS.
+
+
+1. WHAT IS ON THE SCREEN NOW
+----------------------------
+Every row in `SETTINGS_ROWS` carries a `?` on its LEADING edge that opens a
+compact panel naming the row and saying what it does. Six rows, six `?`, no
+exceptions — and the count is enforced twice over (§5).
+
+The panel is the LOBBY'S codex tooltip (`src/ui/codex-hint-view.ts`), reused
+whole, as the brief instructed: it was already "a compact panel (title, badges,
+one-line summary) that floats near the row it describes, clamped inside the
+viewport, and hides on any tap". There is one popup in this game, not two.
+
+
+2. WHY THE `?` LEADS THE ROW  (the measurement the brief asks for)
+------------------------------------------------------------------
+The brief: *"must not overlap the value or the steppers at the narrowest
+supported width… The screenshot is a phone in landscape at 798×384 — check that
+width specifically."*
+
+MEASURED at 798×384, read off the client (`readback.json`, phone-landscape):
+
+  the row                       x=23    w=372   h=55     (two columns)
+  the row's `?`                 x=23    w=48    h=48
+  the − stepper (MASTER VOLUME) x=673   w=48
+  the + stepper (MASTER VOLUME) x=727   w=48
+  clear space between them      222 px  ← the label and the ten pips live here
+
+  The `?` ends at x=71. The nearest thing it could crowd is 222 px away. On the
+  toggle rows the value chip is right-aligned and 149–160 px wide, so it starts
+  at x≈229 — 158 px clear.
+
+At the other two profiles, the same three numbers:
+
+  profile                        row w   `?` w × h   `?` end → − stepper
+  -----------------------------  -----   ---------   ------------------
+  phone landscape 798×384          372     48 × 48        222 px
+  phone PORTRAIT held (844×390)    394     48 × 48        244 px
+  desktop 1280×800                 680     48 × 48        530 px
+
+WHY IT IS THAT EDGE, and it is not a preference: the TRAILING edge is spoken for
+on every row — a toggle's value chip is there, and a volume's two 48px steppers
+are. At 372 px there is nothing to take from either without dropping a control
+under the thumb floor (`TOUCH_MIN` = 48). The leading edge is the one place on a
+settings row where nothing that takes a press already lives, so "clears the value
+and the steppers" is true BY CONSTRUCTION at every width rather than by a
+measurement a future label could invalidate.
+
+WHAT IT IS NOT: a 12-px glyph. The `?` is the same 48×48 square the −/+ steppers
+are (`valueChipHeight`, floored at `TOUCH_MIN`), at every profile above — the
+brief's "a real touch-target size", asserted per row per width in
+`src/ui/settings.test.ts`.
+
+WHAT PAID FOR IT, stated plainly: on a volume row the pip readout gives up the
+handoff's fixed 176-px label column once that column would leave the pips under
+90 px (`PIPS_MIN_WIDTH`). The label's MEASURED width is still a hard floor, so
+nothing is ever written over; the desktop still honours the fixed column exactly.
+No CONTROL shrank — only the readout, and only where the width demanded it. The
+frames are the check: ten pips are still ten legible pips at 798×384
+(`shots/phone-landscape-798x384-rest.png`).
+
+
+3. BOTH INPUT SCHEMES, DRIVEN THROUGH THE REAL CLIENT
+-----------------------------------------------------
+`__mainMenu.settingsHelpTitle` reports the TITLE of the open explanation, from
+the same model the view draws — so this table is what the screen actually said
+after each real gesture, not what the harness hoped. Identical at all three
+profiles (`readback.json` → `grammar`):
+
+  gesture                                        the screen then said
+  --------------------------------------------   --------------------
+  (at rest)                                      —
+  press/tap the `?` on MASTER VOLUME             MASTER VOLUME
+  press/tap the SAME `?` again                   —            (toggles closed)
+  press/tap away from every control              —            (tap away closes)
+  ArrowDown, then Enter — no pointer at all      SFX VOLUME
+  Escape                                         —
+  …and the screen is still                       settings     (Escape took the
+                                                              panel, not the screen)
+
+The touch profiles ran that whole table with `page.touchscreen.tap` and the
+desktop with `page.mouse.click`: "on pointer and on touch" is two claims, and a
+capture of one is not evidence of the other.
+
+WHY THE KEYBOARD ROW SAYS *SFX* rather than FIRE MODE: the focus ring follows a
+POINTER press, so a player who clicks a `?` and then reaches for the arrows
+carries on from the row their hand was on — here, MASTER VOLUME + 1. A finger
+never moves the ring (a touch device has no keyboard to move it with), which is
+why the touch frames show no ring and `phone-landscape-798x384-keyboard.png`,
+driven by arrows alone, does.
+
+KEYBOARD, in full: ArrowDown / ArrowUp (or W/S, or Tab) walk the column of `?`
+controls and wrap at both ends; Enter or Space opens the focused one; Escape
+closes the panel first and the screen second. The focus is drawn as a RING inside
+the chip rather than as the hover state, so "the pointer is here" and "the
+keyboard is here" stay two different pictures on a screen a player may be driving
+with both.
+
+
+4. THE FRAMES  (./shots — 12, four per profile, all opened by a real press)
+--------------------------------------------------------------------------
+  -rest        every row carries its `?`; the value chips, the pips and the −/+
+               are where they were.
+  -open        the panel open on MASTER VOLUME — the tightest row on the screen
+               (a label, ten pips AND two thumb-sized controls). The panel sits
+               ABOVE the row, so the value it explains is on screen while the
+               explanation is up.
+  -open-alt    the same on CONTROLS, the row with the longest copy and the
+               longest value word.
+  -keyboard    the focus ring on a `?` with its panel open, reached with arrows
+               and Enter and no pointer at all — on the phone profiles too.
+
+  profile                    frames
+  -------------------------  ----------------------------------------------
+  phone-landscape-798x384    rest / open / open-alt / keyboard   (dpr 3)
+  phone-portrait-390x844     rest / open / open-alt / keyboard   (dpr 3, and
+                             the landscape lock rotates all four)
+  desktop-1280x800           rest / open / open-alt / keyboard
+
+ALL TWELVE WERE OPENED AND READ AT FULL SIZE BEFORE COMMITTING.
+
+WHAT THEY SHOW THAT IS WORTH SAYING OUT LOUD: a floating panel on a 384-px-tall
+phone overlaps its NEIGHBOURS. It does not overlap the row it explains — when
+there is no room above the `?`, the panel is re-anchored below the whole ROW
+rather than below the `?`, so the value the player just asked about is never the
+thing the answer covers. It is transient and any tap dismisses it, which is the
+same grammar the lobby's dossier has kept since a0-06.
+
+
+5. THE GATE — why a seventh row cannot ship without copy
+--------------------------------------------------------
+Two halves, and neither is "today's six rows have text":
+
+  tsc      `SETTINGS_HELP` is a `Record<SettingsRowKey, SettingsHelp>` and
+           `SettingsRowKey` is DERIVED from `SettingsRowSpec`. A new row kind
+           does not compile until it has an entry.
+  vitest   `every row explains itself` (src/ui/settings.test.ts) walks
+           `SETTINGS_ROWS` itself and asserts, per row: there is copy; the
+           summary is a sentence and not a placeholder; the panel's title is the
+           row's OWN label (a panel a player cannot tie to the control they
+           tapped is not an explanation); no two rows share a summary; the
+           summary stays inside 260 characters (GDD §4.7 — "length is part of
+           clarity"); and no key in the register is an orphan.
+
+So a row added later without help text fails the BUILD, and a row given empty or
+mis-titled copy fails the TEST. That is the point of it: not that today's six
+have text, but that a seventh cannot arrive without it.
+
+
+6. THE COPY, AND WHERE EACH FACT COMES FROM
+-------------------------------------------
+Written to GDD §4.7 register 2: procedural, present tense, second person, no
+adjective that sells a setting. Each says what the control does and when to want
+it; none says how it is implemented.
+
+  FIRE MODE       AUTO-AIM takes the aim, never the trigger — GDD §2.4 ("the
+                  player decides *when* to fire, positioning decides *what* gets
+                  hit"), and it leads a moving target because the shot has
+                  travel time. MANUAL names all three aim devices, because the
+                  mode is a player setting on every platform.
+  CONTROLS        The two schemes as HANDS. Deliberately the same lesson a0-33's
+                  in-match tip teaches: its Tap Commander wordings are "Tap the
+                  asteroid to mine it" and "tap your own station to bank in its
+                  collection field", and this row says the same gesture one
+                  level up. It says "the other scheme" rather than naming it,
+                  because the row's own word for it is the DEVICE in front of
+                  the player (u8-01: STICKS / TWIN STICKS / KEYBOARD + MOUSE) —
+                  so it names all three hardware forms instead, which is true on
+                  every device.
+  REDUCE VFX      What it thins, and that the game ALSO does it unasked below
+                  30 fps (`VfxAutoQuality`, GDD §4.8 risk 5). That second half is
+                  the thing a player watching effects thin out mid-fight cannot
+                  otherwise account for.
+  MASTER VOLUME   Everything, alarm included — `../art/audio/graph` sums every
+                  bus into master.
+  SFX VOLUME      Weapons, impacts, engines, interface — and that the
+                  under-attack alarm is NOT on this channel. It is not: the alarm
+                  has its own bus precisely so a slider cannot switch off a
+                  mechanic on the not-cuttable list (§2.2, §4.9;
+                  `audio.test.ts` holds the mixer to it).
+  MUSIC VOLUME    The soundtrack only, and that nothing you need in a fight
+                  rides it.
+
+
+7. WHAT WAS **NOT** DONE, and why
+---------------------------------
+- **The lobby's own toggles and the pause menu's settings did not get their own
+  treatment.** The brief forbids widening to them; both are proposed as
+  follow-ups in the PR body. The one thing that WAS wired beyond the brief's
+  screen is the pause settings screen's TAP, and only because it is literally the
+  same `SettingsView`: it now draws six `?`, and a drawn control that does
+  nothing is worse than no control. Its keyboard column is deliberately not
+  wired — in a match the arrow keys fly the ship.
+- **No hue was spent.** The `?` is bone on the same `secondary` chip the
+  steppers wear; yellow still means ore and red still means damage
+  (style-guide §2), and a help affordance is neither.
+- **DONE is still the screen's one bright plate** (`singlePrimary`, asserted in
+  `settings.test.ts`) — the `?` is a chip, not a plate.

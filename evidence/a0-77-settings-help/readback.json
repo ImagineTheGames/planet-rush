@@ -1,0 +1,911 @@
+[
+  {
+    "profile": "phone-landscape-798x384",
+    "label": "phone landscape 798×384 — the developer's screenshot, the narrowest supported width",
+    "viewport": {
+      "width": 798,
+      "height": 384
+    },
+    "logicalViewport": {
+      "width": 798,
+      "height": 384
+    },
+    "rotated": false,
+    "rows": [
+      {
+        "kind": "fireMode",
+        "label": "FIRE MODE",
+        "value": "AUTO-AIM"
+      },
+      {
+        "kind": "controls",
+        "label": "CONTROLS",
+        "value": "TAP COMMANDER"
+      },
+      {
+        "kind": "reduceVfx",
+        "label": "REDUCE VFX",
+        "value": "OFF"
+      },
+      {
+        "kind": "volume",
+        "label": "MASTER VOLUME",
+        "value": ""
+      },
+      {
+        "kind": "volume",
+        "label": "SFX VOLUME",
+        "value": ""
+      },
+      {
+        "kind": "volume",
+        "label": "MUSIC VOLUME",
+        "value": ""
+      }
+    ],
+    "controls": [
+      {
+        "kind": "fireMode",
+        "physicalCenter": {
+          "x": 209,
+          "y": 133
+        },
+        "logical": {
+          "x": 23,
+          "y": 105.5,
+          "width": 372,
+          "height": 55
+        }
+      },
+      {
+        "kind": "controls",
+        "physicalCenter": {
+          "x": 209,
+          "y": 192
+        },
+        "logical": {
+          "x": 23,
+          "y": 164.5,
+          "width": 372,
+          "height": 55
+        }
+      },
+      {
+        "kind": "reduceVfx",
+        "physicalCenter": {
+          "x": 209,
+          "y": 251
+        },
+        "logical": {
+          "x": 23,
+          "y": 223.5,
+          "width": 372,
+          "height": 55
+        }
+      },
+      {
+        "kind": "volume",
+        "physicalCenter": {
+          "x": 589,
+          "y": 133
+        },
+        "logical": {
+          "x": 403,
+          "y": 105.5,
+          "width": 372,
+          "height": 55
+        }
+      },
+      {
+        "kind": "volume",
+        "physicalCenter": {
+          "x": 589,
+          "y": 192
+        },
+        "logical": {
+          "x": 403,
+          "y": 164.5,
+          "width": 372,
+          "height": 55
+        }
+      },
+      {
+        "kind": "volume",
+        "physicalCenter": {
+          "x": 589,
+          "y": 251
+        },
+        "logical": {
+          "x": 403,
+          "y": 223.5,
+          "width": 372,
+          "height": 55
+        }
+      },
+      {
+        "kind": "help:fireMode",
+        "physicalCenter": {
+          "x": 47,
+          "y": 133
+        },
+        "logical": {
+          "x": 23,
+          "y": 109,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "help:controls",
+        "physicalCenter": {
+          "x": 47,
+          "y": 192
+        },
+        "logical": {
+          "x": 23,
+          "y": 168,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "help:reduceVfx",
+        "physicalCenter": {
+          "x": 47,
+          "y": 251
+        },
+        "logical": {
+          "x": 23,
+          "y": 227,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "help:volume:master",
+        "physicalCenter": {
+          "x": 427,
+          "y": 133
+        },
+        "logical": {
+          "x": 403,
+          "y": 109,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "help:volume:sfx",
+        "physicalCenter": {
+          "x": 427,
+          "y": 192
+        },
+        "logical": {
+          "x": 403,
+          "y": 168,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "help:volume:music",
+        "physicalCenter": {
+          "x": 427,
+          "y": 251
+        },
+        "logical": {
+          "x": 403,
+          "y": 227,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "minus:volume:master",
+        "physicalCenter": {
+          "x": 697,
+          "y": 133
+        },
+        "logical": {
+          "x": 673,
+          "y": 109,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "plus:volume:master",
+        "physicalCenter": {
+          "x": 751,
+          "y": 133
+        },
+        "logical": {
+          "x": 727,
+          "y": 109,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "minus:volume:sfx",
+        "physicalCenter": {
+          "x": 697,
+          "y": 192
+        },
+        "logical": {
+          "x": 673,
+          "y": 168,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "plus:volume:sfx",
+        "physicalCenter": {
+          "x": 751,
+          "y": 192
+        },
+        "logical": {
+          "x": 727,
+          "y": 168,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "minus:volume:music",
+        "physicalCenter": {
+          "x": 697,
+          "y": 251
+        },
+        "logical": {
+          "x": 673,
+          "y": 227,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "plus:volume:music",
+        "physicalCenter": {
+          "x": 751,
+          "y": 251
+        },
+        "logical": {
+          "x": 727,
+          "y": 227,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "back",
+        "physicalCenter": {
+          "x": 646.5,
+          "y": 359.5
+        },
+        "logical": {
+          "x": 518,
+          "y": 335.5,
+          "width": 257,
+          "height": 48
+        }
+      }
+    ],
+    "grammar": {
+      "at rest": "",
+      "after a press on the ? of MASTER VOLUME": "MASTER VOLUME",
+      "after a second press on the same ?": "",
+      "after a press away from every control": "",
+      "after ArrowDown then Enter, no pointer": "FIRE MODE",
+      "after Escape": "",
+      "…and the screen is still SETTINGS": "settings"
+    }
+  },
+  {
+    "profile": "phone-portrait-390x844",
+    "label": "phone PORTRAIT held — landscape-locked, so the screen lays out at 844×390",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "logicalViewport": {
+      "width": 844,
+      "height": 390
+    },
+    "rotated": true,
+    "rows": [
+      {
+        "kind": "fireMode",
+        "label": "FIRE MODE",
+        "value": "AUTO-AIM"
+      },
+      {
+        "kind": "controls",
+        "label": "CONTROLS",
+        "value": "TAP COMMANDER"
+      },
+      {
+        "kind": "reduceVfx",
+        "label": "REDUCE VFX",
+        "value": "OFF"
+      },
+      {
+        "kind": "volume",
+        "label": "MASTER VOLUME",
+        "value": ""
+      },
+      {
+        "kind": "volume",
+        "label": "SFX VOLUME",
+        "value": ""
+      },
+      {
+        "kind": "volume",
+        "label": "MUSIC VOLUME",
+        "value": ""
+      }
+    ],
+    "controls": [
+      {
+        "kind": "fireMode",
+        "physicalCenter": {
+          "x": 254,
+          "y": 221
+        },
+        "logical": {
+          "x": 24,
+          "y": 108.5,
+          "width": 394,
+          "height": 55
+        }
+      },
+      {
+        "kind": "controls",
+        "physicalCenter": {
+          "x": 195,
+          "y": 221
+        },
+        "logical": {
+          "x": 24,
+          "y": 167.5,
+          "width": 394,
+          "height": 55
+        }
+      },
+      {
+        "kind": "reduceVfx",
+        "physicalCenter": {
+          "x": 136,
+          "y": 221
+        },
+        "logical": {
+          "x": 24,
+          "y": 226.5,
+          "width": 394,
+          "height": 55
+        }
+      },
+      {
+        "kind": "volume",
+        "physicalCenter": {
+          "x": 254,
+          "y": 623
+        },
+        "logical": {
+          "x": 426,
+          "y": 108.5,
+          "width": 394,
+          "height": 55
+        }
+      },
+      {
+        "kind": "volume",
+        "physicalCenter": {
+          "x": 195,
+          "y": 623
+        },
+        "logical": {
+          "x": 426,
+          "y": 167.5,
+          "width": 394,
+          "height": 55
+        }
+      },
+      {
+        "kind": "volume",
+        "physicalCenter": {
+          "x": 136,
+          "y": 623
+        },
+        "logical": {
+          "x": 426,
+          "y": 226.5,
+          "width": 394,
+          "height": 55
+        }
+      },
+      {
+        "kind": "help:fireMode",
+        "physicalCenter": {
+          "x": 254,
+          "y": 48
+        },
+        "logical": {
+          "x": 24,
+          "y": 112,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "help:controls",
+        "physicalCenter": {
+          "x": 195,
+          "y": 48
+        },
+        "logical": {
+          "x": 24,
+          "y": 171,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "help:reduceVfx",
+        "physicalCenter": {
+          "x": 136,
+          "y": 48
+        },
+        "logical": {
+          "x": 24,
+          "y": 230,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "help:volume:master",
+        "physicalCenter": {
+          "x": 254,
+          "y": 450
+        },
+        "logical": {
+          "x": 426,
+          "y": 112,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "help:volume:sfx",
+        "physicalCenter": {
+          "x": 195,
+          "y": 450
+        },
+        "logical": {
+          "x": 426,
+          "y": 171,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "help:volume:music",
+        "physicalCenter": {
+          "x": 136,
+          "y": 450
+        },
+        "logical": {
+          "x": 426,
+          "y": 230,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "minus:volume:master",
+        "physicalCenter": {
+          "x": 254,
+          "y": 742
+        },
+        "logical": {
+          "x": 718,
+          "y": 112,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "plus:volume:master",
+        "physicalCenter": {
+          "x": 254,
+          "y": 796
+        },
+        "logical": {
+          "x": 772,
+          "y": 112,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "minus:volume:sfx",
+        "physicalCenter": {
+          "x": 195,
+          "y": 742
+        },
+        "logical": {
+          "x": 718,
+          "y": 171,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "plus:volume:sfx",
+        "physicalCenter": {
+          "x": 195,
+          "y": 796
+        },
+        "logical": {
+          "x": 772,
+          "y": 171,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "minus:volume:music",
+        "physicalCenter": {
+          "x": 136,
+          "y": 742
+        },
+        "logical": {
+          "x": 718,
+          "y": 230,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "plus:volume:music",
+        "physicalCenter": {
+          "x": 136,
+          "y": 796
+        },
+        "logical": {
+          "x": 772,
+          "y": 230,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "back",
+        "physicalCenter": {
+          "x": 25,
+          "y": 691.5
+        },
+        "logical": {
+          "x": 563,
+          "y": 341,
+          "width": 257,
+          "height": 48
+        }
+      }
+    ],
+    "grammar": {
+      "at rest": "",
+      "after a press on the ? of MASTER VOLUME": "MASTER VOLUME",
+      "after a second press on the same ?": "",
+      "after a press away from every control": "",
+      "after ArrowDown then Enter, no pointer": "FIRE MODE",
+      "after Escape": "",
+      "…and the screen is still SETTINGS": "settings"
+    }
+  },
+  {
+    "profile": "desktop-1280x800",
+    "label": "desktop 1280×800 — the golden suite's control width",
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "logicalViewport": {
+      "width": 1280,
+      "height": 800
+    },
+    "rotated": false,
+    "rows": [
+      {
+        "kind": "fireMode",
+        "label": "FIRE MODE",
+        "value": "AUTO-AIM"
+      },
+      {
+        "kind": "controls",
+        "label": "CONTROLS",
+        "value": "TAP COMMANDER"
+      },
+      {
+        "kind": "reduceVfx",
+        "label": "REDUCE VFX",
+        "value": "OFF"
+      },
+      {
+        "kind": "volume",
+        "label": "MASTER VOLUME",
+        "value": ""
+      },
+      {
+        "kind": "volume",
+        "label": "SFX VOLUME",
+        "value": ""
+      },
+      {
+        "kind": "volume",
+        "label": "MUSIC VOLUME",
+        "value": ""
+      }
+    ],
+    "controls": [
+      {
+        "kind": "fireMode",
+        "physicalCenter": {
+          "x": 640,
+          "y": 222.5
+        },
+        "logical": {
+          "x": 300,
+          "y": 190.5,
+          "width": 680,
+          "height": 64
+        }
+      },
+      {
+        "kind": "controls",
+        "physicalCenter": {
+          "x": 640,
+          "y": 293.5
+        },
+        "logical": {
+          "x": 300,
+          "y": 261.5,
+          "width": 680,
+          "height": 64
+        }
+      },
+      {
+        "kind": "reduceVfx",
+        "physicalCenter": {
+          "x": 640,
+          "y": 364.5
+        },
+        "logical": {
+          "x": 300,
+          "y": 332.5,
+          "width": 680,
+          "height": 64
+        }
+      },
+      {
+        "kind": "volume",
+        "physicalCenter": {
+          "x": 640,
+          "y": 435.5
+        },
+        "logical": {
+          "x": 300,
+          "y": 403.5,
+          "width": 680,
+          "height": 64
+        }
+      },
+      {
+        "kind": "volume",
+        "physicalCenter": {
+          "x": 640,
+          "y": 506.5
+        },
+        "logical": {
+          "x": 300,
+          "y": 474.5,
+          "width": 680,
+          "height": 64
+        }
+      },
+      {
+        "kind": "volume",
+        "physicalCenter": {
+          "x": 640,
+          "y": 577.5
+        },
+        "logical": {
+          "x": 300,
+          "y": 545.5,
+          "width": 680,
+          "height": 64
+        }
+      },
+      {
+        "kind": "help:fireMode",
+        "physicalCenter": {
+          "x": 324,
+          "y": 222.5
+        },
+        "logical": {
+          "x": 300,
+          "y": 198.5,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "help:controls",
+        "physicalCenter": {
+          "x": 324,
+          "y": 293.5
+        },
+        "logical": {
+          "x": 300,
+          "y": 269.5,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "help:reduceVfx",
+        "physicalCenter": {
+          "x": 324,
+          "y": 364.5
+        },
+        "logical": {
+          "x": 300,
+          "y": 340.5,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "help:volume:master",
+        "physicalCenter": {
+          "x": 324,
+          "y": 435.5
+        },
+        "logical": {
+          "x": 300,
+          "y": 411.5,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "help:volume:sfx",
+        "physicalCenter": {
+          "x": 324,
+          "y": 506.5
+        },
+        "logical": {
+          "x": 300,
+          "y": 482.5,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "help:volume:music",
+        "physicalCenter": {
+          "x": 324,
+          "y": 577.5
+        },
+        "logical": {
+          "x": 300,
+          "y": 553.5,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "minus:volume:master",
+        "physicalCenter": {
+          "x": 902,
+          "y": 435.5
+        },
+        "logical": {
+          "x": 878,
+          "y": 411.5,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "plus:volume:master",
+        "physicalCenter": {
+          "x": 956,
+          "y": 435.5
+        },
+        "logical": {
+          "x": 932,
+          "y": 411.5,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "minus:volume:sfx",
+        "physicalCenter": {
+          "x": 902,
+          "y": 506.5
+        },
+        "logical": {
+          "x": 878,
+          "y": 482.5,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "plus:volume:sfx",
+        "physicalCenter": {
+          "x": 956,
+          "y": 506.5
+        },
+        "logical": {
+          "x": 932,
+          "y": 482.5,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "minus:volume:music",
+        "physicalCenter": {
+          "x": 902,
+          "y": 577.5
+        },
+        "logical": {
+          "x": 878,
+          "y": 553.5,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "plus:volume:music",
+        "physicalCenter": {
+          "x": 956,
+          "y": 577.5
+        },
+        "logical": {
+          "x": 932,
+          "y": 553.5,
+          "width": 48,
+          "height": 48
+        }
+      },
+      {
+        "kind": "back",
+        "physicalCenter": {
+          "x": 1086,
+          "y": 754
+        },
+        "logical": {
+          "x": 936,
+          "y": 726,
+          "width": 300,
+          "height": 56
+        }
+      }
+    ],
+    "grammar": {
+      "at rest": "",
+      "after a press on the ? of MASTER VOLUME": "MASTER VOLUME",
+      "after a second press on the same ?": "",
+      "after a press away from every control": "",
+      "after ArrowDown then Enter, no pointer": "SFX VOLUME",
+      "after Escape": "",
+      "…and the screen is still SETTINGS": "settings"
+    }
+  }
+]

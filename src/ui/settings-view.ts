@@ -384,7 +384,19 @@ export class SettingsView extends Container {
       this.hint.hide();
       return;
     }
-    this.hint.show(open.hint, rect.x + rect.width / 2, rect.y, this.viewport.width, this.viewport.height);
+    const row = this.layout.rows[open.index] ?? rect;
+    const ax = rect.x + rect.width / 2;
+    this.hint.show(open.hint, ax, rect.y, this.viewport.width, this.viewport.height);
+    // The panel prefers to sit ABOVE the `?`; on a short screen it folds below it
+    // instead, and below the `?` is ON TOP OF the row the `?` explains — which on
+    // a settings row means covering the very value the player asked about. So when
+    // it folds, it is re-anchored to the row's BOTTOM edge, which clears the row
+    // whole. Same public call, twice, and only in the folding case: the panel's
+    // placement is a pure function of its anchor, so asking it twice costs one
+    // layout and no state.
+    if (this.hint.y > rect.y) {
+      this.hint.show(open.hint, ax, row.y + row.height, this.viewport.width, this.viewport.height);
+    }
   }
 
   /** A volume as filled/empty pips between a − and a + chip. */

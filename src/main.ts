@@ -237,6 +237,7 @@ import {
   SETTINGS_ROWS,
   settingsHelpStep,
   settingsRowKey,
+  volumeButtons,
   createSettings,
   toggleReduceVfx,
   adjustVolume,
@@ -7375,6 +7376,12 @@ interface MenuControlReport {
 interface SettingsControlReport {
   readonly kind: string;
   readonly physicalCenter: { x: number; y: number };
+  /** The LOGICAL rect the client laid the control out in — the same box the view
+   *  drew and the hit test answers on (a0-77). The press point alone says where
+   *  to click; the rect is what lets a capture assert that a `?` clears the value
+   *  chip and the steppers at a given width, from the client's own numbers rather
+   *  than from a re-derivation of them. */
+  readonly logical: { x: number; y: number; width: number; height: number };
 }
 
 /** One settings row's WORDS, exactly as the screen is drawing them this frame
@@ -7421,6 +7428,16 @@ interface MainMenuSeam {
    *  the model the view is drawing (see {@link SettingsRowReport}). Empty until the
    *  screen has been open, because there is nothing on screen to report. */
   settingsRows: readonly SettingsRowReport[];
+  /**
+   * The TITLE of the `?` explanation currently on screen, or `''` when none is
+   * (a0-77) — read from the same model the view draws, so it can never say a
+   * panel is up that is not, or name a different row from the one on the glass.
+   *
+   * It is a title rather than a boolean because the question a capture (or a
+   * live-stage run) has to answer is *"is the right explanation up"*, and a
+   * `?` that opens the panel for the row below it would pass a boolean.
+   */
+  settingsHelpTitle: string;
   /** The CODEX controls (BACK, the four tabs, the visible entry rows), each with
    *  the physical press point — the front-door handles a live-stage run drives the
    *  reference screen through, on both form factors. */
@@ -7765,6 +7782,7 @@ function openMainMenu(
     controls: [],
     settingsControls: [],
     settingsRows: [],
+    settingsHelpTitle: '',
     codexControls: [],
     codexTab: codexState.activeTab,
     codexEntry: activeEntries(codexState).find((e) => e.id === codexState.selectedId)?.title ?? '',
@@ -8010,6 +8028,7 @@ function openMainMenu(
     }
     settingsRowSlots.length = model.rows.length;
     seam.settingsRows = settingsRowSlots;
+    seam.settingsHelpTitle = model.openHelp?.hint.title ?? '';
   }
 
   /** Refresh the seam's logical viewport, rotation flag, and per-button reports
@@ -8031,6 +8050,7 @@ function openMainMenu(
     const rowReports = settingsRects.rows.map((r, i) => ({
       kind: SETTINGS_ROWS[i]?.kind ?? 'row',
       physicalCenter: ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2),
+      logical: { ...r },
     }));
     // …and every row's `?` (a0-77), keyed by the row it explains — `help:fireMode`,
     // `help:volume:master`. Reported for the same reason the rows are: a capture or
@@ -8041,13 +8061,35 @@ function openMainMenu(
       return {
         kind: spec ? `help:${settingsRowKey(spec)}` : 'help',
         physicalCenter: ctx.toPhysical(r.x + r.width / 2, r.y + r.height / 2),
+        logical: { ...r },
       };
+    });
+    // The −/+ of each volume row, so a capture can measure what the `?` had to
+    // stay clear of at a given width without re-deriving the layout it is meant
+    // to be checking (a0-77). Same shape, same remap, same order as the rows.
+    const stepperReports = settingsRects.rows.flatMap((r, i) => {
+      const spec = SETTINGS_ROWS[i];
+      if (!spec || spec.kind !== 'volume') return [];
+      const { minus, plus } = volumeButtons(r, settingsRects.stepper);
+      return [
+        { kind: `minus:${settingsRowKey(spec)}`, box: minus },
+        { kind: `plus:${settingsRowKey(spec)}`, box: plus },
+      ].map(({ kind, box }) => ({
+        kind,
+        physicalCenter: ctx.toPhysical(box.x + box.width / 2, box.y + box.height / 2),
+        logical: { ...box },
+      }));
     });
     const back = settingsRects.back;
     seam.settingsControls = [
       ...rowReports,
       ...helpReports,
-      { kind: 'back', physicalCenter: ctx.toPhysical(back.x + back.width / 2, back.y + back.height / 2) },
+      ...stepperReports,
+      {
+        kind: 'back',
+        physicalCenter: ctx.toPhysical(back.x + back.width / 2, back.y + back.height / 2),
+        logical: { ...back },
+      },
     ];
 
     // The CODEX controls: BACK, the four tabs, and the entry rows that are wholly
@@ -9232,7 +9274,11 @@ function openMainMenu(
         // the panel itself; the keyboard focus follows the press, so an arrow
         // after a tap carries on from the row the finger was on.
         settingsHelp = settingsHelpAtPress === target.index ? null : target.index;
-        settingsHelpFocus = target.index;
+        // The ring follows a POINTER press, so an arrow key after a click carries
+        // on from the row the mouse was on — but never a touch press: a finger has
+        // no keyboard behind it, and a ring left on the glass would advertise a
+        // focus the device cannot move. (The same rule the menu keeps for hover.)
+        if (!isTouch) settingsHelpFocus = target.index;
         ctx.cue(settingsHelp === null ? 'back' : 'press');
         break;
       case 'fireMode':
