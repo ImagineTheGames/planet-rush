@@ -177,13 +177,37 @@ pieces of evidence, none of which required pushing to main or deploying:
       Note 32085944175 / 32073070977 — the same two main pushes that produced
       CI runs 32085944154 / 32073070975 above.
 
-  WHAT IS NOT PROVED PRE-MERGE, AND WHY: `Deploy to GitHub Pages` publishes to
-  the live URL and `Ping ntfy` posts to the classroom topic. Firing either from
-  a probe would mean deploying non-main content to the players' URL, which is
-  not a platform agent's call to make. The end-to-end run is this PR's own
-  merge commit; its run id is appended below when it lands.
+  b4. THE END-TO-END RUN, ADDED AFTER THE FACT.  b1-b3 were everything that
+      could be shown without publishing to the players' URL: `Deploy to GitHub
+      Pages` and `Ping ntfy` are outward-facing, and firing them from a probe
+      would have meant deploying non-main content to the live game and posting
+      to the classroom topic. The real proof was the merge itself.
+
+      PR #453 merged at 2026-08-18T04:20:01Z as 5a9bb530. That push to main —
+      the first main push under the new `on:` block — fired exactly one run:
+
+        $ gh run list --workflow ci.yml --branch main
+        $ gh run view 32098756418
+
+          32098756418  push  main  5a9bb530  success
+          2026-08-18T04:20:03Z -> 04:49:52Z
+
+            Typecheck, test, build                                 success
+            Boot from the deploy subpath                           success
+            Perf gate — submission budget (draw calls, entities)   success
+            Mobile emulation (Playwright) — shard 1..6/6           success (x6)
+            Mobile emulation (Playwright)                          success
+            Deploy to GitHub Pages                                 success
+            Verify live deploy boots                               success
+            Ping ntfy (tagged release)                             skipped
+
+      One run, and job for job the same list as the BEFORE column at the top of
+      this section — including `Verify live deploy boots`, the gate that exists
+      because a stale service worker once bricked the phone (LESSONS §5).
+      Verified, not assumed.
 
   RESULT (b):  1 full run (deploy + verify-live)  ->  1 full run, unchanged.
+               Measured on 5a9bb530, not inferred.
 
 
 ================================================================================
@@ -254,7 +278,8 @@ SUMMARY
   ref                              before   after
   -------------------------------  ------   -----
   (a) agent branch with open PR      2        1
-  (b) push to main                   1        1   (deploy + verify-live intact)
+  (b) push to main                   1        1   (deploy + verify-live green
+                                                  on 5a9bb530, run 32098756418)
   (c) push of a tag                  1        1   (deploy + ntfy intact)
 
 Extrapolated from the measured population: 81 redundant full-pipeline runs per
