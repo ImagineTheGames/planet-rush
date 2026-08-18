@@ -801,6 +801,13 @@ export function flowTapSettings(state: FlowState, target: SettingsTarget): FlowR
       return foldSettings(state, toggleReduceVfx(state.settings));
     case 'volume':
       return foldSettings(state, adjustVolume(state.settings, target.channel, target.dir));
+    case 'help':
+      // A row's `?` (a0-77). It explains the setting and changes NOTHING — no
+      // value, no screen, no `lobbyChoice` — so the flow is returned untouched.
+      // Which explanation is open is held by the wiring layer beside the other
+      // pointer state (hover, press), exactly as the lobby holds its codex
+      // dossier: a panel a player opened is not a decision the room needs told.
+      return rest(state);
   }
 }
 

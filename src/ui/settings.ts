@@ -34,6 +34,7 @@ import { beamContent, gantryFrame, menuColumnBand, menuColumnWidth } from './gan
 import { FONT_HEADING } from './typography';
 import { centeredGrid, clamp, hitRect } from './menu-geometry';
 import type { Insets } from './menu-geometry';
+import type { CodexHint } from './codex';
 
 // ---------------------------------------------------------------------------
 // The value
@@ -265,12 +266,160 @@ export const SETTINGS_ROWS: readonly SettingsRowSpec[] = [
   ...VOLUME_CHANNELS.map((channel) => ({ kind: 'volume', channel }) as const),
 ];
 
+// ---------------------------------------------------------------------------
+// What each row DOES — the `?` copy (a0-77)
+// ---------------------------------------------------------------------------
+
+/**
+ * A row's identity as a plain string — `fireMode`, `volume:master`.
+ *
+ * The help register below is keyed by this rather than by row index, because an
+ * index is a fact about today's screen order and the copy is a fact about the
+ * setting. Re-order {@link SETTINGS_ROWS} and every explanation still lands on
+ * the row it was written for.
+ */
+export type SettingsRowKey = 'fireMode' | 'controls' | 'reduceVfx' | `volume:${VolumeChannel}`;
+
+/** The key for one row spec. Total by construction — a new kind cannot compile
+ *  until it has a key, and a key cannot exist without copy (below). */
+export function settingsRowKey(spec: SettingsRowSpec): SettingsRowKey {
+  return spec.kind === 'volume' ? `volume:${spec.channel}` : spec.kind;
+}
+
+/**
+ * The explanation behind one row's `?`.
+ *
+ * Deliberately the LOBBY'S hint shape ({@link ./codex} `CodexHint`), not a new
+ * one: the panel that draws this is `./codex-hint-view`, already built and
+ * ratified for the lobby's codex tooltips — *"a compact panel (title, badges,
+ * one-line summary) that floats near the row it describes, clamped inside the
+ * viewport, and hides on any tap."* A second popup would be two things to keep
+ * consistent (a0-77's own instruction). No settings row carries badges: the
+ * value chip beside the `?` already shows the seated value, so a badge would be
+ * a second, dimmer copy of it.
+ */
+export type SettingsHelp = CodexHint;
+
+/**
+ * What every row says when a player asks — the whole register, one entry per
+ * {@link SettingsRowKey}.
+ *
+ * **This `Record` is half of a0-77's gate.** It is keyed by the *derived* union,
+ * so a seventh row added to {@link SettingsRowSpec} without copy fails `tsc`
+ * before any test runs; `settings.test.ts`'s "every row explains itself" is the
+ * other half, walking {@link SETTINGS_ROWS} so a row whose copy is present but
+ * empty — or whose title has drifted from the label on the plate — fails too.
+ *
+ * The voice is GDD §4.7 register 2: procedural, present-tense, second person,
+ * no adjective that sells the setting. Each one says what the control does and
+ * when a player would want it, and none of them says how it is implemented —
+ * a player deciding between two fire modes does not need the name of the class
+ * that engages the other one.
+ */
+export const SETTINGS_HELP: Record<SettingsRowKey, SettingsHelp> = {
+  // GDD §2.4 "Fire modes", in the player's terms: auto-aim takes the AIM, never
+  // the trigger ("the player decides *when* to fire, positioning decides *what*
+  // gets hit"), and it leads a moving target because the shot has travel time.
+  // The MANUAL half names all three aim devices rather than a platform, because
+  // the mode is a player setting on every one of them, not a touch concession.
+  fireMode: {
+    title: 'FIRE MODE',
+    summary:
+      'AUTO-AIM takes the aim off you — the weapon locks the nearest target in range, in any direction, and leads it; you still choose when to fire. MANUAL leaves aiming to your mouse, stick or thumb, for choosing the target yourself.',
+    badges: [],
+  },
+  // The two schemes as HANDS, per the brief, and deliberately the same lesson
+  // the in-match tip teaches (`./onboarding` PROMPT_COPY): its Tap Commander
+  // wordings are "Tap the asteroid to mine it" and "tap your own station to bank
+  // in its collection field", and its stick wordings are the ones that name a
+  // held press and a flight path. This row says the same two things one level
+  // up — the gesture, not the lesson — so a player who read the tip in a match
+  // and then opened this screen is told nothing new to reconcile.
+  //
+  // "The other scheme" rather than its name: the row's own word for it is the
+  // DEVICE in front of the player (u8-01 — STICKS / TWIN STICKS / KEYBOARD +
+  // MOUSE), so naming one of the three here would be wrong on the other two.
+  // The sentence names all three instead, which is true on every device.
+  controls: {
+    title: 'CONTROLS',
+    summary:
+      'TAP COMMANDER flies the ship for you: tap a spot to move there, tap a target to attack it, tap your own station to bank. The other scheme puts steering and aim in your hands — WASD and the mouse, both pad sticks, or two sticks on the glass.',
+    badges: [],
+  },
+  // GDD §4.8 risk 5, and the half a player cannot otherwise account for: the
+  // same flag the perf gate engages by itself below the floor (`VfxAutoQuality`
+  // — 30 fps, sustained ~3s, released once the rate recovers). Somebody who
+  // watches the effects thin out mid-fight learns HERE that nothing broke.
+  // The number is named because it is a fact the player can check against their
+  // own frame rate; the class that owns it is not, because they cannot.
+  reduceVfx: {
+    title: 'REDUCE VFX',
+    summary:
+      'Thins the effects that carry no information — impact glows, shimmer — to hold the frame rate. The game does this on its own when the rate sits under 30 for a few seconds; ON keeps them thin whatever the rate.',
+    badges: [],
+  },
+  // The three channels, as the mixer actually routes them (`../art/audio/graph`
+  // — sfx / alarm / ambient / music summing into master). Two facts a player
+  // cannot see from the labels and both of which change what they'd set:
+  // MASTER multiplies everything including the alarm, and the under-attack
+  // alarm has its OWN bus, so SFX at zero does not silence it (§2.2, §4.9 — the
+  // alarm is not cuttable, and `audio.test.ts` holds the mixer to it).
+  'volume:master': {
+    title: 'MASTER VOLUME',
+    summary: 'Every sound the game makes, the under-attack alarm included. The other two channels sit under it.',
+    badges: [],
+  },
+  'volume:sfx': {
+    title: 'SFX VOLUME',
+    summary:
+      'Weapons, impacts, engines, and the interface itself. The under-attack alarm is not on this channel — it is a warning, and stays audible at zero.',
+    badges: [],
+  },
+  'volume:music': {
+    title: 'MUSIC VOLUME',
+    summary: 'The soundtrack, and nothing else. Nothing you need to hear in a fight rides this channel, so it can sit at zero.',
+    badges: [],
+  },
+};
+
+/** The explanation for one row. Total: every key in the union has copy, and the
+ *  union is derived from the row spec, so this cannot return undefined. */
+export function settingsHelp(spec: SettingsRowSpec): SettingsHelp {
+  return SETTINGS_HELP[settingsRowKey(spec)];
+}
+
+/**
+ * The glyph on a row's help control. A bare ASCII `?`, for the reasons
+ * {@link ./lobby} `SEAT_HELP_GLYPH` states and because it is the SAME control a
+ * player already met on the lobby's roster rows — one mark for "explain this"
+ * across the game, not two.
+ */
+export const SETTINGS_HELP_GLYPH = '?';
+
+/**
+ * Move the keyboard focus `delta` places down the column of `?` controls,
+ * wrapping at both ends — the settings screen's half of the rule the menu keeps
+ * (`./main-menu` `mainMenuStep`): nothing on a screen may be pointer-only.
+ * `null` (nothing focused yet) enters at the first row going down and the last
+ * going up, so one arrow press from a cold screen always lands somewhere.
+ */
+export function settingsHelpStep(focus: number | null, delta: number): number {
+  const n = SETTINGS_ROWS.length;
+  if (focus === null) return delta >= 0 ? 0 : n - 1;
+  return (((focus + delta) % n) + n) % n;
+}
+
 /** What a tap on the settings screen changed. */
 export type SettingsTarget =
   | { readonly kind: 'fireMode' }
   | { readonly kind: 'controls' }
   | { readonly kind: 'reduceVfx' }
   | { readonly kind: 'volume'; readonly channel: VolumeChannel; readonly dir: 1 | -1 }
+  /** A row's `?` — it explains the setting and changes nothing (a0-77). Carried
+   *  by ROW INDEX, so one case answers for all six rows and a seventh needs no
+   *  new target; the index is into {@link SETTINGS_ROWS}, which the layout, the
+   *  view and this hit test all already walk in the same order. */
+  | { readonly kind: 'help'; readonly index: number }
   | { readonly kind: 'back' };
 
 // ---------------------------------------------------------------------------
@@ -287,6 +436,21 @@ export type SettingsControlState = 'rest' | 'hover' | 'press';
 export interface SettingsPointer {
   readonly hover?: SettingsTarget | null;
   readonly press?: SettingsTarget | null;
+  /**
+   * Which row's `?` panel is OPEN, as an index into {@link SETTINGS_ROWS}, or
+   * `null` for none (a0-77).
+   *
+   * Held by the wiring layer like every other piece of interaction state on this
+   * screen, and for the same reason: the model is a pure function of what the
+   * player is doing, and "which explanation is up" is exactly that. It is not
+   * part of {@link SettingsState} — a panel a player opened is not a setting and
+   * has no business being persisted.
+   */
+  readonly help?: number | null;
+  /** Which row's `?` the KEYBOARD is on, or `null` before any arrow is pressed.
+   *  Separate from `help`, because focusing a control and opening its panel are
+   *  two presses ({@link settingsHelpStep} moves this; Enter/Space opens). */
+  readonly focus?: number | null;
 }
 
 /** One row, as the view draws it: a label on the left and, on the right, either
@@ -310,6 +474,17 @@ export interface SettingsRowView {
   /** For a volume: the −/+ steppers' own states. */
   readonly minusState?: SettingsControlState;
   readonly plusState?: SettingsControlState;
+  /** The row's `?` control state (a0-77). Every row has one — there is no row a
+   *  player may not ask about — so this is not optional. */
+  readonly helpState: SettingsControlState;
+  /** Whether the keyboard focus is on this row's `?`. Drawn as a ring rather
+   *  than as the hover state, so "the pointer is here" and "the keyboard is
+   *  here" are not the same picture on a screen a player may be driving with
+   *  both. */
+  readonly helpFocused: boolean;
+  /** Whether this row's explanation is the one currently open — the `?` reads
+   *  as held down while its panel is up, the way a toggle reads as engaged. */
+  readonly helpOpen: boolean;
 }
 
 /** The settings screen for one frame. */
@@ -331,6 +506,15 @@ export interface SettingsModel {
    * `settings.test.ts` holds the screen to it.
    */
   readonly backRole: PlateRole;
+  /**
+   * The explanation currently on screen, and the row it belongs to — `null` when
+   * no `?` is open (a0-77).
+   *
+   * The model carries the CONTENT and the row; the view carries the anchor,
+   * because where the panel floats is a fact about the rect the layout placed
+   * and this model has never seen a rect.
+   */
+  readonly openHelp: { readonly index: number; readonly hint: SettingsHelp } | null;
 }
 
 /** The header beam's eyebrow, from the handoff's settings screen. */
@@ -359,7 +543,18 @@ export function settingsModel(
   const stateOf = (target: SettingsTarget): SettingsControlState =>
     sameTarget(pointer.press, target) ? 'press' : sameTarget(pointer.hover, target) ? 'hover' : 'rest';
 
-  const rows: SettingsRowView[] = SETTINGS_ROWS.map((spec) => {
+  /** The `?` on row `i`: pressed, hovered, or at rest — the same three states
+   *  every other control on this screen has, addressed by the same target the
+   *  hit test returns. */
+  const helpOf = (index: number): SettingsControlState => stateOf({ kind: 'help', index });
+  const openIndex = pointer.help ?? null;
+
+  const rows: SettingsRowView[] = SETTINGS_ROWS.map((spec, i) => {
+    const help = {
+      helpState: helpOf(i),
+      helpFocused: pointer.focus === i,
+      helpOpen: openIndex === i,
+    };
     switch (spec.kind) {
       case 'fireMode':
         return {
@@ -368,6 +563,7 @@ export function settingsModel(
           value: fireMode === FireMode.AutoAim ? 'AUTO-AIM' : 'MANUAL',
           on: fireMode === FireMode.AutoAim,
           state: stateOf({ kind: 'fireMode' }),
+          ...help,
         };
       case 'controls':
         // The ratified wording (u8-01, 2026-08-06, superseding p6-01's flat
@@ -383,6 +579,7 @@ export function settingsModel(
           value: controlsValue(controlScheme, device),
           on: controlScheme === 'tap',
           state: stateOf({ kind: 'controls' }),
+          ...help,
         };
       case 'reduceVfx':
         return {
@@ -391,6 +588,7 @@ export function settingsModel(
           value: state.reduceVfx ? 'ON' : 'OFF',
           on: state.reduceVfx,
           state: stateOf({ kind: 'reduceVfx' }),
+          ...help,
         };
       case 'volume':
         return {
@@ -406,6 +604,7 @@ export function settingsModel(
           max: VOLUME_STEPS,
           minusState: stateOf({ kind: 'volume', channel: spec.channel, dir: -1 }),
           plusState: stateOf({ kind: 'volume', channel: spec.channel, dir: 1 }),
+          ...help,
         };
     }
   });
@@ -416,6 +615,13 @@ export function settingsModel(
     backLabel: 'DONE',
     backState: stateOf({ kind: 'back' }),
     backRole: 'primary',
+    // Resolved here rather than in the view, so the words on the panel come from
+    // the same model the readback reports and the cache signs — a screen cannot
+    // show one explanation while the seam reports another.
+    openHelp:
+      openIndex !== null && SETTINGS_ROWS[openIndex]
+        ? { index: openIndex, hint: settingsHelp(SETTINGS_ROWS[openIndex]) }
+        : null,
   };
 }
 
@@ -432,6 +638,7 @@ export function sameTarget(
   if (!a || !b) return !a && !b;
   if (a.kind !== b.kind) return false;
   if (a.kind === 'volume' && b.kind === 'volume') return a.channel === b.channel && a.dir === b.dir;
+  if (a.kind === 'help' && b.kind === 'help') return a.index === b.index;
   return true;
 }
 
@@ -477,6 +684,9 @@ export interface SettingsLayout {
   /** The heading's strip inside the header beam. */
   readonly title: Rect;
   readonly rows: readonly Rect[];
+  /** Each row's `?` square, hung off its LEADING edge — one per row, in the same
+   *  order (a0-77). See {@link helpRect} for why that edge and not the other. */
+  readonly help: readonly Rect[];
   /** The DONE plate, right-aligned in the footer beam (handoff). */
   readonly back: Rect;
   /** A volume row's −/+ square size, so the hit test and the view agree. */
@@ -551,8 +761,35 @@ export function settingsLayout(viewport: Viewport, options: SettingsLayoutOption
   );
   const rows = centeredGrid(grid, SETTINGS_ROWS.length, columnWidth, rowH, columns, gap, metrics.gap);
   const stepper = stepperSize(rows[0], metrics);
+  const help = rows.map((row) => helpRect(row, stepper));
 
-  return { content: frame.content, header: frame.header, footer: frame.footer, title, rows, back, stepper, isTouch, metrics };
+  return { content: frame.content, header: frame.header, footer: frame.footer, title, rows, help, back, stepper, isTouch, metrics };
+}
+
+/**
+ * A row's `?` — a square the size of a volume stepper, flush with the row's
+ * LEADING edge and centred in its height (a0-77).
+ *
+ * **Why the leading edge.** The trailing edge is spoken for on every row: a
+ * toggle's value chip is there, and a volume's two steppers are. On the phone
+ * the developer photographed (798×384 landscape, two columns, a 372px row) there
+ * is no width to take from either without shrinking a control below the thumb
+ * floor, and the brief is explicit that the `?` may not crowd the value or the
+ * steppers. The leading edge is the one place on the row where nothing that
+ * takes a press already lives — so the `?` clears the value and the steppers at
+ * every supported width **by construction**, not by a measurement that a future
+ * label could invalidate.
+ *
+ * It is the STEPPER's size for the same reason it is a chip and not a glyph: it
+ * is a control, and every control on this screen is at least
+ * {@link ../art/materials} `TOUCH_MIN` on both axes (`valueChipHeight`, which
+ * `stepperSize` is derived from, never returns less). A 12px `?` would be a
+ * pointer-only affordance wearing a touch-shaped mark.
+ */
+function helpRect(row: Rect | undefined, size: number): Rect {
+  if (!row || row.width <= 0 || row.height <= 0) return { x: row?.x ?? 0, y: row?.y ?? 0, width: 0, height: 0 };
+  const s = Math.max(0, Math.min(size, row.width, row.height));
+  return { x: row.x, y: row.y + (row.height - s) / 2, width: s, height: s };
 }
 
 /** The −/+ square's edge: the handoff's 40px, never under the thumb floor, and
@@ -600,6 +837,11 @@ export function settingsHitTest(layout: SettingsLayout, x: number, y: number): S
     const rect = layout.rows[i];
     const spec = SETTINGS_ROWS[i];
     if (!rect || !spec || !hitRect(rect, x, y)) continue;
+    // The `?` FIRST, on every kind of row: a toggle's whole width is live, so a
+    // help control tested second would never be reachable on four of the six
+    // rows — it would silently flip the setting it was asked to explain.
+    const help = layout.help[i];
+    if (help && hitRect(help, x, y)) return { kind: 'help', index: i };
     if (spec.kind === 'fireMode') return { kind: 'fireMode' };
     if (spec.kind === 'controls') return { kind: 'controls' };
     if (spec.kind === 'reduceVfx') return { kind: 'reduceVfx' };

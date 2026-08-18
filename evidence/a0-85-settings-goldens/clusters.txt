@@ -1,0 +1,30 @@
+a0-85 — each rebaked golden against BOTH sides of the conflict
+==============================================================================
+
+node evidence/a0-85-settings-goldens/compare.mjs <a> <b> — a0-03's cluster
+localiser. A cluster is changed pixels grouped by adjacency, so POSITION tells
+signal from font/GPU antialiasing where a raw count cannot.
+
+── vs OURS (a0-77's baseline: the ? marks, no plate geometry, no void) ──────
+
+evidence/a0-85-settings-goldens/sides/ours-a0-77-desktop-settings-desktop-linux.png
+  vs tests/mobile/goldens.spec.ts-snapshots/desktop-settings-desktop-linux.png
+    159108 changed of 1280x800 (15.54%) | 25 clusters | 156643px@[0,0,1296,792] 413px@[528,456,648,480] 412px@[696,384,792,408] 384px@[744,240,840,264] 267px@[576,312,648,336] 220px@[432,528,504,552]
+evidence/a0-85-settings-goldens/sides/ours-a0-77-phone-landscape-settings-iphone-linux.png
+  vs tests/mobile/goldens.spec.ts-snapshots/phone-landscape-settings-iphone-linux.png
+    53696 changed of 844x390 (16.31%) | 6 clusters | 53601px@[0,0,864,384] 67px@[456,216,504,240] 12px@[552,144,600,168] 8px@[576,216,600,240] 6px@[480,144,504,168] 2px@[408,192,432,240]
+evidence/a0-85-settings-goldens/sides/ours-a0-77-phone-portrait-settings-iphone-linux.png
+  vs tests/mobile/goldens.spec.ts-snapshots/phone-portrait-settings-iphone-linux.png
+    53696 changed of 390x844 (16.31%) | 6 clusters | 53601px@[0,0,384,864] 67px@[144,456,168,504] 12px@[216,552,240,600] 8px@[144,576,168,600] 6px@[216,480,240,504] 2px@[168,408,216,432]
+
+── vs THEIRS (a0-79's baseline, on main: the geometry and the void, no ?) ───
+
+evidence/a0-85-settings-goldens/sides/theirs-a0-79-desktop-settings-desktop-linux.png
+  vs tests/mobile/goldens.spec.ts-snapshots/desktop-settings-desktop-linux.png
+    18631 changed of 1280x800 (1.82%) | 2 clusters | 18467px@[288,192,840,624] 164px@[0,768,48,792]
+evidence/a0-85-settings-goldens/sides/theirs-a0-79-phone-landscape-settings-iphone-linux.png
+  vs tests/mobile/goldens.spec.ts-snapshots/phone-landscape-settings-iphone-linux.png
+    11953 changed of 844x390 (3.63%) | 3 clusters | 7256px@[408,96,696,288] 4575px@[24,96,216,288] 122px@[0,360,48,384]
+evidence/a0-85-settings-goldens/sides/theirs-a0-79-phone-portrait-settings-iphone-linux.png
+  vs tests/mobile/goldens.spec.ts-snapshots/phone-portrait-settings-iphone-linux.png
+    11953 changed of 390x844 (3.63%) | 3 clusters | 7256px@[96,408,288,696] 4575px@[96,24,288,216] 122px@[0,0,24,48]
