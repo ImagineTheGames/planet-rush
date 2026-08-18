@@ -91,6 +91,8 @@ interface RowNodes {
  */
 export class HangarView extends Container {
   private readonly backdrop = new Graphics();
+  /** Whether the shell has put the real void behind this screen (a0-79). */
+  private voidBehind = false;
   private readonly beams = new Graphics();
   private readonly panels = new Graphics();
   private readonly heading: Text;
@@ -158,6 +160,27 @@ export class HangarView extends Container {
     this.cache.invalidate();
   }
 
+
+  /**
+   * Tell this screen that **something else already paints the whole viewport
+   * behind it** — the real {@link ../art/backdrop} `VoidBackdrop`, put there by
+   * the menu shell (a0-79, `./menu-backdrop`).
+   *
+   * A screen paints its own ground by default, and that default is the safe one:
+   * a view shown with nothing behind it still owns its screen. This is how the
+   * shell says otherwise, and it is a *statement about the scene graph* rather
+   * than a style knob — which is why it is a method the shell calls once and not
+   * a colour or an alpha somebody can tune.
+   *
+   * Invalidates the screen cache, because the cached texture is a rasterisation
+   * of the old answer ({@link ./screen-cache}).
+   */
+  setVoidBehind(on: boolean): void {
+    if (on === this.voidBehind) return;
+    this.voidBehind = on;
+    this.cache.invalidate();
+  }
+
   hitTest(x: number, y: number): HangarTarget | null {
     return hangarHitTest(this.layout, x, y);
   }
@@ -174,11 +197,14 @@ export class HangarView extends Container {
     const { header, footer, title, bay, levelPanel, xpBar, list, rows, back, metrics } = this.layout;
 
     // Near-opaque over the whole viewport: the hangar is a full screen, not an
-    // overlay, and nothing behind it should read through.
+    // overlay, and nothing behind it should read through — unless what is behind
+    // it is the real void the shell put there (a0-79; see `setVoidBehind`).
     this.backdrop.clear();
-    this.backdrop
-      .rect(0, 0, header.x * 2 + header.width, footer.y + footer.height + header.y)
-      .fill({ color: PALETTE.vacuum, alpha: 0.98 });
+    if (!this.voidBehind) {
+      this.backdrop
+        .rect(0, 0, header.x * 2 + header.width, footer.y + footer.height + header.y)
+        .fill({ color: PALETTE.vacuum, alpha: 0.98 });
+    }
 
     this.beams.clear();
     if (header.height > 0) drawBeam(this.beams, header.x, header.y, header.width, 'header', true, header.height);

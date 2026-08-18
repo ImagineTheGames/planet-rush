@@ -88,6 +88,8 @@ interface RowNodes {
  */
 export class SettingsView extends Container {
   private readonly backdrop = new Graphics();
+  /** Whether the shell has put the real void behind this screen (a0-79). */
+  private voidBehind = false;
   private readonly beams = new Graphics();
   private readonly heading: Text;
   private readonly eyebrow: Text;
@@ -118,6 +120,27 @@ export class SettingsView extends Container {
     this.cache.invalidate();
   }
 
+
+  /**
+   * Tell this screen that **something else already paints the whole viewport
+   * behind it** — the real {@link ../art/backdrop} `VoidBackdrop`, put there by
+   * the menu shell (a0-79, `./menu-backdrop`).
+   *
+   * A screen paints its own ground by default, and that default is the safe one:
+   * a view shown with nothing behind it still owns its screen. This is how the
+   * shell says otherwise, and it is a *statement about the scene graph* rather
+   * than a style knob — which is why it is a method the shell calls once and not
+   * a colour or an alpha somebody can tune.
+   *
+   * Invalidates the screen cache, because the cached texture is a rasterisation
+   * of the old answer ({@link ./screen-cache}).
+   */
+  setVoidBehind(on: boolean): void {
+    if (on === this.voidBehind) return;
+    this.voidBehind = on;
+    this.cache.invalidate();
+  }
+
   hitTest(x: number, y: number): SettingsTarget | null {
     return settingsHitTest(this.layout, x, y);
   }
@@ -137,13 +160,19 @@ export class SettingsView extends Container {
     if (this.cache.unchanged(signature)) return;
     const { header, footer, title, rows, back, metrics } = this.layout;
 
-    // Near-opaque over the whole viewport: the settings screen can be opened from
-    // the pause overlay, over a live match, and the rows must read against the
-    // fight rather than through it.
+    // Near-opaque over the whole viewport: **this screen has two homes**, and
+    // this is the one that matters. Opened from the PAUSE overlay it sits over a
+    // live match, and the rows must read against the fight rather than through
+    // it — so the scrim stays wherever the shell has not said otherwise. Opened
+    // from the MAIN MENU there is no fight, the real void is behind it instead
+    // (a0-79), and a 0.96 scrim over the void is a scrim over the thing it was
+    // put there to hide. See `setVoidBehind`.
     this.backdrop.clear();
-    this.backdrop
-      .rect(0, 0, header.x * 2 + header.width, footer.y + footer.height + header.y)
-      .fill({ color: PALETTE.vacuum, alpha: 0.96 });
+    if (!this.voidBehind) {
+      this.backdrop
+        .rect(0, 0, header.x * 2 + header.width, footer.y + footer.height + header.y)
+        .fill({ color: PALETTE.vacuum, alpha: 0.96 });
+    }
 
     this.beams.clear();
     // The beams paint the height the FRAME reserved, not a flat 92 (u7-04) — see

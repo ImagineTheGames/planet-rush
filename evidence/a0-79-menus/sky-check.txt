@@ -1,0 +1,11 @@
+a0-79 — WHICH menu screens actually got the sky
+======================================================================
+
+Pixels that differ between `?sky=1` and `?sky=0` on the same screen, same
+bundle. The goldens tolerate 1%, so anything under that would pass an old
+baseline unchanged.
+
+  desktop 1280x800     menu   21.00% differ  SKY IS THERE
+  desktop 1280x800     doors  20.93% differ  SKY IS THERE
+  phone 844x390 dpr3   menu   15.24% differ  SKY IS THERE
+  phone 844x390 dpr3   doors  17.29% differ  SKY IS THERE

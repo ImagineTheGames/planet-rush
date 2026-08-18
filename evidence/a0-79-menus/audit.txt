@@ -1,0 +1,293 @@
+a0-79 — THE MENUS NEED ROOM, AND A SKY
+======================================================================
+UI Engineer · branch agent/ui/a0-79-menu-room-and-sky · 2026-08-18
+Read `./README.md` for how to re-run any number in here.
+
+
+§0. WHAT WAS ASKED
+----------------------------------------------------------------------
+Developer, 2026-08-17, with a screenshot of the main menu on a phone:
+
+  "the buttons currently expand to fill the screen on mobile. can we
+   reduce that so we have more empty space on the sides..."
+
+  "I'd like to see a space background on every menu screen (the main
+   title screen already has it, id like it to persist throughout)"
+
+Two things. They are independent, they are both done, and each has its
+own measurement below.
+
+
+§1. THE MARGIN — WHY THE CAP NEVER BIT
+----------------------------------------------------------------------
+`src/ui/main-menu.ts` capped the plate column with ONE number:
+
+    const columnWidth = Math.min(COLUMN.title, frame.band.width);
+
+`Math.min` picks whichever is smaller. On a desktop that is the
+ABSOLUTE (800) and the plates stay a column. On a phone it is the BAND —
+752px at the developer's own 798x384 — so the cap never bit at all and
+the plates took everything.
+
+Measured on the SHIPPED bundle at that viewport: the plates were 752px
+wide and the field beside them was **23px, or 2.88% of the screen on
+each side**. That is the screenshot.
+
+  before-menu.png    frames/798x384-landscape-phone/before-menu.png
+  after-menu.png     frames/798x384-landscape-phone/after-menu.png
+
+
+§1a. THE FIX, AND WHY THE PROPORTION IS NOT A TASTE
+----------------------------------------------------------------------
+`src/ui/gantry.ts` grows a proportional ceiling beside the absolute one
+(`menuColumnWidth`, `menuColumnBand`). The share is NOT picked:
+
+    MENU_COLUMN_SHARE = COLUMN.title / referenceBandWidth
+                      = 800 / 1192 = 0.671
+
+That is the ratified handoff's OWN ratio — it draws an 800px column in a
+1192px band. Using the design's own number has two consequences, and
+both of them are the point:
+
+  1. the reference desktop is unchanged TO THE PIXEL (1192 x 0.671 =
+     800 = COLUMN.title), so this is a ceiling and not a redesign. The
+     same rule `frameMetrics` already keeps: a derivation must reproduce
+     its own sample or it is a redesign;
+  2. every narrower screen reads the SAME PROPORTION of field the
+     handoff draws — 18.75% a side on a desktop, 18.4% on the phone.
+
+A floor stops it descending where the constraint reverses
+(`MENU_COLUMN_MIN = 448` reference px, scaled by `plateScale`): below
+that width a screen gives up FIELD, never WORDS. The number is measured,
+not chosen — it is the narrowest column the widest thing the front of
+the game puts in one still fits at a phone's plate scale (the menu's
+longest sub-line, 383px at 844x390; the settings screen's widest row is
+345px). `main-menu.test.ts` re-measures it against the repo's own
+advance tables, so copy that outgrows it fails loudly.
+
+
+§1b. THE NUMBERS — plate-room.txt (headless) and frames.txt (shipped)
+----------------------------------------------------------------------
+Field beside the main-menu plates, as a % of the viewport, EACH side.
+Both columns are the shipped bundles, photographed back to back:
+
+  viewport                          before    after
+  798x384  (the screenshot)          2.88%   18.38%   <- the ask
+  390x844 held portrait (844x390)    2.84%   18.35%
+  1280x720 (the handoff)            18.75%   18.75%   <- unchanged
+  3440x1440                         38.37%   38.37%   <- unchanged
+
+And the labels still fit at the new width — the tightest is HANGAR's
+sub-line, which needs 305px in the 427px the phone plate now gives it
+(121px of slack). plate-room.txt carries the whole sweep.
+
+PORTRAIT, the opposite constraint the brief asked to be checked: at a
+genuinely narrow portrait logical viewport (390 wide — reachable on a
+desktop window, since the landscape lock only rotates on mobile) the
+floor holds and the column is the whole band, 3.33% a side, exactly as
+before a0-79. Nothing was taken from it.
+
+  NOT FIXED, PRE-EXISTING, FLAGGED: at 390 wide, HANGAR's sub-line
+  already overflows its plate by 19px on `main` — the band itself is
+  too narrow for that copy. a0-79 does not change that case in either
+  direction. It is a copy/type question, not a margin one.
+
+
+§1c. THE SAME RULE ON THE OTHER THREE SCREENS
+----------------------------------------------------------------------
+One seam, four screens, so the front of the game is one system rather
+than four that drifted. Each screen names its own absolute column; the
+proportion is decided in exactly one place.
+
+  MAIN MENU  1 column.  800 absolute. Phone 752 -> 505.
+
+  SETTINGS   1-2 columns (it wraps on a short phone). The ceiling is
+             applied to the GRID, not to a column: `centeredGrid` splits
+             the band between its columns, so with two columns the
+             band's own half (372px) was already the narrower cap and
+             capping a column alone changed nothing.
+             On the 798x384 phone the FLOOR wins and the rows do not
+             move — and that is the measured answer, not an omission: a
+             column there is 372px holding content that measures 345px.
+             27px of slack, and this does not spend them. At 844x390
+             there is room: 2.84% -> 4.03% a side. Desktop unchanged.
+
+  HANGAR     1 column, 1140 absolute (two panes want more room than one
+             stack of plates). Phone 752 -> 505, desktop 1140 -> 800.
+             Eyes on the frames: nothing is cut, the panes reflow, and
+             the screen reads as a deliberate column rather than a
+             stretched panel.
+
+  CODEX      **2 content columns** — a rail AND an article. The floor is
+             per column and this screen's article is a SCROLLING BODY OF
+             TEXT: narrowing it does not reflow, it pushes paragraphs off
+             the bottom. Measured on the shipped bundle at 798x384, a
+             one-column floor took the article from "fits the band" to
+             "cut mid-sentence", so the codex keeps its band on a phone.
+             The ceiling does its work where the codex's real drift was:
+
+               codex content    before    after
+               798x384            752      752   (article stays whole)
+               1280x720          1192      911
+               3440x1440         3352     1140   <- see before-codex.png
+
+             3352px of article on an ultrawide was one line of body text
+             running three metres. That is fixed.
+
+
+§2. THE SKY — THE REAL VOID, BEHIND EVERY MENU
+----------------------------------------------------------------------
+`VoidBackdrop` belonged to the MATCH renderer, so the game's own sky
+disappeared the moment a player left the title gate and every menu was a
+flat `PALETTE.vacuum` panel with nothing behind it.
+
+`src/ui/menu-backdrop.ts` drives the REAL `VoidBackdrop` through its real
+API — `setMap` / `configure` / `update` / `destroy`. **Not** a second star
+field in CSS or in a local `Graphics`: one field, one set of numbers, one
+thing to fix when the design moves. A second one would build the
+instrument-vs-game disagreement that cost the bloom five rounds into the
+product on purpose.
+
+The sky is NAMED — Patina Drift, the hue the title gate's own wash is
+painted in — and pinned to the map registry by a test. It had to be
+named: the default map is `octagon` and `octagon`'s sky is `none`, so a
+menu that took the default would have got no sky at all.
+
+The five screens in the menu shell (title, settings, codex, hangar, and
+the doors) stop painting their own full-screen ground when the shell says
+the void is behind them (`setVoidBehind`). The DEFAULT is still "paint
+it", because SettingsView has two homes: opened from the PAUSE overlay it
+sits over a live match and its 0.96 scrim is doing real work.
+
+
+§3. WHAT THE MENU BACKDROP COSTS PER FRAME — MEASURED
+----------------------------------------------------------------------
+a0-75 measured the void's cost while this brief was open: **2.33 blended
+screenfuls per frame**, after its own sky-cache fix, and 61-95% of the
+whole frame in a live match. That is the bill for a sky that MOVES.
+
+A menu has no camera. So this takes the treatment the brief authorises
+for a static screen — a STILL FRAME. `configure` and `update` run once
+per RESIZE; the assembled void is then baked (`cacheAsTexture`, the same
+mechanism `./screen-cache.ts` already uses on every menu screen) and
+blitted. Per-frame cost is ONE OPAQUE TEXTURED QUAD.
+
+`boundsArea` crops the bake to the SCREEN. Without it `cacheAsTexture`
+sizes its texture from `getLocalBounds()`, and the parallax field is
+~2.6x the viewport in each axis — a ~7x texture for no extra pixel on the
+glass. `MENU_BAKE_MAX_TEXELS` (4 Mtexels = 16 MB) is a memory budget in
+the same shape as a0-75's: a phone at dpr 3 bakes at full device
+resolution, and only a very large or very dense viewport gives up
+resolution (~0.9 of CSS on an ultrawide at dpr 2) rather than 79 MB.
+
+THE MEASUREMENT (frame-cost.txt). One bundle, `?sky=0` vs `?sky=1`, three
+alternated passes taken back to back, ~3 s window each, with the live
+match sampled in the same run as the denominator:
+
+  viewport            device px    sky=0     sky=1    backdrop    match   menu/match
+  phone 798x384        1.23 Mpx    22.5 ms   36.0 ms   +13.5 ms   135 ms      0.27x
+  desktop 1280x720     0.92 Mpx    16.1 ms   26.6 ms   +10.5 ms   167 ms      0.16x
+  ultrawide 3440x1440  4.95 Mpx    85.7 ms  151.1 ms   +65.4 ms   653 ms      0.23x
+
+READ IT LIKE THIS. **This box has no GPU** (SwiftShader), so not one of
+those milliseconds is the developer's. Two things in the table do travel:
+
+  1. the cost is LINEAR IN PIXELS at 11.0 / 11.4 / 13.2 ms per megapixel
+     across a 5.4x range of viewport. That is the signature of exactly
+     ONE screenful of fill — which is the claim, arrived at from the
+     other end;
+  2. `menu/match` is **0.16x-0.27x**, against the 4x ceiling
+     `tests/mobile/menu-frame-cost.spec.ts` gates on. The static front
+     door costs a quarter of what the running game costs, at every
+     viewport measured, with the sky on.
+
+The +1 screenful is inherent to the request and is not avoidable: showing
+a background behind a translucent foreground costs a second screenful. A
+LIVE void would have cost 2.33 of them and would have scaled with a0-75's
+per-pixel bill on every frame; this pays it once per resize.
+
+
+§4. WHAT IS NOT IN THIS BRANCH
+----------------------------------------------------------------------
+- The HUD. a0-74 is binding it to a content box on ultrawides; nothing
+  here touches `hud-geometry.ts` or the layout registry.
+- The LOBBY, ship select, map select and end-of-match. They live in a
+  different shell (`openLobby`) and take the same
+  `Math.min(COLUMN.title, ...)` shape at `end-of-match.ts:722` and
+  `lobby-geometry.ts:2010`. They are the obvious next surface; the brief
+  named four screens and widening the diff into a0-74's neighbourhood
+  during the same week is how two lanes collide.
+- The TITLE GATE's own canvas star field. It is a DOM overlay that seals
+  over everything, and the developer's ask was for the sky to persist
+  PAST it, which it now does.
+
+Found and fixed on the way past, in two lines, because both lists were
+right there: `hangarView` was added to the shell root at a0-14 and appears
+in NEITHER `relayout()` nor `teardown()`. So the fourth door outlived the
+shell that owned it, and it never re-laid-out on a rotation — the exact
+failure the M1 field report caught on the menu itself. It joins both.
+
+
+§6. A THING THE GOLDEN GATE CANNOT SEE — found on the way past
+----------------------------------------------------------------------
+The re-baseline moved eleven images. Seven of them moved on the FIRST
+`--update-snapshots` run; four did not, and passed against their old,
+sky-less baselines:
+
+    desktop-title, desktop-settings, desktop-doors, phone-landscape-doors
+
+Those four are exactly the menu screens whose GEOMETRY did not change —
+only the sky went in behind them. The seven that moved all had a plate
+column or a content band move as well.
+
+It is not that the sky is missing on them. `./sky-check.mjs` shoots each
+screen twice from the shipped bundle, `?sky=1` against `?sky=0`, and
+counts the pixels that differ:
+
+    desktop 1280x800    menu    21.00% differ
+    desktop 1280x800    doors   20.93% differ
+    phone 844x390 dpr3  menu    15.24% differ
+    phone 844x390 dpr3  doors   17.29% differ
+
+Every one of those is far past the goldens' own `maxDiffPixelRatio` of
+1%. And deleting `desktop-title-desktop-linux.png` and re-running that
+one test wrote a 395 KB starry frame where the old baseline was 39 KB and
+flat — the capture was right all along.
+
+So the comparison is what did not fire. The likely reason is Playwright's
+per-pixel `threshold` (default 0.2 of a normalised YIQ distance): this
+void is Floor `#070910` where the panel was Vacuum `#0d1015`, plus a
+low-alpha patina wash and a scatter of small stars. Nearly every pixel it
+changes, it changes by a little, and "a little" on a near-black frame is
+under the per-pixel threshold — so fewer than 1% of pixels are counted as
+different at all.
+
+**That is a blind spot in the gate, not in this branch**, and it is worth
+knowing: a change that alters the whole frame *gently* is invisible to
+these baselines. It is QA's file and QA's number, so nothing here touches
+it — but the four stale baselines were deleted and regenerated by hand
+(a MISSING snapshot is always written, which is the one path that cannot
+be silently skipped), so all eleven committed images depict what ships.
+
+
+§5. HOW IT IS HELD
+----------------------------------------------------------------------
+  src/ui/main-menu.test.ts   `the plates leave the edges alone on a
+                             phone` — 6 assertions, RELATIONSHIPS not
+                             pixel counts (LESSONS §26): margin > 0 on
+                             both sides, sides equal, the share within
+                             10% of the handoff's own field proportion,
+                             the plate still over half the screen, the
+                             reference desktop untouched, the floor
+                             re-measured against the real advance tables.
+  src/ui/menu-backdrop.test.ts  16 tests. The sky is the real void (same
+                             layers as the match, one for one), it is
+                             baked, the bake is cropped to the screen, it
+                             re-bakes on a resize and not on a no-op, and
+                             it releases its pooled texture before it
+                             destroys.
+  tests/mobile/menu-frame-cost.spec.ts  already gates menu <= 4x match on
+                             every static Gantry screen. Unchanged, and
+                             §3 says where this lands against it.
+
+Goldens re-baselined in the container, eyes on every image.

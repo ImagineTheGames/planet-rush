@@ -31,6 +31,7 @@ import {
   mainMenuRoute,
   mainMenuStep,
   mainMenuIndexOf,
+  itemPlate,
 } from './main-menu';
 import type { Rect } from '@platform/layout-registry';
 import type { MainMenuOption } from './main-menu';
@@ -39,8 +40,19 @@ import { NAV_EDGES, NAV_SCREENS, reachesMainMenuWithoutMatch } from './menu-nav'
 import type { NavScreen } from './menu-nav';
 import * as flow from './lobby-flow';
 import { FLOW_SCREENS, createFlow, flowKey, flowOpenHangar, flowScreenHandler, flowTapHangar } from './lobby-flow';
-import { singlePrimary } from './gantry';
-import { BEAM, COLUMN, PLATE_SCALES, TOUCH_MIN, frameMetrics } from '../art/materials';
+import { MENU_COLUMN_MIN, menuColumnWidth, singlePrimary } from './gantry';
+import {
+  BEAM,
+  COLUMN,
+  DISPLAY_TRACKING,
+  PLATE_SCALES,
+  TOUCH_MIN,
+  TRACKING,
+  frameMetrics,
+  platePadX,
+  plateTypeSize,
+} from '../art/materials';
+import { textWidth } from './font-metrics';
 
 // A `Text` measures itself against a 2D canvas, which a node test does not have.
 // The stub is the whole of the workaround — the same one `build-wheel-view.test.ts`
@@ -397,6 +409,115 @@ describe('the same screen on a portrait-held phone (844×390 logical)', () => {
       expect(rect.x).toBeGreaterThanOrEqual(insets.left);
       expect(rect.x + rect.width).toBeLessThanOrEqual(PHONE.width - insets.right + 0.5);
     }
+  });
+});
+
+/**
+ * a0-79 — THE MARGIN. The developer's screenshot of the main menu on a phone:
+ * *"the buttons currently expand to fill the screen on mobile. can we reduce that
+ * so we have more empty space on the sides"*.
+ *
+ * The cause was a cap that could not bite: `Math.min(COLUMN.title, band.width)`
+ * picks the ABSOLUTE 800 on a desktop and the BAND on a phone, where the band is
+ * the narrower of the two — so the plates took everything and the field beside
+ * them was 2.9% of the screen a side.
+ *
+ * These are relationship assertions, not pixel counts (LESSONS §26): the claim is
+ * that a phone reads the **same proportion of field the ratified handoff draws on
+ * a desktop**, which survives the next type change, the next plate height and the
+ * next viewport in the matrix.
+ */
+describe('the plates leave the edges alone on a phone', () => {
+  /** The developer's own screenshot viewport. */
+  const SCREENSHOT = { width: 798, height: 384 };
+  /** The field the handoff itself leaves, as a fraction of the viewport, on each
+   *  side: an 800px column on a 1280px screen. Every screen should read this. */
+  const HANDOFF_FIELD_SHARE = (1 - COLUMN.title / VIEWPORT.width) / 2;
+
+  for (const phone of [SCREENSHOT, PHONE]) {
+    const name = `${phone.width}x${phone.height}`;
+
+    it(`leaves a real margin on BOTH sides at ${name}`, () => {
+      const layout = mainMenuLayout(phone, { isTouch: true });
+      expect(layout.buttons.length).toBeGreaterThan(0);
+      for (const rect of layout.buttons) {
+        const left = rect.x;
+        const right = phone.width - (rect.x + rect.width);
+        expect(left).toBeGreaterThan(0);
+        expect(right).toBeGreaterThan(0);
+        // Centred, so the two sides are the same margin — a plate pushed off
+        // centre would satisfy "margin > 0" on one side and fail the screenshot.
+        expect(Math.abs(left - right)).toBeLessThanOrEqual(0.5);
+      }
+    });
+
+    it(`gives that margin the handoff's own PROPORTION at ${name}`, () => {
+      const layout = mainMenuLayout(phone, { isTouch: true });
+      const rect = layout.buttons[0]!;
+      const share = rect.x / phone.width;
+      // Not a pixel count: the same fraction of the screen the reference desktop
+      // gives back, within the rounding the frame's own integer margins cost.
+      expect(share).toBeGreaterThan(HANDOFF_FIELD_SHARE * 0.9);
+      expect(share).toBeLessThan(HANDOFF_FIELD_SHARE * 1.1);
+    });
+
+    it(`still hands the plate the lion's share of the screen at ${name}`, () => {
+      // The margin is the fix, not a smaller plate: PLAY is the primary control
+      // on this screen and it stays comfortably the biggest thing on it.
+      const rect = mainMenuLayout(phone, { isTouch: true }).buttons[0]!;
+      expect(rect.width).toBeGreaterThan(phone.width / 2);
+      expect(rect.height).toBeGreaterThanOrEqual(TOUCH_MIN);
+    });
+  }
+
+  it('leaves the RATIFIED desktop reference untouched — a ceiling, not a redesign', () => {
+    // The share is the handoff's own ratio, so at the handoff's own viewport it
+    // resolves to the handoff's own column. If this ever fails, the proportional
+    // cap has stopped agreeing with the absolute one it was derived from.
+    expect(mainMenuLayout(VIEWPORT).buttons[0]?.width).toBe(COLUMN.title);
+    expect(menuColumnWidth(VIEWPORT.width - 2 * BEAM.margin, COLUMN.title, frameMetrics(VIEWPORT.width, VIEWPORT.height)))
+      .toBe(COLUMN.title);
+  });
+
+  it('gives up FIELD before it gives up WORDS on a narrow portrait viewport', () => {
+    // The opposite constraint to the developer's landscape phone. A share alone
+    // would take a third of a 364px band and leave a plate too narrow for its own
+    // sub-line, so `MENU_COLUMN_MIN` stops the ceiling descending — and below that
+    // width the column is simply the band, exactly as it was before a0-79.
+    const portrait = { width: 390, height: 844 };
+    const before = { width: 0 }; // what the pre-a0-79 rule gave: the whole band
+    const m = frameMetrics(portrait.width, portrait.height);
+    before.width = portrait.width - 2 * m.margin;
+    const rect = mainMenuLayout(portrait).buttons[0]!;
+    expect(rect.width).toBe(before.width);
+  });
+
+  it('sizes MENU_COLUMN_MIN by the MEASURED copy it exists to protect', () => {
+    // The floor is not a taste: it is the narrowest plate the menu's own longest
+    // sub-line still fits at a phone's plate scale, measured against the repo's
+    // real advance tables (./font-metrics). Copy that outgrows it fails HERE,
+    // rather than silently overflowing a bevel on somebody's phone.
+    const m = frameMetrics(PHONE.width, PHONE.height);
+    let widest = 0;
+    for (const item of MAIN_MENU_ITEMS) {
+      const { scale } = itemPlate(item);
+      const padX = platePadX(scale, m);
+      // The plate's own chrome, from `main-menu-view.drawButton`: pad, accent
+      // tick, the gap after it, and the pad on the far side.
+      const chrome = padX + PLATE_SCALES[scale].tickWidth + Math.max(8, Math.round(24 * m.plateScale)) + padX;
+      const label = textWidth(item.label, {
+        face: 'heading',
+        size: plateTypeSize(27, m),
+        tracking: DISPLAY_TRACKING.heading,
+      });
+      const sub = textWidth(item.sub, {
+        face: 'body',
+        size: plateTypeSize(13, m),
+        tracking: TRACKING.label,
+      });
+      widest = Math.max(widest, chrome + Math.max(label, sub));
+    }
+    expect(MENU_COLUMN_MIN * m.plateScale).toBeGreaterThanOrEqual(widest);
   });
 });
 

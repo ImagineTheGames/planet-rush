@@ -1,0 +1,314 @@
+[
+  {
+    "build": "before",
+    "at": "798x384-landscape-phone",
+    "viewport": {
+      "width": 798,
+      "height": 384
+    },
+    "rotated": false,
+    "plates": [
+      {
+        "kind": "play",
+        "x": 23,
+        "y": 64,
+        "width": 752,
+        "height": 62.77647058823529
+      },
+      {
+        "kind": "codex",
+        "x": 23,
+        "y": 134.7764705882353,
+        "width": 752,
+        "height": 56.4078431372549
+      },
+      {
+        "kind": "settings",
+        "x": 23,
+        "y": 199.1843137254902,
+        "width": 752,
+        "height": 56.4078431372549
+      },
+      {
+        "kind": "hangar",
+        "x": 23,
+        "y": 263.5921568627451,
+        "width": 752,
+        "height": 56.4078431372549
+      }
+    ]
+  },
+  {
+    "build": "after",
+    "at": "798x384-landscape-phone",
+    "viewport": {
+      "width": 798,
+      "height": 384
+    },
+    "rotated": false,
+    "plates": [
+      {
+        "kind": "play",
+        "x": 146.6510067114094,
+        "y": 64,
+        "width": 504.6979865771812,
+        "height": 62.77647058823529
+      },
+      {
+        "kind": "codex",
+        "x": 146.6510067114094,
+        "y": 134.7764705882353,
+        "width": 504.6979865771812,
+        "height": 56.4078431372549
+      },
+      {
+        "kind": "settings",
+        "x": 146.6510067114094,
+        "y": 199.1843137254902,
+        "width": 504.6979865771812,
+        "height": 56.4078431372549
+      },
+      {
+        "kind": "hangar",
+        "x": 146.6510067114094,
+        "y": 263.5921568627451,
+        "width": 504.6979865771812,
+        "height": 56.4078431372549
+      }
+    ]
+  },
+  {
+    "build": "before",
+    "at": "390x844-portrait-phone",
+    "viewport": {
+      "width": 844,
+      "height": 390
+    },
+    "rotated": true,
+    "plates": [
+      {
+        "kind": "play",
+        "x": 24,
+        "y": 65,
+        "width": 796,
+        "height": 63.858823529411765
+      },
+      {
+        "kind": "codex",
+        "x": 24,
+        "y": 136.85882352941178,
+        "width": 796,
+        "height": 57.38039215686275
+      },
+      {
+        "kind": "settings",
+        "x": 24,
+        "y": 202.23921568627452,
+        "width": 796,
+        "height": 57.38039215686275
+      },
+      {
+        "kind": "hangar",
+        "x": 24,
+        "y": 267.61960784313726,
+        "width": 796,
+        "height": 57.38039215686275
+      }
+    ]
+  },
+  {
+    "build": "after",
+    "at": "390x844-portrait-phone",
+    "viewport": {
+      "width": 844,
+      "height": 390
+    },
+    "rotated": true,
+    "plates": [
+      {
+        "kind": "play",
+        "x": 154.88590604026842,
+        "y": 65,
+        "width": 534.2281879194632,
+        "height": 63.858823529411765
+      },
+      {
+        "kind": "codex",
+        "x": 154.88590604026842,
+        "y": 136.85882352941178,
+        "width": 534.2281879194632,
+        "height": 57.38039215686275
+      },
+      {
+        "kind": "settings",
+        "x": 154.88590604026842,
+        "y": 202.23921568627452,
+        "width": 534.2281879194632,
+        "height": 57.38039215686275
+      },
+      {
+        "kind": "hangar",
+        "x": 154.88590604026842,
+        "y": 267.61960784313726,
+        "width": 534.2281879194632,
+        "height": 57.38039215686275
+      }
+    ]
+  },
+  {
+    "build": "before",
+    "at": "1280x720-desktop",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "rotated": false,
+    "plates": [
+      {
+        "kind": "play",
+        "x": 240,
+        "y": 189.5,
+        "width": 800,
+        "height": 80
+      },
+      {
+        "kind": "codex",
+        "x": 240,
+        "y": 284.5,
+        "width": 800,
+        "height": 72
+      },
+      {
+        "kind": "settings",
+        "x": 240,
+        "y": 371.5,
+        "width": 800,
+        "height": 72
+      },
+      {
+        "kind": "hangar",
+        "x": 240,
+        "y": 458.5,
+        "width": 800,
+        "height": 72
+      }
+    ]
+  },
+  {
+    "build": "after",
+    "at": "1280x720-desktop",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "rotated": false,
+    "plates": [
+      {
+        "kind": "play",
+        "x": 240,
+        "y": 189.5,
+        "width": 800,
+        "height": 80
+      },
+      {
+        "kind": "codex",
+        "x": 240,
+        "y": 284.5,
+        "width": 800,
+        "height": 72
+      },
+      {
+        "kind": "settings",
+        "x": 240,
+        "y": 371.5,
+        "width": 800,
+        "height": 72
+      },
+      {
+        "kind": "hangar",
+        "x": 240,
+        "y": 458.5,
+        "width": 800,
+        "height": 72
+      }
+    ]
+  },
+  {
+    "build": "before",
+    "at": "3440x1440-ultrawide",
+    "viewport": {
+      "width": 3440,
+      "height": 1440
+    },
+    "rotated": false,
+    "plates": [
+      {
+        "kind": "play",
+        "x": 1320,
+        "y": 549.5,
+        "width": 800,
+        "height": 80
+      },
+      {
+        "kind": "codex",
+        "x": 1320,
+        "y": 644.5,
+        "width": 800,
+        "height": 72
+      },
+      {
+        "kind": "settings",
+        "x": 1320,
+        "y": 731.5,
+        "width": 800,
+        "height": 72
+      },
+      {
+        "kind": "hangar",
+        "x": 1320,
+        "y": 818.5,
+        "width": 800,
+        "height": 72
+      }
+    ]
+  },
+  {
+    "build": "after",
+    "at": "3440x1440-ultrawide",
+    "viewport": {
+      "width": 3440,
+      "height": 1440
+    },
+    "rotated": false,
+    "plates": [
+      {
+        "kind": "play",
+        "x": 1320,
+        "y": 549.5,
+        "width": 800,
+        "height": 80
+      },
+      {
+        "kind": "codex",
+        "x": 1320,
+        "y": 644.5,
+        "width": 800,
+        "height": 72
+      },
+      {
+        "kind": "settings",
+        "x": 1320,
+        "y": 731.5,
+        "width": 800,
+        "height": 72
+      },
+      {
+        "kind": "hangar",
+        "x": 1320,
+        "y": 818.5,
+        "width": 800,
+        "height": 72
+      }
+    ]
+  }
+]
