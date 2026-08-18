@@ -157,6 +157,8 @@ import {
   BUILD_BUTTON_ID,
   BUILD_BUTTON_ANCHOR,
   MainMenuView,
+  MenuBackdrop,
+  menuSkyEnabled,
   SettingsView,
   mainMenuModel,
   mainMenuLayout,
@@ -7845,7 +7847,36 @@ function openMainMenu(
   const hangarView = new HangarView(menu0.w, menu0.h, isTouch);
   let hangarHover: string | null = null;
   let hangarPress: string | null = null;
+  // --- The sky behind all five screens (a0-79; `./ui/menu-backdrop`) --------
+  //     Developer: *"I'd like to see a space background on every menu screen
+  //     (the main title screen already has it, id like it to persist
+  //     throughout)"*. The void used to belong to the MATCH renderer alone, so
+  //     the moment a player left the title gate the game's own sky disappeared
+  //     and every menu was a flat panel.
+  //
+  //     It is the REAL `VoidBackdrop`, not a second star field — one field, one
+  //     set of numbers — and it is BAKED, because a menu is static: `configure`
+  //     and `update` run once per resize and the assembled void is blitted
+  //     thereafter (see `./ui/menu-backdrop` for the measured trade, and a0-75
+  //     for the per-pixel cost it is buying out of).
+  //
+  //     Added FIRST so it sits behind the five screens, and each screen is told
+  //     it no longer has to paint its own ground — a full-screen opaque fill in
+  //     front of the sky is a sky nobody can see.
+  //
+  //     `?sky=0` turns it off and nothing else — the lever the cost evidence
+  //     A/Bs against, in one page under one load (`./ui/menu-backdrop`
+  //     `menuSkyEnabled`). Default is on.
+  const skyBehindMenus = menuSkyEnabled(window.location.search);
+  const menuBackdrop = skyBehindMenus ? new MenuBackdrop(app.renderer.resolution) : null;
+  if (menuBackdrop) {
+    menuBackdrop.resize(menu0.w, menu0.h);
+    ctx.root.addChild(menuBackdrop);
+  }
   ctx.root.addChild(menuView, settingsView, codexView, entryView, hangarView);
+  for (const view of [menuView, settingsView, codexView, entryView, hangarView]) {
+    view.setVoidBehind(skyBehindMenus);
+  }
 
   // The read-only test seam. `matchStarted` is flipped by `handle.matchStarted()`
   // once the real world is built, never here — so the suite's "no sim on the
@@ -9654,10 +9685,14 @@ function openMainMenu(
     // re-layout the field report found missing (rotate → menu stranded).
     ctx.recomputeTransform();
     const { w, h } = ctx.logicalSize();
+    // The still frame first: it is baked for one viewport, so a resize has to
+    // re-bake it before anything draws over it (`./ui/menu-backdrop`).
+    menuBackdrop?.resize(w, h, app.renderer.resolution);
     menuView.resize(w, h, isTouch);
     settingsView.resize(w, h, isTouch);
     codexView.resize(w, h, isTouch);
     entryView.resize(w, h, isTouch);
+    hangarView.resize(w, h, isTouch);
     render();
   }
 
@@ -9683,11 +9718,20 @@ function openMainMenu(
     // view is exactly the u12-01 failure, one screen over.
     if (browseTimer !== null) clearInterval(browseTimer);
     browseTimer = null;
-    ctx.root.removeChild(menuView, settingsView, codexView, entryView);
+    // The hangar joined this list in a0-79: it was added to the root at a0-14 and
+    // never taken off it, so the fourth door outlived the shell that owned it.
+    ctx.root.removeChild(menuView, settingsView, codexView, entryView, hangarView);
+    // The backdrop first, and through its own `destroy` — it holds a pooled
+    // render texture that has to be released before the container goes.
+    if (menuBackdrop) {
+      ctx.root.removeChild(menuBackdrop);
+      menuBackdrop.destroy({ children: true });
+    }
     menuView.destroy({ children: true });
     settingsView.destroy({ children: true });
     codexView.destroy({ children: true });
     entryView.destroy({ children: true });
+    hangarView.destroy({ children: true });
   }
 
   app.canvas.addEventListener('pointerdown', onPointerDown);

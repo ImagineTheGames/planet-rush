@@ -1119,6 +1119,16 @@ export { beamContent, countPrimaries, gantryFrame, singlePrimary, stackPlates } 
 export type { GantryFrame } from './gantry';
 
 export { MainMenuView, MAIN_MENU_ANCHOR } from './main-menu-view';
+// The void behind the menus (a0-79) — the REAL `VoidBackdrop`, baked once per
+// resize because a menu is static. See `./menu-backdrop` for the trade.
+export {
+  MenuBackdrop,
+  MENU_SKY,
+  MENU_SKY_MAP,
+  MENU_BAKE_MAX_TEXELS,
+  menuBakeResolution,
+  menuSkyEnabled,
+} from './menu-backdrop';
 
 // --- The CODEX — the optional main-menu reference (GDD §2.10) ---------------
 //
