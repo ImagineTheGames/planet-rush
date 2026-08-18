@@ -1,0 +1,155 @@
+[
+  {
+    "label": "after",
+    "frame": "after-thrust-1x.png",
+    "rung": 1,
+    "effect": "thrust",
+    "particles": 1,
+    "sprites": 25,
+    "drawn": 323,
+    "shipWorld": {
+      "x": 1570.2476051898414,
+      "y": 974.1975475407182
+    },
+    "shipScreen": {
+      "x": 399,
+      "y": 192
+    }
+  },
+  {
+    "label": "after",
+    "frame": "after-ore-collect-1x.png",
+    "rung": 1,
+    "effect": "oreCollect",
+    "particles": 3,
+    "sprites": 25,
+    "drawn": 22,
+    "shipWorld": {
+      "x": 2366.807539995265,
+      "y": 2085.256441277714
+    },
+    "shipScreen": {
+      "x": 399,
+      "y": 192
+    }
+  },
+  {
+    "label": "after",
+    "frame": "after-thrust-1_5x.png",
+    "rung": 1.5,
+    "effect": "thrust",
+    "particles": 1,
+    "sprites": 22,
+    "drawn": 323,
+    "shipWorld": {
+      "x": 1570.2476051898414,
+      "y": 974.1975475407182
+    },
+    "shipScreen": {
+      "x": 399,
+      "y": 192
+    }
+  },
+  {
+    "label": "after",
+    "frame": "after-ore-collect-1_5x.png",
+    "rung": 1.5,
+    "effect": "oreCollect",
+    "particles": 11,
+    "sprites": 22,
+    "drawn": 22,
+    "shipWorld": {
+      "x": 2366.807539995265,
+      "y": 2085.256441277714
+    },
+    "shipScreen": {
+      "x": 399,
+      "y": 192
+    }
+  },
+  {
+    "label": "after",
+    "frame": "after-thrust-2x.png",
+    "rung": 2,
+    "effect": "thrust",
+    "particles": 13,
+    "sprites": 58,
+    "drawn": 324,
+    "shipWorld": {
+      "x": 1607.561156498439,
+      "y": 996.13187584753
+    },
+    "shipScreen": {
+      "x": 399,
+      "y": 192
+    }
+  },
+  {
+    "label": "after",
+    "frame": "after-ore-collect-2x.png",
+    "rung": 2,
+    "effect": "oreCollect",
+    "particles": 10,
+    "sprites": 58,
+    "drawn": 22,
+    "shipWorld": {
+      "x": 2372.3363725444083,
+      "y": 2090.0113832055704
+    },
+    "shipScreen": {
+      "x": 399,
+      "y": 192
+    }
+  },
+  {
+    "label": "after",
+    "frame": "after-frozen-showcase-1x.png",
+    "rung": 1,
+    "effect": "shipExplode",
+    "particles": 42,
+    "sprites": 42,
+    "drawn": 1,
+    "shipWorld": {
+      "x": 1968,
+      "y": 1200
+    },
+    "shipScreen": {
+      "x": 399,
+      "y": 192
+    }
+  },
+  {
+    "label": "after",
+    "frame": "after-frozen-showcase-1_5x.png",
+    "rung": 1.5,
+    "effect": "shipExplode",
+    "particles": 42,
+    "sprites": 42,
+    "drawn": 1,
+    "shipWorld": {
+      "x": 1968,
+      "y": 1200
+    },
+    "shipScreen": {
+      "x": 399,
+      "y": 192
+    }
+  },
+  {
+    "label": "after",
+    "frame": "after-frozen-showcase-2x.png",
+    "rung": 2,
+    "effect": "shipExplode",
+    "particles": 42,
+    "sprites": 42,
+    "drawn": 1,
+    "shipWorld": {
+      "x": 1968,
+      "y": 1200
+    },
+    "shipScreen": {
+      "x": 399,
+      "y": 192
+    }
+  }
+]

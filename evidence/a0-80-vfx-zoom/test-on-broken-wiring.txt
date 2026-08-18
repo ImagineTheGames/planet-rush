@@ -1,0 +1,52 @@
+[pool-size] worker cap 2: cgroup quota 6 cores / LANES 3 = 2 workers (host claims 6)
+
+ RUN  v2.1.8 /lanes/lane-1
+
+ ❯ src/ui/zoom-control.test.ts (13 tests | 2 failed) 5396ms
+   × the world the control zooms > effects ride the camera scale 1919ms
+     → expected 3657.79052734375 to be close to 3001.193684895833, received difference is 656.596842447917, but expected 5e-7
+   × the world the control zooms > lands the effect on its emitter at every rung, not a fraction of the way there 1326ms
+     → expected { step: 1.5, onTheShip: false } to deeply equal { step: 1.5, onTheShip: true }
+   ✓ the world the control zooms > is why the effects are PARENTED to the world and not positioned beside it 2146ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/zoom-control.test.ts > the world the control zooms > effects ride the camera scale
+AssertionError: expected 3657.79052734375 to be close to 3001.193684895833, received difference is 656.596842447917, but expected 5e-7
+ ❯ src/ui/zoom-control.test.ts:298:22
+    296|         const at = onScreen(sprite);
+    297|         const want = projected(renderer, world);
+    298|         expect(at.x).toBeCloseTo(want.x, 6);
+       |                      ^
+    299|         expect(at.y).toBeCloseTo(want.y, 6);
+    300| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/ui/zoom-control.test.ts > the world the control zooms > lands the effect on its emitter at every rung, not a fraction of the way there
+AssertionError: expected { step: 1.5, onTheShip: false } to deeply equal { step: 1.5, onTheShip: true }
+
+- Expected
++ Received
+
+  Object {
+-   "onTheShip": true,
++   "onTheShip": false,
+    "step": 1.5,
+  }
+
+ ❯ src/ui/zoom-control.test.ts:327:71
+    325|         }),
+    326|       );
+    327|       expect({ step, onTheShip: worst <= REACH * cameraScale(step) }).…
+       |                                                                       ^
+    328|         step,
+    329|         onTheShip: true,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 11 passed (13)
+   Start at  05:44:24
+   Duration  14.36s (transform 2.00s, setup 0ms, collect 7.69s, tests 5.40s, environment 0ms, prepare 823ms)
+

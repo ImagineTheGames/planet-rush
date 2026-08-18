@@ -1,0 +1,237 @@
+a0-80 — AT 1.5x AND 2x THE THRUSTERS DRAW IN THE WRONG PLACE
+=============================================================
+Branch  agent/ui/a0-80-vfx-zoom  (parent 5a9bb530)
+Bundle  the real production pipeline (npm run build + npm run preview) on both
+        halves of every pair. The BEFORE build is a git worktree of the parent
+        commit, driven by the SAME capture script through `A0_80_ROOT` — one
+        harness, two builds, so a pair differs by the change and not by the rig.
+Device  798x384 @ dpr 3, touch — the phone a0-74's report was filed from.
+Method  every effect in these frames got there because the SIM did something and
+        the shipped client noticed. Nothing here pushes a particle. Each capture
+        waits on the client's own `__vfxStage` draw counters and fails rather than
+        shoot a frame it cannot prove; the readings taken as each shutter fell are
+        in ./readback-before.json and ./readback-after.json.
+        Harness: ./playwright.config.ts, ./frames.spec.ts, ./crops.mjs.
+
+
+0. THE REPORT
+-------------
+The developer, 2026-08-17, hours after a0-74 shipped the zoom control:
+
+  "when the screen is 1.5x or 2 the thrusters draw In the wrong place"
+
+
+1. THE CAUSE, AND WHY IT IS NOT ABOUT THRUSTERS
+-----------------------------------------------
+a0-74 zooms by scaling the renderer's world container:
+
+    setCameraScale(scale) { …; this.worldRoot.scale.set(s); }
+
+`worldRoot` holds ten layers — boundary, atmosphere, stations, turrets,
+asteroids, chunks, muzzles, impacts, ships, shots (src/render/index.ts). The VFX
+layer is not one of them. It was parented one level up, beside that container:
+
+    gameRoot.addChild(vfxLayer);                         // src/main.ts:1529
+
+...and chased the camera by writing its own position every frame from the
+renderer's public projection of the world origin:
+
+    renderer.projectToScreen(WORLD_ORIGIN, vfxOriginScratch);
+    vfxLayer.x = vfxOriginScratch.x;
+    vfxLayer.y = vfxOriginScratch.y;
+
+That carries the camera's OFFSET and drops its SCALE. A particle at world point
+P is therefore drawn at
+
+    origin + P        instead of        origin + P·s
+
+so the error is a pure function of where in the arena the emitter is:
+
+    MISS = |P| · (1 − s),        s = cameraScale(step) = 1 / step
+
+  rung    s      miss as a fraction of |P|
+  ----    -----  -------------------------
+  1x      1      0            ← the two spaces coincide: this is why it shipped
+  1.5x    0.667  |P| / 3
+  2x      0.5    |P| / 2
+
+The arena is 2400 units across, so |P| for anything near the middle is ~1700 and
+the miss is hundreds of CSS pixels on a 798-px-wide phone. THE THRUSTER IS NOT
+SPECIAL. Every one of the 25 tells (art/tells.ts) goes through this one layer:
+weapon impacts, ore collection, shield hits, spawn glows, the station-death
+burst. The developer reported the one they happened to be watching.
+
+
+2. WHAT THE ARITHMETIC PREDICTS, AND WHAT THE FRAMES SHOW
+----------------------------------------------------------
+The frozen review sheet (`?debug=1&freeze=1&gate=0`) stages a death burst and an
+ore stream at FIXED world offsets from the camera ship (src/art/vfx/showcase.ts:
+EXPLOSION_AT = anchor + (−240, +110)), at a fixed timestep, and then stops
+updating the field. Nothing about that frame is racing anything, which makes it
+the one place these numbers can be checked to the pixel.
+
+  camera ship (anchor)   world (1968, 1200), held at screen (399, 192)
+  explosion emitter      world (1728, 1310),  |P| = 2168 units
+
+  rung   explosion SHOULD draw at   miss (px)     broken draws it at
+  ----   ------------------------   ----------    -------------------------
+  1x     (159, 302)                 0             (159, 302)   — identical
+  1.5x   (239, 265)                 723           (815, 702)   — off screen
+  2x     (279, 247)                 1084          (1143, 902)  — off screen
+
+  The viewport is 798 x 384. At both zoomed rungs the whole effect set is thrown
+  clean off the glass, down and to the right, in proportion to the emitter's
+  distance from the world origin.
+
+  MEASURED IN THE FRAMES (frames/*frozen-showcase*):
+    before-frozen-showcase-1.5x  no burst, no ore chips anywhere on screen
+    before-frozen-showcase-2x    no burst, no ore chips anywhere on screen
+    after-frozen-showcase-1.5x   burst centred on (239, 265) as predicted
+    after-frozen-showcase-2x     burst centred on (279, 247) as predicted
+
+  ...and the field was drawing into every one of those frames: readback-before
+  records particles = 42, sprites = 42 at each rung, the same 42 as after. This
+  is the distinction that matters — the effects were NOT missing, they were
+  MISPLACED, which is exactly what the report says and what a "the layer is
+  attached" check (tests/live-stage/vfx-alive.spec.ts) can never catch.
+
+  1x IS BYTE-IDENTICAL:
+    b992f1ca3f203e2312c7e73ea4551b03  before-frozen-showcase-1x.png
+    b992f1ca3f203e2312c7e73ea4551b03  after-frozen-showcase-1x.png
+  Same md5, two different builds. See §5 (goldens).
+
+THE THRUSTER ITSELF (live match, the ship flown by a real order through the
+client's own hit-test and picker; crops/*thrust*):
+
+  crops/before-thrust-2x-hull.png   a long, bright plume across the hull —
+                                    which is NOT this ship's. At 2x, a particle
+                                    drawn at the screen centre came from an
+                                    emitter at world P·s, i.e. from a different
+                                    ship half an arena away. The exhaust of
+                                    somebody else, painted on you, at 1:1 size
+                                    inside a half-size world.
+  crops/after-thrust-2x-hull.png    a small plume tight to the engine bell,
+                                    scaled with the ship it came off.
+  crops/before-thrust-1.5x-ship.png the plume trails away below-left of the
+                                    ship, detached from it.
+  crops/after-thrust-1.5x-ship.png  on the ship.
+  crops/*-thrust-1x-*.png           the two builds agree, as §1 says they must.
+
+
+3. THE FIX
+----------
+`Renderer.addWorldLayer(container)` — a public seam that adopts a caller-owned
+container INTO `worldRoot`, appended, so it keeps exactly the depth it had (over
+every entity layer, under the HUD the caller stacks above the renderer). main.ts
+now says `renderer.addWorldLayer(vfxLayer)` and the per-frame position write is
+deleted along with `WORLD_ORIGIN` and its scratch.
+
+Multiplying particle coordinates by the camera scale at emission was rejected,
+and the reason is the whole point of this bug: that leaves TWO owners of one
+transform, and they disagree the first time either changes — which is precisely
+what happened here the day a scale was added to a camera that only translated.
+One container, one scale.
+
+The seam is general rather than vfx-shaped on purpose. It is the answer to "how
+does the next layer avoid being orphaned the same way": there is now a public way
+to say "this is world-space" that carries the whole camera, instead of each new
+layer re-deriving the parts of it that existed when its author wrote it.
+
+
+4. THE REST OF THE CLASS — WHAT WAS CHECKED, NOT JUST WHAT WAS FIXED
+---------------------------------------------------------------------
+The brief asked for the class. Everything that rides `gameRoot` or `app.stage`
+rather than `worldRoot` was walked:
+
+  FIXED — a second crossing of the same seam, in the same shape:
+    `projectToScreen` carries POINTS. Nothing carried LENGTHS. Three HUD feeds
+    hand the layers an entity radius that the receiving contract declares in
+    SCREEN pixels — `Combatant.radius` ("Entity radius in screen space, CSS px",
+    the health bar hangs above by it), the nameplate's clearance
+    (@ui/nameplates-view floats the label off `plate.radius`), and the Tap
+    Commander lock reticle (its brackets sit just outside the target's screen
+    radius) — and all three read `ship.radius` / `turret.radius` /
+    `station.radius` straight off the sim, under a comment that said in as many
+    words: "the camera renders 1:1, so a world radius is a screen radius". True
+    until a0-74. At 2x it floated a bar a full hull-radius above a half-size
+    ship. `Renderer.projectLength` is the length half of `projectToScreen`, off
+    the same live transform; the three feeds go through it.
+    VISIBLE IN THE PAIR: before-frozen-showcase-2x has the YOU nameplate a
+    station-radius too high above its (half-size) station; after has it on the
+    ring. Same in the 1.5x pair.
+
+  CORRECT ALREADY — rides `projectToScreen`, so a0-74 carried it:
+    nameplate + health-bar POSITIONS, tap waypoint / lock marker positions, the
+    under-attack screen-edge arrow, the `?debug=1` centring hook. All read the
+    renderer's ACTUAL worldRoot transform (a0-74's own comment says so) and were
+    re-checked at every rung here.
+
+  CORRECT ALREADY — screen space by design, nothing world-anchored in them:
+    `hud` (all HUD chrome), `touchVisuals`, `fsAffordance`, `endOverlay`,
+    `pauseView`, `pauseSettings`, and `badgeRoot` (build + ping badges, a
+    deliberate stage sibling). None of these place anything relative to a world
+    entity; they anchor to the content box.
+
+  CORRECT ALREADY — the void backdrop (`app.stage`, behind worldRoot). It is
+    screen-space parallax fed the camera OFFSET the renderer just wrote, and it
+    anchors to no world object, so it has no emitter to miss. Its stars do not
+    shrink with the rung; that is a look question for the Art Agent, not this
+    defect, and the frames at all three rungs are here if the Director wants it
+    raised.
+
+  DELIBERATELY NOT SCALED — world-space records that must stay 1:1 with the sim:
+    the tap hit-test candidate list (hit-tested in WORLD space after
+    `logicalToWorld`, whose inverse already carries the scale), the pilot's own
+    ship record, and every minimap datum (map space, not screen). Scaling any of
+    these would be the same bug pointed the other way.
+
+
+5. GOLDENS
+----------
+Not re-baselined, and this is a measurement rather than a hope:
+
+  1. Every golden is taken at the default rung. `DEFAULT_VIEW_ZOOM` is
+     VIEW_ZOOM_STEPS[0] = 1x, the control that changes it is touch-only, and no
+     spec under tests/ calls `setZoom` / touches `viewZoom` (grepped).
+  2. At 1x the camera scale is exactly 1, so both fixes are arithmetic no-ops:
+     `P · 1 = P` and `projectLength(r) = r`.
+  3. Proven, not argued: the frozen review sheet — the scene the goldens are
+     taken on — is BYTE-IDENTICAL between the two builds at 1x (md5 above),
+     nameplates, health bars, particles and all.
+
+  Eyes on every image in ./frames and ./crops (18 + 12), before and after.
+
+
+6. THE TEST
+-----------
+`effects ride the camera scale` — src/ui/zoom-control.test.ts. It lives with the
+control rather than in the renderer's suite because the claim is the control's:
+what this button does to the view, the effects do too. It drives the real
+`Renderer` and the real `VfxField`/`VfxLayer` headless, walks every rung of
+`VIEW_ZOOM_STEPS`, and asserts RELATIONSHIPS, never pixels (LESSONS §26):
+
+  - a particle is drawn where the renderer projects its world point (Pixi's
+    parent chain and the renderer's own projection, two routes to one number);
+  - its screen gap from the emitter equals the world gap times `cameraScale`;
+  - the whole plume stays within a ship-length SCALED of the hull;
+  - `projectLength(r)` equals the gap between two world points r apart, projected.
+
+Against the pre-fix wiring — reconstructed inside the spec, layer beside the
+world container and offset from the camera read-back — it fails by 656 px at
+1.5x and passes at 1x: ./test-on-broken-wiring.txt, with the variant used in
+./pre-fix-wiring.reconstruction.ts.txt.
+
+
+7. REPRODUCING THIS
+-------------------
+  # after (this branch)
+  A0_80_LABEL=after PREVIEW_PORT=4280 \
+    npx playwright test -c evidence/a0-80-vfx-zoom/playwright.config.ts
+
+  # before (any checkout of the parent commit)
+  git worktree add /tmp/a0-80-before 5a9bb530
+  ln -s "$PWD/node_modules" /tmp/a0-80-before/node_modules
+  A0_80_LABEL=before A0_80_ROOT=/tmp/a0-80-before PREVIEW_PORT=4281 \
+    npx playwright test -c evidence/a0-80-vfx-zoom/playwright.config.ts
+
+  node evidence/a0-80-vfx-zoom/crops.mjs
