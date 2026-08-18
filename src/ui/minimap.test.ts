@@ -12,6 +12,14 @@
  *    ship is highlighted and separated from the enemy dots, a spawn-protected
  *    ship dims, a dead ship drops off, ore hints are faint signal-yellow, and the
  *    collapse ring scales with the fit.
+ *  - **Shape carries KIND, colour carries OWNER** (a0-88) — a ship, a station, a
+ *    satellite and a rock are four different marks, and the assertions are made on
+ *    the OUTLINE (a vertex count, which does not move when the radius does) rather
+ *    than on size, because size is exactly the channel that failed the developer
+ *    on a phone. Colour is asserted unchanged, mark for mark.
+ *  - **The coverage rings are ONE region** (a0-88) — the union of the sensor discs,
+ *    so touching discs read as a single lit silhouette instead of stacked circles
+ *    that each look like an ornament around whatever they are centred on.
  *  - **The toggle is one code path for click and tap** — the input-parity
  *    contract this element signs (docs/input-parity.md): a click (PC) and a tap
  *    (mobile) both reach {@link Minimap.tap} and both flip the state, and the PC
@@ -33,9 +41,11 @@ import {
   expandedRect,
   fitBounds,
   mapPoint,
+  markPolygon,
   minimapRect,
   minimapScene,
   pointInRect,
+  sensedRegionOutlines,
   MINIMAP_TOGGLE_KEY,
   MINIMAP_MARGIN,
   MINIMAP_COLLAPSED_TOUCH,
@@ -49,7 +59,7 @@ import {
   MINIMAP_REMEMBERED_ALPHA,
   MINIMAP_REMEMBERED_ORE_ALPHA,
 } from './minimap';
-import type { MinimapFrame, MinimapShip, MinimapFog, MinimapCoverage } from './minimap';
+import type { MinimapDot, MinimapFrame, MinimapShip, MinimapFog, MinimapCoverage } from './minimap';
 
 /** The two phone profiles the field request pins the placement on — landscape
  *  logical space (post landscape-lock), a wider and a narrower handset. */
@@ -539,6 +549,328 @@ describe('minimapScene fog — sensed / remembered / fogged tri-state (feature f
     expect(collapsed.ownDot).not.toBeNull();
     expect(collapsed.satelliteDots).toHaveLength(1);
     expect(collapsed.oreDots).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Shape carries KIND, colour carries OWNER (a0-88)
+// ---------------------------------------------------------------------------
+//
+// The developer, from a live match on a phone: *"the minimap shows two circles.
+// ships should be a different icon though to differentiate."* Every body was a
+// filled circle, so only SIZE and COLOUR told them apart — and colour was already
+// spoken for (roster identity, style-guide §3). These tests pin the second
+// channel, and they pin it WITHOUT reference to size: the discriminator is the
+// mark's outline, which is scale-invariant.
+
+/** Vertices in a mark's outline — 3 for a triangle, 4 for a square/diamond, and
+ *  `null` for a circle, which is drawn with the circle primitive. The count does
+ *  not move when the radius does, which is exactly why the assertions below use
+ *  it instead of comparing sizes. */
+function outlineVertices(dot: MinimapDot): number | null {
+  const poly = markPolygon(dot);
+  return poly === null ? null : poly.length / 2;
+}
+
+/** Even-odd point-in-polygon over a flat `[x0,y0,…]` loop. */
+function inPolygon(loop: readonly number[], px: number, py: number): boolean {
+  let inside = false;
+  const n = loop.length / 2;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = loop[i * 2] as number;
+    const yi = loop[i * 2 + 1] as number;
+    const xj = loop[j * 2] as number;
+    const yj = loop[j * 2 + 1] as number;
+    if (yi > py !== yj > py && px < ((xj - xi) * (py - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+describe('minimapScene — shape is KIND, colour is OWNER (a0-88)', () => {
+  it('a ship and a station do not share a shape', () => {
+    const scene = minimapScene(
+      frame({
+        stations: [{ owner: 2, x: 200, y: 200, alive: true }],
+        ships: [ship({ owner: 3, x: 800, y: 800 })],
+      }),
+      RECT,
+    );
+    const station = scene.stationDots[0]!;
+    const vessel = scene.shipDots[0]!;
+
+    // Both carry a KIND, and the kinds are different ones.
+    expect(station.shape).toBeDefined();
+    expect(vessel.shape).toBeDefined();
+    expect(vessel.shape).not.toBe(station.shape);
+    expect(station.shape).toBe('square');
+    expect(vessel.shape).toBe('triangle');
+
+    // ...and the difference is NOT size. The marks are told apart by the outline
+    // they are drawn as — a count of vertices, which does not change when the
+    // radius does. Force the two to exactly the same radius and the distinction
+    // survives intact, which a size-based read could not.
+    expect(outlineVertices(vessel)).toBe(3);
+    expect(outlineVertices(station)).toBe(4);
+    const r = 7;
+    expect(outlineVertices({ ...vessel, radius: r })).toBe(3);
+    expect(outlineVertices({ ...station, radius: r })).toBe(4);
+    expect(outlineVertices({ ...vessel, radius: r })).not.toBe(outlineVertices({ ...station, radius: r }));
+  });
+
+  it('OWNERSHIP COLOUR is untouched — shape is the only new channel', () => {
+    const scene = minimapScene(
+      frame({
+        stations: [
+          { owner: 2, x: 100, y: 100, alive: true },
+          { owner: 3, x: 900, y: 100, alive: false },
+        ],
+        ships: [ship({ owner: 5, x: 500, y: 500 }), ship({ owner: 0, x: 400, y: 400, local: true })],
+        satellites: [{ owner: 6, x: 700, y: 300, alive: true, local: false }],
+        oreHints: [{ x: 600, y: 600 }],
+      }),
+      RECT,
+    );
+    // Exactly the colours §3 assigned, mark for mark — a wreck still neutral steel,
+    // ore still the reserved signal yellow.
+    expect(scene.stationDots[0]!.color).toBe(playerColor(2));
+    expect(scene.stationDots[1]!.color).toBe(PALETTE.hullSteel);
+    expect(scene.shipDots[0]!.color).toBe(playerColor(5));
+    expect(scene.ownDot!.color).toBe(playerColor(0));
+    expect(scene.satelliteDots[0]!.color).toBe(playerColor(6));
+    expect(scene.oreDots[0]!.color).toBe(PALETTE.signalYellow);
+  });
+
+  it('every kind on the map gets its own mark: ship / station / satellite / ore', () => {
+    const scene = minimapScene(
+      frame({
+        stations: [{ owner: 2, x: 100, y: 100, alive: true }],
+        ships: [ship({ owner: 3, x: 500, y: 500 })],
+        satellites: [{ owner: 4, x: 700, y: 300, alive: true, local: false }],
+        oreHints: [{ x: 600, y: 600 }],
+      }),
+      RECT,
+    );
+    const kinds = [
+      scene.shipDots[0]!.shape,
+      scene.stationDots[0]!.shape,
+      scene.satelliteDots[0]!.shape,
+      scene.oreDots[0]!.shape,
+    ];
+    expect(kinds).toEqual(['triangle', 'square', 'diamond', 'circle']);
+    expect(new Set(kinds).size).toBe(4); // four kinds, four marks, no collisions
+  });
+
+  it('the local ship is a triangle too — same KIND, louder (larger + own)', () => {
+    const scene = minimapScene(
+      frame({ ships: [ship({ owner: 1 }), ship({ owner: 0, x: 300, y: 300, local: true })] }),
+      RECT,
+    );
+    expect(scene.ownDot!.shape).toBe('triangle');
+    expect(scene.shipDots[0]!.shape).toBe('triangle');
+    // Mine is bigger, as it always was — but size is now the "which one is me"
+    // channel only, never the "what kind of thing is this" one.
+    expect(scene.ownDot!.radius).toBeGreaterThan(scene.shipDots[0]!.radius);
+  });
+
+  it("a ship's triangle points along its heading — the thing a dot threw away", () => {
+    const east = minimapScene(frame({ ships: [ship({ angle: 0 })] }), RECT).shipDots[0]!;
+    const south = minimapScene(frame({ ships: [ship({ angle: Math.PI / 2 })] }), RECT).shipDots[0]!;
+    const eastPoly = markPolygon(east)!;
+    const southPoly = markPolygon(south)!;
+    // The nose is vertex 0. Facing 0 puts it to the RIGHT of the mark's centre and
+    // level with it; facing +π/2 puts it BELOW and level horizontally (screen axes).
+    expect(eastPoly[0]!).toBeGreaterThan(east.x);
+    expect(eastPoly[1]!).toBeCloseTo(east.y);
+    expect(southPoly[1]!).toBeGreaterThan(south.y);
+    expect(southPoly[0]!).toBeCloseTo(south.x);
+    // Same ship, same place, same size — only the facing turned.
+    expect(south.x).toBeCloseTo(east.x);
+    expect(south.radius).toBeCloseTo(east.radius);
+  });
+
+  it('a feed with no heading still gets a SHIP-shaped mark (nose right)', () => {
+    // Kind does not depend on the heading being fed: an older feed loses the
+    // facing, never the "this is a vessel".
+    const dot = minimapScene(frame({ ships: [ship()] }), RECT).shipDots[0]!;
+    expect(dot.shape).toBe('triangle');
+    expect(dot.angle).toBe(0);
+    expect(markPolygon(dot)![0]!).toBeGreaterThan(dot.x);
+  });
+
+  it('a WRECK keeps the station square — what says "spent" is the steel and the dim', () => {
+    const scene = minimapScene(
+      frame({ stations: [{ owner: 3, x: 500, y: 500, alive: false }] }),
+      RECT,
+    );
+    // A derelict is still an installation. Changing its KIND on death would make
+    // shape mean two things at once, which is the bug this brief is about.
+    expect(scene.stationDots[0]!.shape).toBe('square');
+    expect(scene.stationDots[0]!.color).toBe(PALETTE.hullSteel);
+    expect(scene.stationDots[0]!.alpha).toBe(MINIMAP_DERELICT_ALPHA);
+  });
+
+  it('ore is drawn with the circle primitive, not a tessellated one', () => {
+    const scene = minimapScene(frame({ oreHints: [{ x: 500, y: 500 }] }), RECT);
+    expect(scene.oreDots[0]!.shape).toBe('circle');
+    expect(markPolygon(scene.oreDots[0]!)).toBeNull();
+  });
+
+  it('each mark carries about the ink its circle did — a new shape, not a louder one', () => {
+    const scene = minimapScene(
+      frame({
+        stations: [{ owner: 2, x: 100, y: 100, alive: true }],
+        ships: [ship({ owner: 3, x: 500, y: 500 })],
+        satellites: [{ owner: 4, x: 700, y: 300, alive: true, local: false }],
+      }),
+      RECT,
+    );
+    for (const dot of [scene.stationDots[0]!, scene.shipDots[0]!, scene.satelliteDots[0]!]) {
+      const circleArea = Math.PI * dot.radius * dot.radius;
+      expect(polygonArea(markPolygon(dot)!) / circleArea).toBeGreaterThan(0.75);
+      expect(polygonArea(markPolygon(dot)!) / circleArea).toBeLessThan(1.25);
+    }
+  });
+});
+
+/** |signed area| of a flat `[x0,y0,…]` polygon (the shoelace). */
+function polygonArea(loop: readonly number[]): number {
+  let a = 0;
+  const n = loop.length / 2;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    a += (loop[j * 2] as number) * (loop[i * 2 + 1] as number) - (loop[i * 2] as number) * (loop[j * 2 + 1] as number);
+  }
+  return Math.abs(a) / 2;
+}
+
+// ---------------------------------------------------------------------------
+// The sensed region — one merged shape, not N circles (a0-88)
+// ---------------------------------------------------------------------------
+//
+// *"also it shows a circle around my ship and a circle around the station not sure
+// what the station circle is but it's unneeded"* — the rings ARE information
+// (radar coverage, feature f1), so the fix is not to cut one. What made them
+// unreadable is that a circle centred on a body reads as a property OF that body,
+// and the overlapping washes double-blended into a lens that advertised "two
+// separate circles". Drawing the UNION removes both readings at once.
+
+describe('sensedRegionOutlines — the union of the coverage discs', () => {
+  it('two SEPARATE discs stay two lobes', () => {
+    const loops = sensedRegionOutlines([
+      { x: 0, y: 0, radius: 10 },
+      { x: 100, y: 0, radius: 10 },
+    ]);
+    expect(loops).toHaveLength(2);
+  });
+
+  it('two OVERLAPPING discs merge into ONE silhouette — the honest picture', () => {
+    // This is the developer's own frame: your ship near your home, both sensing.
+    const loops = sensedRegionOutlines([
+      { x: 0, y: 0, radius: 30 },
+      { x: 40, y: 0, radius: 30 },
+    ]);
+    expect(loops).toHaveLength(1);
+    const loop = loops[0]!;
+    // The merged outline encloses the whole of both discs...
+    expect(inPolygon(loop, -25, 0)).toBe(true); // deep in the left disc
+    expect(inPolygon(loop, 65, 0)).toBe(true); // deep in the right disc
+    expect(inPolygon(loop, 20, 0)).toBe(true); // the overlap
+    // ...and nothing that neither disc reaches.
+    expect(inPolygon(loop, 20, 45)).toBe(false); // above the waist
+    expect(inPolygon(loop, -45, 0)).toBe(false);
+    expect(inPolygon(loop, 85, 0)).toBe(false);
+  });
+
+  it('the merged outline has a WAIST — it is not a circle pretending to be two', () => {
+    const loop = sensedRegionOutlines([
+      { x: 0, y: 0, radius: 30 },
+      { x: 40, y: 0, radius: 30 },
+    ])[0]!;
+    // The boundary at the join sits nearer the axis than either disc's own top.
+    let waist = Infinity;
+    for (let i = 0; i < loop.length; i += 2) {
+      if (Math.abs((loop[i] as number) - 20) < 1.5) waist = Math.min(waist, Math.abs(loop[i + 1] as number));
+    }
+    expect(waist).toBeLessThan(30);
+  });
+
+  it('a disc wholly inside another contributes nothing — one clean boundary', () => {
+    const loops = sensedRegionOutlines([
+      { x: 0, y: 0, radius: 50 },
+      { x: 5, y: 0, radius: 10 },
+    ]);
+    expect(loops).toHaveLength(1);
+    // Every vertex is on the BIG disc, so the small one drew no arc at all.
+    const loop = loops[0]!;
+    for (let i = 0; i < loop.length; i += 2) {
+      expect(Math.hypot(loop[i] as number, loop[i + 1] as number)).toBeCloseTo(50, 5);
+    }
+  });
+
+  it('exact duplicates collapse to one outline (no double-stroked ring)', () => {
+    const loops = sensedRegionOutlines([
+      { x: 10, y: 10, radius: 20 },
+      { x: 10, y: 10, radius: 20 },
+    ]);
+    expect(loops).toHaveLength(1);
+  });
+
+  it('a lone disc is a closed circle; nothing at all is nothing', () => {
+    expect(sensedRegionOutlines([])).toEqual([]);
+    const loops = sensedRegionOutlines([{ x: 0, y: 0, radius: 12 }]);
+    expect(loops).toHaveLength(1);
+    expect(loops[0]!.length / 2).toBeGreaterThan(8);
+    for (let i = 0; i < loops[0]!.length; i += 2) {
+      expect(Math.hypot(loops[0]![i] as number, loops[0]![i + 1] as number)).toBeCloseTo(12, 5);
+    }
+  });
+
+  it('a three-disc chain is one region; break the chain and it is two', () => {
+    const chained = sensedRegionOutlines([
+      { x: 0, y: 0, radius: 20 },
+      { x: 30, y: 0, radius: 20 },
+      { x: 60, y: 0, radius: 20 },
+    ]);
+    expect(chained).toHaveLength(1);
+    const broken = sensedRegionOutlines([
+      { x: 0, y: 0, radius: 20 },
+      { x: 30, y: 0, radius: 20 },
+      { x: 200, y: 0, radius: 20 },
+    ]);
+    expect(broken).toHaveLength(2);
+  });
+
+  it('degenerate discs are dropped rather than drawn', () => {
+    expect(sensedRegionOutlines([{ x: 0, y: 0, radius: 0 }])).toEqual([]);
+    expect(sensedRegionOutlines([{ x: NaN, y: 0, radius: 5 }])).toEqual([]);
+  });
+
+  it('the scene carries the region only when the map is FOGGED', () => {
+    const clear = minimapScene(frame({ ships: [ship({ local: true })] }), RECT);
+    expect(clear.fogged).toBe(false);
+    expect(clear.sensedRegion).toEqual([]);
+
+    const fogged = minimapScene(
+      frame({ ships: [ship({ local: true })], fog: fog([disc(500, 500, 300)]) }),
+      RECT,
+    );
+    expect(fogged.fogged).toBe(true);
+    expect(fogged.sensedRegion).toHaveLength(1);
+  });
+
+  it("the developer's frame: ship disc + station disc read as ONE lit region", () => {
+    // A ship sitting near its own home — the two discs the screenshot showed as
+    // two mystery circles. Coverage radii are the shipped ones (GDD §2.8: ship
+    // sensor 520, station sensor 300).
+    const scene = minimapScene(
+      frame({
+        stations: [{ owner: 0, x: 500, y: 500, alive: true, id: 0 }],
+        ships: [ship({ owner: 0, x: 620, y: 500, local: true })],
+        fog: fog([disc(620, 500, 520), disc(500, 500, 300)], 1),
+      }),
+      RECT,
+    );
+    expect(scene.coverage).toHaveLength(2); // two sensors, as before...
+    expect(scene.sensedRegion).toHaveLength(1); // ...one thing drawn
   });
 });
 

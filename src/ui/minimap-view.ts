@@ -43,6 +43,7 @@ import { playerColor } from './station-hp';
 import {
   fitBounds,
   mapPoint,
+  markPolygon,
   minimapRect,
   minimapScene,
   MINIMAP_DOT_ALPHA,
@@ -53,7 +54,7 @@ import {
   MINIMAP_COVERAGE_FILL_ALPHA,
   MINIMAP_COVERAGE_RING_ALPHA,
 } from './minimap';
-import type { MinimapFrame, MinimapInsets, MinimapState } from './minimap';
+import type { MinimapDot, MinimapFrame, MinimapInsets, MinimapScene, MinimapState } from './minimap';
 
 /** Layout-registry id for the collapsed corner square (GDD §2.2 bottom-right). */
 export const MINIMAP_ID = 'minimap';
@@ -211,9 +212,23 @@ export class MinimapView extends Container {
       const cx = clamp(p.x, rect.x + r, rect.x + rect.width - r);
       const cy = clamp(p.y, rect.y + r, rect.y + rect.height - r);
       const alpha = local.spawnProtected ? MINIMAP_SPAWN_PROTECT_ALPHA : MINIMAP_DOT_ALPHA;
-      this.ownDotG.circle(cx, cy, r).fill({ color: playerColor(local.owner), alpha });
-      // Bright outline so the eye finds "me" instantly among the dots.
-      this.ownDotG.circle(cx, cy, r + 0.5).stroke({ width: 1, color: PALETTE.plasma, alpha: 0.95 });
+      // The same triangle every ship gets (a0-88) — mine is bigger and outlined,
+      // and it points where I am pointed, which is the fastest "that one is me and
+      // this is which way I am facing" the map can say.
+      const mark: MinimapDot = {
+        x: cx,
+        y: cy,
+        radius: r,
+        color: playerColor(local.owner),
+        alpha,
+        own: true,
+        shape: 'triangle',
+        angle: local.angle ?? 0,
+      };
+      drawMark(this.ownDotG, mark);
+      // Bright outline so the eye finds "me" instantly among the marks.
+      const poly = markPolygon(mark);
+      if (poly) this.ownDotG.poly(poly, true).stroke({ width: 1, color: PALETTE.plasma, alpha: 0.95 });
       ownPos = { x: cx, y: cy };
     }
 
@@ -271,10 +286,11 @@ export class MinimapView extends Container {
     // against the dark unsensed vacuum. Under everything else so the dots that
     // survive the fog gate (only the sensed ones — decided in ./minimap) sit on
     // top. Clipped to the rect by the layer's mask, so the veil never spills.
-    if (scene.fogged) this.drawFog(g, rect, scene.coverage);
+    if (scene.fogged) this.drawFog(g, rect, scene.sensedRegion);
 
-    // Faint ore-field hints (under the dots; already fog-gated by the scene).
-    for (const o of scene.oreDots) g.circle(o.x, o.y, o.radius).fill({ color: o.color, alpha: o.alpha });
+    // Faint ore-field hints (under the marks; already fog-gated by the scene).
+    // Ore keeps the plain dot — it is neither a vessel nor an installation (a0-88).
+    for (const o of scene.oreDots) drawMark(g, o);
 
     // The collapse ring (GDD §2.3) — threat red, the match's danger state. Drawn
     // regardless of coverage: it is match-critical and its closure is broadcast
@@ -287,14 +303,18 @@ export class MinimapView extends Container {
       });
     }
 
-    // Stations, then enemy ships, then satellites over them.
-    for (const p of scene.stationDots) g.circle(p.x, p.y, p.radius).fill({ color: p.color, alpha: p.alpha });
-    for (const s of scene.shipDots) g.circle(s.x, s.y, s.radius).fill({ color: s.color, alpha: s.alpha });
-    // Satellites: a small owner-coloured dot with a thin outline so a high-value
-    // radar body reads distinct from a ship at a glance (feature f1).
+    // Stations, then enemy ships, then satellites over them. SHAPE carries kind
+    // and COLOUR carries owner (a0-88) — the mark's outline is decided in the pure
+    // model (`markPolygon`), so what a ship looks like is asserted headless and
+    // this half only fills it.
+    for (const p of scene.stationDots) drawMark(g, p); // squares — fixed installations
+    for (const s of scene.shipDots) drawMark(g, s); // triangles, nose along the heading
+    // Satellites: an owner-coloured diamond with a thin steel outline, so a
+    // high-value radar body reads distinct from a ship at a glance (feature f1).
     for (const sat of scene.satelliteDots) {
-      g.circle(sat.x, sat.y, sat.radius).fill({ color: sat.color, alpha: sat.alpha });
-      g.circle(sat.x, sat.y, sat.radius + 0.75).stroke({ width: 0.75, color: PALETTE.hullSteel, alpha: 0.7 });
+      drawMark(g, sat);
+      const poly = markPolygon(sat);
+      if (poly) g.poly(poly, true).stroke({ width: 0.75, color: PALETTE.hullSteel, alpha: 0.7 });
     }
 
     // NO offscreen texture cache. The field request's "cache to an offscreen
@@ -316,14 +336,27 @@ export class MinimapView extends Container {
   }
 
   /**
-   * Paint the fog-of-war veil + coverage reveals into `g` (feature f1). A near-
+   * Paint the fog-of-war veil + the sensed region into `g` (feature f1). A near-
    * opaque Cold-Vacuum fill darkens the whole rect, a sparse diagonal hatch gives
-   * it the "cold vacuum" texture, and each current coverage disc is revealed with
-   * a faint wash + an edge ring — so the sensed slice reads lit against the dark
-   * unsensed vacuum, and "you see what your radar buys you" is legible. All of it
-   * is clipped to the rect by the layer mask, so nothing spills past the frame.
+   * it the "cold vacuum" texture, and the SENSED REGION is revealed with a faint
+   * wash + an edge line — so the sensed slice reads lit against the dark unsensed
+   * vacuum, and "you see what your radar buys you" is legible. All of it is clipped
+   * to the rect by the layer mask, so nothing spills past the frame.
+   *
+   * **One region, not N discs (a0-88).** This used to fill and stroke each coverage
+   * disc separately, and the developer read the result as decoration: *"it shows a
+   * circle around my ship and a circle around the station not sure what the station
+   * circle is."* Two failures, both fixed by drawing the UNION
+   * ({@link MinimapScene.sensedRegion}) instead. A circle centred on a body reads
+   * as a property OF that body, and the station's had no property anyone could
+   * name; the union is centred on nothing and so cannot be read that way. And the
+   * overlapping washes double-blended into a bright lens exactly where the two
+   * discs met — the map drawing its own "these are two separate circles" tell. The
+   * union fills once, so the sensed area is one even brightness whatever is
+   * projecting it, and its outline is a single silhouette that changes shape as you
+   * fly: the edge of what you can see.
    */
-  private drawFog(g: Graphics, rect: Rect, coverage: readonly { x: number; y: number; radius: number }[]): void {
+  private drawFog(g: Graphics, rect: Rect, sensedRegion: readonly (readonly number[])[]): void {
     // The dark veil over the whole map — fogged vacuum.
     g.rect(rect.x, rect.y, rect.width, rect.height).fill({ color: PALETTE.vacuum, alpha: MINIMAP_FOG_ALPHA });
 
@@ -341,13 +374,15 @@ export class MinimapView extends Container {
     }
     g.stroke({ width: 0.5, color: PALETTE.hullSteel, alpha: 0.06 });
 
-    // Reveal each coverage disc: a faint wash lightens the sensed vacuum, and a
-    // thin ring marks the radar reach (the satellite's LARGE disc is the tell).
-    for (const c of coverage) {
-      g.circle(c.x, c.y, c.radius).fill({ color: PALETTE.hullSteel, alpha: MINIMAP_COVERAGE_FILL_ALPHA });
+    // Reveal the sensed region: a faint wash lightens the sensed vacuum, then its
+    // boundary is drawn once. Each loop is filled on its own so touching discs read
+    // as ONE even area rather than a stack of washes (the double-blended lens is
+    // what made two discs look like two circles).
+    for (const loop of sensedRegion) {
+      g.poly(loop as number[], true).fill({ color: PALETTE.hullSteel, alpha: MINIMAP_COVERAGE_FILL_ALPHA });
     }
-    for (const c of coverage) {
-      g.circle(c.x, c.y, c.radius).stroke({
+    for (const loop of sensedRegion) {
+      g.poly(loop as number[], true).stroke({
         width: 1,
         color: PALETTE.plasma,
         alpha: MINIMAP_COVERAGE_RING_ALPHA,
@@ -429,4 +464,16 @@ export class MinimapView extends Container {
 
 function clamp(v: number, lo: number, hi: number): number {
   return v < lo ? lo : v > hi ? hi : v;
+}
+
+/**
+ * Fill one mark in its own colour and alpha (a0-88). The OUTLINE comes from the
+ * pure model ({@link markPolygon}) so the shape grammar is decided and tested in
+ * one place; a `'circle'` returns null and gets the real circle primitive, because
+ * a tessellated 2 px dot is strictly worse than a drawn one.
+ */
+function drawMark(g: Graphics, dot: MinimapDot): void {
+  const poly = markPolygon(dot);
+  if (poly) g.poly(poly, true).fill({ color: dot.color, alpha: dot.alpha });
+  else g.circle(dot.x, dot.y, dot.radius).fill({ color: dot.color, alpha: dot.alpha });
 }

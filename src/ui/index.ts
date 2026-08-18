@@ -1327,10 +1327,12 @@ export { MapPickerView, MAP_PICKER_ANCHOR } from './map-picker-view';
 // --- The minimap (GDD §2.2; field request v0.2.2) --------------------------
 //
 // Bottom-right corner square that taps/clicks open to a centred overlay (same
-// gesture PC + mobile, `M` on PC), drawing sim-driven dots — stations, ships, the
-// collapse ring, faint ore hints. Same pure-model / Pixi-view split as the rest:
-// `./minimap` decides (toggle, fit, scene), `./minimap-view` draws (throttled
-// cached content + a per-frame own-ship dot). The `Hud` owns both.
+// gesture PC + mobile, `M` on PC), drawing sim-driven marks — station squares,
+// ship triangles pointed along their heading, satellite diamonds, the collapse
+// ring, faint ore dots (a0-88: SHAPE is kind, COLOUR is owner). Same pure-model /
+// Pixi-view split as the rest: `./minimap` decides (toggle, fit, scene, mark
+// geometry, the sensed region), `./minimap-view` draws (throttled cached content +
+// a per-frame own-ship mark). The `Hud` owns both.
 
 export {
   Minimap,
@@ -1340,7 +1342,9 @@ export {
   expandedRect,
   fitBounds,
   mapPoint,
+  markPolygon,
   pointInRect,
+  sensedRegionOutlines,
   MINIMAP_TOGGLE_KEY,
   MINIMAP_REDRAW_TICKS,
   MINIMAP_MARGIN,
@@ -1369,6 +1373,7 @@ export type {
   MinimapFog,
   MinimapInsets,
   MinimapDot,
+  MinimapShape,
   MinimapScene,
   FitTransform,
 } from './minimap';

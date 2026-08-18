@@ -6,12 +6,20 @@
  * `Hud` owns both and feeds this a {@link MinimapFrame} each frame.
  *
  * **What it shows (sim-driven — GDD §2.2 "a minimap (bottom right)").** Arena
- * bounds, stations as owner-coloured dots (a derelict wreck goes neutral steel —
- * it is no longer owned, GDD §2.7), ships as smaller dots (the local ship
- * highlighted, a spawn-protected ship dimmed — GDD §2.1), radar satellites as
- * small dots (feature f1), the collapse ring while it is active (GDD §2.3), and
- * faint ore-field hints. **Dots and colours only** — no nameplates, no health
- * numbers (those are read off the station and the ship themselves, GDD §2.2).
+ * bounds, stations as owner-coloured squares (a derelict wreck goes neutral steel —
+ * it is no longer owned, GDD §2.7), ships as smaller triangles pointed along their
+ * heading (the local ship highlighted, a spawn-protected ship dimmed — GDD §2.1),
+ * radar satellites as small diamonds (feature f1), the collapse ring while it is
+ * active (GDD §2.3), and faint ore-field dots. **Marks and colours only** — no
+ * nameplates, no health numbers (those are read off the station and the ship
+ * themselves, GDD §2.2).
+ *
+ * **Shape is KIND, colour is OWNER (a0-88).** Two independent channels. Colour was
+ * already carrying roster identity (style-guide §3), so when every body was a
+ * filled circle the only thing left to separate a ship from a station was SIZE —
+ * and at minimap scale on a phone that is no separation at all: *"the minimap shows
+ * two circles. ships should be a different icon though to differentiate."* See
+ * {@link MinimapShape} for the grammar and {@link markPolygon} for the geometry.
  *
  * **Fog of war (RATIFIED feature f1).** The map renders ONLY the player's
  * sensed-state (`../sim/sensing`): fogged regions read dark, static geography a
@@ -160,6 +168,50 @@ const OWN_SHIP_DOT_MULTIPLIER = 1.55;
 const ORE_DOT_FRACTION = 0.011;
 const ORE_DOT_MIN = 0.5;
 
+// ---------------------------------------------------------------------------
+// Shape carries KIND; colour carries OWNER (a0-88)
+// ---------------------------------------------------------------------------
+//
+// The developer, on a phone: *"the minimap shows two circles. ships should be a
+// different icon though to differentiate."* Every mark was the same primitive —
+// a filled circle — so only SIZE and COLOUR separated a ship from a station, and
+// colour is already spoken for: it is roster identity (style-guide §3), and a
+// channel that carries two meanings carries neither. Shape is the second channel,
+// and it was free.
+//
+//   SHIP      → a triangle, pointed along its heading. A ship is the one thing on
+//               this map that is going somewhere, and a dot throws that away. The
+//               triangle is the obvious mark precisely because it survives at a
+//               few pixels AND shows facing; nothing else does both.
+//   STATION   → a square. A fixed installation reads as a solid anchor — flat
+//               sides and corners, the visual opposite of a thing in motion.
+//   SATELLITE → a diamond. An installation too (so: angular, the station's
+//               family), but a small orbiting one — the square turned on its
+//               point, smaller, and still wearing its steel outline (feature f1).
+//   ORE       → a plain dot. Neither a vessel nor an installation, and the mark
+//               it already had; a rock has no facing and anchors nothing.
+//
+// Sizes are UNCHANGED — the fractions above still set the mark's radius, and each
+// shape is drawn to roughly the AREA the circle of that radius had, so no mark got
+// louder or quieter. Kind is legible from the outline alone; a colour-blind read
+// and a greyscale read both survive, which is the whole point of a second channel.
+
+/** The mark a minimap body is drawn as. Kind, and only kind — the colour beside it
+ *  is the owner and never varies with this. */
+export type MinimapShape = 'triangle' | 'square' | 'diamond' | 'circle';
+
+/** How far a triangle's nose reaches, in dot radii. */
+const TRIANGLE_NOSE = 1.95;
+/** Half-angle from the heading to each rear corner, radians, and how far out they
+ *  sit — a dart wide enough to read as a triangle at 4 px, not a needle. */
+const TRIANGLE_REAR_ANGLE = 2.35;
+const TRIANGLE_REAR = 1.3;
+/** A square of half-side `k·r` has the area of a circle of radius `r` at
+ *  `k = √π / 2`; the diamond's half-diagonal wants `√(π/2)`. Equal ink, so the
+ *  new shape channel changes what a mark IS without changing how loud it is. */
+const SQUARE_HALF_SIDE = Math.sqrt(Math.PI) / 2;
+const DIAMOND_HALF_DIAGONAL = Math.sqrt(Math.PI / 2);
+
 /** Full opacity of an owned station / live ship dot. */
 export const MINIMAP_DOT_ALPHA = 0.95;
 /** A derelict station's dot (a wreck — no longer owned, GDD §2.7): neutral and
@@ -253,6 +305,13 @@ export interface MinimapShip {
   readonly local: boolean;
   /** Spawn protection still up (GDD §2.1) — the dot dims (not yet a live target). */
   readonly spawnProtected: boolean;
+  /**
+   * Facing in radians (the sim's `Ship.angle`) — which way the ship's triangle
+   * points (a0-88). Optional, defaulting to 0 (nose right), so a feed that has
+   * never heard of headings still type-checks and still gets a *ship-shaped* mark;
+   * the shape channel is what carries kind, and it does not depend on this.
+   */
+  readonly angle?: number;
 }
 
 /** A ring in map space (the collapse ring, GDD §2.3). */
@@ -324,7 +383,11 @@ export interface MinimapInsets {
   readonly left?: number;
 }
 
-/** One drawable dot (screen space, CSS px) the view paints as a filled circle. */
+/**
+ * One drawable mark (screen space, CSS px). `shape` is its KIND (a0-88) and
+ * `color` is its OWNER — two independent channels, neither doing the other's job.
+ * The name is historical: only an ore hint is still literally a dot.
+ */
 export interface MinimapDot {
   readonly x: number;
   readonly y: number;
@@ -333,6 +396,15 @@ export interface MinimapDot {
   readonly alpha: number;
   /** True for the local ship's dot — the view outlines it so it reads as mine. */
   readonly own?: boolean;
+  /**
+   * The mark's kind (a0-88). A ship and a station never share one, and the
+   * distinction does NOT live in {@link radius} — shrink every mark to the same
+   * size and the map still says which is which.
+   */
+  readonly shape: MinimapShape;
+  /** Rotation in radians, for the shapes that have one — a triangle's heading.
+   *  Absent / 0 on a square, a diamond and a dot, which have no facing to tell. */
+  readonly angle?: number;
 }
 
 /** A drawn ring (screen space). */
@@ -373,9 +445,29 @@ export interface MinimapScene {
   /** Whether fog is active this frame — the view lays the Cold-Vacuum veil only
    *  when true (feature f1). False for a fog-less feed / every fixture. */
   readonly fogged: boolean;
-  /** The projected coverage discs (screen space) the view reveals + rings. Empty
-   *  when {@link fogged} is false. */
+  /** The projected coverage discs (screen space). Empty when {@link fogged} is
+   *  false. These are the raw sensor sources — one per ship / station / satellite;
+   *  what the view actually DRAWS is their union, {@link sensedRegion}. */
   readonly coverage: readonly MinimapCoverageDraw[];
+  /**
+   * The OUTLINE of the sensed region (a0-88): the boundary of the union of
+   * {@link coverage}, as closed screen-space loops of `[x0,y0,x1,y1,…]`. One loop
+   * per connected component — discs that touch merge into a single silhouette,
+   * discs that do not stay separate lobes.
+   *
+   * This is what replaced N stacked circles. The developer could not read the old
+   * picture — *"it shows a circle around my ship and a circle around the station
+   * not sure what the station circle is"* — because a circle drawn around an
+   * object reads as an attribute OF that object, and one of them had no
+   * attribute anybody could name. The union has no such reading available: it is
+   * one shape, it is not centred on anything, and it changes when you fly. It says
+   * the only true thing here, which is *this is the edge of what you can see*.
+   * Filling it once also kills the double-blended lens where two discs overlapped
+   * — the very artefact that made "two circles" the obvious reading.
+   *
+   * Empty when {@link fogged} is false.
+   */
+  readonly sensedRegion: readonly (readonly number[])[];
 }
 
 // ---------------------------------------------------------------------------
@@ -524,6 +616,261 @@ export function pointInRect(x: number, y: number, r: Rect): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Mark geometry (a0-88) — the shape channel, as polygons the view just fills
+// ---------------------------------------------------------------------------
+
+const TAU = Math.PI * 2;
+
+/**
+ * The polygon for a mark, as a flat `[x0,y0,x1,y1,…]` screen-space point list —
+ * or `null` for a `'circle'`, which the view draws with the circle primitive
+ * (a tessellated 2 px dot is strictly worse than a real one).
+ *
+ * Pure, so *what a ship looks like* is asserted headless like every other minimap
+ * decision — the view only fills what this returns. Each shape is sized to about
+ * the AREA the old filled circle of the same `radius` had (see
+ * {@link SQUARE_HALF_SIDE}), so the mark's weight on the map did not change when
+ * its outline did.
+ */
+export function markPolygon(dot: MinimapDot): number[] | null {
+  const { x, y, radius: r } = dot;
+  switch (dot.shape) {
+    case 'triangle': {
+      // Nose along the heading, two rear corners swept back — a dart. It reads as
+      // "pointing" down to ~4 px across, which is the collapsed phone map.
+      const a = dot.angle ?? 0;
+      const rl = a + TRIANGLE_REAR_ANGLE;
+      const rr = a - TRIANGLE_REAR_ANGLE;
+      return [
+        x + Math.cos(a) * r * TRIANGLE_NOSE,
+        y + Math.sin(a) * r * TRIANGLE_NOSE,
+        x + Math.cos(rl) * r * TRIANGLE_REAR,
+        y + Math.sin(rl) * r * TRIANGLE_REAR,
+        x + Math.cos(rr) * r * TRIANGLE_REAR,
+        y + Math.sin(rr) * r * TRIANGLE_REAR,
+      ];
+    }
+    case 'square': {
+      // Axis-aligned, deliberately: a station does not turn, and a square that
+      // shares the frame's own horizon is the flattest, most planted thing the
+      // map can draw.
+      const h = r * SQUARE_HALF_SIDE;
+      return [x - h, y - h, x + h, y - h, x + h, y + h, x - h, y + h];
+    }
+    case 'diamond': {
+      const d = r * DIAMOND_HALF_DIAGONAL;
+      return [x, y - d, x + d, y, x, y + d, x - d, y];
+    }
+    case 'circle':
+      return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The sensed region (a0-88) — the union of the coverage discs, as an outline
+// ---------------------------------------------------------------------------
+
+/** Screen-px tolerance for "these two arc endpoints are the same intersection".
+ *  Coincident endpoints agree to ~1e-12 px; distinct ones nearer than this are
+ *  near-tangent circles, where stitching either way is sub-pixel identical. */
+const STITCH_EPSILON = 1e-3;
+
+/** Chord-length target when tessellating a boundary arc, screen px — and the
+ *  clamps that keep a huge disc from exploding the vertex count and a tiny one
+ *  from becoming a triangle. */
+const ARC_CHORD = 1.5;
+const ARC_STEP_MIN = TAU / 256;
+const ARC_STEP_MAX = TAU / 16;
+
+function arcStep(radius: number): number {
+  return clampNum(ARC_CHORD / Math.max(radius, 0.001), ARC_STEP_MIN, ARC_STEP_MAX);
+}
+
+function clampNum(v: number, lo: number, hi: number): number {
+  return v < lo ? lo : v > hi ? hi : v;
+}
+
+/** `x mod TAU`, always in `[0, TAU)`. */
+function wrapAngle(a: number): number {
+  const m = a % TAU;
+  return m < 0 ? m + TAU : m;
+}
+
+/** One boundary arc of the union: the CCW sweep `from → to` on disc `c`. */
+interface BoundaryArc {
+  readonly c: MinimapCoverageDraw;
+  readonly from: number;
+  readonly to: number;
+}
+
+/**
+ * The outline of the union of a set of discs, as closed loops of flat
+ * `[x0,y0,…]` point lists — the geometry behind {@link MinimapScene.sensedRegion}.
+ *
+ * Three steps, all exact until the last one tessellates:
+ *  1. **Cull** every disc wholly inside another (largest first, so a container is
+ *     always already kept; exact duplicates cull each other but the first).
+ *  2. **Free arcs** — for each surviving disc, subtract the angular intervals its
+ *     boundary spends inside another disc. What is left is on the union boundary.
+ *     A disc that meets nothing keeps its whole circle and is emitted as its own
+ *     loop.
+ *  3. **Stitch** — walk arc end → the arc that starts there ({@link STITCH_EPSILON}),
+ *     which is well-defined because every free arc ends at an intersection point
+ *     where exactly one other free arc begins. CCW arcs traversed in order trace
+ *     the boundary CCW, so a component closes on itself.
+ *
+ * O(n²) in the disc count, which is a handful (your ship, your home, each
+ * satellite, and in TEAMS your side's) — and it runs on the throttled rebuild, not
+ * per frame.
+ */
+export function sensedRegionOutlines(discs: readonly MinimapCoverageDraw[]): number[][] {
+  const live = discs.filter((d) => Number.isFinite(d.x) && Number.isFinite(d.y) && d.radius > 0);
+  if (live.length === 0) return [];
+
+  // 1. Cull contained discs, largest radius first.
+  const byRadius = live
+    .map((d, i) => ({ d, i }))
+    .sort((a, b) => b.d.radius - a.d.radius || a.i - b.i);
+  const kept: MinimapCoverageDraw[] = [];
+  for (const { d } of byRadius) {
+    let contained = false;
+    for (const k of kept) {
+      if (Math.hypot(k.x - d.x, k.y - d.y) + d.radius <= k.radius + 1e-9) {
+        contained = true;
+        break;
+      }
+    }
+    if (!contained) kept.push(d);
+  }
+
+  // 2. Free arcs per disc.
+  const arcs: BoundaryArc[] = [];
+  const loops: number[][] = [];
+  for (let i = 0; i < kept.length; i++) {
+    const c = kept[i] as MinimapCoverageDraw;
+    const covered: [number, number][] = [];
+    for (let j = 0; j < kept.length; j++) {
+      if (i === j) continue;
+      const o = kept[j] as MinimapCoverageDraw;
+      const dx = o.x - c.x;
+      const dy = o.y - c.y;
+      const d = Math.hypot(dx, dy);
+      if (d >= c.radius + o.radius || d <= 1e-9) continue; // disjoint or concentric
+      const cosA = (d * d + c.radius * c.radius - o.radius * o.radius) / (2 * d * c.radius);
+      if (cosA >= 1) continue; // touching at a point — nothing swallowed
+      const half = Math.acos(clampNum(cosA, -1, 1));
+      const mid = Math.atan2(dy, dx);
+      covered.push([mid - half, mid + half]);
+    }
+    const free = freeArcs(covered);
+    if (free === 'whole') {
+      loops.push(tessellate(c, 0, TAU, true));
+      continue;
+    }
+    for (const [from, to] of free) arcs.push({ c, from, to });
+  }
+
+  // 3. Stitch the arcs into closed loops.
+  const used = new Array(arcs.length).fill(false);
+  for (let s = 0; s < arcs.length; s++) {
+    if (used[s]) continue;
+    const loop: number[] = [];
+    let cur = s;
+    for (let guard = 0; cur >= 0 && guard <= arcs.length; guard++) {
+      used[cur] = true;
+      const a = arcs[cur] as BoundaryArc;
+      const pts = tessellate(a.c, a.from, a.to, false);
+      for (const v of pts) loop.push(v);
+      const ex = a.c.x + a.c.radius * Math.cos(a.to);
+      const ey = a.c.y + a.c.radius * Math.sin(a.to);
+      let best = -1;
+      let bestD = Infinity;
+      for (let k = 0; k < arcs.length; k++) {
+        if (used[k]) continue;
+        const b = arcs[k] as BoundaryArc;
+        const px = b.c.x + b.c.radius * Math.cos(b.from);
+        const py = b.c.y + b.c.radius * Math.sin(b.from);
+        const dd = (px - ex) * (px - ex) + (py - ey) * (py - ey);
+        if (dd < bestD) {
+          bestD = dd;
+          best = k;
+        }
+      }
+      cur = best >= 0 && bestD <= STITCH_EPSILON * STITCH_EPSILON ? best : -1;
+    }
+    if (loop.length >= 6) loops.push(loop);
+  }
+  return loops;
+}
+
+/**
+ * Subtract a set of covered angular intervals from the full circle. Returns
+ * `'whole'` when nothing is covered (the disc contributes a complete circle), or
+ * the free `[from, to]` sweeps with `to > from` — possibly wrapping past TAU, so a
+ * free arc that straddles angle 0 stays ONE arc rather than two that would have to
+ * be stitched back together through a seam that is not an intersection.
+ */
+function freeArcs(covered: readonly [number, number][]): 'whole' | [number, number][] {
+  if (covered.length === 0) return 'whole';
+  // Normalise into [0, TAU), splitting anything that wraps.
+  const spans: [number, number][] = [];
+  for (const [s, e] of covered) {
+    const width = e - s;
+    if (width >= TAU) return [];
+    const from = wrapAngle(s);
+    const to = from + width;
+    if (to <= TAU) spans.push([from, to]);
+    else {
+      spans.push([from, TAU]);
+      spans.push([0, to - TAU]);
+    }
+  }
+  spans.sort((a, b) => a[0] - b[0]);
+  // Merge.
+  const merged: [number, number][] = [];
+  for (const s of spans) {
+    const last = merged[merged.length - 1];
+    if (last && s[0] <= last[1] + 1e-12) last[1] = Math.max(last[1], s[1]);
+    else merged.push([s[0], s[1]]);
+  }
+  // Complement.
+  const gaps: [number, number][] = [];
+  let cursor = 0;
+  for (const [s, e] of merged) {
+    if (s - cursor > 1e-9) gaps.push([cursor, s]);
+    cursor = Math.max(cursor, e);
+  }
+  if (TAU - cursor > 1e-9) gaps.push([cursor, TAU]);
+  if (gaps.length === 0) return [];
+  // Join a gap ending at TAU with one starting at 0 — the seam at angle 0 is an
+  // artefact of the normalisation, not a boundary.
+  const firstGap = gaps[0] as [number, number];
+  const lastGap = gaps[gaps.length - 1] as [number, number];
+  if (gaps.length > 1 && firstGap[0] <= 1e-9 && lastGap[1] >= TAU - 1e-9) {
+    lastGap[1] = TAU + firstGap[1];
+    gaps.shift();
+  } else if (gaps.length === 1 && firstGap[0] <= 1e-9 && firstGap[1] >= TAU - 1e-9) {
+    return 'whole';
+  }
+  return gaps;
+}
+
+/** Tessellate the CCW sweep `from → to` on `c` into flat `[x,y,…]`. Both endpoints
+ *  are included (they are the intersection points the stitch matches on) unless
+ *  `closed`, where the final duplicate of the first point is dropped. */
+function tessellate(c: MinimapCoverageDraw, from: number, to: number, closed: boolean): number[] {
+  const sweep = to - from;
+  const steps = Math.max(1, Math.ceil(sweep / arcStep(c.radius)));
+  const out: number[] = [];
+  const last = closed ? steps - 1 : steps;
+  for (let k = 0; k <= last; k++) {
+    const a = from + (sweep * k) / steps;
+    out.push(c.x + c.radius * Math.cos(a), c.y + c.radius * Math.sin(a));
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // The scene: project a frame into the active rect
 // ---------------------------------------------------------------------------
 
@@ -609,6 +956,10 @@ export function minimapScene(frame: MinimapFrame, rect: Rect, _isTouch = false):
       // A wreck is no longer owned (GDD §2.7): neutral steel, dimmer.
       color: p.alive ? playerColor(p.owner) : PALETTE.hullSteel,
       alpha,
+      // A fixed installation: the solid anchor (a0-88). A wreck keeps the square —
+      // it is still an installation, just nobody's; what says "spent" is the
+      // neutral steel and the dim, and that grammar did not move.
+      shape: 'square',
     });
   }
 
@@ -627,6 +978,9 @@ export function minimapScene(frame: MinimapFrame, rect: Rect, _isTouch = false):
       color: playerColor(sh.owner),
       alpha: sh.spawnProtected ? MINIMAP_SPAWN_PROTECT_ALPHA : MINIMAP_DOT_ALPHA,
       own: sh.local,
+      // A vessel, pointed where it is going (a0-88).
+      shape: 'triangle',
+      angle: sh.angle ?? 0,
     };
     if (sh.local) ownDot = dot;
     else shipDots.push(dot);
@@ -644,6 +998,9 @@ export function minimapScene(frame: MinimapFrame, rect: Rect, _isTouch = false):
       color: playerColor(sat.owner),
       alpha: MINIMAP_DOT_ALPHA,
       own: sat.local,
+      // An installation, but a small orbiting one: the station's square, turned on
+      // its point and smaller (a0-88). It keeps its steel outline from feature f1.
+      shape: 'diamond',
     });
   }
 
@@ -662,7 +1019,8 @@ export function minimapScene(frame: MinimapFrame, rect: Rect, _isTouch = false):
       }
     }
     const s = mapPoint(transform, o.x, o.y);
-    oreDots.push({ x: s.x, y: s.y, radius: oreR, color: PALETTE.signalYellow, alpha });
+    // Ore is neither a vessel nor an installation and keeps the plain dot (a0-88).
+    oreDots.push({ x: s.x, y: s.y, radius: oreR, color: PALETTE.signalYellow, alpha, shape: 'circle' });
   }
 
   // Coverage discs → screen space, for the view to reveal + ring ("you see what
@@ -690,6 +1048,8 @@ export function minimapScene(frame: MinimapFrame, rect: Rect, _isTouch = false):
     collapseRing,
     fogged: !!fog,
     coverage: coverageDraw,
+    // The union outline, not N circles (a0-88) — see MinimapScene.sensedRegion.
+    sensedRegion: sensedRegionOutlines(coverageDraw),
   };
 }
 
