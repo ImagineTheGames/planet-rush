@@ -389,6 +389,12 @@ export function settingsHelp(spec: SettingsRowSpec, device: DeviceKind): Setting
   return SETTINGS_HELP[settingsRowKey(spec)](device);
 }
 
+/**
+ * The glyph on a row's help control. A bare ASCII `?`, for the reasons
+ * {@link ./lobby} `SEAT_HELP_GLYPH` states and because it is the SAME control a
+ * player already met on the lobby's roster rows — one mark for "explain this"
+ * across the game, not two.
+ */
 export const SETTINGS_HELP_GLYPH = '?';
 
 /**
