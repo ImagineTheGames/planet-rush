@@ -1,0 +1,122 @@
+[
+  {
+    "id": "a0-96-settings-at-rest-both-surfaces",
+    "width": 1280,
+    "title": "a0-96 \u2014 both settings screens at rest, both viewports",
+    "sub": "Build bc4e78f*, production bundle (npm run build + preview). Menu frames reached by pressing SETTINGS on the main menu; match frames by PLAY \u2192 PLAY SOLO \u2192 RUSH \u2192 ESC \u2192 SETTINGS. Pointer parked off every plate before each shot.",
+    "blocks": [
+      {
+        "img": "desktop-1280x800-menu-rest.png",
+        "caption": "MAIN MENU \u2192 SETTINGS, desktop 1280x800. Six rows in one column: FIRE MODE AUTO-AIM, CONTROLS TAP COMMANDER, REDUCE VFX OFF, MASTER VOLUME 8 of 10 pips lit, SFX VOLUME 8 of 10, MUSIC VOLUME 6 of 10. Header SETTINGS left, eyebrow CHANGES SAVE IMMEDIATELY right, DONE bottom-right, build stamp bc4e78f* bottom-left. A `?` leads every row."
+      },
+      {
+        "img": "phone-798x384-menu-rest.png",
+        "caption": "The same screen at 798x384 landscape. The six rows wrap into two columns of three \u2014 toggles left, volumes right \u2014 and carry the same values. Nothing is clipped at this width; the DONE plate is clear of every row."
+      },
+      {
+        "img": "desktop-1280x800-pause-rest.png",
+        "caption": "IN-MATCH pause \u2192 SETTINGS, desktop. The same six rows at the same defaults, over the frozen match (the objective line and the station nameplate are visible through the overlay). Bottom-right, the match's DOWNLOAD LOG button lands on the DONE plate: only DO is readable."
+      },
+      {
+        "img": "phone-798x384-pause-rest.png",
+        "caption": "The in-match screen at 798x384. Six rows, same values, same eyebrow. Bottom-right, DOWNLOAD LOG covers the word DONE entirely \u2014 the only part of the plate still visible is its left accent bar."
+      }
+    ]
+  },
+  {
+    "id": "a0-96-settings-persistence-desktop",
+    "width": 1280,
+    "title": "a0-96 \u2014 CHANGES SAVE IMMEDIATELY, tested: desktop 1280x800",
+    "sub": "One browser context. Every row moved off its default by pressing the control a player presses, then the page reloaded and the screen reopened through the same front door. Nothing is asserted here; the three frames are the whole argument.",
+    "blocks": [
+      {
+        "img": "desktop-1280x800-menu-rest.png",
+        "caption": "BEFORE \u2014 fresh storage. AUTO-AIM / TAP COMMANDER / OFF / MASTER 8 of 10 / SFX 8 of 10 / MUSIC 6 of 10."
+      },
+      {
+        "img": "desktop-1280x800-menu-changed.png",
+        "caption": "AFTER THE PRESSES, still on the same page load. MANUAL / KEYBOARD + MOUSE / ON / MASTER 3 of 10 / SFX 10 of 10 / MUSIC 0 of 10 (no pip lit). Every row has moved."
+      },
+      {
+        "img": "desktop-1280x800-menu-reloaded.png",
+        "caption": "AFTER A FULL PAGE RELOAD, reopened from the main menu. MANUAL / KEYBOARD + MOUSE / ON / MASTER 3 / SFX 10 / MUSIC 0 \u2014 all six rows came back exactly as left. Against the frame above it, 1408 of 4096000 pixels differ, and every one of them is in one 92x92 box: the keyboard focus ring on the CONTROLS row's `?`, bright in the pre-reload frame and absent in the fresh one. No row value moved."
+      },
+      {
+        "img": "../crops/desktop-menu-rest-volumes.png",
+        "caption": "CROP, before: the three bars at 8, 8 and 6 lit pips of 10."
+      },
+      {
+        "img": "../crops/desktop-menu-reloaded-volumes.png",
+        "caption": "CROP, after the reload: 3, 10 and 0. Counted off the committed frames, not read from the app."
+      }
+    ]
+  },
+  {
+    "id": "a0-96-settings-persistence-phone",
+    "width": 1200,
+    "title": "a0-96 \u2014 CHANGES SAVE IMMEDIATELY, tested: phone 798x384 landscape",
+    "sub": "The same run at the narrowest supported width. Presses are real taps through the touch pipeline.",
+    "blocks": [
+      {
+        "img": "phone-798x384-menu-rest.png",
+        "caption": "BEFORE \u2014 fresh storage. AUTO-AIM / TAP COMMANDER / OFF / 8 / 8 / 6. On touch the CONTROLS row's default word is STICKS, so TAP COMMANDER here is the opt-in scheme, seated."
+      },
+      {
+        "img": "phone-798x384-menu-changed.png",
+        "caption": "AFTER THE PRESSES. MANUAL / STICKS / ON / MASTER 3 / SFX 10 / MUSIC 0."
+      },
+      {
+        "img": "phone-798x384-menu-reloaded.png",
+        "caption": "AFTER A FULL PAGE RELOAD. The same six values \u2014 and this frame is byte-identical to the one above it: 0 pixels of 1225728 differ."
+      },
+      {
+        "img": "../crops/phone-menu-rest-volumes.png",
+        "caption": "CROP, before: 8, 8, 6 pips lit."
+      },
+      {
+        "img": "../crops/phone-menu-reloaded-volumes.png",
+        "caption": "CROP, after the reload: 3, 10, 0 pips lit."
+      }
+    ]
+  },
+  {
+    "id": "a0-96-settings-persistence-into-the-match",
+    "width": 1280,
+    "title": "a0-96 \u2014 the second surface reads the same storage",
+    "sub": "Change all six rows on the MENU screen, press DONE, reload the page, then boot a match through the front door (PLAY \u2192 PLAY SOLO \u2192 RUSH) and open pause \u2192 SETTINGS. The match loads its own copy of the settings at boot; these are that copy.",
+    "blocks": [
+      {
+        "img": "phone-798x384-pause-reloaded.png",
+        "caption": "Phone 798x384, in-match pause SETTINGS after the reload: MANUAL / STICKS / ON / MASTER 3 / SFX 10 / MUSIC 0 \u2014 the six values set on the menu screen, in the match's own screen."
+      },
+      {
+        "img": "desktop-1280x800-pause-reloaded.png",
+        "caption": "Desktop 1280x800, same run: MANUAL / KEYBOARD + MOUSE / ON / 3 / 10 / 0. DOWNLOAD LOG again sits on the DONE plate."
+      }
+    ]
+  },
+  {
+    "id": "a0-96-settings-help-panels",
+    "width": 780,
+    "title": "a0-96 \u2014 the six `?` panels, as they render",
+    "sub": "Each panel opened by pressing that row's `?` on the main-menu settings screen and photographed; the crops below are cut out by difference against the same screen with no panel open, so nothing is hand-placed. Desktop first, then the same six on the phone.",
+    "blocks": [
+      {
+        "img": "../crops/desktop-help-panels.png",
+        "caption": "Desktop 1280x800, in row order. FIRE MODE: \"TAP COMMANDER aims and fires for you. Switch CONTROLS to aim yourself.\" CONTROLS: \"TAP COMMANDER flies the ship for you: tap where to go, tap what to hit. On KEYBOARD + MOUSE you fly it yourself.\" REDUCE VFX: \"Thins the effects that carry no information, to hold the frame rate. The game does this on its own when the rate drops; ON keeps them thin all the time.\" MASTER VOLUME: \"Every sound the game makes.\" SFX VOLUME: \"Weapons, impacts, engines, menus.\" MUSIC VOLUME: \"The soundtrack.\""
+      },
+      {
+        "img": "../crops/phone-help-panels.png",
+        "caption": "Phone 798x384, same six. Word for word the same, with one difference: CONTROLS names the device in front of the player, so it reads \"On STICKS you fly it yourself\" where the desktop said KEYBOARD + MOUSE."
+      },
+      {
+        "img": "../crops/desktop-help-fireMode-sticks.png",
+        "caption": "The same FIRE MODE `?`, with CONTROLS switched to KEYBOARD + MOUSE: \"AUTO-AIM locks the nearest target and leads it while you fire. MANUAL leaves the aim to you.\" One row, one value on the chip, two different accounts of what it does."
+      },
+      {
+        "img": "phone-798x384-menu-help-fireMode.png",
+        "caption": "The FIRE MODE panel in its frame at 798x384. It floats above its row and clears both the row and its value \u2014 and its top edge covers the screen's own SETTINGS title. Nothing of the panel is clipped by the viewport."
+      }
+    ]
+  }
+]
