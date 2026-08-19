@@ -19,7 +19,6 @@ import { FireMode } from '@platform/actions';
 import type { ClientMessage, LobbySlot } from '../net/transport';
 import {
   createFlow,
-  flowCloseSettings,
   flowConnected,
   flowEliminated,
   flowFailed,
@@ -28,13 +27,11 @@ import {
   flowMatchEnded,
   flowMatchStart,
   flowOpenHangar,
-  flowOpenSettings,
   flowTapEnd,
   flowTapHangar,
   setFlowProfile,
   flowTapEntry,
   flowTapLobby,
-  flowTapSettings,
   resetFlow,
   setFlowFireMode,
   tickFlow,
@@ -71,7 +68,6 @@ import type { LobbyLayout, LobbyTarget } from './lobby-geometry';
 import type { MatchMode } from '../sim/match-config';
 import type { Rect } from '@platform/layout-registry';
 import { endOfMatchModel } from './end-of-match';
-import { createSettings, volumeLevel } from './settings';
 
 // ---------------------------------------------------------------------------
 // Helpers — a flow is driven the way main.ts will drive it: state in, effects
@@ -1136,81 +1132,52 @@ function inMatch(you = 0, host = you): FlowState {
   return flowMatchStart(inLobby(you, host)).state;
 }
 
-describe('the settings screen (the fourth main-menu option)', () => {
-  it('opens from the main menu and returns to it', () => {
+describe('SETTINGS, the main-menu option this seam deliberately does not carry', () => {
+  // a0-95 deleted the flow's own settings screen: a `FlowState.settings` field,
+  // a tap handler that folded volumes and REDUCE VFX into it, and not one reader
+  // anywhere. The settings a player reaches are the menu's and the pause menu's,
+  // and since a0-92 both go through `./settings` `commitSettings` — the one seam
+  // that writes, saves and reaches the mixer. What is left here is the refusal,
+  // asserted so a later hand cannot quietly grow the third copy back.
+
+  it('leaves the door untouched — SETTINGS opens a screen, not a room', () => {
     const rng = mulberry32(21);
-    const opened = flowTapEntry(createFlow(), { kind: 'settings' }, rng);
-    expect(opened.state.screen).toBe('settings');
-    expect(opened.state.settingsReturn).toBe('entry');
-    expect(opened.effects).toEqual([]); // opening a screen owes the wire nothing
-
-    const done = flowTapSettings(opened.state, { kind: 'back' });
-    expect(done.state.screen).toBe('entry');
+    const before = createFlow();
+    const tapped = flowTapEntry(before, { kind: 'settings' }, rng);
+    expect(tapped.state).toBe(before); // identical, not merely equal
+    expect(tapped.effects).toEqual([]); // and it owes the wire nothing
   });
 
-  it('only opens from a screen a settings button can be pressed on', () => {
-    // Mid-lobby there is no main-menu settings button; the flow refuses to jump.
-    expect(flowOpenSettings(inLobby()).state.screen).toBe('lobby');
+  it('holds no settings of its own — only the two that ride a match', () => {
+    // The whole of what a player's preferences look like from in here: the fire
+    // mode (because it rides `lobbyChoice`) and the control scheme (because a
+    // rematch must not forget it). A volume or a REDUCE VFX flag appearing on
+    // this state again would be the deleted path growing back.
+    expect(Object.keys(createFlow())).not.toContain('settings');
+    expect(Object.keys(createFlow())).not.toContain('settingsReturn');
+    expect(createFlow()).toHaveProperty('fireMode');
+    expect(createFlow()).toHaveProperty('controlScheme');
   });
 
-  it('backs out on Escape, and ignores other keys', () => {
-    const settings = flowOpenSettings(createFlow()).state;
-    expect(flowKey(settings, 'A').state).toBe(settings); // swallowed, no churn
-    expect(flowKey(settings, 'Escape').state.screen).toBe('entry');
-  });
-
-  it('toggles the fire mode, and it is the SAME value the wire will carry', () => {
-    const settings = flowOpenSettings(createFlow(FireMode.Manual)).state;
-    const toggled = flowTapSettings(settings, { kind: 'fireMode' });
-    expect(toggled.state.fireMode).toBe(FireMode.AutoAim);
-    expect(toggled.effects).toEqual([]); // no lobby on the main menu, so no message
-
-    // …and it rides the first lobbyChoice when a room finally opens.
-    const done = flowCloseSettings(toggled.state).state;
+  it('carries the fire mode it was built with onto the first lobbyChoice', () => {
+    // The one thing the deleted screen was genuinely wired to — a fire mode
+    // toggled elsewhere still has to reach the wire. It is pushed in the way it
+    // always could be (`setFlowFireMode` / `createFlow`), and rides the first
+    // choice a room hears.
+    const done = setFlowFireMode(createFlow(FireMode.Manual), FireMode.AutoAim);
     const rng = mulberry32(22);
     const opened = flowTapEntry(done, { kind: 'door', index: doorIndex('solo') }, rng);
     expect(sent(flowConnected(opened.state, 0))[0]).toMatchObject({ fireMode: 'auto' });
   });
 
-  it('toggles the control scheme, and it never rides the wire (local input only)', () => {
-    const settings = flowOpenSettings(createFlow()).state;
-    // Tap Commander is the default on every platform since a0-30 (GDD §2.4,
-    // amended 2026-08-12) — so the row toggles AWAY from it first. The toggle
-    // itself, and both destinations, are unchanged: this used to read 'sticks'
-    // here and 'tap' below.
-    expect(settings.controlScheme).toBe('tap');
-    const sticks = flowTapSettings(settings, { kind: 'controls' });
-    expect(sticks.state.controlScheme).toBe('sticks'); // still one press away
-    expect(sticks.effects).toEqual([]); // the scheme is local input — nothing to send
-    const back = flowTapSettings(sticks.state, { kind: 'controls' });
-    expect(back.state.controlScheme).toBe('tap');
-
-    // …and unlike the fire mode it does NOT ride a lobbyChoice — the sim never
-    // sees the scheme, so opening a room carries no control-scheme field.
-    const done = flowCloseSettings(sticks.state).state;
+  it('never lets the control scheme ride the wire — the sim does not see it', () => {
+    // Sticks vs Tap Commander is local input. It survives into a match as state
+    // and is carried by `resetFlow`, but no `lobbyChoice` mentions it.
+    const sticks = createFlow(undefined, 'sticks');
+    expect(sticks.controlScheme).toBe('sticks');
     const rng = mulberry32(23);
-    const opened = flowTapEntry(done, { kind: 'door', index: doorIndex('solo') }, rng);
+    const opened = flowTapEntry(sticks, { kind: 'door', index: doorIndex('solo') }, rng);
     expect(sent(flowConnected(opened.state, 0))[0]).not.toHaveProperty('controlScheme');
-  });
-
-  it('toggles reduce VFX and steps a volume, without a message either', () => {
-    const settings = flowOpenSettings(createFlow()).state;
-    const vfx = flowTapSettings(settings, { kind: 'reduceVfx' });
-    expect(vfx.state.settings.reduceVfx).toBe(true);
-    expect(vfx.effects).toEqual([]);
-
-    const before = volumeLevel(settings.settings, 'master');
-    const down = flowTapSettings(vfx.state, { kind: 'volume', channel: 'master', dir: -1 });
-    expect(volumeLevel(down.state.settings, 'master')).toBe(before - 1);
-  });
-
-  it('stays perfectly still on a tap that changed nothing', () => {
-    // A volume already at zero, nudged down again: identical settings, identical
-    // flow — no new object for anything watching by identity.
-    let s = flowOpenSettings(createFlow()).state;
-    for (let i = 0; i < 15; i++) s = flowTapSettings(s, { kind: 'volume', channel: 'sfx', dir: -1 }).state;
-    const again = flowTapSettings(s, { kind: 'volume', channel: 'sfx', dir: -1 });
-    expect(again.state).toBe(s);
   });
 });
 
@@ -1287,10 +1254,10 @@ describe('the end-of-match summary, and Rematch (resets the world cleanly)', () 
     expect(flowTapEnd(ended, { kind: 'spectate' }).state).toBe(ended);
   });
 
-  it('Rematch resets the world to a clean door, keeping fire mode and settings', () => {
+  it('Rematch resets the world to a clean door, keeping the how-it-plays choices', () => {
     // A match played with non-default preferences.
     let state = setFlowFireMode(inMatch(0), FireMode.AutoAim);
-    state = { ...state, settings: { ...createSettings(), reduceVfx: true }, controlScheme: 'tap' };
+    state = { ...state, controlScheme: 'tap' };
     const ended = flowMatchEnded(state, 0).state;
 
     const rematch = flowTapEnd(ended, { kind: 'rematch' });
@@ -1302,7 +1269,6 @@ describe('the end-of-match summary, and Rematch (resets the world cleanly)', () 
     expect(back.entry.code).toBe(''); // and the door is clean
     // …but the player's choices survive the reset.
     expect(back.fireMode).toBe(FireMode.AutoAim);
-    expect(back.settings.reduceVfx).toBe(true);
     expect(back.controlScheme).toBe('tap'); // the control scheme is the player's too
   });
 
@@ -1346,7 +1312,7 @@ describe('the hangar', () => {
   });
 
   it('is a no-op from every screen a player cannot have pressed it on', () => {
-    for (const screen of ['settings', 'lobby', 'match', 'end'] as const) {
+    for (const screen of ['lobby', 'match', 'end'] as const) {
       const state: FlowState = { ...createFlow(), screen };
       expect(flowOpenHangar(state).state).toBe(state);
       // …and a stray tap arriving a frame late must not move a live match.

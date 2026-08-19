@@ -74,8 +74,7 @@ import { ShipClass } from '@shared/types';
 import { FireMode, defaultFireMode } from '@platform/actions';
 import type { ClientMessage, FireMode as WireFireMode, LobbySlot, RoomCode } from '../net/transport';
 import type { EntryTarget, LobbyTarget } from './lobby-geometry';
-import { adjustVolume, createSettings, toggleReduceVfx } from './settings';
-import type { ControlScheme, SettingsState, SettingsTarget } from './settings';
+import type { ControlScheme } from './settings';
 import { endButtons } from './end-of-match';
 import type { EndTarget, MatchOutcome } from './end-of-match';
 import { JOIN_MODES } from './lobby-browser';
@@ -135,9 +134,6 @@ import type { Profile } from '../progression/profile';
  * Which screen owns the display.
  *
  *  - `entry`    — the doors and the keypad ({@link ./lobby-entry-view}).
- *  - `settings` — the fire mode, reduce-VFX and volumes ({@link ./settings-view}),
- *                 reached from the main menu and returned from to wherever it was
- *                 opened ({@link FlowState.settingsReturn}).
  *  - `hangar`   — the fourth door (a0-14, {@link ./hangar-view}): your ship, your
  *                 level, and the cosmetics a level has unlocked. Opens from the
  *                 front door and comes back; it starts nothing.
@@ -145,12 +141,24 @@ import type { Profile } from '../progression/profile';
  *  - `match`    — the world has the screen; this module is watching for the end.
  *  - `end`      — the end-of-match summary ({@link ./end-of-match-view}): VICTORY /
  *                 DEFEAT / DRAW / ELIMINATED, with Rematch and maybe Spectate.
+ *
+ * **There is deliberately no `settings` screen here (a0-95).** There was one,
+ * whose tap handler folded volumes and REDUCE VFX into a `FlowState.settings`
+ * field — and nothing ever read that field, rendered that screen or persisted a
+ * byte of it. The settings a player actually reaches are
+ * the two live screens (the menu's and the pause menu's), and since a0-92 both
+ * go through the ONE seam in {@link ./settings} `commitSettings`: it writes the
+ * value, saves it, and pushes the mix at the mixer. A third model here would be
+ * a fourth place a volume could live, which is the exact shape that produced
+ * every settings bug of that week — a value that looks live and is not. If a
+ * pause menu ever needs the flow to know a preference changed, push it in the
+ * way the fire mode already is ({@link setFlowFireMode}); do not grow a screen.
  */
-export type FlowScreen = 'entry' | 'settings' | 'hangar' | 'lobby' | 'match' | 'end';
+export type FlowScreen = 'entry' | 'hangar' | 'lobby' | 'match' | 'end';
 
 /** Every screen, in a stable order — the audit list {@link flowScreenHandler}
  *  is walked over. */
-export const FLOW_SCREENS: readonly FlowScreen[] = ['entry', 'settings', 'hangar', 'lobby', 'match', 'end'];
+export const FLOW_SCREENS: readonly FlowScreen[] = ['entry', 'hangar', 'lobby', 'match', 'end'];
 
 /**
  * The exported function that owns input on each screen — the flow's half of the
@@ -170,8 +178,6 @@ export function flowScreenHandler(screen: FlowScreen): string | null {
   switch (screen) {
     case 'entry':
       return 'flowTapEntry';
-    case 'settings':
-      return 'flowTapSettings';
     case 'hangar':
       return 'flowTapHangar';
     case 'lobby':
@@ -199,18 +205,15 @@ export interface FlowState {
   /** False for the SOLO door — the caller's cue for `LocalLoopback` over a
    *  WebSocket (GDD §4.2). Meaningless before a door has been chosen. */
   readonly online: boolean;
-  /** The fire mode sent with every `lobbyChoice`. The value the settings screen
-   *  toggles, carried here because it rides the wire — one home, no drift. */
+  /** The fire mode sent with every `lobbyChoice`. Set by whoever owns the
+   *  settings screen and pushed in through {@link setFlowFireMode}, carried here
+   *  because it rides the wire — one home, no drift. */
   readonly fireMode: FireMode;
-  /** The rest of the player's settings — reduce VFX and the three volumes. Always
-   *  present; survives a rematch ({@link resetFlow}), because a setting is not
-   *  match state. */
-  readonly settings: SettingsState;
   /** How the player drives the ship (developer §3): `'sticks'` or Tap Commander.
-   *  Held here beside the fire mode — the settings screen's other how-it-plays
-   *  toggle — but unlike the fire mode it never rides the wire (it is a purely
-   *  local input scheme), so changing it costs the lobby nothing. Survives a
-   *  rematch ({@link resetFlow}). */
+   *  Held here beside the fire mode — the other how-it-plays choice — but unlike
+   *  the fire mode it never rides the wire (it is a purely local input scheme),
+   *  so it costs the lobby nothing. Carried in at {@link createFlow} and survives
+   *  a rematch ({@link resetFlow}). */
   readonly controlScheme: ControlScheme;
   /** The end-of-match outcome, once a match has ended. Null on every other
    *  screen; the {@link ./end-of-match} summary is built from it. */
@@ -218,9 +221,6 @@ export interface FlowState {
   /** True while watching a match you are no longer playing (chose Spectate on the
    *  elimination summary). Purely a display flag: the world is unchanged. */
   readonly spectating: boolean;
-  /** Where DONE on the settings screen returns to — the screen it was opened
-   *  from. The main menu is `entry`; a future pause menu would set `match`. */
-  readonly settingsReturn: FlowScreen;
   /**
    * The player's career (`src/progression/profile.ts`) — what the hangar reads
    * and, when a cosmetic is equipped, what it writes back through a
@@ -228,7 +228,7 @@ export interface FlowState {
    *
    * Always present, so no screen has to guard it; a caller with no storage yet
    * gets `freshProfile()`. It is **not match state** and survives a rematch
-   * ({@link resetFlow}) for the same reason the settings do. This module never
+   * ({@link resetFlow}) for the same reason the fire mode does. This module never
    * computes XP: banking is the end-of-match summary's single write site (plan
    * §2.1), and the hangar only ever changes which cosmetic is worn.
    */
@@ -274,8 +274,11 @@ export interface FlowResult {
 const NO_EFFECTS: readonly FlowEffect[] = [];
 
 /**
- * A flow resting on a clean entry screen. Fire mode and the rest of settings carry
- * in, so a rematch keeps a player's choices ({@link resetFlow}).
+ * A flow resting on a clean entry screen. The fire mode and the control scheme
+ * carry in, so a rematch keeps a player's choices ({@link resetFlow}). The rest
+ * of a player's settings — REDUCE VFX and the three volumes — are deliberately
+ * not held here: they belong to {@link ./settings} and the screens that render
+ * them (a0-95), and this module has never had anything to do with them.
  *
  * **The two how-it-plays defaults are the ratified ones, on every platform (GDD
  * §2.4, amended 2026-08-12 — a0-30):** Tap Commander and Auto-aim. They are stated
@@ -288,7 +291,6 @@ const NO_EFFECTS: readonly FlowEffect[] = [];
  */
 export function createFlow(
   fireMode: FireMode = defaultFireMode(),
-  settings: SettingsState = createSettings(),
   controlScheme: ControlScheme = 'tap',
   profile: Profile = freshProfile(),
 ): FlowState {
@@ -300,11 +302,9 @@ export function createFlow(
     room: null,
     online: false,
     fireMode,
-    settings,
     controlScheme,
     end: null,
     spectating: false,
-    settingsReturn: 'entry',
   };
 }
 
@@ -450,9 +450,13 @@ export function flowTapEntry(state: FlowState, target: EntryTarget, rng: Rng): F
     case 'submit':
       return resolve(state, submitJoin(state.entry));
     case 'settings':
-      // The fourth main-menu option opens a screen, not a room — no transport,
-      // no code, just the settings the player already has in hand.
-      return flowOpenSettings(state);
+      // …and the second target this seam deliberately does NOT carry (a0-95).
+      // SETTINGS opens a screen, not a room: no transport, no code, nothing the
+      // sequence owes anyone. The screen and the values on it belong to
+      // {@link ./settings} and the shell that renders it, which is where the two
+      // live settings screens already read and write them — answering here would
+      // mint the third copy this brief deleted.
+      return rest(state);
   }
 }
 
@@ -476,9 +480,6 @@ function resolve(state: FlowState, result: { state: EntryState; intent: EntryInt
  * offered as a character and silently dropped if it is not one.
  */
 export function flowKey(state: FlowState, key: string): FlowResult {
-  // Escape backs out of the settings screen the way DONE does — the one key the
-  // settings screen listens for, since everything else on it is a tap.
-  if (state.screen === 'settings') return key === 'Escape' ? flowCloseSettings(state) : rest(state);
   // The hangar takes Escape and Backspace out, exactly as the codex does — one
   // key out of a screen that is never a gate.
   if (state.screen === 'hangar') {
@@ -755,79 +756,6 @@ export function flowMatchStart(state: FlowState): FlowResult {
 }
 
 // ---------------------------------------------------------------------------
-// Settings — the fourth main-menu screen
-// ---------------------------------------------------------------------------
-
-/**
- * Open the settings screen, remembering where to return. Reachable from the main
- * menu today ({@link flowTapEntry} `settings`); the `settingsReturn` it records
- * is what lets a future pause menu open the same screen and land back in the
- * match. A no-op from anywhere the player cannot have pressed a settings button.
- */
-export function flowOpenSettings(state: FlowState): FlowResult {
-  if (state.screen !== 'entry' && state.screen !== 'match') return rest(state);
-  return rest({ ...state, screen: 'settings', settingsReturn: state.screen });
-}
-
-/** Leave the settings screen for wherever it was opened from. DONE and Escape
- *  both land here; the changes are already applied, so there is nothing to
- *  confirm or discard. */
-export function flowCloseSettings(state: FlowState): FlowResult {
-  if (state.screen !== 'settings') return rest(state);
-  return rest({ ...state, screen: state.settingsReturn });
-}
-
-/**
- * Apply a tap on the settings screen — from {@link ./settings} `settingsHitTest`.
- *
- * Every change is applied on the spot (there is no cancel), and none of them
- * costs the wire anything on the main menu, where there is no lobby to tell. If
- * the fire mode is ever changed from a pause menu mid-lobby, the lobby is owed a
- * fresh `lobbyChoice`, so that one case re-sends it — the same rule
- * {@link withLobby} keeps for a hull.
- */
-export function flowTapSettings(state: FlowState, target: SettingsTarget): FlowResult {
-  if (state.screen !== 'settings') return rest(state);
-  switch (target.kind) {
-    case 'back':
-      return flowCloseSettings(state);
-    case 'fireMode':
-      return applyFireMode(state, state.fireMode === FireMode.AutoAim ? FireMode.Manual : FireMode.AutoAim);
-    case 'controls':
-      // Toggle the scheme. Unlike the fire mode it never touches the wire — it is
-      // a local input scheme the sim never sees — so this only folds into state.
-      return rest({ ...state, controlScheme: state.controlScheme === 'tap' ? 'sticks' : 'tap' });
-    case 'reduceVfx':
-      return foldSettings(state, toggleReduceVfx(state.settings));
-    case 'volume':
-      return foldSettings(state, adjustVolume(state.settings, target.channel, target.dir));
-    case 'help':
-      // A row's `?` (a0-77). It explains the setting and changes NOTHING — no
-      // value, no screen, no `lobbyChoice` — so the flow is returned untouched.
-      // Which explanation is open is held by the wiring layer beside the other
-      // pointer state (hover, press), exactly as the lobby holds its codex
-      // dossier: a panel a player opened is not a decision the room needs told.
-      return rest(state);
-  }
-}
-
-/** Fold a new settings value in, staying identical on a no-op so a slider against
- *  its stop stops churning state. Settings other than fire mode never touch the
- *  wire, so this emits nothing. */
-function foldSettings(state: FlowState, settings: SettingsState): FlowResult {
-  return settings === state.settings ? rest(state) : rest({ ...state, settings });
-}
-
-/** Set the fire mode, re-sending the lobby's choice only if there is a lobby to
- *  hear it (the pause-menu case). On the main menu there is none, so nothing goes
- *  out — the mode simply rides the next `lobbyChoice` when a room opens. */
-function applyFireMode(state: FlowState, fireMode: FireMode): FlowResult {
-  if (state.fireMode === fireMode) return rest(state);
-  const next = { ...state, fireMode };
-  return next.lobby ? { state: next, effects: [choiceFor(next, next.lobby)] } : rest(next);
-}
-
-// ---------------------------------------------------------------------------
 // The hangar — the fourth main-menu screen (a0-14)
 // ---------------------------------------------------------------------------
 
@@ -939,7 +867,7 @@ function sideOf(state: FlowState, you: PlayerId): ReadonlySet<PlayerId> {
  * `endOfMatchHitTest`.
  *
  *  - **Rematch** tears the world down to a clean door ({@link resetFlow}),
- *    keeping the player's settings. This is the "resets the world cleanly" path.
+ *    keeping the player's choices. This is the "resets the world cleanly" path.
  *  - **Spectate** dismisses the summary and returns to watching the still-live
  *    match, flagged as a spectator. Refused when the outcome did not offer it (a
  *    whole-match-over screen has nothing left to watch), so a stale tap cannot
@@ -962,8 +890,8 @@ export function setFlowFireMode(state: FlowState, fireMode: FireMode): FlowState
 /** Leave the match and come back to a clean door — Rematch's way out, and the
  *  reset the end-of-match summary performs. Deliberately a full reset: a stale
  *  roster behind a new door is how a player ends up looking at the previous
- *  match's colours. Fire mode, the control scheme, the rest of settings and the
- *  career profile all survive it — they are the player's, not the match's. */
+ *  match's colours. The fire mode, the control scheme and the career profile all
+ *  survive it — they are the player's, not the match's. */
 export function resetFlow(state: FlowState): FlowState {
-  return createFlow(state.fireMode, state.settings, state.controlScheme, state.profile);
+  return createFlow(state.fireMode, state.controlScheme, state.profile);
 }
