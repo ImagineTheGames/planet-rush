@@ -327,9 +327,10 @@ export const SETTINGS_HELP: Record<
   // GDD §2.4 "Fire modes" — and THE SCHEME SEAM, for the same reason CONTROLS
   // needs the device seam (a0-89).
   //
-  // This row used to end "Either way, you choose when to fire." That was checked
-  // against the sim, where it is true: `fireShip()` (`src/sim/step.ts`) needs
-  // `intent.fire` in both modes, and auto-aim only moves where the shot goes.
+  // This row used to end with a third sentence handing the player the trigger in
+  // both modes ("either way, the moment is yours"). It was checked against the
+  // sim, where that holds: `fireShip()` (`src/sim/step.ts`) needs `intent.fire`
+  // in both modes, and auto-aim only moves where the shot goes.
   // But the player is not at the sim layer. Under TAP COMMANDER — the default
   // scheme on every platform since 2026-08-12, and what the report came from —
   // `TapPilot` writes `fire` ITSELF and `main.ts` hands it straight to the sim:
