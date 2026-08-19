@@ -169,8 +169,8 @@ export function screenClaimsTheDisplay(state: MatchLogOfferState): boolean {
 export function matchLogOffer(state: MatchLogOfferState): MatchLogOfferReason {
   // a0-97: settings / confirm draw their own controls into this corner.
   if (!pauseAllowsDownloadLog(state.pauseScreen)) return null;
-  // a0-98 CLAUSE REMOVED FOR THE 'broken' CAPTURE — see /tmp/a098-broken.patch.sh
-  void screenClaimsTheDisplay;
+  // a0-98: so does the match itself — the minimap, and on touch the fire column.
+  if (!screenClaimsTheDisplay(state)) return null;
   if (sessionHasDropped(state.session)) return 'disconnect';
   return isPauseOpen(state.pauseScreen) ? 'pause' : null;
 }
