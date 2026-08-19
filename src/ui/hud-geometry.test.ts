@@ -980,6 +980,50 @@ describe('onboarding placement', () => {
     expect(violations).toEqual([]);
   });
 
+  it('which screens the WORST AUTHORED prompt actually costs, named rather than discovered', () => {
+    // The screen-level pin above asks "could any prompt fit"; this asks the
+    // question the player experiences — does the LONGEST sentence GDD §2.10 has
+    // fit, on this screen, with the wheel open? The two answers differ, and the
+    // difference is the honest cost of this fix, so it is written down rather
+    // than left for a capture to find.
+    //
+    // What it costs: on 390×844 the objective prompt wraps to FOURTEEN lines,
+    // because a 390px-wide portrait phone has 46px between its two thumb columns
+    // and the band falls back to the legibility floor (80px of text). That is
+    // 241px of panel against a 238px band — a three-pixel miss — so the prompt
+    // waits for the wheel to close there too.
+    //
+    // What it buys, and it is much bigger than QA's capture: the small portrait
+    // phones were the WORST offenders and nobody had photographed them. On
+    // 320×568 that same panel ran 111px into the wheel's footprint and 93px into
+    // the DISC — a third of the wheel's face under a wall of text — and on
+    // 375×667 it ran 79px in. Those two were never a wedge or two clipped; they
+    // were the wheel unusable.
+    const worst = (vp: Viewport, isTouch: boolean): number => {
+      const width = promptWrapWidth(vp.width, vp.height, isTouch);
+      let tallest = 0;
+      for (const text of AUTHORED) tallest = Math.max(tallest, wrapped(text, vp, width).h);
+      return tallest;
+    };
+    const withdrawn = PROFILES.filter(({ vp, isTouch }) =>
+      promptWithdraws(vp.width, vp.height, isTouch, {}, true, worst(vp, isTouch)),
+    ).map(({ name }) => name);
+
+    expect(withdrawn, 'the screens where the longest authored prompt waits for the wheel').toEqual([
+      'iphone/portrait',
+      'iphone/landscape',
+      'qa-phone/landscape',
+      'pixel/landscape',
+      'iphone-se/portrait',
+      'small/portrait',
+      'small/landscape',
+    ]);
+    // …and the two that keep it, so a change that takes the prompt off a DESKTOP
+    // is a failure here and not a shrug.
+    expect(PROFILES.map(({ name }) => name).filter((n) => !withdrawn.includes(n)))
+      .toEqual(['pixel/portrait', 'desktop']);
+  });
+
   it('the two viewports the brief names, in the registry numbers it quotes', () => {
     // The before/after the Definition of Done asks for, as arithmetic rather than
     // as a screenshot. `before` is what `main` computed — the band measured from
