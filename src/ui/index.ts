@@ -1058,6 +1058,9 @@ export type {
 } from './pause-menu';
 
 export { PauseMenuView } from './pause-menu-view';
+
+// Where the DOWNLOAD LOG offer may stand in a match (a0-98) — a0-97's rule,
+// generalised past pause. Beside the pause exports because it composes them.
 export {
   kickOutClaimsTheGlass,
   matchLogOffer,
@@ -1070,7 +1073,6 @@ export type {
   MatchLogOfferState,
   SessionLinkState,
 } from './log-offer';
-
 
 export {
   CONNECTION_STATUS_ID,

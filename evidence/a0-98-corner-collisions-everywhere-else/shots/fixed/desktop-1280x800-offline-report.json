@@ -1,22 +1,22 @@
 {
   "stage": "fixed",
-  "profile": "phone-798x384",
+  "profile": "desktop-1280x800",
   "reports": [
     {
       "state": "boot-failure",
-      "profile": "phone-798x384",
+      "profile": "desktop-1280x800",
       "viewport": {
-        "width": 798,
-        "height": 384,
+        "width": 1280,
+        "height": 800,
         "dpr": 2,
-        "touch": true
+        "touch": false
       },
       "log": {
         "mounted": true,
         "hidden": false,
         "rect": {
-          "x": 496.40625,
-          "y": 290.234375,
+          "x": 978.40625,
+          "y": 706.234375,
           "width": 289.59375,
           "height": 81.765625
         },
@@ -27,16 +27,16 @@
         {
           "control": "dom#boot-error-retry",
           "page": {
-            "x": 117,
-            "y": 486
+            "x": 358,
+            "y": 694
           },
-          "topmost": "nothing",
+          "topmost": "BUTTON#boot-error-retry",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 63.90625,
-            "y": 464.109375,
+            "x": 305,
+            "y": 672.109375,
             "width": 106.5,
             "height": 44
           },
@@ -48,19 +48,19 @@
     },
     {
       "state": "boot-failure-retry-scrolled-into-view",
-      "profile": "phone-798x384",
+      "profile": "desktop-1280x800",
       "viewport": {
-        "width": 798,
-        "height": 384,
+        "width": 1280,
+        "height": 800,
         "dpr": 2,
-        "touch": true
+        "touch": false
       },
       "log": {
         "mounted": true,
         "hidden": false,
         "rect": {
-          "x": 496.40625,
-          "y": 290.234375,
+          "x": 978.40625,
+          "y": 706.234375,
           "width": 289.59375,
           "height": 81.765625
         },
@@ -71,16 +71,16 @@
         {
           "control": "dom#boot-error-retry",
           "page": {
-            "x": 117,
-            "y": 274
+            "x": 358,
+            "y": 690
           },
           "topmost": "BUTTON#boot-error-retry",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 63.90625,
-            "y": 252.109375,
+            "x": 305,
+            "y": 668.109375,
             "width": 106.5,
             "height": 44
           },
@@ -92,12 +92,12 @@
     },
     {
       "state": "menu",
-      "profile": "phone-798x384",
+      "profile": "desktop-1280x800",
       "viewport": {
-        "width": 798,
-        "height": 384,
+        "width": 1280,
+        "height": 800,
         "dpr": 2,
-        "touch": true
+        "touch": false
       },
       "log": {
         "mounted": false
@@ -106,8 +106,8 @@
         {
           "control": "__mainMenu.controls[0]<play>",
           "page": {
-            "x": 399,
-            "y": 95
+            "x": 640,
+            "y": 270
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -119,8 +119,8 @@
         {
           "control": "__mainMenu.controls[1]<codex>",
           "page": {
-            "x": 399,
-            "y": 163
+            "x": 640,
+            "y": 361
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -132,8 +132,8 @@
         {
           "control": "__mainMenu.controls[2]<settings>",
           "page": {
-            "x": 399,
-            "y": 227
+            "x": 640,
+            "y": 448
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -145,8 +145,8 @@
         {
           "control": "__mainMenu.controls[3]<hangar>",
           "page": {
-            "x": 399,
-            "y": 292
+            "x": 640,
+            "y": 535
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -161,12 +161,12 @@
     },
     {
       "state": "doors-idle",
-      "profile": "phone-798x384",
+      "profile": "desktop-1280x800",
       "viewport": {
-        "width": 798,
-        "height": 384,
+        "width": 1280,
+        "height": 800,
         "dpr": 2,
-        "touch": true
+        "touch": false
       },
       "log": {
         "mounted": false
@@ -175,90 +175,90 @@
         {
           "control": "__onlineMenu.doorControls[0]<campaign>",
           "page": {
-            "x": 209,
-            "y": 173
+            "x": 640,
+            "y": 302
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 23,
-            "y": 141.5,
-            "width": 372,
-            "height": 62
+            "x": 240,
+            "y": 265.5,
+            "width": 800,
+            "height": 72
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[1]<solo>",
           "page": {
-            "x": 209,
-            "y": 246
+            "x": 640,
+            "y": 393
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 23,
-            "y": 211.5,
-            "width": 372,
-            "height": 69
+            "x": 240,
+            "y": 352.5,
+            "width": 800,
+            "height": 80
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[2]<create>",
           "page": {
-            "x": 589,
-            "y": 173
+            "x": 640,
+            "y": 484
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 403,
-            "y": 141.5,
-            "width": 372,
-            "height": 62
+            "x": 240,
+            "y": 447.5,
+            "width": 800,
+            "height": 72
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[3]<join>",
           "page": {
-            "x": 589,
-            "y": 243
+            "x": 640,
+            "y": 571
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 403,
-            "y": 211.5,
-            "width": 372,
-            "height": 62
+            "x": 240,
+            "y": 534.5,
+            "width": 800,
+            "height": 72
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[4]<back>",
           "page": {
-            "x": 83,
-            "y": 360
+            "x": 114,
+            "y": 754
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 23,
-            "y": 335.5,
-            "width": 120,
-            "height": 48
+            "x": 44,
+            "y": 726,
+            "width": 140,
+            "height": 56
           },
           "coveredFraction": null
         }
@@ -276,12 +276,12 @@
     },
     {
       "state": "doors-error",
-      "profile": "phone-798x384",
+      "profile": "desktop-1280x800",
       "viewport": {
-        "width": 798,
-        "height": 384,
+        "width": 1280,
+        "height": 800,
         "dpr": 2,
-        "touch": true
+        "touch": false
       },
       "log": {
         "mounted": false
@@ -290,90 +290,90 @@
         {
           "control": "__onlineMenu.doorControls[0]<campaign>",
           "page": {
-            "x": 209,
-            "y": 173
+            "x": 640,
+            "y": 302
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 23,
-            "y": 141.5,
-            "width": 372,
-            "height": 62
+            "x": 240,
+            "y": 265.5,
+            "width": 800,
+            "height": 72
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[1]<solo>",
           "page": {
-            "x": 209,
-            "y": 246
+            "x": 640,
+            "y": 393
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 23,
-            "y": 211.5,
-            "width": 372,
-            "height": 69
+            "x": 240,
+            "y": 352.5,
+            "width": 800,
+            "height": 80
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[2]<create>",
           "page": {
-            "x": 589,
-            "y": 173
+            "x": 640,
+            "y": 484
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 403,
-            "y": 141.5,
-            "width": 372,
-            "height": 62
+            "x": 240,
+            "y": 447.5,
+            "width": 800,
+            "height": 72
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[3]<join>",
           "page": {
-            "x": 589,
-            "y": 243
+            "x": 640,
+            "y": 571
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 403,
-            "y": 211.5,
-            "width": 372,
-            "height": 62
+            "x": 240,
+            "y": 534.5,
+            "width": 800,
+            "height": 72
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[4]<back>",
           "page": {
-            "x": 83,
-            "y": 360
+            "x": 114,
+            "y": 754
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 23,
-            "y": 335.5,
-            "width": 120,
-            "height": 48
+            "x": 44,
+            "y": 726,
+            "width": 140,
+            "height": 56
           },
           "coveredFraction": null
         }
@@ -391,12 +391,12 @@
     },
     {
       "state": "join-browse",
-      "profile": "phone-798x384",
+      "profile": "desktop-1280x800",
       "viewport": {
-        "width": 798,
-        "height": 384,
+        "width": 1280,
+        "height": 800,
         "dpr": 2,
-        "touch": true
+        "touch": false
       },
       "log": {
         "mounted": false
@@ -405,17 +405,17 @@
         {
           "control": "__onlineMenu.doorControls[0]<mode:browse>",
           "page": {
-            "x": 95,
-            "y": 126
+            "x": 128,
+            "y": 216
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 23,
-            "y": 102,
-            "width": 144,
+            "x": 44,
+            "y": 192,
+            "width": 168,
             "height": 48
           },
           "coveredFraction": null
@@ -423,17 +423,17 @@
         {
           "control": "__onlineMenu.doorControls[1]<mode:code>",
           "page": {
-            "x": 243,
-            "y": 126
+            "x": 303,
+            "y": 216
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 171,
-            "y": 102,
-            "width": 144,
+            "x": 219,
+            "y": 192,
+            "width": 168,
             "height": 48
           },
           "coveredFraction": null
@@ -441,18 +441,18 @@
         {
           "control": "__onlineMenu.doorControls[2]<back>",
           "page": {
-            "x": 83,
-            "y": 360
+            "x": 114,
+            "y": 754
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 23,
-            "y": 335.5,
-            "width": 120,
-            "height": 48
+            "x": 44,
+            "y": 726,
+            "width": 140,
+            "height": 56
           },
           "coveredFraction": null
         }
@@ -470,12 +470,12 @@
     },
     {
       "state": "join-keypad-idle",
-      "profile": "phone-798x384",
+      "profile": "desktop-1280x800",
       "viewport": {
-        "width": 798,
-        "height": 384,
+        "width": 1280,
+        "height": 800,
         "dpr": 2,
-        "touch": true
+        "touch": false
       },
       "log": {
         "mounted": false
@@ -484,629 +484,629 @@
         {
           "control": "__onlineMenu.doorControls[0]<key:A>",
           "page": {
-            "x": 189,
-            "y": 180
+            "x": 430,
+            "y": 280
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 161,
-            "y": 162,
+            "x": 402,
+            "y": 252,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[1]<key:B>",
           "page": {
-            "x": 249,
-            "y": 180
+            "x": 490,
+            "y": 280
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 221,
-            "y": 162,
+            "x": 462,
+            "y": 252,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[2]<key:C>",
           "page": {
-            "x": 309,
-            "y": 180
+            "x": 550,
+            "y": 280
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 281,
-            "y": 162,
+            "x": 522,
+            "y": 252,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[3]<key:D>",
           "page": {
-            "x": 369,
-            "y": 180
+            "x": 610,
+            "y": 280
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 341,
-            "y": 162,
+            "x": 582,
+            "y": 252,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[4]<key:E>",
           "page": {
-            "x": 429,
-            "y": 180
+            "x": 670,
+            "y": 280
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 401,
-            "y": 162,
+            "x": 642,
+            "y": 252,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[5]<key:F>",
           "page": {
-            "x": 489,
-            "y": 180
+            "x": 730,
+            "y": 280
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 461,
-            "y": 162,
+            "x": 702,
+            "y": 252,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[6]<key:G>",
           "page": {
-            "x": 549,
-            "y": 180
+            "x": 790,
+            "y": 280
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 521,
-            "y": 162,
+            "x": 762,
+            "y": 252,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[7]<key:H>",
           "page": {
-            "x": 609,
-            "y": 180
+            "x": 850,
+            "y": 280
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 581,
-            "y": 162,
+            "x": 822,
+            "y": 252,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[8]<key:J>",
           "page": {
-            "x": 189,
-            "y": 221
+            "x": 430,
+            "y": 340
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 161,
-            "y": 202.5,
+            "x": 402,
+            "y": 312,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[9]<key:K>",
           "page": {
-            "x": 249,
-            "y": 221
+            "x": 490,
+            "y": 340
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 221,
-            "y": 202.5,
+            "x": 462,
+            "y": 312,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[10]<key:L>",
           "page": {
-            "x": 309,
-            "y": 221
+            "x": 550,
+            "y": 340
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 281,
-            "y": 202.5,
+            "x": 522,
+            "y": 312,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[11]<key:M>",
           "page": {
-            "x": 369,
-            "y": 221
+            "x": 610,
+            "y": 340
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 341,
-            "y": 202.5,
+            "x": 582,
+            "y": 312,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[12]<key:N>",
           "page": {
-            "x": 429,
-            "y": 221
+            "x": 670,
+            "y": 340
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 401,
-            "y": 202.5,
+            "x": 642,
+            "y": 312,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[13]<key:P>",
           "page": {
-            "x": 489,
-            "y": 221
+            "x": 730,
+            "y": 340
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 461,
-            "y": 202.5,
+            "x": 702,
+            "y": 312,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[14]<key:Q>",
           "page": {
-            "x": 549,
-            "y": 221
+            "x": 790,
+            "y": 340
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 521,
-            "y": 202.5,
+            "x": 762,
+            "y": 312,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[15]<key:R>",
           "page": {
-            "x": 609,
-            "y": 221
+            "x": 850,
+            "y": 340
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 581,
-            "y": 202.5,
+            "x": 822,
+            "y": 312,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[16]<key:S>",
           "page": {
-            "x": 189,
-            "y": 261
+            "x": 430,
+            "y": 400
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 161,
-            "y": 243,
+            "x": 402,
+            "y": 372,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[17]<key:T>",
           "page": {
-            "x": 249,
-            "y": 261
+            "x": 490,
+            "y": 400
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 221,
-            "y": 243,
+            "x": 462,
+            "y": 372,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[18]<key:U>",
           "page": {
-            "x": 309,
-            "y": 261
+            "x": 550,
+            "y": 400
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 281,
-            "y": 243,
+            "x": 522,
+            "y": 372,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[19]<key:V>",
           "page": {
-            "x": 369,
-            "y": 261
+            "x": 610,
+            "y": 400
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 341,
-            "y": 243,
+            "x": 582,
+            "y": 372,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[20]<key:W>",
           "page": {
-            "x": 429,
-            "y": 261
+            "x": 670,
+            "y": 400
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 401,
-            "y": 243,
+            "x": 642,
+            "y": 372,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[21]<key:X>",
           "page": {
-            "x": 489,
-            "y": 261
+            "x": 730,
+            "y": 400
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 461,
-            "y": 243,
+            "x": 702,
+            "y": 372,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[22]<key:Y>",
           "page": {
-            "x": 549,
-            "y": 261
+            "x": 790,
+            "y": 400
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 521,
-            "y": 243,
+            "x": 762,
+            "y": 372,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[23]<key:Z>",
           "page": {
-            "x": 609,
-            "y": 261
+            "x": 850,
+            "y": 400
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 581,
-            "y": 243,
+            "x": 822,
+            "y": 372,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[24]<key:2>",
           "page": {
-            "x": 189,
-            "y": 302
+            "x": 430,
+            "y": 460
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 161,
-            "y": 283.5,
+            "x": 402,
+            "y": 432,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[25]<key:3>",
           "page": {
-            "x": 249,
-            "y": 302
+            "x": 490,
+            "y": 460
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 221,
-            "y": 283.5,
+            "x": 462,
+            "y": 432,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[26]<key:4>",
           "page": {
-            "x": 309,
-            "y": 302
+            "x": 550,
+            "y": 460
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 281,
-            "y": 283.5,
+            "x": 522,
+            "y": 432,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[27]<key:5>",
           "page": {
-            "x": 369,
-            "y": 302
+            "x": 610,
+            "y": 460
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 341,
-            "y": 283.5,
+            "x": 582,
+            "y": 432,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[28]<key:6>",
           "page": {
-            "x": 429,
-            "y": 302
+            "x": 670,
+            "y": 460
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 401,
-            "y": 283.5,
+            "x": 642,
+            "y": 432,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[29]<key:7>",
           "page": {
-            "x": 489,
-            "y": 302
+            "x": 730,
+            "y": 460
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 461,
-            "y": 283.5,
+            "x": 702,
+            "y": 432,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[30]<key:8>",
           "page": {
-            "x": 549,
-            "y": 302
+            "x": 790,
+            "y": 460
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 521,
-            "y": 283.5,
+            "x": 762,
+            "y": 432,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[31]<key:9>",
           "page": {
-            "x": 609,
-            "y": 302
+            "x": 850,
+            "y": 460
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 581,
-            "y": 283.5,
+            "x": 822,
+            "y": 432,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[32]<erase>",
           "page": {
-            "x": 555,
-            "y": 360
+            "x": 968,
+            "y": 754
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 486,
-            "y": 335.5,
-            "width": 137,
-            "height": 48
+            "x": 888,
+            "y": 726,
+            "width": 160,
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[33]<submit>",
           "page": {
-            "x": 707,
-            "y": 360
+            "x": 1156,
+            "y": 754
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 638,
-            "y": 335.5,
-            "width": 137,
-            "height": 48
+            "x": 1076,
+            "y": 726,
+            "width": 160,
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[34]<mode:browse>",
           "page": {
-            "x": 95,
-            "y": 126
+            "x": 128,
+            "y": 216
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 23,
-            "y": 102,
-            "width": 144,
+            "x": 44,
+            "y": 192,
+            "width": 168,
             "height": 48
           },
           "coveredFraction": null
@@ -1114,17 +1114,17 @@
         {
           "control": "__onlineMenu.doorControls[35]<mode:code>",
           "page": {
-            "x": 243,
-            "y": 126
+            "x": 303,
+            "y": 216
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 171,
-            "y": 102,
-            "width": 144,
+            "x": 219,
+            "y": 192,
+            "width": 168,
             "height": 48
           },
           "coveredFraction": null
@@ -1132,18 +1132,18 @@
         {
           "control": "__onlineMenu.doorControls[36]<back>",
           "page": {
-            "x": 83,
-            "y": 360
+            "x": 114,
+            "y": 754
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 23,
-            "y": 335.5,
-            "width": 120,
-            "height": 48
+            "x": 44,
+            "y": 726,
+            "width": 140,
+            "height": 56
           },
           "coveredFraction": null
         }
@@ -1161,12 +1161,12 @@
     },
     {
       "state": "join-keypad-error",
-      "profile": "phone-798x384",
+      "profile": "desktop-1280x800",
       "viewport": {
-        "width": 798,
-        "height": 384,
+        "width": 1280,
+        "height": 800,
         "dpr": 2,
-        "touch": true
+        "touch": false
       },
       "log": {
         "mounted": false
@@ -1175,629 +1175,629 @@
         {
           "control": "__onlineMenu.doorControls[0]<key:A>",
           "page": {
-            "x": 189,
-            "y": 180
+            "x": 430,
+            "y": 280
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 161,
-            "y": 162,
+            "x": 402,
+            "y": 252,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[1]<key:B>",
           "page": {
-            "x": 249,
-            "y": 180
+            "x": 490,
+            "y": 280
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 221,
-            "y": 162,
+            "x": 462,
+            "y": 252,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[2]<key:C>",
           "page": {
-            "x": 309,
-            "y": 180
+            "x": 550,
+            "y": 280
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 281,
-            "y": 162,
+            "x": 522,
+            "y": 252,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[3]<key:D>",
           "page": {
-            "x": 369,
-            "y": 180
+            "x": 610,
+            "y": 280
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 341,
-            "y": 162,
+            "x": 582,
+            "y": 252,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[4]<key:E>",
           "page": {
-            "x": 429,
-            "y": 180
+            "x": 670,
+            "y": 280
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 401,
-            "y": 162,
+            "x": 642,
+            "y": 252,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[5]<key:F>",
           "page": {
-            "x": 489,
-            "y": 180
+            "x": 730,
+            "y": 280
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 461,
-            "y": 162,
+            "x": 702,
+            "y": 252,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[6]<key:G>",
           "page": {
-            "x": 549,
-            "y": 180
+            "x": 790,
+            "y": 280
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 521,
-            "y": 162,
+            "x": 762,
+            "y": 252,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[7]<key:H>",
           "page": {
-            "x": 609,
-            "y": 180
+            "x": 850,
+            "y": 280
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 581,
-            "y": 162,
+            "x": 822,
+            "y": 252,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[8]<key:J>",
           "page": {
-            "x": 189,
-            "y": 221
+            "x": 430,
+            "y": 340
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 161,
-            "y": 202.5,
+            "x": 402,
+            "y": 312,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[9]<key:K>",
           "page": {
-            "x": 249,
-            "y": 221
+            "x": 490,
+            "y": 340
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 221,
-            "y": 202.5,
+            "x": 462,
+            "y": 312,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[10]<key:L>",
           "page": {
-            "x": 309,
-            "y": 221
+            "x": 550,
+            "y": 340
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 281,
-            "y": 202.5,
+            "x": 522,
+            "y": 312,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[11]<key:M>",
           "page": {
-            "x": 369,
-            "y": 221
+            "x": 610,
+            "y": 340
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 341,
-            "y": 202.5,
+            "x": 582,
+            "y": 312,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[12]<key:N>",
           "page": {
-            "x": 429,
-            "y": 221
+            "x": 670,
+            "y": 340
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 401,
-            "y": 202.5,
+            "x": 642,
+            "y": 312,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[13]<key:P>",
           "page": {
-            "x": 489,
-            "y": 221
+            "x": 730,
+            "y": 340
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 461,
-            "y": 202.5,
+            "x": 702,
+            "y": 312,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[14]<key:Q>",
           "page": {
-            "x": 549,
-            "y": 221
+            "x": 790,
+            "y": 340
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 521,
-            "y": 202.5,
+            "x": 762,
+            "y": 312,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[15]<key:R>",
           "page": {
-            "x": 609,
-            "y": 221
+            "x": 850,
+            "y": 340
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 581,
-            "y": 202.5,
+            "x": 822,
+            "y": 312,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[16]<key:S>",
           "page": {
-            "x": 189,
-            "y": 261
+            "x": 430,
+            "y": 400
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 161,
-            "y": 243,
+            "x": 402,
+            "y": 372,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[17]<key:T>",
           "page": {
-            "x": 249,
-            "y": 261
+            "x": 490,
+            "y": 400
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 221,
-            "y": 243,
+            "x": 462,
+            "y": 372,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[18]<key:U>",
           "page": {
-            "x": 309,
-            "y": 261
+            "x": 550,
+            "y": 400
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 281,
-            "y": 243,
+            "x": 522,
+            "y": 372,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[19]<key:V>",
           "page": {
-            "x": 369,
-            "y": 261
+            "x": 610,
+            "y": 400
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 341,
-            "y": 243,
+            "x": 582,
+            "y": 372,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[20]<key:W>",
           "page": {
-            "x": 429,
-            "y": 261
+            "x": 670,
+            "y": 400
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 401,
-            "y": 243,
+            "x": 642,
+            "y": 372,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[21]<key:X>",
           "page": {
-            "x": 489,
-            "y": 261
+            "x": 730,
+            "y": 400
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 461,
-            "y": 243,
+            "x": 702,
+            "y": 372,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[22]<key:Y>",
           "page": {
-            "x": 549,
-            "y": 261
+            "x": 790,
+            "y": 400
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 521,
-            "y": 243,
+            "x": 762,
+            "y": 372,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[23]<key:Z>",
           "page": {
-            "x": 609,
-            "y": 261
+            "x": 850,
+            "y": 400
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 581,
-            "y": 243,
+            "x": 822,
+            "y": 372,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[24]<key:2>",
           "page": {
-            "x": 189,
-            "y": 302
+            "x": 430,
+            "y": 460
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 161,
-            "y": 283.5,
+            "x": 402,
+            "y": 432,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[25]<key:3>",
           "page": {
-            "x": 249,
-            "y": 302
+            "x": 490,
+            "y": 460
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 221,
-            "y": 283.5,
+            "x": 462,
+            "y": 432,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[26]<key:4>",
           "page": {
-            "x": 309,
-            "y": 302
+            "x": 550,
+            "y": 460
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 281,
-            "y": 283.5,
+            "x": 522,
+            "y": 432,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[27]<key:5>",
           "page": {
-            "x": 369,
-            "y": 302
+            "x": 610,
+            "y": 460
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 341,
-            "y": 283.5,
+            "x": 582,
+            "y": 432,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[28]<key:6>",
           "page": {
-            "x": 429,
-            "y": 302
+            "x": 670,
+            "y": 460
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 401,
-            "y": 283.5,
+            "x": 642,
+            "y": 432,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[29]<key:7>",
           "page": {
-            "x": 489,
-            "y": 302
+            "x": 730,
+            "y": 460
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 461,
-            "y": 283.5,
+            "x": 702,
+            "y": 432,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[30]<key:8>",
           "page": {
-            "x": 549,
-            "y": 302
+            "x": 790,
+            "y": 460
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 521,
-            "y": 283.5,
+            "x": 762,
+            "y": 432,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[31]<key:9>",
           "page": {
-            "x": 609,
-            "y": 302
+            "x": 850,
+            "y": 460
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 581,
-            "y": 283.5,
+            "x": 822,
+            "y": 432,
             "width": 56,
-            "height": 36.5
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[32]<erase>",
           "page": {
-            "x": 555,
-            "y": 360
+            "x": 968,
+            "y": 754
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 486,
-            "y": 335.5,
-            "width": 137,
-            "height": 48
+            "x": 888,
+            "y": 726,
+            "width": 160,
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[33]<submit>",
           "page": {
-            "x": 707,
-            "y": 360
+            "x": 1156,
+            "y": 754
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 638,
-            "y": 335.5,
-            "width": 137,
-            "height": 48
+            "x": 1076,
+            "y": 726,
+            "width": 160,
+            "height": 56
           },
           "coveredFraction": null
         },
         {
           "control": "__onlineMenu.doorControls[34]<mode:browse>",
           "page": {
-            "x": 95,
-            "y": 126
+            "x": 128,
+            "y": 216
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 23,
-            "y": 102,
-            "width": 144,
+            "x": 44,
+            "y": 192,
+            "width": 168,
             "height": 48
           },
           "coveredFraction": null
@@ -1805,17 +1805,17 @@
         {
           "control": "__onlineMenu.doorControls[35]<mode:code>",
           "page": {
-            "x": 243,
-            "y": 126
+            "x": 303,
+            "y": 216
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 171,
-            "y": 102,
-            "width": 144,
+            "x": 219,
+            "y": 192,
+            "width": 168,
             "height": 48
           },
           "coveredFraction": null
@@ -1823,18 +1823,18 @@
         {
           "control": "__onlineMenu.doorControls[36]<back>",
           "page": {
-            "x": 83,
-            "y": 360
+            "x": 114,
+            "y": 754
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 23,
-            "y": 335.5,
-            "width": 120,
-            "height": 48
+            "x": 44,
+            "y": 726,
+            "width": 140,
+            "height": 56
           },
           "coveredFraction": null
         }
@@ -1853,12 +1853,12 @@
     },
     {
       "state": "lobby",
-      "profile": "phone-798x384",
+      "profile": "desktop-1280x800",
       "viewport": {
-        "width": 798,
-        "height": 384,
+        "width": 1280,
+        "height": 800,
         "dpr": 2,
-        "touch": true
+        "touch": false
       },
       "log": {
         "mounted": false
@@ -1867,152 +1867,152 @@
         {
           "control": "__lobby.seatStates[0]<0>",
           "page": {
-            "x": 49,
-            "y": 142
+            "x": 84,
+            "y": 207
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 27,
-            "y": 116,
-            "width": 43.92,
-            "height": 51
+            "x": 48,
+            "y": 175,
+            "width": 72,
+            "height": 63.125
           },
           "coveredFraction": null
         },
         {
           "control": "__lobby.seatStates[1]<1>",
           "page": {
-            "x": 49,
-            "y": 193
+            "x": 84,
+            "y": 270
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 27,
-            "y": 167,
-            "width": 43.92,
-            "height": 51
+            "x": 48,
+            "y": 238.125,
+            "width": 72,
+            "height": 63.125
           },
           "coveredFraction": null
         },
         {
           "control": "__lobby.seatStates[2]<2>",
           "page": {
-            "x": 49,
-            "y": 244
+            "x": 84,
+            "y": 333
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 27,
-            "y": 218,
-            "width": 43.92,
-            "height": 51
+            "x": 48,
+            "y": 301.25,
+            "width": 72,
+            "height": 63.125
           },
           "coveredFraction": null
         },
         {
           "control": "__lobby.seatStates[3]<3>",
           "page": {
-            "x": 49,
-            "y": 295
+            "x": 84,
+            "y": 396
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 27,
-            "y": 269,
-            "width": 43.92,
-            "height": 51
+            "x": 48,
+            "y": 364.375,
+            "width": 72,
+            "height": 63.125
           },
           "coveredFraction": null
         },
         {
           "control": "__lobby.seatStates[4]<4>",
           "page": {
-            "x": 277,
-            "y": 142
+            "x": 84,
+            "y": 459
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 254.6,
-            "y": 116,
-            "width": 43.91999999999999,
-            "height": 51
+            "x": 48,
+            "y": 427.5,
+            "width": 72,
+            "height": 63.125
           },
           "coveredFraction": null
         },
         {
           "control": "__lobby.seatStates[5]<5>",
           "page": {
-            "x": 277,
-            "y": 193
+            "x": 84,
+            "y": 522
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 254.6,
-            "y": 167,
-            "width": 43.91999999999999,
-            "height": 51
+            "x": 48,
+            "y": 490.625,
+            "width": 72,
+            "height": 63.125
           },
           "coveredFraction": null
         },
         {
           "control": "__lobby.seatStates[6]<6>",
           "page": {
-            "x": 277,
-            "y": 244
+            "x": 84,
+            "y": 585
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 254.6,
-            "y": 218,
-            "width": 43.91999999999999,
-            "height": 51
+            "x": 48,
+            "y": 553.75,
+            "width": 72,
+            "height": 63.125
           },
           "coveredFraction": null
         },
         {
           "control": "__lobby.seatStates[7]<7>",
           "page": {
-            "x": 277,
-            "y": 295
+            "x": 84,
+            "y": 648
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 254.6,
-            "y": 269,
-            "width": 43.91999999999999,
-            "height": 51
+            "x": 48,
+            "y": 616.875,
+            "width": 72,
+            "height": 63.125
           },
           "coveredFraction": null
         },
         {
           "control": "__lobby.rushControl",
           "page": {
-            "x": 681,
-            "y": 360
+            "x": 1126,
+            "y": 754
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -2024,8 +2024,8 @@
         {
           "control": "__lobby.modeControl",
           "page": {
-            "x": 123,
-            "y": 88
+            "x": 144,
+            "y": 144
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -2037,8 +2037,8 @@
         {
           "control": "__lobby.seatControls[0]<0>",
           "page": {
-            "x": 99,
-            "y": 142
+            "x": 345,
+            "y": 207
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -2050,8 +2050,8 @@
         {
           "control": "__lobby.seatControls[1]<1>",
           "page": {
-            "x": 99,
-            "y": 193
+            "x": 345,
+            "y": 270
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -2063,8 +2063,8 @@
         {
           "control": "__lobby.seatControls[2]<2>",
           "page": {
-            "x": 99,
-            "y": 244
+            "x": 345,
+            "y": 333
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -2076,8 +2076,8 @@
         {
           "control": "__lobby.seatControls[3]<3>",
           "page": {
-            "x": 99,
-            "y": 295
+            "x": 345,
+            "y": 396
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -2089,8 +2089,8 @@
         {
           "control": "__lobby.seatControls[4]<4>",
           "page": {
-            "x": 327,
-            "y": 142
+            "x": 345,
+            "y": 459
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -2102,8 +2102,8 @@
         {
           "control": "__lobby.seatControls[5]<5>",
           "page": {
-            "x": 327,
-            "y": 193
+            "x": 345,
+            "y": 522
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -2115,8 +2115,8 @@
         {
           "control": "__lobby.seatControls[6]<6>",
           "page": {
-            "x": 327,
-            "y": 244
+            "x": 345,
+            "y": 585
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -2128,8 +2128,8 @@
         {
           "control": "__lobby.seatControls[7]<7>",
           "page": {
-            "x": 327,
-            "y": 295
+            "x": 345,
+            "y": 648
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -2141,8 +2141,8 @@
         {
           "control": "__lobby.seatHelpControls[0]<0>",
           "page": {
-            "x": 231,
-            "y": 142
+            "x": 734,
+            "y": 207
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -2154,8 +2154,8 @@
         {
           "control": "__lobby.seatHelpControls[1]<1>",
           "page": {
-            "x": 231,
-            "y": 193
+            "x": 734,
+            "y": 270
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -2167,8 +2167,8 @@
         {
           "control": "__lobby.seatHelpControls[2]<2>",
           "page": {
-            "x": 231,
-            "y": 244
+            "x": 734,
+            "y": 333
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -2180,8 +2180,8 @@
         {
           "control": "__lobby.seatHelpControls[3]<3>",
           "page": {
-            "x": 231,
-            "y": 295
+            "x": 734,
+            "y": 396
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -2193,8 +2193,8 @@
         {
           "control": "__lobby.seatHelpControls[4]<4>",
           "page": {
-            "x": 458,
-            "y": 142
+            "x": 734,
+            "y": 459
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -2206,8 +2206,8 @@
         {
           "control": "__lobby.seatHelpControls[5]<5>",
           "page": {
-            "x": 458,
-            "y": 193
+            "x": 734,
+            "y": 522
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -2219,8 +2219,8 @@
         {
           "control": "__lobby.seatHelpControls[6]<6>",
           "page": {
-            "x": 458,
-            "y": 244
+            "x": 734,
+            "y": 585
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -2232,8 +2232,8 @@
         {
           "control": "__lobby.seatHelpControls[7]<7>",
           "page": {
-            "x": 458,
-            "y": 295
+            "x": 734,
+            "y": 648
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -2245,8 +2245,8 @@
         {
           "control": "__lobby.shipCardControl",
           "page": {
-            "x": 627,
-            "y": 126
+            "x": 1001,
+            "y": 322
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -2258,8 +2258,8 @@
         {
           "control": "__lobby.mapCardControl",
           "page": {
-            "x": 627,
-            "y": 258
+            "x": 1001,
+            "y": 479
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -2274,12 +2274,12 @@
     },
     {
       "state": "match-live-offline",
-      "profile": "phone-798x384",
+      "profile": "desktop-1280x800",
       "viewport": {
-        "width": 798,
-        "height": 384,
+        "width": 1280,
+        "height": 800,
         "dpr": 2,
-        "touch": true
+        "touch": false
       },
       "log": {
         "mounted": false
@@ -2288,44 +2288,26 @@
         {
           "control": "__cornerStage.elements[0]<ship-local>",
           "page": {
-            "x": 399,
-            "y": 192
+            "x": 640,
+            "y": 400
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 383,
-            "y": 176,
+            "x": 624,
+            "y": 384,
             "width": 32,
             "height": 32
           },
           "coveredFraction": null
         },
         {
-          "control": "__cornerStage.elements[1]<build-button>",
-          "page": {
-            "x": 92,
-            "y": 172
-          },
-          "topmost": "CANVAS#app",
-          "live": true,
-          "onScreen": true,
-          "collides": false,
-          "box": {
-            "x": 54,
-            "y": 134,
-            "width": 76,
-            "height": 76
-          },
-          "coveredFraction": null
-        },
-        {
-          "control": "__cornerStage.elements[2]<build-badge>",
+          "control": "__cornerStage.elements[1]<build-badge>",
           "page": {
             "x": 30,
-            "y": 370
+            "y": 760
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -2333,34 +2315,70 @@
           "collides": false,
           "box": {
             "x": 8,
-            "y": 363,
+            "y": 753,
             "width": 43.5,
             "height": 13
           },
           "coveredFraction": null
         },
         {
-          "control": "__cornerStage.elements[3]<pause-button>",
+          "control": "__cornerStage.elements[2]<ore-hud>",
           "page": {
-            "x": 96,
-            "y": 40
+            "x": 41,
+            "y": 42
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 72,
+            "x": 16,
             "y": 16,
-            "width": 48,
-            "height": 48
+            "width": 49.72,
+            "height": 52
           },
           "coveredFraction": null
         },
         {
-          "control": "__cornerStage.elements[4]<ore-hud>",
+          "control": "__cornerStage.elements[3]<banked-total>",
           "page": {
-            "x": 39,
+            "x": 23,
+            "y": 43
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 16,
+            "y": 30,
+            "width": 13,
+            "height": 26
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__cornerStage.elements[4]<controls-strip>",
+          "page": {
+            "x": 640,
+            "y": 780
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 0,
+            "y": 760,
+            "width": 1280,
+            "height": 40
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__cornerStage.elements[5]<station-hp>",
+          "page": {
+            "x": 1185,
             "y": 37
           },
           "topmost": "CANVAS#app",
@@ -2368,118 +2386,82 @@
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 16,
+            "x": 1106,
             "y": 16,
-            "width": 45.72,
-            "height": 41
+            "width": 158.5,
+            "height": 42
           },
           "coveredFraction": null
         },
         {
-          "control": "__cornerStage.elements[5]<banked-total>",
+          "control": "__cornerStage.elements[6]<onboarding>",
           "page": {
-            "x": 21,
-            "y": 38
+            "x": 640,
+            "y": 720
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 16,
-            "y": 27,
-            "width": 10,
-            "height": 21
+            "x": 196.77999999999997,
+            "y": 690,
+            "width": 886.44,
+            "height": 60
           },
           "coveredFraction": null
         },
         {
-          "control": "__cornerStage.elements[6]<station-hp>",
+          "control": "__cornerStage.elements[7]<healthbars>",
           "page": {
-            "x": 705,
-            "y": 36
+            "x": 248,
+            "y": 345
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 628,
-            "y": 16,
-            "width": 154.5,
-            "height": 39
+            "x": 177.6098821420453,
+            "y": 7.4684916848246985,
+            "width": 140.40056119564917,
+            "height": 676.0209722230828
           },
           "coveredFraction": null
         },
         {
-          "control": "__cornerStage.elements[7]<zoom-control>",
+          "control": "__cornerStage.elements[8]<nameplates>",
           "page": {
-            "x": 750,
-            "y": 85
+            "x": 502,
+            "y": 492
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 718,
-            "y": 61,
-            "width": 64,
-            "height": 48
+            "x": 255.01044333769445,
+            "y": 312,
+            "width": 493.68955666230556,
+            "height": 360.4894639079075
           },
           "coveredFraction": null
         },
         {
-          "control": "__cornerStage.elements[8]<onboarding>",
+          "control": "__cornerStage.elements[9]<minimap>",
           "page": {
-            "x": 399,
-            "y": 339
+            "x": 1194,
+            "y": 674
           },
           "topmost": "CANVAS#app",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 232.9,
-            "y": 309,
-            "width": 332.20000000000005,
-            "height": 59
-          },
-          "coveredFraction": null
-        },
-        {
-          "control": "__cornerStage.elements[9]<nameplates>",
-          "page": {
-            "x": 495,
-            "y": 112
-          },
-          "topmost": "CANVAS#app",
-          "live": true,
-          "onScreen": true,
-          "collides": false,
-          "box": {
-            "x": 482.3,
-            "y": 104,
-            "width": 25.399999999999977,
-            "height": 16
-          },
-          "coveredFraction": null
-        },
-        {
-          "control": "__cornerStage.elements[10]<minimap>",
-          "page": {
-            "x": 626,
-            "y": 332
-          },
-          "topmost": "CANVAS#app",
-          "live": true,
-          "onScreen": true,
-          "collides": false,
-          "box": {
-            "x": 586,
-            "y": 292,
-            "width": 80,
-            "height": 80
+            "x": 1120,
+            "y": 600,
+            "width": 148,
+            "height": 148
           },
           "coveredFraction": null
         }
@@ -2497,19 +2479,19 @@
     },
     {
       "state": "match-pause-menu",
-      "profile": "phone-798x384",
+      "profile": "desktop-1280x800",
       "viewport": {
-        "width": 798,
-        "height": 384,
+        "width": 1280,
+        "height": 800,
         "dpr": 2,
-        "touch": true
+        "touch": false
       },
       "log": {
         "mounted": true,
         "hidden": false,
         "rect": {
-          "x": 597,
-          "y": 328,
+          "x": 1079,
+          "y": 744,
           "width": 189,
           "height": 44
         },
@@ -2520,8 +2502,8 @@
         {
           "control": "__pauseStage.controls[0]<resume>",
           "page": {
-            "x": 399,
-            "y": 122
+            "x": 640,
+            "y": 313
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -2533,8 +2515,8 @@
         {
           "control": "__pauseStage.controls[1]<settings>",
           "page": {
-            "x": 399,
-            "y": 196
+            "x": 640,
+            "y": 404
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -2546,8 +2528,8 @@
         {
           "control": "__pauseStage.controls[2]<exit>",
           "page": {
-            "x": 399,
-            "y": 266
+            "x": 640,
+            "y": 491
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -2559,44 +2541,26 @@
         {
           "control": "__cornerStage.elements[0]<ship-local>",
           "page": {
-            "x": 399,
-            "y": 192
+            "x": 640,
+            "y": 400
           },
           "topmost": "CANVAS#app",
           "live": false,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 383,
-            "y": 176,
+            "x": 624,
+            "y": 384,
             "width": 32,
             "height": 32
           },
           "coveredFraction": 0
         },
         {
-          "control": "__cornerStage.elements[1]<build-button>",
-          "page": {
-            "x": 92,
-            "y": 172
-          },
-          "topmost": "CANVAS#app",
-          "live": false,
-          "onScreen": true,
-          "collides": false,
-          "box": {
-            "x": 54,
-            "y": 134,
-            "width": 76,
-            "height": 76
-          },
-          "coveredFraction": 0
-        },
-        {
-          "control": "__cornerStage.elements[2]<build-badge>",
+          "control": "__cornerStage.elements[1]<build-badge>",
           "page": {
             "x": 30,
-            "y": 370
+            "y": 760
           },
           "topmost": "CANVAS#app",
           "live": false,
@@ -2604,34 +2568,88 @@
           "collides": false,
           "box": {
             "x": 8,
-            "y": 363,
+            "y": 753,
             "width": 43.5,
             "height": 13
           },
           "coveredFraction": 0
         },
         {
-          "control": "__cornerStage.elements[3]<pause-menu>",
+          "control": "__cornerStage.elements[2]<pause-menu>",
           "page": {
-            "x": 399,
-            "y": 192
+            "x": 640,
+            "y": 400
           },
           "topmost": "CANVAS#app",
           "live": false,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 23,
+            "x": 44,
             "y": 0,
-            "width": 752,
-            "height": 384
+            "width": 1192,
+            "height": 800
           },
-          "coveredFraction": 0.03
+          "coveredFraction": 0.01
         },
         {
-          "control": "__cornerStage.elements[4]<ore-hud>",
+          "control": "__cornerStage.elements[3]<ore-hud>",
           "page": {
-            "x": 39,
+            "x": 41,
+            "y": 42
+          },
+          "topmost": "CANVAS#app",
+          "live": false,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 16,
+            "y": 16,
+            "width": 49.72,
+            "height": 52
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[4]<banked-total>",
+          "page": {
+            "x": 23,
+            "y": 43
+          },
+          "topmost": "CANVAS#app",
+          "live": false,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 16,
+            "y": 30,
+            "width": 13,
+            "height": 26
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[5]<controls-strip>",
+          "page": {
+            "x": 640,
+            "y": 780
+          },
+          "topmost": "CANVAS#app",
+          "live": false,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 0,
+            "y": 760,
+            "width": 1280,
+            "height": 40
+          },
+          "coveredFraction": 0.1
+        },
+        {
+          "control": "__cornerStage.elements[6]<station-hp>",
+          "page": {
+            "x": 1185,
             "y": 37
           },
           "topmost": "CANVAS#app",
@@ -2639,143 +2657,52 @@
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 16,
+            "x": 1106,
             "y": 16,
-            "width": 45.72,
-            "height": 41
+            "width": 158.5,
+            "height": 42
           },
           "coveredFraction": 0
         },
         {
-          "control": "__cornerStage.elements[5]<banked-total>",
+          "control": "__cornerStage.elements[7]<nameplates>",
           "page": {
-            "x": 21,
-            "y": 38
+            "x": 474,
+            "y": 512
           },
           "topmost": "CANVAS#app",
           "live": false,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 16,
-            "y": 27,
-            "width": 10,
-            "height": 21
+            "x": 199.56653936351663,
+            "y": 312,
+            "width": 549.1334606364834,
+            "height": 400.82845856714516
           },
           "coveredFraction": 0
         },
         {
-          "control": "__cornerStage.elements[6]<station-hp>",
+          "control": "__cornerStage.elements[8]<minimap>",
           "page": {
-            "x": 705,
-            "y": 36
+            "x": 1194,
+            "y": 674
           },
           "topmost": "CANVAS#app",
           "live": false,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 628,
-            "y": 16,
-            "width": 154.5,
-            "height": 39
+            "x": 1120,
+            "y": 600,
+            "width": 148,
+            "height": 148
           },
-          "coveredFraction": 0
-        },
-        {
-          "control": "__cornerStage.elements[7]<zoom-control>",
-          "page": {
-            "x": 750,
-            "y": 85
-          },
-          "topmost": "CANVAS#app",
-          "live": false,
-          "onScreen": true,
-          "collides": false,
-          "box": {
-            "x": 718,
-            "y": 61,
-            "width": 64,
-            "height": 48
-          },
-          "coveredFraction": 0
-        },
-        {
-          "control": "__cornerStage.elements[8]<onboarding>",
-          "page": {
-            "x": 399,
-            "y": 339
-          },
-          "topmost": "CANVAS#app",
-          "live": false,
-          "onScreen": true,
-          "collides": false,
-          "box": {
-            "x": 232.9,
-            "y": 309,
-            "width": 332.20000000000005,
-            "height": 59
-          },
-          "coveredFraction": 0
-        },
-        {
-          "control": "__cornerStage.elements[9]<nameplates>",
-          "page": {
-            "x": 495,
-            "y": 112
-          },
-          "topmost": "CANVAS#app",
-          "live": false,
-          "onScreen": true,
-          "collides": false,
-          "box": {
-            "x": 482.3,
-            "y": 104,
-            "width": 25.399999999999977,
-            "height": 16
-          },
-          "coveredFraction": 0
-        },
-        {
-          "control": "__cornerStage.elements[10]<minimap>",
-          "page": {
-            "x": 626,
-            "y": 332
-          },
-          "topmost": "BUTTON#playtest-download-log-button",
-          "live": false,
-          "onScreen": true,
-          "collides": false,
-          "box": {
-            "x": 586,
-            "y": 292,
-            "width": 80,
-            "height": 80
-          },
-          "coveredFraction": 0.47
+          "coveredFraction": 0.03
         }
       ],
       "collisions": [],
-      "coveredButDead": [
-        {
-          "control": "__cornerStage.elements[10]<minimap>",
-          "page": {
-            "x": 626,
-            "y": 332
-          },
-          "topmost": "BUTTON#playtest-download-log-button",
-          "live": false,
-          "onScreen": true,
-          "collides": false,
-          "box": {
-            "x": 586,
-            "y": 292,
-            "width": 80,
-            "height": 80
-          },
-          "coveredFraction": 0.47
-        }
-      ],
+      "coveredButDead": [],
       "context": {
         "pauseScreen": "menu",
         "online": false,
