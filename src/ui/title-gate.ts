@@ -19,7 +19,10 @@
  *     through it.
  *  3. **we go through** — the frame grows until its OPENING exceeds the screen,
  *     so the hull leaves through the edges.
- *  4. **the menu is there** — it was behind the door the whole time.
+ *  4. **the menu is there** — it was behind the door the whole time, and it takes
+ *     a press from the first frame it is the whole picture. Beat 4 is *measured*
+ *     off the door rather than timed ({@link gateClearsViewport}, a0-90): the
+ *     screen must never look ready before it is.
  *
  * `Escape` reseals, staged in reverse: back through, the leaves drive shut, and
  * only once they are home does the lock throw.
@@ -279,6 +282,49 @@ export function skyCoversPoint(view: GateView, scale: number, point: GatePoint):
  * to replace. The 1.4 is margin past "exactly off screen"; the 16 is a ceiling,
  * so a 1×1 viewport cannot ask for an infinite transform.
  */
+/**
+ * **Is the whole screen inside the doorway?** — beat 3 finishing as a *picture*
+ * rather than as a timer (a0-90).
+ *
+ * The developer, from live play: *"there is a pause after the title animation
+ * plays and being able to click on a button."* Measured on the shipped bundle it
+ * is 0.68 s on a 1280×800 desktop and 0.61 s on a 390×844 handset — the door's
+ * last pixel leaves the screen at 2.85 s / 3.21 s and the gate went inert at
+ * 3.61 s / 3.82 s, because going inert was hung on the timed step at 3460 rather
+ * than on the door. In that window the menu is the entire picture and a real
+ * press on it is dropped (a HANGAR press at 3386 ms left `screen` at `menu`).
+ *
+ * The reason the gap exists at all is {@link throughScale}'s 1.4: the frame is
+ * grown 40% past "exactly off screen" so the fade can start with nothing of it
+ * left to fade (trap 2). That margin is right and it is kept — but roughly the
+ * last third of the 1.5 s growth is a door moving where nobody can see it, and
+ * hanging the handover off the END of that growth is what turned polish into a
+ * dead menu.
+ *
+ * So the handover asks the picture instead, with the geometry the punch is
+ * already made of: the doorway is {@link openingPolygon}, it is convex, and a
+ * convex shape that contains the four corners of the viewport contains the
+ * viewport. When it does, the punch has erased the entire field
+ * ({@link skyCoversPoint} is false everywhere on screen) and the hull ring — which
+ * lives strictly outside the opening — is past every edge. There is no gate pixel
+ * left to see, so there is nothing left for the gate to take a press for.
+ *
+ * This is the same rule the reseal already keeps at the other end, where the lock
+ * may only throw once the leaves are **measurably** home ({@link SEAL_FLOOR_MS}):
+ * measured, never assumed, and a timed cap behind it for the tab that never
+ * animates.
+ */
+export function gateClearsViewport(view: GateView, scale: number): boolean {
+  if (!(view.width > 0) || !(view.height > 0)) return false;
+  const poly = openingPolygon(view, scale);
+  return (
+    insidePolygon(poly, { x: 0, y: 0 }) &&
+    insidePolygon(poly, { x: view.width, y: 0 }) &&
+    insidePolygon(poly, { x: 0, y: view.height }) &&
+    insidePolygon(poly, { x: view.width, y: view.height })
+  );
+}
+
 export function throughScale(view: GateView): number {
   const box = doorBox(view, 1);
   const openW = box.width * OPENING_SCALE;
@@ -349,6 +395,16 @@ export interface GateStep {
  * 1.5 s scale must FINISH before the fade begins — `1880 + 1500 = 3380`, so the
  * fade at 3460 starts with the frame already past the edges of the screen. A
  * fade any earlier is a wash appearing over a visible frame.
+ *
+ * **The last step is a CAP, not the timing (a0-90).** Beat 4 normally arrives
+ * the frame the doorway measurably covers the whole screen
+ * ({@link gateClearsViewport}), which is *earlier* than 3460 on every real
+ * viewport, because {@link throughScale} deliberately overshoots "exactly off
+ * screen" by 1.4× and the last stretch of that growth happens with the door
+ * already past the edges. 3460 is what a tab that never ran the transition falls
+ * back to — the same bargain {@link SEAL_CAP_MS} strikes on the way back — and
+ * it stays at `1880 + 1500 + 80` so that fallback still lands after the scale it
+ * is standing in for would have finished.
  */
 export const GATE_OPEN_STEPS: readonly GateStep[] = [
   { at: 0, phase: 'turning' },
@@ -1530,6 +1586,11 @@ export class TitleGate {
   tick(ms: number): void {
     if (!this.mounted) return;
     this.sampleQuality(ms);
+    // The two measured handovers, one at each end of the sequence: we are
+    // through the moment the doorway has measurably cleared the screen, and the
+    // lock throws the moment the leaves are measurably home. Both run before the
+    // `open` return below, so the frame that goes through does not also paint.
+    if (this.phase === 'entering') this.pollThrough();
     if (this.phase === 'closing') this.pollSeal();
     if (this.phase === 'open') return;
     this.paint(ms);
@@ -1601,6 +1662,34 @@ export class TitleGate {
     // made beat 4 the ONLY place that ever hid it — see a0-78.
     this.sfx('gateSeated');
     this.opts.onThrough?.();
+  }
+
+  /**
+   * Beat 4 arrives when the door is MEASURABLY off the screen (a0-90).
+   *
+   * The scale read here is the same one the punch is already tracking every
+   * frame (trap 3) — this asks one further question of it: does the doorway now
+   * cover the whole viewport ({@link gateClearsViewport})? The first frame it
+   * does is the first frame with no gate pixel on the screen, and therefore the
+   * first frame the menu looks interactive. It is also, from here, the first
+   * frame it *is*.
+   *
+   * A `null` measurement is **not** an arrival. `pollSeal` may read a missing
+   * measurement as "home" because a leaf that cannot be measured has nowhere to
+   * be but shut; a door that cannot be measured may be anywhere, and guessing it
+   * is gone hands the menu over with the frame still on screen — the
+   * cross-dissolve of trap 2, arriving as a false positive. The unmeasurable
+   * case is what the timed step in {@link GATE_OPEN_STEPS} is for, so this
+   * simply leaves it alone.
+   */
+  private pollThrough(): void {
+    const scale = this.dom.measureDoorScale();
+    if (scale === null || !gateClearsViewport(this.viewport, scale)) return;
+    // The timed cap is now the thing that would fire late; drop it, so beat 4
+    // cannot happen twice and `through()` stays the one-shot it reads as.
+    this.clearTimers();
+    this.setPhase('open');
+    this.through();
   }
 
   /**

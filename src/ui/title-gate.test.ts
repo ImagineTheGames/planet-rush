@@ -36,6 +36,7 @@ import {
   TitleGate,
   doorBox,
   fieldAnimates,
+  gateClearsViewport,
   gateEnabled,
   gateRootLayoutCss,
   gateVars,
@@ -629,12 +630,224 @@ describe('going through', () => {
     dom.advance(1880);
     expect(g.current).toBe('entering');
 
-    dom.doorScale = 2;
+    // 1.5 rather than 2, since a0-90: at 2 this viewport's doorway already
+    // covers the whole screen, so beat 4 has arrived and there is no frame left
+    // to paint. 1.5 is what "still growing" now has to mean — asserted, not
+    // assumed, so this test cannot quietly stop being about a mid-flight frame.
+    expect(screenIsClear(DESKTOP, 1.5)).toBe(false);
+    dom.doorScale = 1.5;
     dom.ctx.ops.length = 0;
     dom.tick();
     const moves = dom.ctx.ops.filter((o) => o.op === 'moveTo') as { x: number }[];
-    const expected = openingPolygon(DESKTOP, 2)[0]!;
+    const expected = openingPolygon(DESKTOP, 1.5)[0]!;
     expect(moves[moves.length - 1]!.x).toBeCloseTo(expected.x, 6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE MENU MAY NOT LOOK READY BEFORE IT IS — a0-90
+// ---------------------------------------------------------------------------
+//
+// Reported from live play: *"there is a pause after the title animation plays
+// and being able to click on a button (theres a literal PING that you hear and
+// it takes so long to be able to actually click)"*.
+//
+// It is real and it is measured. Instrumented boots of the shipped bundle, in ms
+// from the opening press, on the two profiles QA's device matrix names:
+//
+//                       last gate pixel off screen   PING   takes a press
+//   desktop 1280×800                         2 847   3 537          3 609
+//   phone   390×844 dpr3                     3 207   3 680          3 819
+//
+// …and a real press proves the window is dead rather than merely late: a HANGAR
+// press at 3 386 ms on the desktop profile left `__mainMenu.screen` at `menu`,
+// while the same press at 3 751 ms opened the hangar. For ~0.7 s the menu is the
+// entire picture and it ignores you.
+//
+// The brief's lead was `SEAL_CAP_MS` timing out because `home` never arrives.
+// It is not that: `pollSeal` is only ever reached from `closing`, which only
+// `Escape` produces, and on the reseal path the leaves DO report home. The dead
+// window is on the way IN, and its cause is the other end of the same idea —
+// beat 4 was hung on a TIMER (`GATE_OPEN_STEPS`' 3460) while the door itself
+// leaves the screen partway through beat 3's growth, because `throughScale`
+// deliberately overshoots "exactly off screen" by 1.4×.
+//
+// These tests fail on the code as shipped before a0-90.
+
+/**
+ * **Is there a gate pixel anywhere on the screen?** — asked of `skyCoversPoint`,
+ * which has shipped since a0-50, so the test above is red on today's code for a
+ * reason about BEHAVIOUR rather than about a missing export.
+ *
+ * The four corners are enough: the doorway is a convex octagon, so a corner-clean
+ * screen is a clean screen. `gateClearsViewport` is held to this exact predicate
+ * below.
+ */
+function screenIsClear(view: GateView, scale: number): boolean {
+  return [
+    { x: 0, y: 0 },
+    { x: view.width, y: 0 },
+    { x: 0, y: view.height },
+    { x: view.width, y: view.height },
+  ].every((p) => !skyCoversPoint(view, scale, p));
+}
+
+/**
+ * The frame's growth curve, taken off the shipped markup rather than restated —
+ * `transition:transform 1500ms cubic-bezier(.42,0,.5,1)` — so the scales fed to
+ * the gate below are the ones a browser actually reports mid-transition.
+ */
+function frameCurve(): (t: number) => number {
+  const found = new RegExp(`transition:transform ${TRANSITION.frame}ms cubic-bezier\\(([^)]+)\\)`).exec(
+    titleGateHtml(),
+  );
+  if (!found) throw new Error('the door no longer carries a cubic-bezier growth curve');
+  const [x1, y1, x2, y2] = found[1]!.split(',').map((n) => Number(n));
+  const bez = (a: number, b: number, s: number): number =>
+    3 * (1 - s) * (1 - s) * s * a + 3 * (1 - s) * s * s * b + s * s * s;
+  return (t: number) => {
+    let lo = 0;
+    let hi = 1;
+    for (let i = 0; i < 60; i++) {
+      const mid = (lo + hi) / 2;
+      if (bez(x1!, x2!, mid) < t) lo = mid;
+      else hi = mid;
+    }
+    return bez(y1!, y2!, (lo + hi) / 2);
+  };
+}
+
+/** Beat 3, frame by frame at 60 Hz, as `measureDoorScale` would report it. */
+function growDoor(dom: FakeDom, view: GateView, each: (ms: number, scale: number) => void): void {
+  const curve = frameCurve();
+  const target = throughScale(view);
+  for (let ms = 0; ms <= TRANSITION.frame; ms += 1000 / 60) {
+    dom.doorScale = 1 + (target - 1) * curve(ms / TRANSITION.frame);
+    dom.tick(ms);
+    each(ms, dom.doorScale);
+  }
+}
+
+describe('the menu is interactive from the frame it looks interactive (a0-90)', () => {
+  it('the first button accepts a press as soon as the door looks open', () => {
+    for (const view of [DESKTOP, PHONE]) {
+      const dom = new FakeDom(view);
+      const through = vi.fn();
+      const g = new TitleGate({ dom, onThrough: through });
+      g.mount();
+      dom.listeners?.press();
+      dom.advance(GATE_OPEN_STEPS[2]!.at);
+      expect(g.current, `${view.width}x${view.height}`).toBe('entering');
+
+      let clearedAt: number | null = null;
+      growDoor(dom, view, (ms, scale) => {
+        if (clearedAt !== null || !screenIsClear(view, scale)) {
+          // Still metal on the screen: the door is in front of the menu and is
+          // allowed to be. The other half of the claim — a gate that hands over
+          // EARLY is trap 2 wearing a different hat.
+          if (clearedAt === null) expect(g.modal, `still on screen at ${ms}ms`).toBe(true);
+          return;
+        }
+        clearedAt = ms;
+        // The doorway now contains every corner of the viewport: the punch has
+        // erased the whole field and the hull ring is past every edge. There is
+        // nothing of this screen left to see…
+        expect(dom.visible, `${view.width}x${view.height} at ${ms}ms`).toBe(false);
+        // …so there is nothing left for it to take a press for. `modal` is what
+        // `src/main.ts` asks before it lets the menu act.
+        expect(g.modal, `${view.width}x${view.height} at ${ms}ms`).toBe(false);
+        expect(g.current).toBe('open');
+        expect(through).toHaveBeenCalledTimes(1);
+      });
+
+      expect(clearedAt, `${view.width}x${view.height} never cleared`).not.toBeNull();
+      // AND IT DID NOT COME FROM A TIMER RUNNING OUT. Both caps on this screen —
+      // the open sequence's own last step and the reseal's — are still standing
+      // unfired at the instant the menu became live.
+      const capAt = GATE_OPEN_STEPS[3]!.at - GATE_OPEN_STEPS[2]!.at;
+      expect(clearedAt!).toBeLessThan(capAt);
+      expect(clearedAt!).toBeLessThan(SEAL_CAP_MS);
+      // …and the difference is the reported bug, in milliseconds.
+      expect(capAt - clearedAt!).toBeGreaterThan(300);
+    }
+  });
+
+  it('still opens a tab that never animates, on the timed cap alone', () => {
+    // The safety net the measurement must not cost: a throttled or reduced-motion
+    // tab whose door never reports a scale (`transform:none`, a transition that
+    // never ran) has nothing to measure, and must still end up on a live menu.
+    // `null` is deliberately NOT read as "arrived" — a door that cannot be
+    // measured may be anywhere, and handing the menu over on a guess is the
+    // cross-dissolve trap 2 exists to prevent.
+    const dom = new FakeDom();
+    const g = gate(dom);
+    g.mount();
+    dom.listeners?.press();
+    dom.advance(GATE_OPEN_STEPS[2]!.at);
+
+    dom.doorScale = null;
+    for (let i = 0; i < 240; i++) dom.tick(i * 16);
+    expect(g.current).toBe('entering');
+    expect(g.modal).toBe(true);
+
+    dom.advance(GATE_OPEN_STEPS[3]!.at);
+    expect(g.current).toBe('open');
+    expect(g.modal).toBe(false);
+  });
+
+  it('does not fire beat 4 twice when the cap and the door agree', () => {
+    // The cap is dropped the moment the door reports itself gone, so `onThrough`
+    // — which is how the host learns the screen is the menu's now — stays the
+    // one-shot it reads as.
+    const dom = new FakeDom();
+    const through = vi.fn();
+    const cues: GateCue[] = [];
+    const g = new TitleGate({ dom, onThrough: through, sfx: (cue) => cues.push(cue) });
+    g.mount();
+    dom.listeners?.press();
+    dom.advance(GATE_OPEN_STEPS[2]!.at);
+    growDoor(dom, DESKTOP, () => undefined);
+    expect(g.current).toBe('open');
+
+    dom.advance(GATE_OPEN_STEPS[3]!.at);
+    expect(through).toHaveBeenCalledTimes(1);
+    expect(cues).toEqual(['gateUnlock', 'gateSeated']);
+    expect(dom.pending).toHaveLength(0);
+  });
+
+  it('asks the same question of the picture that the punch is already made of', () => {
+    // Not a second geometry: the predicate is `openingPolygon`, and the four
+    // corners are enough because that polygon is convex. So "the screen is clear"
+    // and "the field covers nothing" are the same statement, and cannot drift.
+    for (const view of [DESKTOP, PHONE]) {
+      const target = throughScale(view);
+      expect(gateClearsViewport(view, 1)).toBe(false);
+      expect(gateClearsViewport(view, target)).toBe(true);
+      // …and at the clearing scale the punched field really does cover no point
+      // of the screen, corners included.
+      let scale = 1;
+      while (scale < target && !gateClearsViewport(view, scale)) scale += 0.005;
+      for (const p of [
+        { x: 0, y: 0 },
+        { x: view.width, y: 0 },
+        { x: 0, y: view.height },
+        { x: view.width, y: view.height },
+        { x: view.width / 2, y: 0 },
+        { x: 0, y: view.height / 2 },
+      ]) {
+        expect(skyCoversPoint(view, scale, p), `${view.width}x${view.height} at ${p.x},${p.y}`).toBe(false);
+      }
+      // A degenerate viewport has no picture to be clear of.
+      expect(gateClearsViewport({ width: 0, height: 0 }, 16)).toBe(false);
+      // …and the two spellings agree at every scale the door passes through, so
+      // the handover and the punch can never come to different conclusions about
+      // the same frame.
+      for (let s = 1; s <= target; s += (target - 1) / 200) {
+        expect(gateClearsViewport(view, s), `${view.width}x${view.height} at scale ${s}`).toBe(
+          screenIsClear(view, s),
+        );
+      }
+    }
   });
 });
 
