@@ -35,7 +35,7 @@ import { test, type Browser, type BrowserContext, type Page } from '@playwright/
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { sweepState, type StateReport } from './probe';
+import { sweepState, topmostAt, type StateReport } from './probe';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const STAGE = process.env.A0_98_STAGE ?? 'broken';
@@ -233,6 +233,70 @@ async function matchContext(page: Page): Promise<Record<string, unknown>> {
   });
 }
 
+
+/**
+ * Press at the point the client says it drew the MINIMAP, and record whether the
+ * minimap noticed.
+ *
+ * The minimap is the one HUD element that is both in the bottom-right corner (GDD
+ * §2.2) and a control: a press toggles it between the collapsed square and the
+ * opened map, and the two states have visibly different rects. So `before` and
+ * `after` off `__cornerStage` answer the only question that matters — did the
+ * press reach the game, or did something else take it — without trusting any seam
+ * to self-report a click.
+ *
+ * A download starting is the other half of the same answer, and it is the one the
+ * player actually experiences: a thumb reaching for the map got a JSON file.
+ */
+async function pressTheCoveredControl(
+  page: Page,
+  touch: boolean,
+): Promise<Record<string, unknown>> {
+  const downloads: string[] = [];
+  page.on('download', (d) => downloads.push(d.suggestedFilename()));
+
+  const read = async (): Promise<{ x: number; y: number; width: number; height: number } | null> =>
+    page.evaluate(() => {
+      const seam = (window as never as {
+        __cornerStage?: { read(): { elements: { id: string; physicalBounds: { x: number; y: number; width: number; height: number } }[] } };
+      }).__cornerStage;
+      const map = seam?.read().elements.find((e) => e.id === 'minimap');
+      return map ? { ...map.physicalBounds } : null;
+    });
+
+  const before = await read();
+  if (!before) return { pressed: null, before, after: null, downloads, note: 'the client drew no minimap this frame' };
+
+  const box = await page.locator('canvas').boundingBox();
+  const at = {
+    x: (box?.x ?? 0) + before.x + before.width / 2,
+    y: (box?.y ?? 0) + before.y + before.height / 2,
+  };
+  const topmost = await topmostAt(page, at.x, at.y);
+  const logLabelBefore = await page.evaluate(
+    () => document.getElementById('playtest-download-log-button')?.textContent ?? null,
+  );
+  if (touch) await page.touchscreen.tap(at.x, at.y);
+  else await page.mouse.click(at.x, at.y);
+  // A player's beat; a 40 KB export is async.
+  await page.waitForTimeout(2_000);
+  const after = await read();
+  const logLabelAfter = await page.evaluate(
+    () => document.getElementById('playtest-download-log-button')?.textContent ?? null,
+  );
+
+  return {
+    pressedAt: { x: Math.round(at.x), y: Math.round(at.y) },
+    topmostAtThatPoint: topmost,
+    minimapBefore: before,
+    minimapAfter: after,
+    minimapToggled: !!after && (after.width !== before.width || after.height !== before.height),
+    logLabelBefore,
+    logLabelAfter,
+    downloads,
+  };
+}
+
 for (const profile of PROFILES) {
   test(`a0-98 what is on top when the connection drops — ${profile.id} (${STAGE})`, async ({ browser, baseURL }) => {
     test.setTimeout(600_000);
@@ -285,6 +349,19 @@ for (const profile of PROFILES) {
       // --- 4. The guest, whose wire never moved, is the control. -------------
       const guestReport = await sweepState(guest.page, 'online-match-guest-healthy', GUEST, await matchContext(guest.page));
       reports.push(guestReport);
+
+      // --- 5. …and the press itself, at the client's own reported point. -----
+      // a0-97's third step, and the half `elementFromPoint` cannot do on its own:
+      // a topmost element is an answer about paint, a press is an answer about
+      // BEHAVIOUR. The minimap is a toggle (GDD §2.2 — collapsed square ⇄ opened
+      // map), so its own reported rect changing size IS the readback for "did the
+      // press reach it", with no seam that could lie about it.
+      const press = await pressTheCoveredControl(host.page, profile.touch);
+      writeFileSync(
+        join(SHOTS, `${profile.id}-press-proof.json`),
+        `${JSON.stringify({ stage: STAGE, profile: profile.id, ...press }, null, 2)}\n`,
+      );
+      await host.page.screenshot({ path: join(SHOTS, `${profile.id}-after-minimap-press.png`) });
     } finally {
       writeFileSync(
         join(SHOTS, `${profile.id}-online-report.json`),

@@ -52,6 +52,14 @@ export interface Cover {
   readonly page: { x: number; y: number };
   /** `CANVAS` means the game got the press. Anything else names what took it. */
   readonly topmost: string;
+  /** Whether the client would route a press here at all. Drawn-but-dead elements
+   *  (the HUD under an open pause overlay) are recorded and marked, never counted:
+   *  chrome over something nobody can press is not the defect. */
+  readonly live: boolean;
+  /** False when the reported point is outside the viewport — the boot screen's
+   *  RETRY is below the fold on a short phone. Not a collision, and not a clean
+   *  bill of health either: a cell the probe could not reach. */
+  readonly onScreen: boolean;
   /** True when the topmost element is the log affordance — a proved collision. */
   readonly collides: boolean;
 }
@@ -73,48 +81,98 @@ export interface StateReport {
   readonly log: LogBox;
   readonly controls: readonly Cover[];
   readonly collisions: readonly Cover[];
+  /** Drawn under the offer but not pressable on this screen — recorded so the
+   *  table can distinguish "nothing was covered" from "nothing live was". */
+  readonly coveredButDead: readonly Cover[];
   /** Free-form context the state wants on the record (session state, screen, …). */
   readonly context?: Record<string, unknown>;
 }
 
 /**
- * Every canvas control the client reports drawing, right now, from every
- * live-stage seam on the page — returned as **canvas-local physical points**, the
- * space every one of those seams speaks.
+ * Every canvas control the client reports drawing **on the screen that is up right
+ * now** — returned as canvas-local physical points, the space every seam speaks.
  *
- * The walk is structural: anything with a numeric `physicalCenter.x/y` is a
- * control, named by its path plus whichever of `kind` / `id` / `door` / `owner` /
- * `index` it carries. `__cornerStage` (a0-98, `main.ts` `installCornerStage`)
- * contributes the drawn HUD — the minimap, the fire button, the controls strip —
- * which is the half no other seam reports and the half the disconnect case is
- * about.
+ * Two rules, and both were learned from a bad first run:
  *
- * Zero-size rects are dropped: the seams report a `nowhere` rect for a control the
- * current screen does not draw, and a press at (0,0) is not a finding about a
- * corner.
+ *  1. **Only what is on screen.** `__mainMenu` reports `settingsControls`,
+ *     `codexControls` and `hangarControls` at all times, whatever screen is
+ *     actually up, and the first pass of this capture duly "found" the connect
+ *     panel sitting on a volume `?` that nobody was drawing. A control the client
+ *     is not painting cannot be covered, and reporting it as covered is worse than
+ *     reporting nothing. So each seam's list is gated on that seam's own
+ *     `visible`/`screen`.
+ *  2. **Drawn is not the same as live.** While the pause overlay is up, `main.ts`
+ *     `pointerdown` consumes every press before the match sees it — *"a tap lands
+ *     on a pause control or on nothing, but never falls through to the frozen
+ *     match under it"*. The minimap keeps being DRAWN under that overlay, and it
+ *     is not a control there. Each row carries `live` so the table can say which
+ *     it is instead of quietly counting one as the other.
+ *
+ * Beyond that the walk is structural: anything with a numeric `physicalCenter.x/y`
+ * is a control, named by its path plus whichever of `kind` / `id` / `door` /
+ * `owner` / `index` it carries. Deliberately not a hand-written list of kinds — a
+ * hand-written list finds only the controls whoever wrote it thought of, and this
+ * brief exists because a0-97's sweep was scoped to the screens its brief named.
+ *
+ * `__cornerStage` (a0-98, `main.ts` `installCornerStage`) contributes the drawn
+ * HUD — the minimap, the fire button, the controls strip — which is the half no
+ * other seam reports and the half the disconnect case is about.
  */
 export async function harvestCanvasControls(
   page: Page,
-): Promise<{ control: string; x: number; y: number }[]> {
+): Promise<{ control: string; x: number; y: number; live: boolean }[]> {
   return page.evaluate(() => {
     type Anon = Record<string, unknown>;
     const w = window as unknown as Anon;
-    const roots: Record<string, unknown> = {};
-    for (const name of ['__mainMenu', '__onlineMenu', '__lobby']) {
-      if (w[name]) roots[name] = w[name];
+
+    /** Each root, with whether the screen it belongs to is the one being drawn. */
+    const roots: { name: string; node: unknown; live: boolean }[] = [];
+
+    const menu = w.__mainMenu as
+      | { visible?: boolean; screen?: string; matchStarted?: boolean; [k: string]: unknown }
+      | undefined;
+    if (menu?.visible) {
+      const on = (screen: string): boolean => menu.screen === screen;
+      if (on('menu')) roots.push({ name: '__mainMenu.controls', node: menu.controls, live: true });
+      if (on('settings')) roots.push({ name: '__mainMenu.settingsControls', node: menu.settingsControls, live: true });
+      if (on('codex')) roots.push({ name: '__mainMenu.codexControls', node: menu.codexControls, live: true });
+      if (on('hangar')) roots.push({ name: '__mainMenu.hangarControls', node: menu.hangarControls, live: true });
     }
-    for (const name of ['__pauseStage', '__cornerStage']) {
-      const seam = w[name] as { read?: () => unknown } | undefined;
-      if (seam && typeof seam.read === 'function') {
-        try {
-          roots[name] = seam.read();
-        } catch {
-          // A seam that cannot read this frame simply contributes nothing.
-        }
+
+    const doors = w.__onlineMenu as { visible?: boolean; [k: string]: unknown } | undefined;
+    if (doors?.visible) {
+      roots.push({ name: '__onlineMenu.doorControls', node: doors.doorControls, live: true });
+      roots.push({ name: '__onlineMenu.browseRows', node: doors.browseRows, live: true });
+    }
+
+    const lobby = w.__lobby as { visible?: boolean; [k: string]: unknown } | undefined;
+    if (lobby?.visible) roots.push({ name: '__lobby', node: lobby, live: true });
+
+    // The pause overlay's own controls — an empty list while it is closed.
+    let pauseOpen = false;
+    const pause = w.__pauseStage as { read?: () => { open: boolean; controls: unknown } } | undefined;
+    if (pause && typeof pause.read === 'function') {
+      try {
+        const read = pause.read();
+        pauseOpen = read.open;
+        roots.push({ name: '__pauseStage.controls', node: read.controls, live: true });
+      } catch {
+        /* a seam that cannot read this frame contributes nothing */
       }
     }
 
-    const out: { control: string; x: number; y: number }[] = [];
+    // …and everything the frame actually drew. Live only while the match owns the
+    // pointer: with the overlay up these are painted, not pressable.
+    const corner = w.__cornerStage as { read?: () => { elements: unknown } } | undefined;
+    if (corner && typeof corner.read === 'function') {
+      try {
+        roots.push({ name: '__cornerStage.elements', node: corner.read().elements, live: !pauseOpen });
+      } catch {
+        /* likewise */
+      }
+    }
+
+    const out: { control: string; x: number; y: number; live: boolean }[] = [];
     const seen = new Set<unknown>();
 
     const label = (path: string, node: Anon): string => {
@@ -127,7 +185,7 @@ export async function harvestCanvasControls(
       return bits.length > 0 ? `${path}<${bits.join(':')}>` : path;
     };
 
-    const walk = (path: string, node: unknown, depth: number): void => {
+    const walk = (path: string, node: unknown, depth: number, live: boolean): void => {
       if (node === null || typeof node !== 'object' || depth > 7) return;
       if (seen.has(node)) return;
       seen.add(node);
@@ -145,23 +203,23 @@ export async function harvestCanvasControls(
           (box.width > 0 && box.height > 0);
         // A control at the origin with no box is the seams' "nowhere" rect.
         if (drawn && (pc.x !== 0 || pc.y !== 0)) {
-          out.push({ control: label(path, rec), x: pc.x, y: pc.y });
+          out.push({ control: label(path, rec), x: pc.x, y: pc.y, live });
         }
       }
 
       if (Array.isArray(node)) {
-        node.forEach((v, i) => walk(`${path}[${i}]`, v, depth + 1));
+        node.forEach((v, i) => walk(`${path}[${i}]`, v, depth + 1, live));
         return;
       }
       for (const key of Object.keys(rec)) {
         if (key === 'physicalCenter' || key === 'physicalBounds') continue;
         if (key === 'logical' || key === 'logicalBounds' || key === 'joinBounds') continue;
         const v = rec[key];
-        if (v !== null && typeof v === 'object') walk(`${path}.${key}`, v, depth + 1);
+        if (v !== null && typeof v === 'object') walk(`${path}.${key}`, v, depth + 1, live);
       }
     };
 
-    for (const [name, root] of Object.entries(roots)) walk(name, root, 0);
+    for (const root of roots) walk(root.name, root.node, 0, root.live);
     return out;
   });
 }
@@ -171,15 +229,15 @@ export async function harvestCanvasControls(
 export async function harvestDomControls(
   page: Page,
   ids: readonly string[] = DOM_CONTROL_IDS,
-): Promise<{ control: string; x: number; y: number }[]> {
+): Promise<{ control: string; x: number; y: number; live: boolean }[]> {
   return page.evaluate((wanted) => {
-    const out: { control: string; x: number; y: number }[] = [];
+    const out: { control: string; x: number; y: number; live: boolean }[] = [];
     for (const id of wanted) {
       const el = document.getElementById(id);
       if (!el) continue;
       const r = el.getBoundingClientRect();
       if (r.width <= 0 || r.height <= 0) continue;
-      out.push({ control: `dom#${id}`, x: r.x + r.width / 2, y: r.y + r.height / 2 });
+      out.push({ control: `dom#${id}`, x: r.x + r.width / 2, y: r.y + r.height / 2, live: true });
     }
     return out;
   }, ids);
@@ -227,11 +285,20 @@ export async function logBox(page: Page): Promise<LogBox> {
   );
 }
 
-/** The canvas origin in page space — the seams report canvas-local physical
- *  points, so a real probe adds this back. Zero while the canvas fills the
- *  window; added anyway, so nothing here depends on that staying true. */
+/**
+ * The canvas origin in page space — the seams report canvas-local physical
+ * points, so a real probe adds this back. Zero while the canvas fills the window;
+ * added anyway, so nothing here depends on that staying true.
+ *
+ * `count()` first, and that is not defensiveness: **the boot-failure screen has no
+ * canvas at all** (`@platform/boot-error` writes over `#app`), and a bare
+ * `boundingBox()` on a locator that matches nothing waits for an element that is
+ * never coming. The first run of this capture hung there for the full ten minutes
+ * and reported not one row.
+ */
 export async function canvasOrigin(page: Page): Promise<{ x: number; y: number }> {
-  const box = await page.locator('canvas').boundingBox();
+  if ((await page.locator('canvas').count()) === 0) return { x: 0, y: 0 };
+  const box = await page.locator('canvas').boundingBox({ timeout: 10_000 }).catch(() => null);
   return box ? { x: box.x, y: box.y } : { x: 0, y: 0 };
 }
 
@@ -255,16 +322,21 @@ export async function sweepState(
     control: c.control,
     x: origin.x + c.x,
     y: origin.y + c.y,
+    live: c.live,
   }));
   const dom = await harvestDomControls(page);
+  const viewport = page.viewportSize() ?? { width: 0, height: 0 };
   const covers: Cover[] = [];
   for (const c of [...canvas, ...dom]) {
-    const topmost = await topmostAt(page, c.x, c.y);
+    const onScreen = c.x >= 0 && c.y >= 0 && c.x <= viewport.width && c.y <= viewport.height;
+    const topmost = onScreen ? await topmostAt(page, c.x, c.y) : 'off-viewport';
     covers.push({
       control: c.control,
       page: { x: Math.round(c.x), y: Math.round(c.y) },
       topmost,
-      collides: topmost.includes(LOG_ROOT_ID) || topmost.includes(LOG_BUTTON_ID),
+      live: c.live,
+      onScreen,
+      collides: c.live && (topmost.includes(LOG_ROOT_ID) || topmost.includes(LOG_BUTTON_ID)),
     });
   }
   return {
@@ -274,6 +346,9 @@ export async function sweepState(
     log: await logBox(page),
     controls: covers,
     collisions: covers.filter((c) => c.collides),
+    coveredButDead: covers.filter(
+      (c) => !c.live && (c.topmost.includes(LOG_ROOT_ID) || c.topmost.includes(LOG_BUTTON_ID)),
+    ),
     context,
   };
 }

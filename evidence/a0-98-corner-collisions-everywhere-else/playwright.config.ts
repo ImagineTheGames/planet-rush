@@ -34,6 +34,8 @@ export default defineConfig({
   use: {
     baseURL: URL,
     browserName: 'chromium',
+    // No action may wait forever: a hung locator costs the whole table.
+    actionTimeout: 20_000,
   },
   webServer: {
     command: `npm run build && npm run preview -- --port ${PORT} --strictPort`,

@@ -108,6 +108,18 @@ for (const profile of PROFILES) {
       await page.waitForSelector('#boot-error', { state: 'visible', timeout: 60_000 });
       await beat(page);
       await record(page, 'boot-failure');
+
+      // …and again with RETRY scrolled into view. On a 798x384 phone the boot
+      // screen is taller than the viewport and RETRY starts below the fold, so the
+      // first row can only report "off-viewport" for it — which is a gap, not a
+      // clean bill of health. The log affordance is `position:fixed`, so it does
+      // NOT scroll away: the question of whether it lands on RETRY is only really
+      // asked once RETRY is somewhere a thumb can reach.
+      await page.evaluate(() => {
+        document.getElementById('boot-error-retry')?.scrollIntoView({ block: 'center' });
+      });
+      await beat(page, 500);
+      await record(page, 'boot-failure-retry-scrolled-into-view');
     }
 
     // =====================================================================

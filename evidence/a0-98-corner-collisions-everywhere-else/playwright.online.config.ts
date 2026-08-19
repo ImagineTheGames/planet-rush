@@ -46,6 +46,8 @@ export default defineConfig({
   use: {
     baseURL: PREVIEW_URL,
     browserName: chromium,
+    // No action may wait forever: a hung locator costs the whole table.
+    actionTimeout: 20_000,
     trace: 'retain-on-failure',
   },
 
