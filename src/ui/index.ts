@@ -829,7 +829,6 @@ export {
   FLOW_SCREENS,
   createFlow,
   flowCloseHangar,
-  flowCloseSettings,
   flowConnected,
   flowEliminated,
   flowFailed,
@@ -838,7 +837,6 @@ export {
   flowMatchEnded,
   flowMatchStart,
   flowOpenHangar,
-  flowOpenSettings,
   flowScreenHandler,
   flowTapEnd,
   flowTapEntry,
@@ -849,7 +847,6 @@ export {
   // is up and hit-tests its own geometry.
   flowTapMapSelect,
   flowTapShipSelect,
-  flowTapSettings,
   resetFlow,
   setFlowFireMode,
   setFlowProfile,
@@ -865,12 +862,15 @@ export type { FlowEffect, FlowResult, FlowScreen, FlowState } from './lobby-flow
 // rows needs no responsive geometry of its own), and a thin Pixi view. The flow
 // owns *when* each is shown; these own *what* each shows.
 //
-//   settings   ← flow.screen === 'settings'  (from the main menu's SETTINGS)
+//   settings   ← the shell's own SETTINGS screen. NOT a flow screen: the flow
+//                has never rendered, stored or read a setting, and the model
+//                that pretended otherwise was deleted in a0-95. The two live
+//                screens (menu and pause) share `./settings` `commitSettings`.
 //   end        ← flow.screen === 'end'        (from flowMatchEnded/flowEliminated)
 //   connection ← driven by the transport's ConnectionState, independent of screen
 //
 // Wiring continues the flow seam:
-//   settingsView.hitTest(x,y) → flowTapSettings(flow, target)
+//   settingsView.hitTest(x,y) → `./settings` `commitSettings` (the one seam)
 //   endView.hitTest(x,y)      → flowTapEnd(flow, target)   // rematch | spectate
 //   on `matchEnd`  → flowMatchEnded(flow, msg.winner)
 //   on your core's death (from the snapshot) → flowEliminated(flow)

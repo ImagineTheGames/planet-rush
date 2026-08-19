@@ -832,3 +832,42 @@ fails to compile here rather than silently costing nothing.
 Note that only `spriteArea` appears on the board: `shapeArea` has one caller and
 it is `spriteArea`, so the scan sees it as live. They stand or fall together, and
 if `spriteArea` were deleted `shapeArea` would take its place on the next report.
+
+### 4.12 SURFACE — the first-run default, once the dead path stopped holding it (a0-95, 2026-08-19)
+
+| Export | Verdict |
+|---|---|
+| `src/ui/settings.ts#createSettings` | SURFACE — the definition of the first-run default, kept where the spec can check `loadSettings` against it |
+
+This row is a **consequence of a deletion, not a new export.** a0-95 removed the
+lobby flow's `settings` screen — a `flowTapSettings` that folded values into a
+`FlowState.settings` no `settingsModel` call site read. That handler defaulted its
+parameter to `createSettings()`, and it was the **last caller outside a test**.
+Cutting dead code exposed what the dead code had been propping up, which is the
+scan working correctly: the number went up because the tree got more honest.
+
+**Wiring it up is the defect, not the fix.** `loadSettings` is documented in the
+same file as *"the counterpart to `createSettings`, and what every live screen
+should seat instead of it"*, and both live screens do (`src/main.ts:1812` and
+`src/main.ts:7843`, plus the boot mix at `841`). That is not an accident of
+history — it is a0-92 mismatch 3, where REDUCE VFX and the three volumes lived in
+a `SettingsState` **rebuilt by `createSettings` on every boot and read back from
+nowhere**. A production caller for this export is precisely the bug that brief
+fixed. This is the rare row where the honest state is zero production callers, and
+a future reader who "finishes the wiring" reintroduces a settings bug.
+
+**Deleting it is the closer call and it loses.** `loadSettings` defaults per
+channel (`parseVolume(stored, DEFAULT_VOLUMES.master)` and so on), so it cannot be
+expressed as a spread of `createSettings()` without contorting it; the two agree
+by arithmetic, not by construction. What holds them together is a single
+assertion — `expect(loadSettings(storageOver(new Map()))).toEqual(createSettings())`
+(`src/ui/settings.test.ts:1042`) — that an empty save opens on the first-run
+default. Delete this export and that spec has to inline a literal, which is a
+second definition of the default that nothing checks against the first. The next
+person to change `DEFAULT_VOLUMES` would move one and not the other, and the
+failure is silent: the game opens on a mix nobody chose.
+
+It is also the fresh-state fixture for ~30 cases in `src/ui/settings.test.ts`.
+That alone would not save it (§4.4(d) is clear that a test's convenience is not a
+reason to export), but the assertion above is not convenience — it is the only
+place the first-run default is stated once and verified.
