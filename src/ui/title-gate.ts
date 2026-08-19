@@ -273,26 +273,18 @@ export function skyCoversPoint(view: GateView, scale: number, point: GatePoint):
 }
 
 /**
- * How far the door must scale for its OPENING to clear the viewport entirely.
- *
- * Measured from the real window, because the door is `min(94vw, 136vh)` wide at
- * 1.62 and **which branch wins differs between a desktop and a phone** — a fixed
- * factor that works on one leaves frame metal on screen on the other, and metal
- * on screen while the frame dissolves is the cross-dissolve this screen exists
- * to replace. The 1.4 is margin past "exactly off screen"; the 16 is a ceiling,
- * so a 1×1 viewport cannot ask for an infinite transform.
- */
-/**
  * **Is the whole screen inside the doorway?** — beat 3 finishing as a *picture*
  * rather than as a timer (a0-90).
  *
  * The developer, from live play: *"there is a pause after the title animation
- * plays and being able to click on a button."* Measured on the shipped bundle it
- * is 0.68 s on a 1280×800 desktop and 0.61 s on a 390×844 handset — the door's
- * last pixel leaves the screen at 2.85 s / 3.21 s and the gate went inert at
- * 3.61 s / 3.82 s, because going inert was hung on the timed step at 3460 rather
- * than on the door. In that window the menu is the entire picture and a real
- * press on it is dropped (a HANGAR press at 3386 ms left `screen` at `menu`).
+ * plays and being able to click on a button."* Measured on the shipped bundle
+ * (`evidence/a0-90-menu-ready/`) it is **645 ms** on a 1280×800 desktop and
+ * **492 ms** on a 390×844 handset: the door's last pixel leaves the screen at
+ * 2955 ms / 3061 ms and the gate went inert at 3600 ms / 3553 ms, because going
+ * inert was hung on the timed step at 3460 rather than on the door. In that
+ * window the menu is the entire picture and a real press on it is dropped — a
+ * HANGAR press at 3489 ms left `__mainMenu.screen` at `menu`, and the four
+ * screenshots either side of the handover are byte-identical.
  *
  * The reason the gap exists at all is {@link throughScale}'s 1.4: the frame is
  * grown 40% past "exactly off screen" so the fade can start with nothing of it
@@ -325,6 +317,16 @@ export function gateClearsViewport(view: GateView, scale: number): boolean {
   );
 }
 
+/**
+ * How far the door must scale for its OPENING to clear the viewport entirely.
+ *
+ * Measured from the real window, because the door is `min(94vw, 136vh)` wide at
+ * 1.62 and **which branch wins differs between a desktop and a phone** — a fixed
+ * factor that works on one leaves frame metal on screen on the other, and metal
+ * on screen while the frame dissolves is the cross-dissolve this screen exists
+ * to replace. The 1.4 is margin past "exactly off screen"; the 16 is a ceiling,
+ * so a 1×1 viewport cannot ask for an infinite transform.
+ */
 export function throughScale(view: GateView): number {
   const box = doorBox(view, 1);
   const openW = box.width * OPENING_SCALE;
