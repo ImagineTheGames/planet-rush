@@ -31,6 +31,13 @@ import {
   showDownloadLog,
 } from './playtest-log-button';
 import type { DownloadLogDom, DownloadLogElement } from './playtest-log-button';
+// a0-98: the corner rule itself lives in `src/ui` (it is a placement decision about
+// the game's own screens, and `src/net` owns none of them). The brief names THIS
+// file for the test, so the import crosses lanes deliberately and in one direction
+// only — `src/net/lifecycle.test.ts` already reaches into `../ui/healthbar` the
+// same way.
+import { kickOutClaimsTheGlass, matchLogOffer } from '../ui/log-offer';
+import type { MatchLogOfferState } from '../ui/log-offer';
 
 afterEach(() => resetDownloadLogButton());
 
@@ -599,5 +606,238 @@ describe('the shared affordance', () => {
     first.show({ reason: 'pause' });
     installDownloadLogButton({ dom, log: newLog(), schedule: null });
     expect(dom.body.children[0]!.removed).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// a0-98 — the offer never lands on a control the player needs
+// ---------------------------------------------------------------------------
+
+/**
+ * A rect in page pixels, exactly as the capture measured it on the built bundle.
+ * These are not numbers anybody chose: every one of them came back from a real
+ * Chromium, and the collisions came back from `document.elementFromPoint` at the
+ * point the CLIENT ITSELF said it drew the control
+ * (`evidence/a0-98-corner-collisions-everywhere-else`).
+ */
+interface MeasuredBox {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/** One control the client drew, and the browser's verdict at its own centre. */
+interface MeasuredControl {
+  readonly name: string;
+  readonly box: MeasuredBox;
+  /** `document.elementFromPoint` at the control's own reported point. */
+  readonly topmost: string;
+}
+
+/**
+ * One state of the client, measured. `rule` says which of the four offer sites in
+ * `src/main.ts` decides this screen — the match one is
+ * `@ui` log-offer `matchLogOffer`, and it is the one this file asserts against;
+ * the others are recorded so a later change to them is measured against the same
+ * table rather than against nothing.
+ */
+interface MeasuredState {
+  readonly what: string;
+  readonly viewport: string;
+  readonly rule: 'match' | 'front-door' | 'boot';
+  /** The inputs the match rule reads. `null` on a screen it does not decide. */
+  readonly match: MatchLogOfferState | null;
+  /** Where the affordance actually stood, or `null` if it was never mounted. */
+  readonly offer: MeasuredBox | null;
+  /** Every control that was LIVE — one the client would route a press to.
+   *  Elements merely DRAWN under an overlay that consumes every press (the HUD
+   *  beneath the pause menu) are not controls and are not listed here. */
+  readonly liveControls: readonly MeasuredControl[];
+}
+
+/** Do two measured rects share any pixel? */
+function overlaps(a: MeasuredBox, b: MeasuredBox): boolean {
+  return (
+    a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
+  );
+}
+
+/**
+ * **The cross-product, as measured.** Every state in which any of the four sites
+ * shows the offer, crossed with what the client draws in the bottom-right corner
+ * of that state, on a phone and a desktop viewport — plus a phone held PORTRAIT,
+ * because the affordance's own CSS re-homes it to the other physical corner there.
+ *
+ * The offline rows come from the shipped artifact through its real front door; the
+ * online ones from the shipped client against a real allocator and a real match
+ * server, with the wire really cut.
+ */
+const MEASURED: readonly MeasuredState[] = [
+  // --- The boot-failure screen (`main.ts` presentBootFailure) ---------------
+  {
+    what: 'boot failure (no WebGL)',
+    viewport: 'desktop 1280x800',
+    rule: 'boot',
+    match: null,
+    offer: { x: 978, y: 706, width: 290, height: 82 },
+    liveControls: [
+      { name: 'RETRY', box: { x: 300, y: 672, width: 116, height: 44 }, topmost: 'BUTTON#boot-error-retry' },
+    ],
+  },
+
+  // --- The pause menu (a0-97's known-good, re-measured) ---------------------
+  // The minimap is DRAWN under the offer on the phone and is not listed: while the
+  // overlay is up `main.ts` pointerdown consumes every press before the match sees
+  // it, so nothing under it is a control. That distinction is the difference
+  // between this row and the live-match rows below.
+  {
+    what: 'pause menu, offline match',
+    viewport: 'phone 798x384',
+    rule: 'match',
+    match: { pauseScreen: 'menu', session: null, glass: 'match' },
+    offer: { x: 597, y: 328, width: 189, height: 44 },
+    liveControls: [
+      { name: 'RESUME', box: { x: 305, y: 100, width: 189, height: 44 }, topmost: 'CANVAS#app' },
+      { name: 'SETTINGS', box: { x: 305, y: 174, width: 189, height: 44 }, topmost: 'CANVAS#app' },
+      { name: 'EXIT TO MENU', box: { x: 305, y: 244, width: 189, height: 44 }, topmost: 'CANVAS#app' },
+    ],
+  },
+  {
+    what: 'pause menu, offline match',
+    viewport: 'desktop 1280x800',
+    rule: 'match',
+    match: { pauseScreen: 'menu', session: null, glass: 'match' },
+    offer: { x: 1079, y: 744, width: 189, height: 44 },
+    liveControls: [
+      { name: 'RESUME', box: { x: 546, y: 232, width: 189, height: 56 }, topmost: 'CANVAS#app' },
+      { name: 'SETTINGS', box: { x: 546, y: 326, width: 189, height: 44 }, topmost: 'CANVAS#app' },
+      { name: 'EXIT TO MENU', box: { x: 546, y: 390, width: 189, height: 44 }, topmost: 'CANVAS#app' },
+    ],
+  },
+
+  // --- A live online match whose session has dropped -----------------------
+  // The state a0-97 never had to look at, and the one that can arrive on any
+  // screen. On the DESKTOP the kick-out card really is the screen: no fullscreen,
+  // so the card paints over the match, its two buttons are centred, and the offer
+  // sits in an empty corner. Nothing to fix, and so nothing withdrawn.
+  {
+    what: 'online match, session reconnecting — CONNECTION LOST card on the glass',
+    viewport: 'desktop 1280x800',
+    rule: 'match',
+    match: { pauseScreen: 'closed', session: 'reconnecting', glass: 'kicked-out' },
+    offer: { x: 959, y: 706, width: 309, height: 82 },
+    liveControls: [
+      { name: 'RECONNECT NOW', box: { x: 436, y: 424, width: 198, height: 45 }, topmost: 'BUTTON#pr-link-loss-reconnect' },
+      { name: 'ABANDON MATCH', box: { x: 645, y: 424, width: 198, height: 45 }, topmost: 'BUTTON#pr-link-loss-abandon' },
+    ],
+  },
+  // …and on a PHONE the same drop is a different screen, because there is no
+  // screen: the root is fullscreen, so the card is painted under the canvas
+  // (`kickOutClaimsTheGlass`) and the HUD is still what the player is looking at.
+  // The offer lands on the minimap — a real tap at the map's own reported centre
+  // downloaded `planet-rush-log-17d1979-…json` and did not toggle the map.
+  {
+    what: 'online match, session reconnecting — card buried by fullscreen, HUD live',
+    viewport: 'phone 798x384',
+    rule: 'match',
+    match: { pauseScreen: 'closed', session: 'reconnecting', glass: 'match' },
+    offer: { x: 477, y: 290, width: 309, height: 82 },
+    liveControls: [
+      { name: 'minimap', box: { x: 586, y: 292, width: 80, height: 80 }, topmost: 'BUTTON#playtest-download-log-button' },
+    ],
+  },
+  {
+    what: 'online match, session reconnecting — portrait, offer re-homed to the other corner',
+    viewport: 'phone portrait 390x844',
+    rule: 'match',
+    match: { pauseScreen: 'closed', session: 'reconnecting', glass: 'match' },
+    offer: { x: 12, y: 571, width: 79, height: 261 },
+    liveControls: [
+      { name: 'minimap', box: { x: 12, y: 632, width: 80, height: 80 }, topmost: 'BUTTON#playtest-download-log-button' },
+    ],
+  },
+];
+
+describe('the offer never lands on a control the player needs', () => {
+  it('is not standing on any live control, in any measured state', () => {
+    for (const s of MEASURED) {
+      const offered = s.rule === 'match' && s.match ? matchLogOffer(s.match) !== null : s.offer !== null;
+      if (!offered || !s.offer) continue;
+      for (const c of s.liveControls) {
+        expect(
+          overlaps(s.offer, c.box),
+          `${s.what} @ ${s.viewport}: the offer sits on ${c.name}`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it('withdraws from every state the browser caught it covering a control', () => {
+    // The rows where `elementFromPoint`, at the control's OWN reported point,
+    // answered with this affordance. Each one has to be a state the rule now
+    // refuses — anything else is the bug still shipping.
+    const caught = MEASURED.filter((s) =>
+      s.liveControls.some((c) => c.topmost.includes(DOWNLOAD_LOG_ROOT_ID)),
+    );
+    expect(caught.length, 'the capture proved at least one collision').toBeGreaterThan(0);
+    for (const s of caught) {
+      expect(s.rule, `${s.what}: decided by the match rule`).toBe('match');
+      expect(matchLogOffer(s.match!), `${s.what} @ ${s.viewport}`).toBeNull();
+    }
+  });
+
+  it('refuses the drop that a0-97 never had to look at — the live match HUD', () => {
+    // The single line this brief is about. Before a0-98 this answered "offer"
+    // whatever was on the glass, and a networked match is never pausable, so the
+    // overlay is CLOSED for the whole of one.
+    expect(matchLogOffer({ pauseScreen: 'closed', session: 'reconnecting', glass: 'match' })).toBeNull();
+    expect(matchLogOffer({ pauseScreen: 'closed', session: 'closed', glass: 'match' })).toBeNull();
+  });
+
+  it('does NOT withdraw where the corner is free — the offer is not the bug', () => {
+    // The other half of the brief, and the half a nervous fix gets wrong. A player
+    // filing "it kept dropping" needs this button.
+    expect(matchLogOffer({ pauseScreen: 'closed', session: 'reconnecting', glass: 'kicked-out' })).toBe('disconnect');
+    expect(matchLogOffer({ pauseScreen: 'closed', session: 'closed', glass: 'kicked-out' })).toBe('disconnect');
+    // …and on the pause menu, drop or no drop.
+    expect(matchLogOffer({ pauseScreen: 'menu', session: null, glass: 'match' })).toBe('pause');
+    expect(matchLogOffer({ pauseScreen: 'menu', session: 'open', glass: 'match' })).toBe('pause');
+    expect(matchLogOffer({ pauseScreen: 'menu', session: 'closed', glass: 'match' })).toBe('disconnect');
+  });
+
+  it('keeps a0-97: nothing layered over pause carries it, whatever the wire is doing', () => {
+    for (const screen of ['settings', 'confirm'] as const) {
+      for (const session of [null, 'open', 'reconnecting', 'closed'] as const) {
+        for (const glass of ['match', 'kicked-out'] as const) {
+          expect(matchLogOffer({ pauseScreen: screen, session, glass }), `${screen}/${session}/${glass}`).toBeNull();
+        }
+      }
+    }
+  });
+
+  it('knows a raised card is not a painted one — the fullscreen top layer', () => {
+    // Measured, not assumed: on a 798x384 touch boot the card is un-hidden and
+    // laid out, and `elementFromPoint` at RECONNECT NOW's own centre answers
+    // `CANVAS#app`. The game root is fullscreen, and the top layer outranks every
+    // z-index (a0-28, from this affordance's own side).
+    expect(kickOutClaimsTheGlass(true, false)).toBe('kicked-out');
+    expect(kickOutClaimsTheGlass(true, true)).toBe('match');
+    expect(kickOutClaimsTheGlass(false, false)).toBe('match');
+    expect(kickOutClaimsTheGlass(false, true)).toBe('match');
+  });
+
+  it('is total — every state has an answer, so no frame can fall through it', () => {
+    const screens = ['closed', 'menu', 'settings', 'confirm'] as const;
+    const sessions = [null, 'connecting', 'open', 'reconnecting', 'closed'] as const;
+    const glasses = ['match', 'kicked-out'] as const;
+    for (const pauseScreen of screens) {
+      for (const session of sessions) {
+        for (const glass of glasses) {
+          const answer = matchLogOffer({ pauseScreen, session, glass });
+          expect([null, 'pause', 'disconnect']).toContain(answer);
+        }
+      }
+    }
   });
 });

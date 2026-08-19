@@ -245,6 +245,7 @@ import {
   applyVolumes,
   SETTINGS_STORAGE,
   EndOfMatchView,
+  endOfMatchLayout,
   endOfMatchModel,
   buildSummary,
   summaryFrame,
@@ -317,6 +318,8 @@ import {
   pauseLayout,
   nextPauseScreen,
   isPauseOpen,
+  kickOutClaimsTheGlass,
+  matchLogOffer,
   pauseAllowsDownloadLog,
   shouldFreezeSim,
   // Whether the bottom edge carries the controls strip — the one piece of screen
@@ -1707,6 +1710,11 @@ async function boot(): Promise<void> {
   // was told it was, not in what it does with that. Same discipline as the pause
   // seam — pure read-back, no mutators, nothing computed until `read()` is called.
   installAlarmStage();
+  // And the CORNER seam, on the same precedent and for a sharper version of the
+  // same reason: the layout registry knows what is drawn in every corner, and it
+  // is built only under `?debug=1`, which cannot reach the front door or an
+  // online match. a0-98 needs exactly those screens. See `installCornerStage`.
+  installCornerStage();
 
   // --- Touch controls made visible (touch-visuals.ts) — the dynamic sticks and
   //     the fire-mode morph the player actually sees. On top of the HUD so the
@@ -3506,7 +3514,10 @@ async function boot(): Promise<void> {
   }
 
   /**
-   * Offer DOWNLOAD LOG in the match, and only where the brief puts it (§2, §3):
+   * Offer DOWNLOAD LOG in the match, and only where the brief puts it (§2, §3) —
+   * which is to say **only where a screen, rather than the match, is claiming the
+   * display**. The whole of that decision is `src/ui/log-offer` `matchLogOffer`,
+   * pure and asserted in node; this function is the wire to it.
    *
    *   1. **A lost or losing connection first.** Online, `reconnecting` and `closed`
    *      are the two states a "it kept dropping" report is about, and the offer names
@@ -3517,33 +3528,62 @@ async function boot(): Promise<void> {
    *      is simply available there, and withdraws for anything layered over it
    *      (`src/ui/pause-menu` `pauseAllowsDownloadLog`).
    *
-   * Anything else hides it. During play the match owns the screen, and a floating
-   * button over the HUD would be exactly the kind of chrome the HUD budget refuses.
+   * ── WHAT a0-98 CHANGED, AND WHY IT IS A RESTORATION ─────────────────────────
+   * Rule 1 used to fire whatever was on screen, and the comment below this one
+   * used to end *"during play the match owns the screen"* while the code did the
+   * opposite: a networked match is never pausable, so the overlay is CLOSED for the
+   * whole of one, and a drop put a DOM button at the maximum z-index over a live
+   * HUD. At the point the client itself reports drawing the minimap (GDD §2.2,
+   * bottom-right), `document.elementFromPoint` on a 798x384 phone answers
+   * `BUTTON#playtest-download-log-button`: the map is a toggle, and a thumb
+   * reaching for it got a JSON file
+   * (`evidence/a0-98-corner-collisions-everywhere-else`).
+   *
+   * So the drop now has to be accompanied by a screen — the pause menu, or the
+   * CONNECTION LOST kick-out the drop itself raises (`src/net/link-loss-view`, a
+   * full-bleed scrim that takes every press). The player who needs the log has
+   * both: ESC opens pause on an online match too, and the card is up within
+   * `src/net/link-loss` `SILENCE_FLOOR_MS` of any real drop.
+   *
    * Called once per rendered frame from {@link syncPause}; a repeated identical offer
    * costs one comparison and no DOM work (`src/net/playtest-log-button`).
    */
   function syncDownloadLog(): void {
-    // A screen LAYERED OVER the pause menu draws its own controls into the corner
-    // this affordance pins itself to, so the offer withdraws for the whole of one
-    // (a0-97: DOWNLOAD LOG landed on the settings screen's DONE plate, and on a
-    // phone there is no Escape key to leave by instead). Ahead of the error branch
-    // and not after it: "nothing is drawn over DONE" is a property of the screen,
-    // and a dropped connection does not make it less true. The log stays one press
-    // away either way — DONE and STAY both step back to the menu, where the offer
-    // (pause's, or the disconnect's) is waiting.
-    if (!pauseAllowsDownloadLog(pauseScreen) || logOfferHeldByPress || performance.now() < logOfferHeldUntilMs) {
+    // The one thing that is not a placement question: a press that has just closed
+    // the screen the offer was standing on must not see it flicker back for a frame
+    // (a0-97's second commit).
+    if (logOfferHeldByPress || performance.now() < logOfferHeldUntilMs) {
       hideDownloadLog();
       return;
     }
-    const state = onlineSession?.state;
-    if (state === 'reconnecting' || state === 'closed') {
+    const state = onlineSession?.state ?? null;
+    // `linkLoss.status()` is as of the last `poll()`, which runs just AFTER this in
+    // the render frame — so the offer trails the kick-out card by one frame in both
+    // directions. Sixteen milliseconds late is the safe side of both edges: the
+    // offer never appears before the card that makes room for it.
+    //
+    // `document.fullscreenElement` is the second half, and it is not incidental:
+    // the card is appended to `body`, a SIBLING of the game root, and a fullscreen
+    // root is in the browser's top layer, which no z-index outranks. On a phone the
+    // card is therefore painted UNDER the canvas and the player is still looking at
+    // the match (`@ui` log-offer `kickOutClaimsTheGlass`, and a0-28, which is the
+    // same mechanism seen from this affordance's own side).
+    const offer = matchLogOffer({
+      pauseScreen,
+      session: state,
+      glass: kickOutClaimsTheGlass(
+        linkLoss !== null && linkLoss.status().phase !== 'live',
+        document.fullscreenElement !== null,
+      ),
+    });
+    if (offer === 'disconnect' && (state === 'reconnecting' || state === 'closed')) {
       showDownloadLog({
         reason: 'error',
         hint: disconnectOfferHint(state, onlineSession?.closeReason ?? null),
       });
       return;
     }
-    if (isPauseOpen(pauseScreen)) {
+    if (offer === 'pause') {
       showDownloadLog({ reason: 'pause' });
       return;
     }
@@ -6638,6 +6678,147 @@ async function boot(): Promise<void> {
     };
     try {
       Object.defineProperty(window, '__pauseStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
+
+  /**
+   * Install `window.__cornerStage` — the read-only seam that answers ONE question
+   * on a real boot: **what has the client drawn in each corner of this frame, and
+   * where.** Every positioned element, with the physical point a real press must
+   * land on (through the landscape-lock remap, like `__pauseStage`).
+   *
+   * ── WHY IT EXISTS, AND WHY IT IS NOT BEHIND ?debug=1 (a0-98) ────────────────
+   * The placement instrument this repo already has is the layout registry
+   * (`@platform/layout-registry`), and it is exactly right: every positioned
+   * element registers its declared anchor and its ACTUAL rendered rect once a
+   * frame, so "is something drawn here" stops being a thing we squint at. But it
+   * is built in {@link refreshLayout} only when `flags.debug` is set, and
+   * `?debug=1` boots straight into an offline match with no menu, no doors and no
+   * lobby (see the `mainMenu` / `lobby` construction above). So the registry
+   * cannot be read on ANY screen reached through the front door, and it cannot be
+   * read in an online match at all.
+   *
+   * a0-98 is a question about exactly those screens: the DOWNLOAD LOG affordance
+   * (`src/net/playtest-log-button`) is `position:fixed` in the bottom-right at the
+   * platform's largest z-index, it is raised from four places, and a0-97 only had
+   * to look at one of them. Proving what a press in that corner actually hits
+   * needs the client's own report of what it drew there — on the front door, and
+   * in a match whose session has dropped.
+   *
+   * That is the same wall {@link installPauseStage} and `installAlarmStage` hit,
+   * and this follows their ratified answer rather than inventing a new one: ship
+   * the seam on BOTH boots, pure read-back, no mutators, and compute nothing until
+   * something calls {@link CornerSeam.read}. A `LayoutRegistry` is allocated per
+   * read and thrown away, so a normal frame is untouched.
+   *
+   * It reuses {@link refreshLayout} verbatim rather than restating any corner
+   * geometry. A seam that recomputed where the minimap goes would be measuring its
+   * own arithmetic; this one can only ever report what the frame registered.
+   */
+  function installCornerStage(): void {
+    const physOf = (lx: number, ly: number): { x: number; y: number } => {
+      const p = logicalToPhysical(lx, ly, transform);
+      return { x: p.x, y: p.y };
+    };
+    /** One drawn element, as the client reports drawing it. `physicalBounds` is
+     *  the same rect through the rotation and re-normalised, so a caller can ask
+     *  about a corner rather than only about a centre. */
+    interface CornerElement {
+      id: string;
+      anchor: string;
+      logicalBounds: Rect;
+      physicalCenter: { x: number; y: number };
+      physicalBounds: Rect;
+    }
+    const physicalRect = (r: Rect): Rect => {
+      const a = physOf(r.x, r.y);
+      const b = physOf(r.x + r.width, r.y + r.height);
+      return {
+        x: Math.min(a.x, b.x),
+        y: Math.min(a.y, b.y),
+        width: Math.abs(b.x - a.x),
+        height: Math.abs(b.y - a.y),
+      };
+    };
+    const stage = {
+      read(): {
+        logicalViewport: { width: number; height: number };
+        rotated: boolean;
+        isTouch: boolean;
+        online: boolean;
+        pauseScreen: PauseScreen;
+        elements: CornerElement[];
+      } {
+        // A throwaway registry, filled by the SAME function the ?debug=1 build
+        // fills each frame — so this reports the drawn frame and never a second
+        // opinion about it.
+        const reg = new LayoutRegistry();
+        refreshLayout(reg);
+        return {
+          logicalViewport: { width: transform.logicalWidth, height: transform.logicalHeight },
+          rotated: transform.rotated,
+          isTouch,
+          online: onlineSession !== null,
+          pauseScreen,
+          elements: reg.entries().map((e) => ({
+            id: e.id,
+            anchor: e.anchor.region,
+            logicalBounds: { ...e.bounds },
+            physicalCenter: physOf(e.bounds.x + e.bounds.width / 2, e.bounds.y + e.bounds.height / 2),
+            physicalBounds: physicalRect(e.bounds),
+          })),
+        };
+      },
+      /**
+       * The END-OF-MATCH overlay's own buttons, each with the physical point a
+       * real press must land on. Not in {@link read}'s `elements` because the
+       * overlay registers ONE rect with the layout registry — its content box
+       * (`@ui` end-of-match-view `describeLayout`) — and "the offer is somewhere
+       * inside a panel" is not the question. Which BUTTON is under it, is.
+       *
+       * Derived from the overlay's own pure layout (`endOfMatchLayout`, the same
+       * call the view makes), so it cannot report a plate the screen did not draw.
+       * Empty while the overlay is down.
+       */
+      endControls(): { kind: string; physicalCenter: { x: number; y: number }; physicalBounds: Rect }[] {
+        if (!endOverlay.visible) return [];
+        const model = endOfMatchModel(currentOutcome(endScreen === 'result'));
+        const ids = model.buttons.map((b) => b.id);
+        const l = endOfMatchLayout(
+          { width: transform.logicalWidth, height: transform.logicalHeight },
+          ids,
+          { isTouch },
+        );
+        return l.buttons.map((r, i) => ({
+          kind: ids[i] ?? 'button',
+          physicalCenter: physOf(r.x + r.width / 2, r.y + r.height / 2),
+          physicalBounds: physicalRect(r),
+        }));
+      },
+      /** The online session's transport state and close reason — the two facts
+       *  `syncDownloadLog` reads to decide whether the offer stands. Read-back
+       *  only; nothing here can open, close or redial a socket. */
+      session(): { state: string | null; closeReason: string | null } {
+        return { state: onlineSession?.state ?? null, closeReason: onlineSession?.closeReason ?? null };
+      },
+      /** Whether the connection watchdog is RETIRED — the fact that makes the
+       *  end-of-match case different from every other drop. `matchEnd` retires it
+       *  (`src/net/session`), so a socket closing after the summary goes up raises
+       *  no CONNECTION LOST card, and the offer stands alone over the end screen. */
+      linkPhase(): string | null {
+        return linkLoss?.status().phase ?? null;
+      },
+    };
+    try {
+      Object.defineProperty(window, '__cornerStage', {
         value: stage,
         writable: false,
         configurable: false,

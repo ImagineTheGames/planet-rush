@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Planet Rush app-shell icon — PLACEHOLDER (Platform Engineer).
+  A geometric stand-in so the PWA is installable (the manifest needs an icon for
+  the browser to offer "Add to Home Screen"); replace with the real mark from the
+  Art & Audio agent when it lands, exactly as the render layer's placeholder ship
+  is replaced. Palette is Cold Vacuum (style-guide §1): vacuum ground, steel hull,
+  plasma accent. No signal yellow — RESERVED (style-guide §2), never decoration.
+  Maskable-safe: the mark sits inside the central 80% safe zone.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0D1015"/>
+  <circle cx="256" cy="256" r="150" fill="none" stroke="#4DC3FF" stroke-width="10" opacity="0.35"/>
+  <g transform="rotate(-30 256 256)">
+    <polygon points="366,256 190,346 190,166" fill="#7E8894"/>
+    <circle cx="286" cy="256" r="26" fill="#4DC3FF"/>
+  </g>
+</svg>

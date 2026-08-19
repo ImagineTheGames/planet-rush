@@ -1,0 +1,32 @@
+{
+  "requestedDpr": 3,
+  "shipScreen": {
+    "x": 640,
+    "y": 400
+  },
+  "shipWorld": {
+    "x": 1968,
+    "y": 1200
+  },
+  "viewport": {
+    "w": 1280,
+    "h": 800,
+    "width": 1280,
+    "height": 800
+  },
+  "cameraOffset": {
+    "x": -1328,
+    "y": -800
+  },
+  "canvas": {
+    "backing": {
+      "w": 3840,
+      "h": 2400
+    },
+    "css": {
+      "w": 1280,
+      "h": 800
+    },
+    "dpr": 3
+  }
+}
