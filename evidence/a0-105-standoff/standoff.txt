@@ -1,0 +1,59 @@
+BEFORE — main @ 84b0f1c (pre-a0-105)
+
+a0-105 — a wounded bot at home, a hostile parked 200u away, 20s ceiling
+hull pinned at 0.14 of max; geometry pinned; 1200 ticks
+
+character  tier    retreat ticks   turned at   into
+rusty      easy        1200   never          —
+bolt       easy        1200   never          —
+foreman    medium      1200   never          —
+patch      medium      1200   never          —
+sable      hard        1200   never          —
+vulture    hard        1200   never          —
+warden     hard        1200   never          —
+
+BEFORE — the same staging held for two minutes, to show the hold is unbounded
+
+a0-105 — a wounded bot at home, a hostile parked 200u away, 120s ceiling
+hull pinned at 0.14 of max; geometry pinned; 7200 ticks
+
+character  tier    retreat ticks   turned at   into
+rusty      easy        7200   never          —
+bolt       easy        7200   never          —
+foreman    medium      7200   never          —
+patch      medium      7200   never          —
+sable      hard        7200   never          —
+vulture    hard        7200   never          —
+warden     hard        7200   never          —
+
+AFTER — agent/bots/a0-105-no-fear-of-death
+
+a0-105 — a wounded bot at home, a hostile parked 200u away, 20s ceiling
+hull pinned at 0.14 of max; geometry pinned; 1200 ticks
+
+character  tier    retreat ticks   turned at   into
+rusty      easy         250   t=250 (4.17s)  turn-and-fight
+bolt       easy         110   t=110 (1.83s)  turn-and-fight
+foreman    medium       140   t=140 (2.33s)  turn-and-fight
+patch      medium       150   t=150 (2.50s)  turn-and-fight
+sable      hard          69   t=69 (1.15s)   turn-and-fight
+vulture    hard          78   t=78 (1.30s)   turn-and-fight
+warden     hard          78   t=78 (1.30s)   turn-and-fight
+
+AFTER — two minutes, to show the fight is where it stays
+
+a0-105 — a wounded bot at home, a hostile parked 200u away, 120s ceiling
+hull pinned at 0.14 of max; geometry pinned; 7200 ticks
+
+character  tier    retreat ticks   turned at   into
+rusty      easy         250   t=250 (4.17s)  turn-and-fight
+bolt       easy         110   t=110 (1.83s)  turn-and-fight
+foreman    medium       140   t=140 (2.33s)  turn-and-fight
+patch      medium       150   t=150 (2.50s)  turn-and-fight
+sable      hard          69   t=69 (1.15s)   turn-and-fight
+vulture    hard          78   t=78 (1.30s)   turn-and-fight
+warden     hard          78   t=78 (1.30s)   turn-and-fight
+
+Instrument: evidence/a0-105-standoff/standoff.ts
+  npx vite-node evidence/a0-105-standoff/standoff.ts
+  A0105_SECONDS=120 npx vite-node evidence/a0-105-standoff/standoff.ts

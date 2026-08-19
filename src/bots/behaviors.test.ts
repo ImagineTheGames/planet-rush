@@ -49,11 +49,20 @@ import {
   step,
   type World,
 } from '../sim';
-import { coveringFire, haulHome, retreat, roam, scavenge } from './behaviors';
+import {
+  GUARD_RADIUS,
+  RETREAT_CLEAR_RANGE,
+  coveringFire,
+  haulHome,
+  retreat,
+  roam,
+  scavenge,
+  standoffPatience,
+} from './behaviors';
 import { createBot, type Bot } from './bot';
 import { botInputs } from './harness';
 import { perceive } from './perception';
-import { Difficulty, PERSONALITIES, type PersonalityId } from './personalities';
+import { Difficulty, PERSONALITIES, tuningFor, type PersonalityId } from './personalities';
 import { context, type BotCtx } from './tree';
 
 // ---------------------------------------------------------------------------
@@ -140,9 +149,10 @@ function chase(opts: { personality: PersonalityId; teammate?: boolean; seed?: nu
   return { world, bot: createBot({ id: 0, personality: opts.personality }, { seed: 3 }), out, me, chaser };
 }
 
-/** One decision's context, perceived through the bot's own fog. */
-function decide(chaseState: Chase): BotCtx {
-  return context(perceive(chaseState.world, 0), chaseState.bot.brain);
+/** One decision's context, perceived through the bot's own fog. Takes the two
+ *  fields it actually reads, so the a0-105 staging below can use it too. */
+function decide(state: { world: World; bot: Bot }): BotCtx {
+  return context(perceive(state.world, 0), state.bot.brain);
 }
 
 /** The threat the retreat is handed — the same read the trees make. */
@@ -356,5 +366,239 @@ describe('a bot running home is still shooting at whoever is chasing it (a0-81)'
       expect(aimOf(loot)).toBeNull();
       expect(triggerOf(loot)).toBe(false);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// a0-105 — the retreat that never ended
+// ---------------------------------------------------------------------------
+
+/**
+ * The developer, 2026-08-19, from a live match, with a screenshot of Rusty
+ * parked at its own station at 20/70 hull:
+ *
+ * > *"I was able to make rusty just stay stuck there by putting myself in
+ * > between the ore and his base. he just stayed in that same spot scared of me.
+ * > ship lives are cheap. enemies should not fear death..."*
+ *
+ * The last sentence is the ruling, and it is already the design: respawn is free
+ * (GDD §2.3, §2.7). The flee latch (`./commitment`, folded in `wantsRetreat`)
+ * released on `recovered || escaped` and on nothing else — and **both of those
+ * are conditions the opponent controls**. Park inside `RETREAT_CLEAR_RANGE` and
+ * `escaped` can never read true; keep the pressure on a game with no hull repair
+ * and `recovered` never can either. So the retreat had no end, and a player who
+ * found that had found a way to switch an opponent off by standing still:
+ * measured at 7200 held ticks out of 7200, at every tier, in
+ * `evidence/a0-105-standoff/`.
+ *
+ * What is pinned below is the *end*, not the retreat — a wounded bot running for
+ * cover is good play and stays exactly as it was:
+ *
+ *  1. the reported scenario terminates, inside a stated bound;
+ *  2. every tier terminates, with the personality spread only in how long;
+ *  3. a retreat that is *working* is left alone — which is what makes the turn
+ *     readable from outside as the bot deciding rather than a timer firing;
+ *  4. the turn ends when its subject does.
+ */
+
+/** The photograph's hull: Rusty at 20 of 70. Under its 0.65 nerve, nowhere near
+ *  the 0.80 it would have to climb back to — and nothing in the game heals a
+ *  hull, so that exit is shut for the whole match. */
+const HULL_20_OF_70 = 20 / 70;
+
+/** Wounded for the **whole cast**: under the 0.15 floor `retreatThreshold`
+ *  clamps to, so Sable (0.18) is as afraid as Rusty (0.65) and one number stages
+ *  every tier. */
+const WOUNDED_ANY_TIER = 0.14;
+
+/** Where the player parks: inside `RETREAT_CLEAR_RANGE` (676) so the retreat can
+ *  never read *escaped*, and inside `GUARD_RADIUS * 2` of the station so this is
+ *  a siege on the doorstep rather than a blockade of the road home — `./cornered`
+ *  owns that other case, and it already terminates. */
+const PARK = 200;
+
+interface Standoff {
+  world: World;
+  bot: Bot;
+  me: World['ships'][number];
+  player: World['ships'][number];
+  /** Unit vector from the station out toward the field. */
+  out: Vec2;
+}
+
+/**
+ * Stage the photograph: the bot is already home — it ran, it arrived, and it is
+ * out of road — with a hostile parked between it and the ore.
+ */
+function standoff(opts: { personality: PersonalityId; hull: number }): Standoff {
+  const world = createWorld({
+    seed: 20260819,
+    players: [0, 1].map((id) => ({ id, shipClass: ShipClass.Vanguard })),
+    bounds: { width: 4000, height: 4000 },
+    asteroidCount: 0,
+  });
+  world.time = SPAWN_PROTECTION_S + 10;
+  for (const ship of world.ships) ship.spawnProtect = 0;
+  for (const station of world.stations) {
+    station.spawnProtect = 0;
+    station.sinceDamage = 999;
+  }
+
+  const home = world.stations.find((s) => s.owner === 0)!;
+  const me = world.ships[0]!;
+  const player = world.ships[1]!;
+
+  const dx = world.bounds.width / 2 - home.pos.x;
+  const dy = world.bounds.height / 2 - home.pos.y;
+  const d = Math.sqrt(dx * dx + dy * dy);
+  const out: Vec2 = { x: dx / d, y: dy / d };
+
+  me.pos = { x: home.pos.x, y: home.pos.y };
+  me.vel = { x: 0, y: 0 };
+  me.hull = me.maxHull * opts.hull;
+  player.pos = { x: home.pos.x + out.x * PARK, y: home.pos.y + out.y * PARK };
+  player.vel = { x: 0, y: 0 };
+
+  return { world, bot: createBot({ id: 0, personality: opts.personality }, { seed: 3 }), me, player, out };
+}
+
+/** What one staging did, tick by tick. */
+interface Held {
+  /** Ticks the `retreat` leaf won. */
+  retreatTicks: number;
+  /** Tick the `turn-and-fight` leaf first won, or -1 if it never did. */
+  turnedAt: number;
+  /** Every leaf that won a tick after the turn. */
+  after: Set<string>;
+}
+
+/**
+ * Hold the standoff for `seconds` and watch the bot's own account of what it was
+ * doing (`Brain.lastBehavior`).
+ *
+ * The geometry is **pinned**: both hulls go back where they started before every
+ * step and the bot's hull is held at its staged fraction, so the player never
+ * falls off and the bot never heals its way out — which is the player standing
+ * still, exactly what the report describes. `drift` opens the gap by that many
+ * units per second instead, for the case where the running IS working.
+ * Everything else is the real sim and the real tree.
+ */
+function hold(state: Standoff, seconds: number, drift = 0): Held {
+  const { world, bot, me, player } = state;
+  const mePos = { ...me.pos };
+  const playerPos = { ...player.pos };
+  const hull = me.hull;
+  const held: Held = { retreatTicks: 0, turnedAt: -1, after: new Set() };
+  for (let tick = 0; tick < Math.round(seconds / TICK_DT); tick++) {
+    const opened = drift * tick * TICK_DT;
+    me.pos = { ...mePos };
+    me.vel = { x: 0, y: 0 };
+    me.hull = hull;
+    player.pos = {
+      x: playerPos.x + state.out.x * opened,
+      y: playerPos.y + state.out.y * opened,
+    };
+    player.vel = { x: 0, y: 0 };
+    player.hull = player.maxHull;
+    step(world, botInputs(world, [bot], TICK_DT), TICK_DT);
+    const leaf = bot.brain.lastBehavior;
+    if (leaf === 'retreat') held.retreatTicks++;
+    if (held.turnedAt < 0 && leaf === 'turn-and-fight') held.turnedAt = tick;
+    else if (held.turnedAt >= 0) held.after.add(leaf);
+  }
+  return held;
+}
+
+/** The bound this file holds every tier to: eight seconds of a retreat that is
+ *  going nowhere is already far longer than a player will watch, and it is more
+ *  than twice the most patient character's own patience. */
+const BOUND_S = 8;
+
+describe('a retreat is a manoeuvre, not a state of mind (a0-105)', () => {
+  it('a retreat that cannot recover and cannot escape ends in a fight', () => {
+    // The photograph: Rusty, at its own station, at 20/70, with the developer
+    // parked between it and the ore. Neither exit the flee latch had can ever
+    // fire here — which is the whole defect.
+    const state = standoff({ personality: 'rusty', hull: HULL_20_OF_70 });
+    const ctx = decide(state);
+    expect(ctx.self.hullFraction).toBeCloseTo(HULL_20_OF_70, 5);
+    const seen = ctx.view.ships.find((s) => s.id === 1);
+    expect(seen, 'the player is inside the bot\'s own fog').toBeTruthy();
+    expect(seen!.distance).toBeLessThan(RETREAT_CLEAR_RANGE); // never *escaped*
+    expect(seen!.distance).toBeLessThan(GUARD_RADIUS * 2); // a siege, not a blockade
+    // Nothing in the game heals a hull, so *recovered* is shut for the match.
+    expect(ctx.self.hullFraction).toBeLessThan(0.8);
+
+    const held = hold(standoff({ personality: 'rusty', hull: HULL_20_OF_70 }), BOUND_S);
+
+    // It ran first — the retreat itself is good play and is not deleted.
+    expect(held.retreatTicks).toBeGreaterThan(0);
+    // And then it stopped running and came at the thing that would not let go.
+    // On today's code this is -1 for as long as anyone cares to run it.
+    expect(held.turnedAt, 'the bot turns and fights inside the bound').toBeGreaterThan(0);
+    expect(held.turnedAt).toBeLessThan(Math.round(BOUND_S / TICK_DT));
+    // And it stays turned: a committed window, not a one-decision twitch.
+    expect(held.after.has('retreat'), 'the turn is not a flap back into fleeing').toBe(false);
+  });
+
+  it('turns at every tier, and puts the personality spread in how long', () => {
+    // "Keep the personality spread intact … but every tier turns." Timid Rusty
+    // takes the longest, reckless Bolt the shortest, and the Hard seats — who
+    // price their own hull the way the design does — barely hesitate. Nobody
+    // gets a different rule, only a different amount of patience, and the clamp
+    // in `standoffPatience` is what makes "every tier turns" structural.
+    const ticks = new Map<PersonalityId, number>();
+    for (const id of Object.keys(PERSONALITIES) as PersonalityId[]) {
+      const held = hold(standoff({ personality: id, hull: WOUNDED_ANY_TIER }), BOUND_S);
+      expect(held.retreatTicks, `${id} still retreats first`).toBeGreaterThan(0);
+      expect(held.turnedAt, `${id} (${PERSONALITIES[id].difficulty}) turns`).toBeGreaterThan(0);
+      ticks.set(id, held.turnedAt);
+    }
+    // The ladder the cast is built on, read straight off the measurement.
+    expect(ticks.get('rusty')!).toBeGreaterThan(ticks.get('bolt')!);
+    expect(ticks.get('bolt')!).toBeGreaterThan(ticks.get('sable')!);
+    expect(ticks.get('patch')!).toBeGreaterThan(ticks.get('warden')!);
+
+    // …and no character's patience can be tuned into a bot that never turns.
+    for (const id of Object.keys(PERSONALITIES) as PersonalityId[]) {
+      const ctx = {
+        tuning: tuningFor(id),
+        weights: PERSONALITIES[id].weights,
+      } as unknown as BotCtx;
+      expect(standoffPatience(ctx)).toBeLessThanOrEqual(5);
+      expect(standoffPatience(ctx)).toBeGreaterThanOrEqual(0.5);
+    }
+  });
+
+  it('leaves a retreat that is actually working alone', () => {
+    // The half that makes this readable from outside rather than as a timer: the
+    // clock runs on *failing to open ground*, not on the calendar. A player who
+    // is being out-flown — here, losing 30 units a second, well inside the
+    // sensor picture and never past the clear range — watches the same wounded
+    // bot keep running for as long as they care to chase it.
+    const held = hold(standoff({ personality: 'rusty', hull: HULL_20_OF_70 }), BOUND_S, 30);
+    expect(held.turnedAt, 'a retreat that is gaining ground is not interrupted').toBe(-1);
+    expect(held.retreatTicks).toBeGreaterThan(0);
+  });
+
+  it('gives the tick back when the thing it turned on breaks contact', () => {
+    // The turn ends when its subject does. A committed window is not a grudge:
+    // once the chaser is past the clear range there is nothing to fight, so the
+    // commitment is dropped rather than swung at empty space.
+    const state = standoff({ personality: 'sable', hull: WOUNDED_ANY_TIER });
+    hold(state, 3);
+    expect(state.bot.brain.lastBehavior).toBe('turn-and-fight');
+    expect(state.bot.brain.standoff.until).toBeGreaterThan(0);
+
+    state.player.pos = {
+      x: state.player.pos.x + state.out.x * RETREAT_CLEAR_RANGE * 2,
+      y: state.player.pos.y + state.out.y * RETREAT_CLEAR_RANGE * 2,
+    };
+    for (let tick = 0; tick < Math.round(1 / TICK_DT); tick++) {
+      state.me.hull = state.me.maxHull * WOUNDED_ANY_TIER;
+      step(state.world, botInputs(state.world, [state.bot], TICK_DT), TICK_DT);
+    }
+    expect(state.bot.brain.lastBehavior).not.toBe('turn-and-fight');
+    expect(state.bot.brain.standoff.until, 'the commitment went with its subject').toBe(-1);
   });
 });
