@@ -1,0 +1,20 @@
+{
+  "stage": "fixed",
+  "profile": "phone-portrait-390x844",
+  "pressedAt": {
+    "x": 52,
+    "y": 672
+  },
+  "topmostAtThatPoint": "CANVAS#app",
+  "minimapBefore": {
+    "x": 12.000000000000057,
+    "y": 632,
+    "width": 80,
+    "height": 80
+  },
+  "minimapAfter": null,
+  "minimapToggled": false,
+  "logLabelBefore": null,
+  "logLabelAfter": null,
+  "downloads": []
+}

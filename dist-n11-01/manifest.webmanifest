@@ -1,0 +1,24 @@
+{
+  "id": "/",
+  "name": "Planet Rush",
+  "short_name": "Planet Rush",
+  "description": "A top-down 2D space arena game. One ship, three jobs, never enough time.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#0D1015",
+  "theme_color": "#0D1015",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["games"],
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

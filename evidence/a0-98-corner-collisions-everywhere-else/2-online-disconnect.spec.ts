@@ -276,13 +276,19 @@ async function pressTheCoveredControl(
   const downloads: string[] = [];
   page.on('download', (d) => downloads.push(d.suggestedFilename()));
 
-  const read = async (): Promise<{ x: number; y: number; width: number; height: number } | null> =>
+  /**
+   * The map as the frame registered it — **either state**. The collapsed corner
+   * square registers as `minimap` and the opened map as `minimap-expanded`
+   * (`@ui` minimap-view), so a helper that looked only for the first would read a
+   * successful toggle as "the map vanished". It did the opposite: it opened.
+   */
+  const read = async (): Promise<{ id: string; x: number; y: number; width: number; height: number } | null> =>
     page.evaluate(() => {
       const seam = (window as never as {
         __cornerStage?: { read(): { elements: { id: string; physicalBounds: { x: number; y: number; width: number; height: number } }[] } };
       }).__cornerStage;
-      const map = seam?.read().elements.find((e) => e.id === 'minimap');
-      return map ? { ...map.physicalBounds } : null;
+      const map = seam?.read().elements.find((e) => e.id === 'minimap' || e.id === 'minimap-expanded');
+      return map ? { id: map.id, ...map.physicalBounds } : null;
     });
 
   /** Everything the frame drew, so an `after` that lost the minimap can say why
@@ -325,7 +331,9 @@ async function pressTheCoveredControl(
     topmostAtThatPoint: topmost,
     minimapBefore: before,
     minimapAfter: after,
-    minimapToggled: !!after && (after.width !== before.width || after.height !== before.height),
+    // The toggle, stated the way the client states it: a different registry id, or
+    // a different box. Either is the map having heard the press.
+    minimapToggled: !!after && (after.id !== before.id || after.width !== before.width || after.height !== before.height),
     logLabelBefore,
     logLabelAfter,
     drawnBefore,
