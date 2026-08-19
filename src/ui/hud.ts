@@ -85,7 +85,7 @@ import { COLLAPSE_CORE_DECAY } from '../sim/constants';
 import { stationHpModel, stationHpFlashOn, coreHpReadout } from './station-hp';
 import { respawnCountdownModel } from './respawn-countdown';
 import type { RespawnCountdownModel } from './respawn-countdown';
-import { healthBarModel, HEALTHBAR_MIN_FILL } from './healthbar';
+import { healthBarModel } from './healthbar';
 import type { Combatant } from './healthbar';
 import { HealthBarView } from './healthbar-view';
 import type { DrawnHealthBar } from './healthbar-view';
@@ -128,8 +128,9 @@ import {
   HP_BAR_WIDTH,
   HP_BAR_HEIGHT,
   HP_BAR_TOP,
-  SHIELD_BAR_GAP,
-  SHIELD_BAR_HEIGHT,
+  stationCoreBarTrack,
+  stationCoreBarFill,
+  stationShieldBarFill,
   presenceBand,
   promptBounds,
   promptWithdraws,
@@ -1591,7 +1592,10 @@ export class Hud extends Container {
     const flash = stationHpFlashOn(model, frame.time);
     const fill = model.critical && flash ? model.criticalColor : model.color;
 
-    const y = HP_BAR_TOP;
+    // The two tracks this element draws in, from `./hud-geometry` (a0-101) — the
+    // bar is painted three times a frame (steel, core fill, repair shimmer) and a
+    // hand-copied `-HP_BAR_WIDTH` in one of the three is how bars come to disagree.
+    const coreTrack = stationCoreBarTrack();
     const r = INSTRUMENT_RADIUS; // a surface is square (./instrument)
     this.stationBar.clear();
     // Track: the full width, so the missing part is visible as absence. Square
@@ -1601,24 +1605,27 @@ export class Hud extends Container {
     // that Bone does not get to take, because style-guide §3 puts player colour
     // on the HP bar by name.
     this.stationBar
-      .roundRect(-HP_BAR_WIDTH, y, HP_BAR_WIDTH, HP_BAR_HEIGHT, r)
+      .roundRect(coreTrack.x, coreTrack.y, coreTrack.width, coreTrack.height, r)
       .fill({ color: PALETTE.hullSteel, alpha: 0.22 })
-      .roundRect(-HP_BAR_WIDTH, y, HP_BAR_WIDTH, HP_BAR_HEIGHT, r)
+      .roundRect(coreTrack.x, coreTrack.y, coreTrack.width, coreTrack.height, r)
       .stroke({ width: 1, color: model.color, alpha: 0.55 });
-    if (model.coreFraction > 0) {
-      // A standing core keeps at least a sliver of fill — a living thing never
-      // renders as an empty bar (field report; full-empty means the core is gone,
-      // which the `coreFraction > 0` gate already excludes). The true fraction
-      // still drives `destroyed`/`critical` in the model.
-      const w = HP_BAR_WIDTH * Math.max(HEALTHBAR_MIN_FILL, model.coreFraction);
-      this.stationBar.roundRect(-w, y, w, HP_BAR_HEIGHT, r).fill({ color: fill, alpha: 0.95 });
+    // A standing core keeps at least a sliver of fill — a living thing never
+    // renders as an empty bar (field report; full-empty means the core is gone,
+    // which the `coreFraction > 0` gate already excludes). The true fraction
+    // still drives `destroyed`/`critical` in the model. Computed once: the repair
+    // shimmer below washes over exactly this rect.
+    const coreFill = model.coreFraction > 0 ? stationCoreBarFill(model.coreFraction) : null;
+    if (coreFill) {
+      this.stationBar
+        .roundRect(coreFill.x, coreFill.y, coreFill.width, coreFill.height, r)
+        .fill({ color: fill, alpha: 0.95 });
     }
     // Shield overbar: plasma, and only while a generator stands (GDD §2.5). A
     // standing shield pool keeps its sliver too, by the same living-never-empty rule.
     if (model.hasShield && model.shieldFraction > 0) {
-      const sw = HP_BAR_WIDTH * Math.max(HEALTHBAR_MIN_FILL, model.shieldFraction);
+      const shield = stationShieldBarFill(model.shieldFraction);
       this.stationBar
-        .roundRect(-sw, y - SHIELD_BAR_HEIGHT - SHIELD_BAR_GAP, sw, SHIELD_BAR_HEIGHT, r)
+        .roundRect(shield.x, shield.y, shield.width, shield.height, r)
         .fill({ color: PALETTE.plasma, alpha: 0.85 });
     }
 
@@ -1627,9 +1634,10 @@ export class Hud extends Container {
     // tell, in the repair tint (patina — style-guide §1), so a player watching
     // the bar sees it move, not just a silent number.
     const shimmer = this.pressFeedback.coreShimmer(this.frameTime);
-    if (shimmer > 0 && model.coreFraction > 0) {
-      const w = HP_BAR_WIDTH * Math.max(HEALTHBAR_MIN_FILL, model.coreFraction);
-      this.stationBar.roundRect(-w, y, w, HP_BAR_HEIGHT, r).fill({ color: PALETTE.patina, alpha: shimmer * 0.6 });
+    if (shimmer > 0 && coreFill) {
+      this.stationBar
+        .roundRect(coreFill.x, coreFill.y, coreFill.width, coreFill.height, r)
+        .fill({ color: PALETTE.patina, alpha: shimmer * 0.6 });
     }
 
     this.stationLabel.text = model.destroyed ? 'HOME LOST' : 'HOME';
