@@ -392,3 +392,111 @@ for (const profile of PROFILES) {
     }
   });
 }
+
+/**
+ * **The front door's own refusal, with the corner offer actually on it.**
+ *
+ * `main.ts:9499` raises the offer for `screen === 'online' && entry.status ===
+ * 'error'`, and on the OFFLINE artifact that never happens: every refusal there
+ * goes through `startResolve`, which opens a connect trace, and the trace's own
+ * DOWNLOAD LOG stands the corner one down. So the offline capture reports
+ * `mounted: false` on every error screen — true, and not the whole truth.
+ *
+ * `startListingJoin` is the path that makes it real, and it is a classroom
+ * scenario rather than a contrivance: a room refused **about the room itself**
+ * (`room-full` / `not-found`) calls `endConnectTrace()` and then `entryFailed`. The
+ * panel goes away, the status is `error`, the screen is still the ROOM LIST — a
+ * list of pressable rows — and the corner offer comes up over it.
+ *
+ * Staged by the host RUSHing into the match while the guest is holding a
+ * photograph of the room list that still shows it: the guest presses a row for a
+ * room that has just started. That is *"the room I could see started without
+ * me"*, and it is the developer's own list, refreshed every five seconds.
+ */
+for (const profile of [PROFILES[0]!, PROFILES[1]!]) {
+  test(`a0-98 what is on top of the room list when a row is refused — ${profile.id} (${STAGE})`, async ({
+    browser,
+    baseURL,
+  }) => {
+    test.setTimeout(600_000);
+    mkdirSync(SHOTS, { recursive: true });
+    const reports: StateReport[] = [];
+    const { client: host, context: hostContext } = await bootClient(browser, PROFILES[0]!, baseURL!);
+    const { client: guest, context: guestContext } = await bootClient(browser, profile, baseURL!);
+    const contexts = [hostContext, guestContext];
+
+    try {
+      // The host puts a room on the board.
+      await pressPlay(host);
+      await pressDoor(host, 'create');
+      await waitForLobby(host.page, 'host CREATE');
+
+      // The guest opens the list and waits for that room to appear on it.
+      await pressPlay(guest);
+      await pressDoor(guest, 'join');
+      await guest.page.waitForFunction(
+        () => ((window as never as { __onlineMenu?: { browseRows: unknown[] } }).__onlineMenu?.browseRows.length ?? 0) > 0,
+        undefined,
+        { timeout: 90_000 },
+      );
+      await guest.page.waitForTimeout(400);
+      const listReport = await sweepState(guest.page, 'front-door-room-list', profile, await entryState(guest.page));
+      reports.push(listReport);
+      await guest.page.screenshot({ path: join(SHOTS, `${profile.id}-front-door-room-list.png`) });
+
+      // The host starts. The listing is withdrawn; the guest's photograph is not.
+      const rush = await host.page.evaluate(
+        () => (window as never as { __lobby: { rushControl: { physicalCenter: { x: number; y: number } } } }).__lobby.rushControl.physicalCenter,
+      );
+      await host.press({ x: rush.x, y: rush.y });
+      await host.page.waitForFunction(
+        () => (window as never as { __mainMenu?: { matchStarted: boolean } }).__mainMenu?.matchStarted === true,
+        undefined,
+        { timeout: 120_000 },
+      );
+
+      // The guest presses the row that is no longer there.
+      const row = await guest.page.evaluate(
+        () =>
+          (window as never as { __onlineMenu: { browseRows: { physicalCenter: { x: number; y: number } }[] } })
+            .__onlineMenu.browseRows[0]?.physicalCenter ?? null,
+      );
+      if (row) await guest.press(row);
+      await guest.page
+        .waitForFunction(
+          () => (window as never as { __onlineMenu?: { status: string } }).__onlineMenu?.status === 'error',
+          undefined,
+          { timeout: 60_000 },
+        )
+        .catch(() => {
+          /* recorded as whatever it did reach */
+        });
+      await guest.page.waitForTimeout(900);
+      reports.push(await sweepState(guest.page, 'front-door-row-refused', profile, await entryState(guest.page)));
+      await guest.page.screenshot({ path: join(SHOTS, `${profile.id}-front-door-row-refused.png`) });
+    } finally {
+      writeFileSync(
+        join(SHOTS, `${profile.id}-front-door-report.json`),
+        `${JSON.stringify({ stage: STAGE, profile: profile.id, reports }, null, 2)}\n`,
+      );
+      for (const context of contexts) await context.close();
+    }
+  });
+}
+
+/** The front door's own state, and whether a connect panel is standing — the one
+ *  thing that decides which of the two DOWNLOAD LOG offers is on screen. */
+async function entryState(page: Page): Promise<Record<string, unknown>> {
+  return page.evaluate(() => {
+    const seam = (window as never as {
+      __onlineMenu?: { visible: boolean; screen: string; status: string; error: string; title: string; joinMode: string; browseRows: unknown[] };
+    }).__onlineMenu;
+    const panel = document.getElementById('pr-connect-trace');
+    return {
+      entry: seam
+        ? { visible: seam.visible, screen: seam.screen, status: seam.status, error: seam.error, title: seam.title, joinMode: seam.joinMode, rows: seam.browseRows.length }
+        : null,
+      connectPanel: panel ? { hidden: panel.hidden, text: (panel.textContent ?? '').slice(0, 120) } : null,
+    };
+  });
+}
