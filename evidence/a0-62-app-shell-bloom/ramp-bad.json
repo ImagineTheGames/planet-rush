@@ -1,0 +1,113 @@
+{
+  "alphaMode": "premultiplied-alpha",
+  "mipLevelCount": 9,
+  "autoGenerateMipmaps": true,
+  "format": "bgra8unorm",
+  "rows": [
+    {
+      "texel": "+10",
+      "authored": [
+        203,
+        203,
+        203,
+        203
+      ],
+      "readBack": [
+        161,
+        161,
+        161,
+        255
+      ]
+    },
+    {
+      "texel": "+20",
+      "authored": [
+        154,
+        154,
+        154,
+        154
+      ],
+      "readBack": [
+        93,
+        93,
+        93,
+        255
+      ]
+    },
+    {
+      "texel": "+40",
+      "authored": [
+        68,
+        68,
+        68,
+        68
+      ],
+      "readBack": [
+        18,
+        18,
+        18,
+        255
+      ]
+    },
+    {
+      "texel": "+60",
+      "authored": [
+        58,
+        58,
+        58,
+        58
+      ],
+      "readBack": [
+        13,
+        13,
+        13,
+        255
+      ]
+    },
+    {
+      "texel": "+80",
+      "authored": [
+        21,
+        21,
+        21,
+        21
+      ],
+      "readBack": [
+        1,
+        1,
+        1,
+        255
+      ]
+    },
+    {
+      "texel": "+100",
+      "authored": [
+        3,
+        3,
+        3,
+        3
+      ],
+      "readBack": [
+        0,
+        0,
+        0,
+        255
+      ]
+    },
+    {
+      "texel": "+110",
+      "authored": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "readBack": [
+        0,
+        0,
+        0,
+        255
+      ]
+    }
+  ]
+}

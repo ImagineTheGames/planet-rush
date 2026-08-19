@@ -1,0 +1,34 @@
+{
+  "dpr": 1,
+  "url": "/?debug=1&freeze=1",
+  "shipScreen": {
+    "x": 640,
+    "y": 400
+  },
+  "shipWorld": {
+    "x": 1968,
+    "y": 1200
+  },
+  "viewport": {
+    "w": 1280,
+    "h": 800,
+    "width": 1280,
+    "height": 800
+  },
+  "cameraOffset": {
+    "x": -1328,
+    "y": -800
+  },
+  "canvas": {
+    "backing": {
+      "w": 1280,
+      "h": 800
+    },
+    "css": {
+      "w": 1280,
+      "h": 800
+    },
+    "dpr": 1,
+    "pixi": null
+  }
+}
