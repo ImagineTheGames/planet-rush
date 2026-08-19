@@ -1,0 +1,165 @@
+{
+  "profile": {
+    "id": "phone-798x384",
+    "label": "phone landscape 798x384 (dpr 2, touch) — the developer's own screenshot size",
+    "width": 798,
+    "height": 384,
+    "dpr": 2,
+    "touch": true
+  },
+  "helpTitle": "FIRE MODE",
+  "frames": {
+    "1 seated (tap)": [
+      {
+        "kind": "fireMode",
+        "label": "FIRE MODE",
+        "value": "AUTO-FIRE",
+        "disabled": true
+      },
+      {
+        "kind": "controls",
+        "label": "CONTROLS",
+        "value": "TAP COMMANDER",
+        "disabled": false
+      },
+      {
+        "kind": "reduceVfx",
+        "label": "REDUCE VFX",
+        "value": "OFF",
+        "disabled": false
+      },
+      {
+        "kind": "volume",
+        "label": "MASTER VOLUME",
+        "value": "",
+        "disabled": false
+      },
+      {
+        "kind": "volume",
+        "label": "SFX VOLUME",
+        "value": "",
+        "disabled": false
+      },
+      {
+        "kind": "volume",
+        "label": "MUSIC VOLUME",
+        "value": "",
+        "disabled": false
+      }
+    ],
+    "3 after one press (tap)": [
+      {
+        "kind": "fireMode",
+        "label": "FIRE MODE",
+        "value": "AUTO-FIRE",
+        "disabled": true
+      },
+      {
+        "kind": "controls",
+        "label": "CONTROLS",
+        "value": "TAP COMMANDER",
+        "disabled": false
+      },
+      {
+        "kind": "reduceVfx",
+        "label": "REDUCE VFX",
+        "value": "OFF",
+        "disabled": false
+      },
+      {
+        "kind": "volume",
+        "label": "MASTER VOLUME",
+        "value": "",
+        "disabled": false
+      },
+      {
+        "kind": "volume",
+        "label": "SFX VOLUME",
+        "value": "",
+        "disabled": false
+      },
+      {
+        "kind": "volume",
+        "label": "MUSIC VOLUME",
+        "value": "",
+        "disabled": false
+      }
+    ],
+    "4 sticks": [
+      {
+        "kind": "fireMode",
+        "label": "FIRE MODE",
+        "value": "AUTO-AIM",
+        "disabled": false
+      },
+      {
+        "kind": "controls",
+        "label": "CONTROLS",
+        "value": "STICKS",
+        "disabled": false
+      },
+      {
+        "kind": "reduceVfx",
+        "label": "REDUCE VFX",
+        "value": "OFF",
+        "disabled": false
+      },
+      {
+        "kind": "volume",
+        "label": "MASTER VOLUME",
+        "value": "",
+        "disabled": false
+      },
+      {
+        "kind": "volume",
+        "label": "SFX VOLUME",
+        "value": "",
+        "disabled": false
+      },
+      {
+        "kind": "volume",
+        "label": "MUSIC VOLUME",
+        "value": "",
+        "disabled": false
+      }
+    ],
+    "5 sticks, one press": [
+      {
+        "kind": "fireMode",
+        "label": "FIRE MODE",
+        "value": "MANUAL",
+        "disabled": false
+      },
+      {
+        "kind": "controls",
+        "label": "CONTROLS",
+        "value": "STICKS",
+        "disabled": false
+      },
+      {
+        "kind": "reduceVfx",
+        "label": "REDUCE VFX",
+        "value": "OFF",
+        "disabled": false
+      },
+      {
+        "kind": "volume",
+        "label": "MASTER VOLUME",
+        "value": "",
+        "disabled": false
+      },
+      {
+        "kind": "volume",
+        "label": "SFX VOLUME",
+        "value": "",
+        "disabled": false
+      },
+      {
+        "kind": "volume",
+        "label": "MUSIC VOLUME",
+        "value": "",
+        "disabled": false
+      }
+    ]
+  }
+}

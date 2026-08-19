@@ -1,0 +1,165 @@
+{
+  "profile": {
+    "id": "desktop-1280x800",
+    "label": "desktop 1280x800 (dpr 2, pointer) — the golden suite's control width",
+    "width": 1280,
+    "height": 800,
+    "dpr": 2,
+    "touch": false
+  },
+  "helpTitle": "FIRE MODE",
+  "frames": {
+    "1 seated (tap)": [
+      {
+        "kind": "fireMode",
+        "label": "FIRE MODE",
+        "value": "AUTO-FIRE",
+        "disabled": true
+      },
+      {
+        "kind": "controls",
+        "label": "CONTROLS",
+        "value": "TAP COMMANDER",
+        "disabled": false
+      },
+      {
+        "kind": "reduceVfx",
+        "label": "REDUCE VFX",
+        "value": "OFF",
+        "disabled": false
+      },
+      {
+        "kind": "volume",
+        "label": "MASTER VOLUME",
+        "value": "",
+        "disabled": false
+      },
+      {
+        "kind": "volume",
+        "label": "SFX VOLUME",
+        "value": "",
+        "disabled": false
+      },
+      {
+        "kind": "volume",
+        "label": "MUSIC VOLUME",
+        "value": "",
+        "disabled": false
+      }
+    ],
+    "3 after one press (tap)": [
+      {
+        "kind": "fireMode",
+        "label": "FIRE MODE",
+        "value": "AUTO-FIRE",
+        "disabled": true
+      },
+      {
+        "kind": "controls",
+        "label": "CONTROLS",
+        "value": "TAP COMMANDER",
+        "disabled": false
+      },
+      {
+        "kind": "reduceVfx",
+        "label": "REDUCE VFX",
+        "value": "OFF",
+        "disabled": false
+      },
+      {
+        "kind": "volume",
+        "label": "MASTER VOLUME",
+        "value": "",
+        "disabled": false
+      },
+      {
+        "kind": "volume",
+        "label": "SFX VOLUME",
+        "value": "",
+        "disabled": false
+      },
+      {
+        "kind": "volume",
+        "label": "MUSIC VOLUME",
+        "value": "",
+        "disabled": false
+      }
+    ],
+    "4 sticks": [
+      {
+        "kind": "fireMode",
+        "label": "FIRE MODE",
+        "value": "AUTO-AIM",
+        "disabled": false
+      },
+      {
+        "kind": "controls",
+        "label": "CONTROLS",
+        "value": "KEYBOARD + MOUSE",
+        "disabled": false
+      },
+      {
+        "kind": "reduceVfx",
+        "label": "REDUCE VFX",
+        "value": "OFF",
+        "disabled": false
+      },
+      {
+        "kind": "volume",
+        "label": "MASTER VOLUME",
+        "value": "",
+        "disabled": false
+      },
+      {
+        "kind": "volume",
+        "label": "SFX VOLUME",
+        "value": "",
+        "disabled": false
+      },
+      {
+        "kind": "volume",
+        "label": "MUSIC VOLUME",
+        "value": "",
+        "disabled": false
+      }
+    ],
+    "5 sticks, one press": [
+      {
+        "kind": "fireMode",
+        "label": "FIRE MODE",
+        "value": "MANUAL",
+        "disabled": false
+      },
+      {
+        "kind": "controls",
+        "label": "CONTROLS",
+        "value": "KEYBOARD + MOUSE",
+        "disabled": false
+      },
+      {
+        "kind": "reduceVfx",
+        "label": "REDUCE VFX",
+        "value": "OFF",
+        "disabled": false
+      },
+      {
+        "kind": "volume",
+        "label": "MASTER VOLUME",
+        "value": "",
+        "disabled": false
+      },
+      {
+        "kind": "volume",
+        "label": "SFX VOLUME",
+        "value": "",
+        "disabled": false
+      },
+      {
+        "kind": "volume",
+        "label": "MUSIC VOLUME",
+        "value": "",
+        "disabled": false
+      }
+    ]
+  }
+}
