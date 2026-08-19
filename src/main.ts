@@ -318,6 +318,7 @@ import {
   pauseLayout,
   nextPauseScreen,
   isPauseOpen,
+  kickOutClaimsTheGlass,
   matchLogOffer,
   pauseAllowsDownloadLog,
   shouldFreezeSim,
@@ -3560,10 +3561,20 @@ async function boot(): Promise<void> {
     // the render frame — so the offer trails the kick-out card by one frame in both
     // directions. Sixteen milliseconds late is the safe side of both edges: the
     // offer never appears before the card that makes room for it.
+    //
+    // `document.fullscreenElement` is the second half, and it is not incidental:
+    // the card is appended to `body`, a SIBLING of the game root, and a fullscreen
+    // root is in the browser's top layer, which no z-index outranks. On a phone the
+    // card is therefore painted UNDER the canvas and the player is still looking at
+    // the match (`@ui` log-offer `kickOutClaimsTheGlass`, and a0-28, which is the
+    // same mechanism seen from this affordance's own side).
     const offer = matchLogOffer({
       pauseScreen,
       session: state,
-      glass: linkLoss !== null && linkLoss.status().phase !== 'live' ? 'kicked-out' : 'match',
+      glass: kickOutClaimsTheGlass(
+        linkLoss !== null && linkLoss.status().phase !== 'live',
+        document.fullscreenElement !== null,
+      ),
     });
     if (offer === 'disconnect' && (state === 'reconnecting' || state === 'closed')) {
       showDownloadLog({

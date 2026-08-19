@@ -1059,6 +1059,7 @@ export type {
 
 export { PauseMenuView } from './pause-menu-view';
 export {
+  kickOutClaimsTheGlass,
   matchLogOffer,
   screenClaimsTheDisplay,
   sessionHasDropped,

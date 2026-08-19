@@ -1,0 +1,125 @@
+{
+  "stage": "broken",
+  "profile": "desktop-1280x800",
+  "reports": [
+    {
+      "state": "front-door-room-list",
+      "profile": "desktop-1280x800",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "dpr": 2,
+        "touch": false
+      },
+      "log": {
+        "mounted": false
+      },
+      "controls": [
+        {
+          "control": "__onlineMenu.doorControls[0]<row:0>",
+          "page": {
+            "x": 640,
+            "y": 300
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 44,
+            "y": 268,
+            "width": 1192,
+            "height": 64
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__onlineMenu.doorControls[1]<mode:browse>",
+          "page": {
+            "x": 128,
+            "y": 216
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 44,
+            "y": 192,
+            "width": 168,
+            "height": 48
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__onlineMenu.doorControls[2]<mode:code>",
+          "page": {
+            "x": 303,
+            "y": 216
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 219,
+            "y": 192,
+            "width": 168,
+            "height": 48
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__onlineMenu.doorControls[3]<back>",
+          "page": {
+            "x": 114,
+            "y": 754
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 44,
+            "y": 726,
+            "width": 140,
+            "height": 56
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__onlineMenu.browseRows[0]<QLZ627>",
+          "page": {
+            "x": 640,
+            "y": 300
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 44,
+            "y": 268,
+            "width": 1192,
+            "height": 64
+          },
+          "coveredFraction": null
+        }
+      ],
+      "collisions": [],
+      "coveredButDead": [],
+      "context": {
+        "entry": {
+          "visible": true,
+          "screen": "join",
+          "status": "idle",
+          "error": "",
+          "title": "PICK A CLAIM",
+          "joinMode": "browse",
+          "rows": 1
+        },
+        "connectPanel": null
+      }
+    }
+  ]
+}

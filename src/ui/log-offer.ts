@@ -24,11 +24,19 @@
  * A networked match is never pausable (`shouldFreezeSim`), so "the overlay is
  * closed" is the normal state of an online match from RUSH! to the last shot.
  *
- * Measured on the built bundle, at the point the client itself reports drawing the
- * minimap (GDD §2.2 puts it bottom-right), `document.elementFromPoint` on a
- * 798×384 phone returns `BUTTON#playtest-download-log-button`. The map is a
- * toggle. A thumb reaching for it gets a JSON file instead
- * (`evidence/a0-98-corner-collisions-everywhere-else`).
+ * Measured on the built bundle, against a real allocator and a real match server,
+ * with the wire really cut: on a 798x384 phone the offer's box is x477-786 y290-372
+ * and the minimap's is x586-666 y292-372 — **the map is 100% under the offer**.
+ * `document.elementFromPoint` at the minimap's own reported centre (626,332)
+ * answers `BUTTON#playtest-download-log-button`, and a real tap there did not
+ * toggle the map: it downloaded `planet-rush-log-17d1979-…json`. A thumb reaching
+ * for the map got a JSON file
+ * (`evidence/a0-98-corner-collisions-everywhere-else`, `phone-798x384-press-proof.json`).
+ *
+ * On a 1280x800 desktop the same drop is NOT a collision, and the offer is left
+ * alone there: no fullscreen, so the kick-out card really is the screen, its two
+ * buttons are centred and clear, and the offer sits in an empty corner doing its
+ * job. That asymmetry is the whole reason {@link kickOutClaimsTheGlass} exists.
  *
  * ── WHY THIS IS A RESTORATION, NOT A NEW POLICY ─────────────────────────────
  * The affordance's own header already states the contract the disconnect branch
@@ -66,10 +74,12 @@ import { isPauseOpen, pauseAllowsDownloadLog } from './pause-menu';
  * stick and FIRE beside it (`right-half-bottom`).
  */
 export type MatchGlassOwner =
-  /** Nothing is layered over the HUD. The player is flying. */
+  /** Nothing is PAINTED over the HUD. The player is looking at the match. */
   | 'match'
-  /** The CONNECTION LOST kick-out (`src/net/link-loss-view`): a full-bleed scrim
-   *  that takes every press, raised by the same drop that raises the offer. */
+  /** The CONNECTION LOST kick-out (`src/net/link-loss-view`) is painted over the
+   *  game root: a full-bleed scrim that takes every press, raised by the same drop
+   *  that raises the offer. **Painted**, not merely raised — see
+   *  {@link kickOutClaimsTheGlass}. */
   | 'kicked-out';
 
 /** The transport states `src/net/session` reports. `null` offline, where there is
@@ -96,6 +106,36 @@ export interface MatchLogOfferState {
  */
 export type MatchLogOfferReason = 'pause' | 'disconnect' | null;
 
+/**
+ * Whether the CONNECTION LOST card is actually **on the glass**, given that it has
+ * been raised.
+ *
+ * This is one function rather than a boolean at the call site because the answer
+ * is not the obvious one, and a0-98 measured it rather than assuming it.
+ *
+ * The card is DOM appended to `body` — a SIBLING of the game root. On a touch boot
+ * PLAY puts that root into the browser's **top layer** (`@platform/fullscreen`,
+ * the landscape lock's other half), and the top layer is not a z-index: it paints
+ * above every normal-flow box no matter what. So while the root is fullscreen the
+ * card is laid out, un-hidden, and **painted under the canvas** — at
+ * `RECONNECT NOW`'s own reported centre on a 798x384 touch boot,
+ * `document.elementFromPoint` answers `CANVAS#app`, and the capture's frame shows
+ * a live HUD with no card on it at all.
+ *
+ * That is exactly a0-28's mechanism, which this affordance already knows about
+ * from the other side: `src/net/playtest-log-button` re-homes ITSELF into
+ * `document.fullscreenElement` for this reason, which is why the offer is on top
+ * in that frame and the card is not.
+ *
+ * So a kicked-out player on a phone is not looking at a screen — they are looking
+ * at the match, with a diagnostic button on the map. The offer has to know the
+ * difference. If the card is ever re-homed the way the affordance was, this
+ * function is the one place that changes.
+ */
+export function kickOutClaimsTheGlass(cardIsUp: boolean, rootIsFullscreen: boolean): MatchGlassOwner {
+  return cardIsUp && !rootIsFullscreen ? 'kicked-out' : 'match';
+}
+
 /** The two transport states a *"it kept dropping"* report is about. */
 export function sessionHasDropped(session: SessionLinkState): boolean {
   return session === 'reconnecting' || session === 'closed';
@@ -107,7 +147,9 @@ export function sessionHasDropped(session: SessionLinkState): boolean {
  *
  * The pause menu counts and the screens layered over it do not: that is a0-97's
  * finding unchanged ({@link pauseAllowsDownloadLog}), and it composes here rather
- * than being restated.
+ * than being restated. The pause overlay is drawn IN THE CANVAS, inside the game
+ * root, so it claims the display on every platform — which is precisely what the
+ * kick-out card does not do ({@link kickOutClaimsTheGlass}).
  */
 export function screenClaimsTheDisplay(state: MatchLogOfferState): boolean {
   if (isPauseOpen(state.pauseScreen)) return pauseAllowsDownloadLog(state.pauseScreen);
