@@ -678,11 +678,19 @@ const STITCH_EPSILON = 1e-3;
  *  clamps that keep a huge disc from exploding the vertex count and a tiny one
  *  from becoming a triangle. */
 const ARC_CHORD = 1.5;
-const ARC_STEP_MIN = TAU / 256;
-const ARC_STEP_MAX = TAU / 16;
+const ARC_STEPS_MIN = 16;
+const ARC_STEPS_MAX = 256;
 
-function arcStep(radius: number): number {
-  return clampNum(ARC_CHORD / Math.max(radius, 0.001), ARC_STEP_MIN, ARC_STEP_MAX);
+/**
+ * How many equal steps a disc of this radius has its WHOLE boundary cut into.
+ *
+ * A count around the full circle, and a function of the radius alone — never of
+ * the arc being drawn. That is what makes the vertex grid in {@link tessellate}
+ * the same grid no matter where the circle is later cut, which is the whole
+ * point: see that function for why a phase-dependent one is a bug.
+ */
+function arcSteps(radius: number): number {
+  return clampNum(Math.ceil((TAU * Math.max(radius, 0.001)) / ARC_CHORD), ARC_STEPS_MIN, ARC_STEPS_MAX);
 }
 
 function clampNum(v: number, lo: number, hi: number): number {
@@ -965,20 +973,47 @@ function pointInLoop(loop: number[], x: number, y: number): boolean {
   return inside;
 }
 
-/** Tessellate the CCW sweep `from → to` on `c` into flat `[x,y,…]`. Both endpoints
- *  are included (they are the intersection points the stitch matches on) unless
- *  `closed`, where the final duplicate of the first point is dropped. */
+/**
+ * Tessellate the CCW sweep `from → to` on `c` into flat `[x,y,…]`. Both endpoints
+ * are included (they are the intersection points the stitch matches on) unless
+ * `closed`, where the final duplicate of the first point is dropped.
+ *
+ * **The interior vertices sit on a fixed grid — `k · TAU/arcSteps(r)` in the
+ * disc's own frame — and NOT at even fractions of this arc's sweep.** They must,
+ * because the same rim gets cut differently as the coverage set changes: gain a
+ * teammate whose disc clips the far side of your ship's, and a sweep-relative
+ * tessellation re-phases every chord along the near side too, even though that
+ * stretch of boundary has not moved at all. Each chord sits a sagitta inside the
+ * true arc, so re-phasing slides the drawn edge by a fraction of a pixel down its
+ * whole length — and the anti-aliased fringe of the 1 px edge line crosses back
+ * over the "is this lit?" threshold wherever it was already marginal.
+ *
+ * That is not cosmetic. It made two pixels the human could see ALONE go dark the
+ * moment they gained allies (`tests/mobile/team-fog-offline.spec.ts`, "the team
+ * read is a UNION"), which is the map denying a fact it had already shown — the
+ * exact sin GDD §2.2 forbids, arrived at by arithmetic rather than by geometry.
+ * Anchored to the disc, an untouched stretch of rim tessellates to the very same
+ * points however the rest of the circle is carved up, so shared boundary renders
+ * identically and only genuinely-moved boundary moves.
+ */
 function tessellate(c: MinimapCoverageDraw, from: number, to: number, closed: boolean): number[] {
-  const sweep = to - from;
-  const steps = Math.max(1, Math.ceil(sweep / arcStep(c.radius)));
+  const step = TAU / arcSteps(c.radius);
   const out: number[] = [];
-  const last = closed ? steps - 1 : steps;
-  for (let k = 0; k <= last; k++) {
-    const a = from + (sweep * k) / steps;
+  const push = (a: number): void => {
     out.push(c.x + c.radius * Math.cos(a), c.y + c.radius * Math.sin(a));
-  }
+  };
+  push(from);
+  // Strictly-interior grid angles only — the epsilon keeps an endpoint that
+  // landed on the grid from being emitted twice as two points a rounding apart.
+  const firstK = Math.floor(from / step + GRID_EPSILON) + 1;
+  const lastK = Math.ceil(to / step - GRID_EPSILON) - 1;
+  for (let k = firstK; k <= lastK; k++) push(k * step);
+  if (!closed) push(to);
   return out;
 }
+
+/** Grid-index slack, in step-widths, for "this endpoint IS a grid angle". */
+const GRID_EPSILON = 1e-9;
 
 // ---------------------------------------------------------------------------
 // The scene: project a frame into the active rect

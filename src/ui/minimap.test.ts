@@ -922,6 +922,44 @@ describe('sensedRegions — the union of the coverage discs', () => {
     expect(scene.coverage).toHaveLength(2); // two sensors, as before...
     expect(scene.sensedRegion).toHaveLength(1); // ...one thing drawn
   });
+
+  it('gaining an ally does not move a stretch of rim the ally never reached', () => {
+    // The union cannot SUBTRACT: a place you could see alone is a place you can
+    // still see with teammates. The boundary is drawn as a chord polygon, though,
+    // and every chord sits a sagitta inside the true arc — so if the vertices are
+    // spaced along each free ARC rather than pinned to the DISC, clipping one side
+    // of your ship's rim re-phases the chords all the way round it. The edge line
+    // then slides by a fraction of a pixel down boundary that never moved, and its
+    // anti-aliased fringe drops back under the "lit?" threshold wherever it was
+    // already marginal — two pixels of the human's own sight went dark on exactly
+    // this, in `tests/mobile/team-fog-offline.spec.ts`.
+    const mine = { x: 0, y: 0, radius: 50 };
+    const alone = sensedRegions([mine, { x: 90, y: 0, radius: 50 }]);
+    // A teammate arrives and clips the FAR side — a quarter turn away from the
+    // stretch of rim this test watches, and never touching it.
+    const withAlly = sensedRegions([mine, { x: 90, y: 0, radius: 50 }, { x: 0, y: 90, radius: 50 }]);
+
+    /** Every drawn vertex sitting on `mine`'s rim, on the arc around angle π. */
+    const westRim = (regions: ReturnType<typeof sensedRegions>): string[] => {
+      const pts: string[] = [];
+      for (const region of regions) {
+        for (const loop of [region.outline, ...region.holes]) {
+          for (let i = 0; i < loop.length; i += 2) {
+            const x = loop[i] as number;
+            const y = loop[i + 1] as number;
+            if (Math.abs(Math.hypot(x - mine.x, y - mine.y) - mine.radius) > 1e-6) continue;
+            if (Math.abs(Math.atan2(y - mine.y, x - mine.x)) < Math.PI - 0.6) continue;
+            pts.push(`${x.toFixed(9)},${y.toFixed(9)}`);
+          }
+        }
+      }
+      return pts.sort();
+    };
+
+    const before = westRim(alone);
+    expect(before.length).toBeGreaterThan(4); // the stretch really is tessellated
+    expect(westRim(withAlly)).toEqual(before); // …and drawn to the same points
+  });
 });
 
 // ---------------------------------------------------------------------------
