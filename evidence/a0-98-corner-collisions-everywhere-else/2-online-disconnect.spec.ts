@@ -367,6 +367,34 @@ for (const profile of PROFILES) {
       await host.page.waitForTimeout(1_200);
       await record('online-match-kicked-out');
 
+      // --- 3b. …and the screen the fix ROUTES that player to. -----------------
+      // The whole of a0-98's answer to "but the report needs this button" is that
+      // pause is one press away on every match, online included, and the offer is
+      // waiting there with the drop named on it. That claim is only worth making if
+      // the pause corner is free with the TALLER error-shaped offer on it — the one
+      // that carries a hint line — so it is measured rather than asserted.
+      const pauseAt = await host.page.evaluate(
+        () => (window as never as { __pauseStage: { read(): { buttonPoint: { x: number; y: number } } } }).__pauseStage.read().buttonPoint,
+      );
+      if (profile.touch) await host.press(pauseAt);
+      else await host.page.keyboard.press('Escape');
+      await host.page
+        .waitForFunction(
+          () => (window as never as { __pauseStage: { read(): { screen: string } } }).__pauseStage.read().screen === 'menu',
+          undefined,
+          { timeout: 30_000 },
+        )
+        .catch(() => {
+          /* recorded as whatever screen it did reach */
+        });
+      await host.page.waitForTimeout(700);
+      await record('online-match-dropped-pause-menu');
+
+      // Back out, so the press proof below still measures the match's own corner.
+      if (profile.touch) await host.press(pauseAt);
+      else await host.page.keyboard.press('Escape');
+      await host.page.waitForTimeout(700);
+
       // --- 4. The guest, whose wire never moved, is the control. -------------
       const guestReport = await sweepState(guest.page, 'online-match-guest-healthy', GUEST, await matchContext(guest.page));
       reports.push(guestReport);
