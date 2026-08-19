@@ -4245,6 +4245,9 @@ async function boot(): Promise<void> {
       r.alive = s.alive && !s.eliminated;
       r.local = s.id === LOCAL_PLAYER;
       r.spawnProtected = s.spawnProtect > 0;
+      // Facing, so the map can point the ship's triangle where the ship is
+      // pointed (a0-88). The sim's resolved per-tick angle, unmodified.
+      r.angle = s.angle;
     }
     minimapShips.length = 0;
     for (let i = 0; i < sn; i++) minimapShips.push(minimapShipPool[i]!);
@@ -4331,7 +4334,7 @@ async function boot(): Promise<void> {
   function minimapShipSlot(i: number): MutMinimapShip {
     let r = minimapShipPool[i];
     if (!r) {
-      r = { owner: 0, x: 0, y: 0, alive: false, local: false, spawnProtected: false };
+      r = { owner: 0, x: 0, y: 0, alive: false, local: false, spawnProtected: false, angle: 0 };
       minimapShipPool[i] = r;
     }
     return r;
@@ -6995,6 +6998,8 @@ interface MutMinimapShip {
   alive: boolean;
   local: boolean;
   spawnProtected: boolean;
+  /** Facing, radians — the ship triangle's heading on the map (a0-88). */
+  angle: number;
 }
 
 /** A mutable {@link TapCandidate} — the pooled records the Tap Commander hit-test

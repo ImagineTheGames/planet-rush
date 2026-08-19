@@ -1,0 +1,394 @@
+a0-88 — a ship and a station are the same dot, and a ring nobody can read
+==============================================================================
+UI Engineer. Branch agent/ui/a0-88-minimap-icons, off origin/main @ 506f26a.
+Container run, 2026-08-19. Every frame below was opened and read.
+
+THE REPORT
+------------------------------------------------------------------------------
+Developer, 2026-08-18, from a live match on a phone:
+
+  "the minimap shows two circles. ships should be a different icon though to
+   differentiate. also it shows a circle around my ship and a circle around the
+   station not sure what the station circle is but it's unneeded"
+
+Two things, and they need opposite answers. The first is a real collision: every
+body on the map was the same filled circle, so KIND was carried by size alone.
+The second is a real signal read as noise: the rings are radar coverage
+(feature f1, "you see what your radar buys you"), so cutting one would delete a
+fact. The frames below are the argument for shape as the second channel, and for
+the union as the honest way to draw the coverage.
+
+
+1. THE CAPTURE
+------------------------------------------------------------------------------
+Viewport      798x384 CSS, dpr 3 — the developer's own phone from the screenshot
+              the report came with (`evidence/a0-74-viewport/profiles.ts` carries
+              it as `phone-798x384`).
+Scene         the shipped frozen, seeded scene, `?debug=1&freeze=1&gate=0` — plus
+              two frames on a LIVE match (§4).
+Rungs         all three of `VIEW_ZOOM_STEPS` (1, 1.5, 2). The report arrived with
+              a0-74's 2x active, so 2x is the rung that had to read; the other two
+              are here to show the map does not depend on the camera.
+Server        `evidence/a0-88-minimap/playwright.config.ts` — private port, own
+              `npm run build`, `reuseExistingServer` off. The lanes share this box
+              and 4173 may be serving another lane's bundle (a0-06's trap).
+Before half   a worktree of origin/main @ 506f26a on its own port, captured with
+              the SAME spec: it uses only seams that exist there
+              (`__minimapStage`, `__viewStage`, and `__tapCommanderStage.readout`,
+              read-only), because a capture that needs the change in order to run
+              cannot photograph the thing before the change.
+
+What each frame drew, read back off `Hud.debugMinimap` at the moment of the shot
+(`shots/{before,after}-readback.json`) — BEFORE and AFTER agree frame for frame,
+count for count, so the only difference between the two halves is how it is drawn:
+
+  frame                    state      station ship ore sat coverage
+  collapsed-1x/1_5x/2x     corner 80      1     0   12   0     2
+  expanded-1x/1_5x/2x      overlay 269    1     0   12   0     2
+  all-marks-2x             overlay 269    3     2   29   1     3
+  underway-2x              corner 80      2     2   48   0     2
+  underway-expanded-2x     overlay 269    2     1   48   0     2
+
+A ship, a station and ore are in every frame, and every frame has both coverage
+discs — which is what the brief asked the evidence to carry.
+
+
+2. SHAPE IS KIND — WHAT THE FRAMES SHOW
+------------------------------------------------------------------------------
+Pairs are `shots/compare-<name>.png`, before left, after right, 4x (2x for the
+overlay frames) nearest-neighbour. Nearest neighbour on purpose: the question is
+what a few pixels of mark look like, and a smoothing resample would invent the
+edge quality being judged.
+
+compare-collapsed-2x        THE REPORTED FRAME. Before: two blue circles, one
+                            inside a ring, one inside another ring — the picture
+                            the report describes, sentence for sentence. After: a
+                            blue triangle nosed left with the plasma own-ship
+                            outline, and the station's blue square behind it, in
+                            one coverage outline. Ore unchanged, yellow, round.
+compare-collapsed-1x        Marks pixel-identical to 2x. Only the starfield
+compare-collapsed-1_5x      behind the translucent panel differs (the camera
+                            moved, the map did not). RUNG-INVARIANCE, shown.
+compare-expanded-1x/1_5x/2x The same decision at overlay scale, all three rungs.
+compare-all-marks-2x        Four kinds at once: my triangle, my station's square,
+                            a satellite diamond, a rival's square with its ship's
+                            triangle beside it, a second rival station in teal,
+                            ore in yellow. Before: seven circles and three rings.
+compare-underway-2x         See §4 — the frame that settles the rings.
+compare-underway-expanded-2x
+
+Read at 4x, the ship/station distinction survives the corner map at 80 CSS px:
+the triangle keeps a point and the square keeps its corners at ~8 px. The tight
+case is a ship DOCKED at its own station — same map position, so the two marks
+overlap into one compound glyph (visible in every frozen frame here, and in the
+build-wheel goldens). That is the map telling the truth about position; the
+alternative is to nudge one of them, which would be a lie about where a thing is.
+Fly out and they separate: §4.
+
+What did NOT change, asserted in the unit tests rather than eyeballed
+(`src/ui/minimap.test.ts`): ownership colour, mark for mark, wreck steel and ore
+yellow included; the dot RADII; and the ink each mark carries — every polygon is
+drawn to about the area of the circle it replaced (`SQUARE_HALF_SIDE` is
+sqrt(pi)/2), so no mark got louder or quieter and the map's weighting is where it
+was.
+
+REJECTED, with reasons:
+  · A different shape for a derelict wreck. Kind would then mean two things at
+    once. Neutral steel + the dim already say "spent" (GDD §2.7).
+  · A legend, or a one-word label, on the corner map. It is 80x80 CSS px on this
+    viewport: a word inside it costs a row of map to say what the shapes say.
+    Checked at size before rejecting — that is what the collapsed frames are.
+
+
+3. THE DoD TEST, RED FIRST
+------------------------------------------------------------------------------
+`a ship and a station do not share a shape` (src/ui/minimap.test.ts:590) asserts
+kind by OUTLINE — a vertex count, which does not move when the radius does — and
+then equalises the two radii and asserts again. Size is the channel that failed
+the developer; a test that leaned on it would be testing the bug.
+
+Run against origin/main's source (the a0-88 test file copied into the
+before-worktree), it fails:
+
+  × minimapScene — shape is KIND, colour is OWNER (a0-88) > a ship and a station
+    do not share a shape
+    → expected undefined to be defined
+    src/ui/minimap.test.ts:602  expect(station.shape).toBeDefined();
+
+Full transcript: §7 below. On this branch the file is 83 tests, all green.
+
+
+4. THE RINGS — WHAT A PLAYER NOW UNDERSTANDS THAT THEY DID NOT
+------------------------------------------------------------------------------
+The station's ring was NOT cut. It was unreadable for a nameable reason: a circle
+centred on a body reads as an attribute OF that body, and this one had no
+attribute anybody could name — a station does not have a radius the way a ship
+has a heading. So the map drew a shape that invited a question it could not
+answer. Worse, two washes overlapped and double-blended into a bright lens
+exactly where the discs met, which is the map advertising "these are two separate
+circles".
+
+Both discs are still drawn. What changed is that they are drawn as ONE THING: the
+union of everything sensing for your side (`sensedRegions`), filled once and
+outlined once. The union is centred on nothing, so the attribute-of-a-body
+reading is not available; it is one even brightness, so there is no lens; and it
+changes shape as you fly, which a property of a body would not.
+
+What the player can now read off it, that they could not before:
+
+  · THE LINE MEANS ONE THING — the edge of what your side can see. Not "my ship's
+    range" and "my station's range" and a mystery, but one boundary with one
+    meaning.
+  · WHERE YOU ARE STANDING SHOWS IN ITS SHAPE. Parked at home, the station's 300
+    disc is swallowed whole by the ship's 520 and the region is a single circle:
+    the second ring is gone because at that moment it genuinely told you nothing —
+    which is exactly why the developer could not name it. That is not a deletion,
+    it is the answer.
+  · FLY OUT AND YOUR HOME'S OWN EYES APPEAR AS A SECOND LOBE. `underway-2x`:
+    the ship 955.8 units out (recorded at the instant of the shot), and the region
+    is now two pieces — the bubble you are carrying, and the patch your home is
+    still watching, with your station's square sitting in the middle of it. The
+    coverage count is 2 in both halves; before, that fact was two circles you
+    could not tell apart, and now it is a picture of your own sensor cover.
+  · IN TEAMS IT IS YOUR SIDE'S SILHOUETTE. `evidence/a0-88-minimap/goldens/
+    desktop-frozen-teams.png`: eight overlapping rings become one scalloped
+    outline with four squares and four triangles inside it.
+
+If the answer had been "nothing", the brief said to cut it. It is not nothing, so
+it stayed — drawn as the one fact it is.
+
+The underway frames are LIVE, not frozen, and that is deliberate: no seam moves
+the ship. It flies with a real Tap Commander tap on empty space (the default
+scheme, GDD §2.4 amended 2026-08-12) until it is 700+ units out, and the distance
+is re-read at the instant of every screenshot — a ship that dies out there
+respawns AT home, which would quietly put the frame back at the scene it exists
+to contrast with. Both halves landed within 0.2 units of each other (955.96
+before, 955.83 after) because the same waypoint chain drives both. The two halves
+are separate flights of a live match, so the rival ships in them are not in the
+same places; everything the frames are evidence FOR — my ship, my station, the
+two coverage lobes, the ore — is in both.
+
+A POCKET IS NOT A PLACE YOU CAN SEE (found while drawing the union, fixed here)
+Three or more of a side's discs can RING an area without covering it — four ships
+900 apart, each with the shipped 520 sensor, leave the middle of the square 636
+from every one of them. The union's boundary then has an inner loop, and the
+first cut filled every loop it was handed: the pocket took the wash twice and came
+out BRIGHTER than the sensed area around it, the map's most confident "you can
+see here" over the one patch nobody is looking at. GDD §2.2 settled what that
+costs about a different display: a readout whose unknown state is
+indistinguishable from its known one asserts a false state rather than
+withholding a true one. `sensedRegions` now returns `{outline, holes}`, sorted by
+nesting depth, and the view cuts the pocket back out. Two unit tests, on the
+shipped radii. No golden scene contains one — proven, not assumed: see §5.
+
+
+5. THE GOLDEN RE-BASELINE
+------------------------------------------------------------------------------
+19 of the 50 baselines carry the corner map. All 19 were re-baselined; the other
+31 were not touched. Method, port and traps: a0-41's
+`evidence/a0-41-cost-every-page/goldens-rebaseline.md`.
+
+FINDING THEM. `GOLDEN` is `maxDiffPixelRatio: 0.01` and the corner map is under
+1% of every frame it appears in, so NOT ONE of these fails at the shipped
+tolerance — the suite was green before this branch and green after it while the
+stored PNGs still pictured two circles and round dots. So the finding run was at
+`maxDiffPixelRatio: 0`, and `--update-snapshots` ran at 0 as well: at 0.01 the
+tests pass and Playwright does not rewrite a passing snapshot. The tolerance edit
+is NOT committed; `tests/mobile/goldens.spec.ts` is byte-identical to origin/main.
+
+That run failed 40 frames. The 21 that are NOT re-baselined are the build-SHA
+watermark in the corner of every frame, which differs by construction at
+tolerance 0: on a menu screen (title, settings, codex, doors, lobby, ship select,
+map select, end of match) that watermark is the whole diff — 3 to 37
+perceptually-changed pixels, all inside the SHA's own box, and there is no
+minimap on those screens at all. Adopting them would bake this branch's commit id
+into 21 baselines with nothing of this change in them.
+
+The 19 that were, with the perceptually-changed pixel count and its bounding box
+(the red channel of Playwright's own diff, so ±1 antialiasing noise is excluded):
+
+  desktop-frozen                       59 px   [1229,655]-[1265,692]
+  desktop-frozen-teams                319 px   [1138,655]-[1265,744]
+  desktop-sky-coalsack                 79 px   [1215,655]-[1252,692]
+  desktop-sky-deep-ember               63 px   [1133,659]-[1161,704]
+  desktop-sky-plasma-reef              45 px   [1240,660]-[1262,687]
+  desktop-build-wheel                  66 px   [1229,655]-[1265,692]
+  desktop-build-wheel-short            66 px   [1229,655]-[1265,692]
+  desktop-build-wheel-hover            66 px   [1229,655]-[1265,692]
+  desktop-upgrade-wheel                66 px   [1229,655]-[1265,692]
+  desktop-upgrade-wheel-short          66 px   [1229,655]-[1265,692]
+  phone-landscape-frozen               41 px   [691,328]-[710,347]
+  phone-landscape-frozen-teams        183 px   [642,328]-[710,376]
+  phone-landscape-build-wheel          37 px   [691,328]-[710,347]
+  phone-landscape-build-wheel-touch    37 px   [691,328]-[710,347]
+  phone-landscape-upgrade-wheel        37 px   [691,328]-[710,347]
+  phone-landscape-thumb-band           41 px   [691,106]-[710,125]
+  phone-portrait-frozen-teams         190 px   [13,642]-[61,710]
+  phone-portrait-build-wheel           37 px   [42,691]-[61,710]
+  phone-portrait-upgrade-wheel         37 px   [42,691]-[61,710]
+
+Every box is inside the map rect of its own device (desktop 148 px at
+[1120,600]-[1268,748]; phone 80 px at [644,298]-[724,378], and its transpose
+through the portrait lock). Nothing outside the corner map moved in any frame.
+
+EYES ON. The map rect was cropped out of the stored golden and the re-baselined
+one and stacked at 4x (`goldencrop.mjs`) — `goldens/*.png`, twelve sheets for
+nineteen frames, because five desktop wheel frames draw the same corner map, as
+do three of the phone ones and two of the portrait ones (identical crop hashes,
+checked rather than assumed). In each: the ore dots, the map frame and its
+chamfer, the fog hatch, the backdrop and the HUD around it are pixel-identical;
+the marks and the coverage outline are the only things that moved.
+
+  desktop-frozen           two circles + two rings -> triangle + square + one region
+  desktop-frozen-teams     THE ONE TO OPEN. Eight overlapping rings -> one
+                           scalloped silhouette; four identical coloured dots ->
+                           four squares, each with its ship's triangle beside it.
+  desktop-sky-*            the same three-body scene under the three named skies;
+                           on `line` the frame reads two enemy squares and my
+                           triangle, which is four kinds' worth of information in
+                           three marks.
+  desktop-build-wheel      the docked case, at desktop scale: the triangle over
+                           the square, one compound mark, because the ship really
+                           is at the station.
+  phone-*                  the same, at 844x390 CSS. Note these goldens are shot
+                           at dpr 1, so they UNDERSTATE what the phone shows: the
+                           developer's device renders the same 80 px map with 3x
+                           the pixels (which is what §1's frames are).
+
+DETERMINISM, CHECKED. The 19 written baselines are byte-for-byte identical to the
+frames the FIRST (finding) run rendered — a different build, from a different
+commit, before the pocket fix. Two runs, two builds, the same pixels. And the
+pocket fix moved nothing in any golden scene, which is the proof that none of
+them contains a ringed pocket. The same held for the evidence capture: re-running
+both halves end to end left the six frozen frames byte-identical and changed only
+the two live UNDERWAY frames, as it should.
+
+NOT ADOPTED, and named rather than left for a reviewer to find: nothing. Every
+frame re-baselined here has a minimap in it and a diff confined to it. No other
+lane's drift is in this diff.
+
+
+6. GATES
+------------------------------------------------------------------------------
+npx tsc --noEmit                    clean
+npm test -- --run                   312 files, 5755 tests, all green
+                                    (src/ui/minimap.test.ts: 83)
+goldens at the SHIPPED 0.01, the 19 re-baselined, own build, private port:
+                                    19 passed, 38 skipped
+evidence spec, after half           8 passed
+evidence spec, before half          8 passed
+
+
+7. THE RED PROOF, VERBATIM
+------------------------------------------------------------------------------
+  $ git -C /tmp/a088-before log --oneline -1
+  506f26a Merge pull request #460 from ImagineTheGames/agent/art/a0-86-red-explosions
+  
+  $ cp /lanes/lane-2/src/ui/minimap.test.ts src/ui/minimap.test.ts   # the a0-88 test file, onto origin/main's src
+  $ npx vitest run src/ui/minimap.test.ts -t 'a ship and a station do not share a shape'
+  [pool-size] worker cap 2: cgroup quota 6 cores / LANES 3 = 2 workers (host claims 6)
+  
+   RUN  v2.1.8 /tmp/a088-before
+  
+   ❯ src/ui/minimap.test.ts (81 tests | 1 failed | 80 skipped) 15ms
+     × minimapScene — shape is KIND, colour is OWNER (a0-88) > a ship and a station do not share a shape 13ms
+       → expected undefined to be defined
+  
+  ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+  
+   FAIL  src/ui/minimap.test.ts > minimapScene — shape is KIND, colour is OWNER (a0-88) > a ship and a station do not share a shape
+  AssertionError: expected undefined to be defined
+   ❯ src/ui/minimap.test.ts:602:27
+      600| 
+      601|     // Both carry a KIND, and the kinds are different ones.
+      602|     expect(station.shape).toBeDefined();
+         |                           ^
+      603|     expect(vessel.shape).toBeDefined();
+      604|     expect(vessel.shape).not.toBe(station.shape);
+  
+  ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+  
+   Test Files  1 failed (1)
+        Tests  1 failed | 80 skipped (81)
+     Start at  00:28:49
+     Duration  7.70s (transform 608ms, setup 0ms, collect 6.15s, tests 15ms, environment 0ms, prepare 968ms)
+  
+
+
+
+8. THE CI RED, AND WHY THE UNION HAD TO BE PHASE-LOCKED
+------------------------------------------------------------------------------
+PR #463 came back red on shard 2/6. Not a golden, and not one of this brief's
+tests: `tests/mobile/team-fog-offline.spec.ts:510` (QA's, desktop only), which
+asserts that no pixel the human could see ALONE goes dark when they gain
+teammates — "the team read is a UNION". It expected `ffaOnly` to be 0 and got 2.
+
+DIAGNOSED OFF THE ARTIFACT, NOT GUESSED. The shard-2 report was pulled
+(`gh api .../actions/artifacts/9348745854/zip`), and the spec's own `comparePair`
+re-run in python over its `expanded` rect (360,100,560x560) against the attached
+TEAMS/FFA frames. That named the two pixels:
+
+  pixel      FFA (alone)              TEAMS (with allies)
+  (864,266)  rgb(19,31,41) lum 29.17  rgb(13,16,21) lum 15.72
+  (891,281)  rgb(19,31,41) lum 29.17  rgb(13,16,21) lum 15.72
+                    ^ threshold is 26          ^ bare fog
+
+An ASCII dump of a 46x25 neighbourhood in both frames puts the boundary arc in
+EXACTLY the same place. Only the anti-aliased outer fringe flickers. So the
+union had not shrunk — the geometry was right and the arithmetic was wrong.
+
+THE DEFECT. `tessellate()` spaced its vertices along each free ARC:
+`from + sweep*k/steps`. Every chord of a polygonised arc sits a sagitta inside
+the true arc, so the drawn edge's exact position depends on chord PHASE. When an
+ally's disc clips one side of the human's rim, that free arc's `from` moves, and
+every chord all the way round re-phases with it — including along the stretch of
+rim the ally never reached. The 1 px edge line slides a fraction of a pixel down
+boundary that never moved, and its AA fringe drops back under the "lit?"
+threshold wherever it was already marginal. Two pixels were marginal.
+
+THE FIX. `arcStep(radius)` -> `arcSteps(radius)`, a COUNT around the whole
+circle, a function of the radius ALONE and never of the arc being drawn.
+`tessellate` now emits `from`, then the strictly-interior grid angles
+`k*TAU/arcSteps(r)` anchored at angle 0 in the disc's OWN frame, then `to`.
+Vertex density is unchanged (16..256 steps, 1.5 px chord target). An untouched
+stretch of rim now tessellates to the same points however the rest of the circle
+is carved up, so shared boundary renders identically and only genuinely-moved
+boundary moves.
+
+REJECTED: a circumscribing polygon (push each vertex out by 1/cos(step/2)).
+It would also have made the union a superset of the true discs and so also
+turned the red green, but it makes the wash claim ~0.01 px of arena nobody
+senses. The wash means *sensed*; over-claiming is the wrong direction (GDD §2.2).
+Phase-locking fixes the actual defect without moving the boundary outward at all.
+
+THE TEST, RED FIRST. `gaining an ally does not move a stretch of rim the ally
+never reached` (84 in the file) puts a teammate a quarter-turn away from the
+stretch it watches and compares the drawn vertices on that stretch.
+
+  $ git checkout src/ui/minimap.ts    # back to the arc-relative tessellate
+  $ npx vitest run src/ui/minimap.test.ts -t 'gaining an ally'
+   ❯ src/ui/minimap.test.ts:961:31
+      959|     const before = westRim(alone);
+      960|     expect(before.length).toBeGreaterThan(4); // the stretch really is…
+      961|     expect(westRim(withAlly)).toEqual(before); // …and drawn to the sa…
+         |                               ^
+   Test Files  1 failed (1)
+        Tests  1 failed | 83 skipped (84)
+
+  (with the fix restored: 84 passed)
+
+GATES, RE-RUN WHOLE AFTER THE FIX
+npx tsc --noEmit                    clean
+npm test -- --run                   312 files, 5756 tests, all green
+                                    (src/ui/minimap.test.ts: 84)
+team-fog-offline.spec.ts, desktop   2 passed — including :510, the CI red
+goldens at the SHIPPED 0.01,
+own build, private port 4288        50 passed, 100 skipped — NO re-baseline
+
+NO GOLDEN WAS RE-BASELINED FOR THIS FIX, and that was predicted before the run
+rather than discovered by it: the change moves only AA fringe along the sensed
+boundary, a few hundred px in a 1.02 M-px frame (~0.03%), well inside the
+shipped `maxDiffPixelRatio` of 0.01. The 19 baselines adopted in §5 stand
+unchanged. The frames in §1 are unaffected — the phase question needs two
+overlapping sensors on the same rim, and re-capture would only have re-rendered
+identical pixels.
