@@ -142,9 +142,11 @@ import {
   SCRIM_BLEED,
   stationChromeHeight,
   waveClockLayout,
+  wheelFootprint,
   wheelRadius,
 } from './hud-geometry';
 import type { ClockLayout } from './hud-geometry';
+import { exclusionViolations } from './layout-exclusions';
 import { contentBox, DEFAULT_VIEW_ZOOM, nextViewZoom } from './viewport';
 import {
   hitZoomControl,
@@ -2554,6 +2556,36 @@ export class Hud extends Container {
       insets,
       wheelOpen,
     );
+
+    // …and the rule itself, ASKED rather than assumed. `promptWithdraws` above is
+    // the legibility question — does the sentence fit the band — and this is the
+    // placement one: does the rect about to be drawn share pixels with a surface
+    // it is excluded from (`./layout-exclusions`)? They are not the same question
+    // and neither subsumes the other, which is the whole lesson of a0-100: the
+    // prompt was inside its anchor and inside its band's arithmetic, and it was
+    // still drawn through the wedges.
+    //
+    // Cheap and load-bearing: two rects and a table lookup on the frames a prompt
+    // is up, and deleting the row in `LAYOUT_EXCLUSIONS` really does stop the
+    // prompt yielding. The wheel's rect is `wheelFootprint` — the pure model of
+    // what `build-wheel-view` fills, which `hud-geometry.test.ts` pins against the
+    // registry numbers QA read off a real phone.
+    const drawn: LayoutEntry[] = [
+      { id: 'onboarding', anchor: { region: 'full', margin: PAD }, bounds },
+    ];
+    if (wheelOpen) {
+      const footprint = wheelFootprint(box.width, box.height);
+      // Both wheels share the centred square, and the follow camera holds it on
+      // the content box's centre — the same point the prompt is centred on.
+      drawn.push({ id: 'build-wheel', anchor: { region: 'full', margin: 0 }, bounds: footprint });
+      drawn.push({ id: 'upgrade-wheel', anchor: { region: 'full', margin: 0 }, bounds: footprint });
+    }
+    if (exclusionViolations(drawn).length > 0) {
+      this.promptGroup.visible = false;
+      this.onboarding.withdrew();
+      return;
+    }
+
     this.promptGroup.x = box.x + box.width / 2;
     this.promptGroup.y = bounds.y + bounds.height / 2;
 

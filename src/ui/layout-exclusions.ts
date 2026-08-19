@@ -186,13 +186,3 @@ export function exclusionViolations(
   }
   return out;
 }
-
-/** A violation as one line of failure message — `id ∩ id = {…}`, with the rects
- *  that produced it, so a red test says what to go and look at. */
-export function describeViolation(v: ExclusionViolation): string {
-  const fmt = (r: Rect): string =>
-    `{x:${r.x.toFixed(1)}, y:${r.y.toFixed(1)}, w:${r.width.toFixed(1)}, h:${r.height.toFixed(1)}}`;
-  return (
-    `${v.a} ${fmt(v.boundsA)} ∩ ${v.b} ${fmt(v.boundsB)} = ${fmt(v.overlap)} — ${v.why}`
-  );
-}

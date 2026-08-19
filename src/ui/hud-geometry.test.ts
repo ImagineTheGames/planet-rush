@@ -73,7 +73,7 @@ import {
   TOUCH_TARGET_MIN,
 } from './hud-geometry';
 import type { AnnularSector } from './hud-geometry';
-import { describeViolation, exclusionViolations, LAYOUT_EXCLUSIONS } from './layout-exclusions';
+import { exclusionViolations, LAYOUT_EXCLUSIONS } from './layout-exclusions';
 import { textWidth } from './font-metrics';
 import type { TypeSpec } from './font-metrics';
 import { TRACKING, WHEEL_HALO, wheelMetrics } from '../art/materials';
@@ -971,7 +971,7 @@ describe('onboarding placement', () => {
           for (const v of exclusionViolations(entries)) {
             violations.push(
               `${name} / wheel=${wheelOpen ? 'open' : 'closed'} / "${text.slice(0, 32)}…": ` +
-                describeViolation(v),
+                `${v.a} ${fmt(v.boundsA)} ∩ ${v.b} ${fmt(v.boundsB)} = ${fmt(v.overlap)} — ${v.why}`,
             );
           }
         }
