@@ -444,16 +444,17 @@ for (const profile of [PROFILES[0]!, PROFILES[1]!]) {
       reports.push(listReport);
       await guest.page.screenshot({ path: join(SHOTS, `${profile.id}-front-door-room-list.png`) });
 
-      // The host starts. The listing is withdrawn; the guest's photograph is not.
-      const rush = await host.page.evaluate(
-        () => (window as never as { __lobby: { rushControl: { physicalCenter: { x: number; y: number } } } }).__lobby.rushControl.physicalCenter,
-      );
-      await host.press({ x: rush.x, y: rush.y });
-      await host.page.waitForFunction(
-        () => (window as never as { __mainMenu?: { matchStarted: boolean } }).__mainMenu?.matchStarted === true,
-        undefined,
-        { timeout: 120_000 },
-      );
+      // The host's browser goes away, and the room with it. The listing is
+      // withdrawn; the guest's photograph of it is not — the list re-reads every
+      // five seconds, and a thumb is faster than that.
+      //
+      // (The first version of this walk had the host press RUSH! instead. A room
+      // holding one human does not start, so the wait for `matchStarted` sat there
+      // for its whole two minutes and the walk reported nothing. Closing the tab is
+      // the same withdrawal by a shorter road, and it is a classroom's own story:
+      // the host shut the laptop.)
+      await hostContext.close();
+      await guest.page.waitForTimeout(1_500);
 
       // The guest presses the row that is no longer there.
       const row = await guest.page.evaluate(
@@ -479,7 +480,7 @@ for (const profile of [PROFILES[0]!, PROFILES[1]!]) {
         join(SHOTS, `${profile.id}-front-door-report.json`),
         `${JSON.stringify({ stage: STAGE, profile: profile.id, reports }, null, 2)}\n`,
       );
-      for (const context of contexts) await context.close();
+      for (const context of contexts) await context.close().catch(() => undefined);
     }
   });
 }
