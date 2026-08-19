@@ -317,6 +317,7 @@ import {
   pauseLayout,
   nextPauseScreen,
   isPauseOpen,
+  pauseAllowsDownloadLog,
   shouldFreezeSim,
   // Whether the bottom edge carries the controls strip — the one piece of screen
   // furniture the build badge has to make room for (see `buildBadge.lift`).
@@ -515,6 +516,16 @@ const CODEX_DATA = normalizeCodex({
 // cooldown under sustained fire; `alarm` accumulates base damage into a pressure
 // gauge that decays each frame, rings once the assault outpaces the decay, and
 // re-arms on a cadence so it pulses rather than chatters.
+/**
+ * How long the corner DOWNLOAD LOG offer stays down after a press that began on a
+ * screen layered over pause (a0-97). A tap's synthesized `click` trails its
+ * `touchend` by a gesture-recogniser's delay, not by a frame, so a hold that ended
+ * at pointer-up let DONE close the settings screen AND download a log. Half a
+ * second clears every delay Chrome uses and is not long enough to read as the
+ * button being missing from the pause menu it returns to.
+ */
+const LOG_OFFER_GHOST_CLICK_MS = 500;
+
 const HAPTIC_HP_EPSILON = 0.001;
 const HAPTIC_HIT_COOLDOWN_MS = 250;
 const HAPTIC_ALARM_DECAY = 0.9;
@@ -1843,10 +1854,36 @@ async function boot(): Promise<void> {
   let pausePress: PauseButton | null = null;
   let endHover: EndButton | null = null;
   let endPress: EndButton | null = null;
+  /**
+   * A press that BEGAN while the corner DOWNLOAD LOG offer was withdrawn keeps it
+   * withdrawn until that press is over — and for a beat afterwards (a0-97, the
+   * phone leg of `evidence/a0-97-nothing-covers-done`).
+   *
+   * A tap is not one event. DONE closes the settings screen on pointer-DOWN, and
+   * the offer is legitimately back on the pause menu underneath one rendered frame
+   * later — but the browser has not finished with the tap: it synthesizes a `click`
+   * after `touchend`, aimed at whatever is under the finger *at that moment*. So
+   * the finger lands on canvas, the screen closes correctly, and the DOM button
+   * reappears in the same corner just in time to catch the tap's own click. The
+   * capture caught exactly that: a settings screen that closed and a log file
+   * downloaded anyway. A mouse has no such synthesis, which is why the desktop leg
+   * was clean and this is a phone problem.
+   *
+   * Pointer-up is not late enough on its own — the synthesized click can trail it
+   * by a gesture-recogniser's delay rather than by a frame — so the hold runs on
+   * past the release by {@link LOG_OFFER_GHOST_CLICK_MS}. A press that starts on a
+   * screen already carrying the offer (the pause menu, where the button is a
+   * control the player may be aiming AT) never arms this, so nothing flickers
+   * there.
+   */
+  let logOfferHeldByPress = false;
+  let logOfferHeldUntilMs = 0;
   const releasePauseSettingsPress = (): void => {
     pauseSettingsPress = null;
     pausePress = null;
     endPress = null;
+    if (logOfferHeldByPress) logOfferHeldUntilMs = performance.now() + LOG_OFFER_GHOST_CLICK_MS;
+    logOfferHeldByPress = false;
   };
   app.canvas.addEventListener('pointerup', releasePauseSettingsPress);
   app.canvas.addEventListener('pointercancel', releasePauseSettingsPress);
@@ -2137,6 +2174,11 @@ async function boot(): Promise<void> {
   app.canvas.addEventListener('pointerdown', (e: PointerEvent) => {
     const w = transform.logicalWidth;
     const h = transform.logicalHeight;
+    // Read BEFORE this press is allowed to change the screen: a press that begins
+    // where the log offer is withdrawn holds it withdrawn for its whole life, so
+    // the tap's own synthesized click cannot land on a button that reappeared
+    // underneath it ({@link logOfferHeldByPress}).
+    if (!pauseAllowsDownloadLog(pauseScreen)) logOfferHeldByPress = true;
     // Un-rotate the tap into logical space (landscape lock) so it lands on the
     // wheel/BUILD-button geometry drawn in that same space.
     const lp = toLogical(e.clientX, e.clientY);
@@ -3471,7 +3513,9 @@ async function boot(): Promise<void> {
    *      which one it was — with the transport's own close reason when it has given
    *      one, so "the room ended" and "your grace ran out" do not arrive as the same
    *      sentence (`src/net/websocket-transport` `CloseReason`).
-   *   2. **The pause menu**, whenever it is up: the log is simply available there.
+   *   2. **The pause menu**, whenever it is up — and only the menu itself: the log
+   *      is simply available there, and withdraws for anything layered over it
+   *      (`src/ui/pause-menu` `pauseAllowsDownloadLog`).
    *
    * Anything else hides it. During play the match owns the screen, and a floating
    * button over the HUD would be exactly the kind of chrome the HUD budget refuses.
@@ -3479,6 +3523,18 @@ async function boot(): Promise<void> {
    * costs one comparison and no DOM work (`src/net/playtest-log-button`).
    */
   function syncDownloadLog(): void {
+    // A screen LAYERED OVER the pause menu draws its own controls into the corner
+    // this affordance pins itself to, so the offer withdraws for the whole of one
+    // (a0-97: DOWNLOAD LOG landed on the settings screen's DONE plate, and on a
+    // phone there is no Escape key to leave by instead). Ahead of the error branch
+    // and not after it: "nothing is drawn over DONE" is a property of the screen,
+    // and a dropped connection does not make it less true. The log stays one press
+    // away either way — DONE and STAY both step back to the menu, where the offer
+    // (pause's, or the disconnect's) is waiting.
+    if (!pauseAllowsDownloadLog(pauseScreen) || logOfferHeldByPress || performance.now() < logOfferHeldUntilMs) {
+      hideDownloadLog();
+      return;
+    }
     const state = onlineSession?.state;
     if (state === 'reconnecting' || state === 'closed') {
       showDownloadLog({

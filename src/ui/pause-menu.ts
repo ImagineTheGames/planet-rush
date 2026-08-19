@@ -86,6 +86,59 @@ export function shouldFreezeSim(screen: PauseScreen, pausable: boolean): boolean
   return isPauseOpen(screen) && pausable;
 }
 
+/**
+ * Whether `screen` is a screen **layered over the pause menu** — one the player
+ * reached FROM the menu and that draws its own full frame on top of it. Two of
+ * them exist: `settings` (the real settings screen, {@link ./settings-view}) and
+ * `confirm` ("Leave the match?"). `menu` is the bottom of that stack and `closed`
+ * is no stack at all.
+ *
+ * The distinction {@link isPauseOpen} deliberately does not make: for freezing the
+ * sim and for routing a tap, every open screen is one screen. For deciding what
+ * ELSE may be on the glass, they are not — see {@link pauseAllowsDownloadLog}.
+ */
+export function isLayeredOverPause(screen: PauseScreen): boolean {
+  return screen === 'settings' || screen === 'confirm';
+}
+
+/**
+ * Whether the DOWNLOAD LOG affordance (`src/net/playtest-log-button`) may stand
+ * while `screen` is up — **the pause menu itself, and nothing stacked on it**
+ * (a0-97).
+ *
+ * ── WHY THIS EXISTS ─────────────────────────────────────────────────────────
+ * The log affordance is DOM, fixed to the bottom-right corner
+ * (`right:max(12px,…);bottom:max(12px,…)`) at the largest z-index the platform
+ * has, inside the fullscreen element on touch — so it is on top of whatever the
+ * canvas drew there, on every viewport. It was offered for *any* open pause
+ * screen, and the rule was written for one of them: **the pause menu**, whose
+ * footer beam "carries no control" ({@link PauseLayout} `footer`) and whose
+ * plates all stack down the centre. That corner is free there. It is not free on
+ * the settings screen, which puts **DONE** in exactly it (`./settings`
+ * `settingsLayout` → `back`, right-aligned in the footer beam).
+ *
+ * a0-96 photographed the result and then proved it with a press: on a phone the
+ * word DONE was not on the screen at all, and at the point the client itself
+ * reported drawing DONE, one press downloaded a log and left the screen up — on
+ * both viewports. A player with no Escape key had no way out of the screen.
+ *
+ * ── WHY THE OFFER WITHDRAWS RATHER THAN DONE MOVING ─────────────────────────
+ * Moving DONE would settle this pair and leave the general rule ("any open pause
+ * screen may carry the corner affordance") standing, so the next screen layered
+ * over pause collides again. Withdrawing keeps the rule the comment always meant
+ * — the log is available *on the pause menu* — and closes its blind spot for
+ * every screen stacked on it, the two that exist and the ones that do not yet.
+ * The log is never more than one press away: DONE (or STAY) returns to the menu,
+ * where the offer is waiting.
+ *
+ * Making the button non-interactive while still drawing it is not a fix: a button
+ * painted over the control a player is aiming for is the defect, whether or not
+ * it swallows the press.
+ */
+export function pauseAllowsDownloadLog(screen: PauseScreen): boolean {
+  return !isLayeredOverPause(screen);
+}
+
 /** The transitions the wiring drives the pause state through. `toggle` is the ESC
  *  / corner-button "open, or back out one level" gesture; the rest are button
  *  presses. */
