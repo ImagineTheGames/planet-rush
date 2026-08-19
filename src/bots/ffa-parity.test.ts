@@ -187,11 +187,39 @@
  * whole matches, `turn-and-fight` takes 0.6% of all decisions (beside
  * `cornered-fight`'s 1.1%), and the retreat itself is still 17.6% of them.
  *
- * | Seed | Post-a0-81 | Post-a0-105 |
+ * **a0-107** moves them a seventh time, for the same reason one level down. QA's
+ * adversarial sweep found that a0-105's exit was gated behind two preconditions
+ * an *opponent* controls, so a hostile parked in the 260-unit band between
+ * `THREAT_RANGE` and `RETREAT_CLEAR_RANGE` switched the exit off and the retreat
+ * was unbounded again (`tests/reports/a0-106-adversarial.md` §5). The gates are
+ * gone and the standoff measures both axes of a retreat instead — the gap to the
+ * threat and the road to the refuge — so wounded bots leave the dead band on
+ * ticks they previously spent parked in it, and every downstream decision
+ * differs from there.
+ *
+ * The size of it, measured the same way over the same five matches
+ * (`evidence/a0-107-dead-band/decision-mix-{before,after}.txt`), and it is the
+ * *tail* that moved rather than the retreat:
+ *
+ * | | before | after |
  * |---|---|---|
- * | 20260806 | `de94b69e` | `42e213df` |
- * | 7 | `ab03dcd3` | `51f2e171` |
- * | 991 | `a37c4e2c` | `a096a954` |
+ * | retreat episodes | 311 | 300 |
+ * | median episode | 1.25 s | **1.40 s** |
+ * | longest episode | **99.00 s** | 14.17 s |
+ * | ticks in 10 s-plus episodes | 68.3% of retreat | 16.3% |
+ * | `retreat` share of decisions | 23.2% | 11.5% |
+ * | `turn-and-fight` | 0.8% | 3.0% |
+ *
+ * Bots retreat just as often and the ordinary retreat is a touch *longer*; what
+ * halved the share is the 99-second one that used to exist. That is the a0-105
+ * scope trap's own test — deleting the retreat would have moved the median —
+ * and it comes out on the right side of it.
+ *
+ * | Seed | Post-a0-81 | Post-a0-105 | Post-a0-107 |
+ * |---|---|---|---|
+ * | 20260806 | `de94b69e` | `42e213df` | `d839695f` |
+ * | 7 | `ab03dcd3` | `51f2e171` | `df4873c3` |
+ * | 991 | `a37c4e2c` | `a096a954` | `b3055735` |
  *
  * The last case is the one that stops this file from being vacuous: it asserts
  * the harness can build a team world *at all*, and that the same lineup on two
@@ -236,9 +264,9 @@ const SECONDS = 180;
  * ratified amendment in `docs/design-amendments.md`.
  */
 const GOLDEN: readonly (readonly [seed: number, hash: string])[] = [
-  [20260806, '42e213df'],
-  [7, '51f2e171'],
-  [991, 'a096a954'],
+  [20260806, 'd839695f'],
+  [7, 'df4873c3'],
+  [991, 'b3055735'],
 ];
 
 /** One eight-bot match, the shipped cast, the offline lobby's own roster path. */
