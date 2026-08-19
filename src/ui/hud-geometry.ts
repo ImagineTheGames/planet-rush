@@ -23,7 +23,7 @@
 import type { Rect } from '@platform/layout-registry';
 import { WHEEL_HALO } from '../art/materials';
 import type { HomeArrow } from './alarm';
-import { hudMetrics, hudSpace, hudType } from './instrument';
+import { hudMetrics, hudSpace, hudType, hullBarFill } from './instrument';
 import { HEALTHBAR_MIN_FILL } from './healthbar';
 import { collapsedRect } from './minimap';
 import type { MinimapInsets } from './minimap';
@@ -454,12 +454,11 @@ export function stationShieldBarFill(shieldFraction: number): Rect {
  */
 function livingBarFill(track: Rect, fraction: number): Rect {
   if (!(fraction > 0)) return { x: track.x, y: track.y, width: 0, height: track.height };
-  const f = Math.min(1, Math.max(HEALTHBAR_MIN_FILL, fraction));
-  const width = track.width * f;
-  // Anchored at the track's RIGHT edge: the fill grows leftward from the corner
-  // and the missing part shows as an empty block at the LEFT. This is the a0-99
-  // behaviour, moved here verbatim — nothing about it changes in this commit.
-  return { x: track.x + track.width - width, y: track.y, width, height: track.height };
+  // Anchored at the track's LEFT edge, so the bar empties rightward — the one
+  // direction every hull bar on the screen takes, argued at [[instrument]]
+  // `hullBarFill` (Director, 2026-08-19, a0-101). This is the line a0-99
+  // photographed running the other way.
+  return hullBarFill(track, Math.max(HEALTHBAR_MIN_FILL, fraction));
 }
 
 // ---------------------------------------------------------------------------
