@@ -1707,6 +1707,11 @@ async function boot(): Promise<void> {
   // was told it was, not in what it does with that. Same discipline as the pause
   // seam — pure read-back, no mutators, nothing computed until `read()` is called.
   installAlarmStage();
+  // And the CORNER seam, on the same precedent and for a sharper version of the
+  // same reason: the layout registry knows what is drawn in every corner, and it
+  // is built only under `?debug=1`, which cannot reach the front door or an
+  // online match. a0-98 needs exactly those screens. See `installCornerStage`.
+  installCornerStage();
 
   // --- Touch controls made visible (touch-visuals.ts) — the dynamic sticks and
   //     the fire-mode morph the player actually sees. On top of the HUD so the
@@ -6638,6 +6643,114 @@ async function boot(): Promise<void> {
     };
     try {
       Object.defineProperty(window, '__pauseStage', {
+        value: stage,
+        writable: false,
+        configurable: false,
+        enumerable: true,
+      });
+    } catch {
+      // Already defined (double install / HMR) — leave the existing one in place.
+    }
+  }
+
+
+  /**
+   * Install `window.__cornerStage` — the read-only seam that answers ONE question
+   * on a real boot: **what has the client drawn in each corner of this frame, and
+   * where.** Every positioned element, with the physical point a real press must
+   * land on (through the landscape-lock remap, like `__pauseStage`).
+   *
+   * ── WHY IT EXISTS, AND WHY IT IS NOT BEHIND ?debug=1 (a0-98) ────────────────
+   * The placement instrument this repo already has is the layout registry
+   * (`@platform/layout-registry`), and it is exactly right: every positioned
+   * element registers its declared anchor and its ACTUAL rendered rect once a
+   * frame, so "is something drawn here" stops being a thing we squint at. But it
+   * is built in {@link refreshLayout} only when `flags.debug` is set, and
+   * `?debug=1` boots straight into an offline match with no menu, no doors and no
+   * lobby (see the `mainMenu` / `lobby` construction above). So the registry
+   * cannot be read on ANY screen reached through the front door, and it cannot be
+   * read in an online match at all.
+   *
+   * a0-98 is a question about exactly those screens: the DOWNLOAD LOG affordance
+   * (`src/net/playtest-log-button`) is `position:fixed` in the bottom-right at the
+   * platform's largest z-index, it is raised from four places, and a0-97 only had
+   * to look at one of them. Proving what a press in that corner actually hits
+   * needs the client's own report of what it drew there — on the front door, and
+   * in a match whose session has dropped.
+   *
+   * That is the same wall {@link installPauseStage} and `installAlarmStage` hit,
+   * and this follows their ratified answer rather than inventing a new one: ship
+   * the seam on BOTH boots, pure read-back, no mutators, and compute nothing until
+   * something calls {@link CornerSeam.read}. A `LayoutRegistry` is allocated per
+   * read and thrown away, so a normal frame is untouched.
+   *
+   * It reuses {@link refreshLayout} verbatim rather than restating any corner
+   * geometry. A seam that recomputed where the minimap goes would be measuring its
+   * own arithmetic; this one can only ever report what the frame registered.
+   */
+  function installCornerStage(): void {
+    const physOf = (lx: number, ly: number): { x: number; y: number } => {
+      const p = logicalToPhysical(lx, ly, transform);
+      return { x: p.x, y: p.y };
+    };
+    /** One drawn element, as the client reports drawing it. `physicalBounds` is
+     *  the same rect through the rotation and re-normalised, so a caller can ask
+     *  about a corner rather than only about a centre. */
+    interface CornerElement {
+      id: string;
+      anchor: string;
+      logicalBounds: Rect;
+      physicalCenter: { x: number; y: number };
+      physicalBounds: Rect;
+    }
+    const physicalRect = (r: Rect): Rect => {
+      const a = physOf(r.x, r.y);
+      const b = physOf(r.x + r.width, r.y + r.height);
+      return {
+        x: Math.min(a.x, b.x),
+        y: Math.min(a.y, b.y),
+        width: Math.abs(b.x - a.x),
+        height: Math.abs(b.y - a.y),
+      };
+    };
+    const stage = {
+      read(): {
+        logicalViewport: { width: number; height: number };
+        rotated: boolean;
+        isTouch: boolean;
+        online: boolean;
+        pauseScreen: PauseScreen;
+        elements: CornerElement[];
+      } {
+        // A throwaway registry, filled by the SAME function the ?debug=1 build
+        // fills each frame — so this reports the drawn frame and never a second
+        // opinion about it.
+        const reg = new LayoutRegistry();
+        refreshLayout(reg);
+        return {
+          logicalViewport: { width: transform.logicalWidth, height: transform.logicalHeight },
+          rotated: transform.rotated,
+          isTouch,
+          online: onlineSession !== null,
+          pauseScreen,
+          elements: reg.entries().map((e) => ({
+            id: e.id,
+            anchor: e.anchor.region,
+            logicalBounds: { ...e.bounds },
+            physicalCenter: physOf(e.bounds.x + e.bounds.width / 2, e.bounds.y + e.bounds.height / 2),
+            physicalBounds: physicalRect(e.bounds),
+          })),
+        };
+      },
+      /** The online session's transport state and close reason — the two facts
+       *  `syncDownloadLog` reads to decide whether the offer stands. Read-back
+       *  only; nothing here can open, close or redial a socket. */
+      session(): { state: string | null; closeReason: string | null } {
+        return { state: onlineSession?.state ?? null, closeReason: onlineSession?.closeReason ?? null };
+      },
+    };
+    try {
+      Object.defineProperty(window, '__cornerStage', {
         value: stage,
         writable: false,
         configurable: false,
