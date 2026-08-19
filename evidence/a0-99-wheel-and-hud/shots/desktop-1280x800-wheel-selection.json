@@ -1,0 +1,264 @@
+{
+  "profile": "desktop 1280x800 (dpr 2, pointer) — the golden suite's control width",
+  "boot": "?debug=1 on the production bundle, openBuild(999)",
+  "wedgeOrder": "index 0 is the TOP segment; 1..4 run clockwise",
+  "steps": [
+    {
+      "index": 0,
+      "wedge": "TURRET",
+      "pressedAt": {
+        "x": 640,
+        "y": 262
+      },
+      "hoverAt": {
+        "x": 640,
+        "y": 262
+      },
+      "selectedBefore": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "selectedOnHover": [
+        true,
+        false,
+        false,
+        false,
+        false
+      ],
+      "selectedAfterPress": [
+        true,
+        false,
+        false,
+        false,
+        false
+      ],
+      "labelsAfter": [
+        "TURRET",
+        "SHIELD",
+        "RADAR",
+        "REPAIR REACTOR",
+        "UPGRADE SHIP"
+      ],
+      "capsBefore": [
+        "0 / 4 BUILT",
+        "0 / 2 BUILT",
+        "0 / 1 BUILT",
+        "",
+        ""
+      ],
+      "capsAfter": [
+        "1 / 4 BUILT",
+        "0 / 2 BUILT",
+        "0 / 1 BUILT",
+        "",
+        ""
+      ],
+      "bankAfter": 996
+    },
+    {
+      "index": 1,
+      "wedge": "SHIELD",
+      "pressedAt": {
+        "x": 771.2457992487311,
+        "y": 357.35565477625727
+      },
+      "hoverAt": {
+        "x": 771.2457992487311,
+        "y": 357.35565477625727
+      },
+      "selectedBefore": [
+        true,
+        false,
+        false,
+        false,
+        false
+      ],
+      "selectedOnHover": [
+        false,
+        true,
+        false,
+        false,
+        false
+      ],
+      "selectedAfterPress": [
+        false,
+        true,
+        false,
+        false,
+        false
+      ],
+      "labelsAfter": [
+        "TURRET",
+        "SHIELD",
+        "RADAR",
+        "REPAIR REACTOR",
+        "UPGRADE SHIP"
+      ],
+      "capsBefore": [
+        "1 / 4 BUILT",
+        "0 / 2 BUILT",
+        "0 / 1 BUILT",
+        "",
+        ""
+      ],
+      "capsAfter": [
+        "1 / 4 BUILT",
+        "1 / 2 BUILT",
+        "0 / 1 BUILT",
+        "",
+        ""
+      ],
+      "bankAfter": 994
+    },
+    {
+      "index": 2,
+      "wedge": "RADAR",
+      "pressedAt": {
+        "x": 721.1143648163613,
+        "y": 511.64434522374273
+      },
+      "hoverAt": {
+        "x": 721.1143648163613,
+        "y": 511.64434522374273
+      },
+      "selectedBefore": [
+        false,
+        true,
+        false,
+        false,
+        false
+      ],
+      "selectedOnHover": [
+        false,
+        false,
+        true,
+        false,
+        false
+      ],
+      "selectedAfterPress": [
+        false,
+        false,
+        true,
+        false,
+        false
+      ],
+      "labelsAfter": [
+        "TURRET",
+        "SHIELD",
+        "RADAR",
+        "REPAIR REACTOR",
+        "UPGRADE SHIP"
+      ],
+      "capsBefore": [
+        "1 / 4 BUILT",
+        "1 / 2 BUILT",
+        "0 / 1 BUILT",
+        "",
+        ""
+      ],
+      "capsAfter": [
+        "1 / 4 BUILT",
+        "1 / 2 BUILT",
+        "1 / 1 BUILT",
+        "",
+        ""
+      ],
+      "bankAfter": 993
+    },
+    {
+      "index": 3,
+      "wedge": "REPAIR REACTOR",
+      "pressedAt": {
+        "x": 558.8856351836387,
+        "y": 511.64434522374273
+      },
+      "hoverAt": {
+        "x": 558.8856351836387,
+        "y": 511.64434522374273
+      },
+      "selectedBefore": [
+        false,
+        false,
+        true,
+        false,
+        false
+      ],
+      "selectedOnHover": [
+        false,
+        false,
+        false,
+        true,
+        false
+      ],
+      "selectedAfterPress": [
+        false,
+        false,
+        false,
+        true,
+        false
+      ],
+      "labelsAfter": [
+        "TURRET",
+        "SHIELD",
+        "RADAR",
+        "REPAIR REACTOR",
+        "UPGRADE SHIP"
+      ],
+      "capsBefore": [
+        "1 / 4 BUILT",
+        "1 / 2 BUILT",
+        "1 / 1 BUILT",
+        "",
+        ""
+      ],
+      "capsAfter": [
+        "1 / 4 BUILT",
+        "1 / 2 BUILT",
+        "1 / 1 BUILT",
+        "",
+        ""
+      ],
+      "bankAfter": 999
+    },
+    {
+      "index": 4,
+      "wedge": "UPGRADE SHIP",
+      "pressedAt": {
+        "x": 508.7542007512688,
+        "y": 357.35565477625727
+      },
+      "hoverAt": {
+        "x": 508.7542007512688,
+        "y": 357.35565477625727
+      },
+      "selectedBefore": [
+        false,
+        false,
+        false,
+        true,
+        false
+      ],
+      "selectedOnHover": [
+        false,
+        false,
+        false,
+        false,
+        true
+      ],
+      "selectedAfterPress": [],
+      "labelsAfter": [],
+      "capsBefore": [
+        "1 / 4 BUILT",
+        "1 / 2 BUILT",
+        "1 / 1 BUILT",
+        "",
+        ""
+      ],
+      "capsAfter": [],
+      "bankAfter": 999
+    }
+  ]
+}

@@ -1,0 +1,219 @@
+{
+  "profile": "phone landscape 798x384 (dpr 2, touch) — the developer's own screenshot size",
+  "boot": "?debug=1 on the production bundle, openBuild(999)",
+  "wedgeOrder": "index 0 is the TOP segment; 1..4 run clockwise",
+  "steps": [
+    {
+      "index": 0,
+      "wedge": "TURRET",
+      "pressedAt": {
+        "x": 399,
+        "y": 109.056
+      },
+      "hoverAt": null,
+      "selectedBefore": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "selectedOnHover": null,
+      "selectedAfterPress": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "labelsAfter": [
+        "TURRET",
+        "SHIELD",
+        "RADAR",
+        "REPAIR REACTOR",
+        "UPGRADE SHIP"
+      ],
+      "capsBefore": [
+        "0/4 BUILT",
+        "0/2 BUILT",
+        "0/1 BUILT",
+        "",
+        ""
+      ],
+      "capsAfter": [
+        "1/4 BUILT",
+        "0/2 BUILT",
+        "0/1 BUILT",
+        "",
+        ""
+      ],
+      "bankAfter": 996
+    },
+    {
+      "index": 1,
+      "wedge": "SHIELD",
+      "pressedAt": {
+        "x": 477.8844316875852,
+        "y": 166.36889441856437
+      },
+      "hoverAt": null,
+      "selectedBefore": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "selectedOnHover": null,
+      "selectedAfterPress": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "labelsAfter": [
+        "TURRET",
+        "SHIELD",
+        "RADAR",
+        "REPAIR REACTOR",
+        "UPGRADE SHIP"
+      ],
+      "capsBefore": [
+        "1/4 BUILT",
+        "0/2 BUILT",
+        "0/1 BUILT",
+        "",
+        ""
+      ],
+      "capsAfter": [
+        "1/4 BUILT",
+        "1/2 BUILT",
+        "0/1 BUILT",
+        "",
+        ""
+      ],
+      "bankAfter": 994
+    },
+    {
+      "index": 2,
+      "wedge": "RADAR",
+      "pressedAt": {
+        "x": 447.7532599661469,
+        "y": 259.10310558143567
+      },
+      "hoverAt": null,
+      "selectedBefore": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "selectedOnHover": null,
+      "selectedAfterPress": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "labelsAfter": [
+        "TURRET",
+        "SHIELD",
+        "RADAR",
+        "REPAIR REACTOR",
+        "UPGRADE SHIP"
+      ],
+      "capsBefore": [
+        "1/4 BUILT",
+        "1/2 BUILT",
+        "0/1 BUILT",
+        "",
+        ""
+      ],
+      "capsAfter": [
+        "1/4 BUILT",
+        "1/2 BUILT",
+        "1/1 BUILT",
+        "",
+        ""
+      ],
+      "bankAfter": 993
+    },
+    {
+      "index": 3,
+      "wedge": "REPAIR REACTOR",
+      "pressedAt": {
+        "x": 350.24674003385314,
+        "y": 259.10310558143567
+      },
+      "hoverAt": null,
+      "selectedBefore": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "selectedOnHover": null,
+      "selectedAfterPress": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "labelsAfter": [
+        "TURRET",
+        "SHIELD",
+        "RADAR",
+        "REPAIR REACTOR",
+        "UPGRADE SHIP"
+      ],
+      "capsBefore": [
+        "1/4 BUILT",
+        "1/2 BUILT",
+        "1/1 BUILT",
+        "",
+        ""
+      ],
+      "capsAfter": [
+        "1/4 BUILT",
+        "1/2 BUILT",
+        "1/1 BUILT",
+        "",
+        ""
+      ],
+      "bankAfter": 999
+    },
+    {
+      "index": 4,
+      "wedge": "UPGRADE SHIP",
+      "pressedAt": {
+        "x": 320.1155683124148,
+        "y": 166.36889441856437
+      },
+      "hoverAt": null,
+      "selectedBefore": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "selectedOnHover": null,
+      "selectedAfterPress": [],
+      "labelsAfter": [],
+      "capsBefore": [
+        "1/4 BUILT",
+        "1/2 BUILT",
+        "1/1 BUILT",
+        "",
+        ""
+      ],
+      "capsAfter": [],
+      "bankAfter": 999
+    }
+  ]
+}

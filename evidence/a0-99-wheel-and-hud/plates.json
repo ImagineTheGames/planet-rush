@@ -1,0 +1,132 @@
+[
+  {
+    "id": "a0-99-wheel-as-a-player-opens-it",
+    "title": "The build wheel, opened the way a player opens it",
+    "sub": "Production bundle, front door (/?gate=0 -> PLAY -> PLAY SOLO -> RUSH). No ore staged: this is the wheel priced against the three ore a match starts you with. Desktop opened with a real E; phone with a real tap on BUILD & UPGRADE at logical (92,172).",
+    "width": 1300,
+    "blocks": [
+      { "img": "desktop-1280x800-front-wheel-open.png", "caption": "desktop 1280x800. Five segments, clockwise from twelve: TURRET / SHIELD / RADAR / REPAIR REACTOR / UPGRADE SHIP. Four lines on each build wedge - the name, YOUR STATION, one number, and a count over its cap. The only numbers on the wheel are the costs 3, 5, 6, 1 and the counts 0/4, 0/2, 0/1. UPGRADE SHIP carries OPEN and an arrow instead of a number. Hub: a yellow 3, the word ORE, and CLOSE . ESC." },
+      { "img": "phone-798x384-front-wheel-open.png", "caption": "phone 798x384. The same five segments and the same numbers. The hub reads CLOSE with no ESC - the desktop's key is not offered to a device that has none. The BUILD & UPGRADE button is still drawn, at the left, while the wheel is up. The pause plate that stood at the top-left in the at-rest frame is NOT drawn here." }
+    ]
+  },
+  {
+    "id": "a0-99-wheel-cost-numerals-by-affordability",
+    "title": "What the cost numeral does as the ore changes",
+    "sub": "Production bundle, ?debug=1, desktop 1280x800. The same TURRET wedge at four bank levels, left to right: 0, 2, 3 and 6 ore. Crop of shots/desktop-1280x800-wheel-ore-{0,2,3,6}.png at 1x.",
+    "width": 1300,
+    "blocks": [
+      { "img": "crops/desktop-turret-cost-by-ore.png", "caption": "0 ore / 2 ore / 3 ore / 6 ore. TURRET costs 3 in all four. The numeral is RED at 0 and at 2, and signal YELLOW at 3 and at 6 - it changes colour at exactly the price, not one either side of it. The words TURRET are dim grey while the cost is red and bright white while it is yellow. The count line reads 0 / 4 BUILT in the first three and 1 / 4 BUILT in the fourth, because the 3-ore frame's press bought one. The lighter wedge fill in tiles 2-4 is the mouse resting on the wedge from the previous press, not the price: tile 1 is the only one taken before the cursor ever went there." }
+    ]
+  },
+  {
+    "id": "a0-99-two-ore-does-not-buy-a-three-ore-turret",
+    "title": "Two ore, and a turret that costs three",
+    "sub": "The developer's report: 'being able to build a turret with 2 ore'. Production bundle, ?debug=1, desktop 1280x800. Every press is a real click at (640,262) - the point the client itself reports drawing the TURRET wedge at.",
+    "width": 1300,
+    "blocks": [
+      { "img": "crops/desktop-turret-press-2ore-vs-3ore.png", "caption": "Left to right: 2 ore before the press, 2 ore after it, 3 ore before, 3 ore after. At 2 ore the hub still reads 2 ORE after the press and the count is still 0 / 4 BUILT - nothing was bought and nothing was spent. At 3 ore the same press takes the hub to 0 ORE and the count to 1 / 4 BUILT, and the cost numeral goes from yellow to red because the bank can no longer pay it. Three ore in, one turret out, exactly three spent." },
+      { "img": "phone-798x384-wheel-ore-2-after-turret-press.png", "caption": "The same press on the phone, at (399,109). The hub reads 2 ORE, the TURRET cost is red, and the count is 0/4 BUILT - the wheel refused it here too." }
+    ]
+  },
+  {
+    "id": "a0-99-selection-reaches-all-five-segments",
+    "title": "The selection walks all five segments",
+    "sub": "The developer's other report: 'a selection animation that only reached the top segment'. Production bundle, ?debug=1. Each tile is a separate press at the coordinate the client reports for that wedge.",
+    "width": 1300,
+    "blocks": [
+      { "img": "crops/desktop-selection-walk-all-five.png", "caption": "desktop 1280x800, a real cursor resting on wedge 0,1,2,3,4 in turn. A different wedge is lit in every tile and the lit wedge is the one under the cursor each time: TURRET, then SHIELD, then RADAR, then REPAIR REACTOR, then UPGRADE SHIP. The highlight is not stuck at the top. The small diamond on the rim at twelve o'clock does NOT move between tiles - it is the fixed index mark for where segment 0 begins, not a selection cursor." },
+      { "img": "crops/phone-selected-state-held.png", "caption": "phone 798x384, the same five wedges with the finger STILL DOWN (the touch is dispatched as touchStart, held across the shutter, released after). TURRET, SHIELD, RADAR and REPAIR REACTOR each light under the finger; the fifth tile is the UPGRADE wheel, because pressing UPGRADE SHIP is what OPEN does. RADAR's cost line has become the word FULL once its count reached 1/1 BUILT - a capped wedge stops quoting a price." }
+    ]
+  },
+  {
+    "id": "a0-99-the-way-out-of-the-wheel-on-a-phone",
+    "title": "Getting out of the build wheel on a phone",
+    "sub": "Production bundle, ?debug=1, phone 798x384. The layout registry lists pause-button every frame the wheel is shut and stops listing it the frame it opens - a0-96's shape of bug, asked of this screen. Every press below is a real tap at a coordinate the client reported.",
+    "width": 1300,
+    "blocks": [
+      { "img": "phone-798x384-wheel-open-before-close.png", "caption": "The wheel up, six ore banked. Top-left carries ORE and 6 and nothing else: the pause plate is gone. The hub reads 6 / ORE / CLOSE with an up-chevron." },
+      { "img": "phone-798x384-wheel-after-hub-press.png", "caption": "After a real tap on the hub at page (399,192) - the centre of the rect the client reported for wheel-hub-back. The wheel is gone, the pause plate is back at the top-left, and the seam that lists the drawn wedges returned five before the tap and none after. CLOSE answers a finger. document.elementFromPoint at (399,192) returned the canvas, so nothing was sitting on top of it." },
+      { "img": "phone-798x384-wheel-after-old-pause-press.png", "caption": "The wheel re-opened, then a tap at (96,40) - where the pause plate stands when the wheel is shut. The wheel closed and the pause overlay did NOT open: the client reported screen 'closed' before the tap and 'closed' after it. A phone player reaching for pause with the wheel up spends that tap dismissing the wheel and has to press again." }
+    ]
+  },
+  {
+    "id": "a0-99-prompt-band-drawn-across-the-wheel",
+    "title": "The onboarding prompt is drawn across the build wheel",
+    "sub": "Production bundle. The layout registry puts onboarding at logical (232.9, 309) 332.2x59 and build-wheel at (239.7, 32.7) 318.5x318.5 on this profile - an intersection 318.5 wide and 42.3 tall, i.e. the full width of the wheel.",
+    "width": 1300,
+    "blocks": [
+      { "img": "phone-798x384-front-wheel-open.png", "caption": "phone 798x384, front door. 'Be the last station standing - mine ore, build defenses, upgrade your ship, attack when you judge it right' runs three lines across the bottom, and its first two lines are drawn over the wheel's lower disc. The words stay legible - white on the wheel's grey - but they cross REPAIR REACTOR's and RADAR's wedges, and the prompt's accent bar at the left starts inside the wheel's bounding box. The desktop frame at the same moment has 44 logical px of clear space between the wheel's registered box and the prompt's; only the narrow profile collides." },
+      { "img": "phone-798x384-overlap-wheel-open.png", "caption": "The same collision on the ?debug=1 boot, so it is not something the front door alone produces." }
+    ]
+  },
+  {
+    "id": "a0-99-match-hud-at-rest",
+    "title": "The match HUD at rest, on both viewports",
+    "sub": "Production bundle, front door, roughly five seconds into a real offline match against seated bots. The brief's five HUD elements are named in each caption, including the ones that are absent.",
+    "width": 1300,
+    "blocks": [
+      { "img": "desktop-1280x800-hud-rest.png", "caption": "desktop 1280x800. ORE and a yellow 3 at the top-left. WAVE 1/5 . Outer Drift / NEXT 2:56 / MATCH 0:05 at the top-centre. 100/100 HOME and a blue bar at the top-right - the STATION's hull, and the only HP readout on the screen; the ship carries no bar while undamaged. Minimap at the bottom-right. Controls strip along the bottom: 'Click anywhere  Move or attack   E Build & Upgrade'. There is NO pause affordance drawn and nothing on the strip names one - Escape works (proved by press below) but the screen never says so. The build stamp fabe6c3* sits at the bottom-left." },
+      { "img": "phone-798x384-hud-rest.png", "caption": "phone 798x384. Same ORE 3, wave clock (one line here, not three), and 100/100 HOME. A pause plate with a pause glyph sits at the top-left immediately right of the ore counter; VIEW 1x sits under the station bar; a round BUILD & UPGRADE button sits at the left. There is no controls strip on this profile. There is no thrust stick and no fire button: the default scheme is tap-to-command, so the only on-screen controls are BUILD, pause and the zoom." }
+    ]
+  },
+  {
+    "id": "a0-99-match-hud-under-attack",
+    "title": "The match HUD with the station under attack",
+    "sub": "Production bundle, ?debug=1. The damage is staged through the sim's own damage functions (damageShip / damageCore / the health-bar stage); nothing about the HUD is staged - no element is shown, hidden or moved by the harness.",
+    "width": 1300,
+    "blocks": [
+      { "img": "desktop-1280x800-fire-2-home-hurt.png", "caption": "desktop 1280x800. A red frame runs round the whole viewport. The top-right reads 88/100 HOME with the bar part-empty, and a red arc has appeared on the station's own ring where it was hit. Two rival nameplates carry health bars with numbers - Warden (HARD) 49/55 in blue, Sable (HARD) 35/35 in orange. The onboarding band reads 'Your station is under attack - Follow the arrow'." },
+      { "img": "phone-798x384-fire-2-home-hurt.png", "caption": "phone 798x384, the same staged siege. The same red frame, the same 88/100 HOME, the same red arc on the ring, the same under-attack sentence. The pause plate is still drawn - the alarm does not withdraw it." },
+      { "img": "crops/ship-hp-over-ship.png", "caption": "Crop of the ship-hurt frame at 3x: the local ship's own HP is a bar drawn above it reading 23/50. This is the whole of the ship-HP readout - the dedicated top-right HULL element was removed on an earlier field report, so an undamaged ship shows no HP anywhere. The numerals sit on the station's bright blue ring here and lose contrast against it." }
+    ]
+  },
+  {
+    "id": "a0-99-two-health-bars-fill-from-opposite-ends",
+    "title": "The two health bars on one screen fill from opposite ends",
+    "sub": "Both crops are from the same pair of frames on the same profile, desktop 1280x800, production bundle.",
+    "width": 1160,
+    "blocks": [
+      { "img": "crops/home-bar-desktop.png", "caption": "The station bar at 88/100, 3x. The missing twelve per cent is the dark block at the LEFT end; the blue fill is anchored to the RIGHT. This bar empties leftward." },
+      { "img": "crops/ship-hp-over-ship.png", "caption": "The ship bar at 23/50, 3x, from the same match. The blue fill is anchored to the LEFT and the empty part is at the RIGHT. This bar empties rightward. Two hull readouts on the same screen, drawn within a second of each other, drain in opposite directions." }
+    ]
+  },
+  {
+    "id": "a0-99-ore-counter-has-no-backing-plate",
+    "title": "The ore counter is drawn straight onto the world",
+    "sub": "Crops of the top-left corner at 2x. Left: desktop 1280x800. Right: phone 798x384. Both from the under-attack frames, hence the red border at the edges.",
+    "width": 1160,
+    "blocks": [
+      { "img": "crops/ore-counter-over-world.png", "caption": "The counter has no plate, scrim or panel behind it. On the desktop tile an asteroid has drifted under it: the word ORE and the yellow 3 are drawn over grey rock, the counter's thin underline rule is nearly invisible against it, and the asteroid carries a yellow ore crystal and a gold vein ring within a few tens of pixels of the counter's own yellow numeral - the same hue, at a similar size, with nothing to separate them. The counter is still readable in this frame; what it has is no guarantee that it will be." }
+    ]
+  },
+  {
+    "id": "a0-99-phone-minimap-is-not-in-its-corner",
+    "title": "The phone minimap stops a sixth of the screen short of its corner",
+    "sub": "Crops of the bottom-right corner to the true screen edge, 1x, at rest, production bundle. Registry rects: phone minimap (586, 292) 80x80 in a 798x384 logical viewport; desktop minimap (1120, 600) 148x148 in 1280x800.",
+    "width": 1160,
+    "blocks": [
+      { "img": "crops/phone-minimap-corner.png", "caption": "phone 798x384. The minimap panel ends 132 logical px from the right edge and 12 from the bottom - the empty starfield to its right is a sixth of the screen wide. Every other right-hand element on this profile hugs a 16px margin: the station bar ends at 782.5 and the VIEW control at 782, of 798. Nothing is drawn in the gap: this scheme has no fire button and no aim stick, so whatever the space is being kept for is not on screen." },
+      { "img": "crops/desktop-minimap-corner.png", "caption": "desktop 1280x800, the same corner. Here the panel ends 12 logical px from the right edge and 52 from the bottom - it is in its corner. The registry's own anchor check passes on BOTH, because the bottom-right zone it tests against is the whole lower-right quadrant; the mechanical check that exists to catch drift does not catch this." }
+    ]
+  },
+  {
+    "id": "a0-99-follow-the-arrow-with-no-arrow-on-screen",
+    "title": "'Follow the arrow', with the station already on screen",
+    "sub": "Production bundle, ?debug=1, the staged siege. Both viewports show the same sentence at the same moment.",
+    "width": 1300,
+    "blocks": [
+      { "img": "phone-798x384-fire-2-home-hurt.png", "caption": "The prompt reads 'Your station is under attack - Follow the arrow'. The player's own station is the large lit object at the centre-right of this very frame, and there is no arrow anywhere on it. I went looking for one at the screen edges and found nothing: the one candidate mark on the desktop frame's left edge magnified into a rival's ship. If the arrow is meant to appear only while the station is off screen, then the sentence that names it is being shown in the state where it cannot be followed." },
+      { "img": "crops/desktop-arrow-hunt-left-edge.png", "caption": "The desktop frame's left edge at 3x - the mark I took for an arrowhead is Sable's fighter, with the red alarm border beside it. Recorded so the search is on the record rather than the conclusion alone." }
+    ]
+  },
+  {
+    "id": "a0-99-nothing-in-the-hud-covers-a-control",
+    "title": "The reachability audit: nothing in the match HUD covers a control",
+    "sub": "Production bundle, ?debug=1, both profiles, wheel shut and wheel open. Every element the client drew was intersected with every other, and every pressable element's own centre was handed to document.elementFromPoint - the browser's own answer to 'who gets this press', and the tool that found a0-96's bug.",
+    "width": 1300,
+    "blocks": [
+      { "img": "desktop-1280x800-overlap-hud-only.png", "caption": "desktop 1280x800, wheel shut. Every pressable centre returned the canvas: there is no DOM element over the match HUD at rest, so nothing of a0-96's class is present here. The only rect collisions are banked-total inside ore-hud (the number inside its own counter) and 6 logical px between the build stamp and the nominal controls-strip band - on the frame the stamp sits clear above the strip's words with no glyph touching." },
+      { "img": "phone-798x384-overlap-wheel-open.png", "caption": "phone 798x384, wheel open. pause-button is absent from the list entirely (see the way-out plate); BUILD, VIEW and the minimap all still return the canvas at their centres. Two registry intersections here are artefacts of the registry rather than findings, and are named so nobody reads them as collisions: 'nameplates' and 'healthbars' are each ONE union rect around every plate or bar on screen, so their overlaps are not per-plate claims; and 'alarm-frame' is a full-viewport element, so under attack it intersects everything by construction." }
+    ]
+  }
+]

@@ -1,0 +1,98 @@
+{
+  "profile": "phone landscape 798x384 (dpr 2, touch) — the developer's own screenshot size",
+  "boot": "?debug=1 on the production bundle, openBuild(6)",
+  "pauseButtonAtRest": {
+    "id": "pause-button",
+    "anchor": {
+      "region": "full",
+      "margin": 0
+    },
+    "bounds": {
+      "x": 72,
+      "y": 16,
+      "width": 48,
+      "height": 48
+    }
+  },
+  "pauseButtonWhileWheelOpen": null,
+  "idsAtRest": [
+    "ship-local",
+    "build-button",
+    "build-badge",
+    "pause-button",
+    "ore-hud",
+    "banked-total",
+    "station-hp",
+    "zoom-control",
+    "onboarding",
+    "nameplates",
+    "minimap"
+  ],
+  "idsWhileWheelOpen": [
+    "ship-local",
+    "build-button",
+    "build-badge",
+    "ore-hud",
+    "banked-total",
+    "station-hp",
+    "zoom-control",
+    "onboarding",
+    "nameplates",
+    "minimap",
+    "build-wheel",
+    "wheel-hub-back"
+  ],
+  "hubRectLogical": {
+    "x": 354.7632,
+    "y": 147.76319999999998,
+    "width": 88.47360000000003,
+    "height": 88.47360000000003
+  },
+  "hubPointClient": {
+    "x": 399,
+    "y": 192
+  },
+  "topmostAtHub": {
+    "tag": "canvas",
+    "id": "",
+    "cls": "",
+    "text": "",
+    "zIndex": "auto",
+    "isCanvas": true
+  },
+  "hubPress": {
+    "at": {
+      "x": 399,
+      "y": 192
+    },
+    "kind": "tap",
+    "wedgesBefore": 5,
+    "wedgesAfter": 0,
+    "note": "wedges() is empty when no Build wheel is up — the readback form of \"it closed\""
+  },
+  "topmostAtOldPause": {
+    "tag": "canvas",
+    "id": "",
+    "cls": "",
+    "text": "",
+    "zIndex": "auto",
+    "isCanvas": true
+  },
+  "oldPausePress": {
+    "at": {
+      "x": 96,
+      "y": 40
+    },
+    "screenBefore": "closed",
+    "screenAfter": "closed",
+    "wedgesAfter": 0
+  },
+  "escape": {
+    "beforeEsc": {
+      "wedges": 5,
+      "screen": "closed"
+    },
+    "wedgesAfter": 0,
+    "screenAfter": "closed"
+  }
+}

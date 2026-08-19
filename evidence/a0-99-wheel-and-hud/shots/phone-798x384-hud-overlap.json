@@ -1,0 +1,748 @@
+{
+  "profile": "phone landscape 798x384 (dpr 2, touch) — the developer's own screenshot size",
+  "boot": "?debug=1 on the production bundle (the layout registry is a ?debug=1 instrument)",
+  "units": "logical px — the landscape space every element lays out in under the landscape lock",
+  "states": [
+    {
+      "state": "hud-only",
+      "viewportLogical": {
+        "width": 798,
+        "height": 384
+      },
+      "elements": [
+        {
+          "id": "ship-local",
+          "anchor": {
+            "region": "center",
+            "margin": 0
+          },
+          "bounds": {
+            "x": 383,
+            "y": 176,
+            "width": 32,
+            "height": 32
+          }
+        },
+        {
+          "id": "build-badge",
+          "anchor": {
+            "region": "bottom-left",
+            "margin": 8
+          },
+          "bounds": {
+            "x": 8,
+            "y": 363,
+            "width": 43.5,
+            "height": 13
+          }
+        },
+        {
+          "id": "pause-button",
+          "anchor": {
+            "region": "full",
+            "margin": 0
+          },
+          "bounds": {
+            "x": 72,
+            "y": 16,
+            "width": 48,
+            "height": 48
+          }
+        },
+        {
+          "id": "ore-hud",
+          "anchor": {
+            "region": "top-left",
+            "margin": 16
+          },
+          "bounds": {
+            "x": 16,
+            "y": 16,
+            "width": 45.72,
+            "height": 41
+          }
+        },
+        {
+          "id": "banked-total",
+          "anchor": {
+            "region": "top-left",
+            "margin": 16
+          },
+          "bounds": {
+            "x": 16,
+            "y": 27,
+            "width": 10,
+            "height": 21
+          }
+        },
+        {
+          "id": "station-hp",
+          "anchor": {
+            "region": "top-right",
+            "margin": 16
+          },
+          "bounds": {
+            "x": 628,
+            "y": 16,
+            "width": 154.5,
+            "height": 39
+          }
+        },
+        {
+          "id": "zoom-control",
+          "anchor": {
+            "region": "top-right",
+            "margin": 16
+          },
+          "bounds": {
+            "x": 718,
+            "y": 61,
+            "width": 64,
+            "height": 48
+          }
+        },
+        {
+          "id": "onboarding",
+          "anchor": {
+            "region": "full",
+            "margin": 16
+          },
+          "bounds": {
+            "x": 232.9,
+            "y": 309,
+            "width": 332.20000000000005,
+            "height": 59
+          }
+        },
+        {
+          "id": "nameplates",
+          "anchor": {
+            "region": "full",
+            "margin": 0
+          },
+          "bounds": {
+            "x": 482.3,
+            "y": 104,
+            "width": 25.399999999999977,
+            "height": 16
+          }
+        },
+        {
+          "id": "minimap",
+          "anchor": {
+            "region": "bottom-right",
+            "margin": 12
+          },
+          "bounds": {
+            "x": 586,
+            "y": 292,
+            "width": 80,
+            "height": 80
+          }
+        },
+        {
+          "id": "build-button",
+          "anchor": {
+            "region": "full",
+            "margin": 0
+          },
+          "bounds": {
+            "x": 54,
+            "y": 134,
+            "width": 76,
+            "height": 76
+          }
+        }
+      ],
+      "placement": [
+        {
+          "id": "ship-local",
+          "ok": true
+        },
+        {
+          "id": "build-badge",
+          "ok": true
+        },
+        {
+          "id": "pause-button",
+          "ok": true
+        },
+        {
+          "id": "ore-hud",
+          "ok": true
+        },
+        {
+          "id": "banked-total",
+          "ok": true
+        },
+        {
+          "id": "station-hp",
+          "ok": true
+        },
+        {
+          "id": "zoom-control",
+          "ok": true
+        },
+        {
+          "id": "onboarding",
+          "ok": true
+        },
+        {
+          "id": "nameplates",
+          "ok": true
+        },
+        {
+          "id": "minimap",
+          "ok": true
+        },
+        {
+          "id": "build-button",
+          "ok": true
+        }
+      ],
+      "overlaps": [
+        {
+          "a": "ore-hud",
+          "b": "banked-total",
+          "intersection": {
+            "x": 16,
+            "y": 27,
+            "width": 10,
+            "height": 21
+          },
+          "aBounds": {
+            "x": 16,
+            "y": 16,
+            "width": 45.72,
+            "height": 41
+          },
+          "bBounds": {
+            "x": 16,
+            "y": 27,
+            "width": 10,
+            "height": 21
+          }
+        }
+      ],
+      "reachability": [
+        {
+          "id": "pause-button",
+          "drawn": true,
+          "boundsLogical": {
+            "x": 72,
+            "y": 16,
+            "width": 48,
+            "height": 48
+          },
+          "centreClient": {
+            "x": 96,
+            "y": 40
+          },
+          "topmost": {
+            "tag": "canvas",
+            "id": "",
+            "cls": "",
+            "text": "",
+            "zIndex": "auto",
+            "isCanvas": true
+          }
+        },
+        {
+          "id": "build-button",
+          "drawn": true,
+          "boundsLogical": {
+            "x": 54,
+            "y": 134,
+            "width": 76,
+            "height": 76
+          },
+          "centreClient": {
+            "x": 92,
+            "y": 172
+          },
+          "topmost": {
+            "tag": "canvas",
+            "id": "",
+            "cls": "",
+            "text": "",
+            "zIndex": "auto",
+            "isCanvas": true
+          }
+        },
+        {
+          "id": "zoom-control",
+          "drawn": true,
+          "boundsLogical": {
+            "x": 718,
+            "y": 61,
+            "width": 64,
+            "height": 48
+          },
+          "centreClient": {
+            "x": 750,
+            "y": 85
+          },
+          "topmost": {
+            "tag": "canvas",
+            "id": "",
+            "cls": "",
+            "text": "",
+            "zIndex": "auto",
+            "isCanvas": true
+          }
+        },
+        {
+          "id": "minimap",
+          "drawn": true,
+          "boundsLogical": {
+            "x": 586,
+            "y": 292,
+            "width": 80,
+            "height": 80
+          },
+          "centreClient": {
+            "x": 626,
+            "y": 332
+          },
+          "topmost": {
+            "tag": "canvas",
+            "id": "",
+            "cls": "",
+            "text": "",
+            "zIndex": "auto",
+            "isCanvas": true
+          }
+        },
+        {
+          "id": "touch-fire-button",
+          "drawn": false
+        }
+      ]
+    },
+    {
+      "state": "wheel-open",
+      "viewportLogical": {
+        "width": 798,
+        "height": 384
+      },
+      "elements": [
+        {
+          "id": "ship-local",
+          "anchor": {
+            "region": "center",
+            "margin": 0
+          },
+          "bounds": {
+            "x": 383,
+            "y": 176,
+            "width": 32,
+            "height": 32
+          }
+        },
+        {
+          "id": "build-badge",
+          "anchor": {
+            "region": "bottom-left",
+            "margin": 8
+          },
+          "bounds": {
+            "x": 8,
+            "y": 363,
+            "width": 43.5,
+            "height": 13
+          }
+        },
+        {
+          "id": "ore-hud",
+          "anchor": {
+            "region": "top-left",
+            "margin": 16
+          },
+          "bounds": {
+            "x": 16,
+            "y": 16,
+            "width": 45.72,
+            "height": 41
+          }
+        },
+        {
+          "id": "banked-total",
+          "anchor": {
+            "region": "top-left",
+            "margin": 16
+          },
+          "bounds": {
+            "x": 16,
+            "y": 27,
+            "width": 10,
+            "height": 21
+          }
+        },
+        {
+          "id": "station-hp",
+          "anchor": {
+            "region": "top-right",
+            "margin": 16
+          },
+          "bounds": {
+            "x": 628,
+            "y": 16,
+            "width": 154.5,
+            "height": 39
+          }
+        },
+        {
+          "id": "zoom-control",
+          "anchor": {
+            "region": "top-right",
+            "margin": 16
+          },
+          "bounds": {
+            "x": 718,
+            "y": 61,
+            "width": 64,
+            "height": 48
+          }
+        },
+        {
+          "id": "onboarding",
+          "anchor": {
+            "region": "full",
+            "margin": 16
+          },
+          "bounds": {
+            "x": 232.9,
+            "y": 309,
+            "width": 332.20000000000005,
+            "height": 59
+          }
+        },
+        {
+          "id": "nameplates",
+          "anchor": {
+            "region": "full",
+            "margin": 0
+          },
+          "bounds": {
+            "x": 276.3,
+            "y": 104,
+            "width": 25.399999999999977,
+            "height": 16
+          }
+        },
+        {
+          "id": "minimap",
+          "anchor": {
+            "region": "bottom-right",
+            "margin": 12
+          },
+          "bounds": {
+            "x": 586,
+            "y": 292,
+            "width": 80,
+            "height": 80
+          }
+        },
+        {
+          "id": "build-button",
+          "anchor": {
+            "region": "full",
+            "margin": 0
+          },
+          "bounds": {
+            "x": 54,
+            "y": 134,
+            "width": 76,
+            "height": 76
+          }
+        },
+        {
+          "id": "build-wheel",
+          "anchor": {
+            "region": "full",
+            "margin": 0
+          },
+          "bounds": {
+            "x": 239.72777142857143,
+            "y": 32.72777142857143,
+            "width": 318.5444571428571,
+            "height": 318.54445714285714
+          }
+        },
+        {
+          "id": "wheel-hub-back",
+          "anchor": {
+            "region": "center",
+            "margin": 0
+          },
+          "bounds": {
+            "x": 354.7632,
+            "y": 147.76319999999998,
+            "width": 88.47360000000003,
+            "height": 88.47360000000003
+          }
+        }
+      ],
+      "placement": [
+        {
+          "id": "ship-local",
+          "ok": true
+        },
+        {
+          "id": "build-badge",
+          "ok": true
+        },
+        {
+          "id": "ore-hud",
+          "ok": true
+        },
+        {
+          "id": "banked-total",
+          "ok": true
+        },
+        {
+          "id": "station-hp",
+          "ok": true
+        },
+        {
+          "id": "zoom-control",
+          "ok": true
+        },
+        {
+          "id": "onboarding",
+          "ok": true
+        },
+        {
+          "id": "nameplates",
+          "ok": true
+        },
+        {
+          "id": "minimap",
+          "ok": true
+        },
+        {
+          "id": "build-button",
+          "ok": true
+        },
+        {
+          "id": "build-wheel",
+          "ok": true
+        },
+        {
+          "id": "wheel-hub-back",
+          "ok": true
+        }
+      ],
+      "overlaps": [
+        {
+          "a": "ship-local",
+          "b": "build-wheel",
+          "intersection": {
+            "x": 383,
+            "y": 176,
+            "width": 32,
+            "height": 32
+          },
+          "aBounds": {
+            "x": 383,
+            "y": 176,
+            "width": 32,
+            "height": 32
+          },
+          "bBounds": {
+            "x": 239.72777142857143,
+            "y": 32.72777142857143,
+            "width": 318.5444571428571,
+            "height": 318.54445714285714
+          }
+        },
+        {
+          "a": "ship-local",
+          "b": "wheel-hub-back",
+          "intersection": {
+            "x": 383,
+            "y": 176,
+            "width": 32,
+            "height": 32
+          },
+          "aBounds": {
+            "x": 383,
+            "y": 176,
+            "width": 32,
+            "height": 32
+          },
+          "bBounds": {
+            "x": 354.7632,
+            "y": 147.76319999999998,
+            "width": 88.47360000000003,
+            "height": 88.47360000000003
+          }
+        },
+        {
+          "a": "ore-hud",
+          "b": "banked-total",
+          "intersection": {
+            "x": 16,
+            "y": 27,
+            "width": 10,
+            "height": 21
+          },
+          "aBounds": {
+            "x": 16,
+            "y": 16,
+            "width": 45.72,
+            "height": 41
+          },
+          "bBounds": {
+            "x": 16,
+            "y": 27,
+            "width": 10,
+            "height": 21
+          }
+        },
+        {
+          "a": "onboarding",
+          "b": "build-wheel",
+          "intersection": {
+            "x": 239.7,
+            "y": 309,
+            "width": 318.5,
+            "height": 42.3
+          },
+          "aBounds": {
+            "x": 232.9,
+            "y": 309,
+            "width": 332.20000000000005,
+            "height": 59
+          },
+          "bBounds": {
+            "x": 239.72777142857143,
+            "y": 32.72777142857143,
+            "width": 318.5444571428571,
+            "height": 318.54445714285714
+          }
+        },
+        {
+          "a": "nameplates",
+          "b": "build-wheel",
+          "intersection": {
+            "x": 276.3,
+            "y": 104,
+            "width": 25.4,
+            "height": 16
+          },
+          "aBounds": {
+            "x": 276.3,
+            "y": 104,
+            "width": 25.399999999999977,
+            "height": 16
+          },
+          "bBounds": {
+            "x": 239.72777142857143,
+            "y": 32.72777142857143,
+            "width": 318.5444571428571,
+            "height": 318.54445714285714
+          }
+        },
+        {
+          "a": "build-wheel",
+          "b": "wheel-hub-back",
+          "intersection": {
+            "x": 354.8,
+            "y": 147.8,
+            "width": 88.5,
+            "height": 88.5
+          },
+          "aBounds": {
+            "x": 239.72777142857143,
+            "y": 32.72777142857143,
+            "width": 318.5444571428571,
+            "height": 318.54445714285714
+          },
+          "bBounds": {
+            "x": 354.7632,
+            "y": 147.76319999999998,
+            "width": 88.47360000000003,
+            "height": 88.47360000000003
+          }
+        }
+      ],
+      "reachability": [
+        {
+          "id": "pause-button",
+          "drawn": false
+        },
+        {
+          "id": "build-button",
+          "drawn": true,
+          "boundsLogical": {
+            "x": 54,
+            "y": 134,
+            "width": 76,
+            "height": 76
+          },
+          "centreClient": {
+            "x": 92,
+            "y": 172
+          },
+          "topmost": {
+            "tag": "canvas",
+            "id": "",
+            "cls": "",
+            "text": "",
+            "zIndex": "auto",
+            "isCanvas": true
+          }
+        },
+        {
+          "id": "zoom-control",
+          "drawn": true,
+          "boundsLogical": {
+            "x": 718,
+            "y": 61,
+            "width": 64,
+            "height": 48
+          },
+          "centreClient": {
+            "x": 750,
+            "y": 85
+          },
+          "topmost": {
+            "tag": "canvas",
+            "id": "",
+            "cls": "",
+            "text": "",
+            "zIndex": "auto",
+            "isCanvas": true
+          }
+        },
+        {
+          "id": "minimap",
+          "drawn": true,
+          "boundsLogical": {
+            "x": 586,
+            "y": 292,
+            "width": 80,
+            "height": 80
+          },
+          "centreClient": {
+            "x": 626,
+            "y": 332
+          },
+          "topmost": {
+            "tag": "canvas",
+            "id": "",
+            "cls": "",
+            "text": "",
+            "zIndex": "auto",
+            "isCanvas": true
+          }
+        },
+        {
+          "id": "touch-fire-button",
+          "drawn": false
+        }
+      ]
+    }
+  ]
+}
