@@ -31,9 +31,11 @@ import {
   VOLUME_STEPS,
   VOLUME_STEP,
   adjustVolume,
+  commitFireMode,
   commitSettings,
   controlsDevice,
   createSettings,
+  fireModeLocked,
   loadSettings,
   parseControlScheme,
   sameTarget,
@@ -1117,5 +1119,152 @@ describe('CHANGES SAVE IMMEDIATELY, on every row that says it (a0-92)', () => {
     saveSettings(storage, state);
     expect(disk.get(SETTINGS_STORAGE.volumes.master)).toBe('3');
     expect(loadSettings(storage).volumes.master).toBe(state.volumes.master);
+  });
+});
+
+/**
+ * **a0-100b — the row that answers a press with nothing.**
+ *
+ * `docs/settings.md` mismatch 1, the last one standing: under Tap Commander the
+ * FIRE MODE row shows a value, toggles on a press, and reaches the sim on no
+ * frame at all — `src/main.ts` computes the mode from the pilot's own order
+ * (`tapPilot.lockedRef ? Manual : AutoAim`) and passes that to `mapActions`
+ * instead of the row's value. a0-96 photographed the consequence: one press on
+ * the chip under Tap Commander moved **0 pixels of 4,096,000** of a frozen match
+ * frame, against a null re-shot that proved the capture honest; the same press on
+ * the sticks scheme moved 18,935.
+ *
+ * The developer ruled on it (2026-08-19): *"we should disable the selection for
+ * fire mode when tap commander is active and set fire mode to Auto-Fire but still
+ * have it grayed out so people can't toggle it"*.
+ *
+ * So the row is shown, locked and honest rather than removed — and the two halves
+ * of that are asserted from the code that decides them, not quoted:
+ *
+ *   **the lock** — {@link TapPilot} writes `fire` itself, so the trigger is not
+ *   the player's on this scheme and there is nothing for the row to choose.
+ *   **the word** — AUTO-FIRE is true where the pilot holds the trigger and false
+ *   where {@link mapActions} only moves the aim, so the value follows the SCHEME.
+ */
+describe('FIRE MODE is locked under Tap Commander (a0-100b)', () => {
+  it('the fire mode row cannot be toggled under tap commander', () => {
+    // The premise, from the code that implements it: with no order at all — a
+    // fresh match on the default scheme — the pilot holds the trigger. The player
+    // is not choosing when to fire, so there is no fire mode to choose.
+    const pilot = new TapPilot();
+    const state = createControlState();
+    pilot.writeInto(state, { pos: { x: 0, y: 0 }, radius: 16 }, null);
+    expect(state.fire, 'Tap Commander fires with no player input').toBe(true);
+
+    // THE PRESS. The row is still a hit target — a locked control that swallowed
+    // the press silently would be the same defect wearing a dimmer coat, and the
+    // wiring layer needs the target to refuse out loud.
+    const layout = settingsLayout(VIEWPORT);
+    const fireRow = layout.rows[0]!;
+    const clearOfTheHelpChip = fireRow.x + layout.help[0]!.width + 4;
+    expect(settingsHitTest(layout, clearOfTheHelpChip, center(fireRow).y)).toEqual({ kind: 'fireMode' });
+
+    // …and it changes NOTHING: not the mode, and not the byte on disk. The whole
+    // disk is checked, not just the fire-mode key, so a write to some neighbouring
+    // key cannot hide here either.
+    const disk = new Map<string, string>();
+    const refused = commitFireMode(FireMode.AutoAim, 'tap', storageOver(disk));
+    expect(refused.moved, 'a press under Tap Commander moves nothing').toBe(false);
+    expect(refused.mode).toBe(FireMode.AutoAim);
+    expect([...disk.keys()], 'nothing is written').toEqual([]);
+    // Manual seated from an earlier session is not toggled either — and not
+    // overwritten: the player's choice is theirs when they go back to the sticks.
+    const alsoRefused = commitFireMode(FireMode.Manual, 'tap', storageOver(disk));
+    expect(alsoRefused).toEqual({ mode: FireMode.Manual, moved: false });
+    expect([...disk.keys()]).toEqual([]);
+
+    // The row says so about itself, so a view cannot draw it as live: this is the
+    // flag `settings-view` dims the plate and the value from.
+    for (const mode of [FireMode.AutoAim, FireMode.Manual]) {
+      const row = settingsModel(createSettings(), mode, 'tap', 'touch').rows[0]!;
+      expect(row.kind).toBe('fireMode');
+      expect(row.disabled, 'the row reports itself locked').toBe(true);
+      // Nothing else on the row lights up either: a locked chip carries no
+      // engaged hairline, and the plate does not answer the pointer.
+      expect(row.on).toBe(false);
+      const pressed = settingsModel(createSettings(), mode, 'tap', 'touch', {
+        press: { kind: 'fireMode' },
+        hover: { kind: 'fireMode' },
+      }).rows[0]!;
+      expect(pressed.state, 'a locked plate does not sink under a press').toBe('rest');
+    }
+
+    // The converse, so "lock it everywhere" is not the way to pass: on the sticks
+    // the trigger IS the player's, so the row is live, it moves, and it persists.
+    const sticksDisk = new Map<string, string>();
+    const moved = commitFireMode(FireMode.AutoAim, 'sticks', storageOver(sticksDisk));
+    expect(moved).toEqual({ mode: FireMode.Manual, moved: true });
+    expect(sticksDisk.get(SETTINGS_STORAGE.fireMode)).toBe(FireMode.Manual);
+    expect(commitFireMode(FireMode.Manual, 'sticks', storageOver(sticksDisk)).mode).toBe(FireMode.AutoAim);
+    for (const scheme of SCHEMES) {
+      expect(fireModeLocked(scheme)).toBe(scheme === 'tap');
+    }
+    expect(settingsModel(createSettings(), FireMode.AutoAim, 'sticks', 'touch').rows[0]!.disabled).toBe(false);
+  });
+
+  it('the chip word follows the scheme: AUTO-FIRE under tap, AUTO-AIM / MANUAL on the sticks', () => {
+    /** Does the player pull the trigger on this scheme? Asked of the code, both
+     *  halves, because the naming conflict is exactly this question: under Tap
+     *  Commander the pilot writes `fire`; on the sticks `mapActions` only decides
+     *  where the shot goes and `fire.active` is still whatever the device held. */
+    const playerFires = (scheme: ControlScheme): boolean => {
+      if (scheme === 'tap') {
+        const pilot = new TapPilot();
+        const s = createControlState();
+        pilot.writeInto(s, { pos: { x: 0, y: 0 }, radius: 16 }, null);
+        return !s.fire; // the pilot held it; the player did not
+      }
+      const s = createControlState();
+      s.fire = false; // the player is not holding the trigger…
+      const idle = mapActions(s, FireMode.AutoAim).find((a) => a.type === 'fire');
+      s.fire = true; // …and now they are.
+      const held = mapActions(s, FireMode.AutoAim).find((a) => a.type === 'fire');
+      return (
+        idle?.type === 'fire' && held?.type === 'fire' && idle.active === false && held.active === true
+      );
+    };
+
+    // Auto-aim on the sticks moves the AIM and nothing else — the shot is still
+    // the player's, so AUTO-FIRE would be a fresh false word in the one place a
+    // false word was just removed.
+    expect(playerFires('sticks'), 'on the sticks the trigger is the player’s').toBe(true);
+    expect(playerFires('tap'), 'under Tap Commander it is not').toBe(false);
+
+    const chip = (mode: FireMode, scheme: ControlScheme): string =>
+      settingsModel(createSettings(), mode, scheme, 'touch').rows[0]!.value;
+
+    // Under tap the word is the same in both modes, because the mode is not the
+    // player's and the game fires either way.
+    expect(chip(FireMode.AutoAim, 'tap')).toBe('AUTO-FIRE');
+    expect(chip(FireMode.Manual, 'tap')).toBe('AUTO-FIRE');
+    // On the sticks the ratified pair is untouched.
+    expect(chip(FireMode.AutoAim, 'sticks')).toBe('AUTO-AIM');
+    expect(chip(FireMode.Manual, 'sticks')).toBe('MANUAL');
+
+    // The row's own NAME does not move on either scheme (GDD §4.7 fixed strings).
+    for (const scheme of SCHEMES) {
+      expect(settingsModel(createSettings(), FireMode.AutoAim, scheme, 'touch').rows[0]!.label).toBe('FIRE MODE');
+    }
+  });
+
+  it('the help panel says the row is locked, and why', () => {
+    // p4-03: a disabled control carries its reason. The row has no width for a
+    // second line on the 372px column a landscape phone gives it, and it already
+    // has the one affordance built for exactly this — its `?`. So the reason
+    // lives there, on every device, and it names the scheme that took the choice.
+    for (const device of ['touch', 'gamepad', 'keyboard'] as const) {
+      const { summary } = settingsHelp({ kind: 'fireMode' }, device, 'tap');
+      expect(summary, `${device} is told the row is locked`).toMatch(/\block(ed)?\b/i);
+      expect(summary, `${device} is told who fires`).toMatch(/\bfires\b[^.]*\bfor you\b/i);
+      expect(summary, `${device} is told the way out`).toContain(STICKS_LABELS[device]);
+      expect(summary).toContain(TAP_COMMANDER_LABEL);
+    }
+    // The sticks branch is not about a lock — the row is live there.
+    expect(settingsHelp({ kind: 'fireMode' }, 'touch', 'sticks').summary).not.toMatch(/\block(ed)?\b/i);
   });
 });
