@@ -40,6 +40,12 @@ the **player** stands on, which means following it out to the seam that actually
 drives their ship. Where the answer differs by scheme or device, that is not a
 sentence to hedge — it is a branch, through the seam (below).
 
+**A row's help describes that row's own axis** — borrowing a neighbouring row's
+behaviour is how both of these went false (a0-93). FIRE MODE claimed the firing
+that Tap Commander does; CONTROLS claimed the aiming that FIRE MODE decides. A
+setting can only keep a promise its own value controls: say what changes when
+this control is pressed, and let the row that owns the rest say the rest.
+
 ---
 
 ## The register
@@ -83,11 +89,12 @@ The same applies to a fact that differs by **scheme** rather than device, which
 is what a0-89 found: `settingsHelp` takes both, and both are required, so a
 caller cannot quietly resolve copy for a configuration the player is not in.
 
-Three tests hold this, and a new one should be added anywhere copy grows another
+Four tests hold this, and a new one should be added anywhere copy grows another
 configuration-dependent fact:
 
 - `src/ui/settings.test.ts` → `never names another device` (swept over both schemes since a0-89)
 - `src/ui/settings.test.ts` → `the fire help is true under every control scheme`
+- `src/ui/settings.test.ts` → `the controls help does not claim aiming the player does not do`
 - `src/ui/onboarding.test.ts` → `never names another device, in any configuration`
 
 `tap` is **not** a device word: TAP COMMANDER is a scheme, and a tap is a tap
@@ -123,7 +130,8 @@ only one of them should mention it at all.
 ### Settings help (`src/ui/settings.ts`)
 
 **CONTROLS** — the specimen. Was one sentence on every device; is now the
-device's own.
+device's own. *And then a0-93, for the same reason FIRE MODE needed a second
+pass.*
 
 > **Before**
 > TAP COMMANDER flies the ship for you: tap a spot to move there, tap a target
@@ -131,18 +139,27 @@ device's own.
 > aim in your hands — WASD and the mouse, both pad sticks, or two sticks on the
 > glass.
 
-> **After (phone)**
+> **After a0-87 — the device half right, the claim wrong, and shipped**
 > TAP COMMANDER flies the ship for you: tap where to go, tap what to hit. On
 > STICKS you steer and aim yourself.
->
-> **After (pad)**
-> …On TWIN STICKS you steer and aim yourself.
->
-> **After (PC)**
-> …On KEYBOARD + MOUSE you steer and aim yourself.
 
-*Tells: hedging into universality, the triad. Banking left the panel — the
-in-match prompt teaches it at the moment a full hold makes it matter.*
+> **After a0-93 (phone)**
+> TAP COMMANDER flies the ship for you: tap where to go, tap what to hit. On
+> STICKS you fly it yourself.
+>
+> **After a0-93 (pad)**
+> …On TWIN STICKS you fly it yourself.
+>
+> **After a0-93 (PC)**
+> …On KEYBOARD + MOUSE you fly it yourself.
+
+*Tells a0-87 fixed: hedging into universality, the triad. Banking left the panel
+— the in-match prompt teaches it at the moment a full hold makes it matter.*
+**What a0-93 fixed:** "aim" was never this row's to promise. AUTO-AIM ships
+seated, `mapActions` emits no `aim` in it, and the sim takes the target across
+the full 360° — so a player who switched schemes on the defaults was told they
+do something they do not. This row chooses who flies the ship; that is true in
+either fire mode, on every device, and it is all this row can be held to.
 
 ---
 

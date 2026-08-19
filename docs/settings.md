@@ -21,14 +21,15 @@ it still matches the code.** Every behavioural claim below carries a
 | # | Row | What is wrong | Where |
 |---|-----|---------------|-------|
 | 1 | **FIRE MODE** | Inert on the default control scheme. Under Tap Commander the row's value is discarded every frame and replaced by the pilot's own `tapMode`. The chip still shows AUTO-AIM / MANUAL and still toggles. | `src/main.ts:3531`, `src/main.ts:3532` |
-| 2 | **CONTROLS** | Help says "you steer and aim yourself" on the sticks scheme. Under AUTO-AIM — the shipped default — no aim is emitted and the sim picks the target, so the player does not aim on any device. | `src/ui/settings.ts:384` vs `src/platform/actions.ts:162`, `src/platform/actions.ts:58` |
-| 3 | **REDUCE VFX + all three volumes** | Not persisted. The header eyebrow reads CHANGES SAVE IMMEDIATELY; four of six rows are gone on reload. | `src/ui/settings.ts:562` vs `src/main.ts:1791`, `src/main.ts:7796` |
+| 2 | ~~**CONTROLS**~~ | ~~Help says "you steer and aim yourself" on the sticks scheme. Under AUTO-AIM — the shipped default — no aim is emitted and the sim picks the target, so the player does not aim on any device.~~ **Fixed** by `a60bbe9` (a0-93): the row now says who flies the ship, which holds in either fire mode. Held by `the controls help does not claim aiming the player does not do` (`src/ui/settings.test.ts`). | `src/ui/settings.ts:397` vs `src/platform/actions.ts:162`, `src/platform/actions.ts:58` |
+| 3 | **REDUCE VFX + all three volumes** | Not persisted. The header eyebrow reads CHANGES SAVE IMMEDIATELY; four of six rows are gone on reload. | `src/ui/settings.ts:575` vs `src/main.ts:1791`, `src/main.ts:7796` |
 | 4 | **REDUCE VFX + all three volumes, on the MAIN MENU screen** | Reach nothing at all. No mixer call, no renderer (none exists yet), and the value is discarded when the match boots. | `src/main.ts:9472`, `src/main.ts:9480`, `src/main.ts:1791` |
 
 Rows that are honest: none of the six is fully clean on every surface. MASTER,
 SFX and MUSIC describe the mixer correctly (mismatches 3 and 4 are about where
 the row is live, not about what the words claim); REDUCE VFX's help is true
-wherever the row is live.
+wherever the row is live. CONTROLS' words are true everywhere since a0-93 — the
+row itself was never the problem, only what its help borrowed from FIRE MODE's.
 
 ---
 
@@ -41,7 +42,7 @@ There are **two** live settings screens, and they hold **separate state**:
 | Main menu → SETTINGS | `src/main.ts:8331` | `settings`, `src/main.ts:7796` |
 | In-match pause → SETTINGS | `src/main.ts:3429` | `matchSettings`, `src/main.ts:1791` |
 
-Both are built by `settingsModel` (`src/ui/settings.ts:576`) and both walk the
+Both are built by `settingsModel` (`src/ui/settings.ts:589`) and both walk the
 same row list, `SETTINGS_ROWS` (`src/ui/settings.ts:262`) — six rows, in this
 order: FIRE MODE, CONTROLS, REDUCE VFX, MASTER VOLUME, SFX VOLUME, MUSIC VOLUME.
 
@@ -60,14 +61,14 @@ A third settings code path exists in the lobby flow (`flowTapSettings`,
 `settingsModel` call site reads that field — it is not wired to a rendered
 screen.
 
-The header eyebrow is `CHANGES SAVE IMMEDIATELY` (`src/ui/settings.ts:562`).
+The header eyebrow is `CHANGES SAVE IMMEDIATELY` (`src/ui/settings.ts:575`).
 
 ---
 
 ## FIRE MODE
 
-**Label** `FIRE MODE` (`src/ui/settings.ts:603`)
-**Values** `AUTO-AIM` / `MANUAL` (`src/ui/settings.ts:604`)
+**Label** `FIRE MODE` (`src/ui/settings.ts:616`)
+**Values** `AUTO-AIM` / `MANUAL` (`src/ui/settings.ts:617`)
 **Default** `AUTO-AIM`, the same on every platform
 (`src/platform/actions.ts:58`; asserted at `src/platform/actions.test.ts:28`)
 **Persisted** yes — `planet-rush:fireMode` (`src/main.ts:522`), written at
@@ -154,7 +155,7 @@ this file documents the name as it stands today.
 
 ## CONTROLS
 
-**Label** `CONTROLS` (`src/ui/settings.ts:619`)
+**Label** `CONTROLS` (`src/ui/settings.ts:632`)
 **Values** `TAP COMMANDER` (`src/ui/settings.ts:125`), or the default scheme's
 word for the device in front of the player (`src/ui/settings.ts:117`):
 `STICKS` on touch, `TWIN STICKS` with a pad connected, `KEYBOARD + MOUSE`
@@ -194,29 +195,38 @@ Live on both — it *is* the scheme. Inert on nothing.
 
 ### Current help text
 
-`src/ui/settings.ts:384`:
+`src/ui/settings.ts:397`:
 
 > *"TAP COMMANDER flies the ship for you: tap where to go, tap what to hit. On
-> {STICKS_LABELS[device]} you steer and aim yourself."*
+> {STICKS_LABELS[device]} you fly it yourself."*
 
 The device half is right — the sentence names the one device the player has, from
 the same lookup the value chip uses, so panel and pill cannot disagree.
 
-**MISMATCH 2: the second clause is false under AUTO-AIM.** AUTO-AIM is the
+Both halves are true in either fire mode, which is the point: this row chooses
+who flies the ship, and nothing FIRE MODE does can falsify that.
+
+**~~MISMATCH 2~~ — struck by `a60bbe9` (a0-93).** The row used to end *"you steer
+and aim yourself"*, and that clause was false under AUTO-AIM. AUTO-AIM is the
 shipped default (`src/platform/actions.ts:58`), and on the sticks scheme in
 AUTO-AIM no `aim` action is emitted (`src/platform/actions.ts:162`), the sim
 acquires the target itself (`src/sim/step.ts:675`), the strip drops the Aim row
 (`src/platform/actions.ts:324`), and on touch the aim stick is replaced by a FIRE
 button (`src/ui/live-controls.ts:104`). A player switching to STICKS on the
-defaults steers and fires; they do not aim. "You steer and aim yourself" is only
-true once they also set FIRE MODE to MANUAL.
+defaults steers and fires; they do not aim, until they also set FIRE MODE to
+MANUAL.
+
+The sentence went wrong by reaching into the row below it for a behaviour this
+row's own value cannot hold true. `the controls help does not claim aiming the
+player does not do` (`src/ui/settings.test.ts`) now asks `mapActions` whether an
+`aim` survives the seated default and fails the build if the copy disagrees.
 
 ---
 
 ## REDUCE VFX
 
-**Label** `REDUCE VFX` (`src/ui/settings.ts:628`)
-**Values** `ON` / `OFF` (`src/ui/settings.ts:629`)
+**Label** `REDUCE VFX` (`src/ui/settings.ts:641`)
+**Values** `ON` / `OFF` (`src/ui/settings.ts:642`)
 **Default** `OFF` (`src/ui/settings.ts:202`)
 **Persisted** **no.** Toggled at `src/main.ts:3364` (pause) and
 `src/main.ts:9472` (menu); neither writes storage, and there is no
@@ -254,7 +264,7 @@ nothing in the path above reads `controlScheme`.
 
 ### Current help text
 
-`src/ui/settings.ts:393`:
+`src/ui/settings.ts:406`:
 
 > *"Thins the effects that carry no information, to hold the frame rate. The game
 > does this on its own when the rate drops; ON keeps them thin all the time."*
@@ -269,10 +279,10 @@ scale rather than a cut, and the second clause matches the OR at
 ## MASTER VOLUME / SFX VOLUME / MUSIC VOLUME
 
 **Labels** `MASTER VOLUME`, `SFX VOLUME`, `MUSIC VOLUME`
-(`src/ui/settings.ts:686`)
+(`src/ui/settings.ts:699`)
 **Values** ten discrete steps, silent to full (`VOLUME_STEPS = 10`,
 `src/ui/settings.ts:191`); drawn as filled pips, not a number
-(`src/ui/settings.ts:644`).
+(`src/ui/settings.ts:657`).
 **Defaults** master `0.8`, sfx `0.8`, music `0.6` (`src/ui/settings.ts:199`).
 **Persisted** **no** — same as REDUCE VFX, and same citation (mismatch 3). A
 slider already at its end refuses audibly rather than silently
@@ -311,7 +321,7 @@ Scheme-independent. No audio path reads `controlScheme`.
 
 ### Current help text
 
-`src/ui/settings.ts:408`–`src/ui/settings.ts:410`:
+`src/ui/settings.ts:421`–`src/ui/settings.ts:423`:
 
 | Row | Help | True? |
 |---|---|---|
