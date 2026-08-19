@@ -29,6 +29,8 @@ import type { Latch } from './commitment';
 import { newLatch, release } from './commitment';
 import type { CorneredLatch } from './cornered';
 import { newCorneredLatch, resetCornered } from './cornered';
+import type { StandoffLatch } from './standoff';
+import { newStandoff, resetStandoff } from './standoff';
 import { BotMemory } from './memory';
 import type { BotView, SelfView } from './perception';
 import type { DifficultyTuning, Personality, PersonalityWeights } from './personalities';
@@ -122,6 +124,22 @@ export interface Brain {
    * remembers a *decision and its deadline*.
    */
   readonly cornered: CorneredLatch;
+  /**
+   * The **standoff** commitment (`./standoff`; developer report a0-105). The
+   * retreat above releases only on conditions an opponent controls — escape and
+   * recovery — so a player who parks inside the clear range on a game with no
+   * hull repair can hold a wounded bot in its retreat forever, which is exactly
+   * the photograph the developer sent. This latch measures whether the running
+   * is *working*, and when it has not been for the character's own patience the
+   * bot turns and fights instead ("ship lives are cheap. enemies should not fear
+   * death").
+   *
+   * Beside {@link Brain.fleeing} and {@link Brain.cornered} rather than folded
+   * into either, because it is a third kind of memory: the flee latch remembers
+   * a *state*, the cornered latch remembers a *decision about the road home*,
+   * and this one remembers *how the manoeuvre is going*.
+   */
+  readonly standoff: StandoffLatch;
   /**
    * The asteroid id this bot committed to mining on its last mining decision, or
    * `-1` when it is not mining (`./behaviors`'s `mine`). Two things read it, both
@@ -247,6 +265,7 @@ export function createBrain(personality: Personality, rng: Rng, radio: TeamRadio
     aim: newAimTrack(),
     fleeing: newLatch(),
     cornered: newCorneredLatch(),
+    standoff: newStandoff(),
     mineSite: -1,
     mineSiteAt: -1,
     tabu: new Map(),
@@ -313,6 +332,10 @@ export function context(view: BotView, brain: Brain): BotCtx {
   if (!view.self.alive) {
     release(brain.fleeing);
     resetCornered(brain.cornered);
+    // Nor the standoff: the retreat that was not working is over, because the
+    // ship that was running it is gone. The next life earns its own patience
+    // (`./standoff`).
+    resetStandoff(brain.standoff);
     // And it is not still flying to a teammate's rescue: a respawned bot that
     // resumed a run which ended two lives ago would be answering an alarm nobody
     // is ringing (`./ally`, plan Task 2.7's trap). The *cooldown* survives, on

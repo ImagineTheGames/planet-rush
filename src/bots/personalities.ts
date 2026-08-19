@@ -112,6 +112,25 @@ export interface DifficultyTuning {
    */
   readonly blockadeDetectSeconds: number;
   /**
+   * Seconds this tier will keep running a retreat that is **not opening any
+   * ground** before it turns and fights instead (`./standoff`; developer report
+   * a0-105, ratified: *"ship lives are cheap. enemies should not fear death"*).
+   *
+   * The retreat's own exits — escaped, recovered — are both conditions the
+   * *opponent* controls, so without this number a player who parks on a wounded
+   * bot holds it in its retreat forever. This is the bound, and it is expressed
+   * as patience rather than as a timer: the clock only runs while the running is
+   * failing, so a bot that is genuinely getting away never spends it.
+   *
+   * Same ladder as {@link blockadeDetectSeconds} and for the same reason — a
+   * Hard bot reads "this is not working" almost at once, an Easy bot keeps
+   * running for a visible stretch first and then turns exactly as hard as
+   * anyone else. Personality `caution` scales it (`./behaviors`
+   * `standoffPatience`), clamped so no character can turn a tier's patience into
+   * a bot that never turns at all. TUNABLE
+   */
+  readonly standoffPatienceSeconds: number;
+  /**
    * How hard this tier *wants* the fight — the appetite the developer ratified
    * in the p15 note ("HARD bots seek the fight more … EASY stays timid").
    *
@@ -191,6 +210,11 @@ export const DIFFICULTY_TUNING: Readonly<Record<Difficulty, DifficultyTuning>> =
     // oscillations" the developer ratified as acceptable at this tier, and then
     // Rusty stops being scared.
     blockadeDetectSeconds: 1.6,
+    // Rusty keeps running for about three seconds of a retreat that is going
+    // nowhere before it wheels around — long enough that the timid read the GDD
+    // asks for survives ("retreats at half hull"), short enough that a player
+    // parked on it never gets to stand there and watch.
+    standoffPatienceSeconds: 3,
     /** "EASY stays timid" — the shipped floor, untouched. */
     aggression: 1,
     // An Easy team is a team that shouts across a noisy room: over a second to
@@ -209,6 +233,8 @@ export const DIFFICULTY_TUNING: Readonly<Record<Difficulty, DifficultyTuning>> =
     memorySeconds: 12,
     /** Half a beat of confusion, then it turns and fights. */
     blockadeDetectSeconds: 0.6,
+    /** Two seconds of a retreat that is not working, and then it stops running. */
+    standoffPatienceSeconds: 2,
     /** The note raises HARD only; Medium keeps the balance it was tuned to. */
     aggression: 1,
     /** Half a beat to be understood, and one call in seven goes unheard. */
@@ -233,6 +259,11 @@ export const DIFFICULTY_TUNING: Readonly<Record<Difficulty, DifficultyTuning>> =
     // Three decisions at 1/20 s. A Hard bot reads a blockade the way a good
     // human does — instantly — and commits ruthlessly (ratified point 3).
     blockadeDetectSeconds: 0.15,
+    // A Hard bot prices its own hull the way the design does — cheap, and free
+    // to replace (GDD §2.3, §2.7) — so it gives a failing retreat about a second
+    // before it turns the fight around. It is still the *last* tier to enter a
+    // retreat at all (`retreatHullFraction` 0.2), which is where its nerve lives.
+    standoffPatienceSeconds: 1.2,
     // The ratified raise is 1.6 (p15 point 3), and it is NOT set here: measured,
     // it costs the player fire in the cast they actually meet. Raising it drops
     // Hard's attack floor 0.34 → 0.21, and a Hard bot that prices targets that

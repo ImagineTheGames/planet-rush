@@ -65,6 +65,7 @@ import {
 } from './steering';
 import { commit, committed, release } from './commitment';
 import { corneredCommit, corneredCommitted, corneredHeld, resetCornered } from './cornered';
+import { resetStandoff, standoffCommitted, standoffFold } from './standoff';
 import {
   homeIntruder,
   intruderNear,
@@ -1602,6 +1603,59 @@ export const RETREAT_CLEAR_RANGE = WEAPON_RANGE * 2.6;
 export const RETREAT_RECOVER_MARGIN = 0.15;
 
 /**
+ * How much further from its threat a committed retreat must get than the best it
+ * has already managed before it counts as **working** (`./standoff`; a0-105).
+ *
+ * The two exits above are both conditions the opponent controls, so this is the
+ * one the *bot* controls: am I opening ground? A margin rather than a bare
+ * comparison, because a chase jitters by a hull's width every decision and that
+ * is not escape — the same argument the wedged counter's `STUCK_PROGRESS` anchor
+ * makes, at the scale of a chase rather than a scrape. 60 units is a quarter of
+ * a second of a Vanguard's top speed (260 u/s), so any genuine speed edge clears
+ * it several times over inside any tier's patience, while a ship being matched
+ * or run down never does. TUNABLE
+ */
+export const RETREAT_PROGRESS = 60;
+
+/**
+ * The minimum window a bot that has turned fights for, seconds, with its fear
+ * model switched off (`./standoff`).
+ *
+ * The twin of {@link CORNERED_COMMIT_SECONDS} and the same size for the same
+ * reason: a one-decision "turn" is another twitch, and this has to outlast the
+ * flap it replaces. It renews itself for as long as the retreat would still be
+ * failing, so it is a floor on how briefly a bot may change its mind and never a
+ * ceiling on the fight. TUNABLE
+ */
+export const STANDOFF_COMMIT_SECONDS = 4;
+
+/** Floor and ceiling on {@link standoffPatience}. The floor keeps a reckless
+ *  character from turning inside a single decision; **the ceiling is the
+ *  guarantee** — no tier and no personality may hold a failing retreat longer
+ *  than this, which is what makes "every tier turns" a property of the code
+ *  rather than of the three numbers in the tuning table. TUNABLE */
+export const STANDOFF_PATIENCE_MIN = 0.5;
+/** See {@link STANDOFF_PATIENCE_MIN}. TUNABLE */
+export const STANDOFF_PATIENCE_MAX = 5;
+
+/**
+ * How long this bot keeps running a retreat that is opening no ground before it
+ * turns and fights: the **tier's** patience scaled by the character's `caution`,
+ * clamped to [{@link STANDOFF_PATIENCE_MIN}, {@link STANDOFF_PATIENCE_MAX}].
+ *
+ * The personality spread the developer's cast is built on survives intact —
+ * timid Rusty (caution 1.3) runs for 3.9 s of a failing retreat, reckless Bolt
+ * (0.5) for 1.5 s, and the Hard seats turn inside a second and a half — and the
+ * clamp means every one of them turns. That is the ruling: respawn is free (GDD
+ * §2.3, §2.7), so no amount of timidity buys a bot the right to hold position
+ * forever.
+ */
+export function standoffPatience(ctx: BotCtx): number {
+  const patience = ctx.tuning.standoffPatienceSeconds * ctx.weights.caution;
+  return Math.min(STANDOFF_PATIENCE_MAX, Math.max(STANDOFF_PATIENCE_MIN, patience));
+}
+
+/**
  * How long a mining site stays tabu after an approach to it was broken off by a
  * retreat (p11 field report point 2). Long enough to outlast a threat that is
  * merely passing through the approach corridor, so the bot commits to another
@@ -1690,11 +1744,26 @@ export function coreUnderFinalAssault(ctx: BotCtx): boolean {
  * drive the wounded ship straight back into the fight it was leaving. Collapse
  * cancels the whole thing — there is no hold worth saving and a respawn is free
  * (GDD §2.3, §2.7) — and releases the latch so the endgame reads cleanly.
+ *
+ * **And it ends** (a0-105; developer, 2026-08-19: *"he just stayed in that same
+ * spot scared of me. ship lives are cheap. enemies should not fear death"*).
+ * Both exits above are conditions the *opponent* controls — park inside
+ * {@link RETREAT_CLEAR_RANGE} and `escaped` can never read true; keep the
+ * pressure on a game with no hull repair and `recovered` never can either — so
+ * on their own they let a player hold a wounded bot in its retreat forever by
+ * standing still. The third exit is the one the *bot* controls: this function
+ * folds every committed decision into the standoff latch (`./standoff`), and
+ * when the running has not opened any ground for the character's own
+ * {@link standoffPatience} the retreat is over and the bot turns and fights (the
+ * `turn-and-fight` leaf, directly below this one in all three trees).
  */
 export function wantsRetreat(ctx: BotCtx): boolean {
   const latch = ctx.brain.fleeing;
+  const stand = ctx.brain.standoff;
+  const now = ctx.view.time;
   if (ctx.view.collapsed || !ctx.self.alive) {
     release(latch);
+    resetStandoff(stand);
     return false;
   }
   // Cornered and committed: there is no retreat to want, because the road home
@@ -1705,12 +1774,23 @@ export function wantsRetreat(ctx: BotCtx): boolean {
   // exactly how the last stand pre-empts a retreat.
   if (corneredCommitted(ctx.brain.cornered, ctx.view.time)) {
     release(latch);
+    resetStandoff(stand);
+    return false;
+  }
+  // Already turned: this bot has decided the running was not working, and inside
+  // the committed window there is no retreat to want (`./standoff`). Exactly the
+  // shape of the cornered guard above — the flee latch is *released* rather than
+  // ignored, so when the window closes the bot re-reads its nerve from scratch
+  // instead of silently resuming the run it abandoned to fight.
+  if (standoffCommitted(stand, now)) {
+    release(latch);
     return false;
   }
   const wounded = ctx.self.hullFraction < retreatThreshold(ctx.tuning, ctx.weights);
   const enter = wounded && incomingThreat(ctx) !== null;
   const recovered = ctx.self.hullFraction >= retreatRecoverFraction(ctx);
-  const escaped = nearestThreat(ctx, RETREAT_CLEAR_RANGE) === null;
+  const threat = nearestThreat(ctx, RETREAT_CLEAR_RANGE);
+  const escaped = threat === null;
   const wasFleeing = latch.on;
   const fleeing = commit(latch, enter, recovered || escaped);
   // The retreat just *committed* off a mining approach: cool the site down so the
@@ -1718,9 +1798,42 @@ export function wantsRetreat(ctx: BotCtx): boolean {
   // with the threat still on the path (p11). `lastBehavior` holds the *previous*
   // decision's leaf here — the tree evaluates this test before the mine leaf runs
   // — so gating on it scopes the tabu to a break-off from mining, never from a
-  // duel or a haul that happened to leave `mineSite` set from earlier.
+  // duel or a haul that happened to leave `mineSite` set from earlier. Booked on
+  // the transition itself, ahead of every standoff return below, because it is a
+  // fact about the *commit* and not about how the run then goes.
   if (fleeing && !wasFleeing && ctx.brain.lastBehavior === 'mine') tabuMineSite(ctx);
-  return fleeing;
+  // Not running, or running from nothing: there is no manoeuvre to measure, so
+  // the next retreat starts its patience from a clean slate.
+  if (!fleeing || threat === null) {
+    resetStandoff(stand);
+    return fleeing;
+  }
+  // Running, but out of the thing's reach, or still with somewhere to run to:
+  // either way this retreat is *working* and keeps its patience.
+  //
+  //  - `THREAT_RANGE` rather than `RETREAT_CLEAR_RANGE` on purpose — the band
+  //    between the two is the flee latch's own hysteresis, and a chaser that has
+  //    fallen out of weapon reach is no longer pinning anybody. That is "cannot
+  //    break contact" read the way a player would read it.
+  //  - {@link retreatOutOfRoad} is the other half: a bot still flying to its own
+  //    turrets has somewhere to be, and this branch never interrupts that.
+  //
+  // Together they are what keep the turn rare and keep the retreat itself
+  // untouched: measured over five whole matches, `turn-and-fight` takes 0.6% of
+  // all decisions, beside `cornered-fight`'s 1.1%.
+  if (threat.distance > THREAT_RANGE || !retreatOutOfRoad(ctx, threat)) {
+    resetStandoff(stand);
+    return true;
+  }
+  // Out of road, still in contact. Is the running *working*? The gap to the thing
+  // being run from is the only honest answer, and it is the one a player reads
+  // too: a bot that is getting away keeps running, a bot that is not turns
+  // around (`./standoff`).
+  if (standoffFold(stand, now, threat.distance, RETREAT_PROGRESS, standoffPatience(ctx), STANDOFF_COMMIT_SECONDS)) {
+    release(latch);
+    return false;
+  }
+  return true;
 }
 
 /**
@@ -1800,6 +1913,94 @@ export function threatAtHome(ctx: BotCtx, threat: PerceivedShip | null): boolean
 }
 
 // ---------------------------------------------------------------------------
+// The end of a retreat (a0-105 — "enemies should not fear death")
+// ---------------------------------------------------------------------------
+
+/**
+ * **Has this retreat run out of road?** The precondition on the whole standoff,
+ * and the sentence the developer's report turns on: *"I retreated, it followed,
+ * and there is nowhere further to go."*
+ *
+ * A retreat is a flight *to somewhere* ({@link retreat}), and it is only stuck
+ * when there is no somewhere left. That is exactly the three cases that function
+ * has, read back:
+ *
+ *  - **arrived** — the bot is inside {@link ARRIVE_RADIUS} of its own station,
+ *    the destination the retreat was flying to. It ran, it got there, and the
+ *    thing came with it. There is no further home to reach.
+ *  - **no refuge** — the station is gone, or the threat is sitting on it
+ *    ({@link threatAtHome}), so `retreat` is not travelling anywhere at all: it
+ *    is pushing flat away from the threat with no destination behind it.
+ *
+ * Everything else is a retreat that is still *going* somewhere, and this file
+ * leaves it completely alone — which is the point. A wounded bot running for
+ * cover is good play, the developer has never complained about it, and it is
+ * still the overwhelming majority of every retreat in a match. Only the last few
+ * seconds of one, at the doorstep with nowhere left, are what this branch is
+ * allowed to end.
+ */
+export function retreatOutOfRoad(ctx: BotCtx, threat: PerceivedShip | null): boolean {
+  const station = ctx.self.station;
+  if (station === null || !station.alive || threatAtHome(ctx, threat)) return true;
+  return dist(ctx.self.pos, station.pos) <= ARRIVE_RADIUS;
+}
+
+/**
+ * The fight a bot commits to when it has decided **not** to run: full engagement
+ * on the ship in front of it, at knife range, with its own tier's spread and
+ * lead-lag and nothing else.
+ *
+ * One function for both ways a bot arrives here — cornered on the road home
+ * ({@link fightBlockade}) and out of patience with a retreat that is not working
+ * ({@link turnAndFight}) — because they are the same fight and must not drift
+ * apart. Deliberately the same `engage` every other attack uses: a bot that
+ * turned is not given a special weapon or a special aim, only a decision it
+ * holds to.
+ */
+export function fightBack(ctx: BotCtx, threat: PerceivedShip): readonly Action[] {
+  return engage(ctx, threat.pos, SHIP_RADIUS, WEAPON_RANGE * 0.6, threat.vel, threat.id);
+}
+
+/**
+ * Has this bot run out of patience with a retreat that is going nowhere? The
+ * tree's test — `./easy`, `./medium` and `./hard` all place it directly *below*
+ * the retreat, because {@link wantsRetreat} is where the standoff is folded and
+ * it must be evaluated every decision for the patience clock to run at all.
+ */
+export function wantsTurnAndFight(ctx: BotCtx): boolean {
+  return standoffCommitted(ctx.brain.standoff, ctx.view.time);
+}
+
+/**
+ * Turn, and fight the thing that would not let go.
+ *
+ * **What a player sees.** They chase a wounded bot home and park on it, the way
+ * the developer did. The bot keeps running for a beat — a timid character for
+ * about four seconds, a Hard one for barely one — and then it stops, swings its
+ * nose around and comes at them, in among its own turrets, which is the best
+ * fight it is going to get and the whole reason a bot retreats *into* its
+ * defences (GDD §2.6). It does not look like a timer expiring because it is not
+ * one: back off far enough that the bot starts opening ground and the same bot
+ * keeps running instead (`./standoff` {@link RETREAT_PROGRESS}). The turn is the
+ * bot's answer to *running is not working*, and a player can feel the difference
+ * from the outside.
+ *
+ * Passes the tick on when the thing it turned on has gone — died, been
+ * eliminated, or finally broken contact past {@link RETREAT_CLEAR_RANGE} — and
+ * drops the commitment with it: the standoff is over because the standoff's
+ * subject left, and the bot goes back to the bottom of its own priority list
+ * rather than swinging at empty space.
+ */
+export function turnAndFight(ctx: BotCtx): readonly Action[] | null {
+  const threat = nearestThreat(ctx, RETREAT_CLEAR_RANGE);
+  if (threat === null) {
+    resetStandoff(ctx.brain.standoff);
+    return null;
+  }
+  return fightBack(ctx, threat);
+}
+
+// ---------------------------------------------------------------------------
 // Cornered — the blockade, and the commitment to fight it (developer report
 // p15, ratified: "a blockaded bot FIGHTS — no dithering")
 // ---------------------------------------------------------------------------
@@ -1873,6 +2074,7 @@ export function corneredBlockader(ctx: BotCtx): PerceivedShip | null {
     const held = blockaderInView(ctx, heldId);
     if (held !== null) {
       release(ctx.brain.fleeing);
+      resetStandoff(ctx.brain.standoff);
       return held;
     }
     resetCornered(latch); // it died, or it broke off: the path is open again
@@ -1911,8 +2113,11 @@ export function corneredBlockader(ctx: BotCtx): PerceivedShip | null {
   // the bot re-reads its nerve from scratch instead of silently resuming the run
   // it abandoned to fight. `wantsRetreat`'s own guard is then a safety net for
   // any future tree that orders these two differently, rather than the only
-  // thing holding the invariant up.
+  // thing holding the invariant up. The standoff goes with it: a bot fighting
+  // its way home is already not running, so there is no failing retreat left to
+  // measure (`./standoff`).
   release(ctx.brain.fleeing);
+  resetStandoff(ctx.brain.standoff);
   return threat;
 }
 
@@ -1934,7 +2139,7 @@ export function wantsCorneredFight(ctx: BotCtx): boolean {
  * model assumes" (the developer's own hull was 22/60 in the frame).
  */
 export function fightBlockade(ctx: BotCtx, threat: PerceivedShip): readonly Action[] {
-  return engage(ctx, threat.pos, SHIP_RADIUS, WEAPON_RANGE * 0.6, threat.vel, threat.id);
+  return fightBack(ctx, threat);
 }
 
 /**
@@ -1950,6 +2155,9 @@ export function fightBlockade(ctx: BotCtx, threat: PerceivedShip): readonly Acti
  */
 export function lastStandDefend(ctx: BotCtx): readonly Action[] | null {
   release(ctx.brain.fleeing);
+  // And the standoff, for the same reason: a core about to die outranks a
+  // grudge against whoever chased this bot home (`./standoff`).
+  resetStandoff(ctx.brain.standoff);
   // The cornered commitment is a commitment like any other, and a core about to
   // die outranks it too: drop it, so a bot that was fighting its way home stops
   // fighting *out there* and comes back to the thing that is not cheap (GDD
