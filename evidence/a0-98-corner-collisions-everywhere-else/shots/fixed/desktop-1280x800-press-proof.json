@@ -1,6 +1,7 @@
 {
   "stage": "fixed",
   "profile": "desktop-1280x800",
+  "pauseScreen": "menu",
   "pressedAt": {
     "x": 1194,
     "y": 674
@@ -26,6 +27,7 @@
   "drawnBefore": [
     "ship-local",
     "build-badge",
+    "pause-menu",
     "ore-hud",
     "banked-total",
     "controls-strip",
@@ -36,6 +38,7 @@
   "drawnAfter": [
     "ship-local",
     "build-badge",
+    "pause-menu",
     "ore-hud",
     "banked-total",
     "controls-strip",

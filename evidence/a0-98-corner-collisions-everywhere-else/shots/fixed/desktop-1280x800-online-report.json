@@ -36,7 +36,7 @@
         {
           "control": "__cornerStage.elements[1]<build-badge>",
           "page": {
-            "x": 101,
+            "x": 99,
             "y": 760
           },
           "topmost": "CANVAS#app",
@@ -46,7 +46,7 @@
           "box": {
             "x": 8,
             "y": 753,
-            "width": 186.78515625,
+            "width": 181.28515625,
             "height": 13
           },
           "coveredFraction": null
@@ -215,7 +215,7 @@
         {
           "control": "__cornerStage.elements[1]<build-badge>",
           "page": {
-            "x": 101,
+            "x": 99,
             "y": 760
           },
           "topmost": "DIV#pr-link-loss",
@@ -225,7 +225,7 @@
           "box": {
             "x": 8,
             "y": 753,
-            "width": 186.78515625,
+            "width": 181.28515625,
             "height": 13
           },
           "coveredFraction": 0
@@ -433,7 +433,7 @@
         {
           "control": "__cornerStage.elements[1]<build-badge>",
           "page": {
-            "x": 101,
+            "x": 99,
             "y": 760
           },
           "topmost": "DIV#pr-link-loss",
@@ -443,7 +443,7 @@
           "box": {
             "x": 8,
             "y": 753,
-            "width": 186.78515625,
+            "width": 181.28515625,
             "height": 13
           },
           "coveredFraction": 0
@@ -557,37 +557,19 @@
           "coveredFraction": 0.28
         },
         {
-          "control": "dom#pr-link-loss-reconnect",
+          "control": "dom#pr-link-loss-menu",
           "page": {
-            "x": 535,
-            "y": 446
+            "x": 640,
+            "y": 449
           },
-          "topmost": "BUTTON#pr-link-loss-reconnect",
+          "topmost": "BUTTON#pr-link-loss-menu",
           "live": true,
           "onScreen": true,
           "collides": false,
           "box": {
-            "x": 435.8125,
-            "y": 423.796875,
-            "width": 198.390625,
-            "height": 44
-          },
-          "coveredFraction": 0
-        },
-        {
-          "control": "dom#pr-link-loss-abandon",
-          "page": {
-            "x": 744,
-            "y": 446
-          },
-          "topmost": "BUTTON#pr-link-loss-abandon",
-          "live": true,
-          "onScreen": true,
-          "collides": false,
-          "box": {
-            "x": 643.796875,
-            "y": 423.796875,
-            "width": 200.390625,
+            "x": 551,
+            "y": 427.140625,
+            "width": 178,
             "height": 44
           },
           "coveredFraction": 0
@@ -690,7 +672,7 @@
         {
           "control": "__cornerStage.elements[1]<build-badge>",
           "page": {
-            "x": 30,
+            "x": 27,
             "y": 760
           },
           "topmost": "DIV#pr-link-loss",
@@ -700,7 +682,7 @@
           "box": {
             "x": 8,
             "y": 753,
-            "width": 43.5,
+            "width": 38,
             "height": 13
           },
           "coveredFraction": 0
@@ -987,10 +969,64 @@
           "coveredFraction": null
         },
         {
-          "control": "__cornerStage.elements[6]<nameplates>",
+          "control": "__cornerStage.elements[6]<alarm-frame>",
           "page": {
-            "x": 544,
-            "y": 320
+            "x": 640,
+            "y": 400
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 0,
+            "y": 0,
+            "width": 1280,
+            "height": 800
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__cornerStage.elements[7]<onboarding>",
+          "page": {
+            "x": 640,
+            "y": 730
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 347.12,
+            "y": 709,
+            "width": 585.76,
+            "height": 41
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__cornerStage.elements[8]<healthbars>",
+          "page": {
+            "x": 887,
+            "y": 393
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 619.5,
+            "y": 370,
+            "width": 535.779108335822,
+            "height": 46.22468154850776
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__cornerStage.elements[9]<nameplates>",
+          "page": {
+            "x": 828,
+            "y": 359
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -999,13 +1035,13 @@
           "box": {
             "x": 531.3,
             "y": 312,
-            "width": 25.40000000000009,
-            "height": 16
+            "width": 593.3791083358219,
+            "height": 93.22468154850776
           },
           "coveredFraction": null
         },
         {
-          "control": "__cornerStage.elements[7]<minimap>",
+          "control": "__cornerStage.elements[10]<minimap>",
           "page": {
             "x": 1194,
             "y": 674

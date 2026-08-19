@@ -54,7 +54,7 @@
         {
           "control": "__cornerStage.elements[2]<build-badge>",
           "page": {
-            "x": 101,
+            "x": 99,
             "y": 370
           },
           "topmost": "CANVAS#app",
@@ -64,7 +64,7 @@
           "box": {
             "x": 8,
             "y": 363,
-            "width": 186.78515625,
+            "width": 181.28515625,
             "height": 13
           },
           "coveredFraction": null
@@ -260,7 +260,7 @@
         {
           "control": "__cornerStage.elements[2]<build-badge>",
           "page": {
-            "x": 30,
+            "x": 27,
             "y": 370
           },
           "topmost": "CANVAS#app",
@@ -270,7 +270,7 @@
           "box": {
             "x": 8,
             "y": 363,
-            "width": 43.5,
+            "width": 38,
             "height": 13
           },
           "coveredFraction": null
@@ -487,7 +487,7 @@
         {
           "control": "__cornerStage.elements[2]<build-badge>",
           "page": {
-            "x": 30,
+            "x": 27,
             "y": 370
           },
           "topmost": "CANVAS#app",
@@ -497,7 +497,7 @@
           "box": {
             "x": 8,
             "y": 363,
-            "width": 43.5,
+            "width": 38,
             "height": 13
           },
           "coveredFraction": null
@@ -762,7 +762,7 @@
         {
           "control": "__cornerStage.elements[2]<build-badge>",
           "page": {
-            "x": 30,
+            "x": 27,
             "y": 370
           },
           "topmost": "CANVAS#app",
@@ -772,7 +772,7 @@
           "box": {
             "x": 8,
             "y": 363,
-            "width": 43.5,
+            "width": 38,
             "height": 13
           },
           "coveredFraction": 0
@@ -990,7 +990,7 @@
         {
           "control": "__cornerStage.elements[1]<build-badge>",
           "page": {
-            "x": 101,
+            "x": 99,
             "y": 760
           },
           "topmost": "CANVAS#app",
@@ -1000,7 +1000,7 @@
           "box": {
             "x": 8,
             "y": 753,
-            "width": 186.78515625,
+            "width": 181.28515625,
             "height": 13
           },
           "coveredFraction": null
@@ -1078,10 +1078,28 @@
           "coveredFraction": null
         },
         {
-          "control": "__cornerStage.elements[6]<nameplates>",
+          "control": "__cornerStage.elements[6]<healthbars>",
           "page": {
-            "x": 544,
-            "y": 320
+            "x": 919,
+            "y": 555
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 619.5,
+            "y": 370,
+            "width": 599.760112494927,
+            "height": 370.32982288707376
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__cornerStage.elements[7]<nameplates>",
+          "page": {
+            "x": 860,
+            "y": 521
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -1090,13 +1108,13 @@
           "box": {
             "x": 531.3,
             "y": 312,
-            "width": 25.40000000000009,
-            "height": 16
+            "width": 657.3601124949269,
+            "height": 417.32982288707376
           },
           "coveredFraction": null
         },
         {
-          "control": "__cornerStage.elements[7]<minimap>",
+          "control": "__cornerStage.elements[8]<minimap>",
           "page": {
             "x": 1194,
             "y": 674

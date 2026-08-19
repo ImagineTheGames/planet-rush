@@ -55,7 +55,7 @@
           "control": "__cornerStage.elements[2]<build-badge>",
           "page": {
             "x": 15,
-            "y": 101
+            "y": 99
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -65,7 +65,7 @@
             "x": 8,
             "y": 8,
             "width": 13,
-            "height": 186.78515625
+            "height": 181.28515625
           },
           "coveredFraction": null
         },
@@ -261,7 +261,7 @@
           "control": "__cornerStage.elements[2]<build-badge>",
           "page": {
             "x": 15,
-            "y": 30
+            "y": 27
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -271,7 +271,7 @@
             "x": 8,
             "y": 8,
             "width": 13,
-            "height": 43.5
+            "height": 38
           },
           "coveredFraction": null
         },
@@ -488,7 +488,7 @@
           "control": "__cornerStage.elements[2]<build-badge>",
           "page": {
             "x": 15,
-            "y": 30
+            "y": 27
           },
           "topmost": "CANVAS#app",
           "live": true,
@@ -498,7 +498,7 @@
             "x": 8,
             "y": 8,
             "width": 13,
-            "height": 43.5
+            "height": 38
           },
           "coveredFraction": null
         },
@@ -763,7 +763,7 @@
           "control": "__cornerStage.elements[2]<build-badge>",
           "page": {
             "x": 15,
-            "y": 30
+            "y": 27
           },
           "topmost": "CANVAS#app",
           "live": false,
@@ -773,7 +773,7 @@
             "x": 8,
             "y": 8,
             "width": 13,
-            "height": 43.5
+            "height": 38
           },
           "coveredFraction": 0
         },
@@ -990,7 +990,7 @@
         {
           "control": "__cornerStage.elements[1]<build-badge>",
           "page": {
-            "x": 101,
+            "x": 99,
             "y": 760
           },
           "topmost": "CANVAS#app",
@@ -1000,7 +1000,7 @@
           "box": {
             "x": 8,
             "y": 753,
-            "width": 186.78515625,
+            "width": 181.28515625,
             "height": 13
           },
           "coveredFraction": null

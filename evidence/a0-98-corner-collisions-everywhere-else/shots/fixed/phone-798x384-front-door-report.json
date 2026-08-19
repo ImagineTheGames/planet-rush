@@ -131,7 +131,16 @@
         "touch": true
       },
       "log": {
-        "mounted": false
+        "mounted": true,
+        "hidden": false,
+        "rect": {
+          "x": 580.40625,
+          "y": 290.234375,
+          "width": 205.59375,
+          "height": 81.765625
+        },
+        "label": "DOWNLOAD LOG",
+        "hint": "DOWNLOAD LOG to report this."
       },
       "controls": [
         {
@@ -150,7 +159,7 @@
             "width": 144,
             "height": 48
           },
-          "coveredFraction": null
+          "coveredFraction": 0
         },
         {
           "control": "__onlineMenu.doorControls[1]<mode:code>",
@@ -168,7 +177,7 @@
             "width": 144,
             "height": 48
           },
-          "coveredFraction": null
+          "coveredFraction": 0
         },
         {
           "control": "__onlineMenu.doorControls[2]<back>",
@@ -186,7 +195,7 @@
             "width": 120,
             "height": 48
           },
-          "coveredFraction": null
+          "coveredFraction": 0
         }
       ],
       "collisions": [],
@@ -196,15 +205,12 @@
           "visible": true,
           "screen": "join",
           "status": "error",
-          "error": "REFUSED: room-gone",
-          "title": "REFUSED: room-gone",
+          "error": "That claim has closed. Pick another, or press SOLO.",
+          "title": "PICK A CLAIM",
           "joinMode": "browse",
           "rows": 0
         },
-        "connectPanel": {
-          "hidden": false,
-          "text": "#pr-connect-trace{position:fixed;z-index:2147483646;pointer-events:none;left:50%;transform:translateX(-50%);top:calc(92p"
-        }
+        "connectPanel": null
       }
     }
   ]
