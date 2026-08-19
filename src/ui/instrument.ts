@@ -627,15 +627,15 @@ export const INSTRUMENT_RADIUS = 0;
  * an *empty* bar is drawn in — because the pair is one idea: a bar is a track plus
  * a fill, the fill starts at the track's left edge, and what is left over is the
  * absence you can see. Every bar that reads a hull or a hull-like pool
- * ({@link ../ui/hud-geometry} `stationCoreBarTrack` / `stationShieldBarTrack`,
- * {@link ../ui/healthbar} `healthBarTrack`) computes its fill through this one
+ * ({@link ./hud-geometry} `stationCoreBarTrack` / `stationShieldBarTrack`,
+ * {@link ./healthbar} `healthBarTrack`) computes its fill through this one
  * function, so a new bar cannot quietly pick the other side — and
  * `hud-geometry.test.ts` (`every hull bar empties in the same direction`) walks
  * the whole enumeration.
  *
  * `fraction` is clamped to `[0, 1]`; a non-finite fraction draws nothing. The
  * caller still owns the "a living thing never renders empty" floor
- * ({@link ../ui/healthbar} `HEALTHBAR_MIN_FILL`) — that is a truth rule about the
+ * ({@link ./healthbar} `HEALTHBAR_MIN_FILL`) — that is a truth rule about the
  * pool, not a direction rule about the bar.
  */
 export function hullBarFill(track: Rect, fraction: number): Rect {
