@@ -161,6 +161,38 @@
  * | 7 | `52475e8b` | `ab03dcd3` |
  * | 991 | `6bc0291a` | `a37c4e2c` |
  *
+ * ### Re-baselined a sixth time, 2026-08-19 (a0-105) — the bots' own lane again
+ *
+ * The same category as a0-81 and answered the same way. The developer's report
+ * is *"I was able to make rusty just stay stuck there by putting myself in
+ * between the ore and his base. he just stayed in that same spot scared of me.
+ * ship lives are cheap. enemies should not fear death..."*, and the rule it
+ * ratifies is that a retreat is a manoeuvre and must **terminate**: a bot that
+ * has run out of road and can neither heal nor break contact turns and fights
+ * (brief a0-105; `./standoff.ts`; measurements in
+ * `evidence/a0-105-standoff/standoff.txt`).
+ *
+ * **Why it is not the thing Rule 3 forbids.** Nothing in a0-105 is team-aware.
+ * The standoff reads one distance, to `nearestThreat` — which asks
+ * `isTargetable`, the single `hostile` stamp off `sim/allegiance.ts`, true for
+ * every ship on an FFA board — plus this bot's own station and its own hull. It
+ * takes no branch on sides, radios or ally lists, so it moves FFA and TEAMS by
+ * the identical mechanism, which is the a0-05 category and the opposite of a
+ * leak. The two non-hash cases below are untouched and are still the thing that
+ * would catch a leak if one ever happened.
+ *
+ * It moves the hash from the first standoff, and unavoidably: a wounded bot at
+ * its own doorstep now fights on ticks it previously spent holding station, so
+ * hulls, kills, chunks and every downstream decision differ. Measured over five
+ * whole matches, `turn-and-fight` takes 0.6% of all decisions (beside
+ * `cornered-fight`'s 1.1%), and the retreat itself is still 17.6% of them.
+ *
+ * | Seed | Post-a0-81 | Post-a0-105 |
+ * |---|---|---|
+ * | 20260806 | `de94b69e` | `42e213df` |
+ * | 7 | `ab03dcd3` | `51f2e171` |
+ * | 991 | `a37c4e2c` | `a096a954` |
+ *
  * The last case is the one that stops this file from being vacuous: it asserts
  * the harness can build a team world *at all*, and that the same lineup on two
  * sides hashes differently. Without it, a `botLobby` that quietly dropped the
@@ -195,16 +227,18 @@ const SECONDS = 180;
  * destroyed ship began dropping its whole hold (a0-59), and a fourth time on the
  * same branch when a0-65 reshaped the commons waves so they stop entombing ships
  * at the map centre, and a fifth time on `agent/bots/a0-81-fire-while-fleeing`
- * when a bot breaking off stopped holding its fire — the module note carries all
- * five moves and their reasons.
+ * when a bot breaking off stopped holding its fire, and a sixth time on
+ * `agent/bots/a0-105-no-fear-of-death` when a retreat that had run out of road
+ * stopped lasting forever — the module note carries all six moves and their
+ * reasons.
  *
  * **Do not re-baseline these.** The only thing that has ever earned it is a
  * ratified amendment in `docs/design-amendments.md`.
  */
 const GOLDEN: readonly (readonly [seed: number, hash: string])[] = [
-  [20260806, 'de94b69e'],
-  [7, 'ab03dcd3'],
-  [991, 'a37c4e2c'],
+  [20260806, '42e213df'],
+  [7, '51f2e171'],
+  [991, 'a096a954'],
 ];
 
 /** One eight-bot match, the shipped cast, the offline lobby's own roster path. */

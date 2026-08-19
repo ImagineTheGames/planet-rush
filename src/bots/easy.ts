@@ -45,6 +45,7 @@ import {
   roam,
   scavenge,
   spendAtHome,
+  turnAndFight,
   upgrade,
   wantsCorePatch,
   wantsCorneredFight,
@@ -53,6 +54,7 @@ import {
   wantsAllyDefence,
   wantsJoinAssault,
   wantsToHaul,
+  wantsTurnAndFight,
 } from './behaviors';
 import { WEAPON_RANGE, NEUTRAL } from './steering';
 import { bestRock, homeIntruder, isWounded, nearestEnemy } from './targeting';
@@ -154,6 +156,16 @@ export const easyTree: Node = selector('easy', [
     (ctx) => wantsRetreat(ctx),
     (ctx) => retreat(ctx, nearestThreat(ctx, RETREAT_CLEAR_RANGE)),
   ),
+
+  // **The retreat that ends** (a0-105; the developer, 2026-08-19: *"he just
+  // stayed in that same spot scared of me. ship lives are cheap. enemies should
+  // not fear death"*). Directly BELOW the retreat, which is deliberate: the
+  // retreat's own test is where the standoff is folded (`./standoff`), so it
+  // must be evaluated every decision for the patience clock to run. When the
+  // running has opened no ground for this character's own patience, `wantsRetreat`
+  // stands down and this leaf takes the tick — the bot turns on its chaser with
+  // its own turrets behind it (GDD §2.6).
+  when('turn-and-fight', (ctx) => wantsTurnAndFight(ctx), (ctx) => turnAndFight(ctx)),
 
   // "over-defends": the alarm outranks the economy, always.
   when(

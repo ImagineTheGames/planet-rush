@@ -55,6 +55,7 @@ import {
   satelliteTarget,
   scavenge,
   spendAtHome,
+  turnAndFight,
   suppressTurrets,
   upgrade,
   wantsCorePatch,
@@ -64,6 +65,7 @@ import {
   wantsAllyDefence,
   wantsJoinAssault,
   wantsToHaul,
+  wantsTurnAndFight,
 } from './behaviors';
 import { NEUTRAL } from './steering';
 import { bestRock, bestTarget, homeIntruder, nearestLivingRival } from './targeting';
@@ -222,6 +224,16 @@ export const hardTree: Node = selector('hard', [
     (ctx) => wantsRetreat(ctx),
     (ctx) => retreat(ctx, nearestThreat(ctx, RETREAT_CLEAR_RANGE)),
   ),
+
+  // **The retreat that ends** (a0-105; the developer, 2026-08-19: *"he just
+  // stayed in that same spot scared of me. ship lives are cheap. enemies should
+  // not fear death"*). Directly BELOW the retreat, which is deliberate: the
+  // retreat's own test is where the standoff is folded (`./standoff`), so it
+  // must be evaluated every decision for the patience clock to run. When the
+  // running has opened no ground for this character's own patience, `wantsRetreat`
+  // stands down and this leaf takes the tick — the bot turns on its chaser with
+  // its own turrets behind it (GDD §2.6).
+  when('turn-and-fight', (ctx) => wantsTurnAndFight(ctx), (ctx) => turnAndFight(ctx)),
 
   // Home comes first, but only when home is actually being hit — a Hard bot does
   // not sit on its doorstep waiting for something that is not coming.

@@ -57,11 +57,20 @@ import { perceive } from './perception';
 import { PERSONALITIES } from './personalities';
 import { context, createBrain } from './tree';
 
-/** Seeds the sweep runs. Five whole matches of eight bots — the same loop
- *  `runHeadlessMatch` runs, opened up only so the test can see the input stream
- *  as well as the world (it needs both to tell a dropped order from a landed
- *  one). Nothing about the match is staged. */
-const SEEDS = [1, 2, 3, 4, 5];
+/**
+ * Seeds the sweep runs. Whole matches of eight bots — the same loop
+ * `runHeadlessMatch` runs, opened up only so the test can see the input stream
+ * as well as the world (it needs both to tell a dropped order from a landed
+ * one). Nothing about the match is staged.
+ *
+ * **Twelve rather than five, widened by a0-105.** Core patches are a
+ * low-frequency event in a match nobody staged — the per-seed counts on the
+ * build this note is written from run 5, 10, 4, 3, 3, 5, 10, 11, 2, 2, 8, 17 —
+ * so a five-seed total is a number with a ±50% mood. The floors below are stated
+ * over twelve for that reason, and the count is the thing to raise if this ever
+ * reads as noisy again; it is not a number to lower.
+ */
+const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 /** The enforced ceiling, in sim seconds — a hung match is a failed test, not a
  *  hung harness (GDD §3.8). */
@@ -142,14 +151,35 @@ const RESULT = sweep();
 
 describe('a damaged bot core recovers HP in a natural match (p15-02)', () => {
   it('patches cores, at a rate the pre-fix trees never reached', () => {
-    // Measured on this exact sweep, before → after the fix: 21 → 51 accepted
-    // repairs and 315 → 765 core HP bought back. The floors sit between the two,
-    // with headroom on both sides: they fail loudly if the home errand or the
-    // cooldown-honest gate regresses, and they do not chase a tuning pass.
-    expect(RESULT.landed).toBeGreaterThanOrEqual(35);
-    expect(RESULT.hpBought).toBeGreaterThanOrEqual(500);
+    // Measured on the original five-seed sweep, before → after the p15-02 fix:
+    // 21 → 51 accepted repairs and 315 → 765 core HP bought back. The floors sit
+    // between the two, with headroom on both sides: they fail loudly if the home
+    // errand or the cooldown-honest gate regresses, and they do not chase a
+    // tuning pass.
+    //
+    // **Restated over twelve seeds by a0-105, and the drop is real.** Ending a
+    // retreat that has run out of road (`./standoff`) is a trade the developer
+    // ordered — *"ship lives are cheap. enemies should not fear death"* — and it
+    // is paid in hulls: over these twelve matches bots die 25% more often (1754
+    // → 2184), and a dead ship drops its whole hold (GDD §2.7), so there is less
+    // ore at home to spend on a core. The same sweep reads:
+    //
+    // | | pre-p15-02 (scaled) | pre-a0-105 | a0-105 |
+    // |---|---|---|---|
+    // | accepted repairs | ~50 | 122 | 80 |
+    // | core HP bought | ~750 | 1830 | 1200 |
+    // | stations that ever patched (of 96) | — | 45 | 39 |
+    //
+    // The floors are set between the *pre-p15-02* column and this build, which
+    // is what keeps this a lock on p15-02's mechanism rather than a thermometer
+    // for whatever the bots did last: a build that lost the home errand would
+    // read ~50 and fail, and this one reads 80 and passes. What it may not do is
+    // absorb another silent third — if a later change puts this red, the answer
+    // is to look at what it cost, not to lower the number again.
+    expect(RESULT.landed).toBeGreaterThanOrEqual(60);
+    expect(RESULT.hpBought).toBeGreaterThanOrEqual(900);
     // And it is not one lucky turtle doing all of it.
-    expect(RESULT.recovered).toBeGreaterThanOrEqual(8);
+    expect(RESULT.recovered).toBeGreaterThanOrEqual(24);
   });
 
   it('never files a repair the sim will refuse', () => {
