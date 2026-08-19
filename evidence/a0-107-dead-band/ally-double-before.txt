@@ -1,0 +1,13 @@
+a0-107 — two teammates flying at one alarm, 4v4 octagon, 240s per match
+
+| seed | alarm-ticks | two flying | share | defender disagreements |
+|---|---|---|---|---|
+| 11 | 4022 | 0 | 0.00% | 0 |
+| 12 | 1966 | 0 | 0.00% | 0 |
+| 13 | 1998 | 0 | 0.00% | 0 |
+| 14 | 1893 | 0 | 0.00% | 0 |
+| 15 | 2529 | 0 | 0.00% | 0 |
+| 16 | 3828 | 0 | 0.00% | 0 |
+| **all** | 16236 | 0 | **0.00%** | 0 |
+
+worst seed: 11 at 0.00%

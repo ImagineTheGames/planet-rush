@@ -1,0 +1,74 @@
+a0-107 — the `fleeing` latch, longest unbroken hold, ticks (0.016666666666666666s per tick)
+ceilings: 40s, 120s, 300s   † = still open at the ceiling
+
+## park@580 — sits 580u off the subject's station, on the lane to the field, and does nothing — between THREAT_RANGE and RETREAT_CLEAR_RANGE
+
+| character | tier | 40s (2400) | 120s (7200) | 300s (18000) | turned to |
+|---|---|---|---|---|---|
+| rusty | easy | 630 | 630 | 630 | turn-and-fight |
+| bolt | easy | 340 | 440 | 440 | turn-and-fight |
+| foreman | medium | 200 | 325 | 395 | turn-and-fight |
+| patch | medium | 415 | 415 | 415 | turn-and-fight |
+| sable | hard | 240 | 267 | 294 | turn-and-fight |
+| vulture | hard | 141 | 267 | 297 | turn-and-fight |
+| warden | hard | 183 | 267 | 267 | turn-and-fight |
+
+## block-ore — interposes between the subject and its nearest rock, silently
+
+| character | tier | 40s (2400) | 120s (7200) | 300s (18000) | turned to |
+|---|---|---|---|---|---|
+| rusty | easy | 380 | 650 | 680 | turn-and-fight |
+| bolt | easy | 240 | 450 | 460 | turn-and-fight |
+| foreman | medium | 435 | 445 | 510 | turn-and-fight |
+| patch | medium | 445 | 510 | 510 | turn-and-fight |
+| sable | hard | 399 | 402 | 414 | turn-and-fight |
+| vulture | hard | 351 | 384 | 384 | turn-and-fight |
+| warden | hard | 198 | 198 | 396 | turn-and-fight |
+
+## block-home — stands on the line between the subject and its own station
+
+| character | tier | 40s (2400) | 120s (7200) | 300s (18000) | turned to |
+|---|---|---|---|---|---|
+| rusty | easy | 370 | 370 | 370 | turn-and-fight |
+| bolt | easy | 230 | 230 | 230 | turn-and-fight |
+| foreman | medium | 275 | 275 | 275 | turn-and-fight |
+| patch | medium | 285 | 285 | 285 | turn-and-fight |
+| sable | hard | 108 | 108 | 108 | cornered-fight |
+| vulture | hard | 147 | 147 | 147 | cornered-fight |
+| warden | hard | 147 | 147 | 147 | cornered-fight |
+
+## never-die — follows at 200u, invulnerable, subject pinned at its staged hull — no exit an opponent controls can fire
+
+| character | tier | 40s (2400) | 120s (7200) | 300s (18000) | turned to |
+|---|---|---|---|---|---|
+| rusty | easy | 360 | 360 | 360 | turn-and-fight |
+| bolt | easy | 220 | 220 | 220 | turn-and-fight |
+| foreman | medium | 245 | 245 | 255 | turn-and-fight |
+| patch | medium | 255 | 265 | 265 | turn-and-fight |
+| sable | hard | 69 | 69 | 69 | turn-and-fight |
+| vulture | hard | 78 | 78 | 78 | turn-and-fight |
+| warden | hard | 78 | 78 | 78 | turn-and-fight |
+
+## park-squad — PARK in the dead band, on a 2v2 board
+
+| character | tier | 40s (2400) | 120s (7200) | 300s (18000) | turned to |
+|---|---|---|---|---|---|
+| rusty | easy | 630 | 630 | 630 | turn-and-fight |
+| bolt | easy | 340 | 420 | 420 | turn-and-fight |
+| foreman | medium | 200 | 410 | 495 | turn-and-fight |
+| patch | medium | 425 | 425 | 425 | turn-and-fight |
+| sable | hard | 231 | 234 | 249 | turn-and-fight |
+| vulture | hard | 141 | 270 | 270 | turn-and-fight |
+| warden | hard | 255 | 309 | 309 | turn-and-fight |
+
+## never-die-squad — NEVER DIE NEVER KILL, on a 2v2 board
+
+| character | tier | 40s (2400) | 120s (7200) | 300s (18000) | turned to |
+|---|---|---|---|---|---|
+| rusty | easy | 360 | 360 | 360 | turn-and-fight |
+| bolt | easy | 220 | 220 | 220 | turn-and-fight |
+| foreman | medium | 245 | 245 | 255 | turn-and-fight |
+| patch | medium | 255 | 265 | 265 | turn-and-fight |
+| sable | hard | 69 | 69 | 69 | turn-and-fight |
+| vulture | hard | 78 | 78 | 78 | turn-and-fight |
+| warden | hard | 78 | 78 | 78 | turn-and-fight |

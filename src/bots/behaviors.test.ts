@@ -52,6 +52,7 @@ import {
 import {
   GUARD_RADIUS,
   RETREAT_CLEAR_RANGE,
+  THREAT_RANGE,
   coveringFire,
   haulHome,
   retreat,
@@ -60,6 +61,8 @@ import {
   standoffPatience,
 } from './behaviors';
 import { createBot, type Bot } from './bot';
+import { committed } from './commitment';
+import { ARRIVE_RADIUS } from './steering';
 import { botInputs } from './harness';
 import { perceive } from './perception';
 import { Difficulty, PERSONALITIES, tuningFor, type PersonalityId } from './personalities';
@@ -430,7 +433,7 @@ interface Standoff {
  * Stage the photograph: the bot is already home — it ran, it arrived, and it is
  * out of road — with a hostile parked between it and the ore.
  */
-function standoff(opts: { personality: PersonalityId; hull: number }): Standoff {
+function standoff(opts: { personality: PersonalityId; hull: number; park?: number }): Standoff {
   const world = createWorld({
     seed: 20260819,
     players: [0, 1].map((id) => ({ id, shipClass: ShipClass.Vanguard })),
@@ -456,7 +459,8 @@ function standoff(opts: { personality: PersonalityId; hull: number }): Standoff 
   me.pos = { x: home.pos.x, y: home.pos.y };
   me.vel = { x: 0, y: 0 };
   me.hull = me.maxHull * opts.hull;
-  player.pos = { x: home.pos.x + out.x * PARK, y: home.pos.y + out.y * PARK };
+  const park = opts.park ?? PARK;
+  player.pos = { x: home.pos.x + out.x * park, y: home.pos.y + out.y * park };
   player.vel = { x: 0, y: 0 };
 
   return { world, bot: createBot({ id: 0, personality: opts.personality }, { seed: 3 }), me, player, out };
@@ -600,5 +604,180 @@ describe('a retreat is a manoeuvre, not a state of mind (a0-105)', () => {
     }
     expect(state.bot.brain.lastBehavior).not.toBe('turn-and-fight');
     expect(state.bot.brain.standoff.until, 'the commitment went with its subject').toBe(-1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// a0-107 — the dead band, and the road (QA defect a0-106-01)
+// ---------------------------------------------------------------------------
+
+/**
+ * Where the second player parks to reproduce a0-106's finding: **580 units**,
+ * inside `RETREAT_CLEAR_RANGE` (676) so the flee latch can still never read
+ * *escaped*, and outside the old `THREAT_RANGE` (416) gate so a0-105's fold was
+ * never evaluated at all. The 260-unit annulus between those two ranges is the
+ * dead band, and this is the cheapest opponent there is: parked, silent, and at
+ * one fixed distance.
+ */
+const PARK_DEAD_BAND = 580;
+
+/** Where a chased bot starts, far enough out that the road home is many seconds
+ *  of flying — the case a0-105 protected with a positional gate. */
+const RUN_HOME_FAR = 1600;
+
+/** The range the chaser holds behind the bot: inside the clear range, so the
+ *  retreat can never read *escaped* however far it flies. */
+const CHASE_HOLD = 300;
+
+/** What one flight home did. */
+interface Flight {
+  /** Tick `turn-and-fight` first won, or -1. */
+  turnedAt: number;
+  /** Distance from the bot to its own station on that tick. */
+  turnedAtRange: number;
+  /** The closest the bot ever got to its own station. */
+  closest: number;
+}
+
+/**
+ * Let the bot **fly**, with something exactly as fast holding station behind it.
+ *
+ * The `hold` staging above pins the bot's position, which is the right way to
+ * ask "does a retreat that has arrived ever end?" and the wrong way to ask "is a
+ * retreat that is still going ever interrupted?" — a pinned bot is not going
+ * anywhere by construction. So this one moves nothing but the chaser: it is
+ * placed each tick on the line from home through the bot, `CHASE_HOLD` units
+ * out, which is a pursuer the bot can never shake and never out-run. Everything
+ * the bot does is its own tree, its own thrusters and its own fog.
+ */
+function flyHome(personality: PersonalityId, seconds: number): Flight {
+  const state = standoff({ personality, hull: WOUNDED_ANY_TIER });
+  const { world, bot, me, player, out } = state;
+  const home = world.stations.find((s) => s.owner === 0)!;
+  me.pos = { x: home.pos.x + out.x * RUN_HOME_FAR, y: home.pos.y + out.y * RUN_HOME_FAR };
+  me.vel = { x: 0, y: 0 };
+
+  const flight: Flight = { turnedAt: -1, turnedAtRange: -1, closest: Infinity };
+  for (let tick = 0; tick < Math.round(seconds / TICK_DT); tick++) {
+    const dx = me.pos.x - home.pos.x;
+    const dy = me.pos.y - home.pos.y;
+    const d = Math.hypot(dx, dy) || 1;
+    player.pos = { x: me.pos.x + (dx / d) * CHASE_HOLD, y: me.pos.y + (dy / d) * CHASE_HOLD };
+    player.vel = { x: 0, y: 0 };
+    player.hull = player.maxHull;
+    me.hull = me.maxHull * WOUNDED_ANY_TIER;
+    step(world, botInputs(world, [bot], TICK_DT), TICK_DT);
+    flight.closest = Math.min(flight.closest, Math.hypot(me.pos.x - home.pos.x, me.pos.y - home.pos.y));
+    if (flight.turnedAt < 0 && bot.brain.lastBehavior === 'turn-and-fight') {
+      flight.turnedAt = tick;
+      flight.turnedAtRange = Math.hypot(me.pos.x - home.pos.x, me.pos.y - home.pos.y);
+    }
+  }
+  return flight;
+}
+
+/** One dead-band staging: what the bot did, and the separation it actually
+ *  held at — which is not the park distance, because the bot settles about 80
+ *  units the far side of its own station while it holds there. QA's `park@580`
+ *  cell reads ~660 for exactly the same reason, and the separation is the number
+ *  the ranges are about. */
+interface Band {
+  held: Held;
+  separation: number;
+}
+
+/**
+ * Stage the dead band the way a player reaches it: **close first, then back off
+ * into the annulus.**
+ *
+ * A bot cannot be held in a retreat it never started, and the flee latch only
+ * *enters* on a threat inside `THREAT_RANGE` — so a hostile that begins at 580
+ * is not the reproduction, it is a bot with nothing to run from. The
+ * reproduction is a hostile that closes, wounds the bot into its retreat, and
+ * then withdraws to a range where a0-105's fold could not be evaluated and the
+ * flee latch's own `escaped` still cannot fire. That is what QA's `park@580`
+ * cell reaches by drift and what this reaches deliberately.
+ */
+function deadBand(personality: PersonalityId, park: number, seconds: number): Band {
+  const state = standoff({ personality, hull: WOUNDED_ANY_TIER });
+  const home = state.world.stations.find((st) => st.owner === 0)!;
+  // In contact: the flee latch commits, which is the retreat this is about.
+  hold(state, 1);
+  expect(committed(state.bot.brain.fleeing), `${personality} is fleeing at ${PARK}`).toBe(true);
+  // …and now it backs off into the band and stands there.
+  state.player.pos = { x: home.pos.x + state.out.x * park, y: home.pos.y + state.out.y * park };
+  const held = hold(state, seconds);
+  return {
+    held,
+    separation: Math.hypot(state.player.pos.x - state.me.pos.x, state.player.pos.y - state.me.pos.y),
+  };
+}
+
+describe('an exit an opponent alone can satisfy is not an exit (a0-107)', () => {
+  it('a hostile parked at 580 — the dead band — no longer holds a wounded bot', () => {
+    // QA's `park@580`: the cheapest opponent there is, and the reproduction the
+    // brief names. It is too far for a0-105's `THREAT_RANGE` fold to be
+    // evaluated and too near for the flee latch to read *escaped*, so before
+    // this branch the patience clock never started and the hold tracked whatever
+    // ceiling you gave it — 17 860 ticks of 18 000 at 300 s
+    // (`tests/reports/a0-107-dead-band.md`). Every character in the cast, so
+    // this cannot pass by a tier falling out sideways into another branch.
+    for (const id of Object.keys(PERSONALITIES) as PersonalityId[]) {
+      const band = deadBand(id, PARK_DEAD_BAND, BOUND_S);
+      // The staging is the defect's own geometry or it proves nothing: too far
+      // for the old gate, too near for `escaped`.
+      expect(band.separation, `${id} separation`).toBeGreaterThan(THREAT_RANGE);
+      expect(band.separation, `${id} separation`).toBeLessThan(RETREAT_CLEAR_RANGE);
+      expect(band.held.turnedAt, `${id} (${PERSONALITIES[id].difficulty}) turns in the dead band`)
+        .toBeGreaterThan(0);
+      expect(band.held.turnedAt).toBeLessThan(Math.round(BOUND_S / TICK_DT));
+    }
+  });
+
+  it('the band it holds for is the flee latch\'s own — there is no annulus left', () => {
+    // The structural half, and the reason widening a range would not have done:
+    // the standoff now measures against the same read the flee latch's `escaped`
+    // exit uses, so "still fleeing this" and "measuring this" are the same
+    // predicate and no gap can open between them. Every separation inside the
+    // clear range ends in the turn — swept across the old gate at 416, which is
+    // where a0-105's band began.
+    const swept: number[] = [];
+    for (const park of [PARK, 300, 396, 480, PARK_DEAD_BAND]) {
+      const band = deadBand('rusty', park, BOUND_S);
+      swept.push(band.separation);
+      expect(band.separation).toBeLessThan(RETREAT_CLEAR_RANGE); // never *escaped*
+      expect(band.held.turnedAt, `separation ${band.separation.toFixed(0)}`).toBeGreaterThan(0);
+    }
+    // The sweep has to have crossed the old gate, or it is a sweep of one side.
+    expect(Math.min(...swept)).toBeLessThan(THREAT_RANGE);
+    expect(Math.max(...swept)).toBeGreaterThan(THREAT_RANGE);
+    // Past the clear range there is nothing to measure: the retreat *succeeded*.
+    const outside = deadBand('rusty', RETREAT_CLEAR_RANGE + 200, BOUND_S);
+    expect(outside.separation).toBeGreaterThan(RETREAT_CLEAR_RANGE);
+    expect(outside.held.turnedAt, 'an opponent past the clear range is escaped, not fought').toBe(-1);
+  });
+
+  it('never interrupts a bot that is still eating the road home', () => {
+    // The a0-105 scope, kept — and kept as a measurement rather than as a gate
+    // an opponent can flap. The chaser holds 300 units off the bot's tail for
+    // the whole flight, so the gap NEVER opens and `escaped` can never fire; the
+    // only reason this bot is not turning is that it is getting somewhere.
+    const flight = flyHome('rusty', 20);
+    expect(flight.closest, 'it flew home').toBeLessThan(ARRIVE_RADIUS);
+    expect(flight.turnedAt, 'and it did not turn on the way').toBeGreaterThan(0);
+    expect(
+      flight.turnedAtRange,
+      'the turn happens at its own doorstep, not out on the road',
+    ).toBeLessThan(ARRIVE_RADIUS * 2);
+  });
+
+  it('and still ends the moment the road runs out, at every tier', () => {
+    // The other half of the same flight: arriving is not an exemption. Every
+    // character flies home, and every character turns once there is no more road
+    // to eat and the thing is still on its tail.
+    for (const id of Object.keys(PERSONALITIES) as PersonalityId[]) {
+      const flight = flyHome(id, 16);
+      expect(flight.turnedAt, `${id} (${PERSONALITIES[id].difficulty}) turns`).toBeGreaterThan(0);
+    }
   });
 });

@@ -345,36 +345,69 @@ describe('a real 4v4 match never splits the side', () => {
     // assignment failing to do its own. That distinction is the difference
     // between a tuning residual and a correctness bug, so it is asserted here
     // and not merely written down.
-    const seats = fillEmptySlots([], 8, undefined, [...SIDES]);
-    const world = createWorld({ seed: 11, players: botLobby(seats), mapId: 'octagon' });
-    const brains = createBots(seats, { seed: 11 });
-    // `Station.team` is optional and falls back to the owner id — teams-of-one,
-    // the same default `sim/state.ts` applies when a spec carries no side.
-    const sideOf = new Map<PlayerId, number>();
-    for (const s of world.stations) sideOf.set(s.owner, s.team ?? s.owner);
-    const teamOf = (s: { owner: PlayerId; team?: number }): number => s.team ?? s.owner;
-
+    //
+    // a0-107 re-measured the residual on both builds over six seeds and it is
+    // still exactly that: 158 two-flying alarm-ticks after against 0 before, and
+    // **zero** defender disagreements in either — 12 matches, 34 000 alarm-ticks
+    // (`evidence/a0-107-dead-band/ally-double.ts`). A retreat that now ends in a
+    // fight leaves bots in different places, so the assignment changes hands
+    // mid-flight more often and the previous defender is still flying on its
+    // latch when it does. The latch's own `ALLY_RESPONSE_MAX` bounds every one
+    // of those, and the agreement assertion below is the one that would fail if
+    // it were the other thing.
+    // THREE seeds, not one (a0-107). The residual below is a *rate*, and one
+    // match is one sample of it: measured on seed 11 alone it read 0.0% before
+    // a0-107 and 5.19% after, which says almost nothing about either build —
+    // over six seeds the same metric reads 0.00% and 0.88%
+    // (`evidence/a0-107-dead-band/ally-double-{before,after}.txt`). A floor with
+    // a tenth of a point of headroom, read off a single seeded match, measures
+    // that match. So the aggregate is what carries the claim, and the per-seed
+    // cap is loose enough to be about the behaviour rather than about seed 11.
+    const SEEDS = [11, 12, 13];
     let alarmsChecked = 0;
     let twoFlying = 0;
 
-    while (world.time < 240 && !isOver(world)) {
-      step(world, botInputs(world, brains, TICK_DT), TICK_DT);
-      for (const s of world.stations) {
-        if (!s.alive || s.sinceDamage >= DEFAULT_PERCEPTION.alarmWindow) continue;
-        const side = brains.filter((b) => sideOf.get(b.seat.id) === teamOf(s));
-        const answers = side.map((b) => defenderFor(perceive(world, b.seat.id), s.owner));
-        expect(new Set(answers).size, `t=${world.time.toFixed(2)} alarm on ${s.owner}`).toBe(1);
-        alarmsChecked++;
-        const flying = side.filter(
-          (b) => b.brain.allyResponse.target === s.owner && b.brain.lastBehavior === 'defend-ally',
-        );
-        if (flying.length >= 2) {
-          twoFlying++;
-          // Whenever two ARE flying, the side still agrees who the defender is,
-          // and at most one of the flyers is it. The other is latch inertia.
-          expect(flying.filter((b) => b.seat.id === answers[0]).length).toBeLessThanOrEqual(1);
+    for (const seed of SEEDS) {
+      const seats = fillEmptySlots([], 8, undefined, [...SIDES]);
+      const world = createWorld({ seed, players: botLobby(seats), mapId: 'octagon' });
+      const brains = createBots(seats, { seed });
+      // `Station.team` is optional and falls back to the owner id — teams-of-one,
+      // the same default `sim/state.ts` applies when a spec carries no side.
+      const sideOf = new Map<PlayerId, number>();
+      for (const s of world.stations) sideOf.set(s.owner, s.team ?? s.owner);
+      const teamOf = (s: { owner: PlayerId; team?: number }): number => s.team ?? s.owner;
+
+      let seedAlarms = 0;
+      let seedTwoFlying = 0;
+
+      while (world.time < 240 && !isOver(world)) {
+        step(world, botInputs(world, brains, TICK_DT), TICK_DT);
+        for (const s of world.stations) {
+          if (!s.alive || s.sinceDamage >= DEFAULT_PERCEPTION.alarmWindow) continue;
+          const side = brains.filter((b) => sideOf.get(b.seat.id) === teamOf(s));
+          const answers = side.map((b) => defenderFor(perceive(world, b.seat.id), s.owner));
+          expect(
+            new Set(answers).size,
+            `seed ${seed} t=${world.time.toFixed(2)} alarm on ${s.owner}`,
+          ).toBe(1);
+          seedAlarms++;
+          const flying = side.filter(
+            (b) => b.brain.allyResponse.target === s.owner && b.brain.lastBehavior === 'defend-ally',
+          );
+          if (flying.length >= 2) {
+            seedTwoFlying++;
+            // Whenever two ARE flying, the side still agrees who the defender is,
+            // and at most one of the flyers is it. The other is latch inertia.
+            expect(flying.filter((b) => b.seat.id === answers[0]).length).toBeLessThanOrEqual(1);
+          }
         }
       }
+      // No single match may be wild, either: 8% is comfortably above the worst
+      // seed either build produced (5.19%) and comfortably below "the split is
+      // back".
+      expect(seedTwoFlying, `seed ${seed}`).toBeLessThan(seedAlarms * 0.08);
+      alarmsChecked += seedAlarms;
+      twoFlying += seedTwoFlying;
     }
     // The scan has to have had something to scan, or it proves nothing.
     expect(alarmsChecked).toBeGreaterThan(200);

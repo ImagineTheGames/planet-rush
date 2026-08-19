@@ -1,0 +1,24 @@
+a0-107 — decision mix, 5 FFA matches × 180s, 8 bots
+seeds: 20260806, 7, 991, 11, 12   432000 decisions
+
+| leaf | decisions | share |
+|---|---|---|
+| dead | 80505 | 18.64% |
+| attack | 75701 | 17.52% |
+| mine | 67012 | 15.51% |
+| defend | 64353 | 14.90% |
+| retreat | 49621 | 11.49% |
+| potshot | 19020 | 4.40% |
+| haul | 18019 | 4.17% |
+| scavenge | 13473 | 3.12% |
+| turn-and-fight | 12981 | 3.00% |
+| last-stand | 12699 | 2.94% |
+| cornered-fight | 7338 | 1.70% |
+| fix-base | 6055 | 1.40% |
+| contest-wave | 4220 | 0.98% |
+| spend | 833 | 0.19% |
+| roam | 170 | 0.04% |
+
+| retreat episodes | count | mean | p50 | p90 | max | >10s | ticks in >10s |
+|---|---|---|---|---|---|---|---|
+| all | 300 | 2.76s | 1.40s | 7.17s | 14.17s | 11 | 8090 (16.3% of retreat) |
