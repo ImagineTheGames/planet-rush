@@ -19,10 +19,21 @@
  *  3. **the commitment is a window**, and inside it nothing is re-derived;
  *  4. **the turn re-anchors**, so a bot that turned does not inherit the widest
  *     gap of the retreat it abandoned and chase a leaving opponent on it.
+ *
+ * And, from a0-107, the second axis — the one that let the caller throw its
+ * gates away:
+ *
+ *  5. **a retreat that is getting home is working too.** Closing on the refuge
+ *     gives the patience back exactly as opening ground does, so the branch
+ *     never interrupts a wounded bot still flying to its turrets;
+ *  6. **and it still ends.** A bot that stops closing — arrived, blocked, or
+ *     herded — spends its patience and turns, because the road anchor is
+ *     monotone and cannot be un-banked by an opponent who jitters it.
  */
 
 import { describe, it, expect } from 'vitest';
 import {
+  NO_ROAD,
   newStandoff,
   resetStandoff,
   standoffCommitted,
@@ -37,9 +48,11 @@ const PROGRESS = 60;
 const PATIENCE = 2;
 const WINDOW = 4;
 
-/** Fold one read at `now` with the fixed knobs above. */
-const fold = (latch: StandoffLatch, now: number, gap: number): boolean =>
-  standoffFold(latch, now, gap, PROGRESS, PATIENCE, WINDOW);
+/** Fold one read at `now` with the fixed knobs above. `road` defaults to
+ *  {@link NO_ROAD} — a retreat with no refuge, measured on the gap alone, which
+ *  is the single-axis case every claim below §2 is about. */
+const fold = (latch: StandoffLatch, now: number, gap: number, road: number = NO_ROAD): boolean =>
+  standoffFold(latch, now, gap, road, PROGRESS, PATIENCE, WINDOW);
 
 describe('a retreat that opens no ground ends (a0-105)', () => {
   it('commits once the patience has run without a single gaining read', () => {
@@ -66,7 +79,7 @@ describe('a retreat that opens no ground ends (a0-105)', () => {
       const latch = newStandoff();
       let committedAt = -1;
       for (let t = 0; t <= 40 && committedAt < 0; t += 0.5) {
-        if (standoffFold(latch, t, 300, PROGRESS, patience, WINDOW)) committedAt = t;
+        if (standoffFold(latch, t, 300, NO_ROAD, PROGRESS, patience, WINDOW)) committedAt = t;
       }
       expect(committedAt, `patience ${patience}`).toBeGreaterThanOrEqual(0);
       expect(committedAt, `patience ${patience}`).toBeLessThanOrEqual(patience + 0.5);
@@ -96,7 +109,7 @@ describe('a retreat that opens no ground ends (a0-105)', () => {
     let gap = 200;
     for (let t = 0; t <= 30; t += 0.5) {
       gap += PROGRESS; // getting away, decision after decision
-      expect(standoffFold(latch, t, gap, PROGRESS, PATIENCE, WINDOW), `t=${t}`).toBe(false);
+      expect(standoffFold(latch, t, gap, NO_ROAD, PROGRESS, PATIENCE, WINDOW), `t=${t}`).toBe(false);
     }
   });
 
@@ -136,5 +149,88 @@ describe('a retreat that opens no ground ends (a0-105)', () => {
     resetStandoff(latch);
     expect(latch).toEqual(newStandoff());
     expect(standoffCommitted(latch, 3.1)).toBe(false);
+  });
+});
+
+describe('a retreat that is getting home is working too (a0-107)', () => {
+  it('gives the patience back for closing on the refuge, with the gap pinned', () => {
+    // The case a0-105 protected with a positional gate and an opponent could
+    // flap. Here it is a measurement: the chaser matches the bot's speed exactly
+    // — the gap never moves — but the bot is eating the road home, so the
+    // retreat is working and the clock never starts.
+    const latch = newStandoff();
+    let road = 4000;
+    for (let t = 0; t <= 20; t += 0.5) {
+      road -= PROGRESS + 20; // closing on home, decision after decision
+      expect(fold(latch, t, 300, road), `t=${t}`).toBe(false);
+      expect(latch.since, `t=${t}`).toBe(-1);
+    }
+  });
+
+  it('starts spending patience the moment the road stops shortening', () => {
+    // It ran, it got there, and the thing came with it: no more road, no more
+    // gap, so the retreat is over and the bot turns. This is the a0-105
+    // photograph, reached without asking anyone whether the bot has "arrived".
+    const latch = newStandoff();
+    expect(fold(latch, 0, 300, 900)).toBe(false);
+    expect(fold(latch, 0.5, 300, 700)).toBe(false); // still closing
+    expect(latch.since).toBe(-1);
+    expect(fold(latch, 1, 300, 90)).toBe(false); // arrived
+    expect(latch.road).toBe(90);
+    expect(fold(latch, 1.5, 300, 92)).toBe(false); // nowhere left to go
+    expect(latch.since).toBe(1.5);
+    expect(fold(latch, 3.6, 300, 88)).toBe(true);
+  });
+
+  it('cannot be paid twice for the same road — the anchor only improves', () => {
+    // The a0-106 shape, in arithmetic. An opponent who herds the bot back and
+    // forth across its own doorstep re-presents road it has already been
+    // credited for; a monotone anchor declines to pay again, so the patience
+    // clock keeps running through the oscillation and the retreat still ends.
+    const latch = newStandoff();
+    fold(latch, 0, 300, 400);
+    fold(latch, 0.5, 300, 200); // banked: the best road of this retreat
+    expect(latch.road).toBe(200);
+    let out = false;
+    for (let t = 1; t <= 6 && !out; t += 0.5) {
+      // pushed out to 400, allowed back to 220, over and over
+      out = fold(latch, t, 300, t % 1 === 0 ? 400 : 220);
+    }
+    expect(out, 'the oscillation bought no patience back').toBe(true);
+  });
+
+  it('measures on the gap alone when there is no refuge to run to', () => {
+    // Station gone, or the threat sitting on it: `retreat` is travelling nowhere
+    // in particular, so there is no second axis and `NO_ROAD` must never read as
+    // progress — least of all against itself.
+    const latch = newStandoff();
+    expect(fold(latch, 0, 300, NO_ROAD)).toBe(false);
+    expect(latch.road).toBe(NO_ROAD);
+    expect(fold(latch, 0.5, 300, NO_ROAD)).toBe(false);
+    expect(latch.since).toBe(0.5);
+    expect(fold(latch, 2.6, 300, NO_ROAD)).toBe(true);
+  });
+
+  it('an opponent who takes the road away only brings the turn forward', () => {
+    // Standing on the bot's own station flips the road to `NO_ROAD` mid-retreat.
+    // The banked anchor stays banked, so the loss of the second axis cannot hand
+    // the bot a fresh clock — it can only leave it with fewer ways to be working.
+    const latch = newStandoff();
+    fold(latch, 0, 300, 800);
+    fold(latch, 0.5, 300, 600);
+    expect(latch.road).toBe(600);
+    expect(fold(latch, 1, 300, NO_ROAD)).toBe(false);
+    expect(latch.since, 'the clock starts, it does not reset').toBe(1);
+    expect(latch.road, 'and the best road of this retreat is still banked').toBe(600);
+    expect(fold(latch, 3.1, 300, NO_ROAD)).toBe(true);
+  });
+
+  it('re-anchors both axes on the turn', () => {
+    const latch = newStandoff();
+    fold(latch, 0, 700, 900); // this retreat did open ground and did close road
+    fold(latch, 1, 200, 950);
+    expect(fold(latch, 3.1, 180, 940)).toBe(true);
+    expect(latch.gap, 'the gap anchor is the range the fight starts at').toBe(180);
+    expect(latch.road, 'and the road anchor is where the bot is standing').toBe(940);
   });
 });

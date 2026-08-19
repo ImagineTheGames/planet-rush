@@ -65,7 +65,7 @@ import {
 } from './steering';
 import { commit, committed, release } from './commitment';
 import { corneredCommit, corneredCommitted, corneredHeld, resetCornered } from './cornered';
-import { resetStandoff, standoffCommitted, standoffFold } from './standoff';
+import { NO_ROAD, resetStandoff, standoffCommitted, standoffFold } from './standoff';
 import {
   homeIntruder,
   intruderNear,
@@ -1753,9 +1753,20 @@ export function coreUnderFinalAssault(ctx: BotCtx): boolean {
  * on their own they let a player hold a wounded bot in its retreat forever by
  * standing still. The third exit is the one the *bot* controls: this function
  * folds every committed decision into the standoff latch (`./standoff`), and
- * when the running has not opened any ground for the character's own
- * {@link standoffPatience} the retreat is over and the bot turns and fights (the
+ * when the retreat has got nowhere for the character's own
+ * {@link standoffPatience} it is over and the bot turns and fights (the
  * `turn-and-fight` leaf, directly below this one in all three trees).
+ *
+ * **Getting nowhere means both ways** (a0-107, from QA's adversarial sweep). The
+ * fold used to sit behind two positional preconditions, and a read that failed
+ * either one *reset* the patience clock — so an opponent who kept either false
+ * held the clock at zero and the retreat was unbounded again, one level down
+ * (`tests/reports/a0-106-adversarial.md` §5). There are no preconditions now.
+ * The fold takes the two measurements a retreat actually has — the gap to the
+ * threat, and the road to its refuge ({@link retreatRoad}) — and a retreat that
+ * improves on either is working. Both are things this bot does, so the only way
+ * an opponent can stop the clock is by letting the bot get away or letting it
+ * get home, and both of those are the retreat succeeding.
  */
 export function wantsRetreat(ctx: BotCtx): boolean {
   const latch = ctx.brain.fleeing;
@@ -1808,28 +1819,34 @@ export function wantsRetreat(ctx: BotCtx): boolean {
     resetStandoff(stand);
     return fleeing;
   }
-  // Running, but out of the thing's reach, or still with somewhere to run to:
-  // either way this retreat is *working* and keeps its patience.
+  // Running, and in contact with the thing the flee latch itself has not called
+  // escaped. Is the running *working*? Two measurements answer it, and they are
+  // the only two a retreat has (a0-107):
   //
-  //  - `THREAT_RANGE` rather than `RETREAT_CLEAR_RANGE` on purpose — the band
-  //    between the two is the flee latch's own hysteresis, and a chaser that has
-  //    fallen out of weapon reach is no longer pinning anybody. That is "cannot
-  //    break contact" read the way a player would read it.
-  //  - {@link retreatOutOfRoad} is the other half: a bot still flying to its own
-  //    turrets has somewhere to be, and this branch never interrupts that.
+  //  - **the gap** to what it is running from — *am I getting away?*
+  //  - **the road** to its refuge ({@link retreatRoad}) — *am I getting home?*
   //
-  // Together they are what keep the turn rare and keep the retreat itself
-  // untouched: measured over five whole matches, `turn-and-fight` takes 0.6% of
+  // Improve on either and the retreat is working and keeps its patience; improve
+  // on neither for the character's own {@link standoffPatience} and it is going
+  // nowhere, so the bot turns and fights (`./standoff`).
+  //
+  // There is deliberately **no gate in front of this fold**. a0-105 had two — a
+  // `THREAT_RANGE` contact read and a positional {@link retreatOutOfRoad} — and
+  // a read that failed either one reset the patience clock, which handed the
+  // opponent a free reset per tick and left the retreat unbounded again (QA
+  // a0-106, defect `a0-106-01`, and `tests/reports/a0-107-dead-band.md`). The
+  // contact range is now the *same* read the flee latch's own `escaped` exit
+  // uses — `threat` is `nearestThreat(ctx, RETREAT_CLEAR_RANGE)` above — so
+  // there is no annulus between "still fleeing this" and "measuring this" for
+  // anyone to park in, and widening a range could not have produced that.
+  //
+  // What kept the turn rare in a0-105 is kept by the road anchor instead, and
+  // more honestly: a bot flying to its own turrets improves the road every
+  // decision, so this branch never interrupts a retreat that is still going
+  // somewhere. Measured over five whole matches, `turn-and-fight` takes 0.6% of
   // all decisions, beside `cornered-fight`'s 1.1%.
-  if (threat.distance > THREAT_RANGE || !retreatOutOfRoad(ctx, threat)) {
-    resetStandoff(stand);
-    return true;
-  }
-  // Out of road, still in contact. Is the running *working*? The gap to the thing
-  // being run from is the only honest answer, and it is the one a player reads
-  // too: a bot that is getting away keeps running, a bot that is not turns
-  // around (`./standoff`).
-  if (standoffFold(stand, now, threat.distance, RETREAT_PROGRESS, standoffPatience(ctx), STANDOFF_COMMIT_SECONDS)) {
+  const road = retreatRoad(ctx, threat);
+  if (standoffFold(stand, now, threat.distance, road, RETREAT_PROGRESS, standoffPatience(ctx), STANDOFF_COMMIT_SECONDS)) {
     release(latch);
     return false;
   }
@@ -1917,32 +1934,46 @@ export function threatAtHome(ctx: BotCtx, threat: PerceivedShip | null): boolean
 // ---------------------------------------------------------------------------
 
 /**
- * **Has this retreat run out of road?** The precondition on the whole standoff,
- * and the sentence the developer's report turns on: *"I retreated, it followed,
- * and there is nowhere further to go."*
+ * **How much road has this retreat got left?** The distance to the place it is
+ * flying to, or {@link NO_ROAD} when it has nowhere to fly — the second of the
+ * standoff's two measurements (`./standoff`), and the sentence the developer's
+ * report turns on: *"I retreated, it followed, and there is nowhere further to
+ * go."*
  *
- * A retreat is a flight *to somewhere* ({@link retreat}), and it is only stuck
- * when there is no somewhere left. That is exactly the three cases that function
- * has, read back:
+ * A retreat is a flight *to somewhere* ({@link retreat}), so "is it working?"
+ * has a second honest answer beside the gap: **is it getting there?** This is
+ * that reading, and it is the same destination `retreat` actually flies to —
+ * the bot's own station, where the turrets are (GDD §2.6) — so the measurement
+ * and the manoeuvre can never drift apart. `retreat`'s no-destination cases are
+ * read back here as {@link NO_ROAD}:
  *
- *  - **arrived** — the bot is inside {@link ARRIVE_RADIUS} of its own station,
- *    the destination the retreat was flying to. It ran, it got there, and the
- *    thing came with it. There is no further home to reach.
- *  - **no refuge** — the station is gone, or the threat is sitting on it
- *    ({@link threatAtHome}), so `retreat` is not travelling anywhere at all: it
- *    is pushing flat away from the threat with no destination behind it.
+ *  - the station is **gone**, so there is nothing to fly to;
+ *  - the threat is **sitting on it** ({@link threatAtHome}), so running there is
+ *    running into the siege and `retreat` pushes flat away instead.
  *
- * Everything else is a retreat that is still *going* somewhere, and this file
- * leaves it completely alone — which is the point. A wounded bot running for
- * cover is good play, the developer has never complained about it, and it is
- * still the overwhelming majority of every retreat in a match. Only the last few
- * seconds of one, at the doorstep with nowhere left, are what this branch is
- * allowed to end.
+ * In both, `retreat` is travelling nowhere in particular and the standoff is
+ * measured on the gap alone.
+ *
+ * **This is a distance, not a gate, and that is the whole of a0-107.** Its
+ * predecessor `retreatOutOfRoad` was a boolean precondition on the fold — "am I
+ * inside {@link ARRIVE_RADIUS} yet?" — and two of its three terms moved with the
+ * opponent, so an opponent who flapped it reset the bot's patience clock every
+ * other tick and the retreat never ended (QA a0-106, defect `a0-106-01`). As a
+ * measurement it cannot be flapped: the anchor in the latch only ever moves in
+ * the improving direction, so a bot that is genuinely closing on its refuge
+ * keeps its patience and a bot that has stopped closing — arrived, blocked, or
+ * herded — starts spending it. "Arrived" stops being a radius somebody has to
+ * pick, and becomes the thing it always meant: *there is no more road.*
+ *
+ * A wounded bot running for cover is good play, the developer has never
+ * complained about it, and it is still the overwhelming majority of every
+ * retreat in a match. Every one of those keeps improving this number, and this
+ * branch leaves them all completely alone.
  */
-export function retreatOutOfRoad(ctx: BotCtx, threat: PerceivedShip | null): boolean {
+export function retreatRoad(ctx: BotCtx, threat: PerceivedShip | null): number {
   const station = ctx.self.station;
-  if (station === null || !station.alive || threatAtHome(ctx, threat)) return true;
-  return dist(ctx.self.pos, station.pos) <= ARRIVE_RADIUS;
+  if (station === null || !station.alive || threatAtHome(ctx, threat)) return NO_ROAD;
+  return dist(ctx.self.pos, station.pos);
 }
 
 /**

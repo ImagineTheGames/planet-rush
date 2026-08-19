@@ -150,9 +150,18 @@ describe('the blockade is detected by geometry, not by fear (ratified point 1)',
     });
     expect(dist(world.ships[0]!.pos, world.ships[1]!.pos)).toBeLessThan(THREAT_RANGE);
 
-    expect(timeToCommit(world, bot, 6)).toBeNull();
+    // A beat in: an ordinary committed retreat, which is the whole claim.
+    expect(timeToCommit(world, bot, 1)).toBeNull();
     expect(bot.brain.lastBehavior).toBe('retreat');
     expect(committed(bot.brain.fleeing)).toBe(true);
+    // And out to six seconds it never becomes a *blockade*. It does eventually
+    // stop being a retreat, and that is a0-107 rather than this branch: nothing
+    // in this staging ever moves, so the bot opens no ground and closes no road,
+    // and after Rusty's 3.9 s of patience the standoff reads a retreat that is
+    // getting nowhere and turns. `turn-and-fight`, not `cornered-fight` — a
+    // different branch, on a geometry that is still not a blockade.
+    expect(timeToCommit(world, bot, 5)).toBeNull();
+    expect(bot.brain.lastBehavior).toBe('turn-and-fight');
   });
 
   it('does not corner an undamaged bot — only fear can build the trap fear falls into', () => {
