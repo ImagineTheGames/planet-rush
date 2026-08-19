@@ -29,12 +29,13 @@
  *     be is the a0-105 photograph: a hold that ran long with the trigger up and
  *     the ship parked. That predicate is `inert` (`./sweep.ts`) and it is the
  *     assertion that keeps "unbounded by design" from becoming a place to hide.
- *  3. **The known defect still reproduces, exactly where the report says.**
+ *  3. **Every pinned defect still reproduces, exactly where its report says.**
  *     a0-106 found one, on the flee latch, and QA does not own `src/bots/` — the
- *     bots agent does. So it is pinned rather than fixed: {@link KNOWN_UNBOUNDED}
- *     is the reproduction, `tests/reports/a0-106-adversarial.md` is the write-up,
- *     and the third assertion below fails **the day it is fixed**, which is the
- *     signal to delete the entry rather than to go looking for what broke.
+ *     bots agent does — so it shipped pinned rather than fixed: {@link
+ *     KNOWN_UNBOUNDED} was the reproduction and the assertion failed **the day
+ *     it was fixed**, which is the signal to delete the entry rather than to go
+ *     looking for what broke. That day was a0-107, so the list is now empty and
+ *     assertion 1 exempts nothing. The mechanism stands for the next finding.
  *
  * ── Why it is affordable ───────────────────────────────────────────────────
  *
@@ -51,58 +52,30 @@ import { CAST, inert, overBound, seconds, sweep } from './sweep';
 import type { Cell } from './sweep';
 
 /**
- * **The a0-106 finding, pinned.** `latch | antagonist | character` for every
- * cell that breaches today.
+ * **The a0-106 finding, pinned — and closed.**
+ * `latch | antagonist | character` for every cell that breaches today.
  *
- * Every entry here is one reproduction of **one defect**: the retreat's
- * turn-and-fight exit — the thing a0-105 added so that a retreat *ends* — is
+ * It is empty, and that is the finding's ending rather than its absence. a0-106
+ * pinned twenty-five cells here, all of them one defect: the retreat's
+ * turn-and-fight exit — the thing a0-105 added so that a retreat *ends* — was
  * itself gated behind two preconditions an opponent controls, so an opponent who
- * stands in the right place switches it off and the flee latch is unbounded
- * again. `tests/reports/a0-106-adversarial.md` has the mechanism, the geometry
- * and the numbers at three ceilings; this list is the machine-readable half of
- * it.
+ * stood in the right place switched it off and the flee latch was unbounded
+ * again. a0-107 removed both gates: the standoff now measures the two things a
+ * retreat can be doing (opening ground on the threat, closing the road to its
+ * refuge), both of them the bot's own doing, and a read that shows neither
+ * *spends* the patience clock rather than resetting it. All twenty-five cells
+ * release inside the `fleeing` bound, `park@580` first among them.
+ * `tests/reports/a0-107-dead-band.md` is the write-up, with the held ticks
+ * before and after at three ceilings.
  *
- * **It is not an exemption.** Assertion 1 skips these cells and assertion 3
- * requires every one of them to still breach, so the list cannot rot in either
- * direction: a new unbounded hold fails assertion 1, and a fixed one fails
- * assertion 3.
+ * **It stays here, and empty.** The two assertions that read it point in
+ * opposite directions on purpose — assertion 1 subtracts this list, assertion 3
+ * requires every entry in it to still breach — so the list cannot rot in either
+ * direction, and an empty one is the strongest form of both: every cell in the
+ * cross-product is now held to its own ceiling with nothing exempted. A future
+ * finding is pinned by adding lines back.
  */
-const KNOWN_UNBOUNDED: readonly string[] = [
-  // (A) The RANGE DEAD-BAND. A hostile parked in the annulus between
-  // `THREAT_RANGE` (416) and `RETREAT_CLEAR_RANGE` (676) is too far for
-  // `wantsRetreat` to fold the standoff and too near for the flee latch to read
-  // *escaped*. The patience clock is reset every tick and never starts.
-  'fleeing|park@580|rusty',
-  'fleeing|park@580|bolt',
-  'fleeing|park@580|foreman',
-  'fleeing|park@580|patch',
-  'fleeing|park@580|sable',
-  'fleeing|park@580|vulture',
-  'fleeing|park@580|warden',
-  'fleeing|park-squad|rusty',
-  'fleeing|park-squad|bolt',
-  'fleeing|park-squad|foreman',
-  'fleeing|park-squad|patch',
-  'fleeing|park-squad|sable',
-  'fleeing|park-squad|vulture',
-  'fleeing|park-squad|warden',
-  // The same band, reached by standing on the ore instead of on the lane home.
-  'fleeing|block-ore|rusty',
-  'fleeing|block-ore|bolt',
-  'fleeing|block-ore|foreman',
-  'fleeing|block-ore|patch',
-  'fleeing|block-ore|warden',
-  // (B) The OUT-OF-ROAD FLAP. The hostile is inside `THREAT_RANGE` throughout,
-  // but `retreatOutOfRoad` alternates as the subject oscillates around its own
-  // `ARRIVE_RADIUS` — and every read that comes back "still has road" resets the
-  // patience clock, so it never reaches even the shortest tier's patience.
-  'fleeing|block-home|rusty',
-  'fleeing|block-home|bolt',
-  'fleeing|never-die|rusty',
-  'fleeing|never-die|bolt',
-  'fleeing|never-die-squad|rusty',
-  'fleeing|never-die-squad|bolt',
-];
+const KNOWN_UNBOUNDED: readonly string[] = [];
 
 /**
  * The one latch the census enumerates and this instrument cannot reach:
