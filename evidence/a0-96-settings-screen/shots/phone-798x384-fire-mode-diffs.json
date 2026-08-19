@@ -1,0 +1,28 @@
+{
+  "profile": {
+    "id": "phone-798x384",
+    "label": "phone landscape 798x384 (dpr 2, touch) — the developer's own screenshot size",
+    "width": 798,
+    "height": 384,
+    "dpr": 2,
+    "touch": true
+  },
+  "note": "All frames at the same pinned freeze tick. \"null\" is two shots with nothing touched between them.",
+  "diffs": {
+    "null": {
+      "pixels": 0,
+      "peak": 0,
+      "total": 1225728
+    },
+    "tap: AUTO-AIM vs MANUAL": {
+      "pixels": 0,
+      "peak": 0,
+      "total": 1225728
+    },
+    "sticks: MANUAL vs AUTO-AIM": {
+      "pixels": 28671,
+      "peak": 248,
+      "total": 1225728
+    }
+  }
+}

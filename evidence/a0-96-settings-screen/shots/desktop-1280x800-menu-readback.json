@@ -1,0 +1,147 @@
+{
+  "profile": {
+    "id": "desktop-1280x800",
+    "label": "desktop 1280x800 (dpr 2, pointer) — the golden suite's control width",
+    "width": 1280,
+    "height": 800,
+    "dpr": 2,
+    "touch": false
+  },
+  "readback": {
+    "menu-rest": [
+      {
+        "kind": "fireMode",
+        "label": "FIRE MODE",
+        "value": "AUTO-AIM"
+      },
+      {
+        "kind": "controls",
+        "label": "CONTROLS",
+        "value": "TAP COMMANDER"
+      },
+      {
+        "kind": "reduceVfx",
+        "label": "REDUCE VFX",
+        "value": "OFF"
+      },
+      {
+        "kind": "volume",
+        "label": "MASTER VOLUME",
+        "value": ""
+      },
+      {
+        "kind": "volume",
+        "label": "SFX VOLUME",
+        "value": ""
+      },
+      {
+        "kind": "volume",
+        "label": "MUSIC VOLUME",
+        "value": ""
+      }
+    ],
+    "help-fireMode-title": "FIRE MODE",
+    "help-controls-title": "CONTROLS",
+    "help-reduceVfx-title": "REDUCE VFX",
+    "help-master-title": "MASTER VOLUME",
+    "help-sfx-title": "SFX VOLUME",
+    "help-music-title": "MUSIC VOLUME",
+    "help-fireMode-sticks-title": "FIRE MODE",
+    "after-help-detour": [
+      {
+        "kind": "fireMode",
+        "label": "FIRE MODE",
+        "value": "AUTO-AIM"
+      },
+      {
+        "kind": "controls",
+        "label": "CONTROLS",
+        "value": "TAP COMMANDER"
+      },
+      {
+        "kind": "reduceVfx",
+        "label": "REDUCE VFX",
+        "value": "OFF"
+      },
+      {
+        "kind": "volume",
+        "label": "MASTER VOLUME",
+        "value": ""
+      },
+      {
+        "kind": "volume",
+        "label": "SFX VOLUME",
+        "value": ""
+      },
+      {
+        "kind": "volume",
+        "label": "MUSIC VOLUME",
+        "value": ""
+      }
+    ],
+    "menu-changed": [
+      {
+        "kind": "fireMode",
+        "label": "FIRE MODE",
+        "value": "MANUAL"
+      },
+      {
+        "kind": "controls",
+        "label": "CONTROLS",
+        "value": "KEYBOARD + MOUSE"
+      },
+      {
+        "kind": "reduceVfx",
+        "label": "REDUCE VFX",
+        "value": "ON"
+      },
+      {
+        "kind": "volume",
+        "label": "MASTER VOLUME",
+        "value": ""
+      },
+      {
+        "kind": "volume",
+        "label": "SFX VOLUME",
+        "value": ""
+      },
+      {
+        "kind": "volume",
+        "label": "MUSIC VOLUME",
+        "value": ""
+      }
+    ],
+    "menu-reloaded": [
+      {
+        "kind": "fireMode",
+        "label": "FIRE MODE",
+        "value": "MANUAL"
+      },
+      {
+        "kind": "controls",
+        "label": "CONTROLS",
+        "value": "KEYBOARD + MOUSE"
+      },
+      {
+        "kind": "reduceVfx",
+        "label": "REDUCE VFX",
+        "value": "ON"
+      },
+      {
+        "kind": "volume",
+        "label": "MASTER VOLUME",
+        "value": ""
+      },
+      {
+        "kind": "volume",
+        "label": "SFX VOLUME",
+        "value": ""
+      },
+      {
+        "kind": "volume",
+        "label": "MUSIC VOLUME",
+        "value": ""
+      }
+    ]
+  }
+}
