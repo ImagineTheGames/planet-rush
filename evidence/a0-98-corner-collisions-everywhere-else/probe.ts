@@ -274,7 +274,13 @@ export async function harvestAndProbeDomControls(
       if (r.width <= 0 || r.height <= 0) continue;
       const x = r.x + r.width / 2;
       const y = r.y + r.height / 2;
-      const hit = document.elementFromPoint(x, y);
+      // Outside the viewport there is nothing to hit-test against, and
+      // `elementFromPoint` answers null there — which must be recorded as a cell the
+      // probe could not reach, NOT as a clear one. The boot-error RETRY starts below
+      // the fold on a 798x384 phone, and the first pass of this table called that
+      // "clear": the exact false all-clear this capture exists to avoid.
+      const onScreen = x >= 0 && y >= 0 && x <= window.innerWidth && y <= window.innerHeight;
+      const hit = onScreen ? document.elementFromPoint(x, y) : null;
       let named = 'nothing';
       if (hit) {
         let owner = '';
@@ -289,9 +295,9 @@ export async function harvestAndProbeDomControls(
       out.push({
         control: `dom#${id}`,
         page: { x: Math.round(x), y: Math.round(y) },
-        topmost: named,
+        topmost: onScreen ? named : 'off-viewport',
         live: true,
-        onScreen: true,
+        onScreen,
         collides: named.includes('playtest-download-log'),
         box: { x: r.x, y: r.y, width: r.width, height: r.height },
       });

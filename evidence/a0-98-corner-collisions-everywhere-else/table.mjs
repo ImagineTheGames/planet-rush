@@ -44,7 +44,9 @@ const offerOf = (log) =>
 
 const verdictOf = (c) => {
   if (c.collides) return '**COLLISION**';
-  if (!c.onScreen) return 'not probed — off-viewport';
+  // `nothing` is what `elementFromPoint` answers outside the viewport, and a cell the
+  // probe could not reach is not a cell that came back clear.
+  if (!c.onScreen || c.topmost === 'nothing' || c.topmost === 'off-viewport') return 'not probed — off-viewport';
   if (!c.live) return 'covered, but nothing routes a press here';
   return 'clear';
 };
