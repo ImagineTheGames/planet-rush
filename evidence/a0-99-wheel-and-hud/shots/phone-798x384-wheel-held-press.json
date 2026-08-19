@@ -1,0 +1,208 @@
+{
+  "profile": "phone landscape 798x384 (dpr 2, touch) — the developer's own screenshot size",
+  "boot": "?debug=1 on the production bundle, openBuild(999) before each wedge",
+  "why": "the tap frames in spec 2 were all taken after the finger lifted; these are taken with it down",
+  "steps": [
+    {
+      "index": 0,
+      "wedge": "TURRET",
+      "heldAt": {
+        "x": 399,
+        "y": 109.056
+      },
+      "gesture": "CDP Input.dispatchTouchEvent touchStart, held across the shot",
+      "selectedBefore": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "selectedWhileHeld": [
+        true,
+        false,
+        false,
+        false,
+        false
+      ],
+      "selectedAfterRelease": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "capsWhileHeld": [
+        "1/4 BUILT",
+        "0/2 BUILT",
+        "0/1 BUILT",
+        "",
+        ""
+      ],
+      "capsAfterRelease": [
+        "1/4 BUILT",
+        "0/2 BUILT",
+        "0/1 BUILT",
+        "",
+        ""
+      ],
+      "bankAfterRelease": 996
+    },
+    {
+      "index": 1,
+      "wedge": "SHIELD",
+      "heldAt": {
+        "x": 477.8844316875852,
+        "y": 166.36889441856437
+      },
+      "gesture": "CDP Input.dispatchTouchEvent touchStart, held across the shot",
+      "selectedBefore": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "selectedWhileHeld": [
+        false,
+        true,
+        false,
+        false,
+        false
+      ],
+      "selectedAfterRelease": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "capsWhileHeld": [
+        "1/4 BUILT",
+        "1/2 BUILT",
+        "0/1 BUILT",
+        "",
+        ""
+      ],
+      "capsAfterRelease": [
+        "1/4 BUILT",
+        "1/2 BUILT",
+        "0/1 BUILT",
+        "",
+        ""
+      ],
+      "bankAfterRelease": 994
+    },
+    {
+      "index": 2,
+      "wedge": "RADAR",
+      "heldAt": {
+        "x": 447.7532599661469,
+        "y": 259.10310558143567
+      },
+      "gesture": "CDP Input.dispatchTouchEvent touchStart, held across the shot",
+      "selectedBefore": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "selectedWhileHeld": [
+        false,
+        false,
+        true,
+        false,
+        false
+      ],
+      "selectedAfterRelease": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "capsWhileHeld": [
+        "1/4 BUILT",
+        "1/2 BUILT",
+        "1/1 BUILT",
+        "",
+        ""
+      ],
+      "capsAfterRelease": [
+        "1/4 BUILT",
+        "1/2 BUILT",
+        "1/1 BUILT",
+        "",
+        ""
+      ],
+      "bankAfterRelease": 993
+    },
+    {
+      "index": 3,
+      "wedge": "REPAIR REACTOR",
+      "heldAt": {
+        "x": 350.24674003385314,
+        "y": 259.10310558143567
+      },
+      "gesture": "CDP Input.dispatchTouchEvent touchStart, held across the shot",
+      "selectedBefore": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "selectedWhileHeld": [
+        false,
+        false,
+        false,
+        true,
+        false
+      ],
+      "selectedAfterRelease": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "capsWhileHeld": [
+        "1/4 BUILT",
+        "1/2 BUILT",
+        "1/1 BUILT",
+        "",
+        ""
+      ],
+      "capsAfterRelease": [
+        "1/4 BUILT",
+        "1/2 BUILT",
+        "1/1 BUILT",
+        "",
+        ""
+      ],
+      "bankAfterRelease": 999
+    },
+    {
+      "index": 4,
+      "wedge": "UPGRADE SHIP",
+      "heldAt": {
+        "x": 320.1155683124148,
+        "y": 166.36889441856437
+      },
+      "gesture": "CDP Input.dispatchTouchEvent touchStart, held across the shot",
+      "selectedBefore": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "selectedWhileHeld": [],
+      "selectedAfterRelease": [],
+      "capsWhileHeld": [],
+      "capsAfterRelease": [],
+      "bankAfterRelease": 999
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "profile": "phone-798x384",
+  "boot": "front door: /?gate=0 → PLAY → PLAY SOLO → RUSH (no ?debug=1, no staged ore)",
+  "press": {
+    "kind": "tap on BUILD & UPGRADE",
+    "at": {
+      "x": 92,
+      "y": 172
+    },
+    "topmostBefore": {
+      "tag": "canvas",
+      "id": "",
+      "cls": "",
+      "text": "",
+      "zIndex": "auto",
+      "isCanvas": true
+    }
+  },
+  "pauseSeamBefore": {
+    "screen": "closed",
+    "open": false,
+    "pausable": true,
+    "frozen": false,
+    "simTicks": 251,
+    "online": false,
+    "ship": {
+      "x": 1968,
+      "y": 1200,
+      "vx": 0,
+      "vy": 0
+    },
+    "controls": [],
+    "buttonPoint": {
+      "x": 96,
+      "y": 40
+    }
+  },
+  "pauseSeamAfter": {
+    "screen": "closed",
+    "open": false,
+    "pausable": true,
+    "frozen": false,
+    "simTicks": 518,
+    "online": false,
+    "ship": {
+      "x": 1968,
+      "y": 1200,
+      "vx": 0,
+      "vy": 0
+    },
+    "controls": [],
+    "buttonPoint": {
+      "x": 96,
+      "y": 40
+    }
+  },
+  "caveat": "the front-door boot installs no wheel seam, so nothing here reads the wheel; what the wheel says is read off the committed frame by eye."
+}

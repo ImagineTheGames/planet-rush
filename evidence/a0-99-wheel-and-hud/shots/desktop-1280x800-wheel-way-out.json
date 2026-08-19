@@ -1,0 +1,67 @@
+{
+  "profile": "desktop 1280x800 (dpr 2, pointer) — the golden suite's control width",
+  "boot": "?debug=1 on the production bundle, openBuild(6)",
+  "pauseButtonAtRest": null,
+  "pauseButtonWhileWheelOpen": null,
+  "idsAtRest": [
+    "ship-local",
+    "build-badge",
+    "ore-hud",
+    "banked-total",
+    "controls-strip",
+    "station-hp",
+    "onboarding",
+    "nameplates",
+    "minimap",
+    "healthbars"
+  ],
+  "idsWhileWheelOpen": [
+    "ship-local",
+    "build-badge",
+    "ore-hud",
+    "banked-total",
+    "controls-strip",
+    "station-hp",
+    "onboarding",
+    "nameplates",
+    "minimap",
+    "build-wheel",
+    "wheel-hub-back"
+  ],
+  "hubRectLogical": {
+    "x": 566.6178947368421,
+    "y": 326.6178947368421,
+    "width": 146.76421052631576,
+    "height": 146.76421052631576
+  },
+  "hubPointClient": {
+    "x": 640,
+    "y": 400
+  },
+  "topmostAtHub": {
+    "tag": "canvas",
+    "id": "",
+    "cls": "",
+    "text": "",
+    "zIndex": "auto",
+    "isCanvas": true
+  },
+  "hubPress": {
+    "at": {
+      "x": 640,
+      "y": 400
+    },
+    "kind": "click",
+    "wedgesBefore": 5,
+    "wedgesAfter": 0,
+    "note": "wedges() is empty when no Build wheel is up — the readback form of \"it closed\""
+  },
+  "escape": {
+    "beforeEsc": {
+      "wedges": 5,
+      "screen": "closed"
+    },
+    "wedgesAfter": 0,
+    "screenAfter": "closed"
+  }
+}
