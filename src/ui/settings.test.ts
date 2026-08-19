@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { FireMode, createControlState, describeBindings } from '@platform/actions';
+import { FireMode, createControlState, describeBindings, readStoredFireMode } from '@platform/actions';
 import type { DeviceKind } from '@platform/actions';
 import { TapPilot } from '@platform/tap-pilot';
 import {
@@ -17,15 +17,20 @@ import {
   SETTINGS_HELP,
   SETTINGS_HELP_GLYPH,
   SETTINGS_ROWS,
+  SETTINGS_STORAGE,
   STICKS_LABELS,
   TAP_COMMANDER_LABEL,
   VOLUME_CHANNELS,
   VOLUME_STEPS,
+  VOLUME_STEP,
   adjustVolume,
+  commitSettings,
   controlsDevice,
   createSettings,
+  loadSettings,
   parseControlScheme,
   sameTarget,
+  saveSettings,
   setReduceVfx,
   setVolume,
   settingsHelp,
@@ -39,7 +44,15 @@ import {
   volumeButtons,
   volumeLevel,
 } from './settings';
-import type { ControlScheme, VolumeChannel } from './settings';
+import type {
+  ControlScheme,
+  SettingsState,
+  SettingsStorage,
+  SettingsValueTarget,
+  VolumeChannel,
+  VolumeMixer,
+  Volumes,
+} from './settings';
 import { hitRect } from './menu-geometry';
 import { textWidth } from './font-metrics';
 import { singlePrimary } from './gantry';
@@ -853,5 +866,175 @@ describe('a ? on every setting (a0-77)', () => {
   it('marks the control with the one glyph the game already uses for "explain this"', () => {
     // The same mark as the lobby's roster rows (`./lobby` SEAT_HELP_GLYPH, a0-06).
     expect(SETTINGS_HELP_GLYPH).toBe('?');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The header's promise (a0-92)
+// ---------------------------------------------------------------------------
+
+/** A store that outlives the page — `platform.storage`'s two methods over a
+ *  `Map`. Handing the SAME map to a second reader is the whole of what a reload
+ *  is, from the settings' point of view: every object is gone, the store is not. */
+function storageOver(disk: Map<string, string>): SettingsStorage {
+  return {
+    get: (key) => disk.get(key) ?? null,
+    set: (key, value) => {
+      disk.set(key, value);
+    },
+  };
+}
+
+/** A mixer that only remembers what arrived — the three setters of the audio
+ *  engine with no `AudioContext` behind them. */
+function recordingMixer(): VolumeMixer & { readonly pushes: Volumes[] } {
+  const pushes: Volumes[] = [];
+  const last = { master: NaN, sfx: NaN, music: NaN };
+  return {
+    pushes,
+    setMasterVolume: (level) => {
+      last.master = level;
+    },
+    setSfxVolume: (level) => {
+      last.sfx = level;
+    },
+    setMusicVolume: (level) => {
+      // Music is pushed last by `applyVolumes`, so the triple is complete here —
+      // and a partial push (a caller that set one bus and stopped) would leave a
+      // NaN in the record rather than passing quietly.
+      pushes.push({ ...last, music: level });
+    },
+  };
+}
+
+describe('CHANGES SAVE IMMEDIATELY, on every row that says it (a0-92)', () => {
+  it('every row the header promises to save survives a reload', () => {
+    // The eyebrow is a promise made on behalf of all six rows, and four of them
+    // did not keep it: REDUCE VFX and the three volumes lived in a value rebuilt
+    // by `createSettings()` on every boot and read back from nowhere
+    // (`docs/settings.md`, mismatch 3). So: move all six off their defaults,
+    // throw the page away, and come back.
+    expect(SETTINGS_EYEBROW).toBe('CHANGES SAVE IMMEDIATELY');
+    expect(SETTINGS_ROWS).toHaveLength(6);
+
+    const disk = new Map<string, string>();
+    const storage = storageOver(disk);
+    const mixer = recordingMixer();
+
+    // Rows 1 and 2 are loose values beside each screen and the wiring layer
+    // writes them — the same two `storage.set` calls `src/main.ts` makes on a
+    // press, through the keys named in one table with the other four.
+    storage.set(SETTINGS_STORAGE.fireMode, FireMode.Manual);
+    storage.set(SETTINGS_STORAGE.controlScheme, storedControlScheme('sticks'));
+
+    // Rows 3-6 go through the one path both settings screens take.
+    let state = createSettings();
+    const press = (target: SettingsValueTarget) => {
+      state = commitSettings(state, target, { storage, mixer }).state;
+    };
+    press({ kind: 'reduceVfx' }); // OFF → ON
+    for (let i = 0; i < 5; i++) press({ kind: 'volume', channel: 'master', dir: -1 }); // 8 → 3 steps
+    for (let i = 0; i < 2; i++) press({ kind: 'volume', channel: 'sfx', dir: 1 }); // 8 → 10 steps
+    for (let i = 0; i < 6; i++) press({ kind: 'volume', channel: 'music', dir: -1 }); // 6 → 0 steps
+
+    // Every value is now away from its default, or the reload proves nothing.
+    expect(state.reduceVfx).not.toBe(createSettings().reduceVfx);
+    expect(state.volumes).not.toEqual(DEFAULT_VOLUMES);
+
+    // THE RELOAD. Nothing crosses it but the store: fresh readers over the same
+    // disk, exactly as a second boot gets.
+    const rebooted = storageOver(disk);
+
+    expect(readStoredFireMode(rebooted.get(SETTINGS_STORAGE.fireMode))).toBe(FireMode.Manual);
+    expect(parseControlScheme(rebooted.get(SETTINGS_STORAGE.controlScheme))).toBe('sticks');
+
+    const back = loadSettings(rebooted);
+    expect(back.reduceVfx).toBe(true);
+    expect(volumeLevel(back, 'master')).toBe(3);
+    expect(volumeLevel(back, 'sfx')).toBe(VOLUME_STEPS);
+    expect(volumeLevel(back, 'music')).toBe(0);
+    // The whole value, not just the parts asserted above.
+    expect(back).toEqual(state);
+
+    // And the read is a READ: an empty disk — a first run, a cleared profile —
+    // still opens on the shipped defaults rather than on whatever was last set.
+    expect(loadSettings(storageOver(new Map()))).toEqual(createSettings());
+  });
+
+  it('the menu volume rows reach the mixer', () => {
+    // Mismatch 4: on the MAIN MENU the volume case folded a new value into a
+    // local and stopped — no mixer call, on the one screen whose own cues are
+    // playing while the player holds the slider. The menu press now goes through
+    // `commitSettings` (`src/main.ts`, `applySettings`), so what is asserted here
+    // is that a press on any channel reaches all three buses with the levels the
+    // pips are drawing.
+    const storage = storageOver(new Map<string, string>());
+    const mixer = recordingMixer();
+    const sink = { storage, mixer };
+
+    const down = commitSettings(createSettings(), { kind: 'volume', channel: 'master', dir: -1 }, sink);
+    expect(down.moved).toBe(true);
+    expect(mixer.pushes).toHaveLength(1);
+    // All three, every time: MASTER moved, and SFX and MUSIC are re-asserted at
+    // the levels the screen shows, so no bus can drift from its pips.
+    const first = mixer.pushes[0]!;
+    expect(first.master).toBeCloseTo(0.7, 10);
+    expect(first.sfx).toBeCloseTo(DEFAULT_VOLUMES.sfx, 10);
+    expect(first.music).toBeCloseTo(DEFAULT_VOLUMES.music, 10);
+
+    const music = commitSettings(down.state, { kind: 'volume', channel: 'music', dir: 1 }, sink);
+    const second = mixer.pushes[1]!;
+    expect(second.music).toBeCloseTo(DEFAULT_VOLUMES.music + VOLUME_STEP, 10);
+    expect(second.master).toBeCloseTo(0.7, 10);
+
+    // A slider against its rail refuses: nothing moved, so nothing is pushed and
+    // nothing is written — the screen cues the refusal off `moved`.
+    let floored: SettingsState = music.state;
+    for (let i = 0; i < VOLUME_STEPS; i++) {
+      floored = commitSettings(floored, { kind: 'volume', channel: 'sfx', dir: -1 }, sink).state;
+    }
+    expect(volumeLevel(floored, 'sfx')).toBe(0);
+    const pushesBefore = mixer.pushes.length;
+    const atRail = commitSettings(floored, { kind: 'volume', channel: 'sfx', dir: -1 }, sink);
+    expect(atRail.moved).toBe(false);
+    expect(atRail.state).toBe(floored);
+    expect(mixer.pushes).toHaveLength(pushesBefore);
+
+    // REDUCE VFX is not a sound: it persists and touches no bus.
+    const vfx = commitSettings(floored, { kind: 'reduceVfx' }, sink);
+    expect(vfx.moved).toBe(true);
+    expect(mixer.pushes).toHaveLength(pushesBefore);
+    expect(loadSettings(storage).reduceVfx).toBe(true);
+  });
+
+  it('folds a stale, absent or hand-edited save to the shipped default, per row', () => {
+    // The same rule the control scheme and the view zoom keep: nothing a player
+    // never chose — and nothing a later build wrote — can seat a value this
+    // screen cannot show. A silent mix from a junk key is the case that matters.
+    const disk = new Map<string, string>([
+      [SETTINGS_STORAGE.reduceVfx, 'yes'],
+      [SETTINGS_STORAGE.volumes.master, 'loud'],
+      [SETTINGS_STORAGE.volumes.sfx, ''],
+      [SETTINGS_STORAGE.volumes.music, '99'],
+    ]);
+    const back = loadSettings(storageOver(disk));
+    expect(back.reduceVfx).toBe(false);
+    expect(back.volumes.master).toBeCloseTo(DEFAULT_VOLUMES.master, 10);
+    expect(back.volumes.sfx).toBeCloseTo(DEFAULT_VOLUMES.sfx, 10);
+    // An out-of-range step count is clamped onto the ladder, not defaulted: it
+    // is a level, just not one this build's ladder reaches.
+    expect(volumeLevel(back, 'music')).toBe(VOLUME_STEPS);
+  });
+
+  it('writes whole steps, so a level round-trips exactly', () => {
+    // A save holding 0.30000000000000004 is a level no row can draw and a value
+    // the next boot has to snap. Steps round-trip.
+    const disk = new Map<string, string>();
+    const storage = storageOver(disk);
+    let state = createSettings();
+    for (let i = 0; i < 5; i++) state = adjustVolume(state, 'master', -1);
+    saveSettings(storage, state);
+    expect(disk.get(SETTINGS_STORAGE.volumes.master)).toBe('3');
+    expect(loadSettings(storage).volumes.master).toBe(state.volumes.master);
   });
 });
