@@ -45,7 +45,7 @@ import {
   minimapRect,
   minimapScene,
   pointInRect,
-  sensedRegionOutlines,
+  sensedRegions,
   MINIMAP_TOGGLE_KEY,
   MINIMAP_MARGIN,
   MINIMAP_COLLAPSED_TOUCH,
@@ -753,9 +753,9 @@ function polygonArea(loop: readonly number[]): number {
 // and the overlapping washes double-blended into a lens that advertised "two
 // separate circles". Drawing the UNION removes both readings at once.
 
-describe('sensedRegionOutlines — the union of the coverage discs', () => {
+describe('sensedRegions — the union of the coverage discs', () => {
   it('two SEPARATE discs stay two lobes', () => {
-    const loops = sensedRegionOutlines([
+    const loops = sensedRegions([
       { x: 0, y: 0, radius: 10 },
       { x: 100, y: 0, radius: 10 },
     ]);
@@ -764,12 +764,13 @@ describe('sensedRegionOutlines — the union of the coverage discs', () => {
 
   it('two OVERLAPPING discs merge into ONE silhouette — the honest picture', () => {
     // This is the developer's own frame: your ship near your home, both sensing.
-    const loops = sensedRegionOutlines([
+    const regions = sensedRegions([
       { x: 0, y: 0, radius: 30 },
       { x: 40, y: 0, radius: 30 },
     ]);
-    expect(loops).toHaveLength(1);
-    const loop = loops[0]!;
+    expect(regions).toHaveLength(1);
+    expect(regions[0]!.holes).toEqual([]);
+    const loop = regions[0]!.outline;
     // The merged outline encloses the whole of both discs...
     expect(inPolygon(loop, -25, 0)).toBe(true); // deep in the left disc
     expect(inPolygon(loop, 65, 0)).toBe(true); // deep in the right disc
@@ -781,10 +782,10 @@ describe('sensedRegionOutlines — the union of the coverage discs', () => {
   });
 
   it('the merged outline has a WAIST — it is not a circle pretending to be two', () => {
-    const loop = sensedRegionOutlines([
+    const loop = sensedRegions([
       { x: 0, y: 0, radius: 30 },
       { x: 40, y: 0, radius: 30 },
-    ])[0]!;
+    ])[0]!.outline;
     // The boundary at the join sits nearer the axis than either disc's own top.
     let waist = Infinity;
     for (let i = 0; i < loop.length; i += 2) {
@@ -794,20 +795,20 @@ describe('sensedRegionOutlines — the union of the coverage discs', () => {
   });
 
   it('a disc wholly inside another contributes nothing — one clean boundary', () => {
-    const loops = sensedRegionOutlines([
+    const loops = sensedRegions([
       { x: 0, y: 0, radius: 50 },
       { x: 5, y: 0, radius: 10 },
     ]);
     expect(loops).toHaveLength(1);
     // Every vertex is on the BIG disc, so the small one drew no arc at all.
-    const loop = loops[0]!;
+    const loop = loops[0]!.outline;
     for (let i = 0; i < loop.length; i += 2) {
       expect(Math.hypot(loop[i] as number, loop[i + 1] as number)).toBeCloseTo(50, 5);
     }
   });
 
   it('exact duplicates collapse to one outline (no double-stroked ring)', () => {
-    const loops = sensedRegionOutlines([
+    const loops = sensedRegions([
       { x: 10, y: 10, radius: 20 },
       { x: 10, y: 10, radius: 20 },
     ]);
@@ -815,23 +816,24 @@ describe('sensedRegionOutlines — the union of the coverage discs', () => {
   });
 
   it('a lone disc is a closed circle; nothing at all is nothing', () => {
-    expect(sensedRegionOutlines([])).toEqual([]);
-    const loops = sensedRegionOutlines([{ x: 0, y: 0, radius: 12 }]);
+    expect(sensedRegions([])).toEqual([]);
+    const loops = sensedRegions([{ x: 0, y: 0, radius: 12 }]);
     expect(loops).toHaveLength(1);
-    expect(loops[0]!.length / 2).toBeGreaterThan(8);
-    for (let i = 0; i < loops[0]!.length; i += 2) {
-      expect(Math.hypot(loops[0]![i] as number, loops[0]![i + 1] as number)).toBeCloseTo(12, 5);
+    const only = loops[0]!.outline;
+    expect(only.length / 2).toBeGreaterThan(8);
+    for (let i = 0; i < only.length; i += 2) {
+      expect(Math.hypot(only[i] as number, only[i + 1] as number)).toBeCloseTo(12, 5);
     }
   });
 
   it('a three-disc chain is one region; break the chain and it is two', () => {
-    const chained = sensedRegionOutlines([
+    const chained = sensedRegions([
       { x: 0, y: 0, radius: 20 },
       { x: 30, y: 0, radius: 20 },
       { x: 60, y: 0, radius: 20 },
     ]);
     expect(chained).toHaveLength(1);
-    const broken = sensedRegionOutlines([
+    const broken = sensedRegions([
       { x: 0, y: 0, radius: 20 },
       { x: 30, y: 0, radius: 20 },
       { x: 200, y: 0, radius: 20 },
@@ -839,9 +841,57 @@ describe('sensedRegionOutlines — the union of the coverage discs', () => {
     expect(broken).toHaveLength(2);
   });
 
+  it('a RING of discs leaves a pocket, and the pocket is a hole, not a second region', () => {
+    // Four of a side's ships spread out on patrol (GDD §2.2, amended 2026-08-13:
+    // in TEAMS the fog lifts under a teammate exactly as under you, so all four
+    // discs are on one map). Their sensor radius is the shipped 520 (§2.8) and
+    // they sit 900 apart, so neighbouring discs overlap but the middle of the
+    // square — 636 from every one of them — is inside none.
+    const patrol = [
+      { x: 0, y: 0, radius: 520 },
+      { x: 900, y: 0, radius: 520 },
+      { x: 900, y: 900, radius: 520 },
+      { x: 0, y: 900, radius: 520 },
+    ];
+    const regions = sensedRegions(patrol);
+    expect(regions).toHaveLength(1); // one lit silhouette...
+    expect(regions[0]!.holes).toHaveLength(1); // ...with an unlit pocket in it
+
+    // The pocket really is the part nobody senses: its centre is outside every
+    // disc, and it is inside the region's outer boundary.
+    const mid = { x: 450, y: 450 };
+    for (const d of patrol) {
+      expect(Math.hypot(mid.x - d.x, mid.y - d.y)).toBeGreaterThan(d.radius);
+    }
+    expect(inPolygon(regions[0]!.outline, mid.x, mid.y)).toBe(true);
+    expect(inPolygon(regions[0]!.holes[0]!, mid.x, mid.y)).toBe(true);
+
+    // And a point that IS sensed is inside the region but outside the pocket.
+    expect(inPolygon(regions[0]!.outline, 450, 0)).toBe(true);
+    expect(inPolygon(regions[0]!.holes[0]!, 450, 0)).toBe(false);
+  });
+
+  it('a disc parked INSIDE a pocket is its own region — nesting, not a hole', () => {
+    // A radar satellite (§2.8: 900) would swallow the ring whole, so this is the
+    // small case: a station's own 300 disc, alone in the middle of the patrol.
+    const regions = sensedRegions([
+      { x: 0, y: 0, radius: 520 },
+      { x: 900, y: 0, radius: 520 },
+      { x: 900, y: 900, radius: 520 },
+      { x: 0, y: 900, radius: 520 },
+      { x: 450, y: 450, radius: 60 },
+    ]);
+    expect(regions).toHaveLength(2);
+    const island = regions.find((r) => Math.abs(r.outline[0]! - 510) < 1e-6);
+    expect(island).toBeDefined(); // the little disc, drawn on its own
+    expect(island!.holes).toEqual([]); // and NOT swallowed by the pocket
+    const ringed = regions.find((r) => r !== island)!;
+    expect(ringed.holes).toHaveLength(1); // the pocket is still the ring's
+  });
+
   it('degenerate discs are dropped rather than drawn', () => {
-    expect(sensedRegionOutlines([{ x: 0, y: 0, radius: 0 }])).toEqual([]);
-    expect(sensedRegionOutlines([{ x: NaN, y: 0, radius: 5 }])).toEqual([]);
+    expect(sensedRegions([{ x: 0, y: 0, radius: 0 }])).toEqual([]);
+    expect(sensedRegions([{ x: NaN, y: 0, radius: 5 }])).toEqual([]);
   });
 
   it('the scene carries the region only when the map is FOGGED', () => {

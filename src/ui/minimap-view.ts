@@ -54,7 +54,14 @@ import {
   MINIMAP_COVERAGE_FILL_ALPHA,
   MINIMAP_COVERAGE_RING_ALPHA,
 } from './minimap';
-import type { MinimapDot, MinimapFrame, MinimapInsets, MinimapScene, MinimapState } from './minimap';
+import type {
+  MinimapDot,
+  MinimapFrame,
+  MinimapInsets,
+  MinimapRegion,
+  MinimapScene,
+  MinimapState,
+} from './minimap';
 
 /** Layout-registry id for the collapsed corner square (GDD §2.2 bottom-right). */
 export const MINIMAP_ID = 'minimap';
@@ -356,7 +363,7 @@ export class MinimapView extends Container {
    * projecting it, and its outline is a single silhouette that changes shape as you
    * fly: the edge of what you can see.
    */
-  private drawFog(g: Graphics, rect: Rect, sensedRegion: readonly (readonly number[])[]): void {
+  private drawFog(g: Graphics, rect: Rect, sensedRegion: readonly MinimapRegion[]): void {
     // The dark veil over the whole map — fogged vacuum.
     g.rect(rect.x, rect.y, rect.width, rect.height).fill({ color: PALETTE.vacuum, alpha: MINIMAP_FOG_ALPHA });
 
@@ -375,18 +382,38 @@ export class MinimapView extends Container {
     g.stroke({ width: 0.5, color: PALETTE.hullSteel, alpha: 0.06 });
 
     // Reveal the sensed region: a faint wash lightens the sensed vacuum, then its
-    // boundary is drawn once. Each loop is filled on its own so touching discs read
-    // as ONE even area rather than a stack of washes (the double-blended lens is
-    // what made two discs look like two circles).
-    for (const loop of sensedRegion) {
-      g.poly(loop as number[], true).fill({ color: PALETTE.hullSteel, alpha: MINIMAP_COVERAGE_FILL_ALPHA });
-    }
-    for (const loop of sensedRegion) {
-      g.poly(loop as number[], true).stroke({
-        width: 1,
-        color: PALETTE.plasma,
-        alpha: MINIMAP_COVERAGE_RING_ALPHA,
+    // boundary is drawn once. Each region is filled ONCE so touching discs read as
+    // one even area rather than a stack of washes (the double-blended lens is what
+    // made two discs look like two circles), and any pocket its discs merely ring
+    // is cut back out — the wash means "sensed", so a washed pocket would be the
+    // map claiming an area nobody is looking at.
+    for (const region of sensedRegion) {
+      g.poly(region.outline as number[], true).fill({
+        color: PALETTE.hullSteel,
+        alpha: MINIMAP_COVERAGE_FILL_ALPHA,
       });
+      // ONE cut per fill. Pixi's `cut()` hangs the active path on the last fill
+      // instruction and, if that fill already has a hole, keeps walking BACK a
+      // second instruction and hangs it on the previous fill too
+      // (`GraphicsContext.cut` — the second branch has no `break`), which would
+      // hand this region's pocket to the region drawn before it as a hole that
+      // does not lie inside it. So a second pocket in the SAME region is left
+      // washed rather than risking a bad cut on a neighbour: one is the case a
+      // ring of a side's discs actually produces, and a washed pocket is a small
+      // overstatement where a mis-cut is a hole in someone else's map.
+      const pocket = region.holes[0];
+      if (pocket) g.poly(pocket as number[], true).cut();
+    }
+    // Every boundary, pockets included: the edge of a pocket is as much the edge
+    // of what you can see as the outside of the region is.
+    for (const region of sensedRegion) {
+      for (const loop of [region.outline, ...region.holes]) {
+        g.poly(loop as number[], true).stroke({
+          width: 1,
+          color: PALETTE.plasma,
+          alpha: MINIMAP_COVERAGE_RING_ALPHA,
+        });
+      }
     }
   }
 

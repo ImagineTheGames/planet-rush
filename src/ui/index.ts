@@ -1344,7 +1344,7 @@ export {
   mapPoint,
   markPolygon,
   pointInRect,
-  sensedRegionOutlines,
+  sensedRegions,
   MINIMAP_TOGGLE_KEY,
   MINIMAP_REDRAW_TICKS,
   MINIMAP_MARGIN,
@@ -1374,6 +1374,7 @@ export type {
   MinimapInsets,
   MinimapDot,
   MinimapShape,
+  MinimapRegion,
   MinimapScene,
   FitTransform,
 } from './minimap';

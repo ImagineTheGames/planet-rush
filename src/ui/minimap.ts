@@ -450,10 +450,9 @@ export interface MinimapScene {
    *  what the view actually DRAWS is their union, {@link sensedRegion}. */
   readonly coverage: readonly MinimapCoverageDraw[];
   /**
-   * The OUTLINE of the sensed region (a0-88): the boundary of the union of
-   * {@link coverage}, as closed screen-space loops of `[x0,y0,x1,y1,…]`. One loop
-   * per connected component — discs that touch merge into a single silhouette,
-   * discs that do not stay separate lobes.
+   * The sensed region (a0-88): the union of {@link coverage}, as one
+   * {@link MinimapRegion} per connected component — discs that touch merge into a
+   * single silhouette, discs that do not stay separate lobes.
    *
    * This is what replaced N stacked circles. The developer could not read the old
    * picture — *"it shows a circle around my ship and a circle around the station
@@ -467,7 +466,7 @@ export interface MinimapScene {
    *
    * Empty when {@link fogged} is false.
    */
-  readonly sensedRegion: readonly (readonly number[])[];
+  readonly sensedRegion: readonly MinimapRegion[];
 }
 
 // ---------------------------------------------------------------------------
@@ -704,8 +703,42 @@ interface BoundaryArc {
 }
 
 /**
- * The outline of the union of a set of discs, as closed loops of flat
- * `[x0,y0,…]` point lists — the geometry behind {@link MinimapScene.sensedRegion}.
+ * One connected piece of the sensed region (a0-88) — a filled area and the
+ * pockets punched out of it.
+ *
+ * `outline` is its boundary, closed, as a flat `[x0,y0,x1,y1,…]` point list.
+ * `holes` are the pockets **inside** that boundary which no disc actually
+ * reaches: three or more of your side's discs can ring an area without covering
+ * it, and the union's boundary then has an inner loop as well as an outer one. A
+ * pocket is not a detail — the wash means *sensed*, so painting one would be the
+ * map asserting a thing it does not know (GDD §2.2 makes exactly this argument
+ * about station health: a display whose unknown state is indistinguishable from
+ * its known one asserts a false state rather than withholding a true one).
+ */
+export interface MinimapRegion {
+  readonly outline: number[];
+  readonly holes: number[][];
+}
+
+/**
+ * The union of a set of discs, as {@link MinimapRegion}s — the geometry behind
+ * {@link MinimapScene.sensedRegion}.
+ *
+ * Two halves: {@link unionLoops} walks the discs' boundaries and returns every
+ * closed loop of the union; {@link groupLoops} decides which of those loops is an
+ * outer boundary and which is a pocket inside one, by nesting depth.
+ *
+ * O(n²) in the disc count, which is a handful (your ship, your home, each
+ * satellite, and in TEAMS your side's) — and it runs on the throttled rebuild, not
+ * per frame.
+ */
+export function sensedRegions(discs: readonly MinimapCoverageDraw[]): MinimapRegion[] {
+  return groupLoops(unionLoops(discs));
+}
+
+/**
+ * The raw closed boundary loops of the union — outer boundaries and pocket
+ * boundaries alike, in no particular order.
  *
  * Three steps, all exact until the last one tessellates:
  *  1. **Cull** every disc wholly inside another (largest first, so a container is
@@ -717,13 +750,10 @@ interface BoundaryArc {
  *  3. **Stitch** — walk arc end → the arc that starts there ({@link STITCH_EPSILON}),
  *     which is well-defined because every free arc ends at an intersection point
  *     where exactly one other free arc begins. CCW arcs traversed in order trace
- *     the boundary CCW, so a component closes on itself.
- *
- * O(n²) in the disc count, which is a handful (your ship, your home, each
- * satellite, and in TEAMS your side's) — and it runs on the throttled rebuild, not
- * per frame.
+ *     the boundary CCW, so a component closes on itself — and a pocket, walked the
+ *     same way, closes the other way round, which is what {@link groupLoops} reads.
  */
-export function sensedRegionOutlines(discs: readonly MinimapCoverageDraw[]): number[][] {
+function unionLoops(discs: readonly MinimapCoverageDraw[]): number[][] {
   const live = discs.filter((d) => Number.isFinite(d.x) && Number.isFinite(d.y) && d.radius > 0);
   if (live.length === 0) return [];
 
@@ -853,6 +883,86 @@ function freeArcs(covered: readonly [number, number][]): 'whole' | [number, numb
     return 'whole';
   }
   return gaps;
+}
+
+/**
+ * Sort the union's loops into regions by NESTING, not by winding.
+ *
+ * A loop that sits inside an odd number of other loops is a pocket, and belongs
+ * to the smallest loop containing it; a loop inside an even number (usually zero)
+ * is a region of its own. Even-odd rather than the loops' orientation, because the
+ * nesting can go deeper than two: park a radar satellite in the middle of a pocket
+ * its own side's ships have ringed, and its disc is a genuine region sitting
+ * inside a hole inside a region.
+ *
+ * Containment is decided by one point of the inner loop — sound here because the
+ * loops of a union never cross, so if one point of a loop is inside another loop
+ * the whole loop is.
+ */
+function groupLoops(loops: number[][]): MinimapRegion[] {
+  if (loops.length === 0) return [];
+  if (loops.length === 1) return [{ outline: loops[0] as number[], holes: [] }];
+
+  const depth = loops.map(() => 0);
+  const parent = loops.map(() => -1);
+  for (let i = 0; i < loops.length; i++) {
+    const inner = loops[i] as number[];
+    let smallest = -1;
+    let smallestArea = Infinity;
+    for (let j = 0; j < loops.length; j++) {
+      if (i === j) continue;
+      const outer = loops[j] as number[];
+      if (!pointInLoop(outer, inner[0] as number, inner[1] as number)) continue;
+      depth[i] = (depth[i] as number) + 1;
+      const a = Math.abs(loopArea(outer));
+      if (a < smallestArea) {
+        smallestArea = a;
+        smallest = j;
+      }
+    }
+    parent[i] = smallest;
+  }
+
+  const regionOf = new Map<number, MinimapRegion & { holes: number[][] }>();
+  const out: MinimapRegion[] = [];
+  for (let i = 0; i < loops.length; i++) {
+    if ((depth[i] as number) % 2 !== 0) continue; // a pocket, placed below
+    const region = { outline: loops[i] as number[], holes: [] as number[][] };
+    regionOf.set(i, region);
+    out.push(region);
+  }
+  for (let i = 0; i < loops.length; i++) {
+    if ((depth[i] as number) % 2 === 0) continue;
+    const host = regionOf.get(parent[i] as number);
+    if (host) host.holes.push(loops[i] as number[]);
+  }
+  return out;
+}
+
+/** Twice the signed area of a closed flat point list (the shoelace sum, halved) —
+ *  used only for its magnitude, to find the SMALLEST loop that contains another. */
+function loopArea(loop: number[]): number {
+  let sum = 0;
+  for (let i = 0; i < loop.length; i += 2) {
+    const j = (i + 2) % loop.length;
+    sum += (loop[i] as number) * (loop[j + 1] as number) - (loop[j] as number) * (loop[i + 1] as number);
+  }
+  return sum / 2;
+}
+
+/** Even-odd ray cast: is `(x, y)` inside the closed flat point list `loop`? */
+function pointInLoop(loop: number[], x: number, y: number): boolean {
+  let inside = false;
+  for (let i = 0, j = loop.length - 2; i < loop.length; j = i, i += 2) {
+    const yi = loop[i + 1] as number;
+    const yj = loop[j + 1] as number;
+    if (yi > y !== yj > y) {
+      const xi = loop[i] as number;
+      const xj = loop[j] as number;
+      if (x < xi + ((y - yi) / (yj - yi)) * (xj - xi)) inside = !inside;
+    }
+  }
+  return inside;
 }
 
 /** Tessellate the CCW sweep `from → to` on `c` into flat `[x,y,…]`. Both endpoints
@@ -1048,8 +1158,8 @@ export function minimapScene(frame: MinimapFrame, rect: Rect, _isTouch = false):
     collapseRing,
     fogged: !!fog,
     coverage: coverageDraw,
-    // The union outline, not N circles (a0-88) — see MinimapScene.sensedRegion.
-    sensedRegion: sensedRegionOutlines(coverageDraw),
+    // The union, not N circles (a0-88) — see MinimapScene.sensedRegion.
+    sensedRegion: sensedRegions(coverageDraw),
   };
 }
 
