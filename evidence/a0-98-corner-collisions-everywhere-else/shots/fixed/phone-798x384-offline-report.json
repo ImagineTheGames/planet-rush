@@ -30,9 +30,9 @@
             "x": 117,
             "y": 486
           },
-          "topmost": "nothing",
+          "topmost": "off-viewport",
           "live": true,
-          "onScreen": true,
+          "onScreen": false,
           "collides": false,
           "box": {
             "x": 63.90625,

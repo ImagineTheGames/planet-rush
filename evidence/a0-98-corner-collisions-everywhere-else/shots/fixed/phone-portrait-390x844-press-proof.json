@@ -1,0 +1,53 @@
+{
+  "stage": "fixed",
+  "profile": "phone-portrait-390x844",
+  "pressedAt": {
+    "x": 52,
+    "y": 672
+  },
+  "topmostAtThatPoint": "BUTTON#playtest-download-log-button",
+  "minimapBefore": {
+    "id": "minimap",
+    "x": 12.000000000000057,
+    "y": 632,
+    "width": 80,
+    "height": 80
+  },
+  "minimapAfter": {
+    "id": "minimap",
+    "x": 12.000000000000057,
+    "y": 632,
+    "width": 80,
+    "height": 80
+  },
+  "minimapToggled": false,
+  "logLabelBefore": "DOWNLOAD LOG",
+  "logLabelAfter": "DOWNLOAD LOG",
+  "drawnBefore": [
+    "ship-local",
+    "build-button",
+    "build-badge",
+    "pause-menu",
+    "ore-hud",
+    "banked-total",
+    "station-hp",
+    "zoom-control",
+    "nameplates",
+    "minimap"
+  ],
+  "drawnAfter": [
+    "ship-local",
+    "build-button",
+    "build-badge",
+    "pause-menu",
+    "ore-hud",
+    "banked-total",
+    "station-hp",
+    "zoom-control",
+    "nameplates",
+    "minimap"
+  ],
+  "downloads": [
+    "planet-rush-log-adcf670-20260819-145833.json"
+  ]
+}

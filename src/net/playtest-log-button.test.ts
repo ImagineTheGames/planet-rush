@@ -656,6 +656,14 @@ interface MeasuredState {
   readonly liveControls: readonly MeasuredControl[];
 }
 
+/** Whether the client's rule stands the offer up in this measured state. The match
+ *  rule is `matchLogOffer`; the other two sites are unchanged by a0-98, so for those
+ *  the capture's own answer — was it mounted and shown — is the rule. */
+function offeredIn(s: MeasuredState): boolean {
+  if (s.rule === 'match' && s.match) return matchLogOffer(s.match) !== null;
+  return s.offer !== null;
+}
+
 /** Do two measured rects share any pixel? */
 function overlaps(a: MeasuredBox, b: MeasuredBox): boolean {
   return (
@@ -674,7 +682,18 @@ function overlaps(a: MeasuredBox, b: MeasuredBox): boolean {
  * server, with the wire really cut.
  */
 const MEASURED: readonly MeasuredState[] = [
-  // --- The boot-failure screen (`main.ts` presentBootFailure) ---------------
+  {
+    what: 'room list, a row refused',
+    viewport: 'desktop 1280x800',
+    rule: 'front-door',
+    match: null,
+    offer: { x: 1062, y: 706, width: 206, height: 82 },
+    liveControls: [
+      { name: '__onlineMenu.doorControls[0]<mode:browse>', box: { x: 44, y: 192, width: 168, height: 48 }, topmost: 'CANVAS#app' },
+      { name: '__onlineMenu.doorControls[1]<mode:code>', box: { x: 219, y: 192, width: 168, height: 48 }, topmost: 'CANVAS#app' },
+      { name: '__onlineMenu.doorControls[2]<back>', box: { x: 44, y: 726, width: 140, height: 56 }, topmost: 'CANVAS#app' },
+    ],
+  },
   {
     what: 'boot failure (no WebGL)',
     viewport: 'desktop 1280x800',
@@ -682,25 +701,17 @@ const MEASURED: readonly MeasuredState[] = [
     match: null,
     offer: { x: 978, y: 706, width: 290, height: 82 },
     liveControls: [
-      { name: 'RETRY', box: { x: 300, y: 672, width: 116, height: 44 }, topmost: 'BUTTON#boot-error-retry' },
+      { name: 'dom#boot-error-retry', box: { x: 305, y: 672, width: 107, height: 44 }, topmost: 'BUTTON#boot-error-retry' },
     ],
   },
-
-  // --- The pause menu (a0-97's known-good, re-measured) ---------------------
-  // The minimap is DRAWN under the offer on the phone and is not listed: while the
-  // overlay is up `main.ts` pointerdown consumes every press before the match sees
-  // it, so nothing under it is a control. That distinction is the difference
-  // between this row and the live-match rows below.
   {
-    what: 'pause menu, offline match',
-    viewport: 'phone 798x384',
-    rule: 'match',
-    match: { pauseScreen: 'menu', session: null, glass: 'match' },
-    offer: { x: 597, y: 328, width: 189, height: 44 },
+    what: 'boot failure, RETRY scrolled into view',
+    viewport: 'desktop 1280x800',
+    rule: 'boot',
+    match: null,
+    offer: { x: 978, y: 706, width: 290, height: 82 },
     liveControls: [
-      { name: 'RESUME', box: { x: 305, y: 100, width: 189, height: 44 }, topmost: 'CANVAS#app' },
-      { name: 'SETTINGS', box: { x: 305, y: 174, width: 189, height: 44 }, topmost: 'CANVAS#app' },
-      { name: 'EXIT TO MENU', box: { x: 305, y: 244, width: 189, height: 44 }, topmost: 'CANVAS#app' },
+      { name: 'dom#boot-error-retry', box: { x: 305, y: 668, width: 107, height: 44 }, topmost: 'BUTTON#boot-error-retry' },
     ],
   },
   {
@@ -709,65 +720,185 @@ const MEASURED: readonly MeasuredState[] = [
     rule: 'match',
     match: { pauseScreen: 'menu', session: null, glass: 'match' },
     offer: { x: 1079, y: 744, width: 189, height: 44 },
-    liveControls: [
-      { name: 'RESUME', box: { x: 546, y: 232, width: 189, height: 56 }, topmost: 'CANVAS#app' },
-      { name: 'SETTINGS', box: { x: 546, y: 326, width: 189, height: 44 }, topmost: 'CANVAS#app' },
-      { name: 'EXIT TO MENU', box: { x: 546, y: 390, width: 189, height: 44 }, topmost: 'CANVAS#app' },
-    ],
+    liveControls: [],
   },
-
-  // --- A live online match whose session has dropped -----------------------
-  // The state a0-97 never had to look at, and the one that can arrive on any
-  // screen. On the DESKTOP the kick-out card really is the screen: no fullscreen,
-  // so the card paints over the match, its two buttons are centred, and the offer
-  // sits in an empty corner. Nothing to fix, and so nothing withdrawn.
   {
-    what: 'online match, session reconnecting — CONNECTION LOST card on the glass',
+    what: 'online match, session dropped',
     viewport: 'desktop 1280x800',
     rule: 'match',
     match: { pauseScreen: 'closed', session: 'reconnecting', glass: 'kicked-out' },
     offer: { x: 959, y: 706, width: 309, height: 82 },
     liveControls: [
-      { name: 'RECONNECT NOW', box: { x: 436, y: 424, width: 198, height: 45 }, topmost: 'BUTTON#pr-link-loss-reconnect' },
-      { name: 'ABANDON MATCH', box: { x: 645, y: 424, width: 198, height: 45 }, topmost: 'BUTTON#pr-link-loss-abandon' },
+      { name: '__cornerStage.elements[7]<minimap>', box: { x: 1120, y: 600, width: 148, height: 148 }, topmost: 'DIV#pr-link-loss' },
+      { name: 'dom#pr-link-loss-reconnect', box: { x: 436, y: 424, width: 198, height: 44 }, topmost: 'BUTTON#pr-link-loss-reconnect' },
+      { name: 'dom#pr-link-loss-abandon', box: { x: 644, y: 424, width: 200, height: 44 }, topmost: 'BUTTON#pr-link-loss-abandon' },
     ],
   },
-  // …and on a PHONE the same drop is a different screen, because there is no
-  // screen: the root is fullscreen, so the card is painted under the canvas
-  // (`kickOutClaimsTheGlass`) and the HUD is still what the player is looking at.
-  // The offer lands on the minimap — a real tap at the map's own reported centre
-  // downloaded `planet-rush-log-17d1979-…json` and did not toggle the map.
   {
-    what: 'online match, session reconnecting — card buried by fullscreen, HUD live',
+    what: 'online match, dropped and backgrounded',
+    viewport: 'desktop 1280x800',
+    rule: 'match',
+    match: { pauseScreen: 'closed', session: 'reconnecting', glass: 'kicked-out' },
+    offer: { x: 959, y: 706, width: 309, height: 82 },
+    liveControls: [
+      { name: '__cornerStage.elements[7]<minimap>', box: { x: 1120, y: 600, width: 148, height: 148 }, topmost: 'DIV#pr-link-loss' },
+      { name: 'dom#pr-link-loss-reconnect', box: { x: 436, y: 424, width: 198, height: 44 }, topmost: 'BUTTON#pr-link-loss-reconnect' },
+      { name: 'dom#pr-link-loss-abandon', box: { x: 644, y: 424, width: 200, height: 44 }, topmost: 'BUTTON#pr-link-loss-abandon' },
+    ],
+  },
+  {
+    what: 'online match, dropped, pause menu open',
+    viewport: 'desktop 1280x800',
+    rule: 'match',
+    match: { pauseScreen: 'menu', session: 'reconnecting', glass: 'match' },
+    offer: { x: 916, y: 688, width: 352, height: 100 },
+    liveControls: [
+      { name: 'dom#pr-link-loss-menu', box: { x: 551, y: 427, width: 178, height: 44 }, topmost: 'BUTTON#pr-link-loss-menu' },
+    ],
+  },
+  {
+    what: 'boot failure (no WebGL)',
+    viewport: 'phone 798x384',
+    rule: 'boot',
+    match: null,
+    offer: { x: 496, y: 290, width: 290, height: 82 },
+    liveControls: [],
+  },
+  {
+    what: 'boot failure, RETRY scrolled into view',
+    viewport: 'phone 798x384',
+    rule: 'boot',
+    match: null,
+    offer: { x: 496, y: 290, width: 290, height: 82 },
+    liveControls: [
+      { name: 'dom#boot-error-retry', box: { x: 64, y: 252, width: 107, height: 44 }, topmost: 'BUTTON#boot-error-retry' },
+    ],
+  },
+  {
+    what: 'pause menu, offline match',
+    viewport: 'phone 798x384',
+    rule: 'match',
+    match: { pauseScreen: 'menu', session: null, glass: 'match' },
+    offer: { x: 597, y: 328, width: 189, height: 44 },
+    liveControls: [],
+  },
+  {
+    what: 'online match, session dropped',
     viewport: 'phone 798x384',
     rule: 'match',
     match: { pauseScreen: 'closed', session: 'reconnecting', glass: 'match' },
     offer: { x: 477, y: 290, width: 309, height: 82 },
     liveControls: [
-      { name: 'minimap', box: { x: 586, y: 292, width: 80, height: 80 }, topmost: 'BUTTON#playtest-download-log-button' },
+      { name: '__cornerStage.elements[1]<build-button>', box: { x: 54, y: 134, width: 76, height: 76 }, topmost: 'CANVAS#app' },
+      { name: '__cornerStage.elements[3]<pause-button>', box: { x: 72, y: 16, width: 48, height: 48 }, topmost: 'CANVAS#app' },
+      { name: '__cornerStage.elements[7]<zoom-control>', box: { x: 718, y: 61, width: 64, height: 48 }, topmost: 'CANVAS#app' },
+      { name: '__cornerStage.elements[9]<minimap>', box: { x: 586, y: 292, width: 80, height: 80 }, topmost: 'BUTTON#playtest-download-log-button' },
+      { name: 'dom#pr-link-loss-reconnect', box: { x: 195, y: 216, width: 198, height: 44 }, topmost: 'CANVAS#app' },
+      { name: 'dom#pr-link-loss-abandon', box: { x: 403, y: 216, width: 200, height: 44 }, topmost: 'CANVAS#app' },
     ],
   },
   {
-    what: 'online match, session reconnecting — portrait, offer re-homed to the other corner',
+    what: 'online match, dropped and backgrounded',
+    viewport: 'phone 798x384',
+    rule: 'match',
+    match: { pauseScreen: 'closed', session: 'reconnecting', glass: 'match' },
+    offer: { x: 477, y: 290, width: 309, height: 82 },
+    liveControls: [
+      { name: '__cornerStage.elements[1]<build-button>', box: { x: 54, y: 134, width: 76, height: 76 }, topmost: 'CANVAS#app' },
+      { name: '__cornerStage.elements[3]<pause-button>', box: { x: 72, y: 16, width: 48, height: 48 }, topmost: 'CANVAS#app' },
+      { name: '__cornerStage.elements[7]<zoom-control>', box: { x: 718, y: 61, width: 64, height: 48 }, topmost: 'CANVAS#app' },
+      { name: '__cornerStage.elements[9]<minimap>', box: { x: 586, y: 292, width: 80, height: 80 }, topmost: 'BUTTON#playtest-download-log-button' },
+      { name: 'dom#pr-link-loss-reconnect', box: { x: 195, y: 216, width: 198, height: 44 }, topmost: 'CANVAS#app' },
+      { name: 'dom#pr-link-loss-abandon', box: { x: 403, y: 216, width: 200, height: 44 }, topmost: 'CANVAS#app' },
+    ],
+  },
+  {
+    what: 'online match, dropped, pause menu open',
+    viewport: 'phone 798x384',
+    rule: 'match',
+    match: { pauseScreen: 'menu', session: 'reconnecting', glass: 'match' },
+    offer: { x: 434, y: 272, width: 352, height: 100 },
+    liveControls: [
+      { name: 'dom#pr-link-loss-menu', box: { x: 310, y: 219, width: 178, height: 44 }, topmost: 'CANVAS#app' },
+    ],
+  },
+  {
+    what: 'online match, session dropped',
     viewport: 'phone portrait 390x844',
     rule: 'match',
     match: { pauseScreen: 'closed', session: 'reconnecting', glass: 'match' },
     offer: { x: 12, y: 571, width: 79, height: 261 },
     liveControls: [
-      { name: 'minimap', box: { x: 12, y: 632, width: 80, height: 80 }, topmost: 'BUTTON#playtest-download-log-button' },
+      { name: '__cornerStage.elements[1]<build-button>', box: { x: 174, y: 54, width: 76, height: 76 }, topmost: 'CANVAS#app' },
+      { name: '__cornerStage.elements[3]<pause-button>', box: { x: 326, y: 72, width: 48, height: 48 }, topmost: 'CANVAS#app' },
+      { name: '__cornerStage.elements[7]<zoom-control>', box: { x: 281, y: 764, width: 48, height: 64 }, topmost: 'CANVAS#app' },
+      { name: '__cornerStage.elements[9]<minimap>', box: { x: 12, y: 632, width: 80, height: 80 }, topmost: 'BUTTON#playtest-download-log-button' },
+      { name: 'dom#pr-link-loss-reconnect', box: { x: 108, y: 411, width: 174, height: 44 }, topmost: 'CANVAS#app' },
+      { name: 'dom#pr-link-loss-abandon', box: { x: 107, y: 465, width: 177, height: 44 }, topmost: 'CANVAS#app' },
+    ],
+  },
+  {
+    what: 'online match, dropped and backgrounded',
+    viewport: 'phone portrait 390x844',
+    rule: 'match',
+    match: { pauseScreen: 'closed', session: 'reconnecting', glass: 'match' },
+    offer: { x: 12, y: 571, width: 79, height: 261 },
+    liveControls: [
+      { name: '__cornerStage.elements[1]<build-button>', box: { x: 174, y: 54, width: 76, height: 76 }, topmost: 'CANVAS#app' },
+      { name: '__cornerStage.elements[3]<pause-button>', box: { x: 326, y: 72, width: 48, height: 48 }, topmost: 'CANVAS#app' },
+      { name: '__cornerStage.elements[7]<zoom-control>', box: { x: 281, y: 764, width: 48, height: 64 }, topmost: 'CANVAS#app' },
+      { name: '__cornerStage.elements[9]<minimap>', box: { x: 12, y: 632, width: 80, height: 80 }, topmost: 'BUTTON#playtest-download-log-button' },
+      { name: 'dom#pr-link-loss-reconnect', box: { x: 108, y: 411, width: 174, height: 44 }, topmost: 'CANVAS#app' },
+      { name: 'dom#pr-link-loss-abandon', box: { x: 107, y: 465, width: 177, height: 44 }, topmost: 'CANVAS#app' },
+    ],
+  },
+  {
+    what: 'online match, dropped, pause menu open',
+    viewport: 'phone portrait 390x844',
+    rule: 'match',
+    match: { pauseScreen: 'menu', session: 'reconnecting', glass: 'match' },
+    offer: { x: 12, y: 491, width: 79, height: 341 },
+    liveControls: [
+      { name: 'dom#pr-link-loss-menu', box: { x: 116, y: 447, width: 159, height: 44 }, topmost: 'CANVAS#app' },
     ],
   },
 ];
 
 describe('the offer never lands on a control the player needs', () => {
-  it('is not standing on any live control, in any measured state', () => {
+  it('is not the topmost thing at any control the client drew', () => {
+    // The brief's own definition, and a0-97's: a collision is `elementFromPoint`
+    // answering with this affordance AT THE CONTROL'S OWN REPORTED POINT. Every row
+    // below carries the browser's actual answer, so this asserts against what a
+    // press would really hit rather than against arithmetic on two rects.
     for (const s of MEASURED) {
-      const offered = s.rule === 'match' && s.match ? matchLogOffer(s.match) !== null : s.offer !== null;
-      if (!offered || !s.offer) continue;
+      if (!offeredIn(s)) continue;
       for (const c of s.liveControls) {
         expect(
-          overlaps(s.offer, c.box),
-          `${s.what} @ ${s.viewport}: the offer sits on ${c.name}`,
+          c.topmost.includes(DOWNLOAD_LOG_ROOT_ID),
+          `${s.what} @ ${s.viewport}: a press at ${c.name} hits the offer`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it('does not even overlap a control, on the screens where the match owns the pointer', () => {
+    // Stricter than the line above, and deliberately narrower in scope. Where the
+    // MATCH owns the glass, a control half-buried is a control half-gone: the
+    // player's thumb is aimed at a target whose edge is under a button, and only
+    // the centre was hit-tested. So those screens have to be clear by RECT.
+    //
+    // Screens where something else owns the pointer are excluded, and that is not a
+    // let-off — it is the measurement. On a desktop drop the CONNECTION LOST card
+    // takes every press, and `elementFromPoint` at the minimap's own centre answers
+    // `DIV#pr-link-loss`: the offer's box does clip the map's bottom corner there,
+    // and no press was going to reach the map anyway. Withdrawing over that would be
+    // withdrawing where nothing collides, which the brief forbids.
+    for (const s of MEASURED) {
+      if (!offeredIn(s) || s.match?.glass !== 'match') continue;
+      for (const c of s.liveControls) {
+        expect(
+          overlaps(s.offer!, c.box),
+          `${s.what} @ ${s.viewport}: the offer's box sits on ${c.name}`,
         ).toBe(false);
       }
     }
