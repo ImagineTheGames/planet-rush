@@ -44,6 +44,14 @@ export const DOM_CONTROL_IDS: readonly string[] = [
   'pr-link-loss-menu',
 ];
 
+/** A rect in page space. */
+export interface Box {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
 /** One control, and what is on top of it. */
 export interface Cover {
   /** Where it came from and what it is — `__lobby.rushControl`, `hud:minimap`, … */
@@ -60,8 +68,17 @@ export interface Cover {
    *  RETRY is below the fold on a short phone. Not a collision, and not a clean
    *  bill of health either: a cell the probe could not reach. */
   readonly onScreen: boolean;
-  /** True when the topmost element is the log affordance — a proved collision. */
+  /** True when the topmost element is the log affordance — a proved collision.
+   *  The brief's definition, and a0-97's: the topmost element at the control's own
+   *  reported point. */
   readonly collides: boolean;
+  /** The control's own box in page space, where the seam reports one. */
+  readonly box: Box | null;
+  /** How much of that box the offer's own box sits on, 0–1. Reported beside
+   *  {@link collides} because the two answer different questions: a minimap whose
+   *  centre is clear and whose bottom third is buried is not "fine", and a table
+   *  that showed only the centre would say it was. */
+  readonly coveredFraction: number | null;
 }
 
 /** The log affordance's own state, as the page has it. */
@@ -120,7 +137,7 @@ export interface StateReport {
  */
 export async function harvestCanvasControls(
   page: Page,
-): Promise<{ control: string; x: number; y: number; live: boolean }[]> {
+): Promise<{ control: string; x: number; y: number; live: boolean; box: Box | null }[]> {
   return page.evaluate(() => {
     type Anon = Record<string, unknown>;
     const w = window as unknown as Anon;
@@ -172,7 +189,7 @@ export async function harvestCanvasControls(
       }
     }
 
-    const out: { control: string; x: number; y: number; live: boolean }[] = [];
+    const out: { control: string; x: number; y: number; live: boolean; box: Box | null }[] = [];
     const seen = new Set<unknown>();
 
     const label = (path: string, node: Anon): string => {
@@ -203,7 +220,14 @@ export async function harvestCanvasControls(
           (box.width > 0 && box.height > 0);
         // A control at the origin with no box is the seams' "nowhere" rect.
         if (drawn && (pc.x !== 0 || pc.y !== 0)) {
-          out.push({ control: label(path, rec), x: pc.x, y: pc.y, live });
+          const b = rec.physicalBounds as Box | undefined;
+          out.push({
+            control: label(path, rec),
+            x: pc.x,
+            y: pc.y,
+            live,
+            box: b && typeof b.width === 'number' ? { x: b.x, y: b.y, width: b.width, height: b.height } : null,
+          });
         }
       }
 
@@ -229,15 +253,21 @@ export async function harvestCanvasControls(
 export async function harvestDomControls(
   page: Page,
   ids: readonly string[] = DOM_CONTROL_IDS,
-): Promise<{ control: string; x: number; y: number; live: boolean }[]> {
+): Promise<{ control: string; x: number; y: number; live: boolean; box: Box | null }[]> {
   return page.evaluate((wanted) => {
-    const out: { control: string; x: number; y: number; live: boolean }[] = [];
+    const out: { control: string; x: number; y: number; live: boolean; box: Box | null }[] = [];
     for (const id of wanted) {
       const el = document.getElementById(id);
       if (!el) continue;
       const r = el.getBoundingClientRect();
       if (r.width <= 0 || r.height <= 0) continue;
-      out.push({ control: `dom#${id}`, x: r.x + r.width / 2, y: r.y + r.height / 2, live: true });
+      out.push({
+        control: `dom#${id}`,
+        x: r.x + r.width / 2,
+        y: r.y + r.height / 2,
+        live: true,
+        box: { x: r.x, y: r.y, width: r.width, height: r.height },
+      });
     }
     return out;
   }, ids);
@@ -323,9 +353,12 @@ export async function sweepState(
     x: origin.x + c.x,
     y: origin.y + c.y,
     live: c.live,
+    box: c.box ? { ...c.box, x: c.box.x + origin.x, y: c.box.y + origin.y } : null,
   }));
   const dom = await harvestDomControls(page);
   const viewport = page.viewportSize() ?? { width: 0, height: 0 };
+  const offer = await logBox(page);
+  const offerBox = offer.mounted && offer.hidden === false ? (offer.rect ?? null) : null;
   const covers: Cover[] = [];
   for (const c of [...canvas, ...dom]) {
     const onScreen = c.x >= 0 && c.y >= 0 && c.x <= viewport.width && c.y <= viewport.height;
@@ -337,13 +370,15 @@ export async function sweepState(
       live: c.live,
       onScreen,
       collides: c.live && (topmost.includes(LOG_ROOT_ID) || topmost.includes(LOG_BUTTON_ID)),
+      box: c.box,
+      coveredFraction: c.box && offerBox ? overlapFraction(c.box, offerBox) : null,
     });
   }
   return {
     state,
     profile: profile.id,
     viewport: { width: profile.width, height: profile.height, dpr: profile.dpr, touch: profile.touch },
-    log: await logBox(page),
+    log: offer,
     controls: covers,
     collisions: covers.filter((c) => c.collides),
     coveredButDead: covers.filter(
@@ -351,4 +386,13 @@ export async function sweepState(
     ),
     context,
   };
+}
+
+/** What fraction of `box` the `over` rect sits on. Plain geometry, reported as
+ *  context beside the browser's own verdict — never in place of it. */
+function overlapFraction(box: Box, over: Box): number {
+  const w = Math.max(0, Math.min(box.x + box.width, over.x + over.width) - Math.max(box.x, over.x));
+  const h = Math.max(0, Math.min(box.y + box.height, over.y + over.height) - Math.max(box.y, over.y));
+  const area = box.width * box.height;
+  return area > 0 ? Math.round(((w * h) / area) * 100) / 100 : 0;
 }
