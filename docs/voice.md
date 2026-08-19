@@ -7,6 +7,12 @@ gate, end-of-match lines, buttons, empty states, errors.
 Written 2026-08-18 (a0-87), from two things the developer found on their phone.
 Check copy against this page before you write it, and against it again after.
 
+**Before writing copy that says what a setting does, read `docs/settings.md` and
+confirm it still matches the code.** Every row is traced there to the line that
+implements it, with the mismatches listed first — a sentence that sounds true and
+is checked against the wrong branch is how the FIRE MODE help survived two
+reviews (a0-91).
+
 ---
 
 ## The one question
