@@ -22,6 +22,11 @@ struck below rather than deleted, so the next reader can still see the shape of
 the defect. **Mismatch 1 still stands.** Both fixes moved code under this file
 and every `file.ts:line` has been re-traced against the merged tree.
 
+**Amended 2026-08-19 (a0-95)**: the dead third path in the lobby flow is
+DELETED, not merely flagged (commit 5dd02c75) — see FIRE MODE's section note and
+checklist item 5. This file is a trace of what the code does, so it no longer
+describes a function that does not exist.
+
 ---
 
 ## MISMATCH summary
@@ -88,10 +93,16 @@ screen at `src/main.ts:3398`, the menu at `src/main.ts:9533` — which is what
 stops one screen quietly growing a shorter path again, the shape of both
 mismatch 3 and mismatch 4.
 
-A third settings code path exists in the lobby flow (`flowTapSettings`,
+~~A third settings code path exists in the lobby flow (`flowTapSettings`,
 `src/ui/lobby-flow.ts:789`). It folds values into `FlowState.settings`, and no
 `settingsModel` call site reads that field — it is not wired to a rendered
-screen.
+screen.~~ **DELETED 2026-08-19 (a0-95, commit 5dd02c75.)** The Director ruled on
+it: the handler, the `FlowState.settings` field, `FlowState.settingsReturn` and
+the flow's whole `settings` screen are gone from `src/ui/lobby-flow.ts`. There
+are now exactly **two** settings screens and **one** write path, which is what
+the rest of this section describes. `src/main.ts` never called any of it — it
+imports one symbol from that module, `wireFireMode` (`src/main.ts:292`), which
+spells a fire mode for the wire and touches no setting.
 
 The header eyebrow is `CHANGES SAVE IMMEDIATELY` (`src/ui/settings.ts:765`).
 
@@ -451,7 +462,8 @@ developer ratification, not a better sentence. 2 was fixed in a60bbe9, 3 and 4 i
    object: `SETTINGS_STORAGE` (`src/ui/settings.ts:269`) is the whole list of
    what carries from one screen to the other, and a value that is not written
    there does not carry.
-5. **A fifth path exists and is DEAD**: `flowTapSettings`
-   (`src/ui/lobby-flow.ts:789`) folds values into `FlowState.settings`, which no
-   `settingsModel` call site reads. a0-92 deliberately did not wire it up; it is
-   the Director's call whether it is deleted. Do not trace a claim through it.
+5. **There is no path in the lobby flow — it was deleted.** `flowTapSettings`
+   folded values into a `FlowState.settings` nothing read; a0-95 removed the
+   handler, both fields and the flow's `settings` screen (commit 5dd02c75). If
+   you find a settings value reached through `src/ui/lobby-flow.ts` again, it is
+   new and it is the same defect coming back. Every live path is above.
