@@ -379,9 +379,22 @@ export const SETTINGS_HELP: Record<
   // as well; it is taught by the in-match prompt at the moment a full hold makes
   // it matter (`./onboarding` HaulHome), which is a better place for it than a
   // settings panel read before the player has any ore.
+  //
+  // The other half used to end "you steer and AIM yourself", and that was false
+  // on the defaults (a0-93). AUTO-AIM ships seated on every platform
+  // ({@link DEFAULT_FIRE_MODE}), and in that mode `mapActions` emits no `aim` at
+  // all (`@platform/actions`) — the sim acquires the target across the full
+  // 360°. A player who switches to the sticks steers and fires; they do not aim
+  // until they also switch FIRE MODE.
+  //
+  // The repair is not a longer sentence covering both modes. This row's axis is
+  // WHO FLIES THE SHIP, and that is true on either side of FIRE MODE and on
+  // every device: Tap Commander flies it, the sticks hand it back. Aiming is the
+  // row above's axis and is explained there. Borrowing a neighbouring row's
+  // behaviour is how this sentence and a0-89's went false — see `docs/voice.md`.
   controls: (device) => ({
     title: 'CONTROLS',
-    summary: `TAP COMMANDER flies the ship for you: tap where to go, tap what to hit. On ${STICKS_LABELS[device]} you steer and aim yourself.`,
+    summary: `TAP COMMANDER flies the ship for you: tap where to go, tap what to hit. On ${STICKS_LABELS[device]} you fly it yourself.`,
     badges: [],
   }),
   // GDD §4.8 risk 5. Two sentences: what it does, and the half a player cannot
