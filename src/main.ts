@@ -240,10 +240,10 @@ import {
   settingsHelpStep,
   settingsRowKey,
   volumeButtons,
-  createSettings,
-  toggleReduceVfx,
-  adjustVolume,
-  DEFAULT_VOLUMES,
+  loadSettings,
+  commitSettings,
+  applyVolumes,
+  SETTINGS_STORAGE,
   EndOfMatchView,
   endOfMatchModel,
   buildSummary,
@@ -360,6 +360,8 @@ import type {
   TeamTable,
   SettingsState,
   SettingsTarget,
+  SettingsSink,
+  VolumeMixer,
   MainMenuOption,
   CodexState,
   CodexTarget,
@@ -519,7 +521,11 @@ const HAPTIC_ALARM_DECAY = 0.9;
 const HAPTIC_ALARM_TRIGGER = 40;
 const HAPTIC_ALARM_REARM_MS = 2500;
 
-const FIRE_MODE_KEY = 'planet-rush:fireMode';
+/** Where the chosen fire mode is remembered. The string itself lives with the
+ *  other five settings keys (`./ui` `SETTINGS_STORAGE`) since a0-92, so one
+ *  screen's six rows have their six keys in one table; the wiring that writes it
+ *  is still this file's. */
+const FIRE_MODE_KEY = SETTINGS_STORAGE.fireMode;
 /** Where the chosen control scheme is remembered (developer's ratified
  *  tap/click-to-move scheme). Same storage seam as the fire mode, so both survive
  *  a reload identically. `'sticks'` is the twin-stick / keyboard / gamepad scheme;
@@ -527,7 +533,7 @@ const FIRE_MODE_KEY = 'planet-rush:fireMode';
  *  first-run default on every platform** — see {@link DEFAULT_CONTROL_SCHEME}. The
  *  stored strings did NOT move with the default: a save that says `sticks` still
  *  seats the sticks (`./ui` `CONTROL_SCHEME_STORAGE`). */
-const CONTROL_SCHEME_KEY = 'planet-rush:controlScheme';
+const CONTROL_SCHEME_KEY = SETTINGS_STORAGE.controlScheme;
 /**
  * Which half of the JOIN screen the player used last (u17-01, plan D2).
  *
@@ -811,8 +817,9 @@ async function boot(): Promise<void> {
   //          ./art/audio/unlock).
   //       3. Derive tells off the SAME live world the renderer draws, and sound
   //          them — the audible twin of the VFX field (GDD §3.6), fed in the loop.
-  //     The starting mix is the settings screen's own DEFAULT_VOLUMES, so what the
-  //     player hears matches what the sliders show, and every default is audible.
+  //     The starting mix is the settings screen's own SAVED one — its defaults on
+  //     a first run (a0-92) — so what the player hears matches what the sliders
+  //     show, on this boot and on the one after it.
   //
   //     THE SEAT IS NOT KNOWN YET, AND THAT IS THE s9-01 BUG (fixed below).
   //     The engine is built HERE, before the menu, because the unlock has to be
@@ -826,10 +833,16 @@ async function boot(): Promise<void> {
   //     assignment — search "s9-01" below. Do not read `LOCAL_PLAYER` into a
   //     construction argument up here again without doing the same.
   const audioCtx = openAudioContext();
+  // The mix the engine opens on is the player's SAVED one, not the shipped
+  // default (a0-92): the volumes persist through the same `planet-rush:` seam as
+  // the fire mode, so a player who turned the music down last night is not met
+  // by it at full on this boot. `DEFAULT_VOLUMES` is still what an empty save
+  // seats — `loadSettings` defaults per channel.
+  const bootMix = loadSettings(platform.storage).volumes;
   const audio = new AudioEngine({
     context: audioCtx,
     local: LOCAL_PLAYER,
-    mix: { master: DEFAULT_VOLUMES.master, sfx: DEFAULT_VOLUMES.sfx, music: DEFAULT_VOLUMES.music },
+    mix: { master: bootMix.master, sfx: bootMix.sfx, music: bootMix.music },
   });
   const audioTells = new TellQueue(TELL_CAPACITY);
   const unlockTarget = defaultUnlockTarget();
@@ -1024,6 +1037,10 @@ async function boot(): Promise<void> {
     // armed above, so the FIRST tap on this screen resumes the context and every
     // one after it lands on a live mix.
     cue: (kind, index) => audio.cue(kind, index),
+    // ...and the same engine's mix, so a volume changed on the menu is heard on
+    // the menu (a0-92). The engine already booted at the SAVED levels above, so
+    // the screen opens showing what the player is hearing.
+    mixer: audio,
     // The door in front of this screen, while it is shut.
     blocked: () => titleGate?.modal ?? false,
   };
@@ -1787,8 +1804,17 @@ async function boot(): Promise<void> {
   let pauseScreen: PauseScreen = 'closed';
   // The match's live settings, so the pause SETTINGS screen shows and changes the
   // real values mid-match (reduce-VFX floors the auto-reducer, the volumes drive
-  // the mixer). Seeded to the same DEFAULT_VOLUMES the audio engine booted with.
-  let matchSettings = createSettings();
+  // the mixer). Read from STORAGE, not built fresh (a0-92): the same seam the
+  // fire mode and the control scheme carry through, so a change made on the main
+  // menu — a different screen holding a DIFFERENT settings object, deliberately —
+  // is the value this match boots with. The two screens agree through the store,
+  // never by sharing an object: the menu is torn down before this world exists.
+  let matchSettings = loadSettings(platform.storage);
+  // ...and the running mixer is put where this value says, once, so the buses and
+  // the pips the pause screen draws against them cannot open out of step — the
+  // engine booted from the same store, and this is the assertion of it rather
+  // than the argument for it. No-ops when running silent.
+  applyVolumes(audio, matchSettings.volumes);
   const pauseView = new PauseMenuView(transform.logicalWidth, transform.logicalHeight, isTouch);
   gameRoot.addChild(pauseView);
   // The pause SETTINGS screen reuses the real settings view (one settings UI, not
@@ -3328,7 +3354,8 @@ async function boot(): Promise<void> {
   /** Apply a tap on the pause SETTINGS screen. Unlike the pre-match menu's copy,
    *  these fold into the LIVE match: the fire mode and control scheme take effect
    *  at once and persist, reduce-VFX and the volumes drive the running renderer
-   *  and mixer through {@link applyAudioMix}. DONE steps back to the pause menu. */
+   *  and mixer through {@link settingsSink} — and, since a0-92, persist through
+   *  it too. DONE steps back to the pause menu. */
   function applyPauseSettings(target: SettingsTarget): void {
     // One cue per row, named by what the row DOES (s6-01): DONE steps back out of
     // the screen, every setting steps one notch, and a slider already at its end
@@ -3361,29 +3388,28 @@ async function boot(): Promise<void> {
         audio.cue('detent');
         break;
       case 'reduceVfx':
-        matchSettings = toggleReduceVfx(matchSettings);
-        audio.cue('detent');
-        break;
       case 'volume': {
-        const next = adjustVolume(matchSettings, target.channel, target.dir);
-        // The one slider whose own cue proves it worked — and whose floor and
-        // ceiling say so out loud instead of being read off a bar.
-        audio.cue(next.volumes[target.channel] === matchSettings.volumes[target.channel] ? 'reject' : 'detent');
-        matchSettings = next;
-        applyAudioMix();
+        // One path for both rows, and the same one the main menu takes
+        // (`./ui` `commitSettings`): fold the value, WRITE IT — the header's
+        // promise, which these four rows did not keep before a0-92 — and push
+        // the mix into the engine. The cue is the screen's own: the one slider
+        // whose floor and ceiling say so out loud instead of being read off a
+        // bar, so a press that moved nothing refuses.
+        const change = commitSettings(matchSettings, target, settingsSink);
+        matchSettings = change.state;
+        audio.cue(change.moved ? 'detent' : 'reject');
         break;
       }
     }
     haptics.haptic('tap');
   }
 
-  /** Push the live match volumes into the mixer (engine.ts). A no-op set of calls
-   *  when running silent (no audio context), so it is safe on every platform. */
-  function applyAudioMix(): void {
-    audio.setMasterVolume(matchSettings.volumes.master);
-    audio.setSfxVolume(matchSettings.volumes.sfx);
-    audio.setMusicVolume(matchSettings.volumes.music);
-  }
+  /** Where a settings change made IN THE MATCH lands: the platform's store — the
+   *  same six-key `planet-rush:` family the fire mode and the control scheme
+   *  ride (`./ui` `SETTINGS_STORAGE`) — and the live audio engine, whose three
+   *  volume setters are no-ops when running silent (no audio context), so this is
+   *  safe on every platform. */
+  const settingsSink: SettingsSink = { storage: platform.storage, mixer: audio };
 
   /** EXIT TO MENU (developer §3): tear the world down — the rematch machinery's own
    *  teardown step ({@link MatchBoot.close}) — and return to the main menu. A clean
@@ -6289,7 +6315,7 @@ async function boot(): Promise<void> {
         return audioCtx ? audioCtx.state : null;
       },
       /** Set the SFX bus level, 0..1 — the same call the settings slider makes
-       *  through {@link applyAudioMix}. Behind ?debug=1 only, so a live-stage test
+       *  through {@link settingsSink}. Behind ?debug=1 only, so a live-stage test
        *  can prove the "slider at 0" case: the UI seam still FIRES (`uiCues`
        *  climbs) but `sfxBusGain` reads 0, so the cue is inaudible (field report
        *  v0.2.4+ point 4). The real slider→gain path is the settings test's job. */
@@ -7493,6 +7519,17 @@ interface MenuContext {
    */
   cue(kind: AudioCue, index?: number): void;
   /**
+   * The audio engine's three volume setters, and nothing else of it — where the
+   * SETTINGS screen's volume rows are HEARD (a0-92).
+   *
+   * The menu has sound ({@link cue}), which is the whole reason a player reaches
+   * for the volume on it; before a0-92 the rows moved their pips and reached no
+   * bus, so MASTER on the main menu changed nothing anyone could hear. It sits
+   * beside `cue` because it is the same fact about this screen — it has a voice —
+   * asked the other way round.
+   */
+  readonly mixer: VolumeMixer;
+  /**
    * Is something MODAL in front of this screen — the title gate, sealed
    * (a0-50)?
    *
@@ -7798,7 +7835,15 @@ function openMainMenu(
   // needs to know about the hardware — and it is a live value, because a pad can
   // be plugged in or die while the screen is open (see the listeners below).
   let gamepadConnected = anyGamepadConnected();
-  let settings: SettingsState = createSettings();
+  // The settings this screen shows and changes. Read from STORAGE (a0-92): the
+  // menu holds its own value — the match builds a separate one, deliberately, and
+  // the two must never share an object because this screen is torn down before
+  // that world exists — but both now read and write the one `planet-rush:` seam,
+  // which is how FIRE MODE and CONTROLS have always carried into a match.
+  let settings: SettingsState = loadSettings(platform.storage);
+  /** Where a change made on THIS screen lands: the same store the match boots
+   *  from, and the menu's own live audio engine. */
+  const settingsSink: SettingsSink = { storage: platform.storage, mixer: ctx.mixer };
   // `online` is the DOORS screen's id — the screen PLAY now opens. Kept under its
   // old name because the `__mainMenu.screen` seam and every live-stage spec already
   // read that string, and renaming a wire-visible id buys nothing.
@@ -9474,15 +9519,20 @@ function openMainMenu(
         ctx.cue('detent');
         break;
       case 'reduceVfx':
-        settings = toggleReduceVfx(settings);
-        ctx.cue('detent');
-        break;
       case 'volume': {
+        // The same one path the pause screen takes (`./ui` `commitSettings`), and
+        // the fix for a0-92 mismatch 4: before it, these two cases folded a value
+        // into a local and stopped. The volume now reaches the MIXER, so a master
+        // lowered on the menu is heard on the menu; both rows reach STORAGE, so
+        // the value is what the match boots with — which is also the whole of
+        // REDUCE VFX here, since the renderer is built after this screen closes
+        // and there is nothing on it for the flag to thin.
+        //
         // A slider already at its end refuses — audibly, so a player nudging the
         // master down hears the floor arrive instead of watching for it.
-        const next = adjustVolume(settings, target.channel, target.dir);
-        ctx.cue(next.volumes[target.channel] === settings.volumes[target.channel] ? 'reject' : 'detent');
-        settings = next;
+        const change = commitSettings(settings, target, settingsSink);
+        settings = change.state;
+        ctx.cue(change.moved ? 'detent' : 'reject');
         break;
       }
     }

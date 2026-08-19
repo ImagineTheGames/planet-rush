@@ -245,6 +245,196 @@ export function volumeLevel(state: SettingsState, channel: VolumeChannel): numbe
 }
 
 // ---------------------------------------------------------------------------
+// Where it is remembered, and where it is heard (a0-92)
+// ---------------------------------------------------------------------------
+
+/**
+ * The key each row of this screen is remembered under.
+ *
+ * The header says CHANGES SAVE IMMEDIATELY ({@link SETTINGS_EYEBROW}) and until
+ * a0-92 two of the six rows earned it: FIRE MODE and CONTROLS wrote through to
+ * `planet-rush:` keys, and REDUCE VFX and the three volumes lived in a
+ * {@link SettingsState} that was rebuilt by {@link createSettings} on every boot
+ * and read back from nowhere (`docs/settings.md`, mismatch 3). The four missing
+ * rows now ride the SAME seam rather than a second one beside it.
+ *
+ * The first two strings are NAMED here, not invented here — `src/main.ts` has
+ * always owned the wiring that writes them and points its own `FIRE_MODE_KEY` /
+ * `CONTROL_SCHEME_KEY` at these values. One screen, six rows, six keys in one
+ * place, so a test can hold the whole header's promise in a single pass.
+ *
+ * **No string here may move.** A key that changes is a save that is silently
+ * discarded, which is the failure this table exists to end.
+ */
+export const SETTINGS_STORAGE = {
+  fireMode: 'planet-rush:fireMode',
+  controlScheme: 'planet-rush:controlScheme',
+  reduceVfx: 'planet-rush:reduceVfx',
+  volumes: {
+    master: 'planet-rush:masterVolume',
+    sfx: 'planet-rush:sfxVolume',
+    music: 'planet-rush:musicVolume',
+  },
+} as const;
+
+/**
+ * The whole of the platform's storage this module needs — the same two methods
+ * `platform.storage` already offers (`src/platform/platform.ts`).
+ *
+ * Structural rather than an import, for the reason {@link ControlsDeviceInputs}
+ * is two booleans rather than a `navigator`: the model stays pure and
+ * headless-testable, and a test hands it a `Map` without standing up a platform.
+ */
+export interface SettingsStorage {
+  get(key: string): string | null;
+  set(key: string, value: string): void;
+}
+
+/** What REDUCE VFX is written as. Words, not `true`/`false`, so a save file
+ *  reads like the row it came from — the same shape the haptics toggle keeps
+ *  (`src/platform/haptics.ts`). */
+const REDUCE_VFX_ON = 'on';
+const REDUCE_VFX_OFF = 'off';
+
+/** The string to persist for the reduce-VFX flag. */
+export function storedReduceVfx(reduceVfx: boolean): string {
+  return reduceVfx ? REDUCE_VFX_ON : REDUCE_VFX_OFF;
+}
+
+/** The flag a stored value seats. Only the explicit `on` turns it on: an absent
+ *  key, a stale one and a hand-edited save all fold to OFF, which is the
+ *  first-run default ({@link createSettings}) — nothing a player never chose can
+ *  seat the reduced look. */
+export function parseReduceVfx(stored: string | null | undefined): boolean {
+  return stored === REDUCE_VFX_ON;
+}
+
+/**
+ * The string to persist for one channel: its **step count**, `0..VOLUME_STEPS`,
+ * not the fraction.
+ *
+ * The screen has ten notches ({@link VOLUME_STEPS}) and a step is what the
+ * player actually set; writing `0.30000000000000004` would save a number no row
+ * can display and hand the next boot an off-grid value to snap
+ * ({@link adjustVolume}). A whole number of notches round-trips exactly.
+ */
+export function storedVolume(level: number): string {
+  return String(Math.round(clamp(level, 0, 1) / VOLUME_STEP));
+}
+
+/**
+ * The level a stored value seats, as a fraction in `[0, 1]`. Anything
+ * unrecognised — an absent key, a stale one, a hand-edited save, a step count
+ * from a build with a different ladder — folds to `fallback`, the channel's own
+ * {@link DEFAULT_VOLUMES} entry, so a save can never seat a silent or
+ * out-of-range mix.
+ */
+export function parseVolume(stored: string | null | undefined, fallback: number): number {
+  if (typeof stored !== 'string' || stored.trim() === '') return fallback;
+  const steps = Number(stored);
+  if (!Number.isFinite(steps)) return fallback;
+  return clamp(Math.round(steps), 0, VOLUME_STEPS) * VOLUME_STEP;
+}
+
+/**
+ * The settings a boot opens with: what was saved, defaulted per row.
+ *
+ * The counterpart to {@link createSettings}, and what every live screen should
+ * seat instead of it — both settings screens hold **separate state** (the menu's
+ * `settings`, the match's `matchSettings`) and must go on doing so, because the
+ * menu is torn down before the match is built. Storage is how the two agree
+ * without sharing an object, exactly as FIRE MODE and CONTROLS already do.
+ */
+export function loadSettings(storage: SettingsStorage): SettingsState {
+  return {
+    reduceVfx: parseReduceVfx(storage.get(SETTINGS_STORAGE.reduceVfx)),
+    volumes: {
+      master: parseVolume(storage.get(SETTINGS_STORAGE.volumes.master), DEFAULT_VOLUMES.master),
+      sfx: parseVolume(storage.get(SETTINGS_STORAGE.volumes.sfx), DEFAULT_VOLUMES.sfx),
+      music: parseVolume(storage.get(SETTINGS_STORAGE.volumes.music), DEFAULT_VOLUMES.music),
+    },
+  };
+}
+
+/** Write every value this screen owns. All four keys every time rather than the
+ *  one that moved: the cost is four string writes on a press a human made, and
+ *  it means a save written by any path is a whole save. */
+export function saveSettings(storage: SettingsStorage, state: SettingsState): void {
+  storage.set(SETTINGS_STORAGE.reduceVfx, storedReduceVfx(state.reduceVfx));
+  for (const channel of VOLUME_CHANNELS) {
+    storage.set(SETTINGS_STORAGE.volumes[channel], storedVolume(state.volumes[channel]));
+  }
+}
+
+/** The three volume setters of the audio engine (`src/art/audio/engine.ts`), and
+ *  nothing else of it — the mixer seam this screen changes. Structural for the
+ *  same reason {@link SettingsStorage} is: a test counts what arrived without a
+ *  `AudioContext`, and `src/ui` stays out of the engine's internals. */
+export interface VolumeMixer {
+  setMasterVolume(level: number): void;
+  setSfxVolume(level: number): void;
+  setMusicVolume(level: number): void;
+}
+
+/** Push all three levels into the mixer. All three, always: one channel's press
+ *  is the only moment anything re-asserts the mix, and a partial push is how a
+ *  bus drifts from the pips drawn against it. */
+export function applyVolumes(mixer: VolumeMixer, volumes: Volumes): void {
+  mixer.setMasterVolume(volumes.master);
+  mixer.setSfxVolume(volumes.sfx);
+  mixer.setMusicVolume(volumes.music);
+}
+
+/** The rows that live in {@link SettingsState} — the two this module can fold,
+ *  persist AND sound by itself. FIRE MODE and CONTROLS are not here: they are
+ *  loose values beside each screen and the wiring layer writes them (see
+ *  {@link SETTINGS_STORAGE}). */
+export type SettingsValueTarget = Extract<SettingsTarget, { kind: 'reduceVfx' } | { kind: 'volume' }>;
+
+/** Everywhere a settings change has to land beyond the value itself. */
+export interface SettingsSink {
+  /** Where it is remembered — pass `platform.storage`. */
+  readonly storage: SettingsStorage;
+  /** Where a volume is heard — pass the audio engine. Every screen with sound
+   *  has one, which is the whole of a0-92 mismatch 4: the main menu's volume
+   *  rows moved their pips and reached no bus, on the one screen a player is
+   *  most likely to reach for the volume *because* they can hear it. */
+  readonly mixer: VolumeMixer;
+}
+
+/** What a committed press did: the value to keep, and whether anything moved. */
+export interface SettingsCommit {
+  readonly state: SettingsState;
+  /** False when the press changed nothing — a slider already against its rail.
+   *  The caller cues a refusal rather than a detent, and nothing is written or
+   *  pushed for a value that did not move. */
+  readonly moved: boolean;
+}
+
+/**
+ * Fold a REDUCE VFX or volume press into the value, persist it, and push the mix
+ * where it is heard — the one path BOTH settings screens take, so neither can
+ * quietly grow a shorter one (a0-92 mismatches 3 and 4 were exactly that: the
+ * pause screen called the mixer and never storage, the menu called neither).
+ *
+ * It deliberately does not cue, haptic or render: those are the screen's, and
+ * they differ between the two.
+ */
+export function commitSettings(
+  state: SettingsState,
+  target: SettingsValueTarget,
+  sink: SettingsSink,
+): SettingsCommit {
+  const next =
+    target.kind === 'reduceVfx' ? toggleReduceVfx(state) : adjustVolume(state, target.channel, target.dir);
+  // `adjustVolume` returns the same object at a rail, so identity IS the refusal.
+  if (next === state) return { state, moved: false };
+  saveSettings(sink.storage, next);
+  if (target.kind === 'volume') applyVolumes(sink.mixer, next.volumes);
+  return { state: next, moved: true };
+}
+
+// ---------------------------------------------------------------------------
 // The rows the screen is made of
 // ---------------------------------------------------------------------------
 
