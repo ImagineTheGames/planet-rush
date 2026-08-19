@@ -1,0 +1,7 @@
+
+class contest (GDD §2.11) — sable, four hulls, fair share 25% — 256 matches, 0 unfinished
+  match length: mean 809s, min 392s, max 844s
+  excavator    186/256  72.7%  OVER
+  vanguard     36/256  14.1%  ok
+  hauler       28/256  10.9%  ok
+  interceptor  6/256  2.3%  ok

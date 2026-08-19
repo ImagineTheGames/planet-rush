@@ -271,20 +271,42 @@ back by ending the retreats that were happening *away* from the ring too.
 
 ### Class contest (GDD §2.11), fair share 25%, ceiling 55%
 
-| hull | before | after | 256-match re-read, before | after |
-|---|---|---|---|---|
-| excavator | 90/128 — **70.3% OVER** | 97/128 — **75.8% OVER** | see below | |
-| vanguard | 17/128 — 13.3% | 21/128 — 16.4% | | |
-| hauler | 18/128 — 14.1% | 6/128 — 4.7% | | |
-| interceptor | 3/128 — 2.3% | 4/128 — 3.1% | | |
+One behaviour (`HARD_POOL[0]` — sable), four hulls rotated. Run twice: at the
+a0-105 sample size (128 matches) and again at **256** to tighten the delta,
+because this is the one number in the sweep that moves the wrong way and it
+deserved a bigger sample rather than a paragraph.
 
-**This is over the ceiling on both builds and is not this branch's finding.** It
-is a pre-existing ship-class result on the shipped trees — a0-105 recorded the
-same OVER at 78.1% before it and 68.8% after — and the §2.11 class multipliers
-are gameplay's lane, not the bot lane's. It is reported here because a reader who
-runs the instrument will see the OVER and should know it was already there. The
-5.5-point move between these two builds is about 1.4 standard errors at 128
-matches (SE ≈ 4.0 points).
+| hull | before, 128 | after, 128 | before, 256 | after, 256 |
+|---|---|---|---|---|
+| excavator | 90/128 — **70.3% OVER** | 97/128 — **75.8% OVER** | 186/256 — **72.7% OVER** | 201/256 — **78.5% OVER** |
+| vanguard | 17/128 — 13.3% | 21/128 — 16.4% | 36/256 — 14.1% | 35/256 — 13.7% |
+| hauler | 18/128 — 14.1% | 6/128 — 4.7% | 28/256 — 10.9% | 14/256 — 5.5% |
+| interceptor | 3/128 — 2.3% | 4/128 — 3.1% | 6/256 — 2.3% | 6/256 — 2.3% |
+
+**Read this one carefully, because it is the honest bad news in the branch.**
+
+1. **It is over the ceiling on both builds**, by 17.7 points before this branch
+   and 23.5 after. The excavator OVER is a pre-existing ship-class result on the
+   shipped trees — a0-105 recorded it at 78.1% before that branch and 68.8%
+   after — and the §2.11 class multipliers are **gameplay's lane, not the bot
+   lane's**. Nothing in `src/bots/` can close a 17-point gap that exists with the
+   retreat branch working correctly.
+2. **This branch does move it, and the move is real rather than noise.** +5.8
+   points at 256 matches is about 2 standard errors (SE ≈ 2.8 points). The
+   mechanism is legible: a wounded bot that turns and fights instead of holding
+   position is a bot in a fight, and the hull with the most of everything wins
+   more of those. The loser is the hauler (10.9% → 5.5%), which is the hull with
+   the least reason to be in one.
+3. **Taken with a0-105 it is a round trip.** Pre-a0-105 the same contest read
+   78.1%; a0-105 took it to 68.8% by ending retreats at the bot's own turret
+   ring; a0-107 ends the rest of them and it returns to 78.5%. The two branches
+   together leave this metric within noise of where they found it, which is the
+   most that can honestly be claimed for a fix whose whole job is to make wounded
+   bots stop standing still.
+
+**Flagged for gameplay, not absorbed.** The bot lane cannot ratify a §2.11
+multiplier change and this report does not propose one; what it does is put the
+number in front of the people who can, with the sample size to act on.
 
 ---
 
