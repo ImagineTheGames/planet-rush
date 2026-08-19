@@ -1,0 +1,162 @@
+{
+  "stage": "broken",
+  "profile": "phone-798x384",
+  "viewport": {
+    "width": 798,
+    "height": 384,
+    "dpr": 2,
+    "touch": true
+  },
+  "menu": {
+    "controls": [
+      {
+        "kind": "resume",
+        "at": {
+          "x": 399,
+          "y": 122
+        },
+        "topmost": "CANVAS#app"
+      },
+      {
+        "kind": "settings",
+        "at": {
+          "x": 399,
+          "y": 195.5
+        },
+        "topmost": "CANVAS#app"
+      },
+      {
+        "kind": "exit",
+        "at": {
+          "x": 399,
+          "y": 265.5
+        },
+        "topmost": "CANVAS#app"
+      }
+    ],
+    "log": {
+      "mounted": true,
+      "hidden": false,
+      "rect": {
+        "x": 597,
+        "y": 328,
+        "width": 189,
+        "height": 44
+      },
+      "label": "DOWNLOAD LOG"
+    }
+  },
+  "confirm": {
+    "controls": [
+      {
+        "kind": "leave",
+        "at": {
+          "x": 399,
+          "y": 153.5
+        },
+        "topmost": "CANVAS#app"
+      },
+      {
+        "kind": "stay",
+        "at": {
+          "x": 399,
+          "y": 227
+        },
+        "topmost": "CANVAS#app"
+      }
+    ],
+    "log": {
+      "mounted": true,
+      "hidden": false,
+      "rect": {
+        "x": 597,
+        "y": 328,
+        "width": 189,
+        "height": 44
+      },
+      "label": "DOWNLOAD LOG"
+    }
+  },
+  "settings": {
+    "controls": [
+      {
+        "kind": "fireMode",
+        "at": {
+          "x": 209,
+          "y": 133
+        },
+        "topmost": "CANVAS#app"
+      },
+      {
+        "kind": "controls",
+        "at": {
+          "x": 209,
+          "y": 192
+        },
+        "topmost": "CANVAS#app"
+      },
+      {
+        "kind": "reduceVfx",
+        "at": {
+          "x": 209,
+          "y": 251
+        },
+        "topmost": "CANVAS#app"
+      },
+      {
+        "kind": "volume",
+        "at": {
+          "x": 589,
+          "y": 133
+        },
+        "topmost": "CANVAS#app"
+      },
+      {
+        "kind": "volume",
+        "at": {
+          "x": 589,
+          "y": 192
+        },
+        "topmost": "CANVAS#app"
+      },
+      {
+        "kind": "volume",
+        "at": {
+          "x": 589,
+          "y": 251
+        },
+        "topmost": "CANVAS#app"
+      },
+      {
+        "kind": "back",
+        "at": {
+          "x": 646.5,
+          "y": 359.5
+        },
+        "topmost": "BUTTON#playtest-download-log-button"
+      }
+    ],
+    "log": {
+      "mounted": true,
+      "hidden": false,
+      "rect": {
+        "x": 597,
+        "y": 328,
+        "width": 189,
+        "height": 44
+      },
+      "label": "DOWNLOAD LOG"
+    }
+  },
+  "donePress": {
+    "at": {
+      "x": 646.5,
+      "y": 359.5
+    },
+    "screenBefore": "settings",
+    "screenAfter": "settings",
+    "downloads": [
+      "planet-rush-log-5ebbe7d-20260819-105323.json"
+    ]
+  }
+}

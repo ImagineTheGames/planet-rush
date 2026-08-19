@@ -317,6 +317,7 @@ import {
   pauseLayout,
   nextPauseScreen,
   isPauseOpen,
+  pauseAllowsDownloadLog,
   shouldFreezeSim,
   // Whether the bottom edge carries the controls strip — the one piece of screen
   // furniture the build badge has to make room for (see `buildBadge.lift`).
@@ -3471,7 +3472,9 @@ async function boot(): Promise<void> {
    *      which one it was — with the transport's own close reason when it has given
    *      one, so "the room ended" and "your grace ran out" do not arrive as the same
    *      sentence (`src/net/websocket-transport` `CloseReason`).
-   *   2. **The pause menu**, whenever it is up: the log is simply available there.
+   *   2. **The pause menu**, whenever it is up — and only the menu itself: the log
+   *      is simply available there, and withdraws for anything layered over it
+   *      (`src/ui/pause-menu` `pauseAllowsDownloadLog`).
    *
    * Anything else hides it. During play the match owns the screen, and a floating
    * button over the HUD would be exactly the kind of chrome the HUD budget refuses.
@@ -3479,6 +3482,18 @@ async function boot(): Promise<void> {
    * costs one comparison and no DOM work (`src/net/playtest-log-button`).
    */
   function syncDownloadLog(): void {
+    // A screen LAYERED OVER the pause menu draws its own controls into the corner
+    // this affordance pins itself to, so the offer withdraws for the whole of one
+    // (a0-97: DOWNLOAD LOG landed on the settings screen's DONE plate, and on a
+    // phone there is no Escape key to leave by instead). Ahead of the error branch
+    // and not after it: "nothing is drawn over DONE" is a property of the screen,
+    // and a dropped connection does not make it less true. The log stays one press
+    // away either way — DONE and STAY both step back to the menu, where the offer
+    // (pause's, or the disconnect's) is waiting.
+    if (!pauseAllowsDownloadLog(pauseScreen)) {
+      hideDownloadLog();
+      return;
+    }
     const state = onlineSession?.state;
     if (state === 'reconnecting' || state === 'closed') {
       showDownloadLog({
