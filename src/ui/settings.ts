@@ -109,10 +109,10 @@ export function parseControlScheme(stored: string | null | undefined): ControlSc
  *   `gamepad`   TWIN STICKS — the pad genuinely has two, and it is named only
  *               when one is actually detected (the report's condition).
  *   `keyboard`  KEYBOARD + MOUSE, not "MOUSE ONLY": the bindings settle it —
- *               thrust is `WASD`, aim is `Mouse`, fire is `Left mouse`
- *               (`describeBindings`), so a player cannot move without the
- *               keyboard and "mouse only" would swap one false label for
- *               another.
+ *               thrust is on the movement keys, aim on the mouse, fire on the
+ *               left button (`describeBindings`), so a player cannot move
+ *               without the keyboard and "mouse only" would swap one false
+ *               label for another.
  */
 export const STICKS_LABELS: Record<DeviceKind, string> = {
   touch: 'STICKS',
@@ -310,82 +310,83 @@ export type SettingsHelp = CodexHint;
  * other half, walking {@link SETTINGS_ROWS} so a row whose copy is present but
  * empty — or whose title has drifted from the label on the plate — fails too.
  *
- * The voice is GDD §4.7 register 2: procedural, present-tense, second person,
- * no adjective that sells the setting. Each one says what the control does and
- * when a player would want it, and none of them says how it is implemented —
- * a player deciding between two fire modes does not need the name of the class
- * that engages the other one.
+ * **Every entry takes the device** (a0-87), even the five that ignore it. The
+ * CONTROLS row has to — see below — and one uniform shape means the next row
+ * that needs the device can take it without moving this register or its gate.
+ *
+ * The voice is GDD §4.7 register 2 and `docs/voice.md`: say what the control
+ * does, in the player's words, and stop. What a row does NOT cover, and what
+ * happens at the ends of its range, are not this screen's business — a player
+ * moving a slider is not auditing the mixer.
  */
-export const SETTINGS_HELP: Record<SettingsRowKey, SettingsHelp> = {
-  // GDD §2.4 "Fire modes", in the player's terms: auto-aim takes the AIM, never
-  // the trigger ("the player decides *when* to fire, positioning decides *what*
-  // gets hit"), and it leads a moving target because the shot has travel time.
-  // The MANUAL half names all three aim devices rather than a platform, because
-  // the mode is a player setting on every one of them, not a touch concession.
-  fireMode: {
+export const SETTINGS_HELP: Record<SettingsRowKey, (device: DeviceKind) => SettingsHelp> = {
+  // GDD §2.4 "Fire modes". The one thing that differs between the two is who
+  // aims; the one thing a player would otherwise get wrong is assuming AUTO-AIM
+  // also pulls the trigger ("the player decides *when* to fire"), so that is the
+  // third sentence and there is no fourth. The old copy named "your mouse, stick
+  // or thumb" — three devices, two of them wrong for whoever is reading (a0-87).
+  fireMode: () => ({
     title: 'FIRE MODE',
-    summary:
-      'AUTO-AIM takes the aim off you — the weapon locks the nearest target in range, in any direction, and leads it; you still choose when to fire. MANUAL leaves aiming to your mouse, stick or thumb, for choosing the target yourself.',
+    summary: 'AUTO-AIM locks the nearest target and leads it. MANUAL leaves the aim to you. Either way, you choose when to fire.',
     badges: [],
-  },
-  // The two schemes as HANDS, per the brief, and deliberately the same lesson
-  // the in-match tip teaches (`./onboarding` PROMPT_COPY): its Tap Commander
-  // wordings are "Tap the asteroid to mine it" and "tap your own station to bank
-  // in its collection field", and its stick wordings are the ones that name a
-  // held press and a flight path. This row says the same two things one level
-  // up — the gesture, not the lesson — so a player who read the tip in a match
-  // and then opened this screen is told nothing new to reconcile.
+  }),
+  // THE u8-01 SEAM, used for the words and not just the pill (a0-87).
   //
-  // "The other scheme" rather than its name: the row's own word for it is the
-  // DEVICE in front of the player (u8-01 — STICKS / TWIN STICKS / KEYBOARD +
-  // MOUSE), so naming one of the three here would be wrong on the other two.
-  // The sentence names all three instead, which is true on every device.
-  controls: {
+  // This row already knows the device: the value chip beside the `?` prints
+  // STICKS / TWIN STICKS / KEYBOARD + MOUSE ({@link STICKS_LABELS}) because a PC
+  // player reading `CONTROLS · STICKS` was told something false. The help then
+  // went and hedged the same fact back in, naming all three input schemes in
+  // one clause — keys and mouse, pad sticks, glass sticks — which is true on
+  // every device and useful on none: a phone player read about a keyboard
+  // (developer field report, 2026-08-18). It now says the ONE that is true, in
+  // the row's own word, so the panel and the pill can never disagree.
+  //
+  // Tap Commander's half keeps two gestures, not three. Banking used to be here
+  // as well; it is taught by the in-match prompt at the moment a full hold makes
+  // it matter (`./onboarding` HaulHome), which is a better place for it than a
+  // settings panel read before the player has any ore.
+  controls: (device) => ({
     title: 'CONTROLS',
-    summary:
-      'TAP COMMANDER flies the ship for you: tap a spot to move there, tap a target to attack it, tap your own station to bank. The other scheme puts steering and aim in your hands — WASD and the mouse, both pad sticks, or two sticks on the glass.',
+    summary: `TAP COMMANDER flies the ship for you: tap where to go, tap what to hit. On ${STICKS_LABELS[device]} you steer and aim yourself.`,
     badges: [],
-  },
-  // GDD §4.8 risk 5, and the half a player cannot otherwise account for: the
-  // same flag the perf gate engages by itself below the floor (`VfxAutoQuality`
-  // — 30 fps, sustained ~3s, released once the rate recovers). Somebody who
-  // watches the effects thin out mid-fight learns HERE that nothing broke.
-  // The number is named because it is a fact the player can check against their
-  // own frame rate; the class that owns it is not, because they cannot.
-  reduceVfx: {
+  }),
+  // GDD §4.8 risk 5. Two sentences: what it does, and the half a player cannot
+  // otherwise account for — the same flag `VfxAutoQuality` engages by itself
+  // under load, so somebody watching the effects thin out mid-fight learns here
+  // that nothing broke. The old copy also named the 30 fps floor and the ~3s
+  // hold; both are gone (a0-87), because there is no frame counter on screen and
+  // a number a player cannot check changes nothing they do.
+  reduceVfx: () => ({
     title: 'REDUCE VFX',
-    summary:
-      'Thins the effects that carry no information — impact glows, shimmer — to hold the frame rate. The game does this on its own when the rate sits under 30 for a few seconds; ON keeps them thin whatever the rate.',
+    summary: 'Thins the effects that carry no information, to hold the frame rate. The game does this on its own when the rate drops; ON keeps them thin all the time.',
     badges: [],
-  },
-  // The three channels, as the mixer actually routes them (`../art/audio/graph`
-  // — sfx / alarm / ambient / music summing into master). Two facts a player
-  // cannot see from the labels and both of which change what they'd set:
-  // MASTER multiplies everything including the alarm, and the under-attack
-  // alarm has its OWN bus, so SFX at zero does not silence it (§2.2, §4.9 — the
-  // alarm is not cuttable, and `audio.test.ts` holds the mixer to it).
-  'volume:master': {
-    title: 'MASTER VOLUME',
-    summary: 'Every sound the game makes, the under-attack alarm included. The other two channels sit under it.',
-    badges: [],
-  },
-  'volume:sfx': {
-    title: 'SFX VOLUME',
-    summary:
-      'Weapons, impacts, engines, and the interface itself. The under-attack alarm is not on this channel — it is a warning, and stays audible at zero.',
-    badges: [],
-  },
-  'volume:music': {
-    title: 'MUSIC VOLUME',
-    summary: 'The soundtrack, and nothing else. Nothing you need to hear in a fight rides this channel, so it can sit at zero.',
-    badges: [],
-  },
+  }),
+  // The three channels, as a player meets them: what is on each one.
+  //
+  // The under-attack alarm used to be in TWO of these, from opposite directions
+  // — MASTER "the under-attack alarm included", SFX "not on this channel — it is
+  // a warning, and stays audible at zero". A player asked what a slider changes
+  // and got the mixer's routing twice (developer field report, 2026-08-18). The
+  // routing is unchanged and `audio.test.ts` still holds it; it is simply not
+  // something this screen says. If the alarm surviving a muted master is worth a
+  // word, it belongs at the moment somebody mutes — see the follow-up note in
+  // `docs/voice.md`.
+  'volume:master': () => ({ title: 'MASTER VOLUME', summary: 'Every sound the game makes.', badges: [] }),
+  'volume:sfx': () => ({ title: 'SFX VOLUME', summary: 'Weapons, impacts, engines, menus.', badges: [] }),
+  'volume:music': () => ({ title: 'MUSIC VOLUME', summary: 'The soundtrack.', badges: [] }),
 };
 
-/** The explanation for one row. Total: every key in the union has copy, and the
- *  union is derived from the row spec, so this cannot return undefined. */
-export function settingsHelp(spec: SettingsRowSpec): SettingsHelp {
-  return SETTINGS_HELP[settingsRowKey(spec)];
+/**
+ * The explanation for one row, for the device in front of the player.
+ *
+ * Total: every key in the union has copy, and the union is derived from the row
+ * spec, so this cannot return undefined. `device` is required for the same
+ * reason {@link settingsModel} requires it — a caller that forgets it would
+ * print a confident sentence about hardware the player does not have, which is
+ * the whole of u8-01.
+ */
+export function settingsHelp(spec: SettingsRowSpec, device: DeviceKind): SettingsHelp {
+  return SETTINGS_HELP[settingsRowKey(spec)](device);
 }
 
 /**
@@ -620,7 +621,7 @@ export function settingsModel(
     // show one explanation while the seam reports another.
     openHelp:
       openIndex !== null && SETTINGS_ROWS[openIndex]
-        ? { index: openIndex, hint: settingsHelp(SETTINGS_ROWS[openIndex]) }
+        ? { index: openIndex, hint: settingsHelp(SETTINGS_ROWS[openIndex], device) }
         : null,
   };
 }

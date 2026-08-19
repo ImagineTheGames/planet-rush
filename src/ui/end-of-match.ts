@@ -340,7 +340,12 @@ function eliminatedSubhead(outcome: MatchOutcome): string {
   if (place && cause) return `${place} — ${cause}`;
   if (place) return place;
   if (cause) return capitalize(cause);
-  return 'Your reactor is gone — but the fight goes on.';
+  // a0-87. This was "Your reactor is gone — but the fight goes on." — a clause
+  // after a dash that consoles, which §4.7 register 2 does not do (it "files a
+  // win and a loss in one sentence shape and congratulates neither", and that
+  // cuts both ways). The fight going on is already on the screen, in the two
+  // buttons under this line: REMATCH and SPECTATE. The line states the fact.
+  return 'Your reactor is gone.';
 }
 
 /** The cause half of the elimination line, lower-case so it reads as the tail of

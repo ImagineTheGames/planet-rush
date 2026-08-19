@@ -655,6 +655,49 @@ describe('resolvePromptText — the lesson branches on the scheme and the mode (
     }
   });
 
+  /**
+   * **The same rule the settings screen now lives under** (a0-87).
+   *
+   * `src/ui/settings.test.ts` has a `never names another device` sweep, written
+   * because the CONTROLS help named a keyboard on a phone. These prompts never
+   * had that bug — they resolve `{fire}` / `{build}` through `describeBindings`,
+   * so the device chooses the word rather than the sentence hedging across all
+   * three — and that is worth holding rather than re-discovering. It is the
+   * pattern a0-87 copied INTO the settings screen, so it should not be able to
+   * rot out of the file it was copied from.
+   *
+   * `tap` is deliberately not a device word: TAP COMMANDER is a scheme, and a
+   * tap is a tap whether it lands from a finger or a mouse. Nor is `stick`,
+   * which is true of the glass and of a pad both.
+   */
+  it('never names another device, in any configuration', () => {
+    const DEVICE_WORDS: Record<DeviceKind, readonly RegExp[]> = {
+      keyboard: [/\bWASD\b/i, /\bkeyboard\b/i, /\bmouse\b/i, /\bspacebar\b/i, /\bclick/i],
+      gamepad: [/\bgamepad\b/i, /\bcontroller\b/i, /\bpad\b/i, /\btrigger/i, /\bbumper/i, /\b[XYAB] \/ /],
+      touch: [/\bglass\b/i, /\bfinger/i, /\bthumbs?\b/i, /\bswipe/i, /\btouchscreen\b/i],
+    };
+    const DEVICES: readonly DeviceKind[] = ['keyboard', 'touch', 'gamepad'];
+
+    for (const id of Object.values(PromptId)) {
+      for (const device of DEVICES) {
+        for (const mode of [FireMode.Manual, FireMode.AutoAim]) {
+          for (const scheme of ['sticks', 'tap'] as ControlScheme[]) {
+            const text = resolvePromptText(id, device, mode, scheme);
+            for (const other of DEVICES) {
+              if (other === device) continue;
+              for (const word of DEVICE_WORDS[other]) {
+                expect(
+                  word.test(text),
+                  `${id}/${device}/${mode}/${scheme} says ${String(word)}: ${text}`,
+                ).toBe(false);
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
   it('keeps GDD §2.10\'s ratified sentence for the configuration it was written for', () => {
     // Sticks + Manual is the one configuration the GDD has words for. Nothing in
     // a0-33 is allowed to move them.

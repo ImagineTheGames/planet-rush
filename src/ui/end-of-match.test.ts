@@ -334,7 +334,9 @@ describe('the frame model', () => {
   });
 
   it('falls back to the plain elimination line with no placement or cause', () => {
-    expect(endOfMatchModel(eliminated(0)).subhead).toBe('Your reactor is gone — but the fight goes on.');
+    // a0-87 trimmed the consolation clause off the end of this one; the fact is
+    // the whole line, and REMATCH / SPECTATE sit right under it.
+    expect(endOfMatchModel(eliminated(0)).subhead).toBe('Your reactor is gone.');
   });
 });
 
