@@ -1,0 +1,28 @@
+{
+  "profile": {
+    "id": "desktop-1280x800",
+    "label": "desktop 1280x800 (dpr 2, pointer) — the golden suite's control width",
+    "width": 1280,
+    "height": 800,
+    "dpr": 2,
+    "touch": false
+  },
+  "note": "All frames at the same pinned freeze tick. \"null\" is two shots with nothing touched between them.",
+  "diffs": {
+    "null": {
+      "pixels": 0,
+      "peak": 0,
+      "total": 4096000
+    },
+    "tap: AUTO-AIM vs MANUAL": {
+      "pixels": 0,
+      "peak": 0,
+      "total": 4096000
+    },
+    "sticks: MANUAL vs AUTO-AIM": {
+      "pixels": 18935,
+      "peak": 248,
+      "total": 4096000
+    }
+  }
+}

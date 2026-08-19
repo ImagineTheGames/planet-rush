@@ -43,11 +43,13 @@
       },
       {
         "img": "../crops/desktop-menu-rest-volumes.png",
-        "caption": "CROP, before: the three bars at 8, 8 and 6 lit pips of 10."
+        "caption": "CROP, before: the three bars at 8, 8 and 6 lit pips of 10.",
+        "scale": "58%"
       },
       {
         "img": "../crops/desktop-menu-reloaded-volumes.png",
-        "caption": "CROP, after the reload: 3, 10 and 0. Counted off the committed frames, not read from the app."
+        "caption": "CROP, after the reload: 3, 10 and 0. Counted off the committed frames, not read from the app.",
+        "scale": "58%"
       }
     ]
   },
@@ -71,11 +73,13 @@
       },
       {
         "img": "../crops/phone-menu-rest-volumes.png",
-        "caption": "CROP, before: 8, 8, 6 pips lit."
+        "caption": "CROP, before: 8, 8, 6 pips lit.",
+        "scale": "58%"
       },
       {
         "img": "../crops/phone-menu-reloaded-volumes.png",
-        "caption": "CROP, after the reload: 3, 10, 0 pips lit."
+        "caption": "CROP, after the reload: 3, 10, 0 pips lit.",
+        "scale": "58%"
       }
     ]
   },
@@ -116,6 +120,98 @@
       {
         "img": "phone-798x384-menu-help-fireMode.png",
         "caption": "The FIRE MODE panel in its frame at 798x384. It floats above its row and clears both the row and its value \u2014 and its top edge covers the screen's own SETTINGS title. Nothing of the panel is clipped by the viewport."
+      }
+    ]
+  },
+  {
+    "id": "a0-96-fire-mode-inert-under-tap-commander",
+    "width": 1280,
+    "title": "a0-96 \u2014 FIRE MODE: the chip answers, the match does not move",
+    "sub": "Boot ?debug=1&freeze=1: the sim is advanced to a fixed seeded tick and pinned there, so the match frame is byte-deterministic and the only thing that can differ between two shots of it is what the capture did in between. Frames below in the order they were taken.",
+    "blocks": [
+      {
+        "img": "desktop-1280x800-fire-match-tap-autoaim.png",
+        "caption": "A \u2014 the frozen match, desktop, CONTROLS = TAP COMMANDER (the shipped default), chip = AUTO-AIM. The controls strip along the bottom reads: Click anywhere \u2014 Move or attack | Build & Upgrade \u2014 get closer to your station."
+      },
+      {
+        "img": "../crops/desktop-chip-tap-autoaim.png",
+        "caption": "B \u2014 pause \u2192 SETTINGS. FIRE MODE reads AUTO-AIM, CONTROLS reads TAP COMMANDER."
+      },
+      {
+        "img": "../crops/desktop-chip-tap-manual.png",
+        "caption": "C \u2014 after ONE press on the FIRE MODE row. The chip now reads MANUAL. The control responds."
+      },
+      {
+        "img": "desktop-1280x800-fire-match-tap-manual.png",
+        "caption": "D \u2014 back to the match, same pinned tick, chip now MANUAL. Against frame A: 0 pixels of 4096000 differ. The strip still reads Click anywhere \u2014 Move or attack. (The null \u2014 A re-shot with nothing touched \u2014 is also 0, so the zero is the toggle's, not the renderer's.)"
+      },
+      {
+        "img": "desktop-1280x800-fire-match-sticks-manual.png",
+        "caption": "CONTROL, same run: CONTROLS switched to KEYBOARD + MOUSE, chip MANUAL. The strip has grown a row \u2014 WASD Thrust | Mouse Aim | Left mouse Fire / Mine."
+      },
+      {
+        "img": "desktop-1280x800-fire-match-sticks-autoaim.png",
+        "caption": "CONTROL, the SAME FIRE MODE press on that scheme: chip back to AUTO-AIM, and the Aim row is gone \u2014 WASD Thrust | Left mouse Hold to fire / mine \u2014 auto-aim picks the target. 18935 pixels differ from the frame above. The measurement can see this toggle; it saw nothing when the scheme was Tap Commander."
+      },
+      {
+        "img": "phone-798x384-fire-match-tap-autoaim.png",
+        "caption": "The phone, 798x384, TAP COMMANDER, chip AUTO-AIM: no thumb furniture at all."
+      },
+      {
+        "img": "phone-798x384-fire-match-tap-manual.png",
+        "caption": "The same, chip MANUAL: 0 pixels of 1225728 differ."
+      },
+      {
+        "img": "phone-798x384-fire-match-sticks-manual.png",
+        "caption": "CONTROL on the phone: STICKS + MANUAL puts two stick rings on the glass, bottom-left and bottom-right."
+      },
+      {
+        "img": "phone-798x384-fire-match-sticks-autoaim.png",
+        "caption": "CONTROL: STICKS + AUTO-AIM replaces the right-hand ring with a round FIRE button. 28671 pixels differ."
+      },
+      {
+        "img": "../crops/desktop-strip-tap-autoaim.png",
+        "caption": "THE STRIP ALONE, desktop, TAP COMMANDER + AUTO-AIM: \"Click anywhere \u2014 Move or attack | Build & Upgrade \u2014 get closer to your station\"."
+      },
+      {
+        "img": "../crops/desktop-strip-tap-manual.png",
+        "caption": "TAP COMMANDER + MANUAL: the same two rows, the same words. This band is part of the 0-pixel difference."
+      },
+      {
+        "img": "../crops/desktop-strip-sticks-manual.png",
+        "caption": "KEYBOARD + MOUSE + MANUAL: \"WASD Thrust | Mouse Aim | Left mouse Fire / Mine | Build & Upgrade \u2026\"."
+      },
+      {
+        "img": "../crops/desktop-strip-sticks-autoaim.png",
+        "caption": "KEYBOARD + MOUSE + AUTO-AIM: the Aim row is gone and the fire row now reads \"Left mouse Hold to fire / mine \u2014 auto-aim picks the target\". Same press, same screen, a different answer."
+      }
+    ]
+  },
+  {
+    "id": "a0-96-pause-done-covered-by-download-log",
+    "width": 1280,
+    "title": "a0-96 \u2014 the in-match settings screen's way out, and what a press on it does",
+    "sub": "Front-door boot, offline match, ESC \u2192 SETTINGS. DOWNLOAD LOG is the match's own affordance and it is offered on every frame the pause overlay is up; the settings screen's DONE plate is in the same corner.",
+    "blocks": [
+      {
+        "img": "../crops/phone-pause-done-corner.png",
+        "caption": "CROP, phone 798x384, 2x: the DONE plate runs off to the left with its accent bar showing, and DOWNLOAD LOG covers the rest of it. The word DONE is not on the screen at all."
+      },
+      {
+        "img": "../crops/desktop-pause-done-corner.png",
+        "caption": "CROP, desktop 1280x800, 2x: the same collision with more room \u2014 DO is readable and the rest of the word is behind DOWNLOAD LOG."
+      },
+      {
+        "img": "phone-798x384-pause-after-done-press.png",
+        "caption": "After ONE press at the point the client itself reports drawing DONE at (646.5, 359.5 css). The settings screen is still up \u2014 the seam read `settings` before the press and `settings` after it \u2014 and the button now reads LOG SAVED over the line \"Log saved to your downloads \u2014 attach that file.\" The press produced planet-rush-log-bc4e78f-20260819-091630.json."
+      },
+      {
+        "img": "desktop-1280x800-pause-after-done-press.png",
+        "caption": "The same press on the desktop, at (1086, 754): screen still `settings`, LOG SAVED, and a second log file downloaded. With the shorter label the word DONE is visible again \u2014 under a button that has just taken its press."
+      },
+      {
+        "img": "phone-798x384-pause-after-done-left-press.png",
+        "caption": "The same screen, one press further LEFT \u2014 at (541.5, 359.5), on the sliver of the DONE plate that is not covered. That press reaches DONE: the pause menu is back (PAUSED / RESUME / SETTINGS / EXIT TO MENU) and no file was downloaded. So the way out is not gone; it is reachable only at the end of the plate that has no label on it. (Build stamp 5992ca4* on this frame against bc4e78f* on the others: the same game code, rebuilt after this directory's harness was committed \u2014 no file under src/ differs between the two.)"
       }
     ]
   }

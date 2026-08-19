@@ -63,3 +63,57 @@ for (const profile of PROFILES) {
     await context.close();
   });
 }
+
+/**
+ * …and how much of DONE is left. The first test presses the plate's own CENTRE,
+ * which is where a label sits and where a thumb goes. This one presses the part
+ * of the plate that is still uncovered — its left end — to find out whether the
+ * way out is GONE or merely mostly gone. The offset is measured off the committed
+ * frame (`phone-798x384-pause-rest.png`: the plate's left edge and its accent bar
+ * stand at 1030-1090 device px of 1596, i.e. 515-545 css; on the desktop frame the
+ * plate runs 934-1235 css and DOWNLOAD LOG starts at 1081), and it is stated here
+ * rather than derived from the layout, because a rectangle read out of the module
+ * under test would prove nothing about what is on the glass.
+ */
+for (const profile of PROFILES) {
+  test(`a0-96 DONE at its uncovered left end — ${profile.id}`, async ({ browser }) => {
+    test.setTimeout(300_000);
+    const context = await browser.newContext({
+      viewport: { width: profile.width, height: profile.height },
+      deviceScaleFactor: profile.dpr,
+      isMobile: profile.touch,
+      hasTouch: profile.touch,
+      acceptDownloads: true,
+    });
+    const page = await context.newPage();
+    const downloads: string[] = [];
+    page.on('download', (d) => downloads.push(d.suggestedFilename()));
+
+    await bootMenu(page);
+    await bootMatchFrontDoor(page);
+    await openPauseSettings(page, profile.touch);
+    const point = await page.evaluate(() => {
+      const c = window.__pauseStage!.read().controls.find((x) => x.kind === 'back');
+      return c ? { ...c.physicalCenter } : null;
+    });
+    const box = await page.locator('canvas').boundingBox();
+    // Left of centre, still inside the plate and clear of the DOM button. Both
+    // numbers are measured off the committed `-pause-rest` frames, and the first
+    // desktop attempt at 165 missed the plate's left edge by 13 css px — recorded
+    // here rather than quietly retuned, because it is why the desktop leg of this
+    // probe was re-run.
+    const dx = profile.touch ? 105 : 100;
+    if (point && box) {
+      if (profile.touch) await page.touchscreen.tap(box.x + point.x - dx, box.y + point.y);
+      else await page.mouse.click(box.x + point.x - dx, box.y + point.y);
+    }
+    await page.waitForTimeout(1_500);
+    const after = await page.evaluate(() => window.__pauseStage!.read().screen);
+    await page.screenshot({ path: join(SHOTS, `${profile.id}-pause-after-done-left-press.png`) });
+    writeFileSync(
+      join(SHOTS, `${profile.id}-done-left-edge.json`),
+      `${JSON.stringify({ profile: profile.id, pressedAt: point ? { x: point.x - dx, y: point.y } : null, screenAfter: after, downloads }, null, 2)}\n`,
+    );
+    await context.close();
+  });
+}

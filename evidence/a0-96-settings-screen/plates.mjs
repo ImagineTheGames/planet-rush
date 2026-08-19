@@ -16,7 +16,7 @@
  *   node evidence/a0-96-settings-screen/plates.mjs
  */
 import { chromium } from 'playwright';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -56,6 +56,7 @@ for (const plate of PLATES) {
   await page.waitForLoadState('networkidle');
   await page.screenshot({ path: join(OUT, `${plate.id}.png`), fullPage: true });
   console.log(`${plate.id}.png`);
+  rmSync(file); // the page is scaffolding for the screenshot, not evidence
   await page.close();
 }
 await browser.close();

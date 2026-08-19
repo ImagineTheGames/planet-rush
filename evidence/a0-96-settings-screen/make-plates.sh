@@ -47,4 +47,10 @@ for m in autoaim manual; do
   node $D/crops.mjs crop $S/phone-798x384-fire-chip-tap-$m.png $C/phone-chip-tap-$m.png 40 205 760 240 2
 done
 
+# The desktop controls strip — the one band of the match frame that is supposed
+# to change with FIRE MODE — in all four states, at the frame's own scale.
+for f in tap-autoaim tap-manual sticks-manual sticks-autoaim; do
+  node $D/crops.mjs crop $S/desktop-1280x800-fire-match-$f.png $C/desktop-strip-$f.png 0 1495 2200 105 1
+done
+
 node $D/plates.mjs
