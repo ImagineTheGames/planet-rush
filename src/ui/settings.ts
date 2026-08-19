@@ -435,6 +435,100 @@ export function commitSettings(
 }
 
 // ---------------------------------------------------------------------------
+// FIRE MODE, and the scheme that takes it away (a0-100b)
+// ---------------------------------------------------------------------------
+
+/**
+ * Is the FIRE MODE row locked — i.e. does the SCHEME fire, rather than the
+ * player?
+ *
+ * Under Tap Commander it does. `TapPilot.writeInto` (`@platform/tap-pilot`)
+ * holds the trigger itself — `state.fire = true` while auto-engaging, and
+ * `target.hostile && surface <= fireRange` on a lock — and `src/main.ts` hands
+ * that straight to the sim, computing the mode it maps with from the pilot's own
+ * order rather than from this row. So the row had a value the game never read: a
+ * toggle that responds and changes nothing (`docs/settings.md` mismatch 1;
+ * measured in a0-96 at **0 pixels of 4,096,000** on a frozen match frame, against
+ * a null re-shot, where the same press on the sticks moved 18,935).
+ *
+ * The developer's ruling (2026-08-19) is that the row stays on screen and stops
+ * pretending: *"disable the selection for fire mode when tap commander is active
+ * and set fire mode to Auto-Fire but still have it grayed out so people can't
+ * toggle it"*. Locked rather than hidden, because CONTROLS is one row below it
+ * and a player who wants the choice back needs to see what they are getting.
+ *
+ * A predicate rather than a literal comparison at each site, so the *look* of the
+ * row ({@link settingsModel}), the *word* on its chip ({@link fireModeValue}),
+ * the *refusal* of a press ({@link commitFireMode}) and the *reason* in its help
+ * all come from one answer and cannot drift apart.
+ */
+export function fireModeLocked(scheme: ControlScheme): boolean {
+  return scheme === 'tap';
+}
+
+/**
+ * The word on the FIRE MODE chip — **and it follows the SCHEME, not just the
+ * value** (a0-100b).
+ *
+ * This is the whole of the naming conflict, and it is why this row has taken five
+ * briefs. The developer ratified AUTO-FIRE, and under Tap Commander that is
+ * exactly right: the pilot holds the trigger with no target chosen and no range
+ * test, so the game fires. On the sticks it is false. There, Auto-aim only
+ * chooses WHERE the shot goes — `mapActions` (`@platform/actions`) drops the
+ * `aim` action and flags `fire.auto`, and `fire.active` is still whatever the
+ * player was holding: the FIRE button on touch, the trigger on a pad, the mouse
+ * on a PC. Printing AUTO-FIRE there would put a fresh false word on the screen in
+ * the exact place a0-89 removed one.
+ *
+ * So: AUTO-FIRE where the scheme fires, the ratified AUTO-AIM / MANUAL pair where
+ * the player does. The row's own LABEL does not move on either — GDD §4.7 lists
+ * FIRE MODE among the fixed strings, and with the values honest per scheme there
+ * is nothing left for a rename to fix.
+ */
+export const AUTO_FIRE_LABEL = 'AUTO-FIRE';
+export const AUTO_AIM_LABEL = 'AUTO-AIM';
+export const MANUAL_LABEL = 'MANUAL';
+
+/** The word the FIRE MODE chip shows, for the mode AND the scheme. */
+export function fireModeValue(mode: FireMode, scheme: ControlScheme): string {
+  if (fireModeLocked(scheme)) return AUTO_FIRE_LABEL;
+  return mode === FireMode.AutoAim ? AUTO_AIM_LABEL : MANUAL_LABEL;
+}
+
+/** What a press on the FIRE MODE row did: the mode to keep, and whether it moved.
+ *  The same shape {@link SettingsCommit} carries, and for the same reason — the
+ *  caller cues a detent or a refusal off `moved`, and nothing is written for a
+ *  value that did not change. */
+export interface FireModeCommit {
+  readonly mode: FireMode;
+  readonly moved: boolean;
+}
+
+/**
+ * Fold a press on the FIRE MODE row and persist it — **the one path every fire
+ * mode change takes**, so the lock cannot be true on one screen and false on
+ * another (both settings screens and the `F` shortcut go through here; the shape
+ * of a0-92's mismatches 3 and 4 was exactly one screen growing a shorter path).
+ *
+ * Under a locked scheme the press is refused: the mode comes back untouched,
+ * nothing is written, and `moved` is false. **The seated value is not overwritten
+ * either.** The row reads AUTO-FIRE under Tap Commander whatever is stored — the
+ * game fires either way — so forcing the save to Auto-aim would spend a player's
+ * MANUAL, chosen on the sticks, to change nothing on screen. Their choice is
+ * waiting for them when they switch CONTROLS back.
+ */
+export function commitFireMode(
+  mode: FireMode,
+  scheme: ControlScheme,
+  storage: SettingsStorage,
+): FireModeCommit {
+  if (fireModeLocked(scheme)) return { mode, moved: false };
+  const next = mode === FireMode.AutoAim ? FireMode.Manual : FireMode.AutoAim;
+  storage.set(SETTINGS_STORAGE.fireMode, next);
+  return { mode: next, moved: true };
+}
+
+// ---------------------------------------------------------------------------
 // The rows the screen is made of
 // ---------------------------------------------------------------------------
 
@@ -538,15 +632,33 @@ export const SETTINGS_HELP: Record<
   //            until the player switches CONTROLS. Saying so is the only thing
   //            that alters what they do next.
   //
-  // The row is still called FIRE MODE, and the values are still AUTO-AIM and
-  // MANUAL: GDD §4.7 lists all three under "fixed strings the voice does not get
-  // to revisit". The name IS wrong — it names firing, and this row controls
-  // aiming — but correcting it is a ratification, not a copy pass (see the PR).
-  fireMode: (_device, scheme) =>
+  // The row is still called FIRE MODE: GDD §4.7 lists it among the "fixed strings
+  // the voice does not get to revisit", and with the VALUES now honest per scheme
+  // (AUTO-FIRE where the pilot fires, AUTO-AIM / MANUAL where the player does —
+  // {@link fireModeValue}) there is nothing left for a rename to fix.
+  //
+  // **The tap branch has a job now** (a0-100b). Its old sentence explained
+  // CONTROLS, because the row had nothing true to say about itself — the
+  // developer caught that on screen. The row is locked now, so it does: it says
+  // the row is locked, who took the choice, and how to get it back. That is the
+  // reason a disabled control owes the player (the p4-03 rule, `./button-theme`),
+  // and it is here rather than on the row because the 372px column a landscape
+  // phone gives the screen has no width for a second line.
+  //
+  // The way out names the ONE scheme the player would switch to, in the same word
+  // the CONTROLS chip shows ({@link STICKS_LABELS}) — the u8-01 seam, so the two
+  // rows cannot disagree about what the device in front of them is called.
+  //
+  // Two sentences and not one, because a0-89's guard below reads a CLAUSE at a
+  // time: the fact ("fires for you") and the way out ("to fire yourself") are
+  // opposite statements about who pulls the trigger, and run together with a
+  // comma they read — to the guard and to a hurried player alike — as the one
+  // sentence that lie always takes.
+  fireMode: (device, scheme) =>
     scheme === 'tap'
       ? {
           title: 'FIRE MODE',
-          summary: `${TAP_COMMANDER_LABEL} aims and fires for you. Switch CONTROLS to aim yourself.`,
+          summary: `${TAP_COMMANDER_LABEL} aims and fires for you. This row is locked on ${AUTO_FIRE_LABEL} — switch CONTROLS to ${STICKS_LABELS[device]} to fire yourself.`,
           badges: [],
         }
       : {
@@ -708,6 +820,21 @@ export interface SettingsRowView {
    *  longer a hue — the settings screen spends none — so an engaged toggle is
    *  the brightest *hairline* on the chip, not a coloured one. */
   readonly on: boolean;
+  /**
+   * Whether this row cannot be changed right now (a0-100b).
+   *
+   * One row is ever true: FIRE MODE under Tap Commander, where the scheme fires
+   * for the player and the value reaches nothing ({@link fireModeLocked}). It is
+   * on EVERY row rather than only the one that uses it, so a view draws the
+   * locked look by reading the model instead of by knowing which row is special —
+   * and so the next row that earns a lock needs no new field.
+   *
+   * A disabled control owes the player its reason (the p4-03 rule, `./button-theme`).
+   * This row's reason is in its `?`: on the 372px column a landscape phone gives
+   * the screen there is no width for a second line, and the `?` is already there,
+   * on every row, built for exactly this.
+   */
+  readonly disabled: boolean;
   /** The row plate's state. A row is an `inert` plate: a surface that holds the
    *  control, hovered and pressed but never bright. */
   readonly state: SettingsControlState;
@@ -800,15 +927,30 @@ export function settingsModel(
       helpOpen: openIndex === i,
     };
     switch (spec.kind) {
-      case 'fireMode':
+      case 'fireMode': {
+        // LOCKED under Tap Commander (a0-100b, developer ruling): the scheme
+        // fires for the player, so there is no choice here to offer — see
+        // {@link fireModeLocked} for the trace and the measurement.
+        const locked = fireModeLocked(controlScheme);
         return {
           kind: 'fireMode',
           label: 'FIRE MODE',
-          value: fireMode === FireMode.AutoAim ? 'AUTO-AIM' : 'MANUAL',
-          on: fireMode === FireMode.AutoAim,
-          state: stateOf({ kind: 'fireMode' }),
+          // The word follows the SCHEME, and the sticks keep the ratified pair.
+          value: fireModeValue(fireMode, controlScheme),
+          // A locked chip carries no engaged hairline: "engaged" is a fact about
+          // a choice the player made, and under Tap Commander they made none —
+          // whatever is stored, the game fires. So the row reads as unavailable
+          // in one direction only, rather than as bright and unavailable at once.
+          on: !locked && fireMode === FireMode.AutoAim,
+          // …and the plate does not answer the pointer, for the same reason the
+          // volume BAR does not: a surface that sinks under a press is promising
+          // something. The press is still a target — the wiring layer refuses it
+          // audibly ({@link commitFireMode}) rather than swallowing it.
+          state: locked ? 'rest' : stateOf({ kind: 'fireMode' }),
+          disabled: locked,
           ...help,
         };
+      }
       case 'controls':
         // The ratified wording (u8-01, 2026-08-06, superseding p6-01's flat
         // "CONTROLS: STICKS / TAP COMMANDER"): the label still names the setting
@@ -823,6 +965,7 @@ export function settingsModel(
           value: controlsValue(controlScheme, device),
           on: controlScheme === 'tap',
           state: stateOf({ kind: 'controls' }),
+          disabled: false,
           ...help,
         };
       case 'reduceVfx':
@@ -832,6 +975,7 @@ export function settingsModel(
           value: state.reduceVfx ? 'ON' : 'OFF',
           on: state.reduceVfx,
           state: stateOf({ kind: 'reduceVfx' }),
+          disabled: false,
           ...help,
         };
       case 'volume':
@@ -843,6 +987,7 @@ export function settingsModel(
           // The bar between the steppers is a readout, not a control, so the row
           // plate itself never lights up — only its two ends do.
           state: 'rest',
+          disabled: false,
           channel: spec.channel,
           level: volumeLevel(state, spec.channel),
           max: VOLUME_STEPS,

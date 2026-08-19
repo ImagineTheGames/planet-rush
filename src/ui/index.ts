@@ -895,8 +895,14 @@ export {
 } from './menu-geometry';
 
 export {
+  // The FIRE MODE chip's three words. AUTO-FIRE is the LOCKED reading under Tap
+  // Commander, where the pilot holds the trigger; the ratified AUTO-AIM / MANUAL
+  // pair is the sticks scheme's, where the player does (a0-100b).
+  AUTO_AIM_LABEL,
+  AUTO_FIRE_LABEL,
   CONTROL_SCHEME_STORAGE,
   DEFAULT_VOLUMES,
+  MANUAL_LABEL,
   SETTINGS_EYEBROW,
   SETTINGS_HELP,
   SETTINGS_HELP_GLYPH,
@@ -910,10 +916,13 @@ export {
   VOLUME_STEPS,
   adjustVolume,
   applyVolumes,
+  commitFireMode,
   commitSettings,
   controlsDevice,
   controlsValue,
   createSettings,
+  fireModeLocked,
+  fireModeValue,
   loadSettings,
   parseControlScheme,
   parseReduceVfx,
@@ -938,6 +947,7 @@ export {
 export type {
   ControlScheme,
   ControlsDeviceInputs,
+  FireModeCommit,
   SettingsCommit,
   SettingsControlState,
   SettingsHelp,

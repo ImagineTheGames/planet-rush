@@ -241,6 +241,7 @@ import {
   settingsRowKey,
   volumeButtons,
   loadSettings,
+  commitFireMode,
   commitSettings,
   applyVolumes,
   SETTINGS_STORAGE,
@@ -3425,12 +3426,20 @@ async function boot(): Promise<void> {
         pauseSettingsHelp = pauseSettingsHelpAtPress === target.index ? null : target.index;
         audio.cue(pauseSettingsHelp === null ? 'back' : 'press');
         break;
-      case 'fireMode':
-        fireMode = fireMode === FireMode.AutoAim ? FireMode.Manual : FireMode.AutoAim;
-        touch.setFireMode(fireMode);
-        platform.storage.set(FIRE_MODE_KEY, fireMode);
-        audio.cue('detent');
+      case 'fireMode': {
+        // The one fold every fire-mode change takes (`./ui` `commitFireMode`),
+        // and the fix for `docs/settings.md` mismatch 1: under TAP COMMANDER the
+        // pilot holds the trigger and this row reaches nothing, so the press is
+        // REFUSED — nothing moves, nothing is written, and the refusal is the
+        // same audible one a slider at its rail gives rather than the silence a
+        // player used to get. The row says so before they press it: it draws
+        // locked, reading AUTO-FIRE (`./ui` `settingsModel`).
+        const change = commitFireMode(fireMode, controlScheme, platform.storage);
+        fireMode = change.mode;
+        if (change.moved) touch.setFireMode(fireMode);
+        audio.cue(change.moved ? 'detent' : 'reject');
         break;
+      }
       case 'controls':
         controlScheme = controlScheme === 'tap' ? 'sticks' : 'tap';
         tapPilot.clear();
@@ -7138,9 +7147,12 @@ async function boot(): Promise<void> {
     // pad button". A settled sequence refuses, so the shortcuts below come back.
     if (endOverlay.visible && skipSummary()) return;
     if (e.code === 'KeyF') {
-      fireMode = fireMode === FireMode.Manual ? FireMode.AutoAim : FireMode.Manual;
+      // Through the same fold as the settings rows, so the lock is one rule and
+      // not one rule per keyboard: a shortcut that could still flip the mode
+      // under Tap Commander would be a back door onto a setting the screen says
+      // is not the player's on that scheme (a0-100b).
+      fireMode = commitFireMode(fireMode, controlScheme, platform.storage).mode;
       touch.setFireMode(fireMode);
-      platform.storage.set(FIRE_MODE_KEY, fireMode);
     }
     // Control-scheme toggle: single key for day-1, mirroring the fire-mode key
     // (developer §3 puts the picker in settings — UI owns that screen; this is the
@@ -7823,6 +7835,10 @@ interface SettingsRowReport {
   readonly kind: string;
   readonly label: string;
   readonly value: string;
+  /** Whether the row reports itself LOCKED (a0-100b) — FIRE MODE under Tap
+   *  Commander is the only row that ever does. Read from the same model the view
+   *  dims, so a capture can cross-check the frame it photographed. */
+  readonly disabled: boolean;
 }
 
 /** One CODEX control as the seam reports it: BACK, a tab, or a (visible) entry
@@ -8468,7 +8484,7 @@ function openMainMenu(
   }
 
   /** The seam's settings-row readback records, reused frame to frame (§4.3). */
-  const settingsRowSlots: { kind: string; label: string; value: string }[] = [];
+  const settingsRowSlots: { kind: string; label: string; value: string; disabled: boolean }[] = [];
 
   /**
    * Report what the settings rows SAY, from the model the view is drawing (a0-30).
@@ -8482,10 +8498,12 @@ function openMainMenu(
   function reportSettingsRows(model: ReturnType<typeof settingsModel>): void {
     for (let i = 0; i < model.rows.length; i++) {
       const row = model.rows[i]!;
-      const slot = settingsRowSlots[i] ?? (settingsRowSlots[i] = { kind: '', label: '', value: '' });
+      const slot =
+        settingsRowSlots[i] ?? (settingsRowSlots[i] = { kind: '', label: '', value: '', disabled: false });
       slot.kind = row.kind;
       slot.label = row.label;
       slot.value = row.value;
+      slot.disabled = row.disabled;
     }
     settingsRowSlots.length = model.rows.length;
     seam.settingsRows = settingsRowSlots;
@@ -9742,11 +9760,15 @@ function openMainMenu(
         if (!isTouch) settingsHelpFocus = target.index;
         ctx.cue(settingsHelp === null ? 'back' : 'press');
         break;
-      case 'fireMode':
-        fireMode = fireMode === FireMode.AutoAim ? FireMode.Manual : FireMode.AutoAim;
-        platform.storage.set(FIRE_MODE_KEY, fireMode);
-        ctx.cue('detent');
+      case 'fireMode': {
+        // The same fold the pause screen takes, refusing on the same rule: under
+        // TAP COMMANDER this row is locked on AUTO-FIRE, because the pilot fires
+        // (a0-100b, `./ui` `commitFireMode`). A press refuses audibly.
+        const change = commitFireMode(fireMode, controlScheme, platform.storage);
+        fireMode = change.mode;
+        ctx.cue(change.moved ? 'detent' : 'reject');
         break;
+      }
       case 'controls':
         // Sticks ⇄ Tap Commander, persisted to the same seam the match reads at
         // boot (CONTROL_SCHEME_KEY) — so the choice takes effect immediately here
