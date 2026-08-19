@@ -1,0 +1,224 @@
+{
+  "timelines": [
+    {
+      "device": "desktop",
+      "logicalViewport": {
+        "width": 1280,
+        "height": 800,
+        "rotated": false
+      },
+      "samples": 127,
+      "looksOpenMs": 2989,
+      "looksOpenScale": 1.76192,
+      "paintClearMs": 2955,
+      "pingMs": 3536,
+      "cueStartsMs": [
+        40,
+        608,
+        3536
+      ],
+      "takesInputMs": 3600
+    },
+    {
+      "device": "phone",
+      "logicalViewport": {
+        "width": 844,
+        "height": 390,
+        "rotated": true
+      },
+      "samples": 32,
+      "looksOpenMs": 3307,
+      "looksOpenScale": 2.37051,
+      "paintClearMs": 3061,
+      "pingMs": 3552,
+      "cueStartsMs": [
+        30,
+        596,
+        3552
+      ],
+      "takesInputMs": 3553
+    }
+  ],
+  "clicks": [
+    {
+      "device": "desktop",
+      "target": "hangar",
+      "controls": [
+        "play",
+        "codex",
+        "settings",
+        "hangar"
+      ],
+      "clickedAtMs": 2564,
+      "screenAfter": "menu"
+    },
+    {
+      "device": "desktop",
+      "target": "hangar",
+      "controls": [
+        "play",
+        "codex",
+        "settings",
+        "hangar"
+      ],
+      "clickedAtMs": 3005,
+      "screenAfter": "menu"
+    },
+    {
+      "device": "desktop",
+      "target": "hangar",
+      "controls": [
+        "play",
+        "codex",
+        "settings",
+        "hangar"
+      ],
+      "clickedAtMs": 3309,
+      "screenAfter": "menu"
+    },
+    {
+      "device": "desktop",
+      "target": "hangar",
+      "controls": [
+        "play",
+        "codex",
+        "settings",
+        "hangar"
+      ],
+      "clickedAtMs": 3489,
+      "screenAfter": "menu"
+    },
+    {
+      "device": "desktop",
+      "target": "hangar",
+      "controls": [
+        "play",
+        "codex",
+        "settings",
+        "hangar"
+      ],
+      "clickedAtMs": 3738,
+      "screenAfter": "hangar"
+    },
+    {
+      "device": "desktop",
+      "target": "hangar",
+      "controls": [
+        "play",
+        "codex",
+        "settings",
+        "hangar"
+      ],
+      "clickedAtMs": 4039,
+      "screenAfter": "hangar"
+    },
+    {
+      "device": "phone",
+      "target": "hangar",
+      "controls": [
+        "play",
+        "codex",
+        "settings",
+        "hangar"
+      ],
+      "clickedAtMs": 2697,
+      "screenAfter": "menu"
+    },
+    {
+      "device": "phone",
+      "target": "hangar",
+      "controls": [
+        "play",
+        "codex",
+        "settings",
+        "hangar"
+      ],
+      "clickedAtMs": 3269,
+      "screenAfter": "menu"
+    },
+    {
+      "device": "phone",
+      "target": "hangar",
+      "controls": [
+        "play",
+        "codex",
+        "settings",
+        "hangar"
+      ],
+      "clickedAtMs": 3449,
+      "screenAfter": "menu"
+    },
+    {
+      "device": "phone",
+      "target": "hangar",
+      "controls": [
+        "play",
+        "codex",
+        "settings",
+        "hangar"
+      ],
+      "clickedAtMs": 3723,
+      "screenAfter": "hangar"
+    },
+    {
+      "device": "phone",
+      "target": "hangar",
+      "controls": [
+        "play",
+        "codex",
+        "settings",
+        "hangar"
+      ],
+      "clickedAtMs": 3853,
+      "screenAfter": "hangar"
+    },
+    {
+      "device": "phone",
+      "target": "hangar",
+      "controls": [
+        "play",
+        "codex",
+        "settings",
+        "hangar"
+      ],
+      "clickedAtMs": 4236,
+      "screenAfter": "hangar"
+    }
+  ],
+  "reseals": [
+    {
+      "device": "desktop",
+      "lockedAfterEscapeMs": 2593
+    },
+    {
+      "device": "phone",
+      "lockedAfterEscapeMs": 3672
+    }
+  ],
+  "shots": [
+    {
+      "device": "desktop",
+      "delayMs": 2900,
+      "shotAtMs": 2974,
+      "takesAPress": false
+    },
+    {
+      "device": "desktop",
+      "delayMs": 3200,
+      "shotAtMs": 3255,
+      "takesAPress": true
+    },
+    {
+      "device": "phone",
+      "delayMs": 2900,
+      "shotAtMs": 3039,
+      "takesAPress": true
+    },
+    {
+      "device": "phone",
+      "delayMs": 3200,
+      "shotAtMs": 3489,
+      "takesAPress": true
+    }
+  ]
+}

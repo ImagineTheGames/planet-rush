@@ -1,0 +1,194 @@
+a0-90 — "the title menu looks ready well before it is"
+======================================================
+
+Developer, 2026-08-19, from live play:
+
+  "there is a pause after the title animation plays and being able to click on
+   a button (theres a literal PING that you hear and it takes so long to be
+   able to actually click)"
+
+Everything below is measured on the real `vite preview` bundle, not on a dev
+server and not in jsdom. Harness: `measure.mjs` in this directory (Playwright,
+Chromium, the two device profiles QA's matrix names — desktop 1280x800 dpr 1 no
+touch, iPhone-ish 390x844 dpr 3 `isMobile`).
+
+  node measure.mjs                      # timelines + the reseal path
+  CLICKS=1 DELAYS=2500,2900,... node measure.mjs
+  SHOTS=shots SHOT_AT=2900,3200 TAG=before node measure.mjs
+  BASE=http://localhost:4198/ ...       # point at another bundle
+
+`before` is `main` at a763ab7; `after` is this branch. Both were built with
+`vite build` and served with `vite preview`, side by side on two ports, so the
+two columns differ in one file.
+
+
+1. THE THREE TIMINGS THE BRIEF ASKED FOR
+----------------------------------------
+
+Milliseconds from the opening press (the `pointerdown` the page itself stamped,
+not the one the driver asked for).
+
+  "animation visually settles" = the frame the LAST GATE PIXEL leaves the
+  screen. Read two independent ways: (a) the punched star-field canvas reports
+  alpha 0 at all four corners — the picture itself; (b) the door's live
+  computed transform, run through the shipped `openingPolygon`, contains all
+  four corners of the viewport. The doorway is convex, so corners are the whole
+  rectangle. (a) is the number quoted; (b) agrees within one sample.
+
+  "the sound plays"     = the audible instant of the last cue cluster scheduled
+                          after the press (`gateSeated`, the confirm triad),
+                          taken by wrapping OscillatorNode/AudioBufferSourceNode
+                          `.start(when)` and correcting `when` against
+                          `ctx.currentTime`.
+
+  "phase === locked"    = the phase in which the gate stops being modal and
+                          stops eating presses. On the way IN that is `open`,
+                          read off the overlay's own `pointer-events:none`.
+                          (`locked` is the SEALED phase; a boot starts there and
+                          never returns to it without `Escape` — see §3.)
+
+                     settles      PING     takes a press     dead window
+  BEFORE
+    desktop            2 955     3 536           3 600           645 ms
+    phone              3 061     3 552           3 553           492 ms
+  AFTER
+    desktop            2 983     2 917           2 983             0 ms
+    phone              3 305     3 069           3 305             0 ms
+
+  Read the AFTER rows as "the same instant, three times". The PING is raised by
+  `through()`, in the same synchronous call as the phase change that opens the
+  menu, so the two are one event in code; the small negative offsets are the
+  sampler's own lag on a software-GL runner whose main thread is saturated
+  (~43 ms per frame desktop, ~240 ms phone). "settles" and "takes a press" are
+  read by two different samplers and land on the same millisecond because after
+  this change they are the same frame by construction.
+
+  The 3.0 s / 3.3 s that remains is the door — four beats the player watches,
+  which is the screen. What is gone is the part after it.
+
+
+2. THE SAME THING, WITH A REAL PRESS
+------------------------------------
+
+Independent of every sampler above: press the door, wait, press HANGAR at its
+own reported physical centre, read `window.__mainMenu.screen` back.
+
+  press at (ms)        2 500   2 900   3 200   3 400   3 700   4 000
+  BEFORE desktop        menu    menu    menu    menu  hangar  hangar
+  BEFORE phone          menu    menu    menu    menu  hangar  hangar
+  AFTER  desktop        menu  hangar  hangar  hangar  hangar  hangar
+  AFTER  phone          menu    menu  hangar  hangar  hangar  hangar
+
+  (Delays are requested; the actual press instants are in the JSON — e.g. the
+  BEFORE desktop "3 400" landed at 3 489 ms and was ignored, and the AFTER
+  desktop "2 900" landed at 2 953 ms and opened the hangar.)
+
+  The 2 500 column is refused in both columns and must be: the door is still on
+  the screen there.
+
+
+3. THE BRIEF'S LEAD, MEASURED — AND WHY IT IS NOT THIS
+------------------------------------------------------
+
+The brief pointed at `pollSeal` waiting out `SEAL_CAP_MS = 3200` because `home`
+never arrives. That is not what is happening, for two reasons:
+
+  a. `pollSeal` is only ever reached from phase `closing`, and the only thing
+     that produces `closing` is `reseal()`, and the only thing that calls
+     `reseal()` is `Escape`. A boot starts at `locked` (`title-gate.ts`, the
+     field initialiser) and goes `locked -> turning -> parting -> entering ->
+     open`. The seal is never polled on the path the developer described.
+
+  b. On the path where it IS polled, `home` arrives. Escape to lock, measured:
+
+       desktop   2 610 / 2 559 / 2 593 ms
+       phone     3 599 / 3 672 / 3 746 ms
+
+     The reseal steps are `returning` at 0 and `closing` at 1 460, and the
+     leaves' own transition is 1 020 ms, so the leaves come home ~2 480 ms after
+     the Escape. The cap would put it at ~4 660 ms. Every run above is the
+     leaves, not the cap. (The phone's extra ~1 s is `pollSeal` counting FRAMES
+     at an assumed 60 Hz on a runner rendering at ~6 fps — the floor, not the
+     cap, and not this brief.)
+
+So the lead's mechanism is right and its location is wrong: beat 4 on the way IN
+was hung on a timer while the door itself had already left the screen. Which is
+the brief's own closing note, applied to the other end of the sequence.
+
+
+4. WHY THE GAP EXISTED
+----------------------
+
+`throughScale()` grows the door until its opening is 1.4x past "exactly off
+screen". That margin is deliberate and correct — it is what lets the frame's
+fade begin with nothing of the frame left to fade (trap 2). But it means the
+door clears the viewport partway through beat 3's 1 500 ms growth, and the rest
+of that growth is a door moving where nobody can see it:
+
+  viewport      through-scale   clears at   fraction of the growth
+  1920x1080          2.254         1.861            0.687
+  1280x800           2.054         1.740            0.702
+  844x390 (phone)    2.744         2.124            0.645
+  2560x1080          3.005         2.264            0.630
+  1024x768           2.229         1.691            0.563
+
+Beat 4 was scheduled at 3 460 ms = 1 880 + 1 500 + 80: the END of that growth.
+The last ~30-45% of it, plus the 80 ms tail, is the dead window.
+
+
+5. WHAT CHANGED
+---------------
+
+`pollThrough()` runs each frame of `entering` and asks the picture, using the
+geometry the punch is already made of: does `openingPolygon` at the door's
+MEASURED scale contain all four corners of the viewport (`gateClearsViewport`)?
+The first frame it does, the punch has erased the entire field and the hull ring
+is past every edge — so the gate goes through then.
+
+Kept, deliberately:
+  - the 1.4 margin (trap 2);
+  - the timed 3 460 step, demoted to a CAP — the fallback for a tab that never
+    ran the transition, which is exactly what `SEAL_CAP_MS` already is at the
+    other end. A `null` measurement is NOT read as arrival: a leaf that cannot
+    be measured has nowhere to be but shut, while a door that cannot be measured
+    may be anywhere.
+
+Not done, deliberately:
+  - shortening the cap, which would hide the bug rather than fix it;
+  - accepting presses during the animation and queueing them, which the brief
+    rules out and which trades a dead menu for a menu that fires late.
+
+
+6. THE PICTURE IS THE SAME; ONLY THE ANSWER CHANGED
+---------------------------------------------------
+
+`shots/` holds four instants, before and after, on both devices. The eight PNGs
+are byte-identical per device:
+
+  41d7136591f27b6fd1da091205d8098f  {before,after}-desktop-{2900,3200}ms.png
+  20d127a76da8401aca9167d99cdc6566  {before,after}-phone-{2900,3200}ms.png
+
+Four frames, one picture each: a finished main menu, no door, nothing moving.
+In the BEFORE column three of those four refuse a press. That is the bug in one
+checksum — the screen was never wrong, it was only lying about being ready.
+
+
+7. WHAT IS NOT CLAIMED
+----------------------
+
+  - These are emulated devices in headless Chromium on a software GL runner, not
+    a handset. The numbers that matter here are CSS-transition and timer
+    instants, which advance on the wall clock and do not depend on frame rate;
+    the SAMPLING of them does, and the resolution is stated above (~43 ms
+    desktop, ~240 ms phone). A real 60 Hz phone resolves the same instants more
+    finely, in the same places.
+  - One frame's worth of quantisation survives at the handover, and must: the
+    door leaves the screen BETWEEN two frames whatever we do, so the last frame
+    that still shows it shows one frame's worth of it. On a device dropping
+    frames that last sliver is proportionally larger. It is the same quantum the
+    reseal's `pollSeal` has always had.
+  - `paintClear` reads null in the AFTER runs. That is not a stale field on the
+    screen: `tick` returns before `paint` on the frame it goes through, and the
+    overlay is hidden in that same synchronous call, so the canvas is never
+    SHOWN unpunched. It simply means the frame loop ended before a fully-punched
+    canvas was ever painted — there was no longer any reason to paint one.
