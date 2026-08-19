@@ -315,6 +315,39 @@ describe('Onboarding — OBJECTIVE prompt (GDD §1 win condition, §2.10)', () =
     expect(ob.isCompleted(PromptId.Objective)).toBe(false);
   });
 
+  it('is not retired by the seconds a WITHDRAWN prompt spent off screen (a0-100)', () => {
+    // The same rule as the siege above, for the other reason a prompt can be off
+    // screen: on a landscape phone the open build wheel's drawn footprint takes
+    // 83% of the height and there is no band left to draw a prompt in, so the
+    // prompt yields and withdraws (`./hud-geometry` `promptWithdraws`). If that
+    // happened behind this machine's back, the eight seconds of dwell would run
+    // while nothing was on screen and the win condition would be marked taught to
+    // a player who never saw it — the one thing GDD §2.10's "fires once" cannot
+    // afford to be wrong about.
+    const ob = new Onboarding();
+    expect(ob.update(sig({ time: 0 }))).toBe(PromptId.Objective);
+    // The view could not draw it: the wheel is open on a short screen.
+    ob.withdrew();
+    expect(ob.update(sig({ time: 60, wheelOpen: true }))).toBe(PromptId.Objective);
+    expect(ob.isCompleted(PromptId.Objective)).toBe(false);
+    // …and the moment the band comes back, so does the dwell, from where it was.
+    expect(ob.update(sig({ time: 61 }))).toBe(PromptId.Objective);
+    expect(ob.update(sig({ time: 70 }))).not.toBe(PromptId.Objective);
+    expect(ob.isCompleted(PromptId.Objective)).toBe(true);
+  });
+
+  it('withdrawal defers, it does not complete — the prompt comes back whole', () => {
+    // Withdrawing must never look like learning. A prompt the player could not
+    // read is still owed to them.
+    const ob = new Onboarding();
+    for (let t = 0; t < 40; t++) {
+      expect(ob.update(sig({ time: t, wheelOpen: true }))).toBe(PromptId.Objective);
+      ob.withdrew();
+    }
+    expect(ob.isCompleted(PromptId.Objective)).toBe(false);
+    expect(ob.update(sig({ time: 40 }))).toBe(PromptId.Objective);
+  });
+
   it('is shown once and never again — across matches, through the memory', () => {
     // §2.10's "never appear again after each is completed once", made durable by
     // u15-01: the objective is a thing you are told, not a thing you re-learn.

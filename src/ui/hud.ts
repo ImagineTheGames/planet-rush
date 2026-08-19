@@ -2681,9 +2681,23 @@ export class Hud extends Container {
    * on that margin in the worst case, which is why this registers with a real
    * `PAD` margin rather than the bare `full` the overlays above use.
    *
-   * Its vertical placement (`PROMPT_CENTER_Y`, below the ship, above the strip)
-   * is a readability choice, not an anchor claim — no region in the vocabulary
+   * Its vertical placement (the clear band under the wheel, above the strip) is a
+   * readability choice, not an anchor claim — no region in the vocabulary
    * distinguishes it, and `hud-geometry.test.ts` pins the footprint it produces.
+   *
+   * **And since a0-100 it is sometimes not here at all.** Two elements can each
+   * be inside their declared anchor and still share pixels, which is exactly what
+   * QA photographed on a 798×384 phone: `onboarding` green inside `full` + PAD,
+   * `build-wheel` green inside `full`, and the prompt's first two lines drawn
+   * through the REPAIR REACTOR and RADAR wedges. Containment is the question the
+   * registry asks; it is not the only question there is. So the prompt now yields
+   * to an open wheel — the wheel is what the player deliberately opened, the
+   * prompt is ambient — and on the landscape phones, where the band left under
+   * the wheel's DRAWN footprint is about 11px against a 33px prompt, yielding
+   * means withdrawing. A withdrawn prompt draws nothing, so `shown()` leaves it
+   * out of the frame entirely and there is no rect to intersect. It is back the
+   * moment the wheel closes: `./onboarding` `withdrew()` keeps the deferral from
+   * becoming a deletion. The pairwise rule itself is `./layout-exclusions`.
    *
    * **Still not registered, and why — measured, not estimated.** One element is
    * left: `wave-clock` (`top-center` in QA's contract). It is worth being exact

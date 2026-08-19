@@ -24,6 +24,11 @@ import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-r
 import { homeArrow, ARROW_EDGE_INSET } from './alarm';
 import { hudMetrics, hudType } from './instrument';
 import { collapsedRect } from './minimap';
+import { zoomControlBounds } from './zoom-control';
+import { affordanceRects, buildButtonRect } from '@platform/touch-visuals';
+import { writeBadgeRect } from '../render/build-badge';
+import { writePingRect } from '../net/ping-badge';
+import { writeAffordanceRect } from '../render/fullscreen-affordance';
 import type { MinimapInsets } from './minimap';
 import {
   wheelBounds,
@@ -1029,6 +1034,65 @@ describe('onboarding placement', () => {
     const deskEntries = entriesFor(desk, false, true, worst(desk, false));
     expect(deskEntries.map((e) => e.id)).toEqual(['build-wheel', 'upgrade-wheel', 'onboarding']);
     expect(exclusionViolations(deskEntries)).toEqual([]);
+  });
+
+  it('every OTHER registered surface on QA\'s profile, held to the same intersection', () => {
+    // The brief's second ask: having found two surfaces sharing pixels with
+    // nothing arbitrating, check the rest of them rather than the one that was
+    // photographed. Every element the client registers on a 798×384 in-match
+    // frame whose rect this repo can compute without a browser, against the same
+    // `wheelFootprint` the prompt is now held to.
+    //
+    // The answer is a SET, pinned, because "nothing else overlaps" is only worth
+    // asserting if a new overlap fails here. Two do, and both are correct:
+    //
+    //  - `alarm-frame` IS the screen (`full` + 0, a stroked border flush with the
+    //    viewport edges), so it contains every other element by construction. An
+    //    exclusion rule naming it would be a rule against the alarm existing.
+    //  - `respawn-countdown` is dead centre, and so is the wheel — but they can
+    //    never be on screen together: the countdown draws only while the local
+    //    ship is dead with a respawn pending, and a dead ship cannot dock or
+    //    build (`./hud`, the display-list note above `respawnGroup`). Two rects
+    //    that share pixels on no frame share no pixels.
+    //
+    // Everything else clears it outright, which is the result worth having: the
+    // corner readouts, the touch affordances and the badges were all already
+    // outside the wheel's DRAWN footprint, not merely outside its disc — so the
+    // prompt was the only surface the halo's 21px a side was hiding.
+    const W = 798;
+    const H = 384;
+    const wheel = wheelFootprint(W, H);
+    const scratch = (): Rect => ({ x: 0, y: 0, width: 0, height: 0 });
+    const sticks = affordanceRects(true, FireMode.Manual, W, H);
+    const auto = affordanceRects(true, FireMode.AutoAim, W, H);
+    // A station off the right-hand edge, so the screen-edge arrow is drawn.
+    const arrow = homeArrow({ x: 0, y: 0 }, { x: 900, y: 0 }, { width: W, height: H });
+
+    const surfaces: ReadonlyArray<readonly [string, Rect | null]> = [
+      ['station-hp', stationHpBounds(W, 40)],
+      ['zoom-control', zoomControlBounds(W, H, true)],
+      ['minimap', collapsedRect({ width: W, height: H }, true, {})],
+      ['alarm-frame', alarmFrameBounds(W, H)],
+      ['alarm-arrow', polyBounds(arrowPoly(arrow))],
+      ['respawn-countdown', respawnBounds(W, H, respawnWrapWidth(W, H), 30)],
+      ['touch-left-stick', sticks.leftStickZone],
+      ['touch-aim-stick', sticks.aimZone],
+      ['touch-fire-button', auto.fireButton],
+      ['build-button', buildButtonRect(true, true, W, H)],
+      ['build-badge', writeBadgeRect(90, 12, W, H, scratch())],
+      ['net-ping', writePingRect(70, 12, W, H, scratch(), 20)],
+      ['fullscreen-reenter', writeAffordanceRect(W, H, scratch())],
+      // `onboarding` is absent on purpose: it withdraws here, which is the fix.
+      ['onboarding', promptWithdraws(W, H, true, {}, true) ? null : promptBounds(W, H, 200, lineBox({ width: W, height: H }), true, {}, true)],
+    ];
+
+    const sharing = surfaces
+      .filter(([, r]) => r !== null && rectsIntersect(r, wheel))
+      .map(([id]) => id);
+    expect(sharing, `against build-wheel ${fmt(wheel)}`).toEqual([
+      'alarm-frame',
+      'respawn-countdown',
+    ]);
   });
 
   it('the exclusion table is a table, and it is about the pairs it names', () => {
