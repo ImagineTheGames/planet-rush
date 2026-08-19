@@ -71,6 +71,8 @@
  */
 
 import type { PlayerId, Vec2 } from '@shared/types';
+import type { Rect } from '@platform/layout-registry';
+import { hullBarFill } from './instrument';
 import { playerColor } from './station-hp';
 
 // ---------------------------------------------------------------------------
@@ -282,6 +284,37 @@ export function healthBarModel(
     });
   }
   return bars;
+}
+
+/**
+ * Where one bar's **track** sits on screen: centred on its entity's x, floated
+ * {@link HEALTHBAR_GAP} above the entity's screen radius, in the size that bar's
+ * style calls for (the local own-ship bar is the larger one — field request
+ * v0.1.1). Screen space, CSS px, since the model's positions already are.
+ *
+ * Split out of {@link ./healthbar-view} (a0-101) so the geometry of a hull bar is
+ * a value the layout tests can hold, rather than four locals inside a draw loop:
+ * the view culls on this rect, draws the steel on it, and fills it through
+ * {@link ./instrument} `hullBarFill` — the one function that decides which way a
+ * hull bar empties. Same track, same direction, ships and turrets alike.
+ */
+export function healthBarTrack(bar: HealthBar): Rect {
+  const width = bar.local ? HEALTHBAR_LOCAL_WIDTH : HEALTHBAR_WIDTH;
+  const height = bar.local ? HEALTHBAR_LOCAL_HEIGHT : HEALTHBAR_HEIGHT;
+  const bottom = bar.y - bar.radius - HEALTHBAR_GAP;
+  return { x: bar.x - width / 2, y: bottom - height, width, height };
+}
+
+/**
+ * The **drawn fill** of one over-entity bar — the coloured part, anchored at its
+ * track's left edge so the bar empties rightward ({@link ./instrument}
+ * `hullBarFill`, the one rule every hull bar on the screen takes).
+ *
+ * `fraction` arrives already floored by {@link livingFraction}, so a living hull
+ * keeps its sliver here without this function knowing anything about hp.
+ */
+export function healthBarFill(bar: HealthBar): Rect {
+  return hullBarFill(healthBarTrack(bar), bar.fraction);
 }
 
 /**

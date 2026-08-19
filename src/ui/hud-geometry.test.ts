@@ -24,6 +24,9 @@ import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-r
 import { homeArrow, ARROW_EDGE_INSET } from './alarm';
 import { hudMetrics, hudType } from './instrument';
 import { collapsedRect } from './minimap';
+import { healthBarFill, healthBarModel, healthBarTrack } from './healthbar';
+import type { Combatant } from './healthbar';
+import { stationHpModel } from './station-hp';
 import { zoomControlBounds } from './zoom-control';
 import { affordanceRects, buildButtonRect } from '@platform/touch-visuals';
 import { writeBadgeRect } from '../render/build-badge';
@@ -35,6 +38,10 @@ import {
   panelBounds,
   panelSize,
   stationHpBounds,
+  stationCoreBarTrack,
+  stationCoreBarFill,
+  stationShieldBarTrack,
+  stationShieldBarFill,
   alarmFrameBounds,
   arrowPoly,
   polyBounds,
@@ -372,6 +379,214 @@ describe('station-hp placement', () => {
 // The own-ship HULL readout that used to stack under HOME was removed (field
 // report v0.2 — the over-ship bar is the truth now), so its top-right placement
 // block went with it. The corner now carries only `station-hp`, tested above.
+
+// ---------------------------------------------------------------------------
+// WHICH WAY A HULL BAR EMPTIES (a0-101)
+// ---------------------------------------------------------------------------
+//
+// a0-99, desktop 1280x800, two crops of the same match: the station bar at
+// `88/100` drew its missing twelve per cent as an empty dark block at the LEFT
+// end with the fill anchored right, and the ship bar at `23/50` drew its missing
+// part at the RIGHT with the fill anchored left. Two hull readouts, one screen,
+// opposite directions. QA declined to rule on which was correct and was right
+// not to: the station block sits under a right-aligned `HOME` label, so a right
+// anchor there is arguable.
+//
+// The Director, 2026-08-19:
+//
+//   > Every hull bar empties rightward: fill anchored left, empty space on the
+//   > right. The ship bar is already correct; the station bar moves.
+//
+// — because the ship bar is the one a player reads most often and under the most
+// pressure, and left-anchored is the ordinary convention a player arrives with;
+// and because a label's text alignment is a typographic choice, not a reason for
+// the quantity beneath it to run the other way. Nothing else on the HUD takes
+// its direction from the label above it.
+//
+// The ruling is about EVERY bar of this kind, not the two photographed, so this
+// block is an ENUMERATION as much as an assertion. Every bar below is reached
+// through the code the views actually draw with — the real model
+// (`healthBarModel`, `stationHpModel`) turns hp into a fraction, and the geometry
+// module turns that fraction into the rect that gets painted — so a view that
+// went back to hand-rolling a rect would have to delete a function to escape it.
+//
+// The bars, and what each of them is:
+//
+//   own station CORE (HOME)      the loss condition, top-right      (./hud)
+//   own station SHIELD overbar   the pooled shield in front of it   (./hud)
+//   repair-shimmer wash          the patina over the core fill      (./hud)
+//   own ship hull                the larger "mine" bar              (./healthbar-view)
+//   enemy ship hull              the narrow bar                     (./healthbar-view)
+//   own turret HP                narrow, in your colour             (./healthbar-view)
+//   enemy turret HP              narrow, in theirs                  (./healthbar-view)
+//   hostile wave unit HP         narrow, un-owned steel             (./healthbar-view)
+//
+// Deliberately NOT here, and why: a rival station's health is a damage RING on
+// the station itself (GDD §2.2 as amended 2026-08-07, drawn in `src/render`), not
+// a bar — a ring has no left end to empty from. The class-tile and settings
+// readouts are discrete PIPS rather than a pool that drains, and they already
+// fill left-to-right. The end-of-match XP bar is not health, and is already
+// left-anchored.
+
+describe('hull bars (a0-101)', () => {
+  /** The camera-followed player, whose station and ship these bars belong to. */
+  const LOCAL = 0;
+
+  /** One enumerated bar: the steel track it is drawn in, and the coloured fill
+   *  its own module produces for a given fraction of the pool. */
+  interface HullBarCase {
+    readonly id: string;
+    readonly track: Rect;
+    readonly fill: (fraction: number) => Rect;
+  }
+
+  /** An entity's screen placement — the bars are drawn in screen space, already
+   *  projected, so any point clear of the viewport edges will do. */
+  const AT_SCREEN = { pos: { x: 640, y: 400 }, radius: 14 } as const;
+
+  /** A combat entity at `fraction` of its hull, in combat so that even a full
+   *  one shows a bar (the visibility rule is ./healthbar.test.ts's subject). */
+  function combatantAt(
+    base: Omit<Combatant, 'hp' | 'maxHp' | 'inCombat'>,
+    fraction: number,
+  ): Combatant {
+    return { ...base, maxHp: 70, hp: 70 * fraction, inCombat: true };
+  }
+
+  /** An over-entity bar, reached the way the view reaches it: the real model
+   *  decides the bar exists and what its fill fraction is, then ./healthbar
+   *  places the track and the fill inside it. */
+  function entityBar(
+    id: string,
+    base: Omit<Combatant, 'hp' | 'maxHp' | 'inCombat'>,
+  ): HullBarCase {
+    const modelled = (fraction: number) => {
+      const bars = healthBarModel([combatantAt(base, fraction)], LOCAL);
+      expect(bars, `${id} should draw a bar at ${fraction}`).toHaveLength(1);
+      return bars[0]!;
+    };
+    return { id, track: healthBarTrack(modelled(1)), fill: (f) => healthBarFill(modelled(f)) };
+  }
+
+  /** The station's pools, through the same model ./hud builds them from. */
+  const coreAt = (fraction: number) => stationHpModel(LOCAL, 100 * fraction, 100, 0, 0);
+  const shieldAt = (fraction: number) => stationHpModel(LOCAL, 100, 100, 60 * fraction, 60);
+
+  const HULL_BARS: readonly HullBarCase[] = [
+    {
+      id: 'own station CORE (HOME)',
+      track: stationCoreBarTrack(),
+      fill: (f) => stationCoreBarFill(coreAt(f).coreFraction),
+    },
+    {
+      id: 'own station SHIELD overbar',
+      track: stationShieldBarTrack(),
+      fill: (f) => stationShieldBarFill(shieldAt(f).shieldFraction),
+    },
+    {
+      // The repair shimmer is a patina wash drawn OVER the core fill (field
+      // report v0.2.2), so it is that same rect and inherits its direction — it
+      // is listed on its own so a shimmer that drifted off the fill fails here
+      // rather than only under a live repair.
+      id: 'repair-shimmer wash over the core',
+      track: stationCoreBarTrack(),
+      fill: (f) => stationCoreBarFill(coreAt(f).coreFraction),
+    },
+    entityBar('own ship hull', { ...AT_SCREEN, owner: LOCAL, alive: true, local: true }),
+    entityBar('enemy ship hull', { ...AT_SCREEN, owner: 1, alive: true }),
+    entityBar('own turret HP', { ...AT_SCREEN, owner: LOCAL, alive: true, turret: true }),
+    entityBar('enemy turret HP', { ...AT_SCREEN, owner: 1, alive: true, turret: true }),
+    entityBar('hostile wave unit HP', { ...AT_SCREEN, owner: -1, alive: true }),
+  ];
+
+  it('every hull bar empties in the same direction', () => {
+    // The enumeration is itself the deliverable, so pin it: a new hull bar has to
+    // be added here — and take the ruling — rather than quietly pick a side.
+    expect(HULL_BARS.map((b) => b.id)).toEqual([
+      'own station CORE (HOME)',
+      'own station SHIELD overbar',
+      'repair-shimmer wash over the core',
+      'own ship hull',
+      'enemy ship hull',
+      'own turret HP',
+      'enemy turret HP',
+      'hostile wave unit HP',
+    ]);
+
+    for (const bar of HULL_BARS) {
+      const { id, track } = bar;
+      expect(track.width, `${id}: a bar has a track to empty into`).toBeGreaterThan(0);
+
+      // 0.46 is the ship crop (23/50) and 0.88 the station crop (88/100).
+      for (const fraction of [0.12, 0.46, 0.5, 0.88]) {
+        const fill = bar.fill(fraction);
+        const where = `${id} @ ${fraction}`;
+
+        // The fill starts at the track's LEFT edge — the ruling, in one line.
+        expect(fill.x, `${where}: the fill starts at the track's LEFT edge`).toBeCloseTo(track.x, 6);
+        // …so there is NO empty block at the left, and the missing part of the
+        // pool reads as absence on the RIGHT. This pair is the a0-99 photograph.
+        expect(fill.x - track.x, `${where}: no empty block at the LEFT end`).toBeCloseTo(0, 6);
+        expect(
+          track.x + track.width - (fill.x + fill.width),
+          `${where}: the missing part shows at the RIGHT end`,
+        ).toBeGreaterThan(0);
+
+        // A fill is its track's own band — it never changes row or thickness.
+        expect(fill.y, `${where}: same row as its track`).toBeCloseTo(track.y, 6);
+        expect(fill.height, `${where}: same thickness as its track`).toBeCloseTo(track.height, 6);
+        expect(fill.width, `${where}: a partial pool is a partial fill`).toBeLessThan(track.width);
+      }
+
+      // Taking damage retreats the RIGHT edge and leaves the left one alone —
+      // the direction stated as motion rather than as a single frame.
+      const full = bar.fill(1);
+      const hurt = bar.fill(0.5);
+      expect(full.width, `${id}: a full pool fills its whole track`).toBeCloseTo(track.width, 6);
+      expect(hurt.x, `${id}: damage does not move the fill's left edge`).toBeCloseTo(full.x, 6);
+      expect(hurt.x + hurt.width, `${id}: damage retreats the fill's right edge`).toBeLessThan(
+        full.x + full.width,
+      );
+    }
+  });
+
+  it('shows the two bars a0-99 photographed side by side, agreeing', () => {
+    // The crops themselves: the station at 88/100 and the own ship at 23/50, on
+    // the 1280x800 desktop they were shot on. Both must put their missing part in
+    // the same place — the right end — which is the whole of the complaint.
+    const stationTrack = stationCoreBarTrack();
+    const station = stationCoreBarFill(stationHpModel(LOCAL, 88, 100).coreFraction);
+    const ship = healthBarModel(
+      [{ ...AT_SCREEN, owner: LOCAL, alive: true, local: true, hp: 23, maxHp: 50, inCombat: false }],
+      LOCAL,
+    )[0]!;
+    const shipTrack = healthBarTrack(ship);
+    const shipFill = healthBarFill(ship);
+
+    const gapAtLeft = (fill: Rect, track: Rect) => fill.x - track.x;
+    const gapAtRight = (fill: Rect, track: Rect) => track.x + track.width - (fill.x + fill.width);
+
+    expect(gapAtLeft(station, stationTrack), 'station 88/100: nothing empty at the left').toBeCloseTo(0, 6);
+    expect(gapAtLeft(shipFill, shipTrack), 'ship 23/50: nothing empty at the left').toBeCloseTo(0, 6);
+    expect(gapAtRight(station, stationTrack), 'station 88/100: the twelve per cent is at the right').toBeGreaterThan(0);
+    expect(gapAtRight(shipFill, shipTrack), 'ship 23/50: the missing hull is at the right').toBeGreaterThan(0);
+  });
+
+  it('leaves the station bars where the corner put them', () => {
+    // The ruling moves the FILL, not the element: the track still hangs off the
+    // group's right-hand origin (that anchor belongs to the corner, not to the
+    // bar), and the footprint the layout registry records is untouched.
+    const core = stationCoreBarTrack();
+    const shield = stationShieldBarTrack();
+    expect(core.x + core.width).toBe(0);
+    expect(core.width).toBe(HP_BAR_WIDTH);
+    expect(core.height).toBe(HP_BAR_HEIGHT);
+    expect(shield.x).toBe(core.x);
+    expect(shield.width).toBe(core.width);
+    expect(core.y - (shield.y + shield.height)).toBe(SHIELD_BAR_GAP);
+    expect(stationHpBounds(1280).height).toBe(HP_BAR_TOP + HP_BAR_HEIGHT);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // The wave clock vs the open wheel (a0-24) — two top-anchored things, one phone

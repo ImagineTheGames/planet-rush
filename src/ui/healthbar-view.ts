@@ -37,13 +37,7 @@
 import { Container, Graphics, Text } from 'pixi.js';
 import type { PlayerId } from '@shared/types';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
-import {
-  HEALTHBAR_GAP,
-  HEALTHBAR_HEIGHT,
-  HEALTHBAR_LOCAL_HEIGHT,
-  HEALTHBAR_LOCAL_WIDTH,
-  HEALTHBAR_WIDTH,
-} from './healthbar';
+import { healthBarFill, healthBarTrack } from './healthbar';
 import type { HealthBar } from './healthbar';
 import { FONT_BODY, TEXT_PRIMARY } from './typography';
 import { hudTracking, INSTRUMENT_RADIUS, INSTRUMENT_TRACK } from './instrument';
@@ -129,13 +123,14 @@ export class HealthBarView extends Container {
     let maxY = -Infinity;
 
     for (const bar of bars) {
-      // The local (own-ship) bar is drawn slightly larger so it reads as "mine"
-      // at a glance (field request v0.1.1); everyone else keeps the narrow bar.
-      const width = bar.local ? HEALTHBAR_LOCAL_WIDTH : HEALTHBAR_WIDTH;
-      const height = bar.local ? HEALTHBAR_LOCAL_HEIGHT : HEALTHBAR_HEIGHT;
-      const left = bar.x - width / 2;
-      const bottom = bar.y - bar.radius - HEALTHBAR_GAP;
-      const top = bottom - height;
+      // The track: centred on the entity and floated above it. The local
+      // (own-ship) bar is the larger one so it reads as "mine" at a glance (field
+      // request v0.1.1); everyone else keeps the narrow bar. Geometry lives in
+      // `./healthbar` `healthBarTrack` so the layout tests can hold it (a0-101).
+      const track = healthBarTrack(bar);
+      const { width, height } = track;
+      const left = track.x;
+      const top = track.y;
 
       // Cull anything that would spill off the canvas: an edge enemy is barely
       // visible anyway, and a partial bar would break the `full` contract.
@@ -153,9 +148,14 @@ export class HealthBarView extends Container {
         color: INSTRUMENT_TRACK,
         alpha: TRACK_ALPHA,
       });
-      const fillW = width * bar.fraction;
-      if (fillW > 0) {
-        g.roundRect(left, top, fillW, height, INSTRUMENT_RADIUS).fill({ color: bar.color, alpha: 0.95 });
+      // Anchored at the track's LEFT edge, so the bar empties rightward — the one
+      // direction every hull bar on the screen takes (./instrument `hullBarFill`).
+      const fill = healthBarFill(bar);
+      if (fill.width > 0) {
+        g.roundRect(fill.x, fill.y, fill.width, fill.height, INSTRUMENT_RADIUS).fill({
+          color: bar.color,
+          alpha: 0.95,
+        });
       }
       // The own ship's bar carries an identity-colour outline — the second half
       // of "reads as mine" (larger + framed), so it stands out from the field of

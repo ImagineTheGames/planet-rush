@@ -46,6 +46,7 @@
 import { BONE, MATERIAL_SHADES, TRACKING, trackingPx, TYPE_MIN } from '../art/materials';
 import type { PlateCanvas } from '../art/materials';
 import { PALETTE } from '../art/palette';
+import type { Rect } from '@platform/layout-registry';
 
 // ---------------------------------------------------------------------------
 // 1. Metrics — the same "the look is ratified, the metrics adapt" rule
@@ -599,6 +600,48 @@ export function drawTick(
  * but a leftover from the pre-Gantry chrome.
  */
 export const INSTRUMENT_RADIUS = 0;
+
+/**
+ * The fill rect of a **hull bar** — the coloured part — given the track it sits
+ * in and the fraction of the pool that is left.
+ *
+ * ## Which way a bar empties (Director, 2026-08-19, a0-101)
+ *
+ * a0-99 photographed two hull readouts on one screen draining in opposite
+ * directions: the station's `88/100` had its missing twelve per cent as an empty
+ * block at the **left** end (fill anchored right), and the ship's `23/50` had its
+ * missing part at the **right** (fill anchored left). QA declined to rule, because
+ * the station bar sits under a right-aligned `HOME` label and a right anchor there
+ * is arguable. The ruling:
+ *
+ * > **Every hull bar empties rightward: fill anchored left, empty space on the
+ * > right.** The ship bar is already correct; the station bar moves.
+ *
+ * The reason is the ship bar's: it is the one a player reads most often and under
+ * the most pressure, and left-anchored is the ordinary convention a player arrives
+ * with. A label's text alignment is a typographic choice and is **not** a reason
+ * for the quantity beneath it to run the other way — nothing else on the HUD takes
+ * its direction from the label above it.
+ *
+ * It lives here, in the grammar file, next to {@link INSTRUMENT_TRACK} — the steel
+ * an *empty* bar is drawn in — because the pair is one idea: a bar is a track plus
+ * a fill, the fill starts at the track's left edge, and what is left over is the
+ * absence you can see. Every bar that reads a hull or a hull-like pool
+ * ({@link ./hud-geometry} `stationCoreBarTrack` / `stationShieldBarTrack`,
+ * {@link ./healthbar} `healthBarTrack`) computes its fill through this one
+ * function, so a new bar cannot quietly pick the other side — and
+ * `hud-geometry.test.ts` (`every hull bar empties in the same direction`) walks
+ * the whole enumeration.
+ *
+ * `fraction` is clamped to `[0, 1]`; a non-finite fraction draws nothing. The
+ * caller still owns the "a living thing never renders empty" floor
+ * ({@link ./healthbar} `HEALTHBAR_MIN_FILL`) — that is a truth rule about the
+ * pool, not a direction rule about the bar.
+ */
+export function hullBarFill(track: Rect, fraction: number): Rect {
+  const f = Number.isFinite(fraction) ? Math.min(1, Math.max(0, fraction)) : 0;
+  return { x: track.x, y: track.y, width: track.width * f, height: track.height };
+}
 
 /**
  * The gantry corner cut, for the one HUD element that is genuinely a *raised

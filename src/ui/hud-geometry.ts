@@ -23,7 +23,8 @@
 import type { Rect } from '@platform/layout-registry';
 import { WHEEL_HALO } from '../art/materials';
 import type { HomeArrow } from './alarm';
-import { hudMetrics, hudSpace, hudType } from './instrument';
+import { hudMetrics, hudSpace, hudType, hullBarFill } from './instrument';
+import { HEALTHBAR_MIN_FILL } from './healthbar';
 import { collapsedRect } from './minimap';
 import type { MinimapInsets } from './minimap';
 
@@ -389,6 +390,75 @@ export function stationHpBounds(viewportWidth: number, labelWidth = 0): Rect {
     width,
     height: HP_BAR_TOP + HP_BAR_HEIGHT,
   };
+}
+
+/**
+ * The own-station CORE bar's track, in the HOME group's own local space.
+ *
+ * The group is registered `top-right` and positioned at the corner, so its origin
+ * is the element's **right** edge and the bar runs back leftward from it — hence
+ * the negative x. That is a placement fact about the corner, and it is the only
+ * thing the right anchor was ever about: the *fill* inside this track starts at
+ * `x` (the track's left edge) like every other hull bar on the screen
+ * ({@link ./instrument} `hullBarFill`, a0-101).
+ *
+ * Returned as a rect rather than left as four numbers in `./hud` because the bar
+ * is drawn three times a frame — track, core fill, and the repair shimmer over it
+ * — and a hand-copied `-HP_BAR_WIDTH` in one of the three is exactly how the two
+ * bars in a0-99 came to disagree.
+ */
+export function stationCoreBarTrack(): Rect {
+  return { x: -HP_BAR_WIDTH, y: HP_BAR_TOP, width: HP_BAR_WIDTH, height: HP_BAR_HEIGHT };
+}
+
+/**
+ * The thin shield overbar's track, in the same local space — the pooled shield HP
+ * standing in front of the core (GDD §2.5), so it sits directly above the core
+ * bar with {@link SHIELD_BAR_GAP} of air between them.
+ *
+ * A shield pool is a hull-like pool: it is health that is being shot, it drains,
+ * and it is read at the same glance as the core under it. So it empties the same
+ * way the core does (a0-101) — same left edge, same direction.
+ */
+export function stationShieldBarTrack(): Rect {
+  const core = stationCoreBarTrack();
+  return {
+    x: core.x,
+    y: core.y - SHIELD_BAR_HEIGHT - SHIELD_BAR_GAP,
+    width: HP_BAR_WIDTH,
+    height: SHIELD_BAR_HEIGHT,
+  };
+}
+
+/**
+ * The **drawn fill** of the own-station core bar for a core fraction — the rect
+ * `./hud` paints in the player's colour, and the one the repair shimmer washes
+ * over. Where the two bars of a0-99 disagreed, and therefore a value this
+ * module hands out rather than a rect a draw loop invents.
+ */
+export function stationCoreBarFill(coreFraction: number): Rect {
+  return livingBarFill(stationCoreBarTrack(), coreFraction);
+}
+
+/** The drawn fill of the shield overbar, by the same rule as the core under it. */
+export function stationShieldBarFill(shieldFraction: number): Rect {
+  return livingBarFill(stationShieldBarTrack(), shieldFraction);
+}
+
+/**
+ * A station bar's fill: the fraction, floored so a **standing** pool never
+ * renders as an empty track ([[healthbar]] `HEALTHBAR_MIN_FILL` — the field
+ * report's "a living thing never shows empty", shared so the station and the
+ * ships cannot answer it differently). A pool that is actually gone draws
+ * nothing: on this bar, empty means the core is gone, exactly.
+ */
+function livingBarFill(track: Rect, fraction: number): Rect {
+  if (!(fraction > 0)) return { x: track.x, y: track.y, width: 0, height: track.height };
+  // Anchored at the track's LEFT edge, so the bar empties rightward — the one
+  // direction every hull bar on the screen takes, argued at [[instrument]]
+  // `hullBarFill` (Director, 2026-08-19, a0-101). This is the line a0-99
+  // photographed running the other way.
+  return hullBarFill(track, Math.max(HEALTHBAR_MIN_FILL, fraction));
 }
 
 // ---------------------------------------------------------------------------
