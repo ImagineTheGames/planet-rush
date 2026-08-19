@@ -14,11 +14,13 @@ disk said so, so the sentence survived two reviews.
 it still matches the code.** Every behavioural claim below carries a
 `file.ts:line`. Re-run the trace rather than trusting the sentence.
 
-**Amended 2026-08-19 (a0-92)**: mismatches 3 and 4 are FIXED — the four rows that
-did not persist now do, through the same seam as the other two, and the main
-menu's volume rows reach the mixer. Struck below rather than deleted, so the next
-reader can see what the shape of the defect was. Every line number in this file
-moved with that change and has been re-traced.
+**Amended 2026-08-19 (a0-93 and a0-92)**: mismatches 2, 3 and 4 are FIXED.
+CONTROLS' help no longer claims an aim the shipped default never emits (a60bbe9);
+the four rows that did not persist now do, through the same seam as the other
+two, and the main menu's volume rows reach the mixer (91828dfe). All three are
+struck below rather than deleted, so the next reader can still see the shape of
+the defect. **Mismatch 1 still stands.** Both fixes moved code under this file
+and every `file.ts:line` has been re-traced against the merged tree.
 
 ---
 
@@ -27,15 +29,21 @@ moved with that change and has been re-traced.
 | # | Row | What is wrong | Where |
 |---|-----|---------------|-------|
 | 1 | **FIRE MODE** | Inert on the default control scheme. Under Tap Commander the row's value is discarded every frame and replaced by the pilot's own `tapMode`. The chip still shows AUTO-AIM / MANUAL and still toggles. | `src/main.ts:3557`, `src/main.ts:3558` |
-| 2 | **CONTROLS** | Help says "you steer and aim yourself" on the sticks scheme. Under AUTO-AIM — the shipped default — no aim is emitted and the sim picks the target, so the player does not aim on any device. | `src/ui/settings.ts:574` vs `src/platform/actions.ts:162`, `src/platform/actions.ts:58` |
+| ~~2~~ | ~~**CONTROLS**~~ | ~~Help says "you steer and aim yourself" on the sticks scheme. Under AUTO-AIM — the shipped default — no aim is emitted and the sim picks the target, so the player does not aim on any device.~~ **FIXED a60bbe9 (a0-93)** — the row now says who flies the ship, which holds in either fire mode. Held by `the controls help does not claim aiming the player does not do` (`src/ui/settings.test.ts`). | `src/ui/settings.ts:587` vs `src/platform/actions.ts:162`, `src/platform/actions.ts:58` |
 | ~~3~~ | ~~**REDUCE VFX + all three volumes**~~ | ~~Not persisted. The header eyebrow reads CHANGES SAVE IMMEDIATELY; four of six rows are gone on reload.~~ **FIXED 91828dfe (a0-92)** — all four persist through `SETTINGS_STORAGE` and are read back at boot. | `src/ui/settings.ts:269`, `src/ui/settings.ts:348` |
 | ~~4~~ | ~~**REDUCE VFX + all three volumes, on the MAIN MENU screen**~~ | ~~Reach nothing at all. No mixer call, no renderer (none exists yet), and the value is discarded when the match boots.~~ **FIXED 91828dfe (a0-92)** — the menu's volume rows push the mix, and both rows write the store the match boots from. REDUCE VFX still reaches no renderer on the menu, because there is none to reach; it is no longer discarded. | `src/main.ts:9521`–`src/main.ts:9536` |
 
-Rows that are honest: MASTER, SFX and MUSIC are now clean on both surfaces — the
-words describe the mixer correctly and the row is live wherever it is drawn.
-REDUCE VFX is clean too, with one honest gap: on the main menu it stores rather
-than showing, because the renderer it thins is built after that screen closes.
-Mismatches 1 and 2 are open, and are FIRE MODE's and CONTROLS' alone.
+Rows that are honest: five of the six. MASTER, SFX and MUSIC are clean on both
+surfaces — the words describe the mixer correctly and the row is live wherever it
+is drawn. REDUCE VFX is clean too, with one honest gap: on the main menu it
+stores rather than shows, because the renderer it thins is built after that
+screen closes. CONTROLS' words have been true everywhere since a0-93 — the row
+itself was never the problem, only what its help borrowed from FIRE MODE's.
+
+**Mismatch 1 is the one still standing**, and it is FIRE MODE's alone. It is not
+a copy fix: the row is inert under the default scheme, so no wording can make the
+chip honest. It awaits developer ratification and is deliberately left open
+here — do not read the three struck rows above as the file being clear.
 
 ---
 
@@ -45,7 +53,7 @@ There are **two** live settings screens, and they hold **separate state**:
 
 | Surface | Model call | Settings value |
 |---|---|---|
-| Main menu → SETTINGS | `src/main.ts:8376` | `settings`, `src/main.ts:7843` |
+| Main menu → SETTINGS | `src/main.ts:8381` | `settings`, `src/main.ts:7843` |
 | In-match pause → SETTINGS | `src/main.ts:3455` | `matchSettings`, `src/main.ts:1812` |
 
 They are still two values and must stay two: the menu is torn down before the
@@ -53,7 +61,7 @@ match world exists, so an object shared between them cannot survive the trip.
 Since a0-92 they agree by both reading and writing **storage** — the same
 mechanism FIRE MODE and CONTROLS have always used.
 
-Both are built by `settingsModel` (`src/ui/settings.ts:766`) and both walk the
+Both are built by `settingsModel` (`src/ui/settings.ts:779`) and both walk the
 same row list, `SETTINGS_ROWS` (`src/ui/settings.ts:452`) — six rows, in this
 order: FIRE MODE, CONTROLS, REDUCE VFX, MASTER VOLUME, SFX VOLUME, MUSIC VOLUME.
 
@@ -85,14 +93,14 @@ A third settings code path exists in the lobby flow (`flowTapSettings`,
 `settingsModel` call site reads that field — it is not wired to a rendered
 screen.
 
-The header eyebrow is `CHANGES SAVE IMMEDIATELY` (`src/ui/settings.ts:752`).
+The header eyebrow is `CHANGES SAVE IMMEDIATELY` (`src/ui/settings.ts:765`).
 
 ---
 
 ## FIRE MODE
 
-**Label** `FIRE MODE` (`src/ui/settings.ts:793`)
-**Values** `AUTO-AIM` / `MANUAL` (`src/ui/settings.ts:794`)
+**Label** `FIRE MODE` (`src/ui/settings.ts:806`)
+**Values** `AUTO-AIM` / `MANUAL` (`src/ui/settings.ts:807`)
 **Default** `AUTO-AIM`, the same on every platform
 (`src/platform/actions.ts:58`; asserted at `src/platform/actions.test.ts:28`)
 **Persisted** yes — `planet-rush:fireMode` (`src/ui/settings.ts:269`, wired at
@@ -154,7 +162,7 @@ drops its Aim row in AUTO-AIM (`src/platform/actions.ts:324`).
 `fireMode` rides every `lobbyChoice` (`src/ui/lobby-flow.ts:360`,
 `src/net/session.ts:311`) and the server decodes it — but no file under
 `server/*.ts` references it, and the offline loopback drops it on the floor
-(`chooseInLobby(message.shipClass)`, `src/net/loopback.ts:176`). The mode is
+(`chooseInLobby(message.shipClass)`, `src/net/loopback.ts:177`). The mode is
 applied client-side only.
 
 ### Current help text
@@ -180,7 +188,7 @@ this file documents the name as it stands today.
 
 ## CONTROLS
 
-**Label** `CONTROLS` (`src/ui/settings.ts:809`)
+**Label** `CONTROLS` (`src/ui/settings.ts:822`)
 **Values** `TAP COMMANDER` (`src/ui/settings.ts:125`), or the default scheme's
 word for the device in front of the player (`src/ui/settings.ts:117`):
 `STICKS` on touch, `TWIN STICKS` with a pad connected, `KEYBOARD + MOUSE`
@@ -221,29 +229,38 @@ Live on both — it *is* the scheme. Inert on nothing.
 
 ### Current help text
 
-`src/ui/settings.ts:574`:
+`src/ui/settings.ts:587`:
 
 > *"TAP COMMANDER flies the ship for you: tap where to go, tap what to hit. On
-> {STICKS_LABELS[device]} you steer and aim yourself."*
+> {STICKS_LABELS[device]} you fly it yourself."*
 
 The device half is right — the sentence names the one device the player has, from
 the same lookup the value chip uses, so panel and pill cannot disagree.
 
-**MISMATCH 2: the second clause is false under AUTO-AIM.** AUTO-AIM is the
+Both halves are true in either fire mode, which is the point: this row chooses
+who flies the ship, and nothing FIRE MODE does can falsify that.
+
+**~~MISMATCH 2~~ — struck by `a60bbe9` (a0-93).** The row used to end *"you steer
+and aim yourself"*, and that clause was false under AUTO-AIM. AUTO-AIM is the
 shipped default (`src/platform/actions.ts:58`), and on the sticks scheme in
 AUTO-AIM no `aim` action is emitted (`src/platform/actions.ts:162`), the sim
 acquires the target itself (`src/sim/step.ts:675`), the strip drops the Aim row
 (`src/platform/actions.ts:324`), and on touch the aim stick is replaced by a FIRE
 button (`src/ui/live-controls.ts:104`). A player switching to STICKS on the
-defaults steers and fires; they do not aim. "You steer and aim yourself" is only
-true once they also set FIRE MODE to MANUAL.
+defaults steers and fires; they do not aim, until they also set FIRE MODE to
+MANUAL.
+
+The sentence went wrong by reaching into the row below it for a behaviour this
+row's own value cannot hold true. `the controls help does not claim aiming the
+player does not do` (`src/ui/settings.test.ts`) now asks `mapActions` whether an
+`aim` survives the seated default and fails the build if the copy disagrees.
 
 ---
 
 ## REDUCE VFX
 
-**Label** `REDUCE VFX` (`src/ui/settings.ts:818`)
-**Values** `ON` / `OFF` (`src/ui/settings.ts:819`)
+**Label** `REDUCE VFX` (`src/ui/settings.ts:831`)
+**Values** `ON` / `OFF` (`src/ui/settings.ts:832`)
 **Default** `OFF` (`src/ui/settings.ts:202`)
 **Persisted** yes, since a0-92 — `planet-rush:reduceVfx`
 (`src/ui/settings.ts:269`), written as the words `on` / `off`
@@ -288,25 +305,27 @@ nothing in the path above reads `controlScheme`.
 
 ### Current help text
 
-`src/ui/settings.ts:583`:
+`src/ui/settings.ts:596`:
 
 > *"Thins the effects that carry no information, to hold the frame rate. The game
 > does this on its own when the rate drops; ON keeps them thin all the time."*
 
 **True on every scheme**, and true of the code: "thins" matches the 0.5 budget
 scale rather than a cut, and the second clause matches the OR at
-`src/main.ts:2702`. The row's only problem is that it does not survive a reload
-(mismatch 3) and does nothing from the main menu (mismatch 4).
+`src/main.ts:2702`. The row's two old problems are gone: it survives a reload
+(mismatch 3) and it is written from the main menu (mismatch 4). What remains is
+the one honest gap — on the menu the flag is stored, not shown, because the
+renderer it thins does not exist yet on that screen.
 
 ---
 
 ## MASTER VOLUME / SFX VOLUME / MUSIC VOLUME
 
 **Labels** `MASTER VOLUME`, `SFX VOLUME`, `MUSIC VOLUME`
-(`src/ui/settings.ts:876`)
+(`src/ui/settings.ts:889`)
 **Values** ten discrete steps, silent to full (`VOLUME_STEPS = 10`,
 `src/ui/settings.ts:191`); drawn as filled pips, not a number
-(`src/ui/settings.ts:834`).
+(`src/ui/settings.ts:847`).
 **Defaults** master `0.8`, sfx `0.8`, music `0.6` (`src/ui/settings.ts:199`).
 **Persisted** yes, since a0-92 — same seam and same call as REDUCE VFX, one key
 per channel (`planet-rush:masterVolume` / `:sfxVolume` / `:musicVolume`,
@@ -358,7 +377,7 @@ Scheme-independent. No audio path reads `controlScheme`.
 
 ### Current help text
 
-`src/ui/settings.ts:598`–`src/ui/settings.ts:600`:
+`src/ui/settings.ts:611`–`src/ui/settings.ts:613`:
 
 | Row | Help | True? |
 |---|---|---|
@@ -414,9 +433,10 @@ code as it stood before 91828dfe.
 
 ## How to re-verify
 
-Neither of the two OPEN mismatches (1 and 2) is a copy fix — each needs the
-owning agent; 3 and 4 were fixed in 91828dfe. What a writer can do is check the
-sentence before shipping it:
+One mismatch is still OPEN — **1, FIRE MODE** — and it is not a copy fix: the
+row is inert under the default scheme, so it needs the owning agent and a
+developer ratification, not a better sentence. 2 was fixed in a60bbe9, 3 and 4 in
+91828dfe. What a writer can do is check the sentence before shipping it:
 
 1. **Find where the value is consumed**, not where it is stored.
    `grep -n '<field>' src/main.ts` and follow it to the call that changes

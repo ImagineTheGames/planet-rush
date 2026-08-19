@@ -7,7 +7,14 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { FireMode, createControlState, describeBindings, readStoredFireMode } from '@platform/actions';
+import {
+  DEFAULT_FIRE_MODE,
+  FireMode,
+  createControlState,
+  describeBindings,
+  mapActions,
+  readStoredFireMode,
+} from '@platform/actions';
 import type { DeviceKind } from '@platform/actions';
 import { TapPilot } from '@platform/tap-pilot';
 import {
@@ -684,6 +691,80 @@ describe('a ? on every setting (a0-77)', () => {
     expect(readings.size).toBe(SCHEMES.length);
   });
 
+  /**
+   * **a0-93 — the row that borrowed its neighbour's behaviour.**
+   *
+   * a0-89 fixed FIRE MODE one row above this one, and the same pass rewrote
+   * CONTROLS without running the same check on it. It shipped ending *"On
+   * STICKS you steer and aim yourself."* — true only once the player has ALSO
+   * set FIRE MODE to MANUAL, which the shipped default is not
+   * ({@link DEFAULT_FIRE_MODE} is Auto-aim on every platform). On the defaults a
+   * player who switches to the sticks steers and fires; the sim picks the
+   * target across the full 360°, and no `aim` action is ever emitted.
+   *
+   * The lesson is not "write better". CONTROLS chooses **who flies the ship** —
+   * that is its axis, and it holds on every scheme and in either fire mode.
+   * Aiming is FIRE MODE's axis, and a sentence that reaches across to a
+   * neighbouring row states a fact this row's own value cannot keep true.
+   *
+   * So the premise is answered by {@link mapActions}, the seam the aim actually
+   * travels down, rather than quoted: push the stick to its rail, seat the mode
+   * a fresh player boots into, and see whether an `aim` reaches the sim. The day
+   * the default moves to Manual, this test re-reads the new truth and the copy
+   * is free to say the player aims again.
+   */
+  it('the controls help does not claim aiming the player does not do', () => {
+    /** Does the player aim in this mode? Asked of the mapper, with the stick
+     *  held hard over — the only way an `aim` action is ever produced. */
+    const playerAims = (mode: FireMode): boolean => {
+      const state = createControlState();
+      state.aim = { x: 1, y: 0 };
+      return mapActions(state, mode).some((action) => action.type === 'aim');
+    };
+
+    // The premise, stated out loud. A player who has never chosen a fire mode
+    // boots into whatever `readStoredFireMode` seats for an empty save, and in
+    // that mode the aim never leaves the device.
+    const seated = readStoredFireMode(null);
+    expect(seated, 'a fresh save seats the shipped default').toBe(DEFAULT_FIRE_MODE);
+    expect(playerAims(seated), 'on the defaults the sim aims, not the player').toBe(false);
+    expect(playerAims(FireMode.Manual), 'MANUAL is where the aim is theirs').toBe(true);
+
+    /** Copy that hands the player the aim. Not one phrase — the CLAIM, in the
+     *  forms it plausibly takes, so a rewrite cannot slip the same one back. */
+    const PLAYER_AIMS = [
+      /\byou\b[^.]*\baim(s|ing)?\b/i,
+      /\baim(ing)?\b[^.]*\byourself\b/i,
+      /\baim(ing)?\b[^.]*\b(is|stays|remains)\b[^.]*\byours\b/i,
+      /\byour\s+(own\s+)?aim\b/i,
+    ];
+
+    // The CONTROLS help is ONE string per device across both fire modes — it is
+    // not handed the mode and cannot be. So while the seated default aims for
+    // the player, this row cannot claim they aim in any reading it has.
+    for (const device of ['touch', 'gamepad', 'keyboard'] as const) {
+      for (const scheme of SCHEMES) {
+        const { summary } = settingsHelp({ kind: 'controls' }, device, scheme);
+        for (const claim of PLAYER_AIMS) {
+          expect(
+            claim.test(summary),
+            `${device}/${scheme}: the sim aims on the defaults, but CONTROLS says ${String(claim)}: ${summary}`,
+          ).toBe(false);
+        }
+      }
+    }
+
+    // The converse, so "say less" is not the way to pass: the row still tells
+    // the player what its own axis changes — who flies the ship — on both sides
+    // of the toggle, and it is the FIRE MODE row that still owns the aim.
+    const controlsCopy = settingsHelp({ kind: 'controls' }, 'touch', 'tap').summary;
+    expect(controlsCopy, 'Tap Commander flies it for them').toMatch(/\bflies\b[^.]*\bfor you\b/i);
+    expect(controlsCopy, 'and the other side hands the ship back').toMatch(/\byou\b[^.]*\bfly\b/i);
+    expect(
+      settingsHelp({ kind: 'fireMode' }, 'touch', 'sticks').summary,
+      'aiming is still explained, one row up',
+    ).toMatch(/\baim/i);
+  });
   /**
    * Length, as the panel actually measures it (a0-87).
    *
