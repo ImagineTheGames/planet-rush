@@ -7,8 +7,9 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { FireMode, describeBindings } from '@platform/actions';
+import { FireMode, createControlState, describeBindings } from '@platform/actions';
 import type { DeviceKind } from '@platform/actions';
+import { TapPilot } from '@platform/tap-pilot';
 import {
   CONTROL_SCHEME_STORAGE,
   DEFAULT_VOLUMES,
@@ -43,6 +44,10 @@ import { hitRect } from './menu-geometry';
 import { textWidth } from './font-metrics';
 import { singlePrimary } from './gantry';
 import { BEAM, COLUMN, ROW, TOUCH_MIN, rowHeight, frameMetrics } from '../art/materials';
+
+/** Both control schemes. Any copy sweep runs over these as well as the devices:
+ *  a string branched on the scheme has two readings, and both of them ship. */
+const SCHEMES: readonly ControlScheme[] = ['sticks', 'tap'];
 
 const VIEWPORT = { width: 1280, height: 720 };
 const center = (r: { x: number; y: number; width: number; height: number }) => ({
@@ -497,7 +502,7 @@ describe('a ? on every setting (a0-77)', () => {
     const seen = new Set<string>();
     for (const [i, spec] of SETTINGS_ROWS.entries()) {
       const key = settingsRowKey(spec);
-      const help = settingsHelp(spec, 'touch');
+      const help = settingsHelp(spec, 'touch', 'tap');
       const row = model.rows[i]!;
 
       // There IS an explanation. NOT "and it is at least twenty characters" —
@@ -555,18 +560,20 @@ describe('a ? on every setting (a0-77)', () => {
     const DEVICES: readonly DeviceKind[] = ['touch', 'gamepad', 'keyboard'];
 
     for (const device of DEVICES) {
+      for (const scheme of SCHEMES) {
       for (const spec of SETTINGS_ROWS) {
-        const { title, summary } = settingsHelp(spec, device);
+        const { title, summary } = settingsHelp(spec, device, scheme);
         const text = `${title} ${summary}`;
         for (const other of DEVICES) {
           if (other === device) continue;
           for (const word of DEVICE_WORDS[other]) {
             expect(
               word.test(text),
-              `on ${device}, row ${settingsRowKey(spec)} says ${String(word)}: ${text}`,
+              `on ${device}/${scheme}, row ${settingsRowKey(spec)} says ${String(word)}: ${text}`,
             ).toBe(false);
           }
         }
+      }
       }
     }
 
@@ -575,14 +582,93 @@ describe('a ? on every setting (a0-77)', () => {
     // names it with the SAME word the value chip shows (u8-01's seam), so the
     // panel and the pill can never disagree.
     for (const device of DEVICES) {
-      const summary = settingsHelp({ kind: 'controls' }, device).summary;
+      const summary = settingsHelp({ kind: 'controls' }, device, 'sticks').summary;
       expect(summary, `${device} names its own scheme`).toContain(STICKS_LABELS[device]);
       expect(summary, `${device} names Tap Commander`).toContain(TAP_COMMANDER_LABEL);
     }
     // …and the three readings really are three different sentences, not one
     // hedge with a word swapped in that happens to pass the sweep above.
-    const readings = new Set(DEVICES.map((d) => settingsHelp({ kind: 'controls' }, d).summary));
+    const readings = new Set(DEVICES.map((d) => settingsHelp({ kind: 'controls' }, d, 'sticks').summary));
     expect(readings.size).toBe(DEVICES.length);
+  });
+
+  /**
+   * **a0-89 — the tooltip that stated the opposite of what the game does.**
+   *
+   * a0-87 shipped `"Either way, you choose when to fire."` on the FIRE MODE row,
+   * and kept it deliberately: a player might assume Auto-aim pulls the trigger,
+   * and at the sim layer it does not — `fireShip()` (`src/sim/step.ts`) needs
+   * `intent.fire` in BOTH modes. The sentence was checked against the sim and it
+   * was true there.
+   *
+   * It was still false on the developer's phone, because the player is not at
+   * the sim layer. Under TAP COMMANDER — the default scheme on every platform
+   * since 2026-08-12 — the pilot writes `fire` itself (`tap-pilot.ts`: `state.fire
+   * = true` while auto-engaging, `state.fire = target.hostile && surface <=
+   * fireRange` on a lock) and `main.ts` hands that straight to the sim. The game
+   * fires. The player does not choose when.
+   *
+   * So the assertion cannot be "the copy avoids a phrase" — that is a spelling
+   * test, and it would pass the day somebody wrote the same claim in new words.
+   * It has to be: **for each scheme, does the game fire on its own, and does the
+   * copy agree?** The first half is answered by running the real {@link TapPilot},
+   * not by quoting it — which is the whole lesson of this brief, in the one place
+   * that can enforce it.
+   */
+  it('the fire help is true under every control scheme', () => {
+    /** Does this scheme fire without the player asking? Answered by the code that
+     *  implements it, so the day the pilot stops holding the trigger this test
+     *  re-reads the new truth instead of asserting the old one. */
+    const firesOnItsOwn = (scheme: ControlScheme): boolean => {
+      if (scheme !== 'tap') return false; // sticks: `merged.fire` is the player's hold.
+      const pilot = new TapPilot();
+      const state = createControlState();
+      const ship = { pos: { x: 0, y: 0 }, radius: 16 };
+      // No order at all — the player has tapped nothing. This is a fresh match
+      // in the default scheme, the exact configuration the report came from.
+      pilot.writeInto(state, ship, null);
+      return state.fire;
+    };
+
+    // The premise, stated out loud: Tap Commander really does fire unbidden, and
+    // the sticks really do not. If this flips, the copy below is the thing that
+    // needs rewriting — the test is not here to be silenced.
+    expect(firesOnItsOwn('tap'), 'Tap Commander fires with no player input').toBe(true);
+    expect(firesOnItsOwn('sticks'), 'the sticks fire only when the player does').toBe(false);
+
+    /** Copy that hands the player the trigger. Not one phrase — the CLAIM, in the
+     *  forms it plausibly takes, so a rewrite cannot slip the same lie past. */
+    const PLAYER_FIRES = [
+      /\byou\b[^.]*\bchoose\b[^.]*\bwhen\b/i,
+      /\byou\b[^.]*\bdecide\b[^.]*\bwhen\b/i,
+      /\byou\b[^.]*\b(still\s+)?(pull|squeeze|hold)\b[^.]*\bfir/i,
+      /\bwhen\b[^.]*\bto fire\b[^.]*\byou\b/i,
+      /\byou\b[^.]*\bfire\b/i,
+    ];
+
+    for (const scheme of SCHEMES) {
+      for (const device of ['touch', 'gamepad', 'keyboard'] as const) {
+        const { summary } = settingsHelp({ kind: 'fireMode' }, device, scheme);
+        if (!firesOnItsOwn(scheme)) continue;
+        for (const claim of PLAYER_FIRES) {
+          expect(
+            claim.test(summary),
+            `${scheme}/${device} fires on its own, but its help says ${String(claim)}: ${summary}`,
+          ).toBe(false);
+        }
+      }
+    }
+
+    // The converse, so "say nothing about firing anywhere" is not a way to pass:
+    // a scheme that fires for the player is told so, in the row that is about it.
+    const tapCopy = settingsHelp({ kind: 'fireMode' }, 'touch', 'tap').summary;
+    expect(tapCopy, 'Tap Commander is told the game fires for it').toMatch(/\bfires\b[^.]*\bfor you\b/i);
+    expect(tapCopy, 'and it is told in the scheme\'s own word').toContain(TAP_COMMANDER_LABEL);
+
+    // …and the two schemes really are two sentences, not one hedge that happens
+    // to dodge the patterns above (a0-87's WASD lesson, applied to the scheme).
+    const readings = new Set(SCHEMES.map((sc) => settingsHelp({ kind: 'fireMode' }, 'touch', sc).summary));
+    expect(readings.size).toBe(SCHEMES.length);
   });
 
   /**
@@ -625,15 +711,17 @@ describe('a ? on every setting (a0-77)', () => {
     };
 
     for (const device of ['touch', 'gamepad', 'keyboard'] as const) {
+      for (const scheme of SCHEMES) {
       for (const spec of SETTINGS_ROWS) {
-        const help = settingsHelp(spec, device);
+        const help = settingsHelp(spec, device, scheme);
         // pad + title + 4 + summary + pad, per `codex-hint-view.show` (no badges).
         const height =
           PAD + lines(help.title, HEADING) * 1.32 * HEADING.size + 4 + lines(help.summary, BODY) * 1.32 * BODY.size + PAD;
         expect(
           height,
-          `${device} ${settingsRowKey(spec)} fits ${PHONE.width}x${PHONE.height}`,
+          `${device}/${scheme} ${settingsRowKey(spec)} fits ${PHONE.width}x${PHONE.height}`,
         ).toBeLessThanOrEqual(PHONE.height - 2 * MARGIN);
+      }
       }
     }
   });
@@ -642,15 +730,15 @@ describe('a ? on every setting (a0-77)', () => {
     // The half a player cannot account for otherwise: `VfxAutoQuality` engages
     // the same flag under load (GDD §4.8 risk 5), and somebody watching effects
     // thin out mid-fight deserves to learn from this screen that nothing broke.
-    const summary = settingsHelp({ kind: 'reduceVfx' }, 'touch').summary;
+    const summary = settingsHelp({ kind: 'reduceVfx' }, 'touch', 'sticks').summary;
     expect(summary).toMatch(/on its own|by itself|automatically/);
     expect(summary).toContain('frame rate');
   });
 
   it('says what is ON each audio channel, and nothing about what is not', () => {
-    const master = settingsHelp({ kind: 'volume', channel: 'master' }, 'touch').summary;
-    const sfx = settingsHelp({ kind: 'volume', channel: 'sfx' }, 'touch').summary;
-    const music = settingsHelp({ kind: 'volume', channel: 'music' }, 'touch').summary;
+    const master = settingsHelp({ kind: 'volume', channel: 'master' }, 'touch', 'sticks').summary;
+    const sfx = settingsHelp({ kind: 'volume', channel: 'sfx' }, 'touch', 'sticks').summary;
+    const music = settingsHelp({ kind: 'volume', channel: 'music' }, 'touch', 'sticks').summary;
 
     // Each one lists what it covers, and that is the whole job.
     expect(master).toMatch(/every sound/i);
@@ -711,7 +799,7 @@ describe('a ? on every setting (a0-77)', () => {
   it('opens the tapped row\'s explanation, and only that one', () => {
     const index = SETTINGS_ROWS.findIndex((r) => r.kind === 'reduceVfx');
     const model = settingsModel(createSettings(), FireMode.AutoAim, 'tap', 'touch', { help: index });
-    expect(model.openHelp).toEqual({ index, hint: settingsHelp(SETTINGS_ROWS[index]!, 'touch') });
+    expect(model.openHelp).toEqual({ index, hint: settingsHelp(SETTINGS_ROWS[index]!, 'touch', 'tap') });
     expect(model.rows.filter((r) => r.helpOpen)).toHaveLength(1);
     expect(model.rows[index]!.helpOpen).toBe(true);
     // The `?` reads as held while its panel is up.

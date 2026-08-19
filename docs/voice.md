@@ -20,6 +20,22 @@ has stopped answering it.
 
 ---
 
+## Verify the claim before writing it
+
+Copy that states how the game behaves is a factual assertion, and the only way
+to check it is to read the code that implements it.
+
+Added 2026-08-19 (a0-89), because the sweep that wrote this page shipped a
+sentence that was the opposite of what the game does. `FIRE MODE` ended *"Either
+way, you choose when to fire."* — checked against `src/sim/step.ts`, where it is
+true, and false on the developer's phone, where `TapPilot` holds the trigger for
+them. Reading one layer is not verifying; the claim has to be true at the layer
+the **player** stands on, which means following it out to the seam that actually
+drives their ship. Where the answer differs by scheme or device, that is not a
+sentence to hedge — it is a branch, through the seam (below).
+
+---
+
 ## The register
 
 The game speaks like a mining authority, not a tutorial. Plain, factual, no
@@ -55,11 +71,17 @@ The two seams that already exist, and the pattern to copy:
 |---|---|
 | Settings CONTROLS row | `STICKS_LABELS[device]` — STICKS / TWIN STICKS / KEYBOARD + MOUSE (`src/ui/settings.ts`) |
 | In-match prompts | `{fire}` / `{build}` resolved through `describeBindings` (`src/ui/onboarding.ts`) |
+| Settings FIRE MODE row | the `scheme` arm of `SETTINGS_HELP` — who fires is a fact about the CONTROL SCHEME, not the device (a0-89, `src/ui/settings.ts`) |
 
-Two tests hold this, and a new one should be added anywhere copy grows a third
-device-dependent fact:
+The same applies to a fact that differs by **scheme** rather than device, which
+is what a0-89 found: `settingsHelp` takes both, and both are required, so a
+caller cannot quietly resolve copy for a configuration the player is not in.
 
-- `src/ui/settings.test.ts` → `never names another device`
+Three tests hold this, and a new one should be added anywhere copy grows another
+configuration-dependent fact:
+
+- `src/ui/settings.test.ts` → `never names another device` (swept over both schemes since a0-89)
+- `src/ui/settings.test.ts` → `the fire help is true under every control scheme`
 - `src/ui/onboarding.test.ts` → `never names another device, in any configuration`
 
 `tap` is **not** a device word: TAP COMMANDER is a scheme, and a tap is a tap
@@ -118,21 +140,33 @@ in-match prompt teaches it at the moment a full hold makes it matter.*
 
 ---
 
-**FIRE MODE**
+**FIRE MODE** — *and then a0-89, which is why the page grew a rule.*
 
-> **Before**
+> **Before (a0-87)**
 > AUTO-AIM takes the aim off you — the weapon locks the nearest target in range,
 > in any direction, and leads it; you still choose when to fire. MANUAL leaves
 > aiming to your mouse, stick or thumb, for choosing the target yourself.
 
-> **After**
+> **After a0-87 — WRONG, and shipped**
 > AUTO-AIM locks the nearest target and leads it. MANUAL leaves the aim to you.
 > Either way, you choose when to fire.
 
-*Tells: the triad ("mouse, stick or thumb" — two of the three wrong for whoever
-is reading), the em-dash explainer, restating the label ("takes the aim off
-you" then "leaves aiming to").* The third sentence stays: a player may
-reasonably assume auto-aim also pulls the trigger, and it does not.
+> **After a0-89 (sticks)**
+> AUTO-AIM locks the nearest target and leads it while you fire. MANUAL leaves
+> the aim to you.
+>
+> **After a0-89 (Tap Commander)**
+> TAP COMMANDER aims and fires for you. Switch CONTROLS to aim yourself.
+
+*Tells a0-87 fixed: the triad ("mouse, stick or thumb" — two of the three wrong
+for whoever is reading), the em-dash explainer, restating the label.* **The tell
+it added:** a0-87 kept the third sentence on purpose — *"a player may reasonably
+assume auto-aim also pulls the trigger, and it does not"* — having checked it
+against `fireShip()`, which does require `intent.fire` in both modes. Under Tap
+Commander the pilot supplies that `fire` itself, so the game fires and the panel
+claimed the player was choosing. One layer down was the wrong layer. See
+**verify the claim before writing it**, above, and the scheme branch this now
+takes.
 
 ---
 
