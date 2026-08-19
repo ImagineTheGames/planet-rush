@@ -206,13 +206,15 @@ not.**
 a0-105 gave the retreat an end: `wantsRetreat` folds every committed decision
 into the standoff latch, and when the running has opened no ground for the
 character's own patience, the bot turns and fights. **The fix is correct and this
-instrument confirms it fires**: the standoff latch commits and releases cleanly
-in 20 cells of the sweep — under `block-build`, `never-die`, `never-die-squad`
-and `block-home` — always for exactly `STANDOFF_COMMIT_SECONDS` (240 ticks), at
-19–100 % trigger, turning into `turn-and-fight`. And where the retreat genuinely
-*works*, it is left alone exactly as designed: at `park@200` every character
-opens ground, reads *escaped* past `RETREAT_CLEAR_RANGE`, and releases inside
-1.83 s without the standoff ever being needed.
+instrument confirms it fires**: the standoff latch commits in 20 cells of the
+sweep — under `block-build`, `never-die`, `never-die-squad`, `block-home`, `poke`
+and `siege-ally` — and releases in every one of them, never longer than
+`STANDOFF_COMMIT_SECONDS` (240 ticks) and often sooner, when whatever it turned
+on left or died first. Thirteen of those twenty hold the full window at 19–100 %
+trigger and hand the tick straight to `turn-and-fight`. And where the retreat
+genuinely *works*, it is left alone exactly as designed: at `park@200` every
+character opens ground, reads *escaped* past `RETREAT_CLEAR_RANGE`, and releases
+inside 1.83 s without the standoff ever being needed.
 
 **But the fold is gated behind two preconditions, and both of them are things an
 opponent controls.** From `behaviors.ts` `wantsRetreat`:
