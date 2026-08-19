@@ -132,7 +132,9 @@ import {
   SHIELD_BAR_HEIGHT,
   presenceBand,
   promptBounds,
+  promptWithdraws,
   promptWrapWidth,
+  PROMPT_TYPE,
   respawnPad,
   RESPAWN_STROKE,
   RESPAWN_CENTER_Y,
@@ -205,8 +207,10 @@ const TYPE = {
   /** A controls-strip binding (`WASD`) and its action (`Thrust`). */
   stripKey: 13,
   stripLabel: 12,
-  /** An onboarding prompt. */
-  prompt: 16,
+  /** An onboarding prompt. The geometry owns the number: `promptWithdraws` has
+   *  to know how tall a line of it is before any text has been measured, and one
+   *  constant in two files is the drift `hud-geometry.ts` exists to prevent. */
+  prompt: PROMPT_TYPE,
   /** `RESPAWNING 3…`. */
   respawn: 24,
   /** A floating ore cost travelling to the bank. */
@@ -2512,6 +2516,32 @@ export class Hud extends Container {
     );
     this.promptText.style.align = 'center';
 
+    // --- The arbitration (a0-100) -------------------------------------------
+    // The band is the room left OUTSIDE the wheel's drawn footprint, and while a
+    // wheel is up on a landscape phone there is about 11px of it — the footprint
+    // takes 83% of a 384px screen. u7-07 let the panel keep its bottom edge and
+    // grow up into the wedges on the argument that the scrim made the overlap
+    // readable; QA's 798x384 capture is what that argument buys, with the
+    // objective prompt's first two lines across REPAIR REACTOR and RADAR.
+    //
+    // So the prompt yields, and yielding means withdrawing: the wheel is what the
+    // player deliberately opened and its wedges carry the only numbers GDD 2.5
+    // permits there, while a prompt is ambient. Measured, not assumed — the
+    // panel's real wrapped height against the real band, so a screen that CAN
+    // hold this string still gets it.
+    //
+    // `withdrew()` is what keeps this a deferral rather than a discard: the
+    // trigger machine stops accruing the dwell that retires OBJECTIVE and
+    // CONTROLS, so a lesson nobody could read is not marked learned, and the
+    // prompt returns intact the moment the wheel closes.
+    if (
+      promptWithdraws(box.width, box.height, isTouch, insets, wheelOpen, this.promptText.height)
+    ) {
+      this.promptGroup.visible = false;
+      this.onboarding.withdrew();
+      return;
+    }
+
     // Hang the panel from the bottom of that band, off the SAME geometry the
     // registry is handed, so the drawn rect and the registered rect are one
     // computation rather than two that have to agree.
@@ -2522,6 +2552,7 @@ export class Hud extends Container {
       this.promptText.height,
       isTouch,
       insets,
+      wheelOpen,
     );
     this.promptGroup.x = box.x + box.width / 2;
     this.promptGroup.y = bounds.y + bounds.height / 2;

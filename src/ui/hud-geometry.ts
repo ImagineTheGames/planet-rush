@@ -21,8 +21,9 @@
  */
 
 import type { Rect } from '@platform/layout-registry';
+import { WHEEL_HALO } from '../art/materials';
 import type { HomeArrow } from './alarm';
-import { hudMetrics, hudSpace } from './instrument';
+import { hudMetrics, hudSpace, hudType } from './instrument';
 import { collapsedRect } from './minimap';
 import type { MinimapInsets } from './minimap';
 
@@ -202,13 +203,64 @@ export function wedgeHitTarget(
 export const TOUCH_TARGET_MIN = 48;
 
 /**
- * The wheel's drawn footprint: a `2r` square centred on the screen. The follow
- * camera keeps the local ship — and so the station it is docked at — at the
- * viewport centre, which is what GDD §2.2's "the wheel when near your own
- * station" resolves to in screen space.
+ * The wheel's **disc**: a `2r` square centred on the screen. The follow camera
+ * keeps the local ship — and so the station it is docked at — at the viewport
+ * centre, which is what GDD §2.2's "the wheel when near your own station"
+ * resolves to in screen space.
+ *
+ * This is the rim, the wedges and their words — everything with an edge. It is
+ * **not** what the layout registry records for `build-wheel`; that is
+ * {@link wheelFootprint}, which is bigger, and the difference is what a0-100 was
+ * filed for. Reach for this one when the question is about the wheel's *face*
+ * (hit-testing, wedge geometry, the a0-24 clock clearance) and for
+ * {@link wheelFootprint} when the question is about the pixels it occupies.
  */
 export function wheelBounds(viewportWidth: number, viewportHeight: number): Rect {
   const r = wheelRadius(viewportWidth, viewportHeight);
+  return { x: viewportWidth / 2 - r, y: viewportHeight / 2 - r, width: 2 * r, height: 2 * r };
+}
+
+/**
+ * How far the wheel's DRAWN pixels reach past its rim, as a multiple of the
+ * radius — the outermost halo band that is actually filled.
+ *
+ * ## Why this number exists (a0-100)
+ *
+ * `build-wheel-view`'s `drawRings` opens with the halo: a pool of void stepped
+ * into `WHEEL_HALO.bands` nested fills, reaching zero coverage at
+ * `WHEEL_HALO.fadeTo × r` and full coverage from `holdTo × r` inward — the
+ * "no plates over gameplay" mechanism (`../art/materials` `WHEEL_HALO`). The
+ * outermost band is drawn at zero alpha and skipped, so the largest circle the
+ * view actually fills is the *second* one, at
+ * `fadeTo + (holdTo − fadeTo) / bands` of the radius.
+ *
+ * That band is why QA's registry read `build-wheel` as **318.5 px** on a 798×384
+ * phone where {@link wheelBounds} says 276.5: `getBounds()` measures what was
+ * filled, alpha notwithstanding, and the gap between the two rects is 21 px on
+ * every side. Everything that computed clearance against the disc was therefore
+ * 21 px optimistic — and 21 px is the whole of the band the prompt had left.
+ *
+ * Derived from `WHEEL_HALO` rather than typed as a constant: the halo's shape is
+ * `../art/materials`' to own, and a hand-copied 1.152 is exactly the drift this
+ * file exists to prevent.
+ */
+export const WHEEL_HALO_SPAN =
+  WHEEL_HALO.fadeTo + (WHEEL_HALO.holdTo - WHEEL_HALO.fadeTo) / WHEEL_HALO.bands;
+
+/**
+ * The wheel's **drawn footprint** — the rect the layout registry records for
+ * `build-wheel` (and `upgrade-wheel`, which shares the square). The disc plus
+ * the halo pool around it, {@link WHEEL_HALO_SPAN} of the radius.
+ *
+ * This is the rect another surface has to clear to be able to say, in the
+ * registry's own numbers, that it does not share pixels with the wheel. The
+ * outer halo bands are nearly transparent and a sentence laid over them would
+ * still be legible — but "the words happened to stay readable in that frame" is
+ * luck, not layout, and the instrument that arbitrates cannot be fed a rect
+ * smaller than the one it measures.
+ */
+export function wheelFootprint(viewportWidth: number, viewportHeight: number): Rect {
+  const r = wheelRadius(viewportWidth, viewportHeight) * WHEEL_HALO_SPAN;
   return { x: viewportWidth / 2 - r, y: viewportHeight / 2 - r, width: 2 * r, height: 2 * r };
 }
 
@@ -649,8 +701,34 @@ export const PROMPT_STRIP_RESERVE = 34;
  */
 export const PROMPT_THUMB_COLUMN = 156;
 
-/** Air between the build wheel's bottom edge and the top of the prompt band. */
+/** Air between the build wheel's drawn footprint and the top of the prompt band. */
 export const PROMPT_WHEEL_GAP = 6;
+
+/**
+ * The onboarding prompt's type size, reference px — `./hud` `TYPE.prompt` reads
+ * this rather than the other way round.
+ *
+ * It moved here (a0-100) because the band arithmetic now has to answer a
+ * question it could not answer before: *is there room for a line of prompt at
+ * all?* {@link promptWithdraws} is that question, it is asked before any text
+ * has been measured, and a type size the geometry cannot see is a question it
+ * cannot ask. One constant, in the module that reasons about it.
+ */
+export const PROMPT_TYPE = 16;
+
+/**
+ * Pixi's line box for one line of prompt type at this viewport, CSS px — the
+ * scaled size times the ~1.3 leading a `Text` lays out with.
+ *
+ * Deliberately the same derivation `hud-geometry.test.ts` has used for the
+ * prompt since u7-07, lifted out of the suite and into the module, because it is
+ * now load-bearing on a *behaviour* ({@link promptWithdraws}) and not only on an
+ * assertion. A model that lives in the test can disagree with the shipped rule;
+ * this one cannot.
+ */
+export function promptLineBox(viewportWidth: number, viewportHeight: number): number {
+  return Math.ceil(hudType(PROMPT_TYPE, hudMetrics(viewportWidth, viewportHeight)) * 1.3);
+}
 
 /** Air between the prompt and the minimap's collapsed corner square. */
 export const PROMPT_MINIMAP_GAP = 8;
@@ -695,25 +773,54 @@ export const PROMPT_MINIMAP_GAP = 8;
  *    prompt breaks to a second line instead of running under a control. That is
  *    the trade, stated: a phone gets a taller prompt rather than a wider one.
  *
- * When even the band cannot hold the panel (a four-line prompt on a 320 px
- * screen), the panel keeps its bottom edge and grows up into the wheel — and
- * that overlap is now *readable*, because the prompt lost its opaque panel in the
- * same change ({@link ./instrument} `SCRIM.prompt`) and the wedge reads through
- * it. Degrading into transparency is the whole point of the material rule.
+ * ## What a0-100 changed, and why "grows up into the wheel" had to go
+ *
+ * u7-07 shipped one more clause: when even the band could not hold the panel, the
+ * panel kept its bottom edge and **grew up into the wheel**, on the argument that
+ * the overlap was readable because the prompt wears a scrim ({@link ./instrument}
+ * `SCRIM.prompt`) and the wedge reads through it. On QA's 798×384 capture that
+ * clause is not a graceful degradation, it is the defect: the objective prompt's
+ * first two lines crossed REPAIR REACTOR and RADAR, and the words stayed legible
+ * only because that particular string happened to clear `0/1 BUILT` by 20 px.
+ * The next string closes the gap, and nothing was arbitrating.
+ *
+ * Two things follow, and this function owns the first of them.
+ *
+ * 1. **The band is measured against the wheel's DRAWN footprint**
+ *    ({@link wheelFootprint}), not its disc. The registry records 318.5 px where
+ *    {@link wheelBounds} says 276.5 — the halo pool — so a band computed from the
+ *    disc was 21 px optimistic, which on this screen was the whole band.
+ * 2. **The band only exists while the wheel is up.** `wheelOpen` is a parameter
+ *    rather than an assumption because the wheel is a thing the player opens and
+ *    closes: reserving the space under it on every frame charged a closed wheel's
+ *    rent forever, and on a landscape phone that meant a 32 px band for a 33 px
+ *    prompt even with nothing on screen. Closed, the band is the whole safe area
+ *    above the bottom margin, which is what {@link promptMaxHeight} always said
+ *    it was.
+ *
+ * The panel can no longer leave this band in either state — {@link promptBounds}
+ * clamps to it — so when the band cannot hold a prompt, the prompt is not drawn
+ * short or drawn through the wedges. It **withdraws** ({@link promptWithdraws})
+ * and comes back when the wheel closes. The wheel is what the player deliberately
+ * opened; the prompt is ambient, and ambient yields.
  */
 export function promptBand(
   viewportWidth: number,
   viewportHeight: number,
   isTouch: boolean,
   insets: MinimapInsets = {},
+  wheelOpen = true,
 ): Rect {
   const left = HUD_PAD + Math.max(0, insets.left ?? 0);
   const right = viewportWidth - HUD_PAD - Math.max(0, insets.right ?? 0);
 
-  // Vertical: under the wheel, above the strip (desktop) / the bottom margin.
-  const wheel = wheelBounds(viewportWidth, viewportHeight);
+  // Vertical: under the wheel while one is up, above the strip (desktop) / the
+  // bottom margin. With no wheel on screen there is nothing to clear and the
+  // band is the whole safe area — the same ceiling `promptMaxHeight` reports.
   const bottom = promptBottom(viewportHeight, isTouch, insets);
-  const top = Math.min(bottom, wheel.y + wheel.height + PROMPT_WHEEL_GAP);
+  const wheel = wheelFootprint(viewportWidth, viewportHeight);
+  const ceiling = wheelOpen ? wheel.y + wheel.height + PROMPT_WHEEL_GAP : HUD_PAD;
+  const top = Math.min(bottom, ceiling);
 
   // Horizontal: centred, and no wider than twice its distance to the nearest
   // thing already living in that band — a thumb column, or the minimap's corner.
@@ -774,6 +881,17 @@ export function promptWrapWidth(
  * registry records what was actually drawn, so the caller passes real numbers
  * rather than the ceiling. Feed {@link promptWrapWidth} to get the worst case.
  *
+ * ## The band is a hard bound too, in both directions (a0-100)
+ *
+ * The height is clamped to {@link promptBand}'s, not only to the safe area, so
+ * the panel cannot leave the band at the top either. That is what makes "the
+ * prompt never intersects the wheel" true by construction rather than by
+ * arithmetic that has to be re-checked every time a string changes: the band is
+ * defined as the room *outside* {@link wheelFootprint}, and the rect returned
+ * here is inside the band. A prompt whose measured text does not fit the clamp
+ * is not squeezed into it — {@link promptWithdraws} says so first, and the view
+ * does not draw it at all.
+ *
  * ## The bottom edge is a hard bound, not a preference (a0-24)
  *
  * The panel hangs from the bottom of {@link promptBand}, so its bottom edge is
@@ -802,13 +920,18 @@ export function promptBounds(
   textHeight: number,
   isTouch = false,
   insets: MinimapInsets = {},
+  wheelOpen = true,
 ): Rect {
-  const band = promptBand(viewportWidth, viewportHeight, isTouch, insets);
+  const band = promptBand(viewportWidth, viewportHeight, isTouch, insets, wheelOpen);
   const pad = promptPad(viewportWidth, viewportHeight);
   const width = Math.min(textWidth + pad.x + PROMPT_STROKE, band.width);
   const height = Math.min(
     textHeight + pad.y + PROMPT_STROKE,
     promptMaxHeight(viewportHeight, isTouch, insets),
+    // The band, which is the wheel's clearance made a number (a0-100). Never
+    // wider than the safe area above, so this is the binding clamp whenever a
+    // wheel is open and the ceiling above whenever one is not.
+    band.height,
   );
   const bottom = band.y + band.height;
   return {
@@ -817,6 +940,58 @@ export function promptBounds(
     width,
     height,
   };
+}
+
+/**
+ * Does the onboarding prompt have to withdraw from this screen — is there no
+ * band left for it to be drawn in?
+ *
+ * ## The arbitration a0-100 asked for, in one predicate
+ *
+ * Two owned surfaces were sharing pixels on the narrowest supported width with
+ * nothing deciding between them. This is the decision, and it goes against the
+ * prompt: the build wheel is what the player deliberately opened and its wedges
+ * carry the only numbers GDD §2.5 lets the wheel show, while a prompt is ambient
+ * — it fires on a trigger nobody asked for. So while a wheel is up and the room
+ * under it cannot hold one line of prompt at its own type scale, the prompt is
+ * not drawn, not registered, and not counted as having fired.
+ *
+ * **Withdrawal is a deferral, not a discard.** `./onboarding` is told (its
+ * `bandClear` signal), so the frame accrues no dwell and the prompt returns
+ * intact the moment the wheel closes — `./hud` `updateOnboarding`. GDD §2.10's
+ * "each fires once" is a promise about lessons learned, and a lesson nobody could
+ * read was not learned.
+ *
+ * ## Two questions, one predicate
+ *
+ * `textHeight` is the measured height of the wrapped text, and passing it asks
+ * the exact question — *does THIS panel fit?* Leaving it out substitutes one line
+ * box ({@link promptLineBox}) and asks the screen-level one — *could ANY prompt
+ * fit?* The view asks the first, because it has measured the string it is about
+ * to draw; a test or a caller reasoning about a device profile asks the second,
+ * because it is a property of the screen rather than of whichever sentence
+ * happens to be eligible. The band's width does not depend on the wheel, so
+ * wrapping is settled before either question is asked: what the wheel takes is
+ * height, and height comes in line boxes.
+ *
+ * On the matrix the screen-level answer is `true` for exactly the landscape
+ * phones — 798×384, 844×390, 915×412, 568×320 — where the wheel's footprint takes
+ * 83% of the height and the room under it is about 11 px. Portrait phones and the
+ * desktop keep their prompt with the wheel open, moved down by the halo they were
+ * previously ignoring.
+ */
+export function promptWithdraws(
+  viewportWidth: number,
+  viewportHeight: number,
+  isTouch: boolean,
+  insets: MinimapInsets = {},
+  wheelOpen = true,
+  textHeight?: number,
+): boolean {
+  const band = promptBand(viewportWidth, viewportHeight, isTouch, insets, wheelOpen);
+  const pad = promptPad(viewportWidth, viewportHeight);
+  const ink = textHeight ?? promptLineBox(viewportWidth, viewportHeight);
+  return band.height + 1e-6 < ink + pad.y + PROMPT_STROKE;
 }
 
 /**
