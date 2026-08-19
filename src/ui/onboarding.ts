@@ -824,6 +824,35 @@ export class Onboarding {
     return this.completed.has(id);
   }
 
+  /**
+   * The view could not draw the prompt {@link update} just returned, so nothing
+   * was on screen this tick after all (a0-100).
+   *
+   * There is exactly one caller and exactly one reason: on a landscape phone the
+   * open build wheel's drawn footprint takes 83% of the height, and the band left
+   * under it cannot hold a line of prompt type. The prompt is ambient and the
+   * wheel is what the player deliberately opened, so the prompt yields and
+   * withdraws — see `./hud-geometry` `promptWithdraws`, `./hud`
+   * `updateOnboarding`.
+   *
+   * **What this exists to protect is the dwell.** OBJECTIVE and CONTROLS retire
+   * on having been on screen long enough to READ, and that clock is accrued
+   * against {@link lastActive} — the prompt this machine returned last tick. A
+   * view that hid a prompt behind the machine's back would retire the lesson
+   * while the player could not see it, which is the very thing the dwell's own
+   * rule forbids ("a prompt that expires while it is off screen is a prompt
+   * nobody read"). Clearing `lastActive` is the whole of the fix: the withdrawn
+   * frames contribute nothing, and the prompt comes back intact when the wheel
+   * closes.
+   *
+   * Completion by *action* is untouched on purpose. Mining, hauling, spending and
+   * surviving a siege are facts about the world, and a player who spends ore has
+   * found the economy whether or not a sentence about it was legible at the time.
+   */
+  withdrew(): void {
+    this.lastActive = null;
+  }
+
   /** Whether every prompt has been completed — the first match has finished
    *  being the tutorial (GDD §2.10: "no separate tutorial mode"). */
   allCompleted(): boolean {

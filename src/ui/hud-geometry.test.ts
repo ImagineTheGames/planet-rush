@@ -20,10 +20,15 @@
  */
 import { describe, it, expect } from 'vitest';
 import { resolveAnchor, rectContains } from '@platform/layout-registry';
-import type { AnchorSpec, Rect, Viewport } from '@platform/layout-registry';
+import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
 import { homeArrow, ARROW_EDGE_INSET } from './alarm';
 import { hudMetrics, hudType } from './instrument';
 import { collapsedRect } from './minimap';
+import { zoomControlBounds } from './zoom-control';
+import { affordanceRects, buildButtonRect } from '@platform/touch-visuals';
+import { writeBadgeRect } from '../render/build-badge';
+import { writePingRect } from '../net/ping-badge';
+import { writeAffordanceRect } from '../render/fullscreen-affordance';
 import type { MinimapInsets } from './minimap';
 import {
   wheelBounds,
@@ -45,9 +50,15 @@ import {
   SHIELD_BAR_HEIGHT,
   promptBounds,
   promptBand,
+  promptLineBox,
   promptMaxHeight,
   promptPad,
+  promptWithdraws,
   promptWrapWidth,
+  PROMPT_TYPE,
+  PROMPT_WHEEL_GAP,
+  wheelFootprint,
+  WHEEL_HALO_SPAN,
   waveClockLayout,
   CLOCK_WHEEL_GAP,
   PROMPT_MIN_TEXT_WIDTH,
@@ -62,7 +73,10 @@ import {
   TOUCH_TARGET_MIN,
 } from './hud-geometry';
 import type { AnnularSector } from './hud-geometry';
-import { wheelMetrics } from '../art/materials';
+import { exclusionViolations, LAYOUT_EXCLUSIONS } from './layout-exclusions';
+import { textWidth } from './font-metrics';
+import type { TypeSpec } from './font-metrics';
+import { TRACKING, WHEEL_HALO, wheelMetrics } from '../art/materials';
 import { buildWheelModel, segmentAngle, WHEEL_ORDER } from './build-wheel';
 import type { BuildWheelSignals } from './build-wheel';
 import {
@@ -110,6 +124,12 @@ interface Profile {
 const PROFILES: readonly Profile[] = [
   { name: 'iphone/portrait', vp: { width: 390, height: 844 }, isTouch: true },
   { name: 'iphone/landscape', vp: { width: 844, height: 390 }, isTouch: true },
+  // QA's a0-99/a0-100 capture, to the logical pixel. Not an emulation-matrix
+  // profile: it is a real handset's landscape viewport once the browser chrome
+  // has taken its cut, and it is the frame the objective prompt was drawn
+  // through the build wheel on. In the matrix permanently now — the narrowest
+  // width anyone has actually photographed this HUD at.
+  { name: 'qa-phone/landscape', vp: { width: 798, height: 384 }, isTouch: true },
   { name: 'pixel/portrait', vp: { width: 412, height: 915 }, isTouch: true },
   { name: 'pixel/landscape', vp: { width: 915, height: 412 }, isTouch: true },
   { name: 'desktop', vp: { width: 1280, height: 800 }, isTouch: false },
@@ -189,6 +209,51 @@ describe('build-wheel placement', () => {
       expect(b.width, `${name} too small`).toBeGreaterThanOrEqual(200);
       // …and never so big it swallows the shorter screen dimension whole.
       expect(b.width, `${name} too big`).toBeLessThan(shortSide);
+    }
+  });
+});
+
+describe('build-wheel drawn footprint (a0-100)', () => {
+  it('is the halo, and the halo is what `build-wheel-view` actually fills', () => {
+    // `WHEEL_HALO_SPAN` is the reason the registry reads 318.5 where `wheelBounds`
+    // says 276.5, so it cannot be a number somebody measured off a screenshot. It
+    // is re-derived here the way `drawRings` draws: the pool is stepped into
+    // `bands` nested fills from `fadeTo × r` inward to `holdTo × r`, and band 0 is
+    // laid out at zero alpha and SKIPPED (`if (alpha <= 0) continue`). So the
+    // largest circle the view fills is band 1, and that is the outermost pixel the
+    // wheel puts on the screen.
+    const { bands, fadeTo, holdTo, peak } = WHEEL_HALO;
+    const alphaOf = (i: number): number => {
+      const outward = (bands - i) / bands;
+      return peak * (1 - outward) * (1 - outward);
+    };
+    const radiusOf = (i: number): number => fadeTo + ((holdTo - fadeTo) * i) / bands;
+    expect(alphaOf(0), 'band 0 is drawn at zero coverage and skipped').toBe(0);
+    expect(alphaOf(1)).toBeGreaterThan(0);
+    expect(WHEEL_HALO_SPAN).toBeCloseTo(radiusOf(1), 12);
+    // …and it really is outside the rim, which is the whole point.
+    expect(WHEEL_HALO_SPAN).toBeGreaterThan(1);
+  });
+
+  it('reproduces the rect QA read out of the registry on the phone that failed', () => {
+    // a0-99's verdict, verbatim: `build-wheel` occupies (239.7, 32.7) 318.5×318.5
+    // on a 798×384 phone. If this stops matching, the model here and the pixels
+    // there have parted company and every clearance computed from it is a guess.
+    const f = wheelFootprint(798, 384);
+    expect(f.x).toBeCloseTo(239.7, 1);
+    expect(f.y).toBeCloseTo(32.7, 1);
+    expect(f.width).toBeCloseTo(318.5, 1);
+    expect(f.height).toBeCloseTo(318.5, 1);
+  });
+
+  it('contains the disc, and stays inside the screen it is drawn on', () => {
+    for (const { name, vp } of PROFILES) {
+      const disc = wheelBounds(vp.width, vp.height);
+      const foot = wheelFootprint(vp.width, vp.height);
+      expect(rectContains(foot, disc), `${name}: the footprint must contain the disc`).toBe(true);
+      // `full` + 0 is what `Hud.describeLayout` registers it under, and the halo
+      // is part of what is drawn — so the anchor has to hold for the bigger rect.
+      expectWithin(foot, FULL, vp, 'build-wheel (drawn footprint)');
     }
   });
 });
@@ -398,6 +463,7 @@ describe('wave clock placement', () => {
     }
     expect(compactWhileOpen, 'the short landscape viewports, and only those').toEqual([
       'iphone/landscape',
+      'qa-phone/landscape',
       'pixel/landscape',
       'small/landscape',
     ]);
@@ -511,45 +577,74 @@ describe('onboarding placement', () => {
     }
   });
 
-  it('CLEARS THE BUILD WHEEL at a one-line prompt — the collision u7-07 was written for', () => {
-    // The regression this brief names: at 844×390 the wheel spans y 54.6 → 335.4
-    // (72% of the screen) and the old `PROMPT_CENTER_Y = 0.72` put the prompt at
-    // y 259 → 302, squarely over the REPAIR REACTOR and RADAR wedges — and the
-    // SPEND prompt fires WHILE the wheel is open by design (GDD §2.10), so that
-    // was its normal state, not an edge case.
+  it('CLEARS THE BUILD WHEEL at a one-line prompt — or withdraws, never between', () => {
+    // The regression u7-07 was written for: at 844×390 the wheel spans y 54.6 →
+    // 335.4 (72% of the screen) and the old `PROMPT_CENTER_Y = 0.72` put the
+    // prompt at y 259 → 302, squarely over the REPAIR REACTOR and RADAR wedges —
+    // and the SPEND prompt fires WHILE the wheel is open by design (GDD §2.10),
+    // so that was its normal state, not an edge case.
+    //
+    // u7-07's answer had a third leg that a0-100 removed: where the band could
+    // not hold the panel, the panel kept its bottom edge and GREW UP into the
+    // wedges, on the argument that the scrim made the overlap readable. QA's
+    // 798×384 capture is what that argument buys. So the two outcomes are now
+    // exactly two — the prompt clears the wheel's drawn footprint, or it is not
+    // drawn at all — and this pins the SET of screens that take the second one.
     //
     // Asserted per profile against the device class that profile ACTUALLY IS: the
     // phones are touch (no controls strip, thumb columns instead) and the desktop
-    // is not. The cross-product is deliberately not asserted here — a 844×390
-    // window driven by a keyboard has to pay for BOTH a 280px-tall wheel and the
-    // strip's reserve, and 390px of height cannot cover both. The prompt degrades
-    // there exactly as documented: it keeps its bottom edge, grows up into the
-    // wheel, and the wedge reads through it (SCRIM.prompt). The `full` + PAD
-    // assertion above still covers that case, which is the promise that matters.
-    //
-    // A one-line prompt is the case that has to be clean, because it is the case
-    // that happens: every authored prompt fits one line of the band on every
-    // profile in the matrix.
-    const degraded: string[] = [];
+    // is not.
+    const withdrawn: string[] = [];
     for (const { name, vp, isTouch } of PROFILES) {
-      const wheel = wheelBounds(vp.width, vp.height);
-      const b = promptBounds(vp.width, vp.height, 200, lineBox(vp), isTouch);
-      if (b.y < wheel.y + wheel.height) {
-        degraded.push(
-          `${name} (prompt top ${b.y.toFixed(1)}, wheel bottom ${(wheel.y + wheel.height).toFixed(1)})`,
-        );
+      const wheel = wheelFootprint(vp.width, vp.height);
+      if (promptWithdraws(vp.width, vp.height, isTouch, {}, true)) {
+        const band = promptBand(vp.width, vp.height, isTouch, {}, true);
+        withdrawn.push(`${name} (band ${band.height.toFixed(1)}px, needs ${(lineBox(vp) + promptPad(vp.width, vp.height).y).toFixed(1)}px)`);
+        continue;
       }
+      const b = promptBounds(vp.width, vp.height, 200, lineBox(vp), isTouch, {}, true);
+      expect(
+        rectsIntersect(b, wheel),
+        `${name}: prompt ${fmt(b)} overlaps the open wheel ${fmt(wheel)}`,
+      ).toBe(false);
     }
 
-    // …and the screens where it CANNOT clear, named. The band is the room left
-    // between the wheel's bottom edge and the HUD margin; on a 320px-tall screen
-    // the wheel's own 120px minimum radius (hud-geometry `WHEEL_MIN_RADIUS`) takes
-    // 240 of those 320 px, leaving 18px for a 33px prompt. So the prompt keeps its
-    // bottom edge and grows 9px up into the bottom wedges, and reads through them
-    // (SCRIM.prompt). Pinning the SET here means a change that makes a second
-    // screen degrade fails this test instead of quietly shipping.
-    expect(degraded, 'exactly one profile in the matrix cannot hold a prompt under the wheel')
-      .toEqual(['small/landscape (prompt top 271.0, wheel bottom 280.0)']);
+    // …and the screens where it CANNOT clear, named. Every one is a landscape
+    // phone, and the arithmetic is the same on each: the wheel's drawn footprint
+    // is `WHEEL_HALO_SPAN × 2r` on a side, which on a 384px-tall screen is 318.5
+    // of it, leaving about 11px between the footprint and the HUD margin for a
+    // 33px prompt. There is no fourth option — above the wheel is the wave clock,
+    // beside it are the thumb columns, and the type is already on `hudType`'s
+    // floor — so the prompt withdraws until the wheel closes and comes back
+    // whole. Pinning the SET here means a change that withdraws the prompt from a
+    // NEW screen fails this test instead of quietly shipping.
+    expect(withdrawn, 'the landscape phones, and only those').toEqual([
+      'iphone/landscape (band 11.2px, needs 33.0px)',
+      'qa-phone/landscape (band 10.7px, needs 33.0px)',
+      'pixel/landscape (band 13.1px, needs 33.0px)',
+      'small/landscape (band 0.0px, needs 33.0px)',
+    ]);
+  });
+
+  it('keeps the prompt on every screen once the wheel is CLOSED — withdrawal is a deferral', () => {
+    // The other half of "withdraw". A prompt that vanished on a landscape phone
+    // for the rest of the match would not be an arbitration, it would be a
+    // deletion — and the SPEND lesson would be the one it deleted, since that one
+    // fires while the wheel is open by design. What the band reserves is the
+    // OPEN wheel's footprint, and a closed wheel draws nothing and registers
+    // nothing, so the whole safe area comes back the moment it shuts.
+    for (const { name, vp, isTouch } of PROFILES) {
+      expect(
+        promptWithdraws(vp.width, vp.height, isTouch, {}, false),
+        `${name}: the prompt has nowhere to go with no wheel on screen`,
+      ).toBe(false);
+      // …and it is a real band, not a sliver: room for the four-line worst case
+      // the `full` + PAD assertions above are written against.
+      const band = promptBand(vp.width, vp.height, isTouch, {}, false);
+      expect(band.height, `${name}: closed-wheel band`).toBeGreaterThanOrEqual(
+        4 * lineBox(vp) + promptPad(vp.width, vp.height).y,
+      );
+    }
   });
 
   it('clears the touch thumb columns — or falls back to the legibility floor, never between', () => {
@@ -702,6 +797,14 @@ describe('onboarding placement', () => {
     // The inset is *consumed*, not merely tolerated: feeding a crop in moves the
     // panel up by that crop and nothing else.
     //
+    // Asserted on the BOTTOM edge rather than the top since a0-100, because the
+    // top is no longer the panel's free end. The panel is clamped to the band and
+    // the band's ceiling is the open wheel's drawn footprint, so on a landscape
+    // phone — where the band is ~11px and the panel is capped by it — a crop moves
+    // the bottom edge up by the full inset and the top by whatever is left. The
+    // bottom edge is the thing the inset is about: it is the line the player's
+    // home indicator or browser bar is eating, and it is what a0-24 filed.
+    //
     // Worth being exact about what this does and does not catch. The geometry
     // below already honoured an inset on `main`; what `main` did not have was
     // anyone PASSING one — `HudFrame`'s inset field was declared, read by this
@@ -712,7 +815,10 @@ describe('onboarding placement', () => {
     for (const { name, vp, isTouch } of PROFILES) {
       const flat = promptBounds(vp.width, vp.height, 200, 20, isTouch);
       const cropped = promptBounds(vp.width, vp.height, 200, 20, isTouch, { bottom: 40 });
-      expect(flat.y - cropped.y, `${name}`).toBeCloseTo(40, 6);
+      expect(
+        flat.y + flat.height - (cropped.y + cropped.height),
+        `${name}`,
+      ).toBeCloseTo(40, 6);
     }
   });
 
@@ -738,6 +844,325 @@ describe('onboarding placement', () => {
         );
       }
     }
+  });
+
+  // -------------------------------------------------------------------------
+  // a0-100 — the arbitration, driven from the layout registry
+  // -------------------------------------------------------------------------
+  //
+  // ## What failed, in the registry's own numbers
+  //
+  // QA's a0-99 capture, 798×384, on the front door and under `?debug=1` alike:
+  //
+  //   onboarding  (232.9, 309)   332.2 × 59
+  //   build-wheel (239.7,  32.7) 318.5 × 318.5
+  //
+  // — an intersection 318.5 wide and 42.3 tall, the WHOLE WIDTH of the wheel,
+  // with the prompt's first two lines across the REPAIR REACTOR and RADAR wedges.
+  // Both elements were inside their declared anchors (`full` + PAD and `full`),
+  // so the registry's containment question answered "yes" twice while the two
+  // surfaces shared pixels. Nothing was arbitrating between them.
+  //
+  // ## The 318.5 is the halo, and that is half the defect
+  //
+  // `wheelBounds(798, 384)` is 276.5 on a side — `clamp(384 × 0.36, 120, 230) × 2`.
+  // The registry says 318.5, because `getBounds()` measures what was FILLED and
+  // `build-wheel-view` fills the halo pool out to `WHEEL_HALO_SPAN × r` (see
+  // hud-geometry `wheelFootprint`). Every clearance computed against the disc was
+  // 21px a side optimistic, and 21px was the whole of the band the prompt had.
+  //
+  // ## Written against the registry, not against numbers copied out of it
+  //
+  // The entries below are `LayoutEntry`s — the same ids, anchors and `Rect`s
+  // `Hud.describeLayout` hands the registry — and the verdict comes from
+  // `./layout-exclusions` `exclusionViolations`, which is the same function the
+  // live client's `?debug=1` surface can be pointed at. Nothing here re-states a
+  // rule in test-local arithmetic: the table says which pairs may not touch, and
+  // this asks it.
+  const entriesFor = (
+    vp: Viewport,
+    isTouch: boolean,
+    wheelOpen: boolean,
+    text: { w: number; h: number },
+  ): LayoutEntry[] => {
+    const out: LayoutEntry[] = [];
+    if (wheelOpen) {
+      // Both wheels share the centred square (field report v0.2), and both are
+      // registered `full` + 0 by `Hud.describeLayout`.
+      const wheel = wheelFootprint(vp.width, vp.height);
+      out.push({ id: 'build-wheel', anchor: FULL, bounds: wheel });
+      out.push({ id: 'upgrade-wheel', anchor: FULL, bounds: wheel });
+    }
+    // An element that is not drawn is not registered — that is what makes
+    // withdrawal a legal way to satisfy an exclusion rather than a dodge.
+    if (!promptWithdraws(vp.width, vp.height, isTouch, {}, wheelOpen, text.h)) {
+      out.push({
+        id: 'onboarding',
+        anchor: FULL_PAD,
+        bounds: promptBounds(vp.width, vp.height, text.w, text.h, isTouch, {}, wheelOpen),
+      });
+    }
+    return out;
+  };
+
+  /** The prompt's type as `./hud` styles it: Audiowide at the frame-scaled 16px,
+   *  `TRACKING.label` — the same three numbers `makeText(FONT_HEADING,
+   *  TYPE.prompt, …, 'label')` puts on the `Text`. */
+  const promptSpec = (vp: Viewport): TypeSpec => ({
+    face: 'heading',
+    size: hudType(PROMPT_TYPE, hudMetrics(vp.width, vp.height)),
+    tracking: TRACKING.label,
+  });
+
+  /** Greedily wrap `text` at `width` the way Pixi's word wrap does — break on
+   *  spaces, never mid-word — and report the box it lays out in. Real per-glyph
+   *  advances of the shipped fonts (`./font-metrics`), so this is what the engine
+   *  will measure and not a per-character guess. The height is counted in
+   *  `promptLineBox`es, the same conservative line box the shipped predicate
+   *  spends, so the model and the rule cannot disagree. */
+  const wrapped = (text: string, vp: Viewport, width: number): { w: number; h: number } => {
+    const spec = promptSpec(vp);
+    let lines = 1;
+    let widest = 0;
+    let line = '';
+    for (const word of text.split(' ')) {
+      const next = line === '' ? word : `${line} ${word}`;
+      if (line !== '' && textWidth(next, spec) > width) {
+        widest = Math.max(widest, textWidth(line, spec));
+        lines++;
+        line = word;
+      } else {
+        line = next;
+      }
+    }
+    widest = Math.max(widest, textWidth(line, spec));
+    return { w: Math.min(widest, width), h: lines * promptLineBox(vp.width, vp.height) };
+  };
+
+  /** Every sentence GDD §2.10 can put in the band: each prompt, in each control
+   *  scheme, in each fire mode, with the bindings of each device resolved — the
+   *  copy is the writer's and this brief may not shorten it, so the assertion has
+   *  to hold for all of it rather than for the string that happened to be up. */
+  const AUTHORED: readonly string[] = (() => {
+    const out = new Set<string>();
+    const devices: DeviceKind[] = ['keyboard', 'gamepad', 'touch'];
+    const schemes: ControlScheme[] = ['sticks', 'tap'];
+    for (const id of Object.values(PromptId)) {
+      for (const device of devices) {
+        for (const mode of [FireMode.Manual, FireMode.AutoAim]) {
+          for (const scheme of schemes) out.add(resolvePromptText(id, device, mode, scheme));
+        }
+      }
+    }
+    return [...out];
+  })();
+
+  it('the onboarding band never intersects the build wheel', () => {
+    // THE assertion this brief exists for. Every profile, every device class,
+    // both wheel states, and every authored sentence at that screen's own wrap
+    // width — because "the words stayed legible in that frame" is luck, and the
+    // next string closes the gap.
+    const violations: string[] = [];
+    for (const { name, vp, isTouch } of PROFILES) {
+      for (const wheelOpen of [false, true]) {
+        const width = promptWrapWidth(vp.width, vp.height, isTouch);
+        for (const text of AUTHORED) {
+          const entries = entriesFor(vp, isTouch, wheelOpen, wrapped(text, vp, width));
+          for (const v of exclusionViolations(entries)) {
+            violations.push(
+              `${name} / wheel=${wheelOpen ? 'open' : 'closed'} / "${text.slice(0, 32)}…": ` +
+                `${v.a} ${fmt(v.boundsA)} ∩ ${v.b} ${fmt(v.boundsB)} = ${fmt(v.overlap)} — ${v.why}`,
+            );
+          }
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  it('which screens the WORST AUTHORED prompt actually costs, named rather than discovered', () => {
+    // The screen-level pin above asks "could any prompt fit"; this asks the
+    // question the player experiences — does the LONGEST sentence GDD §2.10 has
+    // fit, on this screen, with the wheel open? The two answers differ, and the
+    // difference is the honest cost of this fix, so it is written down rather
+    // than left for a capture to find.
+    //
+    // What it costs: on 390×844 the objective prompt wraps to FOURTEEN lines,
+    // because a 390px-wide portrait phone has 46px between its two thumb columns
+    // and the band falls back to the legibility floor (80px of text). That is
+    // 241px of panel against a 238px band — a three-pixel miss — so the prompt
+    // waits for the wheel to close there too.
+    //
+    // What it buys, and it is much bigger than QA's capture: the small portrait
+    // phones were the WORST offenders and nobody had photographed them. On
+    // 320×568 that same panel ran 111px into the wheel's footprint and 93px into
+    // the DISC — a third of the wheel's face under a wall of text — and on
+    // 375×667 it ran 79px in. Those two were never a wedge or two clipped; they
+    // were the wheel unusable.
+    const worst = (vp: Viewport, isTouch: boolean): number => {
+      const width = promptWrapWidth(vp.width, vp.height, isTouch);
+      let tallest = 0;
+      for (const text of AUTHORED) tallest = Math.max(tallest, wrapped(text, vp, width).h);
+      return tallest;
+    };
+    const withdrawn = PROFILES.filter(({ vp, isTouch }) =>
+      promptWithdraws(vp.width, vp.height, isTouch, {}, true, worst(vp, isTouch)),
+    ).map(({ name }) => name);
+
+    expect(withdrawn, 'the screens where the longest authored prompt waits for the wheel').toEqual([
+      'iphone/portrait',
+      'iphone/landscape',
+      'qa-phone/landscape',
+      'pixel/landscape',
+      'iphone-se/portrait',
+      'small/portrait',
+      'small/landscape',
+    ]);
+    // …and the two that keep it, so a change that takes the prompt off a DESKTOP
+    // is a failure here and not a shrug.
+    expect(PROFILES.map(({ name }) => name).filter((n) => !withdrawn.includes(n)))
+      .toEqual(['pixel/portrait', 'desktop']);
+  });
+
+  it('the two viewports the brief names, in the registry numbers it quotes', () => {
+    // The before/after the Definition of Done asks for, as arithmetic rather than
+    // as a screenshot. `before` is what `main` computed — the band measured from
+    // the DISC, the panel free to keep its bottom edge and grow up through the
+    // wedges; `after` is what this branch computes.
+    const worst = (vp: Viewport, isTouch: boolean): { w: number; h: number } => {
+      const width = promptWrapWidth(vp.width, vp.height, isTouch);
+      let box = { w: 0, h: 0 };
+      for (const text of AUTHORED) {
+        const b = wrapped(text, vp, width);
+        if (b.h > box.h || (b.h === box.h && b.w > box.w)) box = b;
+      }
+      return box;
+    };
+
+    // --- QA's phone, 798×384, touch ----------------------------------------
+    const phone: Viewport = { width: 798, height: 384 };
+    const wheel = wheelFootprint(phone.width, phone.height);
+    // The wheel is where it always was — it does not yield, and these are QA's
+    // own numbers to the rounding: (239.7, 32.7) 318.5 × 318.5.
+    expect(wheel.x).toBeCloseTo(239.7, 1);
+    expect(wheel.y).toBeCloseTo(32.7, 1);
+    expect(wheel.width).toBeCloseTo(318.5, 1);
+    // BEFORE: the band was measured from the disc's bottom (330.2), the panel hung
+    // from y 368 and grew up past the footprint's bottom edge at 351.3.
+    expect(wheelBounds(phone.width, phone.height).y + wheelBounds(phone.width, phone.height).height)
+      .toBeCloseTo(330.2, 1);
+    expect(wheel.y + wheel.height).toBeCloseTo(351.3, 1);
+    // AFTER: the prompt withdraws while the wheel is open, so it registers nothing
+    // and the intersection is not small, it is absent.
+    expect(promptWithdraws(phone.width, phone.height, true, {}, true, worst(phone, true).h)).toBe(true);
+    expect(entriesFor(phone, true, true, worst(phone, true)).map((e) => e.id))
+      .toEqual(['build-wheel', 'upgrade-wheel']);
+    expect(exclusionViolations(entriesFor(phone, true, true, worst(phone, true)))).toEqual([]);
+    // …and it is back, in full, the moment the wheel closes.
+    expect(promptWithdraws(phone.width, phone.height, true, {}, false, worst(phone, true).h)).toBe(false);
+
+    // --- Desktop, 1280×800, no touch ---------------------------------------
+    const desk: Viewport = { width: 1280, height: 800 };
+    const deskWheel = wheelFootprint(desk.width, desk.height);
+    // BEFORE: the band's ceiling was the disc's bottom edge, y 630 + 6 = 636 —
+    // 35px INSIDE the footprint, which ends at 665. A prompt tall enough to reach
+    // its ceiling was drawn over the halo, and nothing said it could not.
+    expect(wheelBounds(desk.width, desk.height).y + wheelBounds(desk.width, desk.height).height)
+      .toBeCloseTo(630, 6);
+    expect(deskWheel.y + deskWheel.height).toBeCloseTo(665.0, 1);
+    // AFTER: the ceiling is the footprint's bottom plus the gap, and the desktop
+    // keeps its prompt — it yields 35px of band, not the band.
+    const deskBand = promptBand(desk.width, desk.height, false, {}, true);
+    expect(deskBand.y).toBeCloseTo(deskWheel.y + deskWheel.height + PROMPT_WHEEL_GAP, 6);
+    expect(promptWithdraws(desk.width, desk.height, false, {}, true, worst(desk, false).h)).toBe(false);
+    const deskEntries = entriesFor(desk, false, true, worst(desk, false));
+    expect(deskEntries.map((e) => e.id)).toEqual(['build-wheel', 'upgrade-wheel', 'onboarding']);
+    expect(exclusionViolations(deskEntries)).toEqual([]);
+  });
+
+  it('every OTHER registered surface on QA\'s profile, held to the same intersection', () => {
+    // The brief's second ask: having found two surfaces sharing pixels with
+    // nothing arbitrating, check the rest of them rather than the one that was
+    // photographed. Every element the client registers on a 798×384 in-match
+    // frame whose rect this repo can compute without a browser, against the same
+    // `wheelFootprint` the prompt is now held to.
+    //
+    // The answer is a SET, pinned, because "nothing else overlaps" is only worth
+    // asserting if a new overlap fails here. Two do, and both are correct:
+    //
+    //  - `alarm-frame` IS the screen (`full` + 0, a stroked border flush with the
+    //    viewport edges), so it contains every other element by construction. An
+    //    exclusion rule naming it would be a rule against the alarm existing.
+    //  - `respawn-countdown` is dead centre, and so is the wheel — but they can
+    //    never be on screen together: the countdown draws only while the local
+    //    ship is dead with a respawn pending, and a dead ship cannot dock or
+    //    build (`./hud`, the display-list note above `respawnGroup`). Two rects
+    //    that share pixels on no frame share no pixels.
+    //
+    // Everything else clears it outright, which is the result worth having: the
+    // corner readouts, the touch affordances and the badges were all already
+    // outside the wheel's DRAWN footprint, not merely outside its disc — so the
+    // prompt was the only surface the halo's 21px a side was hiding.
+    const W = 798;
+    const H = 384;
+    const wheel = wheelFootprint(W, H);
+    const scratch = (): Rect => ({ x: 0, y: 0, width: 0, height: 0 });
+    const sticks = affordanceRects(true, FireMode.Manual, W, H);
+    const auto = affordanceRects(true, FireMode.AutoAim, W, H);
+    // A station off the right-hand edge, so the screen-edge arrow is drawn.
+    const arrow = homeArrow({ x: 0, y: 0 }, { x: 900, y: 0 }, { width: W, height: H });
+
+    const surfaces: ReadonlyArray<readonly [string, Rect | null]> = [
+      ['station-hp', stationHpBounds(W, 40)],
+      ['zoom-control', zoomControlBounds(W, H, true)],
+      ['minimap', collapsedRect({ width: W, height: H }, true, {})],
+      ['alarm-frame', alarmFrameBounds(W, H)],
+      ['alarm-arrow', polyBounds(arrowPoly(arrow))],
+      ['respawn-countdown', respawnBounds(W, H, respawnWrapWidth(W, H), 30)],
+      ['touch-left-stick', sticks.leftStickZone],
+      ['touch-aim-stick', sticks.aimZone],
+      ['touch-fire-button', auto.fireButton],
+      ['build-button', buildButtonRect(true, true, W, H)],
+      ['build-badge', writeBadgeRect(90, 12, W, H, scratch())],
+      ['net-ping', writePingRect(70, 12, W, H, scratch(), 20)],
+      ['fullscreen-reenter', writeAffordanceRect(W, H, scratch())],
+      // `onboarding` is absent on purpose: it withdraws here, which is the fix.
+      ['onboarding', promptWithdraws(W, H, true, {}, true) ? null : promptBounds(W, H, 200, lineBox({ width: W, height: H }), true, {}, true)],
+    ];
+
+    const sharing = surfaces
+      .filter(([, r]) => r !== null && rectsIntersect(r, wheel))
+      .map(([id]) => id);
+    expect(sharing, `against build-wheel ${fmt(wheel)}`).toEqual([
+      'alarm-frame',
+      'respawn-countdown',
+    ]);
+  });
+
+  it('the exclusion table is a table, and it is about the pairs it names', () => {
+    // The rule this brief asked to be expressed as data rather than as a branch
+    // in one screen's layout code. Two guards on that: every row carries the
+    // argument for itself, and no row names an element twice (a pair excluded
+    // from itself is a rule that can never be satisfied).
+    for (const rule of LAYOUT_EXCLUSIONS) {
+      expect(rule.a, `${rule.a} vs ${rule.b}`).not.toEqual(rule.b);
+      expect(rule.why.length, `${rule.a} vs ${rule.b} carries no argument`).toBeGreaterThan(20);
+    }
+    // …and it really is checking, not vacuously passing: hand it the frame QA
+    // photographed — the prompt where `main` put it, the wheel where it is — and
+    // it must report the overlap QA reported.
+    const before: LayoutEntry[] = [
+      { id: 'onboarding', anchor: FULL_PAD, bounds: { x: 232.9, y: 309, width: 332.2, height: 59 } },
+      { id: 'build-wheel', anchor: FULL, bounds: { x: 239.7, y: 32.7, width: 318.5, height: 318.5 } },
+    ];
+    const found = exclusionViolations(before);
+    expect(found).toHaveLength(1);
+    expect(found[0]!.overlap.width).toBeCloseTo(318.5, 1);
+    // 42.2 from QA's ROUNDED rects; their own report says 42.3, which is what the
+    // same subtraction gives on the unrounded ones (351.27 − 309.0). Asserted on
+    // the numbers actually written down, so this stays checkable against the
+    // verdict rather than against a recomputation of it.
+    expect(found[0]!.overlap.height).toBeCloseTo(42.2, 1);
   });
 
   it('never collapses below a legible line, however crowded the screen', () => {
