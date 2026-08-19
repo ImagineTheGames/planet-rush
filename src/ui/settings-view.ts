@@ -44,6 +44,7 @@ import type { FrameMetrics, PlateState } from '../art/materials';
 import { PALETTE } from '@render/index';
 import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
 import { FONT_BODY, FONT_HEADING } from './typography';
+import { DISABLED_LABEL, DISABLED_LABEL_ALPHA } from './button-theme';
 import {
   SETTINGS_HELP_GLYPH,
   SETTINGS_ID,
@@ -305,6 +306,14 @@ export class SettingsView extends Container {
     nodes.label.text = row.label;
     nodes.label.style.fontSize = labelPx;
     nodes.label.style.letterSpacing = trackingPx(TRACKING.name, labelPx);
+    // A locked row's NAME dims with its value (a0-100b) — the whole control reads
+    // as unavailable, in the one vocabulary this directory already has for it
+    // ({@link ./button-theme}: a dim label IS the disabled look, and it is the
+    // only place the gray is allowed). Its `?` is deliberately left bright: the
+    // explanation is the one thing on the row that is still live, and it is where
+    // the reason for the lock lives (p4-03).
+    nodes.label.style.fill = row.disabled ? DISABLED_LABEL : MATERIAL_SHADES.bone;
+    nodes.label.alpha = row.disabled ? DISABLED_LABEL_ALPHA : 1;
     nodes.label.x = (help > 0 ? help : rect.x) + padX;
     nodes.label.y = rect.y + rect.height / 2;
 
@@ -334,7 +343,15 @@ export class SettingsView extends Container {
     nodes.value.text = row.value;
     nodes.value.style.fontSize = valuePx;
     nodes.value.style.letterSpacing = trackingPx(TRACKING.label, valuePx);
-    nodes.value.style.fill = row.on ? BONE.hi : MATERIAL_SHADES.bone;
+    // Three looks, one step apart each: ENGAGED (chalk on the brightest hairline),
+    // OFF (bone on the plain chip) and — since a0-100b — LOCKED, which is neither.
+    // A locked chip wears the button contract's own disabled tokens
+    // ({@link ./button-theme} `DISABLED`), because this screen is not inventing a
+    // second word for "you cannot press this": dim label, faint plate, no lit
+    // rule. That contract's one rule is that a control which CAN be pressed never
+    // borrows this costume — which is why nothing else on this screen wears it.
+    nodes.value.style.fill = row.disabled ? DISABLED_LABEL : row.on ? BONE.hi : MATERIAL_SHADES.bone;
+    nodes.value.alpha = row.disabled ? DISABLED_LABEL_ALPHA : 1;
 
     const padX = Math.max(8, Math.round(VALUE_CHIP.padX * m.plateScale));
     const rowPad = Math.max(8, Math.round(ROW.padX * m.plateScale));
@@ -344,7 +361,9 @@ export class SettingsView extends Container {
     const cx = rect.x + rect.width - chipW - rowPad;
     const cy = rect.y + (rect.height - chipH) / 2;
 
-    // The chip rides the row's own press sink, so the two move as one piece.
+    // The chip rides the row's own press sink, so the two move as one piece — and
+    // a locked row's `state` is always `rest` (the model's, not this file's
+    // decision), so the chip cannot sink under a press that does nothing.
     drawPlate(nodes.body, cx, cy, chipW, chipH, row.on ? 'inert' : 'secondary', 'chip', row.state);
 
     nodes.value.x = cx + chipW / 2;
