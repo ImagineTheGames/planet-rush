@@ -92,9 +92,14 @@ async function bootClient(
     undefined,
     { timeout: 60_000 },
   );
-  const box = await page.locator('canvas').boundingBox();
-  if (!box) throw new Error('no canvas bounding box');
+  // The canvas origin is re-read for EVERY press rather than cached at boot. On a
+  // touch profile the first PLAY enters fullscreen on the game root
+  // (`@platform/fullscreen`, the landscape lock's other half), and a box measured
+  // before that is a box from a different layout — which is how the first online
+  // run of this capture tapped CREATE and hit nothing on both phone profiles while
+  // the desktop walk sailed through.
   const press = async (p: { x: number; y: number }): Promise<void> => {
+    const box = (await page.locator('canvas').boundingBox()) ?? { x: 0, y: 0 };
     const x = box.x + p.x;
     const y = box.y + p.y;
     if (profile.touch) await page.touchscreen.tap(x, y);
@@ -132,6 +137,30 @@ async function pressDoor(client: Client, kind: string): Promise<void> {
   await client.press(point);
 }
 
+
+/** Wait for the lobby, and if it does not come, say what the front door was doing
+ *  instead. A bare timeout on `__lobby.visible` reports "the lobby never opened",
+ *  which is the one thing already known. */
+async function waitForLobby(page: Page, what: string): Promise<void> {
+  try {
+    await page.waitForFunction(
+      () => (window as never as { __lobby?: { visible: boolean } }).__lobby?.visible === true,
+      undefined,
+      { timeout: 90_000 },
+    );
+  } catch {
+    const seen = await page.evaluate(() => {
+      const seam = (window as never as {
+        __onlineMenu?: { visible: boolean; screen: string; status: string; error: string; title: string; code: string };
+      }).__onlineMenu;
+      return seam
+        ? { visible: seam.visible, screen: seam.screen, status: seam.status, error: seam.error, title: seam.title, code: seam.code }
+        : 'no __onlineMenu';
+    });
+    throw new Error(`${what}: the lobby never opened — the front door says ${JSON.stringify(seen)}`);
+  }
+}
+
 /** Host creates, guest joins, host starts: both clients in one live match. The
  *  same walk `disconnect-honesty.spec.ts` uses, through the real front door. */
 async function twoClientsInAMatch(
@@ -144,11 +173,7 @@ async function twoClientsInAMatch(
 
   await pressPlay(host);
   await pressDoor(host, 'create');
-  await host.page.waitForFunction(
-    () => (window as never as { __lobby?: { visible: boolean } }).__lobby?.visible === true,
-    undefined,
-    { timeout: 120_000 },
-  );
+  await waitForLobby(host.page, 'host CREATE');
   const code = await host.page.evaluate(() => (window as never as { __lobby: { room: string } }).__lobby.room);
 
   await pressPlay(guest);
@@ -164,11 +189,7 @@ async function twoClientsInAMatch(
   );
   for (const ch of code) await pressDoor(guest, `key:${ch}`);
   await pressDoor(guest, 'submit');
-  await guest.page.waitForFunction(
-    () => (window as never as { __lobby?: { visible: boolean } }).__lobby?.visible === true,
-    undefined,
-    { timeout: 120_000 },
-  );
+  await waitForLobby(guest.page, 'guest JOIN');
   await host.page.waitForFunction(
     () => (window as never as { __lobby?: { humanCount: number } }).__lobby?.humanCount === 2,
     undefined,

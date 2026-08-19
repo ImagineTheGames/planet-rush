@@ -1058,6 +1058,18 @@ export type {
 } from './pause-menu';
 
 export { PauseMenuView } from './pause-menu-view';
+export {
+  matchLogOffer,
+  screenClaimsTheDisplay,
+  sessionHasDropped,
+} from './log-offer';
+export type {
+  MatchGlassOwner,
+  MatchLogOfferReason,
+  MatchLogOfferState,
+  SessionLinkState,
+} from './log-offer';
+
 
 export {
   CONNECTION_STATUS_ID,

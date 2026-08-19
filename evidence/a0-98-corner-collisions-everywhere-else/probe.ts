@@ -248,24 +248,51 @@ export async function harvestCanvasControls(
   });
 }
 
-/** The DOM controls on screen right now, as **page points** — their own boxes'
- *  centres, straight off `getBoundingClientRect`. */
-export async function harvestDomControls(
+/**
+ * The DOM controls on screen right now, **measured and probed in the same turn**.
+ *
+ * One `evaluate`, not two, and that is a correctness fix rather than a saving. The
+ * CONNECTION LOST card ticks a grace countdown ON the RECONNECT button's own label
+ * (`src/net/link-loss` `reconnectLabel`), so the card re-renders about once a
+ * second and its buttons shift under a flex row as the label's width changes. A
+ * harvest-then-probe pass therefore reports the box from one layout and the
+ * topmost element from the next, and the first online run of this capture duly
+ * showed both of the card's buttons "covered" — by the card that contains them.
+ * Rect and hit-test have to come from the same frame or they are not about the
+ * same button.
+ */
+export async function harvestAndProbeDomControls(
   page: Page,
   ids: readonly string[] = DOM_CONTROL_IDS,
-): Promise<{ control: string; x: number; y: number; live: boolean; box: Box | null }[]> {
+): Promise<Omit<Cover, 'coveredFraction'>[]> {
   return page.evaluate((wanted) => {
-    const out: { control: string; x: number; y: number; live: boolean; box: Box | null }[] = [];
+    const out: Omit<Cover, 'coveredFraction'>[] = [];
     for (const id of wanted) {
       const el = document.getElementById(id);
       if (!el) continue;
       const r = el.getBoundingClientRect();
       if (r.width <= 0 || r.height <= 0) continue;
+      const x = r.x + r.width / 2;
+      const y = r.y + r.height / 2;
+      const hit = document.elementFromPoint(x, y);
+      let named = 'nothing';
+      if (hit) {
+        let owner = '';
+        for (let n: Element | null = hit; n; n = n.parentElement) {
+          if (n.id) {
+            owner = n.id;
+            break;
+          }
+        }
+        named = owner ? `${hit.tagName}#${owner}` : hit.tagName;
+      }
       out.push({
         control: `dom#${id}`,
-        x: r.x + r.width / 2,
-        y: r.y + r.height / 2,
+        page: { x: Math.round(x), y: Math.round(y) },
+        topmost: named,
         live: true,
+        onScreen: true,
+        collides: named.includes('playtest-download-log'),
         box: { x: r.x, y: r.y, width: r.width, height: r.height },
       });
     }
@@ -355,12 +382,11 @@ export async function sweepState(
     live: c.live,
     box: c.box ? { ...c.box, x: c.box.x + origin.x, y: c.box.y + origin.y } : null,
   }));
-  const dom = await harvestDomControls(page);
   const viewport = page.viewportSize() ?? { width: 0, height: 0 };
   const offer = await logBox(page);
   const offerBox = offer.mounted && offer.hidden === false ? (offer.rect ?? null) : null;
   const covers: Cover[] = [];
-  for (const c of [...canvas, ...dom]) {
+  for (const c of canvas) {
     const onScreen = c.x >= 0 && c.y >= 0 && c.x <= viewport.width && c.y <= viewport.height;
     const topmost = onScreen ? await topmostAt(page, c.x, c.y) : 'off-viewport';
     covers.push({
@@ -373,6 +399,10 @@ export async function sweepState(
       box: c.box,
       coveredFraction: c.box && offerBox ? overlapFraction(c.box, offerBox) : null,
     });
+  }
+  // The DOM half, rect and hit-test taken together (see the helper's note).
+  for (const d of await harvestAndProbeDomControls(page)) {
+    covers.push({ ...d, coveredFraction: d.box && offerBox ? overlapFraction(d.box, offerBox) : null });
   }
   return {
     state,

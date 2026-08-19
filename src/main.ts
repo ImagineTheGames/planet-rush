@@ -245,6 +245,7 @@ import {
   applyVolumes,
   SETTINGS_STORAGE,
   EndOfMatchView,
+  endOfMatchLayout,
   endOfMatchModel,
   buildSummary,
   summaryFrame,
@@ -317,6 +318,7 @@ import {
   pauseLayout,
   nextPauseScreen,
   isPauseOpen,
+  matchLogOffer,
   pauseAllowsDownloadLog,
   shouldFreezeSim,
   // Whether the bottom edge carries the controls strip — the one piece of screen
@@ -3511,7 +3513,10 @@ async function boot(): Promise<void> {
   }
 
   /**
-   * Offer DOWNLOAD LOG in the match, and only where the brief puts it (§2, §3):
+   * Offer DOWNLOAD LOG in the match, and only where the brief puts it (§2, §3) —
+   * which is to say **only where a screen, rather than the match, is claiming the
+   * display**. The whole of that decision is `src/ui/log-offer` `matchLogOffer`,
+   * pure and asserted in node; this function is the wire to it.
    *
    *   1. **A lost or losing connection first.** Online, `reconnecting` and `closed`
    *      are the two states a "it kept dropping" report is about, and the offer names
@@ -3522,33 +3527,52 @@ async function boot(): Promise<void> {
    *      is simply available there, and withdraws for anything layered over it
    *      (`src/ui/pause-menu` `pauseAllowsDownloadLog`).
    *
-   * Anything else hides it. During play the match owns the screen, and a floating
-   * button over the HUD would be exactly the kind of chrome the HUD budget refuses.
+   * ── WHAT a0-98 CHANGED, AND WHY IT IS A RESTORATION ─────────────────────────
+   * Rule 1 used to fire whatever was on screen, and the comment below this one
+   * used to end *"during play the match owns the screen"* while the code did the
+   * opposite: a networked match is never pausable, so the overlay is CLOSED for the
+   * whole of one, and a drop put a DOM button at the maximum z-index over a live
+   * HUD. At the point the client itself reports drawing the minimap (GDD §2.2,
+   * bottom-right), `document.elementFromPoint` on a 798x384 phone answers
+   * `BUTTON#playtest-download-log-button`: the map is a toggle, and a thumb
+   * reaching for it got a JSON file
+   * (`evidence/a0-98-corner-collisions-everywhere-else`).
+   *
+   * So the drop now has to be accompanied by a screen — the pause menu, or the
+   * CONNECTION LOST kick-out the drop itself raises (`src/net/link-loss-view`, a
+   * full-bleed scrim that takes every press). The player who needs the log has
+   * both: ESC opens pause on an online match too, and the card is up within
+   * `src/net/link-loss` `SILENCE_FLOOR_MS` of any real drop.
+   *
    * Called once per rendered frame from {@link syncPause}; a repeated identical offer
    * costs one comparison and no DOM work (`src/net/playtest-log-button`).
    */
   function syncDownloadLog(): void {
-    // A screen LAYERED OVER the pause menu draws its own controls into the corner
-    // this affordance pins itself to, so the offer withdraws for the whole of one
-    // (a0-97: DOWNLOAD LOG landed on the settings screen's DONE plate, and on a
-    // phone there is no Escape key to leave by instead). Ahead of the error branch
-    // and not after it: "nothing is drawn over DONE" is a property of the screen,
-    // and a dropped connection does not make it less true. The log stays one press
-    // away either way — DONE and STAY both step back to the menu, where the offer
-    // (pause's, or the disconnect's) is waiting.
-    if (!pauseAllowsDownloadLog(pauseScreen) || logOfferHeldByPress || performance.now() < logOfferHeldUntilMs) {
+    // The one thing that is not a placement question: a press that has just closed
+    // the screen the offer was standing on must not see it flicker back for a frame
+    // (a0-97's second commit).
+    if (logOfferHeldByPress || performance.now() < logOfferHeldUntilMs) {
       hideDownloadLog();
       return;
     }
-    const state = onlineSession?.state;
-    if (state === 'reconnecting' || state === 'closed') {
+    const state = onlineSession?.state ?? null;
+    // `linkLoss.status()` is as of the last `poll()`, which runs just AFTER this in
+    // the render frame — so the offer trails the kick-out card by one frame in both
+    // directions. Sixteen milliseconds late is the safe side of both edges: the
+    // offer never appears before the card that makes room for it.
+    const offer = matchLogOffer({
+      pauseScreen,
+      session: state,
+      glass: linkLoss !== null && linkLoss.status().phase !== 'live' ? 'kicked-out' : 'match',
+    });
+    if (offer === 'disconnect' && (state === 'reconnecting' || state === 'closed')) {
       showDownloadLog({
         reason: 'error',
         hint: disconnectOfferHint(state, onlineSession?.closeReason ?? null),
       });
       return;
     }
-    if (isPauseOpen(pauseScreen)) {
+    if (offer === 'pause') {
       showDownloadLog({ reason: 'pause' });
       return;
     }
@@ -6742,11 +6766,44 @@ async function boot(): Promise<void> {
           })),
         };
       },
+      /**
+       * The END-OF-MATCH overlay's own buttons, each with the physical point a
+       * real press must land on. Not in {@link read}'s `elements` because the
+       * overlay registers ONE rect with the layout registry — its content box
+       * (`@ui` end-of-match-view `describeLayout`) — and "the offer is somewhere
+       * inside a panel" is not the question. Which BUTTON is under it, is.
+       *
+       * Derived from the overlay's own pure layout (`endOfMatchLayout`, the same
+       * call the view makes), so it cannot report a plate the screen did not draw.
+       * Empty while the overlay is down.
+       */
+      endControls(): { kind: string; physicalCenter: { x: number; y: number }; physicalBounds: Rect }[] {
+        if (!endOverlay.visible) return [];
+        const model = endOfMatchModel(currentOutcome(endScreen === 'result'));
+        const ids = model.buttons.map((b) => b.id);
+        const l = endOfMatchLayout(
+          { width: transform.logicalWidth, height: transform.logicalHeight },
+          ids,
+          { isTouch },
+        );
+        return l.buttons.map((r, i) => ({
+          kind: ids[i] ?? 'button',
+          physicalCenter: physOf(r.x + r.width / 2, r.y + r.height / 2),
+          physicalBounds: physicalRect(r),
+        }));
+      },
       /** The online session's transport state and close reason — the two facts
        *  `syncDownloadLog` reads to decide whether the offer stands. Read-back
        *  only; nothing here can open, close or redial a socket. */
       session(): { state: string | null; closeReason: string | null } {
         return { state: onlineSession?.state ?? null, closeReason: onlineSession?.closeReason ?? null };
+      },
+      /** Whether the connection watchdog is RETIRED — the fact that makes the
+       *  end-of-match case different from every other drop. `matchEnd` retires it
+       *  (`src/net/session`), so a socket closing after the summary goes up raises
+       *  no CONNECTION LOST card, and the offer stands alone over the end screen. */
+      linkPhase(): string | null {
+        return linkLoss?.status().phase ?? null;
       },
     };
     try {
