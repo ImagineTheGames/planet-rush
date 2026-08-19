@@ -1,0 +1,316 @@
+{
+  "profile": "desktop 1280x800 (dpr 2, pointer) — the golden suite's control width",
+  "boot": "?debug=1 on the production bundle; openBuild(ore) per level, then a real press on TURRET",
+  "report": "developer, twice: (a) selection reached only the top segment, (b) a turret was buildable with 2 ore",
+  "turretCostPerSimConstants": 3,
+  "levels": [
+    {
+      "ore": 0,
+      "drawn": [
+        {
+          "label": "TURRET",
+          "sub": "YOUR STATION",
+          "costLabel": "3",
+          "cost": 3,
+          "costPaint": "refused",
+          "caps": "0 / 4 BUILT",
+          "ready": false,
+          "selected": false
+        },
+        {
+          "label": "SHIELD",
+          "sub": "YOUR STATION",
+          "costLabel": "5",
+          "cost": 5,
+          "costPaint": "refused",
+          "caps": "0 / 2 BUILT",
+          "ready": false,
+          "selected": false
+        },
+        {
+          "label": "RADAR",
+          "sub": "YOUR STATION",
+          "costLabel": "6",
+          "cost": 6,
+          "costPaint": "refused",
+          "caps": "0 / 1 BUILT",
+          "ready": false,
+          "selected": false
+        },
+        {
+          "label": "REPAIR REACTOR",
+          "sub": "REACTOR FULL",
+          "costLabel": "1",
+          "cost": 1,
+          "costPaint": "spent",
+          "caps": "",
+          "ready": false,
+          "selected": false
+        },
+        {
+          "label": "UPGRADE SHIP",
+          "sub": "YOUR SHIP",
+          "costLabel": "OPEN ▸",
+          "cost": null,
+          "costPaint": "none",
+          "caps": "",
+          "ready": true,
+          "selected": false
+        }
+      ],
+      "turretPress": {
+        "pressedAt": {
+          "x": 640,
+          "y": 262
+        },
+        "bankBefore": 0,
+        "bankAfter": 0,
+        "capsBefore": [
+          "0 / 4 BUILT",
+          "0 / 2 BUILT",
+          "0 / 1 BUILT",
+          "",
+          ""
+        ],
+        "capsAfter": [
+          "0 / 4 BUILT",
+          "0 / 2 BUILT",
+          "0 / 1 BUILT",
+          "",
+          ""
+        ]
+      }
+    },
+    {
+      "ore": 2,
+      "drawn": [
+        {
+          "label": "TURRET",
+          "sub": "YOUR STATION",
+          "costLabel": "3",
+          "cost": 3,
+          "costPaint": "refused",
+          "caps": "0 / 4 BUILT",
+          "ready": false,
+          "selected": true
+        },
+        {
+          "label": "SHIELD",
+          "sub": "YOUR STATION",
+          "costLabel": "5",
+          "cost": 5,
+          "costPaint": "refused",
+          "caps": "0 / 2 BUILT",
+          "ready": false,
+          "selected": false
+        },
+        {
+          "label": "RADAR",
+          "sub": "YOUR STATION",
+          "costLabel": "6",
+          "cost": 6,
+          "costPaint": "refused",
+          "caps": "0 / 1 BUILT",
+          "ready": false,
+          "selected": false
+        },
+        {
+          "label": "REPAIR REACTOR",
+          "sub": "REACTOR FULL",
+          "costLabel": "1",
+          "cost": 1,
+          "costPaint": "spent",
+          "caps": "",
+          "ready": false,
+          "selected": false
+        },
+        {
+          "label": "UPGRADE SHIP",
+          "sub": "YOUR SHIP",
+          "costLabel": "OPEN ▸",
+          "cost": null,
+          "costPaint": "none",
+          "caps": "",
+          "ready": true,
+          "selected": false
+        }
+      ],
+      "turretPress": {
+        "pressedAt": {
+          "x": 640,
+          "y": 262
+        },
+        "bankBefore": 2,
+        "bankAfter": 2,
+        "capsBefore": [
+          "0 / 4 BUILT",
+          "0 / 2 BUILT",
+          "0 / 1 BUILT",
+          "",
+          ""
+        ],
+        "capsAfter": [
+          "0 / 4 BUILT",
+          "0 / 2 BUILT",
+          "0 / 1 BUILT",
+          "",
+          ""
+        ]
+      }
+    },
+    {
+      "ore": 3,
+      "drawn": [
+        {
+          "label": "TURRET",
+          "sub": "YOUR STATION",
+          "costLabel": "3",
+          "cost": 3,
+          "costPaint": "ore",
+          "caps": "0 / 4 BUILT",
+          "ready": true,
+          "selected": true
+        },
+        {
+          "label": "SHIELD",
+          "sub": "YOUR STATION",
+          "costLabel": "5",
+          "cost": 5,
+          "costPaint": "refused",
+          "caps": "0 / 2 BUILT",
+          "ready": false,
+          "selected": false
+        },
+        {
+          "label": "RADAR",
+          "sub": "YOUR STATION",
+          "costLabel": "6",
+          "cost": 6,
+          "costPaint": "refused",
+          "caps": "0 / 1 BUILT",
+          "ready": false,
+          "selected": false
+        },
+        {
+          "label": "REPAIR REACTOR",
+          "sub": "REACTOR FULL",
+          "costLabel": "1",
+          "cost": 1,
+          "costPaint": "spent",
+          "caps": "",
+          "ready": false,
+          "selected": false
+        },
+        {
+          "label": "UPGRADE SHIP",
+          "sub": "YOUR SHIP",
+          "costLabel": "OPEN ▸",
+          "cost": null,
+          "costPaint": "none",
+          "caps": "",
+          "ready": true,
+          "selected": false
+        }
+      ],
+      "turretPress": {
+        "pressedAt": {
+          "x": 640,
+          "y": 262
+        },
+        "bankBefore": 3,
+        "bankAfter": 0,
+        "capsBefore": [
+          "0 / 4 BUILT",
+          "0 / 2 BUILT",
+          "0 / 1 BUILT",
+          "",
+          ""
+        ],
+        "capsAfter": [
+          "1 / 4 BUILT",
+          "0 / 2 BUILT",
+          "0 / 1 BUILT",
+          "",
+          ""
+        ]
+      }
+    },
+    {
+      "ore": 6,
+      "drawn": [
+        {
+          "label": "TURRET",
+          "sub": "YOUR STATION",
+          "costLabel": "3",
+          "cost": 3,
+          "costPaint": "ore",
+          "caps": "1 / 4 BUILT",
+          "ready": true,
+          "selected": true
+        },
+        {
+          "label": "SHIELD",
+          "sub": "YOUR STATION",
+          "costLabel": "5",
+          "cost": 5,
+          "costPaint": "ore",
+          "caps": "0 / 2 BUILT",
+          "ready": true,
+          "selected": false
+        },
+        {
+          "label": "RADAR",
+          "sub": "YOUR STATION",
+          "costLabel": "6",
+          "cost": 6,
+          "costPaint": "ore",
+          "caps": "0 / 1 BUILT",
+          "ready": true,
+          "selected": false
+        },
+        {
+          "label": "REPAIR REACTOR",
+          "sub": "REACTOR FULL",
+          "costLabel": "1",
+          "cost": 1,
+          "costPaint": "spent",
+          "caps": "",
+          "ready": false,
+          "selected": false
+        },
+        {
+          "label": "UPGRADE SHIP",
+          "sub": "YOUR SHIP",
+          "costLabel": "OPEN ▸",
+          "cost": null,
+          "costPaint": "none",
+          "caps": "",
+          "ready": true,
+          "selected": false
+        }
+      ],
+      "turretPress": {
+        "pressedAt": {
+          "x": 640,
+          "y": 262
+        },
+        "bankBefore": 6,
+        "bankAfter": 3,
+        "capsBefore": [
+          "1 / 4 BUILT",
+          "0 / 2 BUILT",
+          "0 / 1 BUILT",
+          "",
+          ""
+        ],
+        "capsAfter": [
+          "2 / 4 BUILT",
+          "0 / 2 BUILT",
+          "0 / 1 BUILT",
+          "",
+          ""
+        ]
+      }
+    }
+  ]
+}

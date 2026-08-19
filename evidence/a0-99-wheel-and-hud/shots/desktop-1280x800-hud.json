@@ -1,0 +1,66 @@
+{
+  "profile": "desktop 1280x800 (dpr 2, pointer) — the golden suite's control width",
+  "boot": "front door: /?gate=0 → PLAY → PLAY SOLO → RUSH (no ?debug=1)",
+  "atRest": {
+    "screen": "closed",
+    "open": false,
+    "pausable": true,
+    "frozen": false,
+    "simTicks": 421,
+    "online": false,
+    "ship": {
+      "x": 1968,
+      "y": 1200,
+      "vx": 0,
+      "vy": 0
+    },
+    "controls": [],
+    "buttonPoint": {
+      "x": 96,
+      "y": 40
+    }
+  },
+  "midFight": {
+    "screen": "closed",
+    "open": false,
+    "pausable": true,
+    "frozen": false,
+    "simTicks": 1081,
+    "online": false,
+    "ship": {
+      "x": 2384,
+      "y": 804.8605090602723,
+      "vx": 0,
+      "vy": -0.47024345367085535
+    },
+    "controls": [],
+    "buttonPoint": {
+      "x": 96,
+      "y": 40
+    }
+  },
+  "shipMoved": {
+    "dx": 416,
+    "dy": -395.1
+  },
+  "pausePress": {
+    "kind": "real Escape",
+    "at": null,
+    "clientReportedButtonCentre": {
+      "x": 96,
+      "y": 40
+    },
+    "topmostAtPause": {
+      "tag": "canvas",
+      "id": "",
+      "cls": "",
+      "text": "",
+      "zIndex": "auto",
+      "isCanvas": true
+    },
+    "screenBefore": "closed",
+    "screenAfter": "menu",
+    "frozenAfter": true
+  },
+  "downloads": []
+}

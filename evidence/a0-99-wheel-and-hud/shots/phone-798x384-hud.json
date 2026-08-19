@@ -1,0 +1,69 @@
+{
+  "profile": "phone landscape 798x384 (dpr 2, touch) — the developer's own screenshot size",
+  "boot": "front door: /?gate=0 → PLAY → PLAY SOLO → RUSH (no ?debug=1)",
+  "atRest": {
+    "screen": "closed",
+    "open": false,
+    "pausable": true,
+    "frozen": false,
+    "simTicks": 249,
+    "online": false,
+    "ship": {
+      "x": 1968,
+      "y": 1200,
+      "vx": 0,
+      "vy": 0
+    },
+    "controls": [],
+    "buttonPoint": {
+      "x": 96,
+      "y": 40
+    }
+  },
+  "midFight": {
+    "screen": "closed",
+    "open": false,
+    "pausable": true,
+    "frozen": false,
+    "simTicks": 1094,
+    "online": false,
+    "ship": {
+      "x": 2384,
+      "y": 846.9060227309388,
+      "vx": 0,
+      "vy": -0.0036495774882139708
+    },
+    "controls": [],
+    "buttonPoint": {
+      "x": 96,
+      "y": 40
+    }
+  },
+  "shipMoved": {
+    "dx": 416,
+    "dy": -353.1
+  },
+  "pausePress": {
+    "kind": "tap on the corner pause button",
+    "at": {
+      "x": 96,
+      "y": 40
+    },
+    "clientReportedButtonCentre": {
+      "x": 96,
+      "y": 40
+    },
+    "topmostAtPause": {
+      "tag": "canvas",
+      "id": "",
+      "cls": "",
+      "text": "",
+      "zIndex": "auto",
+      "isCanvas": true
+    },
+    "screenBefore": "closed",
+    "screenAfter": "menu",
+    "frozenAfter": true
+  },
+  "downloads": []
+}
