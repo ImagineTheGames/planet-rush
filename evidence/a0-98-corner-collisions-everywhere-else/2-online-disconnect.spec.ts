@@ -326,7 +326,13 @@ async function pressTheCoveredControl(
     () => document.getElementById('playtest-download-log-button')?.textContent ?? null,
   );
 
+  const pauseScreen = await page.evaluate(
+    () => (window as never as { __pauseStage?: { read(): { screen: string } } }).__pauseStage?.read().screen ?? null,
+  );
   return {
+    // Which corner this press was actually aimed at: the MATCH's, or a screen's.
+    // Without it a proof taken with the overlay still up reads like a failed fix.
+    pauseScreen,
     pressedAt: { x: Math.round(at.x), y: Math.round(at.y) },
     topmostAtThatPoint: topmost,
     minimapBefore: before,
@@ -414,9 +420,29 @@ for (const profile of PROFILES) {
       await host.page.waitForTimeout(700);
       await record('online-match-dropped-pause-menu');
 
-      // Back out, so the press proof below still measures the match's own corner.
-      if (profile.touch) await host.press(pauseAt);
+      // Back out on RESUME, not on the corner button. The corner button is drawn
+      // only while the match owns the screen (`pauseButtonVisible` gates on
+      // `pauseAvailable`), so once the overlay is up a second press at its old point
+      // lands on the overlay's own backdrop and is swallowed — which left the press
+      // proof below measuring a corner the PAUSE MENU legitimately owned, and
+      // reporting a download as if the fix had not worked.
+      const resumeAt = await host.page.evaluate(
+        () =>
+          (window as never as {
+            __pauseStage: { read(): { controls: { kind: string; physicalCenter: { x: number; y: number } }[] } };
+          }).__pauseStage.read().controls.find((c) => c.kind === 'resume')?.physicalCenter ?? null,
+      );
+      if (resumeAt) await host.press(resumeAt);
       else await host.page.keyboard.press('Escape');
+      await host.page
+        .waitForFunction(
+          () => (window as never as { __pauseStage: { read(): { screen: string } } }).__pauseStage.read().screen === 'closed',
+          undefined,
+          { timeout: 20_000 },
+        )
+        .catch(() => {
+          /* the press proof records `pauseScreen` either way */
+        });
       await host.page.waitForTimeout(700);
 
       // --- 4. The guest, whose wire never moved, is the control. -------------
