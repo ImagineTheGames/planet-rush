@@ -310,26 +310,59 @@ export type SettingsHelp = CodexHint;
  * other half, walking {@link SETTINGS_ROWS} so a row whose copy is present but
  * empty — or whose title has drifted from the label on the plate — fails too.
  *
- * **Every entry takes the device** (a0-87), even the five that ignore it. The
- * CONTROLS row has to — see below — and one uniform shape means the next row
- * that needs the device can take it without moving this register or its gate.
+ * **Every entry takes the device and the scheme**, even the ones that ignore
+ * both. CONTROLS has to know the device (a0-87) and FIRE MODE has to know the
+ * scheme (a0-89) — and one uniform shape means the next row that needs either
+ * can take it without moving this register or its gate.
  *
  * The voice is GDD §4.7 register 2 and `docs/voice.md`: say what the control
  * does, in the player's words, and stop. What a row does NOT cover, and what
  * happens at the ends of its range, are not this screen's business — a player
  * moving a slider is not auditing the mixer.
  */
-export const SETTINGS_HELP: Record<SettingsRowKey, (device: DeviceKind) => SettingsHelp> = {
-  // GDD §2.4 "Fire modes". The one thing that differs between the two is who
-  // aims; the one thing a player would otherwise get wrong is assuming AUTO-AIM
-  // also pulls the trigger ("the player decides *when* to fire"), so that is the
-  // third sentence and there is no fourth. The old copy named "your mouse, stick
-  // or thumb" — three devices, two of them wrong for whoever is reading (a0-87).
-  fireMode: () => ({
-    title: 'FIRE MODE',
-    summary: 'AUTO-AIM locks the nearest target and leads it. MANUAL leaves the aim to you. Either way, you choose when to fire.',
-    badges: [],
-  }),
+export const SETTINGS_HELP: Record<
+  SettingsRowKey,
+  (device: DeviceKind, scheme: ControlScheme) => SettingsHelp
+> = {
+  // GDD §2.4 "Fire modes" — and THE SCHEME SEAM, for the same reason CONTROLS
+  // needs the device seam (a0-89).
+  //
+  // This row used to end "Either way, you choose when to fire." That was checked
+  // against the sim, where it is true: `fireShip()` (`src/sim/step.ts`) needs
+  // `intent.fire` in both modes, and auto-aim only moves where the shot goes.
+  // But the player is not at the sim layer. Under TAP COMMANDER — the default
+  // scheme on every platform since 2026-08-12, and what the report came from —
+  // `TapPilot` writes `fire` ITSELF and `main.ts` hands it straight to the sim:
+  // the game shoots, and the panel told the player they were deciding
+  // (developer, 2026-08-18: *"with auto aim it literally fires for you"*).
+  //
+  // So the copy branches on the scheme, and each branch says the one thing that
+  // is true where the player is standing:
+  //
+  //   sticks   the row is live, and it changes AIMING only — firing stays the
+  //            player's, which is what "while you fire" carries without ever
+  //            naming a device's fire control (`describeBindings` owns those).
+  //   tap      the pilot aims and fires; `main.ts` overrides this row's value
+  //            per frame with its own `tapMode`, so the setting changes nothing
+  //            until the player switches CONTROLS. Saying so is the only thing
+  //            that alters what they do next.
+  //
+  // The row is still called FIRE MODE, and the values are still AUTO-AIM and
+  // MANUAL: GDD §4.7 lists all three under "fixed strings the voice does not get
+  // to revisit". The name IS wrong — it names firing, and this row controls
+  // aiming — but correcting it is a ratification, not a copy pass (see the PR).
+  fireMode: (_device, scheme) =>
+    scheme === 'tap'
+      ? {
+          title: 'FIRE MODE',
+          summary: `${TAP_COMMANDER_LABEL} aims and fires for you. Switch CONTROLS to aim yourself.`,
+          badges: [],
+        }
+      : {
+          title: 'FIRE MODE',
+          summary: 'AUTO-AIM locks the nearest target and leads it while you fire. MANUAL leaves the aim to you.',
+          badges: [],
+        },
   // THE u8-01 SEAM, used for the words and not just the pill (a0-87).
   //
   // This row already knows the device: the value chip beside the `?` prints
@@ -377,16 +410,22 @@ export const SETTINGS_HELP: Record<SettingsRowKey, (device: DeviceKind) => Setti
 };
 
 /**
- * The explanation for one row, for the device in front of the player.
+ * The explanation for one row, for the device AND the scheme in front of the
+ * player.
  *
  * Total: every key in the union has copy, and the union is derived from the row
- * spec, so this cannot return undefined. `device` is required for the same
- * reason {@link settingsModel} requires it — a caller that forgets it would
- * print a confident sentence about hardware the player does not have, which is
- * the whole of u8-01.
+ * spec, so this cannot return undefined. Both arguments are required for the
+ * same reason {@link settingsModel} requires them — a caller that forgot the
+ * device would print a confident sentence about hardware the player does not
+ * have (u8-01), and a caller that forgot the scheme would print one about a
+ * control scheme they are not in (a0-89, where that sentence was false).
  */
-export function settingsHelp(spec: SettingsRowSpec, device: DeviceKind): SettingsHelp {
-  return SETTINGS_HELP[settingsRowKey(spec)](device);
+export function settingsHelp(
+  spec: SettingsRowSpec,
+  device: DeviceKind,
+  scheme: ControlScheme,
+): SettingsHelp {
+  return SETTINGS_HELP[settingsRowKey(spec)](device, scheme);
 }
 
 /**
@@ -621,7 +660,7 @@ export function settingsModel(
     // show one explanation while the seam reports another.
     openHelp:
       openIndex !== null && SETTINGS_ROWS[openIndex]
-        ? { index: openIndex, hint: settingsHelp(SETTINGS_ROWS[openIndex], device) }
+        ? { index: openIndex, hint: settingsHelp(SETTINGS_ROWS[openIndex], device, controlScheme) }
         : null,
   };
 }
