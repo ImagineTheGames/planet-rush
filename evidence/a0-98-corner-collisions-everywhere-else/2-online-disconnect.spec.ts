@@ -285,8 +285,22 @@ async function pressTheCoveredControl(
       return map ? { ...map.physicalBounds } : null;
     });
 
+  /** Everything the frame drew, so an `after` that lost the minimap can say why
+   *  rather than reading as a silent null. A match torn down between the two reads
+   *  registers nothing at all, and that is a different fact from a map that moved. */
+  const drawn = async (): Promise<string[]> =>
+    page.evaluate(() => {
+      const seam = (window as never as { __cornerStage?: { read(): { elements: { id: string }[] } } }).__cornerStage;
+      try {
+        return (seam?.read().elements ?? []).map((e) => e.id);
+      } catch {
+        return ['<the corner seam could not read this frame>'];
+      }
+    });
+
+  const drawnBefore = await drawn();
   const before = await read();
-  if (!before) return { pressed: null, before, after: null, downloads, note: 'the client drew no minimap this frame' };
+  if (!before) return { pressed: null, before, after: null, downloads, drawnBefore, note: 'the client drew no minimap this frame' };
 
   const box = await page.locator('canvas').boundingBox();
   const at = {
@@ -314,6 +328,8 @@ async function pressTheCoveredControl(
     minimapToggled: !!after && (after.width !== before.width || after.height !== before.height),
     logLabelBefore,
     logLabelAfter,
+    drawnBefore,
+    drawnAfter: await drawn(),
     downloads,
   };
 }
