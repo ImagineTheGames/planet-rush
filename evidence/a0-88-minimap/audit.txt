@@ -314,3 +314,81 @@ evidence spec, before half          8 passed
      Duration  7.70s (transform 608ms, setup 0ms, collect 6.15s, tests 15ms, environment 0ms, prepare 968ms)
   
 
+
+
+8. THE CI RED, AND WHY THE UNION HAD TO BE PHASE-LOCKED
+------------------------------------------------------------------------------
+PR #463 came back red on shard 2/6. Not a golden, and not one of this brief's
+tests: `tests/mobile/team-fog-offline.spec.ts:510` (QA's, desktop only), which
+asserts that no pixel the human could see ALONE goes dark when they gain
+teammates — "the team read is a UNION". It expected `ffaOnly` to be 0 and got 2.
+
+DIAGNOSED OFF THE ARTIFACT, NOT GUESSED. The shard-2 report was pulled
+(`gh api .../actions/artifacts/9348745854/zip`), and the spec's own `comparePair`
+re-run in python over its `expanded` rect (360,100,560x560) against the attached
+TEAMS/FFA frames. That named the two pixels:
+
+  pixel      FFA (alone)              TEAMS (with allies)
+  (864,266)  rgb(19,31,41) lum 29.17  rgb(13,16,21) lum 15.72
+  (891,281)  rgb(19,31,41) lum 29.17  rgb(13,16,21) lum 15.72
+                    ^ threshold is 26          ^ bare fog
+
+An ASCII dump of a 46x25 neighbourhood in both frames puts the boundary arc in
+EXACTLY the same place. Only the anti-aliased outer fringe flickers. So the
+union had not shrunk — the geometry was right and the arithmetic was wrong.
+
+THE DEFECT. `tessellate()` spaced its vertices along each free ARC:
+`from + sweep*k/steps`. Every chord of a polygonised arc sits a sagitta inside
+the true arc, so the drawn edge's exact position depends on chord PHASE. When an
+ally's disc clips one side of the human's rim, that free arc's `from` moves, and
+every chord all the way round re-phases with it — including along the stretch of
+rim the ally never reached. The 1 px edge line slides a fraction of a pixel down
+boundary that never moved, and its AA fringe drops back under the "lit?"
+threshold wherever it was already marginal. Two pixels were marginal.
+
+THE FIX. `arcStep(radius)` -> `arcSteps(radius)`, a COUNT around the whole
+circle, a function of the radius ALONE and never of the arc being drawn.
+`tessellate` now emits `from`, then the strictly-interior grid angles
+`k*TAU/arcSteps(r)` anchored at angle 0 in the disc's OWN frame, then `to`.
+Vertex density is unchanged (16..256 steps, 1.5 px chord target). An untouched
+stretch of rim now tessellates to the same points however the rest of the circle
+is carved up, so shared boundary renders identically and only genuinely-moved
+boundary moves.
+
+REJECTED: a circumscribing polygon (push each vertex out by 1/cos(step/2)).
+It would also have made the union a superset of the true discs and so also
+turned the red green, but it makes the wash claim ~0.01 px of arena nobody
+senses. The wash means *sensed*; over-claiming is the wrong direction (GDD §2.2).
+Phase-locking fixes the actual defect without moving the boundary outward at all.
+
+THE TEST, RED FIRST. `gaining an ally does not move a stretch of rim the ally
+never reached` (84 in the file) puts a teammate a quarter-turn away from the
+stretch it watches and compares the drawn vertices on that stretch.
+
+  $ git checkout src/ui/minimap.ts    # back to the arc-relative tessellate
+  $ npx vitest run src/ui/minimap.test.ts -t 'gaining an ally'
+   ❯ src/ui/minimap.test.ts:961:31
+      959|     const before = westRim(alone);
+      960|     expect(before.length).toBeGreaterThan(4); // the stretch really is…
+      961|     expect(westRim(withAlly)).toEqual(before); // …and drawn to the sa…
+         |                               ^
+   Test Files  1 failed (1)
+        Tests  1 failed | 83 skipped (84)
+
+  (with the fix restored: 84 passed)
+
+GATES, RE-RUN WHOLE AFTER THE FIX
+npx tsc --noEmit                    clean
+npm test -- --run                   312 files, 5756 tests, all green
+                                    (src/ui/minimap.test.ts: 84)
+team-fog-offline.spec.ts, desktop   2 passed — including :510, the CI red
+goldens at the SHIPPED 0.01,
+own build, private port 4288        50 passed, 100 skipped — NO re-baseline
+
+NO GOLDEN WAS RE-BASELINED FOR THIS FIX, and that was predicted before the run
+rather than discovered by it: the change moves only AA fringe along the sensed
+boundary, a few hundred px in a 1.02 M-px frame (~0.03%), well inside the
+shipped `maxDiffPixelRatio` of 0.01. The 19 baselines adopted in §5 stand
+unchanged. The frames in §1 are unaffected — the phase question needs two
+overlapping sensors on the same rim, and re-capture would only have re-rendered
+identical pixels.
