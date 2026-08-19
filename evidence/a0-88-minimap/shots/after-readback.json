@@ -1,0 +1,66 @@
+{
+  "label": "after",
+  "viewport": {
+    "width": 798,
+    "height": 384
+  },
+  "dpr": 3,
+  "underway-2x": {
+    "drawn": {
+      "expanded": false,
+      "rect": {
+        "x": 586,
+        "y": 292,
+        "width": 80,
+        "height": 80
+      },
+      "ownDot": {
+        "x": 620.0518316146714,
+        "y": 336.4698438174768
+      },
+      "stationCount": 2,
+      "shipCount": 1,
+      "oreCount": 48,
+      "satelliteCount": 0,
+      "coverageCount": 2,
+      "collapseRing": false
+    },
+    "clip": {
+      "x": 582,
+      "y": 288,
+      "width": 88,
+      "height": 88
+    }
+  },
+  "flown": {
+    "atCollapsedShot": 955.8973737301769,
+    "atExpandedShot": 955.8973737301769
+  },
+  "underway-expanded-2x": {
+    "drawn": {
+      "expanded": true,
+      "rect": {
+        "x": 264.6,
+        "y": 26.880000000000024,
+        "width": 268.79999999999995,
+        "height": 268.79999999999995
+      },
+      "ownDot": {
+        "x": 379.0141542192632,
+        "y": 176.29867522788206
+      },
+      "stationCount": 2,
+      "shipCount": 2,
+      "oreCount": 47,
+      "satelliteCount": 0,
+      "coverageCount": 2,
+      "collapseRing": false
+    },
+    "clip": {
+      "x": 260.6,
+      "y": 22.880000000000024,
+      "width": 276.79999999999995,
+      "height": 276.79999999999995
+    }
+  }
+}
