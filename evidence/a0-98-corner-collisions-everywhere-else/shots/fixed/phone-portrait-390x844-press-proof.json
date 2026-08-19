@@ -1,0 +1,52 @@
+{
+  "stage": "fixed",
+  "profile": "phone-portrait-390x844",
+  "pauseScreen": "closed",
+  "pressedAt": {
+    "x": 52,
+    "y": 672
+  },
+  "topmostAtThatPoint": "CANVAS#app",
+  "minimapBefore": {
+    "id": "minimap",
+    "x": 12.000000000000057,
+    "y": 632,
+    "width": 80,
+    "height": 80
+  },
+  "minimapAfter": {
+    "id": "minimap-expanded",
+    "x": 89.69999999999999,
+    "y": 285.5,
+    "width": 273.00000000000006,
+    "height": 273
+  },
+  "minimapToggled": true,
+  "logLabelBefore": "DOWNLOAD LOG",
+  "logLabelAfter": "DOWNLOAD LOG",
+  "drawnBefore": [
+    "ship-local",
+    "build-button",
+    "build-badge",
+    "pause-button",
+    "ore-hud",
+    "banked-total",
+    "station-hp",
+    "zoom-control",
+    "nameplates",
+    "minimap"
+  ],
+  "drawnAfter": [
+    "ship-local",
+    "build-button",
+    "build-badge",
+    "pause-button",
+    "ore-hud",
+    "banked-total",
+    "station-hp",
+    "zoom-control",
+    "nameplates",
+    "minimap-expanded"
+  ],
+  "downloads": []
+}

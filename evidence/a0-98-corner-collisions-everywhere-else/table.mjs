@@ -30,6 +30,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isPressable } from './pressable.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const stage = process.argv[2] ?? 'broken';
@@ -42,12 +43,17 @@ const box = (r) =>
 const offerOf = (log) =>
   !log?.mounted ? 'never mounted' : log.hidden ? 'mounted, **withdrawn**' : `**SHOWN** ${box(log.rect)}`;
 
+const covered = (c) => c.topmost.includes('playtest-download-log');
+
 const verdictOf = (c) => {
-  if (c.collides) return '**COLLISION**';
+  // A collision is the offer topmost at the point of something a press REACHES —
+  // `./pressable.mjs`, which is `main.ts`'s own `pointerdown` order written down.
+  if (covered(c) && isPressable(c)) return '**COLLISION**';
   // `nothing` is what `elementFromPoint` answers outside the viewport, and a cell the
   // probe could not reach is not a cell that came back clear.
   if (!c.onScreen || c.topmost === 'nothing' || c.topmost === 'off-viewport') return 'not probed — off-viewport';
-  if (!c.live) return 'covered, but nothing routes a press here';
+  if (covered(c)) return 'covered — but a readout, not a control';
+  if (!isPressable(c)) return 'clear (readout, not a control)';
   return 'clear';
 };
 
@@ -73,7 +79,7 @@ for (const f of readdirSync(dir).filter((n) => n.endsWith('-report.json')).sort(
         r.state,
         r.profile,
         offer,
-        `\`${c.control}\`${c.live ? '' : ' *(drawn, not live)*'} @ ${c.page.x},${c.page.y}`,
+        `\`${c.control}\`${isPressable(c) ? '' : ' *(drawn, not pressable)*'} @ ${c.page.x},${c.page.y}`,
         `\`${c.topmost}\`${c.coveredFraction ? ` · ${Math.round(c.coveredFraction * 100)}% under the offer` : ''}`,
         verdictOf(c),
       ]);

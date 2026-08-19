@@ -1,0 +1,1222 @@
+{
+  "stage": "broken",
+  "profile": "phone-portrait-390x844",
+  "reports": [
+    {
+      "state": "online-match-live",
+      "profile": "phone-portrait-390x844",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "dpr": 3,
+        "touch": true
+      },
+      "log": {
+        "mounted": false
+      },
+      "controls": [
+        {
+          "control": "__cornerStage.elements[0]<ship-local>",
+          "page": {
+            "x": 195,
+            "y": 422
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 179,
+            "y": 406,
+            "width": 32,
+            "height": 32
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__cornerStage.elements[1]<build-button>",
+          "page": {
+            "x": 212,
+            "y": 92
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 174,
+            "y": 54,
+            "width": 76,
+            "height": 76
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__cornerStage.elements[2]<build-badge>",
+          "page": {
+            "x": 15,
+            "y": 101
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 8,
+            "y": 8,
+            "width": 13,
+            "height": 186.78515625
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__cornerStage.elements[3]<pause-button>",
+          "page": {
+            "x": 350,
+            "y": 96
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 326,
+            "y": 72,
+            "width": 48,
+            "height": 48
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__cornerStage.elements[4]<ore-hud>",
+          "page": {
+            "x": 354,
+            "y": 39
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 333,
+            "y": 16,
+            "width": 41,
+            "height": 45.72
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__cornerStage.elements[5]<banked-total>",
+          "page": {
+            "x": 353,
+            "y": 21
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 342,
+            "y": 16,
+            "width": 21,
+            "height": 10
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__cornerStage.elements[6]<station-hp>",
+          "page": {
+            "x": 355,
+            "y": 751
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 335.00000000000006,
+            "y": 674,
+            "width": 39,
+            "height": 154.5
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__cornerStage.elements[7]<zoom-control>",
+          "page": {
+            "x": 305,
+            "y": 796
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 281.00000000000006,
+            "y": 764,
+            "width": 48,
+            "height": 64
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__cornerStage.elements[8]<nameplates>",
+          "page": {
+            "x": 275,
+            "y": 518
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 267,
+            "y": 505.3,
+            "width": 16,
+            "height": 25.400000000000034
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__cornerStage.elements[9]<minimap>",
+          "page": {
+            "x": 52,
+            "y": 672
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 12.000000000000057,
+            "y": 632,
+            "width": 80,
+            "height": 80
+          },
+          "coveredFraction": null
+        }
+      ],
+      "collisions": [],
+      "coveredButDead": [],
+      "context": {
+        "session": {
+          "state": "open",
+          "closeReason": null
+        },
+        "pauseScreen": "closed",
+        "online": true,
+        "linkLossCard": null
+      }
+    },
+    {
+      "state": "online-match-severed",
+      "profile": "phone-portrait-390x844",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "dpr": 3,
+        "touch": true
+      },
+      "log": {
+        "mounted": true,
+        "hidden": false,
+        "rect": {
+          "x": 12,
+          "y": 571.40625,
+          "width": 78.96875,
+          "height": 260.59375
+        },
+        "label": "DOWNLOAD LOG",
+        "hint": "Reconnecting — DOWNLOAD LOG to report this."
+      },
+      "controls": [
+        {
+          "control": "__cornerStage.elements[0]<ship-local>",
+          "page": {
+            "x": 195,
+            "y": 422
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 179,
+            "y": 406,
+            "width": 32,
+            "height": 32
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[1]<build-button>",
+          "page": {
+            "x": 212,
+            "y": 92
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 174,
+            "y": 54,
+            "width": 76,
+            "height": 76
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[2]<build-badge>",
+          "page": {
+            "x": 15,
+            "y": 101
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 8,
+            "y": 8,
+            "width": 13,
+            "height": 186.78515625
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[3]<pause-button>",
+          "page": {
+            "x": 350,
+            "y": 96
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 326,
+            "y": 72,
+            "width": 48,
+            "height": 48
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[4]<ore-hud>",
+          "page": {
+            "x": 354,
+            "y": 39
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 333,
+            "y": 16,
+            "width": 41,
+            "height": 45.72
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[5]<banked-total>",
+          "page": {
+            "x": 353,
+            "y": 21
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 342,
+            "y": 16,
+            "width": 21,
+            "height": 10
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[6]<station-hp>",
+          "page": {
+            "x": 355,
+            "y": 751
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 335.00000000000006,
+            "y": 674,
+            "width": 39,
+            "height": 154.5
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[7]<zoom-control>",
+          "page": {
+            "x": 305,
+            "y": 796
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 281.00000000000006,
+            "y": 764,
+            "width": 48,
+            "height": 64
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[8]<nameplates>",
+          "page": {
+            "x": 275,
+            "y": 518
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 267,
+            "y": 505.3,
+            "width": 16,
+            "height": 25.400000000000034
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[9]<minimap>",
+          "page": {
+            "x": 52,
+            "y": 672
+          },
+          "topmost": "BUTTON#playtest-download-log-button",
+          "live": true,
+          "onScreen": true,
+          "collides": true,
+          "box": {
+            "x": 12.000000000000057,
+            "y": 632,
+            "width": 80,
+            "height": 80
+          },
+          "coveredFraction": 0.99
+        },
+        {
+          "control": "dom#pr-link-loss-reconnect",
+          "page": {
+            "x": 195,
+            "y": 433
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 108.09375,
+            "y": 411.0625,
+            "width": 173.796875,
+            "height": 44
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "dom#pr-link-loss-abandon",
+          "page": {
+            "x": 195,
+            "y": 487
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 106.59375,
+            "y": 464.65625,
+            "width": 176.796875,
+            "height": 44
+          },
+          "coveredFraction": 0
+        }
+      ],
+      "collisions": [
+        {
+          "control": "__cornerStage.elements[9]<minimap>",
+          "page": {
+            "x": 52,
+            "y": 672
+          },
+          "topmost": "BUTTON#playtest-download-log-button",
+          "live": true,
+          "onScreen": true,
+          "collides": true,
+          "box": {
+            "x": 12.000000000000057,
+            "y": 632,
+            "width": 80,
+            "height": 80
+          },
+          "coveredFraction": 0.99
+        }
+      ],
+      "coveredButDead": [],
+      "context": {
+        "session": {
+          "state": "reconnecting",
+          "closeReason": null
+        },
+        "pauseScreen": "closed",
+        "online": true,
+        "linkLossCard": {
+          "hidden": false,
+          "title": "RECONNECTING…"
+        }
+      }
+    },
+    {
+      "state": "online-match-kicked-out",
+      "profile": "phone-portrait-390x844",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "dpr": 3,
+        "touch": true
+      },
+      "log": {
+        "mounted": true,
+        "hidden": false,
+        "rect": {
+          "x": 12,
+          "y": 571.40625,
+          "width": 78.96875,
+          "height": 260.59375
+        },
+        "label": "DOWNLOAD LOG",
+        "hint": "Reconnecting — DOWNLOAD LOG to report this."
+      },
+      "controls": [
+        {
+          "control": "__cornerStage.elements[0]<ship-local>",
+          "page": {
+            "x": 195,
+            "y": 422
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 179,
+            "y": 406,
+            "width": 32,
+            "height": 32
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[1]<build-button>",
+          "page": {
+            "x": 212,
+            "y": 92
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 174,
+            "y": 54,
+            "width": 76,
+            "height": 76
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[2]<build-badge>",
+          "page": {
+            "x": 15,
+            "y": 101
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 8,
+            "y": 8,
+            "width": 13,
+            "height": 186.78515625
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[3]<pause-button>",
+          "page": {
+            "x": 350,
+            "y": 96
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 326,
+            "y": 72,
+            "width": 48,
+            "height": 48
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[4]<ore-hud>",
+          "page": {
+            "x": 354,
+            "y": 39
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 333,
+            "y": 16,
+            "width": 41,
+            "height": 45.72
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[5]<banked-total>",
+          "page": {
+            "x": 353,
+            "y": 21
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 342,
+            "y": 16,
+            "width": 21,
+            "height": 10
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[6]<station-hp>",
+          "page": {
+            "x": 355,
+            "y": 751
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 335.00000000000006,
+            "y": 674,
+            "width": 39,
+            "height": 154.5
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[7]<zoom-control>",
+          "page": {
+            "x": 305,
+            "y": 796
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 281.00000000000006,
+            "y": 764,
+            "width": 48,
+            "height": 64
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[8]<nameplates>",
+          "page": {
+            "x": 275,
+            "y": 518
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 267,
+            "y": 505.3,
+            "width": 16,
+            "height": 25.400000000000034
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[9]<minimap>",
+          "page": {
+            "x": 52,
+            "y": 672
+          },
+          "topmost": "BUTTON#playtest-download-log-button",
+          "live": true,
+          "onScreen": true,
+          "collides": true,
+          "box": {
+            "x": 12.000000000000057,
+            "y": 632,
+            "width": 80,
+            "height": 80
+          },
+          "coveredFraction": 0.99
+        },
+        {
+          "control": "dom#pr-link-loss-reconnect",
+          "page": {
+            "x": 195,
+            "y": 433
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 108.09375,
+            "y": 411.0625,
+            "width": 173.796875,
+            "height": 44
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "dom#pr-link-loss-abandon",
+          "page": {
+            "x": 195,
+            "y": 487
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 106.59375,
+            "y": 464.65625,
+            "width": 176.796875,
+            "height": 44
+          },
+          "coveredFraction": 0
+        }
+      ],
+      "collisions": [
+        {
+          "control": "__cornerStage.elements[9]<minimap>",
+          "page": {
+            "x": 52,
+            "y": 672
+          },
+          "topmost": "BUTTON#playtest-download-log-button",
+          "live": true,
+          "onScreen": true,
+          "collides": true,
+          "box": {
+            "x": 12.000000000000057,
+            "y": 632,
+            "width": 80,
+            "height": 80
+          },
+          "coveredFraction": 0.99
+        }
+      ],
+      "coveredButDead": [],
+      "context": {
+        "session": {
+          "state": "reconnecting",
+          "closeReason": null
+        },
+        "pauseScreen": "closed",
+        "online": true,
+        "linkLossCard": {
+          "hidden": false,
+          "title": "RECONNECTING…"
+        }
+      }
+    },
+    {
+      "state": "online-match-dropped-pause-menu",
+      "profile": "phone-portrait-390x844",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "dpr": 3,
+        "touch": true
+      },
+      "log": {
+        "mounted": true,
+        "hidden": false,
+        "rect": {
+          "x": 12,
+          "y": 491.40625,
+          "width": 78.96875,
+          "height": 340.59375
+        },
+        "label": "DOWNLOAD LOG",
+        "hint": "Disconnected (grace-elapsed) — DOWNLOAD LOG to report this."
+      },
+      "controls": [
+        {
+          "control": "__pauseStage.controls[0]<resume>",
+          "page": {
+            "x": 265,
+            "y": 422
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": null,
+          "coveredFraction": null
+        },
+        {
+          "control": "__pauseStage.controls[1]<settings>",
+          "page": {
+            "x": 192,
+            "y": 422
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": null,
+          "coveredFraction": null
+        },
+        {
+          "control": "__pauseStage.controls[2]<exit>",
+          "page": {
+            "x": 122,
+            "y": 422
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": null,
+          "coveredFraction": null
+        },
+        {
+          "control": "__cornerStage.elements[0]<ship-local>",
+          "page": {
+            "x": 195,
+            "y": 422
+          },
+          "topmost": "CANVAS#app",
+          "live": false,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 179,
+            "y": 406,
+            "width": 32,
+            "height": 32
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[1]<build-button>",
+          "page": {
+            "x": 212,
+            "y": 92
+          },
+          "topmost": "CANVAS#app",
+          "live": false,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 174,
+            "y": 54,
+            "width": 76,
+            "height": 76
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[2]<build-badge>",
+          "page": {
+            "x": 15,
+            "y": 30
+          },
+          "topmost": "CANVAS#app",
+          "live": false,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 8,
+            "y": 8,
+            "width": 13,
+            "height": 43.5
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[3]<pause-menu>",
+          "page": {
+            "x": 195,
+            "y": 422
+          },
+          "topmost": "CANVAS#app",
+          "live": false,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 0,
+            "y": 24,
+            "width": 390,
+            "height": 796
+          },
+          "coveredFraction": 0.08
+        },
+        {
+          "control": "__cornerStage.elements[4]<ore-hud>",
+          "page": {
+            "x": 354,
+            "y": 39
+          },
+          "topmost": "CANVAS#app",
+          "live": false,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 333,
+            "y": 16,
+            "width": 41,
+            "height": 45.72
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[5]<banked-total>",
+          "page": {
+            "x": 353,
+            "y": 21
+          },
+          "topmost": "CANVAS#app",
+          "live": false,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 342,
+            "y": 16,
+            "width": 21,
+            "height": 10
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[6]<station-hp>",
+          "page": {
+            "x": 355,
+            "y": 751
+          },
+          "topmost": "CANVAS#app",
+          "live": false,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 335.00000000000006,
+            "y": 674,
+            "width": 39,
+            "height": 154.5
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[7]<zoom-control>",
+          "page": {
+            "x": 305,
+            "y": 796
+          },
+          "topmost": "CANVAS#app",
+          "live": false,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 281.00000000000006,
+            "y": 764,
+            "width": 48,
+            "height": 64
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[8]<nameplates>",
+          "page": {
+            "x": 275,
+            "y": 518
+          },
+          "topmost": "CANVAS#app",
+          "live": false,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 267,
+            "y": 505.3,
+            "width": 16,
+            "height": 25.400000000000034
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__cornerStage.elements[9]<minimap>",
+          "page": {
+            "x": 52,
+            "y": 672
+          },
+          "topmost": "BUTTON#playtest-download-log-button",
+          "live": false,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 12.000000000000057,
+            "y": 632,
+            "width": 80,
+            "height": 80
+          },
+          "coveredFraction": 0.99
+        },
+        {
+          "control": "dom#pr-link-loss-menu",
+          "page": {
+            "x": 195,
+            "y": 469
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 115.703125,
+            "y": 447.34375,
+            "width": 158.59375,
+            "height": 44
+          },
+          "coveredFraction": 0
+        }
+      ],
+      "collisions": [],
+      "coveredButDead": [
+        {
+          "control": "__cornerStage.elements[9]<minimap>",
+          "page": {
+            "x": 52,
+            "y": 672
+          },
+          "topmost": "BUTTON#playtest-download-log-button",
+          "live": false,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 12.000000000000057,
+            "y": 632,
+            "width": 80,
+            "height": 80
+          },
+          "coveredFraction": 0.99
+        }
+      ],
+      "context": {
+        "session": {
+          "state": "closed",
+          "closeReason": "grace-elapsed"
+        },
+        "pauseScreen": "menu",
+        "online": true,
+        "linkLossCard": {
+          "hidden": false,
+          "title": "SEAT EXPIRED — a bot flew your ship, match went on"
+        }
+      }
+    },
+    {
+      "state": "online-match-guest-healthy",
+      "profile": "guest-desktop",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "dpr": 1,
+        "touch": false
+      },
+      "log": {
+        "mounted": false
+      },
+      "controls": [
+        {
+          "control": "__cornerStage.elements[0]<ship-local>",
+          "page": {
+            "x": 640,
+            "y": 400
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 624,
+            "y": 384,
+            "width": 32,
+            "height": 32
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__cornerStage.elements[1]<build-badge>",
+          "page": {
+            "x": 101,
+            "y": 760
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 8,
+            "y": 753,
+            "width": 186.78515625,
+            "height": 13
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__cornerStage.elements[2]<ore-hud>",
+          "page": {
+            "x": 41,
+            "y": 42
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 16,
+            "y": 16,
+            "width": 49.72,
+            "height": 52
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__cornerStage.elements[3]<banked-total>",
+          "page": {
+            "x": 23,
+            "y": 43
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 16,
+            "y": 30,
+            "width": 13,
+            "height": 26
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__cornerStage.elements[4]<controls-strip>",
+          "page": {
+            "x": 640,
+            "y": 780
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 0,
+            "y": 760,
+            "width": 1280,
+            "height": 40
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__cornerStage.elements[5]<station-hp>",
+          "page": {
+            "x": 1185,
+            "y": 37
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 1106,
+            "y": 16,
+            "width": 158.5,
+            "height": 42
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__cornerStage.elements[6]<nameplates>",
+          "page": {
+            "x": 544,
+            "y": 320
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 531.3,
+            "y": 312,
+            "width": 25.40000000000009,
+            "height": 16
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__cornerStage.elements[7]<minimap>",
+          "page": {
+            "x": 1194,
+            "y": 674
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 1120,
+            "y": 600,
+            "width": 148,
+            "height": 148
+          },
+          "coveredFraction": null
+        }
+      ],
+      "collisions": [],
+      "coveredButDead": [],
+      "context": {
+        "session": {
+          "state": "open",
+          "closeReason": null
+        },
+        "pauseScreen": "closed",
+        "online": true,
+        "linkLossCard": null
+      }
+    }
+  ]
+}

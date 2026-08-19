@@ -1,0 +1,47 @@
+{
+  "stage": "broken",
+  "profile": "desktop-1280x800",
+  "pressedAt": {
+    "x": 1194,
+    "y": 674
+  },
+  "topmostAtThatPoint": "DIV#pr-link-loss",
+  "minimapBefore": {
+    "id": "minimap",
+    "x": 1120,
+    "y": 600,
+    "width": 148,
+    "height": 148
+  },
+  "minimapAfter": {
+    "id": "minimap",
+    "x": 1120,
+    "y": 600,
+    "width": 148,
+    "height": 148
+  },
+  "minimapToggled": false,
+  "logLabelBefore": "DOWNLOAD LOG",
+  "logLabelAfter": "DOWNLOAD LOG",
+  "drawnBefore": [
+    "ship-local",
+    "build-badge",
+    "ore-hud",
+    "banked-total",
+    "controls-strip",
+    "station-hp",
+    "nameplates",
+    "minimap"
+  ],
+  "drawnAfter": [
+    "ship-local",
+    "build-badge",
+    "ore-hud",
+    "banked-total",
+    "controls-strip",
+    "station-hp",
+    "nameplates",
+    "minimap"
+  ],
+  "downloads": []
+}

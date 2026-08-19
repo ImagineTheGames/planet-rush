@@ -1,0 +1,217 @@
+{
+  "stage": "fixed",
+  "profile": "phone-798x384",
+  "reports": [
+    {
+      "state": "front-door-room-list",
+      "profile": "phone-798x384",
+      "viewport": {
+        "width": 798,
+        "height": 384,
+        "dpr": 2,
+        "touch": true
+      },
+      "log": {
+        "mounted": false
+      },
+      "controls": [
+        {
+          "control": "__onlineMenu.doorControls[0]<row:0>",
+          "page": {
+            "x": 207,
+            "y": 193
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 23,
+            "y": 165,
+            "width": 368.5,
+            "height": 55
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__onlineMenu.doorControls[1]<mode:browse>",
+          "page": {
+            "x": 95,
+            "y": 126
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 23,
+            "y": 102,
+            "width": 144,
+            "height": 48
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__onlineMenu.doorControls[2]<mode:code>",
+          "page": {
+            "x": 243,
+            "y": 126
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 171,
+            "y": 102,
+            "width": 144,
+            "height": 48
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__onlineMenu.doorControls[3]<back>",
+          "page": {
+            "x": 83,
+            "y": 360
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 23,
+            "y": 335.5,
+            "width": 120,
+            "height": 48
+          },
+          "coveredFraction": null
+        },
+        {
+          "control": "__onlineMenu.browseRows[0]<YDM79R>",
+          "page": {
+            "x": 207,
+            "y": 193
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 23,
+            "y": 165,
+            "width": 368.5,
+            "height": 55
+          },
+          "coveredFraction": null
+        }
+      ],
+      "collisions": [],
+      "coveredButDead": [],
+      "context": {
+        "entry": {
+          "visible": true,
+          "screen": "join",
+          "status": "idle",
+          "error": "",
+          "title": "PICK A CLAIM",
+          "joinMode": "browse",
+          "rows": 1
+        },
+        "connectPanel": null
+      }
+    },
+    {
+      "state": "front-door-row-refused",
+      "profile": "phone-798x384",
+      "viewport": {
+        "width": 798,
+        "height": 384,
+        "dpr": 2,
+        "touch": true
+      },
+      "log": {
+        "mounted": true,
+        "hidden": false,
+        "rect": {
+          "x": 580.40625,
+          "y": 290.234375,
+          "width": 205.59375,
+          "height": 81.765625
+        },
+        "label": "DOWNLOAD LOG",
+        "hint": "DOWNLOAD LOG to report this."
+      },
+      "controls": [
+        {
+          "control": "__onlineMenu.doorControls[0]<mode:browse>",
+          "page": {
+            "x": 95,
+            "y": 126
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 23,
+            "y": 102,
+            "width": 144,
+            "height": 48
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__onlineMenu.doorControls[1]<mode:code>",
+          "page": {
+            "x": 243,
+            "y": 126
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 171,
+            "y": 102,
+            "width": 144,
+            "height": 48
+          },
+          "coveredFraction": 0
+        },
+        {
+          "control": "__onlineMenu.doorControls[2]<back>",
+          "page": {
+            "x": 83,
+            "y": 360
+          },
+          "topmost": "CANVAS#app",
+          "live": true,
+          "onScreen": true,
+          "collides": false,
+          "box": {
+            "x": 23,
+            "y": 335.5,
+            "width": 120,
+            "height": 48
+          },
+          "coveredFraction": 0
+        }
+      ],
+      "collisions": [],
+      "coveredButDead": [],
+      "context": {
+        "entry": {
+          "visible": true,
+          "screen": "join",
+          "status": "error",
+          "error": "That claim has closed. Pick another, or press SOLO.",
+          "title": "PICK A CLAIM",
+          "joinMode": "browse",
+          "rows": 0
+        },
+        "connectPanel": null
+      }
+    }
+  ]
+}
