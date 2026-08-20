@@ -871,3 +871,64 @@ It is also the fresh-state fixture for ~30 cases in `src/ui/settings.test.ts`.
 That alone would not save it (§4.4(d) is clear that a test's convenience is not a
 reason to export), but the assertion above is not convenience — it is the only
 place the first-run default is stated once and verified.
+
+### 4.13 SURFACE — a placement contract that must not be the placement (a0-103, 2026-08-20)
+
+| Export | Verdict |
+|---|---|
+| `src/ui/anchor-reach.ts#ANCHOR_EDGES` | SURFACE — what each anchor region *promises*, stated once, apart from the code that honours it |
+| `src/ui/anchor-reach.ts#anchorEdges` | SURFACE — the reader for that table |
+| `src/ui/anchor-reach.ts#edgeGap` | SURFACE — the measurement the promise is checked with |
+| `src/ui/anchor-reach.ts#LAYOUT_RESERVATIONS` | SURFACE — every gap that is deliberate, with the argument attached |
+| `src/ui/anchor-reach.ts#reservedPx` | SURFACE — the reader for that table |
+| `src/ui/anchor-reach.ts#reservationsFor` | SURFACE — the rows behind a verdict, for the failure message |
+| `src/ui/anchor-reach.ts#reachViolations` | SURFACE — the check itself |
+| `src/ui/anchor-reach.ts#describeReachViolation` | SURFACE — one violation, in a sentence |
+| `src/ui/anchor-reach.ts#CONTENT_BOUND_IDS` | SURFACE — which ids are laid out in the HUD's content box (a0-74) |
+
+This is the §4.7 shape — *an invariant that must not be the code it checks* —
+and a0-103 is a sharper instance of it than the doorway was, because the thing
+that failed here **was** the check.
+
+`@platform/layout-registry` `withinAnchor` already asks whether an element's
+bounds sit inside its declared anchor's zone. It was green on a minimap that
+declared `bottom-right` and stopped 132 px from the right edge of a 798 px phone,
+against a declared margin of 12 — because `bottom-right` resolves to the right
+HALF of the screen by the bottom THIRD, and an 80 px square satisfies that from
+12 px off the corner to 250. Nothing was drawn in the gap. QA's verdict was the
+one that matters: *a check that cannot fail is not a check.*
+
+`anchor-reach.ts` is the missing half — does the element REACH the edges its
+anchor names — and it is deliberately a **second statement** of where an element
+belongs rather than a call inside the code that puts it there:
+
+- **A production caller would have to be the placement restated.** The failure
+  it guards is a placement that looks right and computes cleanly:
+  `collapsedRect` was internally consistent, its result was inside its zone, and
+  its own unit tests passed on the number that was wrong. A version wired into
+  `collapsedRect` would be asserting the arithmetic against itself.
+- **The one honest production caller is upstairs, and it is not ours.** The
+  layout host (`src/main.ts`) is where every element's LOGICAL rect exists in one
+  place, and `installLayoutHook`'s `placement()` in
+  `@platform/layout-registry` is the surface this belongs beside. That file's
+  anchor vocabulary is a ratified contract and extending it is not the UI
+  Engineer's unilateral call, so the facility is written in the registry's own
+  vocabulary — `LayoutEntry` in, violations out — to lift there verbatim. This
+  is the same argument `src/ui/layout-exclusions.ts` makes in its header, and the
+  same shape §4.5 calls a SEAM; it is filed as SURFACE because the checking half
+  is complete and tested, not half-landed.
+- **The HUD cannot honestly call it on what it draws.** `Hud.describeLayout`
+  reports measured Pixi bounds in PHYSICAL space — `main.ts` converts them with
+  `physicalBoundsToLogical` before registering — so a reach check run inside the
+  HUD would compare logical margins against physical rects and be wrong under
+  the landscape lock. Reconstructing logical bounds inside `src/ui` to avoid that
+  would be a second registry living in the HUD, which is exactly the coupling
+  `layout-exclusions.ts` was shaped to avoid.
+
+What holds it instead is the sweep in `src/ui/minimap.test.ts` — *"a bottom-right
+element actually reaches the bottom-right"* — which runs the check over every
+element in the build that declares a corner-or-edge anchor, at 12 viewport
+profiles by 3 control schemes, built from each element's own exported anchor
+constant and its own pure placement function. It was RED on the merged tree, on
+the minimap and nothing else, 24 violations
+(`evidence/a0-103-anchor-reach/red-before-the-fix.txt`).
