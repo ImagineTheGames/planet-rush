@@ -74,6 +74,10 @@
             <div style="margin-top:6px;font-size:12px;line-height:1.5;color:#8aa0b6">{{ q.prose }}</div>
           </sc-if>
           <sc-if value="{{ q.settled }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:7px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <span style="font-size:13px;font-weight:600;color:#e7ecf3">{{ q.verdictLabel }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#5c6878">{{ q.when }}</span>
+            </div>
             <div style="margin-top:7px;font-size:12px;color:{{ q.statusColor }}">{{ q.statusLine }}</div>
             <sc-for list="{{ q.briefs }}" as="w" hint-placeholder-count="1">
               <div style="margin-top:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -254,10 +258,16 @@ class Component extends DCLogic {
     };
     // ONE ANSWERED QUESTION, with its consequence. Shared by the review list
     // (where the other questions are still open) and the decided shelf.
-    const answerCard = (board, spec, qid, answer, heading) => {
+    const answerCard = (board, spec, qid, answer, heading, multi) => {
       const denied = answer.verdict === 'DENY ALL';
       const label = optionLabel(spec, qid, answer.verdict);
       const briefs = briefsFor(board, denied ? null : answer.verdict);
+      // Whether anything names THIS pick, as opposed to the board it came from.
+      // On a board that asks one thing they amount to the same claim; on one
+      // that asks three they do not, and calling a brief about the lab "the
+      // brief that builds your pick" would be the overclaim this section exists
+      // to avoid.
+      const exact = !denied && (work[answer.verdict] ?? []).length > 0;
       // Never claim work is under way when nothing references the pick. An
       // honest "nothing queued yet" is the whole reason this section exists.
       const live = briefs.filter(b => b.laneLabel !== LANE_META.backlog.label);
@@ -267,11 +277,13 @@ class Component extends DCLogic {
         : live.length === 0
           ? 'The brief that builds this exists but is not queued yet.'
           : (denied ? 'A new round is in the queue, carrying your reason verbatim.'
-                    : 'The brief that builds your pick:');
+                    : (multi && !exact
+                        ? 'Briefs on this board — none names this pick specifically yet:'
+                        : 'The brief that builds your pick:'));
       return {
         verdictLabel: denied
           ? ('✗ YOU DENIED' + (heading ? ' ' + heading : '') + ' — "' + (answer.reason ?? 'new round requested') + '"')
-          : ('✓ YOU PICKED ' + label + (heading ? ' — ' + heading : ' — ' + board)),
+          : ('✓ YOU PICKED ' + label + (heading ? '' : ' — ' + board)),
         when: answer.at ? new Date(answer.at).toLocaleString() : '',
         statusLine, statusColor: briefs.length === 0 ? '#F2D24B' : '#9fb2c6',
         briefs, hasBriefs: briefs.length > 0, denied,
@@ -296,7 +308,7 @@ class Component extends DCLogic {
           const heading = q.title || (questions.length > 1 ? q.id.toUpperCase() : '');
           const prose = q.question && q.question !== heading ? q.question : '';
           if (answer) {
-            const card = answerCard(name, spec, q.id, answer, heading);
+            const card = answerCard(name, spec, q.id, answer, heading, questions.length > 1);
             return { ...card, id: q.id, settled: true, asking: false,
               heading: heading || 'Your answer', headColor: '#7fe0c4',
               stateLabel: 'SETTLED', stateColor: '#4FA08B',
@@ -337,7 +349,8 @@ class Component extends DCLogic {
         // DECIDED — surfaced with its consequence, not filed away as history.
         const rows = (state.answered ?? Object.keys(answers)).map(qid => {
           const q = questions.find(x => x.id === qid);
-          return answerCard(name, spec, qid, answers[qid], q?.title || (questions.length > 1 ? qid.toUpperCase() : ''));
+          return answerCard(name, spec, qid, answers[qid], q?.title || (questions.length > 1 ? qid.toUpperCase() : ''),
+            questions.length > 1);
         });
         decided.push({
           name, href, answers: rows,

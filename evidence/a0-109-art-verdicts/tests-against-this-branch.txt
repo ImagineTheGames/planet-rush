@@ -1,0 +1,40 @@
+TAP version 13
+# Subtest: a multi-question board keeps every answer
+ok 1 - a multi-question board keeps every answer
+  ---
+  duration_ms: 148.924281
+  ...
+# Subtest: a verdict can be taken back
+ok 2 - a verdict can be taken back
+  ---
+  duration_ms: 131.629797
+  ...
+# Subtest: nothing is recorded until the developer confirms the option by name
+ok 3 - nothing is recorded until the developer confirms the option by name
+  ---
+  duration_ms: 0.660798
+  ...
+# Subtest: the page offers a way to take a verdict back
+ok 4 - the page offers a way to take a verdict back
+  ---
+  duration_ms: 0.256745
+  ...
+# Subtest: the ART endpoints route through the per-question store
+ok 5 - the ART endpoints route through the per-question store
+  ---
+  duration_ms: 0.552875
+  ...
+# Subtest: each answer names the brief that acts on it, and that brief's lane
+ok 6 - each answer names the brief that acts on it, and that brief's lane
+  ---
+  duration_ms: 121.440281
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 450.112999
