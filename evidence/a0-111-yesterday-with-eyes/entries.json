@@ -1,0 +1,142 @@
+[
+  {
+    "id": "a0-111-end-of-match-victory-and-defeat-still-name-the-winner",
+    "title": "VICTORY reads 'You won.' and DEFEAT reads 'Player 2 won.' - both headlines still carry a line naming who won",
+    "area": "match",
+    "image": "images/a0-111-end-of-match-victory-and-defeat.png",
+    "capturedAt": "2026-08-20T09:30:00Z",
+    "buildSha": "84ddec71",
+    "verdict": "verified",
+    "attestation": "PRODUCTION BUNDLE (npm run build + preview), ?debug=1, no ?freeze so the build stamp 84ddec7* is in the bottom-left of every frame. Phone 798x384 dpr2 touch and desktop 1280x800 dpr2. VICTORY: the headline is the single word VICTORY in white, a blue rule under it, and beneath that the sentence 'You won.' with 'MATCH TIME . 00:04' under it. DEFEAT: the headline is DEFEAT in grey, a teal rule, and the sentence 'Player 2 won.' Both frames carry REMATCH as the one bright plate with BACK TO MENU under it, and a summary column reading ORE MINED / DAMAGE DEALT / SHIPS DESTROYED / STATIONS DESTROYED / DISTANCE TRAVELLED / SHIPS USED / ORE USED, then XP EARNED and a level bar. The brief's question was whether the subhead still names WHO WON after a0-108 replaced the headlines. It does, in both faces and on both viewports: VICTORY names the reader ('You won.'), DEFEAT names the seat ('Player 2 won.'). Each ending was staged through the sim's own destroyCore on the __endScreenStage seam - winLocal() for the victory, endMatch() for the defeat - and nothing about the words was staged. One thing I did NOT reach: the TEAMS case, where a0-09's bug lived and where the subhead has to say 'your side' as well as name a player. That needs ?debug=1&sides=2 and it is not in these frames."
+  },
+  {
+    "id": "a0-111-end-of-match-eliminated-names-a-placing-and-no-winner",
+    "title": "ELIMINATED reads '8th of 8 - your reactor was destroyed.' - a placing and a cause, and no winner, because the match is still running",
+    "area": "match",
+    "image": "images/a0-111-end-of-match-eliminated.png",
+    "capturedAt": "2026-08-20T09:30:00Z",
+    "buildSha": "84ddec71",
+    "verdict": "verified",
+    "attestation": "PRODUCTION BUNDLE, ?debug=1, both viewports, build stamp in frame. Staged with __endScreenStage.eliminateLocal(): the local core destroyed through the sim's own destroyCore, the other seven still standing (core HP read back straight after: 0, 100, 100, 100, 100, 100, 100, 100). The headline is ELIMINATED in red, with no rule under it. The line beneath reads '8th of 8 - your reactor was destroyed.' The buttons are REMATCH and SPECTATE. There is no summary column: this screen is the headline, the one line, and the two plates. STATED PLAINLY, because it is the question the brief asked: this subhead does NOT name a winner. I am recording that as VERIFIED rather than failed because on this screen there is no winner to name - the match has not ended, which is exactly what the SPECTATE button offers to do about it. A screen that invented a winner here would be the defect. What the line does carry is the two facts this moment has: where the reader finished and what killed them."
+  },
+  {
+    "id": "a0-111-the-draw-headline-has-no-reachable-path",
+    "title": "Eight destroyed reactors, and the screen reads DEFEAT / 'Player 8 won.' - the DRAW face a0-108 shipped could not be reached at all",
+    "area": "match",
+    "image": "images/a0-111-end-of-match-no-draw.png",
+    "capturedAt": "2026-08-20T09:30:00Z",
+    "buildSha": "84ddec71",
+    "verdict": "failed",
+    "attestation": "PRODUCTION BUNDLE, ?debug=1, both viewports. This is the fourth outcome the brief asked for, and I could not produce it. WHAT I DID: there is no draw seam, so every seat was killed at once - one lethal __planetRush.damageCore(p, 999) queued for all eight in a SINGLE call, retried as a batch until it landed (a fresh world holds station.spawnProtect up for the opening seconds and damageStation refuses every point of damage while it is, so an early burst does nothing at all). The debug queue drains FIFO inside one tick, so all eight cores fell on the same tick. Core HP read back afterwards: 0, 0, 0, 0, 0, 0, 0, 0, on both profiles. WHAT THE SCREEN SAYS OVER THAT WORLD: headline DEFEAT, subhead 'Player 8 won.' A win is credited to a station that is rubble, over a field in which nothing survived. Both viewports, identical. Two earlier cuts of the capture are worth recording so nobody repeats them: killing the seats in waves crowns whoever fell last (the sim is right - the match was over before the last core died), and a single simultaneous burst fired 800ms after boot lands nothing because of spawn protection. Neither of those is what produced the frame above; the frame above is eight cores dead on one tick. THE FINDING, in the brief's words: the screen disagrees with what shipped. a0-108 put a DRAW headline on this screen and I can find no state of the offline bundle that shows it. `sim/match.ts` resolveWinner hands a no-survivor match to lastToDie(m.eliminated) - 'the last team to lose its last core takes it' - so the winner is null only when nothing was ever eliminated AND nothing survived, which no played match produces. I am not calling the tiebreak wrong; I am recording that one of the four outcomes this brief was sent to photograph has no path a player can walk to it, and that the screen standing in its place credits a win to a destroyed station."
+  },
+  {
+    "id": "a0-111-the-join-flow-says-room-and-never-claim",
+    "title": "ROOM CODE, OPEN ROOMS, PICK A ROOM, NO OPEN ROOMS RIGHT NOW - and not one instance of the word 'claim' anywhere the walk could reach",
+    "area": "boot",
+    "image": "images/a0-111-join-flow-says-room.png",
+    "capturedAt": "2026-08-20T09:30:00Z",
+    "buildSha": "84ddec71",
+    "verdict": "verified",
+    "attestation": "PRODUCTION BUNDLE, front door (/?gate=0 -> PLAY -> JOIN), both viewports, build stamp in frame. Every press landed at the point the client itself reported drawing the control at; the coordinates are in the readback JSON beside these frames. BROWSE HALF: eyebrow OPEN ROOMS under DEEP FIELD MINING AUTHORITY; prompt PICK A ROOM; two tabs, BROWSE (lit) and ENTER ROOM CODE; UPDATED 0s AGO at the right; and, with no rooms to list, NO OPEN ROOMS RIGHT NOW over 'Press ENTER ROOM CODE, or go BACK to HOST one.' KEYPAD HALF (reached by a real press on the ENTER ROOM CODE tab at desktop (303,216)): eyebrow ROOM CODE; prompt ENTER THE ROOM CODE; four empty code cells; a 32-key pad A-H, J-N, P-Z, 2-9; ERASE and JOIN. BACK on both. THE HUNT, and how it was run. The brief says not to assume the audit test caught every path because a string can be assembled at runtime, so this was not a grep. Every string the bundle RASTERISED on this walk was recorded by patching the 2D context's fillText/strokeText and measureText before the bundle loaded (evidence/a0-111-yesterday-with-eyes/words.ts) - the final string, after every concatenation and every fitLabel. The walk covered the menu, the doors, both join halves, the lobby roster, map select and the HOST refusal. 107 distinct strings on the desktop walk. The count of strings containing 'claim', case-insensitive: ZERO. The first cut of that recorder reported the whole doors screen as 54 'strings' - 8, 4, d, e, c - because this game letter-spaces its type and a canvas context cannot, so Pixi draws one character per fillText call. A hunt run over that list would have come back empty on a screen that was shouting the word. That trap is written up in words.ts; the numbers above are from the fixed recorder. WHAT THIS DOES NOT COVER, declared: the VISIBILITY chip - the one control whose identifiers are still named claim in the source - is creator-and-online only and is not drawn in an offline lobby, so this walk never rasterised it. Nor is text baked into an image asset visible to the recorder."
+  },
+  {
+    "id": "a0-111-the-lobby-and-map-select-as-a-player-reaches-them",
+    "title": "The offline lobby and MAP SELECT: MINING SECTOR, ONE MAP PER GAME . LOCKED AT RUSH, and the two lines this build will not show an offline player",
+    "area": "boot",
+    "image": "images/a0-111-lobby-and-map-select.png",
+    "capturedAt": "2026-08-20T09:30:00Z",
+    "buildSha": "84ddec71",
+    "verdict": "verified",
+    "attestation": "PRODUCTION BUNDLE, front door -> SOLO, both viewports, build stamp in frame. The MAP card was pressed at the point the lobby reports drawing it (desktop (1001,478)). LOBBY: header CREW MUSTER. Chips MODE . FFA and YIELD . SCARCE. Eight roster rows - P1 YOU with a star, TAKEN, LVL 1; P2-P8 as BOT named Rusty, Bolt, Foreman, Patch, Sable, Vulture, Warden at EASY / EASY / MEDIUM / MEDIUM / HARD / HARD / HARD, each with its own ?. Right-hand cards SHIP . CHANGE over VANGUARD (Anvil, SPD 100% ACC 100% TRN 100% HULL 50 PWR 10 HOLD 2) and MAP . CHANGE over The Ring. Footer: BACK, the line '1 PLAYING . 7 BOTS', and RUSH!. MAP SELECT: title MAP SELECT, eyebrow MINING SECTOR at the right, hint ONE MAP PER GAME . LOCKED AT RUSH. Six cards - The Ring (selected), The Compass, The Oval, Double Diamond (badged VETERAN), The Line, The Crescents - each with a layout diagram and a sentence. BACK bottom-left. TWO GAPS I AM DECLARING RATHER THAN GLOSSING. The brief asked for 'the waiting line' and for the map-select hints. I photographed the HOST forms of both because they are the only forms an offline player can reach: the footer's WAITING FOR THE HOST is drawn only to a GUEST (the view picks it when hostControls is false) and the guest map hint 'THE HOST'S PICK - READ ONLY' likewise. Reaching either needs a second client in a real online room, which needs an allocator this box does not have - the HOST press on this same walk came back 'FAILED: no allocator configured'. So neither guest line is on this record, and neither should be read as checked. One thing visible on the phone frame and worth writing down: the lobby's BACK plate overlaps the build stamp 84ddec7* in the bottom-left corner. The plate is on top and fully legible; it is the stamp that is partly behind it."
+  },
+  {
+    "id": "a0-111-a-failed-host-covers-the-host-door",
+    "title": "After a refused HOST, the DOWNLOAD LOG button is drawn over the HOST door and hides its name",
+    "area": "boot",
+    "image": "images/a0-111-host-refusal-covers-the-host-door.png",
+    "capturedAt": "2026-08-20T09:30:00Z",
+    "buildSha": "84ddec71",
+    "verdict": "failed",
+    "attestation": "PRODUCTION BUNDLE, front door -> HOST, phone 798x384, build stamp in frame. The refusal is real and not staged: this box has no allocator, so a real press on HOST at (589,172.5) produced it. The screen draws 'FAILED: no allocator configured' in red, 'DOWNLOAD LOG to report this.' under it, and two buttons across the middle - RETRY and DOWNLOAD LOG. Those two buttons land ON the doors underneath. RETRY covers part of the CAMPAIGN plate. DOWNLOAD LOG covers the HOST plate: at 3x the button is opaque and takes the top of the word HOST, leaving only the bottom sliver of the four letters showing below its lower edge. The door's subtitle, 'Start a new game and get a code for friends to join.', is untouched and readable. PRESSABILITY, asked separately because a0-96's finding was a control that was drawn and unpressable: after the refusal I asked the browser who receives a press at each door's own reported centre. All five - campaign, solo, create, join, back - answer 'canvas'. So the HOST door is COVERED, not dead: a player can still press it, they just cannot read what it is. That is the same DOWNLOAD LOG element that made the pause DONE plate unpressable in a0-96, on a screen nobody had pointed a camera at."
+  },
+  {
+    "id": "a0-111-the-doors-screen-has-no-settings-and-back-works",
+    "title": "CAMPAIGN / SOLO / HOST / JOIN and a BACK that still comes home - and no SETTINGS anywhere on the doors",
+    "area": "boot",
+    "image": "images/a0-111-doors-have-no-settings.png",
+    "capturedAt": "2026-08-20T09:30:00Z",
+    "buildSha": "84ddec71",
+    "verdict": "verified",
+    "attestation": "PRODUCTION BUNDLE, front door (/?gate=0 -> PLAY), both viewports, build stamp in frame. The doors screen carries the title PLANET RUSH, the standing line MINE . DEFEND . ATTACK, and four plates: CAMPAIGN ('A run of linked contracts.'), SOLO ('Play on your own against bots. No internet needed.', drawn as the one bright plate), HOST ('Start a new game and get a code for friends to join.'), JOIN ('Type in a friend's code to join their game.'). BACK sits alone in the footer. There is no SETTINGS plate, no SETTINGS word, and nothing in the footer beside BACK. The client's own control list agrees on both profiles - campaign, solo, create, join, back - and no listed control's name matches /settings/. The menu one step earlier still carries SETTINGS, which is one of the two places it is meant to be, and that frame is on this plate so the two can be read against each other. BACK WAS PRESSED, not inspected. One real click at desktop (114,754) / one real tap at phone (83,359.5) - the points the client reports drawing it at. The browser named the canvas as the receiver at both. Across that press the state went from online/visible to menu/not-visible, and the third frame on this plate is the main menu it came home to."
+  },
+  {
+    "id": "a0-111-fire-mode-is-locked-on-auto-fire-and-refuses-the-press",
+    "title": "FIRE MODE reads AUTO-FIRE, is drawn dim on both settings screens, and two presses at its own centre move neither the row nor the store",
+    "area": "settings",
+    "image": "images/a0-111-fire-mode-locked.png",
+    "capturedAt": "2026-08-20T09:30:00Z",
+    "buildSha": "84ddec71",
+    "verdict": "verified",
+    "attestation": "PRODUCTION BUNDLE, both viewports, build stamp in frame. Both doors into settings were walked: the MENU's SETTINGS (front door /?gate=0) and the PAUSE overlay's (front door -> PLAY -> SOLO -> RUSH -> Esc -> SETTINGS). The control scheme at rest is Tap Commander on both, with nothing in localStorage. WHAT IS DRAWN: at 1x, beside the CONTROLS row directly under it, the FIRE MODE row's label and its AUTO-FIRE chip are both in a markedly dimmer grey than CONTROLS and TAP COMMANDER, and the AUTO-FIRE chip carries no engaged hairline. Same plate, different ink. The pause screen's row is dim in the same way. WHERE I PRESSED AND WHAT HAPPENED: menu screen, two presses at desktop (640,222.5) / phone (209,133) - the point the client itself reports drawing the row at, with the canvas named as the receiver each time. Before the first press the row read FIRE MODE / AUTO-FIRE / disabled and localStorage 'planet-rush:fireMode' was ABSENT. After the second press the row read FIRE MODE / AUTO-FIRE / disabled and the key was still ABSENT. Pause screen, one press at desktop (640,222.5) / phone (209,133): key absent before, absent after. THE CONTROL FOR THE MEASUREMENT, because 'I pressed it and nothing happened' is what a missed press also looks like. CONTROLS was then pressed once, taking it to KEYBOARD + MOUSE and writing 'sticks' to the store. FIRE MODE went live in the same frame - AUTO-AIM, undrimmed, disabled false - and ONE press at the SAME (640,222.5) changed it to MANUAL and wrote 'manual' to 'planet-rush:fireMode'. So this harness can press this row, at that exact coordinate. Under Tap Commander the row refuses; under the sticks scheme the identical press lands."
+  },
+  {
+    "id": "a0-111-the-fire-mode-help-panel-explains-the-lock",
+    "title": "The FIRE MODE ? panel names the lock, who took the choice, and how to get it back",
+    "area": "settings",
+    "image": "images/a0-111-fire-mode-help-explains-the-lock.png",
+    "capturedAt": "2026-08-20T09:30:00Z",
+    "buildSha": "84ddec71",
+    "verdict": "verified",
+    "attestation": "PRODUCTION BUNDLE, front door -> SETTINGS, both viewports, build stamp in frame. Opened with a real press on the row's own ? at desktop (324,222.5), receiver reported as the canvas. The panel is titled FIRE MODE and reads, in full: 'TAP COMMANDER aims and fires for you. This row is locked on AUTO-FIRE - switch CONTROLS to KEYBOARD + MOUSE to fire yourself.' Three sentences' worth of work in two: it says the row is locked, it says what took the choice, and it says the one press that gives it back. It is not a description of the CONTROLS row. The phone panel carries the same words from the same press. While the panel is up the row's ? is drawn with a bright focus box around it and the rest of the screen is unchanged."
+  },
+  {
+    "id": "a0-111-the-ore-counter-reads-over-a-lit-background",
+    "title": "The ore counter over the busiest background 28 sampled frames could find: the plating behind it is dimmed in a soft patch and ORE and its numeral stay legible",
+    "area": "hud",
+    "image": "images/a0-111-ore-counter-on-its-ground.png",
+    "capturedAt": "2026-08-20T09:30:00Z",
+    "buildSha": "84ddec71",
+    "verdict": "verified",
+    "attestation": "PRODUCTION BUNDLE, ?debug=1, both viewports, build stamp in frame. __oreHudStage.mine(37) puts ore in the hold and parks the ship away from home; fourteen stops around the field per profile were then reached by REAL TAPS (Tap Commander is the shipped default on both form factors, so a tap is a move order), and at each stop the counter's own layout-registry rect - 16,16 by 52.9x75 logical - was measured for how much of the background behind it is lit. The frame this is written from was chosen by that measurement, not by taste; the whole table is in the readback. AT THE BUSIEST STOP (desktop stop 10, 75.2% of the rect lit, a rival station's plating filling it): the grey word ORE and the yellow numeral 3 are both legible, and the station's silver plating is visibly DARKENED in a soft patch around them - the near-black plating beside the numeral against the bright silver of the identical panels a few hundred pixels to the right is the comparison, and it is in the 4x crop on this plate. That soft patch is the ground. AT THE EMPTIEST STOP (7.3% lit) the counter is a grey label, a yellow numeral and a thin rule on open space. TWO NOTES ON METHOD, because the first pass got it wrong. I began by scanning for a luminance STEP at the rect's right and bottom edges and found none, and nearly wrote that there was no ground at all. There is no step because what shipped is a soft scrim rather than a bounded plate - the wrong instrument, and the wrong finding if I had stopped there. Second: the brief asked for an asteroid behind the counter, and across 28 sampled frames I never landed one squarely there. What is behind it here is a rival station, which is a busier background than the asteroid a0-99 photographed, but it is not the same specimen and should not be read as one."
+  },
+  {
+    "id": "a0-111-a-rival-nameplate-is-drawn-into-the-ore-counter",
+    "title": "The word ORE and a rival's nameplate drawn on the same pixels - four of twenty-eight sampled frames put something else inside the ore counter's rect",
+    "area": "hud",
+    "image": "images/a0-111-nameplate-drawn-into-the-ore-counter.png",
+    "capturedAt": "2026-08-20T09:30:00Z",
+    "buildSha": "84ddec71",
+    "verdict": "failed",
+    "attestation": "PRODUCTION BUNDLE, ?debug=1, desktop 1280x800 and phone 798x384, build stamp in frame. Same run as the ground capture: fourteen stops per profile, reached by real taps, with every other registered element's rect intersected against the counter's at each stop. WHAT IS VISIBLE, at 5x: the grey word ORE and the teal nameplate 'Rusty (EASY)' occupy the same pixels - the R of Rusty is drawn across the E of ORE, and both are legible only because they are different colours. Two pieces of text in one place, in the top-left corner of the screen. HOW OFTEN: something other than the counter itself was drawn into the counter's rect on 3 of 14 desktop stops and 1 of 14 phone stops. On all four it was `nameplates`; on the phone stop the `healthbars` layer landed in the rect as well, over a 39.9 x 35.1 logical box. The largest nameplate intersection was 20.3 x 16 logical. WHY IT SURVIVES: the counter is screen-space and pinned to the top-left; nameplates are world-space and go where the ship they belong to goes. So this is not a layout that is wrong at rest - it is a collision that only exists at certain camera positions, which is exactly the kind a golden frame taken at one position cannot see. The ground a0-102 shipped dims the world behind the counter, but a nameplate is HUD drawn after it, so the scrim does not separate these two."
+  },
+  {
+    "id": "a0-111-the-phone-minimap-is-in-its-corner",
+    "title": "The phone minimap now stands 12 logical px from the right edge and 12 from the bottom - a0-99 measured that gap at 132",
+    "area": "hud",
+    "image": "images/a0-111-phone-minimap-in-its-corner.png",
+    "capturedAt": "2026-08-20T09:30:00Z",
+    "buildSha": "84ddec71",
+    "verdict": "verified",
+    "attestation": "PRODUCTION BUNDLE, ?debug=1, phone 798x384 dpr2 and desktop 1280x800 dpr2, build stamp in frame. Nothing staged: the HUD is photographed where it lays itself out. Every registered element's distance from all four edges of the logical viewport is in the readback, so the corner is checked rather than eyeballed - which is the point, because what let a0-99's defect ship was an anchor check that passed on a rect nobody had measured. PHONE, viewport 798x384: minimap drawn at x 706, y 292, 80x80. Right edge to screen edge: 12.0 px. Bottom edge to screen edge: 12.0 px. Its declared anchor is bottom-right with margin 12, so the drawn rect and the declared anchor agree. a0-99's number for that same gap was 132 px, a sixth of the screen. Its right-hand neighbours sit at 15.5 px (station-hp) and 16.0 px (zoom-control), so the minimap now overhangs them by about 4 px rather than falling short of them by 132. Recorded as a number rather than as a complaint. DESKTOP, viewport 1280x800: minimap at x 1120, y 600, 148x148 - right gap 12.0, bottom gap 52.0. The bottom gap is not a miss: the desktop controls-strip occupies the bottom edge at gap 0, and the minimap is lifted clear of it exactly as the build badge is lifted to 34. In the 3x crop the panel holds the fog, one coverage disc, a scatter of yellow ore marks and the blue own-ship arrowhead."
+  },
+  {
+    "id": "a0-111-under-attack-with-the-station-on-screen-and-off-it",
+    "title": "The frame a0-99 could not take: with home off screen the arrow and the sentence arrive together, and with home on screen neither is drawn",
+    "area": "hud",
+    "image": "images/a0-111-under-attack-both-station-states.png",
+    "capturedAt": "2026-08-20T09:30:00Z",
+    "buildSha": "84ddec71",
+    "verdict": "verified",
+    "attestation": "PRODUCTION BUNDLE, ?debug=1, both viewports, build stamp in frame. The siege is held rather than burst - __planetRush.damageCore(0, 2) every 400 ms above a 30 HP floor, through the sim's own damage function on a tick boundary - because the alarm latches for 5 s and a dpr-2 screenshot takes longer than that, and because UNDER-ATTACK completes on a siege survived, so an alarm that lapses mid-capture retires the prompt the capture is about. The floor is there because a dead station switches the alarm off: a siege is not a demolition. The ship is parked at its own station (dock) or 900,900 away from it (mine). Nothing about the HUD is staged. STATION ON SCREEN: a red alarm frame around the whole viewport, the local station centred and labelled YOU with a red arc on its ring, HOME 78/100 in the top right. NO arrow is drawn and NO sentence is drawn. The layout registry agrees - alarm-frame is present, alarm-arrow and onboarding are absent, and the onboarding seam reports its prompt not visible. STATION OFF SCREEN - the frame a0-99 said it could not capture: the red alarm frame is up, a red arrow is drawn at the top of the screen (19.8 x 24.7 logical, registered as alarm-arrow), and the band at the bottom reads 'Your station is under attack - follow the arrow'. The renderer's own visible-world rectangle puts home outside it, so 'off screen' here is a number and not an impression. Both profiles. So the sentence now waits for a station the arrow has something to point at, and the two arrive together. a0-99's finding - the words with no arrow, over a station already centred - does not reproduce on this build."
+  },
+  {
+    "id": "a0-111-the-alarm-arrow-is-drawn-across-the-wave-clock",
+    "title": "On the frame that settles the under-attack brief, the red arrow covers the A of WAVE",
+    "area": "hud",
+    "image": "images/a0-111-alarm-arrow-across-the-wave-clock.png",
+    "capturedAt": "2026-08-20T09:30:00Z",
+    "buildSha": "84ddec71",
+    "verdict": "failed",
+    "attestation": "PRODUCTION BUNDLE, ?debug=1, phone 798x384, build stamp in frame. Same capture as the under-attack pair, looked at closely. The alarm arrow rides the edge of the screen at the bearing of the off-screen station. At this bearing it lands on the top edge, in the middle - which is where the wave clock is. At 3x the red arrow is drawn on top of the clock's first line: it covers the A of WAVE and most of the V, leaving 'W' on one side and 'E 1/5 . Outer Drift' on the other. The clock's two lower lines, NEXT 2:16 and MATCH 0:15, are clear of it. The arrow is doing its job and the words it is standing on are still guessable, so this is a legibility defect and not a broken control. It is recorded as failed because it is a piece of UI drawn over a piece of text, on the one frame that this whole brief exists to put on the record. Nothing in the repo can catch it as it stands: the wave clock is not in the layout registry, so the rect-collision check that found the ore-counter nameplate collision is blind here, and the arrow's position depends on where the station is, which no golden frame pins."
+  }
+]

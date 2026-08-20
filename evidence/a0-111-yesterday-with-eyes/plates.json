@@ -1,0 +1,246 @@
+[
+  {
+    "id": "a0-111-end-of-match-victory-and-defeat",
+    "title": "The end of a match: VICTORY and DEFEAT, and the line under each",
+    "sub": "Production bundle, ?debug=1, no ?freeze (so the build stamp 84ddec7* is in every frame). Each ending staged through the sim's own destroyCore on the __endScreenStage seam; nothing about the WORDS is staged. The count-up sequence is skipped the way an input skips it, and the frame is taken after the sequence reports itself done.",
+    "width": 1300,
+    "blocks": [
+      {
+        "img": "desktop-1280x800-end-victory.png",
+        "caption": "desktop 1280x800. Headline VICTORY in white. Under it a blue rule, then 'You won.' and 'MATCH TIME . 00:04'. Buttons REMATCH (the one bright plate) and BACK TO MENU. The right column is the summary: ORE MINED, DAMAGE DEALT, SHIPS DESTROYED, STATIONS DESTROYED, DISTANCE TRAVELLED, SHIPS USED, ORE USED, then XP EARNED +355 XP and LEVEL 2."
+      },
+      {
+        "img": "desktop-1280x800-end-defeat.png",
+        "caption": "desktop 1280x800. Headline DEFEAT in grey, a teal rule, and 'Player 2 won.' The subhead names the winner. Same two buttons, REMATCH first."
+      },
+      {
+        "img": "phone-798x384-end-victory.png",
+        "caption": "phone 798x384. The same headline and the same sentence, 'You won.', with the summary column beside it rather than under it."
+      },
+      {
+        "img": "phone-798x384-end-defeat.png",
+        "caption": "phone 798x384. DEFEAT, a teal rule, and 'Player 2 won.' - the same seat the desktop run crowned. The winner is named on the phone too."
+      }
+    ]
+  },
+  {
+    "id": "a0-111-end-of-match-eliminated",
+    "title": "ELIMINATED, and the sentence that names no winner",
+    "sub": "Production bundle, ?debug=1. Staged with __endScreenStage.eliminateLocal() - the local core destroyed through the sim's own destroyCore while the other seven still stand (coreHp read back afterwards: 0, 100, 100, 100, 100, 100, 100, 100).",
+    "width": 1300,
+    "blocks": [
+      {
+        "img": "desktop-1280x800-end-eliminated.png",
+        "caption": "desktop 1280x800. Headline ELIMINATED in red, with no rule under it. The line beneath reads '8th of 8 - your reactor was destroyed.' It names a placing and a cause and it names NO winner. Buttons: REMATCH and SPECTATE. There is no summary column - this screen is the headline, the line, and the two plates."
+      },
+      {
+        "img": "phone-798x384-end-eliminated.png",
+        "caption": "phone 798x384. The same headline, the same sentence, the same two buttons."
+      }
+    ]
+  },
+  {
+    "id": "a0-111-end-of-match-no-draw",
+    "title": "Eight destroyed reactors, and a screen that says Player 8 won",
+    "sub": "The DRAW face of the end screen, attempted. One lethal __planetRush.damageCore(p, 999) queued for all eight seats in a SINGLE call, retried together until spawn protection lapsed and it landed, so every core fell on the same tick. Core HP read back afterwards: 0, 0, 0, 0, 0, 0, 0, 0 - on both profiles.",
+    "width": 1300,
+    "blocks": [
+      {
+        "img": "desktop-1280x800-end-draw.png",
+        "caption": "desktop 1280x800, with every reactor in the match destroyed. The headline is DEFEAT, not DRAW, and the line under it reads 'Player 8 won.' - a win credited to a station that is rubble."
+      },
+      {
+        "img": "phone-798x384-end-draw.png",
+        "caption": "phone 798x384, same staging, same frame: DEFEAT / 'Player 8 won.' over eight dead reactors."
+      }
+    ]
+  },
+  {
+    "id": "a0-111-join-flow-says-room",
+    "title": "The join screens, read word for word",
+    "sub": "Production bundle, front door (/?gate=0 -> PLAY -> JOIN). Every press lands at the point the client itself reports drawing the control at; the coordinates are in the readback beside these frames.",
+    "width": 1300,
+    "blocks": [
+      {
+        "img": "desktop-1280x800-join-1-browse.png",
+        "caption": "desktop 1280x800, the browse half. Eyebrow OPEN ROOMS under DEEP FIELD MINING AUTHORITY. Prompt PICK A ROOM. Two tabs: BROWSE (lit) and ENTER ROOM CODE. UPDATED 0s AGO on the right. The empty state reads NO OPEN ROOMS RIGHT NOW over 'Press ENTER ROOM CODE, or go BACK to HOST one.' BACK bottom-left. The word 'claim' appears nowhere."
+      },
+      {
+        "img": "desktop-1280x800-join-2-code.png",
+        "caption": "desktop 1280x800, the keypad half, reached by a real press on the ENTER ROOM CODE tab at (303,216). Eyebrow ROOM CODE. Prompt ENTER THE ROOM CODE. Four empty code cells, a 32-key pad (A-H, J-N, P-Z, 2-9), and ERASE / JOIN at the bottom right."
+      },
+      {
+        "img": "phone-798x384-join-1-browse.png",
+        "caption": "phone 798x384, the browse half. The same eyebrow, prompt, tabs and empty-state pair."
+      }
+    ]
+  },
+  {
+    "id": "a0-111-lobby-and-map-select",
+    "title": "The lobby and map select, offline",
+    "sub": "Production bundle, front door -> SOLO. The MAP card was pressed at the point the lobby reports drawing it. Offline the room is 'LOCAL' and no code is drawn.",
+    "width": 1300,
+    "blocks": [
+      {
+        "img": "phone-798x384-lobby-1-roster.png",
+        "caption": "phone 798x384. Header CREW MUSTER. Chips MODE . FFA and YIELD . SCARCE. Eight roster rows: P1 YOU (star, TAKEN, LVL 1) and P2-P8 as BOT with names Rusty / Bolt / Foreman / Patch / Sable / Vulture / Warden and tiers EASY / EASY / MEDIUM / MEDIUM / HARD / HARD / HARD, each with a ? . Right: SHIP . CHANGE over VANGUARD, and MAP . CHANGE over The Ring. Footer: BACK, '1 PLAYING . 7 BOTS', RUSH!. No visibility chip and no waiting line are drawn here - see the attestation."
+      },
+      {
+        "img": "desktop-1280x800-lobby-2-map-select.png",
+        "caption": "desktop 1280x800, map select. Title MAP SELECT, eyebrow MINING SECTOR at the right. Hint ONE MAP PER GAME . LOCKED AT RUSH. Six cards: The Ring (selected), The Compass, The Oval, Double Diamond (badged VETERAN), The Line, The Crescents, each with a station-layout diagram and one sentence. BACK bottom-left."
+      }
+    ]
+  },
+  {
+    "id": "a0-111-host-refusal-covers-the-host-door",
+    "title": "A failed HOST puts DOWNLOAD LOG over the word HOST",
+    "sub": "Production bundle, front door -> HOST, with no allocator reachable from this box. The refusal is real, not staged. Crop is nearest-neighbour at 3x of phone-798x384-join-3-host.png at physical (690,225) 520x200.",
+    "width": 1300,
+    "blocks": [
+      {
+        "img": "phone-798x384-join-3-host.png",
+        "caption": "phone 798x384. The refusal draws 'FAILED: no allocator configured' in red, 'DOWNLOAD LOG to report this.' under it, and two buttons - RETRY and DOWNLOAD LOG - across the middle of the screen. RETRY lands over the CAMPAIGN plate; DOWNLOAD LOG lands over the HOST plate."
+      },
+      {
+        "img": "crops/host-refusal-over-the-doors.png",
+        "caption": "3x crop. The DOWNLOAD LOG button is opaque and covers the top of the word HOST: only the bottom sliver of H, O, S and T shows below its lower edge. The door's own subtitle ('Start a new game and get a code for friends to join.') is untouched and readable. The door is COVERED, not unpressable - the browser reports the canvas as the receiver at HOST's own centre (589,172.5)."
+      }
+    ]
+  },
+  {
+    "id": "a0-111-doors-have-no-settings",
+    "title": "The doors screen: four doors, BACK, and no SETTINGS",
+    "sub": "Production bundle, front door (/?gate=0 -> PLAY). The seam's door list and the frame agree: campaign, solo, create, join, back.",
+    "width": 1300,
+    "blocks": [
+      {
+        "img": "desktop-1280x800-doors-0-menu.png",
+        "caption": "desktop 1280x800, the main menu that precedes the doors - PLAY, CODEX, SETTINGS, HANGAR, each with a line under it. SETTINGS is here, which is one of the two places it is meant to be."
+      },
+      {
+        "img": "desktop-1280x800-doors-1-home.png",
+        "caption": "desktop 1280x800, the doors. Title PLANET RUSH, standing line MINE . DEFEND . ATTACK. Four plates: CAMPAIGN ('A run of linked contracts.'), SOLO ('Play on your own against bots. No internet needed.', the one bright plate), HOST, JOIN. BACK sits alone in the footer. There is no SETTINGS plate and no SETTINGS word anywhere on this screen."
+      },
+      {
+        "img": "desktop-1280x800-doors-2-after-back.png",
+        "caption": "desktop 1280x800, after one real click on BACK at (114,754). The doors are gone and the main menu is back. The browser reported the canvas as the receiver at that point, and the seam went from online/visible to menu/not-visible across the press."
+      }
+    ]
+  },
+  {
+    "id": "a0-111-fire-mode-locked",
+    "title": "FIRE MODE under Tap Commander: AUTO-FIRE, dimmed, and it does not move",
+    "sub": "Production bundle, front door -> SETTINGS. Two real presses at (640,222.5) - the point the client reports drawing the FIRE MODE row at - then a control: the scheme is switched and the SAME row is pressed at the SAME point. Crop is 1x of desktop-1280x800-fire-1-at-rest.png at physical (590,375) 1400x280.",
+    "width": 1300,
+    "blocks": [
+      {
+        "img": "crops/fire-mode-locked-row.png",
+        "caption": "1x crop, desktop. The FIRE MODE row and the CONTROLS row directly under it, at their real size. FIRE MODE's label and its AUTO-FIRE chip are both drawn in a markedly dimmer grey than CONTROLS and TAP COMMANDER below them, and AUTO-FIRE's chip carries no engaged hairline. The two rows are the same plate; only the ink differs."
+      },
+      {
+        "img": "desktop-1280x800-fire-3-after-two-presses.png",
+        "caption": "desktop 1280x800, after TWO presses at (640,222.5). The row still reads FIRE MODE / AUTO-FIRE and is still dim. localStorage 'planet-rush:fireMode' was absent before the first press and absent after the second."
+      },
+      {
+        "img": "desktop-1280x800-fire-6-sticks-after-press.png",
+        "caption": "The control for the measurement. CONTROLS was pressed once, taking it to KEYBOARD + MOUSE, and FIRE MODE then went live: it read AUTO-AIM undimmed, and one press at the SAME (640,222.5) changed it to MANUAL and wrote 'manual' to localStorage. So the harness can press this row; under Tap Commander the row refuses."
+      },
+      {
+        "img": "phone-798x384-fire-pause-1-at-rest.png",
+        "caption": "phone 798x384, the OTHER door into settings - Esc from a live match, then SETTINGS on the pause overlay. FIRE MODE / AUTO-FIRE is dim here too, and one press at (209,133) left the store untouched."
+      }
+    ]
+  },
+  {
+    "id": "a0-111-fire-mode-help-explains-the-lock",
+    "title": "The FIRE MODE ? panel explains the lock",
+    "sub": "Production bundle, front door -> SETTINGS -> a real press on the row's own ? at (324,222.5).",
+    "width": 1300,
+    "blocks": [
+      {
+        "img": "desktop-1280x800-fire-4-help-panel.png",
+        "caption": "desktop 1280x800. The panel is titled FIRE MODE and reads: 'TAP COMMANDER aims and fires for you. This row is locked on AUTO-FIRE - switch CONTROLS to KEYBOARD + MOUSE to fire yourself.' It says the row is locked, who took the choice, and how to get it back. It is not a description of CONTROLS."
+      },
+      {
+        "img": "phone-798x384-fire-4-help-panel.png",
+        "caption": "phone 798x384, the same panel from the same press."
+      }
+    ]
+  },
+  {
+    "id": "a0-111-ore-counter-on-its-ground",
+    "title": "The ore counter over the busiest background the sweep found",
+    "sub": "Production bundle, ?debug=1. __oreHudStage.mine(37) puts ore in the hold and parks the ship away from home; fourteen stops around the field are then reached by real taps, and at each the counter's own registry rect (16,16 52.9x75 logical) is measured for how much of the background behind it is lit. Crop is nearest-neighbour at 4x of two of those stops at physical (0,0) 260x220.",
+    "width": 1300,
+    "blocks": [
+      {
+        "img": "crops/ore-counter-over-a-station.png",
+        "caption": "4x crops, desktop. LEFT: stop 10, the busiest background of the twenty-eight sampled - 75.2% of the rect lit - with a rival station's plating filling it. The grey word ORE and the yellow numeral 3 stay legible, and the station's silver plating is visibly DARKENED in a soft patch around them: compare the near-black plating beside the 3 with the bright silver plating of the identical panels to the right. RIGHT: stop 2, 7.3% lit, the counter over open space - ORE, the numeral 3, and a thin rule under it."
+      }
+    ]
+  },
+  {
+    "id": "a0-111-nameplate-drawn-into-the-ore-counter",
+    "title": "A rival's nameplate drawn into the ore counter",
+    "sub": "Same run. At every stop, every other registered element's rect is intersected with the counter's. Crop is nearest-neighbour at 5x of desktop-1280x800-ore-stop-7.png at physical (20,30) 290x130.",
+    "width": 1300,
+    "blocks": [
+      {
+        "img": "crops/ore-counter-and-a-rival-nameplate.png",
+        "caption": "5x crop, desktop, stop 7. The grey word ORE and the teal nameplate 'Rusty (EASY)' are drawn on the same pixels: the R of Rusty sits across the E of ORE. Two pieces of text, one place. The registry agrees - nameplates intersects ore-hud over a 20.3 x 16 logical box."
+      },
+      {
+        "img": "desktop-1280x800-ore-stop-7.png",
+        "caption": "The whole frame the crop came from, desktop 1280x800. This happened on 3 of 14 desktop stops and 1 of 14 phone stops; on the phone stop the healthbars layer landed in the counter's rect as well."
+      }
+    ]
+  },
+  {
+    "id": "a0-111-phone-minimap-in-its-corner",
+    "title": "The phone minimap, measured against the screen edge",
+    "sub": "Production bundle, ?debug=1, nothing staged. Every registered element's distance from all four edges of the logical viewport is in the readback; the numbers below are from it. Crop is nearest-neighbour at 3x of phone-798x384-minimap-corner.png at physical (1330,520) 266x248.",
+    "width": 1300,
+    "blocks": [
+      {
+        "img": "crops/phone-minimap-bottom-right-corner.png",
+        "caption": "3x crop of the phone's bottom-right corner. The minimap panel's right edge stands 12 logical px from the right edge of the screen and its bottom edge 12 px from the bottom. a0-99 measured that gap at 132 px - a sixth of the screen. Inside the panel: the fog, one coverage disc, a scatter of yellow ore marks and the blue own-ship arrowhead."
+      },
+      {
+        "img": "phone-798x384-minimap-corner.png",
+        "caption": "The whole phone frame. Its right-hand neighbours sit at 15.5 px (station-hp) and 16 px (zoom-control) from the same edge, so the minimap now overhangs them by about 4 px rather than falling short by 132."
+      }
+    ]
+  },
+  {
+    "id": "a0-111-under-attack-both-station-states",
+    "title": "The under-attack prompt, with the station on screen and off it",
+    "sub": "Production bundle, ?debug=1. A held siege - __planetRush.damageCore(0,2) every 400 ms above a 30 HP floor, through the sim's own damage function on a tick boundary - so the alarm cannot lapse mid-capture. The ship is parked at its own station (dock) or 900,900 away from it (mine). Nothing about the HUD is staged.",
+    "width": 1300,
+    "blocks": [
+      {
+        "img": "phone-798x384-under-attack-on-screen.png",
+        "caption": "phone 798x384, station ON screen. A red alarm frame around the whole viewport, the local station centred and labelled YOU with a red arc on its ring, HOME 78/100 top-right. There is NO arrow and NO 'follow the arrow' sentence. The registry agrees: alarm-frame is drawn, alarm-arrow and onboarding are not."
+      },
+      {
+        "img": "phone-798x384-under-attack-off-screen.png",
+        "caption": "phone 798x384, station OFF screen - the frame a0-99 could not take. The red alarm frame is up, a red arrow is drawn at the top of the screen, and the band at the bottom reads 'Your station is under attack - follow the arrow'. The renderer's own visible-world rectangle puts home outside it. Arrow and sentence arrive together."
+      },
+      {
+        "img": "desktop-1280x800-under-attack-off-screen.png",
+        "caption": "desktop 1280x800, station OFF screen. Same pairing: alarm frame, alarm-arrow in the registry, and the same sentence."
+      }
+    ]
+  },
+  {
+    "id": "a0-111-alarm-arrow-across-the-wave-clock",
+    "title": "The alarm arrow is drawn across the wave clock",
+    "sub": "Same frames. Crop is nearest-neighbour at 3x of phone-798x384-under-attack-off-screen.png at physical (590,20) 460x120.",
+    "width": 1300,
+    "blocks": [
+      {
+        "img": "crops/under-attack-arrow-and-wave-clock.png",
+        "caption": "3x crop, phone. The red arrow sits on top of the wave clock's own line: it covers the A of WAVE and most of the V, leaving 'W', 'E 1/5 . Outer Drift' readable around it. Below the arrow the clock's other two lines, NEXT 2:16 and MATCH 0:15, are clear. The wave clock is not in the layout registry, so no anchor or collision check can see this."
+      }
+    ]
+  }
+]
