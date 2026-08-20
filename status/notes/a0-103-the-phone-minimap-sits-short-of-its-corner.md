@@ -5,7 +5,8 @@ you work; a future you reads it first. This is a working note, not evidence —
 "done" is still the DoD, the PR and QA's attestation, never a line written here.
 
 Branch: `agent/ui/a0-103-minimap-finds-its-corner`. PR
-[#484](https://github.com/ImagineTheGames/planet-rush/pull/484).
+[#484](https://github.com/ImagineTheGames/planet-rush/pull/484) — **MERGED**
+2026-08-20, all 13 CI checks green (6 mobile-emulation shards included).
 
 ## BUILT
 
