@@ -1,0 +1,50 @@
+{
+  "profile": "phone landscape 798x384 (dpr 2, touch) — the developer's own screenshot size",
+  "boot": "?debug=1 on the production bundle (no ?freeze — the build stamp is in frame)",
+  "experiment": "last-two",
+  "staging": "the case a real match produces: seats 7,6,5,4,3,2 killed ONE AT A TIME (the match keeps running — more than one team still stands), leaving the LOCAL player (seat 0) and one rival (seat 1); those last two then killed in a SINGLE call, so their cores fell on the same tick",
+  "burstLanded": true,
+  "hpBeforeTheLastBurst": [
+    100,
+    100,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "coreHpAfter": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "everyCoreDown": true,
+  "screenReported": "result",
+  "headline": "DRAW",
+  "subhead": "No reactor survived the collapse.",
+  "result": {
+    "kind": "draw",
+    "headline": "DRAW",
+    "subhead": "No reactor survived the collapse."
+  },
+  "buttons": [
+    "rematch",
+    "menu"
+  ],
+  "subheadNamesAPlayer": false,
+  "subheadSaysWon": false,
+  "elements": [
+    "build-badge",
+    "ore-hud",
+    "banked-total",
+    "station-hp",
+    "zoom-control",
+    "minimap"
+  ]
+}

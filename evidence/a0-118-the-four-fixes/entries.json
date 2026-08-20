@@ -1,0 +1,72 @@
+[
+  {
+    "id": "a0-118-the-draw-headline-is-reachable-and-says-draw",
+    "title": "Eight cores at 0 HP now read DRAW / 'No reactor survived the collapse.' - the words a0-111 could not reach",
+    "area": "match",
+    "image": "images/a0-118-the-draw-is-reachable.png",
+    "capturedAt": "2026-08-20T17:12:00Z",
+    "buildSha": "e498b831",
+    "verdict": "verified",
+    "attestation": "PRODUCTION BUNDLE built from origin/main @ e498b831, ?debug=1, no ?freeze, build stamp e498b83* legible bottom-left in every frame. a0-111's experiment reproduced exactly - one lethal damageCore(p, 999) queued for all EIGHT seats in a SINGLE call so every core falls on the same tick, retried as a batch until spawn protection lapsed. WORD FOR WORD, what the screen says now: headline 'DRAW', and under it 'No reactor survived the collapse.', then 'MATCH TIME . 00:10'. Buttons REMATCH and BACK TO MENU. a0-111's frame from the identical burst read 'DEFEAT' and 'Player 8 won.' - both are on the plate at the same rectangle and the same 2x scale, and both say MATCH TIME . 00:10. No line on the new screen names a player; no line says anyone won. The SECOND experiment is the one a real match produces: seats 7,6,5,4,3,2 killed one at a time (the match keeps running), leaving the local player on seat 0 and one rival on seat 1 at 100 HP each, then those two killed in a single call so they die on the same tick. It reads the same: DRAW / 'No reactor survived the collapse.', MATCH TIME . 00:15. Both experiments, both profiles - phone 798x384 and desktop 1280x800 - are four frames for four, all DRAW. On the phone the headline and its line hold at the narrowest supported width without wrapping or clipping. a0-113 holds."
+  },
+  {
+    "id": "a0-118-the-refused-host-stands-clear-of-the-doors",
+    "title": "After a refused HOST, RETRY and DOWNLOAD LOG land on no door and HOST reads in full",
+    "area": "boot",
+    "image": "images/a0-118-the-refused-host-stands-clear.png",
+    "capturedAt": "2026-08-20T17:10:00Z",
+    "buildSha": "e498b831",
+    "verdict": "verified",
+    "attestation": "PRODUCTION BUNDLE @ e498b831, ?gate=0 - the front door walked: PLAY, then a REAL press at the HOST door's own reported centre, with no allocator on this box to reach. A real refusal, not a staged one: the screen shows red 'FAILED: no allocator configured' and __onlineMenu.status reads 'error'. THE BUTTONS ARE DRAWN - RETRY and DOWNLOAD LOG are both in the DOM with non-zero rects - so the empty hit-lists below are not the vacuous kind you get when a control has stopped existing. DESKTOP 1280x800: buttons occupy y217.4-261.4; the topmost door (CAMPAIGN) starts at y314.2; ~53px clear. PHONE 798x384: buttons y127.4-171.4, topmost door y186.4; ~15px clear. On BOTH profiles every refusal element reports coversDoors: [] - not one of CAMPAIGN, SOLO, HOST, JOIN or BACK has a refusal control in its rect. Pressed again at the doors' own reported coordinates: document.elementFromPoint at all five door centres returns the CANVAS on both profiles, so doorsThatDoNotReceiveTheirOwnPress is empty - nothing intercepts a door. Read off the image: HOST and its subtitle 'Start a new game and get a code for friends to join.' are fully legible on both. a0-111's frame is on the plate at the same rectangle: there the DOWNLOAD LOG button sits ON the HOST plate and only the top edges of H-O-S-T show beneath it. ONE HONEST CAVEAT, stated because the readback contains it: a single full-viewport <div> (0,0,1280,800 / 0,0,798,384, no text) geometrically intersects all five door rects, and it is the reason doorsCoveredByADomElement is not empty. It intercepts nothing - elementFromPoint proves that - so it is not a cover in the sense a0-111 measured. Also noted: the doors SHIFT DOWN ~49px (desktop) when the refusal banner appears, so the comparison uses the post-press rects, which is what the numbers above are. a0-114 holds."
+  },
+  {
+    "id": "a0-118-the-ore-counter-desktop-three-of-fourteen-is-now-one",
+    "title": "Desktop ore counter: 1 of 14 stops still reports an overlap, down from 3 of 14 - and the one that remains has nothing visible in it",
+    "area": "hud",
+    "image": "images/a0-118-the-ore-counter-sampled-again.png",
+    "capturedAt": "2026-08-20T17:14:00Z",
+    "buildSha": "e498b831",
+    "verdict": "verified",
+    "attestation": "PRODUCTION BUNDLE @ e498b831, ?debug=1, desktop 1280x800, build stamp in frame. a0-111's measurement UNCHANGED: the same fourteen headings in the same order, reached by the same real taps, with every other registered element's rect intersected against the counter's own rect at every stop. THE NUMBER: 1 of 14 desktop stops, against a0-111's 3 of 14. THE ONE THAT REMAINS IS STOP 12, AND ITS OVERLAP IS NOT A LABEL IN THE COUNTER. Magnified 4x, the counter at stop 12 reads ORE / 3 with nothing drawn into it. What the harness reports is the nameplates LAYER's union rect - x59.3 y31.8 w284.2 h626.9, the bounding box of two plates ('YOU' and 'Rusty') drawn far apart - clipping the counter's corner by 9.5x59.2 while neither glyph is near it. a0-111's frame AT THE SAME STOP reports a numerically identical overlap (x59.3 y31.8 w9.5 h59.2) and is likewise visibly clean, so this false positive was in the old count too: the honest like-for-like is 2 real collisions then, 0 now. THE TWO REAL ONES ARE BOTH FIXED. At stop 7 - the frame a0-111's verdict was written from - the teal 'Rusty (EASY)' whose R sat on the E of ORE has stepped sideways: ORE and the numeral 3 are clean and the label stands to the right of the counter. Stop 0 the same. THE ZERO IS NOT PAID FOR BY LABELS THAT STOPPED BEING DRAWN: the nameplates layer is present at all 14 of 14 stops in BOTH runs, and __nameplateStage.plates() reports 1-2 plates drawn at every stop. a0-115 holds on desktop. See the separate phone entry - that profile's zero rests on a thinner sample and is not claimed as the same strength of evidence."
+  },
+  {
+    "id": "a0-118-the-ore-counter-phone-zero-of-fourteen-on-a-thinner-sample",
+    "title": "Phone ore counter: 0 of 14 stops, down from 1 of 14 - but the stop that failed before drew no nameplate at all this run",
+    "area": "hud",
+    "image": "images/a0-118-the-ore-counter-sampled-again.png",
+    "capturedAt": "2026-08-20T17:14:00Z",
+    "buildSha": "e498b831",
+    "verdict": "inconclusive",
+    "attestation": "PRODUCTION BUNDLE @ e498b831, ?debug=1, phone landscape 798x384, build stamp in frame. Same fourteen headings, same order, same intersection test. THE NUMBER: 0 of 14 phone stops, against a0-111's 1 of 14. Nothing landed in the counter's rect at any stop. I am NOT recording this as verified, because the cross-check says the sample is thinner than the one it is being compared with. __nameplateStage.plates() reports a nameplate drawn at only 3 of the 14 phone stops (stops 5, 10 and 11); in a0-111's phone run the nameplates layer was present at 6 of 14. More to the point, a0-111's single phone collision was at STOP 3 - and at stop 3 this run drew no nameplate at all, so the exact frame that failed could not be re-created to be re-tested. A zero over eleven stops with no label to place is not evidence that a label would step aside. What CAN be said: at the three phone stops that did draw a label, the label was outside the counter's rect, and the counter read ORE and its numeral cleanly. The desktop profile is where a0-115 is actually demonstrated - there the two real collisions were reproduced at their own stops and are gone. This entry exists rather than being averaged into the desktop one because the two profiles are two claims and only one of them is proven."
+  },
+  {
+    "id": "a0-118-the-alarm-arrow-is-clear-of-the-wave-clock",
+    "title": "The red arrow now sits below the wave clock's rule - WAVE reads in full, including at dead top-centre",
+    "area": "hud",
+    "image": "images/a0-118-the-alarm-arrow-and-the-wave-clock.png",
+    "capturedAt": "2026-08-20T17:20:00Z",
+    "buildSha": "e498b831",
+    "verdict": "verified",
+    "attestation": "PRODUCTION BUNDLE @ e498b831 - which INCLUDES a0-116 (PR #493, merged as 6c9963c2). This is a test of that fix; the bundle was rebuilt from e498b831 and every frame in this brief was re-taken against it. ?debug=1, no ?freeze. Staging is a0-111's: __oreHudStage.mine(0) puts home off screen, plus a HELD siege (damageCore(0, 2) every 400ms above a 30 HP floor), because the alarm latches 5s and drains and a leisurely dpr-2 capture otherwise photographs a released alarm. AT a0-111'S OWN BEARING, PHONE: a0-111 read 'the red arrow is drawn on top of the clock's first line: it covers the A of WAVE and most of the V' - its frame reads 'W VE 1/5 . Outer Drift'. The same rectangle at the same 3x scale on this build reads 'WAVE 1/5 . Outer Drift' complete: the arrow has dropped below the clock's hairline rule. DESKTOP: the arrow's registry rect moved from y13.9 (a0-111) to y85.0 - it gave up radius, not bearing - and sits below the rule under MATCH, clear of all three lines. THEN THE HARDER QUESTION, because whether the arrow lands on the clock is a fact about where the ship is standing: the ship was flown around the glass with eight REAL taps and the arrow's rect recorded at each. The worst bearing the sweep could find is phone sweep stop 1, where the arrow's centre stands 1.8 logical px from the horizontal centre of the glass - dead centre of the top edge, directly under the clock. Read off that frame: the arrow points straight up from BELOW the rule and all three lines - WAVE 1/5 . Outer Drift, NEXT 2:04, MATCH 0:27 - are readable. WHAT THIS DOES NOT CARRY, and why: the wave clock still has no layout-registry row (src/ui/hud.ts describeLayout does not register it; a0-115 added wave-clock to HUD_READOUT_IDS, but that is a keep-out rule inside the HUD, not a rect a harness can read), so there is NO intersection number for this item and none is invented - the verdict is read off the magnified crop, which is the instrument a0-111 used. Also stated plainly: 6 of the 8 sweep stops drew no arrow at all, because flying toward home brings the station on screen and the arrow retires; the verdict rests on the 2 stops that drew one plus a0-111's bearing on both profiles. a0-116 holds."
+  },
+  {
+    "id": "a0-118-two-nameplates-drawn-on-the-same-pixels",
+    "title": "Not one of the four: two nameplates for the same owner are drawn on each other and neither can be read",
+    "area": "hud",
+    "image": "images/a0-118-two-nameplates-on-the-same-pixels.png",
+    "capturedAt": "2026-08-20T17:14:00Z",
+    "buildSha": "e498b831",
+    "verdict": "failed",
+    "attestation": "PRODUCTION BUNDLE @ e498b831, ?debug=1, desktop 1280x800. Found while sampling the ore counter for item 3, not looked for. At desktop ore stop 7, magnified 4x, two teal nameplates are drawn overlapping and the strip reads 'Rusty(ERusty(EASY)'. __nameplateStage.plates() reports TWO plates at this stop, both owner 1, both text 'Rusty' (the '(EASY)' difficulty tag is appended at draw time). In the overlap region neither label is legible. This is a fault BETWEEN two world labels, not a label inside a HUD readout: the ore counter in this same frame is clean, which is why item 3 is recorded as holding. I am NOT attributing this to a0-115. a0-115's rule moves a label sideways out of a readout's rect, and both of these labels have stepped clear of the counter, so it is possible the rule placed them on each other - but it is equally possible this is just two of player 1's ships standing close together, a condition a0-111's frames did not happen to contain, and nothing I can see from the outside distinguishes those two stories. What is certain is what the frame shows: two labels, same pixels, neither readable. Worth a brief for whoever owns the nameplate layer."
+  },
+  {
+    "id": "a0-118-the-four-fixes-summary",
+    "title": "All four of a0-111's defects hold as fixed on origin/main @ e498b831; one new legibility fault found alongside them",
+    "area": "match",
+    "image": "images/a0-118-the-draw-is-reachable.png",
+    "capturedAt": "2026-08-20T17:22:00Z",
+    "buildSha": "e498b831",
+    "verdict": "verified",
+    "attestation": "SUMMARY of a0-118. a0-111 found four defects that green CI had passed; all four were briefed, fixed and merged; this brief pointed the same camera at the same four screens. WHAT WAS ON MAIN AT CAPTURE TIME, checked first: a0-113 (6671a9de, PR #491), a0-114 (cbca11c8, PR #490), a0-115 (b48cf2cd, PR #492) and a0-116 (6c9963c2, PR #493) are ALL merged into origin/main @ e498b831. a0-116 merged between the bench being written and the frames being taken - the branch was re-baselined onto e498b831, the bundle rebuilt from it, and every frame re-taken, so no frame in this brief predates any of the four fixes and all wear the stamp e498b83*. FOUR OF FOUR HOLD. (1) DRAW: eight cores at 0 HP now read 'DRAW' / 'No reactor survived the collapse.' where a0-111 got 'DEFEAT' / 'Player 8 won.'; the two-seat same-tick case a real match produces reads the same. (2) The refused HOST: RETRY and DOWNLOAD LOG are drawn and cover no door on either profile (~53px clear desktop, ~15px phone), and elementFromPoint at all five doors' own centres returns the canvas. (3) The ore counter: desktop 3 of 14 -> 1 of 14, and the survivor is a union-rect artifact that is visibly clean and was present in a0-111's numbers too, so 2 real -> 0 real; the nameplate layer is still drawn at 14 of 14 stops, so the drop is not paid for by vanished labels. (4) The alarm arrow: it gave up radius (desktop rect y13.9 -> y85.0) and sits below the wave clock's rule, with WAVE readable at a0-111's bearing on both profiles and at the worst bearing an eight-tap sweep could find. TWO THINGS THIS RUN WILL NOT CLAIM. The PHONE half of item 3 is recorded separately as inconclusive: 0 of 14 is real, but a nameplate was drawn at only 3 of 14 phone stops this run against 6 of 14 in a0-111, and a0-111's one failing stop drew no label at all, so the frame that failed could not be re-created. And a fault a0-111's frames did not contain: at desktop ore stop 7 two nameplates for the same owner are drawn on each other and neither is readable - recorded as failed under its own id, unattributed."
+  }
+]

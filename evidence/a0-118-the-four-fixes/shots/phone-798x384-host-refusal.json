@@ -1,0 +1,440 @@
+{
+  "profile": "phone landscape 798x384 (dpr 2, touch) — the developer's own screenshot size",
+  "boot": "?gate=0 on the production bundle — the front door, walked (no ?freeze: the build stamp is in frame)",
+  "route": "front door -> PLAY -> the doors -> a REAL press on HOST, with no allocator on this box to reach",
+  "pressedHostAt": {
+    "x": 589,
+    "y": 172.5
+  },
+  "doorsBeforeThePress": [
+    {
+      "door": "campaign",
+      "centre": {
+        "x": 209,
+        "y": 172.5
+      },
+      "bounds": {
+        "x": 23,
+        "y": 141.5,
+        "width": 372,
+        "height": 62
+      }
+    },
+    {
+      "door": "solo",
+      "centre": {
+        "x": 209,
+        "y": 246
+      },
+      "bounds": {
+        "x": 23,
+        "y": 211.5,
+        "width": 372,
+        "height": 69
+      }
+    },
+    {
+      "door": "create",
+      "centre": {
+        "x": 589,
+        "y": 172.5
+      },
+      "bounds": {
+        "x": 403,
+        "y": 141.5,
+        "width": 372,
+        "height": 62
+      }
+    },
+    {
+      "door": "join",
+      "centre": {
+        "x": 589,
+        "y": 242.5
+      },
+      "bounds": {
+        "x": 403,
+        "y": 211.5,
+        "width": 372,
+        "height": 62
+      }
+    },
+    {
+      "door": "back",
+      "centre": {
+        "x": 83,
+        "y": 359.5
+      },
+      "bounds": {
+        "x": 23,
+        "y": 335.5,
+        "width": 120,
+        "height": 48
+      }
+    }
+  ],
+  "doors": [
+    {
+      "door": "campaign",
+      "centre": {
+        "x": 209,
+        "y": 216.1030534351145
+      },
+      "bounds": {
+        "x": 23,
+        "y": 186.375,
+        "width": 372,
+        "height": 59.45610687022901
+      }
+    },
+    {
+      "door": "solo",
+      "centre": {
+        "x": 209,
+        "y": 286.9155534351145
+      },
+      "bounds": {
+        "x": 23,
+        "y": 253.831106870229,
+        "width": 372,
+        "height": 66.16889312977099
+      }
+    },
+    {
+      "door": "create",
+      "centre": {
+        "x": 589,
+        "y": 216.1030534351145
+      },
+      "bounds": {
+        "x": 403,
+        "y": 186.375,
+        "width": 372,
+        "height": 59.45610687022901
+      }
+    },
+    {
+      "door": "join",
+      "centre": {
+        "x": 589,
+        "y": 283.55916030534354
+      },
+      "bounds": {
+        "x": 403,
+        "y": 253.831106870229,
+        "width": 372,
+        "height": 59.45610687022901
+      }
+    },
+    {
+      "door": "back",
+      "centre": {
+        "x": 83,
+        "y": 359.5
+      },
+      "bounds": {
+        "x": 23,
+        "y": 335.5,
+        "width": 120,
+        "height": 48
+      }
+    }
+  ],
+  "reach": [
+    {
+      "door": "campaign",
+      "at": {
+        "x": 209,
+        "y": 216.1030534351145
+      },
+      "receivedBy": {
+        "tag": "canvas",
+        "text": "",
+        "zIndex": "auto",
+        "isCanvas": true
+      }
+    },
+    {
+      "door": "solo",
+      "at": {
+        "x": 209,
+        "y": 286.9155534351145
+      },
+      "receivedBy": {
+        "tag": "canvas",
+        "text": "",
+        "zIndex": "auto",
+        "isCanvas": true
+      }
+    },
+    {
+      "door": "create",
+      "at": {
+        "x": 589,
+        "y": 216.1030534351145
+      },
+      "receivedBy": {
+        "tag": "canvas",
+        "text": "",
+        "zIndex": "auto",
+        "isCanvas": true
+      }
+    },
+    {
+      "door": "join",
+      "at": {
+        "x": 589,
+        "y": 283.55916030534354
+      },
+      "receivedBy": {
+        "tag": "canvas",
+        "text": "",
+        "zIndex": "auto",
+        "isCanvas": true
+      }
+    },
+    {
+      "door": "back",
+      "at": {
+        "x": 83,
+        "y": 359.5
+      },
+      "receivedBy": {
+        "tag": "canvas",
+        "text": "",
+        "zIndex": "auto",
+        "isCanvas": true
+      }
+    }
+  ],
+  "domElementsCoveringADoor": [
+    {
+      "tag": "div",
+      "text": "",
+      "zIndex": "auto",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 798,
+        "height": 384
+      },
+      "coversDoors": [
+        {
+          "door": "campaign",
+          "intersection": {
+            "x": 23,
+            "y": 186.375,
+            "width": 372,
+            "height": 59.45610687022901
+          }
+        },
+        {
+          "door": "solo",
+          "intersection": {
+            "x": 23,
+            "y": 253.831106870229,
+            "width": 372,
+            "height": 66.16889312977099
+          }
+        },
+        {
+          "door": "create",
+          "intersection": {
+            "x": 403,
+            "y": 186.375,
+            "width": 372,
+            "height": 59.45610687022901
+          }
+        },
+        {
+          "door": "join",
+          "intersection": {
+            "x": 403,
+            "y": 253.831106870229,
+            "width": 372,
+            "height": 59.45610687022901
+          }
+        },
+        {
+          "door": "back",
+          "intersection": {
+            "x": 23,
+            "y": 335.5,
+            "width": 120,
+            "height": 48
+          }
+        }
+      ]
+    }
+  ],
+  "domElementsDrawn": 6,
+  "allDomOverlays": [
+    {
+      "tag": "div",
+      "text": "",
+      "zIndex": "auto",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 798,
+        "height": 384
+      },
+      "coversDoors": [
+        {
+          "door": "campaign",
+          "intersection": {
+            "x": 23,
+            "y": 186.375,
+            "width": 372,
+            "height": 59.45610687022901
+          }
+        },
+        {
+          "door": "solo",
+          "intersection": {
+            "x": 23,
+            "y": 253.831106870229,
+            "width": 372,
+            "height": 66.16889312977099
+          }
+        },
+        {
+          "door": "create",
+          "intersection": {
+            "x": 403,
+            "y": 186.375,
+            "width": 372,
+            "height": 59.45610687022901
+          }
+        },
+        {
+          "door": "join",
+          "intersection": {
+            "x": 403,
+            "y": 253.831106870229,
+            "width": 372,
+            "height": 59.45610687022901
+          }
+        },
+        {
+          "door": "back",
+          "intersection": {
+            "x": 23,
+            "y": 335.5,
+            "width": 120,
+            "height": 48
+          }
+        }
+      ]
+    },
+    {
+      "tag": "div",
+      "text": "#pr-connect-trace{position:fixed;z-index:2147483646;pointer-",
+      "zIndex": "2147483646",
+      "rect": {
+        "x": 159,
+        "y": 102,
+        "width": 480,
+        "height": 69.375
+      },
+      "coversDoors": []
+    },
+    {
+      "tag": "p",
+      "text": "DOWNLOAD LOG to report this.",
+      "zIndex": "auto",
+      "rect": {
+        "x": 306,
+        "y": 102,
+        "width": 186,
+        "height": 18.1875
+      },
+      "coversDoors": []
+    },
+    {
+      "tag": "div",
+      "text": "RETRYDOWNLOAD LOG",
+      "zIndex": "auto",
+      "rect": {
+        "x": 249.609375,
+        "y": 127.375,
+        "width": 298.78125,
+        "height": 44
+      },
+      "coversDoors": []
+    },
+    {
+      "tag": "button",
+      "text": "RETRY",
+      "zIndex": "auto",
+      "rect": {
+        "x": 249.609375,
+        "y": 127.375,
+        "width": 100.1875,
+        "height": 44
+      },
+      "coversDoors": []
+    },
+    {
+      "tag": "button",
+      "text": "DOWNLOAD LOG",
+      "zIndex": "auto",
+      "rect": {
+        "x": 359.390625,
+        "y": 127.375,
+        "width": 189,
+        "height": 44
+      },
+      "coversDoors": []
+    }
+  ],
+  "online": {
+    "screen": "home",
+    "status": "error",
+    "error": "Can’t reach the servers. Check your connection — SOLO still works.",
+    "notice": "",
+    "messageBounds": {
+      "x": 23,
+      "y": 64,
+      "width": 752,
+      "height": 23
+    }
+  },
+  "doorsCoveredByADomElement": [
+    "campaign",
+    "solo",
+    "create",
+    "join",
+    "back"
+  ],
+  "doorsThatDoNotReceiveTheirOwnPress": [],
+  "screenText": [
+    "A run of linked contracts.",
+    "BACK",
+    "CAMPAIGN",
+    "CODEX",
+    "CONTRACT OPEN · SECTOR 04",
+    "Controls, audio, visual effects",
+    "DEEP FIELD MINING AUTHORITY",
+    "e498b83*",
+    "FAILED: no allocator configured",
+    "HANGAR",
+    "HOST",
+    "JOIN",
+    "MINE · DEFEND · ATTACK",
+    "Objective, Bots, Ships, Systems, Strategy",
+    "Open a rig and take the field",
+    "PLANET RUSH",
+    "PLAY",
+    "Play on your own against bots. No internet",
+    "Play on your own against bots. No internetneeded.",
+    "SETTINGS",
+    "SOLO",
+    "Start a new game and get a code for friends",
+    "Start a new game and get a code for friendsto join.",
+    "Type in a friend’s code to join their game.",
+    "Your ship, your level, what you have unlocked"
+  ],
+  "retryHits": [],
+  "downloadHits": []
+}

@@ -1,0 +1,766 @@
+{
+  "profile": "phone landscape 798x384 (dpr 2, touch) — the developer's own screenshot size",
+  "boot": "?debug=1 on the production bundle (no ?freeze — the build stamp is in frame)",
+  "staged": "__oreHudStage.mine(37) — 37 ore in the hold, ship parked away from home: {\"cargo\":37,\"cargoCap\":37,\"banked\":3}",
+  "method": "a0-111's measurement, unchanged: fourteen stops around the field reached by real taps (Tap Commander, the shipped default), with every other registered element's rect intersected against the counter's own rect at each stop",
+  "stopsWithSomethingInTheCounterRect": 0,
+  "stopsSampled": 14,
+  "a0111Baseline": "1 of 14 phone stops",
+  "busiestBackground": {
+    "name": "phone-798x384-ore-stop-12",
+    "lit": 1563,
+    "warm": 331
+  },
+  "framesWithSomethingDrawnIntoTheCounter": [],
+  "stops": [
+    {
+      "stop": 0,
+      "tappedAt": null,
+      "oreHudRect": {
+        "x": 16,
+        "y": 16,
+        "width": 52.866666666666674,
+        "height": 60
+      },
+      "measured": {
+        "total": 12720,
+        "lit": 1118,
+        "warm": 315,
+        "litPct": 8.8
+      },
+      "drawnIntoTheCounterRect": [],
+      "elements": [
+        "ship-local",
+        "build-badge",
+        "pause-button",
+        "ore-hud",
+        "banked-total",
+        "station-hp",
+        "zoom-control",
+        "onboarding",
+        "minimap",
+        "ore-hold"
+      ],
+      "readout": {
+        "cargo": 37,
+        "banked": 3
+      },
+      "total": 3,
+      "ship": {
+        "x": 2384,
+        "y": 2100,
+        "vx": 0,
+        "vy": 0
+      },
+      "world": {
+        "left": 1985,
+        "top": 1908,
+        "right": 2783,
+        "bottom": 2292,
+        "width": 798,
+        "height": 384
+      },
+      "platesDrawn": []
+    },
+    {
+      "stop": 1,
+      "tappedAt": {
+        "x": 119.69999999999999,
+        "y": 76.80000000000001
+      },
+      "oreHudRect": {
+        "x": 16,
+        "y": 16,
+        "width": 52.866666666666674,
+        "height": 60
+      },
+      "measured": {
+        "total": 12720,
+        "lit": 3675,
+        "warm": 273,
+        "litPct": 28.9
+      },
+      "drawnIntoTheCounterRect": [],
+      "elements": [
+        "ship-local",
+        "build-badge",
+        "pause-button",
+        "ore-hud",
+        "banked-total",
+        "station-hp",
+        "zoom-control",
+        "onboarding",
+        "minimap",
+        "ore-hold",
+        "healthbars"
+      ],
+      "readout": {
+        "cargo": 37,
+        "banked": 3
+      },
+      "total": 3,
+      "ship": {
+        "x": 2086.351888270952,
+        "y": 1977.2321475539602,
+        "vx": -0.0004772884307463126,
+        "vy": -0.00019686224548740117
+      },
+      "world": {
+        "left": 1687.3518882709518,
+        "top": 1785.2321475539602,
+        "right": 2485.351888270952,
+        "bottom": 2169.23214755396,
+        "width": 798,
+        "height": 384
+      },
+      "platesDrawn": []
+    },
+    {
+      "stop": 2,
+      "tappedAt": {
+        "x": 678.3,
+        "y": 76.80000000000001
+      },
+      "oreHudRect": {
+        "x": 16,
+        "y": 16,
+        "width": 52.866666666666674,
+        "height": 60
+      },
+      "measured": {
+        "total": 12720,
+        "lit": 1092,
+        "warm": 260,
+        "litPct": 8.6
+      },
+      "drawnIntoTheCounterRect": [],
+      "elements": [
+        "ship-local",
+        "build-badge",
+        "pause-button",
+        "ore-hud",
+        "banked-total",
+        "station-hp",
+        "zoom-control",
+        "onboarding",
+        "minimap",
+        "ore-hold",
+        "healthbars"
+      ],
+      "readout": {
+        "cargo": 37,
+        "banked": 3
+      },
+      "total": 3,
+      "ship": {
+        "x": 2383.9999824346396,
+        "y": 1854.4641840546003,
+        "vx": 0.00005827049664865041,
+        "vy": -0.00002403422951106633
+      },
+      "world": {
+        "left": 1984.9999824346396,
+        "top": 1662.4641840546003,
+        "right": 2782.9999824346396,
+        "bottom": 2046.4641840546003,
+        "width": 798,
+        "height": 384
+      },
+      "platesDrawn": []
+    },
+    {
+      "stop": 3,
+      "tappedAt": {
+        "x": 678.3,
+        "y": 307.20000000000005
+      },
+      "oreHudRect": {
+        "x": 16,
+        "y": 16,
+        "width": 52.866666666666674,
+        "height": 60
+      },
+      "measured": {
+        "total": 12720,
+        "lit": 998,
+        "warm": 261,
+        "litPct": 7.8
+      },
+      "drawnIntoTheCounterRect": [],
+      "elements": [
+        "ship-local",
+        "build-badge",
+        "pause-button",
+        "ore-hud",
+        "banked-total",
+        "station-hp",
+        "zoom-control",
+        "onboarding",
+        "minimap",
+        "ore-hold",
+        "tap-waypoint-marker",
+        "healthbars"
+      ],
+      "readout": {
+        "cargo": 37,
+        "banked": 3
+      },
+      "total": 3,
+      "ship": {
+        "x": 2384,
+        "y": 1969.6819905414065,
+        "vx": 0,
+        "vy": -0.047466787899793375
+      },
+      "world": {
+        "left": 1985,
+        "top": 1777.6819905414065,
+        "right": 2783,
+        "bottom": 2161.681990541407,
+        "width": 798,
+        "height": 384.0000000000002
+      },
+      "platesDrawn": []
+    },
+    {
+      "stop": 4,
+      "tappedAt": {
+        "x": 119.69999999999999,
+        "y": 307.20000000000005
+      },
+      "oreHudRect": {
+        "x": 16,
+        "y": 16,
+        "width": 52.866666666666674,
+        "height": 60
+      },
+      "measured": {
+        "total": 12720,
+        "lit": 1143,
+        "warm": 260,
+        "litPct": 9
+      },
+      "drawnIntoTheCounterRect": [],
+      "elements": [
+        "ship-local",
+        "build-badge",
+        "pause-button",
+        "ore-hud",
+        "banked-total",
+        "station-hp",
+        "zoom-control",
+        "onboarding",
+        "minimap",
+        "ore-hold",
+        "healthbars"
+      ],
+      "readout": {
+        "cargo": 37,
+        "banked": 3
+      },
+      "total": 3,
+      "ship": {
+        "x": 2086.3527406494427,
+        "y": 2092.4336421884404,
+        "vx": -0.0024639255274450287,
+        "vy": 0.0010163200835978218
+      },
+      "world": {
+        "left": 1687.3527406494427,
+        "top": 1900.4336421884404,
+        "right": 2485.3527406494427,
+        "bottom": 2284.4336421884404,
+        "width": 798,
+        "height": 384
+      },
+      "platesDrawn": []
+    },
+    {
+      "stop": 5,
+      "tappedAt": {
+        "x": 399,
+        "y": 46.08
+      },
+      "oreHudRect": {
+        "x": 16,
+        "y": 16,
+        "width": 52.866666666666674,
+        "height": 60
+      },
+      "measured": {
+        "total": 12720,
+        "lit": 4705,
+        "warm": 308,
+        "litPct": 37
+      },
+      "drawnIntoTheCounterRect": [],
+      "elements": [
+        "ship-local",
+        "build-badge",
+        "pause-button",
+        "ore-hud",
+        "banked-total",
+        "station-hp",
+        "zoom-control",
+        "onboarding",
+        "nameplates",
+        "minimap",
+        "ore-hold",
+        "healthbars"
+      ],
+      "readout": {
+        "cargo": 37,
+        "banked": 3
+      },
+      "total": 3,
+      "ship": {
+        "x": 2086.3521808010314,
+        "y": 1937.5725852771502,
+        "vx": 2.0810143540739792e-10,
+        "vy": -0.00011445970603414321
+      },
+      "world": {
+        "left": 1687.3521808010314,
+        "top": 1745.5725852771502,
+        "right": 2485.3521808010314,
+        "bottom": 2129.57258527715,
+        "width": 798,
+        "height": 384
+      },
+      "platesDrawn": [
+        {
+          "owner": 1,
+          "text": "Rusty"
+        }
+      ]
+    },
+    {
+      "stop": 6,
+      "tappedAt": {
+        "x": 718.2,
+        "y": 192
+      },
+      "oreHudRect": {
+        "x": 16,
+        "y": 16,
+        "width": 52.866666666666674,
+        "height": 60
+      },
+      "measured": {
+        "total": 12720,
+        "lit": 1238,
+        "warm": 261,
+        "litPct": 9.7
+      },
+      "drawnIntoTheCounterRect": [],
+      "elements": [
+        "ship-local",
+        "build-badge",
+        "pause-button",
+        "ore-hud",
+        "banked-total",
+        "station-hp",
+        "zoom-control",
+        "onboarding",
+        "minimap",
+        "ore-hold",
+        "healthbars"
+      ],
+      "readout": {
+        "cargo": 37,
+        "banked": 3
+      },
+      "total": 3,
+      "ship": {
+        "x": 2384,
+        "y": 1937.572555127383,
+        "vx": 0,
+        "vy": 6.864534042088316e-11
+      },
+      "world": {
+        "left": 1985,
+        "top": 1745.572555127383,
+        "right": 2783,
+        "bottom": 2129.572555127383,
+        "width": 798,
+        "height": 384
+      },
+      "platesDrawn": []
+    },
+    {
+      "stop": 7,
+      "tappedAt": {
+        "x": 399,
+        "y": 337.92
+      },
+      "oreHudRect": {
+        "x": 16,
+        "y": 16,
+        "width": 52.866666666666674,
+        "height": 60
+      },
+      "measured": {
+        "total": 12720,
+        "lit": 1113,
+        "warm": 312,
+        "litPct": 8.8
+      },
+      "drawnIntoTheCounterRect": [],
+      "elements": [
+        "ship-local",
+        "build-badge",
+        "pause-button",
+        "ore-hud",
+        "banked-total",
+        "station-hp",
+        "zoom-control",
+        "onboarding",
+        "minimap",
+        "ore-hold",
+        "healthbars"
+      ],
+      "readout": {
+        "cargo": 37,
+        "banked": 3
+      },
+      "total": 3,
+      "ship": {
+        "x": 2384,
+        "y": 2092.433777477711,
+        "vx": 0,
+        "vy": 0.00037239978729821955
+      },
+      "world": {
+        "left": 1985,
+        "top": 1900.433777477711,
+        "right": 2783,
+        "bottom": 2284.433777477711,
+        "width": 798,
+        "height": 384
+      },
+      "platesDrawn": []
+    },
+    {
+      "stop": 8,
+      "tappedAt": {
+        "x": 79.80000000000001,
+        "y": 192
+      },
+      "oreHudRect": {
+        "x": 16,
+        "y": 16,
+        "width": 52.866666666666674,
+        "height": 60
+      },
+      "measured": {
+        "total": 12720,
+        "lit": 1257,
+        "warm": 260,
+        "litPct": 9.9
+      },
+      "drawnIntoTheCounterRect": [],
+      "elements": [
+        "ship-local",
+        "build-badge",
+        "pause-button",
+        "ore-hud",
+        "banked-total",
+        "station-hp",
+        "zoom-control",
+        "onboarding",
+        "minimap",
+        "ore-hold",
+        "healthbars"
+      ],
+      "readout": {
+        "cargo": 37,
+        "banked": 3
+      },
+      "total": 3,
+      "ship": {
+        "x": 2044.912010512482,
+        "y": 2092.433872272171,
+        "vx": -0.004922052189586635,
+        "vy": -4.820739908229556e-10
+      },
+      "world": {
+        "left": 1645.912010512482,
+        "top": 1900.433872272171,
+        "right": 2443.912010512482,
+        "bottom": 2284.433872272171,
+        "width": 798,
+        "height": 384
+      },
+      "platesDrawn": []
+    },
+    {
+      "stop": 9,
+      "tappedAt": {
+        "x": 159.60000000000002,
+        "y": 57.599999999999994
+      },
+      "oreHudRect": {
+        "x": 16,
+        "y": 16,
+        "width": 52.866666666666674,
+        "height": 60
+      },
+      "measured": {
+        "total": 12720,
+        "lit": 1117,
+        "warm": 260,
+        "litPct": 8.8
+      },
+      "drawnIntoTheCounterRect": [],
+      "elements": [
+        "build-badge",
+        "pause-button",
+        "ore-hud",
+        "banked-total",
+        "station-hp",
+        "zoom-control",
+        "onboarding",
+        "minimap",
+        "healthbars",
+        "respawn-countdown"
+      ],
+      "readout": {
+        "cargo": 0,
+        "banked": 3
+      },
+      "total": 3,
+      "ship": {
+        "x": 1815.7244824331774,
+        "y": 1963.7678948586768,
+        "vx": 0,
+        "vy": 0
+      },
+      "world": {
+        "left": 1416.7244824331774,
+        "top": 1771.7678948586768,
+        "right": 2214.7244824331774,
+        "bottom": 2155.7678948586768,
+        "width": 798,
+        "height": 384
+      },
+      "platesDrawn": []
+    },
+    {
+      "stop": 10,
+      "tappedAt": {
+        "x": 638.4000000000001,
+        "y": 57.599999999999994
+      },
+      "oreHudRect": {
+        "x": 16,
+        "y": 16,
+        "width": 52.866666666666674,
+        "height": 60
+      },
+      "measured": {
+        "total": 12720,
+        "lit": 2943,
+        "warm": 260,
+        "litPct": 23.1
+      },
+      "drawnIntoTheCounterRect": [],
+      "elements": [
+        "ship-local",
+        "build-button",
+        "build-badge",
+        "pause-button",
+        "ore-hud",
+        "banked-total",
+        "station-hp",
+        "zoom-control",
+        "nameplates",
+        "minimap"
+      ],
+      "readout": {
+        "cargo": 0,
+        "banked": 3
+      },
+      "total": 3,
+      "ship": {
+        "x": 1968,
+        "y": 1200,
+        "vx": 0,
+        "vy": 0
+      },
+      "world": {
+        "left": 1569,
+        "top": 1008,
+        "right": 2367,
+        "bottom": 1392,
+        "width": 798,
+        "height": 384
+      },
+      "platesDrawn": [
+        {
+          "owner": 0,
+          "text": "YOU"
+        }
+      ]
+    },
+    {
+      "stop": 11,
+      "tappedAt": {
+        "x": 159.60000000000002,
+        "y": 326.4
+      },
+      "oreHudRect": {
+        "x": 16,
+        "y": 16,
+        "width": 52.866666666666674,
+        "height": 60
+      },
+      "measured": {
+        "total": 12720,
+        "lit": 974,
+        "warm": 260,
+        "litPct": 7.7
+      },
+      "drawnIntoTheCounterRect": [],
+      "elements": [
+        "ship-local",
+        "build-badge",
+        "pause-button",
+        "ore-hud",
+        "banked-total",
+        "station-hp",
+        "zoom-control",
+        "nameplates",
+        "minimap",
+        "ore-hold",
+        "healthbars"
+      ],
+      "readout": {
+        "cargo": 0,
+        "banked": 3
+      },
+      "total": 3,
+      "ship": {
+        "x": 1711.9212750956524,
+        "y": 1343.7634918196575,
+        "vx": -0.007494860806156253,
+        "vy": 0.004207641070525616
+      },
+      "world": {
+        "left": 1312.9212750956524,
+        "top": 1151.7634918196575,
+        "right": 2110.921275095652,
+        "bottom": 1535.7634918196575,
+        "width": 797.9999999999998,
+        "height": 384
+      },
+      "platesDrawn": [
+        {
+          "owner": 1,
+          "text": "Rusty"
+        }
+      ]
+    },
+    {
+      "stop": 12,
+      "tappedAt": {
+        "x": 638.4000000000001,
+        "y": 326.4
+      },
+      "oreHudRect": {
+        "x": 16,
+        "y": 16,
+        "width": 52.866666666666674,
+        "height": 60
+      },
+      "measured": {
+        "total": 12720,
+        "lit": 1563,
+        "warm": 331,
+        "litPct": 12.3
+      },
+      "drawnIntoTheCounterRect": [],
+      "elements": [
+        "ship-local",
+        "build-badge",
+        "pause-button",
+        "ore-hud",
+        "banked-total",
+        "station-hp",
+        "zoom-control",
+        "minimap",
+        "healthbars"
+      ],
+      "readout": {
+        "cargo": 0,
+        "banked": 3
+      },
+      "total": 3,
+      "ship": {
+        "x": 1967.9958139386463,
+        "y": 1487.5261844696968,
+        "vx": 0.016177544519379673,
+        "vy": 0.009082030162604652
+      },
+      "world": {
+        "left": 1568.9958139386463,
+        "top": 1295.5261844696968,
+        "right": 2366.9958139386463,
+        "bottom": 1679.5261844696968,
+        "width": 798,
+        "height": 384
+      },
+      "platesDrawn": []
+    },
+    {
+      "stop": 13,
+      "tappedAt": {
+        "x": 399,
+        "y": 57.599999999999994
+      },
+      "oreHudRect": {
+        "x": 16,
+        "y": 16,
+        "width": 52.866666666666674,
+        "height": 60
+      },
+      "measured": {
+        "total": 12720,
+        "lit": 945,
+        "warm": 260,
+        "litPct": 7.4
+      },
+      "drawnIntoTheCounterRect": [],
+      "elements": [
+        "ship-local",
+        "build-badge",
+        "pause-button",
+        "ore-hud",
+        "banked-total",
+        "station-hp",
+        "zoom-control",
+        "minimap",
+        "healthbars"
+      ],
+      "readout": {
+        "cargo": 0,
+        "banked": 3
+      },
+      "total": 3,
+      "ship": {
+        "x": 1967.999649660229,
+        "y": 1345.574295744606,
+        "vx": -2.8128849925327678e-8,
+        "vy": -0.002480191527414466
+      },
+      "world": {
+        "left": 1568.999649660229,
+        "top": 1153.574295744606,
+        "right": 2366.999649660229,
+        "bottom": 1537.574295744606,
+        "width": 798,
+        "height": 384
+      },
+      "platesDrawn": []
+    }
+  ]
+}
