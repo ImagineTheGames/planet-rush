@@ -45,7 +45,34 @@
  * (3) is the one GDD §2.10 singles out: it "fires the first time the wheel
  * opens, because upgrades are the half of the economy a player can most easily
  * miss." (4) rides the alarm's sustained-damage trigger ({@link ../ui/alarm}),
- * so it fires on a siege and never on a taunt-tap.
+ * so it fires on a siege and never on a taunt-tap — and, since a0-104, on the
+ * screen-edge ARROW as well as the alarm (see below).
+ *
+ * ---------------------------------------------------------------------------
+ * A PROMPT MAY NOT NAME A MARK THAT IS NOT ON SCREEN (a0-104)
+ * ---------------------------------------------------------------------------
+ * QA photographed both viewports mid-siege: the band read *"Your station is
+ * under attack — follow the arrow"*, the player's own station was the large lit
+ * object at centre-right of that very frame, and there was no arrow on either
+ * frame. Two readings were possible and the code settles it — the arrow is
+ * deliberately hidden while home is on screen, because it is *"a pointer to
+ * somewhere you can't see; once you can see the station, the station is the tell
+ * and the arrow is clutter"* ({@link ../ui/alarm} `HomeArrow.onScreen`, and
+ * {@link ./hud} `drawHomeArrow` returns without drawing on exactly that test).
+ *
+ * So the arrow was right and the sentence was wrong: it was being shown in the
+ * one state where what it names cannot be followed. (4) is therefore gated on the
+ * SAME condition that draws the mark ({@link OnboardingSignals.homeArrowUp}), and
+ * its completion latch with it — the words and the mark appear together or not at
+ * all, and a siege the player was never told about does not spend the lesson.
+ * `hud-geometry.test.ts` asserts it against `homeArrow` itself, so the two rules
+ * cannot drift into two.
+ *
+ * The wording is untouched, which is the smallest true fix: GDD §2.10 quotes this
+ * sentence verbatim and §2.2 makes the arrow the standing half of the tell, so
+ * there is nothing wrong with the words in the state they are now shown in. A
+ * change to the sentence would be the writer's (style-guide §4.7), not this
+ * lane's.
  *
  * ---------------------------------------------------------------------------
  * THE MEMORY (u15-01, a0-19 gap G-3 half A)
@@ -229,7 +256,8 @@ export enum PromptId {
    *  can most easily miss (GDD §2.10, §2.5). */
   Spend = 'spend',
   /** "Your station is under attack — follow the arrow." The alarm's lesson: the
-   *  triangle decision, made audible (GDD §2.2, §2.10). */
+   *  triangle decision, made audible (GDD §2.2, §2.10). Shown only while the
+   *  arrow it names is actually drawn — see the header (a0-104). */
   UnderAttack = 'under-attack',
   /** "Change CONTROLS or FIRE MODE any time — in SETTINGS, or the pause menu."
    *  The developer's third a0-33 ask, as one more contextual prompt: a player who
@@ -514,6 +542,28 @@ export interface OnboardingSignals {
    *  prompt's trigger (GDD §2.2, §2.10). Optional; absent reads as quiet. */
   readonly underAttack?: boolean;
   /**
+   * The **screen-edge arrow home is on screen this frame** ({@link ../ui/alarm}
+   * `homeArrow`, drawn by {@link ./hud} `drawHomeArrow`). The second half of the
+   * UNDER-ATTACK prompt's trigger, and the reason it is a second half (a0-104).
+   *
+   * The arrow is a pointer to somewhere you *cannot see*: once your own station
+   * is on screen the station is the tell and the view hides the arrow
+   * (`HomeArrow.onScreen`). The sentence names that mark — "follow the arrow" —
+   * so a siege fought in sight of home used to put an instruction on the band
+   * that pointed at nothing, which is what QA photographed on both viewports.
+   * The words and the mark now come up together or not at all.
+   *
+   * **Absent reads as no arrow, and therefore no prompt.** That is the same
+   * direction {@link OnboardingSignals.time} fails in for OBJECTIVE, for the same
+   * reason: a prompt whose precondition was not supplied is withheld rather than
+   * guessed at. Nothing is lost by it — a caller that cannot say whether the
+   * arrow is up is a caller that is not drawing one, so the sentence would be
+   * naming a mark that does not exist. Every real feed carries it: {@link ./hud}
+   * hands over the very flag the layout registry uses to decide whether to
+   * register `alarm-arrow` at all.
+   */
+  readonly homeArrowUp?: boolean;
+  /**
    * Elapsed match time in seconds (`world.time`, already on `HudFrame`) — the
    * clock every dwell is measured on: a0-33's CONTROLS tip and a0-34's OBJECTIVE
    * prompt both retire on being read, and this is what "read" is counted in.
@@ -717,6 +767,9 @@ export class Onboarding {
   update(signals: OnboardingSignals): PromptId | null {
     const full = signals.cargoCap > 0 && signals.cargo >= signals.cargoCap;
     const underAttack = signals.underAttack === true;
+    // The mark the UNDER-ATTACK sentence names, this frame (a0-104). Absent reads
+    // as down — see {@link OnboardingSignals.homeArrowUp}.
+    const arrowUp = signals.homeArrowUp === true;
 
     // --- The dwell of whatever was on screen last tick (a0-33, a0-34) --------
     // Counted on the prompt that was SHOWN, not on the one eligible now: a siege
@@ -737,7 +790,7 @@ export class Onboarding {
     // --- Latch progress facts (sticky) --------------------------------------
     if (signals.cargo > 0) this.hasMined = true;
     if (full) this.wasFull = true;
-    if (underAttack) this.wasUnderAttack = true;
+    if (underAttack && arrowUp) this.wasUnderAttack = true;
 
     // --- Completion: a lesson learned is a prompt retired forever ------------
     // MINE is done the moment the player has any ore — they mined (GDD §2.3).
@@ -752,6 +805,17 @@ export class Onboarding {
     // UNDER-ATTACK is done once a siege has been *survived* — the alarm sounded
     // and then fell silent. Retiring it while it is still sounding would pull
     // the instruction off screen mid-lesson.
+    //
+    // The siege that counts is one where the prompt could actually be READ
+    // (a0-104): the latch above only takes a frame the arrow was up on. A siege
+    // fought in sight of your own station shows nothing — the arrow is hidden and
+    // the sentence with it — and retiring the lesson off a siege nobody was told
+    // about would spend it for good, because completion crosses matches through
+    // the memory port. The lesson waits for the siege it is FOR: the one GDD §2.2
+    // describes, deep in the field with home somewhere off the edge of the screen.
+    // Release is still the plain alarm falling silent, so following the arrow all
+    // the way home — which puts the station on screen and takes the arrow down —
+    // completes it exactly as it always did.
     if (this.wasUnderAttack && !underAttack) this.completed.add(PromptId.UnderAttack);
     // OBJECTIVE and CONTROLS are done once they have been on screen long enough
     // to READ (a0-34, a0-33). Neither has a player action to watch for: one names
@@ -806,8 +870,15 @@ export class Onboarding {
         return signals.wheelOpen === true;
       // Rides the alarm's sustained-damage trigger, so it never fires on a
       // taunt-tap (GDD §2.2) — see {@link ../ui/alarm}.
+      //
+      // ...and the ARROW as well as the alarm (a0-104). The sentence's whole
+      // instruction is "follow the arrow", so it may only be on screen while
+      // there is an arrow on screen to follow: the same condition the view draws
+      // the mark under (`HomeArrow.onScreen` → {@link ./hud} `drawHomeArrow`),
+      // asked once and answered for both. Two halves of one tell, and neither
+      // half is allowed to appear alone.
       case PromptId.UnderAttack:
-        return signals.underAttack === true;
+        return signals.underAttack === true && signals.homeArrowUp === true;
       // The settings tip (a0-33). Its trigger is the player having flown one
       // whole loop — mined, and hauled a full hold home — because by then they
       // have felt the scheme they were seated in and know whether they like it,

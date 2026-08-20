@@ -28,10 +28,8 @@ import type { Point } from './alarm';
 // decides whether the sentence naming it is shown. It is asserted here, where
 // the geometry lives, because the failing half was geometric: the prompt was up
 // in a screen state where its instruction could not be followed.
-import { Onboarding, PromptId, resolvePromptText } from './onboarding';
+import { Onboarding } from './onboarding';
 import type { OnboardingSignals } from './onboarding';
-import { FireMode } from '@platform/actions';
-import type { ControlScheme, DeviceKind } from '@platform/actions';
 import { hudMetrics, hudSpace, hudType, scrimPlateau } from './instrument';
 import { collapsedRect } from './minimap';
 import { healthBarFill, healthBarModel, healthBarTrack } from './healthbar';
@@ -1813,14 +1811,19 @@ describe('the under-attack prompt and the mark it names', () => {
     // is permanent across matches (`./onboarding-memory`). A siege fought with
     // home on screen shows nothing — so if it still completed the prompt, the
     // fix for a0-99 would be "the player is never taught the arrow", forever.
+    //
+    // `not.toBe` rather than `toBeNull`, deliberately: withholding this prompt
+    // does not leave the band empty, it lets the next eligible one have it
+    // (OBJECTIVE, here). That is the right outcome and worth pinning as one — the
+    // claim is that the SIEGE sentence is absent, not that the HUD goes quiet.
     const ob = new Onboarding();
-    expect(ob.update(siege(false))).toBeNull();
-    expect(ob.update({ ...siege(false), underAttack: false })).toBeNull();
+    expect(ob.update(siege(false))).not.toBe(PromptId.UnderAttack);
+    expect(ob.update({ ...siege(false), underAttack: false })).not.toBe(PromptId.UnderAttack);
     expect(ob.isCompleted(PromptId.UnderAttack)).toBe(false);
 
     // …and the siege that DID need the arrow still teaches and still retires.
     expect(ob.update(siege(true))).toBe(PromptId.UnderAttack);
-    expect(ob.update({ ...siege(true), underAttack: false })).toBeNull();
+    expect(ob.update({ ...siege(true), underAttack: false })).not.toBe(PromptId.UnderAttack);
     expect(ob.isCompleted(PromptId.UnderAttack)).toBe(true);
   });
 });
