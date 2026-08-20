@@ -288,9 +288,15 @@ export interface DrawnNameplate {
    *  test (and the evidence capture) can show a fighting ship's name and a calm
    *  one's name at the same number, not merely assert it. */
   alpha: number;
-  /** Label centre-x in screen space, CSS px (the entity it tracks) — the NAME's
-   *  centre, which is what stays pinned to the entity now that the side tag leads
-   *  the row (a0-38). */
+  /** Label centre-x in screen space, CSS px — the NAME's centre, which is what
+   *  stays pinned to the entity now that the side tag leads the row (a0-38).
+   *
+   *  It is the centre the name was DRAWN at, which is the entity's own x on all
+   *  but the frames where the plate stepped out of a readout's way (a0-115). On
+   *  those it is the entity's x plus the step, because every other field here
+   *  reports where the ink went and a mixture would be unreadable: `nameX` is
+   *  always `x − name/2`, and `left ≤ x ≤ right` always holds. The entity's own
+   *  position is the caller's — it is what the caller passed in. */
   x: number;
   /**
    * The row's drawn geometry, CSS px: the left edge of each token and the span of
@@ -494,7 +500,7 @@ export class NameplateView extends Container {
       // that ignored the step would report the plate inside the counter it just
       // stepped out of.
       const placed = dx === 0 ? row : shiftRow(row, dx);
-      if (this.debugCapture) this.recordDebug(drawn, plate, top, placed);
+      if (this.debugCapture) this.recordDebug(drawn, plate, top, placed, plate.x + dx);
       drawn++;
 
       if (placed.left < minX) minX = placed.left;
@@ -556,10 +562,16 @@ export class NameplateView extends Container {
 
   /** Record one drawn label into the reusable pool at `i` (grows to fit). Only
    *  reached under {@link debugCapture}, so it costs nothing in a normal build. */
-  private recordDebug(i: number, plate: Nameplate, top: number, row: NameplateRow): void {
+  private recordDebug(
+    i: number,
+    plate: Nameplate,
+    top: number,
+    row: NameplateRow,
+    centerX: number,
+  ): void {
     let d = this.debugDrawn[i];
     if (!d) {
-      d = { owner: plate.owner, kind: plate.kind, text: plate.text, suffix: plate.suffix, teamLabel: plate.teamLabel, teamColor: plate.teamColor, color: plate.color, alpha: plate.alpha, x: plate.x, y: top, local: plate.local, sideX: row.sideX, nameX: row.nameX, suffixX: row.suffixX, left: row.left, right: row.right };
+      d = { owner: plate.owner, kind: plate.kind, text: plate.text, suffix: plate.suffix, teamLabel: plate.teamLabel, teamColor: plate.teamColor, color: plate.color, alpha: plate.alpha, x: centerX, y: top, local: plate.local, sideX: row.sideX, nameX: row.nameX, suffixX: row.suffixX, left: row.left, right: row.right };
       this.debugDrawn[i] = d;
       return;
     }
@@ -571,7 +583,7 @@ export class NameplateView extends Container {
     d.teamColor = plate.teamColor;
     d.color = plate.color;
     d.alpha = plate.alpha;
-    d.x = plate.x;
+    d.x = centerX;
     d.y = top;
     d.local = plate.local;
     d.sideX = row.sideX;
