@@ -1,0 +1,109 @@
+[pool-size] worker cap 2: cgroup quota 6 cores / LANES 3 = 2 workers (host claims 6)
+
+ RUN  v2.1.8 /lanes/lane-1
+
+ ❯ src/ui/minimap.test.ts (88 tests | 1 failed) 33ms
+   × a0-103 — an element declared to an anchor reaches that anchor > a bottom-right element actually reaches the bottom-right 12ms
+     → 
+iphone/portrait 390×844 [tap/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:195.0, y:769.0, w:63.0, h:63.0} in frame {x:0.0, y:0.0, w:390.0, h:844.0}
+iphone/portrait 390×844 [sticks/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:195.0, y:769.0, w:63.0, h:63.0} in frame {x:0.0, y:0.0, w:390.0, h:844.0}
+iphone/portrait 390×844 [sticks/manual] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:195.0, y:769.0, w:63.0, h:63.0} in frame {x:0.0, y:0.0, w:390.0, h:844.0}
+iphone/landscape 844×390 [tap/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:632.0, y:298.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:844.0, h:390.0}
+iphone/landscape 844×390 [sticks/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:632.0, y:298.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:844.0, h:390.0}
+iphone/landscape 844×390 [sticks/manual] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:632.0, y:298.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:844.0, h:390.0}
+qa-phone/landscape 798×384 [tap/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:586.0, y:292.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:798.0, h:384.0}
+qa-phone/landscape 798×384 [sticks/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:586.0, y:292.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:798.0, h:384.0}
+qa-phone/landscape 798×384 [sticks/manual] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:586.0, y:292.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:798.0, h:384.0}
+pixel/portrait 412×915 [tap/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:206.0, y:829.0, w:74.0, h:74.0} in frame {x:0.0, y:0.0, w:412.0, h:915.0}
+pixel/portrait 412×915 [sticks/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:206.0, y:829.0, w:74.0, h:74.0} in frame {x:0.0, y:0.0, w:412.0, h:915.0}
+pixel/portrait 412×915 [sticks/manual] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:206.0, y:829.0, w:74.0, h:74.0} in frame {x:0.0, y:0.0, w:412.0, h:915.0}
+pixel/landscape 915×412 [tap/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:703.0, y:320.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:915.0, h:412.0}
+pixel/landscape 915×412 [sticks/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:703.0, y:320.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:915.0, h:412.0}
+pixel/landscape 915×412 [sticks/manual] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:703.0, y:320.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:915.0, h:412.0}
+iphone-se/portrait 375×667 [tap/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:187.5, y:599.5, w:55.5, h:55.5} in frame {x:0.0, y:0.0, w:375.0, h:667.0}
+iphone-se/portrait 375×667 [sticks/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:187.5, y:599.5, w:55.5, h:55.5} in frame {x:0.0, y:0.0, w:375.0, h:667.0}
+iphone-se/portrait 375×667 [sticks/manual] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:187.5, y:599.5, w:55.5, h:55.5} in frame {x:0.0, y:0.0, w:375.0, h:667.0}
+small/portrait 320×568 [tap/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:160.0, y:528.0, w:28.0, h:28.0} in frame {x:0.0, y:0.0, w:320.0, h:568.0}
+small/portrait 320×568 [sticks/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:160.0, y:528.0, w:28.0, h:28.0} in frame {x:0.0, y:0.0, w:320.0, h:568.0}
+small/portrait 320×568 [sticks/manual] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:160.0, y:528.0, w:28.0, h:28.0} in frame {x:0.0, y:0.0, w:320.0, h:568.0}
+small/landscape 568×320 [tap/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:356.0, y:228.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:568.0, h:320.0}
+small/landscape 568×320 [sticks/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:356.0, y:228.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:568.0, h:320.0}
+small/landscape 568×320 [sticks/manual] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:356.0, y:228.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:568.0, h:320.0}
+: expected [ …(24) ] to deeply equal []
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/ui/minimap.test.ts > a0-103 — an element declared to an anchor reaches that anchor > a bottom-right element actually reaches the bottom-right
+AssertionError: 
+iphone/portrait 390×844 [tap/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:195.0, y:769.0, w:63.0, h:63.0} in frame {x:0.0, y:0.0, w:390.0, h:844.0}
+iphone/portrait 390×844 [sticks/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:195.0, y:769.0, w:63.0, h:63.0} in frame {x:0.0, y:0.0, w:390.0, h:844.0}
+iphone/portrait 390×844 [sticks/manual] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:195.0, y:769.0, w:63.0, h:63.0} in frame {x:0.0, y:0.0, w:390.0, h:844.0}
+iphone/landscape 844×390 [tap/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:632.0, y:298.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:844.0, h:390.0}
+iphone/landscape 844×390 [sticks/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:632.0, y:298.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:844.0, h:390.0}
+iphone/landscape 844×390 [sticks/manual] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:632.0, y:298.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:844.0, h:390.0}
+qa-phone/landscape 798×384 [tap/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:586.0, y:292.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:798.0, h:384.0}
+qa-phone/landscape 798×384 [sticks/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:586.0, y:292.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:798.0, h:384.0}
+qa-phone/landscape 798×384 [sticks/manual] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:586.0, y:292.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:798.0, h:384.0}
+pixel/portrait 412×915 [tap/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:206.0, y:829.0, w:74.0, h:74.0} in frame {x:0.0, y:0.0, w:412.0, h:915.0}
+pixel/portrait 412×915 [sticks/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:206.0, y:829.0, w:74.0, h:74.0} in frame {x:0.0, y:0.0, w:412.0, h:915.0}
+pixel/portrait 412×915 [sticks/manual] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:206.0, y:829.0, w:74.0, h:74.0} in frame {x:0.0, y:0.0, w:412.0, h:915.0}
+pixel/landscape 915×412 [tap/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:703.0, y:320.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:915.0, h:412.0}
+pixel/landscape 915×412 [sticks/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:703.0, y:320.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:915.0, h:412.0}
+pixel/landscape 915×412 [sticks/manual] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:703.0, y:320.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:915.0, h:412.0}
+iphone-se/portrait 375×667 [tap/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:187.5, y:599.5, w:55.5, h:55.5} in frame {x:0.0, y:0.0, w:375.0, h:667.0}
+iphone-se/portrait 375×667 [sticks/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:187.5, y:599.5, w:55.5, h:55.5} in frame {x:0.0, y:0.0, w:375.0, h:667.0}
+iphone-se/portrait 375×667 [sticks/manual] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:187.5, y:599.5, w:55.5, h:55.5} in frame {x:0.0, y:0.0, w:375.0, h:667.0}
+small/portrait 320×568 [tap/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:160.0, y:528.0, w:28.0, h:28.0} in frame {x:0.0, y:0.0, w:320.0, h:568.0}
+small/portrait 320×568 [sticks/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:160.0, y:528.0, w:28.0, h:28.0} in frame {x:0.0, y:0.0, w:320.0, h:568.0}
+small/portrait 320×568 [sticks/manual] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:160.0, y:528.0, w:28.0, h:28.0} in frame {x:0.0, y:0.0, w:320.0, h:568.0}
+small/landscape 568×320 [tap/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:356.0, y:228.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:568.0, h:320.0}
+small/landscape 568×320 [sticks/auto-aim] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:356.0, y:228.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:568.0, h:320.0}
+small/landscape 568×320 [sticks/manual] — "minimap" declares "bottom-right" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:356.0, y:228.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:568.0, h:320.0}
+: expected [ …(24) ] to deeply equal []
+
+- Expected
++ Received
+
+- Array []
++ Array [
++   "iphone/portrait 390×844 [tap/auto-aim] — \"minimap\" declares \"bottom-right\" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:195.0, y:769.0, w:63.0, h:63.0} in frame {x:0.0, y:0.0, w:390.0, h:844.0}",
++   "iphone/portrait 390×844 [sticks/auto-aim] — \"minimap\" declares \"bottom-right\" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:195.0, y:769.0, w:63.0, h:63.0} in frame {x:0.0, y:0.0, w:390.0, h:844.0}",
++   "iphone/portrait 390×844 [sticks/manual] — \"minimap\" declares \"bottom-right\" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:195.0, y:769.0, w:63.0, h:63.0} in frame {x:0.0, y:0.0, w:390.0, h:844.0}",
++   "iphone/landscape 844×390 [tap/auto-aim] — \"minimap\" declares \"bottom-right\" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:632.0, y:298.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:844.0, h:390.0}",
++   "iphone/landscape 844×390 [sticks/auto-aim] — \"minimap\" declares \"bottom-right\" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:632.0, y:298.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:844.0, h:390.0}",
++   "iphone/landscape 844×390 [sticks/manual] — \"minimap\" declares \"bottom-right\" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:632.0, y:298.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:844.0, h:390.0}",
++   "qa-phone/landscape 798×384 [tap/auto-aim] — \"minimap\" declares \"bottom-right\" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:586.0, y:292.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:798.0, h:384.0}",
++   "qa-phone/landscape 798×384 [sticks/auto-aim] — \"minimap\" declares \"bottom-right\" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:586.0, y:292.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:798.0, h:384.0}",
++   "qa-phone/landscape 798×384 [sticks/manual] — \"minimap\" declares \"bottom-right\" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:586.0, y:292.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:798.0, h:384.0}",
++   "pixel/portrait 412×915 [tap/auto-aim] — \"minimap\" declares \"bottom-right\" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:206.0, y:829.0, w:74.0, h:74.0} in frame {x:0.0, y:0.0, w:412.0, h:915.0}",
++   "pixel/portrait 412×915 [sticks/auto-aim] — \"minimap\" declares \"bottom-right\" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:206.0, y:829.0, w:74.0, h:74.0} in frame {x:0.0, y:0.0, w:412.0, h:915.0}",
++   "pixel/portrait 412×915 [sticks/manual] — \"minimap\" declares \"bottom-right\" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:206.0, y:829.0, w:74.0, h:74.0} in frame {x:0.0, y:0.0, w:412.0, h:915.0}",
++   "pixel/landscape 915×412 [tap/auto-aim] — \"minimap\" declares \"bottom-right\" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:703.0, y:320.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:915.0, h:412.0}",
++   "pixel/landscape 915×412 [sticks/auto-aim] — \"minimap\" declares \"bottom-right\" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:703.0, y:320.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:915.0, h:412.0}",
++   "pixel/landscape 915×412 [sticks/manual] — \"minimap\" declares \"bottom-right\" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:703.0, y:320.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:915.0, h:412.0}",
++   "iphone-se/portrait 375×667 [tap/auto-aim] — \"minimap\" declares \"bottom-right\" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:187.5, y:599.5, w:55.5, h:55.5} in frame {x:0.0, y:0.0, w:375.0, h:667.0}",
++   "iphone-se/portrait 375×667 [sticks/auto-aim] — \"minimap\" declares \"bottom-right\" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:187.5, y:599.5, w:55.5, h:55.5} in frame {x:0.0, y:0.0, w:375.0, h:667.0}",
++   "iphone-se/portrait 375×667 [sticks/manual] — \"minimap\" declares \"bottom-right\" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:187.5, y:599.5, w:55.5, h:55.5} in frame {x:0.0, y:0.0, w:375.0, h:667.0}",
++   "small/portrait 320×568 [tap/auto-aim] — \"minimap\" declares \"bottom-right\" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:160.0, y:528.0, w:28.0, h:28.0} in frame {x:0.0, y:0.0, w:320.0, h:568.0}",
++   "small/portrait 320×568 [sticks/auto-aim] — \"minimap\" declares \"bottom-right\" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:160.0, y:528.0, w:28.0, h:28.0} in frame {x:0.0, y:0.0, w:320.0, h:568.0}",
++   "small/portrait 320×568 [sticks/manual] — \"minimap\" declares \"bottom-right\" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:160.0, y:528.0, w:28.0, h:28.0} in frame {x:0.0, y:0.0, w:320.0, h:568.0}",
++   "small/landscape 568×320 [tap/auto-aim] — \"minimap\" declares \"bottom-right\" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:356.0, y:228.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:568.0, h:320.0}",
++   "small/landscape 568×320 [sticks/auto-aim] — \"minimap\" declares \"bottom-right\" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:356.0, y:228.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:568.0, h:320.0}",
++   "small/landscape 568×320 [sticks/manual] — \"minimap\" declares \"bottom-right\" but stops 132.0 px short of its right edge; at most 12.0 px is allowed. bounds {x:356.0, y:228.0, w:80.0, h:80.0} in frame {x:0.0, y:0.0, w:568.0, h:320.0}",
++ ]
+
+ ❯ src/ui/minimap.test.ts:1486:52
+    1484|       }
+    1485|     }
+    1486|     expect(failures, `\n${failures.join('\n')}\n`).toEqual([]);
+       |                                                    ^
+    1487|   });
+    1488| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 87 passed (88)
+   Start at  03:15:54
+   Duration  8.00s (transform 1.43s, setup 0ms, collect 6.64s, tests 33ms, environment 0ms, prepare 873ms)
+

@@ -324,6 +324,20 @@ export function panelBounds(
  *  elements register under, so the two can never drift apart. */
 export const HUD_PAD = 16;
 
+/**
+ * Depth of the `TOTAL` eyebrow over the banked-ore numeral, reference px — the
+ * row the numeral hangs below inside the top-left ore cluster (`./hud`, which
+ * scales it with `hudSpace`).
+ *
+ * It lives here rather than in `./hud` because it is a *placement* fact two
+ * modules now need: the view that draws the cluster, and `./anchor-reach`, whose
+ * `banked-total` reservation is exactly this number — the numeral declares
+ * `top-left` and cannot also touch the top edge, because the word TOTAL is
+ * there. A hand-copied 14 in the second reader is the drift this file exists to
+ * prevent.
+ */
+export const TOTAL_LABEL_H = 14;
+
 /** Own-station HP bar. Wide enough to read a quarter-core loss at arm's length on
  *  a phone (GDD §2.2). See {@link stationHpBounds} for why 140 is not free. */
 export const HP_BAR_WIDTH = 140;

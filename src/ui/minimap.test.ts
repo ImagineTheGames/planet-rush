@@ -33,7 +33,24 @@
 import { describe, it, expect } from 'vitest';
 import { PALETTE } from '@render/index';
 import { resolveAnchor, rectContains } from '@platform/layout-registry';
-import type { AnchorSpec } from '@platform/layout-registry';
+import type { AnchorSpec, LayoutEntry, Rect, Viewport } from '@platform/layout-registry';
+import { FireMode } from '@platform/actions';
+import type { ControlScheme } from '@platform/actions';
+import { writeAffordanceRects } from '@platform/touch-visuals';
+import type { TouchAffordanceRects } from '@platform/touch-visuals';
+import { BADGE_ANCHOR, BADGE_STRIP_LIFT, writeBadgeRect } from '@render/build-badge';
+import { FS_AFFORDANCE_ANCHOR, writeAffordanceRect } from '@render/fullscreen-affordance';
+import { PING_BADGE_ANCHOR, PING_BADGE_STACK_LIFT, writePingRect } from '../net/ping-badge';
+import {
+  CONTENT_BOUND_IDS,
+  describeReachViolation,
+  reachViolations,
+} from './anchor-reach';
+import { showControlsStrip } from './controls-strip';
+import { HUD_PAD, TOTAL_LABEL_H, stationHpBounds } from './hud-geometry';
+import { hudMetrics, hudSpace } from './instrument';
+import { contentBox } from './viewport';
+import { ZOOM_CONTROL_ANCHOR, ZOOM_CONTROL_ID, zoomControlBounds } from './zoom-control';
 import { playerColor } from './station-hp';
 import {
   Minimap,
@@ -1240,5 +1257,315 @@ describe('Minimap — the EXPANDED overlay is modal (u6-01)', () => {
     const touch = sequence(PHONE_WIDE, true);
     expect(pc).toEqual([false, true, true, true, true, false]);
     expect(touch).toEqual(pc);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// a0-103 — REACH: the other half of the anchor contract
+// ---------------------------------------------------------------------------
+//
+// QA, off the client's own layout registry at PHONE 798×384:
+//
+//   > `minimap` occupies logical (586, 292) 80×80 … so it ends 132 px from the
+//   > right edge and 12 px from the bottom. EVERY OTHER RIGHT-HAND ELEMENT ON
+//   > THAT PROFILE HUGS A 16 PX MARGIN … the same element, declared to the same
+//   > `bottom-right` anchor, sits 12 px off the right edge on one profile and
+//   > 132 on the other.
+//
+// **And the anchor check passed anyway**, which is the more important half.
+// `withinAnchor` resolves `bottom-right` to the right HALF by the bottom THIRD —
+// a 383×116 region on that phone — so an 80 px square is inside it from 12 px
+// off the corner to 250. The suite could not have failed. That is what the
+// sweep below fixes, and the minimap is what it caught first.
+//
+// The check itself is `./anchor-reach`, in the registry's own vocabulary
+// (LayoutEntry in, violations out) for the same reason `./layout-exclusions`
+// is: the natural home is `@platform/layout-registry`, which is Platform's.
+//
+// It is exercised HERE, in the minimap's own suite, because the minimap is the
+// element the brief is about — but it is deliberately not a minimap test. The
+// catalogue below is every element in the build that declares a corner-or-edge
+// anchor, at every profile in the device matrix, and the assertion is over all
+// of them at once. A sweep that only looked at the minimap would be the same
+// mistake at a smaller scale.
+
+/** The device matrix — QA's playwright profiles in both orientations, the
+ *  handset a0-99/a0-100 was photographed on, the two smallest screens GDD §4.3
+ *  claims, and (a0-74, "all that UI goes to the edges of the screens") two
+ *  ultrawides, where the chrome is bound to a content box narrower than the
+ *  glass and a naive reach check would flag the FIX as the bug. */
+const REACH_PROFILES: ReadonlyArray<{ name: string; vp: Viewport; isTouch: boolean }> = [
+  { name: 'iphone/portrait', vp: { width: 390, height: 844 }, isTouch: true },
+  { name: 'iphone/landscape', vp: { width: 844, height: 390 }, isTouch: true },
+  { name: 'qa-phone/landscape', vp: { width: 798, height: 384 }, isTouch: true },
+  { name: 'pixel/portrait', vp: { width: 412, height: 915 }, isTouch: true },
+  { name: 'pixel/landscape', vp: { width: 915, height: 412 }, isTouch: true },
+  { name: 'iphone-se/portrait', vp: { width: 375, height: 667 }, isTouch: true },
+  { name: 'small/portrait', vp: { width: 320, height: 568 }, isTouch: true },
+  { name: 'small/landscape', vp: { width: 568, height: 320 }, isTouch: true },
+  { name: 'desktop', vp: { width: 1280, height: 800 }, isTouch: false },
+  { name: 'desktop/720', vp: { width: 1280, height: 720 }, isTouch: false },
+  { name: 'ultrawide/21:9', vp: { width: 2560, height: 1080 }, isTouch: false },
+  { name: 'ultrawide/32:9', vp: { width: 3840, height: 1080 }, isTouch: false },
+];
+
+/**
+ * The two schemes, because they decide whether anything is in the minimap's
+ * corner at all. `'tap'` is the default on every platform since a0-30, and it
+ * draws no sticks and no FIRE (`@platform/touch-visuals` `writeAffordanceRects`
+ * takes `sticksLive` false) — which is exactly why QA could report "the registry
+ * lists no `touch-fire-button` … on that profile".
+ */
+const REACH_SCHEMES: ReadonlyArray<{ scheme: ControlScheme; mode: FireMode }> = [
+  { scheme: 'tap', mode: FireMode.AutoAim },
+  { scheme: 'sticks', mode: FireMode.AutoAim },
+  { scheme: 'sticks', mode: FireMode.Manual },
+];
+
+/** Nominal text metrics for the two dev stamps, whose real size comes from a
+ *  canvas. Only the HEIGHT reaches their placement (both are left-anchored at
+ *  `BADGE_MARGIN` and hang from the bottom), so a plausible cap height is
+ *  enough to put their bottom edge exactly where the drawing code puts it. */
+const STAMP_TEXT = { width: 160, height: 12 };
+
+/**
+ * Every registered element that declares a corner-or-edge anchor, as the layout
+ * host would register it for this profile — id, declared anchor, drawn bounds.
+ *
+ * Built from each element's OWN exported anchor constant and its OWN pure
+ * placement function, never from numbers typed here, so a drawing change lands
+ * in this sweep by itself. The elements whose rect is a measured Pixi
+ * `getBounds()` and cannot be reproduced headless are handled two ways: the two
+ * top-left ore rows appear with their exact laid-out ORIGIN and a nominal extent
+ * (a `top-left` element's reach is decided by its x and y alone, so the extent is
+ * not load-bearing), and `controls-strip` is left out because its region
+ * (`bottom-strip`) promises no edge — see `./anchor-reach` `ANCHOR_EDGES`.
+ */
+function reachCatalogue(
+  vp: Viewport,
+  isTouch: boolean,
+  scheme: ControlScheme,
+  mode: FireMode,
+): LayoutEntry[] {
+  const box = contentBox(vp);
+  const m = hudMetrics(box.width, box.height);
+  const entries: LayoutEntry[] = [];
+
+  // --- HUD chrome, laid out in the content box (a0-74) ---------------------
+
+  // The ore cluster: the group's origin is the corner it hugs, and the banked
+  // numeral hangs one eyebrow row below it inside the same group (`./hud`).
+  entries.push({
+    id: 'ore-hud',
+    anchor: { region: 'top-left', margin: HUD_PAD },
+    bounds: { x: box.x + HUD_PAD, y: HUD_PAD, width: 90, height: 40 },
+  });
+  entries.push({
+    id: 'banked-total',
+    anchor: { region: 'top-left', margin: HUD_PAD },
+    bounds: { x: box.x + HUD_PAD, y: HUD_PAD + hudSpace(TOTAL_LABEL_H, m), width: 60, height: 20 },
+  });
+
+  // Own-station HP (GDD §2.2) — right-aligned on the HUD margin of the box.
+  const hp = stationHpBounds(box.width);
+  entries.push({
+    id: 'station-hp',
+    anchor: { region: 'top-right', margin: HUD_PAD },
+    bounds: { ...hp, x: box.x + hp.x },
+  });
+
+  // The touch zoom control (a0-74), under HOME in the same corner. Touch only.
+  const zoom = zoomControlBounds(box.width, box.height, isTouch);
+  if (zoom) {
+    entries.push({
+      id: ZOOM_CONTROL_ID,
+      anchor: ZOOM_CONTROL_ANCHOR,
+      bounds: { ...zoom, x: box.x + zoom.x },
+    });
+  }
+
+  // The collapsed minimap (GDD §2.2) — the element this brief is about.
+  const map = collapsedRect({ width: box.width, height: box.height }, isTouch);
+  entries.push({
+    id: 'minimap',
+    anchor: COLLAPSED_ANCHOR,
+    bounds: { ...map, x: box.x + map.x },
+  });
+
+  // --- Chrome the host lays out against the raw viewport -------------------
+
+  const fs: Rect = { x: 0, y: 0, width: 0, height: 0 };
+  entries.push({
+    id: 'pr-fullscreen',
+    anchor: FS_AFFORDANCE_ANCHOR,
+    bounds: { ...writeAffordanceRect(vp.width, vp.height, fs) },
+  });
+
+  // The two dev stamps stack in the bottom-left, lifted clear of the desktop
+  // controls strip exactly as `main.ts` lifts them.
+  const buildLift = showControlsStrip(isTouch) ? BADGE_STRIP_LIFT : 0;
+  const badge: Rect = { x: 0, y: 0, width: 0, height: 0 };
+  entries.push({
+    id: 'build-badge',
+    anchor: BADGE_ANCHOR,
+    bounds: {
+      ...writeBadgeRect(STAMP_TEXT.width, STAMP_TEXT.height, vp.width, vp.height, badge, buildLift),
+    },
+  });
+  const ping: Rect = { x: 0, y: 0, width: 0, height: 0 };
+  entries.push({
+    id: 'net-ping',
+    anchor: PING_BADGE_ANCHOR,
+    bounds: {
+      ...writePingRect(
+        STAMP_TEXT.width,
+        STAMP_TEXT.height,
+        vp.width,
+        vp.height,
+        ping,
+        buildLift + PING_BADGE_STACK_LIFT,
+      ),
+    },
+  });
+
+  // --- The touch affordances, from platform's own placement math -----------
+  //
+  // Registered by `main.ts` under the half-screen quadrant regions, which promise
+  // no edge (`./anchor-reach` ANCHOR_EDGES) — included anyway so the sweep is
+  // over the whole registry and not over the rows it expects to pass.
+  const rects: TouchAffordanceRects = { leftStickZone: null, aimZone: null, fireButton: null };
+  writeAffordanceRects(isTouch, mode, vp.width, vp.height, rects, scheme !== 'tap');
+  if (rects.leftStickZone) {
+    entries.push({
+      id: 'touch-left-stick',
+      anchor: { region: 'left-half-bottom', margin: 8 },
+      bounds: { ...rects.leftStickZone },
+    });
+  }
+  if (rects.aimZone) {
+    entries.push({
+      id: 'touch-aim-stick',
+      anchor: { region: 'right-half-bottom', margin: 8 },
+      bounds: { ...rects.aimZone },
+    });
+  }
+  if (rects.fireButton) {
+    entries.push({
+      id: 'touch-fire-button',
+      anchor: { region: 'right-half-bottom', margin: 8 },
+      bounds: { ...rects.fireButton },
+    });
+  }
+
+  return entries;
+}
+
+/** The frame each element was laid out in: the HUD's content box for the chrome
+ *  bound to it (a0-74), the viewport for everything else. */
+function reachFrames(vp: Viewport): (id: string) => Rect | undefined {
+  const box = contentBox(vp);
+  return (id) => (CONTENT_BOUND_IDS.includes(id) ? box : undefined);
+}
+
+describe('a0-103 — an element declared to an anchor reaches that anchor', () => {
+  it('a bottom-right element actually reaches the bottom-right', () => {
+    const failures: string[] = [];
+    for (const { name, vp, isTouch } of REACH_PROFILES) {
+      for (const { scheme, mode } of REACH_SCHEMES) {
+        if (!isTouch && scheme === 'sticks' && mode === FireMode.Manual) continue;
+        const entries = reachCatalogue(vp, isTouch, scheme, mode);
+        const violations = reachViolations(entries, vp, {
+          isTouch,
+          frameFor: reachFrames(vp),
+        });
+        for (const v of violations) {
+          failures.push(`${name} ${vp.width}×${vp.height} [${scheme}/${mode}] — ${describeReachViolation(v)}`);
+        }
+      }
+    }
+    expect(failures, `\n${failures.join('\n')}\n`).toEqual([]);
+  });
+
+  it('the check can fail — an element parked mid-band is caught', () => {
+    // The guard on the guard. a0-99's whole finding was a check that could not
+    // fail; a sweep that went green because it asserts nothing would be the same
+    // defect wearing this test's name. So: an 80 px square on the profile QA
+    // measured, once on its margin and once 120 px in from it, and the two
+    // answers must differ.
+    const vp: Viewport = { width: 798, height: 384 };
+    const size = 80;
+    const inset = (fromRight: number): LayoutEntry => ({
+      id: 'minimap',
+      anchor: COLLAPSED_ANCHOR,
+      bounds: {
+        x: vp.width - fromRight - size,
+        y: vp.height - MINIMAP_MARGIN - size,
+        width: size,
+        height: size,
+      },
+    });
+    expect(reachViolations([inset(MINIMAP_MARGIN)], vp, { isTouch: true })).toEqual([]);
+    const drifted = reachViolations([inset(MINIMAP_MARGIN + 120)], vp, { isTouch: true });
+    expect(drifted.map((v) => v.edge)).toEqual(['right']);
+    expect(drifted[0]!.gap).toBeCloseTo(MINIMAP_MARGIN + 120, 5);
+    expect(drifted[0]!.allowed).toBeCloseTo(MINIMAP_MARGIN, 5);
+  });
+
+  it('every gap the raw check flags is either fixed or declared — the audit', () => {
+    // The brief asked for the list, so the list is generated rather than typed.
+    // With the reservation table EMPTIED, this is every edge in the build that
+    // sits further in than its declared margin — the raw output of the corrected
+    // check. Each row is then either a bug (fixed) or a reservation
+    // (`./anchor-reach` LAYOUT_RESERVATIONS, which is what makes the sweep above
+    // green). Nothing may be in this list and in neither column.
+    const raw = new Set<string>();
+    for (const { vp, isTouch } of REACH_PROFILES) {
+      for (const { scheme, mode } of REACH_SCHEMES) {
+        for (const v of reachViolations(reachCatalogue(vp, isTouch, scheme, mode), vp, {
+          isTouch,
+          frameFor: reachFrames(vp),
+          reservations: [],
+        })) {
+          raw.add(`${v.id}/${v.edge}`);
+        }
+      }
+    }
+    expect([...raw].sort()).toEqual([
+      // Declared: the TOTAL eyebrow is on the top edge above the numeral.
+      'banked-total/top',
+      // Declared: `BADGE_STRIP_LIFT` clears the desktop controls strip.
+      'build-badge/bottom',
+      // FIXED (a0-103): the FIRE column was reserved on every touch profile,
+      // including the ones where Tap Commander draws no FIRE button at all.
+      'minimap/right',
+      // Declared: `MINIMAP_STRIP_CLEARANCE` clears the desktop controls strip.
+      'minimap/bottom',
+      // Declared: the ping stamp stacks over the build stamp.
+      'net-ping/bottom',
+      // Declared: the zoom control hangs under the HOME cluster it shares the
+      // corner with.
+      'zoom-control/top',
+    ].sort());
+  });
+
+  it('the ultrawide content box is not a violation (a0-74)', () => {
+    // The developer's own report — "i have an ultra wide and all that UI goes to
+    // the edges of the screens" — was FIXED by insetting the chrome to a centred
+    // 16:9 content box. Measured against the glass, `station-hp` is then ~336 px
+    // from the right edge and the reach check would call the fix a bug. Measured
+    // against the frame it was laid out in, it hugs its margin. Both stated.
+    const vp: Viewport = { width: 3840, height: 1080 };
+    const box = contentBox(vp);
+    expect(box.width).toBeLessThan(vp.width);
+    const hp = stationHpBounds(box.width);
+    const entry: LayoutEntry = {
+      id: 'station-hp',
+      anchor: { region: 'top-right', margin: HUD_PAD },
+      bounds: { ...hp, x: box.x + hp.x },
+    };
+    expect(reachViolations([entry], vp, { isTouch: false, frameFor: reachFrames(vp) })).toEqual([]);
+    // …and measured against the glass instead, the same rect reports — which is
+    // the trap this option exists to avoid, asserted rather than described.
+    expect(reachViolations([entry], vp, { isTouch: false }).map((v) => v.edge)).toEqual(['right']);
   });
 });

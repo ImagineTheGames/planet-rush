@@ -142,6 +142,7 @@ import {
   respawnWrapWidth,
   SCRIM_BLEED,
   stationChromeHeight,
+  TOTAL_LABEL_H,
   waveClockLayout,
   wheelFootprint,
   wheelRadius,
@@ -185,7 +186,6 @@ const PAD = HUD_PAD;
 const STRIP_ROW = 18;
 const STRIP_PAD = 12;
 /** Gap between the top-left ORE label and the banked number below it, CSS px. */
-const TOTAL_LABEL_H = 14;
 
 // --- Gantry/Bone reference type sizes (u7-07) -------------------------------
 //
